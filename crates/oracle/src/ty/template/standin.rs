@@ -893,7 +893,7 @@ where
 {
     match atom.specifier {
         ClassLikeStringSpecifier::Literal { value } => {
-            let object = builder.object_named(value.as_bytes());
+            let object = builder.named_object_atom(value.as_bytes());
 
             Some(builder.union_of(&[object]))
         }

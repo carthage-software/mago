@@ -230,7 +230,7 @@ where
 
     let name_type = match payload.case {
         Some(case_name) => {
-            let literal = builder.string_literal(case_name);
+            let literal = builder.string_literal_atom(case_name);
 
             builder.union_of(&[literal])
         }

@@ -10,6 +10,8 @@ mod sealing;
 mod tags;
 mod types;
 
+pub use types::lower_type_annotation;
+
 use mago_allocator::Arena;
 use mago_allocator::collections::HashMap;
 use mago_hir::ir::item::expression::anonymous_class::AnonymousClass;

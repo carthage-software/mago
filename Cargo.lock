@@ -1691,6 +1691,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "mago-inference"
+version = "1.42.0"
+dependencies = [
+ "indoc",
+ "itoa",
+ "mago-allocator",
+ "mago-database",
+ "mago-flags",
+ "mago-hir",
+ "mago-oracle",
+ "mago-span",
+ "mago-syntax",
+ "ordered-float",
+]
+
+[[package]]
 name = "mago-linter"
 version = "1.42.0"
 dependencies = [

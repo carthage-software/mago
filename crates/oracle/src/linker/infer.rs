@@ -40,7 +40,7 @@ where
                 LiteralKind::String(string) => match string.value {
                     Some([]) => self.atom_type(well_known::EMPTY_STRING),
                     Some(value) => {
-                        let atom = self.builder.string_literal(value);
+                        let atom = self.builder.string_literal_atom(value);
                         self.atom_type(atom)
                     }
                     None => well_known::TYPE_STRING,
@@ -198,7 +198,7 @@ where
                 let value = self.infer(value).unwrap_or(well_known::TYPE_MIXED);
                 known.push(KnownElement { index: index as u32, value, optional: false });
             }
-            let atom = self.builder.sealed_list(&known, !elements.is_empty());
+            let atom = self.builder.sealed_list_atom(&known, !elements.is_empty());
 
             return Some(self.atom_type(atom));
         }
@@ -213,7 +213,7 @@ where
                 let value = self.infer(value).unwrap_or(well_known::TYPE_MIXED);
                 known.push(KnownItem { key, value, optional: false });
             }
-            let atom = self.builder.keyed_sealed(&known, !elements.is_empty());
+            let atom = self.builder.sealed_keyed_array_atom(&known, !elements.is_empty());
 
             return Some(self.atom_type(atom));
         }

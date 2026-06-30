@@ -94,6 +94,20 @@ where
         for member in members {
             match &member.kind {
                 MemberItemKind::Method(method) => {
+                    if method.name.value.eq_ignore_ascii_case(b"__construct") {
+                        for parameter in method.parameters.as_slice() {
+                            if !parameter.modifiers.is_empty() {
+                                properties.push(self.promoted_property(
+                                    class_name,
+                                    owner,
+                                    parameter,
+                                    method.annotation,
+                                    origin,
+                                ));
+                            }
+                        }
+                    }
+
                     methods.push(self.method(class_name, owner, method, origin));
                 }
                 MemberItemKind::Property(property) => {
@@ -255,6 +269,43 @@ where
         }
     }
 
+    fn promoted_property<I, St, Ex>(
+        &mut self,
+        class_name: &'arena [u8],
+        owner: SymbolId,
+        parameter: &Parameter<'arena, I, St, Ex>,
+        annotation: Option<&ItemAnnotation<'arena, I, St, Ex>>,
+        origin: Origin,
+    ) -> PropertyMember<'arena> {
+        let property_name = parameter.variable.name;
+        let property_id = SymbolId::property(class_name, property_name);
+
+        let read = read_visibility(parameter.modifiers);
+        let attributes = self.attributes(parameter.attributes);
+        let ty = self.parameter_type_slot(parameter, annotation);
+
+        let arena = self.arena;
+        let declared_hooks = parameter.hooks.as_ref().map_or(&[][..], |hooks| hooks.as_slice());
+        let hooks = arena.alloc_slice_fill_iter(
+            declared_hooks
+                .iter()
+                .map(|hook| self.property_hook(class_name, property_name, property_id, hook, ty, origin)),
+        );
+
+        PropertyMember {
+            span: parameter.span,
+            visibility: ReadWriteVisibility::new(read, write_visibility(parameter.modifiers, read)),
+            name: Path::property(self.arena, class_name, property_name),
+            defining_symbol: owner,
+            flags: property_flags(parameter.modifiers, parameter.default_value.is_some(), !hooks.is_empty()),
+            constraint: self.constraint(parameter.version_constraint),
+            attributes,
+            ty,
+            hooks,
+            origin,
+        }
+    }
+
     fn hooked_property<I, St, Ex>(
         &mut self,
         class_name: &'arena [u8],
@@ -403,7 +454,7 @@ where
 
         Some(match literal.kind {
             LiteralKind::Integer(integer) => Atom::int_literal(integer.value? as i64),
-            LiteralKind::String(string) => self.builder.string_literal(string.value?),
+            LiteralKind::String(string) => self.builder.string_literal_atom(string.value?),
             LiteralKind::Float(float) => Atom::float_literal(float.value.into_inner()),
             LiteralKind::True => crate::ty::well_known::TRUE,
             LiteralKind::False => crate::ty::well_known::FALSE,
@@ -539,10 +590,7 @@ where
         arena.alloc_slice_fill_iter(parameters.iter().map(|parameter| {
             let flags = parameter_flags(parameter);
             let attributes = self.attributes(parameter.attributes);
-            let ty = self.type_slot_annotated(
-                parameter.r#type,
-                parameter.annotation.map(|annotation| annotation.type_annotation),
-            );
+            let ty = self.parameter_type_slot(parameter, annotation);
             let out_ty = self.parameter_out_slot(parameter_outs, parameter.variable.name);
             let default_ty = self.default_type_slot(parameter.default_value);
 

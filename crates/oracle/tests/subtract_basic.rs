@@ -26,7 +26,7 @@ fn t_sealed_list<'arena>(f: &mut Fixture<'_, 'arena>, elements: &[Type<'arena>])
         .map(|(index, &value)| KnownElement { index: index as u32, value, optional: false })
         .collect();
 
-    f.builder.sealed_list(&entries, true)
+    f.builder.sealed_list_atom(&entries, true)
 }
 
 fn meet_of<'arena>(
@@ -505,8 +505,8 @@ fn class_string_minus_interface_string_narrows_to_intersected() {
 fn array_minus_list_removes_empty_array() {
     fixture(|f| {
         let w = empty_symbol_table(f.arena);
-        let arr = f.builder.keyed_unsealed(well_known::TYPE_INT, well_known::TYPE_INT, false);
-        let lst = f.builder.list_of(well_known::TYPE_NULL, false);
+        let arr = f.builder.unsealed_keyed_array_atom(well_known::TYPE_INT, well_known::TYPE_INT, false);
+        let lst = f.builder.list_of_atom(well_known::TYPE_NULL, false);
         let a = f.u(arr);
         let lst_ty = f.u(lst);
 
@@ -526,8 +526,8 @@ fn array_minus_list_removes_empty_array() {
 fn list_minus_array_removes_empty_when_array_allows_empty() {
     fixture(|f| {
         let w = empty_symbol_table(f.arena);
-        let lst = f.builder.list_of(well_known::TYPE_NULL, false);
-        let arr = f.builder.keyed_unsealed(well_known::TYPE_INT, well_known::TYPE_INT, false);
+        let lst = f.builder.list_of_atom(well_known::TYPE_NULL, false);
+        let arr = f.builder.unsealed_keyed_array_atom(well_known::TYPE_INT, well_known::TYPE_INT, false);
         let a = f.u(lst);
         let arr_ty = f.u(arr);
 
@@ -549,7 +549,7 @@ fn uninhabited_array_lhs_subtract_is_never() {
         let w = empty_symbol_table(f.arena);
         let obj = f.t_named("A");
         let key_type = f.u(obj);
-        let arr = f.builder.keyed_unsealed(key_type, well_known::TYPE_INT, true);
+        let arr = f.builder.unsealed_keyed_array_atom(key_type, well_known::TYPE_INT, true);
         let a = f.u(arr);
         let b = f.u_many(vec![well_known::INT, well_known::STRING]);
 

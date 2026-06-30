@@ -65,7 +65,7 @@ fn workload(c: &mut Criterion) {
         let depth = 1 + (rng.next_u32() % 3) as usize;
         let mut current = template_parameter;
         for _ in 0..depth {
-            let list_atom = builder.list_of(current, false);
+            let list_atom = builder.list_of_atom(current, false);
             current = ut(&mut builder, list_atom);
         }
         templated_tree.push(current);

@@ -47,11 +47,11 @@ fn workload(c: &mut Criterion) {
                 let literal = i64::from(rng.next_u32() % 500);
                 let atom = match index % 5 {
                     0 => Atom::int_literal(literal),
-                    1 => builder.string_literal(literal.to_string().as_bytes()),
-                    2 => builder.int_range(Some(0), Some(literal.abs())),
+                    1 => builder.string_literal_atom(literal.to_string().as_bytes()),
+                    2 => builder.int_range_atom(Some(0), Some(literal.abs())),
                     3 => {
                         let element = builder.union_of(&[Atom::int_literal(literal)]);
-                        builder.list_of(element, false)
+                        builder.list_of_atom(element, false)
                     }
                     _ => well_known::STRING,
                 };

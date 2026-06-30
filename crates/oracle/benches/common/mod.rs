@@ -161,19 +161,19 @@ where
     let words = ["foo", "bar", "baz", "qux", "hello", "world", "abc", "xyz", "0", "1", ""];
     for _ in 0..30 {
         let word = rng.pick_from(&words);
-        let atom = builder.string_literal(word.as_bytes());
+        let atom = builder.string_literal_atom(word.as_bytes());
         out.push(ut(builder, atom));
     }
 
     let classes = ["Foo", "Bar", "Baz", "Qux", "Container", "List", "Map", "Set"];
     for class in classes {
-        let atom = builder.object_named(class.as_bytes());
+        let atom = builder.named_object_atom(class.as_bytes());
         out.push(ut(builder, atom));
     }
 
     for _ in 0..10 {
         let lower = (rng.next_u64() % 100) as i64;
-        let atom = builder.int_range(Some(lower), Some(lower + 50));
+        let atom = builder.int_range_atom(Some(lower), Some(lower + 50));
         out.push(ut(builder, atom));
     }
 
@@ -238,19 +238,19 @@ where
     let mut out = Vec::with_capacity(20);
     for _ in 0..15 {
         let inner = rng_pick(rng, singletons);
-        let level_one_atom = builder.list_of(inner, false);
+        let level_one_atom = builder.list_of_atom(inner, false);
         let level_one = ut(builder, level_one_atom);
-        let level_two_atom = builder.list_of(level_one, false);
+        let level_two_atom = builder.list_of_atom(level_one, false);
         let level_two = ut(builder, level_two_atom);
-        let level_three_atom = builder.list_of(level_two, false);
+        let level_three_atom = builder.list_of_atom(level_two, false);
         out.push(ut(builder, level_three_atom));
     }
 
     for _ in 0..5 {
         let value_inner = rng_pick(rng, singletons);
-        let list_atom = builder.list_of(value_inner, false);
+        let list_atom = builder.list_of_atom(value_inner, false);
         let list_type = ut(builder, list_atom);
-        let keyed_atom = builder.keyed_unsealed(well_known::TYPE_STRING, list_type, false);
+        let keyed_atom = builder.unsealed_keyed_array_atom(well_known::TYPE_STRING, list_type, false);
         out.push(ut(builder, keyed_atom));
     }
 
