@@ -75,12 +75,6 @@ impl<'source, 'arena, A: Arena> Environment<'source, 'arena, A> {
             && self.variables.iter().all(|(place, ty)| other.variables.get(place) == Some(ty))
     }
 
-    /// Every recorded place and its type, for callers that fold over the whole
-    /// environment (loop widening).
-    pub(crate) fn entries(&self) -> impl Iterator<Item = (Var<'arena>, Type<'arena>)> + '_ {
-        self.variables.iter().map(|(place, ty)| (*place, *ty))
-    }
-
     /// Each place paired with a mutable handle to its type, for rewriting types in
     /// place without reallocating the map (loop widening / definite-key marking).
     pub(crate) fn entries_mut(&mut self) -> impl Iterator<Item = (Var<'arena>, &mut Type<'arena>)> {

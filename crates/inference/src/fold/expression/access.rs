@@ -1,10 +1,17 @@
 use mago_allocator::Arena;
+use mago_allocator::CopyInto;
 use mago_allocator::vec::Vec;
 use mago_hir::ir::expression::Access;
 use mago_hir::ir::expression::AccessKind;
 use mago_hir::ir::expression::Expression;
 use mago_hir::ir::expression::ExpressionKind;
+use mago_hir::ir::expression::selector::ConstantSelector;
+use mago_hir::ir::expression::selector::ConstantSelectorKind;
+use mago_hir::ir::variable::Variable;
 use mago_oracle::id::SymbolId;
+use mago_oracle::symbol::Symbol;
+use mago_oracle::symbol::class_like::ClassLikeKind;
+use mago_oracle::symbol::class_like::ClassLikeSymbol;
 use mago_oracle::ty::Atom;
 use mago_oracle::ty::Type;
 use mago_oracle::ty::atom::payload::array::ArrayAtom;
@@ -29,7 +36,7 @@ where
         span: Span,
         access: &'source Access<'source, SymbolId, S, E>,
     ) -> InferenceResult<Expression<'arena, SymbolId, Flow, Type<'arena>>> {
-        match access.kind {
+        match &access.kind {
             AccessKind::Array(array, index) => {
                 let array = self.infer_expression(array)?;
                 let index = self.infer_expression(index)?;
@@ -46,8 +53,145 @@ where
 
                 Ok(Expression { meta, span, kind: ExpressionKind::Access(self.arena.alloc(node)) })
             }
+            AccessKind::StaticProperty(class, property) => {
+                self.infer_static_property(span, access.span, class, property)
+            }
+            AccessKind::ClassConstant(class, selector) => self.infer_class_constant(span, access.span, class, selector),
             _ => Err(InferenceError::Unsupported { span, construct: "member access" }),
         }
+    }
+
+    fn infer_static_property(
+        &mut self,
+        span: Span,
+        access_span: Span,
+        class: &'source Expression<'source, SymbolId, S, E>,
+        property: &'source Variable<'source, SymbolId, S, E>,
+    ) -> InferenceResult<Expression<'arena, SymbolId, Flow, Type<'arena>>> {
+        let meta = self.static_property_type(class, property);
+        let class = self.infer_expression(class)?;
+        let property = self.infer_variable_node(property)?;
+
+        let node = Access { span: access_span, kind: AccessKind::StaticProperty(self.arena.alloc(class), property) };
+
+        Ok(Expression { meta, span, kind: ExpressionKind::Access(self.arena.alloc(node)) })
+    }
+
+    fn infer_class_constant(
+        &mut self,
+        span: Span,
+        access_span: Span,
+        class: &'source Expression<'source, SymbolId, S, E>,
+        selector: &'source ConstantSelector<'source, SymbolId, S, E>,
+    ) -> InferenceResult<Expression<'arena, SymbolId, Flow, Type<'arena>>> {
+        let meta = self.class_constant_type(class, selector);
+        let class = self.infer_expression(class)?;
+        let selector = self.infer_constant_selector(selector)?;
+
+        let node = Access { span: access_span, kind: AccessKind::ClassConstant(self.arena.alloc(class), selector) };
+
+        Ok(Expression { meta, span, kind: ExpressionKind::Access(self.arena.alloc(node)) })
+    }
+
+    /// The declared type of a `Class::$property` static-property read. `mixed`
+    /// when the class, the property, or its type is unknown, or when a property of
+    /// that name exists but is not static.
+    fn static_property_type(
+        &self,
+        class: &'source Expression<'source, SymbolId, S, E>,
+        property: &Variable<'source, SymbolId, S, E>,
+    ) -> Type<'arena> {
+        let Some(symbol) = self.resolve_class(class) else {
+            return TYPE_MIXED;
+        };
+        let Variable::Direct(direct) = property else {
+            return TYPE_MIXED;
+        };
+        let Some(properties) = symbol.properties() else {
+            return TYPE_MIXED;
+        };
+
+        let target = SymbolId::property(symbol.path().as_bytes(), direct.name);
+        properties
+            .members
+            .iter()
+            .find(|member| member.name.id == target && member.is_static())
+            .and_then(|member| member.ty.effective(false))
+            .unwrap_or(TYPE_MIXED)
+    }
+
+    /// The type of a `Class::CONSTANT` read. Handles three forms: `Class::class`
+    /// yields a literal class-string, an enum case (`Status::Active`) yields that
+    /// case's singleton type, and anything else resolves the class constant.
+    /// `mixed` when the class or member is unknown, or the selector is dynamic.
+    fn class_constant_type(
+        &mut self,
+        class: &'source Expression<'source, SymbolId, S, E>,
+        selector: &ConstantSelector<'source, SymbolId, S, E>,
+    ) -> Type<'arena> {
+        let ConstantSelectorKind::Name(name) = selector.kind else {
+            return TYPE_MIXED;
+        };
+        let Some(symbol) = self.resolve_class(class) else {
+            return TYPE_MIXED;
+        };
+
+        let class_name = symbol.path().as_bytes();
+        let class_id = symbol.path().id;
+
+        if matches!(name.value, b"class") {
+            let atom = self.ty.class_string_literal(class_name);
+            return self.ty.union_of(&[atom]);
+        }
+
+        if matches!(symbol.kind(), ClassLikeKind::Enum) {
+            let case = SymbolId::enum_case(class_name, name.value);
+            if self.symbols.enum_cases(class_id).iter().any(|member| member.name.id == case) {
+                let atom = self.ty.enum_case(class_name, name.value);
+                return self.ty.union_of(&[atom]);
+            }
+        }
+
+        self.symbols.class_constant_type(class_id, name.value).unwrap_or(TYPE_MIXED)
+    }
+
+    fn infer_constant_selector(
+        &mut self,
+        selector: &ConstantSelector<'source, SymbolId, S, E>,
+    ) -> InferenceResult<ConstantSelector<'arena, SymbolId, Flow, Type<'arena>>> {
+        let kind = match selector.kind {
+            ConstantSelectorKind::Missing => ConstantSelectorKind::Missing,
+            ConstantSelectorKind::Name(name) => ConstantSelectorKind::Name(name.copy_into(self.arena)),
+            ConstantSelectorKind::Expression(expression) => {
+                let expression = self.infer_expression(expression)?;
+
+                ConstantSelectorKind::Expression(self.arena.alloc(expression))
+            }
+        };
+
+        Ok(ConstantSelector { span: selector.span, kind })
+    }
+
+    /// Resolves the class operand of a static access to its symbol, trying the
+    /// written name then its short form (mirroring function resolution). `None`
+    /// for `self`/`static`/`parent` (no class context here) or an unknown class.
+    fn resolve_class(&self, class: &'source Expression<'source, SymbolId, S, E>) -> Option<ClassLikeSymbol<'arena>> {
+        let (ExpressionKind::Identifier(identifier) | ExpressionKind::Constant(identifier)) = &class.kind else {
+            return None;
+        };
+
+        if let Some(symbol) = self.symbols.get_class_like(SymbolId::class_like(identifier.value)) {
+            return Some(symbol);
+        }
+
+        if identifier.is_local() && !identifier.imported {
+            let short = identifier.last_segment();
+            if short != identifier.value {
+                return self.symbols.get_class_like(SymbolId::class_like(short));
+            }
+        }
+
+        None
     }
 
     pub(crate) fn array_element_type(&mut self, array: Type<'arena>, key: Type<'arena>) -> Type<'arena> {

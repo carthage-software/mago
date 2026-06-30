@@ -1,7 +1,5 @@
 use mago_hir::ir::statement::StatementKind;
 
-use crate::harness::*;
-
 test_inference! {
     name = binds_the_value_to_the_element_type,
     code = "<?php /** @var list<int> */ $a = []; foreach ($a as $v) { $v; }",
