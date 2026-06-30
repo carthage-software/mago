@@ -86,6 +86,7 @@ impl<A: Arena> ExtensionInference<A> for StdlibInference {
             b"array_flip" => array_flip(context, call),
             b"array_merge" => array_merge(context, call),
             b"array_column" => array_column(context, call),
+            b"str_replace" => fold_str_replace(context, call),
             b"min" => fold_min_max(context, call, false),
             b"max" => fold_min_max(context, call, true),
             b"substr" => fold_substr(context, call),
@@ -421,6 +422,42 @@ fn array_flip<'arena, A: Arena>(
         }
         _ => None,
     }
+}
+
+fn fold_str_replace<'arena, A: Arena>(
+    context: &mut ExtensionContext<'_, '_, 'arena, A>,
+    call: &Call<'arena, SymbolId, Flow, Type<'arena>>,
+) -> Option<Type<'arena>> {
+    let search = nth_argument(call, 0).and_then(literal_string)?;
+    let replace = nth_argument(call, 1).and_then(literal_string)?;
+    let subject = nth_argument(call, 2).and_then(literal_string)?;
+
+    let result = byte_replace(subject, search, replace);
+    if result.len() > FOLD_LENGTH_LIMIT {
+        return None;
+    }
+
+    Some(context.string(&result))
+}
+
+fn byte_replace(subject: &[u8], search: &[u8], replace: &[u8]) -> Vec<u8> {
+    if search.is_empty() {
+        return subject.to_vec();
+    }
+
+    let mut out = Vec::with_capacity(subject.len());
+    let mut index = 0;
+    while index < subject.len() {
+        if subject[index..].starts_with(search) {
+            out.extend_from_slice(replace);
+            index += search.len();
+        } else {
+            out.push(subject[index]);
+            index += 1;
+        }
+    }
+
+    out
 }
 
 fn array_merge<'arena, A: Arena>(

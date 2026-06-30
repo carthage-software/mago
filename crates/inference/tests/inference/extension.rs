@@ -415,3 +415,22 @@ fn stdlib_array_column_extracts_the_column() {
         assert_eq!(get_last_expression(ir).meta.to_string(), expected, "for code: {code}");
     }
 }
+
+#[test]
+fn stdlib_str_replace_folds_literals() {
+    let test = Test::new();
+    let extension = StdlibInference;
+    let inference: [&dyn ExtensionInference<LocalArena>; 1] = [&extension];
+
+    let cases = [
+        ("<?php str_replace('a', 'b', 'banana');", "string('bbnbnb')"),
+        ("<?php str_replace('x', 'y', 'banana');", "string('banana')"),
+        ("<?php str_replace('an', '', 'banana');", "string('ba')"),
+    ];
+
+    for (code, expected) in cases {
+        let ir = test.infer_with("<?php", code, Extensions { inference: &inference, assertion: &[] });
+        assert_eq!(get_last_expression(ir).meta.to_string(), expected, "for code: {code}");
+    }
+}
+
