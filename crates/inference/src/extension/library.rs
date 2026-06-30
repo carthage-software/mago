@@ -8,10 +8,14 @@ use mago_oracle::id::SymbolId;
 use mago_oracle::ty::Atom;
 use mago_oracle::ty::Type;
 use mago_oracle::ty::atom::payload::array::ArrayFlag;
+use mago_oracle::ty::atom::payload::array::ArrayKey;
 use mago_oracle::ty::atom::payload::array::ListFlag;
 use mago_oracle::ty::atom::payload::scalar::float::FloatAtom;
 use mago_oracle::ty::atom::payload::scalar::int::IntAtom;
+use mago_oracle::ty::atom::payload::scalar::string::StringAtom;
 use mago_oracle::ty::atom::payload::scalar::string::StringLiteral;
+use mago_oracle::ty::atom::payload::scalar::string::StringRefinementFlag;
+use mago_oracle::ty::well_known::ARRAY_KEY;
 use mago_oracle::ty::well_known::FALSE;
 use mago_oracle::ty::well_known::FLOAT;
 use mago_oracle::ty::well_known::NON_NEGATIVE_INT;
@@ -33,9 +37,11 @@ impl<A: Arena> ExtensionInference<A> for StdlibInference {
         let ExpressionKind::Call(call) = &expression.kind else {
             return None;
         };
+
         let CalleeKind::Function(callee) = &call.callee.kind else {
             return None;
         };
+
         let ExpressionKind::Identifier(identifier) = &callee.kind else {
             return None;
         };
@@ -64,6 +70,12 @@ impl<A: Arena> ExtensionInference<A> for StdlibInference {
             }),
             b"str_starts_with" => fold_str_search(context, call, |haystack, needle| haystack.starts_with(needle)),
             b"str_ends_with" => fold_str_search(context, call, |haystack, needle| haystack.ends_with(needle)),
+            b"strpos" => Some(string_position(context, call, false, false)),
+            b"stripos" => Some(string_position(context, call, false, true)),
+            b"strrpos" => Some(string_position(context, call, true, false)),
+            b"strripos" => Some(string_position(context, call, true, true)),
+            b"array_keys" => array_keys(context, argument),
+            b"array_values" => array_values(context, argument),
             _ => None,
         }
     }
@@ -73,19 +85,32 @@ fn byte_length<'arena, A: Arena>(
     context: &mut ExtensionContext<'_, '_, 'arena, A>,
     argument: Option<Type<'arena>>,
 ) -> Type<'arena> {
-    match argument.and_then(literal_string) {
-        Some(bytes) => context.int(bytes.len() as i64),
-        None => context.union(&[NON_NEGATIVE_INT]),
+    if let Some(bytes) = argument.and_then(literal_string) {
+        return context.int(bytes.len() as i64);
     }
+
+    string_length_bound(context, argument)
 }
 
 fn character_length<'arena, A: Arena>(
     context: &mut ExtensionContext<'_, '_, 'arena, A>,
     argument: Option<Type<'arena>>,
 ) -> Type<'arena> {
-    match argument.and_then(literal_string).and_then(|bytes| std::str::from_utf8(bytes).ok()) {
-        Some(text) => context.int(text.chars().count() as i64),
-        None => context.union(&[NON_NEGATIVE_INT]),
+    if let Some(text) = argument.and_then(literal_string).and_then(|bytes| std::str::from_utf8(bytes).ok()) {
+        return context.int(text.chars().count() as i64);
+    }
+
+    string_length_bound(context, argument)
+}
+
+fn string_length_bound<'arena, A: Arena>(
+    context: &mut ExtensionContext<'_, '_, 'arena, A>,
+    argument: Option<Type<'arena>>,
+) -> Type<'arena> {
+    if argument.is_some_and(is_non_empty_string) {
+        context.int_range(Some(1), None)
+    } else {
+        context.union(&[NON_NEGATIVE_INT])
     }
 }
 
@@ -223,6 +248,125 @@ fn fold_intdiv<'arena, A: Arena>(
     let divisor = nth_argument(call, 1).and_then(literal_int)?;
 
     dividend.checked_div(divisor).map(|quotient| context.int(quotient))
+}
+
+fn string_position<'arena, A: Arena>(
+    context: &mut ExtensionContext<'_, '_, 'arena, A>,
+    call: &Call<'arena, SymbolId, Flow, Type<'arena>>,
+    last: bool,
+    case_insensitive: bool,
+) -> Type<'arena> {
+    if nth_argument(call, 2).is_none()
+        && let Some(haystack) = nth_argument(call, 0).and_then(literal_string)
+        && let Some(needle) = nth_argument(call, 1).and_then(literal_string)
+    {
+        return match substring_position(haystack, needle, last, case_insensitive) {
+            Some(position) => context.int(position as i64),
+            None => context.union(&[FALSE]),
+        };
+    }
+
+    context.union(&[NON_NEGATIVE_INT, FALSE])
+}
+
+fn substring_position(haystack: &[u8], needle: &[u8], last: bool, case_insensitive: bool) -> Option<usize> {
+    let (haystack, needle) = if case_insensitive {
+        (haystack.to_ascii_lowercase(), needle.to_ascii_lowercase())
+    } else {
+        (haystack.to_vec(), needle.to_vec())
+    };
+
+    if needle.is_empty() {
+        return Some(if last { haystack.len() } else { 0 });
+    }
+    if needle.len() > haystack.len() {
+        return None;
+    }
+
+    let mut windows = haystack.windows(needle.len());
+    if last { windows.rposition(|window| window == needle) } else { windows.position(|window| window == needle) }
+}
+
+fn array_keys<'arena, A: Arena>(
+    context: &mut ExtensionContext<'_, '_, 'arena, A>,
+    argument: Option<Type<'arena>>,
+) -> Option<Type<'arena>> {
+    match argument?.atoms {
+        [Atom::Array(array)] if array.is_sealed() => {
+            let items = array.known_items.unwrap_or(&[]);
+            if items.iter().any(|item| item.optional) {
+                return None;
+            }
+
+            let keys: Vec<Type<'arena>> = items.iter().map(|item| array_key_type(context, item.key)).collect();
+            Some(context.list(&keys, !keys.is_empty()))
+        }
+        [Atom::Array(array)] if array.known_items.is_none() => {
+            Some(context.list_of(array.key_param?, array.flags.contains(ArrayFlag::NonEmpty)))
+        }
+        [Atom::List(list)] if list.element_type.is_never() => {
+            let known = list.known_elements.unwrap_or(&[]);
+            if known.iter().any(|element| element.optional) {
+                return None;
+            }
+
+            let keys: Vec<Type<'arena>> = (0..known.len()).map(|index| context.int(index as i64)).collect();
+            Some(context.list(&keys, !keys.is_empty()))
+        }
+        [Atom::List(list)] => {
+            let index = context.union(&[NON_NEGATIVE_INT]);
+            Some(context.list_of(index, list.flags.contains(ListFlag::NonEmpty)))
+        }
+        _ => None,
+    }
+}
+
+fn array_values<'arena, A: Arena>(
+    context: &mut ExtensionContext<'_, '_, 'arena, A>,
+    argument: Option<Type<'arena>>,
+) -> Option<Type<'arena>> {
+    let [Atom::Array(array)] = argument?.atoms else {
+        return None;
+    };
+
+    if array.is_sealed() {
+        let items = array.known_items.unwrap_or(&[]);
+        if items.iter().any(|item| item.optional) {
+            return None;
+        }
+
+        let values: Vec<Type<'arena>> = items.iter().map(|item| item.value).collect();
+        return Some(context.list(&values, !values.is_empty()));
+    }
+
+    if array.known_items.is_none() {
+        return Some(context.list_of(array.value_param?, array.flags.contains(ArrayFlag::NonEmpty)));
+    }
+
+    None
+}
+
+fn array_key_type<'arena, A: Arena>(
+    context: &mut ExtensionContext<'_, '_, 'arena, A>,
+    key: ArrayKey<'arena>,
+) -> Type<'arena> {
+    match key {
+        ArrayKey::Int(value) => context.int(value),
+        ArrayKey::String(value) => context.string(value),
+        ArrayKey::Const { .. } => context.union(&[ARRAY_KEY]),
+    }
+}
+
+fn is_non_empty_string(ty: Type<'_>) -> bool {
+    !ty.atoms.is_empty()
+        && ty.atoms.iter().all(|atom| matches!(atom, Atom::String(string) if string_atom_non_empty(string)))
+}
+
+fn string_atom_non_empty(string: &StringAtom<'_>) -> bool {
+    match string.literal {
+        StringLiteral::Value(value) => !value.is_empty(),
+        _ => string.flags.contains(StringRefinementFlag::NonEmpty),
+    }
 }
 
 const FOLD_LENGTH_LIMIT: usize = 4096;

@@ -3,6 +3,7 @@ use mago_oracle::symbol::SymbolTable;
 use mago_oracle::ty::Atom;
 use mago_oracle::ty::Type;
 use mago_oracle::ty::TypeBuilder;
+use mago_oracle::ty::atom::payload::array::KnownElement;
 use mago_oracle::ty::atom::payload::scalar::float::FloatAtom;
 use mago_oracle::ty::atom::payload::scalar::float::LiteralFloat;
 use mago_oracle::ty::atom::payload::scalar::int::IntAtom;
@@ -48,6 +49,26 @@ impl<'ctx, 'source, 'arena, A: Arena> ExtensionContext<'ctx, 'source, 'arena, A>
     /// `non-negative-int`, `Some(1), None` is `positive-int`).
     pub fn int_range(&mut self, lower: Option<i64>, upper: Option<i64>) -> Type<'arena> {
         let atom = self.builder.int_range(lower, upper);
+
+        self.builder.union_of(&[atom])
+    }
+
+    /// A sealed list (`list{0: ..., 1: ...}`) of the given element types in order.
+    pub fn list(&mut self, elements: &[Type<'arena>], non_empty: bool) -> Type<'arena> {
+        let known: Vec<KnownElement<'arena>> = elements
+            .iter()
+            .enumerate()
+            .map(|(index, &value)| KnownElement { index: index as u32, value, optional: false })
+            .collect();
+
+        let atom = self.builder.sealed_list(&known, non_empty);
+
+        self.builder.union_of(&[atom])
+    }
+
+    /// An unsealed list of `element` (`list<T>` / `non-empty-list<T>`).
+    pub fn list_of(&mut self, element: Type<'arena>, non_empty: bool) -> Type<'arena> {
+        let atom = self.builder.list_of(element, non_empty);
 
         self.builder.union_of(&[atom])
     }

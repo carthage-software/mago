@@ -168,6 +168,10 @@ fn stdlib_constant_folds_literal_arguments() {
         ("<?php decoct(8);", "string('10')"),
         ("<?php bin2hex('AB');", "string('4142')"),
         ("<?php intdiv(7, 2);", "int(3)"),
+        ("<?php strpos('hello', 'l');", "int(2)"),
+        ("<?php strpos('hello', 'z');", "false"),
+        ("<?php strrpos('hello', 'l');", "int(3)"),
+        ("<?php stripos('HELLO', 'l');", "int(2)"),
     ];
 
     for (code, expected) in cases {
@@ -224,6 +228,46 @@ fn stdlib_abs_refines_int_ranges_and_floats() {
         ("<?php /** @var int<2, 10> */ $n = 2; abs($n);", "int<2, 10>"),
         ("<?php /** @var int */ $n = 0; abs($n);", "non-negative-int"),
         ("<?php /** @var float */ $f = 0.0; abs($f);", "float"),
+    ];
+
+    for (code, expected) in cases {
+        let ir = test.infer_with("<?php", code, Extensions { inference: &inference, assertion: &[] });
+        assert_eq!(get_last_expression(ir).meta.to_string(), expected, "for code: {code}");
+    }
+}
+
+#[test]
+fn stdlib_string_functions_refine_non_literals() {
+    let test = Test::new();
+    let extension = StdlibInference;
+    let inference: [&dyn ExtensionInference<LocalArena>; 1] = [&extension];
+
+    let cases = [
+        ("<?php /** @var non-empty-string */ $s = 'x'; strlen($s);", "positive-int"),
+        ("<?php /** @var string */ $s = ''; strlen($s);", "non-negative-int"),
+        ("<?php /** @var string */ $s = ''; strpos($s, 'x');", "false|non-negative-int"),
+    ];
+
+    for (code, expected) in cases {
+        let ir = test.infer_with("<?php", code, Extensions { inference: &inference, assertion: &[] });
+        assert_eq!(get_last_expression(ir).meta.to_string(), expected, "for code: {code}");
+    }
+}
+
+#[test]
+fn stdlib_array_keys_and_values_are_shape_aware() {
+    let test = Test::new();
+    let extension = StdlibInference;
+    let inference: [&dyn ExtensionInference<LocalArena>; 1] = [&extension];
+
+    let cases = [
+        ("<?php array_keys(['a' => 1, 'b' => 2]);", "list{0: string('a'), 1: string('b')}"),
+        ("<?php array_values(['a' => 1, 'b' => 'x']);", "list{0: int(1), 1: string('x')}"),
+        ("<?php array_keys([10, 20, 30]);", "list{0: int(0), 1: int(1), 2: int(2)}"),
+        ("<?php /** @var array<string, int> */ $a = []; array_keys($a);", "list<string>"),
+        ("<?php /** @var non-empty-array<string, int> */ $a = []; array_keys($a);", "non-empty-list<string>"),
+        ("<?php /** @var array<string, int> */ $a = []; array_values($a);", "list<int>"),
+        ("<?php /** @var list<int> */ $a = []; array_keys($a);", "list<non-negative-int>"),
     ];
 
     for (code, expected) in cases {
