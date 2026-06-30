@@ -3,12 +3,12 @@ use mago_inference::InferenceError;
 use crate::harness::Test;
 
 #[test]
-fn function_declaration_is_reported_unsupported() {
+fn constant_declaration_is_reported_unsupported() {
     let test = Test::new();
-    let result = test.try_infer("<?php", "<?php function f(): int { return 1; }");
+    let result = test.try_infer("<?php", "<?php const FOO = 1;");
 
     assert!(
-        matches!(result, Err(InferenceError::Unsupported { construct: "function declarations", .. })),
+        matches!(result, Err(InferenceError::Unsupported { construct: "constant declarations", .. })),
         "expected an unsupported error, got {result:?}",
     );
 }
@@ -27,7 +27,7 @@ fn method_calls_on_an_unknown_receiver_are_mixed_not_an_error() {
 #[test]
 fn an_unsupported_construct_aborts_inference_rather_than_typing_as_mixed() {
     let test = Test::new();
-    let result = test.try_infer("<?php", "<?php function f(): int { return 1; } $a = 1; $a;");
+    let result = test.try_infer("<?php", "<?php const FOO = 1; $a = 1; $a;");
 
     assert!(result.is_err(), "inference must not fabricate a type for an unsupported construct");
 }

@@ -284,6 +284,61 @@ test_inference! {
     }
 }
 
+test_inference! {
+    name = folds_a_function_declaration_without_error,
+    code = "<?php function f(): int { return 1; } $x = 1;",
+    expect = |ir| {
+        assert!(
+            ir.statements.iter().any(|statement| matches!(statement.kind, StatementKind::Item(_))),
+            "the function declaration survives inference as an item",
+        );
+        assert!(get_last_statement(ir).meta.reachable, "code after a function declaration is reachable");
+    }
+}
+
+test_inference! {
+    name = binds_a_native_parameter_type_in_the_body,
+    code = indoc! {"
+        <?php
+        function f(int $a): int {
+            $b = $a;
+            return $b;
+        }
+    "},
+    expect = |ir| {
+        let Some(value) = function_return_value(ir, b"f") else { panic!("expected a return value in f()") };
+        assert_eq!(value.meta.to_string(), "int", "the native parameter hint flows through the body");
+    }
+}
+
+test_inference! {
+    name = binds_a_docblock_parameter_type_in_the_body,
+    code = indoc! {"
+        <?php
+        /** @param non-empty-string $a */
+        function f($a) {
+            return $a;
+        }
+    "},
+    expect = |ir| {
+        let Some(value) = function_return_value(ir, b"f") else { panic!("expected a return value in f()") };
+        assert_eq!(value.meta.to_string(), "non-empty-string", "the @param hint flows through the body");
+    }
+}
+
+fn function_return_value<'arena>(ir: TypedIr<'arena>, name: &[u8]) -> Option<&'arena TypedExpression<'arena>> {
+    for statement in ir.statements {
+        let StatementKind::Item(item) = statement.kind else { continue };
+        if let ItemStatementKind::Function(function) = item.kind
+            && function.name.value == name
+        {
+            return returned_value(function.body);
+        }
+    }
+
+    None
+}
+
 /// The members of the first class-like declaration in the program, whatever its
 /// kind, so a test can navigate enum/interface/trait members uniformly.
 fn item_members(ir: TypedIr<'_>) -> Option<&[mago_hir::ir::item::member::MemberItem<'_, SymbolId, Flow, Type<'_>>]> {

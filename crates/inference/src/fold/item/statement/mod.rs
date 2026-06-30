@@ -1,5 +1,6 @@
 mod class;
 mod r#enum;
+mod function;
 mod interface;
 mod r#trait;
 
@@ -72,8 +73,8 @@ where
             ItemStatementKind::Constant(_) => {
                 return Err(InferenceError::Unsupported { span: item.span, construct: "constant declarations" });
             }
-            ItemStatementKind::Function(_) => {
-                return Err(InferenceError::Unsupported { span: item.span, construct: "function declarations" });
+            ItemStatementKind::Function(node) => {
+                ItemStatementKind::Function(self.arena.alloc(self.infer_function(node)?))
             }
         };
 
