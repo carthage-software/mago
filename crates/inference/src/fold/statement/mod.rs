@@ -9,7 +9,6 @@ use mago_oracle::id::SymbolId;
 use mago_oracle::linker::lower_type_annotation;
 use mago_oracle::ty::Type;
 
-use crate::error::InferenceError;
 use crate::error::InferenceResult;
 use crate::flow::ControlFlow;
 use crate::flow::Flow;
@@ -90,9 +89,7 @@ where
             StatementKind::DoWhile(do_while) => self.infer_do_while(statement.span, do_while)?,
             StatementKind::For(for_loop) => self.infer_for(statement.span, for_loop)?,
             StatementKind::Foreach(foreach) => self.infer_foreach(statement.span, foreach)?,
-            StatementKind::Item(_) => {
-                return Err(InferenceError::Unsupported { span: statement.span, construct: "this statement" });
-            }
+            StatementKind::Item(item) => self.infer_statement_item(statement.span, item)?,
         };
 
         self.reachable = typed.meta.reachable && matches!(typed.meta.exit, ControlFlow::Fallthrough);

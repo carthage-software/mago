@@ -179,8 +179,12 @@ where
         &self,
         class: &'source Expression<'source, SymbolId, S, E>,
     ) -> Option<ClassLikeSymbol<'arena>> {
-        let (ExpressionKind::Identifier(identifier) | ExpressionKind::Constant(identifier)) = &class.kind else {
-            return None;
+        let identifier = match &class.kind {
+            ExpressionKind::Identifier(identifier) | ExpressionKind::Constant(identifier) => identifier,
+            ExpressionKind::Self_ | ExpressionKind::Static => {
+                return self.self_class.and_then(|name| self.symbols.get_class_like(SymbolId::class_like(name)));
+            }
+            _ => return None,
         };
 
         if let Some(symbol) = self.symbols.get_class_like(SymbolId::class_like(identifier.value)) {

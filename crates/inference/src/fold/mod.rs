@@ -59,6 +59,7 @@ where
     reachable: bool,
     is_first_statement: bool,
     loops: std::vec::Vec<LoopFrame<'source, 'arena, A>>,
+    self_class: Option<&'arena [u8]>,
     extensions: Extensions<'arena, A>,
     _phantom: std::marker::PhantomData<(S, E)>,
 }
@@ -104,6 +105,7 @@ where
             reachable: true,
             is_first_statement: true,
             loops: std::vec::Vec::new(),
+            self_class: None,
             extensions,
             _phantom: std::marker::PhantomData,
         }
