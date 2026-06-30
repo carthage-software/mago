@@ -62,9 +62,9 @@ fn int_range_with_bounds() {
     let scratch = LocalArena::new();
     let mut builder = TypeBuilder::new(&arena, &scratch);
 
-    assert_eq!(builder.int_range(Some(0), Some(10)).to_string(), "int<0, 10>");
-    assert_eq!(builder.int_range(Some(5), None).to_string(), "int<5, max>");
-    assert_eq!(builder.int_range(None, Some(100)).to_string(), "int<min, 100>");
+    assert_eq!(builder.int_range_atom(Some(0), Some(10)).to_string(), "int<0, 10>");
+    assert_eq!(builder.int_range_atom(Some(5), None).to_string(), "int<5, max>");
+    assert_eq!(builder.int_range_atom(None, Some(100)).to_string(), "int<min, 100>");
 }
 
 #[test]

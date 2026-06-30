@@ -57,7 +57,7 @@ fn t_sealed_list<'arena>(f: &mut Fixture<'_, 'arena>, elements: &[Type<'arena>])
         .enumerate()
         .map(|(index, value)| KnownElement { index: index as u32, value: *value, optional: false })
         .collect();
-    f.builder.sealed_list(&entries, !elements.is_empty())
+    f.builder.sealed_list_atom(&entries, !elements.is_empty())
 }
 
 fn t_alias_elem<'arena>(f: &mut Fixture<'_, 'arena>, class: &str, alias: &str) -> Atom<'arena> {

@@ -65,7 +65,7 @@ pub fn apply_merge_keyed_array_params<'scratch, 'arena, S, A>(
         let value_canonical = super::super::compute(&value_atoms, builder);
         let key_type = builder.union_of(&key_canonical);
         let value_type = builder.union_of(&value_canonical);
-        let merged_array = builder.keyed_unsealed(key_type, value_type, *non_empty);
+        let merged_array = builder.unsealed_keyed_array_atom(key_type, value_type, *non_empty);
         atoms[indices[0]] = merged_array;
         for &index in &indices[1..] {
             to_remove.insert(index);

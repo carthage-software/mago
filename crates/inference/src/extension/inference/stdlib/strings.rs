@@ -19,75 +19,96 @@ use crate::flow::Flow;
 
 const FOLD_LENGTH_LIMIT: usize = 4096;
 
-pub(super) fn byte_length<'arena, A: Arena>(
+pub(super) fn byte_length<'arena, A>(
     context: &mut ExtensionContext<'_, '_, 'arena, A>,
     argument: Option<Type<'arena>>,
-) -> Type<'arena> {
+) -> Type<'arena>
+where
+    A: Arena,
+{
     if let Some(bytes) = argument.and_then(literal_string) {
-        return context.int(bytes.len() as i64);
+        return context.ty.int_literal_type(bytes.len() as i64);
     }
 
     string_length_bound(context, argument)
 }
 
-pub(super) fn character_length<'arena, A: Arena>(
+pub(super) fn character_length<'arena, A>(
     context: &mut ExtensionContext<'_, '_, 'arena, A>,
     argument: Option<Type<'arena>>,
-) -> Type<'arena> {
+) -> Type<'arena>
+where
+    A: Arena,
+{
     if let Some(text) = argument.and_then(literal_string).and_then(|bytes| std::str::from_utf8(bytes).ok()) {
-        return context.int(text.chars().count() as i64);
+        return context.ty.int_literal_type(text.chars().count() as i64);
     }
 
     string_length_bound(context, argument)
 }
 
-fn string_length_bound<'arena, A: Arena>(
+fn string_length_bound<'arena, A>(
     context: &mut ExtensionContext<'_, '_, 'arena, A>,
     argument: Option<Type<'arena>>,
-) -> Type<'arena> {
+) -> Type<'arena>
+where
+    A: Arena,
+{
     if argument.is_some_and(is_non_empty_string) {
-        context.int_range(Some(1), None)
+        context.ty.int_range_type(Some(1), None)
     } else {
-        context.union(&[NON_NEGATIVE_INT])
+        context.ty.non_negative_int_type()
     }
 }
 
-pub(super) fn byte_ordinal<'arena, A: Arena>(
+pub(super) fn byte_ordinal<'arena, A>(
     context: &mut ExtensionContext<'_, '_, 'arena, A>,
     argument: Option<Type<'arena>>,
-) -> Type<'arena> {
+) -> Type<'arena>
+where
+    A: Arena,
+{
     match argument.and_then(literal_string) {
-        Some(bytes) => context.int(i64::from(bytes.first().copied().unwrap_or(0))),
-        None => context.union(&[NON_NEGATIVE_INT]),
+        Some(bytes) => context.ty.int_literal_type(i64::from(bytes.first().copied().unwrap_or(0))),
+        None => context.ty.non_negative_int_type(),
     }
 }
 
-pub(super) fn fold_string<'arena, A: Arena>(
+pub(super) fn fold_string<'arena, A>(
     context: &mut ExtensionContext<'_, '_, 'arena, A>,
     argument: Option<Type<'arena>>,
     transform: impl Fn(&[u8], &mut Vec<'arena, u8, A>),
-) -> Option<Type<'arena>> {
+) -> Option<Type<'arena>>
+where
+    A: Arena,
+{
     let bytes = argument.and_then(literal_string)?;
-    let arena = context.arena();
+    let arena = context.ty.arena();
     let mut out = Vec::with_capacity_in(bytes.len(), arena);
     transform(bytes, &mut out);
 
-    Some(context.string(&out))
+    Some(context.ty.string_literal_type(&out))
 }
 
-pub(super) fn fold_chr<'arena, A: Arena>(
+pub(super) fn fold_chr<'arena, A>(
     context: &mut ExtensionContext<'_, '_, 'arena, A>,
     argument: Option<Type<'arena>>,
-) -> Option<Type<'arena>> {
+) -> Option<Type<'arena>>
+where
+    A: Arena,
+{
     let value = argument.and_then(literal_int)?;
 
-    Some(context.string(&[value.rem_euclid(256) as u8]))
+    Some(context.ty.string_literal_type(&[value.rem_euclid(256) as u8]))
 }
 
-pub(super) fn fold_str_repeat<'arena, A: Arena>(
+pub(super) fn fold_str_repeat<'arena, A>(
     context: &mut ExtensionContext<'_, '_, 'arena, A>,
     call: &Call<'arena, SymbolId, Flow, Type<'arena>>,
-) -> Option<Type<'arena>> {
+) -> Option<Type<'arena>>
+where
+    A: Arena,
+{
     let string = nth_argument(call, 0).and_then(literal_string)?;
     let times = nth_argument(call, 1).and_then(literal_int)?;
     if times < 0 {
@@ -99,31 +120,37 @@ pub(super) fn fold_str_repeat<'arena, A: Arena>(
         return None;
     }
 
-    let arena = context.arena();
+    let arena = context.ty.arena();
     let mut out = Vec::with_capacity_in(total, arena);
     for _ in 0..times {
         out.extend_from_slice(string);
     }
 
-    Some(context.string(&out))
+    Some(context.ty.string_literal_type(&out))
 }
 
-pub(super) fn fold_str_search<'arena, A: Arena>(
+pub(super) fn fold_str_search<'arena, A>(
     context: &mut ExtensionContext<'_, '_, 'arena, A>,
     call: &Call<'arena, SymbolId, Flow, Type<'arena>>,
     predicate: impl Fn(&[u8], &[u8]) -> bool,
-) -> Option<Type<'arena>> {
+) -> Option<Type<'arena>>
+where
+    A: Arena,
+{
     let haystack = nth_argument(call, 0).and_then(literal_string)?;
     let needle = nth_argument(call, 1).and_then(literal_string)?;
 
-    Some(context.union(&[if predicate(haystack, needle) { TRUE } else { FALSE }]))
+    Some(context.ty.union_of(&[if predicate(haystack, needle) { TRUE } else { FALSE }]))
 }
 
-pub(super) fn fold_radix<'arena, A: Arena>(
+pub(super) fn fold_radix<'arena, A>(
     context: &mut ExtensionContext<'_, '_, 'arena, A>,
     argument: Option<Type<'arena>>,
     radix: u64,
-) -> Option<Type<'arena>> {
+) -> Option<Type<'arena>>
+where
+    A: Arena,
+{
     let value = argument.and_then(literal_int)? as u64;
 
     const DIGITS: &[u8; 16] = b"0123456789abcdef";
@@ -139,55 +166,58 @@ pub(super) fn fold_radix<'arena, A: Arena>(
         }
     }
 
-    Some(context.string(&buffer[cursor..]))
+    Some(context.ty.string_literal_type(&buffer[cursor..]))
 }
 
-pub(super) fn fold_bin2hex<'arena, A: Arena>(
+pub(super) fn fold_bin2hex<'arena, A>(
     context: &mut ExtensionContext<'_, '_, 'arena, A>,
     argument: Option<Type<'arena>>,
-) -> Option<Type<'arena>> {
+) -> Option<Type<'arena>>
+where
+    A: Arena,
+{
     let bytes = argument.and_then(literal_string)?;
     if bytes.len() > FOLD_LENGTH_LIMIT {
         return None;
     }
 
     const DIGITS: &[u8; 16] = b"0123456789abcdef";
-    let arena = context.arena();
+    let arena = context.ty.arena();
     let mut hex = Vec::with_capacity_in(bytes.len() * 2, arena);
     for &byte in bytes {
         hex.push(DIGITS[(byte >> 4) as usize]);
         hex.push(DIGITS[(byte & 0x0f) as usize]);
     }
 
-    Some(context.string(&hex))
+    Some(context.ty.string_literal_type(&hex))
 }
 
-pub(super) fn string_position<'arena, A: Arena>(
+pub(super) fn string_position<'arena, A>(
     context: &mut ExtensionContext<'_, '_, 'arena, A>,
     call: &Call<'arena, SymbolId, Flow, Type<'arena>>,
     last: bool,
     case_insensitive: bool,
-) -> Type<'arena> {
+) -> Type<'arena>
+where
+    A: Arena,
+{
     if nth_argument(call, 2).is_none()
         && let Some(haystack) = nth_argument(call, 0).and_then(literal_string)
         && let Some(needle) = nth_argument(call, 1).and_then(literal_string)
     {
-        return match substring_position(context.arena(), haystack, needle, last, case_insensitive) {
-            Some(position) => context.int(position as i64),
-            None => context.union(&[FALSE]),
+        return match substring_position(context.ty.arena(), haystack, needle, last, case_insensitive) {
+            Some(position) => context.ty.int_literal_type(position as i64),
+            None => context.ty.union_of(&[FALSE]),
         };
     }
 
-    context.union(&[NON_NEGATIVE_INT, FALSE])
+    context.ty.union_of(&[NON_NEGATIVE_INT, FALSE])
 }
 
-fn substring_position<'arena, A: Arena>(
-    arena: &'arena A,
-    haystack: &[u8],
-    needle: &[u8],
-    last: bool,
-    case_insensitive: bool,
-) -> Option<usize> {
+fn substring_position<A>(arena: &A, haystack: &[u8], needle: &[u8], last: bool, case_insensitive: bool) -> Option<usize>
+where
+    A: Arena,
+{
     if needle.is_empty() {
         return Some(if last { haystack.len() } else { 0 });
     }
@@ -212,28 +242,29 @@ fn find_subslice(haystack: &[u8], needle: &[u8], last: bool) -> Option<usize> {
     if last { windows.rposition(|window| window == needle) } else { windows.position(|window| window == needle) }
 }
 
-pub(super) fn fold_str_replace<'arena, A: Arena>(
+pub(super) fn fold_str_replace<'arena, A>(
     context: &mut ExtensionContext<'_, '_, 'arena, A>,
     call: &Call<'arena, SymbolId, Flow, Type<'arena>>,
-) -> Option<Type<'arena>> {
+) -> Option<Type<'arena>>
+where
+    A: Arena,
+{
     let search = nth_argument(call, 0).and_then(literal_string)?;
     let replace = nth_argument(call, 1).and_then(literal_string)?;
     let subject = nth_argument(call, 2).and_then(literal_string)?;
 
-    let result = byte_replace(context.arena(), subject, search, replace);
+    let result = byte_replace(context.ty.arena(), subject, search, replace);
     if result.len() > FOLD_LENGTH_LIMIT {
         return None;
     }
 
-    Some(context.string(&result))
+    Some(context.ty.string_literal_type(&result))
 }
 
-fn byte_replace<'arena, A: Arena>(
-    arena: &'arena A,
-    subject: &[u8],
-    search: &[u8],
-    replace: &[u8],
-) -> Vec<'arena, u8, A> {
+fn byte_replace<'arena, A>(arena: &'arena A, subject: &[u8], search: &[u8], replace: &[u8]) -> Vec<'arena, u8, A>
+where
+    A: Arena,
+{
     let mut out = Vec::with_capacity_in(subject.len(), arena);
     if search.is_empty() {
         out.extend_from_slice(subject);
@@ -254,10 +285,13 @@ fn byte_replace<'arena, A: Arena>(
     out
 }
 
-pub(super) fn fold_substr<'arena, A: Arena>(
+pub(super) fn fold_substr<'arena, A>(
     context: &mut ExtensionContext<'_, '_, 'arena, A>,
     call: &Call<'arena, SymbolId, Flow, Type<'arena>>,
-) -> Option<Type<'arena>> {
+) -> Option<Type<'arena>>
+where
+    A: Arena,
+{
     let string = nth_argument(call, 0).and_then(literal_string)?;
     let offset = nth_argument(call, 1).and_then(literal_int)?;
     let length = match nth_argument(call, 2) {
@@ -274,13 +308,16 @@ pub(super) fn fold_substr<'arena, A: Arena>(
     };
 
     let slice = if end > start { &string[start as usize..end as usize] } else { &[][..] };
-    Some(context.string(slice))
+    Some(context.ty.string_literal_type(slice))
 }
 
-pub(super) fn fold_implode<'arena, A: Arena>(
+pub(super) fn fold_implode<'arena, A>(
     context: &mut ExtensionContext<'_, '_, 'arena, A>,
     call: &Call<'arena, SymbolId, Flow, Type<'arena>>,
-) -> Option<Type<'arena>> {
+) -> Option<Type<'arena>>
+where
+    A: Arena,
+{
     let separator: &[u8] = match (nth_argument(call, 0), nth_argument(call, 1)) {
         (Some(first), Some(_)) => literal_string(first)?,
         (Some(_), None) => &[],
@@ -288,16 +325,19 @@ pub(super) fn fold_implode<'arena, A: Arena>(
     };
     let array = nth_argument(call, 1).or_else(|| nth_argument(call, 0))?;
 
-    let arena = context.arena();
+    let arena = context.ty.arena();
     let mut joined = Vec::new_in(arena);
     if !append_imploded(&mut joined, array, separator) {
         return None;
     }
 
-    Some(context.string(&joined))
+    Some(context.ty.string_literal_type(&joined))
 }
 
-fn append_imploded<'arena, A: Arena>(joined: &mut Vec<'arena, u8, A>, array: Type<'arena>, separator: &[u8]) -> bool {
+fn append_imploded<'arena, A>(joined: &mut Vec<'arena, u8, A>, array: Type<'arena>, separator: &[u8]) -> bool
+where
+    A: Arena,
+{
     match array.atoms {
         [Atom::List(list)] if list.element_type.is_never() => {
             let elements = list.known_elements.unwrap_or(&[]);
@@ -337,7 +377,10 @@ fn append_imploded<'arena, A: Arena>(joined: &mut Vec<'arena, u8, A>, array: Typ
     }
 }
 
-fn append_element_string<'arena, A: Arena>(joined: &mut Vec<'arena, u8, A>, ty: Type<'arena>) -> bool {
+fn append_element_string<'arena, A>(joined: &mut Vec<'arena, u8, A>, ty: Type<'arena>) -> bool
+where
+    A: Arena,
+{
     if let Some(bytes) = literal_string(ty) {
         joined.extend_from_slice(bytes);
         return true;
@@ -350,7 +393,10 @@ fn append_element_string<'arena, A: Arena>(joined: &mut Vec<'arena, u8, A>, ty: 
     false
 }
 
-fn append_decimal<'arena, A: Arena>(joined: &mut Vec<'arena, u8, A>, value: i64) {
+fn append_decimal<A>(joined: &mut Vec<'_, u8, A>, value: i64)
+where
+    A: Arena,
+{
     let mut buffer = [0u8; 20];
     let mut cursor = buffer.len();
     let mut magnitude = value.unsigned_abs();

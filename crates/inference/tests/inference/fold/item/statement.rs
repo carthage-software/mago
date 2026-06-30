@@ -1,4 +1,7 @@
+#![allow(clippy::expect_used)]
+
 use indoc::indoc;
+
 use mago_hir::ir::item::member::MemberItemKind;
 use mago_hir::ir::item::statement::ItemStatementKind;
 use mago_hir::ir::statement::StatementKind;

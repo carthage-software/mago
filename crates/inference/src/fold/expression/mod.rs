@@ -1,3 +1,5 @@
+#![allow(clippy::type_complexity)]
+
 use mago_allocator::Arena;
 use mago_allocator::CopyInto;
 use mago_hir::ir::expression::Expression;

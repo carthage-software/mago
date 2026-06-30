@@ -46,7 +46,7 @@ where
 
             atoms
         }
-        hir_type::TypeKind::Named(identifier) => vec![builder.object_named(identifier.value)],
+        hir_type::TypeKind::Named(identifier) => vec![builder.named_object_atom(identifier.value)],
         hir_type::TypeKind::Union(members) => {
             let mut atoms = Vec::with_capacity(members.len());
             for member in *members {
@@ -80,7 +80,7 @@ where
             })]
         }
         hir_type::TypeKind::Self_(identifier) | hir_type::TypeKind::Parent(identifier) => {
-            vec![builder.object_named(identifier.value)]
+            vec![builder.named_object_atom(identifier.value)]
         }
         hir_type::TypeKind::Void => vec![well_known::VOID],
         hir_type::TypeKind::Never => vec![well_known::NEVER],

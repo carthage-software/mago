@@ -184,11 +184,11 @@ fn lower_annotation_kind<'scratch, 'arena, S, A>(
         TypeAnnotationKind::Array(non_empty, key, value) => {
             let key_type = lower_subtype(builder, key);
             let value_type = lower_subtype(builder, value);
-            out.push(builder.keyed_unsealed(key_type, value_type, *non_empty));
+            out.push(builder.unsealed_keyed_array_atom(key_type, value_type, *non_empty));
         }
         TypeAnnotationKind::List(non_empty, value) => {
             let element_type = lower_subtype(builder, value);
-            out.push(builder.list_of(element_type, *non_empty));
+            out.push(builder.list_of_atom(element_type, *non_empty));
         }
         TypeAnnotationKind::Iterable(key, value) => {
             let key_type = lower_subtype(builder, key);
@@ -214,7 +214,7 @@ fn lower_annotation_kind<'scratch, 'arena, S, A>(
         TypeAnnotationKind::Int(None) => out.push(well_known::INT),
         TypeAnnotationKind::Int(Some(IntLiteral::Specific(value))) => out.push(Atom::int_literal(*value)),
         TypeAnnotationKind::Int(Some(IntLiteral::Unspecified)) => out.push(well_known::LITERAL_INT),
-        TypeAnnotationKind::IntRange(lower, upper) => out.push(builder.int_range(*lower, *upper)),
+        TypeAnnotationKind::IntRange(lower, upper) => out.push(builder.int_range_atom(*lower, *upper)),
         TypeAnnotationKind::Float(None) => out.push(well_known::FLOAT),
         TypeAnnotationKind::Float(Some(FloatLiteral::Specific(value))) => {
             out.push(Atom::Float(FloatAtom::Literal(LiteralFloat::new(value.into_inner()))))
@@ -230,7 +230,7 @@ fn lower_annotation_kind<'scratch, 'arena, S, A>(
         TypeAnnotationKind::ArrayKey => out.push(well_known::ARRAY_KEY),
         TypeAnnotationKind::Scalar | TypeAnnotationKind::EmptyScalar => out.push(well_known::SCALAR),
         TypeAnnotationKind::Object => out.push(well_known::OBJECT),
-        TypeAnnotationKind::StringableObject => out.push(builder.object_named(b"Stringable")),
+        TypeAnnotationKind::StringableObject => out.push(builder.named_object_atom(b"Stringable")),
         TypeAnnotationKind::ObjectShape(shape) => {
             let known_properties = if shape.fields.as_slice().is_empty() {
                 None
@@ -336,7 +336,7 @@ fn lower_annotation_kind<'scratch, 'arena, S, A>(
         }
         TypeAnnotationKind::Slice(inner) => {
             let value = lower_subtype(builder, inner);
-            out.push(builder.keyed_unsealed(well_known::TYPE_ARRAY_KEY, value, false));
+            out.push(builder.unsealed_keyed_array_atom(well_known::TYPE_ARRAY_KEY, value, false));
         }
         TypeAnnotationKind::Wildcard => out.push(well_known::PLACEHOLDER),
         TypeAnnotationKind::ThisVariable => out.push(well_known::OBJECT),
@@ -423,7 +423,7 @@ where
         }
 
         return match shape.additional_fields {
-            None => builder.sealed_list(&elements, shape.non_empty),
+            None => builder.sealed_list_atom(&elements, shape.non_empty),
             Some(additional) => {
                 let element_type = lower_subtype(builder, additional.value_type);
                 let known_count = NonZeroU32::new(elements.len() as u32);
@@ -446,7 +446,7 @@ where
     }
 
     match shape.additional_fields {
-        None => builder.keyed_sealed(&items, shape.non_empty),
+        None => builder.sealed_keyed_array_atom(&items, shape.non_empty),
         Some(additional) => {
             let key_param = Some(lower_subtype(builder, additional.key_type));
             let value_param = Some(lower_subtype(builder, additional.value_type));
@@ -637,7 +637,7 @@ fn lower_kind<'scratch, 'arena, S, A>(
             lower_kind(builder, &inner.kind, out);
             out.push(well_known::NULL);
         }
-        HirTypeKind::Named(identifier) => out.push(builder.object_named(identifier.value)),
+        HirTypeKind::Named(identifier) => out.push(builder.named_object_atom(identifier.value)),
         HirTypeKind::Union(members) => {
             for member in *members {
                 lower_kind(builder, &member.kind, out);
@@ -664,7 +664,7 @@ fn lower_kind<'scratch, 'arena, S, A>(
             }));
         }
         HirTypeKind::Self_(identifier) | HirTypeKind::Parent(identifier) => {
-            out.push(builder.object_named(identifier.value))
+            out.push(builder.named_object_atom(identifier.value))
         }
         HirTypeKind::Void => out.push(well_known::VOID),
         HirTypeKind::Never => out.push(well_known::NEVER),

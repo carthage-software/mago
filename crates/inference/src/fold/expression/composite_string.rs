@@ -64,7 +64,7 @@ where
         let meta = if has_never {
             TYPE_NEVER
         } else if foldable {
-            self.literal_string(&bytes)
+            self.ty.string_literal_type(&bytes)
         } else if non_empty {
             self.ty.union_of(&[NON_EMPTY_STRING])
         } else {

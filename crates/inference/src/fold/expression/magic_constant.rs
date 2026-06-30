@@ -26,13 +26,13 @@ where
             MagicConstantKind::Line => {
                 let line = line_number(self.line_starts, span.start.offset) + 1;
 
-                self.int_literal(i64::from(line))
+                self.ty.int_literal_type(i64::from(line))
             }
             MagicConstantKind::File | MagicConstantKind::Directory => self.ty.union_of(&[NON_EMPTY_LITERAL_STRING]),
             MagicConstantKind::Namespace => {
                 let namespace = self.namespace;
 
-                self.literal_string(namespace)
+                self.ty.string_literal_type(namespace)
             }
             MagicConstantKind::Trait
             | MagicConstantKind::Method

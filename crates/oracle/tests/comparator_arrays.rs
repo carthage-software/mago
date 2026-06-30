@@ -15,7 +15,7 @@ fn t_sealed_list<'arena>(f: &mut Fixture<'_, 'arena>, elements: &[Type<'arena>],
         .map(|(index, value)| KnownElement { index: index as u32, value: *value, optional: false })
         .collect();
 
-    f.builder.sealed_list(&entries, non_empty)
+    f.builder.sealed_list_atom(&entries, non_empty)
 }
 
 #[test]

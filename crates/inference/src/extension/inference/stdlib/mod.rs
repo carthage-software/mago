@@ -46,12 +46,12 @@ impl<A: Arena> ExtensionInference<A> for StdlibInference {
             b"strlen" => Some(strings::byte_length(context, argument)),
             b"mb_strlen" | b"grapheme_strlen" | b"iconv_strlen" => Some(strings::character_length(context, argument)),
             b"count" | b"sizeof" => Some(arrays::element_count(context, argument)),
-            b"strtoupper" => {
-                strings::fold_string(context, argument, |bytes, out| out.extend(bytes.iter().map(u8::to_ascii_uppercase)))
-            }
-            b"strtolower" => {
-                strings::fold_string(context, argument, |bytes, out| out.extend(bytes.iter().map(u8::to_ascii_lowercase)))
-            }
+            b"strtoupper" => strings::fold_string(context, argument, |bytes, out| {
+                out.extend(bytes.iter().map(u8::to_ascii_uppercase))
+            }),
+            b"strtolower" => strings::fold_string(context, argument, |bytes, out| {
+                out.extend(bytes.iter().map(u8::to_ascii_lowercase))
+            }),
             b"ucfirst" => strings::fold_string(context, argument, |bytes, out| {
                 out.extend_from_slice(bytes);
                 if let Some(first) = out.first_mut() {
@@ -77,7 +77,9 @@ impl<A: Arena> ExtensionInference<A> for StdlibInference {
             b"str_contains" => strings::fold_str_search(context, call, |haystack, needle| {
                 needle.is_empty() || haystack.windows(needle.len()).any(|window| window == needle)
             }),
-            b"str_starts_with" => strings::fold_str_search(context, call, |haystack, needle| haystack.starts_with(needle)),
+            b"str_starts_with" => {
+                strings::fold_str_search(context, call, |haystack, needle| haystack.starts_with(needle))
+            }
             b"str_ends_with" => strings::fold_str_search(context, call, |haystack, needle| haystack.ends_with(needle)),
             b"strpos" => Some(strings::string_position(context, call, false, false)),
             b"stripos" => Some(strings::string_position(context, call, false, true)),
@@ -119,10 +121,13 @@ pub(super) fn nth_argument<'arena>(
         .nth(index)
 }
 
-pub(super) fn positional_arguments<'arena, A: Arena>(
+pub(super) fn positional_arguments<'arena, A>(
     arena: &'arena A,
     call: &Call<'arena, SymbolId, Flow, Type<'arena>>,
-) -> Vec<'arena, Type<'arena>, A> {
+) -> Vec<'arena, Type<'arena>, A>
+where
+    A: Arena,
+{
     let mut arguments = Vec::new_in(arena);
     for argument in call.arguments.items.iter() {
         if let Argument::Value(expression) = argument {
@@ -133,7 +138,7 @@ pub(super) fn positional_arguments<'arena, A: Arena>(
     arguments
 }
 
-pub(super) fn literal_string<'arena>(ty: Type<'arena>) -> Option<&'arena [u8]> {
+pub(super) fn literal_string(ty: Type<'_>) -> Option<&[u8]> {
     match ty.atoms {
         [Atom::String(string)] => match string.literal {
             StringLiteral::Value(value) => Some(value),

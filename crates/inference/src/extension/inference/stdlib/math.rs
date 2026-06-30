@@ -6,7 +6,6 @@ use mago_oracle::ty::Atom;
 use mago_oracle::ty::Type;
 use mago_oracle::ty::atom::payload::scalar::float::FloatAtom;
 use mago_oracle::ty::atom::payload::scalar::int::IntAtom;
-use mago_oracle::ty::well_known::FLOAT;
 
 use crate::extension::ExtensionContext;
 use crate::extension::inference::stdlib::literal_int;
@@ -14,20 +13,23 @@ use crate::extension::inference::stdlib::nth_argument;
 use crate::extension::inference::stdlib::positional_arguments;
 use crate::flow::Flow;
 
-pub(super) fn fold_abs<'arena, A: Arena>(
+pub(super) fn fold_abs<'arena, A>(
     context: &mut ExtensionContext<'_, '_, 'arena, A>,
     argument: Option<Type<'arena>>,
-) -> Option<Type<'arena>> {
+) -> Option<Type<'arena>>
+where
+    A: Arena,
+{
     match argument?.atoms {
         [Atom::Int(integer)] => {
             let (lower, upper) = abs_bounds(int_bounds(integer));
             match (lower, upper) {
-                (Some(low), Some(high)) if low == high => Some(context.int(low)),
-                (low, high) => Some(context.int_range(low, high)),
+                (Some(low), Some(high)) if low == high => Some(context.ty.int_literal_type(low)),
+                (low, high) => Some(context.ty.int_range_type(low, high)),
             }
         }
-        [Atom::Float(FloatAtom::Literal(value))] => Some(context.float(value.0.into_inner().abs())),
-        [Atom::Float(_)] => Some(context.union(&[FLOAT])),
+        [Atom::Float(FloatAtom::Literal(value))] => Some(context.ty.float_literal_type(value.0.into_inner().abs())),
+        [Atom::Float(_)] => Some(context.ty.float_type()),
         _ => None,
     }
 }
@@ -49,36 +51,45 @@ pub(super) fn int_bounds(integer: &IntAtom<'_>) -> (Option<i64>, Option<i64>) {
     }
 }
 
-pub(super) fn fold_intdiv<'arena, A: Arena>(
+pub(super) fn fold_intdiv<'arena, A>(
     context: &mut ExtensionContext<'_, '_, 'arena, A>,
     call: &Call<'arena, SymbolId, Flow, Type<'arena>>,
-) -> Option<Type<'arena>> {
+) -> Option<Type<'arena>>
+where
+    A: Arena,
+{
     let dividend = nth_argument(call, 0).and_then(literal_int)?;
     let divisor = nth_argument(call, 1).and_then(literal_int)?;
 
-    dividend.checked_div(divisor).map(|quotient| context.int(quotient))
+    dividend.checked_div(divisor).map(|quotient| context.ty.int_literal_type(quotient))
 }
 
-pub(super) fn fold_min_max<'arena, A: Arena>(
+pub(super) fn fold_min_max<'arena, A>(
     context: &mut ExtensionContext<'_, '_, 'arena, A>,
     call: &Call<'arena, SymbolId, Flow, Type<'arena>>,
     max: bool,
-) -> Option<Type<'arena>> {
-    let atoms = candidate_atoms(context.arena(), call)?;
+) -> Option<Type<'arena>>
+where
+    A: Arena,
+{
+    let atoms = candidate_atoms(context.ty.arena(), call)?;
     if atoms.is_empty() {
         return None;
     }
 
     match reduce_int_bounds(&atoms, max) {
         Some((lower, upper)) => Some(int_type(context, lower, upper)),
-        None => Some(context.union(&atoms)),
+        None => Some(context.ty.union_of(&atoms)),
     }
 }
 
-fn candidate_atoms<'arena, A: Arena>(
+fn candidate_atoms<'arena, A>(
     arena: &'arena A,
     call: &Call<'arena, SymbolId, Flow, Type<'arena>>,
-) -> Option<Vec<'arena, Atom<'arena>, A>> {
+) -> Option<Vec<'arena, Atom<'arena>, A>>
+where
+    A: Arena,
+{
     let arguments = positional_arguments(arena, call);
     match arguments.as_slice() {
         [] => None,
@@ -94,10 +105,10 @@ fn candidate_atoms<'arena, A: Arena>(
     }
 }
 
-fn array_value_atoms<'arena, A: Arena>(
-    arena: &'arena A,
-    ty: Type<'arena>,
-) -> Option<Vec<'arena, Atom<'arena>, A>> {
+fn array_value_atoms<'arena, A>(arena: &'arena A, ty: Type<'arena>) -> Option<Vec<'arena, Atom<'arena>, A>>
+where
+    A: Arena,
+{
     let mut atoms = Vec::new_in(arena);
     match ty.atoms {
         [Atom::Array(array)] => {
@@ -159,13 +170,16 @@ fn atom_int_bounds(atom: &Atom<'_>) -> Option<(Option<i64>, Option<i64>)> {
     }
 }
 
-fn int_type<'arena, A: Arena>(
+fn int_type<'arena, A>(
     context: &mut ExtensionContext<'_, '_, 'arena, A>,
     lower: Option<i64>,
     upper: Option<i64>,
-) -> Type<'arena> {
+) -> Type<'arena>
+where
+    A: Arena,
+{
     match (lower, upper) {
-        (Some(low), Some(high)) if low == high => context.int(low),
-        (low, high) => context.int_range(low, high),
+        (Some(low), Some(high)) if low == high => context.ty.int_literal_type(low),
+        (low, high) => context.ty.int_range_type(low, high),
     }
 }

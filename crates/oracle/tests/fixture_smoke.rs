@@ -146,7 +146,7 @@ fn sealed_list_uses_never_rest_type() {
     fixture(|f| {
         let int = f.u(well_known::INT);
         let entries = [mago_oracle::ty::atom::payload::array::KnownElement { index: 0, value: int, optional: false }];
-        let sealed = f.builder.sealed_list(&entries, true);
+        let sealed = f.builder.sealed_list_atom(&entries, true);
 
         let Atom::List(payload) = sealed else {
             panic!("sealed list must be a list atom");

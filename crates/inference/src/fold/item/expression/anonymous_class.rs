@@ -39,7 +39,7 @@ where
         }
         self.self_class = outer_class;
 
-        let atom = self.ty.object_named(class_name);
+        let atom = self.ty.named_object_atom(class_name);
         let meta = self.ty.union_of(&[atom]);
 
         let node = AnonymousClass {

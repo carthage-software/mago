@@ -454,7 +454,7 @@ where
 
         Some(match literal.kind {
             LiteralKind::Integer(integer) => Atom::int_literal(integer.value? as i64),
-            LiteralKind::String(string) => self.builder.string_literal(string.value?),
+            LiteralKind::String(string) => self.builder.string_literal_atom(string.value?),
             LiteralKind::Float(float) => Atom::float_literal(float.value.into_inner()),
             LiteralKind::True => crate::ty::well_known::TRUE,
             LiteralKind::False => crate::ty::well_known::FALSE,

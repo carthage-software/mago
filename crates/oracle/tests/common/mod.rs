@@ -180,15 +180,15 @@ impl<'arena> Fixture<'_, 'arena> {
     }
 
     pub fn t_int_from(&mut self, from: i64) -> Atom<'arena> {
-        self.builder.int_range(Some(from), None)
+        self.builder.int_range_atom(Some(from), None)
     }
 
     pub fn t_int_to(&mut self, to: i64) -> Atom<'arena> {
-        self.builder.int_range(None, Some(to))
+        self.builder.int_range_atom(None, Some(to))
     }
 
     pub fn t_int_range(&mut self, low: i64, high: i64) -> Atom<'arena> {
-        self.builder.int_range(Some(low), Some(high))
+        self.builder.int_range_atom(Some(low), Some(high))
     }
 
     pub fn t_int_unspec_lit(&self) -> Atom<'arena> {
@@ -228,7 +228,7 @@ impl<'arena> Fixture<'_, 'arena> {
     }
 
     pub fn t_lit_string(&mut self, value: &str) -> Atom<'arena> {
-        self.builder.string_literal(value.as_bytes())
+        self.builder.string_literal_atom(value.as_bytes())
     }
 
     pub fn t_non_empty_string(&self) -> Atom<'arena> {
@@ -288,7 +288,7 @@ impl<'arena> Fixture<'_, 'arena> {
     }
 
     pub fn t_lit_class_string(&mut self, name: &str) -> Atom<'arena> {
-        self.builder.class_string_literal(name.as_bytes())
+        self.builder.class_string_literal_atom(name.as_bytes())
     }
 
     pub fn t_class_string_of(&mut self, constraint: Type<'arena>) -> Atom<'arena> {
@@ -322,15 +322,15 @@ impl<'arena> Fixture<'_, 'arena> {
     }
 
     pub fn t_named(&mut self, name: &str) -> Atom<'arena> {
-        self.builder.object_named(name.as_bytes())
+        self.builder.named_object_atom(name.as_bytes())
     }
 
     pub fn t_enum(&mut self, name: &str) -> Atom<'arena> {
-        self.builder.enum_any(name.as_bytes())
+        self.builder.enum_atom(name.as_bytes())
     }
 
     pub fn t_enum_case(&mut self, name: &str, case: &str) -> Atom<'arena> {
-        self.builder.enum_case(name.as_bytes(), case.as_bytes())
+        self.builder.enum_case_atom(name.as_bytes(), case.as_bytes())
     }
 
     pub fn t_generic_named(&mut self, name: &str, arguments: Vec<Type<'arena>>) -> Atom<'arena> {
@@ -342,7 +342,7 @@ impl<'arena> Fixture<'_, 'arena> {
     }
 
     pub fn t_named_intersected(&mut self, head: &str, conjuncts: &[Atom<'arena>]) -> Atom<'arena> {
-        let head = self.builder.object_named(head.as_bytes());
+        let head = self.builder.named_object_atom(head.as_bytes());
 
         self.builder.intersected(head, conjuncts)
     }
@@ -413,11 +413,11 @@ impl<'arena> Fixture<'_, 'arena> {
     }
 
     pub fn t_list(&mut self, element: Type<'arena>, non_empty: bool) -> Atom<'arena> {
-        self.builder.list_of(element, non_empty)
+        self.builder.list_of_atom(element, non_empty)
     }
 
     pub fn t_keyed_unsealed(&mut self, key: Type<'arena>, value: Type<'arena>, non_empty: bool) -> Atom<'arena> {
-        self.builder.keyed_unsealed(key, value, non_empty)
+        self.builder.unsealed_keyed_array_atom(key, value, non_empty)
     }
 
     pub fn t_keyed_sealed(
@@ -428,7 +428,7 @@ impl<'arena> Fixture<'_, 'arena> {
         let entries: Vec<KnownItem<'arena>> =
             items.into_iter().map(|(key, (optional, value))| KnownItem { key, value, optional }).collect();
 
-        self.builder.keyed_sealed(&entries, non_empty)
+        self.builder.sealed_keyed_array_atom(&entries, non_empty)
     }
 
     pub fn t_iterable(&mut self, key: Type<'arena>, value: Type<'arena>) -> Atom<'arena> {
@@ -437,11 +437,11 @@ impl<'arena> Fixture<'_, 'arena> {
     }
 
     pub fn t_callable_mixed(&mut self) -> Atom<'arena> {
-        self.builder.callable_mixed()
+        self.builder.mixed_callable_atom()
     }
 
     pub fn t_closure_mixed(&mut self) -> Atom<'arena> {
-        self.builder.closure_mixed()
+        self.builder.mixed_closure_atom()
     }
 
     pub fn t_callable_any(&self) -> Atom<'arena> {

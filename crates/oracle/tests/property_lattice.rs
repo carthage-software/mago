@@ -508,12 +508,12 @@ impl<'scratch, 'arena> Probe<'scratch, 'arena> {
             TypeRecipe::Primitive(primitive) => vec![primitive_atom(*primitive)],
             TypeRecipe::LiteralInt(value) => vec![Atom::int_literal(*value)],
             TypeRecipe::RefinedInt(refined) => vec![self.refined_int_atom(*refined)],
-            TypeRecipe::LiteralString(value) => vec![self.builder.string_literal(value.as_bytes())],
+            TypeRecipe::LiteralString(value) => vec![self.builder.string_literal_atom(value.as_bytes())],
             TypeRecipe::RefinedString(refined) => vec![self.refined_string_atom(*refined)],
             TypeRecipe::LiteralFloat(value) => vec![Atom::float_literal(*value)],
             TypeRecipe::UnspecifiedLiteralFloat => vec![well_known::LITERAL_FLOAT],
-            TypeRecipe::ClassObject(name) => vec![self.builder.object_named(name.as_bytes())],
-            TypeRecipe::Enumeration(name) => vec![self.builder.enum_any(name.as_bytes())],
+            TypeRecipe::ClassObject(name) => vec![self.builder.named_object_atom(name.as_bytes())],
+            TypeRecipe::Enumeration(name) => vec![self.builder.enum_atom(name.as_bytes())],
             TypeRecipe::HasMethod(name) => {
                 let method_name = self.builder.intern(name.as_bytes());
 
@@ -527,7 +527,7 @@ impl<'scratch, 'arena> Probe<'scratch, 'arena> {
                 })]
             }
             TypeRecipe::IntersectionObject(head, conjunct) => {
-                let head_atom = self.builder.object_named(head.as_bytes());
+                let head_atom = self.builder.named_object_atom(head.as_bytes());
                 let conjunct_atom = self.conjunct_atom(*conjunct);
 
                 vec![self.builder.intersected(head_atom, &[conjunct_atom])]
@@ -551,13 +551,13 @@ impl<'scratch, 'arena> Probe<'scratch, 'arena> {
             TypeRecipe::List(element, non_empty) => {
                 let element_type = self.build(element);
 
-                vec![self.builder.list_of(element_type, *non_empty)]
+                vec![self.builder.list_of_atom(element_type, *non_empty)]
             }
             TypeRecipe::KeyedUnsealed(key, value) => {
                 let key_type = self.build(key);
                 let value_type = self.build(value);
 
-                vec![self.builder.keyed_unsealed(key_type, value_type, false)]
+                vec![self.builder.unsealed_keyed_array_atom(key_type, value_type, false)]
             }
             TypeRecipe::Iterable(key, value) => {
                 let key_type = self.build(key);
@@ -659,9 +659,9 @@ impl<'scratch, 'arena> Probe<'scratch, 'arena> {
             RefinedIntRecipe::Negative => well_known::NEGATIVE_INT,
             RefinedIntRecipe::NonNegative => well_known::NON_NEGATIVE_INT,
             RefinedIntRecipe::NonPositive => well_known::NON_POSITIVE_INT,
-            RefinedIntRecipe::Range(lower, upper) => self.builder.int_range(Some(lower), Some(upper)),
-            RefinedIntRecipe::From(lower) => self.builder.int_range(Some(lower), None),
-            RefinedIntRecipe::To(upper) => self.builder.int_range(None, Some(upper)),
+            RefinedIntRecipe::Range(lower, upper) => self.builder.int_range_atom(Some(lower), Some(upper)),
+            RefinedIntRecipe::From(lower) => self.builder.int_range_atom(Some(lower), None),
+            RefinedIntRecipe::To(upper) => self.builder.int_range_atom(None, Some(upper)),
         }
     }
 
@@ -680,7 +680,7 @@ impl<'scratch, 'arena> Probe<'scratch, 'arena> {
 
     fn conjunct_atom(&mut self, conjunct: ConjunctRecipe) -> Atom<'arena> {
         match conjunct {
-            ConjunctRecipe::Named(name) => self.builder.object_named(name.as_bytes()),
+            ConjunctRecipe::Named(name) => self.builder.named_object_atom(name.as_bytes()),
             ConjunctRecipe::HasMethod(name) => {
                 let method_name = self.builder.intern(name.as_bytes());
 
@@ -1759,10 +1759,10 @@ proptest! {
                     continue;
                 }
 
-                let head = probe.builder.object_named(class_name.as_bytes());
+                let head = probe.builder.named_object_atom(class_name.as_bytes());
                 let mut negations: Vec<Atom<'_>> = Vec::with_capacity(inheritors.len());
                 for inheritor in &inheritors {
-                    let inheritor_atom = probe.builder.object_named(inheritor);
+                    let inheritor_atom = probe.builder.named_object_atom(inheritor);
                     let inheritor_type = probe.builder.union_of(&[inheritor_atom]);
                     negations.push(probe.builder.negated(inheritor_type));
                 }

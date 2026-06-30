@@ -66,6 +66,7 @@ use crate::var::Var;
 
 pub mod union_buffer;
 
+mod simple;
 mod sugar;
 
 /// Hash-consing constructor for [`Type`]s and reference-payload [`Atom`]s.
@@ -327,7 +328,7 @@ where
 
     /// `int<lower, upper>` with either bound open when `None`.
     #[must_use]
-    pub fn int_range(&mut self, lower: Option<i64>, upper: Option<i64>) -> Atom<'arena> {
+    pub fn int_range_atom(&mut self, lower: Option<i64>, upper: Option<i64>) -> Atom<'arena> {
         Atom::Int(IntAtom::Range(cons(&mut self.int_ranges, self.arena, IntRange::new(lower, upper))))
     }
 
@@ -588,7 +589,7 @@ where
             Atom::Int(IntAtom::Unspecified) => Atom::Int(IntAtom::Unspecified),
             Atom::Int(IntAtom::UnspecifiedLiteral) => Atom::Int(IntAtom::UnspecifiedLiteral),
             Atom::Int(IntAtom::Literal(value)) => Atom::Int(IntAtom::Literal(value)),
-            Atom::Int(IntAtom::Range(range)) => self.int_range(range.lower(), range.upper()),
+            Atom::Int(IntAtom::Range(range)) => self.int_range_atom(range.lower(), range.upper()),
             Atom::Float(payload) => Atom::Float(payload),
             Atom::String(payload) => {
                 let literal = match payload.literal {

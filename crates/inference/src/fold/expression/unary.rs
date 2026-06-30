@@ -104,15 +104,15 @@ where
         match operator {
             UnaryPrefixOperator::Negation => match number_of(operand) {
                 Some(Number::Int(value)) => match value.checked_neg() {
-                    Some(value) => self.int_literal(value),
-                    None => self.float_literal(-(value as f64)),
+                    Some(value) => self.ty.int_literal_type(value),
+                    None => self.ty.float_literal_type(-(value as f64)),
                 },
-                Some(Number::Float(value)) => self.float_literal(-value),
+                Some(Number::Float(value)) => self.ty.float_literal_type(-value),
                 None => TYPE_INT_OR_FLOAT,
             },
             UnaryPrefixOperator::Plus => match number_of(operand) {
-                Some(Number::Int(value)) => self.int_literal(value),
-                Some(Number::Float(value)) => self.float_literal(value),
+                Some(Number::Int(value)) => self.ty.int_literal_type(value),
+                Some(Number::Float(value)) => self.ty.float_literal_type(value),
                 None => TYPE_INT_OR_FLOAT,
             },
             UnaryPrefixOperator::Not => match truthiness(operand) {
@@ -127,20 +127,20 @@ where
                         result.push(!*byte);
                     }
 
-                    self.literal_string(&result)
+                    self.ty.string_literal_type(&result)
                 } else {
                     match number_of(operand) {
-                        Some(number) => self.int_literal(!number.to_int()),
+                        Some(number) => self.ty.int_literal_type(!number.to_int()),
                         None => TYPE_INT,
                     }
                 }
             }
             UnaryPrefixOperator::IntCast => match cast_number(operand) {
-                Some(number) => self.int_literal(number.to_int()),
+                Some(number) => self.ty.int_literal_type(number.to_int()),
                 None => TYPE_INT,
             },
             UnaryPrefixOperator::FloatCast => match cast_number(operand) {
-                Some(number) => self.float_literal(number.as_f64()),
+                Some(number) => self.ty.float_literal_type(number.as_f64()),
                 None => TYPE_FLOAT,
             },
             UnaryPrefixOperator::BoolCast => match truthiness(operand) {
@@ -150,7 +150,7 @@ where
             },
             UnaryPrefixOperator::StringCast => {
                 let mut bytes = Vec::new_in(self.source);
-                if append_string(&mut bytes, operand) { self.literal_string(&bytes) } else { TYPE_STRING }
+                if append_string(&mut bytes, operand) { self.ty.string_literal_type(&bytes) } else { TYPE_STRING }
             }
             UnaryPrefixOperator::ArrayCast => self.ty.union_of(&[ARRAY_KEY_MIXED]),
             UnaryPrefixOperator::ObjectCast => TYPE_OBJECT,
@@ -169,22 +169,22 @@ where
 
         match atom {
             Atom::Int(IntAtom::Literal(value)) => match value.checked_add(1) {
-                Some(value) => self.int_literal(value),
-                None => self.float_literal(*value as f64 + 1.0),
+                Some(value) => self.ty.int_literal_type(value),
+                None => self.ty.float_literal_type(*value as f64 + 1.0),
             },
-            Atom::Float(FloatAtom::Literal(value)) => self.float_literal(value.0.into_inner() + 1.0),
-            Atom::Null => self.int_literal(1),
+            Atom::Float(FloatAtom::Literal(value)) => self.ty.float_literal_type(value.0.into_inner() + 1.0),
+            Atom::Null => self.ty.int_literal_type(1),
             Atom::True | Atom::False | Atom::Bool => ty,
             Atom::String(string) => match string.literal {
                 StringLiteral::Value(value) => match parse_php_number(value) {
                     Some(Number::Int(number)) => match number.checked_add(1) {
-                        Some(number) => self.int_literal(number),
-                        None => self.float_literal(number as f64 + 1.0),
+                        Some(number) => self.ty.int_literal_type(number),
+                        None => self.ty.float_literal_type(number as f64 + 1.0),
                     },
-                    Some(Number::Float(number)) => self.float_literal(number + 1.0),
+                    Some(Number::Float(number)) => self.ty.float_literal_type(number + 1.0),
                     None => {
                         let mut next = Vec::new_in(self.source);
-                        if php_string_increment(value, &mut next) { self.literal_string(&next) } else { ty }
+                        if php_string_increment(value, &mut next) { self.ty.string_literal_type(&next) } else { ty }
                     }
                 },
                 _ => TYPE_STRING,
@@ -202,18 +202,18 @@ where
 
         match atom {
             Atom::Int(IntAtom::Literal(value)) => match value.checked_sub(1) {
-                Some(value) => self.int_literal(value),
-                None => self.float_literal(*value as f64 - 1.0),
+                Some(value) => self.ty.int_literal_type(value),
+                None => self.ty.float_literal_type(*value as f64 - 1.0),
             },
-            Atom::Float(FloatAtom::Literal(value)) => self.float_literal(value.0.into_inner() - 1.0),
+            Atom::Float(FloatAtom::Literal(value)) => self.ty.float_literal_type(value.0.into_inner() - 1.0),
             Atom::Null | Atom::True | Atom::False | Atom::Bool => ty,
             Atom::String(string) => match string.literal {
                 StringLiteral::Value(value) => match parse_php_number(value) {
                     Some(Number::Int(number)) => match number.checked_sub(1) {
-                        Some(number) => self.int_literal(number),
-                        None => self.float_literal(number as f64 - 1.0),
+                        Some(number) => self.ty.int_literal_type(number),
+                        None => self.ty.float_literal_type(number as f64 - 1.0),
                     },
-                    Some(Number::Float(number)) => self.float_literal(number - 1.0),
+                    Some(Number::Float(number)) => self.ty.float_literal_type(number - 1.0),
                     None => ty,
                 },
                 _ => TYPE_STRING,

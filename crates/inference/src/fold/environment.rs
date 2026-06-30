@@ -1,9 +1,7 @@
 use mago_allocator::Arena;
 use mago_allocator::collections::HashMap;
-use mago_oracle::ty::Atom;
 use mago_oracle::ty::Type;
 use mago_oracle::ty::TypeBuilder;
-use mago_oracle::ty::join;
 use mago_oracle::ty::join::JoinOptions;
 use mago_oracle::ty::well_known::TYPE_MIXED;
 use mago_oracle::var::Var;
@@ -150,18 +148,14 @@ fn is_variable_place(place: Var<'_>) -> bool {
     !place.as_bytes().iter().any(|byte| matches!(byte, b'[' | b'-'))
 }
 
-pub(crate) fn union_types<'source, 'arena, A>(
-    builder: &mut TypeBuilder<'source, 'arena, A, A>,
+pub(crate) fn union_types<'arena, A>(
+    builder: &mut TypeBuilder<'_, 'arena, A, A>,
     left: Type<'arena>,
     right: Type<'arena>,
 ) -> Type<'arena>
 where
     A: Arena,
 {
-    let mut atoms = builder.scratch_vec::<Atom<'arena>>();
-    atoms.extend_from_slice(left.atoms);
-    atoms.extend_from_slice(right.atoms);
-
     let options = JoinOptions {
         merge_int_ranges: false,
         int_literal_collapse_threshold: None,
@@ -171,7 +165,5 @@ where
         ..JoinOptions::default()
     };
 
-    let canonical = join::compute_with(&atoms, &options, builder);
-
-    builder.union_of(&canonical)
+    builder.union_type(left, right, &options)
 }

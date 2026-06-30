@@ -210,8 +210,8 @@ fn flat_map_one_to_many_explodes() {
     let mut builder = TypeBuilder::new(&arena, &scratch);
 
     let five = Atom::Int(IntAtom::Literal(5));
-    let low = builder.int_range(Some(0), Some(4));
-    let high = builder.int_range(Some(6), Some(10));
+    let low = builder.int_range_atom(Some(0), Some(4));
+    let high = builder.int_range_atom(Some(6), Some(10));
 
     let origin = builder.union_of(&[five]);
     let mut buffer = UnionBuffer::from_typed(typed(origin));

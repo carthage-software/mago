@@ -1,29 +1,18 @@
 use mago_allocator::Arena;
 use mago_allocator::vec::Vec;
 use mago_database::file::File;
-use mago_flags::U8Flags;
 use mago_hir::ir::IR;
 use mago_hir::ir::expression::Expression;
 use mago_oracle::assertion::Assertion;
 use mago_oracle::id::SymbolId;
 use mago_oracle::symbol::SymbolTable;
-use mago_oracle::ty::Atom;
 use mago_oracle::ty::Type;
 use mago_oracle::ty::TypeBuilder;
 use mago_oracle::ty::atom::payload::array::ArrayKey;
 use mago_oracle::ty::atom::payload::array::KnownElement;
 use mago_oracle::ty::atom::payload::array::KnownItem;
-use mago_oracle::ty::atom::payload::scalar::float::FloatAtom;
-use mago_oracle::ty::atom::payload::scalar::float::LiteralFloat;
-use mago_oracle::ty::atom::payload::scalar::int::IntAtom;
-use mago_oracle::ty::atom::payload::scalar::string::StringAtom;
-use mago_oracle::ty::atom::payload::scalar::string::StringCasing;
-use mago_oracle::ty::atom::payload::scalar::string::StringLiteral;
-use mago_oracle::ty::atom::payload::scalar::string::StringRefinementFlag;
 use mago_oracle::ty::well_known::EMPTY_ARRAY;
-use mago_oracle::ty::well_known::TYPE_FLOAT;
 use mago_oracle::var::Var;
-use ordered_float::OrderedFloat;
 
 use crate::error::InferenceResult;
 use crate::extension::AssertionSink;
@@ -186,34 +175,6 @@ where
         Ok(IR { span: ir.span, statements, errors: self.arena.alloc_slice_copy(ir.errors) })
     }
 
-    pub(crate) fn int_literal(&mut self, value: i64) -> Type<'arena> {
-        self.ty.union_of(&[Atom::Int(IntAtom::Literal(value))])
-    }
-
-    pub(crate) fn float_literal(&mut self, value: f64) -> Type<'arena> {
-        if !value.is_finite() {
-            return TYPE_FLOAT;
-        }
-
-        self.ty.union_of(&[Atom::Float(FloatAtom::Literal(LiteralFloat(OrderedFloat(value))))])
-    }
-
-    pub(crate) fn literal_string(&mut self, bytes: &[u8]) -> Type<'arena> {
-        let literal = StringLiteral::Value(self.ty.intern(bytes));
-
-        let mut flags = U8Flags::empty();
-        if !bytes.is_empty() {
-            flags = flags.with(StringRefinementFlag::NonEmpty);
-            if bytes != b"0" {
-                flags = flags.with(StringRefinementFlag::Truthy);
-            }
-        }
-
-        let atom = self.ty.string(StringAtom { literal, casing: StringCasing::Unspecified, flags });
-
-        self.ty.union_of(&[atom])
-    }
-
     /// The union of two types.
     pub(crate) fn union(&mut self, left: Type<'arena>, right: Type<'arena>) -> Type<'arena> {
         environment::union_types(&mut self.ty, left, right)
@@ -236,9 +197,9 @@ where
                 elements.push(KnownElement { index: index as u32, value: item.value, optional: item.optional });
             }
 
-            self.ty.sealed_list(&elements, non_empty)
+            self.ty.sealed_list_atom(&elements, non_empty)
         } else {
-            self.ty.keyed_sealed(items, non_empty)
+            self.ty.sealed_keyed_array_atom(items, non_empty)
         };
 
         self.ty.union_of(&[atom])

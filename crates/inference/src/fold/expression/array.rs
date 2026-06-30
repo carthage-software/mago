@@ -95,7 +95,7 @@ where
             self.closed_array(&entries)
         } else {
             let value_param = if value_atoms.is_empty() { TYPE_MIXED } else { self.ty.union_of(&value_atoms) };
-            let atom = self.ty.keyed_unsealed(TYPE_ARRAY_KEY, value_param, true);
+            let atom = self.ty.unsealed_keyed_array_atom(TYPE_ARRAY_KEY, value_param, true);
 
             self.ty.union_of(&[atom])
         };

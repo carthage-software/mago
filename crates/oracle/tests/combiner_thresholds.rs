@@ -91,7 +91,7 @@ fn many_distinct_sealed_lists_above_threshold_collapse() {
         let sealed_lists: Vec<_> = (0..40)
             .map(|i| {
                 let value = f.us(&format!("v{i}"));
-                f.builder.sealed_list(&[KnownElement { index: 0, value, optional: false }], false)
+                f.builder.sealed_list_atom(&[KnownElement { index: 0, value, optional: false }], false)
             })
             .collect();
         let result = combine_with_array_threshold(f, sealed_lists, 32);

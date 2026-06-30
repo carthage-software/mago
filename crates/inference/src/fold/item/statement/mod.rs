@@ -371,7 +371,7 @@ where
             Some(symbol) => (symbol.path().as_bytes(), self.this_type(&symbol)),
             None => {
                 let class_name = self.arena.alloc_slice_copy(fallback_name);
-                let atom = self.ty.object_named(class_name);
+                let atom = self.ty.named_object_atom(class_name);
 
                 (class_name, self.ty.union_of(&[atom]))
             }
@@ -384,7 +384,7 @@ where
     fn this_type(&mut self, symbol: &ClassLikeSymbol<'arena>) -> Type<'arena> {
         let class_name = symbol.path().as_bytes();
         if matches!(symbol.kind(), ClassLikeKind::Enum) {
-            let atom = self.ty.enum_any(class_name);
+            let atom = self.ty.enum_atom(class_name);
 
             return self.ty.union_of(&[atom]);
         }

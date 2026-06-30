@@ -136,7 +136,7 @@ where
     }
 
     let mut new_strings: ScratchVec<'scratch, Atom<'arena>, S> = builder.scratch_vec_with(literals.len());
-    new_strings.extend(literals.into_iter().map(|literal| builder.string_literal(literal)));
+    new_strings.extend(literals.into_iter().map(|literal| builder.string_literal_atom(literal)));
     if let Some(payload) = general {
         new_strings.push(builder.string(payload));
     }

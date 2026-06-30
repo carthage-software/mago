@@ -87,7 +87,7 @@ where
                             match item.key {
                                 ArrayKey::Int(value) => keys.push(Atom::Int(IntAtom::Literal(value))),
                                 ArrayKey::String(bytes) => {
-                                    let string = self.literal_string(bytes);
+                                    let string = self.ty.string_literal_type(bytes);
                                     keys.extend_from_slice(string.atoms);
                                 }
                                 ArrayKey::Const { .. } => key_imprecise = true,

@@ -320,8 +320,7 @@ where
         return None;
     }
 
-    let range = builder.int_range(lower, upper);
-    Some(builder.union_of(&[range]))
+    Some(builder.int_range_type(lower, upper))
 }
 
 /// After a loop that always enters, keys an array gained inside the body are

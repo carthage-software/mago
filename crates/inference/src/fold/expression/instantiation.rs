@@ -66,7 +66,7 @@ where
             return TYPE_MIXED;
         };
 
-        let atom = self.ty.object_named(name);
+        let atom = self.ty.named_object_atom(name);
         self.ty.union_of(&[atom])
     }
 }

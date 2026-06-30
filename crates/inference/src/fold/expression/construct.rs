@@ -69,7 +69,7 @@ where
         operand: &'source Expression<'source, SymbolId, S, E>,
     ) -> InferenceResult<Expression<'arena, SymbolId, Flow, Type<'arena>>> {
         let operand = self.infer_expression(operand)?;
-        let meta = if operand.meta.is_never() { TYPE_NEVER } else { self.int_literal(1) };
+        let meta = if operand.meta.is_never() { TYPE_NEVER } else { self.ty.int_literal_type(1) };
 
         Ok(Expression { meta, span, kind: ExpressionKind::Print(self.arena.alloc(operand)) })
     }

@@ -266,7 +266,7 @@ where
                 if right.is_zero() {
                     TYPE_NEVER
                 } else {
-                    self.int_literal(left.to_int().checked_rem(right.to_int()).unwrap_or(0))
+                    self.ty.int_literal_type(left.to_int().checked_rem(right.to_int()).unwrap_or(0))
                 }
             }
             BinaryOperator::Division => {
@@ -277,22 +277,22 @@ where
                 match (left, right) {
                     (Number::Int(left), Number::Int(right)) if left.checked_rem(right) == Some(0) => {
                         match left.checked_div(right) {
-                            Some(value) => self.int_literal(value),
-                            None => self.float_literal(left as f64 / right as f64),
+                            Some(value) => self.ty.int_literal_type(value),
+                            None => self.ty.float_literal_type(left as f64 / right as f64),
                         }
                     }
-                    _ => self.float_literal(left.as_f64() / right.as_f64()),
+                    _ => self.ty.float_literal_type(left.as_f64() / right.as_f64()),
                 }
             }
             BinaryOperator::Exponentiation => match (left, right) {
                 (Number::Int(base), Number::Int(exponent)) if exponent >= 0 => match u32::try_from(exponent) {
                     Ok(exponent) => match base.checked_pow(exponent) {
-                        Some(value) => self.int_literal(value),
-                        None => self.float_literal((base as f64).powf(exponent as f64)),
+                        Some(value) => self.ty.int_literal_type(value),
+                        None => self.ty.float_literal_type((base as f64).powf(exponent as f64)),
                     },
-                    Err(_) => self.float_literal((base as f64).powf(exponent as f64)),
+                    Err(_) => self.ty.float_literal_type((base as f64).powf(exponent as f64)),
                 },
-                _ => self.float_literal(left.as_f64().powf(right.as_f64())),
+                _ => self.ty.float_literal_type(left.as_f64().powf(right.as_f64())),
             },
             _ => match (left, right) {
                 (Number::Int(left), Number::Int(right)) => {
@@ -303,8 +303,8 @@ where
                     };
 
                     match folded {
-                        Some(value) => self.int_literal(value),
-                        None => self.float_literal(match operator {
+                        Some(value) => self.ty.int_literal_type(value),
+                        None => self.ty.float_literal_type(match operator {
                             BinaryOperator::Addition => left as f64 + right as f64,
                             BinaryOperator::Subtraction => left as f64 - right as f64,
                             _ => left as f64 * right as f64,
@@ -318,7 +318,7 @@ where
                         _ => left.as_f64() * right.as_f64(),
                     };
 
-                    self.float_literal(value)
+                    self.ty.float_literal_type(value)
                 }
             },
         }
@@ -335,7 +335,7 @@ where
 
         let (left, right) = (left.to_int(), right.to_int());
 
-        self.int_literal(match operator {
+        self.ty.int_literal_type(match operator {
             BinaryOperator::BitwiseAnd => left & right,
             BinaryOperator::BitwiseOr => left | right,
             BinaryOperator::BitwiseXor => left ^ right,
@@ -354,8 +354,12 @@ where
         };
 
         match operator {
-            BinaryOperator::LeftShift => left.checked_shl(shift).map_or(TYPE_INT, |value| self.int_literal(value)),
-            BinaryOperator::RightShift => left.checked_shr(shift).map_or(TYPE_INT, |value| self.int_literal(value)),
+            BinaryOperator::LeftShift => {
+                left.checked_shl(shift).map_or(TYPE_INT, |value| self.ty.int_literal_type(value))
+            }
+            BinaryOperator::RightShift => {
+                left.checked_shr(shift).map_or(TYPE_INT, |value| self.ty.int_literal_type(value))
+            }
             _ => unreachable!(),
         }
     }
@@ -380,7 +384,7 @@ where
             }
         }
 
-        self.literal_string(&bytes)
+        self.ty.string_literal_type(&bytes)
     }
 
     fn concat(&mut self, left: Type<'arena>, right: Type<'arena>) -> Type<'arena> {
@@ -390,14 +394,14 @@ where
             return TYPE_STRING;
         }
 
-        self.literal_string(&bytes)
+        self.ty.string_literal_type(&bytes)
     }
 
     fn spaceship(&mut self, left: Type<'arena>, right: Type<'arena>) -> Type<'arena> {
         if let (Some(left), Some(right)) = (comparable_of(left), comparable_of(right))
             && let Some(ordering) = loose_compare(left, right)
         {
-            return self.int_literal(match ordering {
+            return self.ty.int_literal_type(match ordering {
                 Ordering::Less => -1,
                 Ordering::Equal => 0,
                 Ordering::Greater => 1,
@@ -451,7 +455,7 @@ where
         let right_non_empty = collect_array_values(right, &mut values);
 
         let value_type = if values.is_empty() { TYPE_MIXED } else { self.ty.union_of(&values) };
-        let atom = self.ty.keyed_unsealed(TYPE_ARRAY_KEY, value_type, left_non_empty || right_non_empty);
+        let atom = self.ty.unsealed_keyed_array_atom(TYPE_ARRAY_KEY, value_type, left_non_empty || right_non_empty);
 
         self.ty.union_of(&[atom])
     }

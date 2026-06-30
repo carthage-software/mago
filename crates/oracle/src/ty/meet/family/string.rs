@@ -69,7 +69,7 @@ where
             && !flags.contains(StringRefinementFlag::Truthy)
             && !flags.contains(StringRefinementFlag::Numeric);
         if empty_string_admitted {
-            return Some(builder.string_literal(b""));
+            return Some(builder.string_literal_atom(b""));
         }
 
         return None;

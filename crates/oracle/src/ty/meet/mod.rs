@@ -801,14 +801,14 @@ fn narrow_string_falsy<'scratch, 'arena, S, A>(
 
     let numeric = payload.flags.contains(StringRefinementFlag::Numeric);
     if !payload.flags.contains(StringRefinementFlag::NonEmpty) {
-        let empty = builder.string_literal(b"");
+        let empty = builder.string_literal_atom(b"");
         if string_falsy_piece_retained(payload.casing, numeric, empty) {
             out.push(empty);
         }
     }
 
     if zero_string_compatible(*payload) {
-        let zero = builder.string_literal(b"0");
+        let zero = builder.string_literal_atom(b"0");
         if string_falsy_piece_retained(payload.casing, numeric, zero) {
             out.push(zero);
         }

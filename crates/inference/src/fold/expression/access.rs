@@ -215,14 +215,14 @@ where
         let class_id = symbol.path().id;
 
         if matches!(name.value, b"class") {
-            let atom = self.ty.class_string_literal(class_name);
+            let atom = self.ty.class_string_literal_atom(class_name);
             return self.ty.union_of(&[atom]);
         }
 
         if matches!(symbol.kind(), ClassLikeKind::Enum) {
             let case = SymbolId::enum_case(class_name, name.value);
             if self.symbols.enum_cases(class_id).iter().any(|member| member.name.id == case) {
-                let atom = self.ty.enum_case(class_name, name.value);
+                let atom = self.ty.enum_case_atom(class_name, name.value);
                 return self.ty.union_of(&[atom]);
             }
         }
@@ -388,8 +388,8 @@ where
 
     fn array_key_type(&mut self, key: ArrayKey<'arena>) -> Type<'arena> {
         match key {
-            ArrayKey::Int(value) => self.int_literal(value),
-            ArrayKey::String(value) => self.literal_string(value),
+            ArrayKey::Int(value) => self.ty.int_literal_type(value),
+            ArrayKey::String(value) => self.ty.string_literal_type(value),
             ArrayKey::Const { .. } => TYPE_MIXED,
         }
     }

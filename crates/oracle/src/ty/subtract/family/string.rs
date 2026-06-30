@@ -53,7 +53,7 @@ where
     let removed_requires_non_empty = removed_payload.flags.contains(StringRefinementFlag::NonEmpty)
         || removed_payload.flags.contains(StringRefinementFlag::Truthy);
     if input_is_general && removed_is_broad && removed_requires_non_empty {
-        let empty = builder.string_literal(b"");
+        let empty = builder.string_literal_atom(b"");
         out.push(empty);
         return true;
     }

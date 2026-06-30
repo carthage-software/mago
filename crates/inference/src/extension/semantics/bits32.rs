@@ -23,7 +23,7 @@ impl<A: Arena> ExtensionInference<A> for Bits32Extension {
         expression: &Expression<'arena, SymbolId, Flow, Type<'arena>>,
     ) -> Option<Type<'arena>> {
         if let [Atom::Int(IntAtom::Literal(value))] = expression.meta.atoms {
-            return i32::try_from(*value).is_err().then(|| context.float(*value as f64));
+            return i32::try_from(*value).is_err().then(|| context.ty.float_literal_type(*value as f64));
         }
 
         if !expression.meta.atoms.iter().any(overflows_i32) {
@@ -40,7 +40,7 @@ impl<A: Arena> ExtensionInference<A> for Bits32Extension {
             }
         }
 
-        Some(context.union(&atoms))
+        Some(context.ty.union_of(&atoms))
     }
 }
 
