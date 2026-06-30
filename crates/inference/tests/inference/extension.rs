@@ -275,3 +275,45 @@ fn stdlib_array_keys_and_values_are_shape_aware() {
         assert_eq!(get_last_expression(ir).meta.to_string(), expected, "for code: {code}");
     }
 }
+
+#[test]
+fn stdlib_min_max_fold_and_union() {
+    let test = Test::new();
+    let extension = StdlibInference;
+    let inference: [&dyn ExtensionInference<LocalArena>; 1] = [&extension];
+
+    let cases = [
+        ("<?php min(1, 2, 3);", "int(1)"),
+        ("<?php max(1, 2, 3);", "int(3)"),
+        ("<?php min([1, 2, 3]);", "int(1)"),
+        ("<?php /** @var int<2, 9> */ $a = 2; /** @var int<5, 20> */ $b = 5; min($a, $b);", "int<2, 9>"),
+        ("<?php /** @var int */ $a = 0; /** @var string */ $b = ''; min($a, $b);", "int|string"),
+    ];
+
+    for (code, expected) in cases {
+        let ir = test.infer_with("<?php", code, Extensions { inference: &inference, assertion: &[] });
+        assert_eq!(get_last_expression(ir).meta.to_string(), expected, "for code: {code}");
+    }
+}
+
+#[test]
+fn stdlib_substr_and_implode_fold() {
+    let test = Test::new();
+    let extension = StdlibInference;
+    let inference: [&dyn ExtensionInference<LocalArena>; 1] = [&extension];
+
+    let cases = [
+        ("<?php substr('hello', 1, 3);", "string('ell')"),
+        ("<?php substr('hello', -2);", "string('lo')"),
+        ("<?php substr('hello', 1, -1);", "string('ell')"),
+        ("<?php substr('hello', 10);", "string('')"),
+        ("<?php implode(',', ['a', 'b', 'c']);", "string('a,b,c')"),
+        ("<?php implode(['x', 'y']);", "string('xy')"),
+        ("<?php implode('-', [1, 2, 3]);", "string('1-2-3')"),
+    ];
+
+    for (code, expected) in cases {
+        let ir = test.infer_with("<?php", code, Extensions { inference: &inference, assertion: &[] });
+        assert_eq!(get_last_expression(ir).meta.to_string(), expected, "for code: {code}");
+    }
+}

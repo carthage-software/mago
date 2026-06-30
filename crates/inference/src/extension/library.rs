@@ -47,7 +47,8 @@ impl<A: Arena> ExtensionInference<A> for StdlibInference {
         };
 
         let argument = first_argument(call);
-        match identifier.last_segment() {
+
+        match if identifier.imported { identifier.value } else { identifier.last_segment() } {
             b"strlen" => Some(byte_length(context, argument)),
             b"mb_strlen" | b"grapheme_strlen" | b"iconv_strlen" => Some(character_length(context, argument)),
             b"count" | b"sizeof" => Some(element_count(context, argument)),
@@ -76,6 +77,10 @@ impl<A: Arena> ExtensionInference<A> for StdlibInference {
             b"strripos" => Some(string_position(context, call, true, true)),
             b"array_keys" => array_keys(context, argument),
             b"array_values" => array_values(context, argument),
+            b"min" => fold_min_max(context, call, false),
+            b"max" => fold_min_max(context, call, true),
+            b"substr" => fold_substr(context, call),
+            b"implode" | b"join" => fold_implode(context, call),
             _ => None,
         }
     }
@@ -355,6 +360,196 @@ fn array_key_type<'arena, A: Arena>(
         ArrayKey::String(value) => context.string(value),
         ArrayKey::Const { .. } => context.union(&[ARRAY_KEY]),
     }
+}
+
+fn fold_min_max<'arena, A: Arena>(
+    context: &mut ExtensionContext<'_, '_, 'arena, A>,
+    call: &Call<'arena, SymbolId, Flow, Type<'arena>>,
+    max: bool,
+) -> Option<Type<'arena>> {
+    let atoms = candidate_atoms(call)?;
+    if atoms.is_empty() {
+        return None;
+    }
+
+    match reduce_int_bounds(&atoms, max) {
+        Some((lower, upper)) => Some(int_type(context, lower, upper)),
+        None => Some(context.union(&atoms)),
+    }
+}
+
+fn candidate_atoms<'arena>(call: &Call<'arena, SymbolId, Flow, Type<'arena>>) -> Option<Vec<Atom<'arena>>> {
+    let arguments: Vec<Type<'arena>> = positional_arguments(call);
+    match arguments.as_slice() {
+        [] => None,
+        [single] => array_value_atoms(*single),
+        many => Some(many.iter().flat_map(|ty| ty.atoms.iter().copied()).collect()),
+    }
+}
+
+fn positional_arguments<'arena>(call: &Call<'arena, SymbolId, Flow, Type<'arena>>) -> Vec<Type<'arena>> {
+    call.arguments
+        .items
+        .iter()
+        .filter_map(|argument| match argument {
+            Argument::Value(expression) => Some(expression.meta),
+            _ => None,
+        })
+        .collect()
+}
+
+fn array_value_atoms<'arena>(ty: Type<'arena>) -> Option<Vec<Atom<'arena>>> {
+    let mut atoms = Vec::new();
+    match ty.atoms {
+        [Atom::Array(array)] => {
+            if let Some(items) = array.known_items {
+                for item in items {
+                    atoms.extend_from_slice(item.value.atoms);
+                }
+            }
+            if let Some(value) = array.value_param {
+                atoms.extend_from_slice(value.atoms);
+            }
+        }
+        [Atom::List(list)] => {
+            if let Some(elements) = list.known_elements {
+                for element in elements {
+                    atoms.extend_from_slice(element.value.atoms);
+                }
+            }
+            if !list.element_type.is_never() {
+                atoms.extend_from_slice(list.element_type.atoms);
+            }
+        }
+        _ => return None,
+    }
+
+    Some(atoms)
+}
+
+fn reduce_int_bounds(atoms: &[Atom<'_>], max: bool) -> Option<(Option<i64>, Option<i64>)> {
+    let mut iterator = atoms.iter();
+    let (mut lower, mut upper) = atom_int_bounds(iterator.next()?)?;
+
+    for atom in iterator {
+        let (other_lower, other_upper) = atom_int_bounds(atom)?;
+        if max {
+            lower = pick_bound(lower, other_lower, i64::max, true);
+            upper = pick_bound(upper, other_upper, i64::max, false);
+        } else {
+            lower = pick_bound(lower, other_lower, i64::min, false);
+            upper = pick_bound(upper, other_upper, i64::min, true);
+        }
+    }
+
+    Some((lower, upper))
+}
+
+fn pick_bound(current: Option<i64>, other: Option<i64>, combine: fn(i64, i64) -> i64, keep_known: bool) -> Option<i64> {
+    match (current, other) {
+        (Some(left), Some(right)) => Some(combine(left, right)),
+        (left, right) if keep_known => left.or(right),
+        _ => None,
+    }
+}
+
+fn atom_int_bounds(atom: &Atom<'_>) -> Option<(Option<i64>, Option<i64>)> {
+    match atom {
+        Atom::Int(integer) => Some(int_bounds(integer)),
+        _ => None,
+    }
+}
+
+fn int_type<'arena, A: Arena>(
+    context: &mut ExtensionContext<'_, '_, 'arena, A>,
+    lower: Option<i64>,
+    upper: Option<i64>,
+) -> Type<'arena> {
+    match (lower, upper) {
+        (Some(low), Some(high)) if low == high => context.int(low),
+        (low, high) => context.int_range(low, high),
+    }
+}
+
+fn fold_substr<'arena, A: Arena>(
+    context: &mut ExtensionContext<'_, '_, 'arena, A>,
+    call: &Call<'arena, SymbolId, Flow, Type<'arena>>,
+) -> Option<Type<'arena>> {
+    let string = nth_argument(call, 0).and_then(literal_string)?;
+    let offset = nth_argument(call, 1).and_then(literal_int)?;
+    let length = match nth_argument(call, 2) {
+        None => None,
+        Some(length) => Some(literal_int(length)?),
+    };
+
+    let len = string.len() as i64;
+    let start = if offset < 0 { (len + offset).max(0) } else { offset.min(len) };
+    let end = match length {
+        None => len,
+        Some(length) if length < 0 => (len + length).max(start),
+        Some(length) => (start + length).min(len),
+    };
+
+    let slice = if end > start { &string[start as usize..end as usize] } else { &[][..] };
+    Some(context.string(slice))
+}
+
+fn fold_implode<'arena, A: Arena>(
+    context: &mut ExtensionContext<'_, '_, 'arena, A>,
+    call: &Call<'arena, SymbolId, Flow, Type<'arena>>,
+) -> Option<Type<'arena>> {
+    let separator: &[u8] = match (nth_argument(call, 0), nth_argument(call, 1)) {
+        (Some(first), Some(_)) => literal_string(first)?,
+        (Some(_), None) => &[],
+        _ => return None,
+    };
+    let array = nth_argument(call, 1).or_else(|| nth_argument(call, 0))?;
+    let parts = array_string_parts(array)?;
+
+    let mut joined = Vec::new();
+    for (index, part) in parts.iter().enumerate() {
+        if index > 0 {
+            joined.extend_from_slice(separator);
+        }
+        joined.extend_from_slice(part);
+    }
+
+    Some(context.string(&joined))
+}
+
+fn array_string_parts(ty: Type<'_>) -> Option<Vec<Vec<u8>>> {
+    let parts = match ty.atoms {
+        [Atom::List(list)] if list.element_type.is_never() => {
+            let elements = list.known_elements.unwrap_or(&[]);
+            if elements.iter().any(|element| element.optional) {
+                return None;
+            }
+
+            elements.iter().map(|element| element_string(element.value)).collect::<Option<Vec<_>>>()?
+        }
+        [Atom::Array(array)] if array.is_sealed() => {
+            let items = array.known_items.unwrap_or(&[]);
+            if items.iter().any(|item| item.optional) {
+                return None;
+            }
+
+            items.iter().map(|item| element_string(item.value)).collect::<Option<Vec<_>>>()?
+        }
+        _ => return None,
+    };
+
+    Some(parts)
+}
+
+fn element_string(ty: Type<'_>) -> Option<Vec<u8>> {
+    if let Some(bytes) = literal_string(ty) {
+        return Some(bytes.to_vec());
+    }
+    if let Some(value) = literal_int(ty) {
+        return Some(value.to_string().into_bytes());
+    }
+
+    None
 }
 
 fn is_non_empty_string(ty: Type<'_>) -> bool {
