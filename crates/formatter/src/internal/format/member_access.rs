@@ -744,6 +744,9 @@ fn get_flat_expression_width_with_binary_arguments(expression: &Expression<'_>) 
                 .zip(get_selector_width(&access.property))
                 .map(|(object, property)| object + string_width(b"?->") + property)
         }
+        Expression::Call(Call::Function(call)) => get_flat_expression_width_with_binary_arguments(call.function)
+            .zip(get_argument_list_width_with_binary_arguments(&call.argument_list))
+            .map(|(function, arguments)| function + arguments),
         Expression::Call(Call::Method(call)) => get_flat_expression_width_with_binary_arguments(call.object)
             .zip(get_selector_width(&call.method))
             .zip(get_argument_list_width_with_binary_arguments(&call.argument_list))
