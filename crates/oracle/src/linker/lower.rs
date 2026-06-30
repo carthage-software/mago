@@ -112,20 +112,7 @@ where
             }
 
             let attributes = self.attributes(parameter.attributes);
-            let ty = self.type_slot_annotated(
-                parameter.r#type,
-                parameter.annotation.map(|inline| inline.type_annotation).or_else(|| {
-                    annotation.and_then(|annotation| {
-                        annotation
-                            .parameters
-                            .iter()
-                            .find(|declared| {
-                                declared.variable.is_some_and(|variable| variable.name == parameter.variable.name)
-                            })
-                            .and_then(|declared| declared.r#type)
-                    })
-                }),
-            );
+            let ty = self.parameter_type_slot(parameter, annotation);
             let out_ty = self.parameter_out_slot(parameter_outs, parameter.variable.name);
             let default_ty = self.default_type_slot(parameter.default_value);
 
@@ -142,6 +129,31 @@ where
                 origin,
             }
         }))
+    }
+
+    /// The declared type of one parameter: its native hint layered with the phpdoc
+    /// type, taking the inline `@param` on the parameter when present, otherwise the
+    /// matching `@param` tag from the enclosing docblock. Used for both free
+    /// functions and methods so a method's `@param T` reaches its signature.
+    pub(crate) fn parameter_type_slot<I, St, Ex>(
+        &mut self,
+        parameter: &Parameter<'arena, I, St, Ex>,
+        annotation: Option<&ItemAnnotation<'arena, I, St, Ex>>,
+    ) -> TypeSlot<'arena> {
+        self.type_slot_annotated(
+            parameter.r#type,
+            parameter.annotation.map(|inline| inline.type_annotation).or_else(|| {
+                annotation.and_then(|annotation| {
+                    annotation
+                        .parameters
+                        .iter()
+                        .find(|declared| {
+                            declared.variable.is_some_and(|variable| variable.name == parameter.variable.name)
+                        })
+                        .and_then(|declared| declared.r#type)
+                })
+            }),
+        )
     }
 
     /// The `@self-out` type a method declares for `$this` after the call, lowered

@@ -110,3 +110,38 @@ test_inference! {
         "<?php identity('hi');" => "string('hi')",
     }
 }
+
+test_inference! {
+    name = instantiates_a_generic_methods_return_from_its_argument,
+    def = indoc! {"
+        <?php
+        class Box {
+            /**
+             * @template T
+             * @param T $value
+             * @return T
+             */
+            public function wrap($value) { return $value; }
+        }
+    "},
+    cases = {
+        "<?php /** @var Box */ $b = null; $b->wrap(5);" => "int(5)",
+        "<?php /** @var Box */ $b = null; $b->wrap('hi');" => "string('hi')",
+    }
+}
+
+test_inference! {
+    name = instantiates_a_generic_static_methods_return_from_its_argument,
+    def = indoc! {"
+        <?php
+        class Factory {
+            /**
+             * @template T
+             * @param T $value
+             * @return T
+             */
+            public static function of($value) { return $value; }
+        }
+    "},
+    cases = { "<?php Factory::of(true);" => "true" }
+}

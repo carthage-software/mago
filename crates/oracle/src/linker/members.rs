@@ -539,10 +539,7 @@ where
         arena.alloc_slice_fill_iter(parameters.iter().map(|parameter| {
             let flags = parameter_flags(parameter);
             let attributes = self.attributes(parameter.attributes);
-            let ty = self.type_slot_annotated(
-                parameter.r#type,
-                parameter.annotation.map(|annotation| annotation.type_annotation),
-            );
+            let ty = self.parameter_type_slot(parameter, annotation);
             let out_ty = self.parameter_out_slot(parameter_outs, parameter.variable.name);
             let default_ty = self.default_type_slot(parameter.default_value);
 
