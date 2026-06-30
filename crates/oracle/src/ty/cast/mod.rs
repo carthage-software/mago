@@ -233,7 +233,7 @@ where
         Atom::String(_) => CastResult::lossless(builder.union_of(&[atom])),
         Atom::Int(payload) => match payload {
             IntAtom::Literal(value) => {
-                let literal = builder.string_literal(value.to_string().as_bytes());
+                let literal = builder.string_literal_atom(value.to_string().as_bytes());
 
                 CastResult::lossless(builder.union_of(&[literal]))
             }
@@ -241,14 +241,14 @@ where
         },
         Atom::Float(payload) => match payload {
             FloatAtom::Literal(literal) => {
-                let rendered = builder.string_literal(format_php_float(literal.value()).as_bytes());
+                let rendered = builder.string_literal_atom(format_php_float(literal.value()).as_bytes());
 
                 CastResult::lossless(builder.union_of(&[rendered]))
             }
             _ => CastResult::lossless(well_known::TYPE_STRING),
         },
         Atom::True => {
-            let literal = builder.string_literal(b"1");
+            let literal = builder.string_literal_atom(b"1");
 
             CastResult::lossless(builder.union_of(&[literal]))
         }
@@ -329,7 +329,7 @@ where
         Atom::Null | Atom::Void => CastResult::lossless(builder.union_of(&[well_known::EMPTY_ARRAY])),
         Atom::Int(_) | Atom::Float(_) | Atom::String(_) | Atom::True | Atom::False | Atom::Bool | Atom::Resource(_) => {
             let element = builder.union_of(&[atom]);
-            let list = builder.sealed_list(&[KnownElement { index: 0, value: element, optional: false }], true);
+            let list = builder.sealed_list_atom(&[KnownElement { index: 0, value: element, optional: false }], true);
 
             CastResult::lossless(builder.union_of(&[list]))
         }
@@ -351,7 +351,7 @@ where
         | Atom::HasProperty(_)
         | Atom::ObjectAny => CastResult::lossless(builder.union_of(&[atom])),
         _ => {
-            let std_class = builder.object_named(b"stdClass");
+            let std_class = builder.named_object_atom(b"stdClass");
 
             CastResult::lossy(builder.union_of(&[std_class]))
         }

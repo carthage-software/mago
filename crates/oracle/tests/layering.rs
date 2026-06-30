@@ -36,7 +36,7 @@ const make_collection = null;",
         let file_scratch = LocalArena::new();
         let mut file_builder = TypeBuilder::new(&file_arena, &file_scratch);
 
-        let array_collection = file_builder.object_named(b"ArrayCollection");
+        let array_collection = file_builder.named_object_atom(b"ArrayCollection");
         let inferred = file_builder.union_of(&[array_collection]);
 
         let mut report = LatticeReport::new();
@@ -46,7 +46,7 @@ const make_collection = null;",
         let mut report = LatticeReport::new();
         assert!(refines(mixed_union, declared, &symbols, LatticeOptions::default(), &mut report, &mut file_builder));
 
-        let stranger = file_builder.object_named(b"Stranger");
+        let stranger = file_builder.named_object_atom(b"Stranger");
         let stranger_type = file_builder.union_of(&[stranger]);
         let mut report = LatticeReport::new();
         assert!(!refines(stranger_type, declared, &symbols, LatticeOptions::default(), &mut report, &mut file_builder));
@@ -59,7 +59,7 @@ fn symbol_table_atoms_embed_into_file_types_without_copying() {
     let symbols_scratch = LocalArena::new();
     let mut symbols_builder = TypeBuilder::new(&symbols_arena, &symbols_scratch);
 
-    let collection = symbols_builder.object_named(b"Collection");
+    let collection = symbols_builder.named_object_atom(b"Collection");
     let symbols_type = symbols_builder.union_of(&[collection]);
 
     let file_arena = LocalArena::new();
@@ -80,7 +80,7 @@ fn imported_symbol_table_types_are_consed_in_the_file_arena() {
     let symbols_scratch = LocalArena::new();
     let mut symbols_builder = TypeBuilder::new(&symbols_arena, &symbols_scratch);
 
-    let collection = symbols_builder.object_named(b"Collection");
+    let collection = symbols_builder.named_object_atom(b"Collection");
     let symbols_type = symbols_builder.union_of(&[well_known::NULL, collection]);
 
     let file_arena = LocalArena::new();

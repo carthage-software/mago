@@ -43,7 +43,7 @@ where
     match (lower, upper) {
         (Some(lower_bound), Some(upper_bound)) if lower_bound > upper_bound => None,
         (Some(lower_bound), Some(upper_bound)) if lower_bound == upper_bound => Some(Atom::int_literal(lower_bound)),
-        _ => Some(builder.int_range(lower, upper)),
+        _ => Some(builder.int_range_atom(lower, upper)),
     }
 }
 

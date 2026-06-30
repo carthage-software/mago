@@ -43,7 +43,7 @@ where
     /// `"hello"` is non-empty, truthy, and lowercase; `""` is none of
     /// those; `"123"` is numeric and truthy.
     #[must_use]
-    pub fn string_literal(&mut self, value: &[u8]) -> Atom<'arena> {
+    pub fn string_literal_atom(&mut self, value: &[u8]) -> Atom<'arena> {
         let is_numeric = is_numeric_string(value);
         let is_non_empty = is_numeric || !value.is_empty();
         let is_truthy = is_non_empty && value != b"0";
@@ -69,7 +69,7 @@ where
 
     /// Intern a named object atom with no type arguments and default flags.
     #[must_use]
-    pub fn object_named(&mut self, name: &[u8]) -> Atom<'arena> {
+    pub fn named_object_atom(&mut self, name: &[u8]) -> Atom<'arena> {
         let name = self.intern_class_like_path(name);
 
         self.object(ObjectAtom { name, type_arguments: None, flags: U8Flags::empty() })
@@ -77,7 +77,7 @@ where
 
     /// Intern an enum atom ("any case of enum `name`").
     #[must_use]
-    pub fn enum_any(&mut self, name: &[u8]) -> Atom<'arena> {
+    pub fn enum_atom(&mut self, name: &[u8]) -> Atom<'arena> {
         let name = self.intern_class_like_path(name);
 
         self.enumeration(EnumAtom { name, case: None })
@@ -85,7 +85,7 @@ where
 
     /// Intern an enum-case atom (`name::case`).
     #[must_use]
-    pub fn enum_case(&mut self, name: &[u8], case: &[u8]) -> Atom<'arena> {
+    pub fn enum_case_atom(&mut self, name: &[u8], case: &[u8]) -> Atom<'arena> {
         let name = self.intern_class_like_path(name);
         let case = self.intern(case);
 
@@ -95,7 +95,7 @@ where
     /// Intern a literal class-string atom (`class-string` with a concrete
     /// name).
     #[must_use]
-    pub fn class_string_literal(&mut self, name: &[u8]) -> Atom<'arena> {
+    pub fn class_string_literal_atom(&mut self, name: &[u8]) -> Atom<'arena> {
         let value = self.intern_class_like_path(name);
 
         self.class_like_string(ClassLikeStringAtom {
@@ -107,7 +107,7 @@ where
     /// Intern a `list<element>` (or `non-empty-list<element>`) atom with no
     /// fixed-position elements.
     #[must_use]
-    pub fn list_of(&mut self, element_type: Type<'arena>, non_empty: bool) -> Atom<'arena> {
+    pub fn list_of_atom(&mut self, element_type: Type<'arena>, non_empty: bool) -> Atom<'arena> {
         let mut flags = U8Flags::empty();
         flags.set_value(ListFlag::NonEmpty, non_empty);
 
@@ -117,7 +117,7 @@ where
     /// Intern a sealed list atom (`list{0: T0, 1: T1, …}`) with the given
     /// known entries and no rest element type.
     #[must_use]
-    pub fn sealed_list(&mut self, elements: &[KnownElement<'arena>], non_empty: bool) -> Atom<'arena> {
+    pub fn sealed_list_atom(&mut self, elements: &[KnownElement<'arena>], non_empty: bool) -> Atom<'arena> {
         let known_count = NonZeroU32::new(elements.len() as u32);
         let known_elements = Some(self.known_elements(elements));
         let mut flags = U8Flags::empty();
@@ -129,7 +129,7 @@ where
     /// Intern an unsealed keyed-array atom (`array<K, V>` /
     /// `non-empty-array<K, V>`) with no known fixed entries.
     #[must_use]
-    pub fn keyed_unsealed(
+    pub fn unsealed_keyed_array_atom(
         &mut self,
         key_type: Type<'arena>,
         value_type: Type<'arena>,
@@ -144,7 +144,7 @@ where
     /// Intern a sealed keyed-array atom (`array{a: int, b: string, …}`)
     /// with the given known entries and no rest type.
     #[must_use]
-    pub fn keyed_sealed(&mut self, items: &[KnownItem<'arena>], non_empty: bool) -> Atom<'arena> {
+    pub fn sealed_keyed_array_atom(&mut self, items: &[KnownItem<'arena>], non_empty: bool) -> Atom<'arena> {
         let known_items = Some(self.known_items(items));
         let mut flags = U8Flags::empty();
         flags.set_value(ArrayFlag::NonEmpty, non_empty);
@@ -155,7 +155,7 @@ where
     /// Intern a `callable(...)` with a "mixed" signature: parameters
     /// unspecified, return type `mixed`, no `throws`.
     #[must_use]
-    pub fn callable_mixed(&mut self) -> Atom<'arena> {
+    pub fn mixed_callable_atom(&mut self) -> Atom<'arena> {
         let signature = self.signature(Signature {
             parameters: None,
             return_type: well_known::TYPE_MIXED,
@@ -169,7 +169,7 @@ where
     /// Intern a `Closure(...)` with the same "mixed" signature as
     /// [`callable_mixed`](Self::callable_mixed) but tagged as a closure.
     #[must_use]
-    pub fn closure_mixed(&mut self) -> Atom<'arena> {
+    pub fn mixed_closure_atom(&mut self) -> Atom<'arena> {
         let signature = self.signature(Signature {
             parameters: None,
             return_type: well_known::TYPE_MIXED,

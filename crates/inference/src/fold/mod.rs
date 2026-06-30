@@ -1,0 +1,207 @@
+use mago_allocator::Arena;
+use mago_allocator::vec::Vec;
+use mago_database::file::File;
+use mago_hir::ir::IR;
+use mago_hir::ir::expression::Expression;
+use mago_oracle::assertion::Assertion;
+use mago_oracle::id::SymbolId;
+use mago_oracle::symbol::SymbolTable;
+use mago_oracle::ty::Type;
+use mago_oracle::ty::TypeBuilder;
+use mago_oracle::ty::atom::payload::array::ArrayKey;
+use mago_oracle::ty::atom::payload::array::KnownElement;
+use mago_oracle::ty::atom::payload::array::KnownItem;
+use mago_oracle::ty::well_known::EMPTY_ARRAY;
+use mago_oracle::var::Var;
+
+use crate::error::InferenceResult;
+use crate::extension::AssertionSink;
+use crate::extension::AssertionTiming;
+use crate::extension::ExtensionContext;
+use crate::extension::Extensions;
+use crate::flow::Flow;
+use crate::reconciler::reconcile;
+
+mod argument;
+mod assertion;
+mod condition;
+mod environment;
+mod expression;
+mod item;
+mod place;
+mod statement;
+
+pub(crate) use environment::Environment;
+
+#[derive(Debug)]
+pub struct InferenceFolder<'source, 'symbol, 'arena, A, S, E>
+where
+    A: Arena,
+{
+    source: &'source A,
+    arena: &'arena A,
+    symbols: &'symbol SymbolTable<'arena, A>,
+    ty: TypeBuilder<'source, 'arena, A, A>,
+    environment: Environment<'source, 'arena, A>,
+    line_starts: &'source [u32],
+    namespace: &'source [u8],
+    reachable: bool,
+    is_first_statement: bool,
+    loops: std::vec::Vec<LoopFrame<'source, 'arena, A>>,
+    self_class: Option<&'arena [u8]>,
+    extensions: Extensions<'arena, A>,
+    _phantom: std::marker::PhantomData<(S, E)>,
+}
+
+/// The break/continue environments collected for one enclosing loop while its
+/// body is folded. `break` paths feed the environment after the loop; `continue`
+/// paths feed the next iteration's head. The stack is indexed by level, so
+/// `break 2`/`continue 2` reach the second loop out.
+#[derive(Debug)]
+pub(crate) struct LoopFrame<'source, 'arena, A: Arena> {
+    pub(crate) break_environment: Option<Environment<'source, 'arena, A>>,
+    pub(crate) continue_environment: Option<Environment<'source, 'arena, A>>,
+}
+
+impl<A: Arena> Default for LoopFrame<'_, '_, A> {
+    fn default() -> Self {
+        Self { break_environment: None, continue_environment: None }
+    }
+}
+
+impl<'source, 'symbol, 'arena, A, S, E> InferenceFolder<'source, 'symbol, 'arena, A, S, E>
+where
+    A: Arena,
+{
+    pub fn new(
+        source: &'source A,
+        arena: &'arena A,
+        symbols: &'symbol SymbolTable<'arena, A>,
+        file: &File,
+        extensions: Extensions<'arena, A>,
+    ) -> Self {
+        let ty = TypeBuilder::new(arena, source);
+        let line_starts = source.alloc_slice_copy(file.lines.as_slice());
+
+        Self {
+            source,
+            arena,
+            symbols,
+            ty,
+            environment: Environment::new_in(source),
+            line_starts,
+            namespace: b"",
+            reachable: true,
+            is_first_statement: true,
+            loops: std::vec::Vec::new(),
+            self_class: None,
+            extensions,
+            _phantom: std::marker::PhantomData,
+        }
+    }
+
+    /// Records the current environment as a `break`/`continue` target at `level`
+    /// loops out (1 = the innermost). The collected environments are merged when
+    /// the loop finishes: `break` paths into the post-loop environment, `continue`
+    /// paths into the next iteration's head. No-op when no loop is that deep
+    /// (the level is then a fatal error handled by the diverging exit).
+    pub(crate) fn record_loop_exit(&mut self, level: u64, is_break: bool) {
+        let depth = self.loops.len();
+        let level = level as usize;
+        if level == 0 || level > depth {
+            return;
+        }
+
+        let environment = self.environment.clone();
+        let frame = &mut self.loops[depth - level];
+        let slot = if is_break { &mut frame.break_environment } else { &mut frame.continue_environment };
+        *slot = Environment::merge_options(slot.take(), Some(environment), &mut self.ty);
+    }
+
+    /// Lets the enabled [`ExtensionInference`] extensions override the type of an
+    /// already-inferred expression, and applies any unconditional
+    /// ([`AssertionTiming::Always`]) assertions the [`ExtensionAssertion`]
+    /// extensions extract from it to the environment. Skipped entirely when no
+    /// extensions are enabled.
+    pub(crate) fn apply_extensions(&mut self, typed: &mut Expression<'arena, SymbolId, Flow, Type<'arena>>) {
+        let inference = self.extensions.inference;
+        if !inference.is_empty() {
+            let mut context = ExtensionContext::new(&mut self.ty, self.symbols, self.namespace);
+            for extension in inference {
+                if let Some(ty) = extension.infer(&mut context, typed) {
+                    typed.meta = ty;
+                    break;
+                }
+            }
+        }
+
+        if !self.extensions.assertion.is_empty() {
+            let assertions = self.extension_assertions(typed);
+            for (variable, assertion, timing) in &assertions {
+                if matches!(timing, AssertionTiming::Always) {
+                    let base = self.environment.get(*variable);
+                    let narrowed = reconcile(&mut self.ty, self.symbols, *assertion, base);
+                    self.environment.set(*variable, narrowed);
+                }
+            }
+        }
+    }
+
+    /// Collects the assertions every enabled [`ExtensionAssertion`] extracts from
+    /// `expression`, each tagged with the timing under which it holds.
+    pub(crate) fn extension_assertions(
+        &mut self,
+        expression: &Expression<'arena, SymbolId, Flow, Type<'arena>>,
+    ) -> Vec<'source, (Var<'arena>, Assertion<'arena>, AssertionTiming), A> {
+        let extensions = self.extensions.assertion;
+        let mut entries = Vec::new_in(self.source);
+        if !extensions.is_empty() {
+            let mut context = ExtensionContext::new(&mut self.ty, self.symbols, self.namespace);
+            let mut sink = AssertionSink::new(&mut entries);
+            for extension in extensions {
+                extension.assertions(&mut context, expression, &mut sink);
+            }
+        }
+
+        entries
+    }
+
+    pub fn infer_ir(
+        &mut self,
+        ir: IR<'source, SymbolId, S, E>,
+    ) -> InferenceResult<IR<'arena, SymbolId, Flow, Type<'arena>>> {
+        let (statements, _exit) = self.infer_block(ir.statements)?;
+
+        Ok(IR { span: ir.span, statements, errors: self.arena.alloc_slice_copy(ir.errors) })
+    }
+
+    /// The union of two types.
+    pub(crate) fn union(&mut self, left: Type<'arena>, right: Type<'arena>) -> Type<'arena> {
+        environment::union_types(&mut self.ty, left, right)
+    }
+
+    /// Builds a sealed array type from fully-known entries: an ordered run of
+    /// `0, 1, 2, ...` integer keys becomes a `list{...}`, anything else a keyed
+    /// `array{...}`, and no entries the empty array.
+    pub(crate) fn closed_array(&mut self, items: &[KnownItem<'arena>]) -> Type<'arena> {
+        if items.is_empty() {
+            return self.ty.union_of(&[EMPTY_ARRAY]);
+        }
+
+        let non_empty = items.iter().any(|item| !item.optional);
+        let is_list = items.iter().enumerate().all(|(index, item)| item.key == ArrayKey::Int(index as i64));
+
+        let atom = if is_list {
+            let mut elements = Vec::new_in(self.source);
+            for (index, item) in items.iter().enumerate() {
+                elements.push(KnownElement { index: index as u32, value: item.value, optional: item.optional });
+            }
+
+            self.ty.sealed_list_atom(&elements, non_empty)
+        } else {
+            self.ty.sealed_keyed_array_atom(items, non_empty)
+        };
+
+        self.ty.union_of(&[atom])
+    }
+}

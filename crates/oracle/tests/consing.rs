@@ -91,8 +91,8 @@ fn int_range_consing_is_idempotent() {
     let scratch = LocalArena::new();
     let mut builder = TypeBuilder::new(&arena, &scratch);
 
-    let first = builder.int_range(Some(1), None);
-    let second = builder.int_range(Some(1), None);
+    let first = builder.int_range_atom(Some(1), None);
+    let second = builder.int_range_atom(Some(1), None);
 
     assert_eq!(first, well_known::POSITIVE_INT);
 

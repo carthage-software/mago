@@ -165,7 +165,7 @@ where
     A: Arena,
 {
     let atom = match kind {
-        ClassLikeKind::Enum => builder.enum_any(name.as_bytes()),
+        ClassLikeKind::Enum => builder.enum_atom(name.as_bytes()),
         ClassLikeKind::Class | ClassLikeKind::Interface | ClassLikeKind::Trait => {
             builder.object(ObjectAtom { name, type_arguments: None, flags: U8Flags::empty() })
         }

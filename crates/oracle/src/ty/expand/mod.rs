@@ -278,7 +278,7 @@ where
     }
 
     for case in case_names {
-        resolved.push(builder.enum_case(class.as_bytes(), case));
+        resolved.push(builder.enum_case_atom(class.as_bytes(), case));
     }
 
     resolved
@@ -528,7 +528,7 @@ where
             match payload.known_count {
                 Some(known_count) => {
                     let count = std::num::NonZeroI64::from(known_count).get();
-                    keys.push(builder.int_range(Some(0), Some(count - 1)));
+                    keys.push(builder.int_range_atom(Some(0), Some(count - 1)));
                 }
                 None => {
                     keys.push(well_known::NON_NEGATIVE_INT);
@@ -559,7 +559,7 @@ where
                 return well_known::TYPE_NEVER;
             };
 
-            let keys: Vec<Atom<'arena>> = entries.iter().map(|entry| builder.string_literal(entry.name)).collect();
+            let keys: Vec<Atom<'arena>> = entries.iter().map(|entry| builder.string_literal_atom(entry.name)).collect();
 
             if keys.is_empty() { well_known::TYPE_NEVER } else { builder.union_of(&keys) }
         }
@@ -1008,7 +1008,7 @@ where
 {
     match key {
         ArrayKey::Int(value) => Some(Atom::int_literal(value)),
-        ArrayKey::String(name) => Some(builder.string_literal(name)),
+        ArrayKey::String(name) => Some(builder.string_literal_atom(name)),
         ArrayKey::Const { .. } => None,
     }
 }

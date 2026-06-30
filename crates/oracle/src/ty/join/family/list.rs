@@ -51,7 +51,7 @@ pub fn apply_merge_list_element_types<'scratch, 'arena, S, A>(
         }
         let merged = super::super::compute(&merged_atoms, builder);
         let union_type = builder.union_of(&merged);
-        let merged_list = builder.list_of(union_type, *non_empty);
+        let merged_list = builder.list_of_atom(union_type, *non_empty);
         atoms[indices[0]] = merged_list;
         for &index in &indices[1..] {
             to_remove.insert(index);

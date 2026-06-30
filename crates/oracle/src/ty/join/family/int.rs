@@ -71,7 +71,7 @@ pub fn apply_merge_int_ranges<'scratch, 'arena, S, A>(
         let atom = match (lower, upper) {
             (None, None) => INT,
             (Some(lower_value), Some(upper_value)) if lower_value == upper_value => Atom::int_literal(lower_value),
-            _ => builder.int_range(lower, upper),
+            _ => builder.int_range_atom(lower, upper),
         };
         new_atoms.push(atom);
     }

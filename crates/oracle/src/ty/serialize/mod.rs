@@ -1072,7 +1072,7 @@ where
         SerializableInt::Unspecified => Atom::Int(IntAtom::Unspecified),
         SerializableInt::UnspecifiedLiteral => Atom::Int(IntAtom::UnspecifiedLiteral),
         SerializableInt::Literal(value) => Atom::int_literal(value),
-        SerializableInt::Range { lower, upper } => builder.int_range(lower, upper),
+        SerializableInt::Range { lower, upper } => builder.int_range_atom(lower, upper),
     }
 }
 

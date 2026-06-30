@@ -201,7 +201,7 @@ where
     for entry in entries {
         let key_atom = match entry.key {
             ArrayKey::Int(value) => Atom::int_literal(value),
-            ArrayKey::String(name) => builder.string_literal(name),
+            ArrayKey::String(name) => builder.string_literal_atom(name),
             ArrayKey::Const { .. } => well_known::ARRAY_KEY,
         };
 
