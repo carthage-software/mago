@@ -1,4 +1,5 @@
 use mago_allocator::Arena;
+use mago_allocator::vec::Vec;
 use mago_flags::U8Flags;
 use mago_oracle::assertion::Assertion;
 use mago_oracle::symbol::SymbolTable;
@@ -65,11 +66,11 @@ impl<'ctx, 'source, 'arena, A: Arena> ExtensionContext<'ctx, 'source, 'arena, A>
 
     /// A sealed list (`list{0: ..., 1: ...}`) of the given element types in order.
     pub fn list(&mut self, elements: &[Type<'arena>], non_empty: bool) -> Type<'arena> {
-        let known: Vec<KnownElement<'arena>> = elements
-            .iter()
-            .enumerate()
-            .map(|(index, &value)| KnownElement { index: index as u32, value, optional: false })
-            .collect();
+        let arena = self.builder.arena();
+        let mut known = Vec::with_capacity_in(elements.len(), arena);
+        for (index, &value) in elements.iter().enumerate() {
+            known.push(KnownElement { index: index as u32, value, optional: false });
+        }
 
         let atom = self.builder.sealed_list(&known, non_empty);
 
@@ -94,9 +95,10 @@ impl<'ctx, 'source, 'arena, A: Arena> ExtensionContext<'ctx, 'source, 'arena, A>
     }
 
     pub fn filter_array(&mut self, source: Type<'arena>, narrow: bool) -> Option<Type<'arena>> {
+        let arena = self.builder.arena();
         match source.atoms {
             [Atom::Array(array)] => {
-                let mut items: Vec<KnownItem<'arena>> = Vec::new();
+                let mut items = Vec::new_in(arena);
                 if let Some(known) = array.known_items {
                     for item in known {
                         let value = if narrow { self.truthy(item.value) } else { item.value };
@@ -125,7 +127,7 @@ impl<'ctx, 'source, 'arena, A: Arena> ExtensionContext<'ctx, 'source, 'arena, A>
                 Some(self.builder.union_of(&[atom]))
             }
             [Atom::List(list)] => {
-                let mut values: Vec<Atom<'arena>> = Vec::new();
+                let mut values = Vec::new_in(arena);
                 if let Some(known) = list.known_elements {
                     for element in known {
                         values.extend_from_slice(element.value.atoms);
@@ -159,16 +161,11 @@ impl<'ctx, 'source, 'arena, A: Arena> ExtensionContext<'ctx, 'source, 'arena, A>
         match source.atoms {
             [Atom::List(list)] if list.element_type.is_never() && list.known_elements.is_some() => {
                 let elements = list.known_elements.unwrap_or(&[]);
-                let reversed: Vec<KnownElement<'arena>> = elements
-                    .iter()
-                    .rev()
-                    .enumerate()
-                    .map(|(index, element)| KnownElement {
-                        index: index as u32,
-                        value: element.value,
-                        optional: element.optional,
-                    })
-                    .collect();
+                let arena = self.builder.arena();
+                let mut reversed = Vec::with_capacity_in(elements.len(), arena);
+                for (index, element) in elements.iter().rev().enumerate() {
+                    reversed.push(KnownElement { index: index as u32, value: element.value, optional: element.optional });
+                }
                 let known_elements = Some(self.builder.known_elements(&reversed));
                 let atom = self.builder.list(ListAtom {
                     element_type: TYPE_NEVER,
@@ -185,13 +182,14 @@ impl<'ctx, 'source, 'arena, A: Arena> ExtensionContext<'ctx, 'source, 'arena, A>
     }
 
     pub fn remap_array_values(&mut self, source: Type<'arena>, value: Type<'arena>) -> Option<Type<'arena>> {
+        let arena = self.builder.arena();
         let atom = match source.atoms {
             [Atom::List(list)] => {
                 let known_elements = list.known_elements.map(|elements| {
-                    let remapped: Vec<KnownElement<'arena>> = elements
-                        .iter()
-                        .map(|element| KnownElement { index: element.index, value, optional: element.optional })
-                        .collect();
+                    let mut remapped = Vec::with_capacity_in(elements.len(), arena);
+                    for element in elements {
+                        remapped.push(KnownElement { index: element.index, value, optional: element.optional });
+                    }
 
                     self.builder.known_elements(&remapped)
                 });
@@ -206,8 +204,10 @@ impl<'ctx, 'source, 'arena, A: Arena> ExtensionContext<'ctx, 'source, 'arena, A>
             }
             [Atom::Array(array)] => {
                 let known_items = array.known_items.map(|items| {
-                    let remapped: Vec<KnownItem<'arena>> =
-                        items.iter().map(|item| KnownItem { key: item.key, value, optional: item.optional }).collect();
+                    let mut remapped = Vec::with_capacity_in(items.len(), arena);
+                    for item in items {
+                        remapped.push(KnownItem { key: item.key, value, optional: item.optional });
+                    }
 
                     self.builder.known_items(&remapped)
                 });
@@ -229,6 +229,14 @@ impl<'ctx, 'source, 'arena, A: Arena> ExtensionContext<'ctx, 'source, 'arena, A>
         }
 
         self.builder.union_of(&[Atom::Float(FloatAtom::Literal(LiteralFloat(OrderedFloat(value))))])
+    }
+
+    /// The output arena. Returns a `&'arena` reference whose lifetime is
+    /// independent of `&self`, so scratch [`Vec`]s built on it can coexist with
+    /// the `&mut self` builder calls that consume them.
+    #[must_use]
+    pub fn arena(&self) -> &'arena A {
+        self.builder.arena()
     }
 
     /// The symbol table for the program under inference.

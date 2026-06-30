@@ -196,7 +196,7 @@ where
     /// The output arena this builder allocates into.
     #[inline]
     #[must_use]
-    pub(crate) const fn arena(&self) -> &'arena A {
+    pub const fn arena(&self) -> &'arena A {
         self.arena
     }
 
