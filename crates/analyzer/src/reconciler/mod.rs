@@ -149,10 +149,11 @@ pub fn reconcile_keyed_types<'ctx, A>(
             }
         }
 
-        let did_type_exist = block_context.locals.contains_key(key);
+        let existing = block_context.locals.get(key);
+        let did_type_exist = existing.is_some();
         let mut has_object_array_access = false;
 
-        let mut result_type = block_context.locals.get(key).map(|t| t.as_ref().clone()).or_else(|| {
+        let mut result_type = existing.map(|t| t.as_ref().clone()).or_else(|| {
             get_value_for_key(
                 context,
                 *key,
