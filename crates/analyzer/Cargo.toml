@@ -33,6 +33,8 @@ itertools = { workspace = true }
 indexmap = { workspace = true }
 mago-allocator = { workspace = true }
 diffy = { workspace = true }
+itoa = { workspace = true }
+ryu = { workspace = true }
 memchr = { workspace = true }
 
 [dev-dependencies]

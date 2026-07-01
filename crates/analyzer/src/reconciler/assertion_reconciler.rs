@@ -1,11 +1,11 @@
-use mago_allocator::Arena;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use mago_codex::assertion::Assertion;
-use mago_word::Word;
-use mago_word::word;
+use itoa::Buffer as IntegerBuffer;
+use ryu::Buffer as FloatBuffer;
 
+use mago_allocator::Arena;
+use mago_codex::assertion::Assertion;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
@@ -36,6 +36,8 @@ use mago_codex::ttype::intersect_union_types;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;
 use mago_span::Span;
+use mago_word::Word;
+use mago_word::word;
 
 use crate::context::Context;
 use crate::reconciler::map_generic_constraint_or_else;
@@ -943,7 +945,9 @@ where
             }
             TAtomic::Scalar(TScalar::String(TString {
                 literal: Some(TStringLiteral::Value(string_value)), ..
-            })) if is_loose_equality && string_value.as_bytes() == assertion_integer.to_string().as_bytes() => {
+            })) if is_loose_equality
+                && string_value.as_bytes() == IntegerBuffer::new().format(assertion_integer).as_bytes() =>
+            {
                 acceptable_types.push(existing_var_atomic_type.clone());
             }
             TAtomic::Scalar(TScalar::Float(TFloat::Float)) if is_loose_equality => {
@@ -1033,7 +1037,7 @@ where
                 acceptable_types.push(literal_asserted_type.clone());
             }
             TAtomic::Scalar(TScalar::Float(TFloat::Literal(float_value)))
-                if is_loose_equality && float_value.to_string().as_bytes() == assertion_str_val =>
+                if is_loose_equality && FloatBuffer::new().format(**float_value).as_bytes() == assertion_str_val =>
             {
                 acceptable_types.push(existing_var_atomic_type.clone());
             }
@@ -1048,7 +1052,7 @@ where
                 acceptable_types.push(existing_var_atomic_type.clone());
             }
             TAtomic::Scalar(TScalar::Integer(TInteger::Literal(int_value)))
-                if is_loose_equality && int_value.to_string().as_bytes() == assertion_str_val =>
+                if is_loose_equality && IntegerBuffer::new().format(*int_value).as_bytes() == assertion_str_val =>
             {
                 acceptable_types.push(existing_var_atomic_type.clone());
             }
