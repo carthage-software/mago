@@ -1,5 +1,6 @@
 use strum::Display;
 
+use mago_allocator::CopyInto;
 use mago_span::HasSpan;
 use mago_span::Span;
 
@@ -85,5 +86,16 @@ impl<'arena> TriviaSequenceExt<'arena> for Sequence<'arena, Trivia<'arena>> {
         'arena: 'borrow,
     {
         self.iter().filter(|trivia| trivia.kind.is_comment())
+    }
+}
+
+impl CopyInto for Trivia<'_> {
+    type Output<'arena> = Trivia<'arena>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: mago_allocator::Arena,
+    {
+        Trivia { kind: self.kind, span: self.span, value: arena.alloc_slice_copy(self.value) }
     }
 }
