@@ -733,7 +733,6 @@ function func_get_arg(int $position): mixed {}
 
 /**
  * @pure
- * @no-named-arguments
  */
 function func_get_args(): array {}
 
@@ -741,96 +740,79 @@ function func_get_args(): array {}
  * @return int<0, max>
  *
  * @pure
- * @no-named-arguments
  */
 function strlen(string $string): int {}
 
 /**
  * @pure
- * @no-named-arguments
  */
 function strcmp(string $string1, string $string2): int {}
 
 /**
  * @pure
- * @no-named-arguments
  */
 function strncmp(string $string1, string $string2, int $length): int {}
 
 /**
  * @pure
- * @no-named-arguments
  */
 function strcasecmp(string $string1, string $string2): int {}
 
 /**
  * @pure
- * @no-named-arguments
  */
 function strncasecmp(string $string1, string $string2, int $length): int {}
 
 /**
  * @pure
- * @no-named-arguments
  */
 #[Mago\AvailableSince(80000)]
 function str_starts_with(string $haystack, string $needle): bool {}
 
 /**
  * @pure
- * @no-named-arguments
  */
 function str_ends_with(string $haystack, string $needle): bool {}
 
 /**
  * @pure
- * @no-named-arguments
  */
 #[Mago\AvailableSince(80000)]
 function str_contains(string $haystack, string $needle): bool {}
 
 /**
  * @pure
- * @no-named-arguments
  */
 #[Mago\AvailableSince(80300)]
 function str_decrement(string $string): string {}
 
 /**
  * @pure
- * @no-named-arguments
  */
 #[Mago\AvailableSince(80300)]
 function str_increment(string $string): string {}
 
-/**
- * @no-named-arguments
- */
 function error_reporting(?int $error_level = null): int {}
 
 function define(string $constant_name, mixed $value, bool $case_insensitive = false): bool {}
 
 /**
  * @pure
- * @no-named-arguments
  */
 function defined(string $constant_name): bool {}
 
 /**
  * @pure
- * @no-named-arguments
  */
 function get_class(object $object): string {}
 
 /**
  * @pure
- * @no-named-arguments
  */
 function get_called_class(): string {}
 
 /**
  * @pure
- * @no-named-arguments
  */
 function get_parent_class(object|string $object_or_class): string|false {}
 
@@ -838,7 +820,6 @@ function get_parent_class(object|string $object_or_class): string|false {}
  * @param object|class-string $object_or_class
  *
  * @pure
- * @no-named-arguments
  */
 function method_exists(object|string $object_or_class, string $method): bool {}
 
@@ -846,7 +827,6 @@ function method_exists(object|string $object_or_class, string $method): bool {}
  * @param object|class-string $object_or_class
  *
  * @pure
- * @no-named-arguments
  */
 function property_exists(object|string $object_or_class, string $property): bool {}
 
@@ -856,7 +836,6 @@ function property_exists(object|string $object_or_class, string $property): bool
  * @assert-if-true =trait-string $trait
  *
  * @pure
- * @no-named-arguments
  */
 function trait_exists(string $trait, bool $autoload = true): bool {}
 
@@ -866,7 +845,6 @@ function trait_exists(string $trait, bool $autoload = true): bool {}
  * @assert-if-true =class-string $class
  *
  * @pure
- * @no-named-arguments
  */
 function class_exists(string $class, bool $autoload = true): bool {}
 
@@ -876,7 +854,6 @@ function class_exists(string $class, bool $autoload = true): bool {}
  * @assert-if-true =interface-string $interface
  *
  * @pure
- * @no-named-arguments
  */
 function interface_exists(string $interface, bool $autoload = true): bool {}
 
@@ -886,7 +863,6 @@ function interface_exists(string $interface, bool $autoload = true): bool {}
  * @assert-if-true =non-empty-string $function
  *
  * @pure
- * @no-named-arguments
  */
 function function_exists(string $function): bool {}
 
@@ -896,7 +872,6 @@ function function_exists(string $function): bool {}
  * @assert-if-true =enum-string $enum
  *
  * @pure
- * @no-named-arguments
  */
 #[Mago\AvailableSince(80100)]
 function enum_exists(string $enum, bool $autoload = true): bool {}
@@ -905,7 +880,6 @@ function enum_exists(string $enum, bool $autoload = true): bool {}
  * @param class-string $class
  * @param non-empty-string $alias
  *
- * @no-named-arguments
  */
 function class_alias(string $class, string $alias, bool $autoload = true): bool {}
 

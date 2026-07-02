@@ -818,7 +818,6 @@ const PASSWORD_ARGON2_PROVIDER = 'standard';
  *   'options': array{'salt'?: int, 'cost'?: int, 'memory_cost'?: int, 'time_cost'?: int, 'threads'?: int, ...},
  * }
  *
- * @no-named-arguments
  * @pure
  */
 function password_get_info(string $hash): array {}
@@ -828,7 +827,6 @@ function password_get_info(string $hash): array {}
  *
  * @return non-empty-string
  *
- * @no-named-arguments
  * @pure
  */
 function password_hash(string $password, string|int|null $algo, array $options = []): string {}
@@ -836,13 +834,11 @@ function password_hash(string $password, string|int|null $algo, array $options =
 /**
  * @param array{'salt'?:int, 'cost'?: int, 'memory_cost'?: int, 'time_cost'?: int, 'threads'?: int, ...} $options
  *
- * @no-named-arguments
  * @pure
  */
 function password_needs_rehash(string $hash, string|int|null $algo, array $options = []): bool {}
 
 /**
- * @no-named-arguments
  * @pure
  */
 function password_verify(string $password, string $hash): bool {}
@@ -850,7 +846,6 @@ function password_verify(string $password, string $hash): bool {}
 /**
  * @return list<non-empty-string>
  *
- * @no-named-arguments
  * @pure
  */
 function password_algos(): array {}
@@ -3618,7 +3613,6 @@ function array_replace_recursive(array $array, array ...$replacements): array {}
  *
  * @return ($array is non-empty-array|non-empty-list ? non-empty-list<K> : list<K>)
  *
- * @no-named-arguments
  * @pure
  */
 function array_keys(array $array, mixed $filter_value = null, bool $strict = false): array {}
@@ -3631,7 +3625,6 @@ function array_keys(array $array, mixed $filter_value = null, bool $strict = fal
  *
  * @return ($array is non-empty-array|non-empty-list ? non-empty-list<V> : list<V>)
  *
- * @no-named-arguments
  * @pure
  */
 function array_values(array $array): array {}
@@ -3644,7 +3637,6 @@ function array_values(array $array): array {}
  *
  * @return array<V, int>
  *
- * @no-named-arguments
  * @pure
  */
 function array_count_values(array $array): array {}
@@ -3659,7 +3651,6 @@ function array_count_values(array $array): array {}
  *
  * @return array<array-key, V>
  *
- * @no-named-arguments
  * @pure
  */
 function array_column(array $array, string|int|null $column_key, string|int|null $index_key = null): array {}
@@ -3673,7 +3664,6 @@ function array_column(array $array, string|int|null $column_key, string|int|null
  *
  * @return ($array is list<V> ? ($preserve_keys is true ? array<K, V> : list<V>) : array<K, V>)
  *
- * @no-named-arguments
  * @pure
  */
 function array_reverse(array $array, bool $preserve_keys = false): array {}
