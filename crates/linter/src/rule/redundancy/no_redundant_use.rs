@@ -1,10 +1,12 @@
-use mago_allocator::Arena;
 use std::collections::HashMap;
 use std::collections::HashSet;
 
 use indoc::indoc;
 use schemars::JsonSchema;
 
+use mago_allocator::Arena;
+use mago_bytes::BytesDisplay;
+use mago_bytes::trim_start_byte;
 use mago_database::file::HasFileId;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -30,8 +32,6 @@ use crate::rule::Config;
 use crate::rule::LintRule;
 use crate::rule_meta::RuleMeta;
 use crate::settings::RuleSettings;
-use mago_bytes::BytesDisplay;
-use mago_bytes::trim_start_byte;
 
 #[derive(Debug, Clone)]
 pub struct NoRedundantUseRule {
