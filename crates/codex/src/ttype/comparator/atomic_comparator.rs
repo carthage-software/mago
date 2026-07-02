@@ -194,6 +194,12 @@ pub fn is_contained_by(
         return true;
     }
 
+    if input_type_part.is_mixed() || input_type_part.is_templated_as_mixed() {
+        atomic_comparison_result.type_coerced = Some(true);
+        atomic_comparison_result.type_coerced_from_nested_mixed = Some(true);
+        return false;
+    }
+
     if let TAtomic::Object(TObject::Enum(enum_container)) = container_type_part {
         return match input_type_part {
             TAtomic::Object(TObject::Enum(enum_input)) => {
@@ -223,12 +229,6 @@ pub fn is_contained_by(
             }
             _ => false,
         };
-    }
-
-    if input_type_part.is_mixed() || input_type_part.is_templated_as_mixed() {
-        atomic_comparison_result.type_coerced = Some(true);
-        atomic_comparison_result.type_coerced_from_nested_mixed = Some(true);
-        return false;
     }
 
     if matches!(input_type_part, TAtomic::Null) {
