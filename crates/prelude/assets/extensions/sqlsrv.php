@@ -1,14 +1,10 @@
 <?php
 
-// Error / warning selectors
-
 const SQLSRV_ERR_ERRORS = 0;
 
 const SQLSRV_ERR_WARNINGS = 1;
 
 const SQLSRV_ERR_ALL = 2;
-
-// Logging subsystems
 
 const SQLSRV_LOG_SYSTEM_ALL = -1;
 
@@ -22,8 +18,6 @@ const SQLSRV_LOG_SYSTEM_STMT = 4;
 
 const SQLSRV_LOG_SYSTEM_UTIL = 8;
 
-// Logging severities
-
 const SQLSRV_LOG_SEVERITY_ALL = -1;
 
 const SQLSRV_LOG_SEVERITY_ERROR = 1;
@@ -32,15 +26,11 @@ const SQLSRV_LOG_SEVERITY_WARNING = 2;
 
 const SQLSRV_LOG_SEVERITY_NOTICE = 4;
 
-// Fetch types
-
 const SQLSRV_FETCH_NUMERIC = 1;
 
 const SQLSRV_FETCH_ASSOC = 2;
 
 const SQLSRV_FETCH_BOTH = 3;
-
-// PHP types (values 4 and 6 belong to SQLSRV_PHPTYPE_STRING() and SQLSRV_PHPTYPE_STREAM())
 
 const SQLSRV_PHPTYPE_NULL = 1;
 
@@ -52,21 +42,15 @@ const SQLSRV_PHPTYPE_DATETIME = 5;
 
 const SQLSRV_PHPTYPE_TABLE = 7;
 
-// Encodings
-
 const SQLSRV_ENC_BINARY = 'binary';
 
 const SQLSRV_ENC_CHAR = 'char';
-
-// Nullability
 
 const SQLSRV_NULLABLE_NO = 0;
 
 const SQLSRV_NULLABLE_YES = 1;
 
 const SQLSRV_NULLABLE_UNKNOWN = 2;
-
-// SQL types
 
 const SQLSRV_SQLTYPE_BIGINT = -5;
 
@@ -128,15 +112,11 @@ const SQLSRV_SQLTYPE_VARCHAR = 12;
 
 const SQLSRV_SQLTYPE_XML = -152;
 
-// Parameter directions
-
 const SQLSRV_PARAM_IN = 1;
 
 const SQLSRV_PARAM_INOUT = 2;
 
 const SQLSRV_PARAM_OUT = 4;
-
-// Transaction isolation levels
 
 const SQLSRV_TXN_READ_UNCOMMITTED = 1;
 
@@ -147,8 +127,6 @@ const SQLSRV_TXN_REPEATABLE_READ = 4;
 const SQLSRV_TXN_SERIALIZABLE = 8;
 
 const SQLSRV_TXN_SNAPSHOT = 32;
-
-// Cursor scroll options
 
 const SQLSRV_SCROLL_NEXT = 1;
 
@@ -162,8 +140,6 @@ const SQLSRV_SCROLL_ABSOLUTE = 5;
 
 const SQLSRV_SCROLL_RELATIVE = 6;
 
-// Cursor types
-
 const SQLSRV_CURSOR_FORWARD = 'forward';
 
 const SQLSRV_CURSOR_STATIC = 'static';
@@ -175,11 +151,12 @@ const SQLSRV_CURSOR_KEYSET = 'keyset';
 const SQLSRV_CURSOR_CLIENT_BUFFERED = 'buffered';
 
 /**
- * @param array<string, mixed> $connectionInfo
+ * @param non-empty-string     $server_name
+ * @param array<string, mixed> $connection_info
  *
  * @return resource|false
  */
-function sqlsrv_connect(string $serverName, array $connectionInfo = []): mixed {}
+function sqlsrv_connect(string $server_name, array $connection_info = []): mixed {}
 
 /**
  * @param resource $conn
@@ -202,9 +179,9 @@ function sqlsrv_commit($conn): bool {}
 function sqlsrv_rollback($conn): bool {}
 
 /**
- * @return array<int, array<string, mixed>>|null
+ * @return non-empty-list<array<string, mixed>>|null
  */
-function sqlsrv_errors(int $errorsOrWarnings = SQLSRV_ERR_ALL): ?array {}
+function sqlsrv_errors(int $errors_and_or_warnings = SQLSRV_ERR_ALL): ?array {}
 
 function sqlsrv_configure(string $setting, mixed $value): bool {}
 
@@ -217,7 +194,7 @@ function sqlsrv_get_config(string $setting): mixed {}
  *
  * @return resource|false
  */
-function sqlsrv_prepare($conn, string $sql, array $params = [], array $options = []): mixed {}
+function sqlsrv_prepare($conn, string $tsql, array $params = [], array $options = []): mixed {}
 
 /**
  * @param resource $stmt
@@ -231,7 +208,7 @@ function sqlsrv_execute($stmt): bool {}
  *
  * @return resource|false
  */
-function sqlsrv_query($conn, string $sql, array $params = [], array $options = []): mixed {}
+function sqlsrv_query($conn, string $tsql, array $params = [], array $options = []): mixed {}
 
 /**
  * @param resource $stmt
@@ -243,19 +220,19 @@ function sqlsrv_fetch($stmt, ?int $row = null, ?int $offset = null): ?bool {}
  *
  * @return array<array-key, mixed>|null|false
  */
-function sqlsrv_fetch_array($stmt, ?int $fetchType = null, ?int $row = null, ?int $offset = null): array|false|null {}
+function sqlsrv_fetch_array($stmt, ?int $fetch_type = null, ?int $row = null, ?int $offset = null): array|false|null {}
 
 /**
- * @param resource          $stmt
- * @param class-string|null      $className
- * @param array<int, mixed>|null $ctorParams
+ * @param resource               $stmt
+ * @param class-string|null      $class_name
+ * @param array<int, mixed>|null $ctor_params
  *
  * @return object|null|false
  */
 function sqlsrv_fetch_object(
     $stmt,
-    ?string $className = null,
-    ?array $ctorParams = null,
+    ?string $class_name = null,
+    ?array $ctor_params = null,
     ?int $row = null,
     ?int $offset = null,
 ): object|false|null {}
@@ -268,12 +245,12 @@ function sqlsrv_next_result($stmt): ?bool {}
 /**
  * @param resource $stmt
  */
-function sqlsrv_get_field($stmt, int $fieldIndex, ?int $getAsType = null): mixed {}
+function sqlsrv_get_field($stmt, int $field_index, ?int $get_as_type = null): mixed {}
 
 /**
  * @param resource $stmt
  *
- * @return array<int, array<string, mixed>>|false
+ * @return list<array<string, mixed>>|false
  */
 function sqlsrv_field_metadata($stmt): array|false {}
 
@@ -285,21 +262,21 @@ function sqlsrv_has_rows($stmt): bool {}
 /**
  * @param resource $stmt
  *
- * @return int|false
+ * @return int<0, max>|false
  */
 function sqlsrv_num_fields($stmt): int|false {}
 
 /**
  * @param resource $stmt
  *
- * @return int|false
+ * @return int<0, max>|false
  */
 function sqlsrv_num_rows($stmt): int|false {}
 
 /**
  * @param resource $stmt
  *
- * @return int|false
+ * @return int<-1, max>|false
  */
 function sqlsrv_rows_affected($stmt): int|false {}
 
@@ -332,31 +309,54 @@ function sqlsrv_free_stmt($stmt): bool {}
  */
 function sqlsrv_send_stream_data($stmt): bool {}
 
+/**
+ * @param 'binary'|'char' $encoding
+ */
 function SQLSRV_PHPTYPE_STREAM(string $encoding): int {}
 
+/**
+ * @param 'binary'|'char' $encoding
+ */
 function SQLSRV_PHPTYPE_STRING(string $encoding): int {}
 
-function SQLSRV_SQLTYPE_BINARY(int $byteCount): int {}
+/**
+ * @param int<1, 8000> $size
+ */
+function SQLSRV_SQLTYPE_BINARY(int $size): int {}
 
-function SQLSRV_SQLTYPE_CHAR(int $charCount): int {}
+/**
+ * @param int<1, 8000> $size
+ */
+function SQLSRV_SQLTYPE_CHAR(int $size): int {}
 
+/**
+ * @param int<1, 38> $precision
+ * @param int<0, 38> $scale
+ */
 function SQLSRV_SQLTYPE_DECIMAL(int $precision, int $scale): int {}
 
-function SQLSRV_SQLTYPE_NCHAR(int $charCount): int {}
+/**
+ * @param int<1, 4000> $size
+ */
+function SQLSRV_SQLTYPE_NCHAR(int $size): int {}
 
+/**
+ * @param int<1, 38> $precision
+ * @param int<0, 38> $scale
+ */
 function SQLSRV_SQLTYPE_NUMERIC(int $precision, int $scale): int {}
 
 /**
- * @param int|'max' $charCount
+ * @param int<1, 4000>|'max' $size
  */
-function SQLSRV_SQLTYPE_NVARCHAR(int|string $charCount): int {}
+function SQLSRV_SQLTYPE_NVARCHAR(int|string $size): int {}
 
 /**
- * @param int|'max' $byteCount
+ * @param int<1, 8000>|'max' $size
  */
-function SQLSRV_SQLTYPE_VARBINARY(int|string $byteCount): int {}
+function SQLSRV_SQLTYPE_VARBINARY(int|string $size): int {}
 
 /**
- * @param int|'max' $charCount
+ * @param int<1, 8000>|'max' $size
  */
-function SQLSRV_SQLTYPE_VARCHAR(int|string $charCount): int {}
+function SQLSRV_SQLTYPE_VARCHAR(int|string $size): int {}
