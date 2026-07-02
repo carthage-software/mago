@@ -123,8 +123,30 @@ where
         let mut always_account_for_simple_calls = false;
 
         match self.base {
-            Expression::Instantiation(_) => {
-                score += 2; // Instantiation adds extra score
+            Expression::Instantiation(instantiation) => {
+                // A `new X(...)` receiver normally pushes the chain toward breaking.
+                // However, when the chain is short (<= 2 links) and every link is a
+                // simple call (no breaking arguments of its own), a receiver whose
+                // *own* argument list is already spread across multiple lines should
+                // not also drag the trailing short chain onto separate lines.
+                // See: https://github.com/carthage-software/mago/issues/1711
+                let receiver_args_multiline = instantiation.argument_list.as_ref().is_some_and(|argument_list| {
+                    let span = argument_list.span();
+                    misc::has_new_line_in_range(f.source_text, span.start.offset, span.end.offset)
+                });
+
+                let short_simple_chain = self.accesses.len() <= 2
+                    && self.accesses.iter().all(|access| match access.get_arguments_list() {
+                        Some(argument_list) => !argument_list
+                            .arguments
+                            .iter()
+                            .any(|argument| is_breaking_expression(f, argument.value(), false)),
+                        None => true,
+                    });
+
+                if !(receiver_args_multiline && short_simple_chain) {
+                    score += 2; // Instantiation adds extra score
+                }
             }
             Expression::Call(Call::Function(FunctionCall { argument_list, .. }))
                 if argument_list.arguments.len() == 1 =>
