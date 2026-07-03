@@ -617,6 +617,7 @@ test_case!(reconcile_literl_class_string);
 test_case!(class_string_is_never_equal_to_literal_string);
 test_case!(narrow_class_string_match);
 test_case!(narrow_non_final_class_string_match);
+test_case!(narrow_class_string_enum_generic);
 test_case!(expand_class_constant_type);
 test_case!(iterator_to_array);
 test_case!(arrow_function_inherits_method_templates);
