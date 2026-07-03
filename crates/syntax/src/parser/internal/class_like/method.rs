@@ -32,7 +32,7 @@ where
 
     fn parse_method_body(&mut self) -> Result<MethodBody<'arena>, ParseError> {
         Ok(match self.stream.peek_kind(0)? {
-            Some(T![";"]) => MethodBody::Abstract(MethodAbstractBody { semicolon: self.stream.consume_span()? }),
+            Some(T![";" | "?>"]) => MethodBody::Abstract(MethodAbstractBody { terminator: self.parse_terminator()? }),
             _ => MethodBody::Concrete(self.parse_block()?),
         })
     }

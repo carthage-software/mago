@@ -3,6 +3,7 @@ use strum::Display;
 use mago_span::HasSpan;
 use mago_span::Span;
 
+use crate::cst::Terminator;
 use crate::cst::cst::attribute::AttributeList;
 use crate::cst::cst::block::Block;
 use crate::cst::cst::function_like::parameter::FunctionLikeParameterList;
@@ -41,7 +42,7 @@ pub struct Method<'arena> {
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 pub enum MethodBody<'arena> {
-    Abstract(MethodAbstractBody),
+    Abstract(MethodAbstractBody<'arena>),
     Concrete(Block<'arena>),
 }
 
@@ -59,8 +60,8 @@ pub enum MethodBody<'arena> {
 /// ```
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
-pub struct MethodAbstractBody {
-    pub semicolon: Span,
+pub struct MethodAbstractBody<'arena> {
+    pub terminator: Terminator<'arena>,
 }
 
 impl Method<'_> {
@@ -82,7 +83,7 @@ impl Method<'_> {
     /// Returns `true` if the method is static.
     #[inline]
     pub fn is_static(&self) -> bool {
-        self.modifiers.iter().any(super::super::modifier::Modifier::is_static)
+        self.modifiers.iter().any(Modifier::is_static)
     }
 }
 
@@ -109,8 +110,8 @@ impl HasSpan for MethodBody<'_> {
     }
 }
 
-impl HasSpan for MethodAbstractBody {
+impl HasSpan for MethodAbstractBody<'_> {
     fn span(&self) -> Span {
-        self.semicolon
+        self.terminator.span()
     }
 }

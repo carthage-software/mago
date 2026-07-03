@@ -1109,8 +1109,8 @@ generate_ast_walker! {
         }
     }
 
-    _ MethodAbstractBody as method_abstract_body => {
-        // Do nothing by default
+    'arena MethodAbstractBody as method_abstract_body => {
+        walker.walk_terminator(&method_abstract_body.terminator, context);
     }
 
     'arena FunctionLikeReturnTypeHint as function_like_return_type_hint => {

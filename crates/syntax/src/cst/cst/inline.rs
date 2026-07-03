@@ -30,6 +30,20 @@ pub struct Inline<'arena> {
     pub value: &'arena [u8],
 }
 
+impl InlineKind {
+    #[inline(always)]
+    #[must_use]
+    pub const fn is_text(&self) -> bool {
+        matches!(self, InlineKind::Text)
+    }
+
+    #[inline(always)]
+    #[must_use]
+    pub const fn is_shebang(&self) -> bool {
+        matches!(self, InlineKind::Shebang)
+    }
+}
+
 impl HasSpan for Inline<'_> {
     fn span(&self) -> Span {
         self.span

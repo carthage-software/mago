@@ -17,6 +17,7 @@ use mago_syntax::cst::MethodAbstractBody;
 use mago_syntax::cst::MethodBody;
 use mago_syntax::cst::Modifier;
 use mago_syntax::cst::Sequence;
+use mago_syntax::cst::Terminator;
 
 use crate::document::Document;
 use crate::document::Group;
@@ -37,7 +38,7 @@ use crate::wrap;
 
 #[derive(Debug, Clone, Copy)]
 enum FunctionLikeBody<'arena> {
-    Abstract(Span),
+    Abstract(Terminator<'arena>),
     Block(&'arena Block<'arena>),
 }
 
@@ -105,7 +106,7 @@ impl<'arena> FunctionLikeParts<'arena> {
             use_clause: None,
             return_type_hint: method.return_type_hint.as_ref(),
             body: match &method.body {
-                MethodBody::Abstract(body) => FunctionLikeBody::Abstract(body.semicolon),
+                MethodBody::Abstract(body) => FunctionLikeBody::Abstract(body.terminator),
                 MethodBody::Concrete(block) => FunctionLikeBody::Block(block),
             },
         }
@@ -278,7 +279,7 @@ impl<'arena> FunctionLikeParts<'arena> {
         A: Arena,
     {
         match self.body {
-            FunctionLikeBody::Abstract(span) => format_token(f, span, b";"),
+            FunctionLikeBody::Abstract(terminator) => format_token(f, terminator.span(), b";"),
             FunctionLikeBody::Block(block) => {
                 let inlined_braces = self.should_use_inlined_braces(f, settings);
                 let spacing =
@@ -475,7 +476,7 @@ where
     }
 }
 
-impl<'arena, A> Format<'arena, A> for MethodAbstractBody
+impl<'arena, A> Format<'arena, A> for MethodAbstractBody<'arena>
 where
     A: Arena,
 {

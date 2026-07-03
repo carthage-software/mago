@@ -521,7 +521,7 @@ pub enum Node<'ast, 'arena> {
     ClassLikeMemberExpressionSelector(&'ast ClassLikeMemberExpressionSelector<'arena>),
     ClassLikeMemberSelector(&'ast ClassLikeMemberSelector<'arena>),
     Method(&'ast Method<'arena>),
-    MethodAbstractBody(&'ast MethodAbstractBody),
+    MethodAbstractBody(&'ast MethodAbstractBody<'arena>),
     MethodBody(&'ast MethodBody<'arena>),
     HookedProperty(&'ast HookedProperty<'arena>),
     PlainProperty(&'ast PlainProperty<'arena>),
@@ -1261,7 +1261,9 @@ impl<'ast, 'arena> Node<'ast, 'arena> {
                 }
                 f(Node::MethodBody(&node.body));
             }
-            Node::MethodAbstractBody(_) => {}
+            Node::MethodAbstractBody(node) => {
+                f(Node::Terminator(&node.terminator));
+            }
             Node::MethodBody(node) => match node {
                 MethodBody::Abstract(node) => f(Node::MethodAbstractBody(node)),
                 MethodBody::Concrete(node) => f(Node::Block(node)),
