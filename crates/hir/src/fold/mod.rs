@@ -772,7 +772,7 @@ generate_fold! {
     SwitchCase as switch_case => {
         SwitchCase {
             span: switch_case.span,
-            seperator: switch_case.seperator,
+            separator: switch_case.separator,
             kind: match &switch_case.kind {
                 SwitchCaseKind::Expression(expression, statements) => SwitchCaseKind::Expression(
                     folder.arena().alloc(folder.fold_expression(expression)),

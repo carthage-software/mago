@@ -167,14 +167,14 @@ pub struct Switch<'arena, I, S, E> {
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub struct SwitchCase<'arena, I, S, E> {
     pub span: Span,
-    pub seperator: SwitchCaseSeperatorKind,
+    pub separator: SwitchCaseSeparatorKind,
     pub kind: SwitchCaseKind<'arena, I, S, E>,
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
-pub enum SwitchCaseSeperatorKind {
+pub enum SwitchCaseSeparatorKind {
     Colon,
     Semicolon,
 }
@@ -400,7 +400,7 @@ where
     where
         A: Arena,
     {
-        SwitchCase { span: self.span, seperator: self.seperator, kind: self.kind.copy_into(arena) }
+        SwitchCase { span: self.span, separator: self.separator, kind: self.kind.copy_into(arena) }
     }
 }
 

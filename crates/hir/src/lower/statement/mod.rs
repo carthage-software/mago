@@ -29,7 +29,7 @@ use crate::ir::statement::StaticItem;
 use crate::ir::statement::Switch;
 use crate::ir::statement::SwitchCase;
 use crate::ir::statement::SwitchCaseKind;
-use crate::ir::statement::SwitchCaseSeperatorKind;
+use crate::ir::statement::SwitchCaseSeparatorKind;
 use crate::ir::statement::Tag;
 use crate::ir::statement::TagKind;
 use crate::ir::statement::Terminator;
@@ -518,7 +518,7 @@ where
 
     fn lower_switch_case(&mut self, case: &'scratch cst::SwitchCase<'scratch>) -> SwitchCase<'arena, (), (), ()> {
         let span = case.span();
-        let seperator = lower_switch_case_separator(case.separator());
+        let separator = lower_switch_case_separator(case.separator());
         let kind = match case {
             cst::SwitchCase::Expression(case) => {
                 let expression = self.arena.alloc(self.lower_expression(case.expression));
@@ -534,7 +534,7 @@ where
             ),
         };
 
-        SwitchCase { span, seperator, kind }
+        SwitchCase { span, separator, kind }
     }
 
     pub(crate) fn lower_while(&mut self, r#while: &'scratch cst::While<'scratch>) -> &'arena While<'arena, (), (), ()> {
@@ -817,9 +817,9 @@ fn use_identifier_kind(identifier: &cst::Identifier<'_>) -> IdentifierKind {
     }
 }
 
-fn lower_switch_case_separator(separator: &cst::SwitchCaseSeparator) -> SwitchCaseSeperatorKind {
+fn lower_switch_case_separator(separator: &cst::SwitchCaseSeparator) -> SwitchCaseSeparatorKind {
     match separator {
-        cst::SwitchCaseSeparator::Colon(_) => SwitchCaseSeperatorKind::Colon,
-        cst::SwitchCaseSeparator::SemiColon(_) => SwitchCaseSeperatorKind::Semicolon,
+        cst::SwitchCaseSeparator::Colon(_) => SwitchCaseSeparatorKind::Colon,
+        cst::SwitchCaseSeparator::SemiColon(_) => SwitchCaseSeparatorKind::Semicolon,
     }
 }
