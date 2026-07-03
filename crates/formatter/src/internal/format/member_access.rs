@@ -309,6 +309,22 @@ where
         width > f.settings.print_width
     }
 
+    fn exceeds_print_width_from_line_start(&self, f: &FormatterState<'_, '_, A>) -> bool {
+        let Some(width) = self.get_flat_width_with_binary_arguments() else {
+            return false;
+        };
+
+        let base_start = self.base.span().start.offset;
+        let line = f.file.line_number(base_start);
+        let Some(line_start) = f.file.get_line_start_offset(line) else {
+            return false;
+        };
+
+        let prefix_width = string_width(&f.source_text[line_start as usize..base_start as usize]);
+
+        prefix_width + width > f.settings.print_width
+    }
+
     #[inline]
     fn has_break_after_first_access(&self, f: &FormatterState<'_, '_, A>) -> bool {
         for (i, access) in self.accesses.iter().enumerate() {
@@ -365,6 +381,15 @@ where
         let mut width = get_flat_expression_width(self.base)?;
         for access in &self.accesses {
             width += access.get_flat_width()?;
+        }
+
+        Some(width)
+    }
+
+    fn get_flat_width_with_binary_arguments(&self) -> Option<usize> {
+        let mut width = get_flat_expression_width_with_binary_arguments(self.base)?;
+        for access in &self.accesses {
+            width += get_access_flat_width_with_binary_arguments(access)?;
         }
 
         Some(width)
@@ -614,6 +639,18 @@ fn get_argument_width(argument: &Argument<'_>) -> Option<usize> {
     }
 }
 
+fn get_argument_width_with_binary_arguments(argument: &Argument<'_>) -> Option<usize> {
+    match argument {
+        Argument::Positional(argument) => {
+            let unpack_width = usize::from(argument.ellipsis.is_some()) * 3;
+
+            get_flat_expression_width_with_binary_arguments(argument.value).map(|width| width + unpack_width)
+        }
+        Argument::Named(argument) => get_flat_expression_width_with_binary_arguments(argument.value)
+            .map(|width| width + string_width(argument.name.value) + 2),
+    }
+}
+
 fn get_argument_list_width(argument_list: &ArgumentList<'_>) -> Option<usize> {
     let mut width = 2;
     for (i, argument) in argument_list.arguments.iter().enumerate() {
@@ -622,6 +659,19 @@ fn get_argument_list_width(argument_list: &ArgumentList<'_>) -> Option<usize> {
         }
 
         width += get_argument_width(argument)?;
+    }
+
+    Some(width)
+}
+
+fn get_argument_list_width_with_binary_arguments(argument_list: &ArgumentList<'_>) -> Option<usize> {
+    let mut width = 2;
+    for (i, argument) in argument_list.arguments.iter().enumerate() {
+        if i > 0 {
+            width += 2;
+        }
+
+        width += get_argument_width_with_binary_arguments(argument)?;
     }
 
     Some(width)
@@ -675,6 +725,55 @@ fn get_flat_expression_width(expression: &Expression<'_>) -> Option<usize> {
             .map(|((class, method), arguments)| class + string_width(b"::") + method + arguments),
         _ => None,
     }
+}
+
+fn get_flat_expression_width_with_binary_arguments(expression: &Expression<'_>) -> Option<usize> {
+    if let Some(width) = get_expression_width(expression) {
+        return Some(width);
+    }
+
+    match expression {
+        Expression::Parenthesized(parenthesized) => {
+            get_flat_expression_width_with_binary_arguments(parenthesized.expression).map(|width| width + 2)
+        }
+        Expression::Access(Access::Property(access)) => get_flat_expression_width_with_binary_arguments(access.object)
+            .zip(get_selector_width(&access.property))
+            .map(|(object, property)| object + string_width(b"->") + property),
+        Expression::Access(Access::NullSafeProperty(access)) => {
+            get_flat_expression_width_with_binary_arguments(access.object)
+                .zip(get_selector_width(&access.property))
+                .map(|(object, property)| object + string_width(b"?->") + property)
+        }
+        Expression::Call(Call::Function(call)) => get_flat_expression_width_with_binary_arguments(call.function)
+            .zip(get_argument_list_width_with_binary_arguments(&call.argument_list))
+            .map(|(function, arguments)| function + arguments),
+        Expression::Call(Call::Method(call)) => get_flat_expression_width_with_binary_arguments(call.object)
+            .zip(get_selector_width(&call.method))
+            .zip(get_argument_list_width_with_binary_arguments(&call.argument_list))
+            .map(|((object, method), arguments)| object + string_width(b"->") + method + arguments),
+        Expression::Call(Call::NullSafeMethod(call)) => get_flat_expression_width_with_binary_arguments(call.object)
+            .zip(get_selector_width(&call.method))
+            .zip(get_argument_list_width_with_binary_arguments(&call.argument_list))
+            .map(|((object, method), arguments)| object + string_width(b"?->") + method + arguments),
+        Expression::Call(Call::StaticMethod(call)) => get_flat_expression_width_with_binary_arguments(call.class)
+            .zip(get_selector_width(&call.method))
+            .zip(get_argument_list_width_with_binary_arguments(&call.argument_list))
+            .map(|((class, method), arguments)| class + string_width(b"::") + method + arguments),
+        Expression::Binary(binary) => get_flat_expression_width_with_binary_arguments(binary.lhs)
+            .zip(get_flat_expression_width_with_binary_arguments(binary.rhs))
+            .map(|(lhs, rhs)| lhs + string_width(binary.operator.as_bytes()) + rhs + 2),
+        _ => None,
+    }
+}
+
+fn get_access_flat_width_with_binary_arguments(access: &MemberAccess<'_>) -> Option<usize> {
+    let selector_width = get_selector_width(access.get_selector())?;
+    let arguments_width = match access.get_arguments_list() {
+        Some(argument_list) => get_argument_list_width_with_binary_arguments(argument_list)?,
+        None => 0,
+    };
+
+    Some(string_width(access.get_operator_as_bytes()) + selector_width + arguments_width)
 }
 
 pub(super) fn collect_member_access_chain<'arena, A>(
@@ -939,7 +1038,7 @@ where
         && member_access_chain.is_first_link_object_method_call()
         && (member_access_chain.is_first_link_already_broken(f)
             || member_access_chain.has_break_after_first_access(f)
-            || member_access_chain.exceeds_print_width(f));
+            || member_access_chain.exceeds_print_width_from_line_start(f));
 
     if preserve_same_line_first_method {
         return true;

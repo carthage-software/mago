@@ -460,6 +460,8 @@ test_case!(issue_1806);
 test_case!(issue_1808);
 test_case!(issue_1874);
 test_case!(issue_1875);
+test_case!(issue_2032);
+test_case!(issue_2032_nested_function_argument);
 test_case!(member_access_chain_keeps_breaks_with_comments);
 test_case!(issue_1562);
 test_case!(bare_cr_line_endings);
