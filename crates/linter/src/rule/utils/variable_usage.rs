@@ -19,6 +19,8 @@ pub trait Recorder<'arena> {
     fn enter_arm(&mut self);
     fn exit_arm(&mut self);
     fn bail(&mut self);
+    fn record_terminator(&mut self) {}
+    fn commit_arm_pending(&mut self) {}
     fn is_bailed(&self) -> bool;
     fn is_seen(&self, name: &[u8]) -> bool;
     fn tracked_names(&self) -> Vec<&'arena [u8]>;
@@ -214,6 +216,20 @@ impl<'arena> Recorder<'arena> for DeadStoreRecorder<'arena> {
 
     fn record_unset(&mut self, name: &'arena [u8]) {
         self.record_read(name);
+    }
+
+    fn record_terminator(&mut self) {
+        let path = self.current_path();
+        for info in self.info.values_mut() {
+            info.pending.retain(|(_, p)| !p.starts_with(&path));
+        }
+    }
+
+    fn commit_arm_pending(&mut self) {
+        let path = self.current_path();
+        for info in self.info.values_mut() {
+            info.pending.retain(|(_, p)| !p.starts_with(&path));
+        }
     }
 
     fn enter_arm(&mut self) {
@@ -556,6 +572,7 @@ impl<'ast, 'arena, R: Recorder<'arena> + Sync + Send> MutWalker<'ast, 'arena, ()
             self.rec.exit_rescan();
         }
 
+        self.rec.commit_arm_pending();
         self.rec.exit_arm();
     }
 
@@ -637,6 +654,7 @@ impl<'ast, 'arena, R: Recorder<'arena> + Sync + Send> MutWalker<'ast, 'arena, ()
             self.rec.exit_rescan();
         }
 
+        self.rec.commit_arm_pending();
         self.rec.exit_arm();
     }
 
@@ -650,6 +668,7 @@ impl<'ast, 'arena, R: Recorder<'arena> + Sync + Send> MutWalker<'ast, 'arena, ()
             self.rec.exit_rescan();
         }
 
+        self.rec.commit_arm_pending();
         self.rec.exit_arm();
         self.walk_expression(d.condition, ctx);
     }
@@ -699,6 +718,7 @@ impl<'ast, 'arena, R: Recorder<'arena> + Sync + Send> MutWalker<'ast, 'arena, ()
             self.rec.exit_rescan();
         }
 
+        self.rec.commit_arm_pending();
         self.rec.exit_arm();
     }
 
@@ -757,6 +777,51 @@ impl<'ast, 'arena, R: Recorder<'arena> + Sync + Send> MutWalker<'ast, 'arena, ()
 
             self.rec.exit_arm();
         }
+    }
+
+    fn walk_break(&mut self, b: &'ast Break<'arena>, ctx: &mut ()) {
+        if self.rec.is_bailed() {
+            return;
+        }
+
+        if let Some(level) = &b.level {
+            self.with_ctx(ExprCtx::Read, |w| w.walk_expression(level, ctx));
+        }
+
+        self.rec.record_terminator();
+    }
+
+    fn walk_continue(&mut self, c: &'ast Continue<'arena>, ctx: &mut ()) {
+        if self.rec.is_bailed() {
+            return;
+        }
+
+        if let Some(level) = &c.level {
+            self.with_ctx(ExprCtx::Read, |w| w.walk_expression(level, ctx));
+        }
+
+        self.rec.record_terminator();
+    }
+
+    fn walk_return(&mut self, r: &'ast Return<'arena>, ctx: &mut ()) {
+        if self.rec.is_bailed() {
+            return;
+        }
+
+        if let Some(value) = &r.value {
+            self.with_ctx(ExprCtx::Read, |w| w.walk_expression(value, ctx));
+        }
+
+        self.rec.record_terminator();
+    }
+
+    fn walk_throw(&mut self, t: &'ast Throw<'arena>, ctx: &mut ()) {
+        if self.rec.is_bailed() {
+            return;
+        }
+
+        self.with_ctx(ExprCtx::Read, |w| w.walk_expression(t.exception, ctx));
+        self.rec.record_terminator();
     }
 
     fn walk_unset(&mut self, u: &'ast Unset<'arena>, ctx: &mut ()) {
