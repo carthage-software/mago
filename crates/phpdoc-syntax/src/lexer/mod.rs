@@ -88,8 +88,7 @@ impl<'arena> DocblockLexer<'arena> {
             b':' => (TokenKind::Colon, 1),
             b'=' if second == Some(b'>') => (TokenKind::DoubleArrow, 2),
             b'=' => (TokenKind::Equals, 1),
-            b'*' if second == Some(b'/') => (TokenKind::ClosingMarker, 2),
-            b'*' => (TokenKind::Asterisk, 1),
+            b'*' => self.read_asterisk(remaining),
             b'.' if remaining.get(..3) == Some(b"...") => (TokenKind::Ellipsis, 3),
             b'.' if second.is_some_and(|b| b.is_ascii_digit()) => self.read_number(),
             b'-' if second == Some(b'>') => (TokenKind::Arrow, 2),
@@ -135,6 +134,26 @@ impl<'arena> DocblockLexer<'arena> {
         self.read_other()
     }
 
+    #[inline]
+    fn read_asterisk(&self, remaining: &[u8]) -> (TokenKind, usize) {
+        let mut i: usize = 0;
+        while remaining.get(i) == Some(&b'*') {
+            i += 1;
+        }
+
+        if remaining.get(i) == Some(&b'/') { (TokenKind::ClosingMarker, i + 1) } else { (TokenKind::Asterisk, 1) }
+    }
+
+    #[inline]
+    fn is_closing_marker(&self, slice: &[u8]) -> bool {
+        let mut i: usize = 0;
+        while slice.get(i) == Some(&b'*') {
+            i += 1;
+        }
+
+        slice.get(i) == Some(&b'/')
+    }
+
     /// A `//` only opens a line comment when it stands at the start of the
     /// (meaningful) line — i.e. the byte before it is whitespace, or it is the
     /// very start of the input. When `//` is stuck to other text (e.g. the
@@ -151,7 +170,13 @@ impl<'arena> DocblockLexer<'arena> {
         let tail = &self.input.read_remaining()[2..];
 
         let newline = memchr::memchr2(b'\n', b'\r', tail);
-        let marker = memchr::memmem::find(tail, b"*/");
+        let marker = memchr::memmem::find(tail, b"*/").map(|mut m| {
+            while m > 0 && tail[m - 1] == b'*' {
+                m -= 1;
+            }
+
+            m
+        });
 
         let stop = match (newline, marker) {
             (Some(newline), Some(marker)) => newline.min(marker),
@@ -174,7 +199,7 @@ impl<'arena> DocblockLexer<'arena> {
                 break;
             }
 
-            if byte == b'*' && remaining.get(length + 1) == Some(&b'/') {
+            if byte == b'*' && self.is_closing_marker(&remaining[length..]) {
                 break;
             }
 
@@ -283,7 +308,12 @@ impl<'arena> DocblockLexer<'arena> {
         }
 
         if let Some(marker) = memchr::memmem::find(rest, b"*/") {
-            end = end.min(marker);
+            let mut m = marker;
+            while m > 0 && rest[m - 1] == b'*' {
+                m -= 1;
+            }
+
+            end = end.min(m);
         }
 
         (TokenKind::PartialString, 1 + end)
@@ -774,6 +804,29 @@ mod tests {
             TokenKind::Asterisk,
             TokenKind::Asterisk,
             TokenKind::Asterisk
+        ]
+    );
+
+    test!(
+        smoke_multi_asterisk_closing_marker,
+        b"**/***/****/",
+        vec![TokenKind::ClosingMarker, TokenKind::ClosingMarker, TokenKind::ClosingMarker]
+    );
+
+    test!(smoke_multi_asterisk_closing_marker_single, b"*", vec![TokenKind::Asterisk]);
+
+    test!(
+        smoke_multi_asterisk_closing_marker_context,
+        b"/** @var MockObject&Repository **/",
+        vec![
+            TokenKind::OpeningMarker,
+            TokenKind::Tag,
+            TokenKind::Whitespace,
+            TokenKind::Identifier,
+            TokenKind::Ampersand,
+            TokenKind::Identifier,
+            TokenKind::Whitespace,
+            TokenKind::ClosingMarker
         ]
     );
 
