@@ -713,8 +713,14 @@ fn group_impossibilities(mut clauses: Vec<Clause>, max_complexity: usize) -> Opt
                 let mut seed_clause_possibilities = IndexMap::new();
                 seed_clause_possibilities.insert(*var, IndexMap::from([(hash, impossible_type)]));
 
-                let seed_clause =
-                    Clause::new(seed_clause_possibilities, clause.condition_span, clause.span, None, None, None);
+                let seed_clause = Clause::new(
+                    seed_clause_possibilities,
+                    clause.condition_span,
+                    clause.span,
+                    None,
+                    None,
+                    Some(clause.generated),
+                );
 
                 seed_clauses.push(seed_clause);
             }
