@@ -11,6 +11,8 @@ use crate::ir::expression::Access;
 use crate::ir::expression::AccessKind;
 use crate::ir::expression::ArrayElement;
 use crate::ir::expression::ArrayElementKind;
+use crate::ir::expression::ArrayLike;
+use crate::ir::expression::ArrayLikeKind;
 use crate::ir::expression::Assignment;
 use crate::ir::expression::Binary;
 use crate::ir::expression::Call;
@@ -32,7 +34,9 @@ use crate::ir::expression::UnaryPrefix;
 use crate::ir::expression::Yield;
 use crate::ir::expression::YieldKind;
 use crate::ir::expression::operator::BinaryOperator;
+use crate::ir::expression::operator::BinaryOperatorKind;
 use crate::ir::expression::operator::UnaryPrefixOperator;
+use crate::ir::expression::operator::UnaryPrefixOperatorKind;
 use crate::ir::expression::selector::ConstantSelector;
 use crate::ir::expression::selector::ConstantSelectorKind;
 use crate::ir::item::expression::ItemExpression;
@@ -77,15 +81,33 @@ where
                 cst::Expression::Conditional(conditional) => {
                     ExpressionKind::Conditional(self.lower_conditional(conditional))
                 }
-                cst::Expression::Array(array) => ExpressionKind::Array(
-                    self.lower_array_elements(array.left_bracket.join(array.right_bracket), &array.elements),
-                ),
-                cst::Expression::LegacyArray(array) => ExpressionKind::Array(
-                    self.lower_array_elements(array.left_parenthesis.join(array.right_parenthesis), &array.elements),
-                ),
-                cst::Expression::List(list) => ExpressionKind::List(
-                    self.lower_array_elements(list.left_parenthesis.join(list.right_parenthesis), &list.elements),
-                ),
+                cst::Expression::Array(array) => {
+                    let span = array.left_bracket.join(array.right_bracket);
+
+                    ExpressionKind::ArrayLike(ArrayLike {
+                        span,
+                        kind: ArrayLikeKind::Short,
+                        elements: self.lower_array_elements(span, &array.elements),
+                    })
+                }
+                cst::Expression::LegacyArray(array) => {
+                    let span = array.left_parenthesis.join(array.right_parenthesis);
+
+                    ExpressionKind::ArrayLike(ArrayLike {
+                        span,
+                        kind: ArrayLikeKind::Long,
+                        elements: self.lower_array_elements(span, &array.elements),
+                    })
+                }
+                cst::Expression::List(list) => {
+                    let span = list.left_parenthesis.join(list.right_parenthesis);
+
+                    ExpressionKind::ArrayLike(ArrayLike {
+                        span,
+                        kind: ArrayLikeKind::List,
+                        elements: self.lower_array_elements(span, &list.elements),
+                    })
+                }
                 cst::Expression::ArrayAccess(access) => ExpressionKind::Access(self.lower_array_access(access)),
                 cst::Expression::ArrayAppend(append) => {
                     ExpressionKind::ArrayAppend(self.arena.alloc(self.lower_expression(append.array)))
@@ -200,8 +222,12 @@ where
             ConstantExpression::UnaryPrefix(unary) => ExpressionKind::UnaryPrefix(self.arena.alloc(UnaryPrefix {
                 span: unary.span(),
                 operator: match unary.operator {
-                    UnaryPrefixConstantOperator::Plus(_) => UnaryPrefixOperator::Plus,
-                    UnaryPrefixConstantOperator::Negation(_) => UnaryPrefixOperator::Negation,
+                    UnaryPrefixConstantOperator::Plus(span) => {
+                        UnaryPrefixOperator { span, kind: UnaryPrefixOperatorKind::Plus }
+                    }
+                    UnaryPrefixConstantOperator::Negation(span) => {
+                        UnaryPrefixOperator { span, kind: UnaryPrefixOperatorKind::Negation }
+                    }
                 },
                 operand: self.arena.alloc(self.lower_constant_expression(unary.operand)),
             })),
@@ -222,22 +248,32 @@ where
                     },
                 ),
             })),
-            ConstantExpression::Array(array) => ExpressionKind::Array(Delimited {
-                span: array.left_delimiter.join(array.right_delimiter),
-                items: self.arena.alloc_slice_fill_iter(array.items.iter().map(|item| match item.key {
-                    Some(key) => ArrayElement {
-                        span: key.span().join(item.value.span()),
-                        kind: ArrayElementKind::KeyValue(
-                            self.arena.alloc(self.lower_constant_expression(key)),
-                            self.arena.alloc(self.lower_constant_expression(item.value)),
-                        ),
+            ConstantExpression::Array(array) => {
+                let span = array.left_delimiter.join(array.right_delimiter);
+
+                ExpressionKind::ArrayLike(ArrayLike {
+                    span,
+                    kind: if array.keyword.is_some() { ArrayLikeKind::Long } else { ArrayLikeKind::Short },
+                    elements: Delimited {
+                        span,
+                        items: self.arena.alloc_slice_fill_iter(array.items.iter().map(|item| match item.key {
+                            Some(key) => ArrayElement {
+                                span: key.span().join(item.value.span()),
+                                kind: ArrayElementKind::KeyValue(
+                                    self.arena.alloc(self.lower_constant_expression(key)),
+                                    self.arena.alloc(self.lower_constant_expression(item.value)),
+                                ),
+                            },
+                            None => ArrayElement {
+                                span: item.value.span(),
+                                kind: ArrayElementKind::Value(
+                                    self.arena.alloc(self.lower_constant_expression(item.value)),
+                                ),
+                            },
+                        })),
                     },
-                    None => ArrayElement {
-                        span: item.value.span(),
-                        kind: ArrayElementKind::Value(self.arena.alloc(self.lower_constant_expression(item.value))),
-                    },
-                })),
-            }),
+                })
+            }
         };
 
         Expression { meta: (), span: expression.span(), kind }
@@ -259,7 +295,7 @@ where
         self.arena.alloc(Binary {
             span: pipe.span(),
             left: self.arena.alloc(self.lower_expression(pipe.input)),
-            operator: BinaryOperator::Pipe,
+            operator: BinaryOperator { span: pipe.span(), kind: BinaryOperatorKind::Pipe },
             right: self.arena.alloc(self.lower_expression(pipe.callable)),
         })
     }

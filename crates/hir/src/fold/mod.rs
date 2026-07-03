@@ -9,6 +9,7 @@ use crate::ir::expression::Access;
 use crate::ir::expression::AccessKind;
 use crate::ir::expression::ArrayElement;
 use crate::ir::expression::ArrayElementKind;
+use crate::ir::expression::ArrayLike;
 use crate::ir::expression::Assignment;
 use crate::ir::expression::Binary;
 use crate::ir::expression::Call;
@@ -61,6 +62,7 @@ use crate::ir::item::statement::r#enum::Enum;
 use crate::ir::item::statement::function::Function;
 use crate::ir::item::statement::interface::Interface;
 use crate::ir::item::statement::r#trait::Trait;
+use crate::ir::statement::Block;
 use crate::ir::statement::Declare;
 use crate::ir::statement::DeclareItem;
 use crate::ir::statement::DoWhile;
@@ -69,11 +71,13 @@ use crate::ir::statement::Foreach;
 use crate::ir::statement::GlobalItem;
 use crate::ir::statement::If;
 use crate::ir::statement::Namespace;
+use crate::ir::statement::NamespaceBody;
 use crate::ir::statement::Statement;
 use crate::ir::statement::StatementKind;
 use crate::ir::statement::StaticItem;
 use crate::ir::statement::Switch;
 use crate::ir::statement::SwitchCase;
+use crate::ir::statement::SwitchCaseKind;
 use crate::ir::statement::Try;
 use crate::ir::statement::TryCatchClause;
 use crate::ir::statement::While;
@@ -184,7 +188,7 @@ macro_rules! generate_fold {
             fn fold_statement(&mut self, statement: &Statement<'source, Self::FromItem, Self::FromStatement, Self::FromExpression>) -> Statement<'arena, Self::ToItem, Self::ToStatement, Self::ToExpression> {
                 let kind = self.fold_statement_kind(&statement.kind);
                 let meta = self.fold_statement_meta(statement.span, &kind);
-                Statement { meta, span: statement.span, kind }
+                Statement { meta, span: statement.span, kind, terminator: statement.terminator }
             }
 
             #[inline]
@@ -212,7 +216,7 @@ macro_rules! generate_fold {
             fn fold_member_item(&mut self, member: &MemberItem<'source, Self::FromItem, Self::FromStatement, Self::FromExpression>) -> MemberItem<'arena, Self::ToItem, Self::ToStatement, Self::ToExpression> {
                 let kind = self.fold_member_item_kind(&member.kind);
                 let meta = self.fold_member_item_meta(member.span, &kind);
-                MemberItem { meta, span: member.span, kind }
+                MemberItem { meta, span: member.span, kind, terminator: member.terminator }
             }
 
             $( gen_fold_all_mut!($node $name $folder $body); )*
@@ -242,7 +246,7 @@ macro_rules! generate_fold {
             fn fold_statement(&self, statement: &Statement<'source, Self::FromItem, Self::FromStatement, Self::FromExpression>) -> Statement<'arena, Self::ToItem, Self::ToStatement, Self::ToExpression> {
                 let kind = self.fold_statement_kind(&statement.kind);
                 let meta = self.fold_statement_meta(statement.span, &kind);
-                Statement { meta, span: statement.span, kind }
+                Statement { meta, span: statement.span, kind, terminator: statement.terminator }
             }
 
             #[inline]
@@ -270,7 +274,7 @@ macro_rules! generate_fold {
             fn fold_member_item(&self, member: &MemberItem<'source, Self::FromItem, Self::FromStatement, Self::FromExpression>) -> MemberItem<'arena, Self::ToItem, Self::ToStatement, Self::ToExpression> {
                 let kind = self.fold_member_item_kind(&member.kind);
                 let meta = self.fold_member_item_meta(member.span, &kind);
-                MemberItem { meta, span: member.span, kind }
+                MemberItem { meta, span: member.span, kind, terminator: member.terminator }
             }
 
             $( gen_fold_all_const!($node $name $folder $body); )*
@@ -294,7 +298,7 @@ macro_rules! generate_fold {
             fn fold_statement(&mut self, statement: &Statement<'source, I, Self::FromStatement, E>) -> Statement<'arena, I, Self::ToStatement, E> {
                 let kind = self.fold_statement_kind(&statement.kind);
                 let meta = self.fold_statement_meta(statement.span, &kind);
-                Statement { meta, span: statement.span, kind }
+                Statement { meta, span: statement.span, kind, terminator: statement.terminator }
             }
 
             #[inline]
@@ -318,7 +322,7 @@ macro_rules! generate_fold {
             #[inline]
             fn fold_member_item(&mut self, member: &MemberItem<'source, I, Self::FromStatement, E>) -> MemberItem<'arena, I, Self::ToStatement, E> {
                 let kind = self.fold_member_item_kind(&member.kind);
-                MemberItem { meta: member.meta, span: member.span, kind }
+                MemberItem { meta: member.meta, span: member.span, kind, terminator: member.terminator }
             }
 
             $( gen_fold_statement_mut!($node $name $folder $body); )*
@@ -342,7 +346,7 @@ macro_rules! generate_fold {
             fn fold_statement(&self, statement: &Statement<'source, I, Self::FromStatement, E>) -> Statement<'arena, I, Self::ToStatement, E> {
                 let kind = self.fold_statement_kind(&statement.kind);
                 let meta = self.fold_statement_meta(statement.span, &kind);
-                Statement { meta, span: statement.span, kind }
+                Statement { meta, span: statement.span, kind, terminator: statement.terminator }
             }
 
             #[inline]
@@ -366,7 +370,7 @@ macro_rules! generate_fold {
             #[inline]
             fn fold_member_item(&self, member: &MemberItem<'source, I, Self::FromStatement, E>) -> MemberItem<'arena, I, Self::ToStatement, E> {
                 let kind = self.fold_member_item_kind(&member.kind);
-                MemberItem { meta: member.meta, span: member.span, kind }
+                MemberItem { meta: member.meta, span: member.span, kind, terminator: member.terminator }
             }
 
             $( gen_fold_statement_const!($node $name $folder $body); )*
@@ -389,7 +393,7 @@ macro_rules! generate_fold {
             #[inline]
             fn fold_statement(&mut self, statement: &Statement<'source, I, S, Self::FromExpression>) -> Statement<'arena, I, S, Self::ToExpression> {
                 let kind = self.fold_statement_kind(&statement.kind);
-                Statement { meta: statement.meta, span: statement.span, kind }
+                Statement { meta: statement.meta, span: statement.span, kind, terminator: statement.terminator }
             }
 
             #[inline]
@@ -414,7 +418,7 @@ macro_rules! generate_fold {
             #[inline]
             fn fold_member_item(&mut self, member: &MemberItem<'source, I, S, Self::FromExpression>) -> MemberItem<'arena, I, S, Self::ToExpression> {
                 let kind = self.fold_member_item_kind(&member.kind);
-                MemberItem { meta: member.meta, span: member.span, kind }
+                MemberItem { meta: member.meta, span: member.span, kind, terminator: member.terminator }
             }
 
             $( gen_fold_expression_mut!($node $name $folder $body); )*
@@ -437,7 +441,7 @@ macro_rules! generate_fold {
             #[inline]
             fn fold_statement(&self, statement: &Statement<'source, I, S, Self::FromExpression>) -> Statement<'arena, I, S, Self::ToExpression> {
                 let kind = self.fold_statement_kind(&statement.kind);
-                Statement { meta: statement.meta, span: statement.span, kind }
+                Statement { meta: statement.meta, span: statement.span, kind, terminator: statement.terminator }
             }
 
             #[inline]
@@ -462,7 +466,7 @@ macro_rules! generate_fold {
             #[inline]
             fn fold_member_item(&self, member: &MemberItem<'source, I, S, Self::FromExpression>) -> MemberItem<'arena, I, S, Self::ToExpression> {
                 let kind = self.fold_member_item_kind(&member.kind);
-                MemberItem { meta: member.meta, span: member.span, kind }
+                MemberItem { meta: member.meta, span: member.span, kind, terminator: member.terminator }
             }
 
             $( gen_fold_expression_const!($node $name $folder $body); )*
@@ -487,7 +491,7 @@ macro_rules! generate_fold {
             #[inline]
             fn fold_statement(&mut self, statement: &Statement<'source, Self::FromItem, S, E>) -> Statement<'arena, Self::ToItem, S, E> {
                 let kind = self.fold_statement_kind(&statement.kind);
-                Statement { meta: statement.meta, span: statement.span, kind }
+                Statement { meta: statement.meta, span: statement.span, kind, terminator: statement.terminator }
             }
 
             #[inline]
@@ -514,7 +518,7 @@ macro_rules! generate_fold {
             fn fold_member_item(&mut self, member: &MemberItem<'source, Self::FromItem, S, E>) -> MemberItem<'arena, Self::ToItem, S, E> {
                 let kind = self.fold_member_item_kind(&member.kind);
                 let meta = self.fold_member_item_meta(member.span, &kind);
-                MemberItem { meta, span: member.span, kind }
+                MemberItem { meta, span: member.span, kind, terminator: member.terminator }
             }
 
             $( gen_fold_item_mut!($node $name $folder $body); )*
@@ -539,7 +543,7 @@ macro_rules! generate_fold {
             #[inline]
             fn fold_statement(&self, statement: &Statement<'source, Self::FromItem, S, E>) -> Statement<'arena, Self::ToItem, S, E> {
                 let kind = self.fold_statement_kind(&statement.kind);
-                Statement { meta: statement.meta, span: statement.span, kind }
+                Statement { meta: statement.meta, span: statement.span, kind, terminator: statement.terminator }
             }
 
             #[inline]
@@ -566,7 +570,7 @@ macro_rules! generate_fold {
             fn fold_member_item(&self, member: &MemberItem<'source, Self::FromItem, S, E>) -> MemberItem<'arena, Self::ToItem, S, E> {
                 let kind = self.fold_member_item_kind(&member.kind);
                 let meta = self.fold_member_item_meta(member.span, &kind);
-                MemberItem { meta, span: member.span, kind }
+                MemberItem { meta, span: member.span, kind, terminator: member.terminator }
             }
 
             $( gen_fold_item_const!($node $name $folder $body); )*
@@ -580,6 +584,7 @@ generate_fold! {
     IR as ir => {
         IR {
             span: ir.span,
+            comments: copy_slice_into(ir.comments, folder.arena()),
             statements: folder
                 .arena()
                 .alloc_slice_fill_iter(ir.statements.iter().map(|statement| folder.fold_statement(statement))),
@@ -589,13 +594,16 @@ generate_fold! {
 
     StatementKind as statement_kind => {
         match statement_kind {
+            StatementKind::Shebang(value) => StatementKind::Shebang(folder.arena().alloc_slice_copy(value)),
             StatementKind::Inline(value) => StatementKind::Inline(folder.arena().alloc_slice_copy(value)),
+            StatementKind::Tag(value) => StatementKind::Tag(*value),
             StatementKind::Namespace(node) => {
                 StatementKind::Namespace(folder.arena().alloc(folder.fold_namespace(node)))
             }
             StatementKind::Sequence(statements) => StatementKind::Sequence(
                 folder.arena().alloc_slice_fill_iter(statements.iter().map(|statement| folder.fold_statement(statement))),
             ),
+            StatementKind::Block(node) => StatementKind::Block(folder.arena().alloc(folder.fold_block(node))),
             StatementKind::Item(node) => {
                 StatementKind::Item(folder.arena().alloc(folder.fold_item_statement(node)))
             }
@@ -650,7 +658,17 @@ generate_fold! {
         Namespace {
             span: namespace.span,
             name: namespace.name.map(|name| copy_ref_into(name, folder.arena())),
-            statement: folder.arena().alloc(folder.fold_statement(namespace.statement)),
+            body: match &namespace.body {
+                NamespaceBody::BraceDelimited(block) => {
+                    NamespaceBody::BraceDelimited(folder.arena().alloc(folder.fold_block(block)))
+                }
+                NamespaceBody::Implicit { terminator, statements } => NamespaceBody::Implicit {
+                    terminator: *terminator,
+                    statements: folder
+                        .arena()
+                        .alloc_slice_fill_iter(statements.iter().map(|statement| folder.fold_statement(statement))),
+                },
+            },
         }
     }
 
@@ -670,16 +688,25 @@ generate_fold! {
         }
     }
 
+    Block as block => {
+        Block {
+            span: block.span,
+            statements: folder
+                .arena()
+                .alloc_slice_fill_iter(block.statements.iter().map(|statement| folder.fold_statement(statement))),
+        }
+    }
+
     Try as try_statement => {
         Try {
             span: try_statement.span,
-            statement: folder.arena().alloc(folder.fold_statement(try_statement.statement)),
+            block: folder.arena().alloc(folder.fold_block(try_statement.block)),
             catch_clauses: folder.arena().alloc_slice_fill_iter(
                 try_statement.catch_clauses.iter().map(|clause| folder.fold_try_catch_clause(clause)),
             ),
-            finally_clause: try_statement
-                .finally_clause
-                .map(|clause| &*folder.arena().alloc(folder.fold_statement(clause))),
+            finally_block: try_statement
+                .finally_block
+                .map(|clause| &*folder.arena().alloc(folder.fold_block(clause))),
         }
     }
 
@@ -688,7 +715,7 @@ generate_fold! {
             span: try_catch_clause.span,
             r#type: copy_ref_into(try_catch_clause.r#type, folder.arena()),
             variable: try_catch_clause.variable.map(|variable| variable.copy_into(folder.arena())),
-            statement: folder.arena().alloc(folder.fold_statement(try_catch_clause.statement)),
+            block: folder.arena().alloc(folder.fold_block(try_catch_clause.block)),
         }
     }
 
@@ -743,12 +770,18 @@ generate_fold! {
     }
 
     SwitchCase as switch_case => {
-        match switch_case {
-            SwitchCase::Expression(expression, statement) => SwitchCase::Expression(
-                folder.arena().alloc(folder.fold_expression(expression)),
-                folder.arena().alloc(folder.fold_statement(statement)),
-            ),
-            SwitchCase::Default(statement) => SwitchCase::Default(folder.arena().alloc(folder.fold_statement(statement))),
+        SwitchCase {
+            span: switch_case.span,
+            seperator: switch_case.seperator,
+            kind: match &switch_case.kind {
+                SwitchCaseKind::Expression(expression, statements) => SwitchCaseKind::Expression(
+                    folder.arena().alloc(folder.fold_expression(expression)),
+                    folder.arena().alloc_slice_fill_iter(statements.iter().map(|statement| folder.fold_statement(statement))),
+                ),
+                SwitchCaseKind::Default(statements) => SwitchCaseKind::Default(
+                    folder.arena().alloc_slice_fill_iter(statements.iter().map(|statement| folder.fold_statement(statement))),
+                ),
+            },
         }
     }
 
@@ -890,7 +923,7 @@ generate_fold! {
             name: function.name.copy_into(folder.arena()),
             parameters: fold_delimited(folder.arena(), &function.parameters, |parameter| folder.fold_parameter(parameter)),
             return_type: function.return_type.map(|return_type| copy_ref_into(return_type, folder.arena())),
-            body: folder.arena().alloc(folder.fold_statement(function.body)),
+            body: folder.arena().alloc(folder.fold_block(function.body)),
             direct_accessed_globals: copy_slice_into(function.direct_accessed_globals, folder.arena()),
         }
     }
@@ -923,7 +956,7 @@ generate_fold! {
             name: method.name.copy_into(folder.arena()),
             parameters: fold_delimited(folder.arena(), &method.parameters, |parameter| folder.fold_parameter(parameter)),
             return_type: method.return_type.map(|return_type| copy_ref_into(return_type, folder.arena())),
-            body: method.body.map(|body| &*folder.arena().alloc(folder.fold_statement(body))),
+            body: method.body.map(|body| &*folder.arena().alloc(folder.fold_block(body))),
             direct_accessed_globals: copy_slice_into(method.direct_accessed_globals, folder.arena()),
         }
     }
@@ -1026,9 +1059,7 @@ generate_fold! {
             HookBodyKind::Expression(expression) => {
                 HookBodyKind::Expression(folder.arena().alloc(folder.fold_expression(expression)))
             }
-            HookBodyKind::Statements(statements) => HookBodyKind::Statements(
-                folder.arena().alloc_slice_fill_iter(statements.iter().map(|statement| folder.fold_statement(statement))),
-            ),
+            HookBodyKind::Block(block) => HookBodyKind::Block(folder.arena().alloc(folder.fold_block(block))),
         }
     }
 
@@ -1189,16 +1220,13 @@ generate_fold! {
             ExpressionKind::Conditional(node) => {
                 ExpressionKind::Conditional(folder.arena().alloc(folder.fold_conditional(node)))
             }
-            ExpressionKind::Array(elements) => ExpressionKind::Array(fold_delimited(
-                folder.arena(),
-                elements,
-                |element| folder.fold_array_element(element),
-            )),
-            ExpressionKind::List(elements) => ExpressionKind::List(fold_delimited(
-                folder.arena(),
-                elements,
-                |element| folder.fold_array_element(element),
-            )),
+            ExpressionKind::ArrayLike(array_like) => ExpressionKind::ArrayLike(ArrayLike {
+                span: array_like.span,
+                kind: array_like.kind,
+                elements: fold_delimited(folder.arena(), &array_like.elements, |element| {
+                    folder.fold_array_element(element)
+                }),
+            }),
             ExpressionKind::ArrayAppend(node) => {
                 ExpressionKind::ArrayAppend(folder.arena().alloc(folder.fold_expression(node)))
             }
@@ -1529,7 +1557,7 @@ generate_fold! {
             parameters: fold_delimited(folder.arena(), &closure.parameters, |parameter| folder.fold_parameter(parameter)),
             return_type: closure.return_type.map(|return_type| copy_ref_into(return_type, folder.arena())),
             use_variables: closure.use_variables.map(|use_variables| use_variables.copy_into(folder.arena())),
-            body: folder.arena().alloc(folder.fold_statement(closure.body)),
+            body: folder.arena().alloc(folder.fold_block(closure.body)),
             direct_accessed_globals: copy_slice_into(closure.direct_accessed_globals, folder.arena()),
         }
     }
@@ -1636,7 +1664,8 @@ mod tests {
         let arena = LocalArena::new();
         let widen = Widen { arena: &arena };
 
-        let input: IR<'_, String, String, String> = IR { span: Span::zero(), statements: &[], errors: &[] };
+        let input: IR<'_, String, String, String> =
+            IR { span: Span::zero(), comments: &[], statements: &[], errors: &[] };
         let output: IR<'_, (), Vec<String>, u32> = widen.fold_ir(&input);
 
         assert!(output.statements.is_empty());
@@ -1668,7 +1697,7 @@ mod tests {
         let arena = LocalArena::new();
         let folder = WidenStatements { arena: &arena };
 
-        let input: IR<'_, u8, String, u16> = IR { span: Span::zero(), statements: &[], errors: &[] };
+        let input: IR<'_, u8, String, u16> = IR { span: Span::zero(), comments: &[], statements: &[], errors: &[] };
         let output: IR<'_, u8, Vec<String>, u16> = folder.fold_ir(&input);
 
         assert!(output.statements.is_empty());

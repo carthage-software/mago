@@ -49,8 +49,7 @@ pub enum ExpressionKind<'arena, I, S, E> {
     Assignment(&'arena Assignment<'arena, I, S, E>),
     Annotation(&'arena Annotation<'arena, I, S, E>),
     Conditional(&'arena Conditional<'arena, I, S, E>),
-    Array(Delimited<'arena, ArrayElement<'arena, I, S, E>>),
-    List(Delimited<'arena, ArrayElement<'arena, I, S, E>>),
+    ArrayLike(ArrayLike<'arena, I, S, E>),
     ArrayAppend(&'arena Expression<'arena, I, S, E>),
     Item(&'arena ItemExpression<'arena, I, S, E>),
     Call(&'arena Call<'arena, I, S, E>),
@@ -85,7 +84,7 @@ pub enum ExpressionKind<'arena, I, S, E> {
 pub struct Assignment<'arena, I, S, E> {
     pub span: Span,
     pub left: &'arena Expression<'arena, I, S, E>,
-    pub operator: Option<AssignmentOperator>,
+    pub operator: AssignmentOperator,
     pub right: &'arena Expression<'arena, I, S, E>,
 }
 
@@ -245,6 +244,39 @@ pub enum MatchArmKind<'arena, I, S, E> {
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub enum ArrayLikeKind {
+    Short,
+    Long,
+    List,
+}
+
+impl ArrayLikeKind {
+    #[inline(always)]
+    #[must_use]
+    pub const fn is_left_value(&self) -> bool {
+        // `array(...)` is not a left value, but `[...]` and `list(...)` are.
+        !matches!(self, ArrayLikeKind::Long)
+    }
+
+    #[inline(always)]
+    #[must_use]
+    pub const fn is_right_value(&self) -> bool {
+        // `list(...)` is not a right value, but `[...]` and `array(...)` are.
+        !matches!(self, ArrayLikeKind::List)
+    }
+}
+
+#[cfg_attr(feature = "serde", derive(Serialize))]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub struct ArrayLike<'arena, I, S, E> {
+    pub span: Span,
+    pub kind: ArrayLikeKind,
+    pub elements: Delimited<'arena, ArrayElement<'arena, I, S, E>>,
+}
+
+#[cfg_attr(feature = "serde", derive(Serialize))]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub struct ArrayElement<'arena, I, S, E> {
     pub span: Span,
@@ -311,8 +343,7 @@ where
             ExpressionKind::Assignment(node) => ExpressionKind::Assignment(copy_ref_into(*node, arena)),
             ExpressionKind::Annotation(node) => ExpressionKind::Annotation(copy_ref_into(*node, arena)),
             ExpressionKind::Conditional(node) => ExpressionKind::Conditional(copy_ref_into(*node, arena)),
-            ExpressionKind::Array(delimited) => ExpressionKind::Array(delimited.copy_into(arena)),
-            ExpressionKind::List(delimited) => ExpressionKind::List(delimited.copy_into(arena)),
+            ExpressionKind::ArrayLike(array_like) => ExpressionKind::ArrayLike(array_like.copy_into(arena)),
             ExpressionKind::ArrayAppend(node) => ExpressionKind::ArrayAppend(copy_ref_into(*node, arena)),
             ExpressionKind::Item(node) => ExpressionKind::Item(copy_ref_into(*node, arena)),
             ExpressionKind::Call(node) => ExpressionKind::Call(copy_ref_into(*node, arena)),
@@ -700,6 +731,22 @@ where
     }
 }
 
+impl<I, S, E> CopyInto for ArrayLike<'_, I, S, E>
+where
+    I: CopyInto,
+    S: CopyInto,
+    E: CopyInto,
+{
+    type Output<'arena> = ArrayLike<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        ArrayLike { span: self.span, kind: self.kind, elements: self.elements.copy_into(arena) }
+    }
+}
+
 impl<I, S, E> CopyInto for ArrayElement<'_, I, S, E>
 where
     I: CopyInto,
@@ -839,6 +886,12 @@ impl<I, S, E> HasSpan for Yield<'_, I, S, E> {
 }
 
 impl<I, S, E> HasSpan for MatchArm<'_, I, S, E> {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+impl<I, S, E> HasSpan for ArrayLike<'_, I, S, E> {
     fn span(&self) -> Span {
         self.span
     }

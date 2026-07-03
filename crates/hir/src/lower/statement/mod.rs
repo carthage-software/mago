@@ -4,6 +4,7 @@ use mago_allocator::vec::Vec;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::cst;
+use mago_syntax::cst::OpeningTag;
 
 use crate::ir::delimited::Delimited;
 use crate::ir::expression::Expression;
@@ -12,6 +13,7 @@ use crate::ir::identifier::IdentifierKind;
 use crate::ir::item::statement::ItemStatement;
 use crate::ir::item::statement::ItemStatementKind;
 use crate::ir::item::statement::constant::Constant;
+use crate::ir::statement::Block;
 use crate::ir::statement::Declare;
 use crate::ir::statement::DeclareItem;
 use crate::ir::statement::DoWhile;
@@ -20,11 +22,18 @@ use crate::ir::statement::Foreach;
 use crate::ir::statement::GlobalItem;
 use crate::ir::statement::If;
 use crate::ir::statement::Namespace;
+use crate::ir::statement::NamespaceBody;
 use crate::ir::statement::Statement;
 use crate::ir::statement::StatementKind;
 use crate::ir::statement::StaticItem;
 use crate::ir::statement::Switch;
 use crate::ir::statement::SwitchCase;
+use crate::ir::statement::SwitchCaseKind;
+use crate::ir::statement::SwitchCaseSeperatorKind;
+use crate::ir::statement::Tag;
+use crate::ir::statement::TagKind;
+use crate::ir::statement::Terminator;
+use crate::ir::statement::TerminatorKind;
 use crate::ir::statement::Try;
 use crate::ir::statement::TryCatchClause;
 use crate::ir::statement::UseItem;
@@ -97,8 +106,10 @@ where
             }
         };
 
+        let terminator = self.statement_terminator(statement);
+
         if bindings.named.is_empty() {
-            return Statement { meta: (), span, kind };
+            return Statement { meta: (), span, kind, terminator };
         }
 
         let mut statements = Vec::new_in(self.arena);
@@ -111,12 +122,13 @@ where
                     variable,
                     type_annotation,
                 })),
+                terminator: None,
             });
         }
 
-        statements.push(Statement { meta: (), span, kind });
+        statements.push(Statement { meta: (), span, kind, terminator });
 
-        Statement { meta: (), span, kind: StatementKind::Sequence(statements.leak()) }
+        Statement { meta: (), span, kind: StatementKind::Sequence(statements.leak()), terminator: None }
     }
 
     fn lower_define_call(
@@ -177,16 +189,19 @@ where
             kind: ItemStatementKind::Constant(constant),
         }));
 
-        let constant_statement = Statement { meta: (), span, kind: definition };
+        let terminator = self.statement_terminator(statement);
 
         match self.settings.define_constant_lowering {
-            DefineConstantLowering::Statement => Some(constant_statement),
+            DefineConstantLowering::Statement => Some(Statement { meta: (), span, kind: definition, terminator }),
             DefineConstantLowering::StatementAndCall => {
-                let call_statement = Statement { meta: (), span, kind: self.lower_statement_kind(statement) };
+                let constant_statement = Statement { meta: (), span, kind: definition, terminator: None };
+                let call_statement =
+                    Statement { meta: (), span, kind: self.lower_statement_kind(statement), terminator };
                 Some(Statement {
                     meta: (),
                     span,
                     kind: StatementKind::Sequence(self.arena.alloc_slice_copy(&[constant_statement, call_statement])),
+                    terminator: None,
                 })
             }
             DefineConstantLowering::Disabled => None,
@@ -201,10 +216,15 @@ where
             cst::Statement::Expression(expression) => {
                 StatementKind::Expression(self.lower_expression_statement(expression))
             }
-            cst::Statement::Block(block) => StatementKind::Sequence(self.lower_block(block)),
-            cst::Statement::Noop(_) | cst::Statement::ClosingTag(_) | cst::Statement::OpeningTag(_) => {
-                StatementKind::Noop
+            cst::Statement::Block(block) => StatementKind::Block(self.arena.alloc(self.lower_block(block))),
+            cst::Statement::ClosingTag(tag) => StatementKind::Tag(Tag { span: tag.span, kind: TagKind::Closing }),
+            cst::Statement::OpeningTag(OpeningTag::Full(tag)) => {
+                StatementKind::Tag(Tag { span: tag.span, kind: TagKind::Opening })
             }
+            cst::Statement::OpeningTag(OpeningTag::Short(tag)) => {
+                StatementKind::Tag(Tag { span: tag.span, kind: TagKind::ShortOpening })
+            }
+            cst::Statement::Noop(_) => StatementKind::Noop,
             cst::Statement::HaltCompiler(_) => StatementKind::HaltCompiler,
             cst::Statement::Unset(unset) => StatementKind::Unset(self.lower_unset(unset)),
             cst::Statement::Echo(echo) => StatementKind::Echo(self.lower_echo(echo)),
@@ -231,7 +251,13 @@ where
 
                 StatementKind::Use(copy_slice_into(items, self.arena))
             }
-            cst::Statement::Inline(inline) => StatementKind::Inline(self.interner.intern(inline.value)),
+            cst::Statement::Inline(inline) => {
+                if inline.kind.is_shebang() {
+                    StatementKind::Shebang(self.interner.intern(inline.value))
+                } else {
+                    StatementKind::Inline(self.interner.intern(inline.value))
+                }
+            }
             cst::Statement::Class(class) => StatementKind::Item(self.arena.alloc(ItemStatement {
                 meta: (),
                 span: class.span(),
@@ -273,13 +299,9 @@ where
                 if let [single] = item_statements.as_slice() {
                     StatementKind::Item(single)
                 } else {
-                    StatementKind::Sequence(arena.alloc_slice_fill_iter(
-                        item_statements.iter().map(|&item| Statement {
-                            meta: (),
-                            span: item.span,
-                            kind: StatementKind::Item(item),
-                        }),
-                    ))
+                    StatementKind::Sequence(arena.alloc_slice_fill_iter(item_statements.iter().map(|&item| {
+                        Statement { meta: (), span: item.span, kind: StatementKind::Item(item), terminator: None }
+                    })))
                 }
             }
             cst::Statement::Function(function) => StatementKind::Item(self.arena.alloc(ItemStatement {
@@ -306,11 +328,13 @@ where
         }
     }
 
-    pub(crate) fn lower_block(
-        &mut self,
-        block: &'scratch cst::Block<'scratch>,
-    ) -> &'arena [Statement<'arena, (), (), ()>] {
-        self.arena.alloc_slice_fill_iter(block.statements.iter().map(|statement| self.lower_statement(statement)))
+    pub(crate) fn lower_block(&mut self, block: &'scratch cst::Block<'scratch>) -> Block<'arena, (), (), ()> {
+        Block {
+            span: block.span(),
+            statements: self
+                .arena
+                .alloc_slice_fill_iter(block.statements.iter().map(|statement| self.lower_statement(statement))),
+        }
     }
 
     pub(crate) fn colon_delimited_statements_to_statement(
@@ -325,6 +349,7 @@ where
             kind: StatementKind::Sequence(
                 self.arena.alloc_slice_fill_iter(statements.iter().map(|statement| self.lower_statement(statement))),
             ),
+            terminator: None,
         })
     }
 
@@ -345,6 +370,7 @@ where
             kind: StatementKind::Sequence(
                 self.arena.alloc_slice_fill_iter(statements.iter().map(|statement| self.lower_statement(statement))),
             ),
+            terminator: None,
         })
     }
 
@@ -439,7 +465,12 @@ where
                 let r#else = self.lower_statement_else_chain(rest, else_clause);
                 let nested = self.arena.alloc(If { span: clause.span(), condition, then, r#else });
 
-                Some(self.arena.alloc(Statement { meta: (), span: clause.span(), kind: StatementKind::If(nested) }))
+                Some(self.arena.alloc(Statement {
+                    meta: (),
+                    span: clause.span(),
+                    kind: StatementKind::If(nested),
+                    terminator: None,
+                }))
             }
         }
     }
@@ -460,7 +491,12 @@ where
                 let r#else = self.lower_colon_else_chain(rest, else_clause);
                 let nested = self.arena.alloc(If { span: clause.span(), condition, then, r#else });
 
-                Some(self.arena.alloc(Statement { meta: (), span: clause.span(), kind: StatementKind::If(nested) }))
+                Some(self.arena.alloc(Statement {
+                    meta: (),
+                    span: clause.span(),
+                    kind: StatementKind::If(nested),
+                    terminator: None,
+                }))
             }
         }
     }
@@ -481,17 +517,24 @@ where
     }
 
     fn lower_switch_case(&mut self, case: &'scratch cst::SwitchCase<'scratch>) -> SwitchCase<'arena, (), (), ()> {
-        match case {
+        let span = case.span();
+        let seperator = lower_switch_case_separator(case.separator());
+        let kind = match case {
             cst::SwitchCase::Expression(case) => {
                 let expression = self.arena.alloc(self.lower_expression(case.expression));
-                let statement = self.statements_to_statement(case.statements.as_slice(), case.separator.span());
+                let statements = self
+                    .arena
+                    .alloc_slice_fill_iter(case.statements.iter().map(|statement| self.lower_statement(statement)));
 
-                SwitchCase::Expression(expression, statement)
+                SwitchCaseKind::Expression(expression, statements)
             }
-            cst::SwitchCase::Default(case) => {
-                SwitchCase::Default(self.statements_to_statement(case.statements.as_slice(), case.separator.span()))
-            }
-        }
+            cst::SwitchCase::Default(case) => SwitchCaseKind::Default(
+                self.arena
+                    .alloc_slice_fill_iter(case.statements.iter().map(|statement| self.lower_statement(statement))),
+            ),
+        };
+
+        SwitchCase { span, seperator, kind }
     }
 
     pub(crate) fn lower_while(&mut self, r#while: &'scratch cst::While<'scratch>) -> &'arena While<'arena, (), (), ()> {
@@ -560,10 +603,20 @@ where
         };
 
         self.namespace_resolution.enter_namespace(namespace.name.as_ref().map(|identifier| identifier.value()));
-        let statement = self.statements_to_statement(namespace.statements().as_slice(), namespace.namespace.span());
+        let body = match &namespace.body {
+            cst::NamespaceBody::BraceDelimited(block) => {
+                NamespaceBody::BraceDelimited(self.arena.alloc(self.lower_block(block)))
+            }
+            cst::NamespaceBody::Implicit(implicit) => NamespaceBody::Implicit {
+                terminator: self.lower_terminator(implicit.terminator),
+                statements: self
+                    .arena
+                    .alloc_slice_fill_iter(implicit.statements.iter().map(|statement| self.lower_statement(statement))),
+            },
+        };
         self.namespace_resolution.leave_namespace();
 
-        self.arena.alloc(Namespace { span: namespace.span(), name, statement })
+        self.arena.alloc(Namespace { span: namespace.span(), name, body })
     }
 
     pub(crate) fn lower_use(&self, r#use: &'scratch cst::Use<'scratch>) -> &'scratch [UseItem<'scratch>] {
@@ -693,16 +746,14 @@ where
     }
 
     pub(crate) fn lower_try(&mut self, r#try: &'scratch cst::Try<'scratch>) -> &'arena Try<'arena, (), (), ()> {
-        let statement = self.statements_to_statement(r#try.block.statements.as_slice(), r#try.block.span());
+        let statement = self.arena.alloc(self.lower_block(&r#try.block));
         let catch_clauses = self
             .arena
             .alloc_slice_fill_iter(r#try.catch_clauses.iter().map(|clause| self.lower_try_catch_clause(clause)));
-        let finally_clause = r#try
-            .finally_clause
-            .as_ref()
-            .map(|finally| self.statements_to_statement(finally.block.statements.as_slice(), finally.block.span()));
+        let finally_block =
+            r#try.finally_clause.as_ref().map(|finally| &*self.arena.alloc(self.lower_block(&finally.block)));
 
-        self.arena.alloc(Try { span: r#try.span(), statement, catch_clauses, finally_clause })
+        self.arena.alloc(Try { span: r#try.span(), block: statement, catch_clauses, finally_block })
     }
 
     fn lower_try_catch_clause(
@@ -713,8 +764,41 @@ where
             span: clause.span(),
             r#type: self.lower_type(&clause.hint),
             variable: clause.variable.as_ref().map(|variable| self.lower_direct_variable(variable)),
-            statement: self.statements_to_statement(clause.block.statements.as_slice(), clause.block.span()),
+            block: self.arena.alloc(self.lower_block(&clause.block)),
         }
+    }
+
+    pub(crate) fn lower_terminator(&self, terminator: cst::Terminator<'_>) -> Terminator {
+        let kind = match terminator {
+            cst::Terminator::Semicolon(_) => TerminatorKind::Semicolon,
+            cst::Terminator::ClosingTag(_) => TerminatorKind::ClosingTag,
+            cst::Terminator::TagPair(..) => TerminatorKind::TagPair,
+            cst::Terminator::Missing(_) => TerminatorKind::Missing,
+        };
+
+        Terminator { span: terminator.span(), kind }
+    }
+
+    fn statement_terminator(&self, statement: &cst::Statement<'_>) -> Option<Terminator> {
+        let terminator = match statement {
+            cst::Statement::Expression(statement) => statement.terminator,
+            cst::Statement::Return(statement) => statement.terminator,
+            cst::Statement::Break(statement) => statement.terminator,
+            cst::Statement::Continue(statement) => statement.terminator,
+            cst::Statement::Goto(statement) => statement.terminator,
+            cst::Statement::Echo(statement) => statement.terminator,
+            cst::Statement::EchoTag(statement) => statement.terminator,
+            cst::Statement::Unset(statement) => statement.terminator,
+            cst::Statement::Global(statement) => statement.terminator,
+            cst::Statement::Static(statement) => statement.terminator,
+            cst::Statement::Use(statement) => statement.terminator,
+            cst::Statement::HaltCompiler(statement) => statement.terminator,
+            cst::Statement::DoWhile(statement) => statement.terminator,
+            cst::Statement::Constant(statement) => statement.terminator,
+            _ => return None,
+        };
+
+        Some(self.lower_terminator(terminator))
     }
 }
 
@@ -730,5 +814,12 @@ fn use_identifier_kind(identifier: &cst::Identifier<'_>) -> IdentifierKind {
         cst::Identifier::Local(_) => IdentifierKind::Local,
         cst::Identifier::Qualified(_) => IdentifierKind::Qualified,
         cst::Identifier::FullyQualified(_) => IdentifierKind::FullyQualified,
+    }
+}
+
+fn lower_switch_case_separator(separator: &cst::SwitchCaseSeparator) -> SwitchCaseSeperatorKind {
+    match separator {
+        cst::SwitchCaseSeparator::Colon(_) => SwitchCaseSeperatorKind::Colon,
+        cst::SwitchCaseSeparator::SemiColon(_) => SwitchCaseSeperatorKind::Semicolon,
     }
 }

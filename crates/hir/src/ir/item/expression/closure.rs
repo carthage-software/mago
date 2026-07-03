@@ -14,7 +14,7 @@ use crate::ir::item::Item;
 use crate::ir::item::annotation::ItemAnnotation;
 use crate::ir::item::attribute::Attribute;
 use crate::ir::item::parameter::Parameter;
-use crate::ir::statement::Statement;
+use crate::ir::statement::Block;
 use crate::ir::r#type::Type;
 use crate::ir::variable::DirectVariable;
 
@@ -50,7 +50,7 @@ pub struct Closure<'arena, I, S, E> {
     pub return_type: Option<&'arena Type<'arena>>,
     pub use_variables: Option<Delimited<'arena, ClosureUseClauseVariable<'arena>>>,
     pub direct_accessed_globals: &'arena [DirectVariable<'arena>],
-    pub body: &'arena Statement<'arena, I, S, E>,
+    pub body: &'arena Block<'arena, I, S, E>,
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize))]

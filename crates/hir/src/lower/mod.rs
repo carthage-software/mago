@@ -6,8 +6,12 @@ use mago_database::file::File;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::cst::Program;
+use mago_syntax::cst::Trivia;
+use mago_syntax::cst::TriviaKind;
 
 use crate::ir::IR;
+use crate::ir::comment::Comment;
+use crate::ir::comment::CommentKind;
 use crate::ir::variable::DirectVariable;
 use crate::lower::error::lower_parse_error;
 use crate::lower::interner::Interner;
@@ -136,11 +140,23 @@ where
         let arena = self.arena;
         let program = self.program;
 
-        IR {
-            span: program.span(),
-            statements: arena
-                .alloc_slice_fill_iter(program.statements.iter().map(|statement| self.lower_statement(statement))),
-            errors: arena.alloc_slice_fill_iter(program.errors.iter().map(lower_parse_error)),
-        }
+        let comments = arena.alloc_slice_fill_iter(program.trivia.iter().filter_map(|t| self.lower_trivia(t)));
+        let statements = arena.alloc_slice_fill_iter(program.statements.iter().map(|stmt| self.lower_statement(stmt)));
+        let errors = arena.alloc_slice_fill_iter(program.errors.iter().map(lower_parse_error));
+
+        IR { span: program.span(), comments, statements, errors }
+    }
+
+    #[must_use]
+    fn lower_trivia(&mut self, trivia: &Trivia<'scratch>) -> Option<Comment<'arena>> {
+        let kind = match trivia.kind {
+            TriviaKind::WhiteSpace => return None,
+            TriviaKind::SingleLineComment => CommentKind::SingleLine,
+            TriviaKind::MultiLineComment => CommentKind::MultiLine,
+            TriviaKind::HashComment => CommentKind::Hash,
+            TriviaKind::DocBlockComment => CommentKind::DocBlock,
+        };
+
+        Some(Comment { span: trivia.span, kind, value: self.interner.intern(trivia.value) })
     }
 }

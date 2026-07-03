@@ -6,6 +6,7 @@ use mago_hir::ir::IR;
 use mago_hir::ir::expression::CalleeKind;
 use mago_hir::ir::expression::ExpressionKind;
 use mago_hir::ir::identifier::Identifier;
+use mago_hir::ir::statement::NamespaceBody;
 use mago_hir::ir::statement::Statement;
 use mago_hir::ir::statement::StatementKind;
 use mago_hir::lower::LowerSettings;
@@ -34,7 +35,10 @@ fn find_function_callee<'ir, 'arena>(
 ) -> Option<&'ir Identifier<'arena>> {
     for statement in statements {
         let found = match &statement.kind {
-            StatementKind::Namespace(namespace) => find_function_callee(std::slice::from_ref(namespace.statement)),
+            StatementKind::Namespace(namespace) => match &namespace.body {
+                NamespaceBody::BraceDelimited(block) => find_function_callee(block.statements),
+                NamespaceBody::Implicit { statements, .. } => find_function_callee(statements),
+            },
             StatementKind::Sequence(inner) => find_function_callee(inner),
             StatementKind::Expression(expression) => match &expression.kind {
                 ExpressionKind::Call(call) => match &call.callee.kind {

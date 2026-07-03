@@ -11,6 +11,7 @@ use crate::ir::item::member::method::Method;
 use crate::ir::item::member::property::HookedProperty;
 use crate::ir::item::member::property::Property;
 use crate::ir::item::member::trait_use::TraitUse;
+use crate::ir::statement::Terminator;
 use mago_allocator::copy::CopyInto;
 use mago_allocator::copy::copy_ref_into;
 
@@ -27,6 +28,7 @@ pub struct MemberItem<'arena, I, S, E> {
     pub meta: I,
     pub span: Span,
     pub kind: MemberItemKind<'arena, I, S, E>,
+    pub terminator: Option<Terminator>,
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize))]
@@ -53,7 +55,12 @@ where
     where
         A: Arena,
     {
-        MemberItem { meta: self.meta.copy_into(arena), span: self.span, kind: self.kind.copy_into(arena) }
+        MemberItem {
+            meta: self.meta.copy_into(arena),
+            span: self.span,
+            kind: self.kind.copy_into(arena),
+            terminator: self.terminator,
+        }
     }
 }
 

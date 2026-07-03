@@ -2,6 +2,9 @@
 use serde::Serialize;
 
 use mago_allocator::Arena;
+use mago_allocator::copy::CopyInto;
+use mago_allocator::copy::copy_ref_into;
+use mago_allocator::copy::copy_slice_into;
 use mago_flags::U8Flags;
 use mago_php_version::PHPVersionRange;
 use mago_span::HasSpan;
@@ -13,12 +16,9 @@ use crate::ir::item::Item;
 use crate::ir::item::annotation::ItemAnnotation;
 use crate::ir::item::attribute::Attribute;
 use crate::ir::item::parameter::Parameter;
-use crate::ir::statement::Statement;
+use crate::ir::statement::Block;
 use crate::ir::r#type::Type;
 use crate::ir::variable::DirectVariable;
-use mago_allocator::copy::CopyInto;
-use mago_allocator::copy::copy_ref_into;
-use mago_allocator::copy::copy_slice_into;
 
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[cfg_attr(feature = "serde", serde(tag = "kind", content = "value"))]
@@ -43,7 +43,7 @@ pub struct Function<'arena, I, S, E> {
     pub parameters: Delimited<'arena, Parameter<'arena, I, S, E>>,
     pub return_type: Option<&'arena Type<'arena>>,
     pub direct_accessed_globals: &'arena [DirectVariable<'arena>],
-    pub body: &'arena Statement<'arena, I, S, E>,
+    pub body: &'arena Block<'arena, I, S, E>,
 }
 
 impl CopyInto for FunctionFlag {

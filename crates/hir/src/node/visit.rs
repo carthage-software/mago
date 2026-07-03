@@ -18,8 +18,9 @@ use crate::ir::item::member::hook::HookBodyKind;
 use crate::ir::item::member::trait_use::TraitUseAdaptation;
 use crate::ir::item::statement::ItemStatementKind;
 use crate::ir::literal::LiteralKind;
+use crate::ir::statement::NamespaceBody;
 use crate::ir::statement::StatementKind;
-use crate::ir::statement::SwitchCase;
+use crate::ir::statement::SwitchCaseKind;
 use crate::ir::r#type::TypeKind;
 use crate::ir::r#type::annotation::GlobalSelector;
 use crate::ir::r#type::annotation::MemberReferenceSelector;
@@ -44,63 +45,88 @@ impl<'ir, 'arena, I, S, E> Node<'ir, 'arena, I, S, E> {
                     f(Node::Error(error));
                 }
             }
-            Self::Statement(node) => match &node.kind {
-                StatementKind::Inline(_) | StatementKind::HaltCompiler | StatementKind::Noop => {}
-                StatementKind::Namespace(n) => f(Node::Namespace(n)),
-                StatementKind::Sequence(statements) => {
-                    for statement in statements.iter() {
-                        f(Node::Statement(statement));
+            Self::Statement(node) => {
+                match &node.kind {
+                    StatementKind::Shebang(_)
+                    | StatementKind::Inline(_)
+                    | StatementKind::HaltCompiler
+                    | StatementKind::Noop => {}
+                    StatementKind::Tag(n) => f(Node::Tag(n)),
+                    StatementKind::Namespace(n) => f(Node::Namespace(n)),
+                    StatementKind::Sequence(statements) => {
+                        for statement in statements.iter() {
+                            f(Node::Statement(statement));
+                        }
                     }
-                }
-                StatementKind::Item(n) => f(Node::ItemStatement(n)),
-                StatementKind::Declare(n) => f(Node::Declare(n)),
-                StatementKind::Goto(name) | StatementKind::Label(name) => f(Node::Name(name)),
-                StatementKind::Try(n) => f(Node::Try(n)),
-                StatementKind::Foreach(n) => f(Node::Foreach(n)),
-                StatementKind::For(n) => f(Node::For(n)),
-                StatementKind::While(n) => f(Node::While(n)),
-                StatementKind::DoWhile(n) => f(Node::DoWhile(n)),
-                StatementKind::Continue(value) | StatementKind::Break(value) | StatementKind::Return(value) => {
-                    if let Some(value) = value {
-                        f(Node::Expression(value));
+                    StatementKind::Block(n) => f(Node::Block(n)),
+                    StatementKind::Item(n) => f(Node::ItemStatement(n)),
+                    StatementKind::Declare(n) => f(Node::Declare(n)),
+                    StatementKind::Goto(name) | StatementKind::Label(name) => f(Node::Name(name)),
+                    StatementKind::Try(n) => f(Node::Try(n)),
+                    StatementKind::Foreach(n) => f(Node::Foreach(n)),
+                    StatementKind::For(n) => f(Node::For(n)),
+                    StatementKind::While(n) => f(Node::While(n)),
+                    StatementKind::DoWhile(n) => f(Node::DoWhile(n)),
+                    StatementKind::Continue(value) | StatementKind::Break(value) | StatementKind::Return(value) => {
+                        if let Some(value) = value {
+                            f(Node::Expression(value));
+                        }
                     }
-                }
-                StatementKind::Switch(n) => f(Node::Switch(n)),
-                StatementKind::If(n) => f(Node::If(n)),
-                StatementKind::Expression(n) => f(Node::Expression(n)),
-                StatementKind::Echo(values) => {
-                    for value in values.iter() {
-                        f(Node::Expression(value));
+                    StatementKind::Switch(n) => f(Node::Switch(n)),
+                    StatementKind::If(n) => f(Node::If(n)),
+                    StatementKind::Expression(n) => f(Node::Expression(n)),
+                    StatementKind::Echo(values) => {
+                        for value in values.iter() {
+                            f(Node::Expression(value));
+                        }
                     }
-                }
-                StatementKind::Unset(values) => {
-                    for value in values.iter() {
-                        f(Node::Expression(value));
+                    StatementKind::Unset(values) => {
+                        for value in values.iter() {
+                            f(Node::Expression(value));
+                        }
                     }
-                }
-                StatementKind::Use(items) => {
-                    for item in items.iter() {
-                        f(Node::UseItem(item));
+                    StatementKind::Use(items) => {
+                        for item in items.iter() {
+                            f(Node::UseItem(item));
+                        }
                     }
-                }
-                StatementKind::Global(items) => {
-                    for item in items.iter() {
-                        f(Node::GlobalItem(item));
+                    StatementKind::Global(items) => {
+                        for item in items.iter() {
+                            f(Node::GlobalItem(item));
+                        }
                     }
-                }
-                StatementKind::Static(items) => {
-                    for item in items.iter() {
-                        f(Node::StaticItem(item));
+                    StatementKind::Static(items) => {
+                        for item in items.iter() {
+                            f(Node::StaticItem(item));
+                        }
                     }
+                    StatementKind::VariableBindingAnnotation(n) => f(Node::VariableBindingAnnotation(n)),
                 }
-                StatementKind::VariableBindingAnnotation(n) => f(Node::VariableBindingAnnotation(n)),
-            },
+
+                if let Some(terminator) = &node.terminator {
+                    f(Node::Terminator(terminator));
+                }
+            }
+            Self::Tag(_) => {}
+            Self::Block(node) => {
+                for statement in node.statements.iter() {
+                    f(Node::Statement(statement));
+                }
+            }
             Self::Namespace(node) => {
                 if let Some(name) = node.name {
                     f(Node::Identifier(name));
                 }
 
-                f(Node::Statement(node.statement));
+                match &node.body {
+                    NamespaceBody::BraceDelimited(block) => f(Node::Block(block)),
+                    NamespaceBody::Implicit { terminator, statements } => {
+                        f(Node::Terminator(terminator));
+                        for statement in statements.iter() {
+                            f(Node::Statement(statement));
+                        }
+                    }
+                }
             }
             Self::Declare(node) => {
                 for item in node.items.iter() {
@@ -116,12 +142,12 @@ impl<'ir, 'arena, I, S, E> Node<'ir, 'arena, I, S, E> {
                 }
             }
             Self::Try(node) => {
-                f(Node::Statement(node.statement));
+                f(Node::Block(node.block));
                 for catch_clause in node.catch_clauses {
                     f(Node::TryCatchClause(catch_clause));
                 }
-                if let Some(finally_clause) = node.finally_clause {
-                    f(Node::Statement(finally_clause));
+                if let Some(finally_clause) = node.finally_block {
+                    f(Node::Block(finally_clause));
                 }
             }
             Self::TryCatchClause(node) => {
@@ -130,7 +156,7 @@ impl<'ir, 'arena, I, S, E> Node<'ir, 'arena, I, S, E> {
                     f(Node::DirectVariable(variable));
                 }
 
-                f(Node::Statement(node.statement));
+                f(Node::Block(node.block));
             }
             Self::Foreach(node) => {
                 f(Node::Expression(node.expression));
@@ -170,12 +196,18 @@ impl<'ir, 'arena, I, S, E> Node<'ir, 'arena, I, S, E> {
                     f(Node::SwitchCase(case));
                 }
             }
-            Self::SwitchCase(node) => match node {
-                SwitchCase::Expression(expression, statement) => {
+            Self::SwitchCase(node) => match &node.kind {
+                SwitchCaseKind::Expression(expression, statements) => {
                     f(Node::Expression(expression));
-                    f(Node::Statement(statement));
+                    for statement in statements.iter() {
+                        f(Node::Statement(statement));
+                    }
                 }
-                SwitchCase::Default(statement) => f(Node::Statement(statement)),
+                SwitchCaseKind::Default(statements) => {
+                    for statement in statements.iter() {
+                        f(Node::Statement(statement));
+                    }
+                }
             },
             Self::If(node) => {
                 f(Node::Expression(node.condition));
@@ -319,16 +351,22 @@ impl<'ir, 'arena, I, S, E> Node<'ir, 'arena, I, S, E> {
                     f(Node::Type(return_type));
                 }
 
-                f(Node::Statement(node.body));
+                f(Node::Block(node.body));
             }
-            Self::MemberItem(node) => match &node.kind {
-                MemberItemKind::Method(n) => f(Node::Method(n)),
-                MemberItemKind::Property(n) => f(Node::Property(n)),
-                MemberItemKind::HookedProperty(n) => f(Node::HookedProperty(n)),
-                MemberItemKind::TraitUse(n) => f(Node::TraitUse(n)),
-                MemberItemKind::Constant(n) => f(Node::ClassLikeConstant(n)),
-                MemberItemKind::EnumCase(n) => f(Node::EnumCase(n)),
-            },
+            Self::MemberItem(node) => {
+                match &node.kind {
+                    MemberItemKind::Method(n) => f(Node::Method(n)),
+                    MemberItemKind::Property(n) => f(Node::Property(n)),
+                    MemberItemKind::HookedProperty(n) => f(Node::HookedProperty(n)),
+                    MemberItemKind::TraitUse(n) => f(Node::TraitUse(n)),
+                    MemberItemKind::Constant(n) => f(Node::ClassLikeConstant(n)),
+                    MemberItemKind::EnumCase(n) => f(Node::EnumCase(n)),
+                }
+
+                if let Some(terminator) = &node.terminator {
+                    f(Node::Terminator(terminator));
+                }
+            }
             Self::Method(node) => {
                 if let Some(annotation) = node.annotation {
                     f(Node::ItemAnnotation(annotation));
@@ -350,7 +388,7 @@ impl<'ir, 'arena, I, S, E> Node<'ir, 'arena, I, S, E> {
                     f(Node::Type(return_type));
                 }
                 if let Some(body) = node.body {
-                    f(Node::Statement(body));
+                    f(Node::Block(body));
                 }
             }
             Self::Property(node) => {
@@ -455,11 +493,7 @@ impl<'ir, 'arena, I, S, E> Node<'ir, 'arena, I, S, E> {
             }
             Self::HookBody(node) => match &node.kind {
                 HookBodyKind::Expression(expression) => f(Node::Expression(expression)),
-                HookBodyKind::Statements(statements) => {
-                    for statement in statements.iter() {
-                        f(Node::Statement(statement));
-                    }
-                }
+                HookBodyKind::Block(block) => f(Node::Block(block)),
             },
             Self::TraitUse(node) => {
                 if let Some(annotation) = node.annotation {
@@ -710,11 +744,7 @@ impl<'ir, 'arena, I, S, E> Node<'ir, 'arena, I, S, E> {
                     f(Node::Expression(n.expression));
                 }
                 ExpressionKind::Conditional(n) => f(Node::Conditional(n)),
-                ExpressionKind::Array(elements) | ExpressionKind::List(elements) => {
-                    for element in elements.iter() {
-                        f(Node::ArrayElement(element));
-                    }
-                }
+                ExpressionKind::ArrayLike(n) => f(Node::ArrayLike(n)),
                 ExpressionKind::ArrayAppend(n)
                 | ExpressionKind::Clone(n)
                 | ExpressionKind::Empty(n)
@@ -756,14 +786,22 @@ impl<'ir, 'arena, I, S, E> Node<'ir, 'arena, I, S, E> {
             },
             Self::Assignment(node) => {
                 f(Node::Expression(node.left));
+                f(Node::AssignmentOperator(&node.operator));
                 f(Node::Expression(node.right));
             }
             Self::Binary(node) => {
                 f(Node::Expression(node.left));
+                f(Node::BinaryOperator(&node.operator));
                 f(Node::Expression(node.right));
             }
-            Self::UnaryPrefix(node) => f(Node::Expression(node.operand)),
-            Self::UnaryPostfix(node) => f(Node::Expression(node.operand)),
+            Self::UnaryPrefix(node) => {
+                f(Node::UnaryPrefixOperator(&node.operator));
+                f(Node::Expression(node.operand));
+            }
+            Self::UnaryPostfix(node) => {
+                f(Node::Expression(node.operand));
+                f(Node::UnaryPostfixOperator(&node.operator));
+            }
             Self::Conditional(node) => {
                 f(Node::Expression(node.condition));
                 if let Some(then) = node.then {
@@ -771,6 +809,11 @@ impl<'ir, 'arena, I, S, E> Node<'ir, 'arena, I, S, E> {
                 }
 
                 f(Node::Expression(node.r#else));
+            }
+            Self::ArrayLike(node) => {
+                for element in node.elements.iter() {
+                    f(Node::ArrayElement(element));
+                }
             }
             Self::ArrayElement(node) => match &node.kind {
                 ArrayElementKind::KeyValue(key, value) => {
@@ -905,7 +948,7 @@ impl<'ir, 'arena, I, S, E> Node<'ir, 'arena, I, S, E> {
                     f(Node::ClosureUseClauseVariable(use_variable));
                 }
 
-                f(Node::Statement(node.body));
+                f(Node::Block(node.body));
             }
             Self::ArrowFunction(node) => {
                 if let Some(annotation) = node.annotation {
@@ -1098,7 +1141,12 @@ impl<'ir, 'arena, I, S, E> Node<'ir, 'arena, I, S, E> {
                 }
             },
             Self::SelfOutAnnotation(node) => f(Node::TypeAnnotation(node.r#type)),
-            Self::Identifier(_)
+            Self::AssignmentOperator(_)
+            | Self::BinaryOperator(_)
+            | Self::UnaryPrefixOperator(_)
+            | Self::UnaryPostfixOperator(_)
+            | Self::Terminator(_)
+            | Self::Identifier(_)
             | Self::Name(_)
             | Self::DirectVariable(_)
             | Self::LiteralString(_)

@@ -7,6 +7,7 @@ use mago_hir::ir::IR;
 use mago_hir::ir::item::statement::ItemStatementKind;
 use mago_hir::ir::literal::Literal;
 use mago_hir::ir::literal::LiteralKind;
+use mago_hir::ir::statement::NamespaceBody;
 use mago_hir::ir::statement::StatementKind;
 use mago_hir::ir::r#type::TypeKind;
 use mago_hir::lower::LowerSettings;
@@ -45,8 +46,9 @@ fn resolved_names_are_interned_once_per_file() {
         let StatementKind::Namespace(namespace) = &statement.kind else {
             continue;
         };
-        let StatementKind::Sequence(statements) = &namespace.statement.kind else {
-            panic!("the namespace body must lower to a statement sequence");
+        let statements = match &namespace.body {
+            NamespaceBody::BraceDelimited(block) => block.statements,
+            NamespaceBody::Implicit { statements, .. } => statements,
         };
 
         for statement in statements.iter() {

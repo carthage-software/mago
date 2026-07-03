@@ -9,6 +9,7 @@ use crate::ir::expression::Access;
 use crate::ir::expression::AccessKind;
 use crate::ir::expression::ArrayElement;
 use crate::ir::expression::ArrayElementKind;
+use crate::ir::expression::ArrayLike;
 use crate::ir::expression::Assignment;
 use crate::ir::expression::Binary;
 use crate::ir::expression::Call;
@@ -30,6 +31,10 @@ use crate::ir::expression::UnaryPrefix;
 use crate::ir::expression::Yield;
 use crate::ir::expression::YieldKind;
 use crate::ir::expression::annotation::Annotation;
+use crate::ir::expression::operator::AssignmentOperator;
+use crate::ir::expression::operator::BinaryOperator;
+use crate::ir::expression::operator::UnaryPostfixOperator;
+use crate::ir::expression::operator::UnaryPrefixOperator;
 use crate::ir::expression::selector::ConstantSelector;
 use crate::ir::expression::selector::ConstantSelectorKind;
 use crate::ir::expression::selector::MemberSelector;
@@ -105,6 +110,7 @@ use crate::ir::literal::LiteralKind;
 use crate::ir::literal::LiteralString;
 use crate::ir::literal::LiteralStringKind;
 use crate::ir::name::Name;
+use crate::ir::statement::Block;
 use crate::ir::statement::Declare;
 use crate::ir::statement::DeclareItem;
 use crate::ir::statement::DoWhile;
@@ -113,11 +119,15 @@ use crate::ir::statement::Foreach;
 use crate::ir::statement::GlobalItem;
 use crate::ir::statement::If;
 use crate::ir::statement::Namespace;
+use crate::ir::statement::NamespaceBody;
 use crate::ir::statement::Statement;
 use crate::ir::statement::StatementKind;
 use crate::ir::statement::StaticItem;
 use crate::ir::statement::Switch;
 use crate::ir::statement::SwitchCase;
+use crate::ir::statement::SwitchCaseKind;
+use crate::ir::statement::Tag;
+use crate::ir::statement::Terminator;
 use crate::ir::statement::Try;
 use crate::ir::statement::TryCatchClause;
 use crate::ir::statement::UseItem;
@@ -274,19 +284,32 @@ generate_walker! {
         }
     }
 
+    generic Block as block => {
+        for statement in block.statements.iter() {
+            walker.walk_statement(statement, context);
+        }
+    }
+
     generic Statement as statement => {
         walker.walk_statement_kind(&statement.kind, context);
+        if let Some(terminator) = &statement.terminator {
+            walker.walk_terminator(terminator, context);
+        }
     }
+
+    plain Terminator as terminator => {}
 
     generic StatementKind as statement_kind => {
         match statement_kind {
-            StatementKind::Inline(_) | StatementKind::HaltCompiler | StatementKind::Noop => {}
+            StatementKind::Shebang(_) | StatementKind::Inline(_) | StatementKind::HaltCompiler | StatementKind::Noop => {}
+            StatementKind::Tag(node) => walker.walk_tag(node, context),
             StatementKind::Namespace(node) => walker.walk_namespace(node, context),
             StatementKind::Sequence(statements) => {
                 for statement in statements.iter() {
                     walker.walk_statement(statement, context);
                 }
             }
+            StatementKind::Block(node) => walker.walk_block(node, context),
             StatementKind::Item(node) => walker.walk_item_statement(node, context),
             StatementKind::Declare(node) => walker.walk_declare(node, context),
             StatementKind::Goto(name) | StatementKind::Label(name) => walker.walk_name(name, context),
@@ -332,12 +355,22 @@ generate_walker! {
         }
     }
 
+    plain Tag as tag => {}
+
     generic Namespace as namespace => {
         if let Some(name) = namespace.name {
             walker.walk_identifier(name, context);
         }
 
-        walker.walk_statement(namespace.statement, context);
+        match &namespace.body {
+            NamespaceBody::BraceDelimited(block) => walker.walk_block(block, context),
+            NamespaceBody::Implicit { terminator, statements } => {
+                walker.walk_terminator(terminator, context);
+                for statement in statements.iter() {
+                    walker.walk_statement(statement, context);
+                }
+            }
+        }
     }
 
     generic Declare as declare => {
@@ -356,13 +389,13 @@ generate_walker! {
     }
 
     generic Try as try_statement => {
-        walker.walk_statement(try_statement.statement, context);
+        walker.walk_block(try_statement.block, context);
         for catch_clause in try_statement.catch_clauses {
             walker.walk_try_catch_clause(catch_clause, context);
         }
 
-        if let Some(finally_clause) = try_statement.finally_clause {
-            walker.walk_statement(finally_clause, context);
+        if let Some(finally_clause) = try_statement.finally_block {
+            walker.walk_block(finally_clause, context);
         }
     }
 
@@ -372,7 +405,7 @@ generate_walker! {
             walker.walk_direct_variable(variable, context);
         }
 
-        walker.walk_statement(try_catch_clause.statement, context);
+        walker.walk_block(try_catch_clause.block, context);
     }
 
     generic Foreach as foreach => {
@@ -419,12 +452,18 @@ generate_walker! {
     }
 
     generic SwitchCase as switch_case => {
-        match switch_case {
-            SwitchCase::Expression(expression, statement) => {
+        match &switch_case.kind {
+            SwitchCaseKind::Expression(expression, statements) => {
                 walker.walk_expression(expression, context);
-                walker.walk_statement(statement, context);
+                for statement in statements.iter() {
+                    walker.walk_statement(statement, context);
+                }
             }
-            SwitchCase::Default(statement) => walker.walk_statement(statement, context),
+            SwitchCaseKind::Default(statements) => {
+                for statement in statements.iter() {
+                    walker.walk_statement(statement, context);
+                }
+            }
         }
     }
 
@@ -593,11 +632,14 @@ generate_walker! {
             walker.walk_type(return_type, context);
         }
 
-        walker.walk_statement(function.body, context);
+        walker.walk_block(function.body, context);
     }
 
     generic MemberItem as member_item => {
         walker.walk_member_item_kind(&member_item.kind, context);
+        if let Some(terminator) = &member_item.terminator {
+            walker.walk_terminator(terminator, context);
+        }
     }
 
     generic MemberItemKind as member_item_kind => {
@@ -634,7 +676,7 @@ generate_walker! {
         }
 
         if let Some(body) = method.body {
-            walker.walk_statement(body, context);
+            walker.walk_block(body, context);
         }
     }
 
@@ -753,11 +795,7 @@ generate_walker! {
     generic HookBodyKind as hook_body_kind => {
         match hook_body_kind {
             HookBodyKind::Expression(expression) => walker.walk_expression(expression, context),
-            HookBodyKind::Statements(statements) => {
-                for statement in statements.iter() {
-                    walker.walk_statement(statement, context);
-                }
-            }
+            HookBodyKind::Block(block) => walker.walk_block(block, context),
         }
     }
 
@@ -1032,11 +1070,7 @@ generate_walker! {
             ExpressionKind::Assignment(node) => walker.walk_assignment(node, context),
             ExpressionKind::Annotation(node) => walker.walk_annotation(node, context),
             ExpressionKind::Conditional(node) => walker.walk_conditional(node, context),
-            ExpressionKind::Array(elements) | ExpressionKind::List(elements) => {
-                for element in elements.iter() {
-                    walker.walk_array_element(element, context);
-                }
-            }
+            ExpressionKind::ArrayLike(node) => walker.walk_array_like(node, context),
             ExpressionKind::ArrayAppend(node)
             | ExpressionKind::Clone(node)
             | ExpressionKind::Empty(node)
@@ -1076,6 +1110,7 @@ generate_walker! {
 
     generic Assignment as assignment => {
         walker.walk_expression(assignment.left, context);
+        walker.walk_assignment_operator(&assignment.operator, context);
         walker.walk_expression(assignment.right, context);
     }
 
@@ -1086,16 +1121,27 @@ generate_walker! {
 
     generic Binary as binary => {
         walker.walk_expression(binary.left, context);
+        walker.walk_binary_operator(&binary.operator, context);
         walker.walk_expression(binary.right, context);
     }
 
     generic UnaryPrefix as unary_prefix => {
+        walker.walk_unary_prefix_operator(&unary_prefix.operator, context);
         walker.walk_expression(unary_prefix.operand, context);
     }
 
     generic UnaryPostfix as unary_postfix => {
         walker.walk_expression(unary_postfix.operand, context);
+        walker.walk_unary_postfix_operator(&unary_postfix.operator, context);
     }
+
+    plain AssignmentOperator as assignment_operator => {}
+
+    plain BinaryOperator as binary_operator => {}
+
+    plain UnaryPrefixOperator as unary_prefix_operator => {}
+
+    plain UnaryPostfixOperator as unary_postfix_operator => {}
 
     generic Conditional as conditional => {
         walker.walk_expression(conditional.condition, context);
@@ -1104,6 +1150,12 @@ generate_walker! {
         }
 
         walker.walk_expression(conditional.r#else, context);
+    }
+
+    generic ArrayLike as array_like => {
+        for element in array_like.elements.iter() {
+            walker.walk_array_element(element, context);
+        }
     }
 
     generic ArrayElement as array_element => {
@@ -1318,7 +1370,7 @@ generate_walker! {
             walker.walk_closure_use_clause_variable(use_variable, context);
         }
 
-        walker.walk_statement(closure.body, context);
+        walker.walk_block(closure.body, context);
     }
 
     generic ArrowFunction as arrow_function => {

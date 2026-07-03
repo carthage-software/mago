@@ -29,7 +29,7 @@ where
         let parameters = self.lower_parameter_list(&function.parameter_list);
 
         let outer_effects = self.enter_function_like_body();
-        let body = self.statements_to_statement(function.body.statements.as_slice(), function.body.span());
+        let body = self.arena.alloc(self.lower_block(&function.body));
         let effects = self.leave_function_like_body(outer_effects);
 
         let return_expression = self.single_return_expression(&function.body);

@@ -1,6 +1,7 @@
 use crate::ir::delimited::Delimited;
 use crate::ir::expression::ArrayElement;
 use crate::ir::expression::ArrayElementKind;
+use crate::ir::expression::ArrayLike;
 use crate::ir::expression::Expression;
 use crate::ir::expression::ExpressionKind;
 use crate::ir::expression::annotation::Annotation;
@@ -80,15 +81,18 @@ where
                 Some(type_annotation) => self.annotate_expression(target, type_annotation),
                 None => target,
             },
-            ExpressionKind::Array(elements) => {
-                let elements = self.fold_assignment_target_elements(elements, bindings);
+            ExpressionKind::ArrayLike(array_like) => {
+                let elements = self.fold_assignment_target_elements(array_like.elements, bindings);
 
-                self.arena.alloc(Expression { meta: (), span: target.span, kind: ExpressionKind::Array(elements) })
-            }
-            ExpressionKind::List(elements) => {
-                let elements = self.fold_assignment_target_elements(elements, bindings);
-
-                self.arena.alloc(Expression { meta: (), span: target.span, kind: ExpressionKind::List(elements) })
+                self.arena.alloc(Expression {
+                    meta: (),
+                    span: target.span,
+                    kind: ExpressionKind::ArrayLike(ArrayLike {
+                        span: array_like.span,
+                        kind: array_like.kind,
+                        elements,
+                    }),
+                })
             }
             _ => target,
         }

@@ -60,9 +60,10 @@ where
         match body {
             cst::PropertyHookBody::Abstract(_) => None,
             cst::PropertyHookBody::Concrete(concrete) => match concrete {
-                cst::PropertyHookConcreteBody::Block(block) => {
-                    Some(HookBody { span: block.span(), kind: HookBodyKind::Statements(self.lower_block(block)) })
-                }
+                cst::PropertyHookConcreteBody::Block(block) => Some(HookBody {
+                    span: block.span(),
+                    kind: HookBodyKind::Block(self.arena.alloc(self.lower_block(block))),
+                }),
                 cst::PropertyHookConcreteBody::Expression(expression) => Some(HookBody {
                     span: expression.span(),
                     kind: HookBodyKind::Expression(self.arena.alloc(self.lower_expression(expression.expression))),

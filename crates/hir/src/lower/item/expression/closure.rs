@@ -45,7 +45,7 @@ where
         let parameters = self.lower_parameter_list(&closure.parameter_list);
 
         let outer_effects = self.enter_function_like_body();
-        let body = self.statements_to_statement(closure.body.statements.as_slice(), closure.body.span());
+        let body = self.arena.alloc(self.lower_block(&closure.body));
         let effects = self.leave_function_like_body(outer_effects);
 
         let return_expression = self.single_return_expression(&closure.body);

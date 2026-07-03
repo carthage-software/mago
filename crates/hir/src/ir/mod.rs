@@ -2,15 +2,17 @@
 use serde::Serialize;
 
 use mago_allocator::Arena;
+use mago_allocator::copy::CopyInto;
+use mago_allocator::copy::copy_slice_into;
 use mago_span::HasSpan;
 use mago_span::Span;
 
+use crate::ir::comment::Comment;
 use crate::ir::error::Error;
 use crate::ir::statement::Statement;
-use mago_allocator::copy::CopyInto;
-use mago_allocator::copy::copy_slice_into;
 
 pub mod argument;
+pub mod comment;
 pub mod delimited;
 pub mod error;
 pub mod expression;
@@ -26,6 +28,7 @@ pub mod variable;
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub struct IR<'arena, I, S, E> {
     pub span: Span,
+    pub comments: &'arena [Comment<'arena>],
     pub statements: &'arena [Statement<'arena, I, S, E>],
     pub errors: &'arena [Error],
 }
@@ -44,6 +47,7 @@ where
     {
         IR {
             span: self.span,
+            comments: copy_slice_into(self.comments, arena),
             statements: copy_slice_into(self.statements, arena),
             errors: arena.alloc_slice_copy(self.errors),
         }

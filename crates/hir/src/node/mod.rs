@@ -1,15 +1,3 @@
-//! A flat, uniform view over the [`IR`] tree: every node that carries a span is
-//! reachable as a [`Node`], tagged by [`NodeKind`], and walkable by calling
-//! [`Node::children`] (which yields its immediate sub-nodes). This mirrors the
-//! CST's `Node`/`NodeKind` so consumers — the type checker above all — can be a
-//! registry of rules that subscribe to a [`NodeKind`] and run as the tree is
-//! walked, exactly like the linter.
-//!
-//! Membership is decided by one rule: a type is a [`Node`] iff it implements
-//! [`HasSpan`]. The internal `*Kind` dispatch enums (`ExpressionKind`, …) carry
-//! no span and are *not* nodes; the walk threads through them straight to the
-//! span-bearing nodes underneath.
-
 use mago_span::HasSpan;
 use mago_span::Span;
 
@@ -20,6 +8,7 @@ use crate::ir::error::Error;
 use crate::ir::error::annotation::AnnotationError;
 use crate::ir::expression::Access;
 use crate::ir::expression::ArrayElement;
+use crate::ir::expression::ArrayLike;
 use crate::ir::expression::Assignment;
 use crate::ir::expression::Binary;
 use crate::ir::expression::Call;
@@ -33,6 +22,10 @@ use crate::ir::expression::PartialApplication;
 use crate::ir::expression::UnaryPostfix;
 use crate::ir::expression::UnaryPrefix;
 use crate::ir::expression::Yield;
+use crate::ir::expression::operator::AssignmentOperator;
+use crate::ir::expression::operator::BinaryOperator;
+use crate::ir::expression::operator::UnaryPostfixOperator;
+use crate::ir::expression::operator::UnaryPrefixOperator;
 use crate::ir::expression::selector::ConstantSelector;
 use crate::ir::expression::selector::MemberSelector;
 use crate::ir::identifier::Identifier;
@@ -93,6 +86,7 @@ use crate::ir::literal::LiteralFloat;
 use crate::ir::literal::LiteralInteger;
 use crate::ir::literal::LiteralString;
 use crate::ir::name::Name;
+use crate::ir::statement::Block;
 use crate::ir::statement::Declare;
 use crate::ir::statement::DeclareItem;
 use crate::ir::statement::DoWhile;
@@ -105,6 +99,8 @@ use crate::ir::statement::Statement;
 use crate::ir::statement::StaticItem;
 use crate::ir::statement::Switch;
 use crate::ir::statement::SwitchCase;
+use crate::ir::statement::Tag;
+use crate::ir::statement::Terminator;
 use crate::ir::statement::Try;
 use crate::ir::statement::TryCatchClause;
 use crate::ir::statement::UseItem;
@@ -137,13 +133,17 @@ pub enum NodeKind {
     AnonymousClass,
     Argument,
     ArrayElement,
+    ArrayLike,
     ArrowFunction,
     AssertAnnotation,
     AssertAnnotationPattern,
     AssertAnnotationTarget,
     Assignment,
+    AssignmentOperator,
     Attribute,
     Binary,
+    BinaryOperator,
+    Block,
     Call,
     CallableTypeAnnotation,
     CallableTypeAnnotationParameter,
@@ -217,6 +217,8 @@ pub enum NodeKind {
     ShapeTypeAnnotationAdditionalFields,
     ShapeTypeAnnotationField,
     Statement,
+    Tag,
+    Terminator,
     StaticItem,
     StringTypeAnnotation,
     Switch,
@@ -234,7 +236,9 @@ pub enum NodeKind {
     TypeAnnotation,
     TypeParameterAnnotation,
     UnaryPostfix,
+    UnaryPostfixOperator,
     UnaryPrefix,
+    UnaryPrefixOperator,
     UseAnnotation,
     UseItem,
     Variable,
@@ -259,13 +263,17 @@ pub enum Node<'ir, 'arena, I, S, E> {
     AnonymousClass(&'ir AnonymousClass<'arena, I, S, E>),
     Argument(&'ir Argument<'arena, I, S, E>),
     ArrayElement(&'ir ArrayElement<'arena, I, S, E>),
+    ArrayLike(&'ir ArrayLike<'arena, I, S, E>),
     ArrowFunction(&'ir ArrowFunction<'arena, I, S, E>),
     AssertAnnotation(&'ir AssertAnnotation<'arena>),
     AssertAnnotationPattern(&'ir AssertAnnotationPattern<'arena>),
     AssertAnnotationTarget(&'ir AssertAnnotationTarget<'arena>),
     Assignment(&'ir Assignment<'arena, I, S, E>),
+    AssignmentOperator(&'ir AssignmentOperator),
     Attribute(&'ir Attribute<'arena, I, S, E>),
     Binary(&'ir Binary<'arena, I, S, E>),
+    BinaryOperator(&'ir BinaryOperator),
+    Block(&'ir Block<'arena, I, S, E>),
     Call(&'ir Call<'arena, I, S, E>),
     CallableTypeAnnotation(&'ir CallableTypeAnnotation<'arena>),
     CallableTypeAnnotationParameter(&'ir CallableTypeAnnotationParameter<'arena>),
@@ -339,6 +347,8 @@ pub enum Node<'ir, 'arena, I, S, E> {
     ShapeTypeAnnotationAdditionalFields(&'ir ShapeTypeAnnotationAdditionalFields<'arena>),
     ShapeTypeAnnotationField(&'ir ShapeTypeAnnotationField<'arena>),
     Statement(&'ir Statement<'arena, I, S, E>),
+    Tag(&'ir Tag),
+    Terminator(&'ir Terminator),
     StaticItem(&'ir StaticItem<'arena, I, S, E>),
     StringTypeAnnotation(&'ir StringTypeAnnotation<'arena>),
     Switch(&'ir Switch<'arena, I, S, E>),
@@ -356,7 +366,9 @@ pub enum Node<'ir, 'arena, I, S, E> {
     TypeAnnotation(&'ir TypeAnnotation<'arena>),
     TypeParameterAnnotation(&'ir TypeParameterAnnotation<'arena>),
     UnaryPostfix(&'ir UnaryPostfix<'arena, I, S, E>),
+    UnaryPostfixOperator(&'ir UnaryPostfixOperator),
     UnaryPrefix(&'ir UnaryPrefix<'arena, I, S, E>),
+    UnaryPrefixOperator(&'ir UnaryPrefixOperator),
     UseAnnotation(&'ir UseAnnotation<'arena>),
     UseItem(&'ir UseItem<'arena>),
     Variable(&'ir Variable<'arena, I, S, E>),
@@ -378,13 +390,17 @@ impl<'ir, 'arena, I, S, E> Node<'ir, 'arena, I, S, E> {
             Self::AnonymousClass(_) => NodeKind::AnonymousClass,
             Self::Argument(_) => NodeKind::Argument,
             Self::ArrayElement(_) => NodeKind::ArrayElement,
+            Self::ArrayLike(_) => NodeKind::ArrayLike,
             Self::ArrowFunction(_) => NodeKind::ArrowFunction,
             Self::AssertAnnotation(_) => NodeKind::AssertAnnotation,
             Self::AssertAnnotationPattern(_) => NodeKind::AssertAnnotationPattern,
             Self::AssertAnnotationTarget(_) => NodeKind::AssertAnnotationTarget,
             Self::Assignment(_) => NodeKind::Assignment,
+            Self::AssignmentOperator(_) => NodeKind::AssignmentOperator,
             Self::Attribute(_) => NodeKind::Attribute,
             Self::Binary(_) => NodeKind::Binary,
+            Self::BinaryOperator(_) => NodeKind::BinaryOperator,
+            Self::Block(_) => NodeKind::Block,
             Self::Call(_) => NodeKind::Call,
             Self::CallableTypeAnnotation(_) => NodeKind::CallableTypeAnnotation,
             Self::CallableTypeAnnotationParameter(_) => NodeKind::CallableTypeAnnotationParameter,
@@ -458,6 +474,8 @@ impl<'ir, 'arena, I, S, E> Node<'ir, 'arena, I, S, E> {
             Self::ShapeTypeAnnotationAdditionalFields(_) => NodeKind::ShapeTypeAnnotationAdditionalFields,
             Self::ShapeTypeAnnotationField(_) => NodeKind::ShapeTypeAnnotationField,
             Self::Statement(_) => NodeKind::Statement,
+            Self::Tag(_) => NodeKind::Tag,
+            Self::Terminator(_) => NodeKind::Terminator,
             Self::StaticItem(_) => NodeKind::StaticItem,
             Self::StringTypeAnnotation(_) => NodeKind::StringTypeAnnotation,
             Self::Switch(_) => NodeKind::Switch,
@@ -475,7 +493,9 @@ impl<'ir, 'arena, I, S, E> Node<'ir, 'arena, I, S, E> {
             Self::TypeAnnotation(_) => NodeKind::TypeAnnotation,
             Self::TypeParameterAnnotation(_) => NodeKind::TypeParameterAnnotation,
             Self::UnaryPostfix(_) => NodeKind::UnaryPostfix,
+            Self::UnaryPostfixOperator(_) => NodeKind::UnaryPostfixOperator,
             Self::UnaryPrefix(_) => NodeKind::UnaryPrefix,
+            Self::UnaryPrefixOperator(_) => NodeKind::UnaryPrefixOperator,
             Self::UseAnnotation(_) => NodeKind::UseAnnotation,
             Self::UseItem(_) => NodeKind::UseItem,
             Self::Variable(_) => NodeKind::Variable,
@@ -505,13 +525,17 @@ impl<I, S, E> HasSpan for Node<'_, '_, I, S, E> {
             Self::AnonymousClass(node) => node.span(),
             Self::Argument(node) => node.span(),
             Self::ArrayElement(node) => node.span(),
+            Self::ArrayLike(node) => node.span(),
             Self::ArrowFunction(node) => node.span(),
             Self::AssertAnnotation(node) => node.span(),
             Self::AssertAnnotationPattern(node) => node.span(),
             Self::AssertAnnotationTarget(node) => node.span(),
             Self::Assignment(node) => node.span(),
+            Self::AssignmentOperator(node) => node.span(),
             Self::Attribute(node) => node.span(),
             Self::Binary(node) => node.span(),
+            Self::BinaryOperator(node) => node.span(),
+            Self::Block(node) => node.span(),
             Self::Call(node) => node.span(),
             Self::CallableTypeAnnotation(node) => node.span(),
             Self::CallableTypeAnnotationParameter(node) => node.span(),
@@ -585,6 +609,8 @@ impl<I, S, E> HasSpan for Node<'_, '_, I, S, E> {
             Self::ShapeTypeAnnotationAdditionalFields(node) => node.span(),
             Self::ShapeTypeAnnotationField(node) => node.span(),
             Self::Statement(node) => node.span(),
+            Self::Tag(node) => node.span(),
+            Self::Terminator(node) => node.span(),
             Self::StaticItem(node) => node.span(),
             Self::StringTypeAnnotation(node) => node.span(),
             Self::Switch(node) => node.span(),
@@ -602,7 +628,9 @@ impl<I, S, E> HasSpan for Node<'_, '_, I, S, E> {
             Self::TypeAnnotation(node) => node.span(),
             Self::TypeParameterAnnotation(node) => node.span(),
             Self::UnaryPostfix(node) => node.span(),
+            Self::UnaryPostfixOperator(node) => node.span(),
             Self::UnaryPrefix(node) => node.span(),
+            Self::UnaryPrefixOperator(node) => node.span(),
             Self::UseAnnotation(node) => node.span(),
             Self::UseItem(node) => node.span(),
             Self::Variable(node) => node.span(),

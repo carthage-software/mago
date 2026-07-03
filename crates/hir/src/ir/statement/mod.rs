@@ -27,16 +27,20 @@ pub struct Statement<'arena, I, S, E> {
     pub meta: S,
     pub span: Span,
     pub kind: StatementKind<'arena, I, S, E>,
+    pub terminator: Option<Terminator>,
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[cfg_attr(feature = "serde", serde(tag = "kind", content = "value"))]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub enum StatementKind<'arena, I, S, E> {
+    Shebang(&'arena [u8]),
+    Tag(Tag),
     Inline(&'arena [u8]),
     Namespace(&'arena Namespace<'arena, I, S, E>),
     Use(&'arena [UseItem<'arena>]),
     Sequence(&'arena [Statement<'arena, I, S, E>]),
+    Block(&'arena Block<'arena, I, S, E>),
     Item(&'arena ItemStatement<'arena, I, S, E>),
     Declare(&'arena Declare<'arena, I, S, E>),
     Goto(Name<'arena>),
@@ -58,7 +62,47 @@ pub enum StatementKind<'arena, I, S, E> {
     VariableBindingAnnotation(&'arena VariableBindingAnnotation<'arena>),
     HaltCompiler,
     Unset(Delimited<'arena, Expression<'arena, I, S, E>>),
-    Noop,
+    Noop, // `;`
+}
+
+#[cfg_attr(feature = "serde", derive(Serialize))]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub struct Block<'arena, I, S, E> {
+    pub span: Span,
+    pub statements: &'arena [Statement<'arena, I, S, E>],
+}
+
+#[cfg_attr(feature = "serde", derive(Serialize))]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub struct Tag {
+    pub span: Span,
+    pub kind: TagKind,
+}
+
+#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "kind"))]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub enum TagKind {
+    Opening,      // `<?php`
+    ShortOpening, // `<?`
+    Closing,      // `?>`
+}
+
+#[cfg_attr(feature = "serde", derive(Serialize))]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub struct Terminator {
+    pub span: Span,
+    pub kind: TerminatorKind,
+}
+
+#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "kind"))]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub enum TerminatorKind {
+    Semicolon,  // `;`
+    ClosingTag, // `?>`
+    TagPair,    // `?><?php`
+    Missing,
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize))]
@@ -121,9 +165,26 @@ pub struct Switch<'arena, I, S, E> {
 
 #[cfg_attr(feature = "serde", derive(Serialize))]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
-pub enum SwitchCase<'arena, I, S, E> {
-    Expression(&'arena Expression<'arena, I, S, E>, &'arena Statement<'arena, I, S, E>),
-    Default(&'arena Statement<'arena, I, S, E>),
+pub struct SwitchCase<'arena, I, S, E> {
+    pub span: Span,
+    pub seperator: SwitchCaseSeperatorKind,
+    pub kind: SwitchCaseKind<'arena, I, S, E>,
+}
+
+#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub enum SwitchCaseSeperatorKind {
+    Colon,
+    Semicolon,
+}
+
+#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub enum SwitchCaseKind<'arena, I, S, E> {
+    Expression(&'arena Expression<'arena, I, S, E>, &'arena [Statement<'arena, I, S, E>]),
+    Default(&'arena [Statement<'arena, I, S, E>]),
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize))]
@@ -175,9 +236,9 @@ pub struct Foreach<'arena, I, S, E> {
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub struct Try<'arena, I, S, E> {
     pub span: Span,
-    pub statement: &'arena Statement<'arena, I, S, E>,
+    pub block: &'arena Block<'arena, I, S, E>,
     pub catch_clauses: &'arena [TryCatchClause<'arena, I, S, E>],
-    pub finally_clause: Option<&'arena Statement<'arena, I, S, E>>,
+    pub finally_block: Option<&'arena Block<'arena, I, S, E>>,
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize))]
@@ -186,7 +247,7 @@ pub struct TryCatchClause<'arena, I, S, E> {
     pub span: Span,
     pub r#type: &'arena Type<'arena>,
     pub variable: Option<DirectVariable<'arena>>,
-    pub statement: &'arena Statement<'arena, I, S, E>,
+    pub block: &'arena Block<'arena, I, S, E>,
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize))]
@@ -194,7 +255,15 @@ pub struct TryCatchClause<'arena, I, S, E> {
 pub struct Namespace<'arena, I, S, E> {
     pub span: Span,
     pub name: Option<&'arena Identifier<'arena>>,
-    pub statement: &'arena Statement<'arena, I, S, E>,
+    pub body: NamespaceBody<'arena, I, S, E>,
+}
+
+#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "kind", content = "value"))]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub enum NamespaceBody<'arena, I, S, E> {
+    BraceDelimited(&'arena Block<'arena, I, S, E>),
+    Implicit { terminator: Terminator, statements: &'arena [Statement<'arena, I, S, E>] },
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize))]
@@ -242,7 +311,12 @@ where
     where
         A: Arena,
     {
-        Statement { meta: self.meta.copy_into(arena), span: self.span, kind: self.kind.copy_into(arena) }
+        Statement {
+            meta: self.meta.copy_into(arena),
+            span: self.span,
+            kind: self.kind.copy_into(arena),
+            terminator: self.terminator,
+        }
     }
 }
 
@@ -259,10 +333,13 @@ where
         A: Arena,
     {
         match self {
+            StatementKind::Shebang(bytes) => StatementKind::Shebang(arena.alloc_slice_copy(bytes)),
             StatementKind::Inline(bytes) => StatementKind::Inline(arena.alloc_slice_copy(bytes)),
+            StatementKind::Tag(tag) => StatementKind::Tag(*tag),
             StatementKind::Namespace(node) => StatementKind::Namespace(copy_ref_into(*node, arena)),
             StatementKind::Use(items) => StatementKind::Use(copy_slice_into(items, arena)),
             StatementKind::Sequence(statements) => StatementKind::Sequence(copy_slice_into(statements, arena)),
+            StatementKind::Block(node) => StatementKind::Block(copy_ref_into(*node, arena)),
             StatementKind::Item(node) => StatementKind::Item(copy_ref_into(*node, arena)),
             StatementKind::Declare(node) => StatementKind::Declare(copy_ref_into(*node, arena)),
             StatementKind::Goto(name) => StatementKind::Goto(name.copy_into(arena)),
@@ -323,12 +400,44 @@ where
     where
         A: Arena,
     {
+        SwitchCase { span: self.span, seperator: self.seperator, kind: self.kind.copy_into(arena) }
+    }
+}
+
+impl<I, S, E> CopyInto for SwitchCaseKind<'_, I, S, E>
+where
+    I: CopyInto,
+    S: CopyInto,
+    E: CopyInto,
+{
+    type Output<'arena> = SwitchCaseKind<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
         match self {
-            SwitchCase::Expression(expression, statement) => {
-                SwitchCase::Expression(copy_ref_into(*expression, arena), copy_ref_into(*statement, arena))
+            SwitchCaseKind::Expression(expression, statements) => {
+                SwitchCaseKind::Expression(copy_ref_into(*expression, arena), copy_slice_into(statements, arena))
             }
-            SwitchCase::Default(statement) => SwitchCase::Default(copy_ref_into(*statement, arena)),
+            SwitchCaseKind::Default(statements) => SwitchCaseKind::Default(copy_slice_into(statements, arena)),
         }
+    }
+}
+
+impl<I, S, E> CopyInto for Block<'_, I, S, E>
+where
+    I: CopyInto,
+    S: CopyInto,
+    E: CopyInto,
+{
+    type Output<'arena> = Block<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        Block { span: self.span, statements: copy_slice_into(self.statements, arena) }
     }
 }
 
@@ -451,9 +560,9 @@ where
     {
         Try {
             span: self.span,
-            statement: copy_ref_into(self.statement, arena),
+            block: copy_ref_into(self.block, arena),
             catch_clauses: copy_slice_into(self.catch_clauses, arena),
-            finally_clause: self.finally_clause.map(|node| copy_ref_into(node, arena)),
+            finally_block: self.finally_block.map(|node| copy_ref_into(node, arena)),
         }
     }
 }
@@ -474,7 +583,7 @@ where
             span: self.span,
             r#type: copy_ref_into(self.r#type, arena),
             variable: self.variable.map(|node| node.copy_into(arena)),
-            statement: copy_ref_into(self.statement, arena),
+            block: copy_ref_into(self.block, arena),
         }
     }
 }
@@ -494,7 +603,28 @@ where
         Namespace {
             span: self.span,
             name: self.name.map(|node| copy_ref_into(node, arena)),
-            statement: copy_ref_into(self.statement, arena),
+            body: self.body.copy_into(arena),
+        }
+    }
+}
+
+impl<I, S, E> CopyInto for NamespaceBody<'_, I, S, E>
+where
+    I: CopyInto,
+    S: CopyInto,
+    E: CopyInto,
+{
+    type Output<'arena> = NamespaceBody<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        match self {
+            NamespaceBody::BraceDelimited(block) => NamespaceBody::BraceDelimited(copy_ref_into(*block, arena)),
+            NamespaceBody::Implicit { terminator, statements } => {
+                NamespaceBody::Implicit { terminator: *terminator, statements: copy_slice_into(statements, arena) }
+            }
         }
     }
 }
@@ -582,6 +712,18 @@ impl<I, S, E> HasSpan for Statement<'_, I, S, E> {
     }
 }
 
+impl HasSpan for Tag {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+impl HasSpan for Terminator {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
 impl<I, S, E> HasSpan for Switch<'_, I, S, E> {
     fn span(&self) -> Span {
         self.span
@@ -662,9 +804,12 @@ impl<I, S, E> HasSpan for Declare<'_, I, S, E> {
 
 impl<I, S, E> HasSpan for SwitchCase<'_, I, S, E> {
     fn span(&self) -> Span {
-        match self {
-            SwitchCase::Expression(expression, statement) => expression.span().join(statement.span()),
-            SwitchCase::Default(statement) => statement.span(),
-        }
+        self.span
+    }
+}
+
+impl<I, S, E> HasSpan for Block<'_, I, S, E> {
+    fn span(&self) -> Span {
+        self.span
     }
 }

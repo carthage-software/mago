@@ -35,9 +35,7 @@ where
         let outer_effects = self.enter_function_like_body();
         let body = match &method.body {
             cst::MethodBody::Abstract(_) => None,
-            cst::MethodBody::Concrete(block) => {
-                Some(self.statements_to_statement(block.statements.as_slice(), block.span()))
-            }
+            cst::MethodBody::Concrete(block) => Some(&*self.arena.alloc(self.lower_block(block))),
         };
         let effects = self.leave_function_like_body(outer_effects);
 
