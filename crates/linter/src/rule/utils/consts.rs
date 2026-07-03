@@ -154,7 +154,7 @@ pub const ALIAS_TO_FUNCTION: [(&str, &str); 68] = [
 /// List of all PHP extensions and their functions.
 ///
 /// This list is not exhaustive and may not be up-to-date.
-pub const EXTENSION_FUNCTIONS: [(&str, &[&str]); 48] = [
+pub const EXTENSION_FUNCTIONS: [(&str, &[&str]); 49] = [
     (
         "Core",
         &[
@@ -983,6 +983,47 @@ pub const EXTENSION_FUNCTIONS: [(&str, &[&str]); 48] = [
             "pg_delete",
             "pg_select",
             "pg_set_error_context_visibility",
+        ],
+    ),
+    (
+        "sqlsrv",
+        &[
+            "sqlsrv_connect",
+            "sqlsrv_close",
+            "sqlsrv_begin_transaction",
+            "sqlsrv_commit",
+            "sqlsrv_rollback",
+            "sqlsrv_errors",
+            "sqlsrv_configure",
+            "sqlsrv_get_config",
+            "sqlsrv_prepare",
+            "sqlsrv_execute",
+            "sqlsrv_query",
+            "sqlsrv_fetch",
+            "sqlsrv_fetch_array",
+            "sqlsrv_fetch_object",
+            "sqlsrv_next_result",
+            "sqlsrv_get_field",
+            "sqlsrv_field_metadata",
+            "sqlsrv_has_rows",
+            "sqlsrv_num_fields",
+            "sqlsrv_num_rows",
+            "sqlsrv_rows_affected",
+            "sqlsrv_client_info",
+            "sqlsrv_server_info",
+            "sqlsrv_cancel",
+            "sqlsrv_free_stmt",
+            "sqlsrv_send_stream_data",
+            "SQLSRV_PHPTYPE_STREAM",
+            "SQLSRV_PHPTYPE_STRING",
+            "SQLSRV_SQLTYPE_BINARY",
+            "SQLSRV_SQLTYPE_CHAR",
+            "SQLSRV_SQLTYPE_DECIMAL",
+            "SQLSRV_SQLTYPE_NCHAR",
+            "SQLSRV_SQLTYPE_NUMERIC",
+            "SQLSRV_SQLTYPE_NVARCHAR",
+            "SQLSRV_SQLTYPE_VARBINARY",
+            "SQLSRV_SQLTYPE_VARCHAR",
         ],
     ),
     (
