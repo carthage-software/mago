@@ -19,14 +19,17 @@ nav_section = "实用方案"
 
 - 在 Linux 和 macOS 上,该文件通常位于 `~/.config/helix/languages.toml`。
 - 在 Windows 上,通常位于 `%AppData%\helix\languages.toml`。
+- 或者可以在项目中创建 `.helix/languages.toml` 作为项目级配置文件。
 
 如果文件不存在就创建它,然后追加:
 
 ```toml
-[[language]]
-name = "php"
+# 将 Mago 设置为格式化器（此配置假设你的配置文件位于当前工作目录中）。
+formatter = { command = "mago", args = ["--config", "%sh{pwd}/mago.toml", "format", "--stdin-input"] }
+# 如果要使用不同的配置文件,请取消注释此行并替换路径。
+# formatter = { command = "mago", args = ["--config", "%sh{pwd}/path/to/mago.toml", "format", "--stdin-input"] }
 
-formatter = { command = "mago", args = ["format", "--stdin-input"] }
+# 设为 true 以在保存时自动格式化。
 auto-format = true
 ```
 
