@@ -2350,6 +2350,7 @@ test_case!(call_site_variance_projection);
 test_case!(issue_2026);
 test_case!(issue_2029);
 test_case!(issue_2048);
+test_case!(issue_2050);
 test_case!(issue_2054);
 test_case!(issue_2055);
 test_case!(issue_2020);

@@ -54,6 +54,10 @@ pub fn is_contained_by(
         };
 
         for container_atomic in container_union.types.iter() {
+            if container_atomic == container_type_part {
+                continue;
+            }
+
             if is_contained_by(codebase, input_type_part, container_atomic, inside_assertion, atomic_comparison_result)
             {
                 return true;
@@ -69,6 +73,10 @@ pub fn is_contained_by(
         };
 
         for input_atomic in input_union.types.iter() {
+            if input_atomic == input_type_part {
+                continue;
+            }
+
             if !is_contained_by(codebase, input_atomic, container_type_part, inside_assertion, atomic_comparison_result)
             {
                 return false;
