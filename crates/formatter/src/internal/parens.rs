@@ -512,7 +512,9 @@ where
         }
 
         if let Node::ArrayAccess(access) = self.parent_node() {
-            return if expression.end_offset() < access.left_bracket.start_offset() {
+            return if !matches!(expression, Expression::Binary(_))
+                && expression.end_offset() < access.left_bracket.start_offset()
+            {
                 self.callee_expression_need_parenthesis(expression, false)
             } else {
                 false
