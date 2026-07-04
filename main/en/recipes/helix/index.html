@@ -564,12 +564,15 @@
 <ul>
 <li>On Linux and macOS the file is usually at <code>~/.config/helix/languages.toml</code>.</li>
 <li>On Windows it is usually at <code>%AppData%\helix\languages.toml</code>.</li>
+<li>Or a per-project configuration file can be created at <code>.helix/languages.toml</code>.</li>
 </ul>
 <p>Create the file if it does not exist, then append:</p>
-<pre><code class="language-toml">[[language]]
-name = "php"
+<pre><code class="language-toml"># Set Mago as the formatter (this assumes your configuration file is in your current working directory).
+formatter = { command = "mago", args = ["--config", "%sh{pwd}/mago.toml", "format", "--stdin-input"] }
+# If you want to use a different configuration file, uncomment this line and replace the path.
+# formatter = { command = "mago", args = ["--config", "%sh{pwd}/path/to/mago.toml", "format", "--stdin-input"] }
 
-formatter = { command = "mago", args = ["format", "--stdin-input"] }
+# Set to true to format automatically on save.
 auto-format = true
 </code></pre>
 <p>This overrides Helix's default formatter for PHP and enables formatting on save.</p>
