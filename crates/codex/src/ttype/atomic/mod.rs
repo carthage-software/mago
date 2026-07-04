@@ -471,6 +471,9 @@ impl TAtomic {
             TAtomic::Scalar(TScalar::String(TString { literal: Some(TStringLiteral::Value(value)), .. })) => {
                 Some(ArrayKey::String(*value))
             }
+            TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Literal { value })) => {
+                Some(ArrayKey::String(*value))
+            }
             _ => None,
         }
     }

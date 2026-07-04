@@ -2353,6 +2353,7 @@ test_case!(issue_2048);
 test_case!(issue_2050);
 test_case!(issue_2054);
 test_case!(issue_2055);
+test_case!(issue_2056);
 test_case!(issue_2020);
 test_case!(possibly_null_destructuring);
 test_case!(promoted_property_param_docblock);
