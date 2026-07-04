@@ -16,6 +16,7 @@ use crate::ir::expression::Call;
 use crate::ir::expression::Callee;
 use crate::ir::expression::CalleeKind;
 use crate::ir::expression::CompositeStringPart;
+use crate::ir::expression::CompositeStringPartKind;
 use crate::ir::expression::Conditional;
 use crate::ir::expression::Expression;
 use crate::ir::expression::ExpressionKind;
@@ -1348,12 +1349,22 @@ generate_fold! {
     }
 
     CompositeStringPart as composite_string_part => {
-        match composite_string_part {
-            CompositeStringPart::Literal(value) => {
-                CompositeStringPart::Literal(folder.arena().alloc_slice_copy(value))
+        CompositeStringPart {
+            span: composite_string_part.span,
+            kind: folder.fold_composite_string_part_kind(&composite_string_part.kind),
+        }
+    }
+
+    CompositeStringPartKind as composite_string_part_kind => {
+        match composite_string_part_kind {
+            CompositeStringPartKind::Literal(value) => {
+                CompositeStringPartKind::Literal(folder.arena().alloc_slice_copy(value))
             }
-            CompositeStringPart::Expression(expression) => {
-                CompositeStringPart::Expression(folder.arena().alloc(folder.fold_expression(expression)))
+            CompositeStringPartKind::Expression(expression) => {
+                CompositeStringPartKind::Expression(folder.arena().alloc(folder.fold_expression(expression)))
+            }
+            CompositeStringPartKind::BracedExpression(expression) => {
+                CompositeStringPartKind::BracedExpression(folder.arena().alloc(folder.fold_expression(expression)))
             }
         }
     }

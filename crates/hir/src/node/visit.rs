@@ -3,7 +3,7 @@ use crate::ir::argument::PartialArgument;
 use crate::ir::expression::AccessKind;
 use crate::ir::expression::ArrayElementKind;
 use crate::ir::expression::CalleeKind;
-use crate::ir::expression::CompositeStringPart;
+use crate::ir::expression::CompositeStringPartKind;
 use crate::ir::expression::ExpressionKind;
 use crate::ir::expression::MatchArmKind;
 use crate::ir::expression::YieldKind;
@@ -733,9 +733,7 @@ impl<'ir, 'arena, I, S, E> Node<'ir, 'arena, I, S, E> {
                 ExpressionKind::Literal(n) => f(Node::Literal(n)),
                 ExpressionKind::CompositeString(parts) | ExpressionKind::ShellExecute(parts) => {
                     for part in parts.iter() {
-                        if let CompositeStringPart::Expression(expression) = part {
-                            f(Node::Expression(expression));
-                        }
+                        f(Node::CompositeStringPart(part));
                     }
                 }
                 ExpressionKind::Assignment(n) => f(Node::Assignment(n)),
@@ -973,6 +971,15 @@ impl<'ir, 'arena, I, S, E> Node<'ir, 'arena, I, S, E> {
                 Variable::Direct(direct) => f(Node::DirectVariable(direct)),
                 Variable::Indirect(expression) => f(Node::Expression(expression)),
                 Variable::Nested(nested) => f(Node::Variable(nested)),
+            },
+            Self::CompositeStringPart(node) => match node.kind {
+                CompositeStringPartKind::Expression(expression)
+                | CompositeStringPartKind::BracedExpression(expression) => {
+                    f(Node::Expression(expression));
+                }
+                CompositeStringPartKind::Literal(_) => {
+                    // Literal
+                }
             },
             Self::Literal(node) => match &node.kind {
                 LiteralKind::String(n) => f(Node::LiteralString(n)),

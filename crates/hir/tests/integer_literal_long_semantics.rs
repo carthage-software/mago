@@ -4,7 +4,7 @@ use mago_allocator::LocalArena;
 use mago_database::file::File;
 use mago_hir::ir::IR;
 use mago_hir::ir::expression::AccessKind;
-use mago_hir::ir::expression::CompositeStringPart;
+use mago_hir::ir::expression::CompositeStringPartKind;
 use mago_hir::ir::expression::ExpressionKind;
 use mago_hir::ir::literal::LiteralKind;
 use mago_hir::ir::statement::StatementKind;
@@ -34,8 +34,9 @@ fn interpolated_offset_kind<'ir, 'arena>(ir: &'ir IR<'arena, (), (), ()>) -> &'i
         };
 
         for part in *parts {
-            if let CompositeStringPart::Expression(part) = part
-                && let ExpressionKind::Access(access) = &part.kind
+            if let CompositeStringPartKind::Expression(expr) | CompositeStringPartKind::BracedExpression(expr) =
+                part.kind
+                && let ExpressionKind::Access(access) = &expr.kind
                 && let AccessKind::Array(_, index) = &access.kind
             {
                 return &index.kind;

@@ -293,15 +293,24 @@ pub enum ArrayElementKind<'arena, I, S, E> {
     Missing,
 }
 
-#[cfg_attr(feature = "serde", derive(Serialize))]
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+pub struct CompositeStringPart<'arena, I, S, E> {
+    pub span: Span,
+    pub kind: CompositeStringPartKind<'arena, I, S, E>,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 #[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
-pub enum CompositeStringPart<'arena, I, S, E> {
+pub enum CompositeStringPartKind<'arena, I, S, E> {
     /// A literal run, already decoded to its final runtime bytes (escapes
     /// resolved, heredoc indentation stripped, trailing newline removed).
     Literal(&'arena [u8]),
     /// An interpolated expression.
     Expression(&'arena Expression<'arena, I, S, E>),
+    /// An expression wrapped in braces, e.g. `"{$foo}"` or `"${foo}"`.
+    BracedExpression(&'arena Expression<'arena, I, S, E>),
 }
 
 impl<I, S, E> CopyInto for Expression<'_, I, S, E>
@@ -798,10 +807,29 @@ where
     where
         A: Arena,
     {
+        CompositeStringPart { span: self.span, kind: self.kind.copy_into(arena) }
+    }
+}
+
+impl<I, S, E> CopyInto for CompositeStringPartKind<'_, I, S, E>
+where
+    I: CopyInto,
+    S: CopyInto,
+    E: CopyInto,
+{
+    type Output<'arena> = CompositeStringPartKind<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
         match self {
-            CompositeStringPart::Literal(bytes) => CompositeStringPart::Literal(arena.alloc_slice_copy(bytes)),
-            CompositeStringPart::Expression(expression) => {
-                CompositeStringPart::Expression(copy_ref_into(*expression, arena))
+            CompositeStringPartKind::Literal(bytes) => CompositeStringPartKind::Literal(arena.alloc_slice_copy(bytes)),
+            CompositeStringPartKind::Expression(expression) => {
+                CompositeStringPartKind::Expression(copy_ref_into(*expression, arena))
+            }
+            CompositeStringPartKind::BracedExpression(expression) => {
+                CompositeStringPartKind::BracedExpression(copy_ref_into(*expression, arena))
             }
         }
     }
@@ -880,6 +908,12 @@ impl<I, S, E> HasSpan for Access<'_, I, S, E> {
 }
 
 impl<I, S, E> HasSpan for Yield<'_, I, S, E> {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+impl<I, S, E> HasSpan for CompositeStringPart<'_, I, S, E> {
     fn span(&self) -> Span {
         self.span
     }

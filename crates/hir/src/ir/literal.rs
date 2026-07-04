@@ -33,6 +33,8 @@ pub enum LiteralKind<'arena> {
 pub enum LiteralStringKind {
     SingleQuoted,
     DoubleQuoted,
+    Heredoc,
+    Nowdoc,
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize))]

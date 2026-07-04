@@ -16,6 +16,7 @@ use crate::ir::expression::Call;
 use crate::ir::expression::Callee;
 use crate::ir::expression::CalleeKind;
 use crate::ir::expression::CompositeStringPart;
+use crate::ir::expression::CompositeStringPartKind;
 use crate::ir::expression::Conditional;
 use crate::ir::expression::Expression;
 use crate::ir::expression::ExpressionKind;
@@ -1176,9 +1177,15 @@ generate_walker! {
     }
 
     generic CompositeStringPart as composite_string_part => {
-        match composite_string_part {
-            CompositeStringPart::Literal(_) => {}
-            CompositeStringPart::Expression(expression) => walker.walk_expression(expression, context),
+        walker.walk_composite_string_part_kind(&composite_string_part.kind, context);
+    }
+
+    generic CompositeStringPartKind as composite_string_part_kind => {
+        match composite_string_part_kind {
+            CompositeStringPartKind::Literal(_) => {}
+            CompositeStringPartKind::Expression(expression) | CompositeStringPartKind::BracedExpression(expression) => {
+                walker.walk_expression(expression, context);
+            }
         }
     }
 

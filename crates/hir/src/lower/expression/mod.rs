@@ -1,4 +1,5 @@
 use mago_allocator::Arena;
+use mago_allocator::vec::Vec;
 use mago_phpdoc_syntax::cst::expression::ConstantExpression;
 use mago_phpdoc_syntax::cst::expression::UnaryPrefixConstantOperator;
 use mago_span::HasSpan;
@@ -19,6 +20,7 @@ use crate::ir::expression::Call;
 use crate::ir::expression::Callee;
 use crate::ir::expression::CalleeKind;
 use crate::ir::expression::CompositeStringPart;
+use crate::ir::expression::CompositeStringPartKind;
 use crate::ir::expression::Conditional;
 use crate::ir::expression::Expression;
 use crate::ir::expression::ExpressionKind;
@@ -500,7 +502,7 @@ where
         {
             let span = access.index.span();
 
-            let mut raw = mago_allocator::vec::Vec::new_in(self.arena);
+            let mut raw = Vec::new_in(self.arena);
             raw.push(b'-');
             raw.extend_from_slice(integer.raw);
 
@@ -541,21 +543,21 @@ where
         // indentation stripped, trailing newline removed); fall back to the raw bytes only
         // if the parser left it unset. Heredoc/nowdoc need no special handling here: their
         // parts are fully resolved, so they lower exactly like a double-quoted string.
-        let mut parts = mago_allocator::vec::Vec::new_in(arena);
+        let mut parts = Vec::new_in(arena);
         for part in string.parts().iter() {
-            let lowered = match part {
+            let kind = match part {
                 cst::StringPart::Literal(literal) => {
-                    CompositeStringPart::Literal(self.interner.intern(literal.value.unwrap_or(literal.raw)))
+                    CompositeStringPartKind::Literal(self.interner.intern(literal.value.unwrap_or(literal.raw)))
                 }
                 cst::StringPart::Expression(expression) => {
-                    CompositeStringPart::Expression(arena.alloc(self.lower_simple_interpolation_part(expression)))
+                    CompositeStringPartKind::Expression(arena.alloc(self.lower_simple_interpolation_part(expression)))
                 }
                 cst::StringPart::BracedExpression(braced) => {
-                    CompositeStringPart::Expression(arena.alloc(self.lower_expression(braced.expression)))
+                    CompositeStringPartKind::BracedExpression(arena.alloc(self.lower_expression(braced.expression)))
                 }
             };
 
-            parts.push(lowered);
+            parts.push(CompositeStringPart { span: part.span(), kind });
         }
 
         // A shell-execute string is a distinct operation (`shell_exec`), never a string value.
@@ -564,19 +566,26 @@ where
         }
 
         // A string with no interpolation is just a plain literal.
-        if parts.iter().all(|part| matches!(part, CompositeStringPart::Literal(_))) {
-            let value = match parts.as_slice() {
-                [CompositeStringPart::Literal(bytes)] => *bytes,
-                _ => {
-                    let mut buffer = mago_allocator::vec::Vec::new_in(arena);
-                    for part in parts.iter() {
-                        if let CompositeStringPart::Literal(bytes) = part {
-                            buffer.extend_from_slice(bytes);
-                        }
-                    }
+        if parts.iter().map(|part| part.kind).all(|part| matches!(part, CompositeStringPartKind::Literal(_))) {
+            let value = if parts.len() == 1 {
+                let Some(CompositeStringPartKind::Literal(bytes)) = parts.first().map(|part| part.kind) else {
+                    // SAFETY: This code is unreachable because the `all` check above ensures that all parts are literals.
+                    unsafe { std::hint::unreachable_unchecked() }
+                };
 
-                    buffer.leak()
+                bytes
+            } else {
+                let mut buffer = Vec::new_in(arena);
+                for part in parts.iter() {
+                    let CompositeStringPartKind::Literal(bytes) = part.kind else {
+                        // SAFETY: This code is unreachable because the `all` check above ensures that all parts are literals.
+                        unsafe { std::hint::unreachable_unchecked() }
+                    };
+
+                    buffer.extend_from_slice(bytes);
                 }
+
+                buffer.leak()
             };
 
             let span = string.span();
@@ -585,7 +594,17 @@ where
                 span,
                 kind: LiteralKind::String(LiteralString {
                     span,
-                    kind: LiteralStringKind::DoubleQuoted,
+                    kind: match string {
+                        cst::CompositeString::Interpolated(_) => LiteralStringKind::DoubleQuoted,
+                        cst::CompositeString::Document(document_string) => match document_string.kind {
+                            cst::DocumentKind::Heredoc => LiteralStringKind::Heredoc,
+                            cst::DocumentKind::Nowdoc => LiteralStringKind::Nowdoc,
+                        },
+                        cst::CompositeString::ShellExecute(_) => {
+                            // SAFETY: This code is unreachable because shell-execute strings are handled above.
+                            unsafe { std::hint::unreachable_unchecked() }
+                        }
+                    },
                     raw: value,
                     value: Some(value),
                 }),

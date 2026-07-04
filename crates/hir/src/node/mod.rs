@@ -13,6 +13,7 @@ use crate::ir::expression::Assignment;
 use crate::ir::expression::Binary;
 use crate::ir::expression::Call;
 use crate::ir::expression::Callee;
+use crate::ir::expression::CompositeStringPart;
 use crate::ir::expression::Conditional;
 use crate::ir::expression::Expression;
 use crate::ir::expression::Instantiation;
@@ -186,6 +187,7 @@ pub enum NodeKind {
     Ir,
     ItemAnnotation,
     ItemStatement,
+    CompositeStringPart,
     Literal,
     LiteralFloat,
     LiteralInteger,
@@ -317,6 +319,7 @@ pub enum Node<'ir, 'arena, I, S, E> {
     ItemAnnotation(&'ir ItemAnnotation<'arena, I, S, E>),
     ItemStatement(&'ir ItemStatement<'arena, I, S, E>),
     Literal(&'ir Literal<'arena>),
+    CompositeStringPart(&'ir CompositeStringPart<'arena, I, S, E>),
     LiteralFloat(&'ir LiteralFloat<'arena>),
     LiteralInteger(&'ir LiteralInteger<'arena>),
     LiteralString(&'ir LiteralString<'arena>),
@@ -443,6 +446,7 @@ impl<'ir, 'arena, I, S, E> Node<'ir, 'arena, I, S, E> {
             Self::Ir(_) => NodeKind::Ir,
             Self::ItemAnnotation(_) => NodeKind::ItemAnnotation,
             Self::ItemStatement(_) => NodeKind::ItemStatement,
+            Self::CompositeStringPart(_) => NodeKind::CompositeStringPart,
             Self::Literal(_) => NodeKind::Literal,
             Self::LiteralFloat(_) => NodeKind::LiteralFloat,
             Self::LiteralInteger(_) => NodeKind::LiteralInteger,
@@ -578,6 +582,7 @@ impl<I, S, E> HasSpan for Node<'_, '_, I, S, E> {
             Self::Ir(node) => node.span(),
             Self::ItemAnnotation(node) => node.span(),
             Self::ItemStatement(node) => node.span(),
+            Self::CompositeStringPart(node) => node.span(),
             Self::Literal(node) => node.span(),
             Self::LiteralFloat(node) => node.span(),
             Self::LiteralInteger(node) => node.span(),
