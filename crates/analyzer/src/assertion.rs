@@ -123,16 +123,25 @@ where
                     && let Some(first_argument_type) = artifacts.get_expression_type(first_argument.value())
                 {
                     let mut callables = vec![];
-                    for argument_type_atomic in first_argument_type.types.as_ref() {
-                        if let Some(callable) =
-                            cast_atomic_to_callable(argument_type_atomic, assertion_context.codebase, None)
-                        {
+
+                    let mut add_callable_assertion = |atomic: &TAtomic| {
+                        if let Some(callable) = cast_atomic_to_callable(atomic, assertion_context.codebase, None) {
                             callables.push(Assertion::IsType(TAtomic::Callable(callable.into_owned())));
-                        } else if let TAtomic::Scalar(TScalar::String(string)) = argument_type_atomic {
+                        } else if let TAtomic::Scalar(TScalar::String(string)) = atomic {
                             callables.push(Assertion::IsType(TAtomic::Scalar(TScalar::String(string.as_callable()))));
-                        } else {
-                            // not a callable-shaped type; skip without producing an assertion
                         }
+                    };
+
+                    for argument_type_atomic in first_argument_type.types.as_ref() {
+                        if let TAtomic::GenericParameter(generic_parameter) = argument_type_atomic {
+                            for constrained_atomic in generic_parameter.constraint.types.as_ref() {
+                                add_callable_assertion(constrained_atomic);
+                            }
+
+                            continue;
+                        }
+
+                        add_callable_assertion(argument_type_atomic);
                     }
 
                     if !callables.is_empty() {
