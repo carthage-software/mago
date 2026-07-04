@@ -171,6 +171,7 @@ test_case!(breaking_named_arguments);
 test_case!(break_fn_args);
 test_case!(member_access_chain);
 test_case!(member_access_chain_short_after_breaking_receiver_args);
+test_case!(member_access_chain_short_after_collapsed_receiver_args);
 test_case!(same_line_chain_property_receiver);
 test_case!(same_line_chain_method_receiver);
 test_case!(same_line_chain_multi_property_receiver);

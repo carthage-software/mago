@@ -12,6 +12,7 @@ use mago_syntax::cst::ClassLikeMemberSelector;
 use mago_syntax::cst::Expression;
 use mago_syntax::cst::FunctionCall;
 use mago_syntax::cst::Identifier;
+use mago_syntax::cst::Instantiation;
 use mago_syntax::cst::MethodCall;
 use mago_syntax::cst::Node;
 use mago_syntax::cst::NullSafeMethodCall;
@@ -27,6 +28,8 @@ use crate::document::Line;
 use crate::internal::FormatterState;
 use crate::internal::format::Format;
 use crate::internal::format::call_arguments::print_argument_list;
+use crate::internal::format::call_arguments::promote_argument_list_to_partial;
+use crate::internal::format::call_arguments::should_break_all_arguments;
 use crate::internal::format::misc;
 use crate::internal::format::misc::is_breaking_expression;
 use crate::internal::format::misc::is_simple_call_argument;
@@ -127,13 +130,13 @@ where
                 // A `new X(...)` receiver normally pushes the chain toward breaking.
                 // However, when the chain is short (<= 2 links) and every link is a
                 // simple call (no breaking arguments of its own), a receiver whose
-                // *own* argument list is already spread across multiple lines should
+                // *own* argument list will print across multiple lines should
                 // not also drag the trailing short chain onto separate lines.
                 // See: https://github.com/carthage-software/mago/issues/1711
-                let receiver_args_multiline = instantiation.argument_list.as_ref().is_some_and(|argument_list| {
-                    let span = argument_list.span();
-                    misc::has_new_line_in_range(f.source_text, span.start.offset, span.end.offset)
-                });
+                let receiver_args_multiline = instantiation
+                    .argument_list
+                    .as_ref()
+                    .is_some_and(|argument_list| receiver_argument_list_will_break(f, instantiation, argument_list));
 
                 let short_simple_chain = self.accesses.len() <= 2
                     && self.accesses.iter().all(|access| match access.get_arguments_list() {
@@ -659,6 +662,32 @@ fn get_argument_width(argument: &Argument<'_>) -> Option<usize> {
             get_flat_expression_width(argument.value).map(|width| width + string_width(argument.name.value) + 2)
         }
     }
+}
+
+fn receiver_argument_list_will_break<A>(
+    f: &FormatterState<'_, '_, A>,
+    instantiation: &Instantiation<'_>,
+    argument_list: &ArgumentList<'_>,
+) -> bool
+where
+    A: Arena,
+{
+    let argument_list = promote_argument_list_to_partial(f.arena, argument_list);
+    if should_break_all_arguments(f, argument_list, false) {
+        return true;
+    }
+
+    get_instantiation_width(instantiation).is_none_or(|width| width > f.settings.print_width)
+}
+
+fn get_instantiation_width(instantiation: &Instantiation<'_>) -> Option<usize> {
+    let class_width = get_flat_expression_width(instantiation.class)?;
+    let argument_list_width = match &instantiation.argument_list {
+        Some(argument_list) => get_argument_list_width(argument_list)?,
+        None => 0,
+    };
+
+    Some(string_width(b"new ") + class_width + argument_list_width)
 }
 
 fn get_argument_width_with_binary_arguments(argument: &Argument<'_>) -> Option<usize> {
