@@ -672,12 +672,27 @@ fn receiver_argument_list_will_break<A>(
 where
     A: Arena,
 {
+    // An empty argument list (`new static()`) never breaks, so the receiver
+    // cannot be multi-line. Short-circuit before the width fallback below,
+    // which would otherwise force a "will break" verdict for a receiver that
+    // fits comfortably on one line.
+    if argument_list.arguments.is_empty() {
+        return false;
+    }
+
     let argument_list = promote_argument_list_to_partial(f.arena, argument_list);
     if should_break_all_arguments(f, argument_list, false) {
         return true;
     }
 
-    get_instantiation_width(instantiation).is_none_or(|width| width > f.settings.print_width)
+    // Use `is_some_and` (not `is_none_or`) so that an un-computable flat width
+    // does not force a "will break" verdict. When the receiver is already
+    // printed across multiple lines (e.g. on a second format pass) the flat
+    // width is `None`; treating that as "will break" makes the surrounding
+    // attach/break decision depend on the current formatting state and breaks
+    // idempotency. Only a *known* width that exceeds the print width means the
+    // receiver argument list will break.
+    get_instantiation_width(instantiation).is_some_and(|width| width > f.settings.print_width)
 }
 
 fn get_instantiation_width(instantiation: &Instantiation<'_>) -> Option<usize> {
