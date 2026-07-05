@@ -3,6 +3,8 @@ extend-exclude = [
     ".git/",
     "crates/formatter/tests/",
     "crates/codex/tests/",
+    "crates/inference/tests/",
+    "crates/oracle/tests/",
     "crates/analyzer/tests/cases/",
     "crates/twig-syntax/tests/fixtures/",
     "crates/twig-syntax/fuzz/seeds/",

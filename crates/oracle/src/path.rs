@@ -22,9 +22,9 @@ use crate::id::SymbolId;
 pub enum PathSegment<'arena> {
     /// A namespaced name whose leaf is case-sensitive: the namespace folds, the
     /// short name is kept verbatim (a global constant).
-    QualifiedSensative(&'arena [u8]),
+    QualifiedSensitive(&'arena [u8]),
     /// A fully case-insensitive name (class-like, function, method, hook).
-    QualifiedInsensative(&'arena [u8]),
+    QualifiedInsensitive(&'arena [u8]),
     /// A case-sensitive member name without a leading sigil (class constant,
     /// enum case, property).
     Name(&'arena [u8]),
@@ -37,8 +37,8 @@ impl<'arena> PathSegment<'arena> {
     #[must_use]
     pub const fn as_bytes(self) -> &'arena [u8] {
         match self {
-            PathSegment::QualifiedSensative(bytes)
-            | PathSegment::QualifiedInsensative(bytes)
+            PathSegment::QualifiedSensitive(bytes)
+            | PathSegment::QualifiedInsensitive(bytes)
             | PathSegment::Name(bytes)
             | PathSegment::Variable(bytes) => bytes,
         }
@@ -53,9 +53,9 @@ impl CopyInto for PathSegment<'_> {
         A: Arena,
     {
         match *self {
-            PathSegment::QualifiedSensative(bytes) => PathSegment::QualifiedSensative(arena.alloc_slice_copy(bytes)),
-            PathSegment::QualifiedInsensative(bytes) => {
-                PathSegment::QualifiedInsensative(arena.alloc_slice_copy(bytes))
+            PathSegment::QualifiedSensitive(bytes) => PathSegment::QualifiedSensitive(arena.alloc_slice_copy(bytes)),
+            PathSegment::QualifiedInsensitive(bytes) => {
+                PathSegment::QualifiedInsensitive(arena.alloc_slice_copy(bytes))
             }
             PathSegment::Name(bytes) => PathSegment::Name(arena.alloc_slice_copy(bytes)),
             PathSegment::Variable(bytes) => PathSegment::Variable(arena.alloc_slice_copy(bytes)),
@@ -87,7 +87,7 @@ impl<'arena> Path<'arena> {
     {
         Self::new(
             SymbolId::constant(name),
-            arena.alloc_slice_copy(&[PathSegment::QualifiedSensative(strip_leading_separator(name))]),
+            arena.alloc_slice_copy(&[PathSegment::QualifiedSensitive(strip_leading_separator(name))]),
         )
     }
 
@@ -98,7 +98,7 @@ impl<'arena> Path<'arena> {
     {
         Self::new(
             SymbolId::class_like(name),
-            arena.alloc_slice_copy(&[PathSegment::QualifiedInsensative(strip_leading_separator(name))]),
+            arena.alloc_slice_copy(&[PathSegment::QualifiedInsensitive(strip_leading_separator(name))]),
         )
     }
 
@@ -109,7 +109,7 @@ impl<'arena> Path<'arena> {
     {
         Self::new(
             SymbolId::function_like(name),
-            arena.alloc_slice_copy(&[PathSegment::QualifiedInsensative(strip_leading_separator(name))]),
+            arena.alloc_slice_copy(&[PathSegment::QualifiedInsensitive(strip_leading_separator(name))]),
         )
     }
 
@@ -121,7 +121,7 @@ impl<'arena> Path<'arena> {
         Self::new(
             SymbolId::class_like_constant(class_name, name),
             arena.alloc_slice_copy(&[
-                PathSegment::QualifiedInsensative(strip_leading_separator(class_name)),
+                PathSegment::QualifiedInsensitive(strip_leading_separator(class_name)),
                 PathSegment::Name(name),
             ]),
         )
@@ -135,7 +135,7 @@ impl<'arena> Path<'arena> {
         Self::new(
             SymbolId::type_alias(class_name, name),
             arena.alloc_slice_copy(&[
-                PathSegment::QualifiedInsensative(strip_leading_separator(class_name)),
+                PathSegment::QualifiedInsensitive(strip_leading_separator(class_name)),
                 PathSegment::Name(name),
             ]),
         )
@@ -149,7 +149,7 @@ impl<'arena> Path<'arena> {
         Self::new(
             SymbolId::enum_case(enum_name, name),
             arena.alloc_slice_copy(&[
-                PathSegment::QualifiedInsensative(strip_leading_separator(enum_name)),
+                PathSegment::QualifiedInsensitive(strip_leading_separator(enum_name)),
                 PathSegment::Name(name),
             ]),
         )
@@ -163,7 +163,7 @@ impl<'arena> Path<'arena> {
         Self::new(
             SymbolId::property(class_name, name),
             arena.alloc_slice_copy(&[
-                PathSegment::QualifiedInsensative(strip_leading_separator(class_name)),
+                PathSegment::QualifiedInsensitive(strip_leading_separator(class_name)),
                 PathSegment::Name(name.strip_prefix(b"$").unwrap_or(name)),
             ]),
         )
@@ -182,9 +182,9 @@ impl<'arena> Path<'arena> {
         Self::new(
             SymbolId::property_hook(class_name, property_name, name),
             arena.alloc_slice_copy(&[
-                PathSegment::QualifiedInsensative(strip_leading_separator(class_name)),
+                PathSegment::QualifiedInsensitive(strip_leading_separator(class_name)),
                 PathSegment::Name(property_name.strip_prefix(b"$").unwrap_or(property_name)),
-                PathSegment::QualifiedInsensative(name),
+                PathSegment::QualifiedInsensitive(name),
             ]),
         )
     }
@@ -197,8 +197,8 @@ impl<'arena> Path<'arena> {
         Self::new(
             SymbolId::method(class_name, name),
             arena.alloc_slice_copy(&[
-                PathSegment::QualifiedInsensative(strip_leading_separator(class_name)),
-                PathSegment::QualifiedInsensative(name),
+                PathSegment::QualifiedInsensitive(strip_leading_separator(class_name)),
+                PathSegment::QualifiedInsensitive(name),
             ]),
         )
     }
@@ -211,7 +211,7 @@ impl<'arena> Path<'arena> {
         Self::new(
             SymbolId::function_like_parameter(function_like, parameter),
             arena.alloc_slice_copy(&[
-                PathSegment::QualifiedInsensative(strip_leading_separator(function_like)),
+                PathSegment::QualifiedInsensitive(strip_leading_separator(function_like)),
                 PathSegment::Variable(parameter),
             ]),
         )
@@ -230,8 +230,8 @@ impl<'arena> Path<'arena> {
         Self::new(
             SymbolId::method_parameter(class_name, method, parameter),
             arena.alloc_slice_copy(&[
-                PathSegment::QualifiedInsensative(strip_leading_separator(class_name)),
-                PathSegment::QualifiedInsensative(method),
+                PathSegment::QualifiedInsensitive(strip_leading_separator(class_name)),
+                PathSegment::QualifiedInsensitive(method),
                 PathSegment::Variable(parameter),
             ]),
         )
@@ -251,9 +251,9 @@ impl<'arena> Path<'arena> {
         Self::new(
             SymbolId::property_hook_parameter(class_name, property_name, hook, parameter),
             arena.alloc_slice_copy(&[
-                PathSegment::QualifiedInsensative(strip_leading_separator(class_name)),
+                PathSegment::QualifiedInsensitive(strip_leading_separator(class_name)),
                 PathSegment::Name(property_name),
-                PathSegment::QualifiedInsensative(hook),
+                PathSegment::QualifiedInsensitive(hook),
                 PathSegment::Variable(parameter),
             ]),
         )
