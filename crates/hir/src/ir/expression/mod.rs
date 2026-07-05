@@ -44,8 +44,7 @@ pub enum ExpressionKind<'arena, I, S, E> {
     UnaryPrefix(&'arena UnaryPrefix<'arena, I, S, E>),
     UnaryPostfix(&'arena UnaryPostfix<'arena, I, S, E>),
     Literal(&'arena Literal<'arena>),
-    CompositeString(&'arena [CompositeStringPart<'arena, I, S, E>]),
-    ShellExecute(&'arena [CompositeStringPart<'arena, I, S, E>]),
+    CompositeString(&'arena CompositeString<'arena, I, S, E>),
     Assignment(&'arena Assignment<'arena, I, S, E>),
     Annotation(&'arena Annotation<'arena, I, S, E>),
     Conditional(&'arena Conditional<'arena, I, S, E>),
@@ -295,6 +294,23 @@ pub enum ArrayElementKind<'arena, I, S, E> {
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
+pub enum CompositeStringKind {
+    ShellExecute,
+    Interpolated,
+    Heredoc,
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
+pub struct CompositeString<'arena, I, S, E> {
+    pub span: Span,
+    pub kind: CompositeStringKind,
+    pub parts: &'arena [CompositeStringPart<'arena, I, S, E>],
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(Serialize))]
 pub struct CompositeStringPart<'arena, I, S, E> {
     pub span: Span,
     pub kind: CompositeStringPartKind<'arena, I, S, E>,
@@ -347,8 +363,7 @@ where
             ExpressionKind::UnaryPrefix(node) => ExpressionKind::UnaryPrefix(copy_ref_into(*node, arena)),
             ExpressionKind::UnaryPostfix(node) => ExpressionKind::UnaryPostfix(copy_ref_into(*node, arena)),
             ExpressionKind::Literal(node) => ExpressionKind::Literal(copy_ref_into(*node, arena)),
-            ExpressionKind::CompositeString(parts) => ExpressionKind::CompositeString(copy_slice_into(parts, arena)),
-            ExpressionKind::ShellExecute(parts) => ExpressionKind::ShellExecute(copy_slice_into(parts, arena)),
+            ExpressionKind::CompositeString(node) => ExpressionKind::CompositeString(copy_ref_into(*node, arena)),
             ExpressionKind::Assignment(node) => ExpressionKind::Assignment(copy_ref_into(*node, arena)),
             ExpressionKind::Annotation(node) => ExpressionKind::Annotation(copy_ref_into(*node, arena)),
             ExpressionKind::Conditional(node) => ExpressionKind::Conditional(copy_ref_into(*node, arena)),
@@ -795,6 +810,22 @@ where
     }
 }
 
+impl<I, S, E> CopyInto for CompositeString<'_, I, S, E>
+where
+    I: CopyInto,
+    S: CopyInto,
+    E: CopyInto,
+{
+    type Output<'arena> = CompositeString<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        CompositeString { span: self.span, kind: self.kind, parts: copy_slice_into(self.parts, arena) }
+    }
+}
+
 impl<I, S, E> CopyInto for CompositeStringPart<'_, I, S, E>
 where
     I: CopyInto,
@@ -908,6 +939,12 @@ impl<I, S, E> HasSpan for Access<'_, I, S, E> {
 }
 
 impl<I, S, E> HasSpan for Yield<'_, I, S, E> {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+impl<I, S, E> HasSpan for CompositeString<'_, I, S, E> {
     fn span(&self) -> Span {
         self.span
     }

@@ -15,6 +15,7 @@ use crate::ir::expression::Binary;
 use crate::ir::expression::Call;
 use crate::ir::expression::Callee;
 use crate::ir::expression::CalleeKind;
+use crate::ir::expression::CompositeString;
 use crate::ir::expression::CompositeStringPart;
 use crate::ir::expression::CompositeStringPartKind;
 use crate::ir::expression::Conditional;
@@ -115,6 +116,7 @@ use crate::ir::statement::Block;
 use crate::ir::statement::Declare;
 use crate::ir::statement::DeclareItem;
 use crate::ir::statement::DoWhile;
+use crate::ir::statement::ElseClause;
 use crate::ir::statement::For;
 use crate::ir::statement::Foreach;
 use crate::ir::statement::GlobalItem;
@@ -325,7 +327,7 @@ generate_walker! {
                 }
             }
             StatementKind::Switch(node) => walker.walk_switch(node, context),
-            StatementKind::If(node) => walker.walk_if_statement(node, context),
+            StatementKind::If(node) => walker.walk_if(node, context),
             StatementKind::Expression(node) => walker.walk_expression(node, context),
             StatementKind::Echo(values) => {
                 for value in values.iter() {
@@ -468,12 +470,17 @@ generate_walker! {
         }
     }
 
-    generic If as if_statement => {
-        walker.walk_expression(if_statement.condition, context);
-        walker.walk_statement(if_statement.then, context);
-        if let Some(r#else) = if_statement.r#else {
-            walker.walk_statement(r#else, context);
+    generic If as r#if => {
+        walker.walk_expression(r#if.condition, context);
+        walker.walk_statement(r#if.then, context);
+
+        if let Some(else_clause) = r#if.else_clause {
+            walker.walk_else_clause(else_clause, context);
         }
+    }
+
+    generic ElseClause as else_clause => {
+        walker.walk_statement(else_clause.statement, context);
     }
 
     generic StaticItem as static_item => {
@@ -1063,11 +1070,7 @@ generate_walker! {
             ExpressionKind::UnaryPrefix(node) => walker.walk_unary_prefix(node, context),
             ExpressionKind::UnaryPostfix(node) => walker.walk_unary_postfix(node, context),
             ExpressionKind::Literal(node) => walker.walk_literal(node, context),
-            ExpressionKind::CompositeString(parts) | ExpressionKind::ShellExecute(parts) => {
-                for part in parts.iter() {
-                    walker.walk_composite_string_part(part, context);
-                }
-            }
+            ExpressionKind::CompositeString(string) => walker.walk_composite_string(string, context),
             ExpressionKind::Assignment(node) => walker.walk_assignment(node, context),
             ExpressionKind::Annotation(node) => walker.walk_annotation(node, context),
             ExpressionKind::Conditional(node) => walker.walk_conditional(node, context),
@@ -1173,6 +1176,12 @@ generate_walker! {
                 walker.walk_expression(value, context);
             }
             ArrayElementKind::Missing => {}
+        }
+    }
+
+    generic CompositeString as composite_string => {
+        for part in composite_string.parts.iter() {
+            walker.walk_composite_string_part(part, context);
         }
     }
 

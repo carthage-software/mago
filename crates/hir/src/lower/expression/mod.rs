@@ -19,6 +19,8 @@ use crate::ir::expression::Binary;
 use crate::ir::expression::Call;
 use crate::ir::expression::Callee;
 use crate::ir::expression::CalleeKind;
+use crate::ir::expression::CompositeString;
+use crate::ir::expression::CompositeStringKind;
 use crate::ir::expression::CompositeStringPart;
 use crate::ir::expression::CompositeStringPartKind;
 use crate::ir::expression::Conditional;
@@ -560,13 +562,10 @@ where
             parts.push(CompositeStringPart { span: part.span(), kind });
         }
 
-        // A shell-execute string is a distinct operation (`shell_exec`), never a string value.
-        if let cst::CompositeString::ShellExecute(_) = string {
-            return ExpressionKind::ShellExecute(parts.leak());
-        }
-
         // A string with no interpolation is just a plain literal.
-        if parts.iter().map(|part| part.kind).all(|part| matches!(part, CompositeStringPartKind::Literal(_))) {
+        if matches!(string, cst::CompositeString::Interpolated(_) | cst::CompositeString::Document(_))
+            && parts.iter().map(|part| part.kind).all(|part| matches!(part, CompositeStringPartKind::Literal(_)))
+        {
             let value = if parts.len() == 1 {
                 let Some(CompositeStringPartKind::Literal(bytes)) = parts.first().map(|part| part.kind) else {
                     // SAFETY: This code is unreachable because the `all` check above ensures that all parts are literals.
@@ -611,7 +610,22 @@ where
             }));
         }
 
-        ExpressionKind::CompositeString(parts.leak())
+        ExpressionKind::CompositeString(self.arena.alloc(CompositeString {
+            span: string.span(),
+            kind: match string {
+                cst::CompositeString::ShellExecute(_) => CompositeStringKind::ShellExecute,
+                cst::CompositeString::Interpolated(_) => CompositeStringKind::Interpolated,
+                cst::CompositeString::Document(document_string) => match document_string.kind {
+                    cst::DocumentKind::Heredoc => CompositeStringKind::Heredoc,
+                    cst::DocumentKind::Nowdoc => {
+                        // Technically, nowdoc should never reach this point, because it is a literal string and
+                        // should have been handled above.
+                        CompositeStringKind::Heredoc
+                    }
+                },
+            },
+            parts: self.arena.alloc_slice_fill_iter(parts),
+        }))
     }
 
     fn lower_magic_constant(&self, magic_constant: &'scratch cst::MagicConstant<'scratch>) -> MagicConstant {

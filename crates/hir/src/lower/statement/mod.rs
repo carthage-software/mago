@@ -17,6 +17,8 @@ use crate::ir::statement::Block;
 use crate::ir::statement::Declare;
 use crate::ir::statement::DeclareItem;
 use crate::ir::statement::DoWhile;
+use crate::ir::statement::ElseClause;
+use crate::ir::statement::ElseClauseKind;
 use crate::ir::statement::For;
 use crate::ir::statement::Foreach;
 use crate::ir::statement::GlobalItem;
@@ -353,27 +355,6 @@ where
         })
     }
 
-    pub(crate) fn statements_to_statement(
-        &mut self,
-        statements: &'scratch [cst::Statement<'scratch>],
-        fallback_span: Span,
-    ) -> &'arena Statement<'arena, (), (), ()> {
-        let span = match (statements.first(), statements.last()) {
-            (Some(first), Some(last)) => first.span().join(last.span()),
-            (Some(statement), None) => statement.span(),
-            (None, _) => fallback_span,
-        };
-
-        self.arena.alloc(Statement {
-            meta: (),
-            span,
-            kind: StatementKind::Sequence(
-                self.arena.alloc_slice_fill_iter(statements.iter().map(|statement| self.lower_statement(statement))),
-            ),
-            terminator: None,
-        })
-    }
-
     pub(crate) fn lower_unset(
         &mut self,
         unset: &'scratch cst::Unset<'scratch>,
@@ -433,72 +414,70 @@ where
         match &r#if.body {
             cst::IfBody::Statement(body) => {
                 let then = self.arena.alloc(self.lower_statement(body.statement));
-                let r#else =
-                    self.lower_statement_else_chain(body.else_if_clauses.as_slice(), body.else_clause.as_ref());
 
-                self.arena.alloc(If { span: r#if.span(), condition, then, r#else })
+                let mut else_clause = if let Some(else_clause) = body.else_clause.as_ref() {
+                    Some(&*self.arena.alloc(ElseClause {
+                        span: else_clause.span(),
+                        kind: ElseClauseKind::Else,
+                        statement: self.arena.alloc(self.lower_statement(else_clause.statement)),
+                    }))
+                } else {
+                    None
+                };
+
+                for clause in body.else_if_clauses.iter().rev() {
+                    let clause_condition = self.arena.alloc(self.lower_expression(clause.condition));
+                    let clause_then = self.arena.alloc(self.lower_statement(clause.statement));
+                    else_clause = Some(self.wrap_else_if(clause.span(), clause_condition, clause_then, else_clause));
+                }
+
+                self.arena.alloc(If { span: r#if.span(), condition, then, else_clause })
             }
             cst::IfBody::ColonDelimited(body) => {
                 let then =
                     self.colon_delimited_statements_to_statement(body.colon, body.statements.as_slice(), body.endif);
-                let r#else = self.lower_colon_else_chain(body.else_if_clauses.as_slice(), body.else_clause.as_ref());
 
-                self.arena.alloc(If { span: r#if.span(), condition, then, r#else })
+                let mut else_clause = if let Some(else_clause) = body.else_clause.as_ref() {
+                    Some(&*self.arena.alloc(ElseClause {
+                        span: else_clause.span(),
+                        kind: ElseClauseKind::Else,
+                        statement: self.colon_delimited_statements_to_statement(
+                            else_clause.colon,
+                            else_clause.statements.as_slice(),
+                            body.endif,
+                        ),
+                    }))
+                } else {
+                    None
+                };
+
+                for clause in body.else_if_clauses.iter().rev() {
+                    let clause_condition = self.arena.alloc(self.lower_expression(clause.condition));
+                    let clause_then = self.colon_delimited_statements_to_statement(
+                        clause.colon,
+                        clause.statements.as_slice(),
+                        body.endif,
+                    );
+                    else_clause = Some(self.wrap_else_if(clause.span(), clause_condition, clause_then, else_clause));
+                }
+
+                self.arena.alloc(If { span: r#if.span(), condition, then, else_clause })
             }
         }
     }
 
-    fn lower_statement_else_chain(
-        &mut self,
-        clauses: &'scratch [cst::IfStatementBodyElseIfClause<'scratch>],
-        else_clause: Option<&'scratch cst::IfStatementBodyElseClause<'scratch>>,
-    ) -> Option<&'arena Statement<'arena, (), (), ()>> {
-        match clauses.split_first() {
-            None => match else_clause {
-                Some(clause) => Some(self.arena.alloc(self.lower_statement(clause.statement))),
-                None => None,
-            },
-            Some((clause, rest)) => {
-                let condition: &Expression<'arena, (), (), ()> =
-                    self.arena.alloc(self.lower_expression(clause.condition));
-                let then = self.arena.alloc(self.lower_statement(clause.statement));
-                let r#else = self.lower_statement_else_chain(rest, else_clause);
-                let nested = self.arena.alloc(If { span: clause.span(), condition, then, r#else });
+    fn wrap_else_if(
+        &self,
+        span: Span,
+        condition: &'arena Expression<'arena, (), (), ()>,
+        then: &'arena Statement<'arena, (), (), ()>,
+        else_clause: Option<&'arena ElseClause<'arena, (), (), ()>>,
+    ) -> &'arena ElseClause<'arena, (), (), ()> {
+        let inner_if = self.arena.alloc(If { span, condition, then, else_clause });
+        let statement =
+            self.arena.alloc(Statement { meta: (), span, kind: StatementKind::If(inner_if), terminator: None });
 
-                Some(self.arena.alloc(Statement {
-                    meta: (),
-                    span: clause.span(),
-                    kind: StatementKind::If(nested),
-                    terminator: None,
-                }))
-            }
-        }
-    }
-
-    fn lower_colon_else_chain(
-        &mut self,
-        clauses: &'scratch [cst::IfColonDelimitedBodyElseIfClause<'scratch>],
-        else_clause: Option<&'scratch cst::IfColonDelimitedBodyElseClause<'scratch>>,
-    ) -> Option<&'arena Statement<'arena, (), (), ()>> {
-        match clauses.split_first() {
-            None => match else_clause {
-                Some(clause) => Some(self.statements_to_statement(clause.statements.as_slice(), clause.colon)),
-                None => None,
-            },
-            Some((clause, rest)) => {
-                let condition = self.arena.alloc(self.lower_expression(clause.condition));
-                let then = self.statements_to_statement(clause.statements.as_slice(), clause.colon);
-                let r#else = self.lower_colon_else_chain(rest, else_clause);
-                let nested = self.arena.alloc(If { span: clause.span(), condition, then, r#else });
-
-                Some(self.arena.alloc(Statement {
-                    meta: (),
-                    span: clause.span(),
-                    kind: StatementKind::If(nested),
-                    terminator: None,
-                }))
-            }
-        }
+        self.arena.alloc(ElseClause { span, kind: ElseClauseKind::ElseIf, statement })
     }
 
     pub(crate) fn lower_switch(

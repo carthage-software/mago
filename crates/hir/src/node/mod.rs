@@ -13,6 +13,7 @@ use crate::ir::expression::Assignment;
 use crate::ir::expression::Binary;
 use crate::ir::expression::Call;
 use crate::ir::expression::Callee;
+use crate::ir::expression::CompositeString;
 use crate::ir::expression::CompositeStringPart;
 use crate::ir::expression::Conditional;
 use crate::ir::expression::Expression;
@@ -91,6 +92,7 @@ use crate::ir::statement::Block;
 use crate::ir::statement::Declare;
 use crate::ir::statement::DeclareItem;
 use crate::ir::statement::DoWhile;
+use crate::ir::statement::ElseClause;
 use crate::ir::statement::For;
 use crate::ir::statement::Foreach;
 use crate::ir::statement::GlobalItem;
@@ -178,6 +180,7 @@ pub enum NodeKind {
     HookedProperty,
     Identifier,
     If,
+    ElseClause,
     Implements,
     ImplementsAnnotation,
     ImportedTypeAliasAnnotation,
@@ -187,6 +190,7 @@ pub enum NodeKind {
     Ir,
     ItemAnnotation,
     ItemStatement,
+    CompositeString,
     CompositeStringPart,
     Literal,
     LiteralFloat,
@@ -309,6 +313,7 @@ pub enum Node<'ir, 'arena, I, S, E> {
     HookedProperty(&'ir HookedProperty<'arena, I, S, E>),
     Identifier(&'ir Identifier<'arena>),
     If(&'ir If<'arena, I, S, E>),
+    ElseClause(&'ir ElseClause<'arena, I, S, E>),
     Implements(&'ir Implements<'arena>),
     ImplementsAnnotation(&'ir ImplementsAnnotation<'arena>),
     ImportedTypeAliasAnnotation(&'ir ImportedTypeAliasAnnotation<'arena>),
@@ -319,6 +324,7 @@ pub enum Node<'ir, 'arena, I, S, E> {
     ItemAnnotation(&'ir ItemAnnotation<'arena, I, S, E>),
     ItemStatement(&'ir ItemStatement<'arena, I, S, E>),
     Literal(&'ir Literal<'arena>),
+    CompositeString(&'ir CompositeString<'arena, I, S, E>),
     CompositeStringPart(&'ir CompositeStringPart<'arena, I, S, E>),
     LiteralFloat(&'ir LiteralFloat<'arena>),
     LiteralInteger(&'ir LiteralInteger<'arena>),
@@ -437,6 +443,7 @@ impl<'ir, 'arena, I, S, E> Node<'ir, 'arena, I, S, E> {
             Self::HookedProperty(_) => NodeKind::HookedProperty,
             Self::Identifier(_) => NodeKind::Identifier,
             Self::If(_) => NodeKind::If,
+            Self::ElseClause(_) => NodeKind::ElseClause,
             Self::Implements(_) => NodeKind::Implements,
             Self::ImplementsAnnotation(_) => NodeKind::ImplementsAnnotation,
             Self::ImportedTypeAliasAnnotation(_) => NodeKind::ImportedTypeAliasAnnotation,
@@ -446,6 +453,7 @@ impl<'ir, 'arena, I, S, E> Node<'ir, 'arena, I, S, E> {
             Self::Ir(_) => NodeKind::Ir,
             Self::ItemAnnotation(_) => NodeKind::ItemAnnotation,
             Self::ItemStatement(_) => NodeKind::ItemStatement,
+            Self::CompositeString(_) => NodeKind::CompositeString,
             Self::CompositeStringPart(_) => NodeKind::CompositeStringPart,
             Self::Literal(_) => NodeKind::Literal,
             Self::LiteralFloat(_) => NodeKind::LiteralFloat,
@@ -573,6 +581,7 @@ impl<I, S, E> HasSpan for Node<'_, '_, I, S, E> {
             Self::HookedProperty(node) => node.span(),
             Self::Identifier(node) => node.span(),
             Self::If(node) => node.span(),
+            Self::ElseClause(node) => node.span(),
             Self::Implements(node) => node.span(),
             Self::ImplementsAnnotation(node) => node.span(),
             Self::ImportedTypeAliasAnnotation(node) => node.span(),
@@ -582,6 +591,7 @@ impl<I, S, E> HasSpan for Node<'_, '_, I, S, E> {
             Self::Ir(node) => node.span(),
             Self::ItemAnnotation(node) => node.span(),
             Self::ItemStatement(node) => node.span(),
+            Self::CompositeString(node) => node.span(),
             Self::CompositeStringPart(node) => node.span(),
             Self::Literal(node) => node.span(),
             Self::LiteralFloat(node) => node.span(),

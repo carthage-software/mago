@@ -33,7 +33,7 @@ fn interpolated_offset_kind<'ir, 'arena>(ir: &'ir IR<'arena, (), (), ()>) -> &'i
             continue;
         };
 
-        for part in *parts {
+        for part in parts.parts {
             if let CompositeStringPartKind::Expression(expr) | CompositeStringPartKind::BracedExpression(expr) =
                 part.kind
                 && let ExpressionKind::Access(access) = &expr.kind

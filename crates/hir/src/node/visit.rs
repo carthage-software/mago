@@ -212,9 +212,12 @@ impl<'ir, 'arena, I, S, E> Node<'ir, 'arena, I, S, E> {
             Self::If(node) => {
                 f(Node::Expression(node.condition));
                 f(Node::Statement(node.then));
-                if let Some(r#else) = node.r#else {
-                    f(Node::Statement(r#else));
+                if let Some(else_clause) = node.else_clause {
+                    f(Node::ElseClause(else_clause));
                 }
+            }
+            Self::ElseClause(node) => {
+                f(Node::Statement(node.statement));
             }
             Self::StaticItem(node) => {
                 f(Node::DirectVariable(&node.variable));
@@ -731,11 +734,7 @@ impl<'ir, 'arena, I, S, E> Node<'ir, 'arena, I, S, E> {
                 ExpressionKind::UnaryPrefix(n) => f(Node::UnaryPrefix(n)),
                 ExpressionKind::UnaryPostfix(n) => f(Node::UnaryPostfix(n)),
                 ExpressionKind::Literal(n) => f(Node::Literal(n)),
-                ExpressionKind::CompositeString(parts) | ExpressionKind::ShellExecute(parts) => {
-                    for part in parts.iter() {
-                        f(Node::CompositeStringPart(part));
-                    }
-                }
+                ExpressionKind::CompositeString(string) => f(Node::CompositeString(string)),
                 ExpressionKind::Assignment(n) => f(Node::Assignment(n)),
                 ExpressionKind::Annotation(n) => {
                     f(Node::VariableAnnotation(n.annotation));
@@ -972,6 +971,11 @@ impl<'ir, 'arena, I, S, E> Node<'ir, 'arena, I, S, E> {
                 Variable::Indirect(expression) => f(Node::Expression(expression)),
                 Variable::Nested(nested) => f(Node::Variable(nested)),
             },
+            Self::CompositeString(node) => {
+                for part in node.parts.iter() {
+                    f(Node::CompositeStringPart(part));
+                }
+            }
             Self::CompositeStringPart(node) => match node.kind {
                 CompositeStringPartKind::Expression(expression)
                 | CompositeStringPartKind::BracedExpression(expression) => {

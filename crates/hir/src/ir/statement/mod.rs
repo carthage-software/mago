@@ -193,7 +193,23 @@ pub struct If<'arena, I, S, E> {
     pub span: Span,
     pub condition: &'arena Expression<'arena, I, S, E>,
     pub then: &'arena Statement<'arena, I, S, E>,
-    pub r#else: Option<&'arena Statement<'arena, I, S, E>>,
+    pub else_clause: Option<&'arena ElseClause<'arena, I, S, E>>,
+}
+
+#[cfg_attr(feature = "serde", derive(Serialize))]
+#[cfg_attr(feature = "serde", serde(tag = "kind"))]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub enum ElseClauseKind {
+    Else,
+    ElseIf,
+}
+
+#[cfg_attr(feature = "serde", derive(Serialize))]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
+pub struct ElseClause<'arena, I, S, E> {
+    pub span: Span,
+    pub kind: ElseClauseKind,
+    pub statement: &'arena Statement<'arena, I, S, E>,
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize))]
@@ -457,8 +473,24 @@ where
             span: self.span,
             condition: copy_ref_into(self.condition, arena),
             then: copy_ref_into(self.then, arena),
-            r#else: self.r#else.map(|node| copy_ref_into(node, arena)),
+            else_clause: self.else_clause.map(|node| copy_ref_into(node, arena)),
         }
+    }
+}
+
+impl<I, S, E> CopyInto for ElseClause<'_, I, S, E>
+where
+    I: CopyInto,
+    S: CopyInto,
+    E: CopyInto,
+{
+    type Output<'arena> = ElseClause<'arena, I::Output<'arena>, S::Output<'arena>, E::Output<'arena>>;
+
+    fn copy_into<'arena, A>(&self, arena: &'arena A) -> Self::Output<'arena>
+    where
+        A: Arena,
+    {
+        ElseClause { span: self.span, kind: self.kind, statement: copy_ref_into(self.statement, arena) }
     }
 }
 
@@ -731,6 +763,12 @@ impl<I, S, E> HasSpan for Switch<'_, I, S, E> {
 }
 
 impl<I, S, E> HasSpan for If<'_, I, S, E> {
+    fn span(&self) -> Span {
+        self.span
+    }
+}
+
+impl<I, S, E> HasSpan for ElseClause<'_, I, S, E> {
     fn span(&self) -> Span {
         self.span
     }

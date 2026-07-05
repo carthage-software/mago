@@ -15,6 +15,7 @@ use crate::ir::expression::Binary;
 use crate::ir::expression::Call;
 use crate::ir::expression::Callee;
 use crate::ir::expression::CalleeKind;
+use crate::ir::expression::CompositeString;
 use crate::ir::expression::CompositeStringPart;
 use crate::ir::expression::CompositeStringPartKind;
 use crate::ir::expression::Conditional;
@@ -67,6 +68,7 @@ use crate::ir::statement::Block;
 use crate::ir::statement::Declare;
 use crate::ir::statement::DeclareItem;
 use crate::ir::statement::DoWhile;
+use crate::ir::statement::ElseClause;
 use crate::ir::statement::For;
 use crate::ir::statement::Foreach;
 use crate::ir::statement::GlobalItem;
@@ -791,7 +793,15 @@ generate_fold! {
             span: if_statement.span,
             condition: folder.arena().alloc(folder.fold_expression(if_statement.condition)),
             then: folder.arena().alloc(folder.fold_statement(if_statement.then)),
-            r#else: if_statement.r#else.map(|statement| &*folder.arena().alloc(folder.fold_statement(statement))),
+            else_clause: if_statement.else_clause.map(|clause| &*folder.arena().alloc(folder.fold_else_clause(clause))),
+        }
+    }
+
+    ElseClause as else_clause => {
+        ElseClause {
+            span: else_clause.span,
+            kind: else_clause.kind,
+            statement: folder.arena().alloc(folder.fold_statement(else_clause.statement)),
         }
     }
 
@@ -1206,12 +1216,9 @@ generate_fold! {
                 ExpressionKind::UnaryPostfix(folder.arena().alloc(folder.fold_unary_postfix(node)))
             }
             ExpressionKind::Literal(node) => ExpressionKind::Literal(copy_ref_into(*node, folder.arena())),
-            ExpressionKind::CompositeString(parts) => ExpressionKind::CompositeString(
-                folder.arena().alloc_slice_fill_iter(parts.iter().map(|part| folder.fold_composite_string_part(part))),
-            ),
-            ExpressionKind::ShellExecute(parts) => ExpressionKind::ShellExecute(
-                folder.arena().alloc_slice_fill_iter(parts.iter().map(|part| folder.fold_composite_string_part(part))),
-            ),
+            ExpressionKind::CompositeString(node) => {
+                ExpressionKind::CompositeString(folder.arena().alloc(folder.fold_composite_string(node)))
+            }
             ExpressionKind::Assignment(node) => {
                 ExpressionKind::Assignment(folder.arena().alloc(folder.fold_assignment(node)))
             }
@@ -1345,6 +1352,16 @@ generate_fold! {
                 ArrayElementKind::Variadic(folder.arena().alloc(folder.fold_expression(value)))
             }
             ArrayElementKind::Missing => ArrayElementKind::Missing,
+        }
+    }
+
+    CompositeString as composite_string => {
+        CompositeString {
+            span: composite_string.span,
+            kind: composite_string.kind,
+            parts: folder
+                .arena()
+                .alloc_slice_fill_iter(composite_string.parts.iter().map(|part| folder.fold_composite_string_part(part))),
         }
     }
 
