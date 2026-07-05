@@ -939,7 +939,7 @@ checksum = "e835b70203e41293343137df5c0664546da5745f82ec9b84d40be8336958447b"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.117",
+ "syn 2.0.118",
 ]
 
 [[package]]
@@ -1073,24 +1073,12 @@ dependencies = [
 
 [[package]]
 name = "hashbrown"
-<<<<<<< HEAD
-=======
 version = "0.14.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e5274423e17b7c9fc20b6e7e208532f9b19825d82dfd615708b70edd83df41f1"
 
 [[package]]
 name = "hashbrown"
-version = "0.15.5"
-source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "9229cfe53dfd69f0609a49f65461bd93001ea1ef889cd5529dd176593f5338a1"
-dependencies = [
- "foldhash 0.1.5",
-]
-
-[[package]]
-name = "hashbrown"
->>>>>>> ca587eed5 (Revert "chore: remove language-server")
 version = "0.17.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "ed5909b6e89a2db4456e54cd5f673791d7eca6732202bbf2a9cc504fe2f9b84a"
@@ -1289,7 +1277,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "d466e9454f08e4a911e14806c24e16fba1b4c121d1ea474396f396069cf949d9"
 dependencies = [
  "equivalent",
- "hashbrown",
+ "hashbrown 0.17.1",
  "serde",
  "serde_core",
 ]
@@ -1513,7 +1501,7 @@ dependencies = [
  "dialoguer",
  "diffy",
  "flate2",
- "foldhash 0.2.0",
+ "foldhash",
  "indicatif",
  "indoc",
  "libtest-mimic",
@@ -1584,7 +1572,7 @@ version = "1.43.0"
 dependencies = [
  "allocator-api2",
  "blink-alloc",
- "hashbrown",
+ "hashbrown 0.17.1",
  "rayon",
  "serde_json",
 ]
@@ -1946,9 +1934,9 @@ dependencies = [
 
 [[package]]
 name = "mago-server"
-version = "1.30.0"
+version = "1.43.0"
 dependencies = [
- "foldhash 0.2.0",
+ "foldhash",
  "mago-allocator",
  "mago-analyzer",
  "mago-bytes",
@@ -3387,7 +3375,7 @@ checksum = "385a6cb71ab9ab790c5fe8d67f1645e6c450a7ce006a33de03daa956cf70a496"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 2.0.117",
+ "syn 2.0.118",
 ]
 
 [[package]]
