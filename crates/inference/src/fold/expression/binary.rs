@@ -7,7 +7,7 @@ use mago_allocator::vec::Vec;
 use mago_hir::ir::expression::Binary;
 use mago_hir::ir::expression::Expression;
 use mago_hir::ir::expression::ExpressionKind;
-use mago_hir::ir::expression::operator::BinaryOperator;
+use mago_hir::ir::expression::operator::BinaryOperatorKind;
 use mago_oracle::id::SymbolId;
 use mago_oracle::ty::Atom;
 use mago_oracle::ty::Type;
@@ -67,18 +67,20 @@ where
     ) -> InferenceResult<Expression<'arena, SymbolId, Flow, Type<'arena>>> {
         let left = self.infer_expression(binary.left)?;
 
-        let right = match binary.operator {
-            BinaryOperator::And => self.infer_narrowed(binary.right, &left, true)?,
-            BinaryOperator::Or => self.infer_narrowed(binary.right, &left, false)?,
+        let right = match binary.operator.kind {
+            BinaryOperatorKind::And(_) => self.infer_narrowed(binary.right, &left, true)?,
+            BinaryOperatorKind::Or(_) => self.infer_narrowed(binary.right, &left, false)?,
             _ => self.infer_expression(binary.right)?,
         };
 
-        let meta = match binary.operator {
-            BinaryOperator::And | BinaryOperator::Or => match self.boolean_fold(binary.operator, &left, &right) {
-                Some(folded) => folded,
-                None => self.binary_type(binary.operator, left.meta, right.meta),
-            },
-            _ => self.binary_type(binary.operator, left.meta, right.meta),
+        let meta = match binary.operator.kind {
+            BinaryOperatorKind::And(_) | BinaryOperatorKind::Or(_) => {
+                match self.boolean_fold(binary.operator.kind, &left, &right) {
+                    Some(folded) => folded,
+                    None => self.binary_type(binary.operator.kind, left.meta, right.meta),
+                }
+            }
+            _ => self.binary_type(binary.operator.kind, left.meta, right.meta),
         };
 
         let binary = Binary {
@@ -122,7 +124,7 @@ where
     /// per-variable narrowing cannot (e.g. `($a || $b) && (!$a && !$b)`).
     fn boolean_fold(
         &mut self,
-        operator: BinaryOperator,
+        operator: BinaryOperatorKind,
         left: &Expression<'arena, SymbolId, Flow, Type<'arena>>,
         right: &Expression<'arena, SymbolId, Flow, Type<'arena>>,
     ) -> Option<Type<'arena>> {
@@ -131,7 +133,7 @@ where
         let right_node = self.condition_diagram(&mut diagram, right)?;
 
         let combined = match operator {
-            BinaryOperator::And => diagram.and(left_node, right_node),
+            BinaryOperatorKind::And(_) => diagram.and(left_node, right_node),
             _ => diagram.or(left_node, right_node),
         };
 
@@ -146,7 +148,7 @@ where
 
     pub(crate) fn binary_type(
         &mut self,
-        operator: BinaryOperator,
+        operator: BinaryOperatorKind,
         left: Type<'arena>,
         right: Type<'arena>,
     ) -> Type<'arena> {
@@ -154,42 +156,47 @@ where
             return TYPE_NEVER;
         }
         if right.is_never()
-            && !matches!(operator, BinaryOperator::And | BinaryOperator::Or | BinaryOperator::NullCoalesce)
+            && !matches!(
+                operator,
+                BinaryOperatorKind::And(_) | BinaryOperatorKind::Or(_) | BinaryOperatorKind::NullCoalesce
+            )
         {
             return TYPE_NEVER;
         }
 
         match operator {
-            BinaryOperator::Addition
-            | BinaryOperator::Subtraction
-            | BinaryOperator::Multiplication
-            | BinaryOperator::Division
-            | BinaryOperator::Modulo
-            | BinaryOperator::Exponentiation => self.arithmetic(operator, left, right),
-            BinaryOperator::BitwiseAnd | BinaryOperator::BitwiseOr | BinaryOperator::BitwiseXor => {
+            BinaryOperatorKind::Addition
+            | BinaryOperatorKind::Subtraction
+            | BinaryOperatorKind::Multiplication
+            | BinaryOperatorKind::Division
+            | BinaryOperatorKind::Modulo
+            | BinaryOperatorKind::Exponentiation => self.arithmetic(operator, left, right),
+            BinaryOperatorKind::BitwiseAnd | BinaryOperatorKind::BitwiseOr | BinaryOperatorKind::BitwiseXor => {
                 self.bitwise_logical(operator, left, right)
             }
-            BinaryOperator::LeftShift | BinaryOperator::RightShift => self.shift(operator, left, right),
-            BinaryOperator::StringConcat => self.concat(left, right),
-            BinaryOperator::Identical | BinaryOperator::NotIdentical => self.identical(operator, left, right),
-            BinaryOperator::Equal
-            | BinaryOperator::NotEqual
-            | BinaryOperator::LessThan
-            | BinaryOperator::LessThanOrEqual
-            | BinaryOperator::GreaterThan
-            | BinaryOperator::GreaterThanOrEqual => comparison(operator, left, right),
-            BinaryOperator::Spaceship => self.spaceship(left, right),
-            BinaryOperator::And | BinaryOperator::Or | BinaryOperator::Xor => logical(operator, left, right),
-            BinaryOperator::NullCoalesce => self.null_coalesce(left, right),
-            BinaryOperator::Instanceof => TYPE_BOOL,
-            BinaryOperator::Pipe => self.resolve_callable_call(right, &[left]),
+            BinaryOperatorKind::LeftShift | BinaryOperatorKind::RightShift => self.shift(operator, left, right),
+            BinaryOperatorKind::StringConcat => self.concat(left, right),
+            BinaryOperatorKind::Identical | BinaryOperatorKind::NotIdentical => self.identical(operator, left, right),
+            BinaryOperatorKind::Equal
+            | BinaryOperatorKind::NotEqual(_)
+            | BinaryOperatorKind::LessThan
+            | BinaryOperatorKind::LessThanOrEqual
+            | BinaryOperatorKind::GreaterThan
+            | BinaryOperatorKind::GreaterThanOrEqual => comparison(operator, left, right),
+            BinaryOperatorKind::Spaceship => self.spaceship(left, right),
+            BinaryOperatorKind::And(_) | BinaryOperatorKind::Or(_) | BinaryOperatorKind::Xor => {
+                logical(operator, left, right)
+            }
+            BinaryOperatorKind::NullCoalesce => self.null_coalesce(left, right),
+            BinaryOperatorKind::Instanceof => TYPE_BOOL,
+            BinaryOperatorKind::Pipe => self.resolve_callable_call(right, &[left]),
         }
     }
 
     /// `===` / `!==`: fold two concrete literals exactly, and otherwise rule it
     /// `false`/`true` whenever the operand types are disjoint (a value can never
     /// be identical to one of a different type), e.g. `string === null`.
-    fn identical(&mut self, operator: BinaryOperator, left: Type<'arena>, right: Type<'arena>) -> Type<'arena> {
+    fn identical(&mut self, operator: BinaryOperatorKind, left: Type<'arena>, right: Type<'arena>) -> Type<'arena> {
         let identical = match fold_identical(left, right) {
             Some(value) => Some(value),
             None if !self.types_overlap(left, right) => Some(false),
@@ -197,7 +204,7 @@ where
         };
 
         let result = match operator {
-            BinaryOperator::NotIdentical => identical.map(|value| !value),
+            BinaryOperatorKind::NotIdentical => identical.map(|value| !value),
             _ => identical,
         };
 
@@ -214,9 +221,9 @@ where
         overlaps(left, right, self.symbols, LatticeOptions::default(), &mut report, &mut self.ty)
     }
 
-    fn arithmetic(&mut self, operator: BinaryOperator, left: Type<'arena>, right: Type<'arena>) -> Type<'arena> {
+    fn arithmetic(&mut self, operator: BinaryOperatorKind, left: Type<'arena>, right: Type<'arena>) -> Type<'arena> {
         if is_array_type(left) || is_array_type(right) {
-            if !matches!(operator, BinaryOperator::Addition) {
+            if !matches!(operator, BinaryOperatorKind::Addition) {
                 return TYPE_NEVER;
             }
             if !could_be_array(left) || !could_be_array(right) {
@@ -252,7 +259,7 @@ where
         }
 
         match operator {
-            BinaryOperator::Modulo => TYPE_INT,
+            BinaryOperatorKind::Modulo => TYPE_INT,
             _ => TYPE_INT_OR_FLOAT,
         }
     }
@@ -260,16 +267,16 @@ where
     /// Folds a single pair of fully-known numbers, exactly as PHP would, yielding
     /// the literal result (or `never` for the operations PHP throws on, such as
     /// division or modulo by zero).
-    fn arithmetic_pair(&mut self, operator: BinaryOperator, left: Number, right: Number) -> Type<'arena> {
+    fn arithmetic_pair(&mut self, operator: BinaryOperatorKind, left: Number, right: Number) -> Type<'arena> {
         match operator {
-            BinaryOperator::Modulo => {
+            BinaryOperatorKind::Modulo => {
                 if right.is_zero() {
                     TYPE_NEVER
                 } else {
                     self.ty.int_literal_type(left.to_int().checked_rem(right.to_int()).unwrap_or(0))
                 }
             }
-            BinaryOperator::Division => {
+            BinaryOperatorKind::Division => {
                 if right.is_zero() {
                     return TYPE_NEVER;
                 }
@@ -284,7 +291,7 @@ where
                     _ => self.ty.float_literal_type(left.as_f64() / right.as_f64()),
                 }
             }
-            BinaryOperator::Exponentiation => match (left, right) {
+            BinaryOperatorKind::Exponentiation => match (left, right) {
                 (Number::Int(base), Number::Int(exponent)) if exponent >= 0 => match u32::try_from(exponent) {
                     Ok(exponent) => match base.checked_pow(exponent) {
                         Some(value) => self.ty.int_literal_type(value),
@@ -297,24 +304,24 @@ where
             _ => match (left, right) {
                 (Number::Int(left), Number::Int(right)) => {
                     let folded = match operator {
-                        BinaryOperator::Addition => left.checked_add(right),
-                        BinaryOperator::Subtraction => left.checked_sub(right),
+                        BinaryOperatorKind::Addition => left.checked_add(right),
+                        BinaryOperatorKind::Subtraction => left.checked_sub(right),
                         _ => left.checked_mul(right),
                     };
 
                     match folded {
                         Some(value) => self.ty.int_literal_type(value),
                         None => self.ty.float_literal_type(match operator {
-                            BinaryOperator::Addition => left as f64 + right as f64,
-                            BinaryOperator::Subtraction => left as f64 - right as f64,
+                            BinaryOperatorKind::Addition => left as f64 + right as f64,
+                            BinaryOperatorKind::Subtraction => left as f64 - right as f64,
                             _ => left as f64 * right as f64,
                         }),
                     }
                 }
                 _ => {
                     let value = match operator {
-                        BinaryOperator::Addition => left.as_f64() + right.as_f64(),
-                        BinaryOperator::Subtraction => left.as_f64() - right.as_f64(),
+                        BinaryOperatorKind::Addition => left.as_f64() + right.as_f64(),
+                        BinaryOperatorKind::Subtraction => left.as_f64() - right.as_f64(),
                         _ => left.as_f64() * right.as_f64(),
                     };
 
@@ -324,7 +331,12 @@ where
         }
     }
 
-    fn bitwise_logical(&mut self, operator: BinaryOperator, left: Type<'arena>, right: Type<'arena>) -> Type<'arena> {
+    fn bitwise_logical(
+        &mut self,
+        operator: BinaryOperatorKind,
+        left: Type<'arena>,
+        right: Type<'arena>,
+    ) -> Type<'arena> {
         if let (Some(left), Some(right)) = (literal_string_bytes(left), literal_string_bytes(right)) {
             return self.string_bitwise(operator, left, right);
         }
@@ -336,14 +348,14 @@ where
         let (left, right) = (left.to_int(), right.to_int());
 
         self.ty.int_literal_type(match operator {
-            BinaryOperator::BitwiseAnd => left & right,
-            BinaryOperator::BitwiseOr => left | right,
-            BinaryOperator::BitwiseXor => left ^ right,
+            BinaryOperatorKind::BitwiseAnd => left & right,
+            BinaryOperatorKind::BitwiseOr => left | right,
+            BinaryOperatorKind::BitwiseXor => left ^ right,
             _ => unreachable!(),
         })
     }
 
-    fn shift(&mut self, operator: BinaryOperator, left: Type<'arena>, right: Type<'arena>) -> Type<'arena> {
+    fn shift(&mut self, operator: BinaryOperatorKind, left: Type<'arena>, right: Type<'arena>) -> Type<'arena> {
         let (Some(left), Some(right)) = (number_of(left), number_of(right)) else {
             return TYPE_INT;
         };
@@ -354,20 +366,20 @@ where
         };
 
         match operator {
-            BinaryOperator::LeftShift => {
+            BinaryOperatorKind::LeftShift => {
                 left.checked_shl(shift).map_or(TYPE_INT, |value| self.ty.int_literal_type(value))
             }
-            BinaryOperator::RightShift => {
+            BinaryOperatorKind::RightShift => {
                 left.checked_shr(shift).map_or(TYPE_INT, |value| self.ty.int_literal_type(value))
             }
             _ => unreachable!(),
         }
     }
 
-    fn string_bitwise(&mut self, operator: BinaryOperator, left: &[u8], right: &[u8]) -> Type<'arena> {
+    fn string_bitwise(&mut self, operator: BinaryOperatorKind, left: &[u8], right: &[u8]) -> Type<'arena> {
         let mut bytes = Vec::new_in(self.source);
         match operator {
-            BinaryOperator::BitwiseOr => {
+            BinaryOperatorKind::BitwiseOr => {
                 let (longer, shorter) = if left.len() >= right.len() { (left, right) } else { (right, left) };
                 for (index, byte) in longer.iter().enumerate() {
                     bytes.push(if index < shorter.len() { byte | shorter[index] } else { *byte });
@@ -377,7 +389,7 @@ where
                 let length = left.len().min(right.len());
                 for index in 0..length {
                     bytes.push(match operator {
-                        BinaryOperator::BitwiseAnd => left[index] & right[index],
+                        BinaryOperatorKind::BitwiseAnd => left[index] & right[index],
                         _ => left[index] ^ right[index],
                     });
                 }
@@ -498,16 +510,16 @@ fn comparable_of(ty: Type<'_>) -> Option<Comparable<'_>> {
     })
 }
 
-fn comparison<'arena>(operator: BinaryOperator, left: Type<'arena>, right: Type<'arena>) -> Type<'arena> {
+fn comparison<'arena>(operator: BinaryOperatorKind, left: Type<'arena>, right: Type<'arena>) -> Type<'arena> {
     let folded = match operator {
-        BinaryOperator::Identical => fold_identical(left, right),
-        BinaryOperator::NotIdentical => fold_identical(left, right).map(|result| !result),
-        BinaryOperator::Equal => fold_loose_equal(left, right),
-        BinaryOperator::NotEqual => fold_loose_equal(left, right).map(|result| !result),
-        BinaryOperator::LessThan => fold_ordering(left, right).map(|ordering| ordering == Ordering::Less),
-        BinaryOperator::LessThanOrEqual => fold_ordering(left, right).map(|ordering| ordering != Ordering::Greater),
-        BinaryOperator::GreaterThan => fold_ordering(left, right).map(|ordering| ordering == Ordering::Greater),
-        BinaryOperator::GreaterThanOrEqual => fold_ordering(left, right).map(|ordering| ordering != Ordering::Less),
+        BinaryOperatorKind::Identical => fold_identical(left, right),
+        BinaryOperatorKind::NotIdentical => fold_identical(left, right).map(|result| !result),
+        BinaryOperatorKind::Equal => fold_loose_equal(left, right),
+        BinaryOperatorKind::NotEqual(_) => fold_loose_equal(left, right).map(|result| !result),
+        BinaryOperatorKind::LessThan => fold_ordering(left, right).map(|ordering| ordering == Ordering::Less),
+        BinaryOperatorKind::LessThanOrEqual => fold_ordering(left, right).map(|ordering| ordering != Ordering::Greater),
+        BinaryOperatorKind::GreaterThan => fold_ordering(left, right).map(|ordering| ordering == Ordering::Greater),
+        BinaryOperatorKind::GreaterThanOrEqual => fold_ordering(left, right).map(|ordering| ordering != Ordering::Less),
         _ => None,
     };
 
@@ -541,12 +553,12 @@ fn loose_compare(left: Comparable<'_>, right: Comparable<'_>) -> Option<Ordering
     }
 }
 
-fn logical<'arena>(operator: BinaryOperator, left: Type<'arena>, right: Type<'arena>) -> Type<'arena> {
+fn logical<'arena>(operator: BinaryOperatorKind, left: Type<'arena>, right: Type<'arena>) -> Type<'arena> {
     let left = truthiness(left);
     let right = truthiness(right);
 
     let result = match operator {
-        BinaryOperator::And => {
+        BinaryOperatorKind::And(_) => {
             if left == Some(false) || right == Some(false) {
                 Some(false)
             } else if left == Some(true) && right == Some(true) {
@@ -555,7 +567,7 @@ fn logical<'arena>(operator: BinaryOperator, left: Type<'arena>, right: Type<'ar
                 None
             }
         }
-        BinaryOperator::Or => {
+        BinaryOperatorKind::Or(_) => {
             if left == Some(true) || right == Some(true) {
                 Some(true)
             } else if left == Some(false) && right == Some(false) {
@@ -564,7 +576,7 @@ fn logical<'arena>(operator: BinaryOperator, left: Type<'arena>, right: Type<'ar
                 None
             }
         }
-        BinaryOperator::Xor => match (left, right) {
+        BinaryOperatorKind::Xor => match (left, right) {
             (Some(left), Some(right)) => Some(left ^ right),
             _ => None,
         },

@@ -5,6 +5,7 @@ use mago_allocator::vec::Vec;
 use mago_hir::ir::statement::Statement;
 use mago_hir::ir::statement::StatementKind;
 use mago_hir::ir::statement::StaticItem;
+use mago_hir::ir::statement::Terminator;
 use mago_oracle::id::SymbolId;
 use mago_oracle::ty::Type;
 use mago_oracle::ty::well_known::TYPE_MIXED;
@@ -23,6 +24,7 @@ where
     pub(crate) fn infer_static(
         &mut self,
         span: Span,
+        terminator: Option<Terminator>,
         items: &'source [StaticItem<'source, SymbolId, S, E>],
     ) -> InferenceResult<Statement<'arena, SymbolId, Flow, Type<'arena>>> {
         let mut typed_items = Vec::new_in(self.arena);
@@ -59,6 +61,7 @@ where
             meta: Flow { reachable: self.reachable, exit },
             span,
             kind: StatementKind::Static(typed_items.leak()),
+            terminator,
         })
     }
 }

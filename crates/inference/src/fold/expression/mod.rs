@@ -2,6 +2,7 @@
 
 use mago_allocator::Arena;
 use mago_allocator::CopyInto;
+use mago_hir::ir::expression::ArrayLikeKind;
 use mago_hir::ir::expression::Expression;
 use mago_hir::ir::expression::ExpressionKind;
 use mago_oracle::id::SymbolId;
@@ -51,14 +52,15 @@ where
             ExpressionKind::Binary(binary) => self.infer_binary(expression.span, binary)?,
             ExpressionKind::UnaryPrefix(unary) => self.infer_unary_prefix(expression.span, unary)?,
             ExpressionKind::UnaryPostfix(unary) => self.infer_unary_postfix(expression.span, unary)?,
-            ExpressionKind::Array(elements) => self.infer_array(expression.span, elements)?,
+            ExpressionKind::ArrayLike(array_like) => match array_like.kind {
+                ArrayLikeKind::List => self.infer_list(expression.span, array_like)?,
+                ArrayLikeKind::Short | ArrayLikeKind::Long => self.infer_array(expression.span, array_like)?,
+            },
             ExpressionKind::Match(match_expression) => self.infer_match(expression.span, match_expression)?,
             ExpressionKind::Variable(variable) => self.infer_variable(expression.span, variable)?,
-            ExpressionKind::CompositeString(parts) => self.infer_composite_string(expression.span, parts)?,
-            ExpressionKind::ShellExecute(parts) => self.infer_shell_execute(expression.span, parts)?,
+            ExpressionKind::CompositeString(composite) => self.infer_composite_string(expression.span, composite)?,
             ExpressionKind::Annotation(annotation) => self.infer_annotation(expression.span, annotation)?,
             ExpressionKind::Conditional(conditional) => self.infer_conditional(expression.span, conditional)?,
-            ExpressionKind::List(delimited) => self.infer_list(expression.span, delimited)?,
             ExpressionKind::ArrayAppend(array) => {
                 let array = self.infer_expression(array)?;
 

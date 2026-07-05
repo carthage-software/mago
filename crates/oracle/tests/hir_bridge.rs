@@ -5,6 +5,7 @@ use mago_allocator::LocalArena;
 use mago_database::file::File;
 use mago_hir::ir::IR;
 use mago_hir::ir::item::statement::ItemStatementKind;
+use mago_hir::ir::statement::NamespaceBody;
 use mago_hir::ir::statement::StatementKind;
 use mago_hir::ir::r#type as hir_type;
 use mago_hir::lower::LowerSettings;
@@ -138,11 +139,10 @@ fn collect_from_statements<'hir, S, A>(
 {
     for statement in statements {
         match &statement.kind {
-            StatementKind::Namespace(namespace) => {
-                if let StatementKind::Sequence(inner) = &namespace.statement.kind {
-                    collect_from_statements(inner, builder, signatures);
-                }
-            }
+            StatementKind::Namespace(namespace) => match &namespace.body {
+                NamespaceBody::BraceDelimited(block) => collect_from_statements(block.statements, builder, signatures),
+                NamespaceBody::Implicit { statements, .. } => collect_from_statements(statements, builder, signatures),
+            },
             StatementKind::Sequence(inner) => collect_from_statements(inner, builder, signatures),
             StatementKind::Item(definition) => {
                 let ItemStatementKind::Function(function) = &definition.kind else {

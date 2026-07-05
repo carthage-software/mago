@@ -6,6 +6,7 @@ use mago_hir::ir::expression::Expression;
 use mago_hir::ir::expression::ExpressionKind;
 use mago_hir::ir::statement::Statement;
 use mago_hir::ir::statement::StatementKind;
+use mago_hir::ir::statement::Terminator;
 use mago_hir::ir::variable::Variable;
 use mago_oracle::id::SymbolId;
 use mago_oracle::ty::Type;
@@ -24,6 +25,7 @@ where
     pub(crate) fn infer_unset(
         &mut self,
         span: Span,
+        terminator: Option<Terminator>,
         operands_span: Span,
         operands: &'source [Expression<'source, SymbolId, S, E>],
     ) -> InferenceResult<Statement<'arena, SymbolId, Flow, Type<'arena>>> {
@@ -53,6 +55,7 @@ where
             meta: Flow { reachable: self.reachable, exit: ControlFlow::Fallthrough },
             span,
             kind: StatementKind::Unset(Delimited { span: operands_span, items: items.leak() }),
+            terminator,
         })
     }
 }

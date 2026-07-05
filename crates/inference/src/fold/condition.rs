@@ -4,8 +4,8 @@ use mago_hir::ir::expression::Binary;
 use mago_hir::ir::expression::Expression;
 use mago_hir::ir::expression::ExpressionKind;
 use mago_hir::ir::expression::UnaryPrefix;
-use mago_hir::ir::expression::operator::BinaryOperator;
-use mago_hir::ir::expression::operator::UnaryPrefixOperator;
+use mago_hir::ir::expression::operator::BinaryOperatorKind;
+use mago_hir::ir::expression::operator::UnaryPrefixOperatorKind;
 use mago_oracle::id::SymbolId;
 use mago_oracle::ty::Type;
 use mago_oracle::ty::well_known::TYPE_BOOL;
@@ -49,7 +49,7 @@ where
 
                 (node, when_true, when_false)
             }
-            ExpressionKind::UnaryPrefix(unary) if matches!(unary.operator, UnaryPrefixOperator::Not) => {
+            ExpressionKind::UnaryPrefix(unary) if matches!(unary.operator.kind, UnaryPrefixOperatorKind::Not) => {
                 let (operand, operand_true, operand_false) = self.analyze_condition(unary.operand)?;
 
                 let when_true = operand_false;
@@ -65,10 +65,10 @@ where
                     when_false,
                 )
             }
-            ExpressionKind::Binary(binary) if matches!(binary.operator, BinaryOperator::And) => {
+            ExpressionKind::Binary(binary) if matches!(binary.operator.kind, BinaryOperatorKind::And(_)) => {
                 self.analyze_and(expr.span, binary)?
             }
-            ExpressionKind::Binary(binary) if matches!(binary.operator, BinaryOperator::Or) => {
+            ExpressionKind::Binary(binary) if matches!(binary.operator.kind, BinaryOperatorKind::Or(_)) => {
                 self.analyze_or(expr.span, binary)?
             }
             _ => {

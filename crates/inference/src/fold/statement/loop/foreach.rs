@@ -1,9 +1,10 @@
 use mago_allocator::Arena;
 use mago_hir::ir::expression::ExpressionKind;
-use mago_hir::ir::expression::operator::UnaryPrefixOperator;
+use mago_hir::ir::expression::operator::UnaryPrefixOperatorKind;
 use mago_hir::ir::statement::Foreach;
 use mago_hir::ir::statement::Statement;
 use mago_hir::ir::statement::StatementKind;
+use mago_hir::ir::statement::Terminator;
 use mago_oracle::id::SymbolId;
 use mago_oracle::ty::Atom;
 use mago_oracle::ty::Type;
@@ -26,6 +27,7 @@ where
     pub(crate) fn infer_foreach(
         &mut self,
         span: Span,
+        terminator: Option<Terminator>,
         foreach: &'source Foreach<'source, SymbolId, S, E>,
     ) -> InferenceResult<Statement<'arena, SymbolId, Flow, Type<'arena>>> {
         let iterator = self.infer_expression(foreach.expression)?;
@@ -37,7 +39,9 @@ where
         };
 
         let value_target = match &foreach.value.kind {
-            ExpressionKind::UnaryPrefix(prefix) if matches!(prefix.operator, UnaryPrefixOperator::Reference) => {
+            ExpressionKind::UnaryPrefix(prefix)
+                if matches!(prefix.operator.kind, UnaryPrefixOperatorKind::Reference) =>
+            {
                 prefix.operand
             }
             _ => foreach.value,
@@ -58,6 +62,7 @@ where
             meta: Flow { reachable: outcome.reachable, exit: outcome.exit },
             span,
             kind: StatementKind::Foreach(self.arena.alloc(node)),
+            terminator,
         })
     }
 

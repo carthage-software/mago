@@ -7,12 +7,13 @@ use mago_hir::ir::expression::Access;
 use mago_hir::ir::expression::AccessKind;
 use mago_hir::ir::expression::ArrayElement;
 use mago_hir::ir::expression::ArrayElementKind;
+use mago_hir::ir::expression::ArrayLike;
 use mago_hir::ir::expression::Assignment;
 use mago_hir::ir::expression::Expression;
 use mago_hir::ir::expression::ExpressionKind;
 use mago_hir::ir::expression::annotation::Annotation;
-use mago_hir::ir::expression::operator::AssignmentOperator;
-use mago_hir::ir::expression::operator::BinaryOperator;
+use mago_hir::ir::expression::operator::AssignmentOperatorKind;
+use mago_hir::ir::expression::operator::BinaryOperatorKind;
 use mago_hir::ir::expression::selector::MemberSelector;
 use mago_hir::ir::expression::selector::MemberSelectorKind;
 use mago_hir::ir::variable::Variable;
@@ -53,12 +54,12 @@ where
 
         // `$target OP= $value` is `$target = $target OP $value`: the new value is the
         // binary operation against the target's current type, then bound back.
-        let assigned = match assignment.operator {
+        let assigned = match compound_operator(assignment.operator.kind) {
             None => value.meta,
             Some(operator) => {
                 let current = self.infer_expression(assignment.left)?.meta;
 
-                self.binary_type(compound_operator(operator), current, value.meta)
+                self.binary_type(operator, current, value.meta)
             }
         };
 
@@ -124,15 +125,18 @@ where
                     kind: ExpressionKind::Annotation(self.arena.alloc(node)),
                 }
             }
-            ExpressionKind::Array(elements) => {
-                let elements = self.bind_destructure(elements, ty)?;
+            ExpressionKind::ArrayLike(array_like) => {
+                let elements = self.bind_destructure(&array_like.elements, ty)?;
 
-                Expression { meta: ty, span: target.span, kind: ExpressionKind::Array(elements) }
-            }
-            ExpressionKind::List(elements) => {
-                let elements = self.bind_destructure(elements, ty)?;
-
-                Expression { meta: ty, span: target.span, kind: ExpressionKind::List(elements) }
+                Expression {
+                    meta: ty,
+                    span: target.span,
+                    kind: ExpressionKind::ArrayLike(ArrayLike {
+                        span: array_like.span,
+                        kind: array_like.kind,
+                        elements,
+                    }),
+                }
             }
             ExpressionKind::ArrayAppend(base) => {
                 let current = self.infer_expression(base)?.meta;
@@ -426,20 +430,21 @@ fn next_index(items: &[KnownItem<'_>]) -> i64 {
 
 /// The binary operator a compound assignment desugars to (`+=` is `+`, `.=` is
 /// `.`, `??=` is `??`).
-fn compound_operator(operator: AssignmentOperator) -> BinaryOperator {
-    match operator {
-        AssignmentOperator::Addition => BinaryOperator::Addition,
-        AssignmentOperator::Subtraction => BinaryOperator::Subtraction,
-        AssignmentOperator::Multiplication => BinaryOperator::Multiplication,
-        AssignmentOperator::Division => BinaryOperator::Division,
-        AssignmentOperator::Modulo => BinaryOperator::Modulo,
-        AssignmentOperator::Exponentiation => BinaryOperator::Exponentiation,
-        AssignmentOperator::Concat => BinaryOperator::StringConcat,
-        AssignmentOperator::BitwiseAnd => BinaryOperator::BitwiseAnd,
-        AssignmentOperator::BitwiseOr => BinaryOperator::BitwiseOr,
-        AssignmentOperator::BitwiseXor => BinaryOperator::BitwiseXor,
-        AssignmentOperator::LeftShift => BinaryOperator::LeftShift,
-        AssignmentOperator::RightShift => BinaryOperator::RightShift,
-        AssignmentOperator::Coalesce => BinaryOperator::NullCoalesce,
-    }
+fn compound_operator(operator: AssignmentOperatorKind) -> Option<BinaryOperatorKind> {
+    Some(match operator {
+        AssignmentOperatorKind::Assign => return None,
+        AssignmentOperatorKind::Addition => BinaryOperatorKind::Addition,
+        AssignmentOperatorKind::Subtraction => BinaryOperatorKind::Subtraction,
+        AssignmentOperatorKind::Multiplication => BinaryOperatorKind::Multiplication,
+        AssignmentOperatorKind::Division => BinaryOperatorKind::Division,
+        AssignmentOperatorKind::Modulo => BinaryOperatorKind::Modulo,
+        AssignmentOperatorKind::Exponentiation => BinaryOperatorKind::Exponentiation,
+        AssignmentOperatorKind::Concat => BinaryOperatorKind::StringConcat,
+        AssignmentOperatorKind::BitwiseAnd => BinaryOperatorKind::BitwiseAnd,
+        AssignmentOperatorKind::BitwiseOr => BinaryOperatorKind::BitwiseOr,
+        AssignmentOperatorKind::BitwiseXor => BinaryOperatorKind::BitwiseXor,
+        AssignmentOperatorKind::LeftShift => BinaryOperatorKind::LeftShift,
+        AssignmentOperatorKind::RightShift => BinaryOperatorKind::RightShift,
+        AssignmentOperatorKind::Coalesce => BinaryOperatorKind::NullCoalesce,
+    })
 }

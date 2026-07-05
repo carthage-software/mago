@@ -4,6 +4,7 @@ use mago_hir::ir::expression::ExpressionKind;
 use mago_hir::ir::literal::LiteralKind;
 use mago_hir::ir::statement::Statement;
 use mago_hir::ir::statement::StatementKind;
+use mago_hir::ir::statement::Terminator;
 use mago_oracle::id::SymbolId;
 use mago_oracle::ty::Type;
 use mago_span::Span;
@@ -24,6 +25,7 @@ where
     pub(crate) fn infer_break(
         &mut self,
         span: Span,
+        terminator: Option<Terminator>,
         level: Option<&'source Expression<'source, SymbolId, S, E>>,
     ) -> InferenceResult<Statement<'arena, SymbolId, Flow, Type<'arena>>> {
         let reachable = self.reachable;
@@ -39,7 +41,7 @@ where
             None => ControlFlow::Diverge,
         };
 
-        Ok(Statement { meta: Flow { reachable, exit }, span, kind: StatementKind::Break(level) })
+        Ok(Statement { meta: Flow { reachable, exit }, span, kind: StatementKind::Break(level), terminator })
     }
 
     /// Infers a `break`/`continue` level operand. PHP requires it to be a literal

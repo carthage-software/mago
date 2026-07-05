@@ -1,5 +1,5 @@
 use mago_hir::ir::statement::StatementKind;
-use mago_hir::ir::statement::SwitchCase;
+use mago_hir::ir::statement::SwitchCaseKind;
 
 use crate::harness::*;
 
@@ -13,10 +13,11 @@ test_inference! {
             panic!("expected a switch")
         };
         let StatementKind::Switch(switch) = switch_statement.kind else { unreachable!() };
-        let Some(&SwitchCase::Expression(_, body)) = switch.cases.items.last() else {
+        let Some(case) = switch.cases.items.last() else { panic!("expected case 3 to carry a value") };
+        let SwitchCaseKind::Expression(_, body) = case.kind else {
             panic!("expected case 3 to carry a value")
         };
-        let Some(if_statement) = first_if(body) else { panic!("case 3 contains an if") };
+        let Some(if_statement) = body.iter().find_map(first_if) else { panic!("case 3 contains an if") };
         let StatementKind::If(conditional) = if_statement.kind else { unreachable!() };
 
         assert_eq!(

@@ -9,6 +9,8 @@ use mago_hir::ir::expression::Expression;
 use mago_hir::ir::expression::ExpressionKind;
 use mago_hir::ir::item::expression::ItemExpression;
 use mago_hir::ir::item::expression::ItemExpressionKind;
+use mago_hir::ir::statement::Block;
+use mago_hir::ir::statement::NamespaceBody;
 use mago_hir::ir::statement::Statement;
 use mago_hir::ir::statement::StatementKind;
 use mago_oracle::id::SymbolId;
@@ -75,12 +77,13 @@ where
 
     pub(crate) fn infer_returned_type(
         &mut self,
-        body: &Statement<'arena, SymbolId, Flow, Type<'arena>>,
+        body: &Block<'arena, SymbolId, Flow, Type<'arena>>,
+        exit: ControlFlow,
     ) -> Type<'arena> {
         let mut atoms = Vec::new_in(self.source);
-        let mut returns_null = collect_returned_atoms(body, &mut atoms);
+        let mut returns_null = collect_returned_atoms_slice(body.statements, &mut atoms);
 
-        if matches!(body.meta.exit, ControlFlow::Fallthrough) {
+        if matches!(exit, ControlFlow::Fallthrough) {
             returns_null = true;
         }
         if returns_null {
@@ -131,6 +134,21 @@ where
     }
 }
 
+fn collect_returned_atoms_slice<'arena, A>(
+    statements: &[Statement<'arena, SymbolId, Flow, Type<'arena>>],
+    atoms: &mut Vec<'_, Atom<'arena>, A>,
+) -> bool
+where
+    A: Arena,
+{
+    let mut returns_null = false;
+    for statement in statements {
+        returns_null |= collect_returned_atoms(statement, atoms);
+    }
+
+    returns_null
+}
+
 /// Accumulates the value-atoms of every `return` reachable in `statement`,
 /// without descending into nested function-likes (their bodies live in the
 /// surrounding expression's meta). Returns `true` when a `return;` with no value
@@ -148,18 +166,16 @@ where
             false
         }
         StatementKind::Return(None) => true,
-        StatementKind::Sequence(statements) => {
-            let mut returns_null = false;
-            for statement in statements {
-                returns_null |= collect_returned_atoms(statement, atoms);
-            }
-            returns_null
-        }
-        StatementKind::Namespace(namespace) => collect_returned_atoms(namespace.statement, atoms),
+        StatementKind::Sequence(statements) => collect_returned_atoms_slice(statements, atoms),
+        StatementKind::Block(block) => collect_returned_atoms_slice(block.statements, atoms),
+        StatementKind::Namespace(namespace) => match namespace.body {
+            NamespaceBody::BraceDelimited(block) => collect_returned_atoms_slice(block.statements, atoms),
+            NamespaceBody::Implicit { statements, .. } => collect_returned_atoms_slice(statements, atoms),
+        },
         StatementKind::If(conditional) => {
             let mut returns_null = collect_returned_atoms(conditional.then, atoms);
-            if let Some(otherwise) = conditional.r#else {
-                returns_null |= collect_returned_atoms(otherwise, atoms);
+            if let Some(else_clause) = conditional.else_clause {
+                returns_null |= collect_returned_atoms(else_clause.statement, atoms);
             }
             returns_null
         }

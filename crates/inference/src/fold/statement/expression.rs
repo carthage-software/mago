@@ -2,6 +2,7 @@ use mago_allocator::Arena;
 use mago_hir::ir::expression::Expression;
 use mago_hir::ir::statement::Statement;
 use mago_hir::ir::statement::StatementKind;
+use mago_hir::ir::statement::Terminator;
 use mago_oracle::id::SymbolId;
 use mago_oracle::ty::Type;
 use mago_span::Span;
@@ -18,6 +19,7 @@ where
     pub(crate) fn infer_expression_statement(
         &mut self,
         span: Span,
+        terminator: Option<Terminator>,
         expression: &'source Expression<'source, SymbolId, S, E>,
     ) -> InferenceResult<Statement<'arena, SymbolId, Flow, Type<'arena>>> {
         let inferred_expression = self.infer_expression(expression)?;
@@ -28,6 +30,7 @@ where
             meta: Flow { reachable: self.reachable, exit },
             span,
             kind: StatementKind::Expression(self.arena.alloc(inferred_expression)),
+            terminator,
         })
     }
 }

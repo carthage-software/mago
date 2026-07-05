@@ -2,6 +2,7 @@ use mago_allocator::Arena;
 use mago_allocator::copy::copy_slice_into;
 use mago_hir::ir::statement::Statement;
 use mago_hir::ir::statement::StatementKind;
+use mago_hir::ir::statement::Terminator;
 use mago_hir::ir::statement::UseItem;
 use mago_oracle::id::SymbolId;
 use mago_oracle::ty::Type;
@@ -19,12 +20,14 @@ where
     pub(crate) fn infer_use(
         &self,
         span: Span,
+        terminator: Option<Terminator>,
         items: &[UseItem<'source>],
     ) -> InferenceResult<Statement<'arena, SymbolId, Flow, Type<'arena>>> {
         Ok(Statement {
             meta: Flow { reachable: self.reachable, exit: ControlFlow::Fallthrough },
             span,
             kind: StatementKind::Use(copy_slice_into(items, self.arena)),
+            terminator,
         })
     }
 }

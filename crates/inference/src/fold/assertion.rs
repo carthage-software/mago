@@ -3,8 +3,8 @@ use mago_allocator::vec::Vec;
 use mago_hir::ir::expression::Binary;
 use mago_hir::ir::expression::Expression;
 use mago_hir::ir::expression::ExpressionKind;
-use mago_hir::ir::expression::operator::BinaryOperator;
-use mago_hir::ir::expression::operator::UnaryPrefixOperator;
+use mago_hir::ir::expression::operator::BinaryOperatorKind;
+use mago_hir::ir::expression::operator::UnaryPrefixOperatorKind;
 use mago_oracle::assertion::Assertion;
 use mago_oracle::id::SymbolId;
 use mago_oracle::ty::Atom;
@@ -41,7 +41,7 @@ where
     ) {
         match &expr.kind {
             ExpressionKind::Parenthesized(inner) => self.narrowing_assertions(inner, polarity, out),
-            ExpressionKind::UnaryPrefix(unary) if matches!(unary.operator, UnaryPrefixOperator::Not) => {
+            ExpressionKind::UnaryPrefix(unary) if matches!(unary.operator.kind, UnaryPrefixOperatorKind::Not) => {
                 self.narrowing_assertions(unary.operand, !polarity, out);
             }
             ExpressionKind::Empty(operand) => self.narrowing_assertions(operand, !polarity, out),
@@ -52,28 +52,31 @@ where
                     }
                 }
             }
-            ExpressionKind::Binary(binary) => match binary.operator {
-                BinaryOperator::And if polarity => {
+            ExpressionKind::Binary(binary) => match binary.operator.kind {
+                BinaryOperatorKind::And(_) if polarity => {
                     self.narrowing_assertions(binary.left, true, out);
                     self.narrowing_assertions(binary.right, true, out);
                 }
-                BinaryOperator::Or if !polarity => {
+                BinaryOperatorKind::Or(_) if !polarity => {
                     self.narrowing_assertions(binary.left, false, out);
                     self.narrowing_assertions(binary.right, false, out);
                 }
-                BinaryOperator::Identical | BinaryOperator::NotIdentical => {
+                BinaryOperatorKind::Identical | BinaryOperatorKind::NotIdentical => {
                     if let Some((place, base, atom)) = self.comparison_literal(binary) {
-                        let positive = matches!(binary.operator, BinaryOperator::Identical) == polarity;
+                        let positive = matches!(binary.operator.kind, BinaryOperatorKind::Identical) == polarity;
                         let assertion =
                             if positive { Assertion::IsIdentical(atom) } else { Assertion::IsNotIdentical(atom) };
 
                         out.push((place, base, assertion));
                     }
                 }
-                BinaryOperator::Equal | BinaryOperator::NotEqual => {
+                BinaryOperatorKind::Equal | BinaryOperatorKind::NotEqual(_) => {
                     if let Some((place, base, atom)) = self.comparison_literal(binary)
-                        && let Some(assertion) =
-                            loose_equality_assertion(atom, matches!(binary.operator, BinaryOperator::Equal), polarity)
+                        && let Some(assertion) = loose_equality_assertion(
+                            atom,
+                            matches!(binary.operator.kind, BinaryOperatorKind::Equal),
+                            polarity,
+                        )
                     {
                         out.push((place, base, assertion));
                     }
@@ -101,7 +104,7 @@ where
     ) -> Option<Node> {
         match &expr.kind {
             ExpressionKind::Parenthesized(inner) => self.condition_diagram(diagram, inner),
-            ExpressionKind::UnaryPrefix(unary) if matches!(unary.operator, UnaryPrefixOperator::Not) => {
+            ExpressionKind::UnaryPrefix(unary) if matches!(unary.operator.kind, UnaryPrefixOperatorKind::Not) => {
                 let inner = self.condition_diagram(diagram, unary.operand)?;
 
                 Some(diagram.not(inner))
@@ -121,29 +124,33 @@ where
 
                 Some(node)
             }
-            ExpressionKind::Binary(binary) => match binary.operator {
-                BinaryOperator::And => {
+            ExpressionKind::Binary(binary) => match binary.operator.kind {
+                BinaryOperatorKind::And(_) => {
                     let left = self.condition_diagram(diagram, binary.left)?;
                     let right = self.condition_diagram(diagram, binary.right)?;
 
                     Some(diagram.and(left, right))
                 }
-                BinaryOperator::Or => {
+                BinaryOperatorKind::Or(_) => {
                     let left = self.condition_diagram(diagram, binary.left)?;
                     let right = self.condition_diagram(diagram, binary.right)?;
 
                     Some(diagram.or(left, right))
                 }
-                BinaryOperator::Identical | BinaryOperator::NotIdentical => {
+                BinaryOperatorKind::Identical | BinaryOperatorKind::NotIdentical => {
                     let (place, _, atom) = self.comparison_literal(binary)?;
                     let node = diagram.literal(Literal { variable: place, assertion: Assertion::IsIdentical(atom) });
 
-                    Some(if matches!(binary.operator, BinaryOperator::NotIdentical) { diagram.not(node) } else { node })
+                    Some(if matches!(binary.operator.kind, BinaryOperatorKind::NotIdentical) {
+                        diagram.not(node)
+                    } else {
+                        node
+                    })
                 }
-                BinaryOperator::Equal | BinaryOperator::NotEqual => {
+                BinaryOperatorKind::Equal | BinaryOperatorKind::NotEqual(_) => {
                     let (place, _, atom) = self.comparison_literal(binary)?;
                     let truthy = diagram.literal(Literal { variable: place, assertion: Assertion::Truthy });
-                    let is_equal = matches!(binary.operator, BinaryOperator::Equal);
+                    let is_equal = matches!(binary.operator.kind, BinaryOperatorKind::Equal);
 
                     match atom {
                         Atom::True => Some(if is_equal { truthy } else { diagram.not(truthy) }),

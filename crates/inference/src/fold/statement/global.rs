@@ -4,6 +4,7 @@ use mago_allocator::vec::Vec;
 use mago_hir::ir::statement::GlobalItem;
 use mago_hir::ir::statement::Statement;
 use mago_hir::ir::statement::StatementKind;
+use mago_hir::ir::statement::Terminator;
 use mago_hir::ir::variable::Variable;
 use mago_oracle::id::SymbolId;
 use mago_oracle::ty::Type;
@@ -23,6 +24,7 @@ where
     pub(crate) fn infer_global(
         &mut self,
         span: Span,
+        terminator: Option<Terminator>,
         items: &'source [GlobalItem<'source, SymbolId, S, E>],
     ) -> InferenceResult<Statement<'arena, SymbolId, Flow, Type<'arena>>> {
         let mut typed_items = Vec::new_in(self.arena);
@@ -41,6 +43,7 @@ where
             meta: Flow { reachable: self.reachable, exit: ControlFlow::Fallthrough },
             span,
             kind: StatementKind::Global(typed_items.leak()),
+            terminator,
         })
     }
 }

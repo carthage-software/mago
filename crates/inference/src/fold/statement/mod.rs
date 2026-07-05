@@ -2,6 +2,7 @@ use mago_allocator::Arena;
 use mago_allocator::CopyInto;
 use mago_allocator::vec::Vec;
 use mago_hir::ir::delimited::Delimited;
+use mago_hir::ir::statement::Block;
 use mago_hir::ir::statement::Statement;
 use mago_hir::ir::statement::StatementKind;
 use mago_hir::ir::r#type::annotation::TypeAnnotation;
@@ -52,44 +53,75 @@ where
         }
 
         let typed = match statement.kind {
-            StatementKind::Expression(expression) => self.infer_expression_statement(statement.span, expression)?,
-            StatementKind::Namespace(namespace) => self.infer_namespace(statement.span, namespace)?,
-            StatementKind::Sequence(statements) => self.infer_sequence(statement.span, statements)?,
-            StatementKind::Return(value) => self.infer_return(statement.span, value)?,
-            StatementKind::If(conditional) => self.infer_if(statement.span, conditional)?,
-            StatementKind::Echo(expressions) => self.infer_echo(statement.span, expressions)?,
-            StatementKind::Global(items) => self.infer_global(statement.span, items)?,
-            StatementKind::Static(items) => self.infer_static(statement.span, items)?,
+            StatementKind::Expression(expression) => {
+                self.infer_expression_statement(statement.span, statement.terminator, expression)?
+            }
+            StatementKind::Namespace(namespace) => {
+                self.infer_namespace(statement.span, statement.terminator, namespace)?
+            }
+            StatementKind::Sequence(statements) => {
+                self.infer_sequence(statement.span, statement.terminator, statements)?
+            }
+            StatementKind::Return(value) => self.infer_return(statement.span, statement.terminator, value)?,
+            StatementKind::If(conditional) => self.infer_if(statement.span, statement.terminator, conditional)?,
+            StatementKind::Echo(expressions) => self.infer_echo(statement.span, statement.terminator, expressions)?,
+            StatementKind::Global(items) => self.infer_global(statement.span, statement.terminator, items)?,
+            StatementKind::Static(items) => self.infer_static(statement.span, statement.terminator, items)?,
             StatementKind::Unset(Delimited { span: operands_span, items }) => {
-                self.infer_unset(statement.span, operands_span, items)?
+                self.infer_unset(statement.span, statement.terminator, operands_span, items)?
             }
             StatementKind::VariableBindingAnnotation(annotation) => {
-                self.infer_variable_binding_annotation(statement.span, annotation)?
+                self.infer_variable_binding_annotation(statement.span, statement.terminator, annotation)?
             }
-            StatementKind::Inline(content) => self.infer_inline(statement.span, content)?,
-            StatementKind::Use(items) => self.infer_use(statement.span, items)?,
-            StatementKind::Declare(declare) => self.infer_declare(statement.span, declare)?,
-            StatementKind::Goto(label) => self.infer_goto(statement.span, label)?,
-            StatementKind::Label(label) => self.infer_label(statement.span, label)?,
-            StatementKind::Try(try_statement) => self.infer_try(statement.span, try_statement)?,
-            StatementKind::Switch(switch) => self.infer_switch(statement.span, switch)?,
-            StatementKind::Break(level) => self.infer_break(statement.span, level)?,
-            StatementKind::Continue(level) => self.infer_continue(statement.span, level)?,
+            StatementKind::Inline(content) => self.infer_inline(statement.span, statement.terminator, content)?,
+            StatementKind::Use(items) => self.infer_use(statement.span, statement.terminator, items)?,
+            StatementKind::Declare(declare) => self.infer_declare(statement.span, statement.terminator, declare)?,
+            StatementKind::Goto(label) => self.infer_goto(statement.span, statement.terminator, label)?,
+            StatementKind::Label(label) => self.infer_label(statement.span, statement.terminator, label)?,
+            StatementKind::Try(try_statement) => self.infer_try(statement.span, statement.terminator, try_statement)?,
+            StatementKind::Switch(switch) => self.infer_switch(statement.span, statement.terminator, switch)?,
+            StatementKind::Break(level) => self.infer_break(statement.span, statement.terminator, level)?,
+            StatementKind::Continue(level) => self.infer_continue(statement.span, statement.terminator, level)?,
             StatementKind::Noop => Statement {
                 meta: Flow { reachable: self.reachable, exit: ControlFlow::Fallthrough },
                 span: statement.span,
                 kind: StatementKind::Noop,
+                terminator: statement.terminator,
             },
+            StatementKind::Shebang(bytes) => Statement {
+                meta: Flow { reachable: self.reachable, exit: ControlFlow::Fallthrough },
+                span: statement.span,
+                kind: StatementKind::Shebang(self.arena.alloc_slice_copy(bytes)),
+                terminator: statement.terminator,
+            },
+            StatementKind::Tag(tag) => Statement {
+                meta: Flow { reachable: self.reachable, exit: ControlFlow::Fallthrough },
+                span: statement.span,
+                kind: StatementKind::Tag(tag),
+                terminator: statement.terminator,
+            },
+            StatementKind::Block(block) => {
+                let reachable = self.reachable;
+                let (statements, exit) = self.infer_block(block.statements)?;
+
+                Statement {
+                    meta: Flow { reachable, exit },
+                    span: statement.span,
+                    kind: StatementKind::Block(self.arena.alloc(Block { span: block.span, statements })),
+                    terminator: statement.terminator,
+                }
+            }
             StatementKind::HaltCompiler => Statement {
                 meta: Flow { reachable: self.reachable, exit: ControlFlow::Diverge },
                 span: statement.span,
                 kind: StatementKind::HaltCompiler,
+                terminator: statement.terminator,
             },
-            StatementKind::While(while_loop) => self.infer_while(statement.span, while_loop)?,
-            StatementKind::DoWhile(do_while) => self.infer_do_while(statement.span, do_while)?,
-            StatementKind::For(for_loop) => self.infer_for(statement.span, for_loop)?,
-            StatementKind::Foreach(foreach) => self.infer_foreach(statement.span, foreach)?,
-            StatementKind::Item(item) => self.infer_statement_item(statement.span, item)?,
+            StatementKind::While(while_loop) => self.infer_while(statement.span, statement.terminator, while_loop)?,
+            StatementKind::DoWhile(do_while) => self.infer_do_while(statement.span, statement.terminator, do_while)?,
+            StatementKind::For(for_loop) => self.infer_for(statement.span, statement.terminator, for_loop)?,
+            StatementKind::Foreach(foreach) => self.infer_foreach(statement.span, statement.terminator, foreach)?,
+            StatementKind::Item(item) => self.infer_statement_item(statement.span, statement.terminator, item)?,
         };
 
         self.reachable = typed.meta.reachable && matches!(typed.meta.exit, ControlFlow::Fallthrough);

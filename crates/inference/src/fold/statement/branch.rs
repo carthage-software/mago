@@ -1,7 +1,9 @@
 use mago_allocator::Arena;
+use mago_hir::ir::statement::ElseClause;
 use mago_hir::ir::statement::If;
 use mago_hir::ir::statement::Statement;
 use mago_hir::ir::statement::StatementKind;
+use mago_hir::ir::statement::Terminator;
 use mago_oracle::id::SymbolId;
 use mago_oracle::ty::Type;
 use mago_span::Span;
@@ -28,6 +30,7 @@ where
     pub fn infer_if(
         &mut self,
         span: Span,
+        terminator: Option<Terminator>,
         conditional: &'source If<'source, SymbolId, S, E>,
     ) -> InferenceResult<Statement<'arena, SymbolId, Flow, Type<'arena>>> {
         let entry_reachable = self.reachable;
@@ -38,11 +41,16 @@ where
         let then = self.infer_branch(&entry, when_true, conditional.then)?;
 
         self.reachable = entry_reachable;
-        let (otherwise, else_fallthrough, else_exit) = match conditional.r#else {
-            Some(statement) => {
-                let branch = self.infer_branch(&entry, when_false, statement)?;
+        let (otherwise, else_fallthrough, else_exit) = match conditional.else_clause {
+            Some(else_clause) => {
+                let branch = self.infer_branch(&entry, when_false, else_clause.statement)?;
+                let clause = ElseClause {
+                    span: else_clause.span,
+                    kind: else_clause.kind,
+                    statement: self.arena.alloc(branch.statement),
+                };
 
-                (Some(&*self.arena.alloc(branch.statement)), branch.fallthrough, branch.exit)
+                (Some(&*self.arena.alloc(clause)), branch.fallthrough, branch.exit)
             }
             None => (None, when_false.clone(), when_false.map(|_| ControlFlow::Fallthrough)),
         };
@@ -56,13 +64,14 @@ where
             span: conditional.span,
             condition: self.arena.alloc(condition),
             then: self.arena.alloc(then.statement),
-            r#else: otherwise,
+            else_clause: otherwise,
         };
 
         Ok(Statement {
             meta: Flow { reachable: entry_reachable, exit },
             span,
             kind: StatementKind::If(self.arena.alloc(conditional)),
+            terminator,
         })
     }
 

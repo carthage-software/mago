@@ -3,6 +3,7 @@ use mago_allocator::vec::Vec;
 use mago_hir::ir::delimited::Delimited;
 use mago_hir::ir::expression::ArrayElement;
 use mago_hir::ir::expression::ArrayElementKind;
+use mago_hir::ir::expression::ArrayLike;
 use mago_hir::ir::expression::Expression;
 use mago_hir::ir::expression::ExpressionKind;
 use mago_oracle::id::SymbolId;
@@ -29,7 +30,7 @@ where
     pub fn infer_array(
         &mut self,
         span: Span,
-        elements: &Delimited<'source, ArrayElement<'source, SymbolId, S, E>>,
+        array: &ArrayLike<'source, SymbolId, S, E>,
     ) -> InferenceResult<Expression<'arena, SymbolId, Flow, Type<'arena>>> {
         let mut items = Vec::new_in(self.arena);
         let mut entries = Vec::new_in(self.source);
@@ -38,7 +39,7 @@ where
         let mut has_never = false;
         let mut next_int_key: i64 = 0;
 
-        for element in elements.items {
+        for element in array.elements.items {
             let kind = match element.kind {
                 ArrayElementKind::Value(value) => {
                     let value = self.infer_expression(value)?;
@@ -103,7 +104,11 @@ where
         Ok(Expression {
             meta,
             span,
-            kind: ExpressionKind::Array(Delimited { span: elements.span, items: items.leak() }),
+            kind: ExpressionKind::ArrayLike(ArrayLike {
+                span: array.span,
+                kind: array.kind,
+                elements: Delimited { span: array.elements.span, items: items.leak() },
+            }),
         })
     }
 

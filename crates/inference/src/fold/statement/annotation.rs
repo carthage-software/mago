@@ -2,6 +2,7 @@ use mago_allocator::Arena;
 use mago_allocator::CopyInto;
 use mago_hir::ir::statement::Statement;
 use mago_hir::ir::statement::StatementKind;
+use mago_hir::ir::statement::Terminator;
 use mago_hir::ir::statement::annotation::VariableBindingAnnotation;
 use mago_oracle::id::SymbolId;
 use mago_oracle::linker::lower_type_annotation;
@@ -21,6 +22,7 @@ where
     pub(crate) fn infer_variable_binding_annotation(
         &mut self,
         span: Span,
+        terminator: Option<Terminator>,
         annotation: &'source VariableBindingAnnotation<'source>,
     ) -> InferenceResult<Statement<'arena, SymbolId, Flow, Type<'arena>>> {
         let type_annotation = annotation.type_annotation.copy_into(self.arena);
@@ -34,6 +36,7 @@ where
             meta: Flow { reachable: self.reachable, exit: ControlFlow::Fallthrough },
             span,
             kind: StatementKind::VariableBindingAnnotation(self.arena.alloc(node)),
+            terminator,
         })
     }
 }

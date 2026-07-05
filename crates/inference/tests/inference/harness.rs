@@ -6,6 +6,7 @@ use mago_database::file::File;
 use mago_hir::ir::IR;
 use mago_hir::ir::expression::Binary;
 use mago_hir::ir::expression::Expression;
+use mago_hir::ir::statement::NamespaceBody;
 use mago_hir::ir::statement::Statement;
 use mago_hir::ir::statement::StatementKind;
 use mago_hir::lower::LowerSettings;
@@ -154,7 +155,10 @@ fn last_expression_in<'arena>(statements: &'arena [TypedStatement<'arena>]) -> O
         let found = match statement.kind {
             StatementKind::Expression(expression) => Some(expression),
             StatementKind::Sequence(inner) => last_expression_in(inner),
-            StatementKind::Namespace(namespace) => last_expression_in(std::slice::from_ref(namespace.statement)),
+            StatementKind::Namespace(namespace) => match namespace.body {
+                NamespaceBody::BraceDelimited(block) => last_expression_in(block.statements),
+                NamespaceBody::Implicit { statements, .. } => last_expression_in(statements),
+            },
             _ => None,
         };
 

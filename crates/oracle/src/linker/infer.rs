@@ -1,12 +1,12 @@
 use mago_allocator::Arena;
 use mago_hir::ir::expression::ArrayElement;
 use mago_hir::ir::expression::ArrayElementKind;
-use mago_hir::ir::expression::CompositeStringPart;
+use mago_hir::ir::expression::CompositeStringPartKind;
 use mago_hir::ir::expression::Expression;
 use mago_hir::ir::expression::ExpressionKind;
 use mago_hir::ir::expression::MagicConstantKind;
-use mago_hir::ir::expression::operator::BinaryOperator;
-use mago_hir::ir::expression::operator::UnaryPrefixOperator;
+use mago_hir::ir::expression::operator::BinaryOperatorKind;
+use mago_hir::ir::expression::operator::UnaryPrefixOperatorKind;
 use mago_hir::ir::literal::LiteralKind;
 
 use crate::linker::lower::Lowerer;
@@ -49,11 +49,12 @@ where
                 LiteralKind::False => well_known::TYPE_FALSE,
                 LiteralKind::Null => well_known::TYPE_NULL,
             }),
-            ExpressionKind::CompositeString(parts) => {
-                let non_empty = parts.iter().any(|part| match part {
-                    CompositeStringPart::Literal(raw) => !raw.is_empty(),
+            ExpressionKind::CompositeString(composite_string) => {
+                let non_empty = composite_string.parts.iter().any(|part| match part.kind {
+                    CompositeStringPartKind::Literal(raw) => !raw.is_empty(),
                     _ => true,
                 });
+
                 Some(if non_empty { self.atom_type(well_known::NON_EMPTY_STRING) } else { well_known::TYPE_STRING })
             }
             ExpressionKind::MagicConstant(magic) => Some(match magic.kind {
@@ -61,9 +62,9 @@ where
                 _ => well_known::TYPE_STRING,
             }),
             ExpressionKind::Constant(_) | ExpressionKind::Identifier(_) => None,
-            ExpressionKind::UnaryPrefix(unary) => self.infer_unary(unary.operator, unary.operand),
-            ExpressionKind::Binary(binary) => self.infer_binary(binary.operator, binary.left, binary.right),
-            ExpressionKind::Array(elements) | ExpressionKind::List(elements) => self.infer_array(elements.as_slice()),
+            ExpressionKind::UnaryPrefix(unary) => self.infer_unary(unary.operator.kind, unary.operand),
+            ExpressionKind::Binary(binary) => self.infer_binary(binary.operator.kind, binary.left, binary.right),
+            ExpressionKind::ArrayLike(array_like) => self.infer_array(array_like.elements.as_slice()),
             ExpressionKind::Print(_) => Some(self.atom_type(Atom::int_literal(1))),
             ExpressionKind::Isset(_) | ExpressionKind::Empty(_) => Some(well_known::TYPE_BOOL),
             ExpressionKind::Clone(inner) => self.infer(inner),
@@ -74,34 +75,34 @@ where
     /// Folds a unary-prefix operation over an inferred operand.
     fn infer_unary<I, St, Ex>(
         &mut self,
-        operator: UnaryPrefixOperator,
+        operator: UnaryPrefixOperatorKind,
         operand: &Expression<'arena, I, St, Ex>,
     ) -> Option<Type<'arena>> {
         match operator {
-            UnaryPrefixOperator::Plus => self.infer(operand),
-            UnaryPrefixOperator::Negation => {
+            UnaryPrefixOperatorKind::Plus => self.infer(operand),
+            UnaryPrefixOperatorKind::Negation => {
                 let operand = self.infer(operand)?;
                 Some(match single_int(operand) {
                     Some(value) => self.atom_type(Atom::int_literal(value.wrapping_neg())),
                     None => operand,
                 })
             }
-            UnaryPrefixOperator::BitwiseNot => {
+            UnaryPrefixOperatorKind::BitwiseNot => {
                 let operand = self.infer(operand)?;
                 Some(match single_int(operand) {
                     Some(value) => self.atom_type(Atom::int_literal(!value)),
                     None => well_known::TYPE_INT,
                 })
             }
-            UnaryPrefixOperator::Not => Some(well_known::TYPE_BOOL),
-            UnaryPrefixOperator::BoolCast => Some(well_known::TYPE_BOOL),
-            UnaryPrefixOperator::IntCast => Some(well_known::TYPE_INT),
-            UnaryPrefixOperator::FloatCast => Some(well_known::TYPE_FLOAT),
-            UnaryPrefixOperator::StringCast => Some(well_known::TYPE_STRING),
-            UnaryPrefixOperator::ObjectCast => Some(well_known::TYPE_OBJECT),
-            UnaryPrefixOperator::ArrayCast => Some(self.atom_type(well_known::ARRAY_KEY_MIXED)),
-            UnaryPrefixOperator::UnsetCast => Some(well_known::TYPE_NULL),
-            UnaryPrefixOperator::VoidCast => Some(well_known::TYPE_VOID),
+            UnaryPrefixOperatorKind::Not => Some(well_known::TYPE_BOOL),
+            UnaryPrefixOperatorKind::BoolCast(_) => Some(well_known::TYPE_BOOL),
+            UnaryPrefixOperatorKind::IntCast(_) => Some(well_known::TYPE_INT),
+            UnaryPrefixOperatorKind::FloatCast(_) => Some(well_known::TYPE_FLOAT),
+            UnaryPrefixOperatorKind::StringCast(_) => Some(well_known::TYPE_STRING),
+            UnaryPrefixOperatorKind::ObjectCast => Some(well_known::TYPE_OBJECT),
+            UnaryPrefixOperatorKind::ArrayCast => Some(self.atom_type(well_known::ARRAY_KEY_MIXED)),
+            UnaryPrefixOperatorKind::UnsetCast => Some(well_known::TYPE_NULL),
+            UnaryPrefixOperatorKind::VoidCast => Some(well_known::TYPE_VOID),
             _ => None,
         }
     }
@@ -111,58 +112,62 @@ where
     /// the operator's result type otherwise.
     fn infer_binary<I, St, Ex>(
         &mut self,
-        operator: BinaryOperator,
+        operator: BinaryOperatorKind,
         left: &Expression<'arena, I, St, Ex>,
         right: &Expression<'arena, I, St, Ex>,
     ) -> Option<Type<'arena>> {
         match operator {
-            BinaryOperator::StringConcat => Some(well_known::TYPE_STRING),
-            BinaryOperator::BitwiseAnd
-            | BinaryOperator::BitwiseOr
-            | BinaryOperator::BitwiseXor
-            | BinaryOperator::LeftShift
-            | BinaryOperator::RightShift => {
+            BinaryOperatorKind::StringConcat => Some(well_known::TYPE_STRING),
+            BinaryOperatorKind::BitwiseAnd
+            | BinaryOperatorKind::BitwiseOr
+            | BinaryOperatorKind::BitwiseXor
+            | BinaryOperatorKind::LeftShift
+            | BinaryOperatorKind::RightShift => {
                 let folded = self.fold_int_pair(left, right, |left, right| match operator {
-                    BinaryOperator::BitwiseAnd => Some(left & right),
-                    BinaryOperator::BitwiseOr => Some(left | right),
-                    BinaryOperator::BitwiseXor => Some(left ^ right),
-                    BinaryOperator::LeftShift => u32::try_from(right).ok().and_then(|shift| left.checked_shl(shift)),
-                    BinaryOperator::RightShift => u32::try_from(right).ok().and_then(|shift| left.checked_shr(shift)),
+                    BinaryOperatorKind::BitwiseAnd => Some(left & right),
+                    BinaryOperatorKind::BitwiseOr => Some(left | right),
+                    BinaryOperatorKind::BitwiseXor => Some(left ^ right),
+                    BinaryOperatorKind::LeftShift => {
+                        u32::try_from(right).ok().and_then(|shift| left.checked_shl(shift))
+                    }
+                    BinaryOperatorKind::RightShift => {
+                        u32::try_from(right).ok().and_then(|shift| left.checked_shr(shift))
+                    }
                     _ => None,
                 });
                 Some(folded.unwrap_or(well_known::TYPE_INT))
             }
-            BinaryOperator::Addition
-            | BinaryOperator::Subtraction
-            | BinaryOperator::Multiplication
-            | BinaryOperator::Modulo
-            | BinaryOperator::Exponentiation
-            | BinaryOperator::Division => {
+            BinaryOperatorKind::Addition
+            | BinaryOperatorKind::Subtraction
+            | BinaryOperatorKind::Multiplication
+            | BinaryOperatorKind::Modulo
+            | BinaryOperatorKind::Exponentiation
+            | BinaryOperatorKind::Division => {
                 let folded = self.fold_int_pair(left, right, |left, right| match operator {
-                    BinaryOperator::Addition => left.checked_add(right),
-                    BinaryOperator::Subtraction => left.checked_sub(right),
-                    BinaryOperator::Multiplication => left.checked_mul(right),
-                    BinaryOperator::Modulo if right != 0 => left.checked_rem(right),
-                    BinaryOperator::Exponentiation if right >= 0 => {
+                    BinaryOperatorKind::Addition => left.checked_add(right),
+                    BinaryOperatorKind::Subtraction => left.checked_sub(right),
+                    BinaryOperatorKind::Multiplication => left.checked_mul(right),
+                    BinaryOperatorKind::Modulo if right != 0 => left.checked_rem(right),
+                    BinaryOperatorKind::Exponentiation if right >= 0 => {
                         u32::try_from(right).ok().and_then(|exponent| left.checked_pow(exponent))
                     }
-                    BinaryOperator::Division if right != 0 && left % right == 0 => left.checked_div(right),
+                    BinaryOperatorKind::Division if right != 0 && left % right == 0 => left.checked_div(right),
                     _ => None,
                 });
                 Some(folded.unwrap_or(well_known::TYPE_INT_OR_FLOAT))
             }
-            BinaryOperator::Equal
-            | BinaryOperator::NotEqual
-            | BinaryOperator::Identical
-            | BinaryOperator::NotIdentical
-            | BinaryOperator::LessThan
-            | BinaryOperator::LessThanOrEqual
-            | BinaryOperator::GreaterThan
-            | BinaryOperator::GreaterThanOrEqual
-            | BinaryOperator::And
-            | BinaryOperator::Or
-            | BinaryOperator::Xor
-            | BinaryOperator::Instanceof => Some(well_known::TYPE_BOOL),
+            BinaryOperatorKind::Equal
+            | BinaryOperatorKind::NotEqual(_)
+            | BinaryOperatorKind::Identical
+            | BinaryOperatorKind::NotIdentical
+            | BinaryOperatorKind::LessThan
+            | BinaryOperatorKind::LessThanOrEqual
+            | BinaryOperatorKind::GreaterThan
+            | BinaryOperatorKind::GreaterThanOrEqual
+            | BinaryOperatorKind::And(_)
+            | BinaryOperatorKind::Or(_)
+            | BinaryOperatorKind::Xor
+            | BinaryOperatorKind::Instanceof => Some(well_known::TYPE_BOOL),
             _ => None,
         }
     }

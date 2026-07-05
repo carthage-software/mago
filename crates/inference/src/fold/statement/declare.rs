@@ -6,6 +6,7 @@ use mago_hir::ir::statement::Declare;
 use mago_hir::ir::statement::DeclareItem;
 use mago_hir::ir::statement::Statement;
 use mago_hir::ir::statement::StatementKind;
+use mago_hir::ir::statement::Terminator;
 use mago_oracle::id::SymbolId;
 use mago_oracle::ty::Type;
 use mago_span::Span;
@@ -21,6 +22,7 @@ where
     pub(crate) fn infer_declare(
         &mut self,
         span: Span,
+        terminator: Option<Terminator>,
         declare: &'source Declare<'source, SymbolId, S, E>,
     ) -> InferenceResult<Statement<'arena, SymbolId, Flow, Type<'arena>>> {
         let reachable = self.reachable;
@@ -43,6 +45,11 @@ where
             statement: self.arena.alloc(statement),
         };
 
-        Ok(Statement { meta: Flow { reachable, exit }, span, kind: StatementKind::Declare(self.arena.alloc(node)) })
+        Ok(Statement {
+            meta: Flow { reachable, exit },
+            span,
+            kind: StatementKind::Declare(self.arena.alloc(node)),
+            terminator,
+        })
     }
 }

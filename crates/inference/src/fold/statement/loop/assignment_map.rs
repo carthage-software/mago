@@ -8,10 +8,10 @@ use mago_hir::ir::expression::ArrayElement;
 use mago_hir::ir::expression::ArrayElementKind;
 use mago_hir::ir::expression::Expression;
 use mago_hir::ir::expression::ExpressionKind;
-use mago_hir::ir::expression::operator::UnaryPrefixOperator;
+use mago_hir::ir::expression::operator::UnaryPrefixOperatorKind;
 use mago_hir::ir::statement::Statement;
 use mago_hir::ir::statement::StatementKind;
-use mago_hir::ir::statement::SwitchCase;
+use mago_hir::ir::statement::SwitchCaseKind;
 use mago_hir::ir::variable::Variable;
 
 /// The assignment dependency graph of a loop: each assigned root place mapped to
@@ -119,19 +119,25 @@ fn collect_statement<'ir, I, S, E>(statement: &Statement<'ir, I, S, E>, map: &mu
         StatementKind::If(conditional) => {
             collect_expression(conditional.condition, map);
             collect_statement(conditional.then, map);
-            if let Some(otherwise) = conditional.r#else {
-                collect_statement(otherwise, map);
+            if let Some(else_clause) = conditional.else_clause {
+                collect_statement(else_clause.statement, map);
             }
         }
         StatementKind::Switch(switch) => {
             collect_expression(switch.subject, map);
             for case in switch.cases.items {
-                match case {
-                    SwitchCase::Expression(value, body) => {
+                match &case.kind {
+                    SwitchCaseKind::Expression(value, body) => {
                         collect_expression(value, map);
-                        collect_statement(body, map);
+                        for statement in *body {
+                            collect_statement(statement, map);
+                        }
                     }
-                    SwitchCase::Default(body) => collect_statement(body, map),
+                    SwitchCaseKind::Default(body) => {
+                        for statement in *body {
+                            collect_statement(statement, map);
+                        }
+                    }
                 }
             }
         }
@@ -154,12 +160,18 @@ fn collect_statement<'ir, I, S, E>(statement: &Statement<'ir, I, S, E>, map: &mu
             collect_statement(foreach.statement, map);
         }
         StatementKind::Try(try_statement) => {
-            collect_statement(try_statement.statement, map);
-            for catch in try_statement.catch_clauses {
-                collect_statement(catch.statement, map);
+            for statement in try_statement.block.statements {
+                collect_statement(statement, map);
             }
-            if let Some(finally) = try_statement.finally_clause {
-                collect_statement(finally, map);
+            for catch in try_statement.catch_clauses {
+                for statement in catch.block.statements {
+                    collect_statement(statement, map);
+                }
+            }
+            if let Some(finally) = try_statement.finally_block {
+                for statement in finally.statements {
+                    collect_statement(statement, map);
+                }
             }
         }
         StatementKind::Return(Some(value)) => collect_expression(value, map),
@@ -196,7 +208,10 @@ fn collect_expression<'ir, I, S, E>(expression: &Expression<'ir, I, S, E>, map: 
         }
         ExpressionKind::UnaryPostfix(postfix) => record(postfix.operand, b"isset", map),
         ExpressionKind::UnaryPrefix(prefix) => {
-            if matches!(prefix.operator, UnaryPrefixOperator::PreIncrement | UnaryPrefixOperator::PreDecrement) {
+            if matches!(
+                prefix.operator.kind,
+                UnaryPrefixOperatorKind::PreIncrement | UnaryPrefixOperatorKind::PreDecrement
+            ) {
                 record(prefix.operand, b"isset", map);
             } else {
                 collect_expression(prefix.operand, map);
@@ -213,8 +228,8 @@ fn collect_expression<'ir, I, S, E>(expression: &Expression<'ir, I, S, E>, map: 
             }
             collect_expression(conditional.r#else, map);
         }
-        ExpressionKind::Array(elements) | ExpressionKind::List(elements) => {
-            for element in elements.items {
+        ExpressionKind::ArrayLike(array_like) => {
+            for element in array_like.elements.items {
                 if let Some(value) = element_value(element) {
                     collect_expression(value, map);
                 }
@@ -259,7 +274,7 @@ fn root_variable<'ir, I, S, E>(expression: &Expression<'ir, I, S, E>) -> Option<
             | AccessKind::StaticProperty(base, _)
             | AccessKind::ClassConstant(base, _) => root_variable(base),
         },
-        ExpressionKind::UnaryPrefix(prefix) if matches!(prefix.operator, UnaryPrefixOperator::Reference) => {
+        ExpressionKind::UnaryPrefix(prefix) if matches!(prefix.operator.kind, UnaryPrefixOperatorKind::Reference) => {
             root_variable(prefix.operand)
         }
         _ => None,
@@ -285,9 +300,9 @@ fn argument_value<'ast, 'ir, I, S, E>(argument: &'ast Argument<'ir, I, S, E>) ->
 fn array_like_targets<'ast, 'ir, I, S, E>(
     expression: &'ast Expression<'ir, I, S, E>,
 ) -> Option<impl Iterator<Item = &'ast Expression<'ir, I, S, E>>> {
-    let (ExpressionKind::Array(elements) | ExpressionKind::List(elements)) = &expression.kind else {
+    let ExpressionKind::ArrayLike(array_like) = &expression.kind else {
         return None;
     };
 
-    Some(elements.items.iter().filter_map(element_value))
+    Some(array_like.elements.items.iter().filter_map(element_value))
 }

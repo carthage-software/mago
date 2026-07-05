@@ -1,6 +1,9 @@
 use mago_allocator::Arena;
 use mago_allocator::vec::Vec;
+use mago_hir::ir::expression::CompositeString;
+use mago_hir::ir::expression::CompositeStringKind;
 use mago_hir::ir::expression::CompositeStringPart;
+use mago_hir::ir::expression::CompositeStringPartKind;
 use mago_hir::ir::expression::Expression;
 use mago_hir::ir::expression::ExpressionKind;
 use mago_oracle::id::SymbolId;
@@ -27,17 +30,21 @@ where
     pub fn infer_composite_string(
         &mut self,
         span: Span,
-        parts: &[CompositeStringPart<'source, SymbolId, S, E>],
+        composite: &'source CompositeString<'source, SymbolId, S, E>,
     ) -> InferenceResult<Expression<'arena, SymbolId, Flow, Type<'arena>>> {
+        if composite.kind == CompositeStringKind::ShellExecute {
+            return self.infer_shell_execute(span, composite);
+        }
+
         let mut rebuilt = Vec::new_in(self.arena);
         let mut bytes = Vec::new_in(self.source);
         let mut foldable = true;
         let mut non_empty = false;
         let mut has_never = false;
 
-        for part in parts {
-            let rebuilt_part = match part {
-                CompositeStringPart::Literal(literal) => {
+        for part in composite.parts {
+            let kind = match &part.kind {
+                CompositeStringPartKind::Literal(literal) => {
                     if !literal.is_empty() {
                         non_empty = true;
                     }
@@ -45,20 +52,21 @@ where
                         bytes.extend_from_slice(literal);
                     }
 
-                    CompositeStringPart::Literal(self.arena.alloc_slice_copy(literal))
+                    CompositeStringPartKind::Literal(self.arena.alloc_slice_copy(literal))
                 }
-                CompositeStringPart::Expression(expression) => {
+                CompositeStringPartKind::Expression(expression)
+                | CompositeStringPartKind::BracedExpression(expression) => {
                     let expression = self.infer_expression(expression)?;
                     has_never |= expression.meta.is_never();
                     if foldable && !append_string(&mut bytes, expression.meta) {
                         foldable = false;
                     }
 
-                    CompositeStringPart::Expression(self.arena.alloc(expression))
+                    CompositeStringPartKind::Expression(self.arena.alloc(expression))
                 }
             };
 
-            rebuilt.push(rebuilt_part);
+            rebuilt.push(CompositeStringPart { span: part.span, kind });
         }
 
         let meta = if has_never {
@@ -71,42 +79,59 @@ where
             TYPE_STRING
         };
 
-        Ok(Expression { meta, span, kind: ExpressionKind::CompositeString(rebuilt.leak()) })
+        Ok(Expression {
+            meta,
+            span,
+            kind: ExpressionKind::CompositeString(self.arena.alloc(CompositeString {
+                span: composite.span,
+                kind: composite.kind,
+                parts: rebuilt.leak(),
+            })),
+        })
     }
 
-    pub fn infer_shell_execute(
+    fn infer_shell_execute(
         &mut self,
         span: Span,
-        parts: &[CompositeStringPart<'source, SymbolId, S, E>],
+        composite: &'source CompositeString<'source, SymbolId, S, E>,
     ) -> InferenceResult<Expression<'arena, SymbolId, Flow, Type<'arena>>> {
-        let (rebuilt, has_never) = self.rebuild_string_parts(parts)?;
+        let (parts, has_never) = self.rebuild_string_parts(composite.parts)?;
 
         let meta = if has_never { TYPE_NEVER } else { self.ty.union_of(&[STRING, FALSE, NULL]) };
 
-        Ok(Expression { meta, span, kind: ExpressionKind::ShellExecute(rebuilt) })
+        Ok(Expression {
+            meta,
+            span,
+            kind: ExpressionKind::CompositeString(self.arena.alloc(CompositeString {
+                span: composite.span,
+                kind: composite.kind,
+                parts,
+            })),
+        })
     }
 
     fn rebuild_string_parts(
         &mut self,
-        parts: &[CompositeStringPart<'source, SymbolId, S, E>],
+        parts: &'source [CompositeStringPart<'source, SymbolId, S, E>],
     ) -> InferenceResult<(&'arena [TypedPart<'arena>], bool)> {
         let mut rebuilt = Vec::new_in(self.arena);
         let mut has_never = false;
 
         for part in parts {
-            let rebuilt_part = match part {
-                CompositeStringPart::Literal(literal) => {
-                    CompositeStringPart::Literal(self.arena.alloc_slice_copy(literal))
+            let kind = match &part.kind {
+                CompositeStringPartKind::Literal(literal) => {
+                    CompositeStringPartKind::Literal(self.arena.alloc_slice_copy(literal))
                 }
-                CompositeStringPart::Expression(expression) => {
+                CompositeStringPartKind::Expression(expression)
+                | CompositeStringPartKind::BracedExpression(expression) => {
                     let expression = self.infer_expression(expression)?;
                     has_never |= expression.meta.is_never();
 
-                    CompositeStringPart::Expression(self.arena.alloc(expression))
+                    CompositeStringPartKind::Expression(self.arena.alloc(expression))
                 }
             };
 
-            rebuilt.push(rebuilt_part);
+            rebuilt.push(CompositeStringPart { span: part.span, kind });
         }
 
         Ok((rebuilt.leak(), has_never))

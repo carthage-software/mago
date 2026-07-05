@@ -27,8 +27,10 @@ use mago_hir::ir::item::modifier::Modifier;
 use mago_hir::ir::item::modifier::ModifierKind;
 use mago_hir::ir::item::statement::ItemStatement;
 use mago_hir::ir::item::statement::ItemStatementKind;
+use mago_hir::ir::statement::Block;
 use mago_hir::ir::statement::Statement;
 use mago_hir::ir::statement::StatementKind;
+use mago_hir::ir::statement::Terminator;
 use mago_oracle::id::SymbolId;
 use mago_oracle::symbol::Symbol;
 use mago_oracle::symbol::class_like::ClassLikeKind;
@@ -55,6 +57,7 @@ where
     pub(crate) fn infer_statement_item(
         &mut self,
         span: Span,
+        terminator: Option<Terminator>,
         item: &'source ItemStatement<'source, SymbolId, S, E>,
     ) -> InferenceResult<Statement<'arena, SymbolId, Flow, Type<'arena>>> {
         let kind = match item.kind {
@@ -84,6 +87,7 @@ where
             meta: Flow { reachable: self.reachable, exit: ControlFlow::Fallthrough },
             span,
             kind: StatementKind::Item(self.arena.alloc(node)),
+            terminator,
         })
     }
 
@@ -115,7 +119,7 @@ where
             }
         };
 
-        Ok(MemberItem { meta: member.meta, span: member.span, kind })
+        Ok(MemberItem { meta: member.meta, span: member.span, kind, terminator: member.terminator })
     }
 
     fn infer_method(
@@ -142,7 +146,11 @@ where
 
         let parameters = self.infer_parameters(&method.parameters, Some(this_type))?;
         let body = match method.body {
-            Some(body) => Some(&*self.arena.alloc(self.infer_statement(body)?)),
+            Some(body) => {
+                let (statements, _) = self.infer_block(body.statements)?;
+
+                Some(&*self.arena.alloc(Block { span: body.span, statements }))
+            }
             None => None,
         };
 
@@ -301,10 +309,10 @@ where
             HookBodyKind::Expression(expression) => {
                 HookBodyKind::Expression(self.arena.alloc(self.infer_expression(expression)?))
             }
-            HookBodyKind::Statements(statements) => {
-                let (statements, _exit) = self.infer_block(statements)?;
+            HookBodyKind::Block(block) => {
+                let (statements, _exit) = self.infer_block(block.statements)?;
 
-                HookBodyKind::Statements(statements)
+                HookBodyKind::Block(self.arena.alloc(Block { span: block.span, statements }))
             }
         };
 

@@ -1,6 +1,7 @@
 use mago_allocator::Arena;
 use mago_hir::ir::statement::Statement;
 use mago_hir::ir::statement::StatementKind;
+use mago_hir::ir::statement::Terminator;
 use mago_oracle::id::SymbolId;
 use mago_oracle::ty::Type;
 use mago_span::Span;
@@ -17,12 +18,14 @@ where
     pub(crate) fn infer_inline(
         &self,
         span: Span,
+        terminator: Option<Terminator>,
         content: &[u8],
     ) -> InferenceResult<Statement<'arena, SymbolId, Flow, Type<'arena>>> {
         Ok(Statement {
             meta: Flow { reachable: self.reachable, exit: ControlFlow::Fallthrough },
             span,
             kind: StatementKind::Inline(self.arena.alloc_slice_copy(content)),
+            terminator,
         })
     }
 }

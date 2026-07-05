@@ -5,6 +5,8 @@ use mago_hir::ir::statement::Statement;
 use mago_hir::ir::statement::StatementKind;
 use mago_hir::ir::statement::Switch;
 use mago_hir::ir::statement::SwitchCase;
+use mago_hir::ir::statement::SwitchCaseKind;
+use mago_hir::ir::statement::Terminator;
 use mago_oracle::id::SymbolId;
 use mago_oracle::ty::Type;
 use mago_oracle::ty::well_known::TYPE_NEVER;
@@ -24,6 +26,7 @@ where
     pub(crate) fn infer_switch(
         &mut self,
         span: Span,
+        terminator: Option<Terminator>,
         switch: &'source Switch<'source, SymbolId, S, E>,
     ) -> InferenceResult<Statement<'arena, SymbolId, Flow, Type<'arena>>> {
         let reachable = self.reachable;
@@ -49,21 +52,19 @@ where
             }
             self.reachable = reachable;
 
-            let (typed_case, exit, value) = match case {
-                SwitchCase::Expression(value, body) => {
+            let (typed_kind, exit, value) = match case.kind {
+                SwitchCaseKind::Expression(value, body) => {
                     let value = self.infer_expression(value)?;
                     let value_meta = value.meta;
-                    let body = self.infer_statement(body)?;
-                    let exit = body.meta.exit;
+                    let (statements, exit) = self.infer_block(body)?;
 
-                    (SwitchCase::Expression(self.arena.alloc(value), self.arena.alloc(body)), exit, Some(value_meta))
+                    (SwitchCaseKind::Expression(self.arena.alloc(value), statements), exit, Some(value_meta))
                 }
-                SwitchCase::Default(body) => {
+                SwitchCaseKind::Default(body) => {
                     has_default = true;
-                    let body = self.infer_statement(body)?;
-                    let exit = body.meta.exit;
+                    let (statements, exit) = self.infer_block(body)?;
 
-                    (SwitchCase::Default(self.arena.alloc(body)), exit, None)
+                    (SwitchCaseKind::Default(statements), exit, None)
                 }
             };
 
@@ -83,7 +84,7 @@ where
                 excluded = self.union(excluded, value);
             }
 
-            cases.push(typed_case);
+            cases.push(SwitchCase { span: case.span, separator: case.separator, kind: typed_kind });
         }
 
         if !has_default || matches!(last_exit, ControlFlow::Fallthrough) {
@@ -101,6 +102,11 @@ where
             cases: Delimited { span: switch.cases.span, items: cases.leak() },
         };
 
-        Ok(Statement { meta: Flow { reachable, exit }, span, kind: StatementKind::Switch(self.arena.alloc(node)) })
+        Ok(Statement {
+            meta: Flow { reachable, exit },
+            span,
+            kind: StatementKind::Switch(self.arena.alloc(node)),
+            terminator,
+        })
     }
 }

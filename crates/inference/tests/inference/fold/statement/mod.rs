@@ -1,3 +1,4 @@
+use mago_hir::ir::statement::NamespaceBody;
 use mago_hir::ir::statement::StatementKind;
 
 use crate::harness::*;
@@ -81,9 +82,11 @@ test_inference! {
         assert!(!namespaces[1].meta.reachable, "namespace B follows a diverging namespace");
 
         let StatementKind::Namespace(b) = namespaces[1].kind else { panic!("expected a namespace") };
-        let any_inner_reachable = match b.statement.kind {
-            StatementKind::Sequence(statements) => statements.iter().any(|statement| statement.meta.reachable),
-            other => matches!(other, StatementKind::Expression(_)) && b.statement.meta.reachable,
+        let any_inner_reachable = match b.body {
+            NamespaceBody::BraceDelimited(block) => block.statements.iter().any(|statement| statement.meta.reachable),
+            NamespaceBody::Implicit { statements, .. } => {
+                statements.iter().any(|statement| statement.meta.reachable)
+            }
         };
         assert!(!any_inner_reachable, "$c = 2 inside the unreachable namespace B is unreachable too");
     }

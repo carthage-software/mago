@@ -3,6 +3,7 @@ use mago_allocator::vec::Vec;
 use mago_hir::ir::statement::For;
 use mago_hir::ir::statement::Statement;
 use mago_hir::ir::statement::StatementKind;
+use mago_hir::ir::statement::Terminator;
 use mago_oracle::id::SymbolId;
 use mago_oracle::ty::Type;
 use mago_span::Span;
@@ -18,6 +19,7 @@ where
     pub(crate) fn infer_for(
         &mut self,
         span: Span,
+        terminator: Option<Terminator>,
         for_loop: &'source For<'source, SymbolId, S, E>,
     ) -> InferenceResult<Statement<'arena, SymbolId, Flow, Type<'arena>>> {
         let mut initializations = Vec::new_in(self.arena);
@@ -47,6 +49,7 @@ where
             meta: Flow { reachable: outcome.reachable, exit: outcome.exit },
             span,
             kind: StatementKind::For(self.arena.alloc(node)),
+            terminator,
         })
     }
 }

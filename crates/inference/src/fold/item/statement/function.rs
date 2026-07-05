@@ -3,6 +3,7 @@ use mago_allocator::CopyInto;
 use mago_allocator::copy::copy_ref_into;
 use mago_allocator::copy::copy_slice_into;
 use mago_hir::ir::item::statement::function::Function;
+use mago_hir::ir::statement::Block;
 use mago_oracle::id::SymbolId;
 use mago_oracle::symbol::function_like::FunctionLikeSymbol;
 use mago_oracle::symbol::function_like::part::parameter::SignatureParameter;
@@ -36,7 +37,7 @@ where
         self.bind_signature_parameters(function.parameters.items, signature);
 
         let parameters = self.infer_parameters(&function.parameters, None)?;
-        let body = self.infer_statement(function.body)?;
+        let (body_statements, _) = self.infer_block(function.body.statements)?;
 
         self.environment = outer_environment;
         self.reachable = outer_reachable;
@@ -51,7 +52,7 @@ where
             parameters,
             return_type: function.return_type.map(|return_type| copy_ref_into(return_type, self.arena)),
             direct_accessed_globals: copy_slice_into(function.direct_accessed_globals, self.arena),
-            body: self.arena.alloc(body),
+            body: self.arena.alloc(Block { span: function.body.span, statements: body_statements }),
         })
     }
 

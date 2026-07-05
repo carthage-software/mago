@@ -1,4 +1,5 @@
 use mago_allocator::Arena;
+use mago_allocator::copy::copy_slice_into;
 use mago_allocator::vec::Vec;
 use mago_database::file::File;
 use mago_hir::ir::IR;
@@ -172,7 +173,12 @@ where
     ) -> InferenceResult<IR<'arena, SymbolId, Flow, Type<'arena>>> {
         let (statements, _exit) = self.infer_block(ir.statements)?;
 
-        Ok(IR { span: ir.span, statements, errors: self.arena.alloc_slice_copy(ir.errors) })
+        Ok(IR {
+            span: ir.span,
+            comments: copy_slice_into(ir.comments, self.arena),
+            statements,
+            errors: self.arena.alloc_slice_copy(ir.errors),
+        })
     }
 
     /// The union of two types.

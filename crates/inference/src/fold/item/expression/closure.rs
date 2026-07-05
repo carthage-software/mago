@@ -3,6 +3,7 @@ use mago_allocator::CopyInto;
 use mago_allocator::copy::copy_ref_into;
 use mago_allocator::copy::copy_slice_into;
 use mago_hir::ir::item::expression::closure::Closure;
+use mago_hir::ir::statement::Block;
 use mago_oracle::id::SymbolId;
 use mago_oracle::symbol::function_like::part::parameter::SignatureParameter;
 use mago_oracle::ty::Type;
@@ -44,7 +45,7 @@ where
         self.bind_signature_parameters(closure.parameters.items, signature);
 
         let parameters = self.infer_parameters(&closure.parameters, None)?;
-        let body = self.infer_statement(closure.body)?;
+        let (body_statements, body_exit) = self.infer_block(closure.body.statements)?;
 
         self.environment = outer;
         self.reachable = reachable;
@@ -59,12 +60,12 @@ where
             return_type: closure.return_type.map(|return_type| copy_ref_into(return_type, self.arena)),
             use_variables: closure.use_variables.map(|use_variables| use_variables.copy_into(self.arena)),
             direct_accessed_globals: copy_slice_into(closure.direct_accessed_globals, self.arena),
-            body: self.arena.alloc(body),
+            body: self.arena.alloc(Block { span: closure.body.span, statements: body_statements }),
         };
 
         let return_type = match declared_return {
             Some(declared) => declared,
-            None => self.infer_returned_type(node.body),
+            None => self.infer_returned_type(node.body, body_exit),
         };
 
         Ok((self.build_callable(signature, return_type), node))

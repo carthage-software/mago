@@ -25,9 +25,9 @@ test_inference! {
             "in the then-branch the condition holds, so $a['a'] is int(2) and $a['b'] is int(3)",
         );
 
-        let Some(otherwise) = conditional.r#else else { panic!("expected an else branch") };
+        let Some(else_clause) = conditional.else_clause else { panic!("expected an else branch") };
         assert_eq!(
-            place_reads(otherwise),
+            place_reads(else_clause.statement),
             vec!["int(1)|int(2)".to_string(), "int(3)|int(4)".to_string()],
             "the else-branch pins neither element, so each falls back to its shape union",
         );
@@ -45,6 +45,11 @@ fn collect_place_reads(statement: &TypedStatement<'_>, reads: &mut Vec<String>) 
         StatementKind::Expression(expression) => reads.push(expression.meta.to_string()),
         StatementKind::Sequence(statements) => {
             for statement in statements {
+                collect_place_reads(statement, reads);
+            }
+        }
+        StatementKind::Block(block) => {
+            for statement in block.statements {
                 collect_place_reads(statement, reads);
             }
         }

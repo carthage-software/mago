@@ -451,7 +451,7 @@ fn function_return_value<'arena>(ir: TypedIr<'arena>, name: &[u8]) -> Option<&'a
         if let ItemStatementKind::Function(function) = item.kind
             && function.name.value == name
         {
-            return returned_value(function.body);
+            return function.body.statements.iter().find_map(returned_value);
         }
     }
 
@@ -496,7 +496,7 @@ fn method_return_value<'arena>(ir: TypedIr<'arena>, name: &[u8]) -> Option<&'are
                 && method.name.value == name
                 && let Some(body) = method.body
             {
-                return returned_value(body);
+                return body.statements.iter().find_map(returned_value);
             }
         }
     }

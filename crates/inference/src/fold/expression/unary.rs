@@ -6,8 +6,8 @@ use mago_hir::ir::expression::Expression;
 use mago_hir::ir::expression::ExpressionKind;
 use mago_hir::ir::expression::UnaryPostfix;
 use mago_hir::ir::expression::UnaryPrefix;
-use mago_hir::ir::expression::operator::UnaryPostfixOperator;
-use mago_hir::ir::expression::operator::UnaryPrefixOperator;
+use mago_hir::ir::expression::operator::UnaryPostfixOperatorKind;
+use mago_hir::ir::expression::operator::UnaryPrefixOperatorKind;
 use mago_hir::ir::variable::Variable;
 use mago_oracle::id::SymbolId;
 use mago_oracle::ty::Atom;
@@ -54,14 +54,14 @@ where
         let meta = if operand.meta.is_never() {
             TYPE_NEVER
         } else {
-            match unary.operator {
-                UnaryPrefixOperator::PreIncrement => {
+            match unary.operator.kind {
+                UnaryPrefixOperatorKind::PreIncrement => {
                     let incremented = self.increment_type(operand.meta);
                     self.write_back(unary.operand, incremented);
 
                     incremented
                 }
-                UnaryPrefixOperator::PreDecrement => {
+                UnaryPrefixOperatorKind::PreDecrement => {
                     let decremented = self.decrement_type(operand.meta);
                     self.write_back(unary.operand, decremented);
 
@@ -86,9 +86,9 @@ where
         let meta = if operand.meta.is_never() {
             TYPE_NEVER
         } else {
-            let updated = match unary.operator {
-                UnaryPostfixOperator::PostIncrement => self.increment_type(operand.meta),
-                UnaryPostfixOperator::PostDecrement => self.decrement_type(operand.meta),
+            let updated = match unary.operator.kind {
+                UnaryPostfixOperatorKind::PostIncrement => self.increment_type(operand.meta),
+                UnaryPostfixOperatorKind::PostDecrement => self.decrement_type(operand.meta),
             };
             self.write_back(unary.operand, updated);
 
@@ -100,9 +100,9 @@ where
         Ok(Expression { meta, span, kind: ExpressionKind::UnaryPostfix(self.arena.alloc(unary)) })
     }
 
-    fn unary_prefix_type(&mut self, operator: UnaryPrefixOperator, operand: Type<'arena>) -> Type<'arena> {
+    fn unary_prefix_type(&mut self, operator: UnaryPrefixOperatorKind, operand: Type<'arena>) -> Type<'arena> {
         match operator {
-            UnaryPrefixOperator::Negation => match number_of(operand) {
+            UnaryPrefixOperatorKind::Negation => match number_of(operand) {
                 Some(Number::Int(value)) => match value.checked_neg() {
                     Some(value) => self.ty.int_literal_type(value),
                     None => self.ty.float_literal_type(-(value as f64)),
@@ -110,17 +110,17 @@ where
                 Some(Number::Float(value)) => self.ty.float_literal_type(-value),
                 None => TYPE_INT_OR_FLOAT,
             },
-            UnaryPrefixOperator::Plus => match number_of(operand) {
+            UnaryPrefixOperatorKind::Plus => match number_of(operand) {
                 Some(Number::Int(value)) => self.ty.int_literal_type(value),
                 Some(Number::Float(value)) => self.ty.float_literal_type(value),
                 None => TYPE_INT_OR_FLOAT,
             },
-            UnaryPrefixOperator::Not => match truthiness(operand) {
+            UnaryPrefixOperatorKind::Not => match truthiness(operand) {
                 Some(true) => TYPE_FALSE,
                 Some(false) => TYPE_TRUE,
                 None => TYPE_BOOL,
             },
-            UnaryPrefixOperator::BitwiseNot => {
+            UnaryPrefixOperatorKind::BitwiseNot => {
                 if let Some(bytes) = literal_string_bytes(operand) {
                     let mut result = Vec::new_in(self.source);
                     for byte in bytes {
@@ -135,30 +135,30 @@ where
                     }
                 }
             }
-            UnaryPrefixOperator::IntCast => match cast_number(operand) {
+            UnaryPrefixOperatorKind::IntCast(_) => match cast_number(operand) {
                 Some(number) => self.ty.int_literal_type(number.to_int()),
                 None => TYPE_INT,
             },
-            UnaryPrefixOperator::FloatCast => match cast_number(operand) {
+            UnaryPrefixOperatorKind::FloatCast(_) => match cast_number(operand) {
                 Some(number) => self.ty.float_literal_type(number.as_f64()),
                 None => TYPE_FLOAT,
             },
-            UnaryPrefixOperator::BoolCast => match truthiness(operand) {
+            UnaryPrefixOperatorKind::BoolCast(_) => match truthiness(operand) {
                 Some(true) => TYPE_TRUE,
                 Some(false) => TYPE_FALSE,
                 None => TYPE_BOOL,
             },
-            UnaryPrefixOperator::StringCast => {
+            UnaryPrefixOperatorKind::StringCast(_) => {
                 let mut bytes = Vec::new_in(self.source);
                 if append_string(&mut bytes, operand) { self.ty.string_literal_type(&bytes) } else { TYPE_STRING }
             }
-            UnaryPrefixOperator::ArrayCast => self.ty.union_of(&[ARRAY_KEY_MIXED]),
-            UnaryPrefixOperator::ObjectCast => TYPE_OBJECT,
-            UnaryPrefixOperator::UnsetCast | UnaryPrefixOperator::VoidCast => TYPE_NULL,
-            UnaryPrefixOperator::ErrorControl
-            | UnaryPrefixOperator::Reference
-            | UnaryPrefixOperator::PreIncrement
-            | UnaryPrefixOperator::PreDecrement => operand,
+            UnaryPrefixOperatorKind::ArrayCast => self.ty.union_of(&[ARRAY_KEY_MIXED]),
+            UnaryPrefixOperatorKind::ObjectCast => TYPE_OBJECT,
+            UnaryPrefixOperatorKind::UnsetCast | UnaryPrefixOperatorKind::VoidCast => TYPE_NULL,
+            UnaryPrefixOperatorKind::ErrorControl
+            | UnaryPrefixOperatorKind::Reference
+            | UnaryPrefixOperatorKind::PreIncrement
+            | UnaryPrefixOperatorKind::PreDecrement => operand,
         }
     }
 

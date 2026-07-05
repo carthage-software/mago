@@ -2,6 +2,7 @@ use mago_allocator::Arena;
 use mago_hir::ir::expression::Expression;
 use mago_hir::ir::statement::Statement;
 use mago_hir::ir::statement::StatementKind;
+use mago_hir::ir::statement::Terminator;
 use mago_oracle::id::SymbolId;
 use mago_oracle::ty::Type;
 use mago_span::Span;
@@ -18,6 +19,7 @@ where
     pub(crate) fn infer_continue(
         &mut self,
         span: Span,
+        terminator: Option<Terminator>,
         level: Option<&'source Expression<'source, SymbolId, S, E>>,
     ) -> InferenceResult<Statement<'arena, SymbolId, Flow, Type<'arena>>> {
         let reachable = self.reachable;
@@ -33,6 +35,6 @@ where
             None => ControlFlow::Diverge,
         };
 
-        Ok(Statement { meta: Flow { reachable, exit }, span, kind: StatementKind::Continue(level) })
+        Ok(Statement { meta: Flow { reachable, exit }, span, kind: StatementKind::Continue(level), terminator })
     }
 }

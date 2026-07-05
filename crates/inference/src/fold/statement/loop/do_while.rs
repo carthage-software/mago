@@ -2,6 +2,7 @@ use mago_allocator::Arena;
 use mago_hir::ir::statement::DoWhile;
 use mago_hir::ir::statement::Statement;
 use mago_hir::ir::statement::StatementKind;
+use mago_hir::ir::statement::Terminator;
 use mago_oracle::id::SymbolId;
 use mago_oracle::ty::Type;
 use mago_span::Span;
@@ -18,6 +19,7 @@ where
     pub(crate) fn infer_do_while(
         &mut self,
         span: Span,
+        terminator: Option<Terminator>,
         do_while: &'source DoWhile<'source, SymbolId, S, E>,
     ) -> InferenceResult<Statement<'arena, SymbolId, Flow, Type<'arena>>> {
         let infinite = is_truthy_literal(do_while.condition);
@@ -30,6 +32,7 @@ where
             meta: Flow { reachable: outcome.reachable, exit: outcome.exit },
             span,
             kind: StatementKind::DoWhile(self.arena.alloc(node)),
+            terminator,
         })
     }
 }
