@@ -28,8 +28,6 @@ jobs:
         include:
           - { crate: syntax, target: parser, seeds: "../analyzer/tests/cases ../formatter/tests/cases" }
           - { crate: syntax, target: lexer, seeds: "../analyzer/tests/cases ../formatter/tests/cases" }
-          - { crate: type-syntax, target: parser, seeds: "fuzz/seeds/parser" }
-          - { crate: type-syntax, target: lexer, seeds: "fuzz/seeds/lexer" }
           - { crate: twig-syntax, target: parser, seeds: "fuzz/seeds/parser" }
           - { crate: twig-syntax, target: lexer, seeds: "fuzz/seeds/lexer" }
 

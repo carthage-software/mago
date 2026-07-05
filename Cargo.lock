@@ -1573,18 +1573,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "mago-docblock"
-version = "1.42.0"
-dependencies = [
- "mago-allocator",
- "mago-database",
- "mago-span",
- "mago-syntax",
- "memchr",
- "serde",
-]
-
-[[package]]
 name = "mago-documentation"
 version = "1.42.0"
 dependencies = [
@@ -1892,20 +1880,6 @@ dependencies = [
  "mago-syntax-core",
  "memchr",
  "paste",
- "serde",
- "strum 0.28.0",
-]
-
-[[package]]
-name = "mago-type-syntax"
-version = "1.42.0"
-dependencies = [
- "codspeed-criterion-compat",
- "mago-allocator",
- "mago-database",
- "mago-span",
- "mago-syntax-core",
- "ordered-float",
  "serde",
  "strum 0.28.0",
 ]

@@ -1,1 +1,0 @@
-array{count: int, ...<string, mixed>}

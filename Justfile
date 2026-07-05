@@ -69,14 +69,6 @@ fuzz-twig-lexer:
 fuzz-twig-parser:
     cd crates/twig-syntax/fuzz && cargo +{{nightly}} fuzz run parser corpus/parser seeds/parser
 
-# Fuzz the type lexer.
-fuzz-type-lexer:
-    cd crates/type-syntax/fuzz && cargo +{{nightly}} fuzz run lexer corpus/lexer seeds/lexer
-
-# Fuzz the type parser.
-fuzz-type-parser:
-    cd crates/type-syntax/fuzz && cargo +{{nightly}} fuzz run parser corpus/parser seeds/parser
-
 # Publishes all crates to crates.io in the correct order.
 publish:
     # Note: the order of publishing is important, as some crates depend on others.
@@ -92,13 +84,11 @@ publish:
     cargo publish -p mago-syntax-core
     cargo publish -p mago-syntax
     cargo publish -p mago-phpdoc-syntax
-    cargo publish -p mago-type-syntax
     cargo publish -p mago-twig-syntax
     cargo publish -p mago-flags
     cargo publish -p mago-hir
     cargo publish -p mago-collector
     cargo publish -p mago-composer
-    cargo publish -p mago-docblock
     cargo publish -p mago-formatter
     cargo publish -p mago-names
     cargo publish -p mago-semantics
