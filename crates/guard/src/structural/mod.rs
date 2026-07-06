@@ -128,7 +128,11 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
             }
 
             if let Some(must_be_final) = structural_rule.must_be_final {
-                let is_final = class.modifiers.contains_final();
+                let is_final = context
+                    .codebase
+                    .get_class(fqn)
+                    .map(|c| c.flags.is_final())
+                    .unwrap_or(class.modifiers.contains_final());
 
                 match (must_be_final, is_final) {
                     (true, false) => {
