@@ -99,13 +99,13 @@ where
                 if union_comparison_result.type_coerced_from_nested_mixed.unwrap_or(false) {
                     issue_kind = IssueCode::MixedPropertyTypeCoercion;
                     issue = Issue::error(format!(
-                        "A value with a less specific type `{assigned_type_str}` is being assigned to property `${property_name}` ({property_type_str})."
+                        "A value with a less specific type `{assigned_type_str}` is being assigned to property `{property_name}` ({property_type_str})."
                     ))
                     .with_note("The assigned value contains a nested `mixed` type, which can hide potential bugs.");
                 } else {
                     issue_kind = IssueCode::PropertyTypeCoercion;
                     issue = Issue::error(format!(
-                        "A value of a less specific type `{assigned_type_str}` is being assigned to property `${property_name}` ({property_type_str})."
+                        "A value of a less specific type `{assigned_type_str}` is being assigned to property `{property_name}` ({property_type_str})."
                     ))
                     .with_note(format!("While `{assigned_type_str}` can be assigned to `{property_type_str}`, it is a wider type which may accept values that are invalid for this property."));
                 }
