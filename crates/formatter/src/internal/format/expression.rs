@@ -1154,11 +1154,20 @@ where
     A: Arena,
 {
     wrap!(f, arm, MatchDefaultArm, {
+        let expression_has_leading_own_line_comment =
+            has_match_arm_rhs_leading_comment_after_arrow(f, arm.arrow.end_offset(), arm.expression);
+
+        let rhs = if expression_has_leading_own_line_comment {
+            Document::Indent(vec_in![f.arena; Document::Line(Line::hard()), arm.expression.format(f)])
+        } else {
+            arm.expression.format(f)
+        };
+
         Document::Group(Group::new(vec_in![f.arena;
             arm.default.format(f),
             match_arm_alignment_padding(f, alignment),
             format_token(f, arm.arrow, b" => "),
-            arm.expression.format(f),
+            rhs,
         ]))
     })
 }
@@ -1173,6 +1182,8 @@ where
 {
     wrap!(f, arm, MatchExpressionArm, {
         let len = arm.conditions.len();
+        let expression_has_leading_own_line_comment =
+            has_match_arm_rhs_leading_comment_after_arrow(f, arm.arrow.end_offset(), arm.expression);
 
         let must_break = arm
             .conditions
@@ -1201,14 +1212,34 @@ where
             ],
         )));
 
+        let rhs = if expression_has_leading_own_line_comment {
+            Document::Indent(vec_in![f.arena; Document::Line(Line::hard()), arm.expression.format(f)])
+        } else {
+            arm.expression.format(f)
+        };
+
         Document::Group(
             Group::new(vec_in![f.arena;
                 Document::Group(Group::new(contents).with_break_mode(if must_break { BreakMode::Force } else { BreakMode::Auto })),
-                arm.expression.format(f),
+                rhs,
             ])
             .with_id(group_id)
             .with_break_mode(if must_break { BreakMode::Force } else { BreakMode::Auto }),
         )
+    })
+}
+
+fn has_match_arm_rhs_leading_comment_after_arrow<'arena, A>(
+    f: &FormatterState<'_, 'arena, A>,
+    arrow_end: u32,
+    expression: &'arena Expression<'arena>,
+) -> bool
+where
+    A: Arena,
+{
+    f.has_comment_with_filter(expression.span(), CommentFlags::LEADING, |comment| {
+        comment.start >= arrow_end
+            && (f.has_newline(comment.end, false) || misc::has_new_line_in_range(f.source_text, comment.start, comment.end))
     })
 }
 

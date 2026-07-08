@@ -462,6 +462,8 @@ test_case!(issue_1874);
 test_case!(issue_1875);
 test_case!(issue_2038);
 test_case!(issue_2038_parenthesized_array_access_bases);
+test_case!(issue_2060);
+test_case!(issue_2063);
 test_case!(issue_2032);
 test_case!(issue_2032_nested_function_argument);
 test_case!(member_access_chain_keeps_breaks_with_comments);

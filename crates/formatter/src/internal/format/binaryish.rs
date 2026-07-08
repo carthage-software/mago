@@ -120,6 +120,9 @@ where
     let left = unwrap_parenthesized(left);
     let right = unwrap_parenthesized(right);
 
+    let preserves_breaking_layout = f.settings.preserve_breaking_binary_expression
+        && misc::has_new_line_in_range(f.source_text, left.end_offset(), original_right.start_offset());
+
     let grandparent = f.grandparent_node();
 
     let is_inside_parenthesis = f.is_wrapped_in_parens
@@ -186,11 +189,13 @@ where
     if is_inside_parenthesis {
         let lhs_is_binary = left.is_binary();
         let rhs_is_binary = right.is_binary();
-        if (!lhs_is_binary && !rhs_is_binary) || !operator.is_logical() {
+        if ((!lhs_is_binary && !rhs_is_binary) || !operator.is_logical()) && !preserves_breaking_layout {
             return Document::Group(Group::new(parts));
         }
 
-        return Document::Array(parts);
+        if !preserves_breaking_layout {
+            return Document::Array(parts);
+        }
     }
 
     if is_at_callee(f) || matches!(f.grandparent_node(), Some(Node::UnaryPrefix(_) | Node::UnaryPostfix(_))) {
@@ -205,7 +210,7 @@ where
         Some(Node::Binary(parent_binary))
             if (parent_binary.operator.is_comparison() && operator.is_comparison())
                 || (parent_binary.operator.is_logical() && operator.is_logical())
-    ) || matches!(grandparent, Some(Node::Return(_) | Node::Throw(_)))
+    ) || (matches!(grandparent, Some(Node::Return(_) | Node::Throw(_))) && !preserves_breaking_layout)
         || matches!(grandparent, Some(Node::ArrowFunction(func)) if func.arrow.is_before(&operator.span()))
         || matches!(grandparent, Some(Node::For(r#for)) if r#for.body.span().is_after(&operator.span()))
         || (matches!(grandparent, Some(Node::Conditional(_)))
@@ -253,11 +258,17 @@ where
     // When indent_binary_expression_continuation is enabled in an assignment
     // context, operators like ?? that would normally skip indentation (because
     // their RHS is "inlined") should still get indented.
+    let preserve_breaking_continuation = preserves_breaking_layout
+        && (should_indent_if_inlining
+            || f.is_wrapped_in_parens
+            || matches!(grandparent, Some(Node::Return(_) | Node::Throw(_))));
+
     let indent_continuation = should_inline_logical_or_coalesce_rhs
         && !same_precedence_sub_expression
         && f.settings.indent_binary_expression_continuation
         && (should_indent_if_inlining
-            || matches!(f.parent_node(), Node::Assignment(_) | Node::PropertyItem(_) | Node::ConstantItem(_)));
+            || matches!(f.parent_node(), Node::Assignment(_) | Node::PropertyItem(_) | Node::ConstantItem(_)))
+        || preserve_breaking_continuation;
 
     if should_inline_logical_or_coalesce_rhs && !same_precedence_sub_expression && !indent_continuation {
         return Document::Group(Group::new(parts));
