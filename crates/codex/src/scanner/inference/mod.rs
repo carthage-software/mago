@@ -15,6 +15,7 @@ use mago_syntax::cst::Binary;
 use mago_syntax::cst::BinaryOperator;
 use mago_syntax::cst::ClassConstantAccess;
 use mago_syntax::cst::ClassLikeConstantSelector;
+use mago_syntax::cst::ClassLikeMemberSelector;
 use mago_syntax::cst::Construct;
 use mago_syntax::cst::Expression;
 use mago_syntax::cst::Identifier;
@@ -39,6 +40,8 @@ use crate::ttype::atomic::array::TArray;
 use crate::ttype::atomic::array::keyed::TKeyedArray;
 use crate::ttype::atomic::array::list::TList;
 use crate::ttype::atomic::callable::TCallable;
+use crate::ttype::atomic::derived::TDerived;
+use crate::ttype::atomic::derived::value_of::TValueOf;
 use crate::ttype::atomic::reference::TReference;
 use crate::ttype::atomic::reference::TReferenceMemberSelector;
 use crate::ttype::atomic::scalar::TScalar;
@@ -507,6 +510,45 @@ where
                     member_selector: TReferenceMemberSelector::Identifier(word(identifier.value)),
                 })
             }))
+        }
+        Expression::Access(Access::Property(property_access)) => {
+            let ClassLikeMemberSelector::Identifier(property_name) = &property_access.property else {
+                return None;
+            };
+
+            if !property_name.value.eq_ignore_ascii_case(b"value") {
+                return None;
+            }
+
+            let Expression::Access(Access::ClassConstant(ClassConstantAccess {
+                class,
+                constant: ClassLikeConstantSelector::Identifier(case_name),
+                ..
+            })) = property_access.object
+            else {
+                return None;
+            };
+
+            let class_name = if let Expression::Identifier(identifier) = class {
+                context.resolved_names.get(identifier)
+            } else {
+                return None;
+            };
+
+            let object_type = infer_with_constants(context, scope, property_access.object, enclosing_class, constants)?;
+
+            let class_like_name = word(class_name);
+            let expected_case = TAtomic::Reference(TReference::Member {
+                class_like_name,
+                member_selector: TReferenceMemberSelector::Identifier(word(case_name.value)),
+            });
+
+            let is_known_case_reference = object_type.types.len() == 1 && object_type.types[0] == expected_case;
+            if !is_known_case_reference {
+                return None;
+            }
+
+            Some(TUnion::from_atomic(TAtomic::Derived(TDerived::ValueOf(TValueOf::new(Arc::new(object_type))))))
         }
         Expression::Array(Array { elements, .. }) | Expression::LegacyArray(LegacyArray { elements, .. })
             if is_list_array_expression(expression) =>
