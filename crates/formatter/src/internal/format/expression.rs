@@ -1239,7 +1239,8 @@ where
 {
     f.has_comment_with_filter(expression.span(), CommentFlags::LEADING, |comment| {
         comment.start >= arrow_end
-            && (f.has_newline(comment.end, false) || misc::has_new_line_in_range(f.source_text, comment.start, comment.end))
+            && (f.has_newline(comment.end, false)
+                || misc::has_new_line_in_range(f.source_text, comment.start, comment.end))
     })
 }
 
