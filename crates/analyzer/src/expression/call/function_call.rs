@@ -1082,8 +1082,8 @@ mod tests {
             foo(ChangeKind::REMOVE); // Error: 'remove' does not match any pattern
         "},
         issues = [
-            IssueCode::PossiblyInvalidArgument,
-            IssueCode::PossiblyInvalidArgument,
+            IssueCode::InvalidArgument,
+            IssueCode::InvalidArgument,
         ],
     }
 
