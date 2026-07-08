@@ -617,9 +617,15 @@ pub(crate) fn can_be_identical(
 
     if let (TAtomic::Object(TObject::Enum(first_enum)), TAtomic::Object(TObject::Enum(second_enum))) =
         (first_part, second_part)
-        && first_enum.name == second_enum.name
     {
-        return true;
+        if first_enum.name != second_enum.name {
+            return false;
+        }
+
+        return match (first_enum.case, second_enum.case) {
+            (Some(first_case), Some(second_case)) => first_case == second_case,
+            _ => true,
+        };
     }
 
     if (first_part.is_list() && second_part.is_non_empty_list())
