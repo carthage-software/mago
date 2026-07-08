@@ -618,7 +618,7 @@ pub(crate) fn can_be_identical(
     if let (TAtomic::Object(TObject::Enum(first_enum)), TAtomic::Object(TObject::Enum(second_enum))) =
         (first_part, second_part)
     {
-        if first_enum.name != second_enum.name {
+        if !first_enum.name.as_bytes().eq_ignore_ascii_case(second_enum.name.as_bytes()) {
             return false;
         }
 
