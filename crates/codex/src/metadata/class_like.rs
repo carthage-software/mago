@@ -461,6 +461,10 @@ impl ClassLikeMetadata {
     #[must_use]
     pub fn get_missing_required_extends<'meta>(&self, other: &'meta ClassLikeMetadata) -> Option<&'meta Word> {
         for required_extend in &other.require_extends {
+            if self.name == *required_extend {
+                continue;
+            }
+
             if self.all_parent_classes.contains(required_extend) {
                 continue;
             }
