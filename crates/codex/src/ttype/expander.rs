@@ -10,6 +10,7 @@ use mago_word::ascii_lowercase_word;
 
 use crate::identifier::function_like::FunctionLikeIdentifier;
 use crate::metadata::CodebaseMetadata;
+use crate::metadata::class_like::ClassLikeMetadata;
 use crate::metadata::function_like::FunctionLikeMetadata;
 use crate::ttype::TType;
 use crate::ttype::atomic::TAtomic;
@@ -28,6 +29,7 @@ use crate::ttype::atomic::derived::new::TNew;
 use crate::ttype::atomic::derived::properties_of::TPropertiesOf;
 use crate::ttype::atomic::derived::template_type::TTemplateType;
 use crate::ttype::atomic::derived::value_of::TValueOf;
+use crate::ttype::atomic::generic::TGenericParameter;
 use crate::ttype::atomic::mixed::TMixed;
 use crate::ttype::atomic::object::TObject;
 use crate::ttype::atomic::object::named::TNamedObject;
@@ -153,6 +155,11 @@ pub struct TypeExpansionOptions {
     pub function_is_final: bool,
     pub expand_generic: bool,
     pub expand_templates: bool,
+    /// True when expanding the return type of a method resolved through `@mixin`:
+    /// a pre-bound `static` that reaches the receiver through mixin tags rebinds
+    /// to the receiver. Elsewhere the mixin relationship between two class names
+    /// says nothing about how a value was obtained, so no rebinding happens.
+    pub allow_mixin_static_rebind: bool,
 }
 
 impl Default for TypeExpansionOptions {
@@ -166,6 +173,7 @@ impl Default for TypeExpansionOptions {
             function_is_final: false,
             expand_generic: false,
             expand_templates: true,
+            allow_mixin_static_rebind: false,
         }
     }
 }
@@ -627,6 +635,19 @@ fn resolve_special_class_names(object: &mut TObject, codebase: &CodebaseMetadata
         return;
     }
 
+    // A pre-bound `static` type also rebinds to an enum receiver, but only when
+    // the receiver is compatible: an instance of the named class, or reaching it
+    // through `@mixin` tags.
+    if matches!(special, SpecialClassName::None)
+        && named.is_static
+        && let StaticClassType::Object(TObject::Enum(static_enum)) = &options.static_class_type
+        && (codebase.is_instance_of(static_enum.name.as_bytes(), named.name.as_bytes())
+            || (options.allow_mixin_static_rebind && reaches_through_mixins(static_enum.name, named.name, codebase)))
+    {
+        *object = TObject::Enum(static_enum.clone());
+        return;
+    }
+
     let TObject::Named(named) = object else {
         return;
     };
@@ -667,15 +688,35 @@ fn resolve_static_type(
 ) {
     match &options.static_class_type {
         StaticClassType::Object(TObject::Named(static_obj)) => {
-            if check_compatibility && !is_static_type_compatible(named, static_obj, codebase) {
-                return;
+            // When `check_compatibility` is false, `named.name` is the literal
+            // `static`/`$this` keyword rather than a class name, so no
+            // compatibility or mixin-reachability question arises.
+            let mut crosses_mixin = false;
+            if check_compatibility
+                && !codebase.is_instance_of(static_obj.name.as_bytes(), named.name.as_bytes())
+                && !intersection_object_names(static_obj)
+                    .any(|name| codebase.is_instance_of(name.as_bytes(), named.name.as_bytes()))
+            {
+                crosses_mixin = options.allow_mixin_static_rebind
+                    && (reaches_through_mixins(static_obj.name, named.name, codebase)
+                        || intersection_object_names(static_obj)
+                            .any(|name| reaches_through_mixins(name, named.name, codebase)));
+
+                if !crosses_mixin {
+                    return;
+                }
             }
 
             if let Some(intersections) = &static_obj.intersection_types {
                 named.intersection_types.get_or_insert_with(Vec::new).extend(intersections.iter().cloned());
             }
 
-            if static_obj.type_parameters.is_some() && should_use_static_type_params(named, static_obj, codebase) {
+            // When the receiver reaches the declaring class through `@mixin`, the
+            // declaring class's type parameters do not apply to it; the receiver's
+            // own parameters (if any) are the correct ones.
+            if crosses_mixin
+                || (static_obj.type_parameters.is_some() && should_use_static_type_params(named, static_obj, codebase))
+            {
                 named.type_parameters.clone_from(&static_obj.type_parameters);
             }
 
@@ -711,15 +752,67 @@ fn is_effectively_final(class_name: &Word, codebase: &CodebaseMetadata, options:
     codebase.get_class_like(class_name.as_bytes()).is_some_and(|meta| meta.name_span.is_none() || meta.flags.is_final())
 }
 
-/// Checks if the static object type is compatible with a type that has is_this=true.
-fn is_static_type_compatible(named: &TNamedObject, static_obj: &TNamedObject, codebase: &CodebaseMetadata) -> bool {
-    codebase.is_instance_of(static_obj.name.as_bytes(), named.name.as_bytes())
-        || static_obj
-            .intersection_types
-            .iter()
-            .flatten()
-            .filter_map(|t| if let TAtomic::Object(obj) = t { obj.get_name() } else { None })
-            .any(|name| codebase.is_instance_of(name.as_bytes(), named.name.as_bytes()))
+/// Iterates the class names of an object's intersection types.
+fn intersection_object_names(obj: &TNamedObject) -> impl Iterator<Item = Word> {
+    obj.intersection_types
+        .iter()
+        .flatten()
+        .filter_map(|t| if let TAtomic::Object(obj) = t { obj.get_name() } else { None })
+}
+
+/// Checks whether `class_name` reaches `target_name` through a chain of `@mixin`
+/// tags. Methods pulled in via `@mixin` have their `static` return types pre-bound
+/// to the mixin class, so rebinding them to the class carrying the tag must treat
+/// that class as compatible.
+fn reaches_through_mixins(class_name: Word, target_name: Word, codebase: &CodebaseMetadata) -> bool {
+    let Some(metadata) = codebase.get_class_like(class_name.as_bytes()) else {
+        return false;
+    };
+
+    // Direct mixins cover the overwhelmingly common case; the walk only
+    // descends into (and only allocates for) mixins that are chained.
+    let mut visited = HashSet::with_hasher(FixedState::with_seed(0));
+    let mut stack = Vec::new();
+    let mut current = metadata;
+    loop {
+        for (mixin_name, mixin_metadata) in direct_mixins(current, codebase) {
+            if codebase.is_instance_of(mixin_name.as_bytes(), target_name.as_bytes()) {
+                return true;
+            }
+
+            if let Some(mixin_metadata) = mixin_metadata
+                && !mixin_metadata.mixins.is_empty()
+                && visited.insert(mixin_name)
+            {
+                stack.push(mixin_metadata);
+            }
+        }
+
+        let Some(next) = stack.pop() else {
+            return false;
+        };
+        current = next;
+    }
+}
+
+/// Iterates the classes directly named by a class's `@mixin` tags, along with
+/// their metadata if known. A generic-parameter mixin (`@mixin T`) names its
+/// classes through the template constraint.
+fn direct_mixins<'ctx>(
+    metadata: &'ctx ClassLikeMetadata,
+    codebase: &'ctx CodebaseMetadata,
+) -> impl Iterator<Item = (Word, Option<&'ctx ClassLikeMetadata>)> {
+    metadata.mixins.iter().flat_map(|mixin| mixin.types.as_ref().iter()).flat_map(move |mixin_type| {
+        let atomics = match mixin_type {
+            TAtomic::GenericParameter(TGenericParameter { constraint, .. }) => constraint.types.as_ref(),
+            other => std::slice::from_ref(other),
+        };
+
+        atomics.iter().filter_map(move |atomic| {
+            let mixin_name = atomic.get_object_or_enum_name()?;
+            Some((mixin_name, codebase.get_class_like(mixin_name.as_bytes())))
+        })
+    })
 }
 
 /// Returns true if we should use the static object's type parameters instead of the current ones.
@@ -2646,6 +2739,7 @@ mod tests {
             function_is_final: false,
             expand_generic: false,
             expand_templates: false,
+            allow_mixin_static_rebind: false,
         };
 
         let mut actual = input;

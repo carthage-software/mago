@@ -447,6 +447,7 @@ where
         classname: called_on_class_metadata.original_name,
         method_identifier: declaring_method_id,
         static_class_type,
+        declaring_object: None,
         is_static: function_like.method_metadata.as_ref().is_some_and(|m| m.is_static),
         mixin_without_magic_method: None,
     })
@@ -803,6 +804,7 @@ where
         classname: mixin_metadata.original_name,
         method_identifier: declaring_method_id,
         static_class_type,
+        declaring_object: None,
         is_static: function_like.method_metadata.as_ref().is_some_and(|m| m.is_static),
         mixin_without_magic_method: None,
     })

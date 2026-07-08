@@ -431,6 +431,7 @@ where
                 declaring_method_id,
                 class_like_metadata,
                 class_type: StaticClassType::Name(original_class_name),
+                declaring_object_type: None,
             })
         } else {
             None

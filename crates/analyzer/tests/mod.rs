@@ -822,6 +822,7 @@ test_case!(bad_path_assignment_to_this);
 test_case!(typed_property_null_coalesce);
 test_case!(docblock_var_override_foreach);
 test_case!(mixin);
+test_case!(mixin_this_return);
 test_case!(issue_contravariant_params_diamond);
 test_case!(issue_contravariant_params_simple);
 test_case!(anonymous_class_constructor_args);

@@ -100,6 +100,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for MethodPartialApplication<'arena>
                     declaring_method_id: Some(resolved_method.method_identifier),
                     class_like_metadata: class_metadata,
                     class_type: resolved_method.static_class_type,
+                    declaring_object_type: resolved_method.declaring_object,
                 };
 
                 let original_parameters: Vec<_> =

@@ -212,6 +212,7 @@ where
         declaring_method_id: Some(method_identifier),
         class_like_metadata,
         class_type: StaticClassType::Object(object_type.clone()),
+        declaring_object_type: None,
     };
 
     let invocation = Invocation::new(
@@ -315,6 +316,7 @@ where
             declaring_method_id: Some(resolved_method.method_identifier),
             class_like_metadata: metadata,
             class_type: resolved_method.static_class_type,
+            declaring_object_type: resolved_method.declaring_object,
         };
 
         invocation_targets.push(InvocationTarget::FunctionLike {
@@ -404,6 +406,7 @@ where
                 declaring_method_id: Some(magic_call_method.method_identifier),
                 class_like_metadata,
                 class_type: magic_call_method.static_class_type,
+                declaring_object_type: magic_call_method.declaring_object,
             }),
             span,
         };
