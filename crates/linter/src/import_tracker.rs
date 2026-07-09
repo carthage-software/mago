@@ -325,6 +325,14 @@ impl ImportTracker {
         self.scope.sole_function_import_use_span.get(&lookup).copied()
     }
 
+    /// Like [`sole_function_import_use_span`] but removes the entry after
+    /// returning it; subsequent calls for the same `local` return `None`,
+    /// preventing duplicate delete edits.
+    pub fn take_sole_function_import_use_span(&mut self, local: &[u8]) -> Option<Span> {
+        let lookup = ascii_lowercase_word(local);
+        self.scope.sole_function_import_use_span.remove(&lookup)
+    }
+
     pub fn import(&mut self, fqn: &[u8], kind: ImportKind) -> Option<ImportResolution> {
         let (namespace_part, short_part) = split_fqn(fqn)?;
         if is_reserved_type_name(short_part, kind) {

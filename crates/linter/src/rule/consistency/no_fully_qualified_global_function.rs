@@ -216,7 +216,8 @@ impl LintRule for NoFullyQualifiedGlobalFunctionRule {
             })
             .with_help(help);
 
-        let orphaned_use_span = if is_bare_call { ctx.sole_function_import_use_span(identifier.value()) } else { None };
+        let orphaned_use_span =
+            if is_bare_call { ctx.take_sole_function_import_use_span(identifier.value()) } else { None };
 
         match (resolution, replacement) {
             (Some(resolution), Some(replacement)) => {
@@ -791,6 +792,47 @@ mod tests {
 
             $n = Str\length($s);
             $m = Str\length($t);
+        "#}
+    }
+
+    test_lint_fix! {
+        name = namespaced_fix_migrates_multiple_functions_from_same_namespace,
+        rule = NoFullyQualifiedGlobalFunctionRule,
+        settings = |s: &mut crate::settings::Settings| {
+            s.rules.no_fully_qualified_global_function.config.namespaced = true;
+        },
+        code = indoc! {r#"
+            <?php
+
+            declare(strict_types=1);
+
+            use function Some\Ns\bar;
+            use function Some\Ns\baz;
+            use function Some\Ns\foo;
+
+            function foobarbaz(): void
+            {
+                foo();
+                foo(bar());
+                foo(bar(baz()));
+            }
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            declare(strict_types=1);
+
+
+
+
+            use Some\Ns;
+
+            function foobarbaz(): void
+            {
+                Ns\foo();
+                Ns\foo(Ns\bar());
+                Ns\foo(Ns\bar(Ns\baz()));
+            }
         "#}
     }
 

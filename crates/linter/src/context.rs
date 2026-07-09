@@ -102,6 +102,11 @@ where
         self.imports.sole_function_import_use_span(local)
     }
 
+    /// Like [`sole_function_import_use_span`] but removes the entry after returning it.
+    pub fn take_sole_function_import_use_span(&mut self, local: &[u8]) -> Option<mago_span::Span> {
+        self.imports.take_sole_function_import_use_span(local)
+    }
+
     /// Checks if we are currently inside a constant expression context.
     ///
     /// Constant expression contexts include attribute arguments, parameter default values,
