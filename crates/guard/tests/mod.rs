@@ -22,6 +22,9 @@ use mago_guard::settings::PerimeterSettings;
 use mago_guard::settings::PermittedDependency;
 use mago_guard::settings::PermittedDependencyKind;
 use mago_guard::settings::Settings;
+use mago_guard::settings::StructuralRule;
+use mago_guard::settings::StructuralSettings;
+use mago_guard::settings::StructuralSymbolKind;
 use mago_names::resolver::NameResolver;
 use mago_prelude::Prelude;
 use mago_syntax::parser::parse_file;
@@ -595,5 +598,36 @@ pub fn test_narrow_rule_not_widened_by_broad_catchall() {
     assert!(
         !result.boundary_breaches.is_empty(),
         "Expected violations: Domain should not be allowed to use Infrastructure"
+    );
+}
+
+#[test]
+pub fn test_is_final_annotation_counted() {
+    let code = indoc! {r"
+        <?php
+            namespace App\Entity {
+                /** @final */
+                class Test {
+
+                }
+            }
+    "};
+
+    let settings = Settings {
+        structural: StructuralSettings {
+            rules: vec![StructuralRule {
+                on: "**\\Entity\\*".into(),
+                target: StructuralSymbolKind::Class.into(),
+                must_be_final: Some(true),
+                ..Default::default()
+            }],
+        },
+        ..Default::default()
+    };
+
+    let result = test_guard("count_final_annotation_as_real_final_class", code, settings);
+    assert!(
+        result.structural_flaws.is_empty(),
+        "Expected non violations: Should allow declare final class with annotation"
     );
 }
