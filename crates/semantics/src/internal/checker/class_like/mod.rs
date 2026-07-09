@@ -25,7 +25,7 @@ use mago_syntax::cst::TraitUseAliasAdaptation;
 use crate::internal::checker::partial_application;
 use crate::internal::consts::ANONYMOUS_CLASS_NAME;
 use crate::internal::consts::CONSTRUCTOR_MAGIC_METHOD;
-use crate::internal::consts::MAGIC_METHODS;
+use crate::internal::consts::ENUM_FORBIDDEN_MAGIC_METHODS;
 use crate::internal::consts::RESERVED_KEYWORDS;
 use crate::internal::consts::SOFT_RESERVED_KEYWORDS_MINUS_SYMBOL_ALLOWED;
 use crate::internal::context::Context;
@@ -924,8 +924,9 @@ pub fn check_enum<'ast, 'arena>(r#enum: &'ast Enum<'arena>, context: &mut Contex
                 let method_name_bytes: &[u8] = method.name.value;
                 let method_name = BytesDisplay(method_name_bytes);
 
-                if let Some(magic_method) =
-                    MAGIC_METHODS.iter().find(|magic_method| magic_method.eq_ignore_ascii_case(method_name_bytes))
+                if let Some(magic_method) = ENUM_FORBIDDEN_MAGIC_METHODS
+                    .iter()
+                    .find(|magic_method| magic_method.eq_ignore_ascii_case(method_name_bytes))
                 {
                     let magic_method = BytesDisplay(magic_method);
                     context.report(

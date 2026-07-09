@@ -18,12 +18,11 @@ pub const INVOKE_MAGIC_METHOD: &[u8] = b"__invoke";
 pub const SET_STATE_MAGIC_METHOD: &[u8] = b"__set_state";
 pub const DEBUG_INFO_MAGIC_METHOD: &[u8] = b"__debugInfo";
 
-pub const MAGIC_METHODS: &[&[u8]] = &[
+// Enums forbid all magic methods except `__call`, `__callStatic` and `__invoke`.
+pub const ENUM_FORBIDDEN_MAGIC_METHODS: &[&[u8]] = &[
     CONSTRUCTOR_MAGIC_METHOD,
     DESTRUCTOR_MAGIC_METHOD,
     CLONE_MAGIC_METHOD,
-    CALL_MAGIC_METHOD,
-    CALL_STATIC_MAGIC_METHOD,
     GET_MAGIC_METHOD,
     SET_MAGIC_METHOD,
     ISSET_MAGIC_METHOD,
@@ -33,7 +32,6 @@ pub const MAGIC_METHODS: &[&[u8]] = &[
     SERIALIZE_MAGIC_METHOD,
     UNSERIALIZE_MAGIC_METHOD,
     TO_STRING_MAGIC_METHOD,
-    INVOKE_MAGIC_METHOD,
     SET_STATE_MAGIC_METHOD,
     DEBUG_INFO_MAGIC_METHOD,
 ];
