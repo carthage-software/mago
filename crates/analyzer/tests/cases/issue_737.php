@@ -148,3 +148,11 @@ function unsealed_int_keys(array $a): void
         echo 'possible';
     }
 }
+
+/** @param array{a?: string} $a */
+function optional_string_key_vs_list(array $a): void
+{
+    if (array_is_list($a)) {
+        echo 'reached at runtime when $a === []';
+    }
+}

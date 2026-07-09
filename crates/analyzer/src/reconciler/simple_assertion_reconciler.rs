@@ -630,7 +630,10 @@ where
         match atomic {
             TAtomic::Array(TArray::Keyed(TKeyedArray { known_items, parameters, non_empty })) => {
                 if let Some(known_items) = known_items {
-                    for k in known_items.keys() {
+                    for (k, (optional, _)) in known_items.iter() {
+                        if *optional {
+                            continue;
+                        }
                         if !k.is_integer() {
                             did_remove_type = true;
                             continue 'outer;

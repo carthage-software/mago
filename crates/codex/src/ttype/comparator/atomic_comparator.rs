@@ -656,7 +656,10 @@ pub(crate) fn can_be_identical(
     | (TAtomic::Array(TArray::List(list)), TAtomic::Array(TArray::Keyed(keyed_array))) = (first_part, second_part)
     {
         if let Some(known_items) = &keyed_array.known_items {
-            for key in known_items.keys() {
+            for (key, (optional, _)) in known_items.iter() {
+                if *optional {
+                    continue;
+                }
                 if key.is_string() {
                     return false;
                 }

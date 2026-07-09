@@ -2351,6 +2351,7 @@ test_case!(issue_2026);
 test_case!(issue_2029);
 test_case!(issue_2037);
 test_case!(issue_2071);
+test_case!(issue_2073);
 test_case!(issue_2048);
 test_case!(issue_2050);
 test_case!(issue_2054);
