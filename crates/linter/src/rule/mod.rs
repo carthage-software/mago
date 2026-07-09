@@ -302,6 +302,7 @@ define_rules! {
     NoClosingTag(no_closing_tag @ NoClosingTagRule),
     NoBooleanFlagParameter(no_boolean_flag_parameter @ NoBooleanFlagParameterRule),
     NoAssignInArgument(no_assign_in_argument @ NoAssignInArgumentRule),
+    NoMissingFormatArgument(no_missing_format_argument @ NoMissingFormatArgumentRule),
     NoAssignInCondition(no_assign_in_condition @ NoAssignInConditionRule),
     NoFullyQualifiedGlobalClassLike(no_fully_qualified_global_class_like @ NoFullyQualifiedGlobalClassLikeRule),
     NoFullyQualifiedGlobalConstant(no_fully_qualified_global_constant @ NoFullyQualifiedGlobalConstantRule),
