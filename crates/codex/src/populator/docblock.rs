@@ -482,12 +482,10 @@ fn apply_inheritance_work(codebase: &mut CodebaseMetadata, mut inheritance_work:
                 codebase.function_likes.get(&child_method_id).and_then(|m| m.return_type_declaration_metadata.as_ref());
 
             let narrowed_type = if let Some(child_native_return) = child_native_return {
-                let child_is_more_specific = union_comparator::is_contained_by(
+                let child_is_more_specific = union_comparator::is_return_type_contained_by(
                     codebase,
                     &child_native_return.type_union,
                     &type_union,
-                    false,
-                    false,
                     false,
                     &mut ComparisonResult::new(),
                 );

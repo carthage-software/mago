@@ -131,21 +131,11 @@ pub(crate) fn is_contained_by(
         return false;
     };
 
-    if input_return_type.is_void() && container_return_type.accepts_null() {
-        return true;
-    }
-
-    if input_return_type.is_never() {
-        return true;
-    }
-
-    union_comparator::is_contained_by(
+    union_comparator::is_return_type_contained_by(
         codebase,
         input_return_type,
         container_return_type,
-        false,
         input_return_type.ignore_falsable_issues(),
-        false,
         atomic_comparison_result,
     )
 }

@@ -263,12 +263,10 @@ pub fn validate_method_signature_compatibility(
 
         if !expanded_parent_return_type.has_template_types() && !expanded_child_return_type.has_template_types() {
             let mut comparison_result = ComparisonResult::new();
-            let is_compatible = union_comparator::is_contained_by(
+            let is_compatible = union_comparator::is_return_type_contained_by(
                 codebase,
                 &expanded_child_return_type,
                 &expanded_parent_return_type,
-                false,
-                false,
                 false,
                 &mut comparison_result,
             );
