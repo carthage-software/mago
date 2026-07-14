@@ -35,22 +35,17 @@ jobs:
       - name: checkout
         uses: actions/checkout@v4
 
-      - name: resolve toolchain version
-        id: toolchain
-        shell: bash
-        run: echo "version=$(cat nightly-version)" >> "$GITHUB_OUTPUT"
-
       - name: install rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: ${{ steps.toolchain.outputs.version }}
+          toolchain: nightly
           targets: ${{ env.FUZZ_TARGET }}
 
       - name: cache rust dependencies
         uses: Swatinem/rust-cache@v2
         with:
           workspaces: crates/${{ matrix.crate }}/fuzz
-          shared-key: fuzz-${{ matrix.crate }}-${{ steps.toolchain.outputs.version }}
+          shared-key: fuzz-${{ matrix.crate }}-nightly
           cache-on-failure: true
 
       - name: install cargo-fuzz
@@ -80,7 +75,7 @@ jobs:
         working-directory: crates/${{ matrix.crate }}
         run: |
           mkdir -p "fuzz/corpus/${{ matrix.target }}"
-          cargo +${{ steps.toolchain.outputs.version }} fuzz run "${{ matrix.target }}" \
+          cargo +nightly fuzz run "${{ matrix.target }}" \
             "fuzz/corpus/${{ matrix.target }}" \
             ${{ matrix.seeds }} \
             --target ${{ env.FUZZ_TARGET }} \

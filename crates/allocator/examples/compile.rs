@@ -1,4 +1,3 @@
-#![allow(clippy::inline_trait_bounds)]
 #![allow(clippy::missing_assert_message)]
 #![allow(clippy::wildcard_imports)]
 

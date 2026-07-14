@@ -1,5 +1,4 @@
 template_dir := `mktemp -d`
-nightly := `cat nightly-version`
 
 # Lists all available commands.
 list:
@@ -28,18 +27,18 @@ check:
     cargo run -- fmt --check
     cargo run -- lint
     cargo run -- analyze
-    cargo +{{nightly}} fmt --all -- --check --unstable-features
-    cargo +{{nightly}} clippy --workspace --all-targets --all-features -- -D warnings
-    cargo +{{nightly}} check --workspace --locked
+    cargo fmt --all -- --check
+    cargo clippy --workspace --all-targets --all-features -- -D warnings
+    cargo check --workspace --locked
 
 # Fixes linting problems automatically using clippy, cargo fix, and rustfmt.
 fix:
     cargo run -- lint --fix
     cargo run -- analyze --fix
     cargo run -- fmt
-    cargo +{{nightly}} clippy --workspace --all-targets --all-features --fix --allow-dirty --allow-staged
-    cargo +{{nightly}} fix --allow-dirty --allow-staged
-    cargo +{{nightly}} fmt --all -- --unstable-features
+    cargo clippy --workspace --all-targets --all-features --fix --allow-dirty --allow-staged
+    cargo fix --allow-dirty --allow-staged
+    cargo fmt --all
 
 # Runs all tests in the workspace.
 test:
@@ -47,7 +46,7 @@ test:
 
 # Fuzz the PHP lexer. Seeds are drawn from the syntax/analyzer/formatter PHP fixtures.
 fuzz-php-lexer:
-    cd crates/syntax/fuzz && cargo +{{nightly}} fuzz run lexer \
+    cd crates/syntax/fuzz && cargo +nightly fuzz run lexer \
         corpus/lexer \
         ../tests/fixtures \
         ../../analyzer/tests/cases \
@@ -55,7 +54,7 @@ fuzz-php-lexer:
 
 # Fuzz the PHP parser. Seeds are drawn from the syntax/analyzer/formatter PHP fixtures.
 fuzz-php-parser:
-    cd crates/syntax/fuzz && cargo +{{nightly}} fuzz run parser \
+    cd crates/syntax/fuzz && cargo +nightly fuzz run parser \
         corpus/parser \
         ../tests/fixtures \
         ../../analyzer/tests/cases \
@@ -63,11 +62,11 @@ fuzz-php-parser:
 
 # Fuzz the Twig lexer.
 fuzz-twig-lexer:
-    cd crates/twig-syntax/fuzz && cargo +{{nightly}} fuzz run lexer corpus/lexer seeds/lexer
+    cd crates/twig-syntax/fuzz && cargo +nightly fuzz run lexer corpus/lexer seeds/lexer
 
 # Fuzz the Twig parser.
 fuzz-twig-parser:
-    cd crates/twig-syntax/fuzz && cargo +{{nightly}} fuzz run parser corpus/parser seeds/parser
+    cd crates/twig-syntax/fuzz && cargo +nightly fuzz run parser corpus/parser seeds/parser
 
 # Publishes all crates to crates.io in the correct order.
 publish:

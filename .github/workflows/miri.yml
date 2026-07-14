@@ -26,29 +26,24 @@ jobs:
       - name: checkout
         uses: actions/checkout@v4
 
-      - name: resolve toolchain version
-        id: toolchain
-        shell: bash
-        run: echo "version=$(cat nightly-version)" >> "$GITHUB_OUTPUT"
-
       - name: install rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: ${{ steps.toolchain.outputs.version }}
+          toolchain: nightly
           components: miri, rust-src
 
       - name: cache rust dependencies
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: miri-${{ steps.toolchain.outputs.version }}
+          shared-key: miri-nightly
           cache-on-failure: true
 
       - name: miri setup
-        run: cargo +${{ steps.toolchain.outputs.version }} miri setup
+        run: cargo +nightly miri setup
 
       - name: miri test (parser core)
         run: |
-          cargo +${{ steps.toolchain.outputs.version }} miri test \
+          cargo +nightly miri test \
             -p mago-syntax \
             -p mago-twig-syntax
 
@@ -65,31 +60,26 @@ jobs:
       - name: checkout
         uses: actions/checkout@v4
 
-      - name: resolve toolchain version
-        id: toolchain
-        shell: bash
-        run: echo "version=$(cat nightly-version)" >> "$GITHUB_OUTPUT"
-
       - name: install rust toolchain
         uses: dtolnay/rust-toolchain@master
         with:
-          toolchain: ${{ steps.toolchain.outputs.version }}
+          toolchain: nightly
           components: miri, rust-src
 
       - name: cache rust dependencies
         uses: Swatinem/rust-cache@v2
         with:
-          shared-key: miri-${{ steps.toolchain.outputs.version }}
+          shared-key: miri-nightly
           cache-on-failure: true
 
       - name: miri setup
-        run: cargo +${{ steps.toolchain.outputs.version }} miri setup
+        run: cargo +nightly miri setup
 
       - name: miri test (linter, full)
-        run: cargo +${{ steps.toolchain.outputs.version }} miri test -p mago-linter
+        run: cargo +nightly miri test -p mago-linter
 
       - name: miri test (formatter, class-formatting slice)
-        run: cargo +${{ steps.toolchain.outputs.version }} miri test -p mago-formatter class_
+        run: cargo +nightly miri test -p mago-formatter class_
 
       - name: miri test (analyzer, generics lib unit tests)
-        run: cargo +${{ steps.toolchain.outputs.version }} miri test -p mago-analyzer --lib -- template var
+        run: cargo +nightly miri test -p mago-analyzer --lib -- template var
