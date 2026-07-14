@@ -54,6 +54,18 @@ pub fn is_contained_by(
 }
 
 #[inline]
+pub fn is_return_type_contained_by(
+    codebase: &CodebaseMetadata,
+    input_type: &TUnion,
+    container_type: &TUnion,
+    ignore_false: bool,
+    union_comparison_result: &mut ComparisonResult,
+) -> bool {
+    (input_type.is_void() && container_type.accepts_null())
+        || is_contained_by(codebase, input_type, container_type, false, ignore_false, false, union_comparison_result)
+}
+
+#[inline]
 #[allow(clippy::too_many_arguments, clippy::fn_params_excessive_bools)]
 fn is_contained_by_atomic(
     codebase: &CodebaseMetadata,
