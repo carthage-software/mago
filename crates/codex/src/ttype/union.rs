@@ -1180,6 +1180,38 @@ impl TUnion {
         if self.is_single() { self.get_single().get_minimum_int_value() } else { None }
     }
 
+    /// Returns the maximum possible integer value across all types in this union.
+    ///
+    /// Returns `None` when the union is empty, contains a non-integer type, or contains
+    /// an integer type without a known upper bound.
+    #[must_use]
+    pub fn get_maximum_int_value(&self) -> Option<i64> {
+        let mut types = self.types.iter();
+        let mut maximum = types.next()?.get_maximum_int_value()?;
+
+        for atomic in types {
+            maximum = maximum.max(atomic.get_maximum_int_value()?);
+        }
+
+        Some(maximum)
+    }
+
+    /// Returns the minimum possible integer value across all types in this union.
+    ///
+    /// Returns `None` when the union is empty, contains a non-integer type, or contains
+    /// an integer type without a known lower bound.
+    #[must_use]
+    pub fn get_minimum_int_value(&self) -> Option<i64> {
+        let mut types = self.types.iter();
+        let mut minimum = types.next()?.get_minimum_int_value()?;
+
+        for atomic in types {
+            minimum = minimum.min(atomic.get_minimum_int_value()?);
+        }
+
+        Some(minimum)
+    }
+
     #[must_use]
     pub fn get_single_literal_float_value(&self) -> Option<f64> {
         if self.is_single() { self.get_single().get_literal_float_value() } else { None }

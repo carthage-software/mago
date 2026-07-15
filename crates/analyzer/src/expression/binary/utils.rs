@@ -8,7 +8,7 @@ use mago_codex::ttype::union::TUnion;
 
 #[inline]
 pub fn is_always_less_than_or_equal(lhs: &TUnion, rhs: &TUnion) -> bool {
-    if let (Some(max_lhs), Some(min_rhs)) = (lhs.get_single_maximum_int_value(), rhs.get_single_minimum_int_value()) {
+    if let (Some(max_lhs), Some(min_rhs)) = (lhs.get_maximum_int_value(), rhs.get_minimum_int_value()) {
         return max_lhs <= min_rhs;
     }
 
@@ -17,7 +17,7 @@ pub fn is_always_less_than_or_equal(lhs: &TUnion, rhs: &TUnion) -> bool {
 
 #[inline]
 pub fn is_always_greater_than_or_equal(lhs: &TUnion, rhs: &TUnion) -> bool {
-    if let (Some(min_lhs), Some(max_rhs)) = (lhs.get_single_minimum_int_value(), rhs.get_single_maximum_int_value()) {
+    if let (Some(min_lhs), Some(max_rhs)) = (lhs.get_minimum_int_value(), rhs.get_maximum_int_value()) {
         return min_lhs >= max_rhs;
     }
 
