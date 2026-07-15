@@ -72,13 +72,13 @@ fn check_allowed(
         for allowed in &rule.permit {
             match allowed {
                 PermittedDependency::Dependency(path) => {
-                    if is_path_allowed(ctx.codebase, ctx.settings, path, ctx.get_current_namespace(), target_fqn) {
+                    if is_path_allowed(ctx.codebase, ctx.settings, path, &rule.namespace, target_fqn) {
                         return None;
                     }
                 }
                 PermittedDependency::DependencyOfKind { path, kinds } => {
                     if kinds.contains(&dependency_kind)
-                        && is_path_allowed(ctx.codebase, ctx.settings, path, ctx.get_current_namespace(), target_fqn)
+                        && is_path_allowed(ctx.codebase, ctx.settings, path, &rule.namespace, target_fqn)
                     {
                         return None;
                     }
@@ -108,11 +108,6 @@ fn check_allowed(
     } else {
         Some(BreachReason::ForbiddenByRule { rule_namespaces: rules.iter().map(|r| r.namespace.clone()).collect() })
     }
-}
-
-/// Extracts the root namespace from a fully qualified name.
-fn get_root_namespace(fqn: &[u8]) -> &[u8] {
-    if let Some(pos) = fqn.iter().position(|&b| b == b'\\') { &fqn[..pos] } else { fqn }
 }
 
 /// Checks if a fully qualified name is considered native/builtin.
@@ -146,20 +141,20 @@ fn is_path_allowed(
     codebase: &CodebaseMetadata,
     settings: &Settings,
     path: &Path,
-    source_namespace: &[u8],
+    rule_namespace: &NamespacePath,
     target_fqn: &[u8],
 ) -> bool {
     match path {
         Path::All => true,
         Path::Native => is_native(codebase, target_fqn),
-        Path::Self_ => {
-            matcher::matches(target_fqn, source_namespace, false, false)
-                || get_root_namespace(source_namespace).eq_ignore_ascii_case(get_root_namespace(target_fqn))
-        }
+        Path::Self_ => match rule_namespace {
+            NamespacePath::Global => !target_fqn.contains(&b'\\'),
+            NamespacePath::Specific(namespace) => matcher::matches(target_fqn, namespace.as_bytes(), false, true),
+        },
         Path::Layer(layer_name) => settings.perimeter.layers.get(layer_name).is_some_and(|layer_patterns| {
             layer_patterns
                 .iter()
-                .any(|pattern| is_path_allowed(codebase, settings, pattern, source_namespace, target_fqn))
+                .any(|pattern| is_path_allowed(codebase, settings, pattern, rule_namespace, target_fqn))
         }),
         Path::Selector(selector) => match selector {
             SymbolSelector::Namespace(ns) => match ns {
@@ -169,17 +164,5 @@ fn is_path_allowed(
             SymbolSelector::Symbol(sn) => target_fqn.eq_ignore_ascii_case(sn.as_bytes()),
             SymbolSelector::Pattern(p) => matcher::matches(target_fqn, p.as_bytes(), false, false),
         },
-    }
-}
-
-#[cfg(test)]
-mod tests {
-    use super::*;
-
-    #[test]
-    fn test_get_root_namespace() {
-        assert_eq!(get_root_namespace(b"Foo\\Bar\\Baz"), b"Foo");
-        assert_eq!(get_root_namespace(b"Foo\\Bar"), b"Foo");
-        assert_eq!(get_root_namespace(b"Foo"), b"Foo");
     }
 }

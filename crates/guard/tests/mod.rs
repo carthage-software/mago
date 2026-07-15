@@ -602,6 +602,43 @@ pub fn test_narrow_rule_not_widened_by_broad_catchall() {
 }
 
 #[test]
+pub fn test_self_permit_is_scoped_to_rule_namespace() {
+    let code = indoc! {r"
+        <?php
+
+        namespace App\Infrastructure\Doctrine\Orm {
+            class Entity {}
+        }
+
+        namespace App\Domain\Model {
+            class BaseModel {}
+            class LocalUser extends BaseModel {}
+
+            use App\Infrastructure\Doctrine\Orm\Entity;
+
+            class User extends Entity {}
+        }
+    "};
+
+    let settings = Settings {
+        perimeter: PerimeterSettings {
+            rules: vec![PerimeterRule {
+                namespace: NamespacePath::Specific("App\\Domain\\".to_string()),
+                permit: vec![PermittedDependency::Dependency(Path::Self_)],
+            }],
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let result = test_guard("self_permit_is_scoped_to_rule_namespace", code, settings);
+
+    assert_eq!(result.boundary_breaches.len(), 2);
+    assert_eq!(result.boundary_breaches[0].vector, BreachVector::Use);
+    assert_eq!(result.boundary_breaches[1].vector, BreachVector::Extends);
+}
+
+#[test]
 pub fn test_is_final_annotation_counted() {
     let code = indoc! {r"
         <?php
