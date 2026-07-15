@@ -2,6 +2,7 @@ use mago_allocator::Arena;
 use std::sync::Arc;
 
 use mago_word::Word;
+use mago_word::ascii_lowercase_word;
 use mago_word::word;
 
 use mago_codex::identifier::method::MethodIdentifier;
@@ -41,6 +42,7 @@ use crate::resolver::selector::resolve_member_selector;
 use crate::utils::names::display_class_like_name;
 use crate::utils::names::display_method_name;
 use crate::visibility::check_method_visibility;
+use crate::visibility::is_method_visible;
 
 /// Resolves all possible static method targets from a class expression and a member selector.
 ///
@@ -396,7 +398,11 @@ where
         result.has_invalid_target = true;
     }
 
-    if function_like.flags.is_magic_method() && !has_magic_static_call && !defining_class_metadata.kind.is_interface() {
+    if function_like.flags.is_magic_method()
+        && !has_magic_static_call
+        && !defining_class_metadata.kind.is_interface()
+        && !has_real_ancestor_method(context, block_context, defining_class_metadata, method_name)
+    {
         let is_static = !classname.is_parent();
 
         if defining_class_metadata.flags.is_final() && !defining_class_metadata.flags.is_abstract() {
@@ -546,6 +552,35 @@ where
         is_this: true,
         intersection_types: if intersections.is_empty() { None } else { Some(intersections) },
         remapped_parameters: false,
+    })
+}
+
+/// Returns `true` if any ancestor class or used trait provides a real, non-magic implementation
+/// of `method_name` that is accessible from the current scope.
+///
+/// An `@method` tag may shadow such an inherited method (e.g. to refine its return type); the
+/// call is then backed by a real implementation, so no `__callStatic` is required. Traits are
+/// consulted directly because an ancestor's method slot may itself hold a pseudo-method even
+/// though a used trait provides the real one. Inaccessible methods don't count: PHP routes those
+/// calls through `__callStatic`, so the magic handler is still required.
+fn has_real_ancestor_method<'ctx, A>(
+    context: &Context<'ctx, '_, A>,
+    block_context: &BlockContext<'ctx>,
+    class_metadata: &ClassLikeMetadata,
+    method_name: Word,
+) -> bool
+where
+    A: Arena,
+{
+    let method_name_lc = ascii_lowercase_word(method_name.as_bytes());
+
+    class_metadata.all_parent_classes.iter().chain(class_metadata.used_traits.iter()).any(|ancestor_name| {
+        context.codebase.get_class_like(ancestor_name.as_bytes()).is_some_and(|ancestor| {
+            ancestor.declaring_method_ids.get(&method_name_lc).is_some_and(|declaring_id| {
+                context.codebase.get_method_by_id(declaring_id).is_some_and(|m| !m.flags.is_magic_method())
+                    && is_method_visible(context, block_context, ancestor_name.as_bytes(), method_name_lc.as_bytes())
+            })
+        })
     })
 }
 
