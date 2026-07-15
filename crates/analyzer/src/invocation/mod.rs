@@ -10,6 +10,7 @@ use mago_codex::metadata::parameter::FunctionLikeParameterMetadata;
 use mago_codex::misc::VariableIdentifier;
 use mago_codex::ttype::atomic::callable::TCallableSignature;
 use mago_codex::ttype::atomic::callable::parameter::TCallableParameter;
+use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::union::TUnion;
 use mago_span::HasSpan;
@@ -60,6 +61,11 @@ pub struct MethodTargetContext<'ctx> {
     pub class_like_metadata: &'ctx ClassLikeMetadata,
     /// The class type for resolving static references.
     pub class_type: StaticClassType,
+    /// The object the method was found on when it was reached through a `@mixin`.
+    /// `Some` marks the method as mixin-resolved, which lets its `static` return
+    /// type rebind to the receiver; template inference reads the mixin class's
+    /// template arguments from it.
+    pub declaring_object_type: Option<TNamedObject>,
 }
 
 /// The target of an invocation (function, method, or callable).

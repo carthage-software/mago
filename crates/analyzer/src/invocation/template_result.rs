@@ -142,7 +142,13 @@ pub fn populate_template_result_from_invocation<'ctx, 'arena, A>(
         }
     }
 
-    let StaticClassType::Object(TObject::Named(instance_type)) = &method_context.class_type else {
+    // For `@mixin`-resolved methods, `class_type` is the receiver while the type
+    // parameters of `class_like_metadata` live on the mixin object.
+    let instance_type = if let Some(declaring_object) = &method_context.declaring_object_type {
+        declaring_object
+    } else if let StaticClassType::Object(TObject::Named(instance_type)) = &method_context.class_type {
+        instance_type
+    } else {
         return;
     };
 

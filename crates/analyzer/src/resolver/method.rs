@@ -11,6 +11,7 @@ use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::generic::TGenericParameter;
 use mago_codex::ttype::atomic::mixed::TMixed;
 use mago_codex::ttype::atomic::object::TObject;
+use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator::is_contained_by;
 use mago_codex::ttype::expander::StaticClassType;
@@ -50,6 +51,11 @@ pub struct ResolvedMethod {
     pub method_identifier: MethodIdentifier,
     /// The type of `$this` or the static class type if it's a static method.
     pub static_class_type: StaticClassType,
+    /// The object the method was found on when it was reached through a `@mixin`.
+    /// `Some` marks the method as mixin-resolved, which lets its `static` return
+    /// type rebind to the receiver; template inference reads the mixin class's
+    /// template arguments from it.
+    pub declaring_object: Option<TNamedObject>,
     /// True if this method is static, meaning it can be called without an instance.
     pub is_static: bool,
     /// If Some, this method was found in a mixin but the target class lacks the magic method
@@ -64,6 +70,25 @@ pub struct MixinWithoutMagicMethod {
     pub mixin_class_name: Word,
     /// Whether the target class (that has the mixin) is final.
     pub target_is_final: bool,
+}
+
+/// A method found on an object, before being turned into a [`ResolvedMethod`].
+pub struct MethodCandidate<'ctx> {
+    /// Metadata of the class the method was found on.
+    pub metadata: &'ctx ClassLikeMetadata,
+    /// The identifier of the declaring method.
+    pub method_identifier: MethodIdentifier,
+    /// The object type the method was found on (the mixin object for
+    /// `@mixin`-resolved methods, otherwise the receiver).
+    pub object: TObject,
+    /// The name of the class the method was resolved against: the receiver's
+    /// class, or the mixin / require-extends class the method was found on.
+    pub classname: Word,
+    /// See [`ResolvedMethod::mixin_without_magic_method`].
+    pub mixin_without_magic_method: Option<MixinWithoutMagicMethod>,
+    /// The receiver object when the method was reached through `@mixin`, so
+    /// `$this`/`static` bind to the calling object instead of the mixin class.
+    pub receiver_object: Option<TObject>,
 }
 
 /// Holds the results of resolving a method call, including valid targets and summary flags.
@@ -312,7 +337,7 @@ where
 {
     let mut resolved_methods = vec![];
 
-    let method_ids = get_method_ids_from_object(
+    let candidates = get_method_candidates_from_object(
         context,
         block_context,
         object,
@@ -325,15 +350,26 @@ where
         result,
     );
 
-    for (metadata, declaring_method_id, object, classname, mixin_without_magic_method) in method_ids {
+    for candidate in candidates {
+        let MethodCandidate {
+            metadata,
+            method_identifier: declaring_method_id,
+            object,
+            classname,
+            mixin_without_magic_method,
+            receiver_object,
+        } = candidate;
         let declaring_class_metadata =
             context.codebase.get_class_like(declaring_method_id.get_class_name().as_bytes()).unwrap_or(metadata);
 
+        // Collect class-template bounds from the object the method was found on:
+        // for `@mixin`-resolved methods that is the mixin object, whose parameters
+        // instantiate `metadata`'s templates; the receiver's parameters do not.
         let class_template_parameters = super::class_template_type_collector::collect(
             context.codebase,
             metadata,
             declaring_class_metadata,
-            Some(object_type),
+            Some(&object),
         );
 
         if let Some(class_template_parameters) = class_template_parameters {
@@ -353,9 +389,24 @@ where
                 .push(GenericTemplate::new(GenericParent::ClassLike(metadata.name), parameter.clone()));
         }
 
+        let (static_class_type, declaring_object) = match receiver_object {
+            Some(receiver) => {
+                let declaring_object = match object {
+                    TObject::Named(named) => Some(named),
+                    // A non-named mixin object (an enum) carries no type parameters;
+                    // a bare named object keeps template inference from falling back
+                    // to the receiver's parameters.
+                    other => other.get_name().map(TNamedObject::new),
+                };
+                (StaticClassType::Object(receiver), declaring_object)
+            }
+            None => (StaticClassType::Object(object), None),
+        };
+
         resolved_methods.push(ResolvedMethod {
             method_identifier: declaring_method_id,
-            static_class_type: StaticClassType::Object(object.clone()),
+            static_class_type,
+            declaring_object,
             classname,
             is_static: false,
             mixin_without_magic_method,
@@ -365,7 +416,7 @@ where
     resolved_methods
 }
 
-pub fn get_method_ids_from_object<'ctx, 'ast, 'arena, 'object, A>(
+pub fn get_method_candidates_from_object<'ctx, 'ast, 'arena, 'object, A>(
     context: &mut Context<'ctx, 'arena, A>,
     block_context: &BlockContext<'ctx>,
     object: &'ast Expression<'arena>,
@@ -376,11 +427,11 @@ pub fn get_method_ids_from_object<'ctx, 'ast, 'arena, 'object, A>(
     access_span: Span,
     has_magic_call: bool,
     result: &mut MethodResolutionResult,
-) -> Vec<(&'ctx ClassLikeMetadata, MethodIdentifier, TObject, Word, Option<MixinWithoutMagicMethod>)>
+) -> Vec<MethodCandidate<'ctx>>
 where
     A: Arena,
 {
-    let mut ids = vec![];
+    let mut candidates = vec![];
 
     let Some(name) = object_type.get_name() else {
         if std::ptr::eq(object_type, outer_object) {
@@ -395,13 +446,13 @@ where
             }
         }
 
-        return ids;
+        return candidates;
     };
 
     let Some(class_metadata) = context.codebase.get_class_like(name.as_bytes()) else {
         result.has_invalid_target = true;
         report_non_existent_class_like(context, object.span(), name);
-        return ids;
+        return candidates;
     };
 
     let mut method_id = MethodIdentifier::new(class_metadata.original_name, method_name);
@@ -493,7 +544,14 @@ where
             }
         }
 
-        ids.push((class_metadata, method_id, outer_object.clone(), name, None));
+        candidates.push(MethodCandidate {
+            metadata: class_metadata,
+            method_identifier: method_id,
+            object: outer_object.clone(),
+            classname: name,
+            mixin_without_magic_method: None,
+            receiver_object: None,
+        });
     } else if !class_metadata.require_extends.is_empty() || !class_metadata.require_implements.is_empty() {
         for required_class in class_metadata.require_extends.iter().chain(class_metadata.require_implements.iter()) {
             let Some(required_metadata) = context.codebase.get_class_like(required_class.as_bytes()) else {
@@ -506,7 +564,14 @@ where
             }
 
             if context.codebase.get_method_by_id(&required_method_id).is_some() {
-                ids.push((required_metadata, required_method_id, outer_object.clone(), *required_class, None));
+                candidates.push(MethodCandidate {
+                    metadata: required_metadata,
+                    method_identifier: required_method_id,
+                    object: outer_object.clone(),
+                    classname: *required_class,
+                    mixin_without_magic_method: None,
+                    receiver_object: None,
+                });
                 break;
             }
         }
@@ -551,7 +616,17 @@ where
                     Some(MixinWithoutMagicMethod { mixin_class_name, target_is_final: class_metadata.flags.is_final() })
                 };
 
-                ids.push((mixin_metadata, mixin_method_id, mixin_object.clone(), mixin_class_name, mixin_info));
+                // Bind `$this`/`static` in the mixin method's return type to the
+                // receiver, not the mixin class: `@mixin` methods behave as if
+                // declared on the class carrying the tag.
+                candidates.push(MethodCandidate {
+                    metadata: mixin_metadata,
+                    method_identifier: mixin_method_id,
+                    object: mixin_object.clone(),
+                    classname: mixin_class_name,
+                    mixin_without_magic_method: mixin_info,
+                    receiver_object: Some(outer_object.clone()),
+                });
             }
         }
     } else {
@@ -563,7 +638,7 @@ where
             match intersected_atomic {
                 TAtomic::Object(intersected_object) => {
                     // Recursively search in the intersection types
-                    ids.extend(get_method_ids_from_object(
+                    candidates.extend(get_method_candidates_from_object(
                         context,
                         block_context,
                         object,
@@ -581,7 +656,7 @@ where
                     for constraint_atomic in generic_parameter.constraint.types.as_ref() {
                         if let TAtomic::Object(intersected_object) = constraint_atomic {
                             // Recursively search in the intersection types
-                            ids.extend(get_method_ids_from_object(
+                            candidates.extend(get_method_candidates_from_object(
                                 context,
                                 block_context,
                                 object,
@@ -604,9 +679,9 @@ where
     }
 
     let mut seen = HashSet::default();
-    ids.retain(|(_, method_id, _, _, _)| seen.insert(*method_id));
+    candidates.retain(|candidate| seen.insert(candidate.method_identifier));
 
-    ids
+    candidates
 }
 
 fn check_where_method_constraints<A>(
@@ -1086,6 +1161,9 @@ fn collect_mixin_types_into(
             continue;
         }
 
+        let specialized_obj = specialize_mixin_object(codebase, class_metadata, outer_object, obj);
+        let obj = specialized_obj.as_ref().unwrap_or(obj);
+
         results.push((name, obj.clone()));
 
         if let Some(mixin_metadata) = codebase.get_class_like(name.as_bytes())
@@ -1094,4 +1172,46 @@ fn collect_mixin_types_into(
             collect_mixin_types_into(codebase, mixin_metadata, obj, &mixin_metadata.mixins, results, visited);
         }
     }
+}
+
+/// Substitutes the carrier class's template parameters inside a mixin tag's type
+/// arguments (`@mixin Builder<TItem>`) with the receiver's actual type arguments.
+fn specialize_mixin_object(
+    codebase: &CodebaseMetadata,
+    carrier_metadata: &ClassLikeMetadata,
+    carrier_object: &TObject,
+    mixin_object: &TObject,
+) -> Option<TObject> {
+    let TObject::Named(named) = mixin_object else {
+        return None;
+    };
+
+    let parameters = named.type_parameters.as_deref()?;
+
+    if !parameters.iter().any(|parameter| parameter.has_template_types()) {
+        return None;
+    }
+
+    let TObject::Named(carrier) = carrier_object else {
+        return None;
+    };
+
+    let carrier_parameters = carrier.type_parameters.as_ref()?;
+    let mut named = named.clone();
+    named.type_parameters = Some(
+        parameters
+            .iter()
+            .map(|parameter| {
+                super::class_template_type_collector::resolve_template_parameter(
+                    codebase,
+                    parameter,
+                    carrier_metadata,
+                    carrier_parameters,
+                )
+                .unwrap_or_else(|| parameter.clone())
+            })
+            .collect(),
+    );
+
+    Some(TObject::Named(named))
 }
