@@ -530,7 +530,7 @@ where
         }
 
         let mut i = 0;
-        while i < assignment_depth {
+        while i <= assignment_depth {
             let mut variables_to_remove = Vec::new();
 
             loop_scope.iteration_count += 1;
