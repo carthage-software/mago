@@ -262,13 +262,12 @@ impl LintRule for NoRedundantUseRule {
 }
 
 mod utils {
-    use foldhash::HashSet;
     use mago_allocator::Arena;
+    use mago_allocator::collections::HashSet;
     use mago_database::file::FileId;
     use mago_span::Span;
     use mago_syntax::walker::MutWalker;
     use mago_word::Word;
-    use mago_word::WordSet;
     use mago_word::concat_word;
     use mago_word::word;
 
@@ -376,12 +375,15 @@ mod utils {
         }
     }
 
-    pub(super) fn is_item_used(
+    pub(super) fn is_item_used<'arena, A>(
         decl: &UseDeclaration<'_>,
-        used_fqns: &WordSet,
+        used_fqns: &HashSet<'arena, &'arena [u8], A>,
         docblocks: &Vec<&[u8]>,
         inline_contents: &Vec<&[u8]>,
-    ) -> bool {
+    ) -> bool
+    where
+        A: Arena,
+    {
         let alias = get_alias(decl.item);
 
         if docblocks.iter().any(|doc| contains_word(doc, alias.as_bytes())) {
@@ -392,13 +394,13 @@ mod utils {
             return true;
         }
 
-        if used_fqns.iter().any(|used| used.as_bytes().eq_ignore_ascii_case(decl.fqn.as_bytes())) {
+        if used_fqns.iter().any(|used| used.eq_ignore_ascii_case(decl.fqn.as_bytes())) {
             return true;
         }
 
         if decl.import_type == ImportType::ClassOrNamespace {
             let prefix = concat_word!(decl.fqn, b"\\");
-            if used_fqns.iter().any(|used| starts_with_ignore_case(used.as_bytes(), prefix.as_bytes())) {
+            if used_fqns.iter().any(|used| starts_with_ignore_case(used, prefix.as_bytes())) {
                 return true;
             }
         }
@@ -481,17 +483,25 @@ mod utils {
         walker.contents
     }
 
-    pub(super) fn build_used_fqn_set<A>(ctx: &LintContext<'_, '_, A>, declarations: &[UseDeclaration<'_>]) -> WordSet
+    pub(super) fn build_used_fqn_set<'arena, A>(
+        ctx: &LintContext<'_, 'arena, A>,
+        declarations: &[UseDeclaration<'_>],
+    ) -> HashSet<'arena, &'arena [u8], A>
     where
         A: Arena,
     {
-        let import_starts: HashSet<u32> = declarations.iter().map(|d| d.item.name.span().start.offset).collect();
+        let mut import_starts = HashSet::with_capacity_in(declarations.len(), ctx.arena);
+        import_starts.extend(declarations.iter().map(|declaration| declaration.item.name.span().start.offset));
 
-        ctx.resolved_names
-            .iter()
-            .filter(|(start, _, _, _)| !import_starts.contains(start))
-            .map(|(_, _, fqn, _)| word(fqn))
-            .collect()
+        let mut used_fqns = HashSet::with_capacity_in(ctx.resolved_names.len(), ctx.arena);
+        used_fqns.extend(
+            ctx.resolved_names
+                .iter()
+                .filter(|(start, _, _, _)| !import_starts.contains(start))
+                .map(|(_, _, fqn, _)| fqn),
+        );
+
+        used_fqns
     }
 
     pub(super) fn get_alias(item: &UseItem) -> Word {

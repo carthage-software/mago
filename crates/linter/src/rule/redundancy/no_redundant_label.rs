@@ -1,11 +1,13 @@
 use indoc::indoc;
-use mago_allocator::Arena;
 use schemars::JsonSchema;
 
+use mago_allocator::Arena;
+use mago_allocator::vec::Vec;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
+use mago_span::Span;
 use mago_syntax::cst::Node;
 use mago_syntax::cst::NodeKind;
 
@@ -91,14 +93,9 @@ impl LintRule for NoRedundantLabelRule {
             return;
         };
 
-        let labels =
-            node.filter_map(
-                |node| {
-                    if let Node::Label(label) = node { Some((label.name.value, label.span())) } else { None }
-                },
-            );
-
-        let gotos = node.filter_map(|node| if let Node::Goto(goto) = node { Some(goto.label.value) } else { None });
+        let mut labels = Vec::new_in(ctx.arena);
+        let mut gotos = Vec::new_in(ctx.arena);
+        collect_labels_and_gotos(node, &mut labels, &mut gotos);
 
         for (label_name, label_span) in labels {
             if gotos.contains(&label_name) {
@@ -115,4 +112,20 @@ impl LintRule for NoRedundantLabelRule {
             ctx.collector.report(issue);
         }
     }
+}
+
+fn collect_labels_and_gotos<'arena, A>(
+    node: Node<'_, 'arena>,
+    labels: &mut Vec<'arena, (&'arena [u8], Span), A>,
+    gotos: &mut Vec<'arena, &'arena [u8], A>,
+) where
+    A: Arena,
+{
+    match node {
+        Node::Label(label) => labels.push((label.name.value, label.span())),
+        Node::Goto(goto) => gotos.push(goto.label.value),
+        _ => {}
+    }
+
+    node.visit_children(|child| collect_labels_and_gotos(child, labels, gotos));
 }

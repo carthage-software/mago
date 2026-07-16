@@ -24,6 +24,7 @@ use crate::requirements::RuleRequirements;
 use crate::rule::Config;
 use crate::rule::LintRule;
 use crate::rule::utils::call::function_call_matches_any;
+use crate::rule::utils::security::contains_any_direct_variable;
 use crate::rule_meta::RuleMeta;
 use crate::settings::RuleSettings;
 
@@ -200,6 +201,14 @@ impl LintRule for ValidatedSanitizedInputRule {
     where
         A: Arena,
     {
+        let Some(contents) = ctx.source_file.contents.get(node.span().to_range_usize()) else {
+            return;
+        };
+
+        if !contains_any_direct_variable(contents, INPUT_SUPERGLOBALS) {
+            return;
+        }
+
         match node {
             Node::ArrowFunction(arrow) => {
                 self.collect_unsanitized_accesses(ctx, Node::Expression(arrow.expression), false);

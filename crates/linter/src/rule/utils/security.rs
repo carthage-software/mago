@@ -11,6 +11,23 @@ use mago_syntax::cst::LiteralString;
 use mago_syntax::cst::MatchArm;
 use mago_syntax::cst::Variable;
 
+/// Returns whether `haystack` contains any of the given direct variable names.
+///
+/// The comparison is ASCII case-insensitive to match PHP's superglobal checks in
+/// the security rules. Searching for `$` first keeps the common no-match path
+/// cheap and allocation-free.
+#[inline]
+#[must_use]
+pub fn contains_any_direct_variable(haystack: &[u8], names: &[&str]) -> bool {
+    memchr::memchr_iter(b'$', haystack).any(|offset| {
+        names.iter().any(|name| {
+            haystack
+                .get(offset..offset + name.len())
+                .is_some_and(|candidate| candidate.eq_ignore_ascii_case(name.as_bytes()))
+        })
+    })
+}
+
 #[inline]
 #[must_use]
 pub fn is_user_input(expression: &Expression<'_>) -> bool {

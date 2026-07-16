@@ -21,6 +21,7 @@ use crate::requirements::RuleRequirements;
 use crate::rule::Config;
 use crate::rule::LintRule;
 use crate::rule::utils::call::function_call_matches_any;
+use crate::rule::utils::security::contains_any_direct_variable;
 use crate::rule_meta::RuleMeta;
 use crate::settings::RuleSettings;
 
@@ -137,6 +138,14 @@ impl LintRule for NonceVerificationRule {
     where
         A: Arena,
     {
+        let Some(contents) = ctx.source_file.contents.get(node.span().to_range_usize()) else {
+            return;
+        };
+
+        if !contains_any_direct_variable(contents, NONCE_SUPERGLOBALS) {
+            return;
+        }
+
         let custom_nonce = self.cfg.custom_nonce_functions.as_slice();
 
         if let Node::ArrowFunction(arrow) = node {

@@ -7,7 +7,6 @@
 #![allow(clippy::else_if_without_else)]
 #![allow(clippy::match_wildcard_for_single_variants)]
 
-use std::collections::HashSet;
 use std::sync::Arc;
 
 use mago_allocator::prelude::*;
@@ -100,25 +99,20 @@ where
             collector.set_active_codes(only_codes);
         }
 
-        // Compute which rules are excluded for this file
-        let file_name = std::str::from_utf8(source_file.name.as_ref()).ok();
-        let excluded_rules: HashSet<usize> = self
-            .registry
-            .rules()
-            .iter()
-            .enumerate()
-            .filter(|(idx, _)| {
-                let matcher = self.registry.excludes_for(*idx);
-                let Some(name) = file_name else { return false };
-                !matcher.is_empty() && matcher.is_match(name)
-            })
-            .map(|(idx, _)| idx)
-            .collect();
+        let mut excluded_rules = Vec::new_in(self.arena);
+        if let Ok(file_name) = std::str::from_utf8(source_file.name.as_ref()) {
+            for (rule_index, _) in self.registry.rules().iter().enumerate() {
+                let matcher = self.registry.excludes_for(rule_index);
+                if !matcher.is_empty() && matcher.is_match(file_name) {
+                    excluded_rules.push(rule_index);
+                }
+            }
+        }
 
         let mut context =
             LintContext::new(self.php_version, self.arena, &self.registry, source_file, resolved_names, collector);
 
-        walk(Node::Program(program), &mut context, &excluded_rules);
+        walk(Node::Program(program), &mut context, excluded_rules.as_slice());
 
         context.collector.finish()
     }
@@ -135,11 +129,8 @@ fn is_constant_expression_context(kind: NodeKind) -> bool {
     )
 }
 
-fn walk<'ctx, 'arena, A>(
-    root: Node<'ctx, 'arena>,
-    ctx: &mut LintContext<'ctx, 'arena, A>,
-    excluded_rules: &HashSet<usize>,
-) where
+fn walk<'ctx, 'arena, A>(root: Node<'ctx, 'arena>, ctx: &mut LintContext<'ctx, 'arena, A>, excluded_rules: &[usize])
+where
     A: Arena,
 {
     enum Op<'ctx, 'arena> {
@@ -147,7 +138,8 @@ fn walk<'ctx, 'arena, A>(
         Exit { in_scope: bool, in_constant_expression: bool },
     }
 
-    let mut stack = vec![Op::Enter(root)];
+    let mut stack = Vec::with_capacity_in(64, ctx.arena);
+    stack.push(Op::Enter(root));
 
     while let Some(op) = stack.pop() {
         match op {
@@ -172,8 +164,7 @@ fn walk<'ctx, 'arena, A>(
                         continue;
                     }
 
-                    let rule = ctx.registry.rule(rule_index);
-                    rule.check(ctx, node);
+                    ctx.registry.rule(rule_index).check(ctx, node);
                 }
 
                 // Push exit before children so teardown happens after all descendants.

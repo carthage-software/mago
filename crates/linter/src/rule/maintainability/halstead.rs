@@ -1,4 +1,5 @@
 use mago_allocator::Arena;
+use mago_allocator::collections::HashSet;
 use mago_span::HasSpan;
 use schemars::JsonSchema;
 
@@ -190,7 +191,7 @@ impl LintRule for HalsteadRule {
             _ => return,
         };
 
-        let halstead = gather_and_compute_halstead(node);
+        let halstead = gather_and_compute_halstead(ctx.arena, node);
 
         let high_volume = halstead.volume > self.cfg.volume_threshold;
         let high_difficulty = halstead.difficulty > self.cfg.difficulty_threshold;
@@ -262,42 +263,54 @@ struct HalsteadMetrics {
 }
 
 #[inline]
-fn gather_and_compute_halstead(node: Node<'_, '_>) -> HalsteadMetrics {
-    let (operators, operands) = gather_operators_and_operands(node);
+fn gather_and_compute_halstead<'arena, A>(arena: &'arena A, node: Node<'_, 'arena>) -> HalsteadMetrics
+where
+    A: Arena,
+{
+    let mut operators = HashSet::new_in(arena);
+    let mut operands = HashSet::new_in(arena);
+    let mut total_operators = 0;
+    let mut total_operands = 0;
 
-    compute_halstead_metrics(&operators, &operands)
-}
-
-#[derive(Debug, Hash, Eq, PartialEq)]
-struct Operator(NodeKind);
-
-#[derive(Debug, Hash, Eq, PartialEq)]
-struct Operand<'arena>(&'arena [u8]);
-
-#[inline]
-fn gather_operators_and_operands<'arena>(node: Node<'_, 'arena>) -> (Vec<Operator>, Vec<Operand<'arena>>) {
-    let mut operators = Vec::new();
-    let mut operands = Vec::new();
-
-    fn recurse<'arena>(n: Node<'_, 'arena>, ops: &mut Vec<Operator>, rands: &mut Vec<Operand<'arena>>) {
-        if n.is_declaration() {
+    fn recurse<'arena, A>(
+        node: Node<'_, 'arena>,
+        operators: &mut HashSet<'arena, NodeKind, A>,
+        operands: &mut HashSet<'arena, &'arena [u8], A>,
+        total_operators: &mut usize,
+        total_operands: &mut usize,
+    ) where
+        A: Arena,
+    {
+        if node.is_declaration() {
             return;
         }
 
-        n.visit_children(|child| recurse(child, ops, rands));
+        node.visit_children(|child| {
+            recurse(child, operators, operands, total_operators, total_operands);
+        });
 
-        categorize_node(n, ops, rands);
+        categorize_node(node, operators, operands, total_operators, total_operands);
     }
 
-    node.visit_children(|child| recurse(child, &mut operators, &mut operands));
+    node.visit_children(|child| {
+        recurse(child, &mut operators, &mut operands, &mut total_operators, &mut total_operands);
+    });
 
-    (operators, operands)
+    compute_halstead_metrics(operators.len(), operands.len(), total_operators, total_operands)
 }
 
 /// Check if the node is considered an operator or operand in Halstead terms
 /// and record a textual representation.
 #[inline]
-fn categorize_node<'arena>(node: Node<'_, 'arena>, operators: &mut Vec<Operator>, operands: &mut Vec<Operand<'arena>>) {
+fn categorize_node<'arena, A>(
+    node: Node<'_, 'arena>,
+    operators: &mut HashSet<'arena, NodeKind, A>,
+    operands: &mut HashSet<'arena, &'arena [u8], A>,
+    total_operators: &mut usize,
+    total_operands: &mut usize,
+) where
+    A: Arena,
+{
     match node {
         Node::Binary(_)
         | Node::Assignment(_)
@@ -310,22 +323,28 @@ fn categorize_node<'arena>(node: Node<'_, 'arena>, operators: &mut Vec<Operator>
         | Node::Return(_)
         | Node::While(_)
         | Node::DoWhile(_) => {
-            operators.push(Operator(node.kind()));
+            *total_operators += 1;
+            operators.insert(node.kind());
         }
         Node::UnaryPrefix(unary) if unary.operator.is_cast() => {
-            operators.push(Operator(node.kind()));
+            *total_operators += 1;
+            operators.insert(node.kind());
         }
         Node::DirectVariable(variable) => {
-            operands.push(Operand(variable.name));
+            *total_operands += 1;
+            operands.insert(variable.name);
         }
         Node::LiteralString(literal) => {
-            operands.push(Operand(literal.raw));
+            *total_operands += 1;
+            operands.insert(literal.raw);
         }
         Node::LiteralInteger(literal) => {
-            operands.push(Operand(literal.raw));
+            *total_operands += 1;
+            operands.insert(literal.raw);
         }
         Node::LiteralFloat(literal) => {
-            operands.push(Operand(literal.raw));
+            *total_operands += 1;
+            operands.insert(literal.raw);
         }
         _ => (),
     }
@@ -336,17 +355,7 @@ fn categorize_node<'arena>(node: Node<'_, 'arena>, operators: &mut Vec<Operator>
 /// **Important**: if `n2 == 0` or `N2 == 0`, we set all metrics to 0
 /// (mirroring the original phpmetrics approach).
 #[inline]
-fn compute_halstead_metrics(operators: &[Operator], operands: &[Operand]) -> HalsteadMetrics {
-    use std::collections::HashSet;
-
-    let unique_ops: HashSet<_> = operators.iter().collect();
-    let unique_operands: HashSet<_> = operands.iter().collect();
-
-    let n1 = unique_ops.len();
-    let n2 = unique_operands.len();
-    let total_n1 = operators.len();
-    let total_n2 = operands.len();
-
+fn compute_halstead_metrics(n1: usize, n2: usize, total_n1: usize, total_n2: usize) -> HalsteadMetrics {
     if n2 == 0 || total_n2 == 0 {
         return HalsteadMetrics { volume: 0.0, difficulty: 0.0, effort: 0.0 };
     }
