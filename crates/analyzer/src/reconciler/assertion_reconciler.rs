@@ -909,7 +909,7 @@ where
     let is_loose_equality = matches!(assertion, Assertion::IsEqual(_));
 
     if existing_var_type.has_scalar()
-        || existing_var_type.has_numeric()
+        || existing_var_type.types.iter().any(|atomic| matches!(atomic, TAtomic::Scalar(TScalar::Numeric)))
         || existing_var_type.has_array_key()
         || existing_var_type.has_mixed()
     {
@@ -933,8 +933,11 @@ where
 
                 acceptable_types.push(literal_asserted_type.clone());
             }
-            TAtomic::Scalar(TScalar::Integer(_)) => {
+            TAtomic::Scalar(TScalar::Integer(integer)) if integer.contains(TInteger::Literal(assertion_integer)) => {
                 acceptable_types.push(literal_asserted_type.clone());
+            }
+            TAtomic::Scalar(TScalar::Integer(_)) => {
+                did_remove_type = true;
             }
             TAtomic::Scalar(TScalar::Float(TFloat::Literal(float_value)))
                 if is_loose_equality && (*float_value == assertion_integer as f64) =>

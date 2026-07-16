@@ -2560,6 +2560,7 @@ test_case!(issue_1885, crate::framework::check_missing_type_hints_settings());
 test_case!(issue_1888);
 test_case!(issue_2078);
 test_case!(issue_2085);
+test_case!(issue_2087);
 
 #[test]
 #[cfg_attr(miri, ignore)]

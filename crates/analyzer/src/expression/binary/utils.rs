@@ -2,7 +2,6 @@ use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::float::TFloat;
-use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::comparator::union_comparator::can_expression_types_be_identical;
 use mago_codex::ttype::union::TUnion;
 
@@ -39,6 +38,10 @@ pub fn is_always_less_than(lhs: &TUnion, rhs: &TUnion) -> bool {
         return true;
     }
 
+    if let (Some(max_lhs), Some(min_rhs)) = (lhs.get_maximum_int_value(), rhs.get_minimum_int_value()) {
+        return max_lhs < min_rhs;
+    }
+
     if !lhs.is_single() || !rhs.is_single() {
         return false;
     }
@@ -47,10 +50,6 @@ pub fn is_always_less_than(lhs: &TUnion, rhs: &TUnion) -> bool {
     let rhs_atomic = rhs.get_single();
 
     match (lhs_atomic, rhs_atomic) {
-        (TAtomic::Scalar(TScalar::Integer(l)), TAtomic::Scalar(TScalar::Integer(r))) => match (l, r) {
-            (TInteger::Literal(l_val), TInteger::Literal(r_val)) => return l_val < r_val,
-            _ => return false,
-        },
         (TAtomic::Scalar(TScalar::Float(l)), TAtomic::Scalar(TScalar::Float(r))) => match (l, r) {
             (TFloat::Literal(l_val), TFloat::Literal(r_val)) => return l_val < r_val,
             _ => return false,
@@ -76,6 +75,10 @@ pub fn is_always_greater_than(lhs: &TUnion, rhs: &TUnion) -> bool {
         return true;
     }
 
+    if let (Some(min_lhs), Some(max_rhs)) = (lhs.get_minimum_int_value(), rhs.get_maximum_int_value()) {
+        return min_lhs > max_rhs;
+    }
+
     if !lhs.is_single() || !rhs.is_single() {
         return false;
     }
@@ -84,10 +87,6 @@ pub fn is_always_greater_than(lhs: &TUnion, rhs: &TUnion) -> bool {
     let rhs_atomic = rhs.get_single();
 
     match (lhs_atomic, rhs_atomic) {
-        (TAtomic::Scalar(TScalar::Integer(l)), TAtomic::Scalar(TScalar::Integer(r))) => match (l, r) {
-            (TInteger::Literal(l_val), TInteger::Literal(r_val)) => return l_val > r_val,
-            _ => return false,
-        },
         (TAtomic::Scalar(TScalar::Float(l)), TAtomic::Scalar(TScalar::Float(r))) => match (l, r) {
             (TFloat::Literal(l_val), TFloat::Literal(r_val)) => return l_val > r_val,
             _ => return false,

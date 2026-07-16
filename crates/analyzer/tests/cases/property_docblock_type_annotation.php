@@ -22,6 +22,7 @@ class ConfigurationManager
      */
     private function validatePort(int $port): bool
     {
+        /** @mago-expect analysis:redundant-comparison */
         return $port > 0;
     }
 
