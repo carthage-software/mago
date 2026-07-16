@@ -279,11 +279,7 @@ where
         let host_files = measure!(
             trace_enabled,
             host_discover_duration,
-            self.database
-                .files()
-                .filter(|f| f.file_type == FileType::Host)
-                .map(|f| self.database.get(&f.id))
-                .collect::<Result<Vec<_>, _>>()?
+            self.database.files().filter(|f| f.file_type == FileType::Host).collect::<Vec<_>>()
         );
 
         if host_files.is_empty() {
@@ -420,11 +416,7 @@ where
         let host_files: Vec<Arc<File>> = measure!(
             trace_enabled,
             host_discover_duration,
-            self.database
-                .files()
-                .filter(|f| f.file_type == FileType::Host)
-                .map(|f| self.database.get(&f.id))
-                .collect::<Result<Vec<_>, _>>()?
+            self.database.files().filter(|f| f.file_type == FileType::Host).collect()
         );
 
         if host_files.is_empty() {

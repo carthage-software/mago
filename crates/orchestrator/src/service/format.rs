@@ -114,10 +114,7 @@ impl FormatService {
                 Err(parse_error) => FileFormatStatus::FailedToParse(parse_error),
             };
 
-            let mut changed_files = HashMap::with_capacity(1);
-            changed_files.insert(file.id, status);
-
-            Ok(FormatResult { changed_files })
+            Ok((file.id, status))
         })
     }
 
@@ -170,10 +167,7 @@ impl FormatService {
                 Err(parse_error) => FileFormatStatus::FailedToParse(parse_error),
             };
 
-            let mut changed_files = HashMap::with_capacity(1);
-            changed_files.insert(file.id, status);
-
-            Ok(FormatResult { changed_files })
+            Ok((file.id, status))
         })
     }
 }
@@ -242,13 +236,11 @@ struct FormatContext {
 #[derive(Debug, Clone)]
 struct FormatReducer;
 
-impl StatelessReducer<FormatResult, FormatResult> for FormatReducer {
-    fn reduce(&self, results: Vec<FormatResult>) -> Result<FormatResult, OrchestratorError> {
+impl StatelessReducer<(FileId, FileFormatStatus), FormatResult> for FormatReducer {
+    fn reduce(&self, results: Vec<(FileId, FileFormatStatus)>) -> Result<FormatResult, OrchestratorError> {
         let mut changed_files = HashMap::with_capacity(results.len());
 
-        for result in results {
-            changed_files.extend(result.changed_files);
-        }
+        changed_files.extend(results);
 
         Ok(FormatResult { changed_files })
     }
