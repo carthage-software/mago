@@ -231,7 +231,8 @@ fn populate_codebase_inner(
         }
     } else {
         for (name, metadata) in &mut codebase.class_likes {
-            let force_repopulation = metadata.flags.is_user_defined() && !safe_symbols.contains(name);
+            let force_repopulation =
+                if incremental { !safe_symbols.contains(name) } else { metadata.flags.is_user_defined() };
 
             if incremental && metadata.flags.is_populated() && !force_repopulation {
                 continue;
