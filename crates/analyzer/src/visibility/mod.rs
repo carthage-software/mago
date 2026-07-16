@@ -93,6 +93,36 @@ where
     is_visible
 }
 
+/// Determines whether a method is visible from the current scope
+///
+/// Returns `true` when the method is visible (or when visibility cannot be determined), and
+/// `false` only when the method definitively exists but is inaccessible from the current scope.
+pub fn is_method_visible<'ctx, A>(
+    context: &Context<'ctx, '_, A>,
+    block_context: &BlockContext<'ctx>,
+    fqcn: &[u8],
+    method_name: &[u8],
+) -> bool
+where
+    A: Arena,
+{
+    let declaring_class = context.codebase.get_declaring_method_class(fqcn, method_name).unwrap_or_else(|| word(fqcn));
+
+    if context.codebase.get_declaring_method(fqcn, method_name).is_none() {
+        return true;
+    }
+
+    let Some(visibility) = context.codebase.get_method_visibility(fqcn, method_name) else {
+        return true;
+    };
+
+    if visibility == Visibility::Public {
+        return true;
+    }
+
+    is_visible_from_scope(context, visibility, declaring_class.as_bytes(), block_context.scope.get_class_like_name())
+}
+
 /// Checks if a property is readable from the current scope and reports a detailed
 /// error if it is not.
 pub fn check_property_read_visibility<'ctx, A>(

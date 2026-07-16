@@ -660,6 +660,7 @@ test_case!(trait_alias_vis_self);
 test_case!(trait_constant_override);
 test_case!(trait_usage_errors);
 test_case!(trait_method_closure_self);
+test_case!(trait_method_satisfies_pseudo_method);
 test_case!(method_signature_parameter_count);
 test_case!(method_signature_param_types);
 test_case!(method_signature_return_types);
