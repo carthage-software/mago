@@ -6,7 +6,6 @@ use std::time::Duration;
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
 
-use foldhash::HashSet;
 use mago_allocator::LocalArena;
 use mago_php_version::PHPVersion;
 use rayon::prelude::*;
@@ -257,10 +256,33 @@ where
         );
 
         let mut merged_codex = self.codebase;
+        let mut safe_symbols = std::mem::take(&mut merged_codex.safe_symbols);
+        let mut safe_symbol_members = std::mem::take(&mut merged_codex.safe_symbol_members);
+        let mut replaced_classes = (!safe_symbol_members.is_empty()).then(WordSet::default);
         let mut merge_duration = Duration::ZERO;
         measure!(trace_enabled, merge_duration, {
             for partial in partial_codebases {
+                for name in partial.class_likes.keys().chain(partial.patch_class_likes.keys()) {
+                    safe_symbols.remove(name);
+                    if let Some(replaced_classes) = &mut replaced_classes {
+                        replaced_classes.insert(*name);
+                    }
+                }
+                for (scope, member) in partial.function_likes.keys().chain(partial.patch_function_likes.keys()) {
+                    if member.is_empty() {
+                        safe_symbols.remove(scope);
+                    } else {
+                        safe_symbol_members.remove(&(*scope, *member));
+                    }
+                }
+                for name in partial.constants.keys().chain(partial.patch_constants.keys()) {
+                    safe_symbols.remove(name);
+                }
+
                 merged_codex.extend(partial);
+            }
+            if let Some(replaced_classes) = replaced_classes {
+                safe_symbol_members.retain(|(scope, _)| !replaced_classes.contains(scope));
             }
             merged_codex.apply_patches_pass();
         });
@@ -268,7 +290,7 @@ where
         let mut symbol_references = self.symbol_references;
         let mut populate_duration = Duration::ZERO;
         measure!(trace_enabled, populate_duration, {
-            populate_codebase(&mut merged_codex, &mut symbol_references, WordSet::default(), HashSet::default());
+            populate_codebase(&mut merged_codex, &mut symbol_references, safe_symbols, safe_symbol_members);
         });
 
         if let Some(compiling_bar) = compiling_bar {

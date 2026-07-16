@@ -33,6 +33,16 @@ pub(crate) fn build_prelude_internal() -> Prelude {
     #[allow(clippy::default_trait_access)]
     populate_codebase(&mut metadata, &mut symbol_references, Default::default(), Default::default());
 
+    // The embedded prelude is immutable between analyses. Persisting its top-level symbols as
+    // safe lets the runtime population pass skip already-populated built-ins while still
+    // repopulating every project symbol merged into this metadata.
+    let mut safe_symbols = std::mem::take(&mut metadata.safe_symbols);
+    safe_symbols.extend(metadata.class_likes.keys().copied());
+    safe_symbols
+        .extend(metadata.function_likes.keys().filter_map(|(scope, member)| member.is_empty().then_some(*scope)));
+    safe_symbols.extend(metadata.constants.keys().copied());
+    metadata.safe_symbols = safe_symbols;
+
     Prelude { database, metadata, symbol_references }
 }
 

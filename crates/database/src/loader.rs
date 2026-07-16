@@ -129,32 +129,45 @@ impl<'config> DatabaseLoader<'config> {
             })
             .collect();
 
-        let host_files_with_spec = self.load_paths(
-            &self.configuration.paths,
-            FileType::Host,
-            &extensions_set,
-            &glob_excludes,
-            &dir_prune_globs,
-            &path_excludes,
-        )?;
-
-        let vendored_files_with_spec = self.load_paths(
-            &self.configuration.includes,
-            FileType::Vendored,
-            &extensions_set,
-            &glob_excludes,
-            &dir_prune_globs,
-            &path_excludes,
-        )?;
-
-        let patch_files_with_spec = self.load_paths(
-            &self.configuration.patches,
-            FileType::Patch,
-            &extensions_set,
-            &glob_excludes,
-            &dir_prune_globs,
-            &path_excludes,
-        )?;
+        let (host_files_with_spec, (vendored_files_with_spec, patch_files_with_spec)) = rayon::join(
+            || {
+                self.load_paths(
+                    &self.configuration.paths,
+                    FileType::Host,
+                    &extensions_set,
+                    &glob_excludes,
+                    &dir_prune_globs,
+                    &path_excludes,
+                )
+            },
+            || {
+                rayon::join(
+                    || {
+                        self.load_paths(
+                            &self.configuration.includes,
+                            FileType::Vendored,
+                            &extensions_set,
+                            &glob_excludes,
+                            &dir_prune_globs,
+                            &path_excludes,
+                        )
+                    },
+                    || {
+                        self.load_paths(
+                            &self.configuration.patches,
+                            FileType::Patch,
+                            &extensions_set,
+                            &glob_excludes,
+                            &dir_prune_globs,
+                            &path_excludes,
+                        )
+                    },
+                )
+            },
+        );
+        let host_files_with_spec = host_files_with_spec?;
+        let vendored_files_with_spec = vendored_files_with_spec?;
+        let patch_files_with_spec = patch_files_with_spec?;
 
         let mut all_files: HashMap<FileId, File> = HashMap::default();
         // Per-file maximum specificity for each tier the file matched. `None` in a slot means
@@ -280,22 +293,10 @@ impl<'config> DatabaseLoader<'config> {
             })
             .collect();
 
-        let workspace_relative_str = |path: &Path| -> String {
-            let rel = path.strip_prefix(canonical_workspace.as_path()).unwrap_or(path);
-            let s = rel.to_string_lossy();
-            #[cfg(windows)]
-            {
-                s.replace('\\', "/")
-            }
-            #[cfg(not(windows))]
-            {
-                s.into_owned()
-            }
-        };
-
         // The bool flags a path that was named exactly (a literal file on disk) rather than
         // discovered by walking a configured directory. Such paths bypass the extension filter.
         let mut paths_to_process: Vec<(PathBuf, usize, bool)> = Vec::new();
+        let mut directory_roots: Vec<(PathBuf, usize)> = Vec::new();
 
         for root in roots {
             // Check if this is a glob pattern (contains glob metacharacters).
@@ -356,52 +357,28 @@ impl<'config> DatabaseLoader<'config> {
                     continue;
                 }
 
-                let has_dir_prunes = !dir_prune_globs.is_empty();
-                let has_path_prunes = !canonical_excludes.is_empty();
-                let walker = WalkDir::new(&canonical_root).follow_links(true).into_iter().filter_entry(|entry| {
-                    if entry.depth() == 0 || !entry.file_type().is_dir() {
-                        return true;
-                    }
 
-                    let path = entry.path();
-
-                    if has_path_prunes
-                        && let Some(p) = path.to_str()
-                        && canonical_excludes.iter().any(|excl| {
-                            p.starts_with(excl.as_str())
-                                && matches!(p.as_bytes().get(excl.len()), None | Some(&b'/' | &b'\\'))
-                        })
-                    {
-                        return false;
-                    }
-
-                    if has_dir_prunes
-                        && (dir_prune_globs.is_match(path) || dir_prune_globs.is_match(workspace_relative_str(path)))
-                    {
-                        return false;
-                    }
-
-                    true
-                });
-
-                for entry in walker {
+                for entry in WalkDir::new(&canonical_root).follow_links(true).max_depth(1) {
                     match entry {
                         Ok(entry) => {
-                            if !entry.file_type().is_dir() {
+                            if entry.depth() == 0 {
+                                continue;
+                            }
+
+                            if entry.file_type().is_dir() {
+                                if !is_pruned_directory(
+                                    entry.path(),
+                                    canonical_workspace.as_path(),
+                                    &canonical_excludes,
+                                    dir_prune_globs,
+                                ) {
+                                    directory_roots.push((entry.into_path(), specificity));
+                                }
+                            } else {
                                 paths_to_process.push((entry.into_path(), specificity, false));
                             }
                         }
-                        Err(err) => {
-                            let path = err.path().unwrap_or(canonical_root.as_path()).display();
-                            if let Some(ancestor) = err.loop_ancestor() {
-                                tracing::warn!(
-                                    "Skipping symlink loop at `{path}`: link cycles back to `{}`.",
-                                    ancestor.display(),
-                                );
-                            } else {
-                                tracing::warn!("Failed to walk `{path}`: {err}. Entry will be skipped.");
-                            }
-                        }
+                        Err(err) => warn_walk_error(&err, canonical_root.as_path()),
                     }
                 }
             }
@@ -409,64 +386,140 @@ impl<'config> DatabaseLoader<'config> {
 
         let has_path_excludes = !canonical_excludes.is_empty();
         let has_glob_excludes = !glob_excludes.is_empty();
-        let files: Vec<FileWithSpecificity> = paths_to_process
-            .into_par_iter()
-            .filter_map(|(path, specificity, skip_ext_check)| {
-                if has_glob_excludes
-                    && (glob_excludes.is_match(&path) || glob_excludes.is_match(workspace_relative_str(&path)))
-                {
+        let load_path = |(path, specificity, skip_ext_check): (PathBuf, usize, bool)| {
+            if has_glob_excludes
+                && (glob_excludes.is_match(&path)
+                    || glob_excludes.is_match(workspace_relative_string(&path, canonical_workspace.as_path())))
+            {
+                return None;
+            }
+
+            if !skip_ext_check {
+                let ext = path.extension()?;
+                if !extensions.contains(ext) {
                     return None;
                 }
+            }
 
-                if !skip_ext_check {
-                    let ext = path.extension()?;
-                    if !extensions.contains(ext) {
-                        return None;
-                    }
+            if has_path_excludes {
+                let excluded = path.to_str().is_some_and(|s| {
+                    canonical_excludes.iter().any(|excl| {
+                        s.starts_with(excl.as_str())
+                            && matches!(s.as_bytes().get(excl.len()), None | Some(&b'/' | &b'\\'))
+                    })
+                });
+
+                if excluded {
+                    return None;
                 }
+            }
 
-                if has_path_excludes {
-                    let excluded = path.to_str().is_some_and(|s| {
-                        canonical_excludes.iter().any(|excl| {
-                            s.starts_with(excl.as_str())
-                                && matches!(s.as_bytes().get(excl.len()), None | Some(&b'/' | &b'\\'))
-                        })
-                    });
+            let workspace = canonical_workspace.as_path();
+            #[cfg(windows)]
+            let logical_name =
+                path.strip_prefix(workspace).unwrap_or(path.as_path()).to_string_lossy().replace('\\', "/");
+            #[cfg(not(windows))]
+            let logical_name = path.strip_prefix(workspace).unwrap_or(path.as_path()).to_string_lossy().into_owned();
 
-                    if excluded {
-                        return None;
-                    }
-                }
+            if let Some((override_name, override_content)) = &self.stdin_override
+                && override_name.as_ref() == logical_name.as_bytes()
+            {
+                let file = File::new(
+                    Cow::Owned(logical_name.into_bytes()),
+                    file_type,
+                    Some(path),
+                    Cow::Owned(override_content.clone()),
+                );
 
-                let workspace = canonical_workspace.as_path();
-                #[cfg(windows)]
-                let logical_name =
-                    path.strip_prefix(workspace).unwrap_or(path.as_path()).to_string_lossy().replace('\\', "/");
-                #[cfg(not(windows))]
-                let logical_name =
-                    path.strip_prefix(workspace).unwrap_or(path.as_path()).to_string_lossy().into_owned();
+                return Some(Ok(FileWithSpecificity { file, specificity }));
+            }
 
-                if let Some((override_name, override_content)) = &self.stdin_override
-                    && override_name.as_ref() == logical_name.as_bytes()
-                {
-                    let file = File::new(
-                        Cow::Owned(logical_name.into_bytes()),
-                        file_type,
-                        Some(path),
-                        Cow::Owned(override_content.clone()),
-                    );
+            match read_file(workspace, &path, file_type) {
+                Ok(file) => Some(Ok(FileWithSpecificity { file, specificity })),
+                Err(e) => Some(Err(e)),
+            }
+        };
 
-                    return Some(Ok(FileWithSpecificity { file, specificity }));
-                }
+        let (direct_files, directory_files) = rayon::join(
+            || paths_to_process.into_par_iter().filter_map(&load_path).collect::<Result<Vec<FileWithSpecificity>, _>>(),
+            || {
+                directory_roots
+                    .into_par_iter()
+                    .map(|(root, specificity)| {
+                        let walker = WalkDir::new(&root).follow_links(true).into_iter().filter_entry(|entry| {
+                            entry.depth() == 0
+                                || !entry.file_type().is_dir()
+                                || !is_pruned_directory(
+                                    entry.path(),
+                                    canonical_workspace.as_path(),
+                                    &canonical_excludes,
+                                    dir_prune_globs,
+                                )
+                        });
 
-                match read_file(workspace, &path, file_type) {
-                    Ok(file) => Some(Ok(FileWithSpecificity { file, specificity })),
-                    Err(e) => Some(Err(e)),
-                }
-            })
-            .collect::<Result<Vec<FileWithSpecificity>, _>>()?;
+                        let mut files = Vec::new();
+                        for entry in walker {
+                            match entry {
+                                Ok(entry) if !entry.file_type().is_dir() => {
+                                    if let Some(file) = load_path((entry.into_path(), specificity, false)) {
+                                        files.push(file?);
+                                    }
+                                }
+                                Ok(_) => {}
+                                Err(err) => warn_walk_error(&err, root.as_path()),
+                            }
+                        }
+
+                        Ok(files)
+                    })
+                    .collect::<Result<Vec<Vec<FileWithSpecificity>>, DatabaseError>>()
+            },
+        );
+
+        let mut files = direct_files?;
+        files.extend(directory_files?.into_iter().flatten());
 
         Ok(files)
+    }
+}
+
+fn workspace_relative_string(path: &Path, workspace: &Path) -> String {
+    let relative = path.strip_prefix(workspace).unwrap_or(path).to_string_lossy();
+    #[cfg(windows)]
+    {
+        relative.replace('\\', "/")
+    }
+    #[cfg(not(windows))]
+    {
+        relative.into_owned()
+    }
+}
+
+fn is_pruned_directory(
+    path: &Path,
+    workspace: &Path,
+    canonical_excludes: &[String],
+    dir_prune_globs: &GlobSet,
+) -> bool {
+    if let Some(path) = path.to_str()
+        && canonical_excludes.iter().any(|excluded| {
+            path.starts_with(excluded.as_str())
+                && matches!(path.as_bytes().get(excluded.len()), None | Some(&b'/' | &b'\\'))
+        })
+    {
+        return true;
+    }
+
+    !dir_prune_globs.is_empty()
+        && (dir_prune_globs.is_match(path) || dir_prune_globs.is_match(workspace_relative_string(path, workspace)))
+}
+
+fn warn_walk_error(error: &walkdir::Error, fallback: &Path) {
+    let path = error.path().unwrap_or(fallback).display();
+    if let Some(ancestor) = error.loop_ancestor() {
+        tracing::warn!("Skipping symlink loop at `{path}`: link cycles back to `{}`.", ancestor.display());
+    } else {
+        tracing::warn!("Failed to walk `{path}`: {error}. Entry will be skipped.");
     }
 }
 

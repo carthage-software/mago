@@ -1,4 +1,5 @@
 use mago_allocator::Arena;
+use std::cell::OnceCell;
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
@@ -77,18 +78,16 @@ where
         return Ok(());
     };
 
-    let (callable_kind_str, full_callable_name) = match identifier {
-        FunctionLikeIdentifier::Function(_) => ("function", format!("`{}`", metadata.original_name)),
-        FunctionLikeIdentifier::Method(class_name, _) => {
-            let class_display =
-                context.codebase.get_class_like(class_name.as_bytes()).map(|m| m.original_name).unwrap_or(*class_name);
-
-            ("method", format!("`{class_display}::{}`", metadata.original_name))
-        }
-        FunctionLikeIdentifier::Closure(name) => ("closure", format!("`{name}`")),
+    let callable_kind_str = match identifier {
+        FunctionLikeIdentifier::Function(_) => "function",
+        FunctionLikeIdentifier::Method(_, _) => "method",
+        FunctionLikeIdentifier::Closure(_) => "closure",
     };
+    let full_callable_name = OnceCell::new();
 
     if metadata.flags.is_deprecated() {
+        let full_callable_name =
+            full_callable_name.get_or_init(|| display_callable_name(context, identifier, metadata.original_name));
         let issue_kind = match identifier {
             FunctionLikeIdentifier::Function(_) => IssueCode::DeprecatedFunction,
             FunctionLikeIdentifier::Method(_, _) => IssueCode::DeprecatedMethod,
@@ -118,6 +117,8 @@ where
             let Argument::Named(_) = argument else {
                 continue; // Skip if it's not a named argument
             };
+            let full_callable_name =
+                full_callable_name.get_or_init(|| display_callable_name(context, identifier, metadata.original_name));
 
             context.collector.report_with_code(
                 IssueCode::NamedArgumentNotAllowed,
@@ -218,6 +219,26 @@ where
     );
 
     Ok(())
+}
+
+fn display_callable_name<A>(
+    context: &Context<'_, '_, A>,
+    identifier: &FunctionLikeIdentifier,
+    original_name: Word,
+) -> String
+where
+    A: Arena,
+{
+    match identifier {
+        FunctionLikeIdentifier::Function(_) => format!("`{original_name}`"),
+        FunctionLikeIdentifier::Method(class_name, _) => {
+            let class_display =
+                context.codebase.get_class_like(class_name.as_bytes()).map(|m| m.original_name).unwrap_or(*class_name);
+
+            format!("`{class_display}::{original_name}`")
+        }
+        FunctionLikeIdentifier::Closure(name) => format!("`{name}`"),
+    }
 }
 
 fn apply_assertion_to_call_context<'ctx, 'arena, A>(

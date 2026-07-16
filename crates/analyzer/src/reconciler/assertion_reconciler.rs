@@ -65,9 +65,8 @@ where
         return get_missing_type(assertion, inside_loop);
     };
 
-    let old_var_type_atom = existing_var_type.get_id();
-
     if is_negation {
+        let old_var_type_atom = existing_var_type.get_id();
         return negated_assertion_reconciler::reconcile(
             context,
             assertion,
@@ -82,6 +81,7 @@ where
     if assertion.has_literal_value()
         && let Some(assertion_type) = assertion.get_type()
     {
+        let old_var_type_atom = existing_var_type.get_id();
         return handle_literal_equality(
             context,
             assertion,
@@ -114,10 +114,18 @@ where
         if can_report_issues && let (Some(key), Some(span)) = (key, span) {
             if existing_var_type.types == refined_type.types {
                 if !assertion.has_equality() && !assertion_type.is_mixed() {
-                    trigger_issue_for_impossible(context, old_var_type_atom, key, assertion, true, negated, span);
+                    trigger_issue_for_impossible(
+                        context,
+                        existing_var_type.get_id(),
+                        key,
+                        assertion,
+                        true,
+                        negated,
+                        span,
+                    );
                 }
             } else if refined_type.is_never() {
-                trigger_issue_for_impossible(context, old_var_type_atom, key, assertion, false, negated, span);
+                trigger_issue_for_impossible(context, existing_var_type.get_id(), key, assertion, false, negated, span);
             } else {
                 // refinement narrowed the type without making it never; no impossibility to report
             }

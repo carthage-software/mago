@@ -235,10 +235,6 @@ pub fn inherit_method_docblocks(
         }
     }
 
-    inheritance_work.sort_by_key(|(class_name, _, _, _)| {
-        codebase.class_likes.get(class_name).map_or(0, |m| m.all_parent_classes.len() + m.all_parent_interfaces.len())
-    });
-
     apply_inheritance_work(codebase, inheritance_work);
 }
 

@@ -277,9 +277,8 @@ where
     T: HasSpan,
     A: Arena,
 {
-    let type_id = expression_type.get_id();
-
     if expression_type.is_always_falsy() {
+        let type_id = expression_type.get_id();
         context.collector.report_with_code(
             IssueCode::ImpossibleCondition,
             Issue::warning(format!(
@@ -297,6 +296,7 @@ where
             ),
         );
     } else if expression_type.is_always_truthy() {
+        let type_id = expression_type.get_id();
         context.collector.report_with_code(
             IssueCode::RedundantCondition,
             Issue::warning(format!(

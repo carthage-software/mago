@@ -199,9 +199,6 @@ fn verify_construct_input_type<'arena, A>(
         );
     }
 
-    let input_type_str = input_type.get_id();
-    let parameter_type_str = parameter_type.get_id();
-
     if !parameter_type.accepts_null() {
         if input_type.is_null() {
             return report_null_input(
@@ -209,12 +206,14 @@ fn verify_construct_input_type<'arena, A>(
                 construct_kind,
                 input_expression,
                 argument_offset,
-                parameter_type_str,
+                parameter_type.get_id(),
                 construct_keyword,
                 is_argument,
             );
         }
         if input_type.is_nullable() && !input_type.ignore_nullable_issues() {
+            let input_type_str = input_type.get_id();
+            let parameter_type_str = parameter_type.get_id();
             report_possibly_null_input(
                 context,
                 construct_kind,
@@ -235,12 +234,14 @@ fn verify_construct_input_type<'arena, A>(
                 construct_kind,
                 input_expression,
                 argument_offset,
-                parameter_type_str,
+                parameter_type.get_id(),
                 construct_keyword,
                 is_argument,
             );
         }
         if input_type.is_falsable() && !input_type.ignore_falsable_issues() {
+            let input_type_str = input_type.get_id();
+            let parameter_type_str = parameter_type.get_id();
             report_possibly_false_input(
                 context,
                 construct_kind,
@@ -266,6 +267,9 @@ fn verify_construct_input_type<'arena, A>(
     ) {
         return;
     }
+
+    let input_type_str = input_type.get_id();
+    let parameter_type_str = parameter_type.get_id();
 
     if input_type.is_mixed() {
         return report_mixed_input(

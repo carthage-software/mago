@@ -211,13 +211,14 @@ impl Interner {
 
 static INTERNER: OnceLock<Interner> = OnceLock::new();
 
-/// Per-thread cache for recently interned words.
-const CACHE_SLOTS: usize = 256;
-const _: () = assert!(CACHE_SLOTS.is_power_of_two(), "interner cache size must be a power of two");
+/// Per-thread, two-way set-associative cache for recently interned words.
+const CACHE_SETS: usize = 512;
+const CACHE_WAYS: usize = 2;
+const _: () = assert!(CACHE_SETS.is_power_of_two(), "interner cache set count must be a power of two");
 
 thread_local! {
-    static INTERN_CACHE: [Cell<Option<NonNull<Entry>>>; CACHE_SLOTS] =
-        const { [const { Cell::new(None) }; CACHE_SLOTS] };
+    static INTERN_CACHE: [[Cell<Option<NonNull<Entry>>>; CACHE_WAYS]; CACHE_SETS] =
+        const { [const { [const { Cell::new(None) }; CACHE_WAYS] }; CACHE_SETS] };
 }
 
 fn interner() -> &'static Interner {
@@ -234,23 +235,46 @@ pub(crate) fn intern(bytes: &[u8]) -> NonNull<Entry> {
     hasher.write(bytes);
     let hash = hasher.finish();
 
-    let cache_index = (hash as usize) & (CACHE_SLOTS - 1);
-    if let Some(entry) = INTERN_CACHE.with(|cache| cache[cache_index].get()) {
-        let ptr = entry.as_ptr();
-        // SAFETY: cache entries come only from the leaky global interner and
-        // therefore remain valid for the process lifetime.
-        let cached_hash = unsafe { (*ptr).hash };
-        if cached_hash == hash {
+    let cache_index = (hash as usize) & (CACHE_SETS - 1);
+    if let Some(entry) = INTERN_CACHE.with(|cache| {
+        let set = &cache[cache_index];
+
+        for way in 0..CACHE_WAYS {
+            let Some(entry) = set[way].get() else {
+                continue;
+            };
+
+            let ptr = entry.as_ptr();
+            // SAFETY: cache entries come only from the leaky global interner and
+            // therefore remain valid for the process lifetime.
+            let cached_hash = unsafe { (*ptr).hash };
+            if cached_hash != hash {
+                continue;
+            }
+
             // SAFETY: same as above.
             let cached_len = unsafe { (*ptr).len as usize };
-            if cached_len == bytes.len() {
-                // SAFETY: same as above; interner entries include their trailing bytes.
-                let cached_bytes = unsafe { Entry::bytes(ptr) };
-                if cached_bytes == bytes {
-                    return entry;
-                }
+            if cached_len != bytes.len() {
+                continue;
             }
+
+            // SAFETY: same as above; interner entries include their trailing bytes.
+            let cached_bytes = unsafe { Entry::bytes(ptr) };
+            if cached_bytes != bytes {
+                continue;
+            }
+
+            if way != 0 {
+                let previous = set[0].replace(Some(entry));
+                set[way].set(previous);
+            }
+
+            return Some(entry);
         }
+
+        None
+    }) {
+        return entry;
     }
 
     let shard_idx = (hash >> (u64::BITS as usize - SHARD_BITS)) as usize;
@@ -258,7 +282,11 @@ pub(crate) fn intern(bytes: &[u8]) -> NonNull<Entry> {
     // holding the interner lock, which is an unrecoverable invariant violation.
     let mut shard = interner.shards[shard_idx].lock().expect("interner shard mutex poisoned");
     let entry = shard.intern(bytes, hash);
-    INTERN_CACHE.with(|cache| cache[cache_index].set(Some(entry)));
+    INTERN_CACHE.with(|cache| {
+        let set = &cache[cache_index];
+        let previous = set[0].replace(Some(entry));
+        set[1].set(previous);
+    });
 
     entry
 }

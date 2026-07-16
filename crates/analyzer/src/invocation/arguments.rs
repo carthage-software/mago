@@ -167,9 +167,9 @@ pub fn verify_argument_type<'arena, A>(
     A: Arena,
 {
     let target_kind_str = invocation_target.guess_kind();
-    let target_name_str = invocation_target.guess_name(context);
 
     if input_type.is_never() {
+        let target_name_str = invocation_target.guess_name(context);
         context.collector.report_with_code(
             IssueCode::NoValue,
             Issue::error(format!(
@@ -196,14 +196,12 @@ pub fn verify_argument_type<'arena, A>(
         return;
     }
 
-    let call_site = Annotation::secondary(invocation_target.span())
-        .with_message(format!("Arguments to this {} are incorrect", invocation_target.guess_kind()));
-
-    let input_type_str = input_type.get_id();
-    let parameter_type_str = parameter_type.get_id();
-
     if !parameter_type.accepts_null() {
         if input_type.is_null() {
+            let target_name_str = invocation_target.guess_name(context);
+            let parameter_type_str = parameter_type.get_id();
+            let call_site = Annotation::secondary(invocation_target.span())
+                .with_message(format!("Arguments to this {target_kind_str} are incorrect"));
             context.collector.report_with_code(
                 IssueCode::NullArgument,
                 Issue::error(format!(
@@ -224,6 +222,11 @@ pub fn verify_argument_type<'arena, A>(
         }
 
         if input_type.is_nullable() && !input_type.ignore_nullable_issues() {
+            let target_name_str = invocation_target.guess_name(context);
+            let input_type_str = input_type.get_id();
+            let parameter_type_str = parameter_type.get_id();
+            let call_site = Annotation::secondary(invocation_target.span())
+                .with_message(format!("Arguments to this {target_kind_str} are incorrect"));
             context.collector.report_with_code(
                 IssueCode::PossiblyNullArgument,
                 Issue::error(format!(
@@ -237,7 +240,7 @@ pub fn verify_argument_type<'arena, A>(
                     Annotation::primary(input_expression.span())
                         .with_message(format!("This argument of type `{input_type_str}` might be `null`")),
                 )
-                .with_annotation(call_site.clone())
+                .with_annotation(call_site)
                 .with_help("Add a `null` check before this call to ensure the value is not `null`."),
             );
         }
@@ -245,6 +248,10 @@ pub fn verify_argument_type<'arena, A>(
 
     if !parameter_type.accepts_false() {
         if input_type.is_false() {
+            let target_name_str = invocation_target.guess_name(context);
+            let parameter_type_str = parameter_type.get_id();
+            let call_site = Annotation::secondary(invocation_target.span())
+                .with_message(format!("Arguments to this {target_kind_str} are incorrect"));
             context.collector.report_with_code(
                 IssueCode::FalseArgument,
                 Issue::error(format!(
@@ -265,6 +272,11 @@ pub fn verify_argument_type<'arena, A>(
         }
 
         if input_type.is_falsable() && !input_type.ignore_falsable_issues() {
+            let target_name_str = invocation_target.guess_name(context);
+            let input_type_str = input_type.get_id();
+            let parameter_type_str = parameter_type.get_id();
+            let call_site = Annotation::secondary(invocation_target.span())
+                .with_message(format!("Arguments to this {target_kind_str} are incorrect"));
             context.collector.report_with_code(
                 IssueCode::PossiblyFalseArgument,
                 Issue::error(format!(
@@ -278,7 +290,7 @@ pub fn verify_argument_type<'arena, A>(
                     Annotation::primary(input_expression.span())
                         .with_message(format!("This argument of type `{input_type_str}` might be `false`")),
                 )
-                .with_annotation(call_site.clone())
+                .with_annotation(call_site)
                 .with_help("Add a check to ensure the value is not `false` before this call."),
             );
         }
@@ -291,6 +303,12 @@ pub fn verify_argument_type<'arena, A>(
     if type_match_found {
         return;
     }
+
+    let target_name_str = invocation_target.guess_name(context);
+    let input_type_str = input_type.get_id();
+    let parameter_type_str = parameter_type.get_id();
+    let call_site = Annotation::secondary(invocation_target.span())
+        .with_message(format!("Arguments to this {target_kind_str} are incorrect"));
 
     if input_type.is_mixed() {
         context.collector.report_with_code(

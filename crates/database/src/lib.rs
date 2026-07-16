@@ -252,6 +252,27 @@ impl<'config> Database<'config> {
         self.id_to_name.reserve(additional);
     }
 
+    /// Adds files from a base database without replacing files already present in this database.
+    ///
+    /// This is useful when project files and a built-in prelude are loaded independently: project
+    /// files retain precedence while missing built-in files are moved into the project database.
+    #[inline]
+    pub fn merge_base(&mut self, base: Database<'_>) {
+        let Database { files, mut id_to_name, configuration: _ } = base;
+        self.reserve(files.len());
+
+        for (name, file) in files {
+            if self.files.contains_key(name.as_ref()) {
+                continue;
+            }
+
+            let id = file.id;
+            let id_name = id_to_name.remove(&id).unwrap_or_else(|| name.clone());
+            self.files.insert(name, file);
+            self.id_to_name.insert(id, id_name);
+        }
+    }
+
     #[inline]
     pub fn add(&mut self, file: File) -> FileId {
         let name = file.name.clone();
@@ -590,5 +611,36 @@ impl DatabaseReader for ReadDatabase {
     #[inline]
     fn len(&self) -> usize {
         self.files.len()
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn configuration() -> DatabaseConfiguration<'static> {
+        DatabaseConfiguration::new(Path::new("/"), vec![], vec![], vec![], vec![]).into_static()
+    }
+
+    #[test]
+    fn merge_base_adds_missing_files_without_replacing_project_files() {
+        let mut base = Database::new(configuration());
+        base.add(File::new(Cow::Borrowed(b"shared.php"), FileType::Builtin, None, Cow::Borrowed(b"base")));
+        base.add(File::new(Cow::Borrowed(b"builtin.php"), FileType::Builtin, None, Cow::Borrowed(b"builtin")));
+
+        let mut project = Database::new(configuration());
+        project.add(File::new(Cow::Borrowed(b"shared.php"), FileType::Host, None, Cow::Borrowed(b"project")));
+        project.add(File::new(Cow::Borrowed(b"project.php"), FileType::Host, None, Cow::Borrowed(b"project-only")));
+
+        project.merge_base(base);
+
+        assert_eq!(project.len(), 3);
+        let shared = project.get_by_name(b"shared.php").unwrap();
+        assert_eq!(shared.file_type, FileType::Host);
+        assert_eq!(shared.contents.as_ref(), b"project");
+
+        let builtin = project.get_by_name(b"builtin.php").unwrap();
+        assert_eq!(builtin.file_type, FileType::Builtin);
+        assert_eq!(project.get(&builtin.id).unwrap().name.as_ref(), b"builtin.php");
     }
 }

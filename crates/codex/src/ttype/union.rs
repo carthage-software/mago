@@ -6,6 +6,7 @@ use std::sync::Arc;
 use mago_word::Word;
 use mago_word::concat_word;
 use mago_word::empty_word;
+use mago_word::join_words;
 use mago_word::word;
 
 use crate::metadata::CodebaseMetadata;
@@ -1388,12 +1389,7 @@ impl TType for TUnion {
         }
 
         atomic_ids.sort_unstable();
-        let mut result = atomic_ids[0];
-        for id in &atomic_ids[1..] {
-            result = concat_word!(result.as_bytes(), b"|", id.as_bytes());
-        }
-
-        result
+        join_words(&atomic_ids, b"|")
     }
 
     fn get_pretty_id_with_indent(&self, indent: usize) -> Word {

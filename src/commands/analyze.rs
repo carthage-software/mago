@@ -239,15 +239,6 @@ impl AnalyzeCommand {
         let trace_enabled = tracing::enabled!(tracing::Level::TRACE);
         let command_start = trace_enabled.then(Instant::now);
 
-        let prelude_start = trace_enabled.then(Instant::now);
-        let Prelude { database, metadata, symbol_references } = if self.no_stubs {
-            Prelude::default()
-        } else {
-            Prelude::decode(PRELUDE_BYTES).expect("Failed to decode embedded prelude")
-        };
-
-        let prelude_duration = prelude_start.map(|s| s.elapsed());
-
         let orchestrator_init_start = trace_enabled.then(Instant::now);
         let substitutions = self.substitution.resolve()?;
         let substitution_excludes: Vec<String> =
@@ -284,10 +275,31 @@ impl AnalyzeCommand {
         }
         let orchestrator_init_duration = orchestrator_init_start.map(|s| s.elapsed());
 
-        let load_database_start = trace_enabled.then(Instant::now);
-        let mut database =
-            orchestrator.load_database(&configuration.source.workspace, true, Some(database), stdin_override)?;
-        let load_database_duration = load_database_start.map(|s| s.elapsed());
+        let load_inputs_start = trace_enabled.then(Instant::now);
+        let mut prelude_duration = None;
+        let mut load_database_duration = None;
+        let (prelude, database) = rayon::join(
+            || {
+                let start = trace_enabled.then(Instant::now);
+                let prelude = if self.no_stubs {
+                    Prelude::default()
+                } else {
+                    Prelude::decode(PRELUDE_BYTES).expect("Failed to decode embedded prelude")
+                };
+                prelude_duration = start.map(|s| s.elapsed());
+                prelude
+            },
+            || {
+                let start = trace_enabled.then(Instant::now);
+                let database = orchestrator.load_database(&configuration.source.workspace, true, None, stdin_override);
+                load_database_duration = start.map(|s| s.elapsed());
+                database
+            },
+        );
+        let Prelude { database: prelude_database, metadata, symbol_references } = prelude;
+        let mut database = database?;
+        database.merge_base(prelude_database);
+        let load_inputs_duration = load_inputs_start.map(|s| s.elapsed());
 
         if !database.files().any(|f| f.file_type == FileType::Host) {
             tracing::warn!("No files found to analyze.");
@@ -302,14 +314,13 @@ impl AnalyzeCommand {
 
         let report_start = trace_enabled.then(Instant::now);
         let mut issues = analysis_result.issues;
-        let read_db = database.read_only();
         let ignore_set = CompiledIgnoreSet::compile(
             &configuration.analyzer.ignore,
             configuration.source.glob.to_database_settings(),
         );
 
         issues.filter_out_ignored(&ignore_set, |file_id| {
-            read_db.get_ref(&file_id).ok().map(|f| String::from_utf8_lossy(&f.name).into_owned())
+            database.get_ref(&file_id).ok().map(|f| String::from_utf8_lossy(&f.name).into_owned())
         });
 
         let baseline = configuration.analyzer.baseline.as_deref();
@@ -339,9 +350,10 @@ impl AnalyzeCommand {
         let drop_orchestrator_duration = drop_orchestrator_start.map(|s| s.elapsed());
 
         if let Some(start) = command_start {
-            tracing::trace!("Prelude decoded in {:?}.", prelude_duration.unwrap_or_default());
             tracing::trace!("Orchestrator initialized in {:?}.", orchestrator_init_duration.unwrap_or_default());
-            tracing::trace!("Database loaded in {:?}.", load_database_duration.unwrap_or_default());
+            tracing::trace!("Prelude decoded in {:?} (concurrent task).", prelude_duration.unwrap_or_default());
+            tracing::trace!("Database loaded in {:?} (concurrent task).", load_database_duration.unwrap_or_default());
+            tracing::trace!("Prelude and database loaded in {:?}.", load_inputs_duration.unwrap_or_default());
             tracing::trace!("Analysis service ran in {:?}.", service_run_duration.unwrap_or_default());
             tracing::trace!("Issues filtered and reported in {:?}.", report_duration.unwrap_or_default());
             tracing::trace!("Database dropped in {:?}.", drop_database_duration.unwrap_or_default());

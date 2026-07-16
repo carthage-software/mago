@@ -9,6 +9,7 @@ use mago_word::f32_word;
 use mago_word::f64_word;
 use mago_word::i32_word;
 use mago_word::i64_word;
+use mago_word::join_words;
 use mago_word::starts_with_ignore_case;
 use mago_word::u32_word;
 use mago_word::usize_word;
@@ -135,4 +136,29 @@ fn concat_word_macro_handles_long_inputs() {
     assert_eq!(w.len(), 6 + 200 + 4);
     assert!(w.as_bytes().starts_with(b"start_"));
     assert!(w.as_bytes().ends_with(b"_end"));
+}
+
+#[test]
+fn join_words_handles_empty_and_single_inputs() {
+    assert_eq!(join_words(&[], b"|").as_bytes(), b"");
+
+    let only = Word::new(b"only");
+    assert_eq!(join_words(&[only], b"|").as_bytes(), b"only");
+}
+
+#[test]
+fn join_words_joins_short_inputs() {
+    let words = [Word::new(b"alpha"), Word::new(b"beta"), Word::new(b"gamma")];
+    assert_eq!(join_words(&words, b"|").as_bytes(), b"alpha|beta|gamma");
+}
+
+#[test]
+fn join_words_joins_inputs_larger_than_stack_buffer() {
+    let words = [Word::new(&[b'a'; 200]), Word::new(&[b'b'; 200])];
+    let joined = join_words(&words, b"::");
+
+    let mut expected = vec![b'a'; 200];
+    expected.extend_from_slice(b"::");
+    expected.extend_from_slice(&[b'b'; 200]);
+    assert_eq!(joined.as_bytes(), expected);
 }

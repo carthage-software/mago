@@ -53,6 +53,53 @@ pub fn empty_word() -> Word {
     EMPTY_WORD.with(|&w| w)
 }
 
+/// Joins a slice of words with `separator`, interning only the complete result.
+///
+/// Results up to 256 bytes are assembled on the stack. This is preferable to
+/// repeatedly concatenating an accumulator because intermediate prefixes never
+/// enter the global interner.
+#[inline]
+#[must_use]
+pub fn join_words(words: &[Word], separator: &[u8]) -> Word {
+    let Some((first, rest)) = words.split_first() else {
+        return empty_word();
+    };
+
+    if rest.is_empty() {
+        return *first;
+    }
+
+    let words_len = words.iter().map(|word| word.len()).sum::<usize>();
+    let total_len = words_len + separator.len() * rest.len();
+
+    if total_len <= STACK_BUF_SIZE {
+        let mut buffer = [0u8; STACK_BUF_SIZE];
+        let mut offset = 0;
+
+        for (index, word) in words.iter().enumerate() {
+            if index != 0 {
+                buffer[offset..offset + separator.len()].copy_from_slice(separator);
+                offset += separator.len();
+            }
+
+            let bytes = word.as_bytes();
+            buffer[offset..offset + bytes.len()].copy_from_slice(bytes);
+            offset += bytes.len();
+        }
+
+        return Word::new(&buffer[..total_len]);
+    }
+
+    let mut result = Vec::with_capacity(total_len);
+    result.extend_from_slice(first.as_bytes());
+    for word in rest {
+        result.extend_from_slice(separator);
+        result.extend_from_slice(word.as_bytes());
+    }
+
+    Word::new(&result)
+}
+
 /// A macro to concatenate between 2 and 12 byte sequences into a single [`Word`].
 ///
 /// Each argument may be anything that implements `AsRef<[u8]>` (e.g. `&[u8]`, `&str`,

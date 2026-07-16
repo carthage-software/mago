@@ -316,7 +316,6 @@ where
     let mut filled_parameter_offsets: HashSet<usize> = HashSet::default();
 
     let target_kind_str = invocation.target.guess_kind();
-    let target_name_str = invocation.target.guess_name(context);
     let mut has_too_many_arguments = false;
     let mut has_named_argument_anomaly = false;
     let mut last_argument_offset: isize = -1;
@@ -362,6 +361,7 @@ where
                 let named_value_display = BytesDisplay(named_argument.name.value);
                 if let Some(previous_span) = assigned_parameters_by_name.get(&named_argument.name.value) {
                     has_named_argument_anomaly = true;
+                    let target_name_str = invocation.target.guess_name(context);
                     context.collector.report_with_code(
                         IssueCode::DuplicateNamedArgument,
                         Issue::error(format!(
@@ -379,6 +379,7 @@ where
                     );
                 } else if let Some(previous_span) = assigned_parameters_by_position.get(&parameter_offset) {
                     has_named_argument_anomaly = true;
+                    let target_name_str = invocation.target.guess_name(context);
                     if parameter_ref.is_variadic() {
                         context.collector.report_with_code(
                             IssueCode::NamedArgumentAfterPositional,
@@ -472,6 +473,7 @@ where
 
             if !has_variadic_parameter {
                 has_named_argument_anomaly = true;
+                let target_name_str = invocation.target.guess_name(context);
 
                 context.collector.report_with_code(
                     IssueCode::InvalidNamedArgument,
@@ -806,6 +808,7 @@ where
                             })
                             .unwrap_or(0);
                         number_of_provided_parameters += unpacked_count;
+                        let target_name_str = invocation.target.guess_name(context);
 
                         validate_unpacked_argument_elements(
                             context,
@@ -858,6 +861,7 @@ where
 
     if should_check_argument_count {
         let primary_annotation_span = invocation.arguments_source.span();
+        let target_name_str = invocation.target.guess_name(context);
 
         let main_message = match invocation.arguments_source {
             InvocationArgumentsSource::PipeInput(_) => format!(
@@ -911,6 +915,7 @@ where
             && number_of_provided_parameters > max_params
             && max_params > 0)
     {
+        let target_name_str = invocation.target.guess_name(context);
         let first_extra_arg_span = invocation
             .arguments_source
             .get_argument(max_params)
