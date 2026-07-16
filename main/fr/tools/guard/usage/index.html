@@ -590,6 +590,18 @@ class User extends Entity {}
  = The following rule(s) were evaluated but none permitted this dependency: `App\Domain\\`.
  = Help: Update your guard configuration to allow this dependency or refactor the code to remove it.
 </code></pre>
+<h3 id="restricting-where-a-dependency-may-be-used">Restreindre les endroits où une dépendance peut être utilisée</h3>
+<p>Les restrictions de périmètre protègent une dépendance vis-à-vis de certains espaces de noms sources. Cette règle autorise l'utilisation du contrôleur de base uniquement par le code sous <code>App\Http\Controllers\</code> :</p>
+<pre><code class="language-toml">[[guard.perimeter.restrictions]]
+dependency = "App\\Http\\Controllers\\Controller"
+allow-from = ["App\\Http\\Controllers\\"]
+</code></pre>
+<p>Cette règle interdit un trait externe dans tout <code>App\</code>, même si une règle de périmètre ordinaire l'autorise :</p>
+<pre><code class="language-toml">[[guard.perimeter.restrictions]]
+dependency = "Illuminate\\Foundation\\Bus\\Dispatchable"
+deny-from = ["App\\"]
+</code></pre>
+<p>Les restrictions conviennent aux interdictions ciblées. Lorsqu'aucune règle de périmètre ordinaire ni aucun layering n'est configuré, les dépendances qui ne correspondent à aucune restriction restent autorisées.</p>
 <h3 id="structural-flaw">Défaut structurel</h3>
 <p>Étant donné cette règle :</p>
 <pre><code class="language-toml">[[guard.structural.rules]]
@@ -616,6 +628,14 @@ class UserController
  = Help: Declare this class as `final`.
 </code></pre>
 <p>Chaque rapport identifie le symbole, l'emplacement, la violation exacte et la <code>reason</code> de la configuration lorsqu'elle a été fournie.</p>
+<h3 id="limiting-public-methods">Limiter les méthodes publiques</h3>
+<p>Utilisez <code>only-public-methods</code> pour limiter l'API publique déclarée directement par les classes correspondantes :</p>
+<pre><code class="language-toml">[[guard.structural.rules]]
+on = "App\\Http\\Controllers\\**"
+target = "class"
+only-public-methods = ["__construct", "__invoke"]
+</code></pre>
+<p>Toute autre méthode publique déclarée directement produit un défaut <code>only-public-methods</code>. Les méthodes privées et protégées restent autorisées. Les noms configurés sont autorisés, mais ne sont pas obligatoires, et les méthodes héritées ou fournies par des traits ne sont pas vérifiées.</p>
 
     </article>
 
@@ -636,7 +656,15 @@ class UserController
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#restricting-where-a-dependency-may-be-used">Restreindre les endroits où une dépendance peut être utilisée</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
       <a class="doc-toc__link" href="#structural-flaw">Défaut structurel</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#limiting-public-methods">Limiter les méthodes publiques</a>
     </li>
     
   </ol>

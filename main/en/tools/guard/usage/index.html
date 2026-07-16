@@ -588,6 +588,18 @@ class User extends Entity {}
  = The following rule(s) were evaluated but none permitted this dependency: `App\Domain\\`.
  = Help: Update your guard configuration to allow this dependency or refactor the code to remove it.
 </code></pre>
+<h3 id="restricting-where-a-dependency-may-be-used">Restricting where a dependency may be used</h3>
+<p>Perimeter restrictions protect a dependency from selected source namespaces. This rule allows the base controller to be used only by code under <code>App\Http\Controllers\</code>:</p>
+<pre><code class="language-toml">[[guard.perimeter.restrictions]]
+dependency = "App\\Http\\Controllers\\Controller"
+allow-from = ["App\\Http\\Controllers\\"]
+</code></pre>
+<p>This rule forbids an external trait throughout <code>App\</code>, even if an ordinary perimeter rule permits it:</p>
+<pre><code class="language-toml">[[guard.perimeter.restrictions]]
+dependency = "Illuminate\\Foundation\\Bus\\Dispatchable"
+deny-from = ["App\\"]
+</code></pre>
+<p>Restrictions are useful for focused bans. When no ordinary perimeter rules or layering are configured, dependencies that do not match a restriction remain allowed.</p>
 <h3 id="structural-flaw">Structural flaw</h3>
 <p>Given this rule:</p>
 <pre><code class="language-toml">[[guard.structural.rules]]
@@ -614,6 +626,14 @@ class UserController
  = Help: Declare this class as `final`.
 </code></pre>
 <p>Each report identifies the symbol, the location, the exact violation, and the <code>reason</code> from the configuration when one was provided.</p>
+<h3 id="limiting-public-methods">Limiting public methods</h3>
+<p>Use <code>only-public-methods</code> to limit the directly declared public API of matched classes:</p>
+<pre><code class="language-toml">[[guard.structural.rules]]
+on = "App\\Http\\Controllers\\**"
+target = "class"
+only-public-methods = ["__construct", "__invoke"]
+</code></pre>
+<p>Any other directly declared public method produces an <code>only-public-methods</code> flaw. Private and protected methods remain allowed. The configured names are allowed, not required, and inherited or trait-provided methods are not checked.</p>
 
     </article>
 
@@ -634,7 +654,15 @@ class UserController
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#restricting-where-a-dependency-may-be-used">Restricting where a dependency may be used</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
       <a class="doc-toc__link" href="#structural-flaw">Structural flaw</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#limiting-public-methods">Limiting public methods</a>
     </li>
     
   </ol>

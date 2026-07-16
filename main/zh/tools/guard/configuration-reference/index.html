@@ -670,6 +670,24 @@ permit = [{ path = "@all", kinds = ["class-like"] }]
 <li><code>path</code>:上面任意一种路径形式。</li>
 <li><code>kinds</code>:被允许的符号种类。取值为 <code>class-like</code>(涵盖类、接口、trait、枚举)、<code>function</code>、<code>constant</code>、<code>attribute</code>。</li>
 </ul>
+<h3 id="dependency-restrictions">依赖限制</h3>
+<p><code>[[guard.perimeter.restrictions]]</code> 定义面向目标依赖的限制。当某个依赖只能从指定命名空间使用,或必须禁止指定命名空间使用时,可以使用此配置。</p>
+<pre><code class="language-toml">[[guard.perimeter.restrictions]]
+dependency = "App\\Http\\Controllers\\Controller"
+allow-from = ["App\\Http\\Controllers\\"]
+kinds = ["class-like"]
+
+[[guard.perimeter.restrictions]]
+dependency = "Illuminate\\Foundation\\Bus\\Dispatchable"
+deny-from = ["App\\"]
+</code></pre>
+<table><thead><tr><th style="text-align: left">键</th><th style="text-align: left">说明</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>dependency</code></td><td style="text-align: left">必填的符号选择器。接受精确的完全限定名、以 <code>\</code> 结尾的命名空间或 glob 模式。</td></tr>
+<tr><td style="text-align: left"><code>allow-from</code></td><td style="text-align: left">可选的来源命名空间模式。列表非空时,匹配的依赖只能从这些命名空间使用。</td></tr>
+<tr><td style="text-align: left"><code>deny-from</code></td><td style="text-align: left">可选的来源命名空间模式。匹配的依赖禁止从这些命名空间使用。</td></tr>
+<tr><td style="text-align: left"><code>kinds</code></td><td style="text-align: left">可选的依赖种类过滤器。取值为 <code>class-like</code>、<code>function</code>、<code>constant</code>、<code>attribute</code>。空列表表示适用于所有种类。</td></tr>
+</tbody></table>
+<p>限制会在普通 <code>permit</code> 规则和 layering 之前求值,因此权限不能覆盖限制。如果 <code>allow-from</code> 和 <code>deny-from</code> 同时匹配,以 <code>deny-from</code> 为准。匹配 <code>allow-from</code> 只表示满足该限制;如果配置了普通边界规则或 layering,它们仍然必须允许该依赖。仅包含限制的配置会允许无关依赖;限制不会建立隐式允许列表。</p>
 <h2 id="structural-guard">结构 guard</h2>
 <p><code>[[guard.structural.rules]]</code> 定义结构约定。每个条目把用于挑选符号的选择器,与所选符号必须满足的约束组合在一起。</p>
 <pre><code class="language-toml">[[guard.structural.rules]]
@@ -715,8 +733,17 @@ reason = "This namespace is designated for enums only."
 <tr><td style="text-align: left"><code>must-extend</code></td><td style="text-align: left">符号必须继承的一个类。</td></tr>
 <tr><td style="text-align: left"><code>must-use-trait</code></td><td style="text-align: left">符号必须使用的一个或多个 trait。</td></tr>
 <tr><td style="text-align: left"><code>must-use-attribute</code></td><td style="text-align: left">符号必须携带的一个或多个 attribute。</td></tr>
+<tr><td style="text-align: left"><code>only-public-methods</code></td><td style="text-align: left">匹配的类可以声明的公共方法名。</td></tr>
 <tr><td style="text-align: left"><code>reason</code></td><td style="text-align: left">显示在错误消息中的人类可读说明。</td></tr>
 </tbody></table>
+<h4 id="public-method-allowlists">公共方法允许列表</h4>
+<p><code>only-public-methods</code> 适用于类,用于列出允许的公共方法名。方法名匹配不区分大小写。列表中的方法允许存在,但不要求必须存在。</p>
+<pre><code class="language-toml">[[guard.structural.rules]]
+on = "App\\Http\\Controllers\\**"
+target = "class"
+only-public-methods = ["__construct", "__invoke"]
+</code></pre>
+<p>该规则只检查每个匹配类直接声明的公共方法。由于 PHP 会把未显式声明可见性的方法视为公共方法,这些方法也会被检查。私有和受保护方法不受限制。继承的方法和 trait 提供的方法不会被检查。</p>
 <h4 id="inheritance-constraint-shapes">继承约束的形态</h4>
 <p><code>must-implement</code>、<code>must-extend</code>、<code>must-use-trait</code> 和 <code>must-use-attribute</code> 接受单个字符串、字符串数组(AND)或字符串数组的数组(AND 的 OR)。字面量 <code>"@nothing"</code> 表示禁止任何取值。</p>
 <pre><code class="language-toml">must-extend = "App\\BaseClass"
@@ -759,6 +786,10 @@ must-implement = "@nothing"
     
     <li class="doc-toc__item doc-toc__item--lvl3">
       <a class="doc-toc__link" href="#rules">规则</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#dependency-restrictions">依赖限制</a>
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl2">

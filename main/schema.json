@@ -1001,7 +1001,8 @@
         "perimeter": {
           "layers": {},
           "layering": [],
-          "rules": []
+          "rules": [],
+          "restrictions": []
         },
         "structural": {
           "rules": []
@@ -8689,7 +8690,8 @@
           "default": {
             "layers": {},
             "layering": [],
-            "rules": []
+            "rules": [],
+            "restrictions": []
           }
         },
         "structural": {
@@ -8745,6 +8747,14 @@
           "type": "array",
           "items": {
             "$ref": "#/$defs/PerimeterRule"
+          },
+          "default": []
+        },
+        "restrictions": {
+          "description": "Target-oriented dependency restrictions applied before ordinary perimeter rules.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/DependencyRestriction"
           },
           "default": []
         }
@@ -8808,6 +8818,48 @@
         "constant",
         "attribute"
       ]
+    },
+    "DependencyRestriction": {
+      "description": "Restricts where a dependency may or may not be used.",
+      "type": "object",
+      "properties": {
+        "dependency": {
+          "description": "The symbol, namespace, or pattern being restricted.",
+          "$ref": "#/$defs/SymbolSelector"
+        },
+        "allow-from": {
+          "description": "Source namespace patterns from which the dependency may be used.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "deny-from": {
+          "description": "Source namespace patterns from which the dependency may not be used.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "kinds": {
+          "description": "Optional dependency kinds to which this restriction applies. An empty list means all kinds.",
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/PermittedDependencyKind"
+          },
+          "default": []
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "dependency"
+      ]
+    },
+    "SymbolSelector": {
+      "description": "Selects a specific symbol or a group of symbols.",
+      "type": "string"
     },
     "StructuralSettings": {
       "type": "object",
@@ -8941,6 +8993,17 @@
               "type": "null"
             }
           ],
+          "default": null
+        },
+        "only-public-methods": {
+          "description": "The public methods that matched classes may declare. Private and protected methods are unrestricted.",
+          "type": [
+            "array",
+            "null"
+          ],
+          "items": {
+            "type": "string"
+          },
           "default": null
         },
         "reason": {

@@ -617,6 +617,18 @@ class User extends Entity {}
  = The following rule(s) were evaluated but none permitted this dependency: `App\Domain\\`.
  = Help: Update your guard configuration to allow this dependency or refactor the code to remove it.
 </code></pre>
+<h3 id="restricting-where-a-dependency-may-be-used">限制依赖可以从哪里使用</h3>
+<p>边界限制用于保护目标依赖,限定哪些来源命名空间可以使用它。下面的规则只允许 <code>App\Http\Controllers\</code> 下的代码使用基础控制器:</p>
+<pre><code class="language-toml">[[guard.perimeter.restrictions]]
+dependency = "App\\Http\\Controllers\\Controller"
+allow-from = ["App\\Http\\Controllers\\"]
+</code></pre>
+<p>下面的规则会在整个 <code>App\</code> 中禁止某个外部 trait,即使普通边界规则允许该依赖:</p>
+<pre><code class="language-toml">[[guard.perimeter.restrictions]]
+dependency = "Illuminate\\Foundation\\Bus\\Dispatchable"
+deny-from = ["App\\"]
+</code></pre>
+<p>限制适合表达有针对性的禁用规则。未配置普通边界规则或 layering 时,不匹配任何限制的依赖仍然允许使用。</p>
 <h3 id="structural-flaw">结构缺陷</h3>
 <p>给定如下规则:</p>
 <pre><code class="language-toml">[[guard.structural.rules]]
@@ -643,6 +655,14 @@ class UserController
  = Help: Declare this class as `final`.
 </code></pre>
 <p>每条报告都会标识涉及的符号、位置、确切的违规内容,以及配置中提供的 <code>reason</code>(若提供)。</p>
+<h3 id="limiting-public-methods">限制公共方法</h3>
+<p>使用 <code>only-public-methods</code> 可以限制匹配类直接声明的公共 API:</p>
+<pre><code class="language-toml">[[guard.structural.rules]]
+on = "App\\Http\\Controllers\\**"
+target = "class"
+only-public-methods = ["__construct", "__invoke"]
+</code></pre>
+<p>任何其他直接声明的公共方法都会产生 <code>only-public-methods</code> 结构缺陷。私有和受保护方法仍然允许。配置中的方法名表示允许存在,而不是要求必须存在;继承的方法和 trait 提供的方法不会被检查。</p>
 
     </article>
 
@@ -663,7 +683,15 @@ class UserController
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#restricting-where-a-dependency-may-be-used">限制依赖可以从哪里使用</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
       <a class="doc-toc__link" href="#structural-flaw">结构缺陷</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#limiting-public-methods">限制公共方法</a>
     </li>
     
   </ol>

@@ -643,6 +643,24 @@ permit = [{ path = "@all", kinds = ["class-like"] }]
 <li><code>path</code> : n'importe quelle des formes de chemin ci-dessus.</li>
 <li><code>kinds</code> : quels types de symboles sont autorisés. Les valeurs sont <code>class-like</code> (couvre les classes, interfaces, traits, enums), <code>function</code>, <code>constant</code> et <code>attribute</code>.</li>
 </ul>
+<h3 id="dependency-restrictions">Restrictions de dépendance</h3>
+<p><code>[[guard.perimeter.restrictions]]</code> définit des restrictions orientées vers la dépendance cible. Utilisez-les lorsqu'une dépendance ne doit être utilisée que depuis certains espaces de noms, ou doit être interdite depuis certains espaces de noms.</p>
+<pre><code class="language-toml">[[guard.perimeter.restrictions]]
+dependency = "App\\Http\\Controllers\\Controller"
+allow-from = ["App\\Http\\Controllers\\"]
+kinds = ["class-like"]
+
+[[guard.perimeter.restrictions]]
+dependency = "Illuminate\\Foundation\\Bus\\Dispatchable"
+deny-from = ["App\\"]
+</code></pre>
+<table><thead><tr><th style="text-align: left">Clé</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>dependency</code></td><td style="text-align: left">Sélecteur de symbole requis. Accepte un nom pleinement qualifié exact, un espace de noms se terminant par <code>\</code> ou un motif glob.</td></tr>
+<tr><td style="text-align: left"><code>allow-from</code></td><td style="text-align: left">Motifs optionnels d'espaces de noms sources. Lorsque la liste n'est pas vide, les dépendances correspondantes ne sont autorisées que depuis ces espaces de noms.</td></tr>
+<tr><td style="text-align: left"><code>deny-from</code></td><td style="text-align: left">Motifs optionnels d'espaces de noms sources. Les dépendances correspondantes sont interdites depuis ces espaces de noms.</td></tr>
+<tr><td style="text-align: left"><code>kinds</code></td><td style="text-align: left">Filtre optionnel sur le type de dépendance. Valeurs : <code>class-like</code>, <code>function</code>, <code>constant</code>, <code>attribute</code>. Une liste vide s'applique à tous les types.</td></tr>
+</tbody></table>
+<p>Les restrictions sont évaluées avant les règles <code>permit</code> ordinaires et le layering ; une permission ne peut donc pas remplacer une restriction. Si <code>allow-from</code> et <code>deny-from</code> correspondent tous les deux, <code>deny-from</code> l'emporte. Une correspondance avec <code>allow-from</code> satisfait uniquement la restriction ; les règles de périmètre ordinaires et le layering doivent toujours autoriser la dépendance lorsqu'ils sont configurés. Une configuration qui ne contient que des restrictions autorise les dépendances sans rapport ; les restrictions ne créent pas une liste d'autorisation implicite.</p>
 <h2 id="structural-guard">Guard structurel</h2>
 <p><code>[[guard.structural.rules]]</code> définit les conventions structurelles. Chaque entrée combine des sélecteurs qui choisissent quels symboles inspecter avec des contraintes que les symboles sélectionnés doivent satisfaire.</p>
 <pre><code class="language-toml">[[guard.structural.rules]]
@@ -688,8 +706,17 @@ reason = "This namespace is designated for enums only."
 <tr><td style="text-align: left"><code>must-extend</code></td><td style="text-align: left">Une classe que le symbole doit étendre.</td></tr>
 <tr><td style="text-align: left"><code>must-use-trait</code></td><td style="text-align: left">Un ou plusieurs traits que le symbole doit utiliser.</td></tr>
 <tr><td style="text-align: left"><code>must-use-attribute</code></td><td style="text-align: left">Un ou plusieurs attributs que le symbole doit porter.</td></tr>
+<tr><td style="text-align: left"><code>only-public-methods</code></td><td style="text-align: left">Noms des méthodes publiques que les classes correspondantes peuvent déclarer.</td></tr>
 <tr><td style="text-align: left"><code>reason</code></td><td style="text-align: left">Explication lisible affichée dans les messages d'erreur.</td></tr>
 </tbody></table>
+<h4 id="public-method-allowlists">Listes d'autorisation de méthodes publiques</h4>
+<p><code>only-public-methods</code> s'applique aux classes et énumère les noms de méthodes autorisés. La comparaison des noms est insensible à la casse. Les méthodes listées sont autorisées, mais leur présence n'est pas obligatoire.</p>
+<pre><code class="language-toml">[[guard.structural.rules]]
+on = "App\\Http\\Controllers\\**"
+target = "class"
+only-public-methods = ["__construct", "__invoke"]
+</code></pre>
+<p>La règle vérifie les méthodes publiques déclarées directement par chaque classe correspondante, y compris les méthodes sans visibilité explicite, puisque PHP les considère comme publiques. Les méthodes privées et protégées ne sont pas restreintes. Les méthodes héritées et celles fournies par des traits ne sont pas vérifiées.</p>
 <h4 id="inheritance-constraint-shapes">Formes des contraintes d'héritage</h4>
 <p><code>must-implement</code>, <code>must-extend</code>, <code>must-use-trait</code> et <code>must-use-attribute</code> acceptent une seule chaîne, un tableau de chaînes (AND) ou un tableau de tableaux de chaînes (OR de AND). Le littéral <code>"@nothing"</code> interdit toute valeur.</p>
 <pre><code class="language-toml">must-extend = "App\\BaseClass"
@@ -732,6 +759,10 @@ must-implement = "@nothing"
     
     <li class="doc-toc__item doc-toc__item--lvl3">
       <a class="doc-toc__link" href="#rules">Règles</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#dependency-restrictions">Restrictions de dépendance</a>
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl2">

@@ -641,6 +641,24 @@ permit = [{ path = "@all", kinds = ["class-like"] }]
 <li><code>path</code>: any of the path forms above.</li>
 <li><code>kinds</code>: which kinds of symbols are permitted. Values are <code>class-like</code> (covers classes, interfaces, traits, enums), <code>function</code>, <code>constant</code>, and <code>attribute</code>.</li>
 </ul>
+<h3 id="dependency-restrictions">Dependency restrictions</h3>
+<p><code>[[guard.perimeter.restrictions]]</code> defines target-oriented restrictions. Use these when a dependency must only be used from selected namespaces, or must be forbidden from selected namespaces.</p>
+<pre><code class="language-toml">[[guard.perimeter.restrictions]]
+dependency = "App\\Http\\Controllers\\Controller"
+allow-from = ["App\\Http\\Controllers\\"]
+kinds = ["class-like"]
+
+[[guard.perimeter.restrictions]]
+dependency = "Illuminate\\Foundation\\Bus\\Dispatchable"
+deny-from = ["App\\"]
+</code></pre>
+<table><thead><tr><th style="text-align: left">Key</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>dependency</code></td><td style="text-align: left">Required symbol selector. Accepts an exact fully qualified name, a namespace ending in <code>\</code>, or a glob pattern.</td></tr>
+<tr><td style="text-align: left"><code>allow-from</code></td><td style="text-align: left">Optional source namespace patterns. When non-empty, matching dependencies are only allowed from these namespaces.</td></tr>
+<tr><td style="text-align: left"><code>deny-from</code></td><td style="text-align: left">Optional source namespace patterns. Matching dependencies are forbidden from these namespaces.</td></tr>
+<tr><td style="text-align: left"><code>kinds</code></td><td style="text-align: left">Optional dependency-kind filter. Values: <code>class-like</code>, <code>function</code>, <code>constant</code>, <code>attribute</code>. An empty list applies to every kind.</td></tr>
+</tbody></table>
+<p>Restrictions are evaluated before ordinary <code>permit</code> rules and layering, so a permit cannot override a restriction. If both <code>allow-from</code> and <code>deny-from</code> match, <code>deny-from</code> wins. Matching <code>allow-from</code> only satisfies the restriction; ordinary perimeter rules and layering must still allow the dependency when configured. A configuration containing only restrictions allows unrelated dependencies; restrictions do not create an implicit allowlist.</p>
 <h2 id="structural-guard">Structural guard</h2>
 <p><code>[[guard.structural.rules]]</code> defines structural conventions. Each entry combines selectors that pick which symbols to inspect with constraints that the selected symbols must satisfy.</p>
 <pre><code class="language-toml">[[guard.structural.rules]]
@@ -686,8 +704,17 @@ reason = "This namespace is designated for enums only."
 <tr><td style="text-align: left"><code>must-extend</code></td><td style="text-align: left">A class the symbol must extend.</td></tr>
 <tr><td style="text-align: left"><code>must-use-trait</code></td><td style="text-align: left">One or more traits the symbol must use.</td></tr>
 <tr><td style="text-align: left"><code>must-use-attribute</code></td><td style="text-align: left">One or more attributes the symbol must carry.</td></tr>
+<tr><td style="text-align: left"><code>only-public-methods</code></td><td style="text-align: left">Public method names that matched classes may declare.</td></tr>
 <tr><td style="text-align: left"><code>reason</code></td><td style="text-align: left">Human-readable explanation shown in error messages.</td></tr>
 </tbody></table>
+<h4 id="public-method-allowlists">Public method allowlists</h4>
+<p><code>only-public-methods</code> applies to classes and lists allowed method names. Names are matched case-insensitively. The listed methods are allowed but are not required to exist.</p>
+<pre><code class="language-toml">[[guard.structural.rules]]
+on = "App\\Http\\Controllers\\**"
+target = "class"
+only-public-methods = ["__construct", "__invoke"]
+</code></pre>
+<p>The rule checks public methods declared directly by each matched class, including methods with no explicit visibility because PHP treats them as public. Private and protected methods are unrestricted. Inherited methods and methods provided by traits are not checked.</p>
 <h4 id="inheritance-constraint-shapes">Inheritance constraint shapes</h4>
 <p><code>must-implement</code>, <code>must-extend</code>, <code>must-use-trait</code>, and <code>must-use-attribute</code> accept a single string, an array of strings (AND), or an array of arrays of strings (OR of ANDs). The literal <code>"@nothing"</code> forbids any value.</p>
 <pre><code class="language-toml">must-extend = "App\\BaseClass"
@@ -730,6 +757,10 @@ must-implement = "@nothing"
     
     <li class="doc-toc__item doc-toc__item--lvl3">
       <a class="doc-toc__link" href="#rules">Rules</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#dependency-restrictions">Dependency restrictions</a>
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl2">
