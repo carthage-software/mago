@@ -1,5 +1,5 @@
-use foldhash::HashMap;
 use mago_allocator::Arena;
+use mago_allocator::collections::HashMap;
 use mago_allocator::vec::Vec;
 use mago_allocator::vec_in;
 
@@ -24,6 +24,10 @@ use crate::settings::FormatSettings;
 
 mod command;
 
+const MAP_PREALLOCATION_THRESHOLD: usize = 4 * 1024;
+const GROUP_MODE_CAPACITY_DIVISOR: usize = 64;
+const PROPAGATED_BREAK_CAPACITY_DIVISOR: usize = 16;
+
 #[derive(Debug)]
 pub struct Printer<'arena, A>
 where
@@ -35,8 +39,8 @@ where
     position: usize,
     commands: Vec<'arena, Command<'arena, A>, A>,
     line_suffix: Vec<'arena, Command<'arena, A>, A>,
-    group_mode_map: HashMap<GroupIdentifier, Mode>,
-    propagated_breaks: HashMap<usize, bool>,
+    group_mode_map: HashMap<'arena, GroupIdentifier, Mode, A>,
+    propagated_breaks: HashMap<'arena, usize, bool, A>,
     new_line: &'static str,
     can_trim: bool,
 }
@@ -55,6 +59,9 @@ where
         // be the same size as the original text.
         let out = Vec::with_capacity_in(capacity_hint, arena);
         let cmds = vec_in![arena; Command::new(Indentation::root(), Mode::Break, document)];
+        let estimated_map_capacity = |divisor| {
+            if capacity_hint < MAP_PREALLOCATION_THRESHOLD { 0 } else { capacity_hint / divisor }
+        };
 
         Self {
             arena,
@@ -63,8 +70,11 @@ where
             position: 0,
             commands: cmds,
             line_suffix: vec_in![arena],
-            group_mode_map: HashMap::default(),
-            propagated_breaks: HashMap::default(),
+            group_mode_map: HashMap::with_capacity_in(estimated_map_capacity(GROUP_MODE_CAPACITY_DIVISOR), arena),
+            propagated_breaks: HashMap::with_capacity_in(
+                estimated_map_capacity(PROPAGATED_BREAK_CAPACITY_DIVISOR),
+                arena,
+            ),
             new_line: settings.end_of_line.as_str(),
             can_trim: true,
         }
@@ -580,7 +590,7 @@ where
         true
     }
 
-    fn propagate_breaks(propagated_breaks: &mut HashMap<usize, bool>, doc: &Document<'_, A>) -> bool {
+    fn propagate_breaks(propagated_breaks: &mut HashMap<'arena, usize, bool, A>, doc: &Document<'_, A>) -> bool {
         match doc {
             Document::BreakParent => true,
             Document::Group(group) => {
