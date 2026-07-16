@@ -357,7 +357,6 @@ impl<'config> DatabaseLoader<'config> {
                     continue;
                 }
 
-
                 for entry in WalkDir::new(&canonical_root).follow_links(true).max_depth(1) {
                     match entry {
                         Ok(entry) => {
