@@ -12,6 +12,7 @@ use mago_syntax::cst::ClassLikeMemberSelector;
 use mago_syntax::cst::Expression;
 use mago_syntax::cst::FunctionCall;
 use mago_syntax::cst::Identifier;
+use mago_syntax::cst::Instantiation;
 use mago_syntax::cst::MethodCall;
 use mago_syntax::cst::Node;
 use mago_syntax::cst::NullSafeMethodCall;
@@ -27,6 +28,8 @@ use crate::document::Line;
 use crate::internal::FormatterState;
 use crate::internal::format::Format;
 use crate::internal::format::call_arguments::print_argument_list;
+use crate::internal::format::call_arguments::promote_argument_list_to_partial;
+use crate::internal::format::call_arguments::should_break_all_arguments;
 use crate::internal::format::misc;
 use crate::internal::format::misc::is_breaking_expression;
 use crate::internal::format::misc::is_simple_call_argument;
@@ -123,8 +126,30 @@ where
         let mut always_account_for_simple_calls = false;
 
         match self.base {
-            Expression::Instantiation(_) => {
-                score += 2; // Instantiation adds extra score
+            Expression::Instantiation(instantiation) => {
+                // A `new X(...)` receiver normally pushes the chain toward breaking.
+                // However, when the chain is short (<= 2 links) and every link is a
+                // simple call (no breaking arguments of its own), a receiver whose
+                // *own* argument list will print across multiple lines should
+                // not also drag the trailing short chain onto separate lines.
+                // See: https://github.com/carthage-software/mago/issues/1711
+                let receiver_args_multiline = instantiation
+                    .argument_list
+                    .as_ref()
+                    .is_some_and(|argument_list| receiver_argument_list_will_break(f, instantiation, argument_list));
+
+                let short_simple_chain = self.accesses.len() <= 2
+                    && self.accesses.iter().all(|access| match access.get_arguments_list() {
+                        Some(argument_list) => !argument_list
+                            .arguments
+                            .iter()
+                            .any(|argument| is_breaking_expression(f, argument.value(), false)),
+                        None => true,
+                    });
+
+                if !(receiver_args_multiline && short_simple_chain) {
+                    score += 2; // Instantiation adds extra score
+                }
             }
             Expression::Call(Call::Function(FunctionCall { argument_list, .. }))
                 if argument_list.arguments.len() == 1 =>
@@ -637,6 +662,47 @@ fn get_argument_width(argument: &Argument<'_>) -> Option<usize> {
             get_flat_expression_width(argument.value).map(|width| width + string_width(argument.name.value) + 2)
         }
     }
+}
+
+fn receiver_argument_list_will_break<A>(
+    f: &FormatterState<'_, '_, A>,
+    instantiation: &Instantiation<'_>,
+    argument_list: &ArgumentList<'_>,
+) -> bool
+where
+    A: Arena,
+{
+    // An empty argument list (`new static()`) never breaks, so the receiver
+    // cannot be multi-line. Short-circuit before the width fallback below,
+    // which would otherwise force a "will break" verdict for a receiver that
+    // fits comfortably on one line.
+    if argument_list.arguments.is_empty() {
+        return false;
+    }
+
+    let argument_list = promote_argument_list_to_partial(f.arena, argument_list);
+    if should_break_all_arguments(f, argument_list, false) {
+        return true;
+    }
+
+    // Use `is_some_and` (not `is_none_or`) so that an un-computable flat width
+    // does not force a "will break" verdict. When the receiver is already
+    // printed across multiple lines (e.g. on a second format pass) the flat
+    // width is `None`; treating that as "will break" makes the surrounding
+    // attach/break decision depend on the current formatting state and breaks
+    // idempotency. Only a *known* width that exceeds the print width means the
+    // receiver argument list will break.
+    get_instantiation_width(instantiation).is_some_and(|width| width > f.settings.print_width)
+}
+
+fn get_instantiation_width(instantiation: &Instantiation<'_>) -> Option<usize> {
+    let class_width = get_flat_expression_width(instantiation.class)?;
+    let argument_list_width = match &instantiation.argument_list {
+        Some(argument_list) => get_argument_list_width(argument_list)?,
+        None => 0,
+    };
+
+    Some(string_width(b"new ") + class_width + argument_list_width)
 }
 
 fn get_argument_width_with_binary_arguments(argument: &Argument<'_>) -> Option<usize> {
