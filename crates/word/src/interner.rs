@@ -1,3 +1,4 @@
+use std::cell::Cell;
 use std::hash::BuildHasher;
 use std::hash::Hasher;
 use std::ptr::NonNull;
@@ -210,6 +211,15 @@ impl Interner {
 
 static INTERNER: OnceLock<Interner> = OnceLock::new();
 
+/// Per-thread cache for recently interned words.
+const CACHE_SLOTS: usize = 256;
+const _: () = assert!(CACHE_SLOTS.is_power_of_two(), "interner cache size must be a power of two");
+
+thread_local! {
+    static INTERN_CACHE: [Cell<Option<NonNull<Entry>>>; CACHE_SLOTS] =
+        const { [const { Cell::new(None) }; CACHE_SLOTS] };
+}
+
 fn interner() -> &'static Interner {
     INTERNER.get_or_init(Interner::new)
 }
@@ -224,11 +234,33 @@ pub(crate) fn intern(bytes: &[u8]) -> NonNull<Entry> {
     hasher.write(bytes);
     let hash = hasher.finish();
 
+    let cache_index = (hash as usize) & (CACHE_SLOTS - 1);
+    if let Some(entry) = INTERN_CACHE.with(|cache| cache[cache_index].get()) {
+        let ptr = entry.as_ptr();
+        // SAFETY: cache entries come only from the leaky global interner and
+        // therefore remain valid for the process lifetime.
+        let cached_hash = unsafe { (*ptr).hash };
+        if cached_hash == hash {
+            // SAFETY: same as above.
+            let cached_len = unsafe { (*ptr).len as usize };
+            if cached_len == bytes.len() {
+                // SAFETY: same as above; interner entries include their trailing bytes.
+                let cached_bytes = unsafe { Entry::bytes(ptr) };
+                if cached_bytes == bytes {
+                    return entry;
+                }
+            }
+        }
+    }
+
     let shard_idx = (hash >> (u64::BITS as usize - SHARD_BITS)) as usize;
     // `expect` is acceptable here: a poisoned mutex means another thread panicked while
     // holding the interner lock, which is an unrecoverable invariant violation.
     let mut shard = interner.shards[shard_idx].lock().expect("interner shard mutex poisoned");
-    shard.intern(bytes, hash)
+    let entry = shard.intern(bytes, hash);
+    INTERN_CACHE.with(|cache| cache[cache_index].set(Some(entry)));
+
+    entry
 }
 
 /// Top-bits shift count for shard selection. Top bits of the hash, not the low bits,
