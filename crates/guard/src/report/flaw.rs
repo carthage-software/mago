@@ -38,6 +38,7 @@ pub enum FlawKind {
     MustUseTrait { expected: StructuralInheritanceConstraint },
     MustUseAttribute { expected: StructuralInheritanceConstraint },
     MustBe { allowed: Vec<StructuralSymbolKind> },
+    PublicMethodNotAllowed { method: Vec<u8>, allowed: Vec<String> },
 }
 
 impl From<StructuralFlaw> for Issue {
@@ -73,6 +74,10 @@ impl From<StructuralFlaw> for Issue {
             FlawKind::MustBe { .. } => {
                 "Move this symbol to a different namespace or update your guard configuration.".to_string()
             }
+            FlawKind::PublicMethodNotAllowed { method, .. } => format!(
+                "Make method `{}` non-public, remove it, or add it to `only-public-methods`.",
+                BytesDisplay(method)
+            ),
         };
 
         issue.with_help(help)
@@ -109,6 +114,18 @@ impl fmt::Display for FlawKind {
                     .join(", ");
                 write!(f, "This namespace should only contain: {allowed_str}")
             }
+            Self::PublicMethodNotAllowed { method, allowed } => {
+                if allowed.is_empty() {
+                    return write!(
+                        f,
+                        "Public method `{}` is not allowed; no public methods are allowed",
+                        BytesDisplay(method)
+                    );
+                }
+
+                let allowed = allowed.iter().map(|name| format!("`{name}`")).collect::<Vec<_>>().join(", ");
+                write!(f, "Public method `{}` is not allowed; allowed methods: {allowed}", BytesDisplay(method))
+            }
         }
     }
 }
@@ -130,6 +147,7 @@ impl FlawKind {
             Self::MustUseTrait { .. } => "must-use-trait",
             Self::MustUseAttribute { .. } => "must-use-attribute",
             Self::MustBe { .. } => "must-be",
+            Self::PublicMethodNotAllowed { .. } => "only-public-methods",
         }
     }
 }

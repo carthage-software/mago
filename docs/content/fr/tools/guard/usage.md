@@ -61,6 +61,26 @@ error[disallowed-use]: Illegal dependency on `App\Infrastructure\Doctrine\Orm\En
  = Help: Update your guard configuration to allow this dependency or refactor the code to remove it.
 ```
 
+### Restreindre les endroits où une dépendance peut être utilisée
+
+Les restrictions de périmètre protègent une dépendance vis-à-vis de certains espaces de noms sources. Cette règle autorise l'utilisation du contrôleur de base uniquement par le code sous `App\Http\Controllers\` :
+
+```toml
+[[guard.perimeter.restrictions]]
+dependency = "App\\Http\\Controllers\\Controller"
+allow-from = ["App\\Http\\Controllers\\"]
+```
+
+Cette règle interdit un trait externe dans tout `App\`, même si une règle de périmètre ordinaire l'autorise :
+
+```toml
+[[guard.perimeter.restrictions]]
+dependency = "Illuminate\\Foundation\\Bus\\Dispatchable"
+deny-from = ["App\\"]
+```
+
+Les restrictions conviennent aux interdictions ciblées. Lorsqu'aucune règle de périmètre ordinaire ni aucun layering n'est configuré, les dépendances qui ne correspondent à aucune restriction restent autorisées.
+
 ### Défaut structurel
 
 Étant donné cette règle :
@@ -97,3 +117,16 @@ error[must-be-final]: Structural flaw in `App\UI\Controller\UserController`
 ```
 
 Chaque rapport identifie le symbole, l'emplacement, la violation exacte et la `reason` de la configuration lorsqu'elle a été fournie.
+
+### Limiter les méthodes publiques
+
+Utilisez `only-public-methods` pour limiter l'API publique déclarée directement par les classes correspondantes :
+
+```toml
+[[guard.structural.rules]]
+on = "App\\Http\\Controllers\\**"
+target = "class"
+only-public-methods = ["__construct", "__invoke"]
+```
+
+Toute autre méthode publique déclarée directement produit un défaut `only-public-methods`. Les méthodes privées et protégées restent autorisées. Les noms configurés sont autorisés, mais ne sont pas obligatoires, et les méthodes héritées ou fournies par des traits ne sont pas vérifiées.

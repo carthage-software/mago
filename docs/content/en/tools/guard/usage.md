@@ -61,6 +61,26 @@ error[disallowed-use]: Illegal dependency on `App\Infrastructure\Doctrine\Orm\En
  = Help: Update your guard configuration to allow this dependency or refactor the code to remove it.
 ```
 
+### Restricting where a dependency may be used
+
+Perimeter restrictions protect a dependency from selected source namespaces. This rule allows the base controller to be used only by code under `App\Http\Controllers\`:
+
+```toml
+[[guard.perimeter.restrictions]]
+dependency = "App\\Http\\Controllers\\Controller"
+allow-from = ["App\\Http\\Controllers\\"]
+```
+
+This rule forbids an external trait throughout `App\`, even if an ordinary perimeter rule permits it:
+
+```toml
+[[guard.perimeter.restrictions]]
+dependency = "Illuminate\\Foundation\\Bus\\Dispatchable"
+deny-from = ["App\\"]
+```
+
+Restrictions are useful for focused bans. When no ordinary perimeter rules or layering are configured, dependencies that do not match a restriction remain allowed.
+
 ### Structural flaw
 
 Given this rule:
@@ -97,3 +117,16 @@ error[must-be-final]: Structural flaw in `App\UI\Controller\UserController`
 ```
 
 Each report identifies the symbol, the location, the exact violation, and the `reason` from the configuration when one was provided.
+
+### Limiting public methods
+
+Use `only-public-methods` to limit the directly declared public API of matched classes:
+
+```toml
+[[guard.structural.rules]]
+on = "App\\Http\\Controllers\\**"
+target = "class"
+only-public-methods = ["__construct", "__invoke"]
+```
+
+Any other directly declared public method produces an `only-public-methods` flaw. Private and protected methods remain allowed. The configured names are allowed, not required, and inherited or trait-provided methods are not checked.

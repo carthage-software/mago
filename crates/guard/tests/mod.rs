@@ -16,7 +16,10 @@ use mago_guard::path::NamespacePath;
 use mago_guard::path::Path;
 use mago_guard::path::SymbolSelector;
 use mago_guard::report::FortressReport;
+use mago_guard::report::breach::BreachReason;
 use mago_guard::report::breach::BreachVector;
+use mago_guard::report::flaw::FlawKind;
+use mago_guard::settings::DependencyRestriction;
 use mago_guard::settings::PerimeterRule;
 use mago_guard::settings::PerimeterSettings;
 use mago_guard::settings::PermittedDependency;
@@ -636,6 +639,180 @@ pub fn test_self_permit_is_scoped_to_rule_namespace() {
     assert_eq!(result.boundary_breaches.len(), 2);
     assert_eq!(result.boundary_breaches[0].vector, BreachVector::Use);
     assert_eq!(result.boundary_breaches[1].vector, BreachVector::Extends);
+}
+
+#[test]
+pub fn test_dependency_restriction_allows_only_configured_source_namespaces() {
+    let code = indoc! {r"
+        <?php
+
+        namespace App\Http\Controllers {
+            class Controller {}
+            class AllowedController extends Controller {}
+        }
+
+        namespace App\Http\Controllers\Internal {
+            class InternalController extends \App\Http\Controllers\Controller {}
+        }
+
+        namespace Vendor\Package {
+            class BaseClass {}
+        }
+
+        namespace App\Services {
+            class ForbiddenController extends \App\Http\Controllers\Controller {}
+            class UnrestrictedClass extends \Vendor\Package\BaseClass {}
+        }
+    "};
+
+    let settings = Settings {
+        perimeter: PerimeterSettings {
+            restrictions: vec![DependencyRestriction {
+                dependency: SymbolSelector::Symbol("App\\Http\\Controllers\\Controller".to_string()),
+                allow_from: vec!["App\\Http\\Controllers\\".to_string()],
+                deny_from: vec!["App\\Http\\Controllers\\Internal\\".to_string()],
+                kinds: vec![],
+            }],
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let result = test_guard("dependency_restriction_allow_from", code, settings);
+
+    assert_eq!(result.boundary_breaches.len(), 2);
+    assert!(
+        result.boundary_breaches.iter().all(|breach| breach.dependency_fqn == b"App\\Http\\Controllers\\Controller")
+    );
+    assert!(result.boundary_breaches.iter().all(|breach| breach.vector == BreachVector::Extends));
+    assert!(
+        result
+            .boundary_breaches
+            .iter()
+            .all(|breach| matches!(&breach.reason, BreachReason::ForbiddenByRestriction { .. }))
+    );
+}
+
+#[test]
+pub fn test_dependency_restriction_takes_precedence_over_permits() {
+    let code = indoc! {r"
+        <?php
+
+        namespace Illuminate\Foundation\Bus {
+            trait Dispatchable {}
+            function dispatch(): void {}
+        }
+
+        namespace Vendor\Package {
+            trait AllowedTrait {}
+            function allowed(): void {}
+        }
+
+        namespace App\Jobs {
+            class ForbiddenJob {
+                use \Illuminate\Foundation\Bus\Dispatchable;
+            }
+
+            class AllowedJob {
+                use \Vendor\Package\AllowedTrait;
+            }
+
+            function run(): void {
+                \Illuminate\Foundation\Bus\dispatch();
+                \Vendor\Package\allowed();
+            }
+        }
+    "};
+
+    let settings = Settings {
+        perimeter: PerimeterSettings {
+            rules: vec![PerimeterRule {
+                namespace: NamespacePath::Specific("App\\".to_string()),
+                permit: vec![PermittedDependency::Dependency(Path::All)],
+            }],
+            restrictions: vec![
+                DependencyRestriction {
+                    dependency: SymbolSelector::Symbol("Illuminate\\Foundation\\Bus\\Dispatchable".to_string()),
+                    allow_from: vec![],
+                    deny_from: vec!["App\\".to_string()],
+                    kinds: vec![PermittedDependencyKind::ClassLike],
+                },
+                DependencyRestriction {
+                    dependency: SymbolSelector::Symbol("Illuminate\\Foundation\\Bus\\dispatch".to_string()),
+                    allow_from: vec![],
+                    deny_from: vec!["App\\".to_string()],
+                    kinds: vec![PermittedDependencyKind::Function],
+                },
+            ],
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let result = test_guard("dependency_restriction_deny_from", code, settings);
+
+    assert_eq!(result.boundary_breaches.len(), 2);
+    assert!(result.boundary_breaches.iter().any(|breach| {
+        breach.dependency_fqn == b"Illuminate\\Foundation\\Bus\\Dispatchable" && breach.vector == BreachVector::TraitUse
+    }));
+    assert!(result.boundary_breaches.iter().any(|breach| {
+        breach.dependency_fqn == b"Illuminate\\Foundation\\Bus\\dispatch" && breach.vector == BreachVector::FunctionCall
+    }));
+    assert!(
+        result
+            .boundary_breaches
+            .iter()
+            .all(|breach| matches!(&breach.reason, BreachReason::ForbiddenByRestriction { .. }))
+    );
+}
+
+#[test]
+pub fn test_only_public_methods_restricts_declared_class_api() {
+    let code = indoc! {r"
+        <?php
+
+        namespace App\Http\Controllers {
+            class InvokableController {
+                public function __construct() {}
+                public function __invoke() {}
+                public function helper() {}
+                function implicitPublic() {}
+                protected function validate() {}
+                private function normalize() {}
+            }
+        }
+
+        namespace App\Services {
+            class UnrestrictedService {
+                public function helper() {}
+            }
+        }
+    "};
+
+    let settings = Settings {
+        structural: StructuralSettings {
+            rules: vec![StructuralRule {
+                on: "App\\Http\\Controllers\\**".to_string(),
+                target: Some(StructuralSymbolKind::Class),
+                only_public_methods: Some(vec!["__construct".to_string(), "__INVOKE".to_string()]),
+                ..Default::default()
+            }],
+        },
+        ..Default::default()
+    };
+
+    let result = test_guard("only_public_methods", code, settings);
+
+    assert_eq!(result.structural_flaws.len(), 2);
+    assert!(
+        result.structural_flaws.iter().any(|flaw| {
+            matches!(&flaw.kind, FlawKind::PublicMethodNotAllowed { method, .. } if method == b"helper")
+        })
+    );
+    assert!(result.structural_flaws.iter().any(|flaw| {
+        matches!(&flaw.kind, FlawKind::PublicMethodNotAllowed { method, .. } if method == b"implicitPublic")
+    }));
+    assert!(result.structural_flaws.iter().all(|flaw| flaw.kind.error_code() == "only-public-methods"));
 }
 
 #[test]

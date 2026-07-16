@@ -61,6 +61,26 @@ error[disallowed-use]: Illegal dependency on `App\Infrastructure\Doctrine\Orm\En
  = Help: Update your guard configuration to allow this dependency or refactor the code to remove it.
 ```
 
+### 限制依赖可以从哪里使用
+
+边界限制用于保护目标依赖,限定哪些来源命名空间可以使用它。下面的规则只允许 `App\Http\Controllers\` 下的代码使用基础控制器:
+
+```toml
+[[guard.perimeter.restrictions]]
+dependency = "App\\Http\\Controllers\\Controller"
+allow-from = ["App\\Http\\Controllers\\"]
+```
+
+下面的规则会在整个 `App\` 中禁止某个外部 trait,即使普通边界规则允许该依赖:
+
+```toml
+[[guard.perimeter.restrictions]]
+dependency = "Illuminate\\Foundation\\Bus\\Dispatchable"
+deny-from = ["App\\"]
+```
+
+限制适合表达有针对性的禁用规则。未配置普通边界规则或 layering 时,不匹配任何限制的依赖仍然允许使用。
+
 ### 结构缺陷
 
 给定如下规则:
@@ -97,3 +117,16 @@ error[must-be-final]: Structural flaw in `App\UI\Controller\UserController`
 ```
 
 每条报告都会标识涉及的符号、位置、确切的违规内容,以及配置中提供的 `reason`(若提供)。
+
+### 限制公共方法
+
+使用 `only-public-methods` 可以限制匹配类直接声明的公共 API:
+
+```toml
+[[guard.structural.rules]]
+on = "App\\Http\\Controllers\\**"
+target = "class"
+only-public-methods = ["__construct", "__invoke"]
+```
+
+任何其他直接声明的公共方法都会产生 `only-public-methods` 结构缺陷。私有和受保护方法仍然允许。配置中的方法名表示允许存在,而不是要求必须存在;继承的方法和 trait 提供的方法不会被检查。

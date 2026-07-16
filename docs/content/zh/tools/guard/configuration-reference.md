@@ -118,6 +118,30 @@ permit = [{ path = "@all", kinds = ["class-like"] }]
 - `path`:上面任意一种路径形式。
 - `kinds`:被允许的符号种类。取值为 `class-like`(涵盖类、接口、trait、枚举)、`function`、`constant`、`attribute`。
 
+### 依赖限制
+
+`[[guard.perimeter.restrictions]]` 定义面向目标依赖的限制。当某个依赖只能从指定命名空间使用,或必须禁止指定命名空间使用时,可以使用此配置。
+
+```toml
+[[guard.perimeter.restrictions]]
+dependency = "App\\Http\\Controllers\\Controller"
+allow-from = ["App\\Http\\Controllers\\"]
+kinds = ["class-like"]
+
+[[guard.perimeter.restrictions]]
+dependency = "Illuminate\\Foundation\\Bus\\Dispatchable"
+deny-from = ["App\\"]
+```
+
+| 键 | 说明 |
+| :--- | :--- |
+| `dependency` | 必填的符号选择器。接受精确的完全限定名、以 `\` 结尾的命名空间或 glob 模式。 |
+| `allow-from` | 可选的来源命名空间模式。列表非空时,匹配的依赖只能从这些命名空间使用。 |
+| `deny-from` | 可选的来源命名空间模式。匹配的依赖禁止从这些命名空间使用。 |
+| `kinds` | 可选的依赖种类过滤器。取值为 `class-like`、`function`、`constant`、`attribute`。空列表表示适用于所有种类。 |
+
+限制会在普通 `permit` 规则和 layering 之前求值,因此权限不能覆盖限制。如果 `allow-from` 和 `deny-from` 同时匹配,以 `deny-from` 为准。匹配 `allow-from` 只表示满足该限制;如果配置了普通边界规则或 layering,它们仍然必须允许该依赖。仅包含限制的配置会允许无关依赖;限制不会建立隐式允许列表。
+
 ## 结构 guard
 
 `[[guard.structural.rules]]` 定义结构约定。每个条目把用于挑选符号的选择器,与所选符号必须满足的约束组合在一起。
@@ -171,7 +195,21 @@ reason = "This namespace is designated for enums only."
 | `must-extend` | 符号必须继承的一个类。 |
 | `must-use-trait` | 符号必须使用的一个或多个 trait。 |
 | `must-use-attribute` | 符号必须携带的一个或多个 attribute。 |
+| `only-public-methods` | 匹配的类可以声明的公共方法名。 |
 | `reason` | 显示在错误消息中的人类可读说明。 |
+
+#### 公共方法允许列表
+
+`only-public-methods` 适用于类,用于列出允许的公共方法名。方法名匹配不区分大小写。列表中的方法允许存在,但不要求必须存在。
+
+```toml
+[[guard.structural.rules]]
+on = "App\\Http\\Controllers\\**"
+target = "class"
+only-public-methods = ["__construct", "__invoke"]
+```
+
+该规则只检查每个匹配类直接声明的公共方法。由于 PHP 会把未显式声明可见性的方法视为公共方法,这些方法也会被检查。私有和受保护方法不受限制。继承的方法和 trait 提供的方法不会被检查。
 
 #### 继承约束的形态
 

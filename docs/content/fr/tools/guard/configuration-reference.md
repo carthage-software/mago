@@ -118,6 +118,30 @@ permit = [{ path = "@all", kinds = ["class-like"] }]
 - `path` : n'importe quelle des formes de chemin ci-dessus.
 - `kinds` : quels types de symboles sont autorisés. Les valeurs sont `class-like` (couvre les classes, interfaces, traits, enums), `function`, `constant` et `attribute`.
 
+### Restrictions de dépendance
+
+`[[guard.perimeter.restrictions]]` définit des restrictions orientées vers la dépendance cible. Utilisez-les lorsqu'une dépendance ne doit être utilisée que depuis certains espaces de noms, ou doit être interdite depuis certains espaces de noms.
+
+```toml
+[[guard.perimeter.restrictions]]
+dependency = "App\\Http\\Controllers\\Controller"
+allow-from = ["App\\Http\\Controllers\\"]
+kinds = ["class-like"]
+
+[[guard.perimeter.restrictions]]
+dependency = "Illuminate\\Foundation\\Bus\\Dispatchable"
+deny-from = ["App\\"]
+```
+
+| Clé | Description |
+| :--- | :--- |
+| `dependency` | Sélecteur de symbole requis. Accepte un nom pleinement qualifié exact, un espace de noms se terminant par `\` ou un motif glob. |
+| `allow-from` | Motifs optionnels d'espaces de noms sources. Lorsque la liste n'est pas vide, les dépendances correspondantes ne sont autorisées que depuis ces espaces de noms. |
+| `deny-from` | Motifs optionnels d'espaces de noms sources. Les dépendances correspondantes sont interdites depuis ces espaces de noms. |
+| `kinds` | Filtre optionnel sur le type de dépendance. Valeurs : `class-like`, `function`, `constant`, `attribute`. Une liste vide s'applique à tous les types. |
+
+Les restrictions sont évaluées avant les règles `permit` ordinaires et le layering ; une permission ne peut donc pas remplacer une restriction. Si `allow-from` et `deny-from` correspondent tous les deux, `deny-from` l'emporte. Une correspondance avec `allow-from` satisfait uniquement la restriction ; les règles de périmètre ordinaires et le layering doivent toujours autoriser la dépendance lorsqu'ils sont configurés. Une configuration qui ne contient que des restrictions autorise les dépendances sans rapport ; les restrictions ne créent pas une liste d'autorisation implicite.
+
 ## Guard structurel
 
 `[[guard.structural.rules]]` définit les conventions structurelles. Chaque entrée combine des sélecteurs qui choisissent quels symboles inspecter avec des contraintes que les symboles sélectionnés doivent satisfaire.
@@ -171,7 +195,21 @@ reason = "This namespace is designated for enums only."
 | `must-extend` | Une classe que le symbole doit étendre. |
 | `must-use-trait` | Un ou plusieurs traits que le symbole doit utiliser. |
 | `must-use-attribute` | Un ou plusieurs attributs que le symbole doit porter. |
+| `only-public-methods` | Noms des méthodes publiques que les classes correspondantes peuvent déclarer. |
 | `reason` | Explication lisible affichée dans les messages d'erreur. |
+
+#### Listes d'autorisation de méthodes publiques
+
+`only-public-methods` s'applique aux classes et énumère les noms de méthodes autorisés. La comparaison des noms est insensible à la casse. Les méthodes listées sont autorisées, mais leur présence n'est pas obligatoire.
+
+```toml
+[[guard.structural.rules]]
+on = "App\\Http\\Controllers\\**"
+target = "class"
+only-public-methods = ["__construct", "__invoke"]
+```
+
+La règle vérifie les méthodes publiques déclarées directement par chaque classe correspondante, y compris les méthodes sans visibilité explicite, puisque PHP les considère comme publiques. Les méthodes privées et protégées ne sont pas restreintes. Les méthodes héritées et celles fournies par des traits ne sont pas vérifiées.
 
 #### Formes des contraintes d'héritage
 

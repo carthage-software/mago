@@ -20,6 +20,7 @@ use serde::Deserialize;
 
 use crate::path::NamespacePath;
 use crate::path::Path;
+use crate::path::SymbolSelector;
 #[cfg(feature = "serde")]
 use crate::path::is_valid_identifier_part;
 
@@ -39,6 +40,8 @@ pub struct PerimeterSettings {
     pub layers: HashMap<String, Vec<Path>>,
     pub layering: Vec<NamespacePath>,
     pub rules: Vec<PerimeterRule>,
+    /// Target-oriented dependency restrictions applied before ordinary perimeter rules.
+    pub restrictions: Vec<DependencyRestriction>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, JsonSchema)]
@@ -47,6 +50,24 @@ pub struct PerimeterSettings {
 pub struct PerimeterRule {
     pub namespace: NamespacePath,
     pub permit: Vec<PermittedDependency>,
+}
+
+/// Restricts where a dependency may or may not be used.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, JsonSchema)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(rename_all = "kebab-case", deny_unknown_fields))]
+pub struct DependencyRestriction {
+    /// The symbol, namespace, or pattern being restricted.
+    pub dependency: SymbolSelector,
+    /// Source namespace patterns from which the dependency may be used.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub allow_from: Vec<String>,
+    /// Source namespace patterns from which the dependency may not be used.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub deny_from: Vec<String>,
+    /// Optional dependency kinds to which this restriction applies. An empty list means all kinds.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub kinds: Vec<PermittedDependencyKind>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, JsonSchema)]
@@ -104,6 +125,8 @@ pub struct StructuralRule {
     pub must_use_trait: Option<StructuralInheritanceConstraint>,
     /// Structural attribute usage constraints.
     pub must_use_attribute: Option<StructuralInheritanceConstraint>,
+    /// The public methods that matched classes may declare. Private and protected methods are unrestricted.
+    pub only_public_methods: Option<Vec<String>>,
     /// A human-readable reason for this rule.
     pub reason: Option<String>,
 }
@@ -322,10 +345,10 @@ impl fmt::Display for StructuralSymbolKind {
 }
 
 impl PerimeterSettings {
-    /// Returns true if there are no perimeter rules or layering configured.
+    /// Returns true if there are no perimeter rules, restrictions, or layering configured.
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.rules.is_empty() && self.layering.is_empty()
+        self.rules.is_empty() && self.restrictions.is_empty() && self.layering.is_empty()
     }
 }
 
@@ -438,6 +461,32 @@ mod tests {
 
         let none = StructuralInheritanceConstraint::Nothing;
         assert_eq!(none.to_string(), "<nothing>");
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn deserializes_dependency_restrictions_and_public_method_allowlists() {
+        let toml = r#"
+            [[perimeter.restrictions]]
+            dependency = "App\\Http\\Controllers\\Controller"
+            allow-from = ["App\\Http\\Controllers\\"]
+            kinds = ["class-like"]
+
+            [[structural.rules]]
+            on = "App\\Http\\Controllers\\**"
+            target = "class"
+            only-public-methods = ["__construct", "__invoke"]
+        "#;
+
+        let settings: Settings = toml::from_str(toml).unwrap();
+        let restriction = &settings.perimeter.restrictions[0];
+        assert_eq!(restriction.dependency, SymbolSelector::Symbol("App\\Http\\Controllers\\Controller".to_string()));
+        assert_eq!(restriction.allow_from, ["App\\Http\\Controllers\\"]);
+        assert_eq!(restriction.kinds, [PermittedDependencyKind::ClassLike]);
+        assert_eq!(
+            settings.structural.rules[0].only_public_methods,
+            Some(vec!["__construct".to_string(), "__invoke".to_string()])
+        );
     }
 
     #[cfg_attr(feature = "serde", derive(serde::Deserialize))]

@@ -6,6 +6,7 @@ use mago_reporting::Issue;
 use mago_span::Span;
 
 use crate::path::NamespacePath;
+use crate::path::SymbolSelector;
 use crate::settings::PermittedDependencyKind;
 
 /// Represents a single, specific architectural boundary breach found by the guard.
@@ -53,6 +54,8 @@ pub enum BreachReason {
     NoMatchingRule,
     /// One or more rules were evaluated, but none permitted this specific dependency.
     ForbiddenByRule { rule_namespaces: Vec<NamespacePath> },
+    /// A target-oriented dependency restriction rejected this dependency.
+    ForbiddenByRestriction { dependency: SymbolSelector },
 }
 
 impl From<BoundaryBreach> for Issue {
@@ -81,6 +84,13 @@ impl From<BoundaryBreach> for Issue {
                 issue = issue.with_note("Dependency forbidden by architectural rules").with_note(format!(
                     "The following rule(s) were evaluated but none permitted this dependency: {namespaces}."
                 ));
+            }
+            BreachReason::ForbiddenByRestriction { dependency } => {
+                issue = issue
+                    .with_note("Dependency forbidden by an architectural restriction")
+                    .with_note(format!(
+                        "The dependency matches the restricted selector `{dependency}` and cannot be used from this namespace."
+                    ));
             }
         }
 

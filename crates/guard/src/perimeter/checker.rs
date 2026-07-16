@@ -9,6 +9,7 @@ use crate::path::SymbolSelector;
 use crate::report::breach::BoundaryBreach;
 use crate::report::breach::BreachReason;
 use crate::report::breach::BreachVector;
+use crate::settings::DependencyRestriction;
 use crate::settings::PermittedDependency;
 use crate::settings::PermittedDependencyKind;
 use crate::settings::Settings;
@@ -47,6 +48,14 @@ fn check_allowed(
     target_fqn: &[u8],
     dependency_kind: PermittedDependencyKind,
 ) -> Option<BreachReason> {
+    if let Some(restriction) =
+        ctx.settings.perimeter.restrictions.iter().find(|restriction| {
+            violates_restriction(restriction, ctx.get_current_namespace(), target_fqn, dependency_kind)
+        })
+    {
+        return Some(BreachReason::ForbiddenByRestriction { dependency: restriction.dependency.clone() });
+    }
+
     let rule = ctx
         .settings
         .perimeter
@@ -103,10 +112,51 @@ fn check_allowed(
         }
     }
 
-    if rules.is_empty() {
+    if rules.is_empty() && ctx.settings.perimeter.rules.is_empty() && ctx.settings.perimeter.layering.is_empty() {
+        None
+    } else if rules.is_empty() {
         Some(BreachReason::NoMatchingRule)
     } else {
         Some(BreachReason::ForbiddenByRule { rule_namespaces: rules.iter().map(|r| r.namespace.clone()).collect() })
+    }
+}
+
+fn matches_source_namespace(namespace: &[u8], pattern: &str) -> bool {
+    if pattern.eq_ignore_ascii_case("@global") {
+        namespace.is_empty()
+    } else {
+        matcher::matches(namespace, pattern.as_bytes(), false, true)
+    }
+}
+
+fn violates_restriction(
+    restriction: &DependencyRestriction,
+    source_namespace: &[u8],
+    target_fqn: &[u8],
+    dependency_kind: PermittedDependencyKind,
+) -> bool {
+    if (!restriction.kinds.is_empty() && !restriction.kinds.contains(&dependency_kind))
+        || !matches_selector(target_fqn, &restriction.dependency)
+    {
+        return false;
+    }
+
+    let explicitly_denied =
+        restriction.deny_from.iter().any(|pattern| matches_source_namespace(source_namespace, pattern));
+    let allowed = restriction.allow_from.is_empty()
+        || restriction.allow_from.iter().any(|pattern| matches_source_namespace(source_namespace, pattern));
+
+    explicitly_denied || !allowed
+}
+
+fn matches_selector(target_fqn: &[u8], selector: &SymbolSelector) -> bool {
+    match selector {
+        SymbolSelector::Namespace(namespace) => match namespace {
+            NamespacePath::Global => !target_fqn.contains(&b'\\'),
+            NamespacePath::Specific(pattern) => matcher::matches(target_fqn, pattern.as_bytes(), false, true),
+        },
+        SymbolSelector::Symbol(symbol) => target_fqn.eq_ignore_ascii_case(symbol.as_bytes()),
+        SymbolSelector::Pattern(pattern) => matcher::matches(target_fqn, pattern.as_bytes(), false, false),
     }
 }
 
@@ -156,13 +206,6 @@ fn is_path_allowed(
                 .iter()
                 .any(|pattern| is_path_allowed(codebase, settings, pattern, rule_namespace, target_fqn))
         }),
-        Path::Selector(selector) => match selector {
-            SymbolSelector::Namespace(ns) => match ns {
-                NamespacePath::Global => !target_fqn.contains(&b'\\'),
-                NamespacePath::Specific(pattern) => matcher::matches(target_fqn, pattern.as_bytes(), false, true),
-            },
-            SymbolSelector::Symbol(sn) => target_fqn.eq_ignore_ascii_case(sn.as_bytes()),
-            SymbolSelector::Pattern(p) => matcher::matches(target_fqn, p.as_bytes(), false, false),
-        },
+        Path::Selector(selector) => matches_selector(target_fqn, selector),
     }
 }

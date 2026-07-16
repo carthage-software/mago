@@ -290,6 +290,31 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                     });
                 }
             }
+
+            if let Some(allowed_public_methods) = &structural_rule.only_public_methods {
+                for method in class.members.iter().filter_map(|member| match member {
+                    ClassLikeMember::Method(method) => Some(method),
+                    _ => None,
+                }) {
+                    let is_public = !method.modifiers.contains_protected() && !method.modifiers.contains_private();
+                    let is_allowed = allowed_public_methods
+                        .iter()
+                        .any(|allowed| method.name.value.eq_ignore_ascii_case(allowed.as_bytes()));
+
+                    if is_public && !is_allowed {
+                        structural_flaws.push(StructuralFlaw {
+                            symbol_fqn: fqn_to_owned(fqn),
+                            symbol_kind: StructuralSymbolKind::Class,
+                            span: method.name.span,
+                            kind: FlawKind::PublicMethodNotAllowed {
+                                method: method.name.value.to_vec(),
+                                allowed: allowed_public_methods.clone(),
+                            },
+                            reason: structural_rule.reason.clone(),
+                        });
+                    }
+                }
+            }
         }
 
         context.structural_flaws.extend(structural_flaws);

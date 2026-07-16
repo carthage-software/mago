@@ -118,6 +118,30 @@ permit = [{ path = "@all", kinds = ["class-like"] }]
 - `path`: any of the path forms above.
 - `kinds`: which kinds of symbols are permitted. Values are `class-like` (covers classes, interfaces, traits, enums), `function`, `constant`, and `attribute`.
 
+### Dependency restrictions
+
+`[[guard.perimeter.restrictions]]` defines target-oriented restrictions. Use these when a dependency must only be used from selected namespaces, or must be forbidden from selected namespaces.
+
+```toml
+[[guard.perimeter.restrictions]]
+dependency = "App\\Http\\Controllers\\Controller"
+allow-from = ["App\\Http\\Controllers\\"]
+kinds = ["class-like"]
+
+[[guard.perimeter.restrictions]]
+dependency = "Illuminate\\Foundation\\Bus\\Dispatchable"
+deny-from = ["App\\"]
+```
+
+| Key | Description |
+| :--- | :--- |
+| `dependency` | Required symbol selector. Accepts an exact fully qualified name, a namespace ending in `\`, or a glob pattern. |
+| `allow-from` | Optional source namespace patterns. When non-empty, matching dependencies are only allowed from these namespaces. |
+| `deny-from` | Optional source namespace patterns. Matching dependencies are forbidden from these namespaces. |
+| `kinds` | Optional dependency-kind filter. Values: `class-like`, `function`, `constant`, `attribute`. An empty list applies to every kind. |
+
+Restrictions are evaluated before ordinary `permit` rules and layering, so a permit cannot override a restriction. If both `allow-from` and `deny-from` match, `deny-from` wins. Matching `allow-from` only satisfies the restriction; ordinary perimeter rules and layering must still allow the dependency when configured. A configuration containing only restrictions allows unrelated dependencies; restrictions do not create an implicit allowlist.
+
 ## Structural guard
 
 `[[guard.structural.rules]]` defines structural conventions. Each entry combines selectors that pick which symbols to inspect with constraints that the selected symbols must satisfy.
@@ -171,7 +195,21 @@ reason = "This namespace is designated for enums only."
 | `must-extend` | A class the symbol must extend. |
 | `must-use-trait` | One or more traits the symbol must use. |
 | `must-use-attribute` | One or more attributes the symbol must carry. |
+| `only-public-methods` | Public method names that matched classes may declare. |
 | `reason` | Human-readable explanation shown in error messages. |
+
+#### Public method allowlists
+
+`only-public-methods` applies to classes and lists allowed method names. Names are matched case-insensitively. The listed methods are allowed but are not required to exist.
+
+```toml
+[[guard.structural.rules]]
+on = "App\\Http\\Controllers\\**"
+target = "class"
+only-public-methods = ["__construct", "__invoke"]
+```
+
+The rule checks public methods declared directly by each matched class, including methods with no explicit visibility because PHP treats them as public. Private and protected methods are unrestricted. Inherited methods and methods provided by traits are not checked.
 
 #### Inheritance constraint shapes
 
