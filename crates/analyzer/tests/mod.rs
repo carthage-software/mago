@@ -70,6 +70,7 @@ test_case!(list_destructure_string_key_in_union);
 test_case!(list_destructure_string_key_simple);
 test_case!(list_destructure_with_holes_no_warn);
 test_case!(loops_foreach_union_cast_not_always_entered);
+test_case!(do_while_iteration_dependent_conditions);
 test_case!(array_map_non_empty_array);
 test_case!(array_map_non_empty_list);
 test_case!(array_shape_fields);

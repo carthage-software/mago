@@ -4,6 +4,7 @@ use std::cell::Cell;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
 use std::rc::Rc;
+use std::str::FromStr;
 use std::sync::Arc;
 
 use foldhash::HashSet;
@@ -647,7 +648,11 @@ where
 
             let (result, new_recorded_issues) = context.record(|context| -> Result<LoopScope, AnalysisError> {
                 for (condition_offset, pre_condition) in pre_conditions.iter().enumerate() {
-                    apply_pre_condition_to_loop_context(
+                    if is_do {
+                        context.collector.start_recording();
+                    }
+
+                    let result = apply_pre_condition_to_loop_context(
                         context,
                         pre_condition,
                         unsafe {
@@ -660,7 +665,13 @@ where
                         artifacts,
                         is_do,
                         !pre_conditions_applied,
-                    )?;
+                    );
+
+                    if is_do {
+                        context.collector.finish_recording();
+                    }
+
+                    result?;
                 }
 
                 pre_conditions_applied = true;
@@ -744,7 +755,9 @@ where
         }
 
         for issue in first_iteration_issues {
-            if !recorded_issues.iter().any(|existing| existing == &issue) {
+            if !is_iteration_dependent_truthiness_issue(issue.code.as_deref())
+                && !recorded_issues.iter().any(|existing| existing == &issue)
+            {
                 recorded_issues.push(issue);
             }
         }
@@ -1018,6 +1031,27 @@ fn mark_array_keys_definite(union: &mut TUnion) -> bool {
     }
 
     changed
+}
+
+/// Returns whether an issue's claim can be invalidated by a later do-while iteration.
+///
+/// The first iteration is analyzed with the pre-loop types, then the body is analyzed
+/// again with the stabilized loop-carried types. Safety issues found only on the first
+/// iteration remain relevant because a do-while body always executes once. A claim that
+/// a condition or comparison is always true or false, however, is only valid when it is
+/// also found after the loop types stabilize.
+fn is_iteration_dependent_truthiness_issue(code: Option<&str>) -> bool {
+    let Some(code) = code else {
+        return false;
+    };
+
+    matches!(
+        IssueCode::from_str(code),
+        Ok(IssueCode::ImpossibleCondition
+            | IssueCode::RedundantComparison
+            | IssueCode::RedundantCondition
+            | IssueCode::RedundantTypeComparison)
+    )
 }
 
 /// Compute the depth of the loop's assignment dependency graph, clamped to `maximum`.
