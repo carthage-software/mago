@@ -10,7 +10,6 @@
 function a(array $arr, string $k): mixed
 {
     assert(isset($arr[$k]));
-    /** @mago-expect analysis:mixed-return-statement */
     return $arr[$k];
 }
 

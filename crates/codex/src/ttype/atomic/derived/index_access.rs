@@ -3,11 +3,13 @@ use std::sync::Arc;
 use mago_word::Word;
 use mago_word::concat_word;
 
+use crate::metadata::CodebaseMetadata;
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::array::TArray;
 use crate::ttype::atomic::array::key::ArrayKey;
+use crate::ttype::comparator::union_comparator;
 use crate::ttype::union::TUnion;
 
 /// Represents an indexed access type `T[K]`.
@@ -52,6 +54,7 @@ impl TIndexAccess {
     pub fn get_indexed_access_result(
         target_types: &[TAtomic],
         index_types: &[TAtomic],
+        codebase: &CodebaseMetadata,
         retain_generics: bool,
     ) -> Option<TUnion> {
         let mut indexed_values = vec![];
@@ -63,6 +66,7 @@ impl TIndexAccess {
                     if let Some(generic_indexed_values) = Self::get_indexed_access_result(
                         std::slice::from_ref(target_type),
                         index_parameter.get_constraint().types.as_ref(),
+                        codebase,
                         retain_generics,
                     ) {
                         indexed_values.extend(generic_indexed_values.types.into_owned());
@@ -72,42 +76,62 @@ impl TIndexAccess {
                 }
 
                 match target_type {
-                    TAtomic::Array(target_array) => {
-                        let Some(array_key) = index_type.to_array_key() else {
+                    TAtomic::Array(TArray::List(list_array)) => {
+                        let Some(ArrayKey::Integer(target_index)) = index_type.to_array_key() else {
                             continue 'indices;
                         };
 
-                        match target_array {
-                            TArray::List(list_array) => {
-                                let ArrayKey::Integer(target_index) = array_key else {
-                                    continue 'indices;
-                                };
+                        if target_index < 0 {
+                            continue 'indices;
+                        }
 
-                                if target_index < 0 {
-                                    continue 'indices;
+                        let Some(known_elements) = list_array.known_elements.as_ref() else {
+                            continue 'indices;
+                        };
+
+                        let Some((_, known_element_type)) = known_elements.get(&(target_index as usize)) else {
+                            continue 'indices;
+                        };
+
+                        indexed_values.extend(known_element_type.types.iter().cloned());
+                    }
+                    TAtomic::Array(TArray::Keyed(keyed_array)) => {
+                        let literal_key = index_type.to_array_key();
+                        if let Some((_, known_item_type)) = literal_key.as_ref().and_then(|array_key| {
+                            keyed_array.known_items.as_ref().and_then(|items| items.get(array_key))
+                        }) {
+                            indexed_values.extend(known_item_type.types.iter().cloned());
+                            continue 'indices;
+                        }
+
+                        let index_union = TUnion::from_atomic(index_type.clone());
+
+                        if literal_key.is_none()
+                            && let Some(known_items) = keyed_array.known_items.as_ref()
+                        {
+                            for (known_key, (_, known_item_type)) in known_items {
+                                if union_comparator::can_expression_types_be_identical(
+                                    codebase,
+                                    &index_union,
+                                    &known_key.to_union(),
+                                    false,
+                                    false,
+                                ) {
+                                    indexed_values.extend(known_item_type.types.iter().cloned());
                                 }
-
-                                let Some(known_elements) = list_array.known_elements.as_ref() else {
-                                    continue 'indices;
-                                };
-
-                                let Some((_, known_element_type)) = known_elements.get(&(target_index as usize)) else {
-                                    continue 'indices;
-                                };
-
-                                indexed_values.extend(known_element_type.types.iter().cloned());
                             }
-                            TArray::Keyed(keyed_array) => {
-                                let Some(known_items) = keyed_array.known_items.as_ref() else {
-                                    continue 'indices;
-                                };
+                        }
 
-                                let Some((_, known_item_type)) = known_items.get(&array_key) else {
-                                    continue 'indices;
-                                };
-
-                                indexed_values.extend(known_item_type.types.iter().cloned());
-                            }
+                        if let Some((key_type, value_type)) = keyed_array.get_generic_parameters()
+                            && union_comparator::can_expression_types_be_identical(
+                                codebase,
+                                &index_union,
+                                key_type,
+                                false,
+                                false,
+                            )
+                        {
+                            indexed_values.extend(value_type.types.iter().cloned());
                         }
                     }
                     TAtomic::GenericParameter(parameter) => {
@@ -116,6 +140,7 @@ impl TIndexAccess {
                         } else if let Some(generic_indexed_values) = Self::get_indexed_access_result(
                             parameter.get_constraint().types.as_ref(),
                             index_types,
+                            codebase,
                             retain_generics,
                         ) {
                             indexed_values.extend(generic_indexed_values.types.into_owned());

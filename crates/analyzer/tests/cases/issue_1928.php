@@ -9,7 +9,7 @@ class TestParent
      */
     public function get(string $key): mixed
     {
-        /** @mago-ignore analysis:string-member-selector,mixed-return-statement */
+        /** @mago-ignore analysis:string-member-selector */
         return $this->{$key};
     }
 }

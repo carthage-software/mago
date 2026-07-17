@@ -1003,7 +1003,8 @@ fn expand_index_access(
     let mut index_type = return_type_index_access.get_index_type().clone();
     expand_union(codebase, &mut index_type, options);
 
-    let Some(new_return_types) = TIndexAccess::get_indexed_access_result(&target_type.types, &index_type.types, false)
+    let Some(new_return_types) =
+        TIndexAccess::get_indexed_access_result(&target_type.types, &index_type.types, codebase, false)
     else {
         return vec![TAtomic::Derived(TDerived::IndexAccess(return_type_index_access.clone()))];
     };

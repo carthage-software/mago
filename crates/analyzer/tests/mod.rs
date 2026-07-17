@@ -736,6 +736,7 @@ test_case!(type_alias_in_class_method_parameters);
 test_case!(change_private_parent_prop);
 test_case!(class_in_alias);
 test_case!(index_access);
+test_case!(parameter_variable_index_access);
 test_case!(merge_arrays_non_empty);
 test_case!(expand_generic_params);
 test_case!(nullsafe_operator_chain_shortcircuit);

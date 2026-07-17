@@ -5,6 +5,8 @@ use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::misc::GenericParent;
 use mago_codex::ttype::add_union_type;
 use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::atomic::conditional::TConditional;
+use mago_codex::ttype::atomic::derived::TDerived;
 use mago_codex::ttype::atomic::mixed::TMixed;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::combiner::CombinerOptions;
@@ -209,26 +211,106 @@ fn resolve_atomic<'ctx, 'arena, A>(
 where
     A: Arena,
 {
-    if let TAtomic::Variable(variable) = atomic_to_resolve {
-        if variable.as_bytes().eq_ignore_ascii_case(b"$this")
-            && let Some(method_context) = invocation.target.get_method_context()
-            && let StaticClassType::Object(this_type) = &method_context.class_type
-        {
-            return vec![TAtomic::Object(this_type.clone())];
+    match atomic_to_resolve {
+        TAtomic::Variable(variable) => {
+            if variable.as_bytes().eq_ignore_ascii_case(b"$this")
+                && let Some(method_context) = invocation.target.get_method_context()
+                && let StaticClassType::Object(this_type) = &method_context.class_type
+            {
+                return vec![TAtomic::Object(this_type.clone())];
+            }
+
+            parameters
+                .get(&variable)
+                .map(|argument_type| {
+                    inferred_type_replacer::replace(argument_type, template_result, context.codebase).types.into_owned()
+                })
+                .unwrap_or_else(|| vec![TAtomic::Mixed(TMixed::new())])
         }
+        TAtomic::Conditional(conditional) => {
+            resolve_conditional(context, invocation, template_result, parameters, conditional)
+        }
+        TAtomic::Derived(mut derived) => {
+            resolve_derived(context, invocation, template_result, parameters, &mut derived);
 
-        return parameters
-            .get(&variable)
-            .map(|argument_type| {
-                inferred_type_replacer::replace(argument_type, template_result, context.codebase).types.into_owned()
-            })
-            .unwrap_or_else(|| vec![TAtomic::Mixed(TMixed::new())]);
+            vec![TAtomic::Derived(derived)]
+        }
+        atomic => vec![atomic],
     }
+}
 
-    let TAtomic::Conditional(conditional) = atomic_to_resolve else {
-        return vec![atomic_to_resolve];
-    };
+fn resolve_derived<'ctx, 'arena, A>(
+    context: &Context<'ctx, 'arena, A>,
+    invocation: &Invocation<'ctx, '_, 'arena>,
+    template_result: &TemplateResult,
+    parameters: &WordMap<TUnion>,
+    derived: &mut TDerived,
+) where
+    A: Arena,
+{
+    match derived {
+        TDerived::KeyOf(key_of) => {
+            *key_of.get_target_type_mut() =
+                resolve_union(context, invocation, template_result, parameters, key_of.get_target_type().clone());
+        }
+        TDerived::ValueOf(value_of) => {
+            *value_of.get_target_type_mut() =
+                resolve_union(context, invocation, template_result, parameters, value_of.get_target_type().clone());
+        }
+        TDerived::IntMask(int_mask) => {
+            for value in int_mask.get_values_mut() {
+                *value = resolve_union(context, invocation, template_result, parameters, value.clone());
+            }
+        }
+        TDerived::IntMaskOf(int_mask_of) => {
+            *int_mask_of.get_target_type_mut() =
+                resolve_union(context, invocation, template_result, parameters, int_mask_of.get_target_type().clone());
+        }
+        TDerived::PropertiesOf(properties_of) => {
+            *properties_of.get_target_type_mut() = resolve_union(
+                context,
+                invocation,
+                template_result,
+                parameters,
+                properties_of.get_target_type().clone(),
+            );
+        }
+        TDerived::IndexAccess(index_access) => {
+            *index_access.get_target_type_mut() =
+                resolve_union(context, invocation, template_result, parameters, index_access.get_target_type().clone());
+            *index_access.get_index_type_mut() =
+                resolve_union(context, invocation, template_result, parameters, index_access.get_index_type().clone());
+        }
+        TDerived::New(new_type) => {
+            *new_type.get_target_type_mut() =
+                resolve_union(context, invocation, template_result, parameters, new_type.get_target_type().clone());
+        }
+        TDerived::TemplateType(template_type) => {
+            *template_type.get_object_mut() =
+                resolve_union(context, invocation, template_result, parameters, template_type.get_object().clone());
+            *template_type.get_class_name_mut() =
+                resolve_union(context, invocation, template_result, parameters, template_type.get_class_name().clone());
+            *template_type.get_template_name_mut() = resolve_union(
+                context,
+                invocation,
+                template_result,
+                parameters,
+                template_type.get_template_name().clone(),
+            );
+        }
+    }
+}
 
+fn resolve_conditional<'ctx, 'arena, A>(
+    context: &Context<'ctx, 'arena, A>,
+    invocation: &Invocation<'ctx, '_, 'arena>,
+    template_result: &TemplateResult,
+    parameters: &WordMap<TUnion>,
+    conditional: TConditional,
+) -> Vec<TAtomic>
+where
+    A: Arena,
+{
     let subject = resolve_union(context, invocation, template_result, parameters, (*conditional.subject).clone());
     let target = resolve_union(context, invocation, template_result, parameters, (*conditional.target).clone());
     let then_type = resolve_union(context, invocation, template_result, parameters, (*conditional.then).clone());
