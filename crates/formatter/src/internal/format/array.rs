@@ -695,8 +695,8 @@ where
         if should_break_run {
             if let Some(start_idx) = run_start
                 && i - start_idx >= 2
+                && let Some(widths) = calculate_array_element_widths(f, &elements[start_idx..i])
             {
-                let widths = calculate_array_element_widths(&elements[start_idx..i]);
                 runs.push(AlignmentRun::new(start_idx, i, widths));
             }
             run_start = None;
@@ -709,8 +709,8 @@ where
         } else {
             if let Some(start_idx) = run_start
                 && i - start_idx >= 2
+                && let Some(widths) = calculate_array_element_widths(f, &elements[start_idx..i])
             {
-                let widths = calculate_array_element_widths(&elements[start_idx..i]);
                 runs.push(AlignmentRun::new(start_idx, i, widths));
             }
             run_start = None;
@@ -719,8 +719,9 @@ where
 
     if let Some(start_idx) = run_start {
         let len = elements.len();
-        if len - start_idx >= 2 {
-            let widths = calculate_array_element_widths(&elements[start_idx..]);
+        if len - start_idx >= 2
+            && let Some(widths) = calculate_array_element_widths(f, &elements[start_idx..])
+        {
             runs.push(AlignmentRun::new(start_idx, len, widths));
         }
     }
@@ -728,7 +729,13 @@ where
     runs
 }
 
-fn calculate_array_element_widths(elements: &[&ArrayElement<'_>]) -> AlignmentWidths {
+fn calculate_array_element_widths<A>(
+    f: &FormatterState<'_, '_, A>,
+    elements: &[&ArrayElement<'_>],
+) -> Option<AlignmentWidths>
+where
+    A: Arena,
+{
     let mut max_key_width = 0usize;
 
     for element in elements {
@@ -738,7 +745,40 @@ fn calculate_array_element_widths(elements: &[&ArrayElement<'_>]) -> AlignmentWi
         }
     }
 
-    AlignmentWidths::new(max_key_width)
+    let widths = AlignmentWidths::new(max_key_width);
+
+    array_element_alignment_fits(f, elements, &widths).then_some(widths)
+}
+
+fn array_element_alignment_fits<A>(
+    f: &FormatterState<'_, '_, A>,
+    elements: &[&ArrayElement<'_>],
+    widths: &AlignmentWidths,
+) -> bool
+where
+    A: Arena,
+{
+    const KEY_VALUE_SEPARATOR_WIDTH: usize = " => ".len();
+    const COMMA_WIDTH: usize = 1;
+
+    let available_width = f.settings.print_width.saturating_sub(f.settings.tab_width);
+
+    elements.iter().all(|element| {
+        let ArrayElement::KeyValue(element) = element else {
+            return true;
+        };
+
+        let Some(value_width) = get_expression_width(element.value) else {
+            return true;
+        };
+
+        widths
+            .name_width
+            .saturating_add(KEY_VALUE_SEPARATOR_WIDTH)
+            .saturating_add(value_width)
+            .saturating_add(COMMA_WIDTH)
+            <= available_width
+    })
 }
 
 fn get_expression_span_width(expr: &Expression<'_>) -> usize {
