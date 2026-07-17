@@ -264,9 +264,11 @@ where
             || f.is_wrapped_in_parens
             || matches!(grandparent, Some(Node::Return(_) | Node::Throw(_))));
 
+    let indent_assignment_continuation =
+        f.settings.indent_binary_expression_continuation || f.is_in_aligned_assignment_rhs;
     let indent_continuation = should_inline_logical_or_coalesce_rhs
         && !same_precedence_sub_expression
-        && f.settings.indent_binary_expression_continuation
+        && indent_assignment_continuation
         && (should_indent_if_inlining
             || matches!(f.parent_node(), Node::Assignment(_) | Node::PropertyItem(_) | Node::ConstantItem(_)))
         || preserve_breaking_continuation;
@@ -276,7 +278,7 @@ where
     }
 
     if !should_inline_logical_or_coalesce_rhs && should_indent_if_inlining {
-        if f.settings.indent_binary_expression_continuation
+        if indent_assignment_continuation
             && (operator.is_null_coalesce() || operator.is_comparison() || operator.is_equality())
         {
             let split_index = 1.min(parts.len());

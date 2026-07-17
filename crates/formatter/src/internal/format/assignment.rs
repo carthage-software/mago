@@ -126,8 +126,11 @@ where
 {
     if let Some(align) = alignment {
         let outer_alignment = f.alignment_context();
+        let was_in_aligned_assignment_rhs = f.is_in_aligned_assignment_rhs;
         f.set_alignment_context(None);
+        f.is_in_aligned_assignment_rhs = true;
         let rhs = rhs_expression.format(f);
+        f.is_in_aligned_assignment_rhs = was_in_aligned_assignment_rhs;
         f.set_alignment_context(outer_alignment);
 
         let padding = if align.name_padding > 0 {
