@@ -25,18 +25,21 @@ pub struct DisallowedFunctionsRule {
     cfg: DisallowedFunctionsConfig,
 }
 
-/// An entry that can be either a simple string or an object with name and optional help.
+/// An entry that can be either a simple string or an object with name and optional help and level override.
 #[derive(Debug, Clone, Eq, PartialEq, JsonSchema)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(untagged))]
 pub enum DisallowedEntry {
     /// Simple string entry (just the name).
     Simple(String),
-    /// Entry with name and optional help message.
-    WithHelp {
+    /// Entry with name and optional help message and level override.
+    Advanced {
         name: String,
         #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
         help: Option<String>,
+        /// Optional level that supersedes the top-level config level for this entry.
+        #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+        level: Option<Level>,
     },
 }
 
@@ -46,7 +49,7 @@ impl DisallowedEntry {
     pub fn name(&self) -> &str {
         match self {
             DisallowedEntry::Simple(name) => name,
-            DisallowedEntry::WithHelp { name, .. } => name,
+            DisallowedEntry::Advanced { name, .. } => name,
         }
     }
 
@@ -55,7 +58,16 @@ impl DisallowedEntry {
     pub fn help(&self) -> Option<&str> {
         match self {
             DisallowedEntry::Simple(_) => None,
-            DisallowedEntry::WithHelp { help, .. } => help.as_deref(),
+            DisallowedEntry::Advanced { help, .. } => help.as_deref(),
+        }
+    }
+
+    /// Returns the entry-specific level, if any, which supersedes the top-level config level.
+    #[must_use]
+    pub fn level(&self) -> Option<Level> {
+        match self {
+            DisallowedEntry::Simple(_) => None,
+            DisallowedEntry::Advanced { level, .. } => *level,
         }
     }
 }
@@ -97,12 +109,15 @@ impl LintRule for DisallowedFunctionsRule {
                 `functions` or `extensions` options. This helps enforce coding standards,
                 security restrictions, or the usage of preferred alternatives.
 
-                Each entry can be a simple string or an object with `name` and optional `help`:
+                Each entry can be a simple string or an object with `name`, an optional `help`,
+                and an optional `level` that supersedes the top-level `level` for that entry:
 
                 ```toml
                 functions = [
                     'eval',
                     { name = 'error_log', help = 'Use MyLogger instead.' },
+                    { name = 'var_dump', level = 'error' },
+                    { name = 'var_dump', help = 'Do not commit debug code.', level = 'error' },
                 ]
                 ```
             "},
@@ -155,7 +170,9 @@ impl LintRule for DisallowedFunctionsRule {
                 "Use an alternative function or update your configuration if this restriction is no longer needed.",
             );
 
-            let issue = Issue::new(self.cfg.level, format!("Function `{function_name}` is disallowed."))
+            let level = entry.level().unwrap_or(self.cfg.level);
+
+            let issue = Issue::new(level, format!("Function `{function_name}` is disallowed."))
                 .with_code(self.meta.code)
                 .with_annotation(
                     Annotation::primary(function_call.span())
@@ -181,6 +198,8 @@ impl LintRule for DisallowedFunctionsRule {
                 .help()
                 .unwrap_or("Avoid using this extension or update your configuration if exceptions are acceptable.");
 
+            let level = entry.level().unwrap_or(self.cfg.level);
+
             for function_name in *functions {
                 if !function_call_matches(ctx, function_call, function_name) {
                     continue;
@@ -188,7 +207,7 @@ impl LintRule for DisallowedFunctionsRule {
 
                 ctx.collector.report(
                     Issue::new(
-                        self.cfg.level,
+                        level,
                         format!("Function `{function_name}` from the `{extension}` extension is disallowed."),
                     )
                     .with_code(self.meta.code)
