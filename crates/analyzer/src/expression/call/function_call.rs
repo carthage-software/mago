@@ -4,6 +4,7 @@ use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::callable::TCallable;
 use mago_codex::ttype::atomic::callable::TCallableSignature;
 use mago_codex::ttype::cast::cast_atomic_to_callable;
+use mago_codex::ttype::expander::contains_parameter_variable;
 use mago_codex::ttype::template::TemplateResult;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -158,7 +159,16 @@ where
                             id,
                             None,
                             expression.span(),
-                            callable_signature.return_type.clone(),
+                            if context
+                                .codebase
+                                .get_function_like(&id)
+                                .and_then(|metadata| metadata.return_type_metadata.as_ref())
+                                .is_some_and(|metadata| contains_parameter_variable(&metadata.type_union))
+                            {
+                                None
+                            } else {
+                                callable_signature.return_type.clone()
+                            },
                         )
                     {
                         targets.push(target);

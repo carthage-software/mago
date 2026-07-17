@@ -6,6 +6,7 @@ use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::callable::TCallable;
 use mago_codex::ttype::cast::cast_atomic_to_callable;
+use mago_codex::ttype::expander::get_parameter_dependent_signature_of_function_like_identifier;
 use mago_codex::ttype::expander::get_signature_of_function_like_identifier;
 use mago_codex::ttype::get_mixed_closure;
 use mago_codex::ttype::template::TemplateResult;
@@ -78,7 +79,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for FunctionPartialApplication<'aren
             for callable in callables {
                 let (identifier, signature) = match &callable {
                     TCallable::Alias(id) => {
-                        let Some(sig) = get_signature_of_function_like_identifier(id, context.codebase) else {
+                        let Some(sig) =
+                            get_parameter_dependent_signature_of_function_like_identifier(id, context.codebase)
+                        else {
                             continue;
                         };
 
@@ -86,7 +89,14 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for FunctionPartialApplication<'aren
                     }
                     TCallable::Signature(sig) => {
                         if let Some(source_id) = sig.get_source() {
-                            (source_id, sig.clone())
+                            let Some(signature) = get_parameter_dependent_signature_of_function_like_identifier(
+                                &source_id,
+                                context.codebase,
+                            ) else {
+                                continue;
+                            };
+
+                            (source_id, signature)
                         } else {
                             continue;
                         }
@@ -129,10 +139,13 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for FunctionPartialApplication<'aren
                 )?;
 
                 closure_types.push(create_closure_from_partial_application(
+                    context,
+                    &invocation,
                     &signature,
                     &self.argument_list,
                     &original_parameters,
                     &template_result,
+                    &parameter_types,
                     context.codebase,
                 ));
             }

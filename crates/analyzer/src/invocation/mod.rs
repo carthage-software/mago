@@ -33,6 +33,8 @@ use crate::context::Context;
 mod resolver;
 mod template_inference;
 
+pub(crate) use resolver::resolve_invocation_type;
+
 pub(crate) mod arguments;
 
 pub mod analyzer;
@@ -380,14 +382,12 @@ impl<'ctx> InvocationTargetParameter<'ctx> {
         }
     }
 
-    /// Gets the name of the parameter as a `VariableIdentifier`, if available
-    /// (primarily for `FunctionLike` parameters).
+    /// Gets the name of the parameter as a `VariableIdentifier`, if available.
     #[inline]
     pub fn get_name(&self) -> Option<&'ctx VariableIdentifier> {
-        // Changed to &'a
         match self {
             InvocationTargetParameter::FunctionLike(metadata) => Some(metadata.get_name()),
-            InvocationTargetParameter::Callable(_) => None,
+            InvocationTargetParameter::Callable(parameter) => parameter.get_name(),
         }
     }
 

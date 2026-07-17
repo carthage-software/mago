@@ -7,13 +7,18 @@ use foldhash::HashSet;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::ttype::TType;
+use mago_codex::ttype::TypeRef;
+use mago_codex::ttype::add_union_type;
 use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::atomic::array::TArray;
+use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::atomic::callable::TCallable;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::class_like_string::TClassLikeString;
 use mago_codex::ttype::atomic::scalar::string::TString;
 use mago_codex::ttype::atomic::scalar::string::TStringLiteral;
+use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::expander;
 use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::expander::TypeExpansionOptions;
@@ -43,6 +48,7 @@ use crate::invocation::InvocationTargetParameter;
 use crate::invocation::arguments::analyze_and_store_argument_type;
 use crate::invocation::arguments::get_unpacked_argument_type;
 use crate::invocation::arguments::verify_argument_type;
+use crate::invocation::resolver::resolve_invocation_type;
 use crate::invocation::template_inference::infer_parameter_templates_from_argument;
 use crate::invocation::template_inference::infer_parameter_templates_from_default;
 use crate::invocation::template_result::check_template_result;
@@ -204,6 +210,26 @@ where
         }
     }
 
+    for (argument_offset, argument) in &non_closure_arguments {
+        let Some((_, parameter)) = get_parameter_of_argument(&invocation.target, argument, *argument_offset) else {
+            continue;
+        };
+
+        let Some(parameter_name) = parameter.get_name() else {
+            continue;
+        };
+
+        let argument_type = if let Some((argument_type, _)) = analyzed_argument_types.get(argument_offset) {
+            argument_type.clone()
+        } else if argument.is_placeholder() {
+            TUnion::from_atomic(TAtomic::Variable(parameter_name.0))
+        } else {
+            continue;
+        };
+
+        parameter_types.insert(parameter_name.0, argument_type);
+    }
+
     let closure_bind_scope = detect_closure_bind_scope(context, invocation, &analyzed_argument_types);
     let previous_bind_scope = artifacts.closure_bind_scope.take();
     artifacts.closure_bind_scope = closure_bind_scope;
@@ -229,31 +255,36 @@ where
                 method_class_type,
             );
 
-            if base_parameter_type.has_template_types() {
+            let has_parameter_variable = contains_parameter_variable(&base_parameter_type);
+            let mut parameter_type = if base_parameter_type.has_template_types() {
                 parameter_type_had_template_types = true;
                 // Store the original type before replacement for inference
                 base_parameter_type_for_inference = Some(base_parameter_type.clone());
-                let mut replaced_type = inferred_type_replacer::replace_with_polarity(
+                inferred_type_replacer::replace_with_polarity(
                     &base_parameter_type,
                     template_result,
                     context.codebase,
                     mago_codex::ttype::template::variance::Variance::Contravariant,
-                );
-                if replaced_type.is_expandable() {
-                    expander::expand_union(
-                        context.codebase,
-                        &mut replaced_type,
-                        &TypeExpansionOptions {
-                            self_class: base_class_metadata.map(|meta| meta.name),
-                            ..Default::default()
-                        },
-                    );
-                }
-
-                Some(replaced_type)
+                )
             } else {
-                Some(base_parameter_type)
+                base_parameter_type
+            };
+
+            if has_parameter_variable {
+                parameter_type =
+                    resolve_invocation_type(context, invocation, template_result, parameter_types, parameter_type);
+            } else if parameter_type.is_expandable() {
+                expander::expand_union(
+                    context.codebase,
+                    &mut parameter_type,
+                    &TypeExpansionOptions {
+                        self_class: base_class_metadata.map(|metadata| metadata.name),
+                        ..Default::default()
+                    },
+                );
             }
+
+            Some(parameter_type)
         } else {
             None
         };
@@ -293,6 +324,31 @@ where
                 true,
             );
         }
+    }
+
+    for (argument_offset, argument) in &closure_arguments {
+        let Some((_, parameter)) = get_parameter_of_argument(&invocation.target, argument, *argument_offset) else {
+            continue;
+        };
+        let Some(parameter_name) = parameter.get_name() else {
+            continue;
+        };
+        let Some((argument_type, _)) = analyzed_argument_types.get(argument_offset) else {
+            continue;
+        };
+
+        parameter_types.insert(parameter_name.0, argument_type.clone());
+    }
+
+    for parameter in invocation.target.iter_parameters() {
+        let Some(parameter_name) = parameter.get_name() else {
+            continue;
+        };
+        if parameter_types.contains_key(&parameter_name.0) || !parameter.has_default() {
+            continue;
+        }
+
+        parameter_types.insert(parameter_name.0, parameter.get_default_type().cloned().unwrap_or_else(get_mixed));
     }
 
     // Restore the previous closure bind scope after analyzing closure arguments
@@ -426,28 +482,14 @@ where
                 method_class_type,
             );
 
-            let final_parameter_type =
-                if template_result.has_template_types() || !template_result.lower_bounds.is_empty() {
-                    let mut final_parameter_type = inferred_type_replacer::replace_with_polarity(
-                        &base_parameter_type,
-                        template_result,
-                        context.codebase,
-                        mago_codex::ttype::template::variance::Variance::Contravariant,
-                    );
-
-                    expander::expand_union(
-                        context.codebase,
-                        &mut final_parameter_type,
-                        &TypeExpansionOptions {
-                            self_class: base_class_metadata.map(|meta| meta.name),
-                            ..Default::default()
-                        },
-                    );
-
-                    final_parameter_type
-                } else {
-                    base_parameter_type
-                };
+            let final_parameter_type = resolve_parameter_type_for_invocation(
+                context,
+                invocation,
+                template_result,
+                parameter_types,
+                base_class_metadata,
+                base_parameter_type,
+            );
 
             verify_argument_type(
                 context,
@@ -792,6 +834,14 @@ where
                         let argument_value_type =
                             artifacts.get_expression_type(argument_expression).cloned().unwrap_or_else(get_mixed);
 
+                        populate_parameter_types_from_unpacked(
+                            context,
+                            &argument_value_type,
+                            &invocation.target,
+                            current_parameter_position,
+                            parameter_types,
+                        );
+
                         // Count the number of elements that would be unpacked
                         let unpacked_count = argument_value_type
                             .types
@@ -818,8 +868,9 @@ where
                             calling_class_like_metadata,
                             calling_instance_type,
                             method_class_type,
-                            &invocation.target,
+                            invocation,
                             template_result,
+                            parameter_types,
                             current_parameter_position,
                             target_kind_str,
                             &target_name_str,
@@ -979,6 +1030,10 @@ where
 
     let parameter_type = invocation_target_parameter.get_type().cloned().unwrap_or_else(get_mixed);
 
+    if contains_parameter_variable(&parameter_type) {
+        return parameter_type;
+    }
+
     let mut resolved_parameter_type = parameter_type;
 
     let static_class_type = method_class_type
@@ -1011,6 +1066,153 @@ where
     resolved_parameter_type
 }
 
+fn contains_parameter_variable(union: &TUnion) -> bool {
+    union.get_all_child_nodes().into_iter().any(|node| {
+        matches!(
+            node,
+            TypeRef::Atomic(TAtomic::Variable(variable))
+                if !variable.as_bytes().eq_ignore_ascii_case(b"$this")
+        )
+    })
+}
+
+fn resolve_parameter_type_for_invocation<'ctx, 'arena, A>(
+    context: &Context<'ctx, 'arena, A>,
+    invocation: &Invocation<'ctx, '_, 'arena>,
+    template_result: &TemplateResult,
+    parameter_types: &WordMap<TUnion>,
+    base_class_metadata: Option<&ClassLikeMetadata>,
+    base_parameter_type: TUnion,
+) -> TUnion
+where
+    A: Arena,
+{
+    let has_parameter_variable = contains_parameter_variable(&base_parameter_type);
+    let has_template_bindings = template_result.has_template_types() || !template_result.lower_bounds.is_empty();
+    let mut parameter_type = if has_template_bindings {
+        inferred_type_replacer::replace_with_polarity(
+            &base_parameter_type,
+            template_result,
+            context.codebase,
+            mago_codex::ttype::template::variance::Variance::Contravariant,
+        )
+    } else {
+        base_parameter_type
+    };
+
+    if has_parameter_variable {
+        return resolve_invocation_type(context, invocation, template_result, parameter_types, parameter_type);
+    }
+
+    if has_template_bindings {
+        expander::expand_union(
+            context.codebase,
+            &mut parameter_type,
+            &TypeExpansionOptions {
+                self_class: base_class_metadata.map(|metadata| metadata.name),
+                ..Default::default()
+            },
+        );
+    }
+
+    parameter_type
+}
+
+/// Adds statically known unpacked elements to the invocation's parameter map.
+fn populate_parameter_types_from_unpacked<A>(
+    context: &Context<'_, '_, A>,
+    argument_type: &TUnion,
+    invocation_target: &InvocationTarget<'_>,
+    starting_parameter_position: usize,
+    parameter_types: &mut WordMap<TUnion>,
+) where
+    A: Arena,
+{
+    let mut unpacked_parameter_types = WordMap::default();
+
+    for atomic in argument_type.types.as_ref() {
+        let TAtomic::Array(array) = atomic else {
+            continue;
+        };
+
+        match array {
+            TArray::List(list) => {
+                if let Some(known_elements) = &list.known_elements {
+                    for (offset, (_, element_type)) in known_elements {
+                        insert_unpacked_parameter_type(
+                            context,
+                            invocation_target,
+                            starting_parameter_position + offset,
+                            element_type,
+                            &mut unpacked_parameter_types,
+                        );
+                    }
+                } else if let Some(known_count) = list.known_count {
+                    for offset in 0..known_count {
+                        insert_unpacked_parameter_type(
+                            context,
+                            invocation_target,
+                            starting_parameter_position + offset,
+                            list.get_element_type(),
+                            &mut unpacked_parameter_types,
+                        );
+                    }
+                }
+            }
+            TArray::Keyed(keyed) => {
+                let Some(known_items) = &keyed.known_items else {
+                    continue;
+                };
+
+                for (key, (_, element_type)) in known_items {
+                    let parameter_offset = match key {
+                        ArrayKey::Integer(offset) => {
+                            usize::try_from(*offset).ok().map(|offset| starting_parameter_position + offset)
+                        }
+                        ArrayKey::String(name) => find_named_parameter_offset(invocation_target, *name),
+                        ArrayKey::ClassLikeConstant { .. } => None,
+                    };
+
+                    if let Some(parameter_offset) = parameter_offset {
+                        insert_unpacked_parameter_type(
+                            context,
+                            invocation_target,
+                            parameter_offset,
+                            element_type,
+                            &mut unpacked_parameter_types,
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    parameter_types.extend(unpacked_parameter_types);
+}
+
+fn insert_unpacked_parameter_type<A>(
+    context: &Context<'_, '_, A>,
+    invocation_target: &InvocationTarget<'_>,
+    parameter_offset: usize,
+    element_type: &TUnion,
+    parameter_types: &mut WordMap<TUnion>,
+) where
+    A: Arena,
+{
+    let parameter_offset = adjust_offset_for_variadic(invocation_target, parameter_offset);
+    let Some(parameter_name) = invocation_target.get_parameter(parameter_offset).and_then(|p| p.get_name()) else {
+        return;
+    };
+
+    let parameter_type = if let Some(existing) = parameter_types.remove(&parameter_name.0) {
+        add_union_type(existing, element_type, context.codebase, CombinerOptions::default())
+    } else {
+        element_type.clone()
+    };
+
+    parameter_types.insert(parameter_name.0, parameter_type);
+}
+
 /// Validates individual elements within unpacked arrays against their corresponding parameters.
 fn validate_unpacked_argument_elements<'ctx, 'arena, A>(
     context: &mut Context<'ctx, 'arena, A>,
@@ -1020,16 +1222,16 @@ fn validate_unpacked_argument_elements<'ctx, 'arena, A>(
     calling_class_like_metadata: Option<&'ctx ClassLikeMetadata>,
     calling_instance_type: Option<&TAtomic>,
     method_class_type: Option<&StaticClassType>,
-    invocation_target: &InvocationTarget<'_>,
+    invocation: &Invocation<'ctx, '_, 'arena>,
     template_result: &TemplateResult,
+    parameter_types: &WordMap<TUnion>,
     starting_parameter_position: usize,
     target_kind_str: &str,
     target_name_str: &str,
 ) where
     A: Arena,
 {
-    use mago_codex::ttype::atomic::array::TArray;
-    use mago_codex::ttype::template::inferred_type_replacer;
+    let invocation_target = &invocation.target;
 
     for argument_atomic in argument_value_type.types.as_ref() {
         let TAtomic::Array(array) = argument_atomic else {
@@ -1055,28 +1257,14 @@ fn validate_unpacked_argument_elements<'ctx, 'arena, A>(
                                 method_class_type,
                             );
 
-                            let final_parameter_type = if template_result.has_template_types() {
-                                let mut replaced_type = inferred_type_replacer::replace(
-                                    &base_parameter_type,
-                                    template_result,
-                                    context.codebase,
-                                );
-
-                                if replaced_type.is_expandable() {
-                                    expander::expand_union(
-                                        context.codebase,
-                                        &mut replaced_type,
-                                        &TypeExpansionOptions {
-                                            self_class: base_class_metadata.map(|meta| meta.name),
-                                            ..Default::default()
-                                        },
-                                    );
-                                }
-
-                                replaced_type
-                            } else {
-                                base_parameter_type
-                            };
+                            let final_parameter_type = resolve_parameter_type_for_invocation(
+                                context,
+                                invocation,
+                                template_result,
+                                parameter_types,
+                                base_class_metadata,
+                                base_parameter_type,
+                            );
 
                             verify_argument_type(
                                 context,
@@ -1108,28 +1296,14 @@ fn validate_unpacked_argument_elements<'ctx, 'arena, A>(
                                 method_class_type,
                             );
 
-                            let final_parameter_type = if template_result.has_template_types() {
-                                let mut replaced_type = inferred_type_replacer::replace(
-                                    &base_parameter_type,
-                                    template_result,
-                                    context.codebase,
-                                );
-
-                                if replaced_type.is_expandable() {
-                                    expander::expand_union(
-                                        context.codebase,
-                                        &mut replaced_type,
-                                        &TypeExpansionOptions {
-                                            self_class: base_class_metadata.map(|meta| meta.name),
-                                            ..Default::default()
-                                        },
-                                    );
-                                }
-
-                                replaced_type
-                            } else {
-                                base_parameter_type
-                            };
+                            let final_parameter_type = resolve_parameter_type_for_invocation(
+                                context,
+                                invocation,
+                                template_result,
+                                parameter_types,
+                                base_class_metadata,
+                                base_parameter_type,
+                            );
 
                             verify_argument_type(
                                 context,
@@ -1152,8 +1326,10 @@ fn validate_unpacked_argument_elements<'ctx, 'arena, A>(
                     calling_class_like_metadata,
                     calling_instance_type,
                     method_class_type,
-                    invocation_target,
+                    invocation,
                     template_result,
+                    parameter_types,
+                    starting_parameter_position,
                     target_kind_str,
                     target_name_str,
                 );
@@ -1170,17 +1346,18 @@ fn validate_keyed_array_elements<'ctx, 'arena, A>(
     calling_class_like_metadata: Option<&'ctx ClassLikeMetadata>,
     calling_instance_type: Option<&TAtomic>,
     method_class_type: Option<&StaticClassType>,
-    invocation_target: &InvocationTarget<'_>,
+    invocation: &Invocation<'ctx, '_, 'arena>,
     template_result: &TemplateResult,
+    parameter_types: &WordMap<TUnion>,
+    starting_parameter_position: usize,
     target_kind_str: &str,
     target_name_str: &str,
 ) where
     A: Arena,
 {
-    use mago_codex::ttype::atomic::array::key::ArrayKey;
-    use mago_codex::ttype::template::inferred_type_replacer;
     use mago_word::concat_word;
 
+    let invocation_target = &invocation.target;
     let Some(known_items) = &keyed_array.known_items else {
         return;
     };
@@ -1189,7 +1366,10 @@ fn validate_keyed_array_elements<'ctx, 'arena, A>(
         let parameter_name = match array_key {
             ArrayKey::String(key_str) => concat_word!(b"$", key_str.as_bytes()),
             ArrayKey::Integer(key_int) => {
-                if let Some(parameter_ref) = invocation_target.get_parameter(*key_int as usize) {
+                let Ok(key_offset) = usize::try_from(*key_int) else {
+                    continue;
+                };
+                if let Some(parameter_ref) = invocation_target.get_parameter(starting_parameter_position + key_offset) {
                     if let Some(param_name) = parameter_ref.get_name() {
                         param_name.0
                     } else {
@@ -1218,26 +1398,14 @@ fn validate_keyed_array_elements<'ctx, 'arena, A>(
                 method_class_type,
             );
 
-            let final_parameter_type =
-                if template_result.has_template_types() || !template_result.lower_bounds.is_empty() {
-                    let mut replaced_type =
-                        inferred_type_replacer::replace(&base_parameter_type, template_result, context.codebase);
-
-                    if replaced_type.is_expandable() {
-                        expander::expand_union(
-                            context.codebase,
-                            &mut replaced_type,
-                            &TypeExpansionOptions {
-                                self_class: base_class_metadata.map(|meta| meta.name),
-                                ..Default::default()
-                            },
-                        );
-                    }
-
-                    replaced_type
-                } else {
-                    base_parameter_type
-                };
+            let final_parameter_type = resolve_parameter_type_for_invocation(
+                context,
+                invocation,
+                template_result,
+                parameter_types,
+                base_class_metadata,
+                base_parameter_type,
+            );
 
             verify_argument_type(
                 context,

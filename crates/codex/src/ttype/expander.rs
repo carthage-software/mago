@@ -13,6 +13,7 @@ use crate::metadata::CodebaseMetadata;
 use crate::metadata::class_like::ClassLikeMetadata;
 use crate::metadata::function_like::FunctionLikeMetadata;
 use crate::ttype::TType;
+use crate::ttype::TypeRef;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::alias::TAlias;
 use crate::ttype::atomic::array::TArray;
@@ -867,32 +868,55 @@ pub fn get_signature_of_function_like_identifier(
     function_like_identifier: &FunctionLikeIdentifier,
     codebase: &CodebaseMetadata,
 ) -> Option<TCallableSignature> {
+    get_signature_of_function_like_identifier_with_options(function_like_identifier, codebase, false)
+}
+
+/// Builds a callable signature without eagerly expanding types that depend on one of its
+/// parameters.
+///
+/// This is used for first-class and partial callables, where the concrete argument is only
+/// available when the resulting callable is invoked.
+#[must_use]
+pub fn get_parameter_dependent_signature_of_function_like_identifier(
+    function_like_identifier: &FunctionLikeIdentifier,
+    codebase: &CodebaseMetadata,
+) -> Option<TCallableSignature> {
+    get_signature_of_function_like_identifier_with_options(function_like_identifier, codebase, true)
+}
+
+fn get_signature_of_function_like_identifier_with_options(
+    function_like_identifier: &FunctionLikeIdentifier,
+    codebase: &CodebaseMetadata,
+    preserve_parameter_dependencies: bool,
+) -> Option<TCallableSignature> {
     Some(match function_like_identifier {
         FunctionLikeIdentifier::Function(name) => {
             let function_like_metadata = codebase.get_function(name.as_bytes())?;
 
-            get_signature_of_function_like_metadata(
+            get_signature_of_function_like_metadata_with_options(
                 function_like_identifier,
                 function_like_metadata,
                 codebase,
                 &TypeExpansionOptions::default(),
+                preserve_parameter_dependencies,
             )
         }
         FunctionLikeIdentifier::Closure(name) => {
             let function_like_metadata = codebase.get_closure(name)?;
 
-            get_signature_of_function_like_metadata(
+            get_signature_of_function_like_metadata_with_options(
                 function_like_identifier,
                 function_like_metadata,
                 codebase,
                 &TypeExpansionOptions::default(),
+                preserve_parameter_dependencies,
             )
         }
         FunctionLikeIdentifier::Method(classlike_name, method_name) => {
             let function_like_metadata =
                 codebase.get_declaring_method(classlike_name.as_bytes(), method_name.as_bytes())?;
 
-            get_signature_of_function_like_metadata(
+            get_signature_of_function_like_metadata_with_options(
                 function_like_identifier,
                 function_like_metadata,
                 codebase,
@@ -901,6 +925,7 @@ pub fn get_signature_of_function_like_identifier(
                     static_class_type: StaticClassType::Name(*classlike_name),
                     ..Default::default()
                 },
+                preserve_parameter_dependencies,
             )
         }
     })
@@ -923,13 +948,31 @@ pub fn get_signature_of_function_like_metadata(
     codebase: &CodebaseMetadata,
     options: &TypeExpansionOptions,
 ) -> TCallableSignature {
+    get_signature_of_function_like_metadata_with_options(
+        function_like_identifier,
+        function_like_metadata,
+        codebase,
+        options,
+        false,
+    )
+}
+
+fn get_signature_of_function_like_metadata_with_options(
+    function_like_identifier: &FunctionLikeIdentifier,
+    function_like_metadata: &FunctionLikeMetadata,
+    codebase: &CodebaseMetadata,
+    options: &TypeExpansionOptions,
+    preserve_parameter_dependencies: bool,
+) -> TCallableSignature {
     let parameters: Vec<_> = function_like_metadata
         .parameters
         .iter()
         .map(|parameter_metadata| {
             let type_signature = if let Some(t) = parameter_metadata.get_type_metadata() {
                 let mut t = t.type_union.clone();
-                expand_union(codebase, &mut t, options);
+                if !preserve_parameter_dependencies || !contains_parameter_variable(&t) {
+                    expand_union(codebase, &mut t, options);
+                }
                 Some(Arc::new(t))
             } else {
                 None
@@ -941,12 +984,15 @@ pub fn get_signature_of_function_like_metadata(
                 parameter_metadata.flags.is_variadic(),
                 parameter_metadata.flags.has_default(),
             )
+            .with_name(Some(*parameter_metadata.get_name()))
         })
         .collect();
 
     let return_type = if let Some(type_metadata) = function_like_metadata.return_type_metadata.as_ref() {
         let mut return_type = type_metadata.type_union.clone();
-        expand_union(codebase, &mut return_type, options);
+        if !preserve_parameter_dependencies || !contains_parameter_variable(&return_type) {
+            expand_union(codebase, &mut return_type, options);
+        }
         Some(Arc::new(return_type))
     } else {
         None
@@ -957,6 +1003,17 @@ pub fn get_signature_of_function_like_metadata(
         .with_parameters(parameters)
         .with_return_type(return_type)
         .with_source(Some(*function_like_identifier))
+}
+
+#[must_use]
+pub fn contains_parameter_variable(union: &TUnion) -> bool {
+    union.get_all_child_nodes().into_iter().any(|node| {
+        matches!(
+            node,
+            TypeRef::Atomic(TAtomic::Variable(variable))
+                if !variable.as_bytes().eq_ignore_ascii_case(b"$this")
+        )
+    })
 }
 
 #[cold]

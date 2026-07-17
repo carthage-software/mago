@@ -2,6 +2,7 @@ use mago_allocator::Arena;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::callable::TCallable;
+use mago_codex::ttype::expander::get_parameter_dependent_signature_of_function_like_identifier;
 use mago_codex::ttype::expander::get_signature_of_function_like_identifier;
 use mago_codex::ttype::get_mixed_closure;
 use mago_codex::ttype::get_never;
@@ -81,7 +82,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodPartialApplication<'
                     resolved_method.method_identifier.get_method_name(),
                 );
 
-                let Some(signature) = get_signature_of_function_like_identifier(&identifier, context.codebase) else {
+                let Some(signature) =
+                    get_parameter_dependent_signature_of_function_like_identifier(&identifier, context.codebase)
+                else {
                     continue;
                 };
 
@@ -120,10 +123,13 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodPartialApplication<'
                 )?;
 
                 closure_types.push(create_closure_from_partial_application(
+                    context,
+                    &invocation,
                     &signature,
                     &self.argument_list,
                     &original_parameters,
                     &template_result,
+                    &parameter_types,
                     context.codebase,
                 ));
             }

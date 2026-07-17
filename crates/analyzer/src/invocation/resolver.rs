@@ -1,14 +1,22 @@
-use mago_allocator::Arena;
 use std::borrow::Cow;
+use std::sync::Arc;
 
+use mago_allocator::Arena;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::misc::GenericParent;
+use mago_codex::ttype::TType;
+use mago_codex::ttype::TypeRef;
 use mago_codex::ttype::add_union_type;
 use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::atomic::array::TArray;
+use mago_codex::ttype::atomic::callable::TCallable;
 use mago_codex::ttype::atomic::conditional::TConditional;
 use mago_codex::ttype::atomic::derived::TDerived;
 use mago_codex::ttype::atomic::mixed::TMixed;
 use mago_codex::ttype::atomic::object::TObject;
+use mago_codex::ttype::atomic::reference::TReference;
+use mago_codex::ttype::atomic::scalar::TScalar;
+use mago_codex::ttype::atomic::scalar::class_like_string::TClassLikeString;
 use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator;
@@ -211,6 +219,15 @@ fn resolve_atomic<'ctx, 'arena, A>(
 where
     A: Arena,
 {
+    if !matches!(&atomic_to_resolve, TAtomic::Variable(_) | TAtomic::Conditional(_) | TAtomic::Derived(_))
+        && !atomic_to_resolve
+            .get_all_child_nodes()
+            .into_iter()
+            .any(|node| matches!(node, TypeRef::Atomic(TAtomic::Variable(_))))
+    {
+        return vec![atomic_to_resolve];
+    }
+
     match atomic_to_resolve {
         TAtomic::Variable(variable) => {
             if variable.as_bytes().eq_ignore_ascii_case(b"$this")
@@ -235,8 +252,205 @@ where
 
             vec![TAtomic::Derived(derived)]
         }
+        TAtomic::Array(mut array) => {
+            match &mut array {
+                TArray::List(list) => {
+                    *std::sync::Arc::make_mut(&mut list.element_type) =
+                        resolve_union(context, invocation, template_result, parameters, (*list.element_type).clone());
+
+                    if let Some(known_elements) = &mut list.known_elements {
+                        for (_, element_type) in known_elements.values_mut() {
+                            *element_type =
+                                resolve_union(context, invocation, template_result, parameters, element_type.clone());
+                        }
+                    }
+                }
+                TArray::Keyed(keyed) => {
+                    if let Some((key_type, value_type)) = &mut keyed.parameters {
+                        *std::sync::Arc::make_mut(key_type) =
+                            resolve_union(context, invocation, template_result, parameters, (**key_type).clone());
+                        *std::sync::Arc::make_mut(value_type) =
+                            resolve_union(context, invocation, template_result, parameters, (**value_type).clone());
+                    }
+
+                    if let Some(known_items) = &mut keyed.known_items {
+                        for (_, item_type) in known_items.values_mut() {
+                            *item_type =
+                                resolve_union(context, invocation, template_result, parameters, item_type.clone());
+                        }
+                    }
+                }
+            }
+
+            vec![TAtomic::Array(array)]
+        }
+        TAtomic::Iterable(mut iterable) => {
+            *iterable.get_key_type_mut() =
+                resolve_union(context, invocation, template_result, parameters, iterable.get_key_type().clone());
+            *iterable.get_value_type_mut() =
+                resolve_union(context, invocation, template_result, parameters, iterable.get_value_type().clone());
+            resolve_intersection_types(
+                context,
+                invocation,
+                template_result,
+                parameters,
+                iterable.get_intersection_types_mut(),
+            );
+
+            vec![TAtomic::Iterable(iterable)]
+        }
+        TAtomic::Object(mut object) => {
+            match &mut object {
+                TObject::Named(named) => {
+                    if let Some(type_parameters) = named.get_type_parameters_mut() {
+                        for type_parameter in type_parameters {
+                            *type_parameter =
+                                resolve_union(context, invocation, template_result, parameters, type_parameter.clone());
+                        }
+                    }
+                }
+                TObject::WithProperties(shape) => {
+                    for (_, property_type) in shape.known_properties.values_mut() {
+                        *property_type =
+                            resolve_union(context, invocation, template_result, parameters, property_type.clone());
+                    }
+                }
+                _ => {}
+            }
+
+            resolve_intersection_types(
+                context,
+                invocation,
+                template_result,
+                parameters,
+                object.get_intersection_types_mut(),
+            );
+
+            vec![TAtomic::Object(object)]
+        }
+        TAtomic::Callable(mut callable) => {
+            if let TCallable::Signature(signature) = &mut callable {
+                for parameter in signature.get_parameters_mut() {
+                    if let Some(parameter_type) = parameter.get_type_signature_mut() {
+                        *parameter_type =
+                            resolve_union(context, invocation, template_result, parameters, parameter_type.clone());
+                    }
+                }
+
+                if let Some(return_type) = signature.get_return_type_mut() {
+                    *return_type = resolve_union(context, invocation, template_result, parameters, return_type.clone());
+                }
+            }
+
+            vec![TAtomic::Callable(callable)]
+        }
+        TAtomic::GenericParameter(mut generic) => {
+            generic.constraint = std::sync::Arc::new(resolve_union(
+                context,
+                invocation,
+                template_result,
+                parameters,
+                (*generic.constraint).clone(),
+            ));
+            resolve_intersection_types(
+                context,
+                invocation,
+                template_result,
+                parameters,
+                generic.intersection_types.as_mut(),
+            );
+
+            vec![TAtomic::GenericParameter(generic)]
+        }
+        TAtomic::Reference(mut reference) => {
+            if let TReference::Symbol { parameters: type_parameters, intersection_types, .. } = &mut reference {
+                if let Some(type_parameters) = type_parameters {
+                    for type_parameter in type_parameters {
+                        *type_parameter =
+                            resolve_union(context, invocation, template_result, parameters, type_parameter.clone());
+                    }
+                }
+
+                resolve_intersection_types(
+                    context,
+                    invocation,
+                    template_result,
+                    parameters,
+                    intersection_types.as_mut(),
+                );
+            }
+
+            vec![TAtomic::Reference(reference)]
+        }
+        TAtomic::Scalar(TScalar::ClassLikeString(class_string)) => {
+            resolve_class_like_string(context, invocation, template_result, parameters, class_string)
+        }
         atomic => vec![atomic],
     }
+}
+
+fn resolve_intersection_types<'ctx, 'arena, A>(
+    context: &Context<'ctx, 'arena, A>,
+    invocation: &Invocation<'ctx, '_, 'arena>,
+    template_result: &TemplateResult,
+    parameters: &WordMap<TUnion>,
+    intersection_types: Option<&mut Vec<TAtomic>>,
+) where
+    A: Arena,
+{
+    let Some(intersection_types) = intersection_types else {
+        return;
+    };
+
+    *intersection_types = resolve_union(
+        context,
+        invocation,
+        template_result,
+        parameters,
+        TUnion::from_vec(std::mem::take(intersection_types)),
+    )
+    .types
+    .into_owned();
+}
+
+fn resolve_class_like_string<'ctx, 'arena, A>(
+    context: &Context<'ctx, 'arena, A>,
+    invocation: &Invocation<'ctx, '_, 'arena>,
+    template_result: &TemplateResult,
+    parameters: &WordMap<TUnion>,
+    class_string: TClassLikeString,
+) -> Vec<TAtomic>
+where
+    A: Arena,
+{
+    let (kind, constraint, generic) = match class_string {
+        TClassLikeString::OfType { kind, constraint } => (kind, constraint, None),
+        TClassLikeString::Generic { kind, parameter_name, defining_entity, constraint } => {
+            (kind, constraint, Some((parameter_name, defining_entity)))
+        }
+        class_string => return vec![TAtomic::Scalar(TScalar::ClassLikeString(class_string))],
+    };
+
+    resolve_union(
+        context,
+        invocation,
+        template_result,
+        parameters,
+        TUnion::from_vec(vec![Arc::unwrap_or_clone(constraint)]),
+    )
+    .types
+    .into_owned()
+    .into_iter()
+    .map(|constraint| {
+        let class_string = if let Some((parameter_name, defining_entity)) = generic {
+            TClassLikeString::generic(kind, parameter_name, defining_entity, constraint)
+        } else {
+            TClassLikeString::of_type(kind, constraint)
+        };
+
+        TAtomic::Scalar(TScalar::ClassLikeString(class_string))
+    })
+    .collect()
 }
 
 fn resolve_derived<'ctx, 'arena, A>(
