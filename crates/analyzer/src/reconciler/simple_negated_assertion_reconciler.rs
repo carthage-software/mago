@@ -1384,7 +1384,7 @@ where
     // When !isset is true, the value is definitely not set (either null or undefined)
     // For array accesses, this means the key doesn't exist or the value is null
     // In both cases, the resulting type should be null
-    if existing_var_type.possibly_undefined() {
+    if existing_var_type.possibly_undefined() || existing_var_type.possibly_undefined_from_try() {
         return get_undefined_null();
     }
 

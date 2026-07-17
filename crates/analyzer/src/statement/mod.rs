@@ -325,7 +325,8 @@ fn detect_unused_statement_expressions<'ast, 'arena, A>(
         Expression::MagicConstant(_) => "Evaluating a magic constant as a statement has no effect.",
         Expression::Binary(binary) => {
             if (binary.operator.is_null_coalesce() || binary.operator.is_logical())
-                && expression_has_observable_side_effect(binary.rhs)
+                && (expression_has_observable_side_effect(binary.rhs)
+                    || call_may_have_observable_side_effect(binary.rhs, context, artifacts))
             {
                 return;
             }
@@ -375,6 +376,37 @@ fn detect_unused_statement_expressions<'ast, 'arena, A>(
                 "To fix this, assign the value to a variable, return it, or remove the statement if it is truly unnecessary.",
             ),
     );
+}
+
+fn call_may_have_observable_side_effect<'arena, A>(
+    expression: &Expression<'arena>,
+    context: &Context<'_, 'arena, A>,
+    artifacts: &AnalysisArtifacts,
+) -> bool
+where
+    A: Arena,
+{
+    if let Expression::Parenthesized(parenthesized) = expression {
+        return call_may_have_observable_side_effect(parenthesized.expression, context, artifacts);
+    }
+
+    let Expression::Call(call) = expression else {
+        return false;
+    };
+
+    let Some(identifier) = get_function_like_id_from_call(call, context.resolved_names, &artifacts.expression_types)
+    else {
+        return true;
+    };
+
+    let Some(metadata) = context.codebase.get_function_like(&identifier) else {
+        return true;
+    };
+
+    !metadata.flags.is_pure()
+        || metadata.flags.has_throw()
+        || !metadata.thrown_types.is_empty()
+        || metadata.parameters.iter().any(|parameter| parameter.flags.is_by_reference())
 }
 
 /// Checks if an expression is a call to a `@must-use` function/method
