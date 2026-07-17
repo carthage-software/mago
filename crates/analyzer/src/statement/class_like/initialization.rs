@@ -305,7 +305,7 @@ where
 ///
 /// This function uses an iterative approach instead of recursion to avoid stack overflow
 /// in release builds when analyzing deep class hierarchies (common in frameworks like Symfony).
-fn compute_transitive_initializations<A>(
+pub(crate) fn compute_transitive_initializations<A>(
     artifacts: &AnalysisArtifacts,
     context: &Context<'_, '_, A>,
     class_name: Word,
@@ -408,7 +408,7 @@ where
 /// This function checks all methods listed in `class_initializers` setting
 /// and returns the union of properties they initialize. It also walks up
 /// the inheritance chain to check parent classes for class initializers.
-fn compute_class_initializer_initializations<A>(
+pub(crate) fn compute_class_initializer_initializations<A>(
     artifacts: &AnalysisArtifacts,
     context: &Context<'_, '_, A>,
     class_like_metadata: &ClassLikeMetadata,

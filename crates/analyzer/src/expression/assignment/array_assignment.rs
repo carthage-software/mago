@@ -43,6 +43,7 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::context::block::ReferenceConstraintSource;
 use crate::error::AnalysisError;
+use crate::expression::assignment::PropertyWriteKind;
 use crate::expression::assignment::property_assignment;
 use crate::utils::expression::array::ArrayTarget;
 use crate::utils::expression::array::get_array_target_type_given_index;
@@ -149,6 +150,7 @@ where
             property_access,
             &root_array_type,
             Some(root_array_expression.span()),
+            PropertyWriteKind::Mutation,
         )?;
     }
 

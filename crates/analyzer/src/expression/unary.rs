@@ -59,6 +59,7 @@ use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
+use crate::expression::assignment::PropertyWriteKind;
 use crate::expression::assignment::assign_to_expression;
 use crate::expression::call::method_call::analyze_implicit_method_call;
 use crate::utils::expression::get_expression_id;
@@ -700,6 +701,7 @@ where
         None,
         Rc::clone(&resulting_type_union),
         false,
+        PropertyWriteKind::Mutation,
     )?;
 
     if !successful {
@@ -959,6 +961,7 @@ where
         None,
         Rc::clone(&resulting_type_union),
         false,
+        PropertyWriteKind::Mutation,
     )?;
 
     if !successful {

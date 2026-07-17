@@ -32,6 +32,8 @@ pub struct IfScope<'ctx> {
     /// Properties definitely initialized in ALL branches (intersection).
     /// None = no branches processed yet. Some(set) = intersection across branches.
     pub definitely_initialized_properties: Option<WordSet>,
+    /// Property access paths definitely known to be uninitialized in ALL continuing branches.
+    pub definitely_uninitialized_property_ids: Option<WordSet>,
     /// Methods definitely called in ALL branches (intersection).
     /// None = no branches processed yet. Some(set) = intersection across branches.
     pub definitely_called_methods: Option<HashSet<Word>>,
@@ -55,6 +57,7 @@ impl IfScope<'_> {
             if_actions: ControlActionSet::new(),
             post_leaving_if_context: None,
             definitely_initialized_properties: None,
+            definitely_uninitialized_property_ids: None,
             definitely_called_methods: None,
         }
     }

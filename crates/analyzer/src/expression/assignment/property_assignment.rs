@@ -24,6 +24,7 @@ use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
+use crate::expression::assignment::PropertyWriteKind;
 use crate::resolver::property::resolve_instance_properties;
 use crate::utils::expression::get_property_access_expression_id;
 use crate::utils::get_type_diff;
@@ -36,6 +37,7 @@ pub fn analyze<'ctx, 'arena, A>(
     property_access: &PropertyAccess<'arena>,
     assigned_value_type: &TUnion,
     assigned_value_span: Option<Span>,
+    write_kind: PropertyWriteKind,
 ) -> Result<(), AnalysisError>
 where
     A: Arena,
@@ -67,6 +69,20 @@ where
     let mut matched_all_properties = true;
     let mut widened_assigned_type: Option<TUnion> = None;
     for resolved_property in resolution_result.properties {
+        if let Some(declaring_class_id) = resolved_property.declaring_class_id {
+            crate::readonly::check_property_write(
+                context,
+                block_context,
+                artifacts,
+                declaring_class_id,
+                resolved_property.property_name,
+                property_access_id,
+                property_access.span(),
+                property_access.property.span(),
+                write_kind,
+            );
+        }
+
         let mut union_comparison_result = ComparisonResult::new();
 
         let type_match_found = union_comparator::is_contained_by(
@@ -212,7 +228,12 @@ where
 
     artifacts.set_rc_expression_type(property_access, resulting_type);
 
-    if block_context.flags.collect_initializations()
+    if let Some(property_access_id) = property_access_id {
+        block_context.definitely_uninitialized_property_ids.remove(&property_access_id);
+    }
+
+    if write_kind != PropertyWriteKind::Mutation
+        && block_context.flags.collect_initializations()
         && let Expression::Variable(Variable::Direct(var)) = property_access.object
         && var.name == b"$this"
         && let ClassLikeMemberSelector::Identifier(ident) = &property_access.property

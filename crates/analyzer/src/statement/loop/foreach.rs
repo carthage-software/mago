@@ -21,6 +21,7 @@ use crate::context::block::BlockContext;
 use crate::context::block::BreakContext;
 use crate::context::scope::loop_scope::LoopScope;
 use crate::error::AnalysisError;
+use crate::expression::assignment::PropertyWriteKind;
 use crate::expression::assignment::assign_to_expression;
 use crate::statement::r#loop;
 use crate::utils::expression::get_expression_id;
@@ -80,6 +81,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Foreach<'arena> {
                 None,
                 Rc::new(key_type),
                 false,
+                PropertyWriteKind::Direct,
             )?;
 
             if !assigned {
@@ -125,6 +127,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Foreach<'arena> {
             None,
             Rc::new(value_type),
             false,
+            if is_by_reference { PropertyWriteKind::Mutation } else { PropertyWriteKind::Direct },
         )?;
 
         if !assigned {

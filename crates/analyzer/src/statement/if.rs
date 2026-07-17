@@ -268,6 +268,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
         } else {
             post_if_block_context
         };
+        else_block_context
+            .definitely_uninitialized_property_ids
+            .clone_from(&temporary_else_context.definitely_uninitialized_property_ids);
 
         else_block_context.clauses = saturate_clauses(
             else_block_context.clauses.iter().map(Rc::deref).chain(if_scope.negated_clauses.iter()),
@@ -418,6 +421,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
             if let Some(methods) = if_scope.definitely_called_methods.take() {
                 block_context.definitely_called_methods.extend(methods);
             }
+        }
+
+        if let Some(property_ids) = if_scope.definitely_uninitialized_property_ids.take() {
+            block_context.definitely_uninitialized_property_ids = property_ids;
         }
 
         Ok(())
@@ -1035,6 +1042,8 @@ where
             if_scope.definitely_called_methods = None;
         }
 
+        merge_definitely_uninitialized_property_ids(if_scope, else_block_context);
+
         return Ok(());
     }
 
@@ -1299,6 +1308,8 @@ fn update_if_scope<'ctx, A>(
 ) where
     A: Arena,
 {
+    merge_definitely_uninitialized_property_ids(if_scope, if_block_context);
+
     // Handle definitely_initialized_properties with INTERSECTION semantics
     if outer_block_context.flags.collect_initializations() {
         let branch_initialized = std::mem::take(&mut if_block_context.definitely_initialized_properties);
@@ -1425,6 +1436,18 @@ fn update_if_scope<'ctx, A>(
     } else {
         if_scope.redefined_variables = Some(redefined_variables);
         if_scope.possibly_redefined_variables = possibly_redefined_variables;
+    }
+}
+
+fn merge_definitely_uninitialized_property_ids(if_scope: &mut IfScope<'_>, branch_context: &BlockContext<'_>) {
+    match &mut if_scope.definitely_uninitialized_property_ids {
+        Some(existing) => {
+            existing.retain(|property_id| branch_context.definitely_uninitialized_property_ids.contains(property_id));
+        }
+        None => {
+            if_scope.definitely_uninitialized_property_ids =
+                Some(branch_context.definitely_uninitialized_property_ids.clone());
+        }
     }
 }
 

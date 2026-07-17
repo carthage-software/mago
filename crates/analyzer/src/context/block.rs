@@ -107,6 +107,13 @@ pub struct BlockContext<'ctx> {
     /// Uses union semantics - a property initialized in ANY branch is included.
     pub possibly_initialized_properties: WordSet,
 
+    /// Property expression IDs proven uninitialized by the active control-flow path.
+    ///
+    /// This is populated by negated `isset()` assertions and consumed by readonly
+    /// initialization checks. The declared property type is still consulted so that
+    /// nullable properties are not treated as definitely uninitialized.
+    pub definitely_uninitialized_property_ids: WordSet,
+
     /// Methods called on $this that are DEFINITELY called in ALL code paths.
     /// Uses intersection semantics for tracking transitive initialization.
     pub definitely_called_methods: HashSet<Word>,
@@ -200,6 +207,7 @@ impl<'ctx> BlockContext<'ctx> {
             possibly_thrown_exceptions: WordMap::default(),
             definitely_initialized_properties: WordSet::default(),
             possibly_initialized_properties: WordSet::default(),
+            definitely_uninitialized_property_ids: WordSet::default(),
             definitely_called_methods: HashSet::default(),
             called_methods: HashSet::default(),
             calls_parent_initializer: None,

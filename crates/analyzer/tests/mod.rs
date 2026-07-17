@@ -583,6 +583,18 @@ test_case!(redefined_loop_variables);
 test_case!(keyed_array_list_inference);
 test_case!(require_implements_inherited);
 test_case!(readonly_proptected_set);
+test_case!(readonly_initialization_scope_php83, {
+    let mut settings = default_test_settings();
+    settings.version = mago_php_version::PHPVersion::PHP83;
+    settings.check_property_initialization = false;
+    settings
+});
+test_case!(readonly_initialization_scope_php84, {
+    let mut settings = default_test_settings();
+    settings.version = mago_php_version::PHPVersion::PHP84;
+    settings.check_property_initialization = false;
+    settings
+});
 test_case!(value_of_enum_resolution);
 test_case!(duplicate_enum_case_value);
 test_case!(properties_of_enum);
@@ -2154,6 +2166,16 @@ test_case!(issue_809);
 test_case!(issue_822);
 test_case!(issue_830);
 test_case!(issue_835);
+test_case!(issue_2095, {
+    let mut settings = default_test_settings();
+    settings.check_property_initialization = false;
+    settings
+});
+test_case!(issue_2095_class_initializer, {
+    let mut settings = default_test_settings();
+    settings.class_initializers.push(mago_analyzer::settings::ClassInitializer::parse("mount").unwrap());
+    settings
+});
 test_case!(issue_837);
 test_case!(issue_845);
 test_case!(issue_849);

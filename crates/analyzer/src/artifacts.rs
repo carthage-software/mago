@@ -13,6 +13,7 @@ use mago_span::HasSpan;
 
 use crate::context::scope::case_scope::CaseScope;
 use crate::context::scope::loop_scope::LoopScope;
+use crate::readonly::PendingReadonlyPropertyWrite;
 
 /// Represents scope information extracted from a `Closure::bind()` or `Closure::bindTo()` call.
 /// This is used to pass the bound class scope to closure/arrow function analysis.
@@ -43,6 +44,7 @@ pub struct AnalysisArtifacts {
     pub method_calls_parent_constructor: HashMap<(Word, Word), bool>,
     pub method_calls_parent_initializer: HashMap<(Word, Word), Word>,
     pub closure_bind_scope: Option<ClosureBindScope>,
+    pub(crate) pending_readonly_property_writes: Vec<PendingReadonlyPropertyWrite>,
 }
 
 impl Default for AnalysisArtifacts {
@@ -72,6 +74,7 @@ impl AnalysisArtifacts {
             method_calls_parent_constructor: HashMap::default(),
             method_calls_parent_initializer: HashMap::default(),
             closure_bind_scope: None,
+            pending_readonly_property_writes: Vec::new(),
         }
     }
 

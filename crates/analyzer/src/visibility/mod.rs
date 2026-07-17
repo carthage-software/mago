@@ -2,8 +2,6 @@ use mago_allocator::Arena;
 use mago_word::Word;
 use mago_word::word;
 
-use mago_codex::metadata::function_like::FunctionLikeMetadata;
-
 use mago_codex::visibility::Visibility;
 use mago_php_version::feature::Feature;
 use mago_reporting::Annotation;
@@ -63,7 +61,6 @@ where
         declaring_class.as_bytes(),
         block_context.scope.get_class_like_name(),
     );
-
     if !is_visible {
         let declaring_class_name = context
             .codebase
@@ -285,32 +282,42 @@ where
         return false;
     }
 
-    let visibility = property_metadata.write_visibility;
+    if property_metadata.flags.is_magic_property() && property_metadata.flags.is_readonly() {
+        let class_name = &declaring_class_metadata.original_name;
+        context.collector.report_with_code(
+            IssueCode::InvalidPropertyWrite,
+            Issue::error(format!("Cannot write to documented read-only property `{class_name}::{property_name}`."))
+                .with_annotation(
+                    Annotation::primary(member_span.unwrap_or(access_span)).with_message("This property is read-only"),
+                )
+                .with_help("Remove the assignment or change the property documentation to `@property` if writes are supported."),
+        );
+
+        // Keep resolving the access so the resolver can independently report a
+        // missing `__set()` implementation when applicable.
+        return true;
+    }
+
+    let visibility = if property_metadata.flags.is_readonly() {
+        if context.settings.version.is_supported(Feature::AsymmetricVisibility) {
+            match property_metadata.write_visibility {
+                Visibility::Public => Visibility::Protected,
+                visibility => visibility,
+            }
+        } else {
+            Visibility::Private
+        }
+    } else {
+        property_metadata.write_visibility
+    };
+
     let is_visible = is_visible_from_scope(
         context,
         visibility,
         declaring_class_name.as_bytes(),
         block_context.scope.get_class_like_name(),
     );
-
-    let is_readonly_violation = property_metadata.flags.is_readonly()
-        && !can_initialize_readonly_property(
-            context,
-            declaring_class_name.as_bytes(),
-            block_context.scope.get_class_like_name(),
-            block_context.scope.get_function_like(),
-        );
-
-    if is_readonly_violation {
-        report_readonly_issue(
-            context,
-            block_context,
-            IssueCode::InvalidPropertyWrite,
-            access_span,
-            member_span,
-            property_metadata.span.or(property_metadata.name_span),
-        );
-    } else if !is_visible {
+    if !is_visible {
         let issue_title = format!(
             "Cannot write to {} property `{}` on class `{}`.",
             visibility, property_name, declaring_class_metadata.original_name
@@ -401,39 +408,6 @@ where
     false
 }
 
-fn can_initialize_readonly_property<A>(
-    context: &Context<'_, '_, A>,
-    declaring_class_id: &[u8],
-    current_class_opt: Option<Word>,
-    current_function_opt: Option<&FunctionLikeMetadata>,
-) -> bool
-where
-    A: Arena,
-{
-    let is_allowed_method = current_function_opt.is_some_and(|func| {
-        // Constructor is always allowed
-        if func.method_metadata.as_ref().is_some_and(|m| m.is_constructor) {
-            return true;
-        }
-
-        // __clone is allowed in PHP 8.3+
-        if context.settings.version.is_supported(Feature::ReadonlyPropertyReinitializationInClone)
-            && func.name.as_bytes().eq_ignore_ascii_case(b"__clone")
-        {
-            return true;
-        }
-
-        false
-    });
-
-    is_allowed_method
-        && current_class_opt.is_some_and(|current_class_id| {
-            current_class_id.as_bytes().eq_ignore_ascii_case(declaring_class_id)
-                || context.codebase.is_instance_of(current_class_id.as_bytes(), declaring_class_id)
-                || context.codebase.is_instance_of(declaring_class_id, current_class_id.as_bytes())
-        })
-}
-
 fn report_visibility_issue<'ctx, A>(
     context: &mut Context<'ctx, '_, A>,
     block_context: &BlockContext<'ctx>,
@@ -473,55 +447,6 @@ fn report_visibility_issue<'ctx, A>(
     }
 
     issue = issue.with_help(help_text);
-
-    context.collector.report_with_code(code, issue);
-}
-
-fn report_readonly_issue<'ctx, A>(
-    context: &mut Context<'ctx, '_, A>,
-    block_context: &BlockContext<'ctx>,
-    code: IssueCode,
-    access_span: Span,
-    member_span: Option<Span>,
-    definition_span: Option<Span>,
-) where
-    A: Arena,
-{
-    let current_scope_str = if let Some(current_class) = block_context.scope.get_class_like_name() {
-        format!("from within `{current_class}`")
-    } else {
-        "from the global scope".to_string()
-    };
-
-    let primary_annotation_span = member_span.unwrap_or(access_span);
-
-    let (note, help) = if context.settings.version.is_supported(Feature::ReadonlyPropertyReinitializationInClone) {
-        (
-            "Readonly properties can only be initialized once, within `__construct` or `__clone` methods of the declaring class or its descendants.",
-            "Move this initialization to `__construct` or `__clone`.",
-        )
-    } else {
-        (
-            "Readonly properties can only be initialized once within `__construct`. Since PHP 8.3, re-initialization is also allowed in `__clone`.",
-            "Move this initialization to the constructor, or upgrade to PHP 8.3+ to use `__clone` for re-initialization.",
-        )
-    };
-
-    let mut issue = Issue::error("Cannot modify a readonly property after initialization.")
-        .with_annotation(
-            Annotation::primary(primary_annotation_span).with_message("Illegal write to readonly property"),
-        )
-        .with_annotation(
-            Annotation::secondary(access_span).with_message(format!("Write attempt occurs here, {current_scope_str}")),
-        )
-        .with_note(note)
-        .with_help(help);
-
-    if let Some(definition_span) = definition_span {
-        issue = issue.with_annotation(
-            Annotation::secondary(definition_span).with_message("Property is defined as `readonly` here"),
-        );
-    }
 
     context.collector.report_with_code(code, issue);
 }

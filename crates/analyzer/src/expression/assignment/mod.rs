@@ -62,6 +62,13 @@ mod array_assignment;
 mod property_assignment;
 mod static_property_assignment;
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum PropertyWriteKind {
+    Direct,
+    Coalesce,
+    Mutation,
+}
+
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Assignment<'arena> {
     fn analyze<'ctx, A>(
         &'ast self,
@@ -241,6 +248,13 @@ where
         }
     }
 
+    let property_write_kind = match assignment_operator {
+        Some(AssignmentOperator::Coalesce(_)) => PropertyWriteKind::Coalesce,
+        Some(_) => PropertyWriteKind::Mutation,
+        None if source_expression.is_some_and(Expression::is_reference) => PropertyWriteKind::Mutation,
+        None => PropertyWriteKind::Direct,
+    };
+
     let successful = assign_to_expression(
         context,
         block_context,
@@ -250,6 +264,7 @@ where
         source_expression,
         Rc::clone(&source_type),
         false,
+        property_write_kind,
     )?;
 
     if !successful {
@@ -301,6 +316,7 @@ pub(crate) fn assign_to_expression<'ctx, 'ast, 'arena, A>(
     source_expression: Option<&'ast Expression<'arena>>,
     mut source_type: Rc<TUnion>,
     destructuring: bool,
+    property_write_kind: PropertyWriteKind,
 ) -> Result<bool, AnalysisError>
 where
     A: Arena,
@@ -332,6 +348,7 @@ where
             property_access,
             &source_type,
             source_expression.map(mago_span::HasSpan::span),
+            property_write_kind,
         )?,
         Expression::Access(Access::StaticProperty(property_access)) => static_property_assignment::analyze(
             context,

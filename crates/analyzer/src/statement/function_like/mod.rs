@@ -256,6 +256,7 @@ where
     std::mem::swap(&mut context.type_resolution_context, &mut previous_type_resolution_context);
     parent_artifacts.expression_types.extend(std::mem::take(&mut artifacts.expression_types));
     parent_artifacts.symbol_references.extend(std::mem::take(&mut artifacts.symbol_references));
+    parent_artifacts.pending_readonly_property_writes.append(&mut artifacts.pending_readonly_property_writes);
 
     Ok(artifacts)
 }

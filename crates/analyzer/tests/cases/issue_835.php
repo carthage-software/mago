@@ -36,3 +36,39 @@ class Child extends Test
         $this->name = 'child-cloned';
     }
 }
+
+final class CloneThroughPrivateHelper
+{
+    public function __construct(
+        public readonly \DateTimeImmutable $date,
+    ) {}
+
+    public function __clone()
+    {
+        $this->reinitializeDate();
+    }
+
+    private function reinitializeDate(): void
+    {
+        $this->date = clone $this->date;
+    }
+}
+
+final class CloneThroughPublicHelper
+{
+    public function __construct(
+        public readonly \DateTimeImmutable $date,
+    ) {}
+
+    public function __clone()
+    {
+        $this->reinitializeDate();
+    }
+
+    public function reinitializeDate(): void
+    {
+        // The method can also be called outside the clone reinitialization window.
+        // @mago-expect analysis:possibly-invalid-property-write
+        $this->date = clone $this->date;
+    }
+}

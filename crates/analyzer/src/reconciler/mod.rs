@@ -150,6 +150,12 @@ pub fn reconcile_keyed_types<'ctx, A>(
             }
         }
 
+        if has_inverted_isset && key_str.starts_with(b"$this->") {
+            block_context.definitely_uninitialized_property_ids.insert(*key);
+        } else if has_isset {
+            block_context.definitely_uninitialized_property_ids.remove(key);
+        }
+
         let existing = block_context.locals.get(key);
         let did_type_exist = existing.is_some();
         let mut has_object_array_access = false;

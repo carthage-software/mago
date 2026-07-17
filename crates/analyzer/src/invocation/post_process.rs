@@ -43,6 +43,7 @@ use crate::context::block::BlockContext;
 use crate::context::block::ReferenceConstraint;
 use crate::context::block::ReferenceConstraintSource;
 use crate::error::AnalysisError;
+use crate::expression::assignment::PropertyWriteKind;
 use crate::expression::assignment::assign_to_expression;
 use crate::formula::get_formula;
 use crate::formula::negate_or_synthesize;
@@ -365,6 +366,7 @@ where
                     Some(argument),
                     Rc::clone(&new_type),
                     false,
+                    PropertyWriteKind::Mutation,
                 )?;
 
                 block_context.assigned_variable_ids.insert(argument_id, argument.start_offset());
@@ -395,6 +397,7 @@ where
                     Some(argument),
                     Rc::clone(&new_type),
                     false,
+                    PropertyWriteKind::Mutation,
                 )?;
 
                 if let Some(argument_id) = argument_id {
@@ -522,6 +525,8 @@ fn clear_object_property_narrowings<'ctx, 'arena, A>(
         };
 
     if is_self_method_call {
+        block_context.definitely_uninitialized_property_ids.clear();
+
         let keys_to_remove: Vec<_> = block_context
             .locals
             .keys()
@@ -654,6 +659,7 @@ fn clear_object_property_narrowings<'ctx, 'arena, A>(
     }
 
     if this_escapes {
+        block_context.definitely_uninitialized_property_ids.clear();
         escaped_roots.push(Word::new(b"$this"));
     }
 
