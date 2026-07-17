@@ -17,6 +17,7 @@ pub enum SignatureCompatibilityIssue {
     ParameterCountMismatch { child_required_count: usize, parent_required_count: usize },
     IncompatibleParameterType { parameter_index: usize, child_type: Word, parent_type: Word },
     IncompatibleReturnType { child_type: Word, parent_type: Word },
+    MissingReturnTypeDeclaration { parent_type: Word },
     ParameterNameMismatch { parameter_index: usize, child_name: Word, parent_name: Word },
 }
 
@@ -27,6 +28,8 @@ pub enum SignatureCompatibilityIssue {
 /// - Visibility can only widen (public >= protected >= private)
 /// - Parameters are contravariant (child must accept >= parent accepts)
 /// - Return type is covariant (child must return <= parent returns)
+/// - Return type declaration must be present when a non-builtin parent declares one
+///   (builtin declarations may be tentative, where omission only deprecates)
 /// - Parameter count (child must accept at least parent's required parameters)
 /// - Parameter names should match (warning only - breaks named arguments)
 ///
@@ -198,6 +201,29 @@ pub fn validate_method_signature_compatibility(
                 parent_name: parent_param.name.0,
             });
         }
+    }
+
+    if let Some(parent_return) = &parent_method.return_type_declaration_metadata
+        && child_method.return_type_declaration_metadata.is_none()
+        && !parent_method.flags.is_built_in()
+    {
+        let mut expanded_parent_return_type = parent_return.type_union.clone();
+
+        let expansion_options = TypeExpansionOptions {
+            self_class: Some(child_class_name),
+            static_class_type: StaticClassType::Name(child_class_name),
+            function_is_final: child_method_meta.is_final,
+            ..Default::default()
+        };
+
+        if expanded_parent_return_type.is_expandable() {
+            expand_union(codebase, &mut expanded_parent_return_type, &expansion_options);
+        }
+
+        issues.push(SignatureCompatibilityIssue::MissingReturnTypeDeclaration {
+            parent_type: expanded_parent_return_type.get_id(),
+        });
+        return issues;
     }
 
     if let (Some(parent_return), Some(child_return)) =

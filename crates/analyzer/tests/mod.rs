@@ -1925,6 +1925,8 @@ test_case!(inheritance_return_nullable_added);
 test_case!(inheritance_return_nullable_removed);
 test_case!(inheritance_return_type_covariant);
 test_case!(inheritance_return_type_int_to_void);
+test_case!(inheritance_return_type_missing_declaration);
+test_case!(inheritance_return_type_missing_declaration_allowed);
 test_case!(inheritance_return_type_never_ok);
 test_case!(inheritance_return_type_void_to_int);
 test_case!(inheritance_return_type_widened);

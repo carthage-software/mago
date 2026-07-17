@@ -3008,6 +3008,25 @@ fn report_signature_compatibility_issue<'ctx, A>(
                 .with_help("Change the return type to be compatible with the parent method."),
             );
         }
+        SignatureCompatibilityIssue::MissingReturnTypeDeclaration { parent_type } => {
+            context.collector.report_with_code(
+                IssueCode::IncompatibleReturnType,
+                Issue::error(format!(
+                    "`{child_name}::{method_name}()` must declare a return type compatible with `{parent_type}` declared by `{parent_name}::{method_name}()`"
+                ))
+                .with_annotation(Annotation::primary(primary_span).with_message(format!(
+                    "This method has no return type declaration, but the parent declares `{parent_type}`"
+                )))
+                .with_annotation(Annotation::secondary(parent_class_span).with_message(format!(
+                    "Parent method `{parent_name}::{method_name}()` return type declared here"
+                )))
+                .with_annotation(
+                    Annotation::secondary(child_class_span).with_message(format!("In class `{child_name}`")),
+                )
+                .with_note("PHP requires an overriding method to declare a return type when the overridden method declares one.")
+                .with_help(format!("Add a return type declaration compatible with `{parent_type}`.")),
+            );
+        }
         SignatureCompatibilityIssue::ParameterNameMismatch {
             parameter_index,
             child_name: child_param_name,
