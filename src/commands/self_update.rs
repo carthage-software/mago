@@ -42,7 +42,7 @@ pub struct SelfUpdateCommand {
     ///
     /// When this flag is set, the update process will proceed without asking for user confirmation.
     /// Use this option for automated scripts or CI environments where no user interaction is possible.
-    #[arg(long)]
+    #[arg(long, short = 'y')]
     pub no_confirm: bool,
 
     /// Update to a specific version by providing the version tag.
