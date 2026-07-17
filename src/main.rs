@@ -92,6 +92,22 @@ static ALLOC: dhat::Alloc = dhat::Alloc;
 /// Exit code 2 indicates the tool itself failed to complete its operation.
 const EXIT_CODE_ERROR: u8 = 2;
 
+/// Restores the default SIGPIPE behavior so output piped into `head` or `less` exits quietly.
+///
+/// Rust ignores SIGPIPE by default, turning writes to a closed pipe into EPIPE errors that make
+/// `println!` panic. Restoring the default lets standard Unix pipe behavior terminate the process.
+#[cfg(unix)]
+fn reset_sigpipe() {
+    // SAFETY: Resetting SIGPIPE to default (SIG_DFL) is safe.
+    unsafe {
+        libc::signal(libc::SIGPIPE, libc::SIG_DFL);
+    }
+}
+
+/// Windows has no SIGPIPE.
+#[cfg(not(unix))]
+fn reset_sigpipe() {}
+
 /// Entry point for the Mago CLI application.
 ///
 /// This function initializes the heap profiler (if enabled), runs the main application logic,
@@ -113,6 +129,7 @@ pub fn main() -> ExitCode {
     // trace event is emitted from inside `run` once tracing is wired up;
     // telemetry in this function only matters when `MAGO_LOG=trace`.
     let main_start = Instant::now();
+    reset_sigpipe();
 
     #[cfg(feature = "dhat-heap")]
     let _profiler = dhat::Profiler::new_heap();
