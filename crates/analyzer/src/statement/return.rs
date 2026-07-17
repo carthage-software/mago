@@ -6,6 +6,7 @@ use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::metadata::property::PropertyMetadata;
 use mago_codex::metadata::property_hook::PropertyHookMetadata;
 use mago_codex::ttype::TType;
+use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::combine_union_types;
 use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::comparator::ComparisonResult;
@@ -23,8 +24,10 @@ use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::cst::Expression;
 use mago_syntax::cst::Return;
+use mago_syntax::cst::Variable;
 use mago_word::Word;
 use mago_word::concat_word;
+use mago_word::word;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -36,6 +39,7 @@ use crate::error::AnalysisError;
 use crate::utils::docblock::check_docblock_type_incompatibility;
 use crate::utils::docblock::get_type_from_var_docblock;
 use crate::utils::get_type_diff;
+use crate::utils::misc::unwrap_expression;
 use crate::utils::names::display_function_like_identifier;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Return<'arena> {
@@ -332,7 +336,8 @@ pub fn handle_return_value<'ctx, A>(
             return;
         }
 
-        if inferred_return_type.is_mixed() {
+        if inferred_return_type.is_mixed() && !returns_declared_parameter_variable(return_value, &expected_return_type)
+        {
             context.collector.report_with_code(
                 IssueCode::MixedReturnStatement,
                 Issue::error(format!(
@@ -539,6 +544,21 @@ pub fn handle_return_value<'ctx, A>(
     } else {
         // a return value isn't required, the function yields, or this is a constructor; nothing to report
     }
+}
+
+/// A parameter-dependent return such as `@return $value` describes the exact
+/// parameter value, even when the parameter's ordinary static type is `mixed`.
+/// Returning that parameter directly therefore satisfies the declaration.
+fn returns_declared_parameter_variable(return_value: &Expression<'_>, expected_return_type: &TUnion) -> bool {
+    let Expression::Variable(Variable::Direct(variable)) = unwrap_expression(return_value) else {
+        return false;
+    };
+
+    let variable_name = word(variable.name);
+    expected_return_type
+        .types
+        .iter()
+        .any(|atomic| matches!(atomic, TAtomic::Variable(expected) if *expected == variable_name))
 }
 
 fn handle_property_hook_return<'ctx, A>(

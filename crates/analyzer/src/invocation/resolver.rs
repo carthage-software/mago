@@ -191,20 +191,26 @@ where
         allow_mixin_static_rebind = false;
     }
 
-    expander::expand_union(
-        context.codebase,
-        &mut resulting_union,
-        &TypeExpansionOptions {
-            expand_templates: false,
-            expand_generic: true,
-            self_class,
-            static_class_type,
-            parent_class,
-            function_is_final,
-            allow_mixin_static_rebind,
-            ..Default::default()
-        },
-    );
+    let has_lexically_bound_parameter = resulting_union
+        .get_all_child_nodes()
+        .into_iter()
+        .any(|node| matches!(node, TypeRef::Atomic(TAtomic::Variable(_))));
+    if !has_lexically_bound_parameter {
+        expander::expand_union(
+            context.codebase,
+            &mut resulting_union,
+            &TypeExpansionOptions {
+                expand_templates: false,
+                expand_generic: true,
+                self_class,
+                static_class_type,
+                parent_class,
+                function_is_final,
+                allow_mixin_static_rebind,
+                ..Default::default()
+            },
+        );
+    }
 
     resulting_union
 }
@@ -330,15 +336,46 @@ where
         }
         TAtomic::Callable(mut callable) => {
             if let TCallable::Signature(signature) = &mut callable {
+                let mut scoped_parameters = parameters.clone();
+                for parameter in signature.get_parameters() {
+                    if let Some(parameter_name) = parameter.get_name() {
+                        scoped_parameters
+                            .insert(parameter_name.0, TUnion::from_atomic(TAtomic::Variable(parameter_name.0)));
+                    }
+                }
+
                 for parameter in signature.get_parameters_mut() {
                     if let Some(parameter_type) = parameter.get_type_signature_mut() {
-                        *parameter_type =
-                            resolve_union(context, invocation, template_result, parameters, parameter_type.clone());
+                        *parameter_type = resolve_union(
+                            context,
+                            invocation,
+                            template_result,
+                            &scoped_parameters,
+                            parameter_type.clone(),
+                        );
                     }
                 }
 
                 if let Some(return_type) = signature.get_return_type_mut() {
-                    *return_type = resolve_union(context, invocation, template_result, parameters, return_type.clone());
+                    *return_type =
+                        resolve_union(context, invocation, template_result, &scoped_parameters, return_type.clone());
+                }
+
+                for constraint in &mut signature.constraints {
+                    constraint.input_type = Arc::new(resolve_union(
+                        context,
+                        invocation,
+                        template_result,
+                        &scoped_parameters,
+                        (*constraint.input_type).clone(),
+                    ));
+                    constraint.parameter_type = Arc::new(resolve_union(
+                        context,
+                        invocation,
+                        template_result,
+                        &scoped_parameters,
+                        (*constraint.parameter_type).clone(),
+                    ));
                 }
             }
 
@@ -510,6 +547,18 @@ fn resolve_derived<'ctx, 'arena, A>(
                 template_result,
                 parameters,
                 template_type.get_template_name().clone(),
+            );
+        }
+        TDerived::Intersection(intersection) => {
+            let resolved_base =
+                resolve_union(context, invocation, template_result, parameters, intersection.get_base_type().clone());
+            *intersection.get_base_type_mut() = resolved_base;
+            resolve_intersection_types(
+                context,
+                invocation,
+                template_result,
+                parameters,
+                intersection.get_intersection_types_mut(),
             );
         }
     }

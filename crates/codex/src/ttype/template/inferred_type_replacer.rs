@@ -327,6 +327,17 @@ fn replace_atomic(
             if let Some(return_type) = signature.get_return_type_mut() {
                 *return_type = replace_with_polarity(return_type, template_result, codebase, polarity);
             }
+
+            for constraint in &mut signature.constraints {
+                constraint.input_type =
+                    Arc::new(replace_with_polarity(&constraint.input_type, template_result, codebase, polarity));
+                constraint.parameter_type = Arc::new(replace_with_polarity(
+                    &constraint.parameter_type,
+                    template_result,
+                    codebase,
+                    polarity.flip(),
+                ));
+            }
         }
         TAtomic::Derived(derived) => match derived {
             TDerived::KeyOf(key_of) => {
@@ -373,6 +384,17 @@ fn replace_atomic(
 
                 let replaced_template_name = replace(template_type.get_template_name(), template_result, codebase);
                 *template_type.get_template_name_mut() = replaced_template_name;
+            }
+            TDerived::Intersection(intersection) => {
+                let replaced_base = replace(intersection.get_base_type(), template_result, codebase);
+                *intersection.get_base_type_mut() = replaced_base;
+
+                if let Some(intersection_types) = intersection.get_intersection_types_mut() {
+                    for intersection_type in intersection_types {
+                        *intersection_type =
+                            replace_atomic(intersection_type.clone(), template_result, codebase, polarity);
+                    }
+                }
             }
         },
         TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::OfType { constraint, .. })) => {

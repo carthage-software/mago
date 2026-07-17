@@ -129,7 +129,7 @@ pub fn is_contained_by(
         ),
         TDerived::New(new_type) => TNew::get_new_targets(&new_type.get_target_type().types, codebase),
         TDerived::TemplateType(template_type) => template_type.resolve(codebase),
-        TDerived::PropertiesOf(_) | TDerived::IntMask(_) | TDerived::IntMaskOf(_) => {
+        TDerived::PropertiesOf(_) | TDerived::IntMask(_) | TDerived::IntMaskOf(_) | TDerived::Intersection(_) => {
             return false;
         }
     };

@@ -144,7 +144,6 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for MethodPartialApplication<'arena>
                     &original_parameters,
                     &template_result,
                     &parameter_types,
-                    context.codebase,
                 ));
             }
 

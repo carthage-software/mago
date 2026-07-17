@@ -106,6 +106,34 @@ fn parses_typeless_param() {
 }
 
 #[test]
+fn parses_parameter_dependent_param_type() {
+    let arena = LocalArena::new();
+    let document = parse(&arena, b"/** @param $prototype $value */");
+    let tag = first_tag(&document);
+
+    let TagValue::Param(param) = &tag.value else { panic!("expected typed param, got {:?}", tag.value) };
+    let Type::Variable(parameter_type) = param.r#type else {
+        panic!("expected parameter-dependent type, got {:?}", param.r#type);
+    };
+
+    assert_eq!(parameter_type.value, b"$prototype");
+    assert_eq!(param.parameter.map(|parameter| parameter.value), Some(&b"$value"[..]));
+    assert!(param.description.is_none());
+}
+
+#[test]
+fn parses_indexed_parameter_dependent_param_type() {
+    let arena = LocalArena::new();
+    let document = parse(&arena, b"/** @param $objects[$key] $value */");
+    let tag = first_tag(&document);
+
+    let TagValue::Param(param) = &tag.value else { panic!("expected typed param, got {:?}", tag.value) };
+    assert!(matches!(param.r#type, Type::IndexAccess(_)));
+    assert_eq!(param.parameter.map(|parameter| parameter.value), Some(&b"$value"[..]));
+    assert!(param.description.is_none());
+}
+
+#[test]
 fn parses_return_with_union() {
     let arena = LocalArena::new();
     let document = parse(&arena, b"/** @return int|string the result */");

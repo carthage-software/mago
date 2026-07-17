@@ -354,6 +354,60 @@ where
     // Restore the previous closure bind scope after analyzing closure arguments
     artifacts.closure_bind_scope = previous_bind_scope;
 
+    if !unpacked_arguments.is_empty()
+        && invocation
+            .target
+            .parameter_count()
+            .checked_sub(1)
+            .and_then(|offset| invocation.target.get_parameter(offset))
+            .is_some_and(|parameter| !parameter.is_variadic())
+    {
+        let mut current_parameter_position = 0;
+        for argument in invocation.arguments_source.iter_arguments() {
+            if argument.is_unpacked() {
+                let Some(argument_expression) = argument.value() else {
+                    continue;
+                };
+
+                if artifacts.get_expression_type(argument_expression).is_none() {
+                    analyze_and_store_argument_type(
+                        context,
+                        block_context,
+                        artifacts,
+                        &invocation.target,
+                        argument_expression,
+                        usize::MAX,
+                        &mut analyzed_argument_types,
+                        false,
+                        None,
+                    )?;
+                }
+
+                let argument_value_type =
+                    artifacts.get_expression_type(argument_expression).cloned().unwrap_or_else(get_mixed);
+                populate_parameter_types_from_unpacked(
+                    context,
+                    &argument_value_type,
+                    &invocation.target,
+                    current_parameter_position,
+                    parameter_types,
+                );
+
+                current_parameter_position += argument_value_type
+                    .types
+                    .iter()
+                    .filter_map(|atomic| match atomic {
+                        TAtomic::Array(array) => Some(array.get_minimum_size()),
+                        _ => None,
+                    })
+                    .min()
+                    .unwrap_or(0);
+            } else {
+                current_parameter_position += 1;
+            }
+        }
+    }
+
     if let Some(function_like_metadata) = invocation.target.get_function_like_metadata() {
         let class_generic_parameters = get_class_template_parameters_from_result(template_result, context);
         refine_template_result_for_function_like(
@@ -491,14 +545,20 @@ where
                 base_parameter_type,
             );
 
-            verify_argument_type(
-                context,
-                &argument_value_type,
-                &final_parameter_type,
-                *argument_offset,
-                argument_expression,
-                &invocation.target,
-            );
+            let check_is_deferred_to_partial_invocation =
+                matches!(invocation.arguments_source, InvocationArgumentsSource::PartialArgumentList(_))
+                    && contains_parameter_variable(&final_parameter_type);
+
+            if !check_is_deferred_to_partial_invocation {
+                verify_argument_type(
+                    context,
+                    &argument_value_type,
+                    &final_parameter_type,
+                    *argument_offset,
+                    argument_expression,
+                    &invocation.target,
+                );
+            }
 
             if let Some(parameter_name) = parameter_ref.get_name() {
                 parameter_types.insert(parameter_name.0, argument_value_type);
@@ -834,14 +894,6 @@ where
                         let argument_value_type =
                             artifacts.get_expression_type(argument_expression).cloned().unwrap_or_else(get_mixed);
 
-                        populate_parameter_types_from_unpacked(
-                            context,
-                            &argument_value_type,
-                            &invocation.target,
-                            current_parameter_position,
-                            parameter_types,
-                        );
-
                         // Count the number of elements that would be unpacked
                         let unpacked_count = argument_value_type
                             .types
@@ -897,6 +949,48 @@ where
             );
         } else {
             // target accepts no parameters and no unpacking was attempted; nothing to validate
+        }
+    }
+
+    if let InvocationTarget::Callable { signature, .. } = &invocation.target {
+        for constraint in &signature.constraints {
+            let Some((argument_offset, argument_expression)) =
+                invocation.arguments_source.iter_arguments().enumerate().find_map(|(argument_offset, argument)| {
+                    let (_, parameter) = get_parameter_of_argument(&invocation.target, &argument, argument_offset)?;
+                    let parameter_name = parameter.get_name()?;
+                    if !constraint.parameter_names.iter().any(|name| name == parameter_name) {
+                        return None;
+                    }
+
+                    Some((argument_offset, argument.value()?))
+                })
+            else {
+                continue;
+            };
+
+            let input_type = resolve_invocation_type(
+                context,
+                invocation,
+                template_result,
+                parameter_types,
+                (*constraint.input_type).clone(),
+            );
+            let parameter_type = resolve_invocation_type(
+                context,
+                invocation,
+                template_result,
+                parameter_types,
+                (*constraint.parameter_type).clone(),
+            );
+
+            verify_argument_type(
+                context,
+                &input_type,
+                &parameter_type,
+                argument_offset,
+                argument_expression,
+                &invocation.target,
+            );
         }
     }
 
@@ -1128,9 +1222,11 @@ fn populate_parameter_types_from_unpacked<A>(
 ) where
     A: Arena,
 {
-    let mut unpacked_parameter_types = WordMap::default();
+    let alternative_count = argument_type.types.len();
+    let mut candidate_types: WordMap<(TUnion, usize)> = WordMap::default();
 
     for atomic in argument_type.types.as_ref() {
+        let mut branch_types: WordMap<(TUnion, bool)> = WordMap::default();
         let TAtomic::Array(array) = atomic else {
             continue;
         };
@@ -1138,13 +1234,14 @@ fn populate_parameter_types_from_unpacked<A>(
         match array {
             TArray::List(list) => {
                 if let Some(known_elements) = &list.known_elements {
-                    for (offset, (_, element_type)) in known_elements {
+                    for (offset, (is_optional, element_type)) in known_elements {
                         insert_unpacked_parameter_type(
                             context,
                             invocation_target,
                             starting_parameter_position + offset,
                             element_type,
-                            &mut unpacked_parameter_types,
+                            !*is_optional && !element_type.possibly_undefined(),
+                            &mut branch_types,
                         );
                     }
                 } else if let Some(known_count) = list.known_count {
@@ -1154,7 +1251,8 @@ fn populate_parameter_types_from_unpacked<A>(
                             invocation_target,
                             starting_parameter_position + offset,
                             list.get_element_type(),
-                            &mut unpacked_parameter_types,
+                            true,
+                            &mut branch_types,
                         );
                     }
                 }
@@ -1164,7 +1262,7 @@ fn populate_parameter_types_from_unpacked<A>(
                     continue;
                 };
 
-                for (key, (_, element_type)) in known_items {
+                for (key, (is_optional, element_type)) in known_items {
                     let parameter_offset = match key {
                         ArrayKey::Integer(offset) => {
                             usize::try_from(*offset).ok().map(|offset| starting_parameter_position + offset)
@@ -1179,15 +1277,43 @@ fn populate_parameter_types_from_unpacked<A>(
                             invocation_target,
                             parameter_offset,
                             element_type,
-                            &mut unpacked_parameter_types,
+                            !*is_optional && !element_type.possibly_undefined(),
+                            &mut branch_types,
                         );
                     }
                 }
             }
         }
+
+        for (parameter_name, (branch_type, definitely_supplied)) in branch_types {
+            if let Some((candidate_type, supplied_count)) = candidate_types.get_mut(&parameter_name) {
+                *candidate_type = add_union_type(
+                    std::mem::replace(candidate_type, get_mixed()),
+                    &branch_type,
+                    context.codebase,
+                    CombinerOptions::default(),
+                );
+                if definitely_supplied {
+                    *supplied_count += 1;
+                }
+            } else {
+                candidate_types.insert(parameter_name, (branch_type, usize::from(definitely_supplied)));
+            }
+        }
     }
 
-    parameter_types.extend(unpacked_parameter_types);
+    for (parameter_name, (candidate_type, supplied_count)) in candidate_types {
+        if supplied_count == alternative_count {
+            parameter_types.insert(parameter_name, candidate_type);
+        } else if let Some(existing) = parameter_types.remove(&parameter_name) {
+            parameter_types.insert(
+                parameter_name,
+                add_union_type(existing, &candidate_type, context.codebase, CombinerOptions::default()),
+            );
+        } else {
+            parameter_types.insert(parameter_name, candidate_type);
+        }
+    }
 }
 
 fn insert_unpacked_parameter_type<A>(
@@ -1195,7 +1321,8 @@ fn insert_unpacked_parameter_type<A>(
     invocation_target: &InvocationTarget<'_>,
     parameter_offset: usize,
     element_type: &TUnion,
-    parameter_types: &mut WordMap<TUnion>,
+    definitely_supplied: bool,
+    parameter_types: &mut WordMap<(TUnion, bool)>,
 ) where
     A: Arena,
 {
@@ -1204,10 +1331,16 @@ fn insert_unpacked_parameter_type<A>(
         return;
     };
 
-    let parameter_type = if let Some(existing) = parameter_types.remove(&parameter_name.0) {
-        add_union_type(existing, element_type, context.codebase, CombinerOptions::default())
+    let mut element_type = element_type.clone();
+    element_type.set_possibly_undefined(false, None);
+
+    let parameter_type = if let Some((existing, existing_is_definite)) = parameter_types.remove(&parameter_name.0) {
+        (
+            add_union_type(existing, &element_type, context.codebase, CombinerOptions::default()),
+            existing_is_definite && definitely_supplied,
+        )
     } else {
-        element_type.clone()
+        (element_type, definitely_supplied)
     };
 
     parameter_types.insert(parameter_name.0, parameter_type);

@@ -25,6 +25,7 @@ use crate::ttype::atomic::derived::TDerived;
 use crate::ttype::atomic::derived::index_access::TIndexAccess;
 use crate::ttype::atomic::derived::int_mask::TIntMask;
 use crate::ttype::atomic::derived::int_mask_of::TIntMaskOf;
+use crate::ttype::atomic::derived::intersection::TDerivedIntersection;
 use crate::ttype::atomic::derived::key_of::TKeyOf;
 use crate::ttype::atomic::derived::new::TNew;
 use crate::ttype::atomic::derived::properties_of::TPropertiesOf;
@@ -281,6 +282,13 @@ pub(crate) fn expand_atomic(
                     expand_union(codebase, param_type, options);
                 }
             }
+
+            for constraint in &mut signature.constraints {
+                expand_union(codebase, Arc::make_mut(&mut constraint.input_type), options);
+                if !contains_parameter_variable(&constraint.parameter_type) {
+                    expand_union(codebase, Arc::make_mut(&mut constraint.parameter_type), options);
+                }
+            }
         }
         TAtomic::GenericParameter(parameter) => {
             expand_union(codebase, Arc::make_mut(&mut parameter.constraint), options);
@@ -356,6 +364,10 @@ pub(crate) fn expand_atomic(
                 *skip_key = true;
                 new_return_type_parts.extend(expand_template_type(template_type, codebase, options));
             }
+            TDerived::Intersection(intersection) => {
+                *skip_key = true;
+                new_return_type_parts.extend(expand_derived_intersection(intersection, codebase, options));
+            }
         },
         TAtomic::Iterable(iterable) => {
             expand_union(codebase, Arc::make_mut(&mut iterable.key_type), options);
@@ -363,6 +375,35 @@ pub(crate) fn expand_atomic(
         }
         _ => {}
     }
+}
+
+fn expand_derived_intersection(
+    intersection: &TDerivedIntersection,
+    codebase: &CodebaseMetadata,
+    options: &TypeExpansionOptions,
+) -> Vec<TAtomic> {
+    let mut base_type = intersection.get_base_type().clone();
+    expand_union(codebase, &mut base_type, options);
+    let mut results = base_type.types.into_owned();
+
+    for intersection_type in intersection.get_intersection_types().unwrap_or_default() {
+        let mut expanded_intersection = TUnion::from_atomic(intersection_type.clone());
+        expand_union(codebase, &mut expanded_intersection, options);
+
+        let mut next_results = Vec::with_capacity(results.len() * expanded_intersection.types.len());
+        for base in results {
+            for additional in expanded_intersection.types.as_ref() {
+                let mut result = base.clone();
+                if !result.add_intersection_type(additional.clone()) {
+                    return vec![TAtomic::Derived(TDerived::Intersection(intersection.clone()))];
+                }
+                next_results.push(result);
+            }
+        }
+        results = next_results;
+    }
+
+    results
 }
 
 /// Resolves a `ClassLikeConstant` array key to its concrete `Integer` or `String` value.

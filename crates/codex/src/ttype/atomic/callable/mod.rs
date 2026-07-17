@@ -5,6 +5,7 @@ use mago_word::concat_word;
 use mago_word::word;
 
 use crate::identifier::function_like::FunctionLikeIdentifier;
+use crate::misc::VariableIdentifier;
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
 use crate::ttype::atomic::callable::parameter::TCallableParameter;
@@ -31,6 +32,29 @@ pub struct TCallableSignature {
     pub return_type: Option<Arc<TUnion>>,
     /// The source of the callable, if it is an alias or reference to another function-like construct.
     pub source: Option<FunctionLikeIdentifier>,
+    /// Captured arguments whose validity depends on parameters that will be
+    /// supplied when this callable is invoked.
+    pub constraints: Vec<TCallableConstraint>,
+}
+
+/// A captured argument check deferred by a partial application.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct TCallableConstraint {
+    /// Parameters of this callable referenced by `parameter_type`.
+    pub parameter_names: Vec<VariableIdentifier>,
+    /// The type of the argument captured by the partial application.
+    pub input_type: Arc<TUnion>,
+    /// The original parameter type, with unbound callable parameters retained.
+    pub parameter_type: Arc<TUnion>,
+}
+
+impl TCallableConstraint {
+    #[inline]
+    #[must_use]
+    pub fn new(parameter_names: Vec<VariableIdentifier>, input_type: Arc<TUnion>, parameter_type: Arc<TUnion>) -> Self {
+        Self { parameter_names, input_type, parameter_type }
+    }
 }
 
 /// Represents a callable entity, which can either be a fully defined signature
@@ -51,7 +75,7 @@ impl TCallableSignature {
     #[inline]
     #[must_use]
     pub fn new(is_pure: bool, is_closure: bool) -> Self {
-        Self { is_pure, is_closure, parameters: Vec::new(), return_type: None, source: None }
+        Self { is_pure, is_closure, parameters: Vec::new(), return_type: None, source: None, constraints: Vec::new() }
     }
 
     #[must_use]
@@ -125,6 +149,7 @@ impl TCallableSignature {
             parameters: self.parameters.clone(),
             return_type: self.return_type.clone(),
             source: self.source,
+            constraints: self.constraints.clone(),
         }
     }
 
@@ -157,6 +182,14 @@ impl TCallableSignature {
     #[must_use]
     pub fn with_source(mut self, source: Option<FunctionLikeIdentifier>) -> Self {
         self.source = source;
+        self
+    }
+
+    /// Returns a new signature with deferred captured-argument constraints.
+    #[inline]
+    #[must_use]
+    pub fn with_constraints(mut self, constraints: Vec<TCallableConstraint>) -> Self {
+        self.constraints = constraints;
         self
     }
 }
@@ -211,6 +244,11 @@ impl TType for TCallable {
                     children.push(TypeRef::Union(parameter_type));
                 }
             }
+
+            for constraint in &signature.constraints {
+                children.push(TypeRef::Union(&constraint.input_type));
+                children.push(TypeRef::Union(&constraint.parameter_type));
+            }
         }
 
         children
@@ -224,6 +262,9 @@ impl TType for TCallable {
                         .parameters
                         .iter()
                         .any(|param| param.get_type_signature().is_some_and(super::super::TType::needs_population))
+                    || signature.constraints.iter().any(|constraint| {
+                        constraint.input_type.needs_population() || constraint.parameter_type.needs_population()
+                    })
             }
             TCallable::Alias(_) => false,
         }
@@ -238,6 +279,9 @@ impl TType for TCallable {
                         .parameters
                         .iter()
                         .any(|param| param.get_type_signature().is_some_and(super::super::TType::is_expandable))
+                    || signature.constraints.iter().any(|constraint| {
+                        constraint.input_type.is_expandable() || constraint.parameter_type.is_expandable()
+                    })
             }
         }
     }

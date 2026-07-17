@@ -811,6 +811,11 @@ impl TAtomic {
             TAtomic::Reference(TReference::Symbol { intersection_types, .. }) => {
                 *intersection_types = None;
             }
+            TAtomic::Derived(TDerived::Intersection(intersection)) => {
+                if let Some(intersection_types) = intersection.get_intersection_types_mut() {
+                    intersection_types.clear();
+                }
+            }
             _ => {}
         }
 
@@ -1203,6 +1208,23 @@ pub fn populate_atomic_type(
                     populate_union_type(param_type, codebase_symbols, reference_source, symbol_references, force);
                 }
             }
+
+            for constraint in &mut signature.constraints {
+                populate_union_type(
+                    Arc::make_mut(&mut constraint.input_type),
+                    codebase_symbols,
+                    reference_source,
+                    symbol_references,
+                    force,
+                );
+                populate_union_type(
+                    Arc::make_mut(&mut constraint.parameter_type),
+                    codebase_symbols,
+                    reference_source,
+                    symbol_references,
+                    force,
+                );
+            }
         }
         TAtomic::Object(TObject::Named(named_object)) => {
             let name = named_object.get_name();
@@ -1462,6 +1484,26 @@ pub fn populate_atomic_type(
                     symbol_references,
                     force,
                 );
+            }
+            TDerived::Intersection(intersection) => {
+                populate_union_type(
+                    intersection.get_base_type_mut(),
+                    codebase_symbols,
+                    reference_source,
+                    symbol_references,
+                    force,
+                );
+                if let Some(intersection_types) = intersection.get_intersection_types_mut() {
+                    for intersection_type in intersection_types {
+                        populate_atomic_type(
+                            intersection_type,
+                            codebase_symbols,
+                            reference_source,
+                            symbol_references,
+                            force,
+                        );
+                    }
+                }
             }
             _ => {
                 if let Some(target) = derived.get_target_type_mut() {

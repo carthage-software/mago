@@ -23,7 +23,19 @@ where
     }
 
     pub(crate) fn parse_param_tag_value(&mut self) -> Result<TagValue<'arena>, ParseError> {
-        if self.at_parameter_start() {
+        let starts_with_parameter_dependent_type = self.stream.is_at(TokenKind::Variable)
+            && matches!(
+                self.stream.peek_kind(1),
+                Some(
+                    TokenKind::Variable
+                        | TokenKind::ThisVariable
+                        | TokenKind::Pipe
+                        | TokenKind::Ampersand
+                        | TokenKind::LeftBracket
+                )
+            );
+
+        if self.at_parameter_start() && !starts_with_parameter_dependent_type {
             let ampersand =
                 if self.stream.is_at(TokenKind::Ampersand) { Some(self.stream.consume_span()?) } else { None };
             let ellipsis =

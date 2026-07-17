@@ -5,6 +5,7 @@ use crate::ttype::TypeRef;
 use crate::ttype::atomic::derived::index_access::TIndexAccess;
 use crate::ttype::atomic::derived::int_mask::TIntMask;
 use crate::ttype::atomic::derived::int_mask_of::TIntMaskOf;
+use crate::ttype::atomic::derived::intersection::TDerivedIntersection;
 use crate::ttype::atomic::derived::key_of::TKeyOf;
 use crate::ttype::atomic::derived::new::TNew;
 use crate::ttype::atomic::derived::properties_of::TPropertiesOf;
@@ -15,6 +16,7 @@ use crate::ttype::union::TUnion;
 pub mod index_access;
 pub mod int_mask;
 pub mod int_mask_of;
+pub mod intersection;
 pub mod key_of;
 pub mod new;
 pub mod properties_of;
@@ -49,6 +51,8 @@ pub enum TDerived {
     /// Represents the `template-type<Object, ClassName, Name>` utility type
     /// (extracts a concrete `@template` parameter from a passed object).
     TemplateType(TTemplateType),
+    /// Represents an intersection whose base is a deferred type expression.
+    Intersection(TDerivedIntersection),
 }
 
 impl TDerived {
@@ -68,6 +72,7 @@ impl TDerived {
             TDerived::IndexAccess(index_access) => Some(index_access.get_target_type()),
             TDerived::New(new_type) => Some(new_type.get_target_type()),
             TDerived::TemplateType(_) => None,
+            TDerived::Intersection(intersection) => Some(intersection.get_base_type()),
         }
     }
 
@@ -86,6 +91,7 @@ impl TDerived {
             TDerived::IndexAccess(index_access) => Some(index_access.get_target_type_mut()),
             TDerived::New(new_type) => Some(new_type.get_target_type_mut()),
             TDerived::TemplateType(_) => None,
+            TDerived::Intersection(intersection) => Some(intersection.get_base_type_mut()),
         }
     }
 }
@@ -101,6 +107,7 @@ impl TType for TDerived {
             TDerived::IndexAccess(ttype) => ttype.get_child_nodes(),
             TDerived::New(ttype) => ttype.get_child_nodes(),
             TDerived::TemplateType(ttype) => ttype.get_child_nodes(),
+            TDerived::Intersection(ttype) => ttype.get_child_nodes(),
         }
     }
 
@@ -114,6 +121,7 @@ impl TType for TDerived {
             TDerived::IndexAccess(ttype) => ttype.needs_population(),
             TDerived::New(ttype) => ttype.needs_population(),
             TDerived::TemplateType(ttype) => ttype.needs_population(),
+            TDerived::Intersection(ttype) => ttype.needs_population(),
         }
     }
 
@@ -127,11 +135,41 @@ impl TType for TDerived {
             TDerived::IndexAccess(ttype) => ttype.is_expandable(),
             TDerived::New(ttype) => ttype.is_expandable(),
             TDerived::TemplateType(ttype) => ttype.is_expandable(),
+            TDerived::Intersection(ttype) => ttype.is_expandable(),
         }
     }
 
     fn is_complex(&self) -> bool {
-        false
+        matches!(self, TDerived::Intersection(_))
+    }
+
+    fn can_be_intersected(&self) -> bool {
+        matches!(self, TDerived::Intersection(_))
+    }
+
+    fn get_intersection_types(&self) -> Option<&[crate::ttype::atomic::TAtomic]> {
+        match self {
+            TDerived::Intersection(intersection) => intersection.get_intersection_types(),
+            _ => None,
+        }
+    }
+
+    fn get_intersection_types_mut(&mut self) -> Option<&mut Vec<crate::ttype::atomic::TAtomic>> {
+        match self {
+            TDerived::Intersection(intersection) => intersection.get_intersection_types_mut(),
+            _ => None,
+        }
+    }
+
+    fn has_intersection_types(&self) -> bool {
+        matches!(self, TDerived::Intersection(intersection) if intersection.has_intersection_types())
+    }
+
+    fn add_intersection_type(&mut self, intersection_type: crate::ttype::atomic::TAtomic) -> bool {
+        match self {
+            TDerived::Intersection(intersection) => intersection.add_intersection_type(intersection_type),
+            _ => false,
+        }
     }
 
     fn get_id(&self) -> Word {
@@ -144,6 +182,7 @@ impl TType for TDerived {
             TDerived::IndexAccess(index_access) => index_access.get_id(),
             TDerived::New(new_type) => new_type.get_id(),
             TDerived::TemplateType(template_type) => template_type.get_id(),
+            TDerived::Intersection(intersection) => intersection.get_id(),
         }
     }
 
