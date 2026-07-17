@@ -32,6 +32,7 @@ use mago_codex::ttype::expander::TypeExpansionOptions;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_mixed_maybe_from_loop;
 use mago_codex::ttype::get_never;
+use mago_codex::ttype::get_undefined_null;
 use mago_codex::ttype::intersect_union_types;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;
@@ -62,7 +63,7 @@ where
     let is_negation = assertion.is_negation();
 
     let Some(existing_var_type) = existing_var_type else {
-        return get_missing_type(assertion, inside_loop);
+        return get_missing_type(assertion, key, inside_loop);
     };
 
     if is_negation {
@@ -801,9 +802,20 @@ where
     Some(sub_atomic.clone())
 }
 
-fn get_missing_type(assertion: &Assertion, inside_loop: bool) -> TUnion {
+fn get_missing_type(assertion: &Assertion, key: Option<&[u8]>, inside_loop: bool) -> TUnion {
     if matches!(assertion, Assertion::IsIsset | Assertion::IsEqualIsset) {
         return get_mixed_maybe_from_loop(inside_loop);
+    }
+
+    if matches!(assertion, Assertion::IsNotIsset | Assertion::ArrayKeyDoesNotExist) {
+        if key.is_some_and(|key| key.contains(&b'[') || memchr::memmem::find(key, b"->").is_some()) {
+            let mut mixed = get_mixed();
+            mixed.set_possibly_undefined(true, None);
+
+            return mixed;
+        }
+
+        return get_undefined_null();
     }
 
     if let Assertion::IsIdentical(atomic) | Assertion::IsType(atomic) = assertion {

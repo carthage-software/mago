@@ -2562,6 +2562,7 @@ test_case!(issue_1888);
 test_case!(issue_2078);
 test_case!(issue_2085);
 test_case!(issue_2087);
+test_case!(issue_2096);
 
 #[test]
 #[cfg_attr(miri, ignore)]
