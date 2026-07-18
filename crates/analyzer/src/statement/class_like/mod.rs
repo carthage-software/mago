@@ -115,6 +115,7 @@ fn is_type_compatible(codebase: &CodebaseMetadata, child: &TUnion, parent: &TUni
 /// - When the parent has only a `get` hook, covariance (declaring narrower than parent) is allowed.
 /// - When the parent has only a `set` hook, contravariance (declaring wider than parent) is allowed.
 /// - Otherwise, invariance is required.
+/// - Types incomparable with the parent's are invalid under any variance.
 ///
 /// Returns `true` when the declaring type is incompatible with the parent under these rules.
 #[inline]
@@ -130,8 +131,9 @@ fn is_property_type_variance_invalid(
 
     let declaring_is_narrower = declaring_is_subtype_of_parent && !parent_is_subtype_of_declaring;
     let declaring_is_wider = parent_is_subtype_of_declaring && !declaring_is_subtype_of_parent;
+    let incomparable = !declaring_is_subtype_of_parent && !parent_is_subtype_of_declaring;
 
-    (declaring_is_wider && !parent_only_set) || (declaring_is_narrower && !parent_only_get)
+    incomparable || (declaring_is_wider && !parent_only_set) || (declaring_is_narrower && !parent_only_get)
 }
 
 /// Represents different types of property conflicts between traits

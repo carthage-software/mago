@@ -641,6 +641,7 @@ test_case!(private_static_method);
 test_case!(method_docblock);
 test_case!(property_docblock);
 test_case!(untyped_property_docblock);
+test_case!(property_override_incomparable_type);
 test_case!(count);
 test_case!(array_key_exists);
 test_case!(magic_methods);
