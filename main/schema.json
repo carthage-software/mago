@@ -3844,14 +3844,14 @@
       "additionalProperties": false
     },
     "DisallowedEntry": {
-      "description": "An entry that can be either a simple string or an object with name and optional help.",
+      "description": "An entry that can be either a simple string or an object with name and optional help and level override.",
       "anyOf": [
         {
           "description": "Simple string entry (just the name).",
           "type": "string"
         },
         {
-          "description": "Entry with name and optional help message.",
+          "description": "Entry with name and optional help message and level override.",
           "type": "object",
           "properties": {
             "name": {
@@ -3861,6 +3861,17 @@
               "type": [
                 "string",
                 "null"
+              ]
+            },
+            "level": {
+              "description": "Optional level that supersedes the top-level config level for this entry.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Level"
+                },
+                {
+                  "type": "null"
+                }
               ]
             }
           },
@@ -3898,14 +3909,14 @@
       "additionalProperties": false
     },
     "DisallowedTypeEntry": {
-      "description": "An entry that can be either a simple string or an object with name and optional help.",
+      "description": "An entry that can be either a simple string or an object with name and optional help and level override.",
       "anyOf": [
         {
           "description": "Simple string entry (just the name).",
           "type": "string"
         },
         {
-          "description": "Entry with name and optional help message.",
+          "description": "Entry with name and optional help message and level override.",
           "type": "object",
           "properties": {
             "name": {
@@ -3915,6 +3926,17 @@
               "type": [
                 "string",
                 "null"
+              ]
+            },
+            "level": {
+              "description": "Optional level that supersedes the top-level config level for this entry.",
+              "anyOf": [
+                {
+                  "$ref": "#/$defs/Level"
+                },
+                {
+                  "type": "null"
+                }
               ]
             }
           },

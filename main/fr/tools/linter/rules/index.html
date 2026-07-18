@@ -6663,10 +6663,13 @@ function handle_input() {
 <p>You can specify which functions or extensions should be disallowed through the
 <code>functions</code> or <code>extensions</code> options. This helps enforce coding standards,
 security restrictions, or the usage of preferred alternatives.</p>
-<p>Each entry can be a simple string or an object with <code>name</code> and optional <code>help</code>:</p>
+<p>Each entry can be a simple string or an object with <code>name</code>, an optional <code>help</code>,
+and an optional <code>level</code> that supersedes the top-level <code>level</code> for that entry:</p>
 <pre><code class="language-toml">functions = [
     'eval',
     { name = 'error_log', help = 'Use MyLogger instead.' },
+    { name = 'var_dump', level = 'error' },
+    { name = 'var_dump', help = 'Do not commit debug code.', level = 'error' },
 ]
 </code></pre>
 <hr class="rule__separator">
@@ -6706,13 +6709,16 @@ allowed_function(); // Not flagged
 <p>This rule helps enforce architectural patterns such as factory methods or provider patterns
 by preventing direct instantiation of specific classes. This is useful for ensuring consistent
 configuration, centralizing object creation, and maintaining architectural boundaries.</p>
-<p>Each entry can be a simple string or an object with <code>name</code> and optional <code>help</code>:</p>
+<p>Each entry can be a simple string or an object with <code>name</code>, an optional <code>help</code>,
+and an optional <code>level</code> that supersedes the top-level <code>level</code> for that entry:</p>
 <pre><code class="language-toml">[linter.rules]
 disallowed-type-instantiation = {
     enabled = true,
     types = [
         'HttpService\\Client',
         { name = 'DatabaseConnection', help = 'Use DatabaseFactory::create() instead' },
+        { name = 'LegacyService', level = 'error' },
+        { name = 'LegacyService', help = 'Use ShinyNewService instead', level = 'error' },
     ]
 }
 </code></pre>
