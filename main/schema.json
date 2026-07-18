@@ -910,7 +910,19 @@
             "constants": true,
             "statics": true,
             "methods": true,
-            "properties": true
+            "properties": true,
+            "exclude": {
+              "functions": [],
+              "classes": [],
+              "interfaces": [],
+              "traits": [],
+              "enums": [],
+              "enum-cases": [],
+              "constants": [],
+              "statics": [],
+              "methods": [],
+              "properties": []
+            }
           },
           "no-literal-namespace-string": {
             "enabled": false,
@@ -1989,7 +2001,19 @@
               "constants": true,
               "statics": true,
               "methods": true,
-              "properties": true
+              "properties": true,
+              "exclude": {
+                "functions": [],
+                "classes": [],
+                "interfaces": [],
+                "traits": [],
+                "enums": [],
+                "enum-cases": [],
+                "constants": [],
+                "statics": [],
+                "methods": [],
+                "properties": []
+              }
             },
             "no-literal-namespace-string": {
               "enabled": false,
@@ -3412,7 +3436,19 @@
             "constants": true,
             "statics": true,
             "methods": true,
-            "properties": true
+            "properties": true,
+            "exclude": {
+              "functions": [],
+              "classes": [],
+              "interfaces": [],
+              "traits": [],
+              "enums": [],
+              "enum-cases": [],
+              "constants": [],
+              "statics": [],
+              "methods": [],
+              "properties": []
+            }
           }
         },
         "no-literal-namespace-string": {
@@ -7622,9 +7658,19 @@
           "default": false
         },
         "exclude": {
-          "type": "array",
-          "items": {
-            "type": "string"
+          "description": "Per-declaration-kind regular expressions that exempt matching names from\nrequiring a docblock. A declaration is exempt only when *every* name it\ndeclares matches at least one pattern for its kind.",
+          "$ref": "#/$defs/MissingDocsExclude",
+          "default": {
+            "functions": [],
+            "classes": [],
+            "interfaces": [],
+            "traits": [],
+            "enums": [],
+            "enum-cases": [],
+            "constants": [],
+            "statics": [],
+            "methods": [],
+            "properties": []
           }
         },
         "level": {
@@ -7670,6 +7716,83 @@
         "properties": {
           "type": "boolean",
           "default": true
+        }
+      },
+      "additionalProperties": false
+    },
+    "MissingDocsExclude": {
+      "description": "Regular expressions, grouped by declaration kind, that exempt matching names\nfrom the missing-docs check.\n\nDefaults to empty lists for every kind, so existing configurations that do\nnot set `exclude` behave exactly as before.",
+      "type": "object",
+      "properties": {
+        "functions": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "classes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "interfaces": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "traits": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "enums": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "enum-cases": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "constants": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "statics": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "methods": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "properties": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
         }
       },
       "additionalProperties": false
