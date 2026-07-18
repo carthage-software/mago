@@ -1,16 +1,19 @@
 use indoc::indoc;
-use mago_allocator::Arena;
+use regex::bytes::Regex;
 use schemars::JsonSchema;
 
+use mago_allocator::Arena;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
 use mago_syntax::comments::docblock::get_docblock_for_node;
 use mago_syntax::cst::ClassLikeMember;
+use mago_syntax::cst::DirectVariable;
 use mago_syntax::cst::Node;
 use mago_syntax::cst::NodeKind;
 use mago_syntax::cst::Program;
+use mago_syntax::cst::Property;
 use mago_syntax::cst::Statement;
 
 use crate::category::Category;
@@ -25,9 +28,10 @@ use crate::settings::RuleSettings;
 pub struct MissingDocsRule {
     meta: &'static RuleMeta,
     cfg: MissingDocsConfig,
+    excludes: Box<CompiledExcludes>,
 }
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, JsonSchema)]
+#[derive(Debug, Clone, Eq, PartialEq, JsonSchema)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(default, rename_all = "kebab-case", deny_unknown_fields))]
 pub struct MissingDocsConfig {
@@ -42,6 +46,70 @@ pub struct MissingDocsConfig {
     pub statics: bool,
     pub methods: bool,
     pub properties: bool,
+    /// Per-declaration-kind regular expressions that exempt matching names from
+    /// requiring a docblock. A declaration is exempt only when *every* name it
+    /// declares matches at least one pattern for its kind.
+    pub exclude: MissingDocsExclude,
+}
+
+/// Regular expressions, grouped by declaration kind, that exempt matching names
+/// from the missing-docs check.
+///
+/// Defaults to empty lists for every kind, so existing configurations that do
+/// not set `exclude` behave exactly as before.
+#[derive(Debug, Clone, Default, Eq, PartialEq, JsonSchema)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(default, rename_all = "kebab-case", deny_unknown_fields))]
+pub struct MissingDocsExclude {
+    pub functions: Vec<String>,
+    pub classes: Vec<String>,
+    pub interfaces: Vec<String>,
+    pub traits: Vec<String>,
+    pub enums: Vec<String>,
+    pub enum_cases: Vec<String>,
+    pub constants: Vec<String>,
+    pub statics: Vec<String>,
+    pub methods: Vec<String>,
+    pub properties: Vec<String>,
+}
+
+/// Compiled counterpart of [`MissingDocsExclude`], built once when the rule is
+/// constructed so patterns are not recompiled per declaration.
+#[derive(Debug, Clone, Default)]
+struct CompiledExcludes {
+    functions: Vec<Regex>,
+    classes: Vec<Regex>,
+    interfaces: Vec<Regex>,
+    traits: Vec<Regex>,
+    enums: Vec<Regex>,
+    enum_cases: Vec<Regex>,
+    constants: Vec<Regex>,
+    statics: Vec<Regex>,
+    methods: Vec<Regex>,
+    properties: Vec<Regex>,
+}
+
+impl CompiledExcludes {
+    fn from_config(exclude: &MissingDocsExclude) -> Self {
+        Self {
+            functions: compile_patterns(&exclude.functions),
+            classes: compile_patterns(&exclude.classes),
+            interfaces: compile_patterns(&exclude.interfaces),
+            traits: compile_patterns(&exclude.traits),
+            enums: compile_patterns(&exclude.enums),
+            enum_cases: compile_patterns(&exclude.enum_cases),
+            constants: compile_patterns(&exclude.constants),
+            statics: compile_patterns(&exclude.statics),
+            methods: compile_patterns(&exclude.methods),
+            properties: compile_patterns(&exclude.properties),
+        }
+    }
+}
+
+/// Compiles a list of pattern strings, silently dropping any that fail to parse
+/// so an invalid user-supplied regex never aborts the lint run.
+fn compile_patterns(patterns: &[String]) -> Vec<Regex> {
+    patterns.iter().filter_map(|pattern| Regex::new(pattern).ok()).collect()
 }
 
 impl Default for MissingDocsConfig {
@@ -58,6 +126,7 @@ impl Default for MissingDocsConfig {
             statics: true,
             methods: true,
             properties: true,
+            exclude: MissingDocsExclude::default(),
         }
     }
 }
@@ -115,7 +184,9 @@ impl LintRule for MissingDocsRule {
     }
 
     fn build(settings: &RuleSettings<Self::Config>) -> Self {
-        Self { meta: Self::meta(), cfg: settings.config }
+        let excludes = Box::new(CompiledExcludes::from_config(&settings.config.exclude));
+
+        Self { meta: Self::meta(), cfg: settings.config.clone(), excludes }
     }
 
     fn check<'arena, A>(&self, ctx: &mut LintContext<'_, 'arena, A>, node: Node<'_, 'arena>)
@@ -143,7 +214,8 @@ impl MissingDocsRule {
     {
         match stmt {
             Statement::Function(func) if self.cfg.functions => {
-                self.check_docs(ctx, program, func, "function");
+                let names = [func.name.value];
+                self.check_docs(ctx, program, func, "function", &names, &self.excludes.functions);
             }
             Statement::Namespace(ns) => {
                 for inner_stmt in ns.statements() {
@@ -152,37 +224,43 @@ impl MissingDocsRule {
             }
             Statement::Class(class) => {
                 if self.cfg.classes {
-                    self.check_docs(ctx, program, class, "class");
+                    let names = [class.name.value];
+                    self.check_docs(ctx, program, class, "class", &names, &self.excludes.classes);
                 }
 
                 self.check_members(ctx, program, class.members.iter());
             }
             Statement::Interface(interface) => {
                 if self.cfg.interfaces {
-                    self.check_docs(ctx, program, interface, "interface");
+                    let names = [interface.name.value];
+                    self.check_docs(ctx, program, interface, "interface", &names, &self.excludes.interfaces);
                 }
 
                 self.check_members(ctx, program, interface.members.iter());
             }
             Statement::Trait(tr) => {
                 if self.cfg.traits {
-                    self.check_docs(ctx, program, tr, "trait");
+                    let names = [tr.name.value];
+                    self.check_docs(ctx, program, tr, "trait", &names, &self.excludes.traits);
                 }
 
                 self.check_members(ctx, program, tr.members.iter());
             }
             Statement::Enum(en) => {
                 if self.cfg.enums {
-                    self.check_docs(ctx, program, en, "enum");
+                    let names = [en.name.value];
+                    self.check_docs(ctx, program, en, "enum", &names, &self.excludes.enums);
                 }
 
                 self.check_members(ctx, program, en.members.iter());
             }
             Statement::Constant(constant) if self.cfg.constants => {
-                self.check_docs(ctx, program, constant, "constant");
+                let names: Vec<_> = constant.items.iter().map(|item| item.name.value).collect();
+                self.check_docs(ctx, program, constant, "constant", &names, &self.excludes.constants);
             }
             Statement::Static(static_decl) if self.cfg.statics => {
-                self.check_docs(ctx, program, static_decl, "static variable");
+                let names: Vec<_> = static_decl.items.iter().map(|item| variable_name(item.variable())).collect();
+                self.check_docs(ctx, program, static_decl, "static variable", &names, &self.excludes.statics);
             }
             _ => {}
         }
@@ -199,16 +277,20 @@ impl MissingDocsRule {
         for member in members {
             match member {
                 ClassLikeMember::Constant(constant) if self.cfg.constants => {
-                    self.check_docs(ctx, program, constant, "class constant");
+                    let names: Vec<_> = constant.items.iter().map(|item| item.name.value).collect();
+                    self.check_docs(ctx, program, constant, "class constant", &names, &self.excludes.constants);
                 }
                 ClassLikeMember::EnumCase(enum_case) if self.cfg.enum_cases => {
-                    self.check_docs(ctx, program, enum_case, "enum case");
+                    let names = [enum_case.item.name().value];
+                    self.check_docs(ctx, program, enum_case, "enum case", &names, &self.excludes.enum_cases);
                 }
                 ClassLikeMember::Method(method) if self.cfg.methods => {
-                    self.check_docs(ctx, program, method, "method");
+                    let names = [method.name.value];
+                    self.check_docs(ctx, program, method, "method", &names, &self.excludes.methods);
                 }
                 ClassLikeMember::Property(prop) if self.cfg.properties => {
-                    self.check_docs(ctx, program, prop, "property");
+                    let names = property_names(prop);
+                    self.check_docs(ctx, program, prop, "property", &names, &self.excludes.properties);
                 }
                 _ => {}
             }
@@ -221,9 +303,15 @@ impl MissingDocsRule {
         program: &'ast Program<'arena>,
         node: &'ast impl HasSpan,
         subject: &'static str,
+        names: &[&[u8]],
+        excludes: &[Regex],
     ) where
         A: Arena,
     {
+        if is_excluded(names, excludes) {
+            return;
+        }
+
         let trivia = get_docblock_for_node(program, node);
 
         if trivia.is_none_or(|t| !t.kind.is_docblock()) {
@@ -236,6 +324,33 @@ impl MissingDocsRule {
                     .with_help(format!("Add a docblock above this {subject}")),
             );
         }
+    }
+}
+
+/// Returns `true` when a declaration should be exempt from the missing-docs check.
+///
+/// A declaration is exempt only when there is at least one pattern for its kind
+/// and *every* name it declares matches at least one of those patterns.
+fn is_excluded(names: &[&[u8]], excludes: &[Regex]) -> bool {
+    if excludes.is_empty() || names.is_empty() {
+        return false;
+    }
+
+    names.iter().all(|name| excludes.iter().any(|pattern| pattern.is_match(name)))
+}
+
+/// Returns a variable's name with the leading `$` dropped, so patterns match the
+/// bare name (e.g. `^get` matches `$getter`).
+fn variable_name<'arena>(variable: &DirectVariable<'arena>) -> &'arena [u8] {
+    variable.name.strip_prefix(b"$".as_slice()).unwrap_or(variable.name)
+}
+
+/// Collects every name declared by a property, across both plain (`$a, $b`) and
+/// hooked property forms.
+fn property_names<'arena>(property: &Property<'arena>) -> Vec<&'arena [u8]> {
+    match property {
+        Property::Plain(plain) => plain.items.iter().map(|item| variable_name(item.variable())).collect(),
+        Property::Hooked(hooked) => vec![variable_name(hooked.item.variable())],
     }
 }
 
@@ -600,6 +715,146 @@ mod tests {
                  * The bar value.
                  */
                 public string $bar;
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = excluded_function_by_prefix,
+        rule = MissingDocsRule,
+        settings = |s: &mut crate::settings::Settings| {
+            s.rules.missing_docs.config.reset();
+            s.rules.missing_docs.config.functions = true;
+            s.rules.missing_docs.config.exclude.functions = vec!["^test_".to_string(), "^get[A-Z]".to_string()];
+        },
+        code = indoc! {r#"
+            <?php
+
+            function test_it_works(): void {
+            }
+
+            function getName(): string {
+                return 'x';
+            }
+        "#}
+    }
+
+    test_lint_failure! {
+        name = non_excluded_function_still_reported,
+        rule = MissingDocsRule,
+        count = 1,
+        settings = |s: &mut crate::settings::Settings| {
+            s.rules.missing_docs.config.reset();
+            s.rules.missing_docs.config.functions = true;
+            s.rules.missing_docs.config.exclude.functions = vec!["^test_".to_string()];
+        },
+        code = indoc! {r#"
+            <?php
+
+            function compute(): void {
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = excluded_method_by_accessor_prefix,
+        rule = MissingDocsRule,
+        settings = |s: &mut crate::settings::Settings| {
+            s.rules.missing_docs.config.reset();
+            s.rules.missing_docs.config.methods = true;
+            s.rules.missing_docs.config.exclude.methods = vec!["^get[A-Z]".to_string(), "^set[A-Z]".to_string()];
+        },
+        code = indoc! {r#"
+            <?php
+
+            class Foo {
+                public function getName(): string {
+                    return 'x';
+                }
+
+                public function setName(string $name): void {
+                }
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = excluded_class_by_suffix,
+        rule = MissingDocsRule,
+        settings = |s: &mut crate::settings::Settings| {
+            s.rules.missing_docs.config.reset();
+            s.rules.missing_docs.config.classes = true;
+            s.rules.missing_docs.config.exclude.classes = vec!["Test$".to_string()];
+        },
+        code = indoc! {r#"
+            <?php
+
+            class FooTest {
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = excluded_property_matches_bare_name,
+        rule = MissingDocsRule,
+        settings = |s: &mut crate::settings::Settings| {
+            s.rules.missing_docs.config.reset();
+            s.rules.missing_docs.config.properties = true;
+            s.rules.missing_docs.config.exclude.properties = vec!["^cached".to_string()];
+        },
+        code = indoc! {r#"
+            <?php
+
+            class Foo {
+                public string $cachedValue;
+            }
+        "#}
+    }
+
+    test_lint_success! {
+        name = excluded_multi_name_constant_all_match,
+        rule = MissingDocsRule,
+        settings = |s: &mut crate::settings::Settings| {
+            s.rules.missing_docs.config.reset();
+            s.rules.missing_docs.config.constants = true;
+            s.rules.missing_docs.config.exclude.constants = vec!["^INTERNAL_".to_string()];
+        },
+        code = indoc! {r#"
+            <?php
+
+            const INTERNAL_A = 1, INTERNAL_B = 2;
+        "#}
+    }
+
+    test_lint_failure! {
+        name = multi_name_constant_partial_match_still_reported,
+        rule = MissingDocsRule,
+        count = 1,
+        settings = |s: &mut crate::settings::Settings| {
+            s.rules.missing_docs.config.reset();
+            s.rules.missing_docs.config.constants = true;
+            s.rules.missing_docs.config.exclude.constants = vec!["^INTERNAL_".to_string()];
+        },
+        code = indoc! {r#"
+            <?php
+
+            const INTERNAL_A = 1, PUBLIC_B = 2;
+        "#}
+    }
+
+    test_lint_failure! {
+        name = invalid_exclude_pattern_is_ignored,
+        rule = MissingDocsRule,
+        count = 1,
+        settings = |s: &mut crate::settings::Settings| {
+            s.rules.missing_docs.config.reset();
+            s.rules.missing_docs.config.functions = true;
+            s.rules.missing_docs.config.exclude.functions = vec!["(unclosed".to_string()];
+        },
+        code = indoc! {r#"
+            <?php
+
+            function compute(): void {
             }
         "#}
     }
