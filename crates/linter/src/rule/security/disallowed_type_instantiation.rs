@@ -24,18 +24,21 @@ pub struct DisallowedTypeInstantiationRule {
     cfg: DisallowedTypeInstantiationConfig,
 }
 
-/// An entry that can be either a simple string or an object with name and optional help.
+/// An entry that can be either a simple string or an object with name and optional help and level override.
 #[derive(Debug, Clone, Eq, PartialEq, JsonSchema)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[cfg_attr(feature = "serde", serde(untagged))]
 pub enum DisallowedTypeEntry {
     /// Simple string entry (just the name).
     Simple(String),
-    /// Entry with name and optional help message.
-    WithHelp {
+    /// Entry with name and optional help message and level override.
+    Advanced {
         name: String,
         #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
         help: Option<String>,
+        /// Optional level that supersedes the top-level config level for this entry.
+        #[cfg_attr(feature = "serde", serde(default, skip_serializing_if = "Option::is_none"))]
+        level: Option<Level>,
     },
 }
 
@@ -45,7 +48,7 @@ impl DisallowedTypeEntry {
     pub fn name(&self) -> &str {
         match self {
             DisallowedTypeEntry::Simple(name) => name,
-            DisallowedTypeEntry::WithHelp { name, .. } => name,
+            DisallowedTypeEntry::Advanced { name, .. } => name,
         }
     }
 
@@ -54,7 +57,16 @@ impl DisallowedTypeEntry {
     pub fn help(&self) -> Option<&str> {
         match self {
             DisallowedTypeEntry::Simple(_) => None,
-            DisallowedTypeEntry::WithHelp { help, .. } => help.as_deref(),
+            DisallowedTypeEntry::Advanced { help, .. } => help.as_deref(),
+        }
+    }
+
+    /// Returns the entry-specific level, if any, which supersedes the top-level config level.
+    #[must_use]
+    pub fn level(&self) -> Option<Level> {
+        match self {
+            DisallowedTypeEntry::Simple(_) => None,
+            DisallowedTypeEntry::Advanced { level, .. } => *level,
         }
     }
 }
@@ -98,7 +110,8 @@ impl LintRule for DisallowedTypeInstantiationRule {
                 by preventing direct instantiation of specific classes. This is useful for ensuring consistent
                 configuration, centralizing object creation, and maintaining architectural boundaries.
 
-                Each entry can be a simple string or an object with `name` and optional `help`:
+                Each entry can be a simple string or an object with `name`, an optional `help`,
+                and an optional `level` that supersedes the top-level `level` for that entry:
 
                 ```toml
                 [linter.rules]
@@ -107,6 +120,8 @@ impl LintRule for DisallowedTypeInstantiationRule {
                     types = [
                         'HttpService\\Client',
                         { name = 'DatabaseConnection', help = 'Use DatabaseFactory::create() instead' },
+                        { name = 'LegacyService', level = 'error' },
+                        { name = 'LegacyService', help = 'Use ShinyNewService instead', level = 'error' },
                     ]
                 }
                 ```
@@ -166,8 +181,10 @@ impl LintRule for DisallowedTypeInstantiationRule {
                 "Use an alternative factory or provider pattern, or update your configuration if this restriction is no longer needed.",
             );
 
+            let level = entry.level().unwrap_or(self.cfg.level);
+
             let issue = Issue::new(
-                self.cfg.level,
+                level,
                 format!("Direct instantiation of type `{disallowed_type}` is disallowed."),
             )
             .with_code(self.meta.code)
@@ -249,9 +266,31 @@ mod tests {
         rule = DisallowedTypeInstantiationRule,
         settings = |s: &mut crate::settings::Settings| {
             s.rules.disallowed_type_instantiation.config.types = vec![
-                DisallowedTypeEntry::WithHelp {
+                DisallowedTypeEntry::Advanced {
                     name: "HttpService\\Client".to_string(),
                     help: Some("Use ClientProvider::getClient() instead".to_string()),
+                    level: None,
+                },
+            ];
+        },
+        code = indoc! {r"
+            <?php
+
+            use HttpService\Client;
+
+            $client = new Client();
+        "}
+    }
+
+    test_lint_failure! {
+        name = disallow_type_with_level_override,
+        rule = DisallowedTypeInstantiationRule,
+        settings = |s: &mut crate::settings::Settings| {
+            s.rules.disallowed_type_instantiation.config.types = vec![
+                DisallowedTypeEntry::Advanced {
+                    name: "HttpService\\Client".to_string(),
+                    help: None,
+                    level: Some(Level::Error),
                 },
             ];
         },
@@ -306,9 +345,10 @@ mod tests {
         settings = |s: &mut crate::settings::Settings| {
             s.rules.disallowed_type_instantiation.config.types = vec![
                 DisallowedTypeEntry::Simple("HttpService\\Client".to_string()),
-                DisallowedTypeEntry::WithHelp {
+                DisallowedTypeEntry::Advanced {
                     name: "DatabaseConnection".to_string(),
                     help: Some("Use DatabaseFactory::create() instead".to_string()),
+                    level: None,
                 },
             ];
         },
