@@ -1,0 +1,73 @@
+[package]
+name = "mago-oracle"
+description = "The PHP type system: arena-allocated type representation, lattice operations, and comparison primitives for static analysis."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[features]
+default = []
+serde = [
+    "dep:serde",
+    "ordered-float/serde",
+    "mago-flags/serde",
+    "mago-span/serde",
+    "mago-hir/serde",
+    "mago-php-version/serde",
+]
+
+[dependencies]
+foldhash = { workspace = true }
+mago-allocator = { workspace = true }
+mago-flags = { workspace = true }
+mago-php-version = { workspace = true }
+mago-span = { workspace = true }
+mago-hir = { workspace = true }
+ordered-float = { workspace = true }
+serde = { workspace = true, optional = true }
+
+[dev-dependencies]
+criterion = { workspace = true }
+mago-database = { workspace = true }
+mago-hir = { workspace = true }
+mago-syntax = { workspace = true }
+proptest = { workspace = true }
+
+[[bench]]
+name = "workload_builder_churn"
+harness = false
+
+[[bench]]
+name = "workload_lattice_storm"
+harness = false
+
+[[bench]]
+name = "workload_narrow_funnel"
+harness = false
+
+[[bench]]
+name = "workload_join_bulk"
+harness = false
+
+[[bench]]
+name = "workload_template_walk"
+harness = false
+
+[[bench]]
+name = "workload_expand_resolve"
+harness = false
+
+[[bench]]
+name = "workload_arena_lifecycle"
+harness = false
+
+[[bench]]
+name = "workload_cross_arena_compare"
+harness = false

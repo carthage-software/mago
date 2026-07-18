@@ -1679,6 +1679,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "mago-inference"
+version = "1.43.0"
+dependencies = [
+ "indoc",
+ "itoa",
+ "mago-allocator",
+ "mago-database",
+ "mago-flags",
+ "mago-hir",
+ "mago-oracle",
+ "mago-span",
+ "mago-syntax",
+ "ordered-float",
+]
+
+[[package]]
 name = "mago-linter"
 version = "1.43.0"
 dependencies = [
@@ -1718,6 +1734,24 @@ dependencies = [
  "memchr",
  "serde",
  "strum 0.28.0",
+]
+
+[[package]]
+name = "mago-oracle"
+version = "1.43.0"
+dependencies = [
+ "codspeed-criterion-compat",
+ "foldhash",
+ "mago-allocator",
+ "mago-database",
+ "mago-flags",
+ "mago-hir",
+ "mago-php-version",
+ "mago-span",
+ "mago-syntax",
+ "ordered-float",
+ "proptest",
+ "serde",
 ]
 
 [[package]]
