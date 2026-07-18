@@ -309,6 +309,10 @@ mago-prelude = { workspace = true, features = ["build"] }
 [target.'cfg(any(target_os = "macos", target_os = "windows", target_env = "musl", target_env = "gnu"))'.dependencies]
 mimalloc = { version = "0.1.47" }
 
+# TODO(azjezz): replace with https://dev-doc.rust-lang.org/beta/unstable-book/language-features/unix-sigpipe.html once stable.
+[target.'cfg(unix)'.dependencies]
+libc = { workspace = true }
+
 [features]
 dhat-heap = ["dhat"]
 

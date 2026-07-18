@@ -1401,6 +1401,7 @@ dependencies = [
  "flate2",
  "indicatif",
  "indoc",
+ "libc",
  "libtest-mimic",
  "mago-algebra",
  "mago-allocator",
