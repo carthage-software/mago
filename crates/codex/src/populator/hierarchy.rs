@@ -337,6 +337,20 @@ pub fn populate_class_like_types(
         }
     }
 
+    for (property_name, property_metadata) in &mut metadata.magic_properties {
+        let property_reference_source = ReferenceSource::ClassLikeMember(true, name, *property_name);
+
+        if let Some(signature) = property_metadata.type_metadata.as_mut() {
+            populate_union_type(
+                &mut signature.type_union,
+                codebase_symbols,
+                Some(&property_reference_source),
+                symbol_references,
+                force_repopulation,
+            );
+        }
+    }
+
     for template in metadata.template_types.values_mut() {
         if template.constraint.needs_population() || force_repopulation {
             populate_union_type(

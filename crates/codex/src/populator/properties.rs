@@ -7,6 +7,12 @@ pub fn inherit_properties_from_parent(metadata: &mut ClassLikeMetadata, parent_m
     let is_trait = metadata.kind.is_trait();
     let parent_is_trait = parent_metadata.kind.is_trait();
 
+    // Magic `@property*` annotations document the inherited `__get`/`__set` interface, so they
+    // apply to descendants as well; an own tag beats inherited ones.
+    for (property_name, declaring_classlike) in &parent_metadata.magic_property_ids {
+        metadata.magic_property_ids.entry(*property_name).or_insert(*declaring_classlike);
+    }
+
     for (property_name, appearing_classlike) in &parent_metadata.appearing_property_ids {
         if metadata.has_appearing_property(*property_name) {
             continue;
@@ -39,11 +45,7 @@ pub fn inherit_properties_from_parent(metadata: &mut ClassLikeMetadata, parent_m
         }
 
         if metadata.declaring_property_ids.contains_key(property_name) {
-            if !parent_is_trait && metadata.properties.get(property_name).is_some_and(|p| p.flags.is_magic_property()) {
-                metadata.properties.remove(property_name);
-            } else {
-                continue;
-            }
+            continue;
         }
 
         metadata.declaring_property_ids.insert(*property_name, *declaring_classlike);

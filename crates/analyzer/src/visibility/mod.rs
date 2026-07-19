@@ -2,6 +2,7 @@ use mago_allocator::Arena;
 use mago_word::Word;
 use mago_word::word;
 
+use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::visibility::Visibility;
 use mago_php_version::feature::Feature;
 use mago_reporting::Annotation;
@@ -11,6 +12,9 @@ use mago_span::Span;
 use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
+use crate::resolver::property::DeclaredProperty;
+use crate::resolver::property::DeclaredPropertyKind;
+use crate::resolver::property::resolve_declared_property;
 use mago_bytes::BytesDisplay;
 
 /// Checks if a method is visible from the current scope and reports a detailed
@@ -56,7 +60,7 @@ where
     }
 
     let is_visible = is_visible_from_scope(
-        context,
+        context.codebase,
         visibility,
         declaring_class.as_bytes(),
         block_context.scope.get_class_like_name(),
@@ -117,12 +121,20 @@ where
         return true;
     }
 
-    is_visible_from_scope(context, visibility, declaring_class.as_bytes(), block_context.scope.get_class_like_name())
+    is_visible_from_scope(
+        context.codebase,
+        visibility,
+        declaring_class.as_bytes(),
+        block_context.scope.get_class_like_name(),
+    )
 }
 
-/// Checks if a property is readable from the current scope and reports a detailed
-/// error if it is not.
-pub fn check_property_read_visibility<'ctx, A>(
+/// Checks if a static property (`Class::$prop`) is readable from the current scope and
+/// reports a detailed error if it is not.  Magic `@property*` annotations never apply to
+/// static access, so this entry point resolves annotation-blind; instance accesses go through
+/// [`check_resolved_property_read_visibility`] with a resolution from
+/// [`resolve_declared_property`] instead.
+pub fn check_static_property_read_visibility<'ctx, A>(
     context: &mut Context<'ctx, '_, A>,
     block_context: &BlockContext<'ctx>,
     fqcn: &[u8],
@@ -139,19 +151,39 @@ where
         return true;
     };
 
-    let Some(declaring_class_id) = class_metadata.declaring_property_ids.get(&property_name) else {
+    let Some(resolution) = resolve_declared_property(
+        context.codebase,
+        class_metadata,
+        property_name,
+        false, // `instance_access`: this entry point serves `Class::$prop` resolution
+        block_context.scope.get_class_like_name(),
+    ) else {
         return true;
     };
 
-    let Some(declaring_class_metadata) = context.codebase.get_class_like(declaring_class_id.as_bytes()) else {
-        return true;
-    };
+    check_resolved_property_read_visibility(context, block_context, &resolution, access_span, member_span)
+}
 
-    let Some(property_metadata) = declaring_class_metadata.properties.get(&property_name) else {
-        return true;
-    };
+/// Checks if a property access already resolved by [`resolve_declared_property`] is readable
+/// from the current scope and reports a detailed error if it is not.
+pub(crate) fn check_resolved_property_read_visibility<'ctx, A>(
+    context: &mut Context<'ctx, '_, A>,
+    block_context: &BlockContext<'ctx>,
+    resolution: &DeclaredProperty<'_>,
+    access_span: Span,
+    member_span: Option<Span>,
+) -> bool
+where
+    A: Arena,
+{
+    let DeclaredProperty { declaring_class: declaring_class_metadata, property: property_metadata, kind } = *resolution;
+    let property_name = property_metadata.name.0;
 
-    if property_metadata.flags.is_magic_property() && property_metadata.flags.is_writeonly() {
+    if matches!(kind, DeclaredPropertyKind::Magic) {
+        if !property_metadata.flags.is_writeonly() {
+            return true;
+        }
+
         let class_name = &declaring_class_metadata.original_name;
 
         context.collector.report_with_code(
@@ -199,9 +231,9 @@ where
 
     let visibility = property_metadata.read_visibility;
     let is_visible = is_visible_from_scope(
-        context,
+        context.codebase,
         visibility,
-        declaring_class_id.as_bytes(),
+        declaring_class_metadata.name.as_bytes(),
         block_context.scope.get_class_like_name(),
     );
 
@@ -230,34 +262,37 @@ where
     is_visible
 }
 
-pub fn check_property_write_visibility<'ctx, A>(
+/// The write-access counterpart of [`check_resolved_property_read_visibility`].
+pub(crate) fn check_resolved_property_write_visibility<'ctx, A>(
     context: &mut Context<'ctx, '_, A>,
     block_context: &BlockContext<'ctx>,
-    fqcn: &[u8],
-    property_name: &[u8],
+    resolution: &DeclaredProperty<'_>,
     access_span: Span,
     member_span: Option<Span>,
 ) -> bool
 where
     A: Arena,
 {
-    let property_name = word(property_name);
+    let DeclaredProperty { declaring_class: declaring_class_metadata, property: property_metadata, kind } = *resolution;
+    let property_name = property_metadata.name.0;
 
-    let Some(class_metadata) = context.codebase.get_class_like(fqcn) else {
-        return true;
-    };
+    if matches!(kind, DeclaredPropertyKind::Magic) {
+        if property_metadata.flags.is_readonly() {
+            let class_name = &declaring_class_metadata.original_name;
+            context.collector.report_with_code(
+                IssueCode::InvalidPropertyWrite,
+                Issue::error(format!("Cannot write to documented read-only property `{class_name}::{property_name}`."))
+                    .with_annotation(
+                        Annotation::primary(member_span.unwrap_or(access_span)).with_message("This property is read-only"),
+                    )
+                    .with_help("Remove the assignment or change the property documentation to `@property` if writes are supported."),
+            );
+        }
 
-    let Some(declaring_class_name) = class_metadata.declaring_property_ids.get(&property_name) else {
+        // Keep resolving the access so the resolver can independently report a
+        // missing `__set()` implementation when applicable.
         return true;
-    };
-
-    let Some(declaring_class_metadata) = context.codebase.get_class_like(declaring_class_name.as_bytes()) else {
-        return true;
-    };
-
-    let Some(property_metadata) = declaring_class_metadata.properties.get(&property_name) else {
-        return true;
-    };
+    }
 
     if !property_metadata.hooks.is_empty()
         && property_metadata.hooks.contains_key(&word(b"get"))
@@ -282,22 +317,6 @@ where
         return false;
     }
 
-    if property_metadata.flags.is_magic_property() && property_metadata.flags.is_readonly() {
-        let class_name = &declaring_class_metadata.original_name;
-        context.collector.report_with_code(
-            IssueCode::InvalidPropertyWrite,
-            Issue::error(format!("Cannot write to documented read-only property `{class_name}::{property_name}`."))
-                .with_annotation(
-                    Annotation::primary(member_span.unwrap_or(access_span)).with_message("This property is read-only"),
-                )
-                .with_help("Remove the assignment or change the property documentation to `@property` if writes are supported."),
-        );
-
-        // Keep resolving the access so the resolver can independently report a
-        // missing `__set()` implementation when applicable.
-        return true;
-    }
-
     let visibility = if property_metadata.flags.is_readonly() {
         if context.settings.version.is_supported(Feature::AsymmetricVisibility) {
             match property_metadata.write_visibility {
@@ -312,9 +331,9 @@ where
     };
 
     let is_visible = is_visible_from_scope(
-        context,
+        context.codebase,
         visibility,
-        declaring_class_name.as_bytes(),
+        declaring_class_metadata.name.as_bytes(),
         block_context.scope.get_class_like_name(),
     );
     if !is_visible {
@@ -343,23 +362,20 @@ where
     is_visible
 }
 
-fn is_visible_from_scope<A>(
-    context: &Context<'_, '_, A>,
+pub(crate) fn is_visible_from_scope(
+    codebase: &CodebaseMetadata,
     visibility: Visibility,
     declaring_class_id: &[u8],
     current_class_opt: Option<Word>,
-) -> bool
-where
-    A: Arena,
-{
+) -> bool {
     match visibility {
         Visibility::Public => true,
         Visibility::Protected => {
             if let Some(current_class_id) = current_class_opt {
                 current_class_id.as_bytes().eq_ignore_ascii_case(declaring_class_id)
-                    || context.codebase.is_instance_of(current_class_id.as_bytes(), declaring_class_id)
-                    || context.codebase.is_instance_of(declaring_class_id, current_class_id.as_bytes())
-                    || is_visible_via_required_extends(context, current_class_id.as_bytes(), declaring_class_id)
+                    || codebase.is_instance_of(current_class_id.as_bytes(), declaring_class_id)
+                    || codebase.is_instance_of(declaring_class_id, current_class_id.as_bytes())
+                    || is_visible_via_required_extends(codebase, current_class_id.as_bytes(), declaring_class_id)
             } else {
                 false
             }
@@ -367,8 +383,8 @@ where
         Visibility::Private => {
             if let Some(current_class_id) = current_class_opt {
                 current_class_id.as_bytes().eq_ignore_ascii_case(declaring_class_id)
-                    || context.codebase.class_uses_trait(current_class_id.as_bytes(), declaring_class_id)
-                    || context.codebase.class_uses_trait(declaring_class_id, current_class_id.as_bytes())
+                    || codebase.class_uses_trait(current_class_id.as_bytes(), declaring_class_id)
+                    || codebase.class_uses_trait(declaring_class_id, current_class_id.as_bytes())
             } else {
                 false
             }
@@ -379,17 +395,14 @@ where
 /// Checks if a protected member declared in `declaring_class_id` is accessible from
 /// `current_class_id` via `@require-extends`. This handles the case where a trait has
 /// `@require-extends BaseClass` and `BaseClass` uses another trait that declares the method.
-fn is_visible_via_required_extends<A>(
-    context: &Context<'_, '_, A>,
+fn is_visible_via_required_extends(
+    codebase: &CodebaseMetadata,
     current_class_id: &[u8],
     declaring_class_id: &[u8],
-) -> bool
-where
-    A: Arena,
-{
+) -> bool {
     let current_class_id_lc = mago_word::ascii_lowercase_word(current_class_id);
 
-    let Some(current_metadata) = context.codebase.get_class_like(current_class_id_lc.as_bytes()) else {
+    let Some(current_metadata) = codebase.get_class_like(current_class_id_lc.as_bytes()) else {
         return false;
     };
 
@@ -398,8 +411,8 @@ where
     }
 
     for required_class in current_metadata.require_extends.iter() {
-        if context.codebase.is_instance_of(required_class.as_bytes(), declaring_class_id)
-            || context.codebase.class_uses_trait(required_class.as_bytes(), declaring_class_id)
+        if codebase.is_instance_of(required_class.as_bytes(), declaring_class_id)
+            || codebase.class_uses_trait(required_class.as_bytes(), declaring_class_id)
         {
             return true;
         }

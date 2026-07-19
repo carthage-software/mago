@@ -77,7 +77,7 @@ pub(crate) fn check_property_write<A>(
         return;
     };
 
-    if !property_metadata.flags.is_readonly() || property_metadata.flags.is_magic_property() {
+    if !property_metadata.flags.is_readonly() {
         return;
     }
 

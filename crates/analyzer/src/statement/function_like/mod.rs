@@ -55,6 +55,7 @@ use crate::context::block::ReferenceConstraint;
 use crate::context::block::ReferenceConstraintSource;
 use crate::error::AnalysisError;
 use crate::resolver::property::localize_property_type;
+use crate::resolver::property::resolve_declared_property;
 use crate::statement::analyze_statements;
 use crate::statement::attributes::AttributeTarget;
 use crate::statement::attributes::analyze_attributes;
@@ -584,23 +585,36 @@ where
         return Ok(());
     };
 
-    for (property_name, declaring_class) in &class_like_metadata.declaring_property_ids {
-        let Some(property_class_metadata) = context.codebase.get_class_like(declaring_class.as_bytes()) else {
-            return Err(AnalysisError::InternalError(
-                format!("Could not load property class metadata for `{declaring_class}`."),
-                class_like_metadata.span,
-            ));
-        };
+    // Seed every property name reachable on this class: all real declarations, plus magic
+    // `@property*` annotations for names without one.
+    let property_names = class_like_metadata.declaring_property_ids.keys().chain(
+        class_like_metadata
+            .magic_property_ids
+            .keys()
+            .filter(|name| !class_like_metadata.declaring_property_ids.contains_key(name)),
+    );
 
-        let Some(property_metadata) = property_class_metadata.properties.get(property_name) else {
+    for property_name in property_names {
+        // These types seed `$this->prop`, i.e. internal access: the real property when it is
+        // visible from within this class, the `@property*` annotation otherwise.
+        let Some(resolution) = resolve_declared_property(
+            context.codebase,
+            class_like_metadata,
+            *property_name,
+            true, // `instance_access`
+            Some(calling_class),
+        ) else {
             return Err(AnalysisError::InternalError(
                 format!(
-                    "Could not load property metadata for `{property_name}` in class `{declaring_class}` (class-like: `{}`).",
+                    "Could not load property metadata for `{property_name}` in class-like `{}`.",
                     class_like_metadata.name,
                 ),
                 class_like_metadata.span,
             ));
         };
+
+        let property_metadata = resolution.property;
+        let property_class_metadata = resolution.declaring_class;
 
         if !property_metadata.hooks.is_empty()
             && property_metadata.hooks.contains_key(&word(b"set"))
@@ -609,12 +623,7 @@ where
             continue;
         }
 
-        let mut property_type = property_metadata
-            .type_metadata
-            .as_ref()
-            .map(|type_metadata| &type_metadata.type_union)
-            .cloned()
-            .unwrap_or_else(get_mixed);
+        let mut property_type = resolution.declared_type(context.codebase);
 
         let property_name_bytes = property_name.as_bytes();
         let raw_property_name = property_name_bytes.strip_prefix(b"$").unwrap_or(property_name_bytes);

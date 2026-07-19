@@ -1179,9 +1179,8 @@ where
                 new_property.type_metadata.replace(type_metadata);
             }
 
-            new_property.flags.set(MetadataFlags::MAGIC_PROPERTY, true);
-
-            class_like_metadata.add_property_metadata(new_property);
+            class_like_metadata.magic_properties.insert(property_name, new_property);
+            class_like_metadata.magic_property_ids.insert(property_name, class_like_metadata.name);
         }
     }
 
@@ -1491,15 +1490,7 @@ where
                 let properties =
                     scan_properties(property, &mut class_like_metadata, name, &type_context, context, scope);
 
-                for mut property_metadata in properties {
-                    if let Some(existing_property) = class_like_metadata.properties.get_mut(&property_metadata.name.0) {
-                        property_metadata.read_visibility = existing_property.read_visibility;
-                        property_metadata.write_visibility = existing_property.read_visibility;
-
-                        property_metadata.flags.set(MetadataFlags::VIRTUAL_PROPERTY, false);
-                        property_metadata.flags.set(MetadataFlags::READONLY, existing_property.flags.is_readonly());
-                    }
-
+                for property_metadata in properties {
                     class_like_metadata.add_property_metadata(property_metadata);
                 }
             }

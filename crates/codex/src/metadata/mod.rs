@@ -237,6 +237,8 @@ impl CodebaseMetadata {
 
     /// Checks if a property exists on a class-like, including inherited properties.
     /// Class name is case-insensitive, property name is case-sensitive.
+    /// Sees real declarations only; magic `@property*` tags are reachable through
+    /// `ClassLikeMetadata::magic_property_ids`.
     #[inline]
     #[must_use]
     pub fn property_exists(&self, class: &[u8], property: &[u8]) -> bool {
@@ -447,6 +449,8 @@ impl CodebaseMetadata {
 
     /// Retrieves metadata for a property directly from the class where it's declared.
     /// Class name is case-insensitive, property name is case-sensitive.
+    /// Sees real declarations only; magic `@property*` tags are reachable through
+    /// `ClassLikeMetadata::magic_property_ids`.
     #[inline]
     #[must_use]
     pub fn get_property(&self, class: &[u8], property: &[u8]) -> Option<&PropertyMetadata> {
@@ -834,6 +838,8 @@ impl CodebaseMetadata {
     }
 
     /// Gets the class where a property is declared.
+    /// Sees real declarations only; magic `@property*` tags are reachable through
+    /// `ClassLikeMetadata::magic_property_ids`.
     #[inline]
     #[must_use]
     pub fn get_declaring_property_class(&self, class: &[u8], property: &[u8]) -> Option<Word> {

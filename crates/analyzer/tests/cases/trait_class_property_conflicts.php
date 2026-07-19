@@ -132,6 +132,11 @@ class C9
 {
     use T10;
 
+    public function __construct()
+    {
+        $this->prop = 0;
+    }
+
     public function __get(string $name): int
     {
         return $this->prop;

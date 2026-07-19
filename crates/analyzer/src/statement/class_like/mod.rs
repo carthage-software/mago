@@ -2382,12 +2382,6 @@ fn check_trait_property_conflicts<'ctx, 'ast, 'arena, A>(
 
     let mut class_properties: IndexMap<Word, &PropertyMetadata> = IndexMap::new();
     for (property_name, property_metadata) in class_like_metadata.properties.iter().sorted_by_key(|(k, _)| *k) {
-        // Magic properties (from `@property` docblock tags) are not real declarations and
-        // never participate in PHP's trait composition, so they cannot conflict with a trait property.
-        if property_metadata.flags.is_magic_property() {
-            continue;
-        }
-
         if let Some(declaring_class) = class_like_metadata.declaring_property_ids.get(property_name)
             && declaring_class == &class_like_metadata.name
         {
