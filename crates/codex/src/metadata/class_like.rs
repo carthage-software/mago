@@ -814,6 +814,7 @@ impl ClassLikeMetadata {
 
                 slot.type_declaration_metadata.clone_from(&prop_metadata.type_declaration_metadata);
                 slot.type_metadata.clone_from(&prop_metadata.type_metadata);
+                slot.write_type_metadata.clone_from(&prop_metadata.write_type_metadata);
             } else {
                 patch.issues.push(
                     Issue::error(format!(

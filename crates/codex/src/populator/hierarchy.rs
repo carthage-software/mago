@@ -349,6 +349,16 @@ pub fn populate_class_like_types(
                 force_repopulation,
             );
         }
+
+        if let Some(signature) = property_metadata.write_type_metadata.as_mut() {
+            populate_union_type(
+                &mut signature.type_union,
+                codebase_symbols,
+                Some(&property_reference_source),
+                symbol_references,
+                force_repopulation,
+            );
+        }
     }
 
     for template in metadata.template_types.values_mut() {

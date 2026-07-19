@@ -1160,6 +1160,44 @@ where
                 None
             };
 
+            // `@property-read` and `@property-write` tags for the same property combine into
+            // one readable and writable declaration; the later tag must not replace the earlier.
+            if let Some(existing_property) = class_like_metadata.magic_properties.get_mut(&property_name) {
+                let existing_is_write_only = existing_property.flags.is_writeonly();
+                let existing_is_read_only = existing_property.flags.is_readonly();
+
+                if is_read {
+                    existing_property.read_visibility = Visibility::Public;
+                    existing_property.flags.set(MetadataFlags::WRITEONLY, false);
+                    if existing_is_write_only {
+                        // The type slot holds the write-only tag's type; the read type takes the
+                        // slot (it is what property accesses produce) and the write type moves
+                        // into the dedicated write slot.
+                        if existing_property.write_type_metadata.is_none() {
+                            existing_property.write_type_metadata = existing_property.type_metadata.take();
+                        }
+
+                        existing_property.type_metadata = type_metadata.clone();
+                    } else if existing_property.type_metadata.is_none() {
+                        existing_property.type_metadata = type_metadata.clone();
+                    }
+                }
+
+                if is_write {
+                    existing_property.write_visibility = Visibility::Public;
+                    existing_property.flags.set(MetadataFlags::READONLY, false);
+                    if existing_is_read_only {
+                        if existing_property.write_type_metadata.is_none() {
+                            existing_property.write_type_metadata = type_metadata;
+                        }
+                    } else if existing_property.type_metadata.is_none() {
+                        existing_property.type_metadata = type_metadata;
+                    }
+                }
+
+                continue;
+            }
+
             let mut new_property = PropertyMetadata::new(VariableIdentifier(property_name), MetadataFlags::empty());
             if is_read {
                 new_property.read_visibility = Visibility::Public;

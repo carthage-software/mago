@@ -9,6 +9,7 @@ use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_never;
+use mago_codex::ttype::intersect_union_types;
 use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -66,9 +67,13 @@ where
     block_context.flags.set_inside_assignment(was_inside_assignment);
 
     let mut resolved_property_type = None;
+    let mut readable_type: Option<TUnion> = None;
+    let mut has_read_clamp = false;
     let mut matched_all_properties = true;
     let mut widened_assigned_type: Option<TUnion> = None;
     for resolved_property in resolution_result.properties {
+        has_read_clamp |= resolved_property.read_type.is_some();
+
         // A magic-governed write goes through `__set()`, never through the real property of the
         // same name that may exist on the declaring class (e.g. a `readonly` backing property).
         if !resolved_property.is_magic
@@ -196,6 +201,13 @@ where
             }
         }
 
+        // The type a read yields for this property: the `@property-read` type for a magic
+        // property (writes go through `__set`, reads through `__get`), else the property type
+        // itself (writes round-trip).
+        let property_readable_type =
+            resolved_property.read_type.clone().unwrap_or_else(|| resolved_property.property_type.clone());
+        readable_type = Some(add_optional_union_type(property_readable_type, readable_type.as_ref(), context.codebase));
+
         resolved_property_type = Some(add_optional_union_type(
             resolved_property.property_type,
             resolved_property_type.as_ref(),
@@ -227,7 +239,23 @@ where
     if context.settings.memoize_properties
         && let Some(property_access_id) = property_access_id
     {
-        block_context.locals.insert(property_access_id, Rc::clone(&resulting_type));
+        // Memoize the written value so later reads of the same access see it — but only to the
+        // extent it survives a read. For a magic property a read goes through `__get`, yielding
+        // the `@property-read` type, so only the part of the written value that overlaps that
+        // type is observable on read: intersect with it, and fall back to the full read type when
+        // the write converts (a wider `@property-write` whose value shares nothing with the read
+        // type, e.g. a string coerced to int). Real and dynamic (`stdClass`) properties round-trip
+        // and have no distinct read type, so their written value is memoized as-is.
+        let memoized_type = if has_read_clamp && let Some(readable) = &readable_type {
+            let observable = intersect_union_types(readable, &resulting_type, context.codebase)
+                .filter(|intersection| !intersection.is_never());
+
+            Rc::new(observable.unwrap_or_else(|| readable.clone()))
+        } else {
+            Rc::clone(&resulting_type)
+        };
+
+        block_context.locals.insert(property_access_id, memoized_type);
     }
 
     artifacts.set_rc_expression_type(property_access, resulting_type);

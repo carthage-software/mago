@@ -59,6 +59,12 @@ pub struct PropertyMetadata {
     /// in a docblock comment (e.g., `@var string`).
     pub type_metadata: Option<TypeMetadata>,
 
+    /// The type accepted when writing to the property, when it differs from `type_metadata`.
+    ///
+    /// Only set for magic properties declaring split `@property-read` / `@property-write`
+    /// types; `None` means writes accept the same type that reads produce (`type_metadata`).
+    pub write_type_metadata: Option<TypeMetadata>,
+
     /// The type inferred from the property's default value, if it has one.
     ///
     /// e.g., for `public $count = 0;`, this would contain the metadata for `int(0)`.
@@ -94,6 +100,7 @@ impl PropertyMetadata {
             write_visibility: Visibility::Public,
             type_declaration_metadata: None,
             type_metadata: None,
+            write_type_metadata: None,
             default_type_metadata: None,
             flags,
             hooks: WordMap::default(),
@@ -134,6 +141,14 @@ impl PropertyMetadata {
     #[inline]
     pub fn set_type_metadata(&mut self, type_metadata: Option<TypeMetadata>) {
         self.type_metadata = type_metadata;
+    }
+
+    /// Returns the type accepted when writing to the property: the distinct write type
+    /// when one is declared, the read type otherwise.
+    #[inline]
+    #[must_use]
+    pub fn get_write_type_metadata(&self) -> Option<&TypeMetadata> {
+        self.write_type_metadata.as_ref().or(self.type_metadata.as_ref())
     }
 
     /// Returns a reference to the property's name identifier.

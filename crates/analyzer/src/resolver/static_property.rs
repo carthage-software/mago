@@ -195,6 +195,7 @@ where
                     declaring_class_id: Some(required_declaring_id),
                     property_type,
                     is_magic: false,
+                    read_type: None,
                 });
             }
         }
@@ -258,6 +259,7 @@ where
         declaring_class_id: Some(declaring_class_id),
         property_type,
         is_magic: false,
+        read_type: None,
     })
 }
 
