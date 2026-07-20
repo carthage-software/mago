@@ -6,6 +6,7 @@ use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::metadata::property::PropertyMetadata;
+use mago_codex::metadata::ttype::TypeMetadata;
 use mago_codex::misc::GenericParent;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
@@ -58,6 +59,12 @@ pub struct ResolvedProperty {
     pub property_span: Option<Span>,
     pub property_type: TUnion,
     pub is_magic: bool,
+    /// For a magic property resolved for assignment, the `@property-read` type — which a read
+    /// produces via `__get` regardless of the written value. `property_type` here is the (possibly
+    /// wider) `@property-write` type, so a written value that is not assignable to `read_type`
+    /// does not survive a read; memoization clamps to `read_type` in that case. `None` for reads
+    /// and for real/dynamic properties, whose writes round-trip (`property_type` is the read type).
+    pub read_type: Option<TUnion>,
 }
 
 /// Holds the results of a property resolution attempt.
@@ -185,6 +192,7 @@ where
                             declaring_class_id: None,
                             property_type: get_mixed(),
                             is_magic: false,
+                            read_type: None,
                         });
                     }
                 } else {
@@ -219,6 +227,7 @@ where
                             declaring_class_id: None,
                             property_type: get_mixed(),
                             is_magic: false,
+                            read_type: None,
                         });
                     }
                 } else {
@@ -291,6 +300,7 @@ where
                         declaring_class_id: None,
                         property_type,
                         is_magic: false,
+                        read_type: None,
                     };
 
                     result.properties.push(resolved_property);
@@ -423,6 +433,7 @@ where
             declaring_class_id: Some(word(b"UnitEnum")),
             property_type: TUnion::from_vec(name_types),
             is_magic: false,
+            read_type: None,
         })
     } else if prop_str == b"value" {
         let value_types: Vec<TAtomic> = cases.iter().filter_map(|case| case.value_type.clone()).collect();
@@ -439,6 +450,7 @@ where
             declaring_class_id: Some(word(b"BackedEnum")),
             property_type: TUnion::from_vec(value_types),
             is_magic: false,
+            read_type: None,
         })
     } else {
         None
@@ -483,8 +495,28 @@ impl DeclaredProperty<'_> {
     /// `@property` on a subclass), the annotation's type; otherwise the declared type, or
     /// `mixed` when untyped.  A conflicting (non-narrowing) annotation type is ignored.
     pub(crate) fn declared_type(&self, codebase: &CodebaseMetadata) -> TUnion {
+        self.declared_type_impl(codebase, false)
+    }
+
+    /// The type the governing declaration accepts when writing to the property: the distinct
+    /// `@property-write` type when the declaration splits read and write types, otherwise the
+    /// same type [`Self::declared_type`] returns.
+    pub(crate) fn declared_write_type(&self, codebase: &CodebaseMetadata) -> TUnion {
+        self.declared_type_impl(codebase, true)
+    }
+
+    /// [`Self::declared_write_type`] when `for_assignment`, otherwise [`Self::declared_type`].
+    pub(crate) fn declared_type_for(&self, codebase: &CodebaseMetadata, for_assignment: bool) -> TUnion {
+        self.declared_type_impl(codebase, for_assignment)
+    }
+
+    fn declared_type_impl(&self, codebase: &CodebaseMetadata, for_write: bool) -> TUnion {
+        fn annotation_type_metadata(annotation: &PropertyMetadata, for_write: bool) -> Option<&TypeMetadata> {
+            if for_write { annotation.get_write_type_metadata() } else { annotation.type_metadata.as_ref() }
+        }
+
         if let DeclaredPropertyKind::Real { annotation: Some(annotation) } = self.kind
-            && let Some(annotation_type) = annotation.type_metadata.as_ref().map(|tm| &tm.type_union)
+            && let Some(annotation_type) = annotation_type_metadata(annotation, for_write).map(|tm| &tm.type_union)
         {
             let narrows = match self.property.type_metadata.as_ref().map(|tm| &tm.type_union) {
                 None => true,
@@ -507,9 +539,7 @@ impl DeclaredProperty<'_> {
             }
         }
 
-        self.property
-            .type_metadata
-            .as_ref()
+        annotation_type_metadata(self.property, for_write)
             .or(self.property.type_declaration_metadata.as_ref())
             .map(|tm| tm.type_union.clone())
             .unwrap_or_else(get_mixed)
@@ -659,8 +689,13 @@ where
                     property_span: prop_meta.name_span.or(prop_meta.span),
                     property_name: prop_name,
                     declaring_class_id: Some(required_resolution.declaring_class.name),
-                    property_type: required_resolution.declared_type(context.codebase),
+                    property_type: required_resolution.declared_type_for(context.codebase, for_assignment),
                     is_magic: false,
+                    read_type: if for_assignment && required_resolution.is_magic() {
+                        Some(required_resolution.declared_type(context.codebase))
+                    } else {
+                        None
+                    },
                 });
             }
         }
@@ -668,9 +703,14 @@ where
         // Check mixins.
         if !class_metadata.mixins.is_empty() {
             // Try to find property in mixin types
-            if let Some(resolved) =
-                find_property_in_mixins(context, class_metadata, object, &class_metadata.mixins, prop_name)
-            {
+            if let Some(resolved) = find_property_in_mixins(
+                context,
+                class_metadata,
+                object,
+                &class_metadata.mixins,
+                prop_name,
+                for_assignment,
+            ) {
                 // For an annotation-governed mixin property, the caller reports a missing
                 // `__get`/`__set` on the accessed class; the mixin-specific warnings below
                 // cover real mixin properties only.
@@ -707,7 +747,8 @@ where
         }
 
         if let TObject::Named(named_object) = object
-            && let Some(resolved) = find_property_in_intersection_types(context, named_object, prop_name)
+            && let Some(resolved) =
+                find_property_in_intersection_types(context, named_object, prop_name, for_assignment)
         {
             return Some(resolved);
         }
@@ -728,6 +769,9 @@ where
                 declaring_class_id: Some(class_id),
                 property_type: get_mixed(),
                 is_magic: true,
+                // Undocumented access on a class with `__get`/`__set` (e.g. `stdClass` dynamic
+                // properties): the type is unknown, so the written value stays memoizable.
+                read_type: None,
             });
         }
 
@@ -745,6 +789,7 @@ where
                 declaring_class_id: None,
                 property_type: get_mixed(),
                 is_magic: false,
+                read_type: None,
             });
         }
 
@@ -778,7 +823,7 @@ where
         {
             param_type.type_union.clone()
         } else {
-            resolution.declared_type(context.codebase)
+            resolution.declared_write_type(context.codebase)
         }
     } else {
         resolution.declared_type(context.codebase)
@@ -844,6 +889,11 @@ where
         declaring_class_id: Some(declaring_class_id),
         property_type,
         is_magic: resolution.is_magic(),
+        read_type: if for_assignment && resolution.is_magic() {
+            Some(resolution.declared_type(context.codebase))
+        } else {
+            None
+        },
     })
 }
 
@@ -1318,6 +1368,7 @@ fn find_property_in_mixins<A>(
     outer_object: &TObject,
     mixins: &[TUnion],
     prop_name: Word,
+    for_assignment: bool,
 ) -> Option<ResolvedProperty>
 where
     A: Arena,
@@ -1326,12 +1377,15 @@ where
         for mixin_atomic in mixin_type.types.as_ref() {
             match mixin_atomic {
                 TAtomic::Object(TObject::Named(named)) => {
-                    if let Some(result) = find_property_in_single_mixin(context, named.name, prop_name) {
+                    if let Some(result) = find_property_in_single_mixin(context, named.name, prop_name, for_assignment)
+                    {
                         return Some(result);
                     }
                 }
                 TAtomic::Object(TObject::Enum(enum_type)) => {
-                    if let Some(result) = find_property_in_single_mixin(context, enum_type.name, prop_name) {
+                    if let Some(result) =
+                        find_property_in_single_mixin(context, enum_type.name, prop_name, for_assignment)
+                    {
                         return Some(result);
                     }
                 }
@@ -1354,7 +1408,9 @@ where
                                 _ => continue,
                             };
 
-                            if let Some(result) = find_property_in_single_mixin(context, class_name, prop_name) {
+                            if let Some(result) =
+                                find_property_in_single_mixin(context, class_name, prop_name, for_assignment)
+                            {
                                 return Some(result);
                             }
                             resolved = true;
@@ -1371,7 +1427,7 @@ where
                             };
 
                             if let Some(result) =
-                                find_property_in_single_mixin(context, constraint_class_name, prop_name)
+                                find_property_in_single_mixin(context, constraint_class_name, prop_name, for_assignment)
                             {
                                 return Some(result);
                             }
@@ -1391,6 +1447,7 @@ fn find_property_in_single_mixin<A>(
     context: &Context<'_, '_, A>,
     mixin_class_name: Word,
     prop_name: Word,
+    for_assignment: bool,
 ) -> Option<ResolvedProperty>
 where
     A: Arena,
@@ -1405,8 +1462,13 @@ where
         property_span: property_metadata.name_span.or(property_metadata.span),
         property_name: prop_name,
         declaring_class_id: Some(resolution.declaring_class.name),
-        property_type: resolution.declared_type(context.codebase),
+        property_type: resolution.declared_type_for(context.codebase, for_assignment),
         is_magic: resolution.is_magic(),
+        read_type: if for_assignment && resolution.is_magic() {
+            Some(resolution.declared_type(context.codebase))
+        } else {
+            None
+        },
     })
 }
 
@@ -1416,6 +1478,7 @@ fn find_property_in_intersection_types<A>(
     context: &Context<'_, '_, A>,
     named_object: &TNamedObject,
     prop_name: Word,
+    for_assignment: bool,
 ) -> Option<ResolvedProperty>
 where
     A: Arena,
@@ -1443,8 +1506,13 @@ where
                     property_span: property_metadata.name_span.or(property_metadata.span),
                     property_name: prop_name,
                     declaring_class_id: Some(resolution.declaring_class.name),
-                    property_type: resolution.declared_type(context.codebase),
+                    property_type: resolution.declared_type_for(context.codebase, for_assignment),
                     is_magic: resolution.is_magic(),
+                    read_type: if for_assignment && resolution.is_magic() {
+                        Some(resolution.declared_type(context.codebase))
+                    } else {
+                        None
+                    },
                 });
             }
             TAtomic::Object(TObject::WithProperties(shaped)) => {
@@ -1457,6 +1525,7 @@ where
                         declaring_class_id: None,
                         property_type: property_type.clone(),
                         is_magic: false,
+                        read_type: None,
                     });
                 }
             }

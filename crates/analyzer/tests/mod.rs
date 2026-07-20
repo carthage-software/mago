@@ -648,6 +648,8 @@ test_case!(magic_methods);
 test_case!(magic_properties);
 test_case!(magic_property_overridden_by_parent);
 test_case!(magic_property_shadowing_real_property);
+test_case!(magic_property_split_read_write);
+test_case!(magic_property_asymmetric_write_tracking);
 test_case!(magic_methods_args);
 test_case!(method_annotation_with_inheritance);
 test_case!(array_shape_access);
