@@ -59,9 +59,11 @@ pub struct ResolvedProperty {
     pub property_span: Option<Span>,
     pub property_type: TUnion,
     pub is_magic: bool,
-    /// For a magic property resolved for assignment, the `@property-read` type — which a read
-    /// produces via `__get` regardless of the written value. `property_type` here is the (possibly
-    /// wider) `@property-write` type, so a written value that is not assignable to `read_type`
+    /// When resolved for assignment and writes diverge from reads, the type a read produces
+    /// regardless of the written value: the `@property-read` type of a magic property (reads go
+    /// through `__get`) or the declared type of a hook property with a `set` parameter (reads go
+    /// through `get`). `property_type` here is the (possibly wider) write type — the `@property-write`
+    /// type or the `set` parameter type — so a written value that is not assignable to `read_type`
     /// does not survive a read; memoization clamps to `read_type` in that case. `None` for reads
     /// and for real/dynamic properties, whose writes round-trip (`property_type` is the read type).
     pub read_type: Option<TUnion>,
@@ -815,12 +817,14 @@ where
     );
 
     // For assignment, use set hook parameter type when not accessing backing store directly
+    let mut used_set_hook_param = false;
     let mut property_type = if for_assignment {
         if let Some(set_hook) = property_metadata.hooks.get(&word(b"set"))
             && let Some(param) = &set_hook.parameter
             && let Some(param_type) = param.get_type_metadata()
             && !is_backing_store_access(object_expr, prop_name, block_context)
         {
+            used_set_hook_param = true;
             param_type.type_union.clone()
         } else {
             resolution.declared_write_type(context.codebase)
@@ -829,31 +833,45 @@ where
         resolution.declared_type(context.codebase)
     };
 
-    expander::expand_union(
-        context.codebase,
-        &mut property_type,
-        &TypeExpansionOptions {
-            self_class: Some(declaring_class_id),
-            static_class_type: StaticClassType::Object(object.clone()),
-            parent_class: declaring_class_metadata.direct_parent_class,
-            ..Default::default()
-        },
-    );
+    // When writes diverge from reads — a magic property or a hook with a `set` parameter — the
+    // type a read produces regardless of the written value. It is resolved (below) alongside
+    // `property_type` so a generic or `self` read type is expanded and localized before it clamps
+    // the memoized write value in `property_assignment`.
+    let mut read_type = (for_assignment && (resolution.is_magic() || used_set_hook_param))
+        .then(|| resolution.declared_type(context.codebase));
 
-    if !declaring_class_metadata.template_types.is_empty()
-        && let TObject::Named(named_object) = object
-    {
-        property_type = localize_property_type(
-            context,
-            &property_type,
-            named_object.get_type_parameters().unwrap_or_default(),
-            if class_id.as_bytes().eq_ignore_ascii_case(declaring_class_id.as_bytes()) {
-                declaring_class_metadata
-            } else {
-                context.codebase.get_class_like(class_id.as_bytes()).unwrap_or(declaring_class_metadata)
+    let expand_and_localize = |ty: &mut TUnion| {
+        expander::expand_union(
+            context.codebase,
+            ty,
+            &TypeExpansionOptions {
+                self_class: Some(declaring_class_id),
+                static_class_type: StaticClassType::Object(object.clone()),
+                parent_class: declaring_class_metadata.direct_parent_class,
+                ..Default::default()
             },
-            declaring_class_metadata,
         );
+
+        if !declaring_class_metadata.template_types.is_empty()
+            && let TObject::Named(named_object) = object
+        {
+            *ty = localize_property_type(
+                context,
+                ty,
+                named_object.get_type_parameters().unwrap_or_default(),
+                if class_id.as_bytes().eq_ignore_ascii_case(declaring_class_id.as_bytes()) {
+                    declaring_class_metadata
+                } else {
+                    context.codebase.get_class_like(class_id.as_bytes()).unwrap_or(declaring_class_metadata)
+                },
+                declaring_class_metadata,
+            );
+        }
+    };
+
+    expand_and_localize(&mut property_type);
+    if let Some(read_type) = read_type.as_mut() {
+        expand_and_localize(read_type);
     }
 
     if !for_assignment
@@ -889,11 +907,7 @@ where
         declaring_class_id: Some(declaring_class_id),
         property_type,
         is_magic: resolution.is_magic(),
-        read_type: if for_assignment && resolution.is_magic() {
-            Some(resolution.declared_type(context.codebase))
-        } else {
-            None
-        },
+        read_type,
     })
 }
 
