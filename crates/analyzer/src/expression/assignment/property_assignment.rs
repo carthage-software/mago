@@ -201,9 +201,10 @@ where
             }
         }
 
-        // The type a read yields for this property: the `@property-read` type for a magic
-        // property (writes go through `__set`, reads through `__get`), else the property type
-        // itself (writes round-trip).
+        // The type a read yields for this property: the distinct read type when writes and reads
+        // diverge — a magic property (writes go through `__set`, reads through `__get`) or a hook
+        // property with a wider `set` parameter (writes go through `set`, reads through `get`) —
+        // else the property type itself (writes round-trip).
         let property_readable_type =
             resolved_property.read_type.clone().unwrap_or_else(|| resolved_property.property_type.clone());
         readable_type = Some(add_optional_union_type(property_readable_type, readable_type.as_ref(), context.codebase));
@@ -240,10 +241,11 @@ where
         && let Some(property_access_id) = property_access_id
     {
         // Memoize the written value so later reads of the same access see it — but only to the
-        // extent it survives a read. For a magic property a read goes through `__get`, yielding
-        // the `@property-read` type, so only the part of the written value that overlaps that
-        // type is observable on read: intersect with it, and fall back to the full read type when
-        // the write converts (a wider `@property-write` whose value shares nothing with the read
+        // extent it survives a read. When writes and reads diverge — a magic property (read goes
+        // through `__get`, yielding the `@property-read` type) or a hook property with a wider `set`
+        // parameter (read goes through `get`, yielding the property type) — only the part of the
+        // written value that overlaps the read type is observable: intersect with it, and fall back
+        // to the full read type when the write converts (a value that shares nothing with the read
         // type, e.g. a string coerced to int). Real and dynamic (`stdClass`) properties round-trip
         // and have no distinct read type, so their written value is memoized as-is.
         let memoized_type = if has_read_clamp && let Some(readable) = &readable_type {
