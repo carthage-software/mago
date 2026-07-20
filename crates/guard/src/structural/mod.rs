@@ -133,9 +133,10 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                     .get_class(fqn)
                     .map(|c| c.flags.is_final())
                     .unwrap_or(class.modifiers.contains_final());
+                let is_abstract = class.modifiers.contains_abstract();
 
-                match (must_be_final, is_final) {
-                    (true, false) => {
+                match (must_be_final, is_final, is_abstract) {
+                    (true, false, false) => {
                         structural_flaws.push(StructuralFlaw {
                             symbol_fqn: fqn_to_owned(fqn),
                             symbol_kind: StructuralSymbolKind::Class,
@@ -144,7 +145,7 @@ impl<'ast, 'ctx, 'arena> MutWalker<'ast, 'arena, GuardContext<'ctx, 'arena>> for
                             reason: structural_rule.reason.clone(),
                         });
                     }
-                    (false, true) => {
+                    (false, true, true) => {
                         structural_flaws.push(StructuralFlaw {
                             symbol_fqn: fqn_to_owned(fqn),
                             symbol_kind: StructuralSymbolKind::Class,
