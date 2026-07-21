@@ -294,13 +294,13 @@ impl<'cfg> Orchestrator<'cfg> {
     /// # Returns
     ///
     /// A [`GuardService`] configured with the orchestrator's guard settings and progress bar preferences.
-    pub fn get_guard_service(&self, database: ReadDatabase, codebase: CodebaseMetadata) -> GuardService {
+    pub fn get_guard_service(&self, database: ReadDatabase) -> GuardService {
         GuardService::new(
             database,
-            codebase,
             self.config.guard_settings.clone(),
             self.config.parser_settings,
             self.config.use_progress_bars,
+            self.config.php_version,
         )
     }
 
