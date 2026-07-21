@@ -33,6 +33,7 @@ use mago_word::word;
 
 use crate::flags::attribute::AttributeFlags;
 use crate::identifier::function_like::FunctionLikeIdentifier;
+use crate::metadata::class_like_constant::ClassLikeConstantMetadata;
 use crate::metadata::constant::ConstantMetadata;
 use crate::scanner::Context;
 use crate::ttype::atomic::TAtomic;
@@ -205,7 +206,7 @@ pub(super) fn infer<'arena, A>(
 where
     A: Arena,
 {
-    infer_with_constants(context, scope, expression, enclosing_class, None)
+    infer_with_constant_sources(context, scope, expression, enclosing_class, None, None)
 }
 
 #[inline]
@@ -215,6 +216,35 @@ pub(super) fn infer_with_constants<'arena, A>(
     expression: &'arena Expression<'arena>,
     enclosing_class: Option<Word>,
     constants: Option<&WordMap<ConstantMetadata>>,
+) -> Option<TUnion>
+where
+    A: Arena,
+{
+    infer_with_constant_sources(context, scope, expression, enclosing_class, constants, None)
+}
+
+#[inline]
+pub(super) fn infer_with_class_constants<'arena, A>(
+    context: &Context<'_, 'arena, A>,
+    scope: &NamespaceScope,
+    expression: &'arena Expression<'arena>,
+    enclosing_class: Option<Word>,
+    class_constants: &WordMap<ClassLikeConstantMetadata>,
+) -> Option<TUnion>
+where
+    A: Arena,
+{
+    infer_with_constant_sources(context, scope, expression, enclosing_class, None, Some(class_constants))
+}
+
+#[inline]
+fn infer_with_constant_sources<'arena, A>(
+    context: &Context<'_, 'arena, A>,
+    scope: &NamespaceScope,
+    expression: &'arena Expression<'arena>,
+    enclosing_class: Option<Word>,
+    constants: Option<&WordMap<ConstantMetadata>>,
+    class_constants: Option<&WordMap<ClassLikeConstantMetadata>>,
 ) -> Option<TUnion>
 where
     A: Arena,
@@ -300,7 +330,8 @@ where
             if contains_content { Some(get_non_empty_string()) } else { Some(get_string()) }
         }
         Expression::UnaryPrefix(UnaryPrefix { operator, operand }) => {
-            let operand_type = infer_with_constants(context, scope, operand, enclosing_class, constants)?;
+            let operand_type =
+                infer_with_constant_sources(context, scope, operand, enclosing_class, constants, class_constants)?;
 
             match operator {
                 UnaryPrefixOperator::Plus(_) => {
@@ -341,10 +372,14 @@ where
             }
         }
         Expression::Binary(Binary { operator: BinaryOperator::StringConcat(_), lhs, rhs }) => {
-            let Some(lhs_type) = infer_with_constants(context, scope, lhs, enclosing_class, constants) else {
+            let Some(lhs_type) =
+                infer_with_constant_sources(context, scope, lhs, enclosing_class, constants, class_constants)
+            else {
                 return Some(get_string());
             };
-            let Some(rhs_type) = infer_with_constants(context, scope, rhs, enclosing_class, constants) else {
+            let Some(rhs_type) =
+                infer_with_constant_sources(context, scope, rhs, enclosing_class, constants, class_constants)
+            else {
                 return Some(get_string());
             };
 
@@ -382,8 +417,8 @@ where
             Some(wrap_atomic(TAtomic::Scalar(TScalar::String(final_string_type))))
         }
         Expression::Binary(Binary { operator, lhs, rhs }) if operator.is_bitwise() => {
-            let lhs = infer_with_constants(context, scope, lhs, enclosing_class, constants);
-            let rhs = infer_with_constants(context, scope, rhs, enclosing_class, constants);
+            let lhs = infer_with_constant_sources(context, scope, lhs, enclosing_class, constants, class_constants);
+            let rhs = infer_with_constant_sources(context, scope, rhs, enclosing_class, constants, class_constants);
 
             Some(wrap_atomic(
                 match (
@@ -431,8 +466,8 @@ where
             ))
         }
         Expression::Binary(Binary { operator, lhs, rhs }) if operator.is_arithmetic() => {
-            let lhs = infer_with_constants(context, scope, lhs, enclosing_class, constants);
-            let rhs = infer_with_constants(context, scope, rhs, enclosing_class, constants);
+            let lhs = infer_with_constant_sources(context, scope, lhs, enclosing_class, constants, class_constants);
+            let rhs = infer_with_constant_sources(context, scope, rhs, enclosing_class, constants, class_constants);
 
             match (
                 lhs.and_then(|v| v.get_single_literal_int_value()),
@@ -480,6 +515,14 @@ where
             } else {
                 return None;
             };
+
+            if let Some(class_constants) = class_constants
+                && enclosing_class.is_some_and(|class_name| class_name_str.eq_ignore_ascii_case(class_name.as_bytes()))
+                && let Some(constant) = class_constants.get(&word(identifier.value))
+                && let Some(inferred_type) = &constant.inferred_type
+            {
+                return Some(wrap_atomic(inferred_type.clone()));
+            }
 
             Some(wrap_atomic(if identifier.value.eq_ignore_ascii_case(b"class") {
                 TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::literal(word(class_name_str))))
@@ -535,7 +578,14 @@ where
                 return None;
             };
 
-            let object_type = infer_with_constants(context, scope, property_access.object, enclosing_class, constants)?;
+            let object_type = infer_with_constant_sources(
+                context,
+                scope,
+                property_access.object,
+                enclosing_class,
+                constants,
+                class_constants,
+            )?;
 
             let class_like_name = word(class_name);
             let expected_case = TAtomic::Reference(TReference::Member {
@@ -560,8 +610,15 @@ where
                     return None;
                 };
 
-                let value_type = infer_with_constants(context, scope, element.value, enclosing_class, constants)
-                    .unwrap_or_else(get_mixed);
+                let value_type = infer_with_constant_sources(
+                    context,
+                    scope,
+                    element.value,
+                    enclosing_class,
+                    constants,
+                    class_constants,
+                )
+                .unwrap_or_else(get_mixed);
 
                 entries.insert(i, (false, value_type));
             }
@@ -583,12 +640,25 @@ where
                     return None;
                 };
 
-                let value_type = infer_with_constants(context, scope, element.value, enclosing_class, constants)
-                    .unwrap_or_else(get_mixed);
+                let value_type = infer_with_constant_sources(
+                    context,
+                    scope,
+                    element.value,
+                    enclosing_class,
+                    constants,
+                    class_constants,
+                )
+                .unwrap_or_else(get_mixed);
 
-                let Some(key_type) = infer_with_constants(context, scope, element.key, enclosing_class, constants)
-                    .and_then(|v| v.get_single_array_key())
-                else {
+                let Some(key_type) = infer_with_constant_sources(
+                    context,
+                    scope,
+                    element.key,
+                    enclosing_class,
+                    constants,
+                    class_constants,
+                )
+                .and_then(|v| v.get_single_array_key()) else {
                     unknown_key_values.push(value_type);
                     continue;
                 };

@@ -4,13 +4,15 @@ use mago_span::HasSpan;
 use mago_syntax::cst::EnumCase;
 use mago_syntax::cst::EnumCaseItem;
 use mago_word::Word;
+use mago_word::WordMap;
 use mago_word::word;
 
+use crate::metadata::class_like_constant::ClassLikeConstantMetadata;
 use crate::metadata::enum_case::EnumCaseMetadata;
 use crate::metadata::flags::MetadataFlags;
 use crate::scanner::Context;
 use crate::scanner::attribute::scan_attribute_lists;
-use crate::scanner::inference::infer;
+use crate::scanner::inference::infer_with_class_constants;
 use crate::scanner::version_claim::evaluate_version_attributes;
 
 use super::super::ttype::union::TUnion;
@@ -21,6 +23,7 @@ pub fn scan_enum_case<'arena, A>(
     case: &'arena EnumCase<'arena>,
     context: &Context<'_, 'arena, A>,
     scope: &NamespaceScope,
+    class_constants: &WordMap<ClassLikeConstantMetadata>,
 ) -> EnumCaseMetadata
 where
     A: Arena,
@@ -48,7 +51,8 @@ where
             let mut meta = EnumCaseMetadata::new(word(item.name.value), item.name.span, span, flags);
 
             meta.attributes = attributes;
-            meta.value_type = infer(context, scope, item.value, Some(enum_name)).map(TUnion::get_single_owned);
+            meta.value_type = infer_with_class_constants(context, scope, item.value, Some(enum_name), class_constants)
+                .map(TUnion::get_single_owned);
             meta.version_constraint = verdict.constraint;
 
             meta

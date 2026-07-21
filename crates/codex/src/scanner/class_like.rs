@@ -1223,33 +1223,37 @@ where
     }
 
     for member in members {
-        match member {
-            ClassLikeMember::Constant(constant) => {
-                for constant_metadata in scan_class_like_constants(
-                    &mut class_like_metadata,
-                    constant,
-                    Some(original_name),
-                    &type_context,
-                    context,
-                    scope,
-                ) {
-                    if class_like_metadata.constants.contains_key(&constant_metadata.name) {
-                        continue;
-                    }
+        let ClassLikeMember::Constant(constant) = member else {
+            continue;
+        };
 
-                    class_like_metadata.constants.insert(constant_metadata.name, constant_metadata);
-                }
+        for constant_metadata in scan_class_like_constants(
+            &mut class_like_metadata,
+            constant,
+            Some(original_name),
+            &type_context,
+            context,
+            scope,
+        ) {
+            if class_like_metadata.constants.contains_key(&constant_metadata.name) {
+                continue;
             }
-            ClassLikeMember::EnumCase(enum_case) => {
-                let case_metadata = scan_enum_case(name, enum_case, context, scope);
-                if class_like_metadata.constants.contains_key(&case_metadata.name) {
-                    continue;
-                }
 
-                class_like_metadata.enum_cases.insert(case_metadata.name, case_metadata);
-            }
-            _ => {}
+            class_like_metadata.constants.insert(constant_metadata.name, constant_metadata);
         }
+    }
+
+    for member in members {
+        let ClassLikeMember::EnumCase(enum_case) = member else {
+            continue;
+        };
+
+        let case_metadata = scan_enum_case(name, enum_case, context, scope, &class_like_metadata.constants);
+        if class_like_metadata.constants.contains_key(&case_metadata.name) {
+            continue;
+        }
+
+        class_like_metadata.enum_cases.insert(case_metadata.name, case_metadata);
     }
 
     if class_like_metadata.kind.is_enum()
