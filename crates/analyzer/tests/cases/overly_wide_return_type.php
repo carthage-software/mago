@@ -54,6 +54,31 @@ $wide_closure =
         return 42;
     };
 
+function nullable_only_null(): ?int // @mago-expect analysis:overly-wide-return-type
+{
+    return null;
+}
+
+function explicit_null_union_only_null(): string|null // @mago-expect analysis:overly-wide-return-type
+{
+    return null;
+}
+
+function nullable_array_only_null(): ?array // @mago-expect analysis:overly-wide-return-type
+{
+    return null;
+}
+
+/**
+ * @return array<int, string>
+ *
+ * @mago-expect analysis:overly-wide-return-type
+ */
+function docblock_narrows_native(): ?array
+{
+    return ['a'];
+}
+
 function exact_match(): int
 {
     return 1;
