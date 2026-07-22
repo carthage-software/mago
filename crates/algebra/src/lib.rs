@@ -681,6 +681,10 @@ pub fn disjoin_clauses(
 pub fn negate_formula(mut clauses: Vec<Clause>, thresholds: &AlgebraThresholds) -> Option<Vec<Clause>> {
     clauses.retain(|clause| clause.reconcilable);
 
+    clauses.retain(|clause| {
+        clause.wedge || clause.possibilities.values().all(|assertions| assertions.values().all(Assertion::is_negatable))
+    });
+
     if clauses.is_empty() {
         return Some(vec![]);
     }

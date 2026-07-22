@@ -3,6 +3,7 @@ use std::collections::VecDeque;
 use std::rc::Rc;
 use std::sync::Arc;
 
+use mago_codex::assertion::Assertion;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
@@ -18,6 +19,8 @@ use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::atomic_comparator;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_never;
+use mago_codex::ttype::get_non_negative_int;
+use mago_codex::ttype::get_positive_int;
 use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -32,6 +35,7 @@ use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
+use crate::utils::expression::get_expression_id;
 
 #[inline]
 pub fn analyze_arithmetic_operation<'ctx, 'arena, A>(
@@ -497,15 +501,19 @@ where
         );
     }
 
-    let final_type = if result_atomic_types.is_empty() {
-        // No valid pairs found, and potentially errors issued.
-        // Psalm often defaults to mixed here if operands were invalid.
-        // If errors were due to null/false operands handled initially, use the type set there.
-        // Otherwise, default to mixed.
-        get_mixed()
-    } else {
-        TUnion::from_vec(combiner::combine(result_atomic_types, context.codebase, context.settings.combiner_options()))
-    };
+    let final_type =
+        infer_subtraction_type_from_active_relation(context, block_context, binary, &left_type, &right_type)
+            .unwrap_or_else(|| {
+                if result_atomic_types.is_empty() {
+                    get_mixed()
+                } else {
+                    TUnion::from_vec(combiner::combine(
+                        result_atomic_types,
+                        context.codebase,
+                        context.settings.combiner_options(),
+                    ))
+                }
+            });
 
     assign_arithmetic_type(artifacts, final_type, binary);
 
@@ -545,6 +553,74 @@ where
 #[inline]
 pub fn assign_arithmetic_type(artifacts: &mut AnalysisArtifacts, cond_type: TUnion, binary: &Binary<'_>) {
     artifacts.set_expression_type(binary, cond_type);
+}
+
+/// Infer the sign of `left - right` from an exact, active variable relation.
+fn infer_subtraction_type_from_active_relation<'ctx, 'arena, A>(
+    context: &Context<'ctx, 'arena, A>,
+    block_context: &BlockContext<'ctx>,
+    binary: &Binary<'arena>,
+    left_type: &TUnion,
+    right_type: &TUnion,
+) -> Option<TUnion>
+where
+    A: Arena,
+{
+    if !matches!(binary.operator, BinaryOperator::Subtraction(_))
+        || left_type.get_minimum_int_value().is_none()
+        || right_type.get_minimum_int_value().is_none()
+    {
+        return None;
+    }
+
+    let assertion_context = context.get_assertion_context_from_block(block_context);
+    let left_id = get_expression_id(
+        binary.lhs,
+        assertion_context.this_class_name,
+        assertion_context.resolved_names,
+        Some(assertion_context.codebase),
+    )?;
+    let right_id = get_expression_id(
+        binary.rhs,
+        assertion_context.this_class_name,
+        assertion_context.resolved_names,
+        Some(assertion_context.codebase),
+    )?;
+
+    for clause in &block_context.clauses {
+        if clause.wedge || !clause.reconcilable || clause.possibilities.len() != 1 {
+            continue;
+        }
+
+        let Some((&variable, assertions)) = clause.possibilities.iter().next() else {
+            continue;
+        };
+        if assertions.len() != 1 {
+            continue;
+        }
+
+        let Some(assertion) = assertions.values().next() else {
+            continue;
+        };
+
+        match (variable, assertion) {
+            (variable, Assertion::IsGreaterThanVariable(other)) if variable == left_id && *other == right_id => {
+                return Some(get_positive_int());
+            }
+            (variable, Assertion::IsGreaterThanOrEqualVariable(other)) if variable == left_id && *other == right_id => {
+                return Some(get_non_negative_int());
+            }
+            (variable, Assertion::IsLessThanVariable(other)) if variable == right_id && *other == left_id => {
+                return Some(get_positive_int());
+            }
+            (variable, Assertion::IsLessThanOrEqualVariable(other)) if variable == right_id && *other == left_id => {
+                return Some(get_non_negative_int());
+            }
+            _ => {}
+        }
+    }
+
+    None
 }
 
 fn determine_numeric_result(op: &BinaryOperator<'_>, left: &TAtomic, right: &TAtomic, in_loop: bool) -> Vec<TAtomic> {

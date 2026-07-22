@@ -55,6 +55,24 @@ pub enum Assertion {
     IsLessThanOrEqual(i64),
     IsGreaterThan(i64),
     IsGreaterThanOrEqual(i64),
+    /// A range fact implied by a comparison with a non-literal bound.
+    ///
+    /// For example, `$a > $b` with `int<0, max> $b` implies `$a > 0`
+    /// in the true branch, but its negation does not imply `$a <= 0`.
+    /// These assertions therefore deliberately negate to `Any`.
+    IsLessThanFromBound(i64),
+    IsLessThanOrEqualFromBound(i64),
+    IsGreaterThanFromBound(i64),
+    IsGreaterThanOrEqualFromBound(i64),
+    /// An exact comparison with another tracked expression.
+    ///
+    /// Unlike bound-derived facts, these retain the relationship so consumers
+    /// can reason about arithmetic such as `$limit - $length` after
+    /// `$length < $limit`.
+    IsLessThanVariable(Word),
+    IsLessThanOrEqualVariable(Word),
+    IsGreaterThanVariable(Word),
+    IsGreaterThanOrEqualVariable(Word),
     Countable,
     NotCountable(bool),
 }
@@ -100,6 +118,26 @@ impl Assertion {
             Assertion::IsLessThanOrEqual(number) => concat_word!(b"is-less-than-or-equal-", i64_word(*number)),
             Assertion::IsGreaterThan(number) => concat_word!(b"is-greater-than-", i64_word(*number)),
             Assertion::IsGreaterThanOrEqual(number) => concat_word!(b"is-greater-than-or-equal-", i64_word(*number)),
+            Assertion::IsLessThanFromBound(number) => concat_word!(b"is-less-than-from-bound-", i64_word(*number)),
+            Assertion::IsLessThanOrEqualFromBound(number) => {
+                concat_word!(b"is-less-than-or-equal-from-bound-", i64_word(*number))
+            }
+            Assertion::IsGreaterThanFromBound(number) => {
+                concat_word!(b"is-greater-than-from-bound-", i64_word(*number))
+            }
+            Assertion::IsGreaterThanOrEqualFromBound(number) => {
+                concat_word!(b"is-greater-than-or-equal-from-bound-", i64_word(*number))
+            }
+            Assertion::IsLessThanVariable(variable) => concat_word!(b"is-less-than-variable-", variable),
+            Assertion::IsLessThanOrEqualVariable(variable) => {
+                concat_word!(b"is-less-than-or-equal-variable-", variable)
+            }
+            Assertion::IsGreaterThanVariable(variable) => {
+                concat_word!(b"is-greater-than-variable-", variable)
+            }
+            Assertion::IsGreaterThanOrEqualVariable(variable) => {
+                concat_word!(b"is-greater-than-or-equal-variable-", variable)
+            }
             Assertion::NonEmptyCountable(negatable) => {
                 if *negatable {
                     word("non-empty-countable")
@@ -436,6 +474,26 @@ impl Assertion {
                 Assertion::IsLessThan(other_number) => other_number == number,
                 _ => false,
             },
+            Assertion::IsLessThanFromBound(_)
+            | Assertion::IsLessThanOrEqualFromBound(_)
+            | Assertion::IsGreaterThanFromBound(_)
+            | Assertion::IsGreaterThanOrEqualFromBound(_) => false,
+            Assertion::IsLessThanVariable(variable) => match other {
+                Assertion::IsGreaterThanOrEqualVariable(other_variable) => other_variable == variable,
+                _ => false,
+            },
+            Assertion::IsLessThanOrEqualVariable(variable) => match other {
+                Assertion::IsGreaterThanVariable(other_variable) => other_variable == variable,
+                _ => false,
+            },
+            Assertion::IsGreaterThanVariable(variable) => match other {
+                Assertion::IsLessThanOrEqualVariable(other_variable) => other_variable == variable,
+                _ => false,
+            },
+            Assertion::IsGreaterThanOrEqualVariable(variable) => match other {
+                Assertion::IsLessThanVariable(other_variable) => other_variable == variable,
+                _ => false,
+            },
             Assertion::Countable => matches!(other, Assertion::NotCountable(negatable) if *negatable),
             Assertion::NotCountable(_) => matches!(other, Assertion::Countable),
         }
@@ -484,8 +542,47 @@ impl Assertion {
             Assertion::IsLessThanOrEqual(number) => Assertion::IsGreaterThan(*number),
             Assertion::IsGreaterThan(number) => Assertion::IsLessThanOrEqual(*number),
             Assertion::IsGreaterThanOrEqual(number) => Assertion::IsLessThan(*number),
+            Assertion::IsLessThanFromBound(_)
+            | Assertion::IsLessThanOrEqualFromBound(_)
+            | Assertion::IsGreaterThanFromBound(_)
+            | Assertion::IsGreaterThanOrEqualFromBound(_) => Assertion::Any,
+            Assertion::IsLessThanVariable(variable) => Assertion::IsGreaterThanOrEqualVariable(*variable),
+            Assertion::IsLessThanOrEqualVariable(variable) => Assertion::IsGreaterThanVariable(*variable),
+            Assertion::IsGreaterThanVariable(variable) => Assertion::IsLessThanOrEqualVariable(*variable),
+            Assertion::IsGreaterThanOrEqualVariable(variable) => Assertion::IsLessThanVariable(*variable),
             Assertion::Countable => Assertion::NotCountable(true),
             Assertion::NotCountable(_) => Assertion::Countable,
+        }
+    }
+
+    /// Whether this assertion represents the condition itself and can be used
+    /// while constructing the opposite branch.
+    ///
+    /// Facts inferred from a non-literal range bound are only consequences of
+    /// a condition. They are useful in the true branch but are not logically
+    /// equivalent to that condition, so negating them would be unsound.
+    #[inline]
+    #[must_use]
+    pub const fn is_negatable(&self) -> bool {
+        !matches!(
+            self,
+            Self::IsLessThanFromBound(_)
+                | Self::IsLessThanOrEqualFromBound(_)
+                | Self::IsGreaterThanFromBound(_)
+                | Self::IsGreaterThanOrEqualFromBound(_)
+        )
+    }
+
+    /// Returns the expression referenced by a relational assertion.
+    #[inline]
+    #[must_use]
+    pub const fn referenced_variable(&self) -> Option<Word> {
+        match self {
+            Self::IsLessThanVariable(variable)
+            | Self::IsLessThanOrEqualVariable(variable)
+            | Self::IsGreaterThanVariable(variable)
+            | Self::IsGreaterThanOrEqualVariable(variable) => Some(*variable),
+            _ => None,
         }
     }
 }

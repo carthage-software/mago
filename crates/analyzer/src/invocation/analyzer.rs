@@ -13,6 +13,8 @@ use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::atomic::callable::TCallable;
+use mago_codex::ttype::atomic::callable::TCallableSignature;
+use mago_codex::ttype::atomic::callable::parameter::TCallableParameter;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::class_like_string::TClassLikeString;
@@ -29,6 +31,7 @@ use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
+use mago_span::Span;
 use mago_syntax::cst::Expression;
 use mago_word::Word;
 use mago_word::WordMap;
@@ -751,6 +754,18 @@ where
         }
     }
 
+    infer_generic_callable_arguments(
+        context,
+        invocation,
+        template_result,
+        parameter_types,
+        &analyzed_argument_types,
+        base_class_metadata,
+        calling_class_like_metadata,
+        calling_instance_type,
+        method_class_type,
+    );
+
     let max_params = invocation.target.parameter_count();
     let number_of_required_parameters = invocation
         .target
@@ -1104,6 +1119,144 @@ where
     check_template_result(context, template_result, invocation.span);
 
     Ok(())
+}
+
+/// Instantiates first-class generic callables from the surrounding call's other arguments.
+#[allow(clippy::too_many_arguments)]
+fn infer_generic_callable_arguments<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
+    invocation: &Invocation<'ctx, '_, 'arena>,
+    template_result: &mut TemplateResult,
+    parameter_types: &WordMap<TUnion>,
+    analyzed_argument_types: &HashMap<usize, (TUnion, Span)>,
+    base_class_metadata: Option<&'ctx ClassLikeMetadata>,
+    calling_class_like_metadata: Option<&'ctx ClassLikeMetadata>,
+    calling_instance_type: Option<&TAtomic>,
+    method_class_type: Option<&StaticClassType>,
+) where
+    A: Arena,
+{
+    for (argument_offset, argument) in invocation.arguments_source.iter_arguments().enumerate() {
+        let Some((argument_type, argument_span)) = analyzed_argument_types.get(&argument_offset) else {
+            continue;
+        };
+
+        if !callable_argument_has_template_parameter(context, argument_type) {
+            continue;
+        }
+
+        let Some((_, parameter)) = get_parameter_of_argument(&invocation.target, &argument, argument_offset) else {
+            continue;
+        };
+
+        let base_parameter_type = get_parameter_type(
+            context,
+            Some(parameter),
+            base_class_metadata,
+            calling_class_like_metadata,
+            calling_instance_type,
+            method_class_type,
+        );
+
+        let mut result_without_callback_bounds = template_result.clone();
+        remove_template_bounds_from_argument(&mut result_without_callback_bounds, argument_offset);
+
+        let expected_parameter_type = resolve_parameter_type_for_invocation(
+            context,
+            invocation,
+            &result_without_callback_bounds,
+            parameter_types,
+            base_class_metadata,
+            base_parameter_type,
+        );
+
+        let expected_signatures = expected_parameter_type.types.iter().filter_map(|atomic| match atomic {
+            TAtomic::Callable(TCallable::Signature(signature)) => Some(Cow::Borrowed(signature)),
+            TAtomic::Callable(TCallable::Alias(identifier)) => {
+                expander::get_signature_of_function_like_identifier(identifier, context.codebase).map(Cow::Owned)
+            }
+            _ => None,
+        });
+
+        for expected_signature in expected_signatures {
+            for argument_atomic in argument_type.types.iter() {
+                let input_signature: Cow<'_, TCallableSignature> = match argument_atomic {
+                    TAtomic::Callable(TCallable::Signature(signature)) if signature.get_source().is_some() => {
+                        Cow::Owned(signature.clone())
+                    }
+                    TAtomic::Callable(TCallable::Alias(identifier)) => {
+                        let Some(signature) =
+                            expander::get_signature_of_function_like_identifier(identifier, context.codebase)
+                        else {
+                            continue;
+                        };
+
+                        Cow::Owned(signature)
+                    }
+                    _ => continue,
+                };
+
+                for (input_parameter, expected_parameter) in
+                    input_signature.get_parameters().iter().zip(expected_signature.get_parameters())
+                {
+                    let Some(input_type) = input_parameter.get_type_signature() else {
+                        continue;
+                    };
+                    let Some(expected_type) = expected_parameter.get_type_signature() else {
+                        continue;
+                    };
+
+                    if !input_type.has_template_types() || expected_type.is_mixed() {
+                        continue;
+                    }
+
+                    infer_parameter_templates_from_argument(
+                        context,
+                        input_type,
+                        expected_type,
+                        template_result,
+                        argument_offset,
+                        *argument_span,
+                        false,
+                    );
+                }
+            }
+        }
+    }
+}
+
+fn callable_argument_has_template_parameter<A>(context: &Context<'_, '_, A>, argument_type: &TUnion) -> bool
+where
+    A: Arena,
+{
+    argument_type.types.iter().any(|atomic| match atomic {
+        TAtomic::Callable(TCallable::Signature(signature)) if signature.get_source().is_some() => signature
+            .get_parameters()
+            .iter()
+            .filter_map(TCallableParameter::get_type_signature)
+            .any(TUnion::has_template_types),
+        TAtomic::Callable(TCallable::Alias(identifier)) => {
+            context.codebase.get_function_like(identifier).is_some_and(|metadata| {
+                metadata
+                    .parameters
+                    .iter()
+                    .filter_map(|parameter| parameter.get_type_metadata().map(|metadata| &metadata.type_union))
+                    .any(TUnion::has_template_types)
+            })
+        }
+        _ => false,
+    })
+}
+
+fn remove_template_bounds_from_argument(template_result: &mut TemplateResult, argument_offset: usize) {
+    template_result.lower_bounds.retain(|_, bounds_by_parent| {
+        bounds_by_parent.retain(|_, bounds| {
+            bounds.retain(|bound| bound.argument_offset != Some(argument_offset));
+            !bounds.is_empty()
+        });
+
+        !bounds_by_parent.is_empty()
+    });
 }
 
 /// Gets the effective parameter type, expanding class-relative types based on call context.

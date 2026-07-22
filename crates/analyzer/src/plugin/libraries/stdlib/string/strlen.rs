@@ -1,6 +1,7 @@
 //! `strlen()` return type provider.
 
 use mago_codex::ttype::get_literal_int;
+use mago_codex::ttype::get_non_negative_int;
 use mago_codex::ttype::union::TUnion;
 
 use crate::plugin::context::InvocationInfo;
@@ -10,8 +11,11 @@ use crate::plugin::provider::ProviderMeta;
 use crate::plugin::provider::function::FunctionReturnTypeProvider;
 use crate::plugin::provider::function::FunctionTarget;
 
-static META: ProviderMeta =
-    ProviderMeta::new("php::string::strlen", "strlen", "Returns literal int for literal string");
+static META: ProviderMeta = ProviderMeta::new(
+    "php::string::strlen",
+    "strlen",
+    "Returns a non-negative integer, or a literal length for literal strings",
+);
 
 #[derive(Default)]
 pub struct StrlenProvider;
@@ -34,8 +38,9 @@ impl FunctionReturnTypeProvider for StrlenProvider {
     ) -> Option<TUnion> {
         let string_argument = invocation.get_argument(0, &[b"string"])?;
         let string_argument_type = context.get_expression_type(string_argument)?;
-        let string_literal = string_argument_type.get_single_literal_string_value()?;
-
-        Some(get_literal_int(string_literal.len() as i64))
+        match string_argument_type.get_single_literal_string_value() {
+            Some(string_literal) => Some(get_literal_int(string_literal.len() as i64)),
+            None => Some(get_non_negative_int()),
+        }
     }
 }

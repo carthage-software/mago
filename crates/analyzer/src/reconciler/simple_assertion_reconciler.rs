@@ -271,7 +271,11 @@ where
     }
 
     match assertion {
-        Assertion::Any => Some(existing_var_type.clone()),
+        Assertion::Any
+        | Assertion::IsLessThanVariable(_)
+        | Assertion::IsLessThanOrEqualVariable(_)
+        | Assertion::IsGreaterThanVariable(_)
+        | Assertion::IsGreaterThanOrEqualVariable(_) => Some(existing_var_type.clone()),
         Assertion::Truthy | Assertion::NonEmpty => {
             Some(reconcile_truthy_or_non_empty(context, assertion, existing_var_type, key, negated, span))
         }
@@ -317,13 +321,14 @@ where
         Assertion::HasAtLeastCount(count) => {
             Some(reconcile_at_least_countable(context, assertion, existing_var_type, key, negated, span, false, *count))
         }
-        Assertion::IsLessThan(less_than) => {
+        Assertion::IsLessThan(less_than) | Assertion::IsLessThanFromBound(less_than) => {
             Some(reconcile_less_than(context, assertion, existing_var_type, key, negated, span, *less_than))
         }
-        Assertion::IsGreaterThan(greater_than) => {
+        Assertion::IsGreaterThan(greater_than) | Assertion::IsGreaterThanFromBound(greater_than) => {
             Some(reconcile_greater_than(context, assertion, existing_var_type, key, negated, span, *greater_than))
         }
-        Assertion::IsLessThanOrEqual(less_than_or_equal) => Some(reconcile_less_than_or_equal(
+        Assertion::IsLessThanOrEqual(less_than_or_equal)
+        | Assertion::IsLessThanOrEqualFromBound(less_than_or_equal) => Some(reconcile_less_than_or_equal(
             context,
             assertion,
             existing_var_type,
@@ -332,7 +337,8 @@ where
             span,
             *less_than_or_equal,
         )),
-        Assertion::IsGreaterThanOrEqual(greater_than_or_equal) => Some(reconcile_greater_than_or_equal(
+        Assertion::IsGreaterThanOrEqual(greater_than_or_equal)
+        | Assertion::IsGreaterThanOrEqualFromBound(greater_than_or_equal) => Some(reconcile_greater_than_or_equal(
             context,
             assertion,
             existing_var_type,

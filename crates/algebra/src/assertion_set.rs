@@ -87,6 +87,7 @@ pub fn negate_assertion_set(assertion_set: AssertionSet) -> AssertionSet {
     //    `(A OR B) AND C` becomes `(¬A AND ¬B) OR (¬C)`.
     let dnf: AssertionSet = assertion_set
         .into_iter()
+        .filter(|or_clause| or_clause.iter().all(Assertion::is_negatable))
         .map(|or_clause| or_clause.into_iter().map(|a| a.get_negation()).collect::<Vec<_>>())
         .filter(|and_clause| !and_clause.is_empty())
         .collect();

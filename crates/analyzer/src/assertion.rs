@@ -1250,7 +1250,7 @@ where
         return vec![];
     }
 
-    let mut if_types = WordMap::default();
+    let mut if_types: WordMap<AssertionSet> = WordMap::default();
 
     let left_id = get_expression_id(
         left,
@@ -1266,11 +1266,20 @@ where
         Some(assertion_context.codebase),
     );
 
+    if let (Some(left_var_id), Some(right_var_id)) = (left_id, right_id) {
+        let relation = if matches!(operator, BinaryOperator::LessThanOrEqual(_)) {
+            Assertion::IsLessThanOrEqualVariable(right_var_id)
+        } else {
+            Assertion::IsLessThanVariable(right_var_id)
+        };
+
+        if_types.entry(left_var_id).or_default().push(vec![relation]);
+    }
+
     // Generate assertions for the left variable based on the right variable's type.
     // For an expression `$a < $b`, this asserts `$a` is less than the upper bound of `$b`.
-    // Range bounds are only used when the right operand is a trackable variable;
-    // for non-variable expressions (e.g. function calls), using a bound produces
-    // incorrect narrowing when the assertion is negated for the else branch.
+    // A non-literal bound is only a one-way implication: the assertion narrows
+    // the true branch but must not narrow the negated branch.
     if let (Some(left_var_id), Some(right_int)) = (left_id, &right_integer) {
         let use_range_bounds = right_id.is_some();
 
@@ -1278,10 +1287,10 @@ where
             match *right_int {
                 TInteger::Literal(count) => Some((Assertion::IsLessThanOrEqual(count), count)),
                 TInteger::To(upper_bound) if use_range_bounds => {
-                    Some((Assertion::IsLessThanOrEqual(upper_bound), upper_bound))
+                    Some((Assertion::IsLessThanOrEqualFromBound(upper_bound), upper_bound))
                 }
                 TInteger::Range(_, upper_bound) if use_range_bounds => {
-                    Some((Assertion::IsLessThanOrEqual(upper_bound), upper_bound))
+                    Some((Assertion::IsLessThanOrEqualFromBound(upper_bound), upper_bound))
                 }
                 _ => None,
             }
@@ -1289,10 +1298,10 @@ where
             match *right_int {
                 TInteger::Literal(count) => Some((Assertion::IsLessThan(count), count)),
                 TInteger::To(upper_bound) if use_range_bounds => {
-                    Some((Assertion::IsLessThan(upper_bound), upper_bound))
+                    Some((Assertion::IsLessThanFromBound(upper_bound), upper_bound))
                 }
                 TInteger::Range(_, upper_bound) if use_range_bounds => {
-                    Some((Assertion::IsLessThan(upper_bound), upper_bound))
+                    Some((Assertion::IsLessThanFromBound(upper_bound), upper_bound))
                 }
                 _ => None,
             }
@@ -1312,7 +1321,7 @@ where
             }
 
             if !is_redundant {
-                if_types.insert(left_var_id, vec![vec![assertion]]);
+                if_types.entry(left_var_id).or_default().push(vec![assertion]);
             }
         }
     }
@@ -1442,13 +1451,35 @@ where
         return vec![];
     }
 
-    let mut if_types = WordMap::default();
+    let mut if_types: WordMap<AssertionSet> = WordMap::default();
+
+    let left_id = get_expression_id(
+        left,
+        assertion_context.this_class_name,
+        assertion_context.resolved_names,
+        Some(assertion_context.codebase),
+    );
+    let right_id = get_expression_id(
+        right,
+        assertion_context.this_class_name,
+        assertion_context.resolved_names,
+        Some(assertion_context.codebase),
+    );
+
+    if let (Some(left_var_id), Some(right_var_id)) = (left_id, right_id) {
+        let relation = if matches!(operator, BinaryOperator::GreaterThanOrEqual(_)) {
+            Assertion::IsGreaterThanOrEqualVariable(right_var_id)
+        } else {
+            Assertion::IsGreaterThanVariable(right_var_id)
+        };
+
+        if_types.entry(left_var_id).or_default().push(vec![relation]);
+    }
 
     // Generate assertions for the left variable based on the right variable's type.
     // For an expression `$a > $b`, this asserts `$a` is greater than the lower bound of `$b`.
-    // Range bounds are only used when the right operand is a trackable variable;
-    // for non-variable expressions (e.g. function calls), using a bound produces
-    // incorrect narrowing when the assertion is negated for the else branch.
+    // A non-literal bound is only a one-way implication: the assertion narrows
+    // the true branch but must not narrow the negated branch.
     if let Some(right_int) = &right_integer
         && let Some(left_var_id) = get_expression_id(
             left,
@@ -1469,10 +1500,10 @@ where
             match *right_int {
                 TInteger::Literal(count) => Some((Assertion::IsGreaterThanOrEqual(count), count)),
                 TInteger::From(lower_bound) if use_range_bounds => {
-                    Some((Assertion::IsGreaterThanOrEqual(lower_bound), lower_bound))
+                    Some((Assertion::IsGreaterThanOrEqualFromBound(lower_bound), lower_bound))
                 }
                 TInteger::Range(lower_bound, _) if use_range_bounds => {
-                    Some((Assertion::IsGreaterThanOrEqual(lower_bound), lower_bound))
+                    Some((Assertion::IsGreaterThanOrEqualFromBound(lower_bound), lower_bound))
                 }
                 _ => None,
             }
@@ -1480,10 +1511,10 @@ where
             match *right_int {
                 TInteger::Literal(count) => Some((Assertion::IsGreaterThan(count), count)),
                 TInteger::From(lower_bound) if use_range_bounds => {
-                    Some((Assertion::IsGreaterThan(lower_bound), lower_bound))
+                    Some((Assertion::IsGreaterThanFromBound(lower_bound), lower_bound))
                 }
                 TInteger::Range(lower_bound, _) if use_range_bounds => {
-                    Some((Assertion::IsGreaterThan(lower_bound), lower_bound))
+                    Some((Assertion::IsGreaterThanFromBound(lower_bound), lower_bound))
                 }
                 _ => None,
             }
@@ -1503,13 +1534,15 @@ where
             }
 
             if !is_redundant {
-                if_types.insert(left_var_id, vec![vec![assertion]]);
+                if_types.entry(left_var_id).or_default().push(vec![assertion]);
             }
         }
     }
 
     // Generate assertions for the right variable based on the left variable's type.
     // For an expression `$a > $b`, this asserts `$b` is less than the upper bound of `$a`.
+    // As above, range-derived facts must not be treated as the negation of the
+    // full comparison in the false branch.
     if let Some(left_int) = &left_integer
         && let Some(right_var_id) = get_expression_id(
             right,
@@ -1530,10 +1563,10 @@ where
             match *left_int {
                 TInteger::Literal(count) => Some((Assertion::IsLessThanOrEqual(count), count)),
                 TInteger::To(upper_bound) if use_range_bounds => {
-                    Some((Assertion::IsLessThanOrEqual(upper_bound), upper_bound))
+                    Some((Assertion::IsLessThanOrEqualFromBound(upper_bound), upper_bound))
                 }
                 TInteger::Range(_, upper_bound) if use_range_bounds => {
-                    Some((Assertion::IsLessThanOrEqual(upper_bound), upper_bound))
+                    Some((Assertion::IsLessThanOrEqualFromBound(upper_bound), upper_bound))
                 }
                 _ => None,
             }
@@ -1541,10 +1574,10 @@ where
             match *left_int {
                 TInteger::Literal(count) => Some((Assertion::IsLessThan(count), count)),
                 TInteger::To(upper_bound) if use_range_bounds => {
-                    Some((Assertion::IsLessThan(upper_bound), upper_bound))
+                    Some((Assertion::IsLessThanFromBound(upper_bound), upper_bound))
                 }
                 TInteger::Range(_, upper_bound) if use_range_bounds => {
-                    Some((Assertion::IsLessThan(upper_bound), upper_bound))
+                    Some((Assertion::IsLessThanFromBound(upper_bound), upper_bound))
                 }
                 _ => None,
             }

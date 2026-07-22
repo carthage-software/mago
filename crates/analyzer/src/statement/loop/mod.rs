@@ -1101,6 +1101,18 @@ fn can_condition_be_initially_false(pre_condition: &Expression<'_>, artifacts: &
         return artifacts.get_expression_type(pre_condition).is_none_or(|ct| !ct.is_always_truthy());
     };
 
+    match binary.operator {
+        BinaryOperator::And(_) | BinaryOperator::LowAnd(_) => {
+            return can_condition_be_initially_false(binary.lhs, artifacts)
+                || can_condition_be_initially_false(binary.rhs, artifacts);
+        }
+        BinaryOperator::Or(_) | BinaryOperator::LowOr(_) => {
+            return can_condition_be_initially_false(binary.lhs, artifacts)
+                && can_condition_be_initially_false(binary.rhs, artifacts);
+        }
+        _ => {}
+    }
+
     let Some(left_type) = artifacts.get_expression_type(binary.lhs) else {
         return false;
     };

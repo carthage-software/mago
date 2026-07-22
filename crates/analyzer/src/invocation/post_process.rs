@@ -16,6 +16,8 @@ use mago_codex::assertion::Assertion;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::atomic::array::TArray;
+use mago_codex::ttype::atomic::resource::TResource;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::bool::TBool;
 use mago_codex::ttype::comparator::ComparisonResult;
@@ -484,6 +486,47 @@ fn clear_object_property_narrowings<'ctx, 'arena, A>(
     // except for readonly ones, readonly properties can never be reassigned by
     // any concurrently running fiber either.
     let suspends_fiber = metadata.is_some_and(|m| m.flags.suspends_fiber());
+    if suspends_fiber {
+        let resource_ids: WordSet = block_context
+            .locals
+            .iter()
+            .filter_map(|(var_id, current_type)| {
+                current_type
+                    .types
+                    .iter()
+                    .any(|atomic| matches!(atomic, TAtomic::Resource(resource) if resource.is_open()))
+                    .then_some(*var_id)
+            })
+            .collect();
+
+        for resource_id in &resource_ids {
+            let Some(current_type) = block_context.locals.get(resource_id).cloned() else {
+                continue;
+            };
+
+            let mut widened = (*current_type).clone();
+            for atomic in widened.types.to_mut() {
+                if let TAtomic::Resource(resource) = atomic
+                    && resource.is_open()
+                {
+                    *resource = TResource::new(None);
+                }
+            }
+
+            block_context.locals.insert(*resource_id, Rc::new(widened));
+        }
+
+        if !resource_ids.is_empty() {
+            block_context.clauses.retain(|clause| {
+                clause.wedge || !clause.possibilities.keys().copied().any(|var_id| resource_ids.contains(&var_id))
+            });
+
+            block_context.reconciled_expression_clauses.retain(|clause| {
+                clause.wedge || !clause.possibilities.keys().copied().any(|var_id| resource_ids.contains(&var_id))
+            });
+        }
+    }
+
     if suspends_fiber && block_context.scope.get_class_like_name().is_some() {
         let keys_to_remove: Vec<_> = block_context
             .locals
@@ -859,21 +902,25 @@ where
 
                         if !any_possible
                             && let Some(asserted_type) = &asserted_type
-                            && can_expression_types_be_identical(
+                            && (can_expression_types_be_identical(
                                 context.codebase,
                                 asserted_type,
                                 &resolved_assertion_type,
                                 false,
                                 false,
-                            )
+                            ) || generic_keyed_array_can_be_list(asserted_type, &resolved_assertion_type))
                         {
                             any_possible = true;
                         }
+
+                        let assertion_loses_template_precision =
+                            derived_assertion_loses_template_precision(assertion_atomic);
 
                         if always_redundant
                             && let Some(asserted_type) = &asserted_type
                             && !asserted_type.is_mixed()
                             && !resolved_assertion_type.has_template()
+                            && !assertion_loses_template_precision
                         {
                             let mut comparison_result = ComparisonResult::default();
                             let is_subtype = is_contained_by(
@@ -1117,6 +1164,34 @@ where
     }
 
     type_assertions
+}
+
+fn generic_keyed_array_can_be_list(asserted_type: &TUnion, assertion_type: &TUnion) -> bool {
+    if !assertion_type.types.iter().any(|atomic| matches!(atomic, TAtomic::Array(TArray::List(_)))) {
+        return false;
+    }
+
+    asserted_type.types.iter().any(|atomic| {
+        let TAtomic::Array(TArray::Keyed(keyed)) = atomic else {
+            return false;
+        };
+
+        let Some((key_type, _)) = keyed.parameters.as_ref() else {
+            return false;
+        };
+
+        key_type.types.iter().any(|key_atomic| {
+            matches!(key_atomic, TAtomic::GenericParameter(parameter) if parameter.constraint.is_array_key())
+        })
+    })
+}
+
+fn derived_assertion_loses_template_precision(assertion: &TAtomic) -> bool {
+    let TAtomic::Derived(derived) = assertion else {
+        return false;
+    };
+
+    derived.get_target_type().is_some_and(TUnion::has_template_types)
 }
 
 /// Resolves an argument or a special assertion target from an invocation.

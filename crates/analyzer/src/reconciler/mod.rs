@@ -127,6 +127,7 @@ pub fn reconcile_keyed_types<'ctx, A>(
         let mut has_truthy_or_falsy_or_empty = false;
         let mut has_count_check = false;
         let mut has_empty = false;
+        let mut has_relational_comparison = false;
         let is_real = old_new_types.get(key).is_some_and(|v| v.eq(new_type_parts));
         let mut is_equality = is_real;
 
@@ -148,6 +149,14 @@ pub fn reconcile_keyed_types<'ctx, A>(
                 has_inverted_key_exists =
                     has_inverted_key_exists || matches!(assertion, Assertion::ArrayKeyDoesNotExist);
                 has_count_check = has_count_check || matches!(assertion, Assertion::NonEmptyCountable(_));
+                has_relational_comparison = has_relational_comparison
+                    || matches!(
+                        assertion,
+                        Assertion::IsLessThanVariable(_)
+                            | Assertion::IsLessThanOrEqualVariable(_)
+                            | Assertion::IsGreaterThanVariable(_)
+                            | Assertion::IsGreaterThanOrEqualVariable(_)
+                    );
             }
         }
 
@@ -319,7 +328,7 @@ pub fn reconcile_keyed_types<'ctx, A>(
                     block_context.locals.remove(&new_key);
                 }
             }
-        } else if !has_negation && !has_truthy_or_falsy_or_empty && !has_isset {
+        } else if !has_negation && !has_truthy_or_falsy_or_empty && !has_isset && !has_relational_comparison {
             changed_var_ids.insert(*key);
         } else {
             // type unchanged and the assertion is one that wouldn't mark the variable changed anyway

@@ -304,9 +304,16 @@ impl<'ctx> BlockContext<'ctx> {
                 continue;
             }
 
-            for key in c.possibilities.keys() {
+            for (key, assertions) in &c.possibilities {
                 for changed_var_id in changed_var_ids {
-                    if changed_var_id == key || var_has_root(*key, *changed_var_id) {
+                    if changed_var_id == key
+                        || var_has_root(*key, *changed_var_id)
+                        || assertions.values().any(|assertion| {
+                            assertion
+                                .referenced_variable()
+                                .is_some_and(|variable| var_has_root(variable, *changed_var_id))
+                        })
+                    {
                         rejected_clauses.push(Rc::clone(c));
                         continue 'outer;
                     }
@@ -329,8 +336,12 @@ impl<'ctx> BlockContext<'ctx> {
                 continue;
             }
 
-            for key in c.possibilities.keys() {
-                if changed_var_ids.contains(key) {
+            for (key, assertions) in &c.possibilities {
+                if changed_var_ids.contains(key)
+                    || assertions.values().any(|assertion| {
+                        assertion.referenced_variable().is_some_and(|variable| changed_var_ids.contains(&variable))
+                    })
+                {
                     rejected_clauses.push(c.clone());
                     continue 'outer;
                 }
@@ -355,8 +366,12 @@ impl<'ctx> BlockContext<'ctx> {
         let mut other_clauses = Vec::new();
 
         'outer: for clause in clauses {
-            for var_id in clause.possibilities.keys() {
-                if var_has_root(*var_id, remove_var_id) {
+            for (var_id, assertions) in &clause.possibilities {
+                if var_has_root(*var_id, remove_var_id)
+                    || assertions.values().any(|assertion| {
+                        assertion.referenced_variable().is_some_and(|variable| var_has_root(variable, remove_var_id))
+                    })
+                {
                     continue 'outer;
                 }
             }
