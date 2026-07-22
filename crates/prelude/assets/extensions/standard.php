@@ -3786,10 +3786,10 @@ function array_intersect_assoc(array $array, array ...$arrays): array {}
 
 /**
  * @template K as array-key
- * @template V
+ * @template V as scalar|Stringable|null|resource
  *
  * @param array<K, V> $array
- * @param array ...$arrays
+ * @param array<array-key, V> ...$arrays
  *
  * @return array<K, V>
  * @pure
