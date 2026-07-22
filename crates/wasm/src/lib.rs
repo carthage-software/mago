@@ -32,6 +32,7 @@ use mago_syntax::parser::parse_file;
 use mago_syntax::settings::ParserSettings;
 
 use crate::types::IssueSource;
+use crate::types::WasmAnalyzerSettings;
 use crate::types::WasmIntegrationInfo;
 use crate::types::WasmIssue;
 use crate::types::WasmPluginInfo;
@@ -83,6 +84,50 @@ fn issue_key(issue: &WasmIssue) -> Option<(String, u32, u32)> {
     let code = issue.code.as_ref()?;
     let ann = issue.annotations.first()?;
     Some((code.clone(), ann.start_line, ann.start_column))
+}
+
+fn build_analyzer_settings(settings: &WasmAnalyzerSettings, version: PHPVersion) -> AnalyzerSettings {
+    AnalyzerSettings {
+        version,
+        find_unused_expressions: settings.find_unused_expressions,
+        find_unused_definitions: settings.find_unused_definitions,
+        find_overly_wide_return_types: settings.find_overly_wide_return_types,
+        analyze_dead_code: settings.analyze_dead_code,
+        memoize_properties: settings.memoize_properties,
+        allow_possibly_undefined_array_keys: settings.allow_possibly_undefined_array_keys,
+        check_throws: settings.check_throws,
+        unchecked_exceptions: settings.unchecked_exceptions.iter().map(|e| mago_word::word(e.as_bytes())).collect(),
+        unchecked_exception_classes: settings
+            .unchecked_exception_classes
+            .iter()
+            .map(|e| mago_word::word(e.as_bytes()))
+            .collect(),
+        check_missing_override: settings.check_missing_override,
+        find_unused_parameters: settings.find_unused_parameters,
+        strict_list_index_checks: settings.strict_list_index_checks,
+        strict_array_index_existence: settings.strict_array_index_existence,
+        allow_array_truthy_operand: settings.allow_array_truthy_operand,
+        no_boolean_literal_comparison: settings.no_boolean_literal_comparison,
+        check_missing_type_hints: settings.check_missing_type_hints,
+        check_closure_missing_type_hints: settings.check_closure_missing_type_hints,
+        check_arrow_function_missing_type_hints: settings.check_arrow_function_missing_type_hints,
+        allow_implicit_pipe_callable_types: settings.allow_implicit_pipe_callable_types,
+        register_super_globals: settings.register_super_globals,
+        trust_existence_checks: settings.trust_existence_checks,
+        class_initializers: settings
+            .class_initializers
+            .iter()
+            .filter_map(|setting| mago_analyzer::settings::ClassInitializer::parse(setting))
+            .collect(),
+        check_property_initialization: settings.check_property_initialization,
+        check_use_statements: settings.check_use_statements,
+        check_experimental: settings.check_experimental,
+        check_name_casing: settings.check_name_casing,
+        enforce_class_finality: settings.enforce_class_finality,
+        require_api_or_internal: settings.require_api_or_internal,
+        allow_side_effects_in_conditions: settings.allow_side_effects_in_conditions,
+        ..Default::default()
+    }
 }
 
 /// Runs both the linter and analyzer over `code` using the supplied settings and
@@ -147,44 +192,7 @@ pub fn run(code: String, settings_js: JsValue) -> Result<JsValue, JsValue> {
     prelude.database.add(file);
 
     let s = &settings.analyzer;
-    let analyzer_settings = AnalyzerSettings {
-        version,
-        find_unused_expressions: s.find_unused_expressions,
-        find_unused_definitions: s.find_unused_definitions,
-        analyze_dead_code: s.analyze_dead_code,
-        memoize_properties: s.memoize_properties,
-        allow_possibly_undefined_array_keys: s.allow_possibly_undefined_array_keys,
-        check_throws: s.check_throws,
-        unchecked_exceptions: s.unchecked_exceptions.iter().map(|e| mago_word::word(e.as_bytes())).collect(),
-        unchecked_exception_classes: s
-            .unchecked_exception_classes
-            .iter()
-            .map(|e| mago_word::word(e.as_bytes()))
-            .collect(),
-        check_missing_override: s.check_missing_override,
-        find_unused_parameters: s.find_unused_parameters,
-        strict_list_index_checks: s.strict_list_index_checks,
-        strict_array_index_existence: s.strict_array_index_existence,
-        allow_array_truthy_operand: s.allow_array_truthy_operand,
-        no_boolean_literal_comparison: s.no_boolean_literal_comparison,
-        check_missing_type_hints: s.check_missing_type_hints,
-        check_closure_missing_type_hints: s.check_closure_missing_type_hints,
-        check_arrow_function_missing_type_hints: s.check_arrow_function_missing_type_hints,
-        register_super_globals: s.register_super_globals,
-        trust_existence_checks: s.trust_existence_checks,
-        class_initializers: s
-            .class_initializers
-            .iter()
-            .filter_map(|s| mago_analyzer::settings::ClassInitializer::parse(s))
-            .collect(),
-        check_property_initialization: s.check_property_initialization,
-        check_use_statements: s.check_use_statements,
-        check_experimental: s.check_experimental,
-        check_name_casing: s.check_name_casing,
-        enforce_class_finality: s.enforce_class_finality,
-        require_api_or_internal: s.require_api_or_internal,
-        ..Default::default()
-    };
+    let analyzer_settings = build_analyzer_settings(s, version);
 
     let plugin_registry = Arc::new(create_registry_with_plugins(&s.plugins, s.disable_default_plugins));
     let analysis_service = AnalysisService::new(
@@ -485,5 +493,32 @@ fn integration_id(integration: Integration) -> &'static str {
         Integration::Behat => "behat",
         Integration::Codeception => "codeception",
         Integration::PHPSpec => "phpspec",
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn playground_analyzer_settings_are_deserialized_and_forwarded() {
+        let parsed_settings = serde_json::from_str(
+            r#"{
+                "analyzer": {
+                    "findOverlyWideReturnTypes": true,
+                    "allowImplicitPipeCallableTypes": true,
+                    "allowSideEffectsInConditions": false
+                }
+            }"#,
+        );
+        let settings: WasmSettings = match parsed_settings {
+            Ok(settings) => settings,
+            Err(error) => panic!("failed to parse playground settings: {error}"),
+        };
+        let analyzer_settings = build_analyzer_settings(&settings.analyzer, PHPVersion::PHP85);
+
+        assert!(analyzer_settings.find_overly_wide_return_types);
+        assert!(analyzer_settings.allow_implicit_pipe_callable_types);
+        assert!(!analyzer_settings.allow_side_effects_in_conditions);
     }
 }

@@ -147,6 +147,7 @@ pub struct WasmPluginInfo {
 pub struct WasmAnalyzerSettings {
     pub find_unused_expressions: bool,
     pub find_unused_definitions: bool,
+    pub find_overly_wide_return_types: bool,
     pub analyze_dead_code: bool,
     pub memoize_properties: bool,
     pub allow_possibly_undefined_array_keys: bool,
@@ -163,6 +164,7 @@ pub struct WasmAnalyzerSettings {
     pub check_missing_type_hints: bool,
     pub check_closure_missing_type_hints: bool,
     pub check_arrow_function_missing_type_hints: bool,
+    pub allow_implicit_pipe_callable_types: bool,
     pub register_super_globals: bool,
     pub trust_existence_checks: bool,
     pub class_initializers: Vec<String>,
@@ -171,6 +173,7 @@ pub struct WasmAnalyzerSettings {
     pub check_experimental: bool,
     pub check_name_casing: bool,
     pub require_api_or_internal: bool,
+    pub allow_side_effects_in_conditions: bool,
     /// Disable all default plugins (including stdlib).
     pub disable_default_plugins: bool,
     /// List of plugins to enable (by name or alias).
@@ -182,6 +185,7 @@ impl Default for WasmAnalyzerSettings {
         Self {
             find_unused_expressions: true,
             find_unused_definitions: true,
+            find_overly_wide_return_types: false,
             analyze_dead_code: false,
             memoize_properties: false,
             allow_possibly_undefined_array_keys: false,
@@ -198,6 +202,7 @@ impl Default for WasmAnalyzerSettings {
             check_missing_type_hints: false,
             check_closure_missing_type_hints: false,
             check_arrow_function_missing_type_hints: false,
+            allow_implicit_pipe_callable_types: false,
             register_super_globals: true,
             trust_existence_checks: true,
             class_initializers: Vec::new(),
@@ -206,6 +211,7 @@ impl Default for WasmAnalyzerSettings {
             check_experimental: false,
             check_name_casing: false,
             require_api_or_internal: false,
+            allow_side_effects_in_conditions: true,
             disable_default_plugins: false,
             plugins: Vec::new(),
         }

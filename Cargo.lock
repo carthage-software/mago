@@ -1902,6 +1902,7 @@ dependencies = [
  "mago-word",
  "serde",
  "serde-wasm-bindgen",
+ "serde_json",
  "wasm-bindgen",
 ]
 
