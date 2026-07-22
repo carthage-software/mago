@@ -69,7 +69,36 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
 
         let was_inside_try = block_context.flags.inside_try();
         block_context.flags.set_inside_try(true);
-        analyze_statements(self.block.statements.as_slice(), context, block_context, artifacts)?;
+        let mut exception_entry_locals: WordMap<Vec<WordSet>> = WordMap::default();
+        if self.catch_clauses.is_empty() || !context.settings.check_throws {
+            analyze_statements(self.block.statements.as_slice(), context, block_context, artifacts)?;
+        } else {
+            for statement in &self.block.statements {
+                let definitely_defined_locals = block_context
+                    .assigned_variable_ids
+                    .keys()
+                    .filter_map(|variable_id| {
+                        block_context.locals.get(variable_id).and_then(|variable_type| {
+                            (!variable_type.possibly_undefined() && !variable_type.possibly_undefined_from_try())
+                                .then_some(*variable_id)
+                        })
+                    })
+                    .collect::<WordSet>();
+                let thrown_exception_counts = block_context
+                    .possibly_thrown_exceptions
+                    .iter()
+                    .map(|(exception, spans)| (*exception, spans.len()))
+                    .collect::<WordMap<_>>();
+
+                analyze_statements(std::slice::from_ref(statement), context, block_context, artifacts)?;
+
+                for (exception, spans) in &block_context.possibly_thrown_exceptions {
+                    if spans.len() > thrown_exception_counts.get(exception).copied().unwrap_or_default() {
+                        exception_entry_locals.entry(*exception).or_default().push(definitely_defined_locals.clone());
+                    }
+                }
+            }
+        }
         block_context.flags.set_inside_try(was_inside_try);
         if !self.catch_clauses.is_empty() {
             block_context.flags.set_has_returned(false);
@@ -165,6 +194,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
         for (i, catch_clause) in self.catch_clauses.iter().enumerate() {
             let mut catch_block_context = original_block_context.clone();
             catch_block_context.flags.set_has_returned(false);
+            let caught_classes = get_caught_classes(context, &catch_clause.hint);
+
             for (variable_id, variable_type) in &mut catch_block_context.locals {
                 if let Some(old_type) = old_block_context_locals.get(variable_id) {
                     *variable_type = Rc::new(ttype::combine_union_types(
@@ -180,8 +211,6 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                     *variable_type = Rc::new(possibly_undefined_type);
                 }
             }
-
-            let caught_classes = get_caught_classes(context, &catch_clause.hint);
 
             for caught in &caught_classes {
                 if context.codebase.is_instance_of(caught.as_bytes(), b"Error") {
@@ -202,6 +231,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
             }
 
             let possibly_thrown_exceptions = std::mem::take(&mut catch_block_context.possibly_thrown_exceptions);
+            let mut caught_exception_types = WordSet::default();
+            let mut definitely_defined_locals: Option<WordSet> = None;
             for caught_class in &caught_classes {
                 for possibly_thrown_exception in possibly_thrown_exceptions.keys() {
                     if possibly_thrown_exception.as_bytes().eq_ignore_ascii_case(caught_class.as_bytes())
@@ -209,10 +240,34 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                             .codebase
                             .is_instance_of(possibly_thrown_exception.as_bytes(), caught_class.as_bytes())
                     {
+                        if caught_exception_types.insert(*possibly_thrown_exception)
+                            && let Some(entry_locals) = exception_entry_locals.get(possibly_thrown_exception)
+                        {
+                            for entry_locals in entry_locals {
+                                intersect_definitely_defined_locals(&mut definitely_defined_locals, entry_locals);
+                            }
+                        }
+
                         original_block_context.possibly_thrown_exceptions.remove(possibly_thrown_exception);
                         block_context.possibly_thrown_exceptions.remove(possibly_thrown_exception);
                         catch_block_context.possibly_thrown_exceptions.remove(possibly_thrown_exception);
                     }
+                }
+            }
+
+            if let Some(definitely_defined_locals) = definitely_defined_locals {
+                for variable_id in definitely_defined_locals {
+                    let Some(variable_type) = catch_block_context.locals.get_mut(&variable_id) else {
+                        continue;
+                    };
+
+                    if !variable_type.possibly_undefined() && !variable_type.possibly_undefined_from_try() {
+                        continue;
+                    }
+
+                    let mut defined_variable_type = (**variable_type).clone();
+                    defined_variable_type.set_possibly_undefined(false, Some(false));
+                    *variable_type = Rc::new(defined_variable_type);
                 }
             }
 
@@ -400,6 +455,18 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
         });
 
         Ok(())
+    }
+}
+
+/// Intersects definitely defined locals from paths that can enter the same catch clause.
+fn intersect_definitely_defined_locals(definitely_defined_locals: &mut Option<WordSet>, entry_locals: &WordSet) {
+    match definitely_defined_locals {
+        Some(definitely_defined_locals) => {
+            definitely_defined_locals.retain(|variable_id| entry_locals.contains(variable_id));
+        }
+        None => {
+            *definitely_defined_locals = Some(entry_locals.clone());
+        }
     }
 }
 
