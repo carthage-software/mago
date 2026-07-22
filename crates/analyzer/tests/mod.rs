@@ -93,6 +93,7 @@ test_case!(arrays_array_intersect);
 test_case!(arrays_array_keys);
 test_case!(arrays_array_map_keyed);
 test_case!(arrays_array_map_list);
+test_case!(arrays_array_map_optional_keys_untyped_closure);
 test_case!(arrays_array_map_multi);
 test_case!(arrays_array_merge_two_lists);
 test_case!(arrays_max_on_possibly_empty);
