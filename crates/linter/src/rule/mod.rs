@@ -245,6 +245,7 @@ define_rules! {
     PreferAnonymousMigration(prefer_anonymous_migration @ PreferAnonymousMigrationRule),
     PreferArrayValidationRules(prefer_array_validation_rules @ PreferArrayValidationRulesRule),
     PreferCastsMethod(prefer_casts_method @ PreferCastsMethodRule),
+    PreferTimestampFactory(prefer_datetimeimmutable_create_from_timestamp @ PreferTimestampFactoryRule),
     PreferDedicatedStatusAssertion(prefer_dedicated_status_assertion @ PreferDedicatedStatusAssertionRule),
     PreferFakeHelper(prefer_fake_helper @ PreferFakeHelperRule),
     PreferFirstClassCallable(prefer_first_class_callable @ PreferFirstClassCallableRule),

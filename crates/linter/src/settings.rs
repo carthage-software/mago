@@ -149,6 +149,7 @@ use crate::rule::PreferPreIncrementConfig;
 use crate::rule::PreferSelfReturnTypeConfig;
 use crate::rule::PreferStaticClosureConfig;
 use crate::rule::PreferTestAttributeConfig;
+use crate::rule::PreferTimestampFactoryConfig;
 use crate::rule::PreferViewArrayConfig;
 use crate::rule::PreferWhileLoopConfig;
 use crate::rule::PreparedSqlConfig;
@@ -266,6 +267,7 @@ pub struct RulesSettings {
     pub prefer_anonymous_migration: RuleSettings<PreferAnonymousMigrationConfig>,
     pub prefer_array_validation_rules: RuleSettings<PreferArrayValidationRulesConfig>,
     pub prefer_casts_method: RuleSettings<PreferCastsMethodConfig>,
+    pub prefer_datetimeimmutable_create_from_timestamp: RuleSettings<PreferTimestampFactoryConfig>,
     pub prefer_dedicated_status_assertion: RuleSettings<PreferDedicatedStatusAssertionConfig>,
     pub prefer_array_spread: RuleSettings<PreferArraySpreadConfig>,
     pub prefer_explode_over_preg_split: RuleSettings<PreferExplodeOverPregSplitConfig>,
