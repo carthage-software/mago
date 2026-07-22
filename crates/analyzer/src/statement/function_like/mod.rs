@@ -45,6 +45,8 @@ use mago_span::Span;
 use mago_syntax::cst::Expression;
 use mago_syntax::cst::FunctionLikeParameterList;
 use mago_syntax::cst::Statement;
+use mago_text_edit::Safety;
+use mago_text_edit::TextEdit;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -833,16 +835,6 @@ fn check_return_type_width<'ctx, A>(
         return;
     };
 
-    let declared = &return_type_metadata.type_union;
-    if declared.is_mixed()
-        || declared.is_void()
-        || declared.is_never()
-        || declared.has_template_types()
-        || declared.is_generic_parameter()
-    {
-        return;
-    }
-
     let is_overriding_method = function_like_metadata.kind.is_method()
         && block_context.scope.get_class_like_name().is_some_and(|class_name| {
             context.codebase.method_is_overriding(class_name.as_bytes(), function_like_metadata.name.as_bytes())
@@ -861,6 +853,45 @@ fn check_return_type_width<'ctx, A>(
     });
 
     if any_return_is_uninformative {
+        return;
+    }
+
+    check_return_type_metadata_width(context, block_context, artifacts, function_like_metadata, return_type_metadata);
+
+    // The effective (docblock) type and the native hint are separate declarations
+    // with separate source spans, so each overly-wide one needs its own fix. When
+    // a docblock overrides the return type, check the native hint too; without an
+    // override `return_type_metadata` already *is* the native declaration, so this
+    // would just be a duplicate check.
+    if return_type_metadata.from_docblock
+        && let Some(native_return_type_metadata) = function_like_metadata.return_type_declaration_metadata.as_ref()
+    {
+        check_return_type_metadata_width(
+            context,
+            block_context,
+            artifacts,
+            function_like_metadata,
+            native_return_type_metadata,
+        );
+    }
+}
+
+fn check_return_type_metadata_width<'ctx, A>(
+    context: &mut Context<'ctx, '_, A>,
+    block_context: &BlockContext<'ctx>,
+    artifacts: &mut AnalysisArtifacts,
+    function_like_metadata: &'ctx FunctionLikeMetadata,
+    return_type_metadata: &TypeMetadata,
+) where
+    A: Arena,
+{
+    let declared = &return_type_metadata.type_union;
+    if declared.is_mixed()
+        || declared.is_void()
+        || declared.is_never()
+        || declared.has_template_types()
+        || declared.is_generic_parameter()
+    {
         return;
     }
 
@@ -905,24 +936,24 @@ fn check_return_type_width<'ctx, A>(
         return;
     }
 
-    let has_unused = expanded_declared.types.iter().any(|declared_atomic| !any_inferred_matches(declared_atomic));
-    if !has_unused {
-        return;
-    }
-
-    let unused_list = expanded_declared
+    let unused_atomics = expanded_declared
         .types
         .iter()
         .filter(|declared_atomic| !any_inferred_matches(declared_atomic))
-        .map(|a| a.get_id().to_string())
-        .collect::<Vec<_>>()
-        .join("`, `");
+        .collect::<Vec<_>>();
+    if unused_atomics.is_empty() {
+        return;
+    }
+
+    let unused_list = unused_atomics.iter().map(|a| a.get_id().to_string()).collect::<Vec<_>>().join("`, `");
 
     let declared_str = expanded_declared.get_id();
     let return_span = return_type_metadata.span;
     let function_label = function_like_metadata.name;
 
-    let issue = Issue::help(format!(
+    let narrowed_type_text = get_narrowed_return_type_text(context, return_span, &unused_atomics);
+
+    let mut issue = Issue::help(format!(
         "Declared return type `{declared_str}` for `{function_label}` has unused branches: `{unused_list}`."
     ))
     .with_annotation(
@@ -935,10 +966,126 @@ fn check_return_type_width<'ctx, A>(
     )
     .with_note("A return type wider than the body produces is misleading.")
     .with_note("Callers must handle branches the function never actually returns.")
-    .with_note("It can hide dead code paths meant to produce the missing variant.")
-    .with_help(format!("Remove `{unused_list}` from the return type, or add a branch that returns it."));
+    .with_note("It can hide dead code paths meant to produce the missing variant.");
 
-    context.collector.report_with_code(IssueCode::OverlyWideReturnType, issue);
+    issue = if let Some(narrowed_type_text) = &narrowed_type_text {
+        issue.with_help(format!("Remove `{unused_list}` from the return type, giving `{narrowed_type_text}`."))
+    } else {
+        issue.with_help(format!("Remove `{unused_list}` from the return type, or add a branch that returns it."))
+    };
+
+    context.collector.propose_with_code(IssueCode::OverlyWideReturnType, issue, |edits| {
+        if let Some(narrowed_type_text) = narrowed_type_text {
+            edits.push(
+                TextEdit::replace(return_span.to_range(), narrowed_type_text).with_safety(Safety::PotentiallyUnsafe),
+            );
+        }
+    });
+}
+
+/// Attempts to compute replacement source text for `return_span` with the given
+/// atomics removed from the union, by re-slicing the original declaration text
+/// rather than re-rendering the type from scratch.
+///
+/// This preserves the author's original formatting (spacing, generic parameters,
+/// docblock-only syntax, etc.) for the branches that remain, and only gives up
+/// (returning `None`) when a branch we need to remove can't be unambiguously
+/// located in the source text, e.g. because it's expressed differently than its
+/// canonical id (a type alias, a differently-cased keyword, ...).
+fn get_narrowed_return_type_text<A>(
+    context: &Context<'_, '_, A>,
+    return_span: Span,
+    unused_atomics: &[&TAtomic],
+) -> Option<String>
+where
+    A: Arena,
+{
+    let start = return_span.start_offset() as usize;
+    let end = return_span.end_offset() as usize;
+    let source_text = std::str::from_utf8(context.source_file.contents.get(start..end)?).ok()?;
+
+    let (mut leading_nullable, rest) = match source_text.strip_prefix('?') {
+        Some(rest) => (true, rest),
+        None => (false, source_text),
+    };
+
+    let mut segments = split_top_level_union_members(rest);
+
+    for atomic in unused_atomics {
+        if atomic.is_null() {
+            if leading_nullable {
+                leading_nullable = false;
+                continue;
+            }
+
+            let position = segments.iter().position(|segment| segment.trim().eq_ignore_ascii_case("null"))?;
+            segments.remove(position);
+        } else {
+            let atomic_id = atomic.get_id().to_string();
+            let position = segments.iter().position(|segment| segment_matches_atomic(segment.trim(), &atomic_id))?;
+            segments.remove(position);
+        }
+    }
+
+    if segments.is_empty() {
+        // Everything but the implicit `null` from the `?` prefix was removed, so
+        // the narrowed type is spelled `null` rather than a bare, invalid `?`.
+        // If nothing at all remains, give up.
+        return leading_nullable.then(|| "null".to_string());
+    }
+
+    let mut result = if leading_nullable { "?".to_string() } else { String::new() };
+    result.push_str(&segments.iter().map(|segment| segment.trim()).collect::<Vec<_>>().join("|"));
+
+    Some(result)
+}
+
+/// Whether a source-text `segment` denotes the same type as the canonical
+/// `atomic_id`.
+///
+/// A bare collection keyword like `array` carries no generic parameters in the
+/// source, whereas its canonical id always spells them out (bare `array` becomes
+/// `array<array-key, mixed>`; the same goes for `iterable`). A native return type
+/// hint can only ever be such a bare keyword, since native syntax has no generics
+/// at all. So an unparameterized segment matches on its base keyword alone, while
+/// anything the author did parameterize must still match verbatim (ignoring case).
+fn segment_matches_atomic(segment: &str, atomic_id: &str) -> bool {
+    if segment.eq_ignore_ascii_case(atomic_id) {
+        return true;
+    }
+
+    let is_bare = !segment.contains(['<', '{', '(']);
+    is_bare && segment.eq_ignore_ascii_case(base_keyword(atomic_id))
+}
+
+/// The leading type keyword of a canonical id, i.e. the part before any generic
+/// parameters, shape body, or callable signature (`array<array-key, mixed>` -> `array`).
+fn base_keyword(atomic_id: &str) -> &str {
+    match atomic_id.find(['<', '{', '(']) {
+        Some(index) => &atomic_id[..index],
+        None => atomic_id,
+    }
+}
+
+/// Splits a type hint's source text on top-level `|` characters, i.e. those not
+/// nested inside generic parameters, shapes, or callable signatures.
+fn split_top_level_union_members(text: &str) -> Vec<&str> {
+    let mut segments = Vec::new();
+    let mut depth: i32 = 0;
+    let mut start = 0;
+    for (i, ch) in text.char_indices() {
+        match ch {
+            '<' | '(' | '[' | '{' => depth += 1,
+            '>' | ')' | ']' | '}' => depth -= 1,
+            '|' if depth == 0 => {
+                segments.push(&text[start..i]);
+                start = i + 1;
+            }
+            _ => {}
+        }
+    }
+    segments.push(&text[start..]);
+    segments
 }
 
 fn check_thrown_types<'ctx, A>(
