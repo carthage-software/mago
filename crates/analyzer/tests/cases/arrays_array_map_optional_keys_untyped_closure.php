@@ -7,7 +7,7 @@ declare(strict_types=1);
  * a `list<string>` that would clash with the declared return type.
  *
  * @param array{foo?: string} $x
- * @return array<string, string>
+ * @return array{foo?: string}
  */
 function map_optional_shape(array $x): array
 {
