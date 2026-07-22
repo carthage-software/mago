@@ -79,19 +79,35 @@ impl FunctionReturnTypeProvider for ArrayMapProvider {
         }
 
         let array_arg = invocation.get_argument(1, &[b"array"])?;
-        let callback_metadata = context.get_callable_metadata(callback_arg)?;
-        let raw_return_type = &callback_metadata.return_type_metadata.as_ref()?.type_union;
+        let callback_metadata = context.get_callable_metadata(callback_arg);
+
+        // Fall back to the inferred return type when none is declared, e.g. for
+        // an untyped arrow function.
+        let declared_return_type =
+            callback_metadata.and_then(|metadata| metadata.return_type_metadata.as_ref()).map(|r| &r.type_union);
+        let inferred_return_type = if callback_type.is_single()
+            && let TAtomic::Callable(callable) = callback_type.get_single()
+        {
+            callable.get_signature().and_then(|signature| signature.get_return_type())
+        } else {
+            None
+        };
+        let raw_return_type = declared_return_type.or(inferred_return_type)?.clone();
 
         let array_type = context.get_expression_type(array_arg)?;
         let array = array_type.get_single_array()?;
 
         let codebase = context.codebase();
-        let first_parameter_name = callback_metadata.parameters.first().map(|parameter| parameter.name.0);
+        // Only a declared return type can reference the callback's parameter.
+        let first_parameter_name = declared_return_type
+            .and(callback_metadata)
+            .and_then(|metadata| metadata.parameters.first())
+            .map(|parameter| parameter.name.0);
 
         let resolve_for = |element: &TUnion| -> TUnion {
             match first_parameter_name {
                 Some(parameter_name) => {
-                    resolve_conditionals_in_return(codebase, raw_return_type, parameter_name, element)
+                    resolve_conditionals_in_return(codebase, &raw_return_type, parameter_name, element)
                 }
                 None => raw_return_type.clone(),
             }
