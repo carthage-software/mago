@@ -657,6 +657,46 @@ fn scan_function_like_docblock<A>(
         }
     }
 
+    for tag in document.tags() {
+        let TagValue::ParamClosureThis(param_closure_this) = &tag.value else {
+            continue;
+        };
+
+        let param_name = word(param_closure_this.parameter.value);
+
+        let Some(parameter_metadata) = metadata.get_parameter_mut(param_name) else {
+            metadata.issues.push(
+                Issue::error("@param-closure-this tag references an unknown parameter.")
+                    .with_code(ScanningIssueKind::InvalidParamClosureThisTag)
+                    .with_annotation(
+                        Annotation::primary(param_closure_this.span())
+                            .with_message(format!("Parameter `{}` does not exist", param_closure_this.parameter)),
+                    )
+                    .with_note("The `@param-closure-this` tag specifies the type of `$this` bound inside a closure passed as this parameter.")
+                    .with_help("Check for typos or ensure this parameter exists in the function signature."),
+            );
+
+            continue;
+        };
+
+        match get_type_metadata_from_type(param_closure_this.r#type, classname, &type_context, scope) {
+            Ok(closure_this_type) => {
+                parameter_metadata.closure_this_type = Some(closure_this_type);
+            }
+            Err(typing_error) => {
+                metadata.issues.push(
+                    Issue::error("Invalid `@param-closure-this` type string.")
+                        .with_code(ScanningIssueKind::InvalidParamClosureThisTag)
+                        .with_annotation(
+                            Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
+                        )
+                        .with_note(typing_error.note())
+                        .with_help(typing_error.help()),
+                );
+            }
+        }
+    }
+
     let return_tag = find_most_trusted_tag(&document, |tag| match &tag.value {
         TagValue::Return(return_tag) => Some(*return_tag),
         _ => None,

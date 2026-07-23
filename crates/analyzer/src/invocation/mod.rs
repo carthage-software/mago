@@ -371,6 +371,17 @@ impl<'ctx> InvocationTargetParameter<'ctx> {
         }
     }
 
+    /// Gets the `@param-closure-this` type (`TUnion`) of the parameter, if declared.
+    #[inline]
+    pub fn get_closure_this_type(&self) -> Option<&'ctx TUnion> {
+        match self {
+            InvocationTargetParameter::FunctionLike(metadata) => {
+                metadata.closure_this_type.as_ref().map(|type_metadata| &type_metadata.type_union)
+            }
+            _ => None,
+        }
+    }
+
     /// Gets the type (`TUnion`) of the parameter.
     #[inline]
     pub fn get_type(&self) -> Option<&'ctx TUnion> {

@@ -233,9 +233,8 @@ where
         parameter_types.insert(parameter_name.0, argument_type);
     }
 
-    let closure_bind_scope = detect_closure_bind_scope(context, invocation, &analyzed_argument_types);
+    let global_closure_bind_scope = detect_closure_bind_scope(context, invocation, &analyzed_argument_types);
     let previous_bind_scope = artifacts.closure_bind_scope.take();
-    artifacts.closure_bind_scope = closure_bind_scope;
 
     for (argument_offset, argument) in &closure_arguments {
         let Some(argument_expression) = argument.value() else {
@@ -298,6 +297,35 @@ where
         } else {
             None
         };
+
+        // A `@param-closure-this T` parameter binds `$this` to `T` inside the closure literal.
+        // It takes precedence over any global `Closure::bind` scope for this argument.
+        artifacts.closure_bind_scope = parameter
+            .and_then(|(_, p)| p.get_closure_this_type())
+            .and_then(|closure_this_type| {
+                // Resolve `self`/`static` and class-level context, then bind any method templates
+                // (e.g. a trait template `T` mapped to `self<...>` via `@use`).
+                let mut resolved = resolve_type_in_class_context(
+                    context,
+                    closure_this_type.clone(),
+                    base_class_metadata,
+                    calling_class_like_metadata,
+                    calling_instance_type,
+                    method_class_type,
+                );
+
+                if resolved.has_template_types() {
+                    resolved = inferred_type_replacer::replace_with_polarity(
+                        &resolved,
+                        template_result,
+                        context.codebase,
+                        mago_codex::ttype::template::variance::Variance::Invariant,
+                    );
+                }
+
+                closure_this_bind_scope(&resolved)
+            })
+            .or_else(|| global_closure_bind_scope.clone());
 
         analyze_and_store_argument_type(
             context,
@@ -1277,11 +1305,34 @@ where
 
     let parameter_type = invocation_target_parameter.get_type().cloned().unwrap_or_else(get_mixed);
 
-    if contains_parameter_variable(&parameter_type) {
-        return parameter_type;
+    resolve_type_in_class_context(
+        context,
+        parameter_type,
+        base_class_metadata,
+        calling_class_like_metadata,
+        calling_instance_type,
+        method_class_type,
+    )
+}
+
+/// Expands `self`/`static`/`parent` and class-level context in a type declared on a function-like,
+/// relative to the class the invocation is dispatched against.
+fn resolve_type_in_class_context<'ctx, A>(
+    context: &Context<'ctx, '_, A>,
+    ttype: TUnion,
+    base_class_metadata: Option<&'ctx ClassLikeMetadata>,
+    calling_class_like_metadata: Option<&'ctx ClassLikeMetadata>,
+    calling_instance_type: Option<&TAtomic>,
+    method_class_type: Option<&StaticClassType>,
+) -> TUnion
+where
+    A: Arena,
+{
+    if contains_parameter_variable(&ttype) {
+        return ttype;
     }
 
-    let mut resolved_parameter_type = parameter_type;
+    let mut resolved_parameter_type = ttype;
 
     let static_class_type = method_class_type
         .filter(|t| !matches!(t, StaticClassType::None))
@@ -1831,6 +1882,13 @@ where
     }
 
     None
+}
+
+/// Builds the bind scope for a `@param-closure-this` type: `$this` is bound (non-static) to the
+/// extracted class. Returns `None` when no concrete class can be extracted from the type.
+fn closure_this_bind_scope(closure_this_type: &TUnion) -> Option<ClosureBindScope> {
+    extract_class_name_from_type(closure_this_type)
+        .map(|class_name| ClosureBindScope { class_name: Some(class_name), has_this: true })
 }
 
 /// Extracts a class name from a type union (typically for $this type).
