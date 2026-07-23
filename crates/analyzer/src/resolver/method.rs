@@ -41,6 +41,7 @@ use crate::resolver::selector::resolve_member_selector;
 use crate::utils::names::display_class_like_name;
 use crate::utils::names::display_method_name;
 use crate::visibility::check_method_visibility;
+use crate::visibility::is_method_visible;
 
 #[derive(Debug)]
 pub struct ResolvedMethod {
@@ -138,6 +139,7 @@ where
     A: Arena,
 {
     let mut result = MethodResolutionResult::default();
+    let mut asserted_descendant_method_references = Vec::new();
 
     let was_inside_general_use = block_context.flags.inside_general_use();
     block_context.flags.set_inside_general_use(true);
@@ -232,6 +234,16 @@ where
                 );
 
                 if resolved_methods.is_empty() {
+                    collect_asserted_descendant_method_references(
+                        context,
+                        block_context,
+                        obj_type,
+                        method_name,
+                        &mut asserted_descendant_method_references,
+                    );
+                }
+
+                if resolved_methods.is_empty() {
                     if let Some(classname) = obj_type.get_name() {
                         let method_name_bytes: &[u8] = method_name.as_ref();
                         let has_method_assertion = type_has_method_assertion(obj_type, method_name_bytes);
@@ -307,6 +319,10 @@ where
         report_call_on_non_object(context, &TAtomic::Mixed(TMixed::new()), object.span(), selector.span());
     }
 
+    for method_id in asserted_descendant_method_references {
+        artifacts.symbol_references.add_reference_for_method_call(&block_context.scope, &method_id);
+    }
+
     // Compute whether all resolved methods have non-nullable return types.
     // This is used to determine if null in the result type came only from nullsafe short-circuit.
     result.all_methods_non_nullable_return = !result.resolved_methods.is_empty()
@@ -319,6 +335,39 @@ where
         });
 
     Ok(result)
+}
+
+/// Records references to child methods that can satisfy a `method_exists()` assertion.
+fn collect_asserted_descendant_method_references<'ctx, A>(
+    context: &Context<'ctx, '_, A>,
+    block_context: &BlockContext<'ctx>,
+    object_type: &TObject,
+    method_name: Word,
+    references: &mut Vec<MethodIdentifier>,
+) where
+    A: Arena,
+{
+    if !type_has_method_assertion(object_type, method_name.as_bytes()) {
+        return;
+    }
+
+    let Some(class_name) = object_type.get_name() else {
+        return;
+    };
+
+    for descendant in context.codebase.get_all_descendants(class_name.as_bytes()) {
+        if !context.codebase.method_exists(descendant.as_bytes(), method_name.as_bytes())
+            || !is_method_visible(context, block_context, descendant.as_bytes(), method_name.as_bytes())
+        {
+            continue;
+        }
+
+        let method_id =
+            context.codebase.get_declaring_method_identifier(&MethodIdentifier::new(descendant, method_name));
+        if !references.contains(&method_id) {
+            references.push(method_id);
+        }
+    }
 }
 
 pub fn resolve_method_from_object<'ctx, 'ast, 'arena, A>(

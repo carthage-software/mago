@@ -24,6 +24,8 @@ use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::template::TemplateResult;
 use mago_codex::ttype::template::inferred_type_replacer;
 use mago_codex::ttype::union::TUnion;
+use mago_codex::visibility::Visibility;
+use mago_php_version::feature::Feature;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -330,6 +332,7 @@ where
             let resolved_property = find_property_in_class(
                 context,
                 block_context,
+                artifacts,
                 classname,
                 *prop_name,
                 property_selector,
@@ -642,6 +645,7 @@ pub(crate) fn resolve_property_for_external_access<'ctx>(
 fn find_property_in_class<'ctx, 'ast, 'arena, A>(
     context: &mut Context<'ctx, 'arena, A>,
     block_context: &BlockContext<'ctx>,
+    artifacts: &mut AnalysisArtifacts,
     class_id: Word,
     prop_name: Word,
     selector: &'ast ClassLikeMemberSelector<'arena>,
@@ -778,13 +782,18 @@ where
         }
 
         let prop_name_without_dollar = word(trim_start_byte(prop_name.as_bytes(), b'$'));
-        let has_property_assertion = if let TObject::Named(named_object) = object {
-            type_has_property_assertion(named_object.get_intersection_types(), prop_name_without_dollar)
-        } else {
-            false
-        };
+        if let TObject::Named(named_object) = object
+            && type_has_property_assertion(named_object.get_intersection_types(), prop_name_without_dollar)
+        {
+            record_asserted_descendant_property_references(
+                context,
+                block_context,
+                artifacts,
+                named_object,
+                prop_name,
+                for_assignment,
+            );
 
-        if has_property_assertion {
             return Some(ResolvedProperty {
                 property_span: None,
                 property_name: prop_name,
@@ -909,6 +918,130 @@ where
         is_magic: resolution.is_magic(),
         read_type,
     })
+}
+
+/// Records references to child properties that can satisfy a `property_exists()` assertion.
+fn record_asserted_descendant_property_references<'ctx, A>(
+    context: &Context<'ctx, '_, A>,
+    block_context: &BlockContext<'ctx>,
+    artifacts: &mut AnalysisArtifacts,
+    object: &TNamedObject,
+    property_name: Word,
+    for_assignment: bool,
+) where
+    A: Arena,
+{
+    let property_name_without_dollar = word(trim_start_byte(property_name.as_bytes(), b'$'));
+    if !type_has_property_assertion(object.get_intersection_types(), property_name_without_dollar) {
+        return;
+    }
+
+    let mut declaring_classes = Vec::new();
+    for descendant in context.codebase.get_all_descendants(object.name.as_bytes()) {
+        let Some(declaring_class) =
+            context.codebase.get_declaring_property_class(descendant.as_bytes(), property_name.as_bytes())
+        else {
+            continue;
+        };
+
+        if declaring_classes.contains(&declaring_class) {
+            continue;
+        }
+
+        let Some(declaring_metadata) = context.codebase.get_class_like(declaring_class.as_bytes()) else {
+            continue;
+        };
+        let Some(property_metadata) = declaring_metadata.properties.get(&property_name) else {
+            continue;
+        };
+
+        if !is_asserted_descendant_property_accessible(
+            context,
+            block_context,
+            declaring_metadata,
+            property_metadata,
+            for_assignment,
+        ) {
+            continue;
+        }
+
+        declaring_classes.push(declaring_class);
+    }
+
+    for declaring_class in declaring_classes {
+        if for_assignment {
+            artifacts.symbol_references.add_reference_for_property_write(
+                &block_context.scope,
+                declaring_class,
+                property_name,
+            );
+        } else {
+            artifacts.symbol_references.add_reference_for_property_read(
+                &block_context.scope,
+                declaring_class,
+                property_name,
+            );
+        }
+    }
+}
+
+/// Checks whether an asserted child property can be reached by the current instance access.
+fn is_asserted_descendant_property_accessible<'ctx, A>(
+    context: &Context<'ctx, '_, A>,
+    block_context: &BlockContext<'ctx>,
+    declaring_class: &ClassLikeMetadata,
+    property: &PropertyMetadata,
+    for_assignment: bool,
+) -> bool
+where
+    A: Arena,
+{
+    if property.flags.is_static() {
+        return false;
+    }
+
+    if for_assignment {
+        if property.flags.is_virtual_property()
+            && property.hooks.contains_key(&word(b"get"))
+            && !property.hooks.contains_key(&word(b"set"))
+        {
+            return false;
+        }
+
+        let visibility = if property.flags.is_readonly() {
+            if context.settings.version.is_supported(Feature::AsymmetricVisibility) {
+                match property.write_visibility {
+                    Visibility::Public => Visibility::Protected,
+                    visibility => visibility,
+                }
+            } else {
+                Visibility::Private
+            }
+        } else {
+            property.write_visibility
+        };
+
+        return is_visible_from_scope(
+            context.codebase,
+            visibility,
+            declaring_class.name.as_bytes(),
+            block_context.scope.get_class_like_name(),
+        );
+    }
+
+    if property.flags.is_virtual_property()
+        && property.hooks.contains_key(&word(b"set"))
+        && !property.hooks.contains_key(&word(b"get"))
+    {
+        return false;
+    }
+
+    is_visible_from_scope(
+        context.codebase,
+        property.read_visibility,
+        declaring_class.name.as_bytes(),
+        block_context.scope.get_class_like_name(),
+    )
 }
 
 pub fn localize_property_type<A>(
