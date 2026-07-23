@@ -38,6 +38,12 @@ pub struct FunctionLikeParameterMetadata {
     /// This indicates the expected type of a pass-by-reference parameter *after* the function executes.
     pub out_type: Option<TypeMetadata>,
 
+    /// The type specified by a `@param-closure-this` docblock tag.
+    ///
+    /// When this parameter receives a closure, that closure is invoked with `$this` bound to an
+    /// instance of this type. A closure literal passed here is analyzed with `$this` set accordingly.
+    pub closure_this_type: Option<TypeMetadata>,
+
     /// The inferred type of the parameter's default value, if `has_default` is true and the
     /// type could be determined.
     ///
@@ -78,6 +84,7 @@ impl FunctionLikeParameterMetadata {
             type_declaration_metadata: None,
             type_metadata: None,
             out_type: None,
+            closure_this_type: None,
             default_type: None,
         }
     }

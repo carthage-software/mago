@@ -322,6 +322,13 @@ fn check_unused_template_parameters<'ctx, A>(
                     is_used = true;
                     break;
                 }
+
+                if let Some(type_metadata) = &param.closure_this_type
+                    && type_contains_template_param(&type_metadata.type_union, *template_name, class_name)
+                {
+                    is_used = true;
+                    break;
+                }
             }
 
             if is_used {

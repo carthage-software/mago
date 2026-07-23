@@ -1148,6 +1148,7 @@ test_case!(callables_basic_function_call);
 test_case!(callables_named_arg_unknown_after_positional);
 test_case!(callables_pass_string_to_closure_param);
 test_case!(callables_param_default_int);
+test_case!(callables_param_closure_this);
 test_case!(callables_default_uses_class_constant);
 test_case!(callables_optional_after_required);
 test_case!(callables_too_few_arguments);

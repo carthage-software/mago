@@ -9,6 +9,7 @@ pub(crate) enum ScanningIssueKind {
     InvalidReturnTag,
     InvalidWhereTag,
     InvalidParamOutTag,
+    InvalidParamClosureThisTag,
     InvalidParamTag,
     InvalidThrowsTag,
     InvalidPropertyTag,
