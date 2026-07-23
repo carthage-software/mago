@@ -186,6 +186,8 @@ pub(crate) fn finalize_class_writes<A>(
 ) where
     A: Arena,
 {
+    check_parent_constructor_reinitializations(context, artifacts, class_metadata);
+
     if artifacts.pending_readonly_property_writes.is_empty() {
         return;
     }
@@ -261,6 +263,204 @@ pub(crate) fn finalize_class_writes<A>(
             PendingCertainty::EntryDependent(_) => unreachable!(),
         }
     }
+}
+
+/// Report promoted readonly properties that a parent constructor initializes again.
+///
+/// PHP initializes promoted properties before the constructor body. Therefore, a child
+/// constructor cannot promote a readonly property that its parent constructor initializes
+/// when it calls `parent::__construct()`.
+fn check_parent_constructor_reinitializations<A>(
+    context: &mut Context<'_, '_, A>,
+    artifacts: &AnalysisArtifacts,
+    class_metadata: &ClassLikeMetadata,
+) where
+    A: Arena,
+{
+    let constructor_name = word(b"__construct");
+    let Some(constructor_id) = class_metadata.declaring_method_ids.get(&constructor_name) else {
+        return;
+    };
+
+    // An inherited constructor has no child promotion before it runs, and only a constructor
+    // declared on this class can contain a direct `parent::__construct()` call.
+    if constructor_id.get_class_name() != class_metadata.name
+        || artifacts.method_calls_parent_constructor.get(&(class_metadata.name, constructor_name)) != Some(&true)
+    {
+        return;
+    }
+
+    if !class_metadata.properties.iter().any(|(&property_name, property_metadata)| {
+        class_metadata.declaring_property_ids.get(&property_name) == Some(&class_metadata.name)
+            && property_metadata.flags.is_promoted_property()
+            && property_metadata.flags.is_readonly()
+    }) {
+        return;
+    }
+
+    let Some(parent_name) = class_metadata.direct_parent_class else {
+        return;
+    };
+    let Some(parent_metadata) = context.codebase.get_class_like(parent_name.as_bytes()) else {
+        return;
+    };
+    let Some(parent_constructor_id) = parent_metadata.declaring_method_ids.get(&constructor_name) else {
+        return;
+    };
+
+    let parent_constructor_class = parent_constructor_id.get_class_name();
+    let Some(parent_constructor_metadata) = context.codebase.get_class_like(parent_constructor_class.as_bytes()) else {
+        return;
+    };
+    let parent_constructor_writes =
+        compute_constructor_property_writes(context, artifacts, parent_constructor_metadata);
+
+    for (&property_name, property_metadata) in &class_metadata.properties {
+        if class_metadata.declaring_property_ids.get(&property_name) != Some(&class_metadata.name)
+            || !property_metadata.flags.is_promoted_property()
+            || !property_metadata.flags.is_readonly()
+            || !parent_constructor_writes.contains(&property_name)
+        {
+            continue;
+        }
+
+        let Some(parent_property_class) = parent_constructor_metadata
+            .declaring_property_ids
+            .get(&property_name)
+            .and_then(|class_name| context.codebase.get_class_like(class_name.as_bytes()))
+        else {
+            continue;
+        };
+        let Some(parent_property_metadata) = parent_property_class.properties.get(&property_name) else {
+            continue;
+        };
+
+        // Private properties are distinct slots, so the parent writes its own property rather
+        // than the promoted property declared on the child.
+        if parent_property_metadata.is_final() {
+            continue;
+        }
+
+        report_parent_constructor_reinitialization(
+            context,
+            class_metadata,
+            property_name,
+            property_metadata.name_span.unwrap_or(class_metadata.span),
+            parent_property_class,
+            parent_property_metadata.name_span.unwrap_or(parent_property_class.span),
+        );
+    }
+}
+
+/// Collect writes performed while running a constructor, including implicit writes from
+/// promoted properties. `method_initialized_properties` records explicit assignments only.
+fn compute_constructor_property_writes<A>(
+    context: &Context<'_, '_, A>,
+    artifacts: &AnalysisArtifacts,
+    constructor_class: &ClassLikeMetadata,
+) -> WordSet
+where
+    A: Arena,
+{
+    let constructor_name = word(b"__construct");
+    let mut writes = WordSet::default();
+    let mut pending_classes = vec![constructor_class.name];
+    let mut visited_classes = WordSet::default();
+
+    while let Some(class_name) = pending_classes.pop() {
+        if !visited_classes.insert(class_name) {
+            continue;
+        }
+
+        let Some(class_metadata) = context.codebase.get_class_like(class_name.as_bytes()) else {
+            continue;
+        };
+        let Some(constructor_id) = class_metadata.declaring_method_ids.get(&constructor_name) else {
+            continue;
+        };
+
+        let declaring_class = constructor_id.get_class_name();
+        if declaring_class != class_name {
+            pending_classes.push(declaring_class);
+            continue;
+        }
+
+        for (&property_name, property_declaring_class) in &class_metadata.declaring_property_ids {
+            if *property_declaring_class != class_name {
+                continue;
+            }
+
+            if class_metadata
+                .properties
+                .get(&property_name)
+                .is_some_and(|property| property.flags.is_promoted_property())
+            {
+                writes.insert(property_name);
+            }
+        }
+
+        writes.extend(compute_transitive_initializations(
+            artifacts,
+            context,
+            class_name,
+            constructor_name,
+            class_metadata.flags.is_final(),
+            false,
+        ));
+
+        if artifacts.method_calls_parent_constructor.get(&(class_name, constructor_name)) != Some(&true) {
+            continue;
+        }
+        let Some(parent_name) = class_metadata.direct_parent_class else {
+            continue;
+        };
+        let Some(parent_metadata) = context.codebase.get_class_like(parent_name.as_bytes()) else {
+            continue;
+        };
+        let Some(parent_constructor_id) = parent_metadata.declaring_method_ids.get(&constructor_name) else {
+            continue;
+        };
+
+        pending_classes.push(parent_constructor_id.get_class_name());
+    }
+
+    writes
+}
+
+fn report_parent_constructor_reinitialization<A>(
+    context: &mut Context<'_, '_, A>,
+    class_metadata: &ClassLikeMetadata,
+    property_name: Word,
+    property_span: Span,
+    parent_property_class: &ClassLikeMetadata,
+    parent_property_span: Span,
+) where
+    A: Arena,
+{
+    let class_name = class_metadata.original_name;
+    let parent_class_name = parent_property_class.original_name;
+
+    context.collector.report_with_code(
+        IssueCode::InvalidPropertyWrite,
+        Issue::error(format!(
+            "Readonly property `{class_name}::{property_name}` is initialized before the parent constructor runs."
+        ))
+        .with_annotation(
+            Annotation::primary(property_span)
+                .with_message("This promoted property is initialized before the constructor body"),
+        )
+        .with_annotation(
+            Annotation::secondary(parent_property_span).with_message(format!(
+                "`{parent_class_name}::__construct()` initializes this inherited property again"
+            )),
+        )
+        .with_note(
+            "Promoted properties are initialized before the constructor body. A parent constructor that initializes the same property performs a second write, which throws an `Error` at runtime.",
+        )
+        .with_help(
+            "Pass inherited properties to `parent::__construct()` as regular parameters; promote only properties initialized by this class.",
+        ),
+    );
 }
 
 fn compute_constructor_initializations<A>(
