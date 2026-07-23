@@ -7,6 +7,7 @@ pub mod r#enum;
 pub mod filter;
 pub mod json;
 pub mod math;
+pub mod object;
 pub mod random;
 pub mod reflection;
 pub mod session;
@@ -50,6 +51,7 @@ impl Plugin for StdlibPlugin {
         registry.register_function_provider(array::ArrayMapProvider);
         registry.register_function_provider(array::ArrayMergeProvider);
         registry.register_function_provider(array::CompactProvider);
+        registry.register_function_provider(object::GetObjectVarsProvider);
         registry.register_function_provider(url::ParseUrlProvider);
         registry.register_function_provider(filter::FilterVarProvider);
         registry.register_function_provider(filter::FilterInputProvider);
