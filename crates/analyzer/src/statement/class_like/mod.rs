@@ -269,41 +269,25 @@ fn check_unused_template_parameters<'ctx, A>(
     let class_kind_str = class_like_metadata.kind.as_str();
     let class_name_span = class_like_metadata.name_span.unwrap_or(class_like_metadata.span);
 
-    for (template_name, _) in &class_like_metadata.template_types {
+    'templates: for (template_name, _) in &class_like_metadata.template_types {
         if template_name.as_bytes().starts_with(b"_") {
             continue;
         }
 
-        let mut is_used = false;
-
         for extended_params in class_like_metadata.template_extended_parameters.values() {
             for (_param_name, param_type) in extended_params {
                 if type_contains_template_param(param_type, *template_name, class_name) {
-                    is_used = true;
-                    break;
+                    continue 'templates;
                 }
             }
-
-            if is_used {
-                break;
-            }
-        }
-
-        if is_used {
-            continue;
         }
 
         for property_metadata in class_like_metadata.properties.values() {
             if let Some(type_metadata) = &property_metadata.type_metadata
                 && type_contains_template_param(&type_metadata.type_union, *template_name, class_name)
             {
-                is_used = true;
-                break;
+                continue 'templates;
             }
-        }
-
-        if is_used {
-            continue;
         }
 
         for method_id in class_like_metadata.declaring_method_ids.values() {
@@ -319,33 +303,22 @@ fn check_unused_template_parameters<'ctx, A>(
                 if let Some(type_metadata) = &param.type_metadata
                     && type_contains_template_param(&type_metadata.type_union, *template_name, class_name)
                 {
-                    is_used = true;
-                    break;
+                    continue 'templates;
                 }
 
                 if let Some(type_metadata) = &param.closure_this_type
                     && type_contains_template_param(&type_metadata.type_union, *template_name, class_name)
                 {
-                    is_used = true;
-                    break;
+                    continue 'templates;
                 }
-            }
-
-            if is_used {
-                break;
             }
 
             // Check return type
             if let Some(return_type_metadata) = &function_like.return_type_metadata
                 && type_contains_template_param(&return_type_metadata.type_union, *template_name, class_name)
             {
-                is_used = true;
-                break;
+                continue 'templates;
             }
-        }
-
-        if is_used {
-            continue;
         }
 
         // Report warning if template parameter is unused
