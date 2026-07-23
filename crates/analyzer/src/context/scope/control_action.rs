@@ -93,6 +93,8 @@ impl ControlAction {
                     return control_actions;
                 }
                 _ if statement.is_loop() => {
+                    let has_enclosing_loop_break = control_actions.contains(ControlAction::BreakImmediateLoop);
+
                     let (inner_statements, condition) = match statement {
                         Statement::For(for_loop) => (
                             match &for_loop.body {
@@ -135,7 +137,10 @@ impl ControlAction {
 
                     control_actions.extend(loop_actions);
 
-                    if !control_actions.iter().any(|a| a.is_break_immediate_loop() || a.is_exit_path()) {
+                    if !control_actions
+                        .iter()
+                        .any(|a| matches!(a, ControlAction::Break) || a.is_break_immediate_loop() || a.is_exit_path())
+                    {
                         if let (Some(artifacts), Some(condition)) = (artifacts, condition)
                             && let Some(condition_type) = artifacts.get_expression_type(condition)
                             && condition_type.is_always_truthy()
@@ -166,6 +171,10 @@ impl ControlAction {
                     }
 
                     control_actions.retain(|a| !a.is_break_immediate_loop());
+
+                    if has_enclosing_loop_break {
+                        control_actions.insert(ControlAction::BreakImmediateLoop);
+                    }
                 }
                 Statement::Block(block) => {
                     let mut block_actions = ControlAction::from_statements(
@@ -235,7 +244,9 @@ impl ControlAction {
                         if let Some(count) = maybe_count
                             && break_type_len >= count
                         {
-                            if let Some(b) = break_type.get(break_type_len - count) {
+                            if count > 1 {
+                                control_actions.insert(ControlAction::Break);
+                            } else if let Some(b) = break_type.get(break_type_len - count) {
                                 if b.is_switch() {
                                     control_actions.insert(ControlAction::LeaveSwitch);
                                 } else {

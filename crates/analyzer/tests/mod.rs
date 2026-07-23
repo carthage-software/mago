@@ -2616,6 +2616,11 @@ test_case!(issue_2096);
 test_case!(issue_2111);
 test_case!(issue_2116);
 test_case!(issue_2119);
+test_case!(issue_2124, {
+    let mut settings = crate::framework::default_test_settings();
+    settings.check_throws = false;
+    settings
+});
 test_case!(issue_2125);
 
 #[test]
