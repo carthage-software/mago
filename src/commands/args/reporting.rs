@@ -62,6 +62,14 @@ pub struct ReportingArgs {
     #[arg(long)]
     pub sort: bool,
 
+    /// Show a summary of issue counts per code instead of individual issues.
+    ///
+    /// Instead of reporting each issue, displays all issue codes along with
+    /// how many times each occurred, ordered from highest to lowest count.
+    /// This is a shorthand for `--reporting-format code-count`.
+    #[arg(long, conflicts_with_all = ["fix", "reporting_format"])]
+    pub stats: bool,
+
     /// Apply automatic fixes to the source code where possible.
     ///
     /// This will modify your files to fix issues that have automatic solutions.
@@ -217,7 +225,7 @@ impl ReportingArgs {
             dry_run: self.dry_run,
             fail_on_remaining: self.fail_on_remaining,
             reporting_target: self.reporting_target.clone(),
-            reporting_format: self.reporting_format,
+            reporting_format: if self.stats { ReportingFormat::CodeCount } else { self.reporting_format },
             minimum_fail_level: self.minimum_fail_level.unwrap_or(config_minimum_fail_level),
             minimum_report_level: self.minimum_report_level,
             retain_code: self.retain_code.clone(),

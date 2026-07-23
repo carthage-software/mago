@@ -28,6 +28,7 @@ How Mago presents the issues it finds.
 | Flag | Description |
 | :--- | :--- |
 | `--sort` | Sort reported issues by level, then code, then location. |
+| `--stats` | Show a summary of issue counts per code, ordered from highest to lowest, instead of individual issues. Shorthand for `--reporting-format code-count`. |
 | `--reporting-target <TARGET>` | Where to write the report. Values: `stdout` (default), `stderr`. |
 | `--reporting-format <FORMAT>` | Output format. See below; defaults to auto-detected. |
 | `--minimum-fail-level <LEVEL>`, `-m` | Lowest level that triggers a non-zero exit. Values: `note`, `help`, `warning`, `error`. Defaults to the value in the config file, or `error` if absent. |

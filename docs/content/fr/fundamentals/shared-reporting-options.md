@@ -28,6 +28,7 @@ Comment Mago présente les problèmes trouvés.
 | Drapeau | Description |
 | :--- | :--- |
 | `--sort` | Trie les problèmes signalés par niveau, puis par code, puis par emplacement. |
+| `--stats` | Affiche un résumé du nombre de problèmes par code, du plus fréquent au moins fréquent, au lieu des problèmes individuels. Raccourci pour `--reporting-format code-count`. |
 | `--reporting-target <TARGET>` | Où écrire le rapport. Valeurs : `stdout` (par défaut), `stderr`. |
 | `--reporting-format <FORMAT>` | Format de sortie. Voir ci-dessous ; par défaut auto-détecté. |
 | `--minimum-fail-level <LEVEL>`, `-m` | Niveau le plus bas qui déclenche un code de sortie non nul. Valeurs : `note`, `help`, `warning`, `error`. Par défaut, la valeur du fichier de configuration, ou `error` si absent. |

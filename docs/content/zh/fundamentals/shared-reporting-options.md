@@ -28,6 +28,7 @@ Mago 如何呈现它发现的问题。
 | 参数 | 说明 |
 | :--- | :--- |
 | `--sort` | 按级别、code、位置依次排序报告中的问题。 |
+| `--stats` | 显示每个 code 的问题数量汇总（按数量从高到低排序），而不是逐条列出问题。等同于 `--reporting-format code-count` 的简写。 |
 | `--reporting-target <TARGET>` | 报告写入的目标。可选值:`stdout`(默认)、`stderr`。 |
 | `--reporting-format <FORMAT>` | 输出格式。详见下文;默认自动检测。 |
 | `--minimum-fail-level <LEVEL>`, `-m` | 触发非零退出的最低级别。可选值:`note`、`help`、`warning`、`error`。默认采用配置文件中的值,若无则为 `error`。 |
