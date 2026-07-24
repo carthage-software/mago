@@ -234,6 +234,32 @@ pub fn reconcile_keyed_types<'ctx, A>(
             result_type = orred_type;
         }
 
+        let needs_refinement =
+            new_type_parts.len() > 1 && result_type.as_ref().is_some_and(|current| !current.is_never());
+        if needs_refinement {
+            for new_type_part_parts in new_type_parts {
+                let mut orred_type: Option<TUnion> = None;
+
+                for assertion in new_type_part_parts {
+                    let result_type_candidate = assertion_reconciler::reconcile(
+                        context,
+                        assertion,
+                        result_type.as_ref(),
+                        Some(key_str),
+                        inside_loop,
+                        Some(span),
+                        false,
+                        negated,
+                    );
+
+                    orred_type =
+                        Some(add_optional_union_type(result_type_candidate, orred_type.as_ref(), context.codebase));
+                }
+
+                result_type = orred_type;
+            }
+        }
+
         let result_type = result_type.unwrap_or_else(get_never);
 
         let key_parts = break_up_path_into_parts(key_str);
@@ -398,37 +424,43 @@ where
     let mut result = base_type.cloned();
     let mut saw_mixed_disjunction = false;
 
-    for disjuncts in new_type_parts {
-        let value_assertions = disjuncts
-            .iter()
-            .filter(|assertion| !matches!(assertion, Assertion::IsNotIsset | Assertion::ArrayKeyDoesNotExist))
-            .collect::<Vec<_>>();
+    for pass in 0..2 {
+        for disjuncts in new_type_parts {
+            let value_assertions = disjuncts
+                .iter()
+                .filter(|assertion| !matches!(assertion, Assertion::IsNotIsset | Assertion::ArrayKeyDoesNotExist))
+                .collect::<Vec<_>>();
 
-        if value_assertions.is_empty() {
-            continue;
+            if value_assertions.is_empty() {
+                continue;
+            }
+
+            if pass == 0 && value_assertions.len() != disjuncts.len() {
+                saw_mixed_disjunction = true;
+            }
+
+            let mut orred_type: Option<TUnion> = None;
+            for assertion in value_assertions {
+                let candidate = assertion_reconciler::reconcile(
+                    context,
+                    assertion,
+                    result.as_ref(),
+                    Some(key_str),
+                    inside_loop,
+                    Some(span),
+                    false,
+                    negated,
+                );
+
+                orred_type = Some(add_optional_union_type(candidate, orred_type.as_ref(), context.codebase));
+            }
+
+            result = orred_type;
         }
 
-        if value_assertions.len() != disjuncts.len() {
-            saw_mixed_disjunction = true;
+        if result.as_ref().is_none_or(TUnion::is_never) {
+            break;
         }
-
-        let mut orred_type: Option<TUnion> = None;
-        for assertion in value_assertions {
-            let candidate = assertion_reconciler::reconcile(
-                context,
-                assertion,
-                result.as_ref(),
-                Some(key_str),
-                inside_loop,
-                Some(span),
-                false,
-                negated,
-            );
-
-            orred_type = Some(add_optional_union_type(candidate, orred_type.as_ref(), context.codebase));
-        }
-
-        result = orred_type;
     }
 
     if !saw_mixed_disjunction {
