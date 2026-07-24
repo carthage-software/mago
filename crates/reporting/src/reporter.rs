@@ -136,7 +136,7 @@ impl Reporter {
         let lowest_reported_level = issues.get_lowest_level();
 
         // Early return if no issues to report
-        if total_reported_issues == 0 {
+        if total_reported_issues == 0 && !self.config.format.requires_output_when_empty() {
             return Ok(ReportStatus {
                 baseline_dead_issues,
                 baseline_filtered_issues,
@@ -219,7 +219,7 @@ impl Reporter {
         let lowest_reported_level = issues.get_lowest_level();
 
         // Early return if no issues to report
-        if total_reported_issues == 0 {
+        if total_reported_issues == 0 && !self.config.format.requires_output_when_empty() {
             return Ok(ReportStatus {
                 baseline_dead_issues,
                 baseline_filtered_issues,
@@ -248,5 +248,96 @@ impl Reporter {
             lowest_reported_level,
             total_reported_issues,
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::borrow::Cow;
+
+    use mago_database::Database;
+    use mago_database::DatabaseConfiguration;
+    use mago_database::file::File;
+
+    use super::*;
+
+    fn reporter_for(format: ReportingFormat) -> Reporter {
+        let file = File::ephemeral(Cow::Borrowed(b"test.php"), Cow::Borrowed(b"<?php\n"));
+        let configuration =
+            DatabaseConfiguration::new(std::path::Path::new("/"), vec![], vec![], vec![], vec![]).into_static();
+        let database = Database::single(file, configuration).read_only();
+
+        Reporter::new(
+            database,
+            ReporterConfig {
+                target: ReportingTarget::Stdout,
+                format,
+                color_choice: ColorChoice::Never,
+                filter_fixable: false,
+                sort: false,
+                minimum_report_level: None,
+                editor_url: None,
+            },
+        )
+    }
+
+    fn report_empty(format: ReportingFormat) -> Vec<u8> {
+        let reporter = reporter_for(format);
+        let mut buffer = Vec::new();
+
+        let Ok(status) = reporter.report_to(IssueCollection::new(), None, &mut buffer) else {
+            panic!("reporting an empty collection should succeed");
+        };
+
+        assert_eq!(status.total_reported_issues, 0);
+
+        buffer
+    }
+
+    #[test]
+    fn human_formats_write_nothing_when_empty() {
+        assert!(report_empty(ReportingFormat::Rich).is_empty());
+        assert!(report_empty(ReportingFormat::Medium).is_empty());
+        assert!(report_empty(ReportingFormat::Short).is_empty());
+    }
+
+    #[test]
+    fn checkstyle_writes_document_when_empty() {
+        let output = String::from_utf8_lossy(&report_empty(ReportingFormat::Checkstyle)).into_owned();
+
+        assert!(output.contains("<?xml"));
+        assert!(output.contains("<checkstyle>"));
+        assert!(output.contains("</checkstyle>"));
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn sarif_writes_document_when_empty() {
+        let output = report_empty(ReportingFormat::Sarif);
+
+        let Ok(value) = serde_json::from_slice::<serde_json::Value>(&output) else {
+            panic!("empty SARIF report should be valid JSON");
+        };
+
+        assert_eq!(value["version"], "2.1.0");
+        assert!(value["runs"][0]["results"].as_array().is_some_and(Vec::is_empty));
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn json_writes_document_when_empty() {
+        let output = report_empty(ReportingFormat::Json);
+
+        let Ok(value) = serde_json::from_slice::<serde_json::Value>(&output) else {
+            panic!("empty JSON report should be valid JSON");
+        };
+
+        assert!(value["issues"].as_array().is_some_and(Vec::is_empty));
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn gitlab_writes_empty_list_when_empty() {
+        assert_eq!(report_empty(ReportingFormat::Gitlab), b"[]");
     }
 }

@@ -99,6 +99,18 @@ pub enum ReportingFormat {
     Sarif,
 }
 
+impl ReportingFormat {
+    #[must_use]
+    pub const fn requires_output_when_empty(self) -> bool {
+        match self {
+            Self::Checkstyle => true,
+            #[cfg(feature = "serde")]
+            Self::Gitlab | Self::Json | Self::Sarif => true,
+            _ => false,
+        }
+    }
+}
+
 /// Dispatch to the appropriate formatter based on the format type.
 ///
 /// This function performs static dispatch using enum matching for optimal performance.
