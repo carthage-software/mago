@@ -85,10 +85,8 @@ fn parse_count_lines(stdout: &str) -> Vec<(String, usize)> {
         .lines()
         .filter(|line| !line.trim().is_empty())
         .map(|line| {
-            let (label, count) =
-                line.rsplit_once(": ").unwrap_or_else(|| panic!("unexpected stats line: {line:?}"));
-            let count =
-                count.trim().parse::<usize>().unwrap_or_else(|_| panic!("unexpected count in line: {line:?}"));
+            let (label, count) = line.rsplit_once(": ").unwrap_or_else(|| panic!("unexpected stats line: {line:?}"));
+            let count = count.trim().parse::<usize>().unwrap_or_else(|_| panic!("unexpected count in line: {line:?}"));
 
             (label.to_string(), count)
         })
@@ -176,9 +174,6 @@ fn test_lint_stats_conflicts_with_explicit_reporting_format_and_fix() {
             "lint {} should be rejected by clap; stderr: {stderr}",
             conflicting_args.join(" ")
         );
-        assert!(
-            stderr.contains("--stats"),
-            "conflict error should mention --stats; got: {stderr}"
-        );
+        assert!(stderr.contains("--stats"), "conflict error should mention --stats; got: {stderr}");
     }
 }
