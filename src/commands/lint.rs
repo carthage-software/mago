@@ -12,6 +12,7 @@
 //! - **Semantics Only** (`--semantics`): Only validate syntax and basic semantic structure
 //! - **Pedantic Mode** (`--pedantic`): Enable all available rules for maximum thoroughness
 //! - **Targeted Linting** (`--only`): Run only specific rules by code
+//! - **Statistics** (`--stats`): Summarize issue counts per rule code instead of listing issues
 //!
 //! # Rule Discovery
 //!
@@ -76,6 +77,11 @@ use crate::utils::git;
 /// ```text
 /// mago lint --explain no-empty
 /// ```
+///
+/// Show issue counts per rule code:
+/// ```text
+/// mago lint --stats
+/// ```
 #[derive(Parser, Debug)]
 #[command(
     name = "lint",
@@ -91,6 +97,7 @@ use crate::utils::git;
 
             mago lint
             mago lint src/
+            mago lint --stats
             mago lint --list-rules
             mago lint --explain no-empty
             mago lint --only no-empty,constant-condition
@@ -130,7 +137,7 @@ pub struct LintCommand {
     /// such as 'no-empty' or 'prefer-while-loop'.
     #[arg(
         long,
-        conflicts_with_all = ["list_rules", "sort", "fixable_only", "semantics", "reporting_target", "reporting_format"]
+        conflicts_with_all = ["list_rules", "sort", "stats", "fixable_only", "semantics", "reporting_target", "reporting_format"]
     )]
     pub explain: Option<String>,
 
@@ -141,7 +148,7 @@ pub struct LintCommand {
     /// Combine with --json for machine-readable output.
     #[arg(
         long,
-        conflicts_with_all = ["explain", "sort", "fixable_only", "semantics", "reporting_target", "reporting_format"]
+        conflicts_with_all = ["explain", "sort", "stats", "fixable_only", "semantics", "reporting_target", "reporting_format"]
     )]
     pub list_rules: bool,
 
