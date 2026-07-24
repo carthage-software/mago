@@ -255,9 +255,37 @@ pub fn reconcile_keyed_types<'ctx, A>(
             changed_var_ids.insert(*key);
             if key_str.ends_with(b"]") && !has_inverted_isset && !has_inverted_key_exists && !has_empty && !is_equality
             {
-                adjust_array_type(key_parts.clone(), block_context, changed_var_ids, &result_type, context.codebase);
+                adjust_array_type(
+                    key_parts.clone(),
+                    block_context,
+                    changed_var_ids,
+                    &result_type,
+                    context.codebase,
+                    false,
+                );
             } else if key_str.ends_with(b"]") && (has_inverted_isset || has_inverted_key_exists) {
-                adjust_array_type_remove_key(key_parts.clone(), block_context, changed_var_ids, context.codebase);
+                let optional_entry_type = reconcile_optional_entry_type(
+                    context,
+                    new_type_parts,
+                    before_adjustment.as_ref(),
+                    key_str,
+                    inside_loop,
+                    span,
+                    negated,
+                );
+
+                if let Some(entry_type) = optional_entry_type {
+                    adjust_array_type(
+                        key_parts.clone(),
+                        block_context,
+                        changed_var_ids,
+                        &entry_type,
+                        context.codebase,
+                        true,
+                    );
+                } else {
+                    adjust_array_type_remove_key(key_parts.clone(), block_context, changed_var_ids, context.codebase);
+                }
             } else if memchr::memmem::find(key_str, b"->").is_some() && !is_equality {
                 adjust_object_property_type(key_parts.clone(), block_context, changed_var_ids, &result_type, context);
             } else {
@@ -355,12 +383,68 @@ pub fn reconcile_keyed_types<'ctx, A>(
     }
 }
 
+fn reconcile_optional_entry_type<A>(
+    context: &mut Context<'_, '_, A>,
+    new_type_parts: &AssertionSet,
+    base_type: Option<&TUnion>,
+    key_str: &[u8],
+    inside_loop: bool,
+    span: &Span,
+    negated: bool,
+) -> Option<TUnion>
+where
+    A: Arena,
+{
+    let mut result = base_type.cloned();
+    let mut saw_mixed_disjunction = false;
+
+    for disjuncts in new_type_parts {
+        let value_assertions = disjuncts
+            .iter()
+            .filter(|assertion| !matches!(assertion, Assertion::IsNotIsset | Assertion::ArrayKeyDoesNotExist))
+            .collect::<Vec<_>>();
+
+        if value_assertions.is_empty() {
+            continue;
+        }
+
+        if value_assertions.len() != disjuncts.len() {
+            saw_mixed_disjunction = true;
+        }
+
+        let mut orred_type: Option<TUnion> = None;
+        for assertion in value_assertions {
+            let candidate = assertion_reconciler::reconcile(
+                context,
+                assertion,
+                result.as_ref(),
+                Some(key_str),
+                inside_loop,
+                Some(span),
+                false,
+                negated,
+            );
+
+            orred_type = Some(add_optional_union_type(candidate, orred_type.as_ref(), context.codebase));
+        }
+
+        result = orred_type;
+    }
+
+    if !saw_mixed_disjunction {
+        return None;
+    }
+
+    result.filter(|entry_type| !entry_type.is_never() && !entry_type.is_mixed())
+}
+
 fn adjust_array_type(
     mut key_parts: Vec<Vec<u8>>,
     context: &mut BlockContext<'_>,
     changed_var_ids: &mut WordSet,
     result_type: &TUnion,
     codebase: &CodebaseMetadata,
+    optional: bool,
 ) {
     key_parts.pop();
     let Some(array_key) = key_parts.pop() else {
@@ -430,10 +514,10 @@ fn adjust_array_type(
                             }
                         }
                     } else {
-                        known_items.insert(dictkey, (false, result_type.clone()));
+                        known_items.insert(dictkey, (optional, result_type.clone()));
                     }
                 } else {
-                    *known_items = Some(BTreeMap::from([(dictkey, (false, result_type.clone()))]));
+                    *known_items = Some(BTreeMap::from([(dictkey, (optional, result_type.clone()))]));
                 }
             }
             TAtomic::Array(TArray::List(TList { known_elements, .. })) => {
@@ -451,10 +535,10 @@ fn adjust_array_type(
                                 }
                             }
                         } else {
-                            known_elements.insert(arraykey_offset, (false, result_type.clone()));
+                            known_elements.insert(arraykey_offset, (optional, result_type.clone()));
                         }
                     } else {
-                        *known_elements = Some(BTreeMap::from([(arraykey_offset, (false, result_type.clone()))]));
+                        *known_elements = Some(BTreeMap::from([(arraykey_offset, (optional, result_type.clone()))]));
                     }
                 }
             }
@@ -471,9 +555,9 @@ fn adjust_array_type(
                 };
 
                 base_atomic_type = TAtomic::Array(TArray::Keyed(TKeyedArray {
-                    known_items: Some(BTreeMap::from([(key, (false, result_type.clone()))])),
+                    known_items: Some(BTreeMap::from([(key, (optional, result_type.clone()))])),
                     parameters: Some((Arc::new(get_arraykey()), Arc::new(get_mixed()))),
-                    non_empty: true,
+                    non_empty: !optional,
                 }));
             }
             _ => {
@@ -500,6 +584,7 @@ fn adjust_array_type(
                 changed_var_ids,
                 &wrap_atomic(base_atomic_type.clone()),
                 codebase,
+                false,
             );
         }
 
@@ -590,6 +675,7 @@ fn adjust_array_type_remove_key(
                 changed_var_ids,
                 &wrap_atomic(base_atomic_type.clone()),
                 codebase,
+                false,
             );
         }
     }
