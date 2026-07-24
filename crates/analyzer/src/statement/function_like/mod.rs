@@ -1278,24 +1278,17 @@ pub fn check_unused_function_template_parameters<'ctx, A>(
         return;
     };
 
-    for (template_name, _) in &function_like_metadata.template_types {
+    'templates: for (template_name, _) in &function_like_metadata.template_types {
         if template_name.as_bytes().starts_with(b"_") {
             continue;
         }
-
-        let mut is_used = false;
 
         for param in &function_like_metadata.parameters {
             if let Some(type_metadata) = &param.type_metadata
                 && type_contains_function_template_param(&type_metadata.type_union, *template_name, function_identifier)
             {
-                is_used = true;
-                break;
+                continue 'templates;
             }
-        }
-
-        if is_used {
-            continue;
         }
 
         if let Some(return_type_metadata) = &function_like_metadata.return_type_metadata
@@ -1305,10 +1298,6 @@ pub fn check_unused_function_template_parameters<'ctx, A>(
                 function_identifier,
             )
         {
-            is_used = true;
-        }
-
-        if is_used {
             continue;
         }
 
