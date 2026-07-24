@@ -597,6 +597,7 @@
 <p>Mago 如何呈现它发现的问题。</p>
 <table><thead><tr><th style="text-align: left">参数</th><th style="text-align: left">说明</th></tr></thead><tbody>
 <tr><td style="text-align: left"><code>--sort</code></td><td style="text-align: left">按级别、code、位置依次排序报告中的问题。</td></tr>
+<tr><td style="text-align: left"><code>--stats</code></td><td style="text-align: left">显示每个 code 的问题数量汇总（按数量从高到低排序），而不是逐条列出问题。等同于 <code>--reporting-format code-count</code> 的简写。</td></tr>
 <tr><td style="text-align: left"><code>--reporting-target &lt;TARGET&gt;</code></td><td style="text-align: left">报告写入的目标。可选值:<code>stdout</code>(默认)、<code>stderr</code>。</td></tr>
 <tr><td style="text-align: left"><code>--reporting-format &lt;FORMAT&gt;</code></td><td style="text-align: left">输出格式。详见下文;默认自动检测。</td></tr>
 <tr><td style="text-align: left"><code>--minimum-fail-level &lt;LEVEL&gt;</code>, <code>-m</code></td><td style="text-align: left">触发非零退出的最低级别。可选值:<code>note</code>、<code>help</code>、<code>warning</code>、<code>error</code>。默认采用配置文件中的值,若无则为 <code>error</code>。</td></tr>
