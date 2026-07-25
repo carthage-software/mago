@@ -61,6 +61,7 @@ pub(super) fn is_intersection_shallowly_contained_by(
     if let TAtomic::GenericParameter(TGenericParameter {
         defining_entity: container_defining_entity,
         parameter_name: container_parameter_name,
+        constraint: container_constraint,
         ..
     }) = intersection_container_type
     {
@@ -108,6 +109,20 @@ pub(super) fn is_intersection_shallowly_contained_by(
             }
 
             return false;
+        }
+
+        if inside_assertion {
+            let input_union = wrap_atomic(intersection_input_type.clone());
+
+            return union_comparator::is_contained_by(
+                codebase,
+                &input_union,
+                container_constraint,
+                false,
+                input_union.ignore_falsable_issues(),
+                inside_assertion,
+                atomic_comparison_result,
+            );
         }
 
         return false;
