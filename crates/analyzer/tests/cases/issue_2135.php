@@ -100,3 +100,61 @@ function incompatible_concrete(Cage $cage): void
         $cage->bark();
     }
 }
+
+/**
+ * @template-covariant T
+ */
+interface CovariantNode
+{
+    /**
+     * @return T
+     */
+    public function getValue(): mixed;
+}
+
+/**
+ * @template-covariant T
+ *
+ * @implements CovariantNode<T>
+ */
+final readonly class CovariantTreeNode implements CovariantNode
+{
+    /**
+     * @param T $value
+     * @param list<CovariantNode<T>> $children
+     */
+    public function __construct(
+        private mixed $value,
+        private array $children = [],
+    ) {}
+
+    public function getValue(): mixed
+    {
+        return $this->value;
+    }
+
+    /**
+     * @return list<CovariantNode<T>>
+     */
+    public function getChildren(): array
+    {
+        return $this->children;
+    }
+}
+
+/**
+ * @template T
+ *
+ * @param CovariantNode<T> $node
+ */
+function covariant_narrowing(CovariantNode $node): int
+{
+    $total = 1;
+    if ($node instanceof CovariantTreeNode) {
+        foreach ($node->getChildren() as $child) {
+            $total += covariant_narrowing($child);
+        }
+    }
+
+    return $total;
+}

@@ -3,6 +3,7 @@ use mago_word::word;
 
 use crate::metadata::CodebaseMetadata;
 use crate::metadata::class_like_constant::ClassLikeConstantMetadata;
+use crate::misc::GenericParent;
 use crate::ttype::TType;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::array::TArray;
@@ -128,19 +129,14 @@ pub fn is_contained_by(
     }
 
     if inside_assertion
-        && let TAtomic::GenericParameter(TGenericParameter {
-            parameter_name: container_param_name,
-            defining_entity: container_entity,
-            ..
-        }) = container_type_part
-        && let TAtomic::GenericParameter(TGenericParameter {
-            parameter_name: input_param_name,
-            defining_entity: input_entity,
-            ..
-        }) = input_type_part
+        && let TAtomic::GenericParameter(container_generic) = container_type_part
+        && let TAtomic::GenericParameter(input_generic) = input_type_part
     {
         // Different template parameters are not contained by each other during assertion reconciliation
-        if input_param_name != container_param_name || input_entity != container_entity {
+        if (input_generic.parameter_name != container_generic.parameter_name
+            || input_generic.defining_entity != container_generic.defining_entity)
+            && !is_forwarded_template_parameter(codebase, input_generic, container_generic)
+        {
             return false;
         }
     }
@@ -433,29 +429,23 @@ pub fn is_contained_by(
         return false;
     }
 
-    if let TAtomic::GenericParameter(TGenericParameter {
-        parameter_name: container_param_name,
-        defining_entity: container_entity,
-        constraint: container_constraint,
-        ..
-    }) = container_type_part
-        && let TAtomic::GenericParameter(TGenericParameter {
-            parameter_name: input_param_name,
-            defining_entity: input_entity,
-            constraint: input_constraint,
-            ..
-        }) = input_type_part
+    if let TAtomic::GenericParameter(container_generic) = container_type_part
+        && let TAtomic::GenericParameter(input_generic) = input_type_part
     {
-        if inside_assertion && (input_param_name != container_param_name || input_entity != container_entity) {
+        if inside_assertion
+            && (input_generic.parameter_name != container_generic.parameter_name
+                || input_generic.defining_entity != container_generic.defining_entity)
+            && !is_forwarded_template_parameter(codebase, input_generic, container_generic)
+        {
             return false;
         }
 
         return union_comparator::is_contained_by(
             codebase,
-            input_constraint,
-            container_constraint,
+            &input_generic.constraint,
+            &container_generic.constraint,
             false,
-            input_constraint.ignore_falsable_issues(),
+            input_generic.constraint.ignore_falsable_issues(),
             inside_assertion,
             atomic_comparison_result,
         );
@@ -571,6 +561,24 @@ pub fn is_contained_by(
     }
 
     false
+}
+
+fn is_forwarded_template_parameter(
+    codebase: &CodebaseMetadata,
+    input_generic: &TGenericParameter,
+    container_generic: &TGenericParameter,
+) -> bool {
+    let (GenericParent::ClassLike(input_class), GenericParent::ClassLike(container_class)) =
+        (&input_generic.defining_entity, &container_generic.defining_entity)
+    else {
+        return false;
+    };
+
+    input_class != container_class
+        && codebase
+            .get_class_like(input_class.as_bytes())
+            .and_then(|metadata| metadata.template_extended_parameters.get(container_class))
+            .is_some_and(|parameters| parameters.contains_key(&container_generic.parameter_name))
 }
 
 pub(crate) fn can_be_identical(
