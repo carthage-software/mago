@@ -915,7 +915,7 @@
             "statics": true,
             "methods": true,
             "properties": true,
-            "exclude": {
+            "exclusions": {
               "functions": [],
               "classes": [],
               "interfaces": [],
@@ -2010,7 +2010,7 @@
               "statics": true,
               "methods": true,
               "properties": true,
-              "exclude": {
+              "exclusions": {
                 "functions": [],
                 "classes": [],
                 "interfaces": [],
@@ -3452,7 +3452,7 @@
             "statics": true,
             "methods": true,
             "properties": true,
-            "exclude": {
+            "exclusions": {
               "functions": [],
               "classes": [],
               "interfaces": [],
@@ -7715,19 +7715,9 @@
           "default": false
         },
         "exclude": {
-          "description": "Per-declaration-kind regular expressions that exempt matching names from\nrequiring a docblock. A declaration is exempt only when *every* name it\ndeclares matches at least one pattern for its kind.",
-          "$ref": "#/$defs/MissingDocsExclude",
-          "default": {
-            "functions": [],
-            "classes": [],
-            "interfaces": [],
-            "traits": [],
-            "enums": [],
-            "enum-cases": [],
-            "constants": [],
-            "statics": [],
-            "methods": [],
-            "properties": []
+          "type": "array",
+          "items": {
+            "type": "string"
           }
         },
         "level": {
@@ -7773,12 +7763,28 @@
         "properties": {
           "type": "boolean",
           "default": true
+        },
+        "exclusions": {
+          "description": "Per-declaration-kind regular expressions that exempt matching names from\nrequiring a docblock. A declaration is exempt only when *every* name it\ndeclares matches at least one pattern for its kind.",
+          "$ref": "#/$defs/MissingDocsExclusions",
+          "default": {
+            "functions": [],
+            "classes": [],
+            "interfaces": [],
+            "traits": [],
+            "enums": [],
+            "enum-cases": [],
+            "constants": [],
+            "statics": [],
+            "methods": [],
+            "properties": []
+          }
         }
       },
       "additionalProperties": false
     },
-    "MissingDocsExclude": {
-      "description": "Regular expressions, grouped by declaration kind, that exempt matching names\nfrom the missing-docs check.\n\nDefaults to empty lists for every kind, so existing configurations that do\nnot set `exclude` behave exactly as before.",
+    "MissingDocsExclusions": {
+      "description": "Regular expressions, grouped by declaration kind, that exempt matching names\nfrom the missing-docs check.\n\nDefaults to empty lists for every kind, so existing configurations that do\nnot set `exclusions` behave exactly as before.",
       "type": "object",
       "properties": {
         "functions": {
