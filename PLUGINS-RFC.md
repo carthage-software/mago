@@ -88,6 +88,19 @@ $em->getRepository(Patient::class)->findOneBy(['fieldThatDoesNotExist' => 'x']);
 | PHPStan + phpstan-doctrine | `doctrine.findOneByArgument` — "entity does not have a field named $fieldThatDoesNotExist" |
 | Mago (any current config) | **silent** ❌ |
 
+Probe C — string service id (the gap the Symfony plugin closes):
+
+```php
+$mailer = static::getContainer()->get('app.mailer');
+$mailer->methodThatDoesNotExist();
+```
+
+| Tool | Verdict |
+|---|---|
+| PHPStan + phpstan-symfony (`containerXmlPath`) | resolved through the XML; `method.notFound` |
+| Mago without the plugin | `mixed-method-access` — admits blindness |
+| **Mago + `symfony` plugin** | **`non-existent-method`, resolved through the XML** ✅ |
+
 ## Design — Doctrine plugin
 
 See `crates/analyzer/src/plugin/libraries/doctrine/`. Summary: a method hook
@@ -115,7 +128,7 @@ Following the methodology of `carthage-software/php-toolchain-benchmarks`
 does not measure — **detection equivalence**:
 
 1. Probe B reports `doctrine-unknown-field` (parity with phpstan-doctrine).
-2. String-id probe resolves through the XML (parity with phpstan-symfony).
+2. Probe C resolves through the XML (parity with phpstan-symfony).
 3. On the reference codebase, `src+tests` error count with both plugins is
    explainable: every remaining error is triaged real-or-limitation, no
    blindness class left.

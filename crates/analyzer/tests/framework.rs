@@ -25,17 +25,17 @@ use mago_word::WordSet;
 static PRELUDE: LazyLock<Prelude> = LazyLock::new(Prelude::build);
 static PLUGIN_REGISTRY: LazyLock<PluginRegistry> = LazyLock::new(PluginRegistry::with_library_providers);
 
-#[derive(Debug, Clone)]
 pub struct TestCase<'src> {
     name: &'src str,
     content: &'src [u8],
     settings: Option<Settings>,
+    registry: Option<PluginRegistry>,
 }
 
 impl<'src> TestCase<'src> {
     #[must_use]
     pub fn new(name: &'src str, content: &'src [u8]) -> Self {
-        Self { name, content, settings: None }
+        Self { name, content, settings: None, registry: None }
     }
 
     #[must_use]
@@ -44,9 +44,39 @@ impl<'src> TestCase<'src> {
         self
     }
 
+    /// Replaces the shared plugin registry with a case-specific one, for
+    /// cases exercising configured plugins.
+    #[must_use]
+    pub fn registry(mut self, registry: PluginRegistry) -> Self {
+        self.registry = Some(registry);
+        self
+    }
+
     pub fn run(self) {
         run_test_case_inner(self);
     }
+}
+
+/// Registry for the `symfony_container_get` case: the shared library
+/// providers plus the Symfony plugin configured with the container XML
+/// fixture (Probe C of `PLUGINS-RFC.md`).
+#[must_use]
+pub fn symfony_container_fixture_registry() -> PluginRegistry {
+    use mago_analyzer::plugin::Plugin;
+    use mago_analyzer::plugin::PluginSettings;
+    use mago_analyzer::plugin::libraries::SymfonyPlugin;
+
+    let settings = PluginSettings {
+        symfony_container_xml_path: Some(std::path::PathBuf::from(concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/tests/fixtures/symfony_container.xml"
+        ))),
+    };
+
+    let mut registry = PluginRegistry::with_library_providers();
+    SymfonyPlugin.register(&mut registry, &settings);
+
+    registry
 }
 
 #[must_use]
@@ -116,8 +146,10 @@ fn run_test_case_inner(config: TestCase) {
 
     populate_codebase(&mut metadata, &mut symbol_references, WordSet::default(), HashSet::default());
 
+    let registry = config.registry.as_ref().unwrap_or(&PLUGIN_REGISTRY);
+
     let mut analysis_result = AnalysisResult::new(symbol_references);
-    let analyzer = Analyzer::new(&arena, source_file, &resolved_names, &metadata, &PLUGIN_REGISTRY, settings);
+    let analyzer = Analyzer::new(&arena, source_file, &resolved_names, &metadata, registry, settings);
 
     let analysis_run_result = analyzer.analyze(program, &mut analysis_result);
 

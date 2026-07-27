@@ -19,6 +19,13 @@ mod framework;
 /// 2. Read the content from the file `cases/my_test.php`.
 /// 3. Create and run a `TestCase` with that content and the specified settings.
 macro_rules! test_case {
+    ($test_name:ident, registry = $registry:expr) => {
+        #[test]
+        fn $test_name() {
+            let content = include_bytes!(concat!("cases/", stringify!($test_name), ".php"));
+            $crate::framework::TestCase::new(stringify!($test_name), content).registry($registry).run();
+        }
+    };
     ($test_name:ident, $settings:expr) => {
         #[test]
         fn $test_name() {
@@ -400,6 +407,12 @@ test_case!(psl_integration);
 test_case!(psl_int_range);
 test_case!(psr_container_get);
 test_case!(doctrine_find_by);
+
+// Probe C from `PLUGINS-RFC.md`: literal string service ids resolved
+// through a compiled Symfony container XML fixture. Uses a case-specific
+// registry because the `symfony` plugin only registers its provider when
+// pointed at a container dump.
+test_case!(symfony_container_get, registry = crate::framework::symfony_container_fixture_registry());
 test_case!(flow_php_integration);
 test_case!(reconcile_array_index_type);
 test_case!(reconcile_empty_string);
