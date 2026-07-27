@@ -41,7 +41,6 @@ use std::sync::OnceLock;
 use foldhash::HashSet;
 use mago_allocator::LocalArena;
 use mago_analyzer::plugin::PluginRegistry;
-use mago_analyzer::plugin::PluginSettings;
 use mago_analyzer::plugin::create_registry_with_plugins;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::reference::SymbolReferences;
@@ -116,7 +115,7 @@ impl<'cfg> Orchestrator<'cfg> {
             Arc::new(create_registry_with_plugins(
                 &self.config.analyzer_plugins,
                 self.config.disable_default_analyzer_plugins,
-                &PluginSettings::default(),
+                &self.config.analyzer_plugin_settings,
             ))
         }))
     }

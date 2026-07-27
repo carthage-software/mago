@@ -227,6 +227,7 @@ Les plugins fournissent des fournisseurs de types pour les bibliothèques et fra
 | :--- | :--- | :--- | :--- |
 | `disable-default-plugins` | `bool` | `false` | Désactive tous les plugins par défaut. Seuls les noms que vous listez dans `plugins` sont actifs. |
 | `plugins` | `string[]` | `[]` | Plugins à activer, par nom ou alias. |
+| `symfony-container-xml-path` | `string` | non défini | Chemin vers le XML du conteneur Symfony compilé (ex. `var/cache/test/App_KernelTestDebugContainer.xml`), utilisé par le plugin `symfony` pour résoudre les ids de service en chaîne. Les chemins relatifs sont résolus depuis la racine du workspace. |
 
 ### Plugins disponibles
 

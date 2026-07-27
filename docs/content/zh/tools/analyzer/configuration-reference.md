@@ -201,6 +201,7 @@ class StableService {
 | :--- | :--- | :--- | :--- |
 | `disable-default-plugins` | `bool` | `false` | 禁用所有默认插件。仅 `plugins` 中列出的名称会激活。 |
 | `plugins` | `string[]` | `[]` | 按名称或别名启用的插件。 |
+| `symfony-container-xml-path` | `string` | 未设置 | 编译后的 Symfony 容器 XML 转储路径（例如 `var/cache/test/App_KernelTestDebugContainer.xml`），供 `symfony` 插件解析字符串服务 id。相对路径基于工作区根目录解析。 |
 
 ### 可用插件
 

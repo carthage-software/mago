@@ -227,6 +227,7 @@ Plugins ship type providers for libraries and frameworks, so functions return pr
 | :--- | :--- | :--- | :--- |
 | `disable-default-plugins` | `bool` | `false` | Disable all default plugins. Only the names you list in `plugins` are active. |
 | `plugins` | `string[]` | `[]` | Plugins to enable, by name or alias. |
+| `symfony-container-xml-path` | `string` | unset | Path to the compiled Symfony container XML dump (e.g. `var/cache/test/App_KernelTestDebugContainer.xml`), used by the `symfony` plugin to resolve string service ids. Relative paths are resolved against the workspace root. |
 
 ### Available plugins
 

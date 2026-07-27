@@ -4,6 +4,7 @@ use std::io::IsTerminal;
 use clap::ColorChoice;
 use diffy::PatchFormatter;
 
+use mago_analyzer::plugin::PluginSettings;
 use mago_database::change::ChangeLog;
 use mago_database::file::File;
 use mago_linter::integration::IntegrationSet;
@@ -90,6 +91,14 @@ pub(crate) fn create_orchestrator<'a>(
         }
     };
 
+    let plugin_settings = PluginSettings {
+        symfony_container_xml_path: configuration
+            .analyzer
+            .symfony_container_xml_path
+            .as_ref()
+            .map(|path| if path.is_absolute() { path.clone() } else { configuration.source.workspace.join(path) }),
+    };
+
     let orchestrator_config = OrchestratorConfiguration {
         php_version: configuration.php_version,
         parser_settings: configuration.parser.to_settings(),
@@ -99,6 +108,7 @@ pub(crate) fn create_orchestrator<'a>(
         formatter_settings: configuration.formatter.settings,
         disable_default_analyzer_plugins: configuration.analyzer.disable_default_plugins,
         analyzer_plugins: configuration.analyzer.plugins.clone(),
+        analyzer_plugin_settings: plugin_settings,
         use_progress_bars,
         use_colors: should_use_colors(color_choice),
         paths: configuration.source.paths.clone(),

@@ -3,6 +3,7 @@
 //! This module defines [`OrchestratorConfiguration`], which aggregates all settings
 //! needed by the orchestrator and its various services.
 
+use mago_analyzer::plugin::PluginSettings;
 use mago_analyzer::settings::Settings as AnalyzerSettings;
 use mago_database::GlobSettings;
 use mago_formatter::settings::FormatSettings;
@@ -134,6 +135,12 @@ pub struct OrchestratorConfiguration<'cfg> {
     /// - `flow-php` (aliases: `flow`, `flow-etl`)
     /// - `psr-container` (aliases: `psr-11`)
     pub analyzer_plugins: Vec<String>,
+
+    /// Configuration consumed by analyzer plugins at registration time.
+    ///
+    /// For example, `symfony_container_xml_path` points the `symfony` plugin at a
+    /// compiled container XML dump so it can resolve string service ids.
+    pub analyzer_plugin_settings: PluginSettings,
 
     /// Whether to display progress bars during long-running operations.
     ///

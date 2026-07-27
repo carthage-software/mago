@@ -78,6 +78,17 @@ pub struct AnalyzerConfiguration {
     /// Example: `plugins = ["stdlib", "psl"]`
     pub plugins: Vec<String>,
 
+    /// Path to a compiled Symfony container XML dump, consumed by the `symfony` plugin.
+    ///
+    /// Points at the file Symfony writes when the container is compiled — for an
+    /// application under test, typically
+    /// `var/cache/test/App_KernelTestDebugContainer.xml`. The plugin uses it to
+    /// resolve literal string service ids in `get('...')` calls to their classes.
+    ///
+    /// Relative paths are resolved against the workspace root. When unset, the
+    /// `symfony` plugin registers no container-id provider.
+    pub symfony_container_xml_path: Option<PathBuf>,
+
     /// Whether to find unused expressions.
     pub find_unused_expressions: bool,
 
@@ -506,6 +517,7 @@ impl Default for AnalyzerConfiguration {
         Self {
             disable_default_plugins: false,
             plugins: vec![],
+            symfony_container_xml_path: None,
             excludes: vec![],
             ignore: vec![],
             baseline: None,
