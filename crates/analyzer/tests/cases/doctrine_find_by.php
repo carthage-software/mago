@@ -104,6 +104,18 @@ namespace App {
         public string $anything = '';
     }
 
+    #[ORM\Entity]
+    class LinkEntity
+    {
+        public function __construct(
+            #[ORM\Id]
+            #[ORM\Column]
+            public string $id,
+            #[ORM\Column]
+            public string $localIdentifier,
+        ) {}
+    }
+
     function unknown_field_is_reported(EntityManagerInterface $em): void
     {
         /** @mago-expect analysis:doctrine-unknown-field */
@@ -128,6 +140,15 @@ namespace App {
         $em->getRepository(UserEntity::class)->findBy(['active' => true], ['email' => 'ASC']);
         $em->getRepository(UserEntity::class)->count(['id' => 'some-uuid']);
         $repository->findOneBy(['manager' => null]);
+    }
+
+    function promoted_properties_are_persisted_fields(EntityManagerInterface $em): void
+    {
+        $em->getRepository(LinkEntity::class)->findOneBy(['localIdentifier' => 'x']);
+
+        // Column name used instead of the field name.
+        /** @mago-expect analysis:doctrine-unknown-field */
+        $em->getRepository(LinkEntity::class)->findOneBy(['local_identifier' => 'x']);
     }
 
     /**

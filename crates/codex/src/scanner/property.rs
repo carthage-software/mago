@@ -90,6 +90,7 @@ where
 
     let mut property_metadata = PropertyMetadata::new(*name, flags);
 
+    property_metadata.attributes.clone_from(&parameter_metadata.attributes);
     property_metadata.set_default_type_metadata(default_type_metadata);
     property_metadata.set_name_span(Some(name_span));
     property_metadata.set_span(Some(parameter.span()));
