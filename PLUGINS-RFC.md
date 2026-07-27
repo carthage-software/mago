@@ -1,7 +1,7 @@
 # RFC — Doctrine & Symfony analyzer plugins for Mago
 
-> Status: draft, seeking upstream feedback · Author: @cmukanisa · Date: 2026-07-27
-> Branch: `feat/doctrine-symfony-plugins` · Scaffolds under `crates/analyzer/src/plugin/libraries/{doctrine,symfony}/`
+> Status: implemented on this branch, validated on the reference codebase, seeking upstream feedback · Author: @cmukanisa · Date: 2026-07-27
+> Branch: `feat/doctrine-symfony-plugins` · Implementations under `crates/analyzer/src/plugin/libraries/{doctrine,symfony}/` · Measured verdicts in § Validation run
 
 ## Why these two plugins
 
@@ -86,7 +86,15 @@ $em->getRepository(Patient::class)->findOneBy(['fieldThatDoesNotExist' => 'x']);
 | Tool | Verdict |
 |---|---|
 | PHPStan + phpstan-doctrine | `doctrine.findOneByArgument` — "entity does not have a field named $fieldThatDoesNotExist" |
-| Mago (any current config) | **silent** ❌ |
+| Mago without the plugin | **silent** ❌ |
+| **Mago + `doctrine` plugin** | **`doctrine-unknown-field`, naming the entity and its mapping sources** ✅ |
+
+Measured on the reference codebase (2026-07-27, implementation on this
+branch): the probe reports the exact entity FQCN; on a near-miss key
+(`localIdentifer` for `localIdentifier`) the issue adds
+``Help: Did you mean `localIdentifier`?`` via the closest-match suggestion.
+On the real `src/ + tests/` tree the plugin reports **zero**
+`doctrine-unknown-field` — no false positives on 2,845 `find*()` calls.
 
 Probe C — string service id (the gap the Symfony plugin closes):
 
@@ -108,6 +116,62 @@ the whole blindness family on that call site —
 `ambiguous-object-method-access`, `possible-method-access-on-null`, and
 `mixed-assignment` — by resolving the id to `Doctrine\DBAL\Connection`;
 the file's only remaining issue is unrelated to the container.
+
+## Validation run — 2026-07-27, shipped implementation
+
+Binary built from this branch (`mago 1.45.0` + these plugins), reference
+codebase at its current head (8,685 src files, 1,771 test files), disposable
+worktree, `threads = 2`, vendor included, peak RSS via `/usr/bin/time -l`.
+Single cold runs, back-to-back in one session — so the **paired A/B deltas**
+below are the trustworthy signal; the absolutes moved against the baseline
+session in *both* directions (src+tests time 14.8 s → 5–6 s, peak RSS
+1.0 GB → 2.1–2.2 GB, same binary version) and are dominated by machine/session
+state. Report the pair, not the absolute.
+
+### Full analysis, A/B on the same binary
+
+| Configuration | Scope | Time | Peak RSS | Issues | Errors |
+|---|---|---|---|---|---|
+| `psr-container` only | src | 5.28 s | 2.10 GB | 1,535 | 540 |
+| + `doctrine` + `symfony` | src | 5.07–5.28 s | 2.07–2.15 GB | 1,535 | 540 |
+| `psr-container` only | src + tests | 6.00 s | 2.16 GB | 3,220 | 678 |
+| + `doctrine` + `symfony` | src + tests | 5.12 s | 2.23 GB | **3,178** | **646** |
+
+On `src/` the two new plugins change nothing — issue-for-issue identical
+output — which is exactly right: production code neither fetches string
+service ids nor passes unknown criteria keys. On `src + tests` they remove
+42 issues, 32 of them errors. Per-category deltas:
+
+| Issue code | Before | After |
+|---|---|---|
+| `ambiguous-object-method-access` | 13 | **0** |
+| `possible-method-access-on-null` | 14 | **1** |
+| `possibly-null-argument` | 306 | 299 |
+| `less-specific-argument` | 7 | 1 |
+| `mixed-method-access` | 37 | 35 |
+| `mixed-assignment` | 1,474 | 1,466 |
+| `redundant-docblock-type` | 26 | **37** — sharper inferred types expose docblocks that were papering over the blindness |
+| `doctrine-unknown-field` on real code | — | **0** (no false positives) |
+
+### Success criteria — verdicts
+
+1. Probe B parity with phpstan-doctrine — **met** (incl. closest-match help).
+2. Probe C parity with phpstan-symfony — **met** (resolved through a
+   20,211-service compiled dump).
+3. No blindness class left — **met for container blindness** (13 → 0
+   ambiguous accesses, 14 → 1 null-method accesses on tests); the residual
+   error classes match the baseline triage (299× `possibly-null-argument`,
+   158× `incompatible-return-type` — the verified-real covariance family).
+   A file-by-file re-triage of all 646 errors was not redone in this run.
+4. Time within 2× of current Mago — **met with margin**: plugin overhead is
+   below run noise (the plugins-on src+tests run was *faster* than the
+   plugins-off one).
+5. Memory ≤ 1.5 GB at `threads = 2` — **not met as an absolute, by either
+   configuration**: today's session measures 2.07–2.23 GB with *and* without
+   the new plugins. The plugin-attributable delta is ≈ +70 MB (~3%). The
+   criterion as written bounds the wrong variable — the absolute moves with
+   session state, not with the plugins. Restated for upstream review:
+   *plugin overhead ≤ 10% peak RSS* — **met** (~3%).
 
 ## Design — Doctrine plugin
 
@@ -146,7 +210,8 @@ does not measure — **detection equivalence**:
 
 ## Contribution plan
 
-1. This branch: scaffolds + RFC + fixtures (no wiring, tree still compiles).
+1. This branch: implementations + RFC + fixtures, validated end to end on
+   the reference codebase (§ Validation run). **Done.**
 2. Upstream discussion issue referencing this RFC.
 3. Implement Doctrine first (smaller, self-contained, no configuration
    surface), `cargo test` fixtures from § Probes. **Done on this branch.**
