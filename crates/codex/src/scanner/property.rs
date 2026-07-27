@@ -182,6 +182,7 @@ where
     match property {
         Property::Plain(plain_property) => {
             let verdict = evaluate_version_attributes(&plain_property.attribute_lists, context, context.php_version);
+            let attributes = scan_attribute_lists(&plain_property.attribute_lists, context);
 
             plain_property
                 .items
@@ -230,6 +231,7 @@ where
 
                     let mut metadata = PropertyMetadata::new(name, item_flags);
 
+                    metadata.attributes.clone_from(&attributes);
                     metadata.set_name_span(Some(name_span));
                     metadata.set_default_type_metadata(default_type);
                     metadata.set_visibility(read_visibility, write_visibility);
@@ -293,6 +295,7 @@ where
 
             let mut metadata = PropertyMetadata::new(name, flags);
 
+            metadata.attributes = scan_attribute_lists(&hooked_property.attribute_lists, context);
             metadata.set_name_span(Some(name_span));
             metadata.set_default_type_metadata(default_type);
             metadata.set_span(Some(hooked_property.span()));
