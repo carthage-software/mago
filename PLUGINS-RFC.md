@@ -67,8 +67,8 @@ entirely: 194× `ambiguous-object-method-access` and 195×
 Probe A — container service, nonexistent method:
 
 ```php
-$lookup = static::getContainer()->get(EmployeeGradeLookup::class);
-$lookup->methodeQuiNexistePas();
+$lookup = static::getContainer()->get(GradeLookup::class);
+$lookup->methodThatDoesNotExist();
 ```
 
 | Tool | Verdict |
@@ -80,12 +80,12 @@ $lookup->methodeQuiNexistePas();
 Probe B — Doctrine criteria key (the gap the Doctrine plugin closes):
 
 ```php
-$em->getRepository(UserEntity::class)->findOneBy(['champInexistant' => 'x']);
+$em->getRepository(Patient::class)->findOneBy(['fieldThatDoesNotExist' => 'x']);
 ```
 
 | Tool | Verdict |
 |---|---|
-| PHPStan + phpstan-doctrine | `doctrine.findOneByArgument` — "entity does not have a field named $champInexistant" |
+| PHPStan + phpstan-doctrine | `doctrine.findOneByArgument` — "entity does not have a field named $fieldThatDoesNotExist" |
 | Mago (any current config) | **silent** ❌ |
 
 ## Design — Doctrine plugin
