@@ -10,6 +10,7 @@ use std::sync::Arc;
 
 use wasm_bindgen::prelude::*;
 
+use mago_analyzer::plugin::PluginSettings;
 use mago_analyzer::plugin::available_plugins;
 use mago_analyzer::plugin::create_registry_with_plugins;
 use mago_analyzer::settings::Settings as AnalyzerSettings;
@@ -194,7 +195,8 @@ pub fn run(code: String, settings_js: JsValue) -> Result<JsValue, JsValue> {
     let s = &settings.analyzer;
     let analyzer_settings = build_analyzer_settings(s, version);
 
-    let plugin_registry = Arc::new(create_registry_with_plugins(&s.plugins, s.disable_default_plugins));
+    let plugin_registry =
+        Arc::new(create_registry_with_plugins(&s.plugins, s.disable_default_plugins, &PluginSettings::default()));
     let analysis_service = AnalysisService::new(
         prelude.database.read_only(),
         prelude.metadata,
@@ -313,7 +315,7 @@ pub fn analyze(code: String, php_version: &str) -> Result<JsValue, JsValue> {
     };
 
     // Use default plugin configuration (stdlib enabled by default)
-    let plugin_registry = Arc::new(create_registry_with_plugins(&[], false));
+    let plugin_registry = Arc::new(create_registry_with_plugins(&[], false, &PluginSettings::default()));
     let service = AnalysisService::new(
         prelude.database.read_only(),
         prelude.metadata,

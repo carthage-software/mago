@@ -7,6 +7,7 @@ pub use get::ContainerGetProvider;
 use crate::plugin::Plugin;
 use crate::plugin::PluginMeta;
 use crate::plugin::PluginRegistry;
+use crate::plugin::PluginSettings;
 
 /// Plugin providing type inference for psr/container interface.
 pub struct PsrContainerPlugin;
@@ -24,7 +25,7 @@ impl Plugin for PsrContainerPlugin {
         &META
     }
 
-    fn register(&self, registry: &mut PluginRegistry) {
+    fn register(&self, registry: &mut PluginRegistry, _settings: &PluginSettings) {
         registry.register_method_provider(ContainerGetProvider);
     }
 }

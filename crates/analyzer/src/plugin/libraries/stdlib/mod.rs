@@ -18,6 +18,7 @@ pub mod url;
 use crate::plugin::Plugin;
 use crate::plugin::PluginMeta;
 use crate::plugin::PluginRegistry;
+use crate::plugin::PluginSettings;
 
 /// Plugin providing type inference for PHP standard library functions.
 pub struct StdlibPlugin;
@@ -35,7 +36,7 @@ impl Plugin for StdlibPlugin {
         &META
     }
 
-    fn register(&self, registry: &mut PluginRegistry) {
+    fn register(&self, registry: &mut PluginRegistry, _settings: &PluginSettings) {
         registry.register_function_provider(string::StrlenProvider);
         registry.register_function_provider(string::SprintfProvider);
         registry.register_function_provider(json::JsonEncodeProvider);

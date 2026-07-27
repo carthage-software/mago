@@ -8,6 +8,7 @@ pub mod libraries;
 pub mod plugin;
 pub mod provider;
 pub mod registry;
+pub mod settings;
 
 pub use context::*;
 pub use error::*;
@@ -15,6 +16,7 @@ pub use hook::*;
 pub use plugin::*;
 pub use provider::*;
 pub use registry::PluginRegistry;
+pub use settings::PluginSettings;
 
 /// Returns a list of all available plugins with their metadata.
 #[must_use]
@@ -41,12 +43,17 @@ pub fn resolve_plugin_name(name: &str) -> Option<&'static str> {
 ///
 /// * `enabled_plugins` - List of plugin names/aliases to enable
 /// * `disable_defaults` - If true, default plugins are not automatically enabled
+/// * `settings` - Configuration consumed by plugins at registration time
 ///
 /// # Returns
 ///
 /// A new `PluginRegistry` with only the specified plugins registered.
 #[must_use]
-pub fn create_registry_with_plugins(enabled_plugins: &[String], disable_defaults: bool) -> PluginRegistry {
+pub fn create_registry_with_plugins(
+    enabled_plugins: &[String],
+    disable_defaults: bool,
+    settings: &PluginSettings,
+) -> PluginRegistry {
     let mut registry = PluginRegistry::new();
 
     for plugin in libraries::ALL_PLUGINS.iter() {
@@ -59,7 +66,7 @@ pub fn create_registry_with_plugins(enabled_plugins: &[String], disable_defaults
         let default_enabled = !disable_defaults && meta.default_enabled;
 
         if explicitly_enabled || default_enabled {
-            plugin.register(&mut registry);
+            plugin.register(&mut registry, settings);
         }
     }
 
@@ -71,9 +78,11 @@ pub fn create_registry_with_plugins(enabled_plugins: &[String], disable_defaults
 /// This is the legacy behavior for backwards compatibility.
 #[must_use]
 pub fn create_registry() -> PluginRegistry {
+    let settings = PluginSettings::default();
+
     let mut registry = PluginRegistry::new();
     for plugin in libraries::ALL_PLUGINS.iter() {
-        plugin.register(&mut registry);
+        plugin.register(&mut registry, &settings);
     }
 
     registry

@@ -21,6 +21,7 @@ pub use container_id::ContainerIdProvider;
 use crate::plugin::Plugin;
 use crate::plugin::PluginMeta;
 use crate::plugin::PluginRegistry;
+use crate::plugin::PluginSettings;
 
 /// Plugin providing container-aware type inference for Symfony applications.
 pub struct SymfonyPlugin;
@@ -38,7 +39,7 @@ impl Plugin for SymfonyPlugin {
         &META
     }
 
-    fn register(&self, registry: &mut PluginRegistry) {
+    fn register(&self, registry: &mut PluginRegistry, _settings: &PluginSettings) {
         let _ = registry; // TODO: registry.register_method_provider(ContainerIdProvider::from_config(...));
     }
 }

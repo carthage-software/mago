@@ -7,6 +7,7 @@ pub use type_structure::TypeStructureProvider;
 use crate::plugin::Plugin;
 use crate::plugin::PluginMeta;
 use crate::plugin::PluginRegistry;
+use crate::plugin::PluginSettings;
 
 /// Plugin providing type inference for flow-php/etl package.
 pub struct FlowPhpPlugin;
@@ -24,7 +25,7 @@ impl Plugin for FlowPhpPlugin {
         &META
     }
 
-    fn register(&self, registry: &mut PluginRegistry) {
+    fn register(&self, registry: &mut PluginRegistry, _settings: &PluginSettings) {
         registry.register_function_provider(TypeStructureProvider);
     }
 }

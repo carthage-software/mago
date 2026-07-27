@@ -10,6 +10,7 @@ pub use find_by::FindByFieldValidator;
 use crate::plugin::Plugin;
 use crate::plugin::PluginMeta;
 use crate::plugin::PluginRegistry;
+use crate::plugin::PluginSettings;
 
 /// Plugin providing argument validation for Doctrine ORM.
 ///
@@ -32,7 +33,7 @@ impl Plugin for DoctrinePlugin {
         &META
     }
 
-    fn register(&self, registry: &mut PluginRegistry) {
+    fn register(&self, registry: &mut PluginRegistry, _settings: &PluginSettings) {
         registry.register_method_provider(FindByFieldValidator);
     }
 }

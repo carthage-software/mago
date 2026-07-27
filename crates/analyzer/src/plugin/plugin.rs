@@ -1,6 +1,7 @@
 //! Plugin trait and metadata for analyzer plugins.
 
 use crate::plugin::PluginRegistry;
+use crate::plugin::PluginSettings;
 
 /// Metadata describing an analyzer plugin.
 #[derive(Debug, Clone)]
@@ -47,5 +48,8 @@ pub trait Plugin: Send + Sync {
     fn meta(&self) -> &'static PluginMeta;
 
     /// Registers all providers and hooks from this plugin into the registry.
-    fn register(&self, registry: &mut PluginRegistry);
+    ///
+    /// `settings` carries the per-plugin configuration; configuration-free
+    /// plugins simply ignore it.
+    fn register(&self, registry: &mut PluginRegistry, settings: &PluginSettings);
 }
