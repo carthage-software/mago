@@ -101,6 +101,14 @@ $mailer->methodThatDoesNotExist();
 | Mago without the plugin | `mixed-method-access` — admits blindness |
 | **Mago + `symfony` plugin** | **`non-existent-method`, resolved through the XML** ✅ |
 
+Measured on the reference codebase (2026-07-27, implementation on this
+branch, compiled test container: 20,147 service tags): on an integration
+test fetching `get('doctrine.dbal.central_connection')`, the plugin removes
+the whole blindness family on that call site —
+`ambiguous-object-method-access`, `possible-method-access-on-null`, and
+`mixed-assignment` — by resolving the id to `Doctrine\DBAL\Connection`;
+the file's only remaining issue is unrelated to the container.
+
 ## Design — Doctrine plugin
 
 See `crates/analyzer/src/plugin/libraries/doctrine/`. Summary: a method hook
@@ -140,6 +148,10 @@ does not measure — **detection equivalence**:
 1. This branch: scaffolds + RFC + fixtures (no wiring, tree still compiles).
 2. Upstream discussion issue referencing this RFC.
 3. Implement Doctrine first (smaller, self-contained, no configuration
-   surface), `cargo test` fixtures from § Probes.
-4. Symfony string-id second (needs a config key upstream may want to shape).
-5. PRs kept small: one provider per PR.
+   surface), `cargo test` fixtures from § Probes. **Done on this branch.**
+4. Symfony string-id second (needs a config key upstream may want to shape:
+   this branch proposes `symfony-container-xml-path` under `[analyzer]`,
+   threaded to plugins through a new `PluginSettings` passed at
+   registration). **Done on this branch.**
+5. PRs kept small: one provider per PR. `getParameter()` typing from the
+   same dump is the natural next provider.
