@@ -347,6 +347,7 @@ final class AnalyzerCodeModuleGenerator
         'unavailable-constant',
         'unavailable-class-constant',
         'unavailable-enum-case',
+        'doctrine-unknown-field',
     ];
 
     /**
