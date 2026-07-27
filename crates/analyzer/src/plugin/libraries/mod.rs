@@ -1,5 +1,6 @@
-//! Library-specific providers for PHP stdlib, PSL, Flow-PHP, and PSR-11 Container.
+//! Library-specific providers for PHP stdlib, PSL, Flow-PHP, PSR-11 Container, and Doctrine ORM.
 
+pub mod doctrine;
 pub mod flow_php;
 pub mod psl;
 pub mod psr_container;
