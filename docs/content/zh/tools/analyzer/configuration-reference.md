@@ -210,6 +210,7 @@ class StableService {
 | `psl` | `php-standard-library`、`azjezz-psl` | 未启用 | [php-standard-library](https://github.com/php-standard-library/php-standard-library)。 |
 | `flow-php` | `flow`、`flow-etl` | 未启用 | [flow-php/etl](https://github.com/flow-php/etl)。 |
 | `psr-container` | `psr-11` | 未启用 | [psr/container](https://github.com/php-fig/container)。 |
+| `doctrine` | `doctrine-orm` | 未启用 | Doctrine ORM：`findBy`/`findOneBy`/`count` 的条件键会根据实体的映射字段进行检查。 |
 
 举例来说,`stdlib` 插件会让分析器知道 `strlen($s)` 返回 `int<0, max>`,`json_decode($json, true)` 返回 `array<string, mixed>`,而 `array_filter($array)` 会保留输入形状但可能丢弃元素。
 

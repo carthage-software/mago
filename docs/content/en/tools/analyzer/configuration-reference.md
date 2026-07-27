@@ -236,6 +236,7 @@ Plugins ship type providers for libraries and frameworks, so functions return pr
 | `psl` | `php-standard-library`, `azjezz-psl` | disabled | [php-standard-library](https://github.com/php-standard-library/php-standard-library). |
 | `flow-php` | `flow`, `flow-etl` | disabled | [flow-php/etl](https://github.com/flow-php/etl). |
 | `psr-container` | `psr-11` | disabled | [psr/container](https://github.com/php-fig/container). |
+| `doctrine` | `doctrine-orm` | disabled | Doctrine ORM: `findBy`/`findOneBy`/`count` criteria keys checked against the entity's mapped fields. |
 
 For example, the `stdlib` plugin teaches the analyzer that `strlen($s)` returns `int<0, max>`, that `json_decode($json, true)` returns `array<string, mixed>`, and that `array_filter($array)` keeps the input shape but possibly drops elements.
 

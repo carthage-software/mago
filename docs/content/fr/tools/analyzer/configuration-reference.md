@@ -236,6 +236,7 @@ Les plugins fournissent des fournisseurs de types pour les bibliothèques et fra
 | `psl` | `php-standard-library`, `azjezz-psl` | désactivé | [php-standard-library](https://github.com/php-standard-library/php-standard-library). |
 | `flow-php` | `flow`, `flow-etl` | désactivé | [flow-php/etl](https://github.com/flow-php/etl). |
 | `psr-container` | `psr-11` | désactivé | [psr/container](https://github.com/php-fig/container). |
+| `doctrine` | `doctrine-orm` | désactivé | Doctrine ORM : clés de critères `findBy`/`findOneBy`/`count` vérifiées contre les champs mappés de l'entité. |
 
 Par exemple, le plugin `stdlib` apprend à l'analyseur que `strlen($s)` retourne `int<0, max>`, que `json_decode($json, true)` retourne `array<string, mixed>` et que `array_filter($array)` conserve la forme d'entrée mais peut perdre des éléments.
 
