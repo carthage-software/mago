@@ -1,10 +1,11 @@
-//! Library-specific providers for PHP stdlib, PSL, Flow-PHP, PSR-11 Container, and Doctrine ORM.
+//! Library-specific providers for PHP stdlib, PSL, Flow-PHP, PSR-11 Container, Doctrine ORM, and Symfony.
 
 pub mod doctrine;
 pub mod flow_php;
 pub mod psl;
 pub mod psr_container;
 pub mod stdlib;
+pub mod symfony;
 
 use crate::plugin::Plugin;
 

@@ -15,8 +15,10 @@
 //! 3. (later) `#[Autowire]`-style constructs where types are config-driven.
 
 mod container_id;
+pub mod container_xml;
 
 pub use container_id::ContainerIdProvider;
+pub use container_xml::ServiceMap;
 
 use crate::plugin::Plugin;
 use crate::plugin::PluginMeta;
