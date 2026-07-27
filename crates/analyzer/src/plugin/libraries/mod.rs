@@ -14,7 +14,8 @@ pub use flow_php::FlowPhpPlugin;
 pub use psl::PslPlugin;
 pub use psr_container::PsrContainerPlugin;
 pub use stdlib::StdlibPlugin;
+pub use symfony::SymfonyPlugin;
 
 /// All available analyzer plugins.
 pub static ALL_PLUGINS: &[&dyn Plugin] =
-    &[&StdlibPlugin, &PslPlugin, &FlowPhpPlugin, &PsrContainerPlugin, &DoctrinePlugin];
+    &[&StdlibPlugin, &PslPlugin, &FlowPhpPlugin, &PsrContainerPlugin, &DoctrinePlugin, &SymfonyPlugin];
