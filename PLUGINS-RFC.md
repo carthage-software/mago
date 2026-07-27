@@ -3,6 +3,29 @@
 > Status: implemented on this branch, validated on the reference codebase, seeking upstream feedback · Author: @cmukanisa · Date: 2026-07-27
 > Branch: `feat/doctrine-symfony-plugins` · Implementations under `crates/analyzer/src/plugin/libraries/{doctrine,symfony}/` · Measured verdicts in § Validation run
 
+## TL;DR for the upstream discussion
+
+Two analyzer plugins, implemented and validated end to end on a production
+Symfony 8.1 / Doctrine ORM 3 codebase (10,456 PHP files):
+
+- **`doctrine`** — validates literal criteria keys in `findBy` / `findOneBy` /
+  `count` against the entity's ORM attribute mapping. New issue code
+  `doctrine-unknown-field`, with a closest-match suggestion. Zero false
+  positives across 2,845 `find*()` calls on the reference codebase.
+- **`symfony`** — extends the `psr-container` idea to literal *string* service
+  ids, resolved through the compiled container XML (new analyzer setting
+  `symfony-container-xml-path`, the analogue of phpstan-symfony's
+  `containerXmlPath`). Fail-open on unknown ids.
+
+Measured effect (paired A/B, same binary, same session): −42 issues / −32
+errors on `src + tests`, the container-blindness families eliminated
+(13 → 0 `ambiguous-object-method-access`, 14 → 1
+`possible-method-access-on-null`), plugin overhead ~0 time and ~3% peak RSS.
+Detection parity with phpstan-doctrine / phpstan-symfony on the deliberate
+defect probes below. Proposed as one-provider-per-PR; the configuration key
+shape and the issue-code naming are the two decisions upstream may want to
+reshape.
+
 ## Why these two plugins
 
 Mago's analyzer already matches PHPStan `level: max` defect-for-defect on plain
