@@ -124,10 +124,11 @@ iteration; XML/YAML mappings out of scope. New issue code:
 
 See `crates/analyzer/src/plugin/libraries/symfony/`. Summary: the
 `psr-container` provider shape, extended to literal **string ids** resolved
-through the compiled container XML (`symfony.container-xml-path` analyzer
+through the compiled container XML (`symfony-container-xml-path` analyzer
 setting — for an app under test, `var/cache/test/App_Kernel*Container.xml`),
-plus `getParameter()` typing from the same source. Returns `None` (no opinion)
-on unknown ids: fail-open on typing, never a false positive.
+with `getParameter()` typing from the same source as a follow-up provider.
+Returns `None` (no opinion) on unknown ids: fail-open on typing, never a
+false positive.
 
 ## Success criteria, in benchmark form
 
