@@ -24,7 +24,7 @@ parameters, resolved through the compiled container XML.
 
 | | |
 |---|---|
-| Framework | Symfony 8.1, PHP 8.4, API Platform 4, Doctrine ORM 3 |
+| Framework | Symfony 8.x, PHP 8.4, API Platform 4, Doctrine ORM 3 — private codebase, anonymized |
 | `src/` | 8,681 PHP files |
 | `tests/` | 1,761 PHP files |
 | Container fetches in tests | 188 call sites across 95 files, `::class` idiom |
