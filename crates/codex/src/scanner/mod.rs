@@ -792,6 +792,47 @@ mod polyfill_tests {
         codebase.constants.get(&word(name)).unwrap_or_else(|| panic!("constant `{name}` not found")).flags
     }
 
+    fn property_attribute_names(codebase: &CodebaseMetadata, class: &str, property: &str) -> Vec<String> {
+        codebase
+            .class_likes
+            .get(&ascii_lowercase_word(class.as_bytes()))
+            .unwrap_or_else(|| panic!("class-like `{class}` not found"))
+            .properties
+            .get(&word(property))
+            .unwrap_or_else(|| panic!("property `{property}` not found on `{class}`"))
+            .attributes
+            .iter()
+            .map(|attribute| attribute.name.to_string())
+            .collect()
+    }
+
+    #[test]
+    fn property_attributes_are_recorded() {
+        let codebase = scan(
+            "<?php
+            #[Attribute]
+            final class Marker {}
+
+            final class Subject {
+                #[Marker]
+                public int $declared = 0;
+
+                #[Marker]
+                public int $grouped = 0, $alsoGrouped = 0;
+
+                public function __construct(#[Marker] public readonly int $promoted) {}
+            }
+        ",
+        );
+
+        assert_eq!(vec!["Marker"], property_attribute_names(&codebase, "Subject", "$declared"));
+        // A grouped declaration shares one attribute list; PHP applies it to every item.
+        assert_eq!(vec!["Marker"], property_attribute_names(&codebase, "Subject", "$grouped"));
+        assert_eq!(vec!["Marker"], property_attribute_names(&codebase, "Subject", "$alsoGrouped"));
+        // Attributes on a promoted parameter belong to the property it creates.
+        assert_eq!(vec!["Marker"], property_attribute_names(&codebase, "Subject", "$promoted"));
+    }
+
     #[test]
     fn class_in_not_class_exists_is_polyfill() {
         let code = "<?php
