@@ -200,6 +200,46 @@ fn parses_method_with_static_as_return_type_only() {
 }
 
 #[test]
+fn parses_method_named_static_without_whitespace_before_parameters() {
+    let arena = LocalArena::new();
+    let document = parse(&arena, b"/** @method static(int $value) */");
+    let tag = first_tag(&document);
+
+    let TagValue::Method(method) = &tag.value else { panic!() };
+    assert!(method.r#static.is_none());
+    assert!(method.return_type.is_none());
+    assert_eq!(method.name.value, b"static");
+    assert_eq!(method.parameters.entries.len(), 1);
+}
+
+#[test]
+fn parses_static_method_with_parenthesized_array_return_type() {
+    let arena = LocalArena::new();
+    let document = parse(&arena, b"/** @method static (string|int)[] getArray() */");
+    let tag = first_tag(&document);
+
+    let TagValue::Method(method) = &tag.value else { panic!() };
+    assert!(method.r#static.is_some());
+    assert!(matches!(method.return_type, Some(Type::Slice(_))));
+    assert_eq!(method.name.value, b"getArray");
+    assert_eq!(method.parameters.entries.len(), 0);
+}
+
+#[test]
+fn parses_static_method_with_parenthesized_callable_return_type() {
+    let arena = LocalArena::new();
+    let document = parse(&arena, b"/** @method static (callable(): string) getCallable() */");
+    let tag = first_tag(&document);
+
+    let TagValue::Method(method) = &tag.value else { panic!() };
+    assert!(method.r#static.is_some());
+    let Some(Type::Parenthesized(return_type)) = method.return_type else { panic!() };
+    assert!(matches!(return_type.inner, Type::Callable(_)));
+    assert_eq!(method.name.value, b"getCallable");
+    assert_eq!(method.parameters.entries.len(), 0);
+}
+
+#[test]
 fn parses_method_without_return_type() {
     let arena = LocalArena::new();
     let document = parse(&arena, b"/** @method getName() */");

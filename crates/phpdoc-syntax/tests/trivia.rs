@@ -54,6 +54,9 @@ fn every_source_token_is_accounted_for() {
     assert_every_token_is_accounted_for(b"/**\n * Summary.\n *\n * @param string $a first\n * @return bool\n */");
     assert_every_token_is_accounted_for(b"/** @var array{a: int, b: string} $map the map */");
     assert_every_token_is_accounted_for(b"/** @method static T find<T>(int $id, ?string $name = null) by id */");
+    assert_every_token_is_accounted_for(b"/** @method static(int $value) */");
+    assert_every_token_is_accounted_for(b"/** @method static (string|int)[] getArray() */");
+    assert_every_token_is_accounted_for(b"/** @method static (callable(): string) getCallable() */");
     assert_every_token_is_accounted_for(b"/** plain description with no tags */");
     assert_every_token_is_accounted_for(b"/** @var int // trailing line comment */");
     assert_every_token_is_accounted_for("/** @param string $مثال 中文描述 */".as_bytes());

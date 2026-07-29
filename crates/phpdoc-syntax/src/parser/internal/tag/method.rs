@@ -49,9 +49,10 @@ where
         let visibility = self.parse_optional_method_visibility()?;
 
         let first = self.parse_type_without_conditional()?;
-        let static_candidate = is_static_identifier(&first)
-            && !self.stream.is_at(TokenKind::LeftParenthesis)
-            && !self.stream.is_at(TokenKind::LeftAngleBracket);
+        let is_method_named_static =
+            self.stream.is_at(TokenKind::LeftParenthesis) && !self.stream.is_preceded_by_whitespace(0);
+        let static_candidate =
+            is_static_identifier(&first) && !is_method_named_static && !self.stream.is_at(TokenKind::LeftAngleBracket);
 
         let (r#static, return_type, name) = if static_candidate {
             let candidate = self.parse_type_without_conditional()?;
