@@ -49,3 +49,27 @@ function get_literal_items(): Builder
 
     return $model::query();
 }
+
+final class WeakReferenceOwner
+{
+    private bool $called = false;
+
+    public function callback(): Closure
+    {
+        $self = WeakReference::create($this);
+
+        return static function () use ($self): void {
+            $owner = $self->get();
+            if ($owner === null) {
+                return;
+            }
+
+            $owner->called = true;
+        };
+    }
+
+    public function wasCalled(): bool
+    {
+        return $this->called;
+    }
+}

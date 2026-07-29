@@ -733,7 +733,9 @@ fn resolve_static_type(
     options: &TypeExpansionOptions,
 ) {
     match &options.static_class_type {
-        StaticClassType::Exact(static_class) => {
+        StaticClassType::Exact(static_class)
+            if !check_compatibility || codebase.is_instance_of(static_class.as_bytes(), named.name.as_bytes()) =>
+        {
             named.name = *static_class;
             named.is_static = false;
             named.is_this = false;
