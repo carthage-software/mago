@@ -2,6 +2,7 @@ use mago_allocator::Arena;
 use std::rc::Rc;
 
 use mago_codex::ttype::TType;
+use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::get_bool;
 use mago_codex::ttype::get_false;
 use mago_codex::ttype::get_mixed;
@@ -10,6 +11,7 @@ use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
+use mago_syntax::cst::ArrayElement;
 use mago_syntax::cst::Binary;
 use mago_syntax::cst::BinaryOperator;
 use mago_syntax::cst::Expression;
@@ -17,6 +19,7 @@ use mago_syntax::cst::Literal;
 use mago_syntax::cst::Parenthesized;
 use mago_syntax::cst::Variable;
 use mago_text_edit::TextEdit;
+use mago_word::empty_word;
 use mago_word::word;
 
 use crate::analyzable::Analyzable;
@@ -299,7 +302,7 @@ where
 
                 if !should_be_specific {
                     get_bool()
-                } else if is_always_identical_to(lhs_type, rhs_type) {
+                } else if are_expressions_always_identical(binary.lhs, binary.rhs, lhs_type, rhs_type, artifacts) {
                     if !block_context.flags.inside_loop_expressions() {
                         report_redundant_comparison(context, artifacts, binary, "always equal to", "`true`");
                     }
@@ -321,7 +324,7 @@ where
 
                 if !should_be_specific {
                     get_bool()
-                } else if is_always_identical_to(lhs_type, rhs_type) {
+                } else if are_expressions_always_identical(binary.lhs, binary.rhs, lhs_type, rhs_type, artifacts) {
                     if !block_context.flags.inside_loop_expressions() {
                         report_redundant_comparison(
                             context,
@@ -355,7 +358,7 @@ where
 
                 if !should_be_specific {
                     get_bool()
-                } else if is_always_identical_to(lhs_type, rhs_type) {
+                } else if are_expressions_always_identical(binary.lhs, binary.rhs, lhs_type, rhs_type, artifacts) {
                     if !block_context.flags.inside_loop_expressions() {
                         report_redundant_comparison(context, artifacts, binary, "always identical to", "`true`");
                     }
@@ -377,7 +380,7 @@ where
 
                 if !should_be_specific {
                     get_bool()
-                } else if is_always_identical_to(lhs_type, rhs_type) {
+                } else if are_expressions_always_identical(binary.lhs, binary.rhs, lhs_type, rhs_type, artifacts) {
                     if !block_context.flags.inside_loop_expressions() {
                         report_redundant_comparison(
                             context,
@@ -416,6 +419,107 @@ fn get_boolean_literal(expr: &Expression<'_>) -> Option<bool> {
         Expression::Parenthesized(Parenthesized { expression, .. }) => get_boolean_literal(expression),
         _ => None,
     }
+}
+
+fn are_expressions_always_identical(
+    lhs: &Expression<'_>,
+    rhs: &Expression<'_>,
+    lhs_type: &TUnion,
+    rhs_type: &TUnion,
+    artifacts: &AnalysisArtifacts,
+) -> bool {
+    let lhs = unwrap_expression(lhs);
+    let rhs = unwrap_expression(rhs);
+
+    let lhs_elements = match lhs {
+        Expression::Array(array) => Some(array.elements.as_slice()),
+        Expression::LegacyArray(array) => Some(array.elements.as_slice()),
+        _ => None,
+    };
+
+    let rhs_elements = match rhs {
+        Expression::Array(array) => Some(array.elements.as_slice()),
+        Expression::LegacyArray(array) => Some(array.elements.as_slice()),
+        _ => None,
+    };
+
+    let (Some(lhs_elements), Some(rhs_elements)) = (lhs_elements, rhs_elements) else {
+        return is_always_identical_to(lhs_type, rhs_type);
+    };
+
+    if lhs_elements.len() != rhs_elements.len() {
+        return false;
+    }
+
+    lhs_elements.iter().zip(rhs_elements).all(|(lhs, rhs)| match (lhs, rhs) {
+        (ArrayElement::Value(lhs), ArrayElement::Value(rhs)) => {
+            let Some(lhs_type) = artifacts.get_expression_type(lhs.value) else {
+                return false;
+            };
+
+            let Some(rhs_type) = artifacts.get_expression_type(rhs.value) else {
+                return false;
+            };
+
+            are_expressions_always_identical(lhs.value, rhs.value, lhs_type, rhs_type, artifacts)
+        }
+        (ArrayElement::KeyValue(lhs), ArrayElement::KeyValue(rhs)) => {
+            let Some(lhs_key) = get_literal_array_key(lhs.key, artifacts) else {
+                return false;
+            };
+
+            let Some(rhs_key) = get_literal_array_key(rhs.key, artifacts) else {
+                return false;
+            };
+
+            let Some(lhs_type) = artifacts.get_expression_type(lhs.value) else {
+                return false;
+            };
+
+            let Some(rhs_type) = artifacts.get_expression_type(rhs.value) else {
+                return false;
+            };
+
+            lhs_key == rhs_key && are_expressions_always_identical(lhs.value, rhs.value, lhs_type, rhs_type, artifacts)
+        }
+        _ => false,
+    })
+}
+
+fn get_literal_array_key(expression: &Expression<'_>, artifacts: &AnalysisArtifacts) -> Option<ArrayKey> {
+    let key_type = artifacts.get_expression_type(expression)?;
+
+    Some(if key_type.is_null() {
+        ArrayKey::String(empty_word())
+    } else if key_type.is_true() {
+        ArrayKey::Integer(1)
+    } else if key_type.is_false() {
+        ArrayKey::Integer(0)
+    } else if let Some(value) = key_type.get_single_literal_float_value() {
+        ArrayKey::Integer(value.trunc() as i64)
+    } else if let Some(value) = key_type.get_single_literal_int_value() {
+        ArrayKey::Integer(value)
+    } else if let Some(value) = key_type.get_single_literal_string_value() {
+        match get_numeric_array_key(value) {
+            Some(value) => ArrayKey::Integer(value),
+            None => ArrayKey::String(word(value)),
+        }
+    } else {
+        return key_type.get_single_class_string_value().map(ArrayKey::String);
+    })
+}
+
+fn get_numeric_array_key(key: &[u8]) -> Option<i64> {
+    if key.starts_with(b"0") || key.starts_with(b"+") {
+        return None;
+    }
+
+    let key = std::str::from_utf8(key).ok()?;
+    if key.trim() != key {
+        return None;
+    }
+
+    key.parse().ok()
 }
 
 fn should_use_specific_equality_inference(

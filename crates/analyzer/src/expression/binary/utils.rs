@@ -1,5 +1,6 @@
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::float::TFloat;
 use mago_codex::ttype::comparator::union_comparator::can_expression_types_be_identical;
@@ -136,7 +137,67 @@ pub fn is_always_identical_to(lhs: &TUnion, rhs: &TUnion) -> bool {
         return l == r;
     }
 
-    false
+    if !lhs.is_single() || !rhs.is_single() {
+        return false;
+    }
+
+    match (lhs.get_single(), rhs.get_single()) {
+        (TAtomic::Array(lhs), TAtomic::Array(rhs)) => are_sealed_arrays_always_identical(lhs, rhs),
+        _ => false,
+    }
+}
+
+fn are_sealed_arrays_always_identical(lhs: &TArray, rhs: &TArray) -> bool {
+    match (lhs, rhs) {
+        (TArray::List(lhs), TArray::List(rhs)) => {
+            if !lhs.element_type.is_never()
+                || !rhs.element_type.is_never()
+                || lhs.known_count != rhs.known_count
+                || lhs.known_count.is_none()
+            {
+                return false;
+            }
+
+            let (Some(lhs_elements), Some(rhs_elements)) = (&lhs.known_elements, &rhs.known_elements) else {
+                return false;
+            };
+
+            lhs_elements.len() == rhs_elements.len()
+                && lhs_elements.iter().zip(rhs_elements).all(
+                    |((lhs_offset, (lhs_optional, lhs_type)), (rhs_offset, (rhs_optional, rhs_type)))| {
+                        lhs_offset == rhs_offset
+                            && !lhs_optional
+                            && !rhs_optional
+                            && is_always_identical_to(lhs_type, rhs_type)
+                    },
+                )
+        }
+        (TArray::Keyed(lhs), TArray::Keyed(rhs)) => {
+            if lhs.parameters.is_some() || rhs.parameters.is_some() {
+                return false;
+            }
+
+            let lhs_items = lhs.known_items.as_ref().filter(|items| !items.is_empty());
+            let rhs_items = rhs.known_items.as_ref().filter(|items| !items.is_empty());
+
+            match (lhs_items, rhs_items) {
+                (None, None) => !lhs.non_empty && !rhs.non_empty,
+                (Some(lhs_items), Some(rhs_items)) if lhs_items.len() <= 1 && rhs_items.len() <= 1 => {
+                    lhs_items.len() == rhs_items.len()
+                        && lhs_items.iter().zip(rhs_items).all(
+                            |((lhs_key, (lhs_optional, lhs_type)), (rhs_key, (rhs_optional, rhs_type)))| {
+                                lhs_key == rhs_key
+                                    && !lhs_optional
+                                    && !rhs_optional
+                                    && is_always_identical_to(lhs_type, rhs_type)
+                            },
+                        )
+                }
+                _ => false,
+            }
+        }
+        _ => false,
+    }
 }
 
 /// Checks if two types are guaranteed to be non-equal under PHP's loose equality (`==`).
