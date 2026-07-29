@@ -126,6 +126,18 @@ pub fn populate_function_like_metadata(
                 force_type_population,
             );
         }
+
+        if let Some(default) = template.default.as_mut()
+            && (force_type_population || default.needs_population())
+        {
+            populate_union_type(
+                default,
+                codebase_symbols,
+                Some(reference_source),
+                symbol_references,
+                force_type_population,
+            );
+        }
     }
 
     if let Some(type_resolution_context) = metadata.type_resolution_context.as_mut() {
@@ -134,6 +146,18 @@ pub fn populate_function_like_metadata(
                 if force_type_population || template.constraint.needs_population() {
                     populate_union_type(
                         &mut template.constraint,
+                        codebase_symbols,
+                        Some(reference_source),
+                        symbol_references,
+                        force_type_population,
+                    );
+                }
+
+                if let Some(default) = template.default.as_mut()
+                    && (force_type_population || default.needs_population())
+                {
+                    populate_union_type(
+                        default,
                         codebase_symbols,
                         Some(reference_source),
                         symbol_references,

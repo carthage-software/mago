@@ -371,6 +371,18 @@ pub fn populate_class_like_types(
                 force_repopulation,
             );
         }
+
+        if let Some(default) = template.default.as_mut()
+            && (default.needs_population() || force_repopulation)
+        {
+            populate_union_type(
+                default,
+                codebase_symbols,
+                Some(&class_like_reference_source),
+                symbol_references,
+                force_repopulation,
+            );
+        }
     }
 
     for template in &mut metadata.template_extended_offsets.values_mut().flatten() {
