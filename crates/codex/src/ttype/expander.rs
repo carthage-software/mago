@@ -143,7 +143,11 @@ impl Drop for ConstantExpansionGuard {
 pub enum StaticClassType {
     #[default]
     None,
+    /// The late-static type is bound to this exact class at the call site.
+    Exact(Word),
+    /// The class is known, but late-static identity must be preserved.
     Name(Word),
+    /// The late-static type is bound to a potentially specialized object.
     Object(TObject),
 }
 
@@ -423,7 +427,7 @@ fn resolve_array_key(key: ArrayKey, codebase: &CodebaseMetadata, options: &TypeE
         match name_lc.as_bytes() {
             b"self" => options.self_class.unwrap_or(class_like_name),
             b"static" | b"$this" => {
-                if let StaticClassType::Name(name) = &options.static_class_type {
+                if let StaticClassType::Exact(name) | StaticClassType::Name(name) = &options.static_class_type {
                     *name
                 } else {
                     options.self_class.unwrap_or(class_like_name)
@@ -729,6 +733,11 @@ fn resolve_static_type(
     options: &TypeExpansionOptions,
 ) {
     match &options.static_class_type {
+        StaticClassType::Exact(static_class) => {
+            named.name = *static_class;
+            named.is_static = false;
+            named.is_this = false;
+        }
         StaticClassType::Object(TObject::Named(static_obj)) => {
             // When `check_compatibility` is false, `named.name` is the literal
             // `static`/`$this` keyword rather than a class name, so no

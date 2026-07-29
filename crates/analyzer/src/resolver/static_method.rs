@@ -440,6 +440,8 @@ where
         } else {
             StaticClassType::Name(fq_class_id)
         }
+    } else if classname.is_named() || classname.is_from_literal_class_string() {
+        StaticClassType::Exact(fq_class_id)
     } else {
         StaticClassType::Name(fq_class_id)
     };

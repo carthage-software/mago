@@ -188,6 +188,8 @@ impl ResolvedClassname {
 
                 if codebase.symbols.contains_enum(lowercase_fqcn) {
                     TObject::Enum(TEnum::new(fqcn))
+                } else if self.can_extend_static() {
+                    TObject::Named(TNamedObject::new_static(fqcn))
                 } else {
                     TObject::Named(TNamedObject::new(fqcn))
                 }
