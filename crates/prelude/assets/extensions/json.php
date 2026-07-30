@@ -23,6 +23,8 @@ function json_last_error_msg(): string {}
 
 /**
  * @pure
+ *
+ * @assert-if-true non-empty-string $json
  */
 #[Mago\AvailableSince(80300)]
 function json_validate(string $json, int $depth = 512, int $flags = 0): bool {}
