@@ -227,30 +227,37 @@ where
     {
         let expanded_type =
             expand_type_metadata(context, block_context, &mut artifacts, function_like_metadata, return_type);
-        let expected_return_type_id = expanded_type.get_id();
 
-        let help_message = if expanded_type.is_nullable() {
-            "Ensure all code paths end with a `return` statement. You may need to add `return null;` to the paths that currently don't return a value.".to_string()
-        } else {
-            format!(
-                "Add a `return` statement that provides a value of type '{expected_return_type_id}' to all paths, or change the function's return type to '{expected_return_type_id}|null' and return `null` explicitly."
-            )
-        };
+        // A conditional return type whose branches are all `void`/`never` erases to `void`, which
+        // the check above cannot see through since it only sees the unexpanded conditional.
+        if !expanded_type.is_void() {
+            let expected_return_type_id = expanded_type.get_id();
 
-        context.collector.report_with_code(
-            IssueCode::MissingReturnStatement,
-            Issue::error(format!("Missing return statement in function `{}`", function_metadata.name))
-                .with_annotation(
-                    Annotation::primary(function_metadata.name_span.unwrap_or(function_metadata.span))
-                        .with_message(format!("This function is declared to return '{expected_return_type_id}'...")),
+            let help_message = if expanded_type.is_nullable() {
+                "Ensure all code paths end with a `return` statement. You may need to add `return null;` to the paths that currently don't return a value.".to_string()
+            } else {
+                format!(
+                    "Add a `return` statement that provides a value of type '{expected_return_type_id}' to all paths, or change the function's return type to '{expected_return_type_id}|null' and return `null` explicitly."
                 )
-                .with_annotation(
-                    Annotation::secondary(body.span())
-                        .with_message("...but this path can exit without returning a value."),
-                )
-                .with_note("A function that does not explicitly return a value will implicitly return `null`.")
-                .with_help(help_message),
-        );
+            };
+
+            context.collector.report_with_code(
+                IssueCode::MissingReturnStatement,
+                Issue::error(format!("Missing return statement in function `{}`", function_metadata.name))
+                    .with_annotation(
+                        Annotation::primary(function_metadata.name_span.unwrap_or(function_metadata.span))
+                            .with_message(format!(
+                                "This function is declared to return '{expected_return_type_id}'..."
+                            )),
+                    )
+                    .with_annotation(
+                        Annotation::secondary(body.span())
+                            .with_message("...but this path can exit without returning a value."),
+                    )
+                    .with_note("A function that does not explicitly return a value will implicitly return `null`.")
+                    .with_help(help_message),
+            );
+        }
     }
 
     check_return_type_width(context, block_context, &mut artifacts, function_like_metadata);
