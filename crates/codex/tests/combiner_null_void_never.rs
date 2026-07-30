@@ -62,9 +62,9 @@ fn void_with_resource_yields_resource_or_null() {
 }
 
 #[test]
-fn void_or_never_yields_null() {
-    assert_combines_to(vec![void(), never()], vec![null()]);
-    assert_combines_to(vec![never(), void()], vec![null()]);
+fn void_or_never_yields_void() {
+    assert_combines_to(vec![void(), never()], vec![void()]);
+    assert_combines_to(vec![never(), void()], vec![void()]);
 }
 
 #[test]

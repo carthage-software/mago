@@ -565,12 +565,12 @@ fn p_never_null() {
 
 #[test]
 fn p_void_never() {
-    check(vec![void(), never()], &["null"]);
+    check(vec![void(), never()], &["void"]);
 }
 
 #[test]
 fn p_never_void() {
-    check(vec![never(), void()], &["null"]);
+    check(vec![never(), void()], &["void"]);
 }
 
 #[test]

@@ -119,7 +119,7 @@ fn primitive_pairs_void() {
     check("void ∨ Foo", vec![void(), t_named("Foo")], &["Foo", "null"]);
     check("void ∨ resource", vec![void(), t_resource()], &["null", "resource"]);
     check("void ∨ array{}", vec![void(), t_empty_array()], &["array{}", "null"]);
-    check("void ∨ never", vec![void(), never()], &["null"]);
+    check("void ∨ never", vec![void(), never()], &["void"]);
     check("void ∨ mixed", vec![void(), mixed()], &["mixed"]);
 }
 
@@ -131,7 +131,7 @@ fn primitive_pairs_never() {
     check("never ∨ float", vec![never(), t_float()], &["float"]);
     check("never ∨ bool", vec![never(), t_bool()], &["bool"]);
     check("never ∨ null", vec![never(), null()], &["null"]);
-    check("never ∨ void", vec![never(), void()], &["null"]);
+    check("never ∨ void", vec![never(), void()], &["void"]);
     check("never ∨ object", vec![never(), t_object_any()], &["object"]);
     check("never ∨ Foo", vec![never(), t_named("Foo")], &["Foo"]);
     check("never ∨ resource", vec![never(), t_resource()], &["resource"]);
