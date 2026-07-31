@@ -183,6 +183,12 @@ pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, options: Combin
         return vec![TAtomic::Mixed(TMixed::new())];
     }
 
+    // `never` is the bottom type, absorbed by any other member of the union. Drop it up front so
+    // that it does not make the combination look non-simple, which would turn `void` into `null`.
+    if combination.value_types.len() > 1 {
+        combination.value_types.remove(&*ATOM_NEVER);
+    }
+
     if combination.is_simple() {
         if combination.value_types.contains_key(&*ATOM_FALSE) {
             return vec![TAtomic::Scalar(TScalar::r#false())];
