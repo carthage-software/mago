@@ -718,6 +718,7 @@ test_case!(sealed_class_performance);
 test_case!(class_instance);
 test_case!(conditional_return);
 test_case!(conditional_return_void_never_matches_native_void);
+test_case!(conditional_return_void_never_needs_no_return);
 test_case!(literal_int);
 test_case!(calling_interface_methods_from_trait);
 test_case!(parent_class_constant_validation);
