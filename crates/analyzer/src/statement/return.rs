@@ -1261,16 +1261,6 @@ mod tests {
 
             declare(strict_types=1);
 
-            #[Attribute(Attribute::TARGET_CLASS)]
-            class Attribute
-            {
-            }
-
-            #[Attribute(Attribute::TARGET_METHOD)]
-            class Override
-            {
-            }
-
             /**
              * @template T
              */
@@ -1304,7 +1294,6 @@ mod tests {
                 /**
                  * @assert-if-true R|L $value
                  */
-                #[Override]
                 public function matches(mixed $value): bool
                 {
                     return $this->left->matches($value) || $this->right->matches($value);
@@ -1319,7 +1308,6 @@ mod tests {
                 /**
                  * @assert-if-true string $value
                  */
-                #[Override]
                 public function matches(mixed $value): bool
                 {
                     return $this->matches($value);
@@ -1334,7 +1322,6 @@ mod tests {
                 /**
                  * @assert-if-true bool $value
                  */
-                #[Override]
                 public function matches(mixed $value): bool
                 {
                     return $this->matches($value);
@@ -1349,7 +1336,6 @@ mod tests {
                 /**
                  * @assert-if-true int $value
                  */
-                #[Override]
                 public function matches(mixed $value): bool
                 {
                     return $this->matches($value);
@@ -1364,7 +1350,6 @@ mod tests {
                 /**
                  * @assert-if-true float $value
                  */
-                #[Override]
                 public function matches(mixed $value): bool
                 {
                     return $this->matches($value);
