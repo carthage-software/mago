@@ -21,6 +21,7 @@ use crate::context::LintContext;
 use crate::requirements::RuleRequirements;
 use crate::rule::Config;
 use crate::rule::LintRule;
+use crate::rule::consistency::is_valid_identifier;
 use crate::rule_meta::RuleMeta;
 use crate::settings::RuleSettings;
 
@@ -155,6 +156,12 @@ impl PropertyNameRule {
 
         if self.cfg.either {
             if !is_camel_case(name_without_dollar) && !is_snake_case(name_without_dollar) {
+                let camel_name = to_camel_case(name_without_dollar);
+                let snake_name = to_snake_case(name_without_dollar);
+                if !is_valid_identifier(&camel_name) || !is_valid_identifier(&snake_name) {
+                    return;
+                }
+
                 ctx.collector.report(
                     Issue::new(
                         self.cfg.level(),
@@ -169,8 +176,8 @@ impl PropertyNameRule {
                     ))
                     .with_help(format!(
                         "Consider renaming it to `${}` or `${}` to adhere to the naming convention.",
-                        String::from_utf8_lossy(&to_camel_case(name_without_dollar)),
-                        String::from_utf8_lossy(&to_snake_case(name_without_dollar))
+                        String::from_utf8_lossy(&camel_name),
+                        String::from_utf8_lossy(&snake_name)
                     )),
                 );
             }
@@ -179,6 +186,11 @@ impl PropertyNameRule {
         }
 
         if self.cfg.camel && !is_camel_case(name_without_dollar) {
+            let suggested_name = to_camel_case(name_without_dollar);
+            if !is_valid_identifier(&suggested_name) {
+                return;
+            }
+
             ctx.collector.report(
                 Issue::new(self.cfg.level(), format!("Property name `{name}` should be in camel case."))
                     .with_code(self.meta.code)
@@ -188,10 +200,15 @@ impl PropertyNameRule {
                     .with_note(format!("The property name `{name}` does not follow camel naming convention."))
                     .with_help(format!(
                         "Consider renaming it to `${}` to adhere to the naming convention.",
-                        String::from_utf8_lossy(&to_camel_case(name_without_dollar))
+                        String::from_utf8_lossy(&suggested_name)
                     )),
             );
         } else if !self.cfg.camel && !is_snake_case(name_without_dollar) {
+            let suggested_name = to_snake_case(name_without_dollar);
+            if !is_valid_identifier(&suggested_name) {
+                return;
+            }
+
             ctx.collector.report(
                 Issue::new(self.cfg.level(), format!("Property name `{name}` should be in snake case."))
                     .with_code(self.meta.code)
@@ -201,7 +218,7 @@ impl PropertyNameRule {
                     .with_note(format!("The property name `{name}` does not follow snake naming convention."))
                     .with_help(format!(
                         "Consider renaming it to `${}` to adhere to the naming convention.",
-                        String::from_utf8_lossy(&to_snake_case(name_without_dollar))
+                        String::from_utf8_lossy(&suggested_name)
                     )),
             );
         }

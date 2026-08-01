@@ -15,6 +15,7 @@ use crate::context::LintContext;
 use crate::requirements::RuleRequirements;
 use crate::rule::Config;
 use crate::rule::LintRule;
+use crate::rule::consistency::is_valid_identifier;
 use crate::rule_meta::RuleMeta;
 use crate::settings::RuleSettings;
 use mago_bytes::BytesDisplay;
@@ -101,38 +102,48 @@ impl LintRule for TraitNameRule {
         let fqcn = BytesDisplay(ctx.lookup_name(&r#trait.name));
 
         if !is_class_case(name) {
-            issues.push(
-                Issue::new(self.cfg.level(), format!("Trait name `{name}` should be in class case."))
-                    .with_code(self.meta.code)
-                    .with_annotation(
-                        Annotation::primary(r#trait.name.span())
-                            .with_message(format!("Trait `{name}` is declared here")),
-                    )
-                    .with_annotation(
-                        Annotation::secondary(r#trait.span()).with_message(format!("Trait `{fqcn}` is defined here")),
-                    )
-                    .with_note(format!("The trait name `{name}` does not follow class naming convention."))
-                    .with_help(format!(
-                        "Consider renaming it to `{}` to adhere to the naming convention.",
-                        String::from_utf8_lossy(&mago_casing::to_class_case(name))
-                    )),
-            );
+            let suggested_name = mago_casing::to_class_case(name);
+            if is_valid_identifier(&suggested_name) {
+                issues.push(
+                    Issue::new(self.cfg.level(), format!("Trait name `{name}` should be in class case."))
+                        .with_code(self.meta.code)
+                        .with_annotation(
+                            Annotation::primary(r#trait.name.span())
+                                .with_message(format!("Trait `{name}` is declared here")),
+                        )
+                        .with_annotation(
+                            Annotation::secondary(r#trait.span())
+                                .with_message(format!("Trait `{fqcn}` is defined here")),
+                        )
+                        .with_note(format!("The trait name `{name}` does not follow class naming convention."))
+                        .with_help(format!(
+                            "Consider renaming it to `{}` to adhere to the naming convention.",
+                            String::from_utf8_lossy(&suggested_name)
+                        )),
+                );
+            }
         }
 
         if self.cfg.psr && !name_bytes.ends_with(b"Trait") {
-            issues.push(
-                Issue::new(self.cfg.level(), format!("Trait name `{name}` should be suffixed with `Trait`."))
-                    .with_code(self.meta.code)
-                    .with_annotation(
-                        Annotation::primary(r#trait.name.span())
-                            .with_message(format!("Trait `{name}` is declared here")),
-                    )
-                    .with_annotation(
-                        Annotation::secondary(r#trait.span()).with_message(format!("Trait `{fqcn}` is defined here")),
-                    )
-                    .with_note(format!("The trait name `{name}` does not follow PSR naming convention."))
-                    .with_help(format!("Consider renaming it to `{name}Trait` to adhere to the naming convention.")),
-            );
+            let suggested_name = format!("{name}Trait");
+            if is_valid_identifier(suggested_name.as_bytes()) {
+                issues.push(
+                    Issue::new(self.cfg.level(), format!("Trait name `{name}` should be suffixed with `Trait`."))
+                        .with_code(self.meta.code)
+                        .with_annotation(
+                            Annotation::primary(r#trait.name.span())
+                                .with_message(format!("Trait `{name}` is declared here")),
+                        )
+                        .with_annotation(
+                            Annotation::secondary(r#trait.span())
+                                .with_message(format!("Trait `{fqcn}` is defined here")),
+                        )
+                        .with_note(format!("The trait name `{name}` does not follow PSR naming convention."))
+                        .with_help(format!(
+                            "Consider renaming it to `{suggested_name}` to adhere to the naming convention."
+                        )),
+                );
+            }
         }
 
         for issue in issues {

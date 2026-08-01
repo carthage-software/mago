@@ -17,6 +17,7 @@ use crate::context::LintContext;
 use crate::requirements::RuleRequirements;
 use crate::rule::Config;
 use crate::rule::LintRule;
+use crate::rule::consistency::is_valid_identifier;
 use crate::rule_meta::RuleMeta;
 use crate::settings::RuleSettings;
 use mago_bytes::BytesDisplay;
@@ -100,6 +101,11 @@ impl LintRule for EnumNameRule {
         let fqcn = BytesDisplay(ctx.lookup_name(&r#enum.name));
 
         if !is_class_case(name) {
+            let suggested_name = to_class_case(name);
+            if !is_valid_identifier(&suggested_name) {
+                return;
+            }
+
             ctx.collector.report(
                 Issue::new(self.cfg.level(), format!("Enum name `{name}` should be in class case."))
                     .with_code(self.meta.code)
@@ -112,7 +118,7 @@ impl LintRule for EnumNameRule {
                     .with_note(format!("The enum name `{name}` does not follow class naming convention."))
                     .with_help(format!(
                         "Consider renaming it to `{}` to adhere to the naming convention.",
-                        String::from_utf8_lossy(&to_class_case(name))
+                        String::from_utf8_lossy(&suggested_name)
                     )),
             );
         }

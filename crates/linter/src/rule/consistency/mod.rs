@@ -26,6 +26,17 @@ pub mod string_style;
 pub mod trait_name;
 pub mod variable_name;
 
+use mago_syntax_core::part_of_identifier;
+use mago_syntax_core::start_of_identifier;
+
+fn is_valid_identifier(identifier: &[u8]) -> bool {
+    let Some((first, rest)) = identifier.split_first() else {
+        return false;
+    };
+
+    matches!(*first, start_of_identifier!()) && rest.iter().all(|byte| matches!(*byte, part_of_identifier!()))
+}
+
 pub use ambiguous_constant_access::*;
 pub use ambiguous_function_call::*;
 pub use array_style::*;
@@ -53,3 +64,64 @@ pub use property_name::*;
 pub use string_style::*;
 pub use trait_name::*;
 pub use variable_name::*;
+
+#[cfg(test)]
+mod tests {
+    use super::ClassNameRule;
+    use super::EnumNameRule;
+    use super::FunctionNameRule;
+    use super::InterfaceNameRule;
+    use super::MethodNameRule;
+    use super::PropertyNameRule;
+    use super::TraitNameRule;
+    use super::VariableNameRule;
+    use crate::test_lint_success;
+
+    test_lint_success! {
+        name = class_name_does_not_suggest_invalid_identifier,
+        rule = ClassNameRule,
+        code = "<?php class _360_class {}",
+    }
+
+    test_lint_success! {
+        name = interface_name_does_not_suggest_invalid_identifier,
+        rule = InterfaceNameRule,
+        code = "<?php interface _360_interface {}",
+    }
+
+    test_lint_success! {
+        name = trait_name_does_not_suggest_invalid_identifier,
+        rule = TraitNameRule,
+        code = "<?php trait _360_trait {}",
+    }
+
+    test_lint_success! {
+        name = enum_name_does_not_suggest_invalid_identifier,
+        rule = EnumNameRule,
+        code = "<?php enum _360_enum {}",
+    }
+
+    test_lint_success! {
+        name = function_name_does_not_suggest_invalid_identifier,
+        rule = FunctionNameRule,
+        code = "<?php function _360_FUNCTION(): void {}",
+    }
+
+    test_lint_success! {
+        name = method_name_does_not_suggest_invalid_identifier,
+        rule = MethodNameRule,
+        code = "<?php class Example { public function _360_METHOD(): void {} }",
+    }
+
+    test_lint_success! {
+        name = property_name_does_not_suggest_invalid_identifier,
+        rule = PropertyNameRule,
+        code = "<?php class Example { public string $_360_PROPERTY; }",
+    }
+
+    test_lint_success! {
+        name = variable_name_does_not_suggest_invalid_identifier,
+        rule = VariableNameRule,
+        code = "<?php $___360 = 1;",
+    }
+}

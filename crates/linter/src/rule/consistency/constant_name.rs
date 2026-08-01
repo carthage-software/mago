@@ -16,6 +16,7 @@ use crate::context::LintContext;
 use crate::requirements::RuleRequirements;
 use crate::rule::Config;
 use crate::rule::LintRule;
+use crate::rule::consistency::is_valid_identifier;
 use crate::rule_meta::RuleMeta;
 use crate::settings::RuleSettings;
 
@@ -105,6 +106,11 @@ impl LintRule for ConstantNameRule {
                 for item in &constant.items {
                     let Some(name) = std::str::from_utf8(item.name.value).ok() else { continue };
                     if !is_constant_case(name) {
+                        let suggested_name = to_constant_case(name);
+                        if !is_valid_identifier(&suggested_name) {
+                            continue;
+                        }
+
                         ctx.collector.report(
                             Issue::new(self.cfg.level(), format!("Constant name `{name}` should be in constant case."))
                                 .with_code(self.meta.code)
@@ -117,7 +123,7 @@ impl LintRule for ConstantNameRule {
                                 ))
                                 .with_help(format!(
                                     "Consider renaming it to `{}` to adhere to the naming convention.",
-                                    String::from_utf8_lossy(&to_constant_case(name))
+                                    String::from_utf8_lossy(&suggested_name)
                                 )),
                         );
                     }
@@ -128,6 +134,11 @@ impl LintRule for ConstantNameRule {
                     let Some(name) = std::str::from_utf8(item.name.value).ok() else { continue };
 
                     if !is_constant_case(name) {
+                        let suggested_name = to_constant_case(name);
+                        if !is_valid_identifier(&suggested_name) {
+                            continue;
+                        }
+
                         ctx.collector.report(
                             Issue::new(self.cfg.level(), format!("Constant name `{name}` should be in constant case."))
                                 .with_code(self.meta.code)
@@ -140,7 +151,7 @@ impl LintRule for ConstantNameRule {
                                 ))
                                 .with_help(format!(
                                     "Consider renaming it to `{}` to adhere to the naming convention.",
-                                    String::from_utf8_lossy(&to_constant_case(name))
+                                    String::from_utf8_lossy(&suggested_name)
                                 )),
                         );
                     }
@@ -148,5 +159,28 @@ impl LintRule for ConstantNameRule {
             }
             _ => {}
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use indoc::indoc;
+
+    use super::ConstantNameRule;
+    use crate::test_lint_success;
+
+    test_lint_success! {
+        name = does_not_suggest_invalid_identifier,
+        rule = ConstantNameRule,
+        code = indoc! {r"
+            <?php
+
+            const _360_TODO_FILTERS = '360TodoFilters';
+
+            final class Filters
+            {
+                public const _360_TODO_FILTERS = '360TodoFilters';
+            }
+        "}
     }
 }

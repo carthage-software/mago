@@ -17,6 +17,7 @@ use crate::context::LintContext;
 use crate::requirements::RuleRequirements;
 use crate::rule::Config;
 use crate::rule::LintRule;
+use crate::rule::consistency::is_valid_identifier;
 use crate::rule_meta::RuleMeta;
 use crate::settings::RuleSettings;
 
@@ -100,35 +101,42 @@ impl LintRule for ClassNameRule {
         let Some(name) = std::str::from_utf8(name_bytes).ok() else { return };
 
         if !is_class_case(name) {
-            let issue = Issue::new(self.cfg.level(), format!("Class name `{name}` should be in class case."))
-                .with_code(self.meta.code)
-                .with_annotation(
-                    Annotation::primary(class.name.span()).with_message(format!("Class `{name}` is declared here")),
-                )
-                .with_note(format!("The class name `{name}` does not follow class naming convention."))
-                .with_help(format!(
-                    "Consider renaming it to `{}` to adhere to the naming convention.",
-                    String::from_utf8_lossy(&to_class_case(name))
-                ));
+            let suggested_name = to_class_case(name);
+            if is_valid_identifier(&suggested_name) {
+                let issue = Issue::new(self.cfg.level(), format!("Class name `{name}` should be in class case."))
+                    .with_code(self.meta.code)
+                    .with_annotation(
+                        Annotation::primary(class.name.span()).with_message(format!("Class `{name}` is declared here")),
+                    )
+                    .with_note(format!("The class name `{name}` does not follow class naming convention."))
+                    .with_help(format!(
+                        "Consider renaming it to `{}` to adhere to the naming convention.",
+                        String::from_utf8_lossy(&suggested_name)
+                    ));
 
-            issues.push(issue);
+                issues.push(issue);
+            }
         }
 
         if class.modifiers.contains_abstract() && self.cfg.psr && !name_bytes.starts_with(b"Abstract") {
             let suggested_name = format!("Abstract{}", String::from_utf8_lossy(&to_class_case(name)));
 
-            issues.push(
-                Issue::new(
-                    self.cfg.level(),
-                    format!("Abstract class name `{name}` should be prefixed with `Abstract`."),
-                )
-                .with_code(self.meta.code)
-                .with_annotation(
-                    Annotation::primary(class.name.span()).with_message(format!("Class `{name}` is declared here")),
-                )
-                .with_note(format!("The abstract class name `{name}` does not follow PSR naming convention."))
-                .with_help(format!("Consider renaming it to `{suggested_name}` to adhere to the naming convention.")),
-            );
+            if is_valid_identifier(suggested_name.as_bytes()) {
+                issues.push(
+                    Issue::new(
+                        self.cfg.level(),
+                        format!("Abstract class name `{name}` should be prefixed with `Abstract`."),
+                    )
+                    .with_code(self.meta.code)
+                    .with_annotation(
+                        Annotation::primary(class.name.span()).with_message(format!("Class `{name}` is declared here")),
+                    )
+                    .with_note(format!("The abstract class name `{name}` does not follow PSR naming convention."))
+                    .with_help(format!(
+                        "Consider renaming it to `{suggested_name}` to adhere to the naming convention."
+                    )),
+                );
+            }
         }
 
         for issue in issues {

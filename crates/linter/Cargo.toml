@@ -20,6 +20,7 @@ mago-reporting = { workspace = true }
 mago-phpdoc-syntax = { workspace = true }
 mago-span = { workspace = true }
 mago-syntax = { workspace = true }
+mago-syntax-core = { workspace = true }
 mago-database = { workspace = true }
 mago-casing = { workspace = true }
 mago-names = { workspace = true }
