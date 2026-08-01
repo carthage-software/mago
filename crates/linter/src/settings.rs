@@ -164,6 +164,7 @@ use crate::rule::PslRegexFunctionsConfig;
 use crate::rule::PslSleepFunctionsConfig;
 use crate::rule::PslStringFunctionsConfig;
 use crate::rule::ReadableLiteralConfig;
+use crate::rule::RedundantStaticConfig;
 use crate::rule::RequireNamespaceConfig;
 use crate::rule::RequirePregQuoteDelimiterConfig;
 use crate::rule::SensitiveParameterConfig;
@@ -302,6 +303,7 @@ pub struct RulesSettings {
     pub no_redundant_yield_from: RuleSettings<NoRedundantYieldFromConfig>,
     pub no_self_assignment: RuleSettings<NoSelfAssignmentConfig>,
     pub no_protected_in_final: RuleSettings<NoProtectedInFinalConfig>,
+    pub redundant_static: RuleSettings<RedundantStaticConfig>,
     pub no_php_tag_terminator: RuleSettings<NoPhpTagTerminatorConfig>,
     pub nonce_verification: RuleSettings<NonceVerificationConfig>,
     pub no_noop: RuleSettings<NoNoopConfig>,

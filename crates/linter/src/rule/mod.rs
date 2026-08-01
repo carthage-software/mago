@@ -278,6 +278,7 @@ define_rules! {
     NoRedundantYieldFrom(no_redundant_yield_from @ NoRedundantYieldFromRule),
     NoSelfAssignment(no_self_assignment @ NoSelfAssignmentRule),
     NoProtectedInFinal(no_protected_in_final @ NoProtectedInFinalRule),
+    RedundantStatic(redundant_static @ RedundantStaticRule),
     NoPhpTagTerminator(no_php_tag_terminator @ NoPhpTagTerminatorRule),
     NonceVerification(nonce_verification @ NonceVerificationRule),
     NoNoop(no_noop @ NoNoopRule),
