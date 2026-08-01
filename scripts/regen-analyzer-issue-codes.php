@@ -286,6 +286,7 @@ final class AnalyzerCodeModuleGenerator
         'unreachable-else-clause',
         'unreachable-switch-case',
         'unreachable-switch-default',
+        'duplicate-switch-case',
         'invalid-isset-expression',
         'invalid-trait-use',
         'trait-constant-override',

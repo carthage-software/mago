@@ -80,11 +80,13 @@ where
     leftover_statements: Vec<Statement<'arena>>,
     leftover_case_equality_expression: Option<Expression<'arena>>,
     has_fallthrough: bool,
+    has_reachable_fallthrough: bool,
     negated_clauses: Vec<Clause>,
     new_assigned_variable_ids: WordMap<u32>,
     last_case_exit_type: ControlAction,
     case_exit_types: HashMap<usize, ControlAction>,
     case_actions: HashMap<usize, ControlActionSet>,
+    seen_case_condition_types: Vec<(Rc<TUnion>, Span)>,
     has_default_case: bool,
 }
 
@@ -109,11 +111,13 @@ where
             leftover_statements: vec![],
             leftover_case_equality_expression: None,
             has_fallthrough: false,
+            has_reachable_fallthrough: false,
             negated_clauses: vec![],
             new_assigned_variable_ids: WordMap::default(),
             last_case_exit_type: ControlAction::Break,
             case_exit_types: HashMap::default(),
             case_actions: HashMap::default(),
+            seen_case_condition_types: vec![],
             has_default_case: false,
         }
     }
@@ -369,8 +373,26 @@ where
             );
         }
 
+        let mut case_statements_are_reachable = self.has_reachable_fallthrough || result != Some(false);
+
         if let Some(case_condition) = switch_case.expression() {
+            let mut has_non_duplicate_empty_case = false;
+            for previous_empty_case in previous_empty_cases {
+                previous_empty_case.expression.analyze(self.context, self.block_context, self.artifacts)?;
+                if !self.check_for_duplicate_case_condition(previous_empty_case.expression, true) {
+                    has_non_duplicate_empty_case = true;
+                }
+            }
+
             case_condition.analyze(self.context, self.block_context, self.artifacts)?;
+            let has_alternate_entry = self.has_reachable_fallthrough || has_non_duplicate_empty_case;
+            let condition_is_duplicate = self.check_for_duplicate_case_condition(
+                case_condition,
+                switch_case.statements().is_empty() || has_alternate_entry,
+            );
+            if condition_is_duplicate && !has_alternate_entry {
+                result = Some(false);
+            }
 
             if result.is_none()
                 && let Some(condition_type) = self.artifacts.get_rc_expression_type(case_condition)
@@ -431,11 +453,9 @@ where
                 }
             }
 
-            case_equality_expression = Some(if !previous_empty_cases.is_empty() {
-                for previous_empty_case in previous_empty_cases {
-                    previous_empty_case.expression.analyze(self.context, self.block_context, self.artifacts)?;
-                }
+            case_statements_are_reachable = has_alternate_entry || result != Some(false);
 
+            case_equality_expression = Some(if !previous_empty_cases.is_empty() {
                 new_synthetic_disjunctive_equality(
                     self.context.arena,
                     switch_condition,
@@ -468,6 +488,7 @@ where
             }
 
             self.has_fallthrough = true;
+            self.has_reachable_fallthrough = case_statements_are_reachable;
             self.leftover_statements = case_stmts;
             self.artifacts.expression_types = old_expression_types;
 
@@ -625,6 +646,7 @@ where
         } else {
             analyze_statements(&case_stmts, self.context, &mut case_block_context, self.artifacts)?;
         }
+        self.has_reachable_fallthrough = false;
 
         let Some(case_scope) = self.artifacts.case_scopes.pop() else {
             return Ok(result);
@@ -716,6 +738,65 @@ where
         }
 
         Ok(result)
+    }
+
+    fn check_for_duplicate_case_condition(
+        &mut self,
+        condition: &Expression<'arena>,
+        statements_are_reachable: bool,
+    ) -> bool {
+        let Some(condition_type) = self.artifacts.get_rc_expression_type(condition).cloned() else {
+            return false;
+        };
+
+        if !is_always_identical_to(&condition_type, &condition_type) {
+            return false;
+        }
+
+        let duplicate_span = self
+            .seen_case_condition_types
+            .iter()
+            .find_map(|(seen_type, span)| is_always_identical_to(seen_type, &condition_type).then_some(*span));
+
+        if let Some(first_span) = duplicate_span {
+            if statements_are_reachable {
+                self.context.collector.report_with_code(
+                    IssueCode::DuplicateSwitchCase,
+                    Issue::warning("Duplicate switch case")
+                        .with_annotation(
+                            Annotation::primary(condition.span())
+                                .with_message("this case condition duplicates an earlier one"),
+                        )
+                        .with_annotation(
+                            Annotation::secondary(first_span).with_message("the same case value first appears here"),
+                        )
+                        .with_note(
+                            "This label cannot be selected independently, but its statements remain reachable through another case.",
+                        )
+                        .with_help("Remove the duplicate case label while preserving its reachable statements."),
+                );
+            } else {
+                self.context.collector.report_with_code(
+                    IssueCode::UnreachableSwitchCase,
+                    Issue::error("Unreachable switch case")
+                        .with_annotation(
+                            Annotation::primary(condition.span()).with_message("this case can never be entered"),
+                        )
+                        .with_annotation(
+                            Annotation::secondary(first_span).with_message("an earlier case has the same value"),
+                        )
+                        .with_note(
+                            "The earlier identical case is tested first, and control cannot fall through to these statements.",
+                        )
+                        .with_help("Remove this unreachable case and its statements."),
+                );
+            }
+
+            true
+        } else {
+            self.seen_case_condition_types.push((condition_type, condition.span()));
+            false
+        }
     }
 
     fn handle_non_returning_case(
