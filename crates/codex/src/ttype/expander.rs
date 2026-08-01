@@ -883,7 +883,9 @@ fn should_use_static_type_params(named: &TNamedObject, static_obj: &TNamedObject
 
     current_params.len() == templates.len()
         && current_params.iter().zip(templates.values()).all(|(current, template)| {
-            current == &template.constraint || template.default.as_ref().is_some_and(|default| current == default)
+            current.from_template_default()
+                || current == &template.constraint
+                || template.default.as_ref().is_some_and(|default| current == default)
         })
 }
 
@@ -1677,6 +1679,39 @@ mod tests {
                 false
             }
         }));
+    }
+
+    #[test]
+    fn test_expand_static_replaces_defaulted_type_parameters_with_receiver_parameters() {
+        let code = "<?php
+            /**
+             * @template TKey of array-key
+             * @template TValue
+             */
+            final class Collection {}
+        ";
+        let codebase = create_test_codebase(code);
+
+        let mut input = TNamedObject::new_static(ascii_lowercase_word(b"collection"));
+        let mut default_key = crate::ttype::get_arraykey();
+        default_key.set_from_template_default(true);
+        let mut default_value = crate::ttype::get_mixed();
+        default_value.set_from_template_default(true);
+        input.type_parameters = Some(vec![default_key, default_value]);
+
+        let receiver = TNamedObject::new_with_type_parameters(
+            ascii_lowercase_word(b"collection"),
+            Some(vec![crate::ttype::get_int(), crate::ttype::get_string()]),
+        );
+        let options = options_with_static_object(TObject::Named(receiver));
+        let mut actual = TUnion::from_atomic(TAtomic::Object(TObject::Named(input)));
+        expand_union(&codebase, &mut actual, &options);
+
+        let TAtomic::Object(TObject::Named(actual)) = &actual.types[0] else {
+            panic!("expected a named object");
+        };
+        let parameters = actual.type_parameters.as_ref().expect("expected type parameters");
+        assert_eq!(parameters, &[crate::ttype::get_int(), crate::ttype::get_string()]);
     }
 
     #[test]
