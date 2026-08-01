@@ -1,4 +1,4 @@
-use std::collections::HashMap;
+use std::collections::BTreeMap;
 use std::io::Write;
 
 use mago_database::DatabaseReader;
@@ -24,7 +24,9 @@ impl Formatter for CheckstyleFormatter {
         database: &ReadDatabase,
         config: &FormatterConfig,
     ) -> Result<(), ReportingError> {
-        let mut issues_by_file: HashMap<String, Vec<String>> = HashMap::new();
+        // Ordered, not hashed: `HashMap` iteration order is randomised per process, so grouping
+        // through one made this format's output differ between two runs over unchanged code.
+        let mut issues_by_file: BTreeMap<String, Vec<String>> = BTreeMap::new();
 
         for issue in crate::formatter::utils::filter_issues(issues, config, false) {
             let (filename, line, column) = match issue.primary_annotation() {

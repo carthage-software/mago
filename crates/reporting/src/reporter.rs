@@ -10,8 +10,10 @@
 
 use std::io::Write;
 
+use mago_database::DatabaseReader;
 use mago_database::ReadDatabase;
 
+use crate::Issue;
 use crate::IssueCollection;
 use crate::Level;
 use crate::baseline::Baseline;
@@ -117,6 +119,8 @@ impl Reporter {
     ) -> Result<ReportStatus, ReportingError> {
         let mut writer = self.config.target.resolve();
 
+        issues = in_file_order(issues, &self.database);
+
         // Apply baseline filtering
         let mut baseline_dead_issues = 0;
         let mut baseline_filtered_issues = 0;
@@ -200,6 +204,8 @@ impl Reporter {
     where
         W: Write,
     {
+        issues = in_file_order(issues, &self.database);
+
         // Apply baseline filtering
         let mut baseline_dead_issues = 0;
         let mut baseline_filtered_issues = 0;
@@ -249,6 +255,35 @@ impl Reporter {
             total_reported_issues,
         })
     }
+}
+
+/// Orders issues by file, then by position within it, and nothing else.
+///
+/// Files are analysed in parallel and their issues concatenated as workers finish, so without this
+/// the default is not "the order they appear in files" but the order the thread pool happened to
+/// produce, and two runs over unchanged code print the same findings in a different order.
+///
+/// Two things the key deliberately leaves alone:
+///
+/// Issues that share a file and a position keep the order the analyzer emitted them in, because the
+/// sort is stable and a single file is analysed on one thread. Parallelism reorders files, not the
+/// issues inside one, so that sequence is already reproducible and it reads better than any ordering
+/// this function could impose on it.
+///
+/// An issue with no primary span, or one whose file is not in the database, sorts ahead of everything
+/// else: `None` orders before `Some`. Those are not about a particular file, so leading with them is
+/// the useful place to put them.
+fn in_file_order(issues: IssueCollection, database: &ReadDatabase) -> IssueCollection {
+    let mut issues: Vec<Issue> = issues.into_iter().collect();
+
+    issues.sort_by_cached_key(|issue| {
+        let span = issue.primary_span();
+        let name = span.and_then(|span| database.get_ref(&span.file_id).ok()).map(|file| file.name.to_vec());
+
+        (name, span.map_or(0, |span| span.start.offset))
+    });
+
+    IssueCollection::from(issues)
 }
 
 #[cfg(test)]

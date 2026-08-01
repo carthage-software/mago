@@ -91,11 +91,13 @@ fn compare_issues(a: &&Issue, b: &&Issue) -> Ordering {
         Ordering::Equal => match a.code.as_deref().cmp(&b.code.as_deref()) {
             Ordering::Less => Ordering::Less,
             Ordering::Greater => Ordering::Greater,
+            // The message is the tiebreak. Without it, level, code and span can all tie and the
+            // order is then decided by whichever worker finished first.
             Ordering::Equal => match (a.primary_span(), b.primary_span()) {
-                (Some(a_span), Some(b_span)) => a_span.cmp(&b_span),
+                (Some(a_span), Some(b_span)) => a_span.cmp(&b_span).then_with(|| a.message.cmp(&b.message)),
                 (Some(_), None) => Ordering::Less,
                 (None, Some(_)) => Ordering::Greater,
-                (None, None) => Ordering::Equal,
+                (None, None) => a.message.cmp(&b.message),
             },
         },
     }

@@ -814,10 +814,16 @@ impl IssueCollection {
         Self { issues: self.issues.into_iter().filter(|issue| !issue.edits.is_empty()).collect() }
     }
 
-    /// Sorts the issues in the collection.
+    /// Sorts the issues in the collection: by level, then code, then primary span, then message.
     ///
-    /// The issues are sorted by severity level in ascending order,
-    /// then by code in ascending order, and finally by the primary annotation span.
+    /// This is not a total order. Two issues agreeing on all four keys compare equal while still
+    /// differing in their notes, annotations or suggested edits, and the sort being stable means such
+    /// a pair keeps the order it arrived in. The message is there because without it the tie is far
+    /// wider, and a tie is settled by whichever worker happened to finish first.
+    ///
+    /// Note that the reporting pipeline does not go through here. `--sort` is applied per formatter,
+    /// by `formatter::utils::compare_issues`, which orders by the same keys. This method is kept in
+    /// step with it so that an external caller gets the same answer.
     #[must_use]
     pub fn sorted(self) -> Self {
         let mut issues = self.issues;
@@ -833,10 +839,10 @@ impl IssueCollection {
                     let b_span = b.primary_span();
 
                     match (a_span, b_span) {
-                        (Some(a_span), Some(b_span)) => a_span.cmp(&b_span),
+                        (Some(a_span), Some(b_span)) => a_span.cmp(&b_span).then_with(|| a.message.cmp(&b.message)),
                         (Some(_), None) => Ordering::Less,
                         (None, Some(_)) => Ordering::Greater,
-                        (None, None) => Ordering::Equal,
+                        (None, None) => a.message.cmp(&b.message),
                     }
                 }
             },
