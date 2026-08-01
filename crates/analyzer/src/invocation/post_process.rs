@@ -443,6 +443,14 @@ fn clear_object_property_narrowings<'ctx, 'arena, A>(
 {
     let metadata = invocation.target.get_function_like_metadata();
 
+    let preserves_stable_method_results = metadata.is_some_and(|metadata| {
+        (metadata.flags.is_pure() || metadata.flags.is_mutation_free()) && !metadata.flags.suspends_fiber()
+    });
+    if !preserves_stable_method_results {
+        block_context.stable_method_call_assertions.clear();
+        block_context.stable_method_calls.clear();
+    }
+
     if let Some(metadata) = metadata
         && (metadata.flags.is_pure() || metadata.flags.is_mutation_free() || metadata.flags.is_external_mutation_free())
         && !metadata.flags.suspends_fiber()

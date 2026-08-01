@@ -225,6 +225,19 @@ fn get_extended_expression_id<'ast, 'arena>(
         Expression::ArrayAccess(array_access) => {
             get_array_access_id(array_access, this_class_name, resolved_names, codebase)?
         }
+        Expression::Call(Call::Method(MethodCall {
+            object,
+            method: ClassLikeMemberSelector::Identifier(method),
+            argument_list,
+            ..
+        })) if argument_list.arguments.is_empty() => {
+            let object = get_expression_id(object, this_class_name, resolved_names, codebase)?;
+            if object.as_bytes().ends_with(b"()") {
+                return None;
+            }
+
+            concat_word!(object.as_bytes(), b"->", method.value, b"()")
+        }
         Expression::Self_(_) => {
             if let Some(class_name) = this_class_name {
                 class_name

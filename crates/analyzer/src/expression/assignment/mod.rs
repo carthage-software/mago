@@ -329,6 +329,17 @@ where
         analyze_reference_assignment(context, block_context, target_expression, source_expression);
     }
 
+    if let Some(root) = get_root_expression_id(target_expression) {
+        let belongs_to_root =
+            |key: &Word| key.as_bytes().strip_prefix(root.as_bytes()).is_some_and(|suffix| suffix.starts_with(b"->"));
+
+        block_context.stable_method_call_assertions.retain(|key, _| !belongs_to_root(key));
+        block_context.stable_method_calls.retain(|key| !belongs_to_root(key));
+    } else if !matches!(target_expression, Expression::Variable(_)) {
+        block_context.stable_method_call_assertions.clear();
+        block_context.stable_method_calls.clear();
+    }
+
     match target_expression {
         Expression::Variable(target_variable) if target_expression_id.is_some() => analyze_assignment_to_variable(
             context,

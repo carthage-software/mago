@@ -133,6 +133,13 @@ pub struct BlockContext<'ctx> {
     /// Key: method call expression id (e.g., "$statements->first()")
     /// Value: assertion set to apply to the method's return type
     pub active_method_call_assertions: WordMap<AssertionSet>,
+
+    /// Assertions inferred for repeated zero-argument method calls in the active branch.
+    pub stable_method_call_assertions: WordMap<AssertionSet>,
+
+    /// Zero-argument method calls known to be stable since the last potentially
+    /// mutating invocation.
+    pub stable_method_calls: WordSet,
 }
 
 impl BreakContext {
@@ -212,6 +219,8 @@ impl<'ctx> BlockContext<'ctx> {
             called_methods: HashSet::default(),
             calls_parent_initializer: None,
             active_method_call_assertions: WordMap::default(),
+            stable_method_call_assertions: WordMap::default(),
+            stable_method_calls: WordSet::default(),
         };
 
         if register_super_globals {

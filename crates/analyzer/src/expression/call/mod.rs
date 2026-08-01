@@ -1,6 +1,7 @@
 use mago_allocator::Arena;
 use std::sync::Arc;
 
+use mago_algebra::assertion_set::AssertionSet;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::ttype::TType;
@@ -93,6 +94,18 @@ where
             None
         }
     });
+
+    let method_call_is_stable = matches!(
+        invocation_arguments,
+        InvocationArgumentsSource::ArgumentList(arguments) if arguments.arguments.is_empty()
+    ) && !invocation_targets.is_empty()
+        && invocation_targets.iter().all(|target| {
+            let InvocationTarget::FunctionLike { metadata, method_context: Some(_), .. } = target else {
+                return false;
+            };
+
+            (metadata.flags.is_pure() || metadata.flags.is_mutation_free()) && !metadata.flags.suspends_fiber()
+        });
 
     let mut resulting_type = None;
     for target in invocation_targets {
@@ -218,8 +231,20 @@ where
         }
     };
 
-    let resulting_type =
-        apply_method_call_assertions(context, block_context, this_variable, method_name_for_assertions, resulting_type);
+    if method_call_is_stable
+        && let (Some(this_variable), Some(method_name)) = (this_variable, method_name_for_assertions)
+    {
+        block_context.stable_method_calls.insert(concat_word!(this_variable, "->", method_name, "()"));
+    }
+
+    let resulting_type = apply_method_call_assertions(
+        context,
+        block_context,
+        this_variable,
+        method_name_for_assertions,
+        method_call_is_stable,
+        resulting_type,
+    );
 
     if resulting_type.is_never() && !block_context.flags.inside_loop() {
         artifacts.set_expression_type(&call_span, resulting_type);
@@ -243,6 +268,7 @@ fn apply_method_call_assertions<'ctx, A>(
     block_context: &BlockContext<'ctx>,
     this_variable: Option<&[u8]>,
     method_name: Option<Word>,
+    method_is_stable: bool,
     mut return_type: TUnion,
 ) -> TUnion
 where
@@ -256,29 +282,31 @@ where
         return return_type;
     };
 
-    if block_context.active_method_call_assertions.is_empty() {
-        return return_type;
-    }
-
     let method_call_key = concat_word!(this_var, "->", method, "()");
-    let Some(assertions) = block_context.active_method_call_assertions.get(&method_call_key) else {
-        return return_type;
+
+    let mut apply_assertions = |assertions: &AssertionSet| {
+        for clause in assertions {
+            for assertion in clause {
+                return_type = assertion_reconciler::reconcile(
+                    context,
+                    assertion,
+                    Some(&return_type),
+                    None,
+                    block_context.flags.inside_loop(),
+                    None,
+                    false,
+                    false,
+                );
+            }
+        }
     };
 
-    // Apply the assertions to narrow the return type using the reconciler
-    for clause in assertions.iter() {
-        for assertion in clause {
-            return_type = assertion_reconciler::reconcile(
-                context,
-                assertion,
-                Some(&return_type),
-                None,
-                block_context.flags.inside_loop(),
-                None,
-                false,
-                false,
-            );
-        }
+    if method_is_stable && let Some(assertions) = block_context.stable_method_call_assertions.get(&method_call_key) {
+        apply_assertions(assertions);
+    }
+
+    if let Some(assertions) = block_context.active_method_call_assertions.get(&method_call_key) {
+        apply_assertions(assertions);
     }
 
     return_type
