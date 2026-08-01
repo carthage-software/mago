@@ -277,6 +277,10 @@ pub fn get_property_access_expression_id<'ast, 'arena>(
     codebase: Option<&CodebaseMetadata>,
 ) -> Option<Word> {
     let object = get_expression_id(object_expression, this_class_name, resolved_names, codebase)?;
+    if object.as_bytes().ends_with(b"()") {
+        return None;
+    }
+
     let property = get_member_selector_id(selector, this_class_name, resolved_names, codebase)?;
 
     Some(if is_null_safe {

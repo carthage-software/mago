@@ -116,7 +116,7 @@ pub fn reconcile_keyed_types<'ctx, A>(
 
     for (key, new_type_parts) in &new_types {
         let key_str = key.as_bytes();
-        if key_str.ends_with(b"()") {
+        if key_str.ends_with(b"()") && !block_context.locals.contains_key(key) {
             if block_context.stable_method_calls.contains(key) {
                 block_context.stable_method_call_assertions.entry(*key).or_default().extend(new_type_parts.clone());
             }

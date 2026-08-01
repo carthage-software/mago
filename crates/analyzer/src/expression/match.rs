@@ -1,3 +1,4 @@
+use std::collections::hash_map::Entry;
 use std::convert::AsRef;
 use std::ops::Deref;
 use std::rc::Rc;
@@ -267,7 +268,15 @@ where
             self.context.resolved_names,
             Some(self.context.codebase),
         ) {
-            (false, id, self.stmt.expression.clone())
+            let inserted = match self.block_context.locals.entry(id) {
+                Entry::Occupied(_) => false,
+                Entry::Vacant(entry) => {
+                    entry.insert(Rc::clone(subject_type));
+                    true
+                }
+            };
+
+            (inserted, id, self.stmt.expression.clone())
         } else {
             let subject_id_str =
                 format!("{}{}", Self::SYNTHETIC_MATCH_VAR_PREFIX, self.stmt.expression.span().start.offset);

@@ -335,9 +335,15 @@ where
 
         block_context.stable_method_call_assertions.retain(|key, _| !belongs_to_root(key));
         block_context.stable_method_calls.retain(|key| !belongs_to_root(key));
+        block_context.clauses.retain(|clause| !clause.possibilities.keys().any(belongs_to_root));
+        block_context.reconciled_expression_clauses.retain(|clause| !clause.possibilities.keys().any(belongs_to_root));
     } else if !matches!(target_expression, Expression::Variable(_)) {
         block_context.stable_method_call_assertions.clear();
         block_context.stable_method_calls.clear();
+        block_context.clauses.retain(|clause| !clause.possibilities.keys().any(|key| key.as_bytes().ends_with(b"()")));
+        block_context
+            .reconciled_expression_clauses
+            .retain(|clause| !clause.possibilities.keys().any(|key| key.as_bytes().ends_with(b"()")));
     }
 
     match target_expression {
