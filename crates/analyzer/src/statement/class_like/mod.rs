@@ -354,7 +354,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Class<'arena> {
             artifacts,
             self.attribute_lists.as_slice(),
             AttributeTarget::ClassLike,
-        );
+        )?;
 
         let name = context.resolved_names.get(&self.name);
         let Some(class_like_metadata) = context.codebase.get_class_like(name) else {
@@ -496,7 +496,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Interface<'arena> {
             artifacts,
             self.attribute_lists.as_slice(),
             AttributeTarget::ClassLike,
-        );
+        )?;
 
         let name = context.resolved_names.get(&self.name);
         let Some(class_like_metadata) = context.codebase.get_class_like(name) else {
@@ -583,7 +583,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Trait<'arena> {
             artifacts,
             self.attribute_lists.as_slice(),
             AttributeTarget::ClassLike,
-        );
+        )?;
 
         let name = context.resolved_names.get(&self.name);
         let Some(class_like_metadata) = context.codebase.get_class_like(name) else {
@@ -670,7 +670,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Enum<'arena> {
             artifacts,
             self.attribute_lists.as_slice(),
             AttributeTarget::ClassLike,
-        );
+        )?;
 
         let name = context.resolved_names.get(&self.name);
         let Some(class_like_metadata) = context.codebase.get_class_like(name) else {

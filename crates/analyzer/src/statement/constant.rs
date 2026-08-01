@@ -30,7 +30,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Constant<'arena> {
             artifacts,
             self.attribute_lists.as_slice(),
             AttributeTarget::Constant,
-        );
+        )?;
 
         for item in &self.items {
             let name_bytes = context.resolved_names.get(&item.name);

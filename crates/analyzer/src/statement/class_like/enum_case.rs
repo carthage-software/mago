@@ -32,7 +32,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for EnumCase<'arena> {
             artifacts,
             self.attribute_lists.as_slice(),
             AttributeTarget::ClassLikeConstant,
-        );
+        )?;
 
         self.item.analyze(context, block_context, artifacts)
     }

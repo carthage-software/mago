@@ -125,6 +125,8 @@ pub enum InvocationArgumentsSource<'ast, 'arena> {
     PipeInput(&'ast Pipe<'arena>),
     /// Arguments from a partial application, which may include placeholders.
     PartialArgumentList(&'ast PartialArgumentList<'arena>),
+    /// Constructor arguments supplied to an attribute.
+    AttributeArgumentList(&'ast PartialArgumentList<'arena>),
 }
 
 /// Represents a single argument passed during an invocation, abstracting whether
@@ -450,7 +452,8 @@ impl<'ast, 'arena> InvocationArgumentsSource<'ast, 'arena> {
             InvocationArgumentsSource::ArgumentList(argument_list) => argument_list.arguments.len(),
             InvocationArgumentsSource::PipeInput(_) => 1,
             InvocationArgumentsSource::None(_) => 0,
-            InvocationArgumentsSource::PartialArgumentList(partial_argument_list) => {
+            InvocationArgumentsSource::PartialArgumentList(partial_argument_list)
+            | InvocationArgumentsSource::AttributeArgumentList(partial_argument_list) => {
                 partial_argument_list.arguments.len()
             }
         }
@@ -480,7 +483,8 @@ impl<'ast, 'arena> InvocationArgumentsSource<'ast, 'arena> {
                 }
             }
             InvocationArgumentsSource::None(_) => None,
-            InvocationArgumentsSource::PartialArgumentList(partial_argument_list) => {
+            InvocationArgumentsSource::PartialArgumentList(partial_argument_list)
+            | InvocationArgumentsSource::AttributeArgumentList(partial_argument_list) => {
                 partial_argument_list.arguments.get(index).map(|partial_argument| match partial_argument {
                     PartialArgument::Positional(positional_argument) => {
                         InvocationArgument::Positional(positional_argument)
@@ -644,7 +648,8 @@ impl HasSpan for InvocationArgumentsSource<'_, '_> {
             InvocationArgumentsSource::ArgumentList(arg_list) => arg_list.span(),
             InvocationArgumentsSource::PipeInput(pipe) => pipe.span(),
             InvocationArgumentsSource::None(span) => *span,
-            InvocationArgumentsSource::PartialArgumentList(partial_arg_list) => partial_arg_list.span(),
+            InvocationArgumentsSource::PartialArgumentList(partial_arg_list)
+            | InvocationArgumentsSource::AttributeArgumentList(partial_arg_list) => partial_arg_list.span(),
         }
     }
 }

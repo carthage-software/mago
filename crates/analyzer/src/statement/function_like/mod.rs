@@ -478,7 +478,7 @@ where
             } else {
                 AttributeTarget::Parameter
             },
-        );
+        )?;
 
         if let Some(default_value) = parameter_node.default_value.as_ref() {
             default_value.value.analyze(context, block_context, artifacts)?;

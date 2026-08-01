@@ -426,7 +426,8 @@ fn get_argument<'ast, 'arena>(
 
             None
         }
-        InvocationArgumentsSource::PartialArgumentList(partial_argument_list) => {
+        InvocationArgumentsSource::PartialArgumentList(partial_argument_list)
+        | InvocationArgumentsSource::AttributeArgumentList(partial_argument_list) => {
             if let Some(PartialArgument::Positional(argument)) = partial_argument_list.arguments.get(index) {
                 return Some(argument.value);
             }

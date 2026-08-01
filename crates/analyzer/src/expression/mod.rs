@@ -118,7 +118,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Expression<'arena> {
                     artifacts,
                     anonymous_class.attribute_lists.as_slice(),
                     AttributeTarget::ClassLike,
-                );
+                )?;
 
                 let Some(class_like_metadata) = context.codebase.get_anonymous_class(context.source_file, self.span())
                 else {

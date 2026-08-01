@@ -33,7 +33,13 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Method<'arena> {
     where
         A: Arena,
     {
-        analyze_attributes(context, block_context, artifacts, self.attribute_lists.as_slice(), AttributeTarget::Method);
+        analyze_attributes(
+            context,
+            block_context,
+            artifacts,
+            self.attribute_lists.as_slice(),
+            AttributeTarget::Method,
+        )?;
 
         let Some(class_like_metadata) = block_context.scope.get_class_like() else {
             tracing::error!(

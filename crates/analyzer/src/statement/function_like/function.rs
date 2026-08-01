@@ -61,7 +61,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Function<'arena> {
             artifacts,
             self.attribute_lists.as_slice(),
             AttributeTarget::Function,
-        );
+        )?;
 
         let function_name = word(context.resolved_names.get(&self.name));
 

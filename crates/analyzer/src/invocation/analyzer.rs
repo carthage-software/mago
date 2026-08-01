@@ -1073,11 +1073,12 @@ where
             ));
 
         issue = match invocation.arguments_source {
-            InvocationArgumentsSource::ArgumentList(_) | InvocationArgumentsSource::PartialArgumentList(_) => issue
-                .with_annotation(
-                    Annotation::secondary(invocation.target.span())
-                        .with_message(format!("For this {target_kind_str} call")),
-                ),
+            InvocationArgumentsSource::ArgumentList(_)
+            | InvocationArgumentsSource::PartialArgumentList(_)
+            | InvocationArgumentsSource::AttributeArgumentList(_) => issue.with_annotation(
+                Annotation::secondary(invocation.target.span())
+                    .with_message(format!("For this {target_kind_str} call")),
+            ),
             InvocationArgumentsSource::PipeInput(pipe) => issue
                 .with_annotation(Annotation::secondary(pipe.callable.span()).with_message(format!(
                     "This {target_kind_str} requires at least {number_of_required_parameters} argument(s)",

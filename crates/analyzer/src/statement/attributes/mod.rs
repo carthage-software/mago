@@ -1,19 +1,34 @@
 use foldhash::HashMap;
+use foldhash::fast::RandomState;
+use indexmap::IndexMap;
 use mago_allocator::Arena;
 
 use mago_codex::flags::attribute::AttributeFlags;
-
+use mago_codex::identifier::function_like::FunctionLikeIdentifier;
+use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
+use mago_codex::ttype::expander::StaticClassType;
+use mago_codex::ttype::template::TemplateResult;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_syntax::cst::Attribute;
 use mago_syntax::cst::AttributeList;
+use mago_word::WordMap;
+use mago_word::word;
 
+use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
 use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
+use crate::error::AnalysisError;
+use crate::invocation::Invocation;
+use crate::invocation::InvocationArgumentsSource;
+use crate::invocation::InvocationTarget;
+use crate::invocation::MethodTargetContext;
+use crate::invocation::analyzer::analyze_invocation;
+use crate::visibility::check_method_visibility;
 use mago_bytes::BytesDisplay;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -46,11 +61,12 @@ impl AttributeTarget {
 
 pub fn analyze_attributes<'ctx, 'arena, A>(
     context: &mut Context<'ctx, 'arena, A>,
-    _block_context: &mut BlockContext<'ctx>,
-    _artifacts: &mut AnalysisArtifacts,
+    block_context: &mut BlockContext<'ctx>,
+    artifacts: &mut AnalysisArtifacts,
     attribute_lists: &[AttributeList<'arena>],
     target: AttributeTarget,
-) where
+) -> Result<(), AnalysisError>
+where
     A: Arena,
 {
     let attributes = attribute_lists.iter().flat_map(|list| list.attributes.iter()).collect::<Vec<_>>();
@@ -71,6 +87,7 @@ pub fn analyze_attributes<'ctx, 'arena, A>(
                 .with_help("Verify the attribute class name, its namespace, and your autoloader configuration. Make sure the class is defined."),
             );
 
+            analyze_attribute_argument_expressions(attribute, context, block_context, artifacts)?;
             continue;
         };
 
@@ -101,6 +118,7 @@ pub fn analyze_attributes<'ctx, 'arena, A>(
                 .with_help(format!("Ensure you are using a class intended to be an attribute. Replace `{attribute_name}` with a valid attribute class.")),
             );
 
+            analyze_attribute_argument_expressions(attribute, context, block_context, artifacts)?;
             continue;
         }
 
@@ -119,6 +137,7 @@ pub fn analyze_attributes<'ctx, 'arena, A>(
                     .with_help(format!("Use a concrete class instead of `{attribute_name}` for attributes.")),
             );
 
+            analyze_attribute_argument_expressions(attribute, context, block_context, artifacts)?;
             continue;
         }
 
@@ -139,6 +158,7 @@ pub fn analyze_attributes<'ctx, 'arena, A>(
                 .with_help(format!("Add `#[\\Attribute]` to the definition of class `{attribute_name}` to declare it as an attribute, or use a different class that is a valid attribute.")),
             );
 
+            analyze_attribute_argument_expressions(attribute, context, block_context, artifacts)?;
             continue;
         };
 
@@ -163,8 +183,6 @@ pub fn analyze_attributes<'ctx, 'arena, A>(
                     "Remove this duplicate `{attribute_name}` attribute, or if multiple instances are intended and valid, modify the attribute class `{attribute_name}` to include `Attribute::IS_REPEATABLE` in its `#[Attribute]` declaration (e.g., `#[Attribute(Attribute::TARGET_ALL | Attribute::IS_REPEATABLE)]`).",
                 )),
             );
-
-            continue;
         }
 
         used_attributes.insert(attribute_name_bytes, attribute.name.span());
@@ -185,7 +203,115 @@ pub fn analyze_attributes<'ctx, 'arena, A>(
                 report_invalid_target(context, metadata, attribute, target, flags);
             }
         }
+
+        analyze_attribute_constructor(context, block_context, artifacts, attribute, metadata)?;
     }
+
+    Ok(())
+}
+
+fn analyze_attribute_argument_expressions<'ctx, 'arena, A>(
+    attribute: &Attribute<'arena>,
+    context: &mut Context<'ctx, 'arena, A>,
+    block_context: &mut BlockContext<'ctx>,
+    artifacts: &mut AnalysisArtifacts,
+) -> Result<(), AnalysisError>
+where
+    A: Arena,
+{
+    if let Some(argument_list) = &attribute.argument_list {
+        argument_list.analyze(context, block_context, artifacts)?;
+    }
+
+    Ok(())
+}
+
+fn analyze_attribute_constructor<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
+    block_context: &mut BlockContext<'ctx>,
+    artifacts: &mut AnalysisArtifacts,
+    attribute: &Attribute<'arena>,
+    metadata: &'ctx ClassLikeMetadata,
+) -> Result<(), AnalysisError>
+where
+    A: Arena,
+{
+    let constructor_id = MethodIdentifier::new(metadata.original_name, word("__construct"));
+    let declaring_constructor_id = context.codebase.get_declaring_method_identifier(&constructor_id);
+
+    artifacts.symbol_references.add_reference_for_method_call(&block_context.scope, &constructor_id);
+
+    let Some(constructor) = context.codebase.get_method_by_id(&declaring_constructor_id) else {
+        if let Some(argument_list) = &attribute.argument_list {
+            if !argument_list.arguments.is_empty() {
+                let attribute_name = metadata.original_name;
+                context.collector.report_with_code(
+                    IssueCode::TooManyArguments,
+                    Issue::error(format!(
+                        "Attribute class `{attribute_name}` has no `__construct` method, but arguments were provided."
+                    ))
+                    .with_annotation(Annotation::primary(argument_list.span()).with_message("Arguments provided here"))
+                    .with_annotation(
+                        Annotation::secondary(attribute.name.span())
+                            .with_message(format!("Attribute class `{attribute_name}` has no constructor")),
+                    )
+                    .with_help("Remove the arguments, or define a public `__construct` method on the attribute class."),
+                );
+            }
+
+            argument_list.analyze(context, block_context, artifacts)?;
+        }
+
+        return Ok(());
+    };
+
+    artifacts.symbol_references.add_reference_for_method_call(&block_context.scope, &declaring_constructor_id);
+
+    let invocation = Invocation {
+        target: InvocationTarget::FunctionLike {
+            identifier: FunctionLikeIdentifier::Method(
+                declaring_constructor_id.get_class_name(),
+                declaring_constructor_id.get_method_name(),
+            ),
+            metadata: constructor,
+            inferred_return_type: None,
+            method_context: Some(MethodTargetContext {
+                declaring_method_id: Some(declaring_constructor_id),
+                class_like_metadata: metadata,
+                class_type: StaticClassType::None,
+                declaring_object_type: None,
+            }),
+            span: attribute.name.span(),
+        },
+        arguments_source: match &attribute.argument_list {
+            Some(argument_list) => InvocationArgumentsSource::AttributeArgumentList(argument_list),
+            None => InvocationArgumentsSource::None(attribute.span()),
+        },
+        span: attribute.span(),
+    };
+
+    let mut template_result = TemplateResult::new(IndexMap::with_hasher(RandomState::default()), HashMap::default());
+    let mut argument_types = WordMap::default();
+    analyze_invocation(
+        context,
+        block_context,
+        artifacts,
+        &invocation,
+        Some((metadata.name, None)),
+        &mut template_result,
+        &mut argument_types,
+    )?;
+
+    check_method_visibility(
+        context,
+        block_context,
+        declaring_constructor_id.get_class_name().as_bytes(),
+        declaring_constructor_id.get_method_name().as_bytes(),
+        attribute.span(),
+        Some(attribute.name.span()),
+    );
+
+    Ok(())
 }
 
 fn report_invalid_target<'ctx, 'arena, A>(

@@ -37,7 +37,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ClassLikeConstant<'arena> {
             artifacts,
             self.attribute_lists.as_slice(),
             AttributeTarget::ClassLikeConstant,
-        );
+        )?;
 
         for item in &self.items {
             item.analyze(context, block_context, artifacts)?;

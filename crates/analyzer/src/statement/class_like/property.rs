@@ -72,7 +72,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for PlainProperty<'arena> {
             artifacts,
             self.attribute_lists.as_slice(),
             AttributeTarget::Property,
-        );
+        )?;
 
         for item in &self.items {
             item.analyze(context, block_context, artifacts)?;
@@ -189,7 +189,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for HookedProperty<'arena> {
             artifacts,
             self.attribute_lists.as_slice(),
             AttributeTarget::Property,
-        );
+        )?;
         self.item.analyze(context, block_context, artifacts)?;
 
         let property_name = word(self.item.variable().name);
@@ -231,7 +231,7 @@ where
         artifacts,
         hook.attribute_lists.as_slice(),
         AttributeTarget::Method,
-    );
+    )?;
 
     let PropertyHookBody::Concrete(body) = &hook.body else {
         return Ok(());
