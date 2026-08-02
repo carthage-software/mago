@@ -26,8 +26,8 @@ where
 {
     arena: &'arena A,
     lexer: Lexer<'input>,
-    buffer: LookaheadBuf<Token<'input>, 16>,
-    trivia: Vec<'arena, Token<'input>, A>,
+    buffer: LookaheadBuf<Token<'input>, 4>,
+    trivia: Vec<'arena, Trivia<'input>, A>,
     position: Position,
     file_id: FileId,
 }
@@ -253,30 +253,10 @@ where
     /// Consumes the comments collected by the lexer and returns them.
     #[inline]
     pub fn get_trivia(&mut self) -> Sequence<'arena, Trivia<'arena>> {
-        let mut tokens = Vec::new_in(self.arena);
-        std::mem::swap(&mut self.trivia, &mut tokens);
+        let mut trivia = Vec::new_in(self.arena);
+        std::mem::swap(&mut self.trivia, &mut trivia);
 
-        let file_id = self.file_id();
-        Sequence::new(
-            tokens
-                .into_iter()
-                .filter_map(|token| {
-                    let span = token.span_for(file_id);
-                    let kind = match token.kind {
-                        TokenKind::Whitespace => TriviaKind::WhiteSpace,
-                        TokenKind::HashComment => TriviaKind::HashComment,
-                        TokenKind::SingleLineComment => TriviaKind::SingleLineComment,
-                        TokenKind::MultiLineComment => TriviaKind::MultiLineComment,
-                        TokenKind::DocBlockComment => TriviaKind::DocBlockComment,
-                        // Tokens collected into `self.trivia` are guaranteed by `fill_buffer_slow`
-                        // to satisfy `kind.is_trivia()`; any non-trivia kind here is a parser bug
-                        // and the safe response is to drop it rather than panic.
-                        _ => return None,
-                    };
-                    Some(Trivia { kind, span, value: token.value })
-                })
-                .collect_in(self.arena),
-        )
+        Sequence::new(trivia)
     }
 
     /// Fills the token buffer until at least `n` tokens are available, unless the lexer returns EOF.
@@ -297,10 +277,20 @@ where
             match self.lexer.advance() {
                 Some(result) => {
                     let token = result?;
-                    if token.kind.is_trivia() {
-                        self.trivia.push(token);
+                    let trivia_kind = match token.kind {
+                        TokenKind::Whitespace => Some(TriviaKind::WhiteSpace),
+                        TokenKind::HashComment => Some(TriviaKind::HashComment),
+                        TokenKind::SingleLineComment => Some(TriviaKind::SingleLineComment),
+                        TokenKind::MultiLineComment => Some(TriviaKind::MultiLineComment),
+                        TokenKind::DocBlockComment => Some(TriviaKind::DocBlockComment),
+                        _ => None,
+                    };
+
+                    if let Some(kind) = trivia_kind {
+                        self.trivia.push(Trivia { kind, span: token.span_for(self.file_id), value: token.value });
                         continue;
                     }
+
                     self.buffer.push_back(token);
                 }
                 None => return Ok(None),
