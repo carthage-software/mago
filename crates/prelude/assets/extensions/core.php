@@ -468,8 +468,10 @@ final class Attribute
     public const TARGET_PROPERTY = 8;
     public const TARGET_CLASS_CONSTANT = 16;
     public const TARGET_PARAMETER = 32;
-    public const TARGET_ALL = 63;
-    public const IS_REPEATABLE = 64;
+    #[Mago\AvailableSince(80500)]
+    public const TARGET_CONSTANT = 64;
+    public const TARGET_ALL = 127;
+    public const IS_REPEATABLE = 128;
 
     public int $flags;
 

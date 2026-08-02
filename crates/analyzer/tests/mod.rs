@@ -36,6 +36,12 @@ macro_rules! test_case {
 }
 
 test_case!(accessing_undefined_class_constant);
+test_case!(attribute_target_constant);
+test_case!(attribute_target_constant_php84, {
+    let mut settings = default_test_settings();
+    settings.version = mago_php_version::PHPVersion::PHP84;
+    settings
+});
 test_case!(unavailable_symbols, {
     let mut settings = default_test_settings();
     settings.version = mago_php_version::PHPVersion::PHP85;
