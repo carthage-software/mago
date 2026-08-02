@@ -18,6 +18,7 @@ pub enum SyntaxError {
     UnexpectedToken(FileId, u8, Position),
     UnrecognizedToken(FileId, u8, Position),
     UnexpectedEndOfFile(FileId, Position),
+    RecursionLimitExceeded(FileId, Position),
 }
 
 /// The token kinds a parser expected at the point an error was raised.
@@ -54,6 +55,7 @@ impl HasFileId for SyntaxError {
             Self::UnexpectedToken(file_id, _, _) => *file_id,
             Self::UnrecognizedToken(file_id, _, _) => *file_id,
             Self::UnexpectedEndOfFile(file_id, _) => *file_id,
+            Self::RecursionLimitExceeded(file_id, _) => *file_id,
         }
     }
 }
@@ -76,6 +78,7 @@ impl HasSpan for SyntaxError {
             Self::UnexpectedToken(file_id, _, p) => (file_id, p),
             Self::UnrecognizedToken(file_id, _, p) => (file_id, p),
             Self::UnexpectedEndOfFile(file_id, p) => (file_id, p),
+            Self::RecursionLimitExceeded(file_id, p) => (file_id, p),
         };
 
         Span::new(*file_id, *position, position.forward(1))
@@ -102,6 +105,7 @@ impl std::fmt::Display for SyntaxError {
                 &format!("Unrecognised token `{}` (0x{:02X})", *token as char, token)
             }
             Self::UnexpectedEndOfFile(_, _) => "Unexpected end of file",
+            Self::RecursionLimitExceeded(_, _) => "Maximum recursion depth exceeded",
         };
 
         write!(f, "{message}")

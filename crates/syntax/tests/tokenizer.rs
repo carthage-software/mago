@@ -1116,6 +1116,32 @@ fn test_braced_dynamic_array_key_in_string_interpolation() -> Result<(), SyntaxE
 }
 
 #[test]
+fn test_deeply_nested_string_interpolation_hits_recursion_limit() {
+    let depth = 65;
+    let mut code = Vec::from(&b"<?php \""[..]);
+    for _ in 0..depth {
+        code.extend_from_slice(b"{$a[\"");
+    }
+    code.push(b'x');
+    for _ in 0..depth {
+        code.extend_from_slice(b"\"]}");
+    }
+    code.extend_from_slice(b"\";");
+
+    let input = Input::new(FileId::zero(), &code);
+    let mut lexer = Lexer::new(input, LexerSettings::default());
+
+    loop {
+        match lexer.advance() {
+            Some(Err(SyntaxError::RecursionLimitExceeded(..))) => break,
+            Some(Err(error)) => panic!("expected recursion limit error, got {error}"),
+            Some(Ok(_)) => {}
+            None => panic!("expected deeply nested interpolation to exceed the recursion limit"),
+        }
+    }
+}
+
+#[test]
 fn test_brace_in_nested_string_in_braced_interpolation() -> Result<(), SyntaxError> {
     let code = r#"<?= "{$a["}"]}";"#;
     let expected = &[
