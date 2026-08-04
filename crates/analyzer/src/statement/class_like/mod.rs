@@ -59,8 +59,7 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::plugin::context::HookContext;
-use crate::statement::attributes::AttributeTarget;
-use crate::statement::attributes::analyze_attributes;
+use crate::statement::attributes::analyze_class_like_attributes;
 use crate::statement::class_like::method_signature::SignatureCompatibilityIssue;
 use crate::statement::function_like::report_undefined_type_references;
 use crate::utils::missing_type_hints;
@@ -348,20 +347,14 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Class<'arena> {
     where
         A: Arena,
     {
-        analyze_attributes(
-            context,
-            block_context,
-            artifacts,
-            self.attribute_lists.as_slice(),
-            AttributeTarget::ClassLike,
-        )?;
-
         let name = context.resolved_names.get(&self.name);
         let Some(class_like_metadata) = context.codebase.get_class_like(name) else {
             tracing::warn!("Class {} not found in codebase", BytesDisplay(name));
 
             return Ok(());
         };
+
+        analyze_class_like_attributes(context, artifacts, self.attribute_lists.as_slice(), class_like_metadata)?;
 
         if class_like_metadata.span != self.span() {
             report_duplicate_definition(context, "Class", "class", name, self.span(), class_like_metadata.span);
@@ -490,20 +483,14 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Interface<'arena> {
     where
         A: Arena,
     {
-        analyze_attributes(
-            context,
-            block_context,
-            artifacts,
-            self.attribute_lists.as_slice(),
-            AttributeTarget::ClassLike,
-        )?;
-
         let name = context.resolved_names.get(&self.name);
         let Some(class_like_metadata) = context.codebase.get_class_like(name) else {
             tracing::warn!("Interface {} not found in codebase", BytesDisplay(name));
 
             return Ok(());
         };
+
+        analyze_class_like_attributes(context, artifacts, self.attribute_lists.as_slice(), class_like_metadata)?;
 
         if class_like_metadata.span != self.span() {
             report_duplicate_definition(context, "Interface", "interface", name, self.span(), class_like_metadata.span);
@@ -577,20 +564,14 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Trait<'arena> {
     where
         A: Arena,
     {
-        analyze_attributes(
-            context,
-            block_context,
-            artifacts,
-            self.attribute_lists.as_slice(),
-            AttributeTarget::ClassLike,
-        )?;
-
         let name = context.resolved_names.get(&self.name);
         let Some(class_like_metadata) = context.codebase.get_class_like(name) else {
             tracing::warn!("Trait {} not found in codebase", BytesDisplay(name));
 
             return Ok(());
         };
+
+        analyze_class_like_attributes(context, artifacts, self.attribute_lists.as_slice(), class_like_metadata)?;
 
         if class_like_metadata.span != self.span() {
             report_duplicate_definition(context, "Trait", "trait", name, self.span(), class_like_metadata.span);
@@ -664,20 +645,14 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Enum<'arena> {
     where
         A: Arena,
     {
-        analyze_attributes(
-            context,
-            block_context,
-            artifacts,
-            self.attribute_lists.as_slice(),
-            AttributeTarget::ClassLike,
-        )?;
-
         let name = context.resolved_names.get(&self.name);
         let Some(class_like_metadata) = context.codebase.get_class_like(name) else {
             tracing::warn!("Enum {} not found in codebase", BytesDisplay(name));
 
             return Ok(());
         };
+
+        analyze_class_like_attributes(context, artifacts, self.attribute_lists.as_slice(), class_like_metadata)?;
 
         if class_like_metadata.span != self.span() {
             report_duplicate_definition(context, "Enum", "enum", name, self.span(), class_like_metadata.span);

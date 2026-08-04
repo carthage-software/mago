@@ -27,8 +27,7 @@ use crate::formula::get_formula;
 use crate::plugin::ExpressionHookResult;
 use crate::plugin::context::HookContext;
 use crate::reconciler::reconcile_keyed_types;
-use crate::statement::attributes::AttributeTarget;
-use crate::statement::attributes::analyze_attributes;
+use crate::statement::attributes::analyze_class_like_attributes;
 use crate::statement::class_like::analyze_class_like;
 use crate::statement::class_like::override_attribute;
 use crate::utils::misc::check_for_paradox;
@@ -112,18 +111,17 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Expression<'arena> {
                 Ok(())
             }
             Expression::AnonymousClass(anonymous_class) => {
-                analyze_attributes(
-                    context,
-                    block_context,
-                    artifacts,
-                    anonymous_class.attribute_lists.as_slice(),
-                    AttributeTarget::ClassLike,
-                )?;
-
                 let Some(class_like_metadata) = context.codebase.get_anonymous_class(context.source_file, self.span())
                 else {
                     return Ok(());
                 };
+
+                analyze_class_like_attributes(
+                    context,
+                    artifacts,
+                    anonymous_class.attribute_lists.as_slice(),
+                    class_like_metadata,
+                )?;
 
                 analyze_anonymous_class_constructor(
                     context,

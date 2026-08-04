@@ -512,7 +512,7 @@ where
     if let Some(function_like_metadata) = context.codebase.get_method_by_id(&method_id) {
         if !check_method_visibility(
             context,
-            block_context,
+            block_context.scope.get_class_like_name(),
             class_metadata.original_name.as_bytes(),
             method_name.as_bytes(),
             access_span,
@@ -642,7 +642,7 @@ where
             if let Some(function_like_metadata) = context.codebase.get_method_by_id(&mixin_method_id) {
                 if !check_method_visibility(
                     context,
-                    block_context,
+                    block_context.scope.get_class_like_name(),
                     mixin_metadata.original_name.as_bytes(),
                     method_name.as_bytes(),
                     access_span,

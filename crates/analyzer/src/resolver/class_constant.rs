@@ -142,6 +142,7 @@ where
                 class_expr.span(),
                 constant_selector.span(),
                 &class_resolution.origin,
+                block_context.flags.inside_class_like_attribute(),
             ) {
                 result.constants.push(resolved_const);
             } else {
@@ -233,7 +234,14 @@ where
 /// Checks if a trait constant access is valid based on how the trait is referenced.
 /// Valid accesses are via self, static, or $this (which resolve the trait in context).
 /// Direct trait name access (e.g., `TraitName::CONSTANT`) is invalid.
-fn is_valid_trait_constant_access(origin: &ResolutionOrigin) -> bool {
+///
+/// Attribute arguments on the trait declaration are evaluated outside the trait body, so
+/// even `self::CONSTANT` resolves the trait directly there and is rejected at runtime.
+fn is_valid_trait_constant_access(origin: &ResolutionOrigin, inside_class_like_attribute: bool) -> bool {
+    if inside_class_like_attribute {
+        return false;
+    }
+
     matches!(
         origin,
         // self::CONSTANT
@@ -255,24 +263,33 @@ fn find_constant_in_class<'ctx, A>(
     class_span: Span,
     const_span: Span,
     resolution_origin: &ResolutionOrigin,
+    inside_class_like_attribute: bool,
 ) -> Option<ResolvedConstant>
 where
     A: Arena,
 {
-    if metadata.kind.is_trait() && !is_valid_trait_constant_access(resolution_origin) {
-        context.collector.report_with_code(
-            IssueCode::DirectTraitConstantAccess,
-            Issue::error(format!(
-                "Cannot access trait constant `{}::{}` directly.",
-                metadata.original_name, const_name
-            ))
-            .with_annotation(
-                Annotation::primary(class_span).with_message(format!("`{}` is a trait", metadata.original_name)),
-            )
-            .with_annotation(Annotation::secondary(const_span).with_message("Constant accessed here"))
-            .with_note("Trait constants can only be accessed through classes that use the trait, or via self, static, or $this within the trait.")
-            .with_help(format!("Access this constant through a class that uses `{}`, or use `self::{}`, `static::{}`, or `$this::{}` instead.", metadata.original_name, const_name, const_name, const_name)),
-        );
+    if metadata.kind.is_trait() && !is_valid_trait_constant_access(resolution_origin, inside_class_like_attribute) {
+        let trait_name = metadata.original_name;
+
+        let mut issue = Issue::error(format!("Cannot access trait constant `{trait_name}::{const_name}` directly."))
+            .with_annotation(Annotation::primary(class_span).with_message(format!("`{trait_name}` is a trait")))
+            .with_annotation(Annotation::secondary(const_span).with_message("Constant accessed here"));
+
+        issue = if inside_class_like_attribute {
+            issue
+                .with_note(
+                    "Attribute arguments are evaluated outside the trait body, so `self` resolves the trait directly here.",
+                )
+                .with_help(format!(
+                    "Spell out a class that uses `{trait_name}`, or inline the value of `{const_name}`."
+                ))
+        } else {
+            issue
+                .with_note("Trait constants can only be accessed through classes that use the trait, or via self, static, or $this within the trait.")
+                .with_help(format!("Access this constant through a class that uses `{trait_name}`, or use `self::{const_name}`, `static::{const_name}`, or `$this::{const_name}` instead."))
+        };
+
+        context.collector.report_with_code(IssueCode::DirectTraitConstantAccess, issue);
     }
 
     // Check for a defined constant
