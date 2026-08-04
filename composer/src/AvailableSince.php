@@ -24,6 +24,8 @@ use Attribute;
     | Attribute::TARGET_METHOD
     | Attribute::TARGET_PROPERTY
     | Attribute::TARGET_CLASS_CONSTANT
+    // Only read by Mago itself, never reflected at runtime, so the 8.5 floor does not apply.
+    // @mago-ignore analysis:unavailable-class-constant
     | Attribute::TARGET_CONSTANT
     | Attribute::TARGET_PARAMETER
     | Attribute::IS_REPEATABLE,
