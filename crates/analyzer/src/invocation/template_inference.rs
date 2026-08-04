@@ -94,6 +94,47 @@ fn expand_template_constraint<'ty>(
     Cow::Owned(expanded)
 }
 
+/// Whether `input_object` is the very class the container is parameterizing, without carrying
+/// type parameters of its own — in which case it cannot specialize anything.
+fn names_the_same_unspecialized_class(container_constraint: &TAtomic, input_object: &TAtomic) -> bool {
+    let (TAtomic::Object(TObject::Named(container)), TAtomic::Object(TObject::Named(input))) =
+        (container_constraint, input_object)
+    else {
+        return false;
+    };
+
+    input.type_parameters.is_none() && container.name == input.name
+}
+
+/// Turns the class-string-ish members of `input_type` into the object types they name.
+fn collect_class_string_object_types<A>(context: &Context<'_, '_, A>, input_type: &TUnion) -> Vec<TAtomic>
+where
+    A: Arena,
+{
+    let mut input_objects = vec![];
+    for input_atomic in input_type.types.iter() {
+        match input_atomic {
+            TAtomic::Scalar(TScalar::ClassLikeString(class_string)) => {
+                input_objects.push(class_string.get_object_type(context.codebase));
+            }
+            TAtomic::Scalar(TScalar::String(string)) => {
+                // A literal `'Foo'` argument passed where `class-string<T>` is expected
+                // should bind `T = Foo`, mirroring how Psalm/PHPStan coerce literal
+                // strings that name a real class. Only do this when the literal really
+                // names a class-like in the codebase, otherwise leave inference alone.
+                if let Some(literal) = string.get_known_literal_value()
+                    && context.codebase.class_like_exists(literal)
+                {
+                    input_objects.push(TClassLikeString::literal(word(literal)).get_object_type(context.codebase));
+                }
+            }
+            _ => {}
+        }
+    }
+
+    input_objects
+}
+
 fn infer_templates_from_input_and_container_types<A>(
     context: &Context<'_, '_, A>,
     container_type: &TUnion,
@@ -751,6 +792,37 @@ fn infer_templates_from_input_and_container_types<A>(
                     }
                 }
             }
+            // `class-string<Repo<T>>`: the templates live inside the constraint, not in the
+            // class-string itself, so unwrap both sides to objects and let the regular object
+            // inference specialize `T` through the argument's `@extends`.
+            TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::OfType { constraint, .. })) => {
+                let container_object_type = wrap_atomic(constraint.as_ref().clone());
+                if !container_object_type.has_template_types() {
+                    continue;
+                }
+
+                // Only a name that actually specializes the container's parameters tells us
+                // anything. `class-string<It>` against `class-string<It<K, V>>` would otherwise
+                // bind `K` and `V` to their bare constraints and wipe out the bounds that other
+                // arguments already pinned.
+                let input_objects = collect_class_string_object_types(context, &residual_input_type)
+                    .into_iter()
+                    .filter(|input_object| !names_the_same_unspecialized_class(constraint, input_object))
+                    .collect::<Vec<_>>();
+
+                if input_objects.is_empty() {
+                    continue;
+                }
+
+                infer_templates_from_input_and_container_types(
+                    context,
+                    &container_object_type,
+                    &TUnion::from_vec(input_objects),
+                    template_result,
+                    options,
+                    violations,
+                );
+            }
             TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Generic {
                 parameter_name,
                 defining_entity,
@@ -764,28 +836,7 @@ fn infer_templates_from_input_and_container_types<A>(
                         .and_then(|map| map.get(defining_entity))
                         .is_none_or(std::vec::Vec::is_empty);
 
-                let mut input_objects = vec![];
-                for input_atomic in residual_input_type.types.iter() {
-                    match input_atomic {
-                        TAtomic::Scalar(TScalar::ClassLikeString(class_string)) => {
-                            input_objects.push(class_string.get_object_type(context.codebase));
-                        }
-                        TAtomic::Scalar(TScalar::String(string)) => {
-                            // A literal `'Foo'` argument passed where `class-string<T>` is expected
-                            // should bind `T = Foo`, mirroring how Psalm/PHPStan coerce literal
-                            // strings that name a real class. Only do this when the literal really
-                            // names a class-like in the codebase, otherwise leave inference alone.
-                            if let Some(literal) = string.get_known_literal_value()
-                                && context.codebase.class_like_exists(literal)
-                            {
-                                input_objects
-                                    .push(TClassLikeString::literal(word(literal)).get_object_type(context.codebase));
-                            }
-                        }
-                        _ => {}
-                    }
-                }
-
+                let input_objects = collect_class_string_object_types(context, &residual_input_type);
                 if input_objects.is_empty() || !should_add_bound {
                     continue;
                 }

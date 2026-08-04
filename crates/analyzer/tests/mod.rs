@@ -804,6 +804,7 @@ test_case!(interface_assertion);
 test_case!(nullsafe_chain_bug);
 test_case!(class_string_instantiation);
 test_case!(class_string_comparison);
+test_case!(class_string_of_generic_object_inference);
 test_case!(static_var_lazy_init);
 test_case!(static_var_coalesce);
 test_case!(array_coalesce_assign_check);
