@@ -3,6 +3,7 @@ use foldhash::fast::RandomState;
 use indexmap::IndexMap;
 use mago_allocator::Arena;
 
+use mago_codex::context::ScopeContext;
 use mago_codex::flags::attribute::AttributeFlags;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::identifier::method::MethodIdentifier;
@@ -57,6 +58,34 @@ impl AttributeTarget {
             Self::Constant => "a constant",
         }
     }
+}
+
+/// Analyzes the attributes attached to a class-like declaration.
+///
+/// Attribute arguments on a class-like are evaluated in the scope of that
+/// class-like, so `self::` and `parent::` must resolve against it rather than
+/// against the enclosing scope.
+pub fn analyze_class_like_attributes<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
+    artifacts: &mut AnalysisArtifacts,
+    attribute_lists: &[AttributeList<'arena>],
+    class_like_metadata: &'ctx ClassLikeMetadata,
+) -> Result<(), AnalysisError>
+where
+    A: Arena,
+{
+    if attribute_lists.iter().all(|list| list.attributes.is_empty()) {
+        return Ok(());
+    }
+
+    let mut scope = ScopeContext::new();
+    scope.set_class_like(Some(class_like_metadata));
+    scope.set_static(true);
+
+    let mut block_context = BlockContext::new(scope, context.settings.register_super_globals);
+    block_context.flags.set_inside_class_like_attribute(true);
+
+    analyze_attributes(context, &mut block_context, artifacts, attribute_lists, AttributeTarget::ClassLike)
 }
 
 pub fn analyze_attributes<'ctx, 'arena, A>(
@@ -302,9 +331,11 @@ where
         &mut argument_types,
     )?;
 
+    // Attributes are instantiated by reflection, never from the annotated declaration, so
+    // the constructor must be reachable from the global scope.
     check_method_visibility(
         context,
-        block_context,
+        None,
         declaring_constructor_id.get_class_name().as_bytes(),
         declaring_constructor_id.get_method_name().as_bytes(),
         attribute.span(),

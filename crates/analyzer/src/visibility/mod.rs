@@ -23,7 +23,7 @@ use mago_bytes::BytesDisplay;
 /// # Arguments
 ///
 /// * `context` - The global analysis context.
-/// * `block_context` - The context of the current code block, providing scope information.
+/// * `calling_class` - The class the access occurs in, or `None` for the global scope.
 /// * `fqcn` - The fully-qualified class name on which the method is being called.
 /// * `method_name` - The method name.
 /// * `access_span` - The span of the entire method call/access expression (e.g., `$obj->method()`).
@@ -33,9 +33,9 @@ use mago_bytes::BytesDisplay;
 ///
 /// `true` if the method is visible, `false` otherwise. An error is reported to the
 /// context buffer if the method is not visible.
-pub fn check_method_visibility<'ctx, A>(
-    context: &mut Context<'ctx, '_, A>,
-    block_context: &BlockContext<'ctx>,
+pub fn check_method_visibility<A>(
+    context: &mut Context<'_, '_, A>,
+    calling_class: Option<Word>,
     fqcn: &[u8],
     method_name: &[u8],
     access_span: Span,
@@ -59,12 +59,7 @@ where
         return true;
     }
 
-    let is_visible = is_visible_from_scope(
-        context.codebase,
-        visibility,
-        declaring_class.as_bytes(),
-        block_context.scope.get_class_like_name(),
-    );
+    let is_visible = is_visible_from_scope(context.codebase, visibility, declaring_class.as_bytes(), calling_class);
     if !is_visible {
         let declaring_class_name = context
             .codebase
@@ -80,7 +75,7 @@ where
 
         report_visibility_issue(
             context,
-            block_context,
+            calling_class,
             IssueCode::InvalidMethodAccess,
             issue_title,
             visibility,
@@ -248,7 +243,7 @@ where
 
         report_visibility_issue(
             context,
-            block_context,
+            block_context.scope.get_class_like_name(),
             IssueCode::InvalidPropertyRead,
             issue_title,
             visibility,
@@ -348,7 +343,7 @@ where
 
         report_visibility_issue(
             context,
-            block_context,
+            block_context.scope.get_class_like_name(),
             IssueCode::InvalidPropertyWrite,
             issue_title,
             visibility,
@@ -421,9 +416,9 @@ fn is_visible_via_required_extends(
     false
 }
 
-fn report_visibility_issue<'ctx, A>(
-    context: &mut Context<'ctx, '_, A>,
-    block_context: &BlockContext<'ctx>,
+fn report_visibility_issue<A>(
+    context: &mut Context<'_, '_, A>,
+    calling_class: Option<Word>,
     code: IssueCode,
     title: String,
     visibility: Visibility,
@@ -434,7 +429,7 @@ fn report_visibility_issue<'ctx, A>(
 ) where
     A: Arena,
 {
-    let current_scope_str = if let Some(current_class) = block_context.scope.get_class_like_name() {
+    let current_scope_str = if let Some(current_class) = calling_class {
         format!("from within `{current_class}`")
     } else {
         "from the global scope".to_string()

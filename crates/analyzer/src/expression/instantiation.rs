@@ -365,7 +365,7 @@ where
 
         if !check_method_visibility(
             context,
-            block_context,
+            block_context.scope.get_class_like_name(),
             constructor_declraing_id.get_class_name().as_bytes(),
             constructor_declraing_id.get_method_name().as_bytes(),
             instantiation_span,

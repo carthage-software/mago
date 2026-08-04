@@ -21,6 +21,10 @@ impl BlockContextFlags {
     pub const COLLECT_INITIALIZATIONS: u32 = 1 << 15;
     pub const CALLS_PARENT_CONSTRUCTOR: u32 = 1 << 16;
     pub const INSIDE_PIPE_CALLABLE: u32 = 1 << 17;
+    /// Set while analyzing the arguments of an attribute on a class-like declaration. The
+    /// class-like is in scope for name resolution, but the arguments are evaluated outside
+    /// its body.
+    pub const INSIDE_CLASS_LIKE_ATTRIBUTE: u32 = 1 << 18;
 
     #[inline]
     pub const fn new() -> Self {
@@ -140,6 +144,11 @@ impl BlockContextFlags {
     }
 
     #[inline(always)]
+    pub const fn inside_class_like_attribute(&self) -> bool {
+        self.contains(Self::INSIDE_CLASS_LIKE_ATTRIBUTE)
+    }
+
+    #[inline(always)]
     pub fn set_inside_conditional(&mut self, value: bool) {
         self.set(Self::INSIDE_CONDITIONAL, value);
     }
@@ -227,5 +236,10 @@ impl BlockContextFlags {
     #[inline(always)]
     pub fn set_inside_pipe_callable(&mut self, value: bool) {
         self.set(Self::INSIDE_PIPE_CALLABLE, value);
+    }
+
+    #[inline(always)]
+    pub fn set_inside_class_like_attribute(&mut self, value: bool) {
+        self.set(Self::INSIDE_CLASS_LIKE_ATTRIBUTE, value);
     }
 }

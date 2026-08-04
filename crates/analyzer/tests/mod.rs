@@ -253,6 +253,7 @@ test_case!(arrays_err_sort_int);
 test_case!(arrays_err_widen_array_to_list);
 test_case!(assert_concrete_to_template_type);
 test_case!(assert_generic_array_key_is_array_key);
+test_case!(attribute_self_scope);
 test_case!(bare_identifier_in_array_access);
 test_case!(bin2hex);
 test_case!(break_narrowing);
