@@ -59,6 +59,9 @@ pub struct ReportingArgs {
     ///
     /// By default, issues are reported in the order they appear in files.
     /// This option provides a more organized view for reviewing large numbers of issues.
+    ///
+    /// No-op for aggregate-formats (count, code-count) and formats where the consumer handles
+    /// ordering (github, gitlab, sarif, checkstyle, emacs), they are always unordered.
     #[arg(long)]
     pub sort: bool,
 
