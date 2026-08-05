@@ -258,11 +258,14 @@ mod tests {
     use mago_database::Database;
     use mago_database::DatabaseConfiguration;
     use mago_database::file::File;
+    use mago_span::Span;
+
+    use crate::Annotation;
+    use crate::Issue;
 
     use super::*;
 
-    fn reporter_for(format: ReportingFormat) -> Reporter {
-        let file = File::ephemeral(Cow::Borrowed(b"test.php"), Cow::Borrowed(b"<?php\n"));
+    fn reporter_for_file(format: ReportingFormat, file: File) -> Reporter {
         let configuration =
             DatabaseConfiguration::new(std::path::Path::new("/"), vec![], vec![], vec![], vec![]).into_static();
         let database = Database::single(file, configuration).read_only();
@@ -279,6 +282,26 @@ mod tests {
                 editor_url: None,
             },
         )
+    }
+
+    fn reporter_for(format: ReportingFormat) -> Reporter {
+        reporter_for_file(format, File::ephemeral(Cow::Borrowed(b"test.php"), Cow::Borrowed(b"<?php\n")))
+    }
+
+    fn report_hostile_values(format: ReportingFormat) -> Vec<u8> {
+        let file = File::ephemeral(Cow::Borrowed(b"src/<evil>\r\nname.php"), Cow::Borrowed(b"<?php\n"));
+        let file_id = file.id;
+        let reporter = reporter_for_file(format, file);
+        let issue = Issue::error("message\0\u{1}\r\n</error>")
+            .with_code("code\r\nvalue")
+            .with_annotation(Annotation::primary(Span::new(file_id, 0u32.into(), 1u32.into())));
+        let mut buffer = Vec::new();
+
+        let Ok(_) = reporter.report_to(IssueCollection::from([issue]), None, &mut buffer) else {
+            panic!("reporting hostile values should succeed");
+        };
+
+        buffer
     }
 
     fn report_empty(format: ReportingFormat) -> Vec<u8> {
@@ -310,6 +333,31 @@ mod tests {
         assert!(output.contains("</checkstyle>"));
     }
 
+    #[test]
+    fn checkstyle_escapes_hostile_values_as_valid_xml_text() {
+        let Ok(output) = String::from_utf8(report_hostile_values(ReportingFormat::Checkstyle)) else {
+            panic!("Checkstyle output should be UTF-8");
+        };
+
+        assert!(!output.contains('\0'));
+        assert!(!output.contains('\u{1}'));
+        assert!(output.contains("name=\"src/&lt;evil&gt;&#13;&#10;name.php\""));
+        assert!(output.contains("message=\"message&#13;&#10;&lt;/error&gt;\""));
+    }
+
+    #[test]
+    fn emacs_escapes_hostile_values_to_one_record() {
+        let Ok(output) = String::from_utf8(report_hostile_values(ReportingFormat::Emacs)) else {
+            panic!("Emacs output should be UTF-8");
+        };
+
+        assert_eq!(output.bytes().filter(|byte| *byte == b'\n').count(), 1);
+        assert!(!output.contains('\r'));
+        assert!(output.contains(r"src/<evil>\r\nname.php"));
+        assert!(output.contains(r"code\r\nvalue"));
+        assert!(output.contains("message\0\u{1}\\r\\n</error>"));
+    }
+
     #[cfg(feature = "serde")]
     #[test]
     fn sarif_writes_document_when_empty() {
@@ -321,6 +369,17 @@ mod tests {
 
         assert_eq!(value["version"], "2.1.0");
         assert!(value["runs"][0]["results"].as_array().is_some_and(Vec::is_empty));
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn sarif_serializes_hostile_values_as_json_data() {
+        let output = report_hostile_values(ReportingFormat::Sarif);
+        let Ok(value) = serde_json::from_slice::<serde_json::Value>(&output) else {
+            panic!("SARIF output should be valid JSON");
+        };
+
+        assert_eq!(value["runs"][0]["results"][0]["message"]["text"], "message\0\u{1}\r\n</error>");
     }
 
     #[cfg(feature = "serde")]
@@ -337,7 +396,29 @@ mod tests {
 
     #[cfg(feature = "serde")]
     #[test]
+    fn json_serializes_hostile_values_as_data() {
+        let output = report_hostile_values(ReportingFormat::Json);
+        let Ok(value) = serde_json::from_slice::<serde_json::Value>(&output) else {
+            panic!("JSON report should be valid JSON");
+        };
+
+        assert_eq!(value["issues"][0]["message"], "message\0\u{1}\r\n</error>");
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
     fn gitlab_writes_empty_list_when_empty() {
         assert_eq!(report_empty(ReportingFormat::Gitlab), b"[]");
+    }
+
+    #[cfg(feature = "serde")]
+    #[test]
+    fn gitlab_serializes_hostile_values_as_json_data() {
+        let output = report_hostile_values(ReportingFormat::Gitlab);
+        let Ok(value) = serde_json::from_slice::<serde_json::Value>(&output) else {
+            panic!("GitLab report should be valid JSON");
+        };
+
+        assert_eq!(value[0]["description"], "message\0\u{1}\r\n</error>");
     }
 }

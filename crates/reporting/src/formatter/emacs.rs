@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::io::IsTerminal;
 use std::io::Write;
 
@@ -14,6 +15,23 @@ use crate::formatter::utils::osc8_hyperlink;
 
 /// Formatter that outputs issues in Emacs compilation mode format.
 pub(crate) struct EmacsFormatter;
+
+fn escape_record_field(input: &str) -> Cow<'_, str> {
+    if !input.bytes().any(|byte| matches!(byte, b'\r' | b'\n')) {
+        return Cow::Borrowed(input);
+    }
+
+    let mut escaped = String::with_capacity(input.len());
+    for character in input.chars() {
+        match character {
+            '\r' => escaped.push_str("\\r"),
+            '\n' => escaped.push_str("\\n"),
+            character => escaped.push(character),
+        }
+    }
+
+    Cow::Owned(escaped)
+}
 
 impl Formatter for EmacsFormatter {
     fn format(
@@ -40,7 +58,7 @@ impl Formatter for EmacsFormatter {
                         name.into_owned()
                     };
 
-                    (display, line, column)
+                    (escape_record_field(&display).into_owned(), line, column)
                 }
                 None => ("<unknown>".to_string(), 0, 0),
             };
@@ -56,12 +74,25 @@ impl Formatter for EmacsFormatter {
                 message.push_str(link);
                 message.push(')');
             }
+            let message = escape_record_field(&message);
 
             let issue_type = issue.code.as_deref().unwrap_or("other");
+            let issue_type = escape_record_field(issue_type);
 
             writeln!(writer, "{file_display}:{line}:{column}:{severity} - {issue_type}: {message}")?;
         }
 
         Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::escape_record_field;
+
+    #[test]
+    fn escapes_physical_line_boundaries() {
+        assert_eq!(escape_record_field("plain"), "plain");
+        assert_eq!(escape_record_field("first\r\nsecond"), "first\\r\\nsecond");
     }
 }

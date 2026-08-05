@@ -109,6 +109,10 @@ pub fn xml_encode(input: impl AsRef<str>) -> String {
     let mut result = String::with_capacity(input.len());
 
     for c in input.chars() {
+        if !is_xml_1_0_character(c) {
+            continue;
+        }
+
         let next = match c {
             '&' => "&amp;",
             '<' => "&lt;",
@@ -128,6 +132,14 @@ pub fn xml_encode(input: impl AsRef<str>) -> String {
     }
 
     result
+}
+
+#[inline]
+fn is_xml_1_0_character(character: char) -> bool {
+    matches!(
+        character,
+        '\u{9}' | '\u{A}' | '\u{D}' | '\u{20}'..='\u{D7FF}' | '\u{E000}'..='\u{FFFD}' | '\u{10000}'..='\u{10FFFF}'
+    )
 }
 
 /// Build a long message from an issue including notes, help, and links.
@@ -201,6 +213,17 @@ fn strip_windows_verbatim_prefix(path: &str) -> std::borrow::Cow<'_, str> {
 #[cfg(test)]
 mod tests {
     use super::strip_windows_verbatim_prefix;
+    use super::xml_encode;
+
+    #[test]
+    fn xml_encoding_escapes_markup_and_line_boundaries() {
+        assert_eq!(xml_encode("<&>\"'\r\n"), "&lt;&amp;&gt;&quot;&apos;&#13;&#10;");
+    }
+
+    #[test]
+    fn xml_encoding_removes_characters_forbidden_by_xml_1_0() {
+        assert_eq!(xml_encode("a\0\u{1}\u{B}\u{C}\u{1F}\u{FFFE}\u{FFFF}b\t"), "ab\t");
+    }
 
     #[test]
     fn strips_verbatim_drive_prefix() {
