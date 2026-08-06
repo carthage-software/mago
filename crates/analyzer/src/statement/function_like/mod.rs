@@ -653,7 +653,9 @@ where
             concat_word!(b"$this->", raw_property_name)
         };
 
-        if property_metadata.type_declaration_metadata.is_some() && !property_metadata.flags.has_default() {
+        if resolution.is_magic()
+            || (property_metadata.type_declaration_metadata.is_some() && !property_metadata.flags.has_default())
+        {
             property_type.set_possibly_undefined(true, None);
         }
 
