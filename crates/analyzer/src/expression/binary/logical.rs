@@ -21,6 +21,7 @@ use mago_syntax::cst::BinaryOperator;
 use mago_syntax::cst::Expression;
 use mago_text_edit::Safety;
 use mago_text_edit::TextEdit;
+use mago_word::WordMap;
 use mago_word::WordSet;
 
 use crate::analyzable::Analyzable;
@@ -37,6 +38,35 @@ use crate::reconciler;
 use crate::utils::conditional;
 use crate::utils::expression::expression_has_observable_side_effect;
 use crate::utils::symbol_existence::extract_function_constant_existence;
+
+/// Merges variables assigned by a short-circuiting right-hand side back into the
+/// enclosing context.
+fn merge_short_circuited_assignments<'ctx, A>(
+    context: &Context<'ctx, '_, A>,
+    block_context: &mut BlockContext<'ctx>,
+    left_locals: &WordMap<Rc<TUnion>>,
+    right_locals: &WordMap<Rc<TUnion>>,
+    right_assigned_var_ids: &WordMap<u32>,
+) where
+    A: Arena,
+{
+    for (var_id, right_type) in right_locals {
+        if !right_assigned_var_ids.contains_key(var_id) {
+            continue;
+        }
+
+        let Some(left_type) = left_locals.get(var_id) else {
+            block_context.locals.insert(*var_id, Rc::clone(right_type));
+
+            continue;
+        };
+
+        block_context.locals.insert(
+            *var_id,
+            combine_union_types_rc(left_type, right_type, context.codebase, context.settings.combiner_options()),
+        );
+    }
+}
 
 #[inline]
 pub fn analyze_logical_and_operation<'ctx, 'arena, A>(
@@ -225,7 +255,6 @@ where
         .conditionally_referenced_variable_ids
         .extend(right_block_context.conditionally_referenced_variable_ids);
 
-    let left_assigned_var_ids = left_block_context.assigned_variable_ids.clone();
     let right_assigned_var_ids = right_block_context.assigned_variable_ids.clone();
     if block_context.flags.inside_conditional() {
         block_context.assigned_variable_ids = left_block_context.assigned_variable_ids;
@@ -261,16 +290,15 @@ where
         }
     } else {
         let left_locals = left_block_context.locals;
-        for (var_id, var_type) in &right_block_context.locals {
-            if right_assigned_var_ids.contains_key(var_id)
-                && !left_assigned_var_ids.contains_key(var_id)
-                && !left_locals.contains_key(var_id)
-            {
-                block_context.locals.insert(*var_id, Rc::clone(var_type));
-            }
-        }
+        block_context.locals.extend(left_locals.iter().map(|(var_id, var_type)| (*var_id, Rc::clone(var_type))));
 
-        block_context.locals.extend(left_locals);
+        merge_short_circuited_assignments(
+            context,
+            block_context,
+            &left_locals,
+            &right_block_context.locals,
+            &right_assigned_var_ids,
+        );
     }
 
     Ok(())
@@ -554,7 +582,7 @@ where
         block_context
             .conditionally_referenced_variable_ids
             .extend(right_block_context.conditionally_referenced_variable_ids);
-        block_context.assigned_variable_ids.extend(right_block_context.assigned_variable_ids);
+        block_context.assigned_variable_ids.extend(right_block_context.assigned_variable_ids.clone());
     }
 
     if let Some(if_body_context) = &block_context.if_body_context {
@@ -588,6 +616,14 @@ where
         if_body_context_inner
             .assigned_variable_ids
             .extend(block_context.assigned_variable_ids.iter().map(|(k, v)| (*k, *v)));
+    } else {
+        merge_short_circuited_assignments(
+            context,
+            block_context,
+            &left_block_context.locals,
+            &right_block_context.locals,
+            &right_block_context.assigned_variable_ids,
+        );
     }
 
     artifacts.set_expression_type(binary, result_type);
