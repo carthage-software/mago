@@ -432,7 +432,7 @@ where
                 ))
         {
             if parameter_metadata.get_type_metadata().is_some()
-                && !declared_parameter_type.is_nullable()
+                && !declared_parameter_type.can_be_null()
                 && inferred_type.is_nullable()
             {
                 inferred_type.to_non_nullable()
