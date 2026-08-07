@@ -959,6 +959,9 @@ where
             TAtomic::Mixed(_) | TAtomic::Scalar(TScalar::Generic) => {
                 return get_numeric();
             }
+            TAtomic::Scalar(TScalar::Numeric) => {
+                acceptable_types.push(TAtomic::Scalar(TScalar::Numeric));
+            }
             TAtomic::Scalar(TScalar::Float(float)) => {
                 acceptable_types.push(TAtomic::Scalar(TScalar::Float(*float)));
             }

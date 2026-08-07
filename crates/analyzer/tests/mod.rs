@@ -402,6 +402,7 @@ test_case!(non_utf8_class_names);
 test_case!(non_utf8_function_names);
 test_case!(non_utf8_property_names);
 test_case!(numeric_reconciliation);
+test_case!(narrowing_to_numeric_is_idempotent);
 test_case!(priority_queue_implementation);
 test_case!(psl_integration);
 test_case!(psl_int_range);
