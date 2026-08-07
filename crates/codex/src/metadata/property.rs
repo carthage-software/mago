@@ -4,6 +4,7 @@ use mago_php_version::PHPVersionRange;
 use mago_span::Span;
 use mago_word::WordMap;
 
+use crate::metadata::attribute::AttributeMetadata;
 use crate::metadata::flags::MetadataFlags;
 use crate::metadata::property_hook::PropertyHookMetadata;
 use crate::metadata::ttype::TypeMetadata;
@@ -29,6 +30,12 @@ pub struct PropertyMetadata {
     /// The source code location (span) covering the entire property declaration statement.
     /// `None` if the location is unknown or not relevant.
     pub span: Option<Span>,
+
+    /// Attributes (e.g. `#[SomeAttribute]`) applied to the property declaration.
+    ///
+    /// For grouped declarations (`public int $a, $b;`), every item carries the
+    /// attributes of the shared declaration, matching PHP semantics.
+    pub attributes: Vec<AttributeMetadata>,
 
     /// The visibility level required for reading the property's value.
     ///
@@ -96,6 +103,7 @@ impl PropertyMetadata {
             name,
             name_span: None,
             span: None,
+            attributes: Vec::new(),
             read_visibility: Visibility::Public,
             write_visibility: Visibility::Public,
             type_declaration_metadata: None,
