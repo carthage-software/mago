@@ -248,6 +248,7 @@ mod tests {
         content: &'static str,
         settings: Settings,
         expected_issues: Vec<IssueCode>,
+        expected_messages: Vec<&'static str>,
     }
 
     impl TestCase {
@@ -261,6 +262,7 @@ mod tests {
                     ..Default::default()
                 },
                 expected_issues: vec![],
+                expected_messages: vec![],
             }
         }
 
@@ -276,6 +278,11 @@ mod tests {
 
         pub fn expect_issues(mut self, codes: Vec<IssueCode>) -> Self {
             self.expected_issues = codes;
+            self
+        }
+
+        pub fn expect_messages(mut self, messages: Vec<&'static str>) -> Self {
+            self.expected_messages = messages;
             self
         }
 
@@ -311,7 +318,13 @@ mod tests {
             panic!("Test '{}': Expected analysis to succeed, but it failed with an error: {}", config.name, err);
         }
 
-        verify_reported_issues(config.name, analysis_result, codebase, &config.expected_issues);
+        verify_reported_issues(
+            config.name,
+            analysis_result,
+            codebase,
+            &config.expected_issues,
+            &config.expected_messages,
+        );
     }
 
     fn verify_reported_issues(
@@ -319,6 +332,7 @@ mod tests {
         mut analysis_result: AnalysisResult,
         mut codebase: CodebaseMetadata,
         expected_issue_codes: &[IssueCode],
+        expected_messages: &[&str],
     ) {
         let mut actual_issues_collected = std::mem::take(&mut analysis_result.issues);
 
@@ -371,6 +385,13 @@ mod tests {
             panic!("{}", panic_message);
         }
 
+        for expected_message in expected_messages {
+            assert!(
+                actual_issues_collected.iter().any(|issue| issue.message == *expected_message),
+                "Test '{test_name}': Expected issue message {expected_message:?}, but found: {actual_issues_collected:?}",
+            );
+        }
+
         if expected_issue_codes.is_empty() && actual_issues_count != 0 {
             let mut panic_message = format!("Test '{test_name}': Expected no issues, but found:\n");
             for issue in actual_issues_collected {
@@ -384,6 +405,26 @@ mod tests {
 
             panic!("{}", panic_message);
         }
+    }
+
+    #[test]
+    fn unused_method_message_preserves_declaration_casing() {
+        TestCase::new(
+            "unused_method_message_preserves_declaration_casing",
+            "<?php
+
+final class Test
+{
+    private function getRandomString(): string
+    {
+        return 'string';
+    }
+}
+",
+        )
+        .expect_issues(vec![IssueCode::UnusedMethod])
+        .expect_messages(vec!["Method `getRandomString()` is never used."])
+        .run();
     }
 
     #[macro_export]

@@ -32,6 +32,7 @@ use crate::context::Context;
 #[derive(Clone)]
 struct CheckableMember {
     symbol_id: SymbolIdentifier,
+    display_name: Word,
     span: Span,
     is_property: bool,
 }
@@ -113,6 +114,7 @@ where
         if let Some(property_span) = property.name_span.or(property.span) {
             checkable_members.push(CheckableMember {
                 symbol_id: (class_name, *property_name),
+                display_name: *property_name,
                 span: property_span,
                 is_property: true,
             });
@@ -166,6 +168,7 @@ where
         let method_span = method_metadata.name_span.unwrap_or(method_metadata.span);
         checkable_members.push(CheckableMember {
             symbol_id: (class_name, *method_name),
+            display_name: method_metadata.original_name,
             span: method_span,
             is_property: false,
         });
@@ -206,9 +209,9 @@ where
     for member in &checkable_members {
         if unused_members.contains(&member.symbol_id) {
             if member.is_property {
-                report_unused_property(context, class_span, member.symbol_id.1, member.span);
+                report_unused_property(context, class_span, member.display_name, member.span);
             } else {
-                report_unused_method(context, class_span, member.symbol_id.1, member.span);
+                report_unused_method(context, class_span, member.display_name, member.span);
             }
         }
     }

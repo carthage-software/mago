@@ -10,6 +10,15 @@ class UnusedPrivateMethod
     }
 }
 
+final class UnusedCamelCaseMethod
+{
+    // @mago-expect analysis:unused-method
+    private function getRandomString(): string
+    {
+        return 'string';
+    }
+}
+
 class UsedPrivateMethod
 {
     private function helper(): void
