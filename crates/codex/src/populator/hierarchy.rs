@@ -23,6 +23,7 @@ use crate::ttype::union::populate_union_type;
 use super::merge::merge_interface_metadata_from_parent_interface;
 use super::merge::merge_metadata_from_parent_class_like;
 use super::merge::merge_metadata_from_required_class_like;
+use super::merge::merge_metadata_from_required_interface;
 use super::merge::merge_metadata_from_trait;
 
 #[inline]
@@ -148,7 +149,7 @@ pub fn populate_class_like_metadata_iterative(
     }
 
     for required_interface in sorted_atoms(metadata.require_implements.iter().copied()) {
-        merge_interface_metadata_from_parent_interface(&mut metadata, codebase, required_interface, symbol_references);
+        merge_metadata_from_required_interface(&mut metadata, codebase, required_interface, symbol_references);
     }
 
     if metadata.flags.is_readonly() {

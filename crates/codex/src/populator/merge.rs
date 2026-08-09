@@ -101,6 +101,27 @@ pub fn merge_metadata_from_required_class_like(
     metadata.require_implements.extend(parent_metadata.all_parent_interfaces.iter().copied());
 }
 
+/// Merges metadata needed to resolve a required interface without inheriting its members.
+/// Assumes the interface is already populated.
+pub fn merge_metadata_from_required_interface(
+    metadata: &mut ClassLikeMetadata,
+    codebase: &CodebaseMetadata,
+    required_interface: Word,
+    symbol_references: &mut SymbolReferences,
+) {
+    symbol_references.add_symbol_reference_to_symbol(metadata.name, required_interface, true);
+
+    let Some(interface_metadata) = codebase.class_likes.get(&required_interface) else {
+        metadata.invalid_dependencies.insert(required_interface);
+        return;
+    };
+
+    metadata.require_implements.extend(interface_metadata.all_parent_interfaces.iter().copied());
+    metadata.invalid_dependencies.extend(interface_metadata.invalid_dependencies.iter().copied());
+
+    extend_template_parameters(metadata, interface_metadata);
+}
+
 /// Merges class-like data inherited from a used trait.
 /// Assumes the trait is already populated.
 pub fn merge_metadata_from_trait(
