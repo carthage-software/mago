@@ -21,6 +21,9 @@ package.rust-version = "1.97.0"
 members = ["crates/*", "docs"]
 exclude = ["crates/syntax/fuzz", "crates/twig-syntax/fuzz"]
 
+[workspace.lints.rust]
+unknown_lints = "allow"
+
 [workspace.lints.clippy]
 large_enum_variant = { level = "deny" }
 print_stdout = { level = "deny" }
@@ -35,6 +38,7 @@ min_ident_chars = "allow"
 implicit_return = "allow"
 single_call_fn = "allow"
 arbitrary_source_item_ordering = "allow"
+definition_in_module_root = "allow"
 pub_with_shorthand = "allow"
 question_mark_used = "allow"
 wildcard_enum_match_arm = "allow"
