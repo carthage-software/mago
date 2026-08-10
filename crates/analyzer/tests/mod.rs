@@ -2649,6 +2649,7 @@ test_case!(issue_2149);
 test_case!(issue_2151);
 test_case!(issue_2161);
 test_case!(issue_2162);
+test_case!(issue_2185);
 test_case!(issue_2188, {
     let mut settings = crate::framework::default_test_settings();
     settings.version = mago_php_version::PHPVersion::PHP83;

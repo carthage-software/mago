@@ -77,7 +77,7 @@ where
     new_locals: Option<WordMap<Rc<TUnion>>>,
     redefined_variables: Option<WordMap<Rc<TUnion>>>,
     possibly_redefined_variables: Option<WordMap<Rc<TUnion>>>,
-    leftover_statements: Vec<Statement<'arena>>,
+    leftover_statement_groups: Vec<(Vec<Statement<'arena>>, bool)>,
     leftover_case_equality_expression: Option<Expression<'arena>>,
     has_fallthrough: bool,
     has_reachable_fallthrough: bool,
@@ -108,7 +108,7 @@ where
             new_locals: None,
             redefined_variables: None,
             possibly_redefined_variables: None,
-            leftover_statements: vec![],
+            leftover_statement_groups: vec![],
             leftover_case_equality_expression: None,
             has_fallthrough: false,
             has_reachable_fallthrough: false,
@@ -373,7 +373,8 @@ where
             );
         }
 
-        let mut case_statements_are_reachable = self.has_reachable_fallthrough || result != Some(false);
+        let mut case_has_direct_entry = result != Some(false);
+        let mut case_statements_are_reachable = self.has_reachable_fallthrough || case_has_direct_entry;
 
         if let Some(case_condition) = switch_case.expression() {
             let mut has_non_duplicate_empty_case = false;
@@ -393,6 +394,8 @@ where
             if condition_is_duplicate && !has_alternate_entry {
                 result = Some(false);
             }
+
+            case_has_direct_entry = result != Some(false) && (!condition_is_duplicate || has_non_duplicate_empty_case);
 
             if result.is_none()
                 && let Some(condition_type) = self.artifacts.get_rc_expression_type(case_condition)
@@ -473,10 +476,6 @@ where
             // default case after a previously matching case; result already decided
         }
 
-        let mut case_stmts = self.leftover_statements.clone();
-
-        case_stmts.extend(switch_case.statements().iter().cloned());
-
         if !has_leaving_statements && !is_last {
             if let Some(case_equality_expression) = case_equality_expression {
                 self.leftover_case_equality_expression =
@@ -489,7 +488,7 @@ where
 
             self.has_fallthrough = true;
             self.has_reachable_fallthrough = case_statements_are_reachable;
-            self.leftover_statements = case_stmts;
+            self.leftover_statement_groups.push((switch_case.statements().to_vec(), case_has_direct_entry));
             self.artifacts.expression_types = old_expression_types;
 
             return Ok(result);
@@ -506,7 +505,7 @@ where
 
         case_block_context.break_types.push(BreakContext::Switch);
         if !self.has_fallthrough {
-            self.leftover_statements = vec![];
+            self.leftover_statement_groups.clear();
         }
 
         self.leftover_case_equality_expression = None;
@@ -622,10 +621,17 @@ where
         if self.has_fallthrough {
             self.has_fallthrough = false;
 
-            let leftover = std::mem::take(&mut self.leftover_statements);
-            analyze_statements(&leftover, self.context, &mut case_block_context, self.artifacts)?;
+            for (leftover_statements, has_direct_entry) in std::mem::take(&mut self.leftover_statement_groups) {
+                if has_direct_entry {
+                    case_block_context.flags.set_has_returned(false);
+                }
 
-            case_block_context.flags.set_has_returned(false);
+                analyze_statements(&leftover_statements, self.context, &mut case_block_context, self.artifacts)?;
+            }
+
+            if case_has_direct_entry {
+                case_block_context.flags.set_has_returned(false);
+            }
             for (var_id, original_type) in &original_block_context.locals {
                 if let Some(current_type) = case_block_context.locals.get(var_id)
                     && current_type != original_type
@@ -644,7 +650,7 @@ where
 
             analyze_statements(switch_case.statements(), self.context, &mut case_block_context, self.artifacts)?;
         } else {
-            analyze_statements(&case_stmts, self.context, &mut case_block_context, self.artifacts)?;
+            analyze_statements(switch_case.statements(), self.context, &mut case_block_context, self.artifacts)?;
         }
         self.has_reachable_fallthrough = false;
 
