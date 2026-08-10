@@ -60,9 +60,9 @@ pub(crate) fn is_contained_by(
         };
 
         // When the input has no explicit type parameters, the specialized type
-        // comes from template defaults, not explicit annotations.
+        // is only the template's upper bound, not an explicit invariant argument.
         if input_type_parameters.is_none() {
-            specialized_template_type.set_from_template_default(true);
+            specialized_template_type.set_from_unspecified_template(true);
         }
 
         let mut parameter_comparison_result = ComparisonResult::new();
@@ -124,8 +124,8 @@ pub(crate) fn is_contained_by(
 
         if matches!(variance, Variance::Invariant)
             && (!inside_assertion || !container_type_parameter.has_template_types())
-            && !specialized_template_type.from_template_default()
-            && !container_type_parameter.from_template_default()
+            && !specialized_template_type.from_template_fallback()
+            && !container_type_parameter.from_template_fallback()
         {
             let mut reverse_result = ComparisonResult::new();
             let reverse_ok = union_comparator::is_contained_by(

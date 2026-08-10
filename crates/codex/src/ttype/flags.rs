@@ -27,6 +27,8 @@ impl UnionFlags {
     pub const POPULATED: UnionFlags = UnionFlags(1 << 8);
     /// Indicates the null in this union came from nullsafe short-circuit.
     pub const NULLSAFE_NULL: UnionFlags = UnionFlags(1 << 9);
+    /// Indicates this union fills an omitted template argument that has no declared default.
+    pub const FROM_UNSPECIFIED_TEMPLATE: UnionFlags = UnionFlags(1 << 10);
 }
 
 impl UnionFlags {

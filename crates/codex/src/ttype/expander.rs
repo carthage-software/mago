@@ -869,7 +869,7 @@ fn direct_mixins<'ctx>(
 }
 
 /// Returns true if we should use the static object's type parameters instead of the current ones.
-/// This is true when current params are None or match the class's default template bounds.
+/// This is true when current params are None or came from omitted/defaulted template arguments.
 fn should_use_static_type_params(named: &TNamedObject, static_obj: &TNamedObject, codebase: &CodebaseMetadata) -> bool {
     let Some(current_params) = &named.type_parameters else {
         return true;
@@ -883,13 +883,13 @@ fn should_use_static_type_params(named: &TNamedObject, static_obj: &TNamedObject
 
     current_params.len() == templates.len()
         && current_params.iter().zip(templates.values()).all(|(current, template)| {
-            current.from_template_default()
+            current.from_template_fallback()
                 || current == &template.constraint
                 || template.default.as_ref().is_some_and(|default| current == default)
         })
 }
 
-/// Expands existing type parameters or fills them with default template bounds.
+/// Expands existing type parameters and fills omitted arguments.
 fn expand_or_fill_type_parameters(
     named: &mut TNamedObject,
     codebase: &CodebaseMetadata,
@@ -902,9 +902,15 @@ fn expand_or_fill_type_parameters(
         if supplied_count < template_count {
             let mut params = named.type_parameters.take().unwrap_or_default();
             params.extend(class_metadata.template_types.values().skip(supplied_count).map(|template| {
-                let mut fallback = template.default.clone().unwrap_or_else(|| template.constraint.clone());
-                fallback.set_from_template_default(true);
-                fallback
+                if let Some(default) = &template.default {
+                    let mut default = default.clone();
+                    default.set_from_template_default(true);
+                    default
+                } else {
+                    let mut constraint = template.constraint.clone();
+                    constraint.set_from_unspecified_template(true);
+                    constraint
+                }
             }));
             named.type_parameters = Some(params);
         }
@@ -1835,7 +1841,7 @@ mod tests {
     }
 
     #[test]
-    fn test_expand_object_gets_default_type_params() {
+    fn test_expand_object_marks_omitted_type_params_as_unspecified() {
         let code = "<?php
             /** @template T */
             class Container {}
@@ -1848,9 +1854,38 @@ mod tests {
         let mut actual = input;
         expand_union(&codebase, &mut actual, &TypeExpansionOptions::default());
 
-        if let TAtomic::Object(TObject::Named(named)) = &actual.types[0] {
-            assert!(named.type_parameters.is_some());
-        }
+        let TAtomic::Object(TObject::Named(named)) = &actual.types[0] else {
+            panic!("Expected a named object");
+        };
+        let parameter = &named.type_parameters.as_ref().expect("Expected a filled type parameter")[0];
+
+        assert!(parameter.is_mixed());
+        assert!(parameter.from_unspecified_template());
+        assert!(!parameter.from_template_default());
+    }
+
+    #[test]
+    fn test_expand_object_keeps_declared_template_defaults_concrete() {
+        let code = "<?php
+            /** @template T = string */
+            class Container {}
+        ";
+        let codebase = create_test_codebase(code);
+
+        let named = TNamedObject::new(ascii_lowercase_word(b"container"));
+        let input = TUnion::from_atomic(TAtomic::Object(TObject::Named(named)));
+
+        let mut actual = input;
+        expand_union(&codebase, &mut actual, &TypeExpansionOptions::default());
+
+        let TAtomic::Object(TObject::Named(named)) = &actual.types[0] else {
+            panic!("Expected a named object");
+        };
+        let parameter = &named.type_parameters.as_ref().expect("Expected a filled type parameter")[0];
+
+        assert!(parameter.is_string());
+        assert!(parameter.from_template_default());
+        assert!(!parameter.from_unspecified_template());
     }
 
     #[test]

@@ -191,6 +191,27 @@ impl TUnion {
 
     #[inline]
     #[must_use]
+    pub const fn from_unspecified_template(&self) -> bool {
+        self.flags.contains(UnionFlags::FROM_UNSPECIFIED_TEMPLATE)
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn from_template_fallback(&self) -> bool {
+        self.from_template_default() || self.from_unspecified_template()
+    }
+
+    #[must_use]
+    pub fn contains_unspecified_template_arguments(&self) -> bool {
+        self.from_unspecified_template()
+            || self
+                .get_all_child_nodes()
+                .into_iter()
+                .any(|node| matches!(node, TypeRef::Union(union) if union.from_unspecified_template()))
+    }
+
+    #[inline]
+    #[must_use]
     pub const fn populated(&self) -> bool {
         self.flags.contains(UnionFlags::POPULATED)
     }
@@ -234,6 +255,11 @@ impl TUnion {
     #[inline]
     pub fn set_from_template_default(&mut self, value: bool) {
         self.flags.set(UnionFlags::FROM_TEMPLATE_DEFAULT, value);
+    }
+
+    #[inline]
+    pub fn set_from_unspecified_template(&mut self, value: bool) {
+        self.flags.set(UnionFlags::FROM_UNSPECIFIED_TEMPLATE, value);
     }
 
     #[inline]
@@ -1471,7 +1497,8 @@ impl PartialEq for TUnion {
             .union(UnionFlags::POSSIBLY_UNDEFINED)
             .union(UnionFlags::IGNORE_NULLABLE_ISSUES)
             .union(UnionFlags::IGNORE_FALSABLE_ISSUES)
-            .union(UnionFlags::FROM_TEMPLATE_DEFAULT);
+            .union(UnionFlags::FROM_TEMPLATE_DEFAULT)
+            .union(UnionFlags::FROM_UNSPECIFIED_TEMPLATE);
 
         if self.flags.intersection(SEMANTIC_FLAGS) != other.flags.intersection(SEMANTIC_FLAGS) {
             return false;

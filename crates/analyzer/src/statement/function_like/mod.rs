@@ -311,7 +311,7 @@ where
                 let expanded_native =
                     expand_type_metadata(context, block_context, artifacts, function_like_metadata, native_type);
 
-                let is_compatible = union_comparator::is_contained_by(
+                let is_compatible = union_comparator::is_contained_by_with_erased_template_arguments(
                     context.codebase,
                     &effective_type,
                     &expanded_native,
@@ -346,6 +346,7 @@ where
                 } else if !is_overriding_method
                     && !effective_type.has_template_types()
                     && !expanded_native.has_template_types()
+                    && !expanded_native.contains_unspecified_template_arguments()
                 {
                     let dropped: Vec<&TAtomic> = expanded_native
                         .types

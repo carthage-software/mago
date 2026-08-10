@@ -92,7 +92,7 @@ pub(crate) fn is_contained_by(
 
         let mut parameter_comparison_result = ComparisonResult::new();
 
-        if !union_comparator::is_contained_by(
+        if !union_comparator::is_contained_by_with_erased_template_arguments(
             codebase,
             container_parameter_type,
             input_parameter_type,
