@@ -623,6 +623,7 @@ ignore = [
 </code></pre>
 <p>glob 匹配会遵循 <code>[source.glob]</code> 下的项目级设置,因此像 <code>literal-separator</code> 和 <code>case-insensitive</code> 这样的开关在这里同样适用。</p>
 <p><code>excludes</code> 与 <code>ignore</code> 含义不同。<code>excludes</code> 把文件完全从分析中移除,因此这些文件不会被解析以提供类型信息。<code>ignore</code> 仍会分析文件,但会在输出中抑制所列代码。</p>
+<p>若想查看 <code>ignore</code> 列表当前隐藏了哪些问题,可运行一次 <code>mago analyze --skip-ignores</code>,该列表仅在这一次运行中被禁用。</p>
 <h2 id="pattern-based-ignoring">特性开关</h2>
 <p>这些开关用于切换各项独立的分析。默认值已为日常使用调好;在代码库逐步收紧时再开启它们。</p>
 <table><thead><tr><th style="text-align: left">选项</th><th style="text-align: left">默认值</th><th style="text-align: left">说明</th></tr></thead><tbody>

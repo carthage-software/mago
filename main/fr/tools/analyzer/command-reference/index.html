@@ -566,6 +566,7 @@
 <h2 id="analyzer-specific-options">Options spécifiques à l'analyseur</h2>
 <table><thead><tr><th style="text-align: left">Indicateur</th><th style="text-align: left">Description</th></tr></thead><tbody>
 <tr><td style="text-align: left"><code>--no-stubs</code></td><td style="text-align: left">Ignore les stubs intégrés de la bibliothèque standard PHP. À utiliser uniquement lorsque vous avez une raison.</td></tr>
+<tr><td style="text-align: left"><code>--skip-ignores</code></td><td style="text-align: left">Ignore la liste <code>ignore</code> de <code>mago.toml</code> et signale tous les problèmes trouvés. Les suppressions en ligne restent actives.</td></tr>
 <tr><td style="text-align: left"><code>--staged</code></td><td style="text-align: left">Analyse uniquement les fichiers stagés dans git. Échoue en dehors d'un dépôt git.</td></tr>
 <tr><td style="text-align: left"><code>--stdin-input</code></td><td style="text-align: left">Lit le contenu du fichier depuis stdin et utilise l'unique argument de chemin pour la recherche de baseline et le rapport. Destiné aux intégrations d'éditeur.</td></tr>
 <tr><td style="text-align: left"><code>--substitute &lt;ORIG=TEMP&gt;</code></td><td style="text-align: left">Remplace un fichier hôte par un autre pour cette invocation. Destiné aux tests de mutation. Répétable.</td></tr>

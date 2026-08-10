@@ -564,6 +564,7 @@
 <h2 id="analyzer-specific-options">Analyzer-specific options</h2>
 <table><thead><tr><th style="text-align: left">Flag</th><th style="text-align: left">Description</th></tr></thead><tbody>
 <tr><td style="text-align: left"><code>--no-stubs</code></td><td style="text-align: left">Skip the built-in PHP standard-library stubs. Use only when you have a reason.</td></tr>
+<tr><td style="text-align: left"><code>--skip-ignores</code></td><td style="text-align: left">Ignore the <code>ignore</code> list from <code>mago.toml</code> and report every issue found. Inline suppressions still apply.</td></tr>
 <tr><td style="text-align: left"><code>--staged</code></td><td style="text-align: left">Analyze only files staged in git. Fails outside a git repository.</td></tr>
 <tr><td style="text-align: left"><code>--stdin-input</code></td><td style="text-align: left">Read file content from stdin and use the single path argument for baseline lookup and reporting. Intended for editor integrations.</td></tr>
 <tr><td style="text-align: left"><code>--substitute &lt;ORIG=TEMP&gt;</code></td><td style="text-align: left">Replace one host file with another for this invocation. Intended for mutation testing. Repeatable.</td></tr>

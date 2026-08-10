@@ -605,6 +605,7 @@ ignore = [
 <p>Both <code>code</code> and <code>in</code> are optional. With only a <code>pattern</code>, every reported issue is tested against the regex regardless of code or file. Combining <code>pattern</code> with <code>code</code> and/or <code>in</code> narrows the search before running the regex, which is cheaper and avoids accidental matches in unrelated rules.</p>
 <p>The pattern is a <a href="https://docs.rs/regex/">bare Rust regex</a>. Write <code>(?i)</code> at the start to match case-insensitively; do not wrap the regex in <code>/.../</code> delimiters. An invalid regex is logged and the entry is skipped, so a single bad pattern does not stop the run.</p>
 <p><code>excludes</code> and <code>ignore</code> are not the same. <code>excludes</code> removes files from analysis entirely, so they are not parsed for type information. <code>ignore</code> still analyses the file but suppresses the listed codes in the output.</p>
+<p>To see what the <code>ignore</code> list is currently hiding, run <code>mago analyze --skip-ignores</code> once; it disables the whole list for that run only.</p>
 <h2 id="feature-flags">Feature flags</h2>
 <p>These flags toggle individual analyses. Defaults are tuned for everyday use; flip them on as your codebase tightens up.</p>
 <table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr></thead><tbody>

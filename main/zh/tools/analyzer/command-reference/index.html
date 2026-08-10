@@ -593,6 +593,7 @@
 <h2 id="analyzer-specific-options">分析器专属选项</h2>
 <table><thead><tr><th style="text-align: left">标志</th><th style="text-align: left">说明</th></tr></thead><tbody>
 <tr><td style="text-align: left"><code>--no-stubs</code></td><td style="text-align: left">跳过内置的 PHP 标准库 stub。仅在确实需要时使用。</td></tr>
+<tr><td style="text-align: left"><code>--skip-ignores</code></td><td style="text-align: left">忽略 <code>mago.toml</code> 中的 <code>ignore</code> 列表,报告发现的所有问题。源码中的内联抑制仍然有效。</td></tr>
 <tr><td style="text-align: left"><code>--staged</code></td><td style="text-align: left">仅分析 git 中暂存的文件。在非 git 仓库中运行会失败。</td></tr>
 <tr><td style="text-align: left"><code>--stdin-input</code></td><td style="text-align: left">从 stdin 读取文件内容,使用单一路径参数进行 baseline 查找和报告。用于编辑器集成。</td></tr>
 <tr><td style="text-align: left"><code>--substitute &lt;ORIG=TEMP&gt;</code></td><td style="text-align: left">在本次调用中以另一个文件替换某个宿主文件。用于变异测试。可重复使用。</td></tr>
