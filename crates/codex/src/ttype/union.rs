@@ -869,7 +869,15 @@ impl TUnion {
 
     #[must_use]
     pub fn has_bool(&self) -> bool {
-        self.types.iter().any(|t| t.is_bool() || t.is_generic_scalar()) && !self.types.is_empty()
+        if self.types.is_empty() {
+            return false;
+        }
+
+        self.types.iter().any(|atomic| {
+            atomic.is_bool()
+                || atomic.is_generic_scalar()
+                || atomic.map_generic_parameter_constraint(TUnion::has_bool).unwrap_or(false)
+        })
     }
 
     /// Checks if the union explicitly contains the generic `scalar` type.
