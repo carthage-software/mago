@@ -344,7 +344,7 @@ impl TType for TClassLikeString {
     fn get_id(&self) -> Word {
         match self {
             TClassLikeString::Any { kind } => word(kind.as_bytes()),
-            TClassLikeString::Generic { kind, parameter_name, defining_entity, constraint, .. } => {
+            TClassLikeString::Generic { kind, parameter_name, defining_entity, constraint } => {
                 concat_word!(
                     kind.as_bytes(),
                     b"<'",
