@@ -2654,6 +2654,7 @@ test_case!(issue_2189, {
     settings.version = mago_php_version::PHPVersion::PHP83;
     settings
 });
+test_case!(issue_2190);
 
 #[test]
 #[cfg_attr(miri, ignore)]

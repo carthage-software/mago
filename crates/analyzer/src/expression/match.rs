@@ -267,7 +267,8 @@ where
             self.block_context.scope.get_class_like_name(),
             self.context.resolved_names,
             Some(self.context.codebase),
-        ) {
+        ) && memchr::memmem::find(id.as_bytes(), b"()").is_none()
+        {
             let inserted = match self.block_context.locals.entry(id) {
                 Entry::Occupied(_) => false,
                 Entry::Vacant(entry) => {
