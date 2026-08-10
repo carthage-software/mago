@@ -340,10 +340,12 @@ where
     } else if !matches!(target_expression, Expression::Variable(_)) {
         block_context.stable_method_call_assertions.clear();
         block_context.stable_method_calls.clear();
-        block_context.clauses.retain(|clause| !clause.possibilities.keys().any(|key| key.as_bytes().ends_with(b"()")));
-        block_context
-            .reconciled_expression_clauses
-            .retain(|clause| !clause.possibilities.keys().any(|key| key.as_bytes().ends_with(b"()")));
+        block_context.clauses.retain(|clause| {
+            !clause.possibilities.keys().any(|key| memchr::memmem::find(key.as_bytes(), b"()").is_some())
+        });
+        block_context.reconciled_expression_clauses.retain(|clause| {
+            !clause.possibilities.keys().any(|key| memchr::memmem::find(key.as_bytes(), b"()").is_some())
+        });
     }
 
     match target_expression {

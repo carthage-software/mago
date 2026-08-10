@@ -450,8 +450,10 @@ fn clear_object_property_narrowings<'ctx, 'arena, A>(
     if !preserves_stable_method_results {
         block_context.stable_method_call_assertions.clear();
         block_context.stable_method_calls.clear();
+        let references_method_call_key = |key: Word| memchr::memmem::find(key.as_bytes(), b"()").is_some();
         let references_method_call =
-            |clause: &Rc<Clause>| clause.possibilities.keys().any(|key| key.as_bytes().ends_with(b"()"));
+            |clause: &Rc<Clause>| clause.possibilities.keys().copied().any(references_method_call_key);
+        block_context.locals.retain(|key, _| !references_method_call_key(*key));
         block_context.clauses.retain(|clause| !references_method_call(clause));
         block_context.reconciled_expression_clauses.retain(|clause| !references_method_call(clause));
     }
