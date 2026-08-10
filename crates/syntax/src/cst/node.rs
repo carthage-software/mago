@@ -1,6 +1,7 @@
 use std::fmt::Debug;
 
 use strum::Display;
+use strum::EnumString;
 
 use mago_span::HasSpan;
 use mago_span::Span;
@@ -229,7 +230,7 @@ use crate::cst::cst::YieldFrom;
 use crate::cst::cst::YieldPair;
 use crate::cst::cst::YieldValue;
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord, Display, EnumString)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]
 #[repr(u8)]

@@ -4,6 +4,47 @@ use std::time::Duration;
 
 use crate::protocol::ProtocolVersion;
 
+/// Errors encountered while encoding or decoding a domain payload.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum PayloadError {
+    /// A collection or byte string cannot be represented by the wire `u32` length.
+    LengthOverflow { length: usize },
+    /// Advancing the reader would overflow its byte offset.
+    OffsetOverflow { field: &'static str },
+    /// The payload ended before a field was fully decoded.
+    UnexpectedEnd { field: &'static str, needed: usize, remaining: usize },
+    /// A byte string expected to contain text is not valid UTF-8.
+    InvalidUtf8 { field: &'static str },
+    /// A boolean was encoded with a value other than zero or one.
+    InvalidBoolean { field: &'static str, value: u8 },
+    /// A decoded collection count exceeds its domain-specific limit.
+    CountExceeded { field: &'static str, count: usize, maximum: usize },
+    /// A message contained bytes after its last expected field.
+    TrailingBytes { remaining: usize },
+}
+
+impl std::fmt::Display for PayloadError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::LengthOverflow { length } => {
+                write!(formatter, "payload length {length} exceeds u32::MAX")
+            }
+            Self::OffsetOverflow { field } => write!(formatter, "{field} length overflowed the payload offset"),
+            Self::UnexpectedEnd { field, needed, remaining } => {
+                write!(formatter, "payload ended while reading {field}: needed {needed} bytes, found {remaining}")
+            }
+            Self::InvalidUtf8 { field } => write!(formatter, "{field} is not valid UTF-8"),
+            Self::InvalidBoolean { field, value } => write!(formatter, "{field} has invalid boolean value {value}"),
+            Self::CountExceeded { field, count, maximum } => {
+                write!(formatter, "{field} count {count} exceeds limit {maximum}")
+            }
+            Self::TrailingBytes { remaining } => write!(formatter, "payload contains {remaining} trailing bytes"),
+        }
+    }
+}
+
+impl std::error::Error for PayloadError {}
+
 /// Errors encountered while reading or writing an extension protocol frame.
 #[derive(Debug)]
 pub enum ProtocolError {

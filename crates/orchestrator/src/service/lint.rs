@@ -5,6 +5,7 @@ use mago_allocator::LocalArena;
 use mago_database::ReadDatabase;
 use mago_database::file::File;
 use mago_linter::Linter;
+use mago_linter::external::ExternalLinter;
 use mago_linter::registry::RuleRegistry;
 use mago_linter::settings::Settings;
 use mago_names::resolver::NameResolver;
@@ -42,6 +43,9 @@ pub struct LintService {
 
     /// Whether to display progress bars during linting.
     use_progress_bars: bool,
+
+    /// Optional worker-backed custom linter rules.
+    external_linter: Option<Arc<ExternalLinter>>,
 }
 
 impl LintService {
@@ -64,7 +68,14 @@ impl LintService {
         parser_settings: ParserSettings,
         use_progress_bars: bool,
     ) -> Self {
-        Self { database, settings, parser_settings, use_progress_bars }
+        Self { database, settings, parser_settings, use_progress_bars, external_linter: None }
+    }
+
+    /// Adds worker-backed custom rules to parallel full lint runs.
+    #[must_use]
+    pub fn with_external_linter(mut self, external_linter: Arc<ExternalLinter>) -> Self {
+        self.external_linter = Some(external_linter);
+        self
     }
 
     /// Creates a `RuleRegistry` based on the current settings.
@@ -148,6 +159,7 @@ impl LintService {
             parser_settings: self.parser_settings,
             registry: Arc::new(self.create_registry(only, false)),
             mode,
+            external_linter: self.external_linter,
         };
 
         let pipeline = StatelessParallelPipeline::new(
@@ -173,8 +185,11 @@ impl LintService {
 
             if context.mode == LintMode::Full {
                 let linter = Linter::from_registry(arena, context.registry, context.php_version);
-
-                issues.extend(linter.lint(&file, program, &resolved_names));
+                if let Some(external_linter) = context.external_linter.as_deref() {
+                    issues.extend(linter.lint_with_external(&file, program, &resolved_names, external_linter)?);
+                } else {
+                    issues.extend(linter.lint(&file, program, &resolved_names));
+                }
             }
 
             Ok(issues)
@@ -193,6 +208,8 @@ struct LintContext {
     pub registry: Arc<RuleRegistry>,
     /// The operational mode, determining which checks to run.
     pub mode: LintMode,
+    /// Worker-backed custom rules, when configured by the host.
+    pub external_linter: Option<Arc<ExternalLinter>>,
 }
 
 /// The "reduce" step for the linting pipeline.

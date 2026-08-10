@@ -6,13 +6,17 @@
 
 pub mod command;
 pub mod error;
+pub mod payload;
 pub mod pool;
 pub mod protocol;
 pub mod worker;
 
 pub use command::WorkerCommand;
+pub use error::PayloadError;
 pub use error::ProtocolError;
 pub use error::WorkerError;
+pub use payload::PayloadReader;
+pub use payload::PayloadWriter;
 pub use pool::WorkerPool;
 pub use pool::WorkerPoolOptions;
 pub use protocol::FRAME_HEADER_LENGTH;
