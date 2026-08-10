@@ -96,7 +96,23 @@ pub fn inherit_methods_from_parent(
             }
 
             metadata.declaring_method_ids.insert(aliased_method_name, *declaring_method_id);
-            metadata.inheritable_method_ids.insert(aliased_method_name, *declaring_method_id);
+
+            let is_ctor_or_clone = aliased_method_name == word("__construct") || aliased_method_name == word("__clone");
+            let is_inheritable = !parent_is_trait
+                || metadata.kind.is_trait()
+                || is_ctor_or_clone
+                || metadata
+                    .trait_visibility_map
+                    .get(&aliased_method_name)
+                    .copied()
+                    .or_else(|| {
+                        codebase.get_method_visibility(parent_metadata.name.as_bytes(), aliased_method_name.as_bytes())
+                    })
+                    .is_none_or(|visibility| !visibility.is_private());
+
+            if is_inheritable {
+                metadata.inheritable_method_ids.insert(aliased_method_name, *declaring_method_id);
+            }
         };
 
         process_name(*method_name_lc, metadata);
