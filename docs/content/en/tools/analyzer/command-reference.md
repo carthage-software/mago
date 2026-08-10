@@ -26,6 +26,7 @@ Global flags must come before `analyze`. See the [CLI overview](/fundamentals/co
 | Flag | Description |
 | :--- | :--- |
 | `--no-stubs` | Skip the built-in PHP standard-library stubs. Use only when you have a reason. |
+| `--skip-ignores` | Ignore the `ignore` list from `mago.toml` and report every issue found. Inline suppressions still apply. |
 | `--staged` | Analyze only files staged in git. Fails outside a git repository. |
 | `--stdin-input` | Read file content from stdin and use the single path argument for baseline lookup and reporting. Intended for editor integrations. |
 | `--substitute <ORIG=TEMP>` | Replace one host file with another for this invocation. Intended for mutation testing. Repeatable. |

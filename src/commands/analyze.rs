@@ -122,6 +122,14 @@ pub struct AnalyzeCommand {
     #[arg(long, default_value_t = false)]
     pub no_stubs: bool,
 
+    /// Ignore the `ignore` list from the analyzer configuration.
+    ///
+    /// Reports every issue the analyzer finds, including codes suppressed by the
+    /// configured `ignore` entries. Useful for one-off runs that audit what is
+    /// currently being hidden. Inline suppressions in the source are unaffected.
+    #[arg(long, default_value_t = false)]
+    pub skip_ignores: bool,
+
     /// Enable watch mode for continuous analysis (experimental).
     ///
     /// When enabled, the analyzer watches the workspace for file changes and
@@ -141,7 +149,7 @@ pub struct AnalyzeCommand {
     ///
     /// Outputs a JSON array of all issue code strings that the analyzer
     /// can report. Useful for tooling integration and documentation.
-    #[arg(long, conflicts_with_all = ["path", "no_stubs", "watch", "reporting_target", "reporting_format"])]
+    #[arg(long, conflicts_with_all = ["path", "no_stubs", "skip_ignores", "watch", "reporting_target", "reporting_format"])]
     pub list_codes: bool,
 
     /// Only analyze files that are staged in git.
@@ -314,10 +322,7 @@ impl AnalyzeCommand {
 
         let report_start = trace_enabled.then(Instant::now);
         let mut issues = analysis_result.issues;
-        let ignore_set = CompiledIgnoreSet::compile(
-            &configuration.analyzer.ignore,
-            configuration.source.glob.to_database_settings(),
-        );
+        let ignore_set = self.compile_ignore_set(&configuration);
 
         issues.filter_out_ignored(&ignore_set, |file_id| {
             database.get_ref(&file_id).ok().map(|f| String::from_utf8_lossy(&f.name).into_owned())
@@ -362,6 +367,15 @@ impl AnalyzeCommand {
         }
 
         Ok(exit_code)
+    }
+
+    /// Compiles the configured ignore entries, or an empty set with `--skip-ignores`.
+    fn compile_ignore_set(&self, configuration: &Configuration) -> CompiledIgnoreSet {
+        if self.skip_ignores {
+            return CompiledIgnoreSet::default();
+        }
+
+        CompiledIgnoreSet::compile(&configuration.analyzer.ignore, configuration.source.glob.to_database_settings())
     }
 
     /// Wraps watch mode in a restart loop.
@@ -454,10 +468,7 @@ impl AnalyzeCommand {
             orchestrator.get_incremental_analysis_service(watcher.read_only_database(), metadata, symbol_references);
         let analysis_result = service.analyze()?;
 
-        let ignore_set = CompiledIgnoreSet::compile(
-            &configuration.analyzer.ignore,
-            configuration.source.glob.to_database_settings(),
-        );
+        let ignore_set = self.compile_ignore_set(configuration);
 
         let mut issues = analysis_result.issues;
         let read_db = watcher.read_only_database();
