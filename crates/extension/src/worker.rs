@@ -1,0 +1,742 @@
+use std::collections::HashMap;
+use std::collections::VecDeque;
+use std::io::BufReader;
+use std::io::BufWriter;
+use std::io::Read;
+use std::io::Write;
+use std::process::Child;
+use std::process::ChildStderr;
+use std::process::ChildStdout;
+use std::sync::Arc;
+use std::sync::Mutex;
+use std::sync::MutexGuard;
+use std::sync::atomic::AtomicU8;
+use std::sync::atomic::AtomicU64;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
+use std::sync::mpsc;
+use std::thread::JoinHandle;
+use std::time::Duration;
+use std::time::Instant;
+
+use crate::command::WorkerCommand;
+use crate::error::WorkerError;
+use crate::error::WorkerFailure;
+use crate::pool::WorkerPoolOptions;
+use crate::protocol::Frame;
+use crate::protocol::FrameFlags;
+use crate::protocol::FrameKind;
+
+const STATE_RUNNING: u8 = 0;
+const STATE_STOPPING: u8 = 1;
+const STATE_STOPPED: u8 = 2;
+const STATE_FAILED: u8 = 3;
+const IO_THREAD_STACK_SIZE: usize = 256 * 1024;
+
+/// Handles a nested request sent by an extension worker while Mago is waiting
+/// for the worker's outer response.
+///
+/// The successful or error bytes are returned to the worker as an opaque
+/// response payload.
+pub trait WorkerRequestHandler {
+    /// Handles one nested worker request.
+    ///
+    /// # Errors
+    ///
+    /// Returns an opaque binary error payload to send back to the worker.
+    fn handle(&mut self, request: &Frame) -> Result<Vec<u8>, Vec<u8>>;
+}
+
+impl<F> WorkerRequestHandler for F
+where
+    F: FnMut(&Frame) -> Result<Vec<u8>, Vec<u8>>,
+{
+    fn handle(&mut self, request: &Frame) -> Result<Vec<u8>, Vec<u8>> {
+        self(request)
+    }
+}
+
+enum PendingEvent {
+    Frame(Frame),
+    Failure(WorkerFailure),
+}
+
+struct StderrTail {
+    bytes: VecDeque<u8>,
+    capacity: usize,
+}
+
+impl StderrTail {
+    fn new(capacity: usize) -> Self {
+        Self { bytes: VecDeque::with_capacity(capacity.min(4096)), capacity }
+    }
+
+    fn extend(&mut self, bytes: &[u8]) {
+        if self.capacity == 0 {
+            return;
+        }
+
+        if bytes.len() >= self.capacity {
+            self.bytes.clear();
+            self.bytes.extend(&bytes[bytes.len() - self.capacity..]);
+            return;
+        }
+
+        let excess = self.bytes.len().saturating_add(bytes.len()).saturating_sub(self.capacity);
+        self.bytes.drain(..excess);
+        self.bytes.extend(bytes);
+    }
+
+    fn display(&self) -> String {
+        let bytes: Vec<_> = self.bytes.iter().copied().collect();
+        String::from_utf8_lossy(&bytes).trim().to_owned()
+    }
+}
+
+struct WorkerInner {
+    id: usize,
+    state: AtomicU8,
+    next_request_id: AtomicU64,
+    in_flight: AtomicUsize,
+    maximum_payload_size: usize,
+    writer: Mutex<Option<BufWriter<Box<dyn Write + Send>>>>,
+    child: Mutex<Option<Child>>,
+    pending: Mutex<HashMap<u64, mpsc::Sender<PendingEvent>>>,
+    stderr: Mutex<StderrTail>,
+}
+
+impl WorkerInner {
+    fn send(&self, frame: &Frame) -> Result<(), WorkerError> {
+        if self.state.load(Ordering::Acquire) != STATE_RUNNING {
+            return Err(self.disconnected("worker is not running"));
+        }
+
+        let result = {
+            let mut writer = lock(&self.writer);
+            let writer = writer.as_mut().ok_or_else(|| self.disconnected("worker stdin is closed"))?;
+            frame.write_to(writer, self.maximum_payload_size).and_then(|()| writer.flush().map_err(Into::into))
+        };
+
+        if let Err(source) = result {
+            let error = WorkerError::protocol(self.id, source);
+            self.fail(error.to_string());
+            return Err(error);
+        }
+
+        Ok(())
+    }
+
+    fn route(&self, frame: Frame) {
+        if frame.kind == FrameKind::Shutdown {
+            self.fail("worker requested shutdown");
+            return;
+        }
+
+        let pending_id = match frame.kind {
+            FrameKind::Response | FrameKind::Cancel => frame.id,
+            FrameKind::Request | FrameKind::Notification => frame.parent_id,
+            FrameKind::Shutdown => return,
+        };
+        if pending_id == 0 {
+            tracing::warn!(worker = self.id, kind = ?frame.kind, "Ignoring unassociated extension worker frame.");
+            return;
+        }
+
+        let sender = {
+            let mut pending = lock(&self.pending);
+            if frame.kind == FrameKind::Response {
+                pending.remove(&pending_id)
+            } else {
+                pending.get(&pending_id).cloned()
+            }
+        };
+
+        if let Some(sender) = sender {
+            let _result = sender.send(PendingEvent::Frame(frame));
+        } else {
+            tracing::debug!(worker = self.id, request = pending_id, "Ignoring late extension worker frame.");
+        }
+    }
+
+    fn fail(&self, reason: impl Into<String>) {
+        if self.state.compare_exchange(STATE_RUNNING, STATE_FAILED, Ordering::AcqRel, Ordering::Acquire).is_err() {
+            return;
+        }
+
+        lock(&self.writer).take();
+        if let Some(child) = lock(&self.child).as_mut() {
+            let _result = child.kill();
+        }
+
+        let mut message = reason.into();
+        let stderr = lock(&self.stderr).display();
+        if !stderr.is_empty() {
+            message.push_str("; stderr: ");
+            message.push_str(&stderr);
+        }
+
+        let failure = WorkerFailure::new(message);
+        let pending = std::mem::take(&mut *lock(&self.pending));
+        for sender in pending.into_values() {
+            let _result = sender.send(PendingEvent::Failure(failure.clone()));
+        }
+    }
+
+    fn disconnected(&self, message: impl Into<String>) -> WorkerError {
+        WorkerError::Disconnected { worker: self.id, message: message.into() }
+    }
+}
+
+pub(crate) struct Worker {
+    inner: Arc<WorkerInner>,
+    request_timeout: Duration,
+    shutdown_timeout: Duration,
+    reader_thread: Mutex<Option<JoinHandle<()>>>,
+    stderr_thread: Mutex<Option<JoinHandle<()>>>,
+}
+
+impl Worker {
+    pub fn spawn(id: usize, command: &WorkerCommand, options: &WorkerPoolOptions) -> Result<Arc<Self>, WorkerError> {
+        let mut child = command
+            .build()
+            .spawn()
+            .map_err(|source| WorkerError::Spawn { program: command.program().to_owned(), source })?;
+
+        let stdin = take_pipe(id, "stdin", child.stdin.take(), &mut child)?;
+        let stdout = take_pipe(id, "stdout", child.stdout.take(), &mut child)?;
+        let stderr = take_pipe(id, "stderr", child.stderr.take(), &mut child)?;
+
+        let inner = Arc::new(WorkerInner {
+            id,
+            state: AtomicU8::new(STATE_RUNNING),
+            next_request_id: AtomicU64::new(1),
+            in_flight: AtomicUsize::new(0),
+            maximum_payload_size: options.maximum_payload_size,
+            writer: Mutex::new(Some(BufWriter::new(Box::new(stdin)))),
+            child: Mutex::new(Some(child)),
+            pending: Mutex::new(HashMap::new()),
+            stderr: Mutex::new(StderrTail::new(options.stderr_tail_size)),
+        });
+
+        let reader_inner = Arc::clone(&inner);
+        let reader_thread = std::thread::Builder::new()
+            .name(format!("mago-extension-worker-{id}-stdout"))
+            .stack_size(IO_THREAD_STACK_SIZE)
+            .spawn(move || read_worker_stdout(&reader_inner, stdout))
+            .map_err(|source| {
+                inner.fail("failed to start stdout reader thread");
+                reap_child(&inner);
+                WorkerError::ThreadSpawn { worker: id, role: "stdout reader", source }
+            })?;
+
+        let stderr_inner = Arc::clone(&inner);
+        let stderr_thread = match std::thread::Builder::new()
+            .name(format!("mago-extension-worker-{id}-stderr"))
+            .stack_size(IO_THREAD_STACK_SIZE)
+            .spawn(move || read_worker_stderr(&stderr_inner, stderr))
+        {
+            Ok(thread) => thread,
+            Err(source) => {
+                inner.fail("failed to start stderr reader thread");
+                reap_child(&inner);
+                let _result = reader_thread.join();
+                return Err(WorkerError::ThreadSpawn { worker: id, role: "stderr reader", source });
+            }
+        };
+
+        Ok(Arc::new(Self {
+            inner,
+            request_timeout: options.request_timeout,
+            shutdown_timeout: options.shutdown_timeout,
+            reader_thread: Mutex::new(Some(reader_thread)),
+            stderr_thread: Mutex::new(Some(stderr_thread)),
+        }))
+    }
+
+    pub fn id(&self) -> usize {
+        self.inner.id
+    }
+
+    pub fn is_running(&self) -> bool {
+        self.inner.state.load(Ordering::Acquire) == STATE_RUNNING
+    }
+
+    pub fn in_flight(&self) -> usize {
+        self.inner.in_flight.load(Ordering::Relaxed)
+    }
+
+    pub fn request(&self, payload: Vec<u8>) -> Result<Vec<u8>, WorkerError> {
+        self.request_inner(payload, None)
+    }
+
+    pub fn request_with_handler<H>(&self, payload: Vec<u8>, handler: &mut H) -> Result<Vec<u8>, WorkerError>
+    where
+        H: WorkerRequestHandler,
+    {
+        self.request_inner(payload, Some(handler))
+    }
+
+    fn request_inner(
+        &self,
+        payload: Vec<u8>,
+        mut handler: Option<&mut dyn WorkerRequestHandler>,
+    ) -> Result<Vec<u8>, WorkerError> {
+        if !self.is_running() {
+            return Err(self.inner.disconnected("worker is not running"));
+        }
+
+        let request_id = self.next_request_id();
+        let (sender, receiver) = mpsc::channel();
+        lock(&self.inner.pending).insert(request_id, sender);
+
+        if let Err(error) = self.inner.send(&Frame::request(request_id, payload)) {
+            lock(&self.inner.pending).remove(&request_id);
+            return Err(error);
+        }
+
+        let deadline = Instant::now() + self.request_timeout;
+        loop {
+            let Some(remaining) = deadline.checked_duration_since(Instant::now()) else {
+                self.timeout(request_id);
+                return Err(WorkerError::Timeout {
+                    worker: self.id(),
+                    request: request_id,
+                    duration: self.request_timeout,
+                });
+            };
+
+            match receiver.recv_timeout(remaining) {
+                Ok(PendingEvent::Frame(frame)) => match frame.kind {
+                    FrameKind::Response => {
+                        if frame.flags.contains(FrameFlags::ERROR) {
+                            return Err(WorkerError::Remote {
+                                worker: self.id(),
+                                request: request_id,
+                                payload: frame.payload,
+                            });
+                        }
+
+                        return Ok(frame.payload);
+                    }
+                    FrameKind::Request => {
+                        let Some(handler) = handler.as_deref_mut() else {
+                            let response = Frame::error(
+                                frame.id,
+                                request_id,
+                                b"Mago did not install a handler for nested worker requests".to_vec(),
+                            );
+                            let _result = self.inner.send(&response);
+                            lock(&self.inner.pending).remove(&request_id);
+                            return Err(WorkerError::UnexpectedRequest { worker: self.id(), request: frame.id });
+                        };
+
+                        let response = match handler.handle(&frame) {
+                            Ok(payload) => Frame::response(frame.id, request_id, payload),
+                            Err(payload) => Frame::error(frame.id, request_id, payload),
+                        };
+                        self.inner.send(&response)?;
+                    }
+                    FrameKind::Notification => {
+                        tracing::trace!(worker = self.id(), request = request_id, "Worker notification received.");
+                    }
+                    FrameKind::Cancel => {
+                        lock(&self.inner.pending).remove(&request_id);
+                        return Err(self.inner.disconnected(format!("worker cancelled request {request_id}")));
+                    }
+                    FrameKind::Shutdown => {
+                        self.inner.fail("worker requested shutdown");
+                    }
+                },
+                Ok(PendingEvent::Failure(failure)) => {
+                    return Err(self.inner.disconnected(failure.message));
+                }
+                Err(mpsc::RecvTimeoutError::Timeout) => {
+                    self.timeout(request_id);
+                    return Err(WorkerError::Timeout {
+                        worker: self.id(),
+                        request: request_id,
+                        duration: self.request_timeout,
+                    });
+                }
+                Err(mpsc::RecvTimeoutError::Disconnected) => {
+                    lock(&self.inner.pending).remove(&request_id);
+                    return Err(self.inner.disconnected("response channel closed"));
+                }
+            }
+        }
+    }
+
+    fn next_request_id(&self) -> u64 {
+        loop {
+            let id = self.inner.next_request_id.fetch_add(1, Ordering::Relaxed);
+            if id != 0 {
+                return id;
+            }
+        }
+    }
+
+    fn timeout(&self, request_id: u64) {
+        lock(&self.inner.pending).remove(&request_id);
+        let _result = self.inner.send(&Frame::cancel(request_id));
+        self.inner.fail(format!("request {request_id} timed out"));
+    }
+
+    pub fn reserve(self: &Arc<Self>) -> WorkerReservation {
+        self.inner.in_flight.fetch_add(1, Ordering::Relaxed);
+        WorkerReservation { worker: Arc::clone(self) }
+    }
+
+    pub fn shutdown(&self) {
+        self.begin_shutdown();
+        self.finish_shutdown(Instant::now() + self.shutdown_timeout);
+    }
+
+    pub fn begin_shutdown(&self) {
+        let mut state = self.inner.state.load(Ordering::Acquire);
+        loop {
+            match state {
+                STATE_RUNNING | STATE_FAILED => {
+                    match self.inner.state.compare_exchange(state, STATE_STOPPING, Ordering::AcqRel, Ordering::Acquire)
+                    {
+                        Ok(_) => break,
+                        Err(actual) => state = actual,
+                    }
+                }
+                STATE_STOPPING | STATE_STOPPED => return,
+                _ => return,
+            }
+        }
+
+        {
+            let mut writer = lock(&self.inner.writer);
+            if state == STATE_RUNNING
+                && let Some(mut writer) = writer.take()
+            {
+                let _result = Frame::shutdown()
+                    .write_to(&mut writer, self.inner.maximum_payload_size)
+                    .and_then(|()| writer.flush().map_err(Into::into));
+            } else {
+                writer.take();
+            }
+        }
+    }
+
+    pub fn finish_shutdown(&self, deadline: Instant) {
+        if self.inner.state.load(Ordering::Acquire) == STATE_STOPPED {
+            self.join_threads();
+            return;
+        }
+
+        loop {
+            let exited = {
+                let mut child = lock(&self.inner.child);
+                match child.as_mut() {
+                    Some(child) => child.try_wait().ok().flatten().is_some(),
+                    None => true,
+                }
+            };
+            if exited || Instant::now() >= deadline {
+                break;
+            }
+
+            std::thread::sleep(Duration::from_millis(5));
+        }
+
+        let child = lock(&self.inner.child).take();
+        if let Some(mut child) = child {
+            if child.try_wait().ok().flatten().is_none() {
+                let _result = child.kill();
+            }
+            let _result = child.wait();
+        }
+
+        self.inner.state.store(STATE_STOPPED, Ordering::Release);
+        let failure = WorkerFailure::new("worker shut down");
+        let pending = std::mem::take(&mut *lock(&self.inner.pending));
+        for sender in pending.into_values() {
+            let _result = sender.send(PendingEvent::Failure(failure.clone()));
+        }
+
+        self.join_threads();
+    }
+
+    #[cfg(test)]
+    fn from_streams(
+        id: usize,
+        reader: impl Read + Send + 'static,
+        writer: impl Write + Send + 'static,
+        options: &WorkerPoolOptions,
+    ) -> Arc<Self> {
+        let inner = Arc::new(WorkerInner {
+            id,
+            state: AtomicU8::new(STATE_RUNNING),
+            next_request_id: AtomicU64::new(1),
+            in_flight: AtomicUsize::new(0),
+            maximum_payload_size: options.maximum_payload_size,
+            writer: Mutex::new(Some(BufWriter::new(Box::new(writer)))),
+            child: Mutex::new(None),
+            pending: Mutex::new(HashMap::new()),
+            stderr: Mutex::new(StderrTail::new(options.stderr_tail_size)),
+        });
+        let reader_inner = Arc::clone(&inner);
+        let reader_thread = std::thread::spawn(move || read_worker_stream(&reader_inner, reader));
+
+        Arc::new(Self {
+            inner,
+            request_timeout: options.request_timeout,
+            shutdown_timeout: options.shutdown_timeout,
+            reader_thread: Mutex::new(Some(reader_thread)),
+            stderr_thread: Mutex::new(None),
+        })
+    }
+
+    fn join_threads(&self) {
+        let reader_thread = lock(&self.reader_thread).take();
+        if let Some(thread) = reader_thread {
+            let _result = thread.join();
+        }
+        let stderr_thread = lock(&self.stderr_thread).take();
+        if let Some(thread) = stderr_thread {
+            let _result = thread.join();
+        }
+    }
+}
+
+impl Drop for Worker {
+    fn drop(&mut self) {
+        self.shutdown();
+    }
+}
+
+pub(crate) struct WorkerReservation {
+    worker: Arc<Worker>,
+}
+
+impl WorkerReservation {
+    pub fn worker(&self) -> &Worker {
+        &self.worker
+    }
+
+    pub fn matches(&self, worker: &Arc<Worker>) -> bool {
+        Arc::ptr_eq(&self.worker, worker)
+    }
+}
+
+impl Drop for WorkerReservation {
+    fn drop(&mut self) {
+        self.worker.inner.in_flight.fetch_sub(1, Ordering::Relaxed);
+    }
+}
+
+fn take_pipe<T>(id: usize, name: &'static str, pipe: Option<T>, child: &mut Child) -> Result<T, WorkerError> {
+    pipe.ok_or_else(|| {
+        let _result = child.kill();
+        let _result = child.wait();
+        WorkerError::MissingPipe { worker: id, pipe: name }
+    })
+}
+
+fn read_worker_stdout(inner: &WorkerInner, stdout: ChildStdout) {
+    read_worker_stream(inner, stdout);
+}
+
+fn read_worker_stream(inner: &WorkerInner, stream: impl Read) {
+    let mut reader = BufReader::new(stream);
+    loop {
+        match Frame::read_from(&mut reader, inner.maximum_payload_size) {
+            Ok(Some(frame)) => inner.route(frame),
+            Ok(None) => {
+                if inner.state.load(Ordering::Acquire) == STATE_RUNNING {
+                    inner.fail("worker closed stdout");
+                }
+                return;
+            }
+            Err(error) => {
+                inner.fail(format!("failed to read worker frame: {error}"));
+                return;
+            }
+        }
+    }
+}
+
+fn read_worker_stderr(inner: &WorkerInner, stderr: ChildStderr) {
+    let mut reader = BufReader::new(stderr);
+    let mut buffer = [0u8; 4096];
+    loop {
+        match reader.read(&mut buffer) {
+            Ok(0) | Err(_) => return,
+            Ok(read) => lock(&inner.stderr).extend(&buffer[..read]),
+        }
+    }
+}
+
+fn reap_child(inner: &WorkerInner) {
+    let child = lock(&inner.child).take();
+    if let Some(mut child) = child {
+        let _result = child.kill();
+        let _result = child.wait();
+    }
+}
+
+fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+    mutex.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+#[cfg(test)]
+#[allow(clippy::expect_used)]
+mod tests {
+    use std::net::TcpListener;
+    use std::net::TcpStream;
+    use std::sync::Barrier;
+
+    use super::*;
+
+    #[test]
+    fn stderr_tail_keeps_only_the_configured_suffix() {
+        let mut tail = StderrTail::new(5);
+        tail.extend(b"abc");
+        tail.extend(b"defg");
+
+        assert_eq!(tail.display(), "cdefg");
+    }
+
+    #[test]
+    fn stderr_tail_handles_a_chunk_larger_than_its_capacity() {
+        let mut tail = StderrTail::new(4);
+        tail.extend(b"abcdefgh");
+
+        assert_eq!(tail.display(), "efgh");
+    }
+
+    #[test]
+    fn routes_multiplexed_responses_by_request_id() {
+        let (worker, mut peer_reader, mut peer_writer) = connected_worker(Duration::from_secs(2));
+        let barrier = Arc::new(Barrier::new(3));
+
+        let first_worker = Arc::clone(&worker);
+        let first_barrier = Arc::clone(&barrier);
+        let first = std::thread::spawn(move || {
+            first_barrier.wait();
+            first_worker.request(b"first".to_vec()).expect("first request should succeed")
+        });
+        let second_worker = Arc::clone(&worker);
+        let second_barrier = Arc::clone(&barrier);
+        let second = std::thread::spawn(move || {
+            second_barrier.wait();
+            second_worker.request(b"second".to_vec()).expect("second request should succeed")
+        });
+        barrier.wait();
+
+        let request_a = Frame::read_from(&mut peer_reader, 1024)
+            .expect("first request should decode")
+            .expect("first request should be present");
+        let request_b = Frame::read_from(&mut peer_reader, 1024)
+            .expect("second request should decode")
+            .expect("second request should be present");
+        Frame::response(request_b.id, 0, request_b.payload)
+            .write_to(&mut peer_writer, 1024)
+            .expect("second response should encode");
+        peer_writer.flush().expect("second response should flush");
+        Frame::response(request_a.id, 0, request_a.payload)
+            .write_to(&mut peer_writer, 1024)
+            .expect("first response should encode");
+        peer_writer.flush().expect("first response should flush");
+
+        let mut responses =
+            [first.join().expect("first thread should join"), second.join().expect("second thread should join")];
+        responses.sort();
+        assert_eq!(responses, [b"first".to_vec(), b"second".to_vec()]);
+
+        drop(peer_reader);
+        drop(peer_writer);
+        worker.shutdown();
+    }
+
+    #[test]
+    fn services_a_nested_worker_request_on_the_calling_thread() {
+        let (worker, mut peer_reader, mut peer_writer) = connected_worker(Duration::from_secs(2));
+        let peer = std::thread::spawn(move || {
+            let outer = Frame::read_from(&mut peer_reader, 1024)
+                .expect("outer request should decode")
+                .expect("outer request should be present");
+            let nested = Frame {
+                version: crate::protocol::PROTOCOL_VERSION,
+                kind: FrameKind::Request,
+                flags: FrameFlags::empty(),
+                id: 77,
+                parent_id: outer.id,
+                payload: b"metadata?".to_vec(),
+            };
+            nested.write_to(&mut peer_writer, 1024).expect("nested request should encode");
+            peer_writer.flush().expect("nested request should flush");
+
+            let nested_response = Frame::read_from(&mut peer_reader, 1024)
+                .expect("nested response should decode")
+                .expect("nested response should be present");
+            assert_eq!(nested_response.kind, FrameKind::Response);
+            assert_eq!(nested_response.id, nested.id);
+            assert_eq!(nested_response.parent_id, outer.id);
+            assert_eq!(nested_response.payload, b"metadata!");
+
+            Frame::response(outer.id, 0, b"done".to_vec())
+                .write_to(&mut peer_writer, 1024)
+                .expect("outer response should encode");
+            peer_writer.flush().expect("outer response should flush");
+
+            let shutdown = Frame::read_from(&mut peer_reader, 1024)
+                .expect("shutdown should decode")
+                .expect("shutdown should be present");
+            assert_eq!(shutdown.kind, FrameKind::Shutdown);
+        });
+
+        let mut handler = |request: &Frame| {
+            assert_eq!(request.payload, b"metadata?");
+            Ok(b"metadata!".to_vec())
+        };
+        let response =
+            worker.request_with_handler(b"analyze".to_vec(), &mut handler).expect("outer request should succeed");
+        assert_eq!(response, b"done");
+
+        worker.shutdown();
+        peer.join().expect("peer thread should join");
+    }
+
+    #[test]
+    fn a_timed_out_request_stops_the_worker() {
+        let (worker, mut peer_reader, peer_writer) = connected_worker(Duration::from_millis(20));
+        let peer = std::thread::spawn(move || {
+            let _request = Frame::read_from(&mut peer_reader, 1024)
+                .expect("request should decode")
+                .expect("request should be present");
+            let cancel = Frame::read_from(&mut peer_reader, 1024)
+                .expect("cancellation should decode")
+                .expect("cancellation should be present");
+            assert_eq!(cancel.kind, FrameKind::Cancel);
+        });
+
+        let error = worker.request(Vec::new()).expect_err("request should time out");
+        assert!(matches!(error, WorkerError::Timeout { .. }));
+        assert!(!worker.is_running());
+
+        drop(peer_writer);
+        worker.shutdown();
+        peer.join().expect("peer thread should join");
+    }
+
+    fn connected_worker(timeout: Duration) -> (Arc<Worker>, TcpStream, TcpStream) {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("listener should bind");
+        let address = listener.local_addr().expect("listener should have an address");
+        let host_stream = TcpStream::connect(address).expect("host should connect");
+        let peer_stream = listener.accept().expect("peer should connect").0;
+        let host_reader = host_stream.try_clone().expect("host stream should clone");
+        let peer_reader = peer_stream.try_clone().expect("peer stream should clone");
+        let options = WorkerPoolOptions {
+            maximum_payload_size: 1024,
+            request_timeout: timeout,
+            shutdown_timeout: Duration::from_millis(100),
+            stderr_tail_size: 1024,
+        };
+
+        (Worker::from_streams(0, host_reader, host_stream, &options), peer_reader, peer_stream)
+    }
+}

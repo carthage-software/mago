@@ -1595,6 +1595,13 @@ dependencies = [
 ]
 
 [[package]]
+name = "mago-extension"
+version = "1.46.0"
+dependencies = [
+ "tracing",
+]
+
+[[package]]
 name = "mago-fingerprint"
 version = "1.46.0"
 dependencies = [
