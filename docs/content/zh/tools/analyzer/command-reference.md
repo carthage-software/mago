@@ -26,6 +26,7 @@ Usage: mago analyze [OPTIONS] [PATHS]...
 | 标志 | 说明 |
 | :--- | :--- |
 | `--no-stubs` | 跳过内置的 PHP 标准库 stub。仅在确实需要时使用。 |
+| `--skip-ignores` | 忽略 `mago.toml` 中的 `ignore` 列表,报告发现的所有问题。源码中的内联抑制仍然有效。 |
 | `--staged` | 仅分析 git 中暂存的文件。在非 git 仓库中运行会失败。 |
 | `--stdin-input` | 从 stdin 读取文件内容,使用单一路径参数进行 baseline 查找和报告。用于编辑器集成。 |
 | `--substitute <ORIG=TEMP>` | 在本次调用中以另一个文件替换某个宿主文件。用于变异测试。可重复使用。 |

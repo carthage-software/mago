@@ -82,6 +82,8 @@ Le motif est une [regex Rust brute](https://docs.rs/regex/). Écrivez `(?i)` au 
 
 `excludes` et `ignore` ne sont pas la même chose. `excludes` retire entièrement les fichiers de l'analyse, ils ne sont donc pas analysés pour les informations de type. `ignore` analyse toujours le fichier mais supprime les codes listés dans la sortie.
 
+Pour voir ce que la liste `ignore` masque actuellement, lancez `mago analyze --skip-ignores` : la liste entière est désactivée pour cette exécution uniquement.
+
 ## Indicateurs de fonctionnalité
 
 Ces indicateurs activent ou désactivent des analyses individuelles. Les valeurs par défaut sont ajustées pour un usage quotidien ; activez-les à mesure que votre base de code se renforce.

@@ -26,6 +26,7 @@ Les indicateurs globaux doivent venir avant `analyze`. Voir l'[aperçu de la CLI
 | Indicateur | Description |
 | :--- | :--- |
 | `--no-stubs` | Ignore les stubs intégrés de la bibliothèque standard PHP. À utiliser uniquement lorsque vous avez une raison. |
+| `--skip-ignores` | Ignore la liste `ignore` de `mago.toml` et signale tous les problèmes trouvés. Les suppressions en ligne restent actives. |
 | `--staged` | Analyse uniquement les fichiers stagés dans git. Échoue en dehors d'un dépôt git. |
 | `--stdin-input` | Lit le contenu du fichier depuis stdin et utilise l'unique argument de chemin pour la recherche de baseline et le rapport. Destiné aux intégrations d'éditeur. |
 | `--substitute <ORIG=TEMP>` | Remplace un fichier hôte par un autre pour cette invocation. Destiné aux tests de mutation. Répétable. |
