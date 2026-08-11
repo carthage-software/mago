@@ -4,9 +4,17 @@ declare(strict_types=1);
 
 namespace Mago\Sdk;
 
+use Mago\Sdk\Analyzer\PluginRegistry as AnalyzerPluginRegistry;
+use Mago\Sdk\Analyzer\ReturnTypeProviderContext;
+use Mago\Sdk\Analyzer\TypeComparator;
 use Mago\Sdk\Exception\CancelledException;
 use Mago\Sdk\Exception\InvalidArgumentException;
 use Mago\Sdk\Exception\ProtocolException;
+use Mago\Sdk\Internal\Analyzer\Protocol as AnalyzerProtocol;
+use Mago\Sdk\Internal\Analyzer\RegisteredFunctionReturnTypeProvider;
+use Mago\Sdk\Internal\Analyzer\RegisteredMethodReturnTypeProvider;
+use Mago\Sdk\Internal\Analyzer\RegisteredPlugin;
+use Mago\Sdk\Internal\HostClient;
 use Mago\Sdk\Internal\Io\ResourceReader;
 use Mago\Sdk\Internal\Io\ResourceWriter;
 use Mago\Sdk\Internal\Linter\Protocol as LinterProtocol;
@@ -28,6 +36,8 @@ use function fwrite;
 use function ob_end_flush;
 use function ob_get_level;
 use function ob_start;
+use function strncmp;
+use function strtolower;
 
 use const STDERR;
 use const STDIN;
@@ -52,6 +62,15 @@ final class Worker
      */
     private readonly array $rules;
 
+    /** @var list<RegisteredPlugin> */
+    private readonly array $analyzerPlugins;
+
+    /** @var list<RegisteredFunctionReturnTypeProvider> */
+    private readonly array $functionReturnTypeProviders;
+
+    /** @var list<RegisteredMethodReturnTypeProvider> */
+    private readonly array $methodReturnTypeProviders;
+
     /**
      * @var list<int<0, 65535>>
      */
@@ -75,6 +94,10 @@ final class Worker
         $extensionIdentifiers = [];
         $ruleCodes = [];
         $rules = [];
+        $pluginIdentifiers = [];
+        $registeredPlugins = [];
+        $functionProviders = [];
+        $methodProviders = [];
         foreach ($extensions as $registeredExtension) {
             if (array_key_exists($registeredExtension->identifier, $extensionIdentifiers)) {
                 throw new InvalidArgumentException(
@@ -99,10 +122,86 @@ final class Worker
 
                 $rules[] = new RegisteredRule($ruleIndex, $rule, $definition);
             }
+
+            foreach ($registeredExtension->analyzerPlugins as $plugin) {
+                $definition = $plugin->getDefinition();
+                $normalizedIdentifier = strtolower($definition->identifier);
+                if (array_key_exists($normalizedIdentifier, $pluginIdentifiers)) {
+                    throw new InvalidArgumentException(
+                        "Analyzer plugin `{$definition->identifier}` is registered by more than one extension.",
+                    );
+                }
+
+                $pluginIdentifiers[$normalizedIdentifier] = true;
+                $registry = new AnalyzerPluginRegistry();
+                $plugin->register($registry);
+                $registeredFunctionProviders = [];
+                foreach ($registry->getFunctionReturnTypeProviders() as $provider) {
+                    $targets = $provider->getTargets();
+                    if ($targets === []) {
+                        throw new InvalidArgumentException(
+                            "A function return-type provider in `{$definition->identifier}` has no targets.",
+                        );
+                    }
+
+                    $providerIndex = count($functionProviders);
+                    if ($providerIndex > 65_535) {
+                        throw new InvalidArgumentException(
+                            'A worker cannot register more than 65,536 function return-type providers.',
+                        );
+                    }
+
+                    $registeredProvider = new RegisteredFunctionReturnTypeProvider(
+                        $providerIndex,
+                        $definition->identifier,
+                        $provider,
+                        $targets,
+                    );
+                    $functionProviders[] = $registeredProvider;
+                    $registeredFunctionProviders[] = $registeredProvider;
+                }
+
+                $registeredMethodProviders = [];
+                foreach ($registry->getMethodReturnTypeProviders() as $provider) {
+                    $targets = $provider->getTargets();
+                    if ($targets === []) {
+                        throw new InvalidArgumentException(
+                            "A method return-type provider in `{$definition->identifier}` has no targets.",
+                        );
+                    }
+
+                    $providerIndex = count($methodProviders);
+                    if ($providerIndex > 65_535) {
+                        throw new InvalidArgumentException(
+                            'A worker cannot register more than 65,536 method return-type providers.',
+                        );
+                    }
+
+                    $registeredProvider = new RegisteredMethodReturnTypeProvider(
+                        $providerIndex,
+                        $definition->identifier,
+                        $provider,
+                        $targets,
+                    );
+                    $methodProviders[] = $registeredProvider;
+                    $registeredMethodProviders[] = $registeredProvider;
+                }
+
+                $registeredPlugins[] = new RegisteredPlugin(
+                    $registeredExtension->identifier,
+                    $plugin,
+                    $definition,
+                    $registeredFunctionProviders,
+                    $registeredMethodProviders,
+                );
+            }
         }
 
         $this->extensions = $extensions;
         $this->rules = $rules;
+        $this->analyzerPlugins = $registeredPlugins;
+        $this->functionReturnTypeProviders = $functionProviders;
+        $this->methodReturnTypeProviders = $methodProviders;
     }
 
     /**
@@ -124,6 +223,7 @@ final class Worker
         $codec = new FrameCodec($maximumPayloadSize);
         $reader = new ResourceReader($input ?? STDIN);
         $writer = new ResourceWriter($output ?? STDOUT);
+        $host = new HostClient($codec, $writer);
 
         /** @var array<int<0, max>, SignalCancellationToken> $requests */
         $requests = [];
@@ -133,11 +233,13 @@ final class Worker
                 $frame = $codec->read($reader);
                 if ($frame === null) {
                     $this->cancelRequests($requests);
+                    $host->fail(new ProtocolException('Mago closed the worker input stream.'));
                     return;
                 }
 
                 if ($frame->kind === FrameKind::Shutdown) {
                     $this->cancelRequests($requests);
+                    $host->fail(new ProtocolException('Mago requested worker shutdown.'));
                     return;
                 }
 
@@ -149,11 +251,15 @@ final class Worker
                     continue;
                 }
 
+                if ($host->accept($frame)) {
+                    continue;
+                }
+
                 if ($frame->kind !== FrameKind::Request) {
                     throw new ProtocolException("Unexpected {$frame->kind->name} frame from Mago.");
                 }
 
-                if ($frame->flags !== 0 || $frame->parentId !== 0) {
+                if ($frame->flags !== 0 || $frame->parentId !== 0 || $frame->id === 0) {
                     throw new ProtocolException('A top-level Mago request contains invalid frame metadata.');
                 }
 
@@ -163,9 +269,9 @@ final class Worker
 
                 $cancellation = new SignalCancellationToken();
                 $requests[$frame->id] = $cancellation;
-                EventLoop::queue(function () use ($frame, $cancellation, $codec, $writer, &$requests): void {
+                EventLoop::queue(function () use ($frame, $cancellation, $codec, $writer, $host, &$requests): void {
                     try {
-                        $payload = $this->handleRequest($frame->payload, $cancellation);
+                        $payload = $this->handleRequest($frame->payload, $frame->id, $host, $cancellation);
                         $response = $codec->encodeResponse($frame->id, $payload);
                     } catch (CancelledException) {
                         return;
@@ -188,7 +294,25 @@ final class Worker
         }
     }
 
-    private function handleRequest(string $payload, CancellationTokenInterface $cancellation): string
+    /** @param positive-int $requestId */
+    private function handleRequest(
+        string $payload,
+        int $requestId,
+        HostClient $host,
+        CancellationTokenInterface $cancellation,
+    ): string {
+        if (strncmp($payload, 'MLNT', 4) === 0) {
+            return $this->handleLinterRequest($payload, $cancellation);
+        }
+
+        if (strncmp($payload, 'MANA', 4) === 0) {
+            return $this->handleAnalyzerRequest($payload, $requestId, $host, $cancellation);
+        }
+
+        throw new ProtocolException('Unknown Mago extension capability protocol.');
+    }
+
+    private function handleLinterRequest(string $payload, CancellationTokenInterface $cancellation): string
     {
         [$kind, $reader] = LinterProtocol::readRequest($payload);
         if ($kind === LinterProtocol::DESCRIBE_REQUEST) {
@@ -249,6 +373,58 @@ final class Worker
         }
 
         return LinterProtocol::writeLintResponse($reportedIssues);
+    }
+
+    /** @param positive-int $requestId */
+    private function handleAnalyzerRequest(
+        string $payload,
+        int $requestId,
+        HostClient $host,
+        CancellationTokenInterface $cancellation,
+    ): string {
+        [$kind, $reader] = AnalyzerProtocol::readRequest($payload);
+        if ($kind === AnalyzerProtocol::DESCRIBE_REQUEST) {
+            $this->phpVersion = AnalyzerProtocol::readDescribeRequest($reader);
+
+            return AnalyzerProtocol::writeDescribeResponse($this->extensions, $this->analyzerPlugins);
+        }
+
+        if ($kind !== AnalyzerProtocol::RETURN_TYPE_REQUEST) {
+            throw new ProtocolException("Unknown analyzer request kind {$kind}.");
+        }
+
+        $request = AnalyzerProtocol::readReturnTypeRequest($reader);
+        $providers = $request->method ? $this->methodReturnTypeProviders : $this->functionReturnTypeProviders;
+        foreach ($request->providerIndices as $providerIndex) {
+            $registered = $providers[$providerIndex] ?? null;
+            if ($registered === null) {
+                throw new ProtocolException("Mago requested unregistered analyzer provider index {$providerIndex}.");
+            }
+
+            $cancellation->throwIfCancelled();
+            try {
+                $type = $registered->provider->getReturnType(
+                    new ReturnTypeProviderContext(
+                        $this->phpVersion,
+                        $request->invocation,
+                        new TypeComparator($host, $requestId, $cancellation),
+                        $cancellation,
+                    ),
+                );
+            } catch (Throwable $throwable) {
+                throw new ProtocolException(
+                    "Analyzer provider in `{$registered->plugin}` failed: {$throwable->getMessage()}",
+                    0,
+                    $throwable,
+                );
+            }
+
+            if ($type !== null) {
+                return AnalyzerProtocol::writeReturnTypeResponse($type);
+            }
+        }
+
+        return AnalyzerProtocol::writeReturnTypeResponse(null);
     }
 
     /**

@@ -2,6 +2,12 @@
 
 declare(strict_types=1);
 
+use Mago\Sdk\Analyzer\FunctionTarget;
+use Mago\Sdk\Analyzer\MethodTarget;
+use Mago\Sdk\Analyzer\PluginDefinition;
+use Mago\Sdk\Analyzer\Type;
+use Mago\Sdk\Analyzer\Type\ListType;
+use Mago\Sdk\Analyzer\Type\TypeFlags;
 use Mago\Sdk\Exception\CancelledException;
 use Mago\Sdk\Exception\InvalidArgumentException;
 use Mago\Sdk\Internal\Io\ResourceReader;
@@ -212,5 +218,36 @@ try {
 }
 
 expect($invalidSpanRejected, 'Invalid spans must be rejected.');
+
+$plugin = new PluginDefinition('demo', 'Demo', 'Demo analyzer plugin.', ['example']);
+expect($plugin->aliases === ['example'], 'Analyzer plugin aliases did not round-trip.');
+expect(FunctionTarget::exact('demo')->value === 'demo', 'Function targets did not retain their value.');
+expect(MethodTarget::anyClass('create')->class === '*', 'Method wildcard target was not constructed.');
+expect((string) Type::namedObject('Box', Type::string()) === 'Box<string>', 'Named object type was not built.');
+expect((string) Type::union(Type::string(), Type::null()) === 'string|null', 'Union type was not built.');
+expect((string) Type::nonNegativeInt() === 'non-negative-int', 'Refined integer type was not built.');
+expect((string) Type::nonEmptyString() === 'non-empty-string', 'Refined string type was not built.');
+expect((string) Type::literalInt(-42) === 'int(-42)', 'Literal integer type was not built.');
+
+$completeType = Type::fromAtomic(new ListType(Type::string(), null, null, true))->withFlags(
+    new TypeFlags(possiblyUndefined: true),
+);
+$completeTypeReader = new PayloadReader($completeType->encode());
+expect($completeTypeReader->readU8() === 20, 'A structured type did not use the complete type encoding.');
+expect($completeTypeReader->readU16() === 1 << 4, 'A structured union did not preserve its flags.');
+expect($completeTypeReader->readU32() === 1, 'A structured union encoded the wrong atomic count.');
+expect($completeTypeReader->readU8() === 5, 'A structured list did not encode as an array atomic.');
+expect($completeTypeReader->readU8() === 1, 'A structured list encoded the wrong array variant.');
+expect($completeTypeReader->readU16() === 0, 'A nested union encoded unexpected flags.');
+expect($completeTypeReader->readU32() === 1, 'A nested union encoded the wrong atomic count.');
+expect($completeTypeReader->readU8() === 1, 'A nested string did not encode as a scalar atomic.');
+expect($completeTypeReader->readU8() === 7, 'A nested string encoded the wrong scalar variant.');
+expect($completeTypeReader->readU8() === 0, 'A general string encoded a literal refinement.');
+expect($completeTypeReader->readU8() === 0, 'A general string encoded unexpected flags.');
+expect($completeTypeReader->readU8() === 0, 'A general string encoded unexpected casing.');
+expect(!$completeTypeReader->readBoolean(), 'A generic list encoded known elements.');
+expect(!$completeTypeReader->readBoolean(), 'A generic list encoded a known count.');
+expect($completeTypeReader->readBoolean(), 'A non-empty list lost its non-empty refinement.');
+$completeTypeReader->finish();
 
 echo "Mago SDK tests passed.\n";

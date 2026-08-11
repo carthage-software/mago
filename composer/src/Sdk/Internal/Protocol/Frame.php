@@ -39,4 +39,13 @@ final class Frame
     {
         return new self(FrameKind::Response, self::ERROR_FLAG, $id, 0, $payload);
     }
+
+    /**
+     * @param int<0, max> $id
+     * @param int<1, max> $parentId
+     */
+    public static function request(int $id, int $parentId, string $payload): self
+    {
+        return new self(FrameKind::Request, 0, $id, $parentId, $payload);
+    }
 }
