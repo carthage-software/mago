@@ -270,6 +270,7 @@ mago-algebra = { workspace = true }
 mago-codex = { workspace = true }
 mago-guard = { workspace = true, features = ["serde"] }
 mago-orchestrator = { workspace = true }
+mago-extension = { workspace = true }
 serde = { workspace = true }
 clap = { workspace = true }
 clap_complete = { workspace = true }

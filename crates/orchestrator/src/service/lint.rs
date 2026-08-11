@@ -90,7 +90,18 @@ impl LintService {
     /// A configured `RuleRegistry` instance.
     #[must_use]
     pub fn create_registry(&self, only: Option<&[String]>, include_disabled: bool) -> RuleRegistry {
-        RuleRegistry::build(&self.settings, only, include_disabled)
+        let registry = RuleRegistry::build(&self.settings, only, include_disabled);
+        if let Some(only) = only
+            && registry.is_empty()
+            && !self
+                .external_linter
+                .as_ref()
+                .is_some_and(|external| external.rules().iter().any(|rule| only.iter().any(|code| code == &rule.code)))
+        {
+            tracing::warn!("No rules found for the specified 'only' filter: {:?}", only);
+        }
+
+        registry
     }
 
     /// Lints a single file synchronously without using parallel processing.

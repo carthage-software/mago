@@ -1410,6 +1410,7 @@ dependencies = [
  "mago-codex",
  "mago-composer",
  "mago-database",
+ "mago-extension",
  "mago-formatter",
  "mago-guard",
  "mago-linter",

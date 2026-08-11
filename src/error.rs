@@ -107,6 +107,9 @@ pub enum Error {
     /// Configuration file's `extends` chain cycles back on itself.
     CircularExtends(PathBuf),
 
+    /// An external extension host has an invalid configuration.
+    InvalidExtensionHostConfiguration(String),
+
     /// The `extends` field had an unsupported shape (must be a string or an array of strings).
     InvalidExtendsEntry { path: PathBuf, reason: String },
 
@@ -319,6 +322,7 @@ impl std::fmt::Display for Error {
             Self::CircularExtends(path) => {
                 write!(f, "Configuration `extends` chain cycles back on `{}`", path.display())
             }
+            Self::InvalidExtensionHostConfiguration(message) => f.write_str(message),
             Self::InvalidExtendsEntry { path, reason } => {
                 write!(f, "Invalid `extends` declaration in `{}`: {reason}", path.display())
             }
@@ -403,6 +407,7 @@ impl std::error::Error for Error {
             Self::UnsupportedConfigExtension(_) => None,
             Self::EnvVarParse { source, .. } => Some(source.as_ref()),
             Self::CircularExtends(_) => None,
+            Self::InvalidExtensionHostConfiguration(_) => None,
             Self::InvalidExtendsEntry { .. } => None,
             Self::ExtendsTargetNotFound { source, .. } => Some(source),
             Self::BuildingRuntime(error) => Some(error),

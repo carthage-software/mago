@@ -36,6 +36,7 @@ use mago_reporting::baseline::Baseline;
 
 use crate::config::Configuration;
 use crate::config::analyzer::AnalyzerConfiguration;
+use crate::config::extension::ExtensionHostConfiguration;
 use crate::config::formatter::FormatterConfiguration;
 use crate::config::linter::LinterConfiguration;
 use crate::config::parser::ParserConfiguration;
@@ -51,6 +52,7 @@ use crate::error::Error;
 #[value(rename_all = "kebab-case")]
 enum ConfigSection {
     Source,
+    ExtensionHosts,
     Linter,
     Formatter,
     Analyzer,
@@ -83,7 +85,8 @@ pub struct ConfigCommand {
     ///
     /// Instead of showing the entire configuration, focus on just one section.
     ///
-    /// Available sections: source, linter, formatter, analyzer.
+    /// Available sections: source, extension-hosts, linter, formatter, analyzer,
+    /// parser, and baseline.
     #[arg(long, value_enum)]
     show: Option<ConfigSection>,
 
@@ -140,6 +143,10 @@ impl ConfigCommand {
                         let schema = schema_for!(SourceConfiguration);
                         serde_json::to_string_pretty(&schema)?
                     }
+                    ConfigSection::ExtensionHosts => {
+                        let schema = schema_for!(std::collections::BTreeMap<String, ExtensionHostConfiguration>);
+                        serde_json::to_string_pretty(&schema)?
+                    }
                     ConfigSection::Linter => {
                         let schema = schema_for!(LinterConfiguration);
                         serde_json::to_string_pretty(&schema)?
@@ -172,6 +179,15 @@ impl ConfigCommand {
                         serde_json::to_string_pretty(&SourceConfiguration::from_workspace(CURRENT_DIR.clone()))?
                     } else {
                         serde_json::to_string_pretty(&configuration.source)?
+                    }
+                }
+                ConfigSection::ExtensionHosts => {
+                    if self.default {
+                        serde_json::to_string_pretty(
+                            &std::collections::BTreeMap::<String, ExtensionHostConfiguration>::new(),
+                        )?
+                    } else {
+                        serde_json::to_string_pretty(&configuration.extension_hosts)?
                     }
                 }
                 ConfigSection::Linter => {
