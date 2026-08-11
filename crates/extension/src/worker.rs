@@ -1,4 +1,3 @@
-use std::collections::HashMap;
 use std::collections::VecDeque;
 use std::io::BufReader;
 use std::io::BufWriter;
@@ -19,6 +18,9 @@ use std::thread::JoinHandle;
 use std::time::Duration;
 use std::time::Instant;
 
+use foldhash::HashMap;
+use foldhash::HashMapExt;
+
 use crate::command::WorkerCommand;
 use crate::error::WorkerError;
 use crate::error::WorkerFailure;
@@ -32,6 +34,8 @@ const STATE_STOPPING: u8 = 1;
 const STATE_STOPPED: u8 = 2;
 const STATE_FAILED: u8 = 3;
 const IO_THREAD_STACK_SIZE: usize = 256 * 1024;
+const INITIAL_SHUTDOWN_POLL_INTERVAL: Duration = Duration::from_micros(50);
+const MAXIMUM_SHUTDOWN_POLL_INTERVAL: Duration = Duration::from_millis(1);
 
 /// Handles a nested request sent by an extension worker while Mago is waiting
 /// for the worker's outer response.
@@ -427,6 +431,7 @@ impl Worker {
             return;
         }
 
+        let mut poll_interval = INITIAL_SHUTDOWN_POLL_INTERVAL;
         loop {
             let exited = {
                 let mut child = lock(&self.inner.child);
@@ -435,11 +440,13 @@ impl Worker {
                     None => true,
                 }
             };
-            if exited || Instant::now() >= deadline {
+            let now = Instant::now();
+            if exited || now >= deadline {
                 break;
             }
 
-            std::thread::sleep(Duration::from_millis(5));
+            std::thread::sleep(poll_interval.min(deadline.saturating_duration_since(now)));
+            poll_interval = (poll_interval * 2).min(MAXIMUM_SHUTDOWN_POLL_INTERVAL);
         }
 
         let child = lock(&self.inner.child).take();

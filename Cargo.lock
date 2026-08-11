@@ -1599,6 +1599,7 @@ dependencies = [
 name = "mago-extension"
 version = "1.46.0"
 dependencies = [
+ "foldhash",
  "tracing",
 ]
 
