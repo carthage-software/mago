@@ -5,6 +5,7 @@ use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
+use mago_codex::metadata::ttype::TypeMetadata;
 use mago_codex::misc::GenericParent;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
@@ -19,7 +20,6 @@ use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_specialized_template_type;
 use mago_codex::ttype::template::GenericTemplate;
 use mago_codex::ttype::template::TemplateResult;
-use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -1131,7 +1131,7 @@ fn collect_mixin_types(
     codebase: &CodebaseMetadata,
     class_metadata: &ClassLikeMetadata,
     outer_object: &TObject,
-    mixins: &[TUnion],
+    mixins: &[TypeMetadata],
 ) -> Vec<(Word, TObject)> {
     let mut results = Vec::new();
     let mut visited = HashSet::default();
@@ -1144,14 +1144,14 @@ fn collect_mixin_types_into(
     codebase: &CodebaseMetadata,
     class_metadata: &ClassLikeMetadata,
     outer_object: &TObject,
-    mixins: &[TUnion],
+    mixins: &[TypeMetadata],
     results: &mut Vec<(Word, TObject)>,
     visited: &mut HashSet<Word>,
 ) {
     let mut direct: Vec<(Word, &TObject)> = Vec::new();
 
     for mixin_type in mixins {
-        for mixin_atomic in mixin_type.types.as_ref() {
+        for mixin_atomic in mixin_type.type_union.types.as_ref() {
             match mixin_atomic {
                 TAtomic::Object(obj @ TObject::Named(named)) => {
                     direct.push((ascii_lowercase_word(named.name.as_bytes()), obj));

@@ -855,7 +855,7 @@ fn direct_mixins<'ctx>(
     metadata: &'ctx ClassLikeMetadata,
     codebase: &'ctx CodebaseMetadata,
 ) -> impl Iterator<Item = (Word, Option<&'ctx ClassLikeMetadata>)> {
-    metadata.mixins.iter().flat_map(|mixin| mixin.types.as_ref().iter()).flat_map(move |mixin_type| {
+    metadata.mixins.iter().flat_map(|mixin| mixin.type_union.types.as_ref().iter()).flat_map(move |mixin_type| {
         let atomics = match mixin_type {
             TAtomic::GenericParameter(TGenericParameter { constraint, .. }) => constraint.types.as_ref(),
             other => std::slice::from_ref(other),

@@ -7,6 +7,7 @@ use mago_word::word;
 
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
+use mago_codex::metadata::ttype::TypeMetadata;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::generic::TGenericParameter;
 use mago_codex::ttype::atomic::object::TObject;
@@ -14,7 +15,6 @@ use mago_codex::ttype::atomic::object::r#enum::TEnum;
 use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::get_specialized_template_type;
-use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;
 use mago_php_version::feature::Feature;
 use mago_reporting::Annotation;
@@ -729,7 +729,7 @@ fn report_non_existent_mixin_static_method<A>(
 fn find_static_method_in_mixins<'ctx, 'arena, A>(
     context: &mut Context<'ctx, 'arena, A>,
     block_context: &BlockContext<'ctx>,
-    mixins: &[TUnion],
+    mixins: &[TypeMetadata],
     method_name: Word,
     selector: &ClassLikeMemberSelector<'arena>,
     access_span: Span,
@@ -738,7 +738,7 @@ where
     A: Arena,
 {
     for mixin_type in mixins {
-        for mixin_atomic in mixin_type.types.as_ref() {
+        for mixin_atomic in mixin_type.type_union.types.as_ref() {
             match mixin_atomic {
                 TAtomic::Object(TObject::Named(named)) => {
                     if let Some(result) = find_static_method_in_single_mixin(

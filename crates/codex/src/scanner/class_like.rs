@@ -1040,7 +1040,7 @@ where
                 continue;
             };
 
-            match builder::get_union_from_type(mixin.r#type, scope, &type_context, Some(original_name)) {
+            match get_type_metadata_from_type(mixin.r#type, Some(original_name), &type_context, scope) {
                 Ok(mixin_type) => {
                     class_like_metadata.mixins.push(mixin_type);
                 }

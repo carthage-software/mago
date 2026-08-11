@@ -438,9 +438,9 @@ pub fn populate_class_like_types(
     }
 
     for mixin_type in &mut metadata.mixins {
-        if mixin_type.needs_population() || force_repopulation {
+        if mixin_type.type_union.needs_population() || force_repopulation {
             populate_union_type(
-                mixin_type,
+                &mut mixin_type.type_union,
                 codebase_symbols,
                 Some(&class_like_reference_source),
                 symbol_references,

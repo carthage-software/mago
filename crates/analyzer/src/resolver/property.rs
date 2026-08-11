@@ -1513,7 +1513,7 @@ fn find_property_in_mixins<A>(
     context: &Context<'_, '_, A>,
     class_metadata: &ClassLikeMetadata,
     outer_object: &TObject,
-    mixins: &[TUnion],
+    mixins: &[TypeMetadata],
     prop_name: Word,
     for_assignment: bool,
 ) -> Option<ResolvedProperty>
@@ -1521,7 +1521,7 @@ where
     A: Arena,
 {
     for mixin_type in mixins {
-        for mixin_atomic in mixin_type.types.as_ref() {
+        for mixin_atomic in mixin_type.type_union.types.as_ref() {
             match mixin_atomic {
                 TAtomic::Object(TObject::Named(named)) => {
                     if let Some(result) = find_property_in_single_mixin(context, named.name, prop_name, for_assignment)
