@@ -627,6 +627,7 @@ test_case!(match_expression);
 test_case!(match_arm_reaching);
 test_case!(missing_constructor);
 test_case!(property_initialization);
+test_case!(docblock_declared_members_undefined_types);
 test_case!(parent_constructor_init);
 test_case!(parent_static_return);
 test_case!(property_hooks_initialization);

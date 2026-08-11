@@ -107,7 +107,7 @@ pub struct ClassLikeMetadata {
     pub imported_type_aliases: WordMap<(Word, Word, Span)>,
     /// Mixin types from @mixin annotations - these types' methods/properties
     /// can be accessed via magic methods (__call, __get, __set, __callStatic)
-    pub mixins: Vec<TUnion>,
+    pub mixins: Vec<TypeMetadata>,
     pub version_constraint: VersionConstraint,
 }
 
