@@ -57,6 +57,14 @@ expect($reader->readOptionalString() === 'optional', 'optional string did not ro
 expect($reader->readOptionalString() === null, 'absent string did not round-trip.');
 $reader->finish();
 
+$signedReader = new PayloadReader(pack('J', -42));
+expect($signedReader->readI64() === -42, 'i64 did not round-trip.');
+$signedReader->finish();
+
+$floatReader = new PayloadReader(pack('E', 3.5));
+expect($floatReader->readF64() === 3.5, 'f64 did not round-trip.');
+$floatReader->finish();
+
 $noNode = 4_294_967_295;
 $nodeRecords =
     pack('CNNNNN', 0, 0, 10, $noNode, 1, $noNode)

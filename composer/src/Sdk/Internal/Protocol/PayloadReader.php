@@ -92,6 +92,26 @@ final class PayloadReader
         return $value;
     }
 
+    public function readI64(): int
+    {
+        /** @var array{v: int} $decoded */
+        $decoded = unpack('Jv', $this->payload, $this->offset);
+        $value = $decoded['v'];
+        $this->offset += 8;
+
+        return $value;
+    }
+
+    public function readF64(): float
+    {
+        /** @var array{v: float} $decoded */
+        $decoded = unpack('Ev', $this->payload, $this->offset);
+        $value = $decoded['v'];
+        $this->offset += 8;
+
+        return $value;
+    }
+
     /**
      * @param int<0, max> $count
      *

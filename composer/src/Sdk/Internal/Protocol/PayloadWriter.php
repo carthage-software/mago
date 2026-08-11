@@ -44,6 +44,16 @@ final class PayloadWriter
         $this->payload .= pack('J', $value);
     }
 
+    public function writeI64(int $value): void
+    {
+        $this->payload .= pack('J', $value);
+    }
+
+    public function writeF64(float $value): void
+    {
+        $this->payload .= pack('E', $value);
+    }
+
     /**
      * @mago-expect lint:no-boolean-flag-parameter
      */
