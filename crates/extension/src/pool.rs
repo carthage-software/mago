@@ -18,6 +18,30 @@ const INITIAL_WORKERS: usize = 2;
 const WARMUP_REQUESTS: usize = 8;
 const GROWTH_SAMPLE_MULTIPLIER: usize = 2;
 const GROWTH_REQUEST_NANOS: u64 = 1_000_000;
+const SLOW_REQUEST_THRESHOLD: Duration = Duration::from_millis(10);
+
+#[derive(Debug, Default)]
+struct PoolTelemetry {
+    requests: AtomicU64,
+    request_errors: AtomicU64,
+    request_bytes: AtomicU64,
+    response_bytes: AtomicU64,
+    request_ns: AtomicU64,
+    reserve_ns: AtomicU64,
+    exchange_ns: AtomicU64,
+    recovery_ns: AtomicU64,
+    contended_reservations: AtomicU64,
+    peak_in_flight: AtomicUsize,
+    broadcasts: AtomicU64,
+    broadcast_workers: AtomicU64,
+    broadcast_ns: AtomicU64,
+    restarts: AtomicU64,
+    restart_ns: AtomicU64,
+    growths: AtomicU64,
+    growth_ns: AtomicU64,
+    bootstrap_replays: AtomicU64,
+    bootstrap_ns: AtomicU64,
+}
 
 /// Runtime and safety limits shared by every process in a worker pool.
 #[derive(Debug, Clone)]
@@ -72,6 +96,9 @@ pub struct WorkerPool {
     request_nanos: AtomicU64,
     cursor: AtomicUsize,
     shutting_down: AtomicBool,
+    trace_enabled: bool,
+    telemetry: PoolTelemetry,
+    started_at: Option<Instant>,
 }
 
 impl std::fmt::Debug for WorkerPool {
@@ -88,6 +115,9 @@ impl std::fmt::Debug for WorkerPool {
             .field("request_nanos", &self.request_nanos.load(Ordering::Relaxed))
             .field("cursor", &self.cursor.load(Ordering::Relaxed))
             .field("shutting_down", &self.shutting_down.load(Ordering::Relaxed))
+            .field("trace_enabled", &self.trace_enabled)
+            .field("telemetry", &self.telemetry)
+            .field("started_at", &self.started_at)
             .finish()
     }
 }
@@ -123,10 +153,33 @@ impl WorkerPool {
         initial_workers: usize,
         options: WorkerPoolOptions,
     ) -> Result<Self, WorkerError> {
+        let trace_enabled = tracing::enabled!(tracing::Level::TRACE);
+        let started_at = trace_enabled.then(Instant::now);
+        tracing::trace!(
+            program = ?command.program(),
+            configured_workers = size.get(),
+            initial_workers,
+            adaptive = initial_workers < size.get(),
+            maximum_payload_bytes = options.maximum_payload_size,
+            request_timeout_ms = options.request_timeout.as_millis(),
+            shutdown_timeout_ms = options.shutdown_timeout.as_millis(),
+            stderr_tail_bytes = options.stderr_tail_size,
+            "Starting extension worker pool."
+        );
         let mut workers = Vec::with_capacity(size.get());
         for id in 0..size.get() {
             let worker = if id < initial_workers { Some(Worker::spawn(id, &command, &options)?) } else { None };
             workers.push(WorkerSlot { worker: Mutex::new(worker), restart: Mutex::new(()) });
+        }
+
+        if let Some(start) = started_at {
+            tracing::trace!(
+                program = ?command.program(),
+                active_workers = initial_workers,
+                worker_capacity = size.get(),
+                elapsed = ?start.elapsed(),
+                "Extension worker pool started."
+            );
         }
 
         Ok(Self {
@@ -140,6 +193,9 @@ impl WorkerPool {
             request_nanos: AtomicU64::new(0),
             cursor: AtomicUsize::new(0),
             shutting_down: AtomicBool::new(false),
+            trace_enabled,
+            telemetry: PoolTelemetry::default(),
+            started_at,
         })
     }
 
@@ -163,9 +219,45 @@ impl WorkerPool {
     /// deadline expires, or the worker returns an error response.
     pub fn request(&self, payload: Vec<u8>) -> Result<Vec<u8>, WorkerError> {
         let start = Instant::now();
-        let (index, reservation) = self.reserve_worker()?;
+        let trace_start = self.trace_enabled.then(Instant::now);
+        let request_bytes = payload.len();
+        let reserve_start = self.trace_enabled.then(Instant::now);
+        let (index, reservation) = match self.reserve_worker() {
+            Ok(reservation) => reservation,
+            Err(error) => {
+                self.record_trace_request(
+                    request_bytes,
+                    0,
+                    trace_start.map_or(Duration::ZERO, |start| start.elapsed()),
+                    reserve_start.map_or(Duration::ZERO, |start| start.elapsed()),
+                    Duration::ZERO,
+                    Duration::ZERO,
+                    true,
+                    false,
+                );
+                return Err(error);
+            }
+        };
+        let reserve_duration = reserve_start.map_or(Duration::ZERO, |start| start.elapsed());
+        let exchange_start = self.trace_enabled.then(Instant::now);
         let result = reservation.worker().request(payload);
-        self.recover_if_needed(index, &reservation, &result)?;
+        let exchange_duration = exchange_start.map_or(Duration::ZERO, |start| start.elapsed());
+        let recovery_start = self.trace_enabled.then(Instant::now);
+        let recovery = self.recover_if_needed(index, &reservation, &result);
+        let recovery_duration = recovery_start.map_or(Duration::ZERO, |start| start.elapsed());
+        let response_bytes = result.as_ref().map_or(0, Vec::len);
+        let failed = result.is_err() || recovery.is_err();
+        self.record_trace_request(
+            request_bytes,
+            response_bytes,
+            trace_start.map_or(Duration::ZERO, |start| start.elapsed()),
+            reserve_duration,
+            exchange_duration,
+            recovery_duration,
+            failed,
+            false,
+        );
+        recovery?;
         self.record_request(start.elapsed());
         result
     }
@@ -182,9 +274,45 @@ impl WorkerPool {
         H: WorkerRequestHandler,
     {
         let start = Instant::now();
-        let (index, reservation) = self.reserve_worker()?;
+        let trace_start = self.trace_enabled.then(Instant::now);
+        let request_bytes = payload.len();
+        let reserve_start = self.trace_enabled.then(Instant::now);
+        let (index, reservation) = match self.reserve_worker() {
+            Ok(reservation) => reservation,
+            Err(error) => {
+                self.record_trace_request(
+                    request_bytes,
+                    0,
+                    trace_start.map_or(Duration::ZERO, |start| start.elapsed()),
+                    reserve_start.map_or(Duration::ZERO, |start| start.elapsed()),
+                    Duration::ZERO,
+                    Duration::ZERO,
+                    true,
+                    true,
+                );
+                return Err(error);
+            }
+        };
+        let reserve_duration = reserve_start.map_or(Duration::ZERO, |start| start.elapsed());
+        let exchange_start = self.trace_enabled.then(Instant::now);
         let result = reservation.worker().request_with_handler(payload, handler);
-        self.recover_if_needed(index, &reservation, &result)?;
+        let exchange_duration = exchange_start.map_or(Duration::ZERO, |start| start.elapsed());
+        let recovery_start = self.trace_enabled.then(Instant::now);
+        let recovery = self.recover_if_needed(index, &reservation, &result);
+        let recovery_duration = recovery_start.map_or(Duration::ZERO, |start| start.elapsed());
+        let response_bytes = result.as_ref().map_or(0, Vec::len);
+        let failed = result.is_err() || recovery.is_err();
+        self.record_trace_request(
+            request_bytes,
+            response_bytes,
+            trace_start.map_or(Duration::ZERO, |start| start.elapsed()),
+            reserve_duration,
+            exchange_duration,
+            recovery_duration,
+            failed,
+            true,
+        );
+        recovery?;
         self.record_request(start.elapsed());
         result
     }
@@ -202,12 +330,19 @@ impl WorkerPool {
     /// restarted after failure. All coordinator threads are joined before the
     /// error is returned.
     pub fn broadcast(&self, payload: &[u8]) -> Result<Vec<Vec<u8>>, WorkerError> {
+        let trace_start = self.trace_enabled.then(Instant::now);
         if self.shutting_down.load(Ordering::Acquire) {
+            tracing::trace!(payload_bytes = payload.len(), "Rejected extension broadcast while pool is shutting down.");
             return Err(WorkerError::Unavailable);
         }
 
         let _initialization = lock(&self.growth);
         let active_workers = self.active_workers.load(Ordering::Acquire);
+        tracing::trace!(
+            workers = active_workers,
+            payload_bytes = payload.len(),
+            "Broadcasting extension initialization request."
+        );
         let workers = (0..active_workers)
             .map(|index| self.ensure_running(index).map(|worker| (index, worker)))
             .collect::<Result<Vec<_>, _>>()?;
@@ -252,12 +387,39 @@ impl WorkerPool {
         }
 
         if let Some(error) = first_error {
+            if let Some(start) = trace_start {
+                self.telemetry.broadcasts.fetch_add(1, Ordering::Relaxed);
+                self.telemetry.broadcast_workers.fetch_add(active_workers as u64, Ordering::Relaxed);
+                self.telemetry.broadcast_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
+                tracing::trace!(
+                    workers = active_workers,
+                    payload_bytes = payload.len(),
+                    elapsed = ?start.elapsed(),
+                    error = %error,
+                    "Extension initialization broadcast failed."
+                );
+            }
             return Err(error);
         }
 
         let responses = responses.into_iter().flatten().collect::<Vec<_>>();
+        let response_bytes = responses.iter().map(Vec::len).sum::<usize>();
         if let Some(response) = responses.first() {
             lock(&self.bootstraps).push(Bootstrap { request: payload.to_vec(), response: response.clone() });
+        }
+
+        if let Some(start) = trace_start {
+            let elapsed = start.elapsed();
+            self.telemetry.broadcasts.fetch_add(1, Ordering::Relaxed);
+            self.telemetry.broadcast_workers.fetch_add(active_workers as u64, Ordering::Relaxed);
+            self.telemetry.broadcast_ns.fetch_add(duration_nanos(elapsed), Ordering::Relaxed);
+            tracing::trace!(
+                workers = active_workers,
+                request_bytes = payload.len(),
+                response_bytes,
+                elapsed = ?elapsed,
+                "Extension initialization broadcast completed."
+            );
         }
 
         Ok(responses)
@@ -270,6 +432,50 @@ impl WorkerPool {
             return;
         }
 
+        if tracing::enabled!(tracing::Level::TRACE) {
+            let completed = self.completed_requests.load(Ordering::Relaxed);
+            let measured = completed.saturating_sub(WARMUP_REQUESTS);
+            let request_nanos = self.request_nanos.load(Ordering::Relaxed);
+            let traced_requests = self.telemetry.requests.load(Ordering::Relaxed);
+            tracing::trace!(
+                completed_requests = completed,
+                active_workers = self.active_workers.load(Ordering::Relaxed),
+                average_request_micros = if measured == 0 { 0 } else { request_nanos / measured as u64 / 1_000 },
+                "Shutting down extension worker pool."
+            );
+            tracing::trace!(
+                requests = traced_requests,
+                errors = self.telemetry.request_errors.load(Ordering::Relaxed),
+                request_bytes = self.telemetry.request_bytes.load(Ordering::Relaxed),
+                response_bytes = self.telemetry.response_bytes.load(Ordering::Relaxed),
+                total_request_ms = nanos_millis(self.telemetry.request_ns.load(Ordering::Relaxed)),
+                average_request_micros =
+                    average_micros(self.telemetry.request_ns.load(Ordering::Relaxed), traced_requests),
+                "Extension worker pool request summary."
+            );
+            tracing::trace!(
+                reserve_ms = nanos_millis(self.telemetry.reserve_ns.load(Ordering::Relaxed)),
+                exchange_ms = nanos_millis(self.telemetry.exchange_ns.load(Ordering::Relaxed)),
+                recovery_ms = nanos_millis(self.telemetry.recovery_ns.load(Ordering::Relaxed)),
+                contended_reservations = self.telemetry.contended_reservations.load(Ordering::Relaxed),
+                peak_in_flight = self.telemetry.peak_in_flight.load(Ordering::Relaxed),
+                "Extension worker pool scheduling and IPC summary."
+            );
+            tracing::trace!(
+                broadcasts = self.telemetry.broadcasts.load(Ordering::Relaxed),
+                broadcast_workers = self.telemetry.broadcast_workers.load(Ordering::Relaxed),
+                broadcast_ms = nanos_millis(self.telemetry.broadcast_ns.load(Ordering::Relaxed)),
+                restarts = self.telemetry.restarts.load(Ordering::Relaxed),
+                restart_ms = nanos_millis(self.telemetry.restart_ns.load(Ordering::Relaxed)),
+                growths = self.telemetry.growths.load(Ordering::Relaxed),
+                growth_ms = nanos_millis(self.telemetry.growth_ns.load(Ordering::Relaxed)),
+                bootstrap_replays = self.telemetry.bootstrap_replays.load(Ordering::Relaxed),
+                bootstrap_ms = nanos_millis(self.telemetry.bootstrap_ns.load(Ordering::Relaxed)),
+                lifetime = ?self.started_at.map(|start| start.elapsed()).unwrap_or_default(),
+                "Extension worker pool lifecycle summary."
+            );
+        }
+
         let workers: Vec<_> =
             self.workers.iter().filter_map(|slot| lock(&slot.worker).as_ref().map(Arc::clone)).collect();
         for worker in &workers {
@@ -280,6 +486,8 @@ impl WorkerPool {
         for worker in workers {
             worker.finish_shutdown(deadline);
         }
+
+        tracing::trace!("Extension worker pool shut down.");
     }
 
     fn reserve_worker(&self) -> Result<(usize, crate::worker::WorkerReservation), WorkerError> {
@@ -308,8 +516,16 @@ impl WorkerPool {
         }
 
         let Some((index, worker, load)) = selected else {
+            tracing::trace!(active_workers, "No running extension worker could be reserved.");
             return Err(last_error.unwrap_or(WorkerError::Unavailable));
         };
+
+        if self.trace_enabled {
+            if load > 0 {
+                self.telemetry.contended_reservations.fetch_add(1, Ordering::Relaxed);
+            }
+            self.telemetry.peak_in_flight.fetch_max(load.saturating_add(1), Ordering::Relaxed);
+        }
 
         if load > 0
             && self.should_grow(active_workers)
@@ -327,6 +543,7 @@ impl WorkerPool {
             return Ok(worker);
         }
 
+        tracing::trace!(worker = index, "Extension worker is not running; attempting restart.");
         self.restart(index, &worker)
     }
 
@@ -351,6 +568,8 @@ impl WorkerPool {
     }
 
     fn restart(&self, index: usize, failed: &Arc<Worker>) -> Result<Arc<Worker>, WorkerError> {
+        let trace_start = self.trace_enabled.then(Instant::now);
+        tracing::trace!(worker = index, "Restarting extension worker.");
         let _restart = lock(&self.workers[index].restart);
         let mut slot = lock(&self.workers[index].worker);
         if let Some(current) = slot.as_ref()
@@ -365,6 +584,13 @@ impl WorkerPool {
             .spawn_initialized(index)
             .map_err(|source| WorkerError::Restart { worker: index, source: Box::new(source) })?;
         *slot = Some(Arc::clone(&replacement));
+
+        if let Some(start) = trace_start {
+            let elapsed = start.elapsed();
+            self.telemetry.restarts.fetch_add(1, Ordering::Relaxed);
+            self.telemetry.restart_ns.fetch_add(duration_nanos(elapsed), Ordering::Relaxed);
+            tracing::trace!(worker = index, elapsed = ?elapsed, "Extension worker restarted.");
+        }
 
         Ok(replacement)
     }
@@ -385,17 +611,32 @@ impl WorkerPool {
             return Ok(None);
         }
 
+        let trace_start = self.trace_enabled.then(Instant::now);
+        tracing::trace!(
+            active_workers,
+            worker_capacity = self.workers.len(),
+            "Growing adaptive extension worker pool."
+        );
         let worker = self.spawn_initialized(active_workers)?;
         *lock(&self.workers[active_workers].worker) = Some(Arc::clone(&worker));
         self.active_workers.store(active_workers + 1, Ordering::Release);
-        tracing::trace!(workers = active_workers + 1, "Expanded adaptive extension worker pool.");
+        if let Some(start) = trace_start {
+            let elapsed = start.elapsed();
+            self.telemetry.growths.fetch_add(1, Ordering::Relaxed);
+            self.telemetry.growth_ns.fetch_add(duration_nanos(elapsed), Ordering::Relaxed);
+            tracing::trace!(workers = active_workers + 1, elapsed = ?elapsed, "Expanded adaptive extension worker pool.");
+        }
 
         Ok(Some((active_workers, worker)))
     }
 
     fn spawn_initialized(&self, index: usize) -> Result<Arc<Worker>, WorkerError> {
+        let trace_start = self.trace_enabled.then(Instant::now);
         let worker = Worker::spawn(index, &self.command, &self.options)?;
-        for bootstrap in lock(&self.bootstraps).iter() {
+        let bootstraps = lock(&self.bootstraps);
+        tracing::trace!(worker = index, bootstrap_requests = bootstraps.len(), "Initializing extension worker state.");
+        for bootstrap in bootstraps.iter() {
+            let bootstrap_start = self.trace_enabled.then(Instant::now);
             let response = match worker.request(bootstrap.request.clone()) {
                 Ok(response) => response,
                 Err(error) => {
@@ -404,9 +645,23 @@ impl WorkerPool {
                 }
             };
             if response != bootstrap.response {
+                tracing::trace!(worker = index, "Extension worker returned inconsistent bootstrap metadata.");
                 worker.shutdown();
                 return Err(WorkerError::InconsistentInitialization { worker: index });
             }
+            if let Some(start) = bootstrap_start {
+                self.telemetry.bootstrap_replays.fetch_add(1, Ordering::Relaxed);
+                self.telemetry.bootstrap_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
+            }
+        }
+
+        if let Some(start) = trace_start {
+            tracing::trace!(
+                worker = index,
+                bootstrap_requests = bootstraps.len(),
+                elapsed = ?start.elapsed(),
+                "Extension worker state initialized."
+            );
         }
 
         Ok(worker)
@@ -429,6 +684,46 @@ impl WorkerPool {
             self.request_nanos.fetch_add(nanos, Ordering::Relaxed);
         }
     }
+
+    #[allow(clippy::too_many_arguments)]
+    fn record_trace_request(
+        &self,
+        request_bytes: usize,
+        response_bytes: usize,
+        total: Duration,
+        reserve: Duration,
+        exchange: Duration,
+        recovery: Duration,
+        failed: bool,
+        nested_handler: bool,
+    ) {
+        if !self.trace_enabled {
+            return;
+        }
+
+        self.telemetry.requests.fetch_add(1, Ordering::Relaxed);
+        self.telemetry.request_errors.fetch_add(u64::from(failed), Ordering::Relaxed);
+        self.telemetry.request_bytes.fetch_add(request_bytes as u64, Ordering::Relaxed);
+        self.telemetry.response_bytes.fetch_add(response_bytes as u64, Ordering::Relaxed);
+        self.telemetry.request_ns.fetch_add(duration_nanos(total), Ordering::Relaxed);
+        self.telemetry.reserve_ns.fetch_add(duration_nanos(reserve), Ordering::Relaxed);
+        self.telemetry.exchange_ns.fetch_add(duration_nanos(exchange), Ordering::Relaxed);
+        self.telemetry.recovery_ns.fetch_add(duration_nanos(recovery), Ordering::Relaxed);
+
+        if total >= SLOW_REQUEST_THRESHOLD {
+            tracing::trace!(
+                request_bytes,
+                response_bytes,
+                elapsed = ?total,
+                reserve = ?reserve,
+                exchange = ?exchange,
+                recovery = ?recovery,
+                nested_handler,
+                failed,
+                "Slow extension worker-pool request completed."
+            );
+        }
+    }
 }
 
 impl Drop for WorkerPool {
@@ -439,6 +734,19 @@ impl Drop for WorkerPool {
 
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+fn duration_nanos(duration: Duration) -> u64 {
+    u64::try_from(duration.as_nanos()).unwrap_or(u64::MAX)
+}
+
+#[allow(clippy::cast_precision_loss, clippy::float_arithmetic)]
+fn nanos_millis(nanos: u64) -> f64 {
+    nanos as f64 / 1_000_000.0
+}
+
+fn average_micros(nanos: u64, count: u64) -> u64 {
+    nanos.checked_div(count).unwrap_or(0) / 1_000
 }
 
 #[cfg(test)]

@@ -7,6 +7,8 @@
 #![allow(clippy::big_endian_bytes, reason = "network byte order is part of the stable linter wire format")]
 
 use std::collections::HashSet;
+use std::time::Duration;
+use std::time::Instant;
 
 use mago_database::file::File;
 use mago_extension::PayloadReader;
@@ -50,6 +52,17 @@ const MAXIMUM_NOTES_PER_ISSUE: usize = 0x0001_0000;
 pub(super) struct Registration {
     pub extensions: Vec<super::ExternalExtension>,
     pub rules: Vec<ExternalRule>,
+}
+
+#[derive(Debug)]
+pub(super) struct LintRequest {
+    pub payload: Vec<u8>,
+    pub targets: usize,
+    pub nodes: usize,
+    pub names: usize,
+    pub trivia: usize,
+    pub snapshot_duration: Duration,
+    pub serialization_duration: Duration,
 }
 
 #[derive(Debug)]
@@ -292,11 +305,19 @@ pub(super) fn encode_lint_request<'arena>(
     resolved_names: &ResolvedNames<'arena>,
     active_rules: &[u16],
     target_kinds: &[bool; u8::MAX as usize + 1],
-) -> Result<Option<Vec<u8>>, ExternalLintError> {
+    trace_enabled: bool,
+) -> Result<Option<LintRequest>, ExternalLintError> {
+    let snapshot_start = trace_enabled.then(Instant::now);
     let Some(snapshot) = FileSnapshot::build(file, program, resolved_names, target_kinds)? else {
         return Ok(None);
     };
+    let snapshot_duration = snapshot_start.map_or(Duration::ZERO, |start| start.elapsed());
+    let serialization_start = trace_enabled.then(Instant::now);
     let names_length = snapshot.names.iter().map(|(_, _, name, _)| name.len()).sum::<usize>();
+    let target_count = snapshot.targets.len();
+    let node_count = snapshot.nodes.len();
+    let name_count = snapshot.names.len();
+    let trivia_count = snapshot.trivia.len();
     let payload_capacity = HEADER_LENGTH
         + 4
         + file.name.len()
@@ -381,7 +402,15 @@ pub(super) fn encode_lint_request<'arena>(
         writer.write_u32(end);
     }
 
-    Ok(Some(writer.finish()))
+    Ok(Some(LintRequest {
+        payload: writer.finish(),
+        targets: target_count,
+        nodes: node_count,
+        names: name_count,
+        trivia: trivia_count,
+        snapshot_duration,
+        serialization_duration: serialization_start.map_or(Duration::ZERO, |start| start.elapsed()),
+    }))
 }
 
 pub(super) fn decode_lint_response(

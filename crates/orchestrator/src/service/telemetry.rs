@@ -93,6 +93,58 @@ impl AnalysisPhaseTelemetry {
     }
 }
 
+/// Per-phase aggregate counters for the lint-parallel hot loop.
+#[derive(Default)]
+pub(crate) struct LintPhaseTelemetry {
+    pub(crate) parse_ns: AtomicU64,
+    pub(crate) resolve_ns: AtomicU64,
+    pub(crate) semantics_ns: AtomicU64,
+    pub(crate) lint_ns: AtomicU64,
+    pub(crate) per_file_total_ns: AtomicU64,
+    pub(crate) files: AtomicU64,
+}
+
+impl LintPhaseTelemetry {
+    pub(crate) fn dump(&self) {
+        let files = self.files.load(Relaxed);
+        if files == 0 {
+            return;
+        }
+
+        #[allow(clippy::float_arithmetic)]
+        let per_file_us = |counter: &AtomicU64| -> f64 { (counter.load(Relaxed) as f64 / files as f64) / 1_000.0 };
+        #[allow(clippy::float_arithmetic)]
+        let total_ms = |counter: &AtomicU64| -> f64 { counter.load(Relaxed) as f64 / 1_000_000.0 };
+
+        tracing::trace!("Linted {} files in the parallel phase.", files);
+        tracing::trace!(
+            "Parsing accounted for {:.3} ms of lint worker CPU time (average {:.2} µs per file).",
+            total_ms(&self.parse_ns),
+            per_file_us(&self.parse_ns),
+        );
+        tracing::trace!(
+            "Name resolution accounted for {:.3} ms of lint worker CPU time (average {:.2} µs per file).",
+            total_ms(&self.resolve_ns),
+            per_file_us(&self.resolve_ns),
+        );
+        tracing::trace!(
+            "Semantics checking accounted for {:.3} ms of lint worker CPU time (average {:.2} µs per file).",
+            total_ms(&self.semantics_ns),
+            per_file_us(&self.semantics_ns),
+        );
+        tracing::trace!(
+            "Built-in and external lint rules accounted for {:.3} ms of worker CPU time (average {:.2} µs per file).",
+            total_ms(&self.lint_ns),
+            per_file_us(&self.lint_ns),
+        );
+        tracing::trace!(
+            "Total lint worker CPU time across all sub-phases was {:.3} ms (average {:.2} µs per file).",
+            total_ms(&self.per_file_total_ns),
+            per_file_us(&self.per_file_total_ns),
+        );
+    }
+}
+
 /// Collects per-file durations from workers in a parallel phase so that at
 /// the end of the phase the N slowest files can be reported.
 pub(crate) struct SlowestFiles {

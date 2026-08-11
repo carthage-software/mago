@@ -1,4 +1,6 @@
 use std::sync::Arc;
+use std::sync::atomic::Ordering::Relaxed;
+use std::time::Instant;
 
 use mago_allocator::LocalArena;
 
@@ -19,6 +21,7 @@ use mago_syntax::settings::ParserSettings;
 use crate::OrchestratorError;
 use crate::service::pipeline::StatelessParallelPipeline;
 use crate::service::pipeline::StatelessReducer;
+use crate::service::telemetry::LintPhaseTelemetry;
 
 /// Defines the different operational modes for the linter.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -181,9 +184,23 @@ impl LintService {
             self.use_progress_bars,
         );
 
-        pipeline.run(|context, arena, file| {
+        let trace_enabled = tracing::enabled!(tracing::Level::TRACE);
+        let telemetry = Arc::new(LintPhaseTelemetry::default());
+        let telemetry_for_closure = Arc::clone(&telemetry);
+
+        let result = pipeline.run(move |context, arena, file| {
+            let per_file_start = trace_enabled.then(Instant::now);
+            let parse_start = trace_enabled.then(Instant::now);
             let program = parse_file_with_settings(arena, &file, context.parser_settings);
+            if let Some(start) = parse_start {
+                telemetry_for_closure.parse_ns.fetch_add(start.elapsed().as_nanos() as u64, Relaxed);
+            }
+
+            let resolve_start = trace_enabled.then(Instant::now);
             let resolved_names = NameResolver::new(arena).resolve(program);
+            if let Some(start) = resolve_start {
+                telemetry_for_closure.resolve_ns.fetch_add(start.elapsed().as_nanos() as u64, Relaxed);
+            }
 
             let mut issues = IssueCollection::new();
 
@@ -192,19 +209,38 @@ impl LintService {
             }
 
             let semantics_checker = SemanticsChecker::new(context.php_version);
+            let semantics_start = trace_enabled.then(Instant::now);
             issues.extend(semantics_checker.check(&file, program, &resolved_names));
+            if let Some(start) = semantics_start {
+                telemetry_for_closure.semantics_ns.fetch_add(start.elapsed().as_nanos() as u64, Relaxed);
+            }
 
             if context.mode == LintMode::Full {
+                let lint_start = trace_enabled.then(Instant::now);
                 let linter = Linter::from_registry(arena, context.registry, context.php_version);
                 if let Some(external_linter) = context.external_linter.as_deref() {
                     issues.extend(linter.lint_with_external(&file, program, &resolved_names, external_linter)?);
                 } else {
                     issues.extend(linter.lint(&file, program, &resolved_names));
                 }
+                if let Some(start) = lint_start {
+                    telemetry_for_closure.lint_ns.fetch_add(start.elapsed().as_nanos() as u64, Relaxed);
+                }
+            }
+
+            if let Some(start) = per_file_start {
+                telemetry_for_closure.per_file_total_ns.fetch_add(start.elapsed().as_nanos() as u64, Relaxed);
+                telemetry_for_closure.files.fetch_add(1, Relaxed);
             }
 
             Ok(issues)
-        })
+        });
+
+        if trace_enabled {
+            telemetry.dump();
+        }
+
+        result
     }
 }
 

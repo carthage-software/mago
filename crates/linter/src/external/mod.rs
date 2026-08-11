@@ -7,6 +7,10 @@
 
 use std::collections::HashSet;
 use std::sync::Arc;
+use std::sync::atomic::AtomicU64;
+use std::sync::atomic::Ordering;
+use std::time::Duration;
+use std::time::Instant;
 
 use mago_database::file::File;
 use mago_extension::WorkerError;
@@ -23,6 +27,32 @@ use protocol::Registration;
 
 mod error;
 pub mod protocol;
+
+const SLOW_FILE_THRESHOLD: Duration = Duration::from_millis(10);
+
+#[derive(Debug, Default)]
+struct ExternalLintTelemetry {
+    files: AtomicU64,
+    backend_checks: AtomicU64,
+    inactive_backends: AtomicU64,
+    unmatched_backends: AtomicU64,
+    requests: AtomicU64,
+    errors: AtomicU64,
+    active_rules: AtomicU64,
+    targets: AtomicU64,
+    nodes: AtomicU64,
+    names: AtomicU64,
+    trivia: AtomicU64,
+    issues: AtomicU64,
+    request_bytes: AtomicU64,
+    response_bytes: AtomicU64,
+    encode_ns: AtomicU64,
+    snapshot_ns: AtomicU64,
+    serialization_ns: AtomicU64,
+    ipc_ns: AtomicU64,
+    decode_ns: AtomicU64,
+    total_ns: AtomicU64,
+}
 
 /// Metadata advertised for one custom linter rule.
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -79,6 +109,9 @@ pub struct ExternalLinter<T = WorkerPool> {
     backends: Box<[Backend<T>]>,
     extensions: Box<[ExternalExtension]>,
     rules: Box<[ExternalRule]>,
+    trace_enabled: bool,
+    telemetry: ExternalLintTelemetry,
+    started_at: Option<Instant>,
 }
 
 impl ExternalLinter<WorkerPool> {
@@ -124,8 +157,23 @@ impl<T> ExternalLinter<T> {
     where
         T: LinterTransport,
     {
+        let trace_start = self.trace_enabled.then(Instant::now);
+        let mut file_encode_ns = 0u64;
+        let mut file_ipc_ns = 0u64;
+        let mut file_decode_ns = 0u64;
+        let mut file_requests = 0u64;
+        let mut file_issues = 0u64;
+        let mut file_request_bytes = 0u64;
+        let mut file_targets = 0u64;
+        let mut file_nodes = 0u64;
+        if self.trace_enabled {
+            self.telemetry.files.fetch_add(1, Ordering::Relaxed);
+        }
         let mut issues = IssueCollection::new();
         for backend in &self.backends {
+            if self.trace_enabled {
+                self.telemetry.backend_checks.fetch_add(1, Ordering::Relaxed);
+            }
             let mut active_rule_indices = Vec::new();
             let mut target_kinds = [false; u8::MAX as usize + 1];
             for (rule_index, rule) in backend.registration.rules.iter().enumerate() {
@@ -141,21 +189,102 @@ impl<T> ExternalLinter<T> {
             }
 
             if active_rule_indices.is_empty() {
+                if self.trace_enabled {
+                    self.telemetry.inactive_backends.fetch_add(1, Ordering::Relaxed);
+                }
                 continue;
             }
 
-            let Some(payload) =
-                protocol::encode_lint_request(file, program, resolved_names, &active_rule_indices, &target_kinds)?
+            let encode_start = self.trace_enabled.then(Instant::now);
+            let request = protocol::encode_lint_request(
+                file,
+                program,
+                resolved_names,
+                &active_rule_indices,
+                &target_kinds,
+                self.trace_enabled,
+            );
+            if let Some(start) = encode_start {
+                let elapsed = duration_nanos(start.elapsed());
+                file_encode_ns = file_encode_ns.saturating_add(elapsed);
+                self.telemetry.encode_ns.fetch_add(elapsed, Ordering::Relaxed);
+            }
+            let Some(request) = request.inspect_err(|_| {
+                if self.trace_enabled {
+                    self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
+                }
+            })?
             else {
+                if self.trace_enabled {
+                    self.telemetry.unmatched_backends.fetch_add(1, Ordering::Relaxed);
+                }
                 continue;
             };
-            let response = backend.transport.request(payload)?;
-            issues.extend(protocol::decode_lint_response(
-                &response,
-                file,
-                &backend.registration.rules,
-                &active_rule_indices,
-            )?);
+            if self.trace_enabled {
+                self.telemetry.requests.fetch_add(1, Ordering::Relaxed);
+                self.telemetry.active_rules.fetch_add(active_rule_indices.len() as u64, Ordering::Relaxed);
+                self.telemetry.targets.fetch_add(request.targets as u64, Ordering::Relaxed);
+                self.telemetry.nodes.fetch_add(request.nodes as u64, Ordering::Relaxed);
+                self.telemetry.names.fetch_add(request.names as u64, Ordering::Relaxed);
+                self.telemetry.trivia.fetch_add(request.trivia as u64, Ordering::Relaxed);
+                self.telemetry.request_bytes.fetch_add(request.payload.len() as u64, Ordering::Relaxed);
+                self.telemetry.snapshot_ns.fetch_add(duration_nanos(request.snapshot_duration), Ordering::Relaxed);
+                self.telemetry
+                    .serialization_ns
+                    .fetch_add(duration_nanos(request.serialization_duration), Ordering::Relaxed);
+                file_requests += 1;
+                file_request_bytes = file_request_bytes.saturating_add(request.payload.len() as u64);
+                file_targets = file_targets.saturating_add(request.targets as u64);
+                file_nodes = file_nodes.saturating_add(request.nodes as u64);
+            }
+            let ipc_start = self.trace_enabled.then(Instant::now);
+            let response = backend.transport.request(request.payload).inspect_err(|_| {
+                if self.trace_enabled {
+                    self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
+                }
+            })?;
+            if let Some(start) = ipc_start {
+                let elapsed = duration_nanos(start.elapsed());
+                file_ipc_ns = file_ipc_ns.saturating_add(elapsed);
+                self.telemetry.ipc_ns.fetch_add(elapsed, Ordering::Relaxed);
+                self.telemetry.response_bytes.fetch_add(response.len() as u64, Ordering::Relaxed);
+            }
+            let decode_start = self.trace_enabled.then(Instant::now);
+            let backend_issues =
+                protocol::decode_lint_response(&response, file, &backend.registration.rules, &active_rule_indices)
+                    .inspect_err(|_| {
+                        if self.trace_enabled {
+                            self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
+                        }
+                    })?;
+            if let Some(start) = decode_start {
+                let elapsed = duration_nanos(start.elapsed());
+                file_decode_ns = file_decode_ns.saturating_add(elapsed);
+                self.telemetry.decode_ns.fetch_add(elapsed, Ordering::Relaxed);
+                self.telemetry.issues.fetch_add(backend_issues.len() as u64, Ordering::Relaxed);
+                file_issues = file_issues.saturating_add(backend_issues.len() as u64);
+            }
+            issues.extend(backend_issues);
+        }
+
+        if let Some(start) = trace_start {
+            let elapsed = start.elapsed();
+            self.telemetry.total_ns.fetch_add(duration_nanos(elapsed), Ordering::Relaxed);
+            if elapsed >= SLOW_FILE_THRESHOLD {
+                tracing::trace!(
+                    file = %mago_bytes::BytesDisplay(&file.name),
+                    elapsed = ?elapsed,
+                    requests = file_requests,
+                    issues = file_issues,
+                    request_bytes = file_request_bytes,
+                    targets = file_targets,
+                    nodes = file_nodes,
+                    encode_ms = nanos_millis(file_encode_ns),
+                    ipc_ms = nanos_millis(file_ipc_ns),
+                    decode_ms = nanos_millis(file_decode_ns),
+                    "Slow external linter file completed."
+                );
+            }
         }
 
         Ok(issues)
@@ -168,6 +297,9 @@ impl<T> ExternalLinter<T> {
     where
         T: LinterTransport,
     {
+        let trace_enabled = tracing::enabled!(tracing::Level::TRACE);
+        let started_at = trace_enabled.then(Instant::now);
+        tracing::trace!(php_version = %php_version, "Initializing external linter registrations.");
         let describe = protocol::encode_describe_request(php_version);
         let mut backends = Vec::new();
         let mut extensions = Vec::new();
@@ -175,8 +307,15 @@ impl<T> ExternalLinter<T> {
         let mut extension_identifiers = HashSet::new();
         let mut rule_codes = HashSet::new();
 
-        for transport in transports {
+        for (backend_index, transport) in transports.into_iter().enumerate() {
+            let backend_start = trace_enabled.then(Instant::now);
+            tracing::trace!(
+                backend = backend_index,
+                request_bytes = describe.len(),
+                "Describing external linter backend."
+            );
             let responses = transport.broadcast(&describe)?;
+            let response_bytes = responses.iter().map(Vec::len).sum::<usize>();
             let mut decoded = responses.iter().map(|response| protocol::decode_registration(response));
             let Some(first) = decoded.next() else {
                 return Err(ExternalLintError::Protocol("worker pool returned no registration responses".to_string()));
@@ -202,15 +341,96 @@ impl<T> ExternalLinter<T> {
 
             extensions.extend(registration.extensions.iter().cloned());
             rules.extend(registration.rules.iter().cloned());
+            if let Some(start) = backend_start {
+                tracing::trace!(
+                    backend = backend_index,
+                    workers = responses.len(),
+                    response_bytes,
+                    extensions = registration.extensions.len(),
+                    rules = registration.rules.len(),
+                    elapsed = ?start.elapsed(),
+                    "External linter backend registered."
+                );
+            }
             backends.push(Backend { transport, registration });
         }
 
-        Ok(Self {
+        let linter = Self {
             backends: backends.into_boxed_slice(),
             extensions: extensions.into_boxed_slice(),
             rules: rules.into_boxed_slice(),
-        })
+            trace_enabled,
+            telemetry: ExternalLintTelemetry::default(),
+            started_at,
+        };
+        if let Some(start) = started_at {
+            tracing::trace!(
+                backends = linter.backends.len(),
+                extensions = linter.extensions.len(),
+                rules = linter.rules.len(),
+                elapsed = ?start.elapsed(),
+                "External linter initialized."
+            );
+        }
+
+        Ok(linter)
     }
+}
+
+impl<T> Drop for ExternalLinter<T> {
+    fn drop(&mut self) {
+        if !self.trace_enabled {
+            return;
+        }
+
+        let files = self.telemetry.files.load(Ordering::Relaxed);
+        let requests = self.telemetry.requests.load(Ordering::Relaxed);
+        tracing::trace!(
+            files,
+            backend_checks = self.telemetry.backend_checks.load(Ordering::Relaxed),
+            inactive_backends = self.telemetry.inactive_backends.load(Ordering::Relaxed),
+            unmatched_backends = self.telemetry.unmatched_backends.load(Ordering::Relaxed),
+            requests,
+            errors = self.telemetry.errors.load(Ordering::Relaxed),
+            issues = self.telemetry.issues.load(Ordering::Relaxed),
+            "External linter dispatch summary."
+        );
+        tracing::trace!(
+            active_rules = self.telemetry.active_rules.load(Ordering::Relaxed),
+            targets = self.telemetry.targets.load(Ordering::Relaxed),
+            nodes = self.telemetry.nodes.load(Ordering::Relaxed),
+            resolved_names = self.telemetry.names.load(Ordering::Relaxed),
+            trivia = self.telemetry.trivia.load(Ordering::Relaxed),
+            request_bytes = self.telemetry.request_bytes.load(Ordering::Relaxed),
+            response_bytes = self.telemetry.response_bytes.load(Ordering::Relaxed),
+            "External linter snapshot summary."
+        );
+        tracing::trace!(
+            encode_ms = nanos_millis(self.telemetry.encode_ns.load(Ordering::Relaxed)),
+            snapshot_ms = nanos_millis(self.telemetry.snapshot_ns.load(Ordering::Relaxed)),
+            serialization_ms = nanos_millis(self.telemetry.serialization_ns.load(Ordering::Relaxed)),
+            ipc_ms = nanos_millis(self.telemetry.ipc_ns.load(Ordering::Relaxed)),
+            decode_ms = nanos_millis(self.telemetry.decode_ns.load(Ordering::Relaxed)),
+            total_worker_cpu_ms = nanos_millis(self.telemetry.total_ns.load(Ordering::Relaxed)),
+            average_file_micros = average_micros(self.telemetry.total_ns.load(Ordering::Relaxed), files),
+            average_request_micros = average_micros(self.telemetry.ipc_ns.load(Ordering::Relaxed), requests),
+            lifetime = ?self.started_at.map(|start| start.elapsed()).unwrap_or_default(),
+            "External linter timing summary."
+        );
+    }
+}
+
+fn duration_nanos(duration: Duration) -> u64 {
+    u64::try_from(duration.as_nanos()).unwrap_or(u64::MAX)
+}
+
+#[allow(clippy::cast_precision_loss, clippy::float_arithmetic)]
+fn nanos_millis(nanos: u64) -> f64 {
+    nanos as f64 / 1_000_000.0
+}
+
+fn average_micros(nanos: u64, count: u64) -> u64 {
+    nanos.checked_div(count).unwrap_or(0) / 1_000
 }
 
 #[cfg(test)]

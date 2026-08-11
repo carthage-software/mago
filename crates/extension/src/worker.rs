@@ -9,6 +9,7 @@ use std::process::ChildStdout;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::MutexGuard;
+use std::sync::atomic::AtomicBool;
 use std::sync::atomic::AtomicU8;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::AtomicUsize;
@@ -36,6 +37,26 @@ const STATE_FAILED: u8 = 3;
 const IO_THREAD_STACK_SIZE: usize = 256 * 1024;
 const INITIAL_SHUTDOWN_POLL_INTERVAL: Duration = Duration::from_micros(50);
 const MAXIMUM_SHUTDOWN_POLL_INTERVAL: Duration = Duration::from_millis(1);
+
+#[derive(Debug, Default)]
+struct WorkerTelemetry {
+    frames_sent: AtomicU64,
+    frames_received: AtomicU64,
+    bytes_sent: AtomicU64,
+    bytes_received: AtomicU64,
+    requests: AtomicU64,
+    request_ns: AtomicU64,
+    successful_responses: AtomicU64,
+    remote_errors: AtomicU64,
+    nested_requests: AtomicU64,
+    nested_handler_ns: AtomicU64,
+    notifications: AtomicU64,
+    cancellations: AtomicU64,
+    timeouts: AtomicU64,
+    failures: AtomicU64,
+    stderr_bytes: AtomicU64,
+    forced_shutdowns: AtomicU64,
+}
 
 /// Handles a nested request sent by an extension worker while Mago is waiting
 /// for the worker's outer response.
@@ -107,6 +128,10 @@ struct WorkerInner {
     child: Mutex<Option<Child>>,
     pending: Mutex<HashMap<u64, mpsc::Sender<PendingEvent>>>,
     stderr: Mutex<StderrTail>,
+    trace_enabled: bool,
+    trace_summary_emitted: AtomicBool,
+    telemetry: WorkerTelemetry,
+    started_at: Option<Instant>,
 }
 
 impl WorkerInner {
@@ -127,11 +152,25 @@ impl WorkerInner {
             return Err(error);
         }
 
+        if self.trace_enabled {
+            self.telemetry.frames_sent.fetch_add(1, Ordering::Relaxed);
+            self.telemetry
+                .bytes_sent
+                .fetch_add((crate::protocol::FRAME_HEADER_LENGTH + frame.payload.len()) as u64, Ordering::Relaxed);
+        }
+
         Ok(())
     }
 
     fn route(&self, frame: Frame) {
+        if self.trace_enabled {
+            self.telemetry.frames_received.fetch_add(1, Ordering::Relaxed);
+            self.telemetry
+                .bytes_received
+                .fetch_add((crate::protocol::FRAME_HEADER_LENGTH + frame.payload.len()) as u64, Ordering::Relaxed);
+        }
         if frame.kind == FrameKind::Shutdown {
+            tracing::trace!(worker = self.id, "Extension worker requested host-side shutdown.");
             self.fail("worker requested shutdown");
             return;
         }
@@ -167,6 +206,10 @@ impl WorkerInner {
             return;
         }
 
+        if self.trace_enabled {
+            self.telemetry.failures.fetch_add(1, Ordering::Relaxed);
+        }
+
         lock(&self.writer).take();
         if let Some(child) = lock(&self.child).as_mut() {
             let _result = child.kill();
@@ -180,6 +223,7 @@ impl WorkerInner {
         }
 
         let failure = WorkerFailure::new(message);
+        tracing::trace!(worker = self.id, reason = %failure.message, "Extension worker failed.");
         let pending = std::mem::take(&mut *lock(&self.pending));
         for sender in pending.into_values() {
             let _result = sender.send(PendingEvent::Failure(failure.clone()));
@@ -188,6 +232,60 @@ impl WorkerInner {
 
     fn disconnected(&self, message: impl Into<String>) -> WorkerError {
         WorkerError::Disconnected { worker: self.id, message: message.into() }
+    }
+
+    fn emit_trace_summary(&self) {
+        if !self.trace_enabled || self.trace_summary_emitted.swap(true, Ordering::AcqRel) {
+            return;
+        }
+
+        let requests = self.telemetry.requests.load(Ordering::Relaxed);
+        let request_ns = self.telemetry.request_ns.load(Ordering::Relaxed);
+        let nested_requests = self.telemetry.nested_requests.load(Ordering::Relaxed);
+        let nested_ns = self.telemetry.nested_handler_ns.load(Ordering::Relaxed);
+        tracing::trace!(
+            worker = self.id,
+            requests,
+            successful_responses = self.telemetry.successful_responses.load(Ordering::Relaxed),
+            remote_errors = self.telemetry.remote_errors.load(Ordering::Relaxed),
+            timeouts = self.telemetry.timeouts.load(Ordering::Relaxed),
+            cancellations = self.telemetry.cancellations.load(Ordering::Relaxed),
+            total_request_ms = nanos_millis(request_ns),
+            average_request_micros = average_micros(request_ns, requests),
+            "Extension worker request summary."
+        );
+        tracing::trace!(
+            worker = self.id,
+            frames_sent = self.telemetry.frames_sent.load(Ordering::Relaxed),
+            frames_received = self.telemetry.frames_received.load(Ordering::Relaxed),
+            bytes_sent = self.telemetry.bytes_sent.load(Ordering::Relaxed),
+            bytes_received = self.telemetry.bytes_received.load(Ordering::Relaxed),
+            notifications = self.telemetry.notifications.load(Ordering::Relaxed),
+            "Extension worker protocol summary."
+        );
+        tracing::trace!(
+            worker = self.id,
+            nested_requests,
+            nested_handler_ms = nanos_millis(nested_ns),
+            average_nested_handler_micros = average_micros(nested_ns, nested_requests),
+            failures = self.telemetry.failures.load(Ordering::Relaxed),
+            stderr_bytes = self.telemetry.stderr_bytes.load(Ordering::Relaxed),
+            forced_shutdowns = self.telemetry.forced_shutdowns.load(Ordering::Relaxed),
+            lifetime = ?self.started_at.map(|start| start.elapsed()).unwrap_or_default(),
+            "Extension worker lifecycle summary."
+        );
+    }
+}
+
+struct WorkerRequestTrace<'worker> {
+    inner: &'worker WorkerInner,
+    started_at: Instant,
+}
+
+impl Drop for WorkerRequestTrace<'_> {
+    fn drop(&mut self) {
+        self.inner.telemetry.requests.fetch_add(1, Ordering::Relaxed);
+        self.inner.telemetry.request_ns.fetch_add(duration_nanos(self.started_at.elapsed()), Ordering::Relaxed);
     }
 }
 
@@ -201,6 +299,15 @@ pub(crate) struct Worker {
 
 impl Worker {
     pub fn spawn(id: usize, command: &WorkerCommand, options: &WorkerPoolOptions) -> Result<Arc<Self>, WorkerError> {
+        let trace_enabled = tracing::enabled!(tracing::Level::TRACE);
+        let started_at = trace_enabled.then(Instant::now);
+        tracing::trace!(
+            worker = id,
+            program = ?command.program(),
+            arguments = command.arguments().len(),
+            working_directory = ?command.current_directory(),
+            "Spawning extension worker process."
+        );
         let mut child = command
             .build()
             .spawn()
@@ -209,6 +316,7 @@ impl Worker {
         let stdin = take_pipe(id, "stdin", child.stdin.take(), &mut child)?;
         let stdout = take_pipe(id, "stdout", child.stdout.take(), &mut child)?;
         let stderr = take_pipe(id, "stderr", child.stderr.take(), &mut child)?;
+        let process_id = child.id();
 
         let inner = Arc::new(WorkerInner {
             id,
@@ -220,7 +328,12 @@ impl Worker {
             child: Mutex::new(Some(child)),
             pending: Mutex::new(HashMap::new()),
             stderr: Mutex::new(StderrTail::new(options.stderr_tail_size)),
+            trace_enabled,
+            trace_summary_emitted: AtomicBool::new(false),
+            telemetry: WorkerTelemetry::default(),
+            started_at,
         });
+        tracing::trace!(worker = id, process_id, "Extension worker process spawned.");
 
         let reader_inner = Arc::clone(&inner);
         let reader_thread = std::thread::Builder::new()
@@ -248,13 +361,18 @@ impl Worker {
             }
         };
 
-        Ok(Arc::new(Self {
+        let worker = Arc::new(Self {
             inner,
             request_timeout: options.request_timeout,
             shutdown_timeout: options.shutdown_timeout,
             reader_thread: Mutex::new(Some(reader_thread)),
             stderr_thread: Mutex::new(Some(stderr_thread)),
-        }))
+        });
+        if let Some(start) = started_at {
+            tracing::trace!(worker = id, elapsed = ?start.elapsed(), "Extension worker I/O threads started.");
+        }
+
+        Ok(worker)
     }
 
     pub fn id(&self) -> usize {
@@ -289,6 +407,8 @@ impl Worker {
             return Err(self.inner.disconnected("worker is not running"));
         }
 
+        let _trace =
+            self.inner.trace_enabled.then(|| WorkerRequestTrace { inner: &self.inner, started_at: Instant::now() });
         let request_id = self.next_request_id();
         let (sender, receiver) = mpsc::channel();
         lock(&self.inner.pending).insert(request_id, sender);
@@ -313,6 +433,9 @@ impl Worker {
                 Ok(PendingEvent::Frame(frame)) => match frame.kind {
                     FrameKind::Response => {
                         if frame.flags.contains(FrameFlags::ERROR) {
+                            if self.inner.trace_enabled {
+                                self.inner.telemetry.remote_errors.fetch_add(1, Ordering::Relaxed);
+                            }
                             return Err(WorkerError::Remote {
                                 worker: self.id(),
                                 request: request_id,
@@ -320,9 +443,15 @@ impl Worker {
                             });
                         }
 
+                        if self.inner.trace_enabled {
+                            self.inner.telemetry.successful_responses.fetch_add(1, Ordering::Relaxed);
+                        }
                         return Ok(frame.payload);
                     }
                     FrameKind::Request => {
+                        if self.inner.trace_enabled {
+                            self.inner.telemetry.nested_requests.fetch_add(1, Ordering::Relaxed);
+                        }
                         let Some(handler) = handler.as_deref_mut() else {
                             let response = Frame::error(
                                 frame.id,
@@ -334,16 +463,29 @@ impl Worker {
                             return Err(WorkerError::UnexpectedRequest { worker: self.id(), request: frame.id });
                         };
 
+                        let handler_start = self.inner.trace_enabled.then(Instant::now);
                         let response = match handler.handle(&frame) {
                             Ok(payload) => Frame::response(frame.id, request_id, payload),
                             Err(payload) => Frame::error(frame.id, request_id, payload),
                         };
+                        if let Some(start) = handler_start {
+                            self.inner
+                                .telemetry
+                                .nested_handler_ns
+                                .fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
+                        }
                         self.inner.send(&response)?;
                     }
                     FrameKind::Notification => {
+                        if self.inner.trace_enabled {
+                            self.inner.telemetry.notifications.fetch_add(1, Ordering::Relaxed);
+                        }
                         tracing::trace!(worker = self.id(), request = request_id, "Worker notification received.");
                     }
                     FrameKind::Cancel => {
+                        if self.inner.trace_enabled {
+                            self.inner.telemetry.cancellations.fetch_add(1, Ordering::Relaxed);
+                        }
                         lock(&self.inner.pending).remove(&request_id);
                         return Err(self.inner.disconnected(format!("worker cancelled request {request_id}")));
                     }
@@ -380,6 +522,10 @@ impl Worker {
     }
 
     fn timeout(&self, request_id: u64) {
+        if self.inner.trace_enabled {
+            self.inner.telemetry.timeouts.fetch_add(1, Ordering::Relaxed);
+        }
+        tracing::trace!(worker = self.id(), request = request_id, timeout = ?self.request_timeout, "Extension worker request timed out.");
         lock(&self.inner.pending).remove(&request_id);
         let _result = self.inner.send(&Frame::cancel(request_id));
         self.inner.fail(format!("request {request_id} timed out"));
@@ -411,6 +557,8 @@ impl Worker {
             }
         }
 
+        tracing::trace!(worker = self.id(), previous_state = state, "Beginning extension worker shutdown.");
+
         {
             let mut writer = lock(&self.inner.writer);
             if state == STATE_RUNNING
@@ -428,11 +576,13 @@ impl Worker {
     pub fn finish_shutdown(&self, deadline: Instant) {
         if self.inner.state.load(Ordering::Acquire) == STATE_STOPPED {
             self.join_threads();
+            self.inner.emit_trace_summary();
             return;
         }
 
+        let trace_start = self.inner.trace_enabled.then(Instant::now);
         let mut poll_interval = INITIAL_SHUTDOWN_POLL_INTERVAL;
-        loop {
+        let exited_gracefully = loop {
             let exited = {
                 let mut child = lock(&self.inner.child);
                 match child.as_mut() {
@@ -442,16 +592,20 @@ impl Worker {
             };
             let now = Instant::now();
             if exited || now >= deadline {
-                break;
+                break exited;
             }
 
             std::thread::sleep(poll_interval.min(deadline.saturating_duration_since(now)));
             poll_interval = (poll_interval * 2).min(MAXIMUM_SHUTDOWN_POLL_INTERVAL);
-        }
+        };
 
         let child = lock(&self.inner.child).take();
         if let Some(mut child) = child {
             if child.try_wait().ok().flatten().is_none() {
+                if self.inner.trace_enabled {
+                    self.inner.telemetry.forced_shutdowns.fetch_add(1, Ordering::Relaxed);
+                }
+                tracing::trace!(worker = self.id(), "Killing extension worker after shutdown grace period.");
                 let _result = child.kill();
             }
             let _result = child.wait();
@@ -465,6 +619,15 @@ impl Worker {
         }
 
         self.join_threads();
+        if let Some(start) = trace_start {
+            tracing::trace!(
+                worker = self.id(),
+                graceful = exited_gracefully,
+                elapsed = ?start.elapsed(),
+                "Extension worker shutdown completed."
+            );
+        }
+        self.inner.emit_trace_summary();
     }
 
     #[cfg(test)]
@@ -484,6 +647,10 @@ impl Worker {
             child: Mutex::new(None),
             pending: Mutex::new(HashMap::new()),
             stderr: Mutex::new(StderrTail::new(options.stderr_tail_size)),
+            trace_enabled: tracing::enabled!(tracing::Level::TRACE),
+            trace_summary_emitted: AtomicBool::new(false),
+            telemetry: WorkerTelemetry::default(),
+            started_at: tracing::enabled!(tracing::Level::TRACE).then(Instant::now),
         });
         let reader_inner = Arc::clone(&inner);
         let reader_thread = std::thread::spawn(move || read_worker_stream(&reader_inner, reader));
@@ -499,10 +666,15 @@ impl Worker {
 
     fn join_threads(&self) {
         let reader_thread = lock(&self.reader_thread).take();
+        let stderr_thread = lock(&self.stderr_thread).take();
+        if reader_thread.is_none() && stderr_thread.is_none() {
+            return;
+        }
+
+        tracing::trace!(worker = self.id(), "Joining extension worker I/O threads.");
         if let Some(thread) = reader_thread {
             let _result = thread.join();
         }
-        let stderr_thread = lock(&self.stderr_thread).take();
         if let Some(thread) = stderr_thread {
             let _result = thread.join();
         }
@@ -548,6 +720,7 @@ fn read_worker_stdout(inner: &WorkerInner, stdout: ChildStdout) {
 }
 
 fn read_worker_stream(inner: &WorkerInner, stream: impl Read) {
+    tracing::trace!(worker = inner.id, "Extension worker stdout reader started.");
     let mut reader = BufReader::new(stream);
     loop {
         match Frame::read_from(&mut reader, inner.maximum_payload_size) {
@@ -556,9 +729,11 @@ fn read_worker_stream(inner: &WorkerInner, stream: impl Read) {
                 if inner.state.load(Ordering::Acquire) == STATE_RUNNING {
                     inner.fail("worker closed stdout");
                 }
+                tracing::trace!(worker = inner.id, "Extension worker stdout reader reached EOF.");
                 return;
             }
             Err(error) => {
+                tracing::trace!(worker = inner.id, error = %error, "Extension worker stdout reader failed.");
                 inner.fail(format!("failed to read worker frame: {error}"));
                 return;
             }
@@ -567,17 +742,31 @@ fn read_worker_stream(inner: &WorkerInner, stream: impl Read) {
 }
 
 fn read_worker_stderr(inner: &WorkerInner, stderr: ChildStderr) {
+    tracing::trace!(worker = inner.id, "Extension worker stderr reader started.");
     let mut reader = BufReader::new(stderr);
     let mut buffer = [0u8; 4096];
     loop {
         match reader.read(&mut buffer) {
-            Ok(0) | Err(_) => return,
-            Ok(read) => lock(&inner.stderr).extend(&buffer[..read]),
+            Ok(0) => {
+                tracing::trace!(worker = inner.id, "Extension worker stderr reader reached EOF.");
+                return;
+            }
+            Err(error) => {
+                tracing::trace!(worker = inner.id, error = %error, "Extension worker stderr reader failed.");
+                return;
+            }
+            Ok(read) => {
+                if inner.trace_enabled {
+                    inner.telemetry.stderr_bytes.fetch_add(read as u64, Ordering::Relaxed);
+                }
+                lock(&inner.stderr).extend(&buffer[..read]);
+            }
         }
     }
 }
 
 fn reap_child(inner: &WorkerInner) {
+    tracing::trace!(worker = inner.id, "Reaping failed extension worker process.");
     let child = lock(&inner.child).take();
     if let Some(mut child) = child {
         let _result = child.kill();
@@ -587,6 +776,19 @@ fn reap_child(inner: &WorkerInner) {
 
 fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
+}
+
+fn duration_nanos(duration: Duration) -> u64 {
+    u64::try_from(duration.as_nanos()).unwrap_or(u64::MAX)
+}
+
+#[allow(clippy::cast_precision_loss, clippy::float_arithmetic)]
+fn nanos_millis(nanos: u64) -> f64 {
+    nanos as f64 / 1_000_000.0
+}
+
+fn average_micros(nanos: u64, count: u64) -> u64 {
+    nanos.checked_div(count).unwrap_or(0) / 1_000
 }
 
 #[cfg(test)]
