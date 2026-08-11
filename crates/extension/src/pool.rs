@@ -3,14 +3,21 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::MutexGuard;
 use std::sync::atomic::AtomicBool;
+use std::sync::atomic::AtomicU64;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
 use std::time::Duration;
+use std::time::Instant;
 
 use crate::command::WorkerCommand;
 use crate::error::WorkerError;
 use crate::worker::Worker;
 use crate::worker::WorkerRequestHandler;
+
+const INITIAL_WORKERS: usize = 2;
+const WARMUP_REQUESTS: usize = 8;
+const GROWTH_SAMPLE_MULTIPLIER: usize = 2;
+const GROWTH_REQUEST_NANOS: u64 = 1_000_000;
 
 /// Runtime and safety limits shared by every process in a worker pool.
 #[derive(Debug, Clone)]
@@ -37,20 +44,32 @@ impl Default for WorkerPoolOptions {
 }
 
 struct WorkerSlot {
-    worker: Mutex<Arc<Worker>>,
+    worker: Mutex<Option<Arc<Worker>>>,
     restart: Mutex<()>,
 }
 
-/// A fixed-size pool of persistent, multiplexed extension worker processes.
+#[derive(Debug)]
+struct Bootstrap {
+    request: Vec<u8>,
+    response: Vec<u8>,
+}
+
+/// A fixed or adaptive pool of persistent, multiplexed extension processes.
 ///
 /// Scheduling prefers the live worker with the fewest requests in flight.
-/// Equal loads are distributed round-robin. CPU-bound parallelism comes from
-/// the process count, while each process may cooperatively interleave multiple
-/// requests when its runtime supports that.
+/// An adaptive pool starts small to avoid multiplying language-runtime startup
+/// costs, then grows toward its configured ceiling when completed requests
+/// prove the extension workload is CPU-heavy. Each process may cooperatively
+/// interleave multiple requests when its runtime supports that.
 pub struct WorkerPool {
     command: WorkerCommand,
     options: WorkerPoolOptions,
     workers: Box<[WorkerSlot]>,
+    active_workers: AtomicUsize,
+    growth: Mutex<()>,
+    bootstraps: Mutex<Vec<Bootstrap>>,
+    completed_requests: AtomicUsize,
+    request_nanos: AtomicU64,
     cursor: AtomicUsize,
     shutting_down: AtomicBool,
 }
@@ -61,7 +80,12 @@ impl std::fmt::Debug for WorkerPool {
             .debug_struct("WorkerPool")
             .field("command", &self.command)
             .field("options", &self.options)
-            .field("worker_count", &self.workers.len())
+            .field("worker_count", &self.active_workers.load(Ordering::Relaxed))
+            .field("worker_capacity", &self.workers.len())
+            .field("growth", &self.growth)
+            .field("bootstraps", &self.bootstraps)
+            .field("completed_requests", &self.completed_requests.load(Ordering::Relaxed))
+            .field("request_nanos", &self.request_nanos.load(Ordering::Relaxed))
             .field("cursor", &self.cursor.load(Ordering::Relaxed))
             .field("shutting_down", &self.shutting_down.load(Ordering::Relaxed))
             .finish()
@@ -69,16 +93,39 @@ impl std::fmt::Debug for WorkerPool {
 }
 
 impl WorkerPool {
-    /// Starts `size` identical worker processes.
+    /// Starts a fixed pool of `size` identical worker processes.
     ///
     /// # Errors
     ///
-    /// Returns an error if any worker process or one of its stream reader
-    /// threads cannot be started.
+    /// Returns an error if a worker process or one of its stream reader threads
+    /// cannot be started.
     pub fn spawn(command: WorkerCommand, size: NonZeroUsize, options: WorkerPoolOptions) -> Result<Self, WorkerError> {
+        Self::spawn_with_initial_size(command, size, size.get(), options)
+    }
+
+    /// Creates a pool that starts small and may grow to `size` workers.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if an eager worker process or one of its stream reader
+    /// threads cannot be started.
+    pub fn spawn_adaptive(
+        command: WorkerCommand,
+        size: NonZeroUsize,
+        options: WorkerPoolOptions,
+    ) -> Result<Self, WorkerError> {
+        Self::spawn_with_initial_size(command, size, size.get().min(INITIAL_WORKERS), options)
+    }
+
+    fn spawn_with_initial_size(
+        command: WorkerCommand,
+        size: NonZeroUsize,
+        initial_workers: usize,
+        options: WorkerPoolOptions,
+    ) -> Result<Self, WorkerError> {
         let mut workers = Vec::with_capacity(size.get());
         for id in 0..size.get() {
-            let worker = Worker::spawn(id, &command, &options)?;
+            let worker = if id < initial_workers { Some(Worker::spawn(id, &command, &options)?) } else { None };
             workers.push(WorkerSlot { worker: Mutex::new(worker), restart: Mutex::new(()) });
         }
 
@@ -86,15 +133,20 @@ impl WorkerPool {
             command,
             options,
             workers: workers.into_boxed_slice(),
+            active_workers: AtomicUsize::new(initial_workers),
+            growth: Mutex::new(()),
+            bootstraps: Mutex::new(Vec::new()),
+            completed_requests: AtomicUsize::new(0),
+            request_nanos: AtomicU64::new(0),
             cursor: AtomicUsize::new(0),
             shutting_down: AtomicBool::new(false),
         })
     }
 
-    /// Number of processes managed by this pool.
+    /// Number of processes currently active in this pool.
     #[must_use]
     pub fn len(&self) -> usize {
-        self.workers.len()
+        self.active_workers.load(Ordering::Acquire)
     }
 
     /// A worker pool always contains at least one process.
@@ -110,9 +162,11 @@ impl WorkerPool {
     /// Returns an error when no worker is available, communication fails, the
     /// deadline expires, or the worker returns an error response.
     pub fn request(&self, payload: Vec<u8>) -> Result<Vec<u8>, WorkerError> {
+        let start = Instant::now();
         let (index, reservation) = self.reserve_worker()?;
         let result = reservation.worker().request(payload);
         self.recover_if_needed(index, &reservation, &result)?;
+        self.record_request(start.elapsed());
         result
     }
 
@@ -127,17 +181,20 @@ impl WorkerPool {
     where
         H: WorkerRequestHandler,
     {
+        let start = Instant::now();
         let (index, reservation) = self.reserve_worker()?;
         let result = reservation.worker().request_with_handler(payload, handler);
         self.recover_if_needed(index, &reservation, &result)?;
+        self.record_request(start.elapsed());
         result
     }
 
-    /// Sends the same request to every worker concurrently and returns results
-    /// in worker-index order.
+    /// Sends the same request to every active worker concurrently and returns
+    /// results in worker-index order.
     ///
     /// This is intended for initialization and registration validation, where
-    /// every process in a pool must begin with identical extension state.
+    /// every process in a pool must begin with identical extension state. The
+    /// exchange is recorded and replayed by workers started later.
     ///
     /// # Errors
     ///
@@ -149,7 +206,9 @@ impl WorkerPool {
             return Err(WorkerError::Unavailable);
         }
 
-        let workers = (0..self.workers.len())
+        let _initialization = lock(&self.growth);
+        let active_workers = self.active_workers.load(Ordering::Acquire);
+        let workers = (0..active_workers)
             .map(|index| self.ensure_running(index).map(|worker| (index, worker)))
             .collect::<Result<Vec<_>, _>>()?;
 
@@ -172,7 +231,7 @@ impl WorkerPool {
                 .collect::<Vec<_>>()
         });
 
-        let mut responses = vec![None; self.workers.len()];
+        let mut responses = vec![None; active_workers];
         let mut first_error = None;
         for (index, result) in results {
             let Ok((reservation, result)) = result else {
@@ -196,7 +255,12 @@ impl WorkerPool {
             return Err(error);
         }
 
-        Ok(responses.into_iter().flatten().collect())
+        let responses = responses.into_iter().flatten().collect::<Vec<_>>();
+        if let Some(response) = responses.first() {
+            lock(&self.bootstraps).push(Bootstrap { request: payload.to_vec(), response: response.clone() });
+        }
+
+        Ok(responses)
     }
 
     /// Gracefully stops every worker, then kills workers that exceed the
@@ -206,7 +270,8 @@ impl WorkerPool {
             return;
         }
 
-        let workers: Vec<_> = self.workers.iter().map(|slot| Arc::clone(&lock(&slot.worker))).collect();
+        let workers: Vec<_> =
+            self.workers.iter().filter_map(|slot| lock(&slot.worker).as_ref().map(Arc::clone)).collect();
         for worker in &workers {
             worker.begin_shutdown();
         }
@@ -222,12 +287,13 @@ impl WorkerPool {
             return Err(WorkerError::Unavailable);
         }
 
-        let start = self.cursor.fetch_add(1, Ordering::Relaxed) % self.workers.len();
+        let active_workers = self.active_workers.load(Ordering::Acquire);
+        let start = self.cursor.fetch_add(1, Ordering::Relaxed) % active_workers;
         let mut selected: Option<(usize, Arc<Worker>, usize)> = None;
         let mut last_error = None;
 
-        for offset in 0..self.workers.len() {
-            let index = (start + offset) % self.workers.len();
+        for offset in 0..active_workers {
+            let index = (start + offset) % active_workers;
             let worker = match self.ensure_running(index) {
                 Ok(worker) => worker,
                 Err(error) => {
@@ -241,15 +307,22 @@ impl WorkerPool {
             }
         }
 
-        let Some((index, worker, _)) = selected else {
+        let Some((index, worker, load)) = selected else {
             return Err(last_error.unwrap_or(WorkerError::Unavailable));
         };
+
+        if load > 0
+            && self.should_grow(active_workers)
+            && let Some((index, worker)) = self.try_grow(active_workers)?
+        {
+            return Ok((index, worker.reserve()));
+        }
 
         Ok((index, worker.reserve()))
     }
 
     fn ensure_running(&self, index: usize) -> Result<Arc<Worker>, WorkerError> {
-        let worker = Arc::clone(&lock(&self.workers[index].worker));
+        let worker = lock(&self.workers[index].worker).as_ref().map(Arc::clone).ok_or(WorkerError::Unavailable)?;
         if worker.is_running() {
             return Ok(worker);
         }
@@ -267,8 +340,10 @@ impl WorkerPool {
             return Ok(());
         }
 
-        let failed = Arc::clone(&lock(&self.workers[index].worker));
-        if reservation.matches(&failed) {
+        let failed = lock(&self.workers[index].worker).as_ref().map(Arc::clone);
+        if let Some(failed) = failed
+            && reservation.matches(&failed)
+        {
             self.restart(index, &failed)?;
         }
 
@@ -278,16 +353,81 @@ impl WorkerPool {
     fn restart(&self, index: usize, failed: &Arc<Worker>) -> Result<Arc<Worker>, WorkerError> {
         let _restart = lock(&self.workers[index].restart);
         let mut slot = lock(&self.workers[index].worker);
-        if !Arc::ptr_eq(&slot, failed) && slot.is_running() {
-            return Ok(Arc::clone(&slot));
+        if let Some(current) = slot.as_ref()
+            && !Arc::ptr_eq(current, failed)
+            && current.is_running()
+        {
+            return Ok(Arc::clone(current));
         }
 
         failed.shutdown();
-        let replacement = Worker::spawn(index, &self.command, &self.options)
+        let replacement = self
+            .spawn_initialized(index)
             .map_err(|source| WorkerError::Restart { worker: index, source: Box::new(source) })?;
-        *slot = Arc::clone(&replacement);
+        *slot = Some(Arc::clone(&replacement));
 
         Ok(replacement)
+    }
+
+    fn try_grow(&self, observed_workers: usize) -> Result<Option<(usize, Arc<Worker>)>, WorkerError> {
+        if observed_workers >= self.workers.len() {
+            return Ok(None);
+        }
+
+        let Ok(_growth) = self.growth.try_lock() else {
+            return Ok(None);
+        };
+        let active_workers = self.active_workers.load(Ordering::Acquire);
+        if active_workers != observed_workers
+            || active_workers >= self.workers.len()
+            || !self.should_grow(active_workers)
+        {
+            return Ok(None);
+        }
+
+        let worker = self.spawn_initialized(active_workers)?;
+        *lock(&self.workers[active_workers].worker) = Some(Arc::clone(&worker));
+        self.active_workers.store(active_workers + 1, Ordering::Release);
+        tracing::trace!(workers = active_workers + 1, "Expanded adaptive extension worker pool.");
+
+        Ok(Some((active_workers, worker)))
+    }
+
+    fn spawn_initialized(&self, index: usize) -> Result<Arc<Worker>, WorkerError> {
+        let worker = Worker::spawn(index, &self.command, &self.options)?;
+        for bootstrap in lock(&self.bootstraps).iter() {
+            let response = match worker.request(bootstrap.request.clone()) {
+                Ok(response) => response,
+                Err(error) => {
+                    worker.shutdown();
+                    return Err(error);
+                }
+            };
+            if response != bootstrap.response {
+                worker.shutdown();
+                return Err(WorkerError::InconsistentInitialization { worker: index });
+            }
+        }
+
+        Ok(worker)
+    }
+
+    fn should_grow(&self, active_workers: usize) -> bool {
+        let completed = self.completed_requests.load(Ordering::Relaxed);
+        let samples = completed.saturating_sub(WARMUP_REQUESTS);
+        if samples < active_workers * GROWTH_SAMPLE_MULTIPLIER {
+            return false;
+        }
+
+        self.request_nanos.load(Ordering::Relaxed) / samples as u64 >= GROWTH_REQUEST_NANOS
+    }
+
+    fn record_request(&self, duration: Duration) {
+        let completed = self.completed_requests.fetch_add(1, Ordering::Relaxed);
+        if completed >= WARMUP_REQUESTS {
+            let nanos = u64::try_from(duration.as_nanos()).unwrap_or(u64::MAX);
+            self.request_nanos.fetch_add(nanos, Ordering::Relaxed);
+        }
     }
 }
 
@@ -315,6 +455,92 @@ mod tests {
             .expect_err("missing program should fail");
 
         assert!(matches!(error, WorkerError::Spawn { .. }));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn starts_only_two_workers_eagerly() {
+        let pool = WorkerPool::spawn_adaptive(
+            WorkerCommand::new("cat"),
+            NonZeroUsize::new(4).expect("four is non-zero"),
+            WorkerPoolOptions::default(),
+        )
+        .expect("worker pool should start");
+
+        assert_eq!(pool.len(), 2);
+        let running = pool.workers.iter().map(|slot| lock(&slot.worker).is_some()).collect::<Vec<_>>();
+        assert_eq!(running, [true, true, false, false]);
+        pool.shutdown();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn starts_every_worker_in_a_fixed_pool() {
+        let pool = WorkerPool::spawn(
+            WorkerCommand::new("cat"),
+            NonZeroUsize::new(3).expect("three is non-zero"),
+            WorkerPoolOptions::default(),
+        )
+        .expect("worker pool should start");
+
+        assert_eq!(pool.len(), 3);
+        assert!(pool.workers.iter().all(|slot| lock(&slot.worker).is_some()));
+        pool.shutdown();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn ignores_runtime_warmup_when_deciding_to_expand() {
+        let pool = WorkerPool::spawn_adaptive(
+            WorkerCommand::new("cat"),
+            NonZeroUsize::new(3).expect("three is non-zero"),
+            WorkerPoolOptions::default(),
+        )
+        .expect("worker pool should start");
+
+        for _ in 0..WARMUP_REQUESTS {
+            pool.record_request(Duration::from_millis(10));
+        }
+        assert!(!pool.should_grow(2));
+
+        for _ in 0..(2 * GROWTH_SAMPLE_MULTIPLIER) {
+            pool.record_request(Duration::from_millis(10));
+        }
+        assert!(pool.should_grow(2));
+        pool.shutdown();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn initializes_a_lazily_started_worker() {
+        const WORKER: &str = concat!(
+            "dd bs=1 count=36 of=/dev/null 2>/dev/null; ",
+            "printf '\\115\\101\\107\\117",              // MAGO
+            "\\000\\001\\000\\000",                      // protocol 1.0
+            "\\002\\000\\000\\000",                      // response, no flags or reserved bits
+            "\\000\\000\\000\\000\\000\\000\\000\\001",  // request id 1
+            "\\000\\000\\000\\000\\000\\000\\000\\000",  // no parent
+            "\\000\\000\\000\\005",                      // five payload bytes
+            "\\162\\145\\141\\144\\171'; ",              // ready
+            "dd bs=1 count=32 of=/dev/null 2>/dev/null", // shutdown frame
+        );
+
+        let pool = WorkerPool::spawn_adaptive(
+            WorkerCommand::new("sh").with_arguments(["-c", WORKER]),
+            NonZeroUsize::new(3).expect("three is non-zero"),
+            WorkerPoolOptions::default(),
+        )
+        .expect("worker pool should start");
+
+        assert_eq!(
+            pool.broadcast(b"init").expect("initialization should succeed"),
+            [b"ready".to_vec(), b"ready".to_vec()]
+        );
+        let worker = pool.spawn_initialized(2).expect("lazy worker should replay initialization");
+        assert!(worker.is_running());
+
+        worker.shutdown();
+        pool.shutdown();
     }
 
     #[cfg(unix)]

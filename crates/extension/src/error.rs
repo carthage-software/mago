@@ -121,6 +121,8 @@ pub enum WorkerError {
     UnexpectedRequest { worker: usize, request: u64 },
     /// A worker connection stopped before completing the request.
     Disconnected { worker: usize, message: String },
+    /// A lazily started worker advertised different initialization state.
+    InconsistentInitialization { worker: usize },
     /// No live worker was available.
     Unavailable,
     /// A failed worker could not be replaced.
@@ -169,6 +171,9 @@ impl std::fmt::Display for WorkerError {
             }
             Self::Disconnected { worker, message } => {
                 write!(formatter, "extension worker {worker} disconnected: {message}")
+            }
+            Self::InconsistentInitialization { worker } => {
+                write!(formatter, "extension worker {worker} returned inconsistent initialization state")
             }
             Self::Unavailable => formatter.write_str("no extension worker is available"),
             Self::Restart { worker, source } => {
