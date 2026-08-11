@@ -1,5 +1,7 @@
 //! Plugin registry for managing and dispatching to providers and hooks.
 
+use std::sync::Arc;
+
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
@@ -27,7 +29,9 @@ use mago_word::concat_word;
 
 use crate::artifacts::AnalysisArtifacts;
 use crate::context::block::BlockContext;
+use crate::external::ExternalAnalyzerHandle;
 use crate::invocation::Invocation;
+use crate::plugin::PluginError;
 use crate::plugin::context::HookContext;
 use crate::plugin::context::InvocationInfo;
 use crate::plugin::context::ProviderContext;
@@ -70,6 +74,7 @@ pub struct ProviderResult {
 
 #[derive(Default)]
 pub struct PluginRegistry {
+    external_analyzer: Option<Arc<ExternalAnalyzerHandle>>,
     function_exact: WordMap<Vec<usize>>,
     function_prefix: Vec<(Word, usize)>,
     function_namespace: Vec<(Word, usize)>,
@@ -112,6 +117,7 @@ pub struct PluginRegistry {
 impl std::fmt::Debug for PluginRegistry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("PluginRegistry")
+            .field("external_analyzer", &self.external_analyzer.is_some())
             .field("function_providers", &self.function_providers.len())
             .field("method_providers", &self.method_providers.len())
             .field("program_hooks", &self.program_hooks.len())
@@ -138,6 +144,25 @@ impl std::fmt::Debug for PluginRegistry {
 }
 
 impl PluginRegistry {
+    /// Attaches worker-backed analyzer plugins to this registry.
+    pub fn set_external_analyzer(&mut self, analyzer: Arc<ExternalAnalyzerHandle>) {
+        self.external_analyzer = Some(analyzer);
+    }
+
+    /// Completes concurrent external analyzer initialization before file analysis.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a worker fails to initialize or advertises invalid capabilities.
+    pub fn prepare_external_analyzer(&self) -> PluginResult<()> {
+        self.external_analyzer
+            .as_deref()
+            .map(ExternalAnalyzerHandle::prepare)
+            .transpose()
+            .map_err(|reason| PluginError::InitializationFailed { name: "external analyzer".to_string(), reason })?;
+        Ok(())
+    }
+
     #[inline]
     #[must_use]
     pub fn new() -> Self {
@@ -987,7 +1012,9 @@ impl PluginRegistry {
         indices
     }
 
-    #[must_use]
+    /// # Errors
+    ///
+    /// Returns an error when an external provider fails or returns an invalid response.
     pub fn get_function_like_return_type<'ctx>(
         &self,
         codebase: &'ctx CodebaseMetadata,
@@ -996,30 +1023,29 @@ impl PluginRegistry {
         artifacts: &AnalysisArtifacts,
         function_like: &FunctionLikeIdentifier,
         invocation: &Invocation<'ctx, '_, '_>,
-    ) -> Option<ProviderResult> {
+    ) -> PluginResult<Option<ProviderResult>> {
         match function_like {
-            FunctionLikeIdentifier::Function(name) => Some(self.get_function_return_type(
-                codebase,
-                source_file,
-                block_context,
-                artifacts,
-                name.as_bytes(),
-                invocation,
-            )),
-            FunctionLikeIdentifier::Method(class_name, method_name) => Some(self.get_method_return_type(
-                codebase,
-                source_file,
-                block_context,
-                artifacts,
-                class_name.as_bytes(),
-                method_name.as_bytes(),
-                invocation,
-            )),
-            _ => None,
+            FunctionLikeIdentifier::Function(name) => self
+                .get_function_return_type(codebase, source_file, block_context, artifacts, name.as_bytes(), invocation)
+                .map(Some),
+            FunctionLikeIdentifier::Method(class_name, method_name) => self
+                .get_method_return_type(
+                    codebase,
+                    source_file,
+                    block_context,
+                    artifacts,
+                    class_name.as_bytes(),
+                    method_name.as_bytes(),
+                    invocation,
+                )
+                .map(Some),
+            _ => Ok(None),
         }
     }
 
-    #[must_use]
+    /// # Errors
+    ///
+    /// Returns an error when an external function provider fails or returns an invalid response.
     pub fn get_function_return_type<'ctx>(
         &self,
         codebase: &'ctx CodebaseMetadata,
@@ -1028,7 +1054,7 @@ impl PluginRegistry {
         artifacts: &AnalysisArtifacts,
         function_name: &[u8],
         invocation: &Invocation<'ctx, '_, '_>,
-    ) -> ProviderResult {
+    ) -> PluginResult<ProviderResult> {
         let indices = self.get_function_provider_indices(function_name);
         let mut all_issues = Vec::new();
 
@@ -1038,16 +1064,28 @@ impl PluginRegistry {
 
             if let Some(ty) = self.function_providers[idx].get_return_type(&provider_context, &invocation_info) {
                 all_issues.extend(provider_context.take_issues());
-                return ProviderResult { return_type: Some(ty), issues: all_issues };
+                return Ok(ProviderResult { return_type: Some(ty), issues: all_issues });
             }
 
             all_issues.extend(provider_context.take_issues());
         }
 
-        ProviderResult { return_type: None, issues: all_issues }
+        let return_type = self
+            .external_analyzer
+            .as_deref()
+            .map(|analyzer| {
+                analyzer.get_function_return_type(function_name, invocation, artifacts, source_file, codebase)
+            })
+            .transpose()
+            .map_err(|reason| PluginError::Internal { reason })?
+            .flatten();
+
+        Ok(ProviderResult { return_type, issues: all_issues })
     }
 
-    #[must_use]
+    /// # Errors
+    ///
+    /// Returns an error when an external method provider fails or returns an invalid response.
     pub fn get_method_return_type<'ctx>(
         &self,
         codebase: &'ctx CodebaseMetadata,
@@ -1057,7 +1095,7 @@ impl PluginRegistry {
         class_name: &[u8],
         method_name: &[u8],
         invocation: &Invocation<'ctx, '_, '_>,
-    ) -> ProviderResult {
+    ) -> PluginResult<ProviderResult> {
         let indices = self.get_method_provider_indices(class_name, method_name);
         let mut all_issues = Vec::new();
 
@@ -1069,13 +1107,23 @@ impl PluginRegistry {
                 self.method_providers[idx].get_return_type(&provider_context, class_name, method_name, &invocation_info)
             {
                 all_issues.extend(provider_context.take_issues());
-                return ProviderResult { return_type: Some(ty), issues: all_issues };
+                return Ok(ProviderResult { return_type: Some(ty), issues: all_issues });
             }
 
             all_issues.extend(provider_context.take_issues());
         }
 
-        ProviderResult { return_type: None, issues: all_issues }
+        let return_type = self
+            .external_analyzer
+            .as_deref()
+            .map(|analyzer| {
+                analyzer.get_method_return_type(class_name, method_name, invocation, artifacts, source_file, codebase)
+            })
+            .transpose()
+            .map_err(|reason| PluginError::Internal { reason })?
+            .flatten();
+
+        Ok(ProviderResult { return_type, issues: all_issues })
     }
 
     #[inline]

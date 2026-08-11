@@ -171,7 +171,7 @@ where
                 &invocation,
                 &template_result,
                 &argument_types,
-            ),
+            )?,
             resulting_type.as_ref(),
             context.codebase,
         ));

@@ -239,7 +239,7 @@ where
         &invocation,
         &template_result,
         &WordMap::default(),
-    );
+    )?;
 
     post_invocation_process(
         context,
@@ -419,7 +419,7 @@ where
             &invocation,
             &template_result,
             &WordMap::default(),
-        );
+        )?;
 
         resulting_type = Some(add_optional_union_type(return_type, resulting_type.as_ref(), context.codebase));
     }

@@ -7,6 +7,7 @@ use mago_word::WordMap;
 use crate::artifacts::AnalysisArtifacts;
 use crate::context::Context;
 use crate::context::block::BlockContext;
+use crate::error::AnalysisError;
 use crate::invocation::Invocation;
 use crate::invocation::resolver::resolve_invocation_type;
 
@@ -17,7 +18,7 @@ pub fn fetch_invocation_return_type<'ctx, 'arena, A>(
     invocation: &Invocation<'ctx, '_, 'arena>,
     template_result: &TemplateResult,
     parameters: &WordMap<TUnion>,
-) -> TUnion
+) -> Result<TUnion, AnalysisError>
 where
     A: Arena,
 {
@@ -30,14 +31,14 @@ where
             artifacts,
             identifier,
             invocation,
-        )
+        )?
     {
         for reported_issue in result.issues {
             context.collector.report_with_code(reported_issue.code, reported_issue.issue);
         }
 
         if let Some(ty) = result.return_type {
-            return ty;
+            return Ok(ty);
         }
     }
 
@@ -53,5 +54,5 @@ where
         resulting_type.set_by_reference(true);
     }
 
-    resulting_type
+    Ok(resulting_type)
 }
