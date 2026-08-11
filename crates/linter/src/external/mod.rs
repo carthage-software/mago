@@ -127,21 +127,33 @@ impl<T> ExternalLinter<T> {
     {
         let mut issues = IssueCollection::new();
         for backend in &self.backends {
-            let active_rules: Vec<&str> = backend
-                .registration
-                .rules
-                .iter()
-                .filter(|rule| only.map_or(rule.default_enabled, |codes| codes.iter().any(|code| code == &rule.code)))
-                .map(|rule| rule.code.as_str())
-                .collect();
+            let mut active_rules = Vec::new();
+            let mut target_kinds = [false; u8::MAX as usize + 1];
+            for rule in &backend.registration.rules {
+                if only.map_or(rule.default_enabled, |codes| codes.iter().any(|code| code == &rule.code)) {
+                    active_rules.push(rule.code.as_str());
+                    for target in &rule.targets {
+                        target_kinds[*target as usize] = true;
+                    }
+                }
+            }
+
             if active_rules.is_empty() {
                 continue;
             }
 
-            let payload =
-                protocol::encode_lint_request(self.php_version, file, program, resolved_names, &active_rules)?;
+            let Some(payload) = protocol::encode_lint_request(
+                self.php_version,
+                file,
+                program,
+                resolved_names,
+                &active_rules,
+                &target_kinds,
+            )?
+            else {
+                continue;
+            };
             let response = backend.transport.request(payload)?;
-            let active_rules: HashSet<&str> = active_rules.into_iter().collect();
             issues.extend(protocol::decode_lint_response(&response, file, &active_rules)?);
         }
 
@@ -246,7 +258,7 @@ mod tests {
     }
 
     #[test]
-    fn batches_a_complete_file_snapshot_and_decodes_native_issues() {
+    fn batches_matching_subtrees_and_decodes_native_issues() {
         let source = b"<?php\n\n/** docs */\nuse Vendor\\Package as P;\nP\\run();\n";
         let arena = LocalArena::new();
         let file = File::ephemeral(Cow::Borrowed(b"src/test.php"), Cow::Borrowed(source));
@@ -284,11 +296,70 @@ mod tests {
         assert_eq!(request.file_name, b"src/test.php");
         assert_eq!(request.source, source);
         assert_eq!(request.active_rules, ["acme/no-run"]);
-        assert!(request.nodes.iter().any(|node| node.kind == "Program" && node.parent.is_none()));
-        assert!(request.nodes.iter().any(|node| node.kind == "FunctionCall" && node.parent.is_some()));
+        assert_eq!(request.targets.len(), 1);
+        assert_eq!(request.nodes[request.targets[0] as usize].kind, "FunctionCall");
+        assert!(!request.nodes.iter().any(|node| node.kind == "Program"));
+        assert!(request.nodes.iter().any(|node| node.kind == "FunctionCall" && node.parent.is_none()));
         assert!(request.nodes.iter().any(|node| !node.children.is_empty()));
         assert!(request.names.iter().any(|(_, _, name, imported)| name == b"Vendor\\Package\\run" && *imported));
         assert!(request.trivia.iter().any(|(kind, _, _)| kind == "DocBlockComment"));
+    }
+
+    #[test]
+    fn skips_worker_when_a_file_has_no_matching_nodes() {
+        let source = b"<?php\nconst ANSWER = 42;\n";
+        let arena = LocalArena::new();
+        let file = File::ephemeral(Cow::Borrowed(b"src/test.php"), Cow::Borrowed(source));
+        let program = parse_file(&arena, &file);
+        let resolved_names = NameResolver::new(&arena).resolve(program);
+        let transport = Arc::new(MockTransport {
+            registration: testing::describe_response(
+                "acme/tools",
+                "Acme Tools",
+                "1.0.0",
+                &[("acme/no-run", "No run", "Disallows this call.", Level::Warning, true, &[NodeKind::FunctionCall])],
+            ),
+            response: testing::lint_response(&[]),
+            request: Mutex::new(None),
+            workers: 1,
+        });
+        let external = ExternalLinter::initialize_transports([Arc::clone(&transport)], PHPVersion::PHP85)
+            .expect("registration should succeed");
+
+        let issues = external.lint(&file, program, &resolved_names, None).expect("external lint should succeed");
+
+        assert!(issues.is_empty());
+        assert!(transport.request.lock().unwrap().is_none());
+    }
+
+    #[test]
+    fn deduplicates_nested_matching_subtrees() {
+        let source = b"<?php\nouter(inner());\n";
+        let arena = LocalArena::new();
+        let file = File::ephemeral(Cow::Borrowed(b"src/test.php"), Cow::Borrowed(source));
+        let program = parse_file(&arena, &file);
+        let resolved_names = NameResolver::new(&arena).resolve(program);
+        let transport = Arc::new(MockTransport {
+            registration: testing::describe_response(
+                "acme/tools",
+                "Acme Tools",
+                "1.0.0",
+                &[("acme/no-call", "No calls", "Disallows calls.", Level::Warning, true, &[NodeKind::FunctionCall])],
+            ),
+            response: testing::lint_response(&[]),
+            request: Mutex::new(None),
+            workers: 1,
+        });
+        let external = ExternalLinter::initialize_transports([Arc::clone(&transport)], PHPVersion::PHP85)
+            .expect("registration should succeed");
+
+        external.lint(&file, program, &resolved_names, None).expect("external lint should succeed");
+
+        let request = transport.request.lock().unwrap();
+        let request = request.as_ref().expect("one request should be captured");
+        assert_eq!(request.targets.len(), 2);
+        assert_eq!(request.nodes.iter().filter(|node| node.kind == "FunctionCall").count(), 2);
+        assert_ne!(request.targets[0], request.targets[1]);
     }
 
     #[test]
