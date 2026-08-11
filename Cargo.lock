@@ -1486,6 +1486,7 @@ dependencies = [
  "mago-codex",
  "mago-collector",
  "mago-database",
+ "mago-extension",
  "mago-names",
  "mago-php-version",
  "mago-phpdoc-syntax",

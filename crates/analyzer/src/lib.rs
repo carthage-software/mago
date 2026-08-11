@@ -30,6 +30,7 @@ pub mod analysis_result;
 pub mod artifacts;
 pub mod code;
 pub mod error;
+pub mod external;
 pub mod plugin;
 pub mod settings;
 #[cfg(not(target_arch = "wasm32"))]

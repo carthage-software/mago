@@ -109,6 +109,13 @@ impl TMixed {
         self.is_non_null
     }
 
+    /// Checks whether this mixed type carries the internal empty-value constraint.
+    #[inline]
+    #[must_use]
+    pub const fn is_empty(&self) -> bool {
+        self.is_empty
+    }
+
     /// Returns the known truthiness constraint for this `mixed` type.
     #[inline]
     #[must_use]
