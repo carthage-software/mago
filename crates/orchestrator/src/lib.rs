@@ -40,6 +40,8 @@ use std::sync::OnceLock;
 
 use foldhash::HashSet;
 use mago_allocator::LocalArena;
+use mago_analyzer::external::ExternalAnalyzer;
+use mago_analyzer::external::ExternalAnalyzerHandle;
 use mago_analyzer::plugin::PluginRegistry;
 use mago_analyzer::plugin::create_registry_with_plugins;
 use mago_codex::metadata::CodebaseMetadata;
@@ -117,6 +119,20 @@ impl<'cfg> Orchestrator<'cfg> {
                 self.config.disable_default_analyzer_plugins,
             ))
         }))
+    }
+
+    /// Adds worker-backed analyzer plugins before an analysis service is created.
+    pub fn set_external_analyzer(&self, analyzer: ExternalAnalyzer) {
+        self.set_external_analyzer_handle(Arc::new(ExternalAnalyzerHandle::ready(analyzer)));
+    }
+
+    /// Adds an analyzer that is initializing concurrently with the codebase pipeline.
+    pub fn set_external_analyzer_handle(&self, analyzer: Arc<ExternalAnalyzerHandle>) {
+        let mut registry =
+            create_registry_with_plugins(&self.config.analyzer_plugins, self.config.disable_default_analyzer_plugins);
+        registry.set_external_analyzer(analyzer);
+        let result = self.plugin_registry.set(Arc::new(registry));
+        debug_assert!(result.is_ok(), "analyzer plugin registry was initialized before external plugins were attached");
     }
 
     /// Adds additional exclusion patterns to the orchestrator's configuration.

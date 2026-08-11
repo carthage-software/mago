@@ -11,6 +11,7 @@ use mago_allocator::LocalArena;
 
 use mago_analyzer::Analyzer;
 use mago_analyzer::analysis_result::AnalysisResult;
+use mago_analyzer::error::AnalysisError;
 use mago_analyzer::plugin::PluginRegistry;
 use mago_analyzer::settings::Settings;
 #[cfg(not(target_arch = "wasm32"))]
@@ -166,6 +167,8 @@ impl AnalysisService {
         let telemetry_for_closure = Arc::clone(&telemetry);
 
         let result = pipeline.run(move |(settings, parser_settings), arena, source_file, codebase| {
+            plugin_registry.prepare_external_analyzer().map_err(AnalysisError::from)?;
+
             #[cfg(not(target_arch = "wasm32"))]
             let per_file_start = trace_enabled.then(Instant::now);
             let mut analysis_result = AnalysisResult::new(SymbolReferences::new());
