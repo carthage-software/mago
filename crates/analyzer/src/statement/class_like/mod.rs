@@ -38,6 +38,7 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
+use mago_syntax::comments::docblock::PrecedingDocblocks;
 use mago_syntax::cst::Class;
 use mago_syntax::cst::ClassLikeMember;
 use mago_syntax::cst::Enum;
@@ -1008,6 +1009,7 @@ where
 
     check_unused_template_parameters(context, class_like_metadata);
     check_class_like_properties(context, class_like_metadata);
+    check_docblock_declared_members(context, class_like_metadata, declaration_span);
 
     let mut scope = ScopeContext::new();
     scope.set_class_like(Some(class_like_metadata));
@@ -3009,6 +3011,60 @@ fn report_signature_compatibility_issue<'ctx, A>(
                     "Consider renaming the parameter to `{parent_param_name}` to match the parent method."
                 )),
             );
+        }
+    }
+}
+
+/// Reports undefined type references in the `@method`, `@property` and `@mixin`
+/// tags of a class-like docblock.
+///
+/// The members these tags declare have no AST of their own, so they are never
+/// visited by the analyzers that perform this check for real methods and
+/// properties.
+fn check_docblock_declared_members<A>(
+    context: &mut Context<'_, '_, A>,
+    class_like_metadata: &ClassLikeMetadata,
+    declaration_span: Span,
+) where
+    A: Arena,
+{
+    for pseudo_method_name in &class_like_metadata.pseudo_methods {
+        let Some(metadata) = context.codebase.function_likes.get(&(class_like_metadata.name, *pseudo_method_name))
+        else {
+            continue;
+        };
+
+        if let Some(return_type) = &metadata.return_type_metadata {
+            report_undefined_type_references(context, return_type);
+        }
+
+        for parameter in &metadata.parameters {
+            if let Some(parameter_type) = &parameter.type_declaration_metadata {
+                report_undefined_type_references(context, parameter_type);
+            }
+        }
+    }
+
+    for (property_name, property_metadata) in &class_like_metadata.magic_properties {
+        if class_like_metadata.magic_property_ids.get(property_name) != Some(&class_like_metadata.name) {
+            continue;
+        }
+
+        for type_metadata in
+            [&property_metadata.type_metadata, &property_metadata.write_type_metadata].into_iter().flatten()
+        {
+            report_undefined_type_references(context, type_metadata);
+        }
+    }
+
+    // Unlike the tags above, mixins are merged into every subclass, so report only
+    // the ones coming from this class-like's own docblock.
+    let docblocks: Vec<Span> =
+        PrecedingDocblocks::new(context.comments, declaration_span.start.offset).map(|trivia| trivia.span).collect();
+
+    for mixin in &class_like_metadata.mixins {
+        if docblocks.iter().any(|docblock| docblock.contains(&mixin.span)) {
+            report_undefined_type_references(context, mixin);
         }
     }
 }
