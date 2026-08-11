@@ -14,6 +14,10 @@ regen-analyzer-issue-codes:
     php scripts/regen-analyzer-issue-codes.php >> crates/analyzer/src/code.rs
     rustfmt crates/analyzer/src/code.rs
 
+# Regenerate the PHP SDK's stable syntax node names.
+regen-sdk-node-kinds:
+    php scripts/regen-sdk-node-kinds.php
+
 # Builds the library in release mode.
 build:
     cargo build --release

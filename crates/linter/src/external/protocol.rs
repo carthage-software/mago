@@ -24,6 +24,7 @@ use mago_span::Span;
 use mago_syntax::cst::Node;
 use mago_syntax::cst::NodeKind;
 use mago_syntax::cst::Program;
+use strum::IntoEnumIterator;
 
 use super::ExternalLintError;
 use super::ExternalRule;
@@ -38,6 +39,7 @@ const LINT_FILE_REQUEST: u16 = 2;
 const DESCRIBE_RESPONSE: u16 = 0x8001;
 const LINT_FILE_RESPONSE: u16 = 0x8002;
 const NO_PARENT: u32 = u32::MAX;
+const MAXIMUM_EXTENSIONS: usize = 0x4000;
 const MAXIMUM_EXTENSIONS_RULES: usize = 0x4000;
 const MAXIMUM_TARGETS_PER_RULE: usize = 512;
 const MAXIMUM_ISSUES_PER_FILE: usize = 1_000_000;
@@ -46,9 +48,7 @@ const MAXIMUM_NOTES_PER_ISSUE: usize = 0x0001_0000;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub(super) struct Registration {
-    pub identifier: String,
-    pub name: String,
-    pub version: String,
+    pub extensions: Vec<super::ExternalExtension>,
     pub rules: Vec<ExternalRule>,
 }
 
@@ -58,7 +58,9 @@ struct SnapshotNode {
     start: u32,
     end: u32,
     parent: Option<u32>,
-    children: Vec<u32>,
+    first_child: Option<u32>,
+    next_sibling: Option<u32>,
+    last_child: Option<u32>,
 }
 
 #[derive(Debug)]
@@ -83,12 +85,14 @@ impl<'source> FileSnapshot<'source> {
         let mut nodes = Vec::new();
         let mut targets = Vec::new();
         let mut target_ranges = Vec::new();
-        let mut stack = vec![Node::Program(program)];
+        let mut stack = Vec::with_capacity(64);
+        let mut subtree_stack = Vec::with_capacity(64);
+        stack.push(Node::Program(program));
         while let Some(node) = stack.pop() {
             if target_kinds[node.kind() as usize] {
                 let span = node.span();
                 target_ranges.push((span.start.offset, span.end.offset));
-                Self::append_subtree(node, target_kinds, &mut nodes, &mut targets)?;
+                Self::append_subtree(node, target_kinds, &mut nodes, &mut targets, &mut subtree_stack)?;
                 continue;
             }
 
@@ -101,18 +105,16 @@ impl<'source> FileSnapshot<'source> {
             return Ok(None);
         }
 
-        let mut names: Vec<_> = resolved_names.iter().collect();
+        let mut names: Vec<_> = resolved_names
+            .iter()
+            .filter(|(start, end, _, _)| {
+                let range_index = target_ranges.partition_point(|(_, range_end)| range_end <= start);
+                target_ranges
+                    .get(range_index)
+                    .is_some_and(|(range_start, range_end)| range_start <= start && end <= range_end)
+            })
+            .collect();
         names.sort_unstable_by_key(|(start, end, _, _)| (*start, *end));
-        let mut range_index = 0;
-        names.retain(|(start, end, _, _)| {
-            while range_index < target_ranges.len() && target_ranges[range_index].1 <= *start {
-                range_index += 1;
-            }
-
-            target_ranges
-                .get(range_index)
-                .is_some_and(|(range_start, range_end)| range_start <= start && end <= range_end)
-        });
 
         let trivia = program
             .trivia
@@ -134,13 +136,14 @@ impl<'source> FileSnapshot<'source> {
         Ok(Some(Self { nodes, targets, names, trivia }))
     }
 
-    fn append_subtree(
-        root: Node<'_, '_>,
+    fn append_subtree<'ast, 'arena>(
+        root: Node<'ast, 'arena>,
         target_kinds: &[bool; u8::MAX as usize + 1],
         nodes: &mut Vec<SnapshotNode>,
         targets: &mut Vec<u32>,
+        stack: &mut Vec<(Node<'ast, 'arena>, Option<u32>)>,
     ) -> Result<(), ExternalLintError> {
-        let mut stack = vec![(root, None)];
+        stack.push((root, None));
         while let Some((node, parent)) = stack.pop() {
             let identifier =
                 u32::try_from(nodes.len()).map_err(|_| protocol("syntax tree contains more than u32::MAX nodes"))?;
@@ -150,11 +153,18 @@ impl<'source> FileSnapshot<'source> {
                 start: span.start.offset,
                 end: span.end.offset,
                 parent,
-                children: Vec::new(),
+                first_child: None,
+                next_sibling: None,
+                last_child: None,
             });
 
             if let Some(parent) = parent {
-                nodes[parent as usize].children.push(identifier);
+                let previous_sibling = nodes[parent as usize].last_child.replace(identifier);
+                if let Some(previous_sibling) = previous_sibling {
+                    nodes[previous_sibling as usize].next_sibling = Some(identifier);
+                } else {
+                    nodes[parent as usize].first_child = Some(identifier);
+                }
             }
 
             if target_kinds[node.kind() as usize] {
@@ -173,113 +183,145 @@ impl<'source> FileSnapshot<'source> {
 pub(super) fn encode_describe_request(php_version: PHPVersion) -> Vec<u8> {
     let mut writer = message_writer(DESCRIBE_REQUEST);
     writer.write_u32(php_version.to_version_id());
+    writer.write_u32(NodeKind::iter().count() as u32);
+    for kind in NodeKind::iter() {
+        let name = kind.to_string();
+        writer.write_u32(name.len() as u32);
+        writer.write_raw(name.as_bytes());
+    }
+
     writer.finish()
 }
 
 pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, ExternalLintError> {
     let mut reader = message_reader(payload, DESCRIBE_RESPONSE)?;
-    let identifier = reader.read_string("extension identifier")?;
-    let name = reader.read_string("extension name")?;
-    let version = reader.read_string("extension version")?;
-    if identifier.is_empty() {
-        return Err(protocol("extension identifier cannot be empty"));
+    let extension_count = reader.read_count("extensions", MAXIMUM_EXTENSIONS)?;
+    if extension_count == 0 {
+        return Err(protocol("worker registration contains no extensions"));
     }
 
-    if name.is_empty() {
-        return Err(protocol("extension name cannot be empty"));
-    }
-
-    let rule_count = reader.read_count("rules", MAXIMUM_EXTENSIONS_RULES)?;
-    let mut rules = Vec::with_capacity(rule_count);
-    let mut codes = HashSet::with_capacity(rule_count);
-    for _ in 0..rule_count {
-        let code = reader.read_string("rule code")?;
-        let name = reader.read_string("rule name")?;
-        let description = reader.read_string("rule description")?;
-        let default_level = read_level(&mut reader)?;
-        let default_enabled = reader.read_bool("rule default-enabled flag")?;
-        let target_count = reader.read_count("rule targets", MAXIMUM_TARGETS_PER_RULE)?;
-        let mut targets = Vec::with_capacity(target_count);
-        let mut unique_targets = HashSet::with_capacity(target_count);
-        for _ in 0..target_count {
-            let target_name = reader.read_str("node kind")?;
-            let target = target_name
-                .parse::<NodeKind>()
-                .map_err(|_| protocol(format!("rule `{code}` targets unknown node kind `{target_name}`")))?;
-            if !unique_targets.insert(target) {
-                return Err(protocol(format!("rule `{code}` lists node kind `{target_name}` more than once")));
-            }
-
-            targets.push(target);
-        }
-
-        if code.is_empty() {
-            return Err(protocol("rule code cannot be empty"));
+    let mut extensions = Vec::with_capacity(extension_count);
+    let mut rules = Vec::new();
+    let mut identifiers = HashSet::with_capacity(extension_count);
+    let mut codes = HashSet::new();
+    for _ in 0..extension_count {
+        let identifier = reader.read_string("extension identifier")?;
+        let name = reader.read_string("extension name")?;
+        let version = reader.read_string("extension version")?;
+        if identifier.is_empty() {
+            return Err(protocol("extension identifier cannot be empty"));
         }
 
         if name.is_empty() {
-            return Err(protocol(format!("rule `{code}` has an empty name")));
+            return Err(protocol("extension name cannot be empty"));
         }
 
-        if targets.is_empty() {
-            return Err(protocol(format!("rule `{code}` has no target node kinds")));
+        if version.is_empty() {
+            return Err(protocol(format!("extension `{identifier}` has an empty version")));
         }
 
-        if !codes.insert(code.clone()) {
-            return Err(protocol(format!("extension `{identifier}` advertises rule `{code}` more than once")));
+        if !identifiers.insert(identifier.clone()) {
+            return Err(protocol(format!("worker advertises extension `{identifier}` more than once")));
         }
 
-        rules.push(ExternalRule {
-            extension: identifier.clone(),
-            code,
-            name,
-            description,
-            default_level,
-            default_enabled,
-            targets,
-        });
+        let rule_count = reader.read_count("rules", MAXIMUM_EXTENSIONS_RULES)?;
+        let mut extension_rules = Vec::with_capacity(rule_count);
+        for _ in 0..rule_count {
+            let code = reader.read_string("rule code")?;
+            let rule_name = reader.read_string("rule name")?;
+            let description = reader.read_string("rule description")?;
+            let default_level = read_level(&mut reader)?;
+            let default_enabled = reader.read_bool("rule default-enabled flag")?;
+            let target_count = reader.read_count("rule targets", MAXIMUM_TARGETS_PER_RULE)?;
+            let mut targets = Vec::with_capacity(target_count);
+            let mut unique_targets = HashSet::with_capacity(target_count);
+            for _ in 0..target_count {
+                let target_name = reader.read_str("node kind")?;
+                let target = target_name
+                    .parse::<NodeKind>()
+                    .map_err(|_| protocol(format!("rule `{code}` targets unknown node kind `{target_name}`")))?;
+                if !unique_targets.insert(target) {
+                    return Err(protocol(format!("rule `{code}` lists node kind `{target_name}` more than once")));
+                }
+
+                targets.push(target);
+            }
+
+            if code.is_empty() {
+                return Err(protocol("rule code cannot be empty"));
+            }
+
+            if rule_name.is_empty() {
+                return Err(protocol(format!("rule `{code}` has an empty name")));
+            }
+
+            if description.is_empty() {
+                return Err(protocol(format!("rule `{code}` has an empty description")));
+            }
+
+            if targets.is_empty() {
+                return Err(protocol(format!("rule `{code}` has no target node kinds")));
+            }
+
+            if !codes.insert(code.clone()) {
+                return Err(protocol(format!("worker advertises linter rule `{code}` more than once")));
+            }
+
+            extension_rules.push(ExternalRule {
+                extension: identifier.clone(),
+                code,
+                name: rule_name,
+                description,
+                default_level,
+                default_enabled,
+                targets,
+            });
+        }
+
+        rules.extend(extension_rules.iter().cloned());
+        extensions.push(super::ExternalExtension { identifier, name, version, rules: extension_rules });
     }
 
     reader.finish()?;
-    Ok(Registration { identifier, name, version, rules })
+    Ok(Registration { extensions, rules })
 }
 
 pub(super) fn encode_lint_request<'arena>(
-    php_version: PHPVersion,
     file: &File,
     program: &Program<'arena>,
     resolved_names: &ResolvedNames<'arena>,
-    active_rules: &[&str],
+    active_rules: &[u16],
     target_kinds: &[bool; u8::MAX as usize + 1],
 ) -> Result<Option<Vec<u8>>, ExternalLintError> {
     let Some(snapshot) = FileSnapshot::build(file, program, resolved_names, target_kinds)? else {
         return Ok(None);
     };
-    let mut writer = message_writer(LINT_FILE_REQUEST);
-    writer.write_u32(php_version.to_version_id());
+    let names_length = snapshot.names.iter().map(|(_, _, name, _)| name.len()).sum::<usize>();
+    let payload_capacity = HEADER_LENGTH
+        + 4
+        + file.name.len()
+        + 4
+        + file.contents.len()
+        + 2
+        + (active_rules.len() * 2)
+        + 4
+        + (snapshot.targets.len() * 4)
+        + 4
+        + (snapshot.nodes.len() * 21)
+        + 4
+        + (snapshot.names.len() * 17)
+        + 4
+        + names_length
+        + 4
+        + (snapshot.trivia.len() * 9);
+    let mut writer = message_writer_with_capacity(LINT_FILE_REQUEST, payload_capacity);
     writer.write_bytes(file.name.as_ref())?;
     writer.write_bytes(file.contents.as_ref())?;
-    writer.write_length(active_rules.len())?;
-    for code in active_rules {
-        writer.write_string(code)?;
-    }
-
-    // Node kinds are stable names on the wire, but each name is written only
-    // once. Nodes refer to this per-message dictionary with a compact u16.
-    let mut kind_indices = [u16::MAX; u8::MAX as usize + 1];
-    let mut kinds = Vec::new();
-    for node in &snapshot.nodes {
-        let slot = &mut kind_indices[node.kind as usize];
-        if *slot == u16::MAX {
-            *slot =
-                u16::try_from(kinds.len()).map_err(|_| protocol("syntax tree uses more than u16::MAX node kinds"))?;
-            kinds.push(node.kind);
-        }
-    }
-
-    writer.write_length(kinds.len())?;
-    for kind in kinds {
-        writer.write_string(&kind.to_string())?;
+    writer.write_u16(
+        u16::try_from(active_rules.len()).map_err(|_| protocol("more than u16::MAX linter rules are active"))?,
+    );
+    for index in active_rules {
+        writer.write_u16(*index);
     }
 
     writer.write_length(snapshot.targets.len())?;
@@ -287,29 +329,54 @@ pub(super) fn encode_lint_request<'arena>(
         writer.write_u32(target);
     }
 
+    // Nodes use fixed-width records so workers can retain the table as packed
+    // bytes and materialize public node objects only when a rule visits them.
+    // Children form an intrusive sibling list, avoiding both a second edge
+    // table on the wire and one allocation per node while building snapshots.
     writer.write_length(snapshot.nodes.len())?;
     for node in &snapshot.nodes {
-        writer.write_u16(kind_indices[node.kind as usize]);
+        writer.write_u8(node.kind as u8);
         writer.write_u32(node.start);
         writer.write_u32(node.end);
         writer.write_u32(node.parent.unwrap_or(NO_PARENT));
-        writer.write_length(node.children.len())?;
-        for child in &node.children {
-            writer.write_u32(*child);
-        }
+        writer.write_u32(node.first_child.unwrap_or(NO_PARENT));
+        writer.write_u32(node.next_sibling.unwrap_or(NO_PARENT));
     }
 
+    // Starts are a packed column so PHP builds its lookup with one bulk unpack.
+    // The remaining fixed-width metadata points into one trailing byte buffer.
     writer.write_length(snapshot.names.len())?;
-    for (start, end, name, imported) in snapshot.names {
-        writer.write_u32(start);
-        writer.write_u32(end);
-        writer.write_bytes(name)?;
-        writer.write_bool(imported);
+    for (start, _, _, _) in &snapshot.names {
+        writer.write_u32(*start);
     }
 
+    let mut name_offset = 0usize;
+    for (_, end, name, imported) in &snapshot.names {
+        writer.write_u32(*end);
+        writer.write_length(name_offset)?;
+        writer.write_length(name.len())?;
+        writer.write_bool(*imported);
+        name_offset = name_offset
+            .checked_add(name.len())
+            .ok_or_else(|| protocol("resolved names exceed the addressable protocol payload"))?;
+    }
+
+    writer.write_length(names_length)?;
+    for (_, _, name, _) in snapshot.names {
+        writer.write_raw(name);
+    }
+
+    // Trivia kinds are a compact stable discriminant instead of repeated
+    // strings. Objects are constructed lazily if an extension requests them.
     writer.write_length(snapshot.trivia.len())?;
     for (kind, start, end) in snapshot.trivia {
-        writer.write_string(kind)?;
+        writer.write_u8(match kind {
+            "SingleLineComment" => 1,
+            "MultiLineComment" => 2,
+            "HashComment" => 3,
+            "DocBlockComment" => 4,
+            _ => unreachable!("file snapshots contain only known comment trivia"),
+        });
         writer.write_u32(start);
         writer.write_u32(end);
     }
@@ -320,19 +387,24 @@ pub(super) fn encode_lint_request<'arena>(
 pub(super) fn decode_lint_response(
     payload: &[u8],
     file: &File,
-    active_rules: &[&str],
+    rules: &[ExternalRule],
+    active_rules: &[u16],
 ) -> Result<IssueCollection, ExternalLintError> {
     let mut reader = message_reader(payload, LINT_FILE_RESPONSE)?;
     let issue_count = reader.read_count("issues", MAXIMUM_ISSUES_PER_FILE)?;
     let mut issues = IssueCollection::new();
     issues.reserve(issue_count);
     for _ in 0..issue_count {
-        let code = reader.read_string("issue code")?;
-        if !active_rules.contains(&code.as_str()) {
-            return Err(protocol(format!("worker reported inactive or unregistered rule `{code}`")));
+        let rule_index = reader.read_u16("issue rule index")?;
+        if !active_rules.contains(&rule_index) {
+            return Err(protocol(format!("worker reported inactive rule index `{rule_index}`")));
         }
 
-        let level = read_level(&mut reader)?;
+        let rule = rules
+            .get(rule_index as usize)
+            .ok_or_else(|| protocol(format!("worker reported unregistered rule index `{rule_index}`")))?;
+        let code = &rule.code;
+        let level = rule.default_level;
         let message = reader.read_string("issue message")?;
         if message.is_empty() {
             return Err(protocol(format!("rule `{code}` reported an empty issue message")));
@@ -373,7 +445,7 @@ pub(super) fn decode_lint_response(
             return Err(protocol(format!("rule `{code}` reported an issue without a primary annotation")));
         }
 
-        let mut issue = Issue::new(level, message).with_code(code).with_annotations(annotations);
+        let mut issue = Issue::new(level, message).with_code(code.clone()).with_annotations(annotations);
         issue.notes = notes;
         issue.help = help;
         issue.link = link;
@@ -389,7 +461,11 @@ fn protocol(message: impl Into<String>) -> ExternalLintError {
 }
 
 fn message_writer(kind: u16) -> PayloadWriter {
-    let mut writer = PayloadWriter::with_capacity(HEADER_LENGTH);
+    message_writer_with_capacity(kind, HEADER_LENGTH)
+}
+
+fn message_writer_with_capacity(kind: u16, capacity: usize) -> PayloadWriter {
+    let mut writer = PayloadWriter::with_capacity(capacity);
     writer.write_raw(&LINTER_PROTOCOL_MAGIC);
     writer.write_u16(LINTER_PROTOCOL_MAJOR);
     writer.write_u16(LINTER_PROTOCOL_MINOR);
@@ -459,10 +535,9 @@ pub(super) mod testing {
 
     #[derive(Debug, PartialEq, Eq)]
     pub struct DecodedRequest {
-        pub php_version: u32,
         pub file_name: Vec<u8>,
         pub source: Vec<u8>,
-        pub active_rules: Vec<String>,
+        pub active_rules: Vec<u16>,
         pub targets: Vec<u32>,
         pub nodes: Vec<DecodedNode>,
         pub names: Vec<(u32, u32, Vec<u8>, bool)>,
@@ -470,32 +545,38 @@ pub(super) mod testing {
     }
 
     pub fn describe_response(identifier: &str, name: &str, version: &str, rules: &[RuleDescription<'_>]) -> Vec<u8> {
+        describe_extensions_response(&[(identifier, name, version, rules)])
+    }
+
+    pub fn describe_extensions_response(extensions: &[(&str, &str, &str, &[RuleDescription<'_>])]) -> Vec<u8> {
         let mut writer = message_writer(DESCRIBE_RESPONSE);
-        writer.write_string(identifier).unwrap();
-        writer.write_string(name).unwrap();
-        writer.write_string(version).unwrap();
-        writer.write_length(rules.len()).unwrap();
-        for (code, name, description, level, enabled, targets) in rules {
-            writer.write_string(code).unwrap();
-            writer.write_string(name).unwrap();
-            writer.write_string(description).unwrap();
-            writer.write_u8(level_value(*level));
-            writer.write_bool(*enabled);
-            writer.write_length(targets.len()).unwrap();
-            for target in *targets {
-                writer.write_string(&target.to_string()).unwrap();
+        writer.write_length(extensions.len()).unwrap();
+        for (identifier, extension_name, version, rules) in extensions {
+            writer.write_string(identifier).unwrap();
+            writer.write_string(extension_name).unwrap();
+            writer.write_string(version).unwrap();
+            writer.write_length(rules.len()).unwrap();
+            for (code, rule_name, description, level, enabled, targets) in *rules {
+                writer.write_string(code).unwrap();
+                writer.write_string(rule_name).unwrap();
+                writer.write_string(description).unwrap();
+                writer.write_u8(level_value(*level));
+                writer.write_bool(*enabled);
+                writer.write_length(targets.len()).unwrap();
+                for target in *targets {
+                    writer.write_string(&target.to_string()).unwrap();
+                }
             }
         }
 
         writer.finish()
     }
 
-    pub fn lint_response(issues: &[Issue]) -> Vec<u8> {
+    pub fn lint_response(issues: &[(u16, Issue)]) -> Vec<u8> {
         let mut writer = message_writer(LINT_FILE_RESPONSE);
         writer.write_length(issues.len()).unwrap();
-        for issue in issues {
-            writer.write_string(issue.code.as_deref().unwrap()).unwrap();
-            writer.write_u8(level_value(issue.level));
+        for (rule_index, issue) in issues {
+            writer.write_u16(*rule_index);
             writer.write_string(&issue.message).unwrap();
             writer.write_length(issue.notes.len()).unwrap();
             for note in &issue.notes {
@@ -521,20 +602,15 @@ pub(super) mod testing {
 
     pub fn decode_lint_request(payload: &[u8]) -> Result<DecodedRequest, ExternalLintError> {
         let mut reader = message_reader(payload, LINT_FILE_REQUEST)?;
-        let php_version = reader.read_u32("PHP version")?;
         let file_name = reader.read_bytes("file name")?.to_vec();
         let source = reader.read_bytes("source")?.to_vec();
-        let active_count = reader.read_u32("active rule count")? as usize;
+        let active_count = reader.read_u16("active rule count")? as usize;
         let mut active_rules = Vec::with_capacity(active_count);
         for _ in 0..active_count {
-            active_rules.push(reader.read_string("active rule")?);
+            active_rules.push(reader.read_u16("active rule index")?);
         }
 
-        let kind_count = reader.read_u32("node kind count")? as usize;
-        let mut kinds = Vec::with_capacity(kind_count);
-        for _ in 0..kind_count {
-            kinds.push(reader.read_string("node kind")?);
-        }
+        let kinds = NodeKind::iter().map(|kind| kind.to_string()).collect::<Vec<_>>();
 
         let target_count = reader.read_u32("target node count")? as usize;
         let mut targets = Vec::with_capacity(target_count);
@@ -543,9 +619,9 @@ pub(super) mod testing {
         }
 
         let node_count = reader.read_u32("node count")? as usize;
-        let mut nodes = Vec::with_capacity(node_count);
+        let mut raw_nodes = Vec::with_capacity(node_count);
         for _ in 0..node_count {
-            let kind_index = reader.read_u16("node kind index")? as usize;
+            let kind_index = reader.read_u8("node kind index")? as usize;
             let kind =
                 kinds.get(kind_index).ok_or_else(|| protocol(format!("invalid node kind index {kind_index}")))?.clone();
             let start = reader.read_u32("node start")?;
@@ -554,38 +630,71 @@ pub(super) mod testing {
                 NO_PARENT => None,
                 parent => Some(parent),
             };
-            let child_count = reader.read_u32("child count")? as usize;
-            let mut children = Vec::with_capacity(child_count);
-            for _ in 0..child_count {
-                children.push(reader.read_u32("child")?);
+            let first_child = reader.read_u32("first child")?;
+            let next_sibling = reader.read_u32("next sibling")?;
+
+            raw_nodes.push((kind, start, end, parent, first_child, next_sibling));
+        }
+
+        let mut nodes = Vec::with_capacity(node_count);
+        for (kind, start, end, parent, first_child, _) in &raw_nodes {
+            let mut children = Vec::new();
+            let mut child = *first_child;
+            while child != NO_PARENT {
+                children.push(child);
+                if children.len() > node_count {
+                    return Err(protocol("cycle in node sibling list"));
+                }
+
+                child = raw_nodes
+                    .get(child as usize)
+                    .ok_or_else(|| protocol(format!("invalid child node identifier {child}")))?
+                    .5;
             }
 
-            nodes.push(DecodedNode { kind, start, end, parent, children });
+            nodes.push(DecodedNode { kind: kind.clone(), start: *start, end: *end, parent: *parent, children });
         }
 
         let name_count = reader.read_u32("name count")? as usize;
-        let mut names = Vec::with_capacity(name_count);
+        let mut name_starts = Vec::with_capacity(name_count);
         for _ in 0..name_count {
-            names.push((
-                reader.read_u32("name start")?,
+            name_starts.push(reader.read_u32("name start")?);
+        }
+
+        let mut name_records = Vec::with_capacity(name_count);
+        for _ in 0..name_count {
+            name_records.push((
                 reader.read_u32("name end")?,
-                reader.read_bytes("resolved name")?.to_vec(),
+                reader.read_u32("name offset")? as usize,
+                reader.read_u32("name length")? as usize,
                 reader.read_bool("imported")?,
             ));
+        }
+
+        let names_buffer = reader.read_bytes("resolved names")?;
+        let mut names = Vec::with_capacity(name_count);
+        for (start, (end, offset, length, imported)) in name_starts.into_iter().zip(name_records) {
+            let name = names_buffer
+                .get(offset..offset + length)
+                .ok_or_else(|| protocol("resolved name points outside the name buffer"))?;
+            names.push((start, end, name.to_vec(), imported));
         }
 
         let trivia_count = reader.read_u32("trivia count")? as usize;
         let mut trivia = Vec::with_capacity(trivia_count);
         for _ in 0..trivia_count {
-            trivia.push((
-                reader.read_string("trivia kind")?,
-                reader.read_u32("trivia start")?,
-                reader.read_u32("trivia end")?,
-            ));
+            let kind = match reader.read_u8("trivia kind")? {
+                1 => "SingleLineComment",
+                2 => "MultiLineComment",
+                3 => "HashComment",
+                4 => "DocBlockComment",
+                value => return Err(protocol(format!("invalid trivia kind {value}"))),
+            };
+            trivia.push((kind.to_owned(), reader.read_u32("trivia start")?, reader.read_u32("trivia end")?));
         }
 
         reader.finish()?;
-        Ok(DecodedRequest { php_version, file_name, source, active_rules, targets, nodes, names, trivia })
+        Ok(DecodedRequest { file_name, source, active_rules, targets, nodes, names, trivia })
     }
 
     fn optional_string(writer: &mut PayloadWriter, value: Option<&str>) {

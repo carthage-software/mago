@@ -76,7 +76,6 @@ struct Backend<T> {
 /// A set of custom linter rules backed by one or more extension worker pools.
 #[derive(Debug)]
 pub struct ExternalLinter<T = WorkerPool> {
-    php_version: PHPVersion,
     backends: Box<[Backend<T>]>,
     extensions: Box<[ExternalExtension]>,
     rules: Box<[ExternalRule]>,
@@ -127,34 +126,36 @@ impl<T> ExternalLinter<T> {
     {
         let mut issues = IssueCollection::new();
         for backend in &self.backends {
-            let mut active_rules = Vec::new();
+            let mut active_rule_indices = Vec::new();
             let mut target_kinds = [false; u8::MAX as usize + 1];
-            for rule in &backend.registration.rules {
+            for (rule_index, rule) in backend.registration.rules.iter().enumerate() {
                 if only.map_or(rule.default_enabled, |codes| codes.iter().any(|code| code == &rule.code)) {
-                    active_rules.push(rule.code.as_str());
+                    let rule_index = u16::try_from(rule_index).map_err(|_| {
+                        ExternalLintError::Protocol("worker registered more than u16::MAX linter rules".to_string())
+                    })?;
+                    active_rule_indices.push(rule_index);
                     for target in &rule.targets {
                         target_kinds[*target as usize] = true;
                     }
                 }
             }
 
-            if active_rules.is_empty() {
+            if active_rule_indices.is_empty() {
                 continue;
             }
 
-            let Some(payload) = protocol::encode_lint_request(
-                self.php_version,
-                file,
-                program,
-                resolved_names,
-                &active_rules,
-                &target_kinds,
-            )?
+            let Some(payload) =
+                protocol::encode_lint_request(file, program, resolved_names, &active_rule_indices, &target_kinds)?
             else {
                 continue;
             };
             let response = backend.transport.request(payload)?;
-            issues.extend(protocol::decode_lint_response(&response, file, &active_rules)?);
+            issues.extend(protocol::decode_lint_response(
+                &response,
+                file,
+                &backend.registration.rules,
+                &active_rule_indices,
+            )?);
         }
 
         Ok(issues)
@@ -187,8 +188,10 @@ impl<T> ExternalLinter<T> {
                 }
             }
 
-            if !extension_identifiers.insert(registration.identifier.clone()) {
-                return Err(ExternalLintError::DuplicateExtension(registration.identifier));
+            for extension in &registration.extensions {
+                if !extension_identifiers.insert(extension.identifier.clone()) {
+                    return Err(ExternalLintError::DuplicateExtension(extension.identifier.clone()));
+                }
             }
 
             for rule in &registration.rules {
@@ -197,19 +200,12 @@ impl<T> ExternalLinter<T> {
                 }
             }
 
-            extensions.push(ExternalExtension {
-                identifier: registration.identifier.clone(),
-                name: registration.name.clone(),
-                version: registration.version.clone(),
-                rules: registration.rules.clone(),
-            });
-
+            extensions.extend(registration.extensions.iter().cloned());
             rules.extend(registration.rules.iter().cloned());
             backends.push(Backend { transport, registration });
         }
 
         Ok(Self {
-            php_version,
             backends: backends.into_boxed_slice(),
             extensions: extensions.into_boxed_slice(),
             rules: rules.into_boxed_slice(),
@@ -280,7 +276,7 @@ mod tests {
                 "1.0.0",
                 &[("acme/no-run", "No run", "Disallows this call.", Level::Warning, true, &[NodeKind::FunctionCall])],
             ),
-            response: testing::lint_response(&[issue]),
+            response: testing::lint_response(&[(0, issue)]),
             request: Mutex::new(None),
             workers: 3,
         });
@@ -295,7 +291,7 @@ mod tests {
         let request = request.as_ref().expect("one request should be captured");
         assert_eq!(request.file_name, b"src/test.php");
         assert_eq!(request.source, source);
-        assert_eq!(request.active_rules, ["acme/no-run"]);
+        assert_eq!(request.active_rules, [0]);
         assert_eq!(request.targets.len(), 1);
         assert_eq!(request.nodes[request.targets[0] as usize].kind, "FunctionCall");
         assert!(!request.nodes.iter().any(|node| node.kind == "Program"));
@@ -383,7 +379,7 @@ mod tests {
                 "1.0.0",
                 &[("acme/no-foo", "No foo", "Disallows foo.", Level::Warning, true, &[NodeKind::FunctionCall])],
             ),
-            response: testing::lint_response(&[issue]),
+            response: testing::lint_response(&[(0, issue)]),
             request: Mutex::new(None),
             workers: 1,
         });
@@ -419,5 +415,46 @@ mod tests {
 
         let result = ExternalLinter::initialize_transports([Arc::new(InconsistentTransport)], PHPVersion::PHP85);
         assert!(matches!(result, Err(ExternalLintError::InconsistentRegistration)));
+    }
+
+    #[test]
+    fn registers_multiple_extensions_from_one_worker_pool() {
+        let function_targets = [NodeKind::FunctionCall];
+        let interface_targets = [NodeKind::Interface];
+        let iteration_rules = [(
+            "acme/prefer-array-any",
+            "Prefer array_any",
+            "Prefers the native array_any function.",
+            Level::Help,
+            true,
+            function_targets.as_slice(),
+        )];
+        let architecture_rules = [(
+            "acme/no-interface",
+            "No interfaces",
+            "Disallows interface declarations.",
+            Level::Warning,
+            false,
+            interface_targets.as_slice(),
+        )];
+        let transport = Arc::new(MockTransport {
+            registration: testing::describe_extensions_response(&[
+                ("acme/iteration", "Iteration", "1.0.0", &iteration_rules),
+                ("acme/architecture", "Architecture", "2.0.0", &architecture_rules),
+            ]),
+            response: testing::lint_response(&[]),
+            request: Mutex::new(None),
+            workers: 2,
+        });
+
+        let external =
+            ExternalLinter::initialize_transports([transport], PHPVersion::PHP85).expect("registration should succeed");
+
+        assert_eq!(external.extensions().len(), 2);
+        assert_eq!(external.extensions()[0].identifier, "acme/iteration");
+        assert_eq!(external.extensions()[1].identifier, "acme/architecture");
+        assert_eq!(external.rules().len(), 2);
+        assert_eq!(external.rules()[0].extension, "acme/iteration");
+        assert_eq!(external.rules()[1].extension, "acme/architecture");
     }
 }

@@ -289,6 +289,7 @@ impl<'payload> PayloadReader<'payload> {
 }
 
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use super::*;
 

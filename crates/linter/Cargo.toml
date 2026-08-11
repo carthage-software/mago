@@ -37,6 +37,7 @@ indoc = { workspace = true }
 mago-allocator = { workspace = true }
 tracing = { workspace = true }
 schemars = { workspace = true }
+strum = { workspace = true }
 
 [features]
 default = []
