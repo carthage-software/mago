@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::sync::OnceLock;
 #[cfg(not(target_arch = "wasm32"))]
 use std::sync::atomic::Ordering::Relaxed;
 #[cfg(not(target_arch = "wasm32"))]
@@ -11,7 +12,9 @@ use mago_allocator::LocalArena;
 
 use mago_analyzer::Analyzer;
 use mago_analyzer::analysis_result::AnalysisResult;
+use mago_analyzer::artifacts::AnalysisArtifacts;
 use mago_analyzer::error::AnalysisError;
+use mago_analyzer::external::FileAnalysisSnapshot;
 use mago_analyzer::plugin::PluginRegistry;
 use mago_analyzer::settings::Settings;
 #[cfg(not(target_arch = "wasm32"))]
@@ -120,6 +123,22 @@ impl AnalysisService {
 
         populate_codebase(&mut self.codebase, &mut self.symbol_references, WordSet::default(), HashSet::default());
 
+        if let Err(err) = self.plugin_registry.prepare_external_analyzer() {
+            issues.push(Issue::error(format!("Analysis error: {err}")));
+            return issues;
+        }
+
+        match self.plugin_registry.run_external_before_analysis_hooks(&self.codebase, external_session.as_ref()) {
+            Ok(reported) => issues.extend(reported),
+            Err(err) => {
+                issues.push(Issue::error(format!("Analysis error: {err}")));
+                return issues;
+            }
+        }
+
+        let after_file = self.plugin_registry.has_external_after_file_analysis_hooks().unwrap_or_default();
+        let after_analysis = self.plugin_registry.has_external_after_analysis_hooks().unwrap_or_default();
+
         // Run the analyzer
         let mut analysis_result = AnalysisResult::new(self.symbol_references);
         let mut analyzer =
@@ -128,12 +147,43 @@ impl AnalysisService {
             analyzer = analyzer.with_external_analysis_session(session);
         }
 
-        if let Err(err) = analyzer.analyze(program, &mut analysis_result) {
-            issues.push(Issue::error(format!("Analysis error: {err}")));
+        let artifacts = match analyzer.analyze_with_artifacts(program, &mut analysis_result) {
+            Ok(artifacts) => artifacts,
+            Err(err) => {
+                issues.push(Issue::error(format!("Analysis error: {err}")));
+                AnalysisArtifacts::new()
+            }
+        };
+
+        if after_file {
+            match self.plugin_registry.run_external_after_file_analysis_hooks(
+                file,
+                &artifacts,
+                &self.codebase,
+                external_session.as_ref(),
+            ) {
+                Ok(reported) => analysis_result.issues.extend(reported),
+                Err(err) => issues.push(Issue::error(format!("Analysis error: {err}"))),
+            }
         }
 
-        issues.extend(analysis_result.issues);
+        issues.extend(analysis_result.issues.iter().cloned());
         issues.extend(self.codebase.take_issues(true));
+        if after_analysis {
+            let snapshot = Arc::new(FileAnalysisSnapshot::new(file, &artifacts));
+            let mut project_result = AnalysisResult::new(analysis_result.symbol_references);
+            project_result.issues = issues.clone();
+            match self.plugin_registry.run_external_after_analysis_hooks(
+                &project_result,
+                &[snapshot],
+                &self.codebase,
+                external_session.as_ref(),
+            ) {
+                Ok(reported) => issues.extend(reported),
+                Err(err) => issues.push(Issue::error(format!("Analysis error: {err}"))),
+            }
+        }
+
         issues
     }
 
@@ -151,6 +201,12 @@ impl AnalysisService {
 
         let external_session =
             self.plugin_registry.create_external_analysis_session(self.database.files()).map(Arc::new);
+        let lifecycle_capabilities = Arc::new(OnceLock::new());
+        let reducer = AnalysisResultReducer {
+            plugin_registry: Arc::clone(&self.plugin_registry),
+            external_session: external_session.clone(),
+        };
+
         let pipeline = ParallelPipeline::new(
             ANALYSIS_PROGRESS_PREFIX,
             self.database,
@@ -159,11 +215,15 @@ impl AnalysisService {
             (self.settings.clone(), self.parser_settings),
             self.parser_settings,
             self.settings.version,
-            Box::new(AnalysisResultReducer),
+            Box::new(reducer),
             self.use_progress_bars,
         );
 
         let plugin_registry = Arc::clone(&self.plugin_registry);
+        let before_plugin_registry = Arc::clone(&self.plugin_registry);
+        let before_external_session = external_session.clone();
+        let before_capabilities = Arc::clone(&lifecycle_capabilities);
+        let map_capabilities = Arc::clone(&lifecycle_capabilities);
 
         #[cfg(not(target_arch = "wasm32"))]
         let trace_enabled = tracing::enabled!(tracing::Level::TRACE);
@@ -172,81 +232,115 @@ impl AnalysisService {
         #[cfg(not(target_arch = "wasm32"))]
         let telemetry_for_closure = Arc::clone(&telemetry);
 
-        let result = pipeline.run(move |(settings, parser_settings), arena, source_file, codebase| {
-            plugin_registry.prepare_external_analyzer().map_err(AnalysisError::from)?;
-
-            #[cfg(not(target_arch = "wasm32"))]
-            let per_file_start = trace_enabled.then(Instant::now);
-            let mut analysis_result = AnalysisResult::new(SymbolReferences::new());
-
-            #[cfg(not(target_arch = "wasm32"))]
-            let parse_start = trace_enabled.then(Instant::now);
-            let program = parse_file_with_settings(arena, &source_file, parser_settings);
-            #[cfg(not(target_arch = "wasm32"))]
-            if let Some(start) = parse_start {
-                telemetry_for_closure.parse_ns.fetch_add(start.elapsed().as_nanos() as u64, Relaxed);
-            }
-
-            #[cfg(not(target_arch = "wasm32"))]
-            let resolve_start = trace_enabled.then(Instant::now);
-            let resolved_names = NameResolver::new(arena).resolve(program);
-            #[cfg(not(target_arch = "wasm32"))]
-            if let Some(start) = resolve_start {
-                telemetry_for_closure.resolve_ns.fetch_add(start.elapsed().as_nanos() as u64, Relaxed);
-            }
-
-            if program.has_errors() {
-                analysis_result.issues.extend(program.errors.iter().map(Issue::from));
-            }
-
-            let semantics_checker = SemanticsChecker::new(settings.version);
-
-            #[cfg(not(target_arch = "wasm32"))]
-            let analyzer_new_start = trace_enabled.then(Instant::now);
-            let mut analyzer =
-                Analyzer::new(arena, &source_file, &resolved_names, &codebase, &plugin_registry, settings);
-            if let Some(session) = external_session.as_deref() {
-                analyzer = analyzer.with_external_analysis_session(session);
-            }
-            #[cfg(not(target_arch = "wasm32"))]
-            if let Some(start) = analyzer_new_start {
-                telemetry_for_closure.analyzer_new_ns.fetch_add(start.elapsed().as_nanos() as u64, Relaxed);
-            }
-
-            #[cfg(not(target_arch = "wasm32"))]
-            let semantics_start = trace_enabled.then(Instant::now);
-            analysis_result.issues.extend(semantics_checker.check(&source_file, program, &resolved_names));
-            #[cfg(not(target_arch = "wasm32"))]
-            if let Some(start) = semantics_start {
-                telemetry_for_closure.semantics_ns.fetch_add(start.elapsed().as_nanos() as u64, Relaxed);
-            }
-
-            #[cfg(not(target_arch = "wasm32"))]
-            let analyze_start = trace_enabled.then(Instant::now);
-            analyzer.analyze(program, &mut analysis_result)?;
-            #[cfg(not(target_arch = "wasm32"))]
-            if let Some(start) = analyze_start {
-                telemetry_for_closure.analyze_ns.fetch_add(start.elapsed().as_nanos() as u64, Relaxed);
-            }
-
-            #[cfg(not(target_arch = "wasm32"))]
-            if let Some(start) = per_file_start {
-                telemetry_for_closure.per_file_total_ns.fetch_add(start.elapsed().as_nanos() as u64, Relaxed);
-                telemetry_for_closure.files.fetch_add(1, Relaxed);
-            }
-
-            #[cfg(not(target_arch = "wasm32"))]
-            if analysis_result.time_in_analysis > ANALYSIS_DURATION_THRESHOLD {
-                tracing::warn!(
-                    "Analysis of source file '{}' took longer than {}s: {}s",
-                    mago_bytes::BytesDisplay(&source_file.name),
-                    ANALYSIS_DURATION_THRESHOLD.as_secs_f32(),
-                    analysis_result.time_in_analysis.as_secs_f32()
+        let result = pipeline.run(
+            move |codebase| {
+                before_plugin_registry.prepare_external_analyzer().map_err(AnalysisError::from)?;
+                let capabilities = (
+                    before_plugin_registry.has_external_after_file_analysis_hooks().map_err(AnalysisError::from)?,
+                    before_plugin_registry.has_external_after_analysis_hooks().map_err(AnalysisError::from)?,
                 );
-            }
+                let _result = before_capabilities.set(capabilities);
+                let issues = before_plugin_registry
+                    .run_external_before_analysis_hooks(codebase, before_external_session.as_deref())
+                    .map_err(AnalysisError::from)?;
+                if issues.is_empty() {
+                    Ok(None)
+                } else {
+                    let mut result = AnalysisResult::new(SymbolReferences::new());
+                    result.issues = issues;
+                    Ok(Some(AnalysisTaskResult { result, snapshot: None }))
+                }
+            },
+            move |(settings, parser_settings), arena, source_file, codebase| {
+                let (after_file, after_analysis) = map_capabilities.get().copied().unwrap_or_default();
 
-            Ok(analysis_result)
-        });
+                #[cfg(not(target_arch = "wasm32"))]
+                let per_file_start = trace_enabled.then(Instant::now);
+                let mut analysis_result = AnalysisResult::new(SymbolReferences::new());
+
+                #[cfg(not(target_arch = "wasm32"))]
+                let parse_start = trace_enabled.then(Instant::now);
+                let program = parse_file_with_settings(arena, &source_file, parser_settings);
+                #[cfg(not(target_arch = "wasm32"))]
+                if let Some(start) = parse_start {
+                    telemetry_for_closure.parse_ns.fetch_add(start.elapsed().as_nanos() as u64, Relaxed);
+                }
+
+                #[cfg(not(target_arch = "wasm32"))]
+                let resolve_start = trace_enabled.then(Instant::now);
+                let resolved_names = NameResolver::new(arena).resolve(program);
+                #[cfg(not(target_arch = "wasm32"))]
+                if let Some(start) = resolve_start {
+                    telemetry_for_closure.resolve_ns.fetch_add(start.elapsed().as_nanos() as u64, Relaxed);
+                }
+
+                if program.has_errors() {
+                    analysis_result.issues.extend(program.errors.iter().map(Issue::from));
+                }
+
+                let semantics_checker = SemanticsChecker::new(settings.version);
+
+                #[cfg(not(target_arch = "wasm32"))]
+                let analyzer_new_start = trace_enabled.then(Instant::now);
+                let mut analyzer =
+                    Analyzer::new(arena, &source_file, &resolved_names, &codebase, &plugin_registry, settings);
+                if let Some(session) = external_session.as_deref() {
+                    analyzer = analyzer.with_external_analysis_session(session);
+                }
+                #[cfg(not(target_arch = "wasm32"))]
+                if let Some(start) = analyzer_new_start {
+                    telemetry_for_closure.analyzer_new_ns.fetch_add(start.elapsed().as_nanos() as u64, Relaxed);
+                }
+
+                #[cfg(not(target_arch = "wasm32"))]
+                let semantics_start = trace_enabled.then(Instant::now);
+                analysis_result.issues.extend(semantics_checker.check(&source_file, program, &resolved_names));
+                #[cfg(not(target_arch = "wasm32"))]
+                if let Some(start) = semantics_start {
+                    telemetry_for_closure.semantics_ns.fetch_add(start.elapsed().as_nanos() as u64, Relaxed);
+                }
+
+                #[cfg(not(target_arch = "wasm32"))]
+                let analyze_start = trace_enabled.then(Instant::now);
+                let artifacts = analyzer.analyze_with_artifacts(program, &mut analysis_result)?;
+                if after_file {
+                    analysis_result.issues.extend(
+                        plugin_registry
+                            .run_external_after_file_analysis_hooks(
+                                &source_file,
+                                &artifacts,
+                                &codebase,
+                                external_session.as_deref(),
+                            )
+                            .map_err(AnalysisError::from)?,
+                    );
+                }
+
+                #[cfg(not(target_arch = "wasm32"))]
+                if let Some(start) = analyze_start {
+                    telemetry_for_closure.analyze_ns.fetch_add(start.elapsed().as_nanos() as u64, Relaxed);
+                }
+
+                #[cfg(not(target_arch = "wasm32"))]
+                if let Some(start) = per_file_start {
+                    telemetry_for_closure.per_file_total_ns.fetch_add(start.elapsed().as_nanos() as u64, Relaxed);
+                    telemetry_for_closure.files.fetch_add(1, Relaxed);
+                }
+
+                #[cfg(not(target_arch = "wasm32"))]
+                if analysis_result.time_in_analysis > ANALYSIS_DURATION_THRESHOLD {
+                    tracing::warn!(
+                        "Analysis of source file '{}' took longer than {}s: {}s",
+                        mago_bytes::BytesDisplay(&source_file.name),
+                        ANALYSIS_DURATION_THRESHOLD.as_secs_f32(),
+                        analysis_result.time_in_analysis.as_secs_f32()
+                    );
+                }
+
+                let snapshot = after_analysis.then(|| Arc::new(FileAnalysisSnapshot::new(&source_file, &artifacts)));
+                Ok(AnalysisTaskResult { result: analysis_result, snapshot })
+            },
+        );
 
         #[cfg(not(target_arch = "wasm32"))]
         if trace_enabled {
@@ -262,22 +356,43 @@ impl AnalysisService {
 ///
 /// This struct aggregates the `AnalysisResult` from each parallel task into a single,
 /// final `AnalysisResult` for the entire project.
-#[derive(Debug, Clone)]
-struct AnalysisResultReducer;
+#[derive(Debug)]
+struct AnalysisTaskResult {
+    result: AnalysisResult,
+    snapshot: Option<Arc<FileAnalysisSnapshot>>,
+}
 
-impl Reducer<AnalysisResult, AnalysisResult> for AnalysisResultReducer {
+#[derive(Debug, Clone)]
+struct AnalysisResultReducer {
+    plugin_registry: Arc<PluginRegistry>,
+    external_session: Option<Arc<mago_analyzer::external::ExternalAnalysisSession>>,
+}
+
+impl Reducer<AnalysisTaskResult, AnalysisResult> for AnalysisResultReducer {
     fn reduce(
         &self,
         mut codebase: CodebaseMetadata,
         symbol_references: SymbolReferences,
-        results: Vec<AnalysisResult>,
+        results: Vec<AnalysisTaskResult>,
     ) -> Result<AnalysisResult, OrchestratorError> {
         let mut aggregated_result = AnalysisResult::new(symbol_references);
+        let mut snapshots = Vec::new();
         for result in results {
-            aggregated_result.extend(result);
+            aggregated_result.extend(result.result);
+            snapshots.extend(result.snapshot);
         }
 
         aggregated_result.issues.extend(codebase.take_issues(true));
+        aggregated_result.issues.extend(
+            self.plugin_registry
+                .run_external_after_analysis_hooks(
+                    &aggregated_result,
+                    &snapshots,
+                    &codebase,
+                    self.external_session.as_deref(),
+                )
+                .map_err(AnalysisError::from)?,
+        );
 
         Ok(aggregated_result)
     }

@@ -181,9 +181,10 @@ where
     /// - `result`: The aggregated result from the reducer
     /// - `codebase`: The final codebase metadata after all processing
     /// - `symbol_references`: The final symbol references
-    pub fn run<F>(self, map_function: F) -> Result<R, OrchestratorError>
+    pub fn run<F, B>(self, before_map: B, map_function: F) -> Result<R, OrchestratorError>
     where
         F: Fn(T, &LocalArena, Arc<File>, Arc<CodebaseMetadata>) -> Result<I, OrchestratorError> + Send + Sync + 'static,
+        B: FnOnce(&CodebaseMetadata) -> Result<Option<I>, OrchestratorError>,
     {
         #[cfg(not(target_arch = "wasm32"))]
         let trace_enabled = tracing::enabled!(tracing::Level::TRACE);
@@ -304,9 +305,11 @@ where
             self.database.files().filter(|f| f.file_type == FileType::Host).collect::<Vec<_>>()
         );
 
+        let before_map_result = before_map(&merged_codex)?;
+
         if host_files.is_empty() {
             tracing::warn!("No host files found for analysis after compilation.");
-            return self.reducer.reduce(merged_codex, symbol_references, Vec::new());
+            return self.reducer.reduce(merged_codex, symbol_references, before_map_result.into_iter().collect());
         }
         #[cfg(not(target_arch = "wasm32"))]
         let host_count = host_files.len();
@@ -326,7 +329,7 @@ where
         let hang_watcher = trace_enabled.then(|| HangWatcher::spawn(rayon::current_num_threads()));
 
         let mut analyze_parallel_duration = Duration::ZERO;
-        let results: Vec<I> = measure!(
+        let mut results: Vec<I> = measure!(
             trace_enabled,
             analyze_parallel_duration,
             host_files
@@ -361,6 +364,10 @@ where
                 })
                 .collect::<Result<Vec<I>, OrchestratorError>>()?
         );
+
+        if let Some(result) = before_map_result {
+            results.insert(0, result);
+        }
 
         #[cfg(not(target_arch = "wasm32"))]
         drop(hang_watcher);
