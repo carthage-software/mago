@@ -53,7 +53,7 @@ final class JsonEncodeProvider implements FunctionReturnTypeProvider
             return null;
         }
 
-        $literal = $flags->type->getLiteralInt();
+        $literal = $flags?->type->getLiteralInt();
         $throws = $literal !== null && ($literal & JSON_THROW_ON_ERROR) !== 0;
 
         return $throws ? Type::nonEmptyString() : Type::union(Type::nonEmptyString(), Type::false());
@@ -62,7 +62,6 @@ final class JsonEncodeProvider implements FunctionReturnTypeProvider
 
 /**
  * @mago-expect lint:single-class-per-file
- * @mago-expect lint:cyclomatic-complexity
  */
 final class RandomBytesProvider implements FunctionReturnTypeProvider
 {
