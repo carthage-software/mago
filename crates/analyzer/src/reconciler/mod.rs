@@ -114,6 +114,13 @@ pub fn reconcile_keyed_types<'ctx, A>(
 
     add_nested_assertions(&mut new_types, &mut active_new_types, block_context);
 
+    let original_types = can_report_issues.then(|| {
+        new_types
+            .keys()
+            .filter_map(|key| block_context.locals.get(key).map(|ty| (*key, Rc::clone(ty))))
+            .collect::<WordMap<_>>()
+    });
+
     for (key, new_type_parts) in &new_types {
         let key_str = key.as_bytes();
         if key_str.ends_with(b"()") && !block_context.locals.contains_key(key) {
@@ -204,8 +211,10 @@ pub fn reconcile_keyed_types<'ctx, A>(
                     && active_new_types.get(key).is_some_and(|active_new_type| active_new_type.contains(&i));
 
                 if report_this_assertion
-                    && i > 0
-                    && let Some(original) = before_adjustment.as_ref()
+                    && let Some(original) = original_types
+                        .as_ref()
+                        .and_then(|types| types.get(key).map(Rc::as_ref))
+                        .or(before_adjustment.as_ref())
                     && result_type.as_ref().is_some_and(|current| current != original)
                 {
                     let probe_on_original = assertion_reconciler::reconcile(
