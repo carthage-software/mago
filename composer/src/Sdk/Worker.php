@@ -4,12 +4,14 @@ declare(strict_types=1);
 
 namespace Mago\Sdk;
 
+use Mago\Sdk\Analyzer\Codebase;
 use Mago\Sdk\Analyzer\PluginRegistry as AnalyzerPluginRegistry;
 use Mago\Sdk\Analyzer\ReturnTypeProviderContext;
 use Mago\Sdk\Analyzer\TypeComparator;
 use Mago\Sdk\Exception\CancelledException;
 use Mago\Sdk\Exception\InvalidArgumentException;
 use Mago\Sdk\Exception\ProtocolException;
+use Mago\Sdk\Internal\Analyzer\MetadataCache;
 use Mago\Sdk\Internal\Analyzer\Protocol as AnalyzerProtocol;
 use Mago\Sdk\Internal\Analyzer\RegisteredFunctionReturnTypeProvider;
 use Mago\Sdk\Internal\Analyzer\RegisteredMethodReturnTypeProvider;
@@ -87,6 +89,8 @@ final class Worker
     private array $nodeKinds = [];
 
     private PHPVersion $phpVersion;
+
+    private ?MetadataCache $metadataCache = null;
 
     public function __construct(Extension $extension, Extension ...$additionalExtensions)
     {
@@ -394,6 +398,10 @@ final class Worker
         }
 
         $request = AnalyzerProtocol::readReturnTypeRequest($reader);
+        if ($this->metadataCache === null || $this->metadataCache->generation !== $request->generation) {
+            $this->metadataCache = new MetadataCache($request->generation);
+        }
+        $codebase = new Codebase($host, $requestId, $cancellation, $this->metadataCache);
         $providers = $request->method ? $this->methodReturnTypeProviders : $this->functionReturnTypeProviders;
         foreach ($request->providerIndices as $providerIndex) {
             $registered = $providers[$providerIndex] ?? null;
@@ -406,6 +414,7 @@ final class Worker
                 $type = $registered->provider->getReturnType(
                     new ReturnTypeProviderContext(
                         $this->phpVersion,
+                        $codebase,
                         $request->invocation,
                         new TypeComparator($host, $requestId, $cancellation),
                         $cancellation,

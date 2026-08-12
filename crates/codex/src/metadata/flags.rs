@@ -5,6 +5,12 @@ use mago_database::file::FileType;
 pub struct MetadataFlags(u64);
 
 impl MetadataFlags {
+    #[inline]
+    #[must_use]
+    pub const fn bits(self) -> u64 {
+        self.0
+    }
+
     pub const ABSTRACT: MetadataFlags = MetadataFlags(1 << 0);
     pub const FINAL: MetadataFlags = MetadataFlags(1 << 1);
     pub const READONLY: MetadataFlags = MetadataFlags(1 << 3);

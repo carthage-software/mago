@@ -29,6 +29,7 @@ use mago_word::concat_word;
 
 use crate::artifacts::AnalysisArtifacts;
 use crate::context::block::BlockContext;
+use crate::external::ExternalAnalysisSession;
 use crate::external::ExternalAnalyzerHandle;
 use crate::invocation::Invocation;
 use crate::plugin::PluginError;
@@ -161,6 +162,16 @@ impl PluginRegistry {
             .transpose()
             .map_err(|reason| PluginError::InitializationFailed { name: "external analyzer".to_string(), reason })?;
         Ok(())
+    }
+
+    /// Creates the immutable external-plugin context for one frozen codebase generation.
+    #[must_use]
+    pub fn create_external_analysis_session(
+        &self,
+        files: impl IntoIterator<Item = Arc<File>>,
+    ) -> Option<ExternalAnalysisSession> {
+        self.external_analyzer.as_ref()?;
+        Some(ExternalAnalysisSession::from_files(files))
     }
 
     #[inline]
@@ -1023,10 +1034,19 @@ impl PluginRegistry {
         artifacts: &AnalysisArtifacts,
         function_like: &FunctionLikeIdentifier,
         invocation: &Invocation<'ctx, '_, '_>,
+        external_session: Option<&ExternalAnalysisSession>,
     ) -> PluginResult<Option<ProviderResult>> {
         match function_like {
             FunctionLikeIdentifier::Function(name) => self
-                .get_function_return_type(codebase, source_file, block_context, artifacts, name.as_bytes(), invocation)
+                .get_function_return_type(
+                    codebase,
+                    source_file,
+                    block_context,
+                    artifacts,
+                    name.as_bytes(),
+                    invocation,
+                    external_session,
+                )
                 .map(Some),
             FunctionLikeIdentifier::Method(class_name, method_name) => self
                 .get_method_return_type(
@@ -1037,6 +1057,7 @@ impl PluginRegistry {
                     class_name.as_bytes(),
                     method_name.as_bytes(),
                     invocation,
+                    external_session,
                 )
                 .map(Some),
             _ => Ok(None),
@@ -1054,6 +1075,7 @@ impl PluginRegistry {
         artifacts: &AnalysisArtifacts,
         function_name: &[u8],
         invocation: &Invocation<'ctx, '_, '_>,
+        external_session: Option<&ExternalAnalysisSession>,
     ) -> PluginResult<ProviderResult> {
         let indices = self.get_function_provider_indices(function_name);
         let mut all_issues = Vec::new();
@@ -1073,8 +1095,9 @@ impl PluginRegistry {
         let return_type = self
             .external_analyzer
             .as_deref()
-            .map(|analyzer| {
-                analyzer.get_function_return_type(function_name, invocation, artifacts, source_file, codebase)
+            .zip(external_session)
+            .map(|(analyzer, session)| {
+                analyzer.get_function_return_type(function_name, invocation, artifacts, source_file, codebase, session)
             })
             .transpose()
             .map_err(|reason| PluginError::Internal { reason })?
@@ -1095,6 +1118,7 @@ impl PluginRegistry {
         class_name: &[u8],
         method_name: &[u8],
         invocation: &Invocation<'ctx, '_, '_>,
+        external_session: Option<&ExternalAnalysisSession>,
     ) -> PluginResult<ProviderResult> {
         let indices = self.get_method_provider_indices(class_name, method_name);
         let mut all_issues = Vec::new();
@@ -1116,8 +1140,17 @@ impl PluginRegistry {
         let return_type = self
             .external_analyzer
             .as_deref()
-            .map(|analyzer| {
-                analyzer.get_method_return_type(class_name, method_name, invocation, artifacts, source_file, codebase)
+            .zip(external_session)
+            .map(|(analyzer, session)| {
+                analyzer.get_method_return_type(
+                    class_name,
+                    method_name,
+                    invocation,
+                    artifacts,
+                    source_file,
+                    codebase,
+                    session,
+                )
             })
             .transpose()
             .map_err(|reason| PluginError::Internal { reason })?

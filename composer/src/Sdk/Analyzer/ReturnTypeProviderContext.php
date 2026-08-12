@@ -12,6 +12,7 @@ final class ReturnTypeProviderContext
 {
     public function __construct(
         public readonly PHPVersion $phpVersion,
+        public readonly Codebase $codebase,
         public readonly Invocation $invocation,
         public readonly TypeComparator $types,
         public readonly CancellationTokenInterface $cancellation,

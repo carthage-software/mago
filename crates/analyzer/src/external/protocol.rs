@@ -82,6 +82,7 @@ use mago_span::HasSpan;
 use mago_word::word;
 
 use crate::artifacts::AnalysisArtifacts;
+use crate::external::ExternalAnalysisSession;
 use crate::external::ExternalExtension;
 use crate::external::ExternalPlugin;
 use crate::external::FunctionProvider;
@@ -90,6 +91,7 @@ use crate::external::MethodProvider;
 use crate::external::MethodTarget;
 use crate::external::error::ExternalAnalyzerError;
 use crate::external::error::protocol;
+use crate::external::metadata;
 use crate::invocation::Invocation;
 
 pub const ANALYZER_PROTOCOL_MAGIC: [u8; 4] = *b"MANA";
@@ -176,6 +178,12 @@ pub(super) struct ReturnTypeRequest<'type_info> {
     pub arguments: usize,
     pub typed_arguments: usize,
     pub type_snapshot_duration: Duration,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) enum NestedRequestKind {
+    TypeComparison,
+    CodebaseQuery,
 }
 
 pub(super) fn encode_describe_request(php_version: PHPVersion) -> Vec<u8> {
@@ -298,6 +306,7 @@ pub(super) fn encode_function_return_type_request<'type_info>(
     invocation: &Invocation<'_, '_, '_>,
     artifacts: &'type_info AnalysisArtifacts,
     source_file: &File,
+    generation: u64,
     trace_enabled: bool,
 ) -> Result<ReturnTypeRequest<'type_info>, ExternalAnalyzerError> {
     encode_return_type_request(
@@ -308,6 +317,7 @@ pub(super) fn encode_function_return_type_request<'type_info>(
         invocation,
         artifacts,
         source_file,
+        generation,
         trace_enabled,
     )
 }
@@ -319,6 +329,7 @@ pub(super) fn encode_method_return_type_request<'type_info>(
     invocation: &Invocation<'_, '_, '_>,
     artifacts: &'type_info AnalysisArtifacts,
     source_file: &File,
+    generation: u64,
     trace_enabled: bool,
 ) -> Result<ReturnTypeRequest<'type_info>, ExternalAnalyzerError> {
     encode_return_type_request(
@@ -329,6 +340,7 @@ pub(super) fn encode_method_return_type_request<'type_info>(
         invocation,
         artifacts,
         source_file,
+        generation,
         trace_enabled,
     )
 }
@@ -341,12 +353,14 @@ fn encode_return_type_request<'type_info>(
     invocation: &Invocation<'_, '_, '_>,
     artifacts: &'type_info AnalysisArtifacts,
     source_file: &File,
+    generation: u64,
     trace_enabled: bool,
 ) -> Result<ReturnTypeRequest<'type_info>, ExternalAnalyzerError> {
     let mut writer = message_writer(RETURN_TYPE_REQUEST);
     let mut types = Vec::new();
     let mut typed_arguments = 0usize;
     let mut type_snapshot_duration = Duration::ZERO;
+    writer.write_u64(generation);
     writer.write_u8(invocation_kind);
     writer.write_u16(
         u16::try_from(provider_indices.len()).map_err(|_| protocol("more than u16::MAX providers matched"))?,
@@ -403,7 +417,7 @@ fn encode_return_type_request<'type_info>(
     })
 }
 
-fn encode_union_snapshot<'type_info>(
+pub(super) fn encode_union_snapshot<'type_info>(
     writer: &mut PayloadWriter,
     union: &'type_info TUnion,
     types: &mut Vec<&'type_info TUnion>,
@@ -962,7 +976,10 @@ fn encode_optional_variances(
     Ok(())
 }
 
-fn encode_generic_parent(writer: &mut PayloadWriter, parent: GenericParent) -> Result<(), ExternalAnalyzerError> {
+pub(super) fn encode_generic_parent(
+    writer: &mut PayloadWriter,
+    parent: GenericParent,
+) -> Result<(), ExternalAnalyzerError> {
     match parent {
         GenericParent::ClassLike(name) => {
             writer.write_u8(1);
@@ -1099,6 +1116,30 @@ where
     let mut writer = message_writer(TYPE_COMPARISON_RESPONSE);
     writer.write_bool(result);
     Ok(writer.finish())
+}
+
+pub(super) fn handle_nested_request<'type_info, F>(
+    payload: &[u8],
+    codebase: &CodebaseMetadata,
+    session: &ExternalAnalysisSession,
+    argument_type: F,
+) -> Result<(NestedRequestKind, Vec<u8>), ExternalAnalyzerError>
+where
+    F: Fn(usize) -> Option<&'type_info TUnion>,
+{
+    let kind = message_kind(payload)?;
+    match kind {
+        TYPE_COMPARISON_REQUEST => handle_type_comparison_request(payload, codebase, argument_type)
+            .map(|response| (NestedRequestKind::TypeComparison, response)),
+        metadata::CODEBASE_QUERY_REQUEST => {
+            let mut reader = message_reader(payload, metadata::CODEBASE_QUERY_REQUEST)?;
+            let mut writer = message_writer(metadata::CODEBASE_QUERY_RESPONSE);
+            metadata::handle_query(&mut reader, codebase, session, &mut writer)?;
+            reader.finish()?;
+            Ok((NestedRequestKind::CodebaseQuery, writer.finish()))
+        }
+        unknown => Err(protocol(format!("unknown nested analyzer request kind {unknown}"))),
+    }
 }
 
 fn decode_type<'type_info, F>(
@@ -1728,7 +1769,7 @@ fn decode_function_like_identifier(
     })
 }
 
-fn message_writer(kind: u16) -> PayloadWriter {
+pub(super) fn message_writer(kind: u16) -> PayloadWriter {
     let mut writer = PayloadWriter::with_capacity(INITIAL_MESSAGE_CAPACITY);
     writer.write_raw(&ANALYZER_PROTOCOL_MAGIC);
     writer.write_u16(ANALYZER_PROTOCOL_MAJOR);
@@ -1738,7 +1779,7 @@ fn message_writer(kind: u16) -> PayloadWriter {
     writer
 }
 
-fn message_reader(payload: &[u8], expected_kind: u16) -> Result<PayloadReader<'_>, ExternalAnalyzerError> {
+pub(super) fn message_reader(payload: &[u8], expected_kind: u16) -> Result<PayloadReader<'_>, ExternalAnalyzerError> {
     if payload.len() < HEADER_LENGTH {
         return Err(protocol("analyzer payload is shorter than its header"));
     }
@@ -1764,6 +1805,32 @@ fn message_reader(payload: &[u8], expected_kind: u16) -> Result<PayloadReader<'_
     }
 
     Ok(reader)
+}
+
+fn message_kind(payload: &[u8]) -> Result<u16, ExternalAnalyzerError> {
+    if payload.len() < HEADER_LENGTH {
+        return Err(protocol("analyzer message is shorter than its header"));
+    }
+
+    let mut reader = PayloadReader::new(payload);
+    let magic = reader.read_array::<4>("analyzer protocol magic")?;
+    if magic != ANALYZER_PROTOCOL_MAGIC {
+        return Err(protocol("invalid analyzer protocol magic"));
+    }
+
+    let major = reader.read_u16("analyzer protocol major version")?;
+    let minor = reader.read_u16("analyzer protocol minor version")?;
+    if major != ANALYZER_PROTOCOL_MAJOR || minor != ANALYZER_PROTOCOL_MINOR {
+        return Err(protocol(format!("unsupported analyzer protocol version {major}.{minor}")));
+    }
+
+    let kind = reader.read_u16("analyzer message kind")?;
+    let reserved = reader.read_u16("analyzer reserved header field")?;
+    if reserved != 0 {
+        return Err(protocol("analyzer reserved header field is non-zero"));
+    }
+
+    Ok(kind)
 }
 
 fn non_empty<T>(value: T, field: &str) -> Result<T, ExternalAnalyzerError>

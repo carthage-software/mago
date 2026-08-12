@@ -44,6 +44,49 @@ final class DemoIdentityProvider implements FunctionReturnTypeProvider
 }
 
 /** @mago-expect lint:single-class-per-file */
+final class DemoMetadataProvider implements FunctionReturnTypeProvider
+{
+    public function getTargets(): array
+    {
+        return [FunctionTarget::exact('demo_metadata')];
+    }
+
+    public function getReturnType(ReturnTypeProviderContext $context): ?Type
+    {
+        [$child, $missing] = $context->codebase->getMultipleClasses(['MetadataChild', 'DefinitelyMissing']);
+        if (
+            $child === null
+            || $missing !== null
+            || $child->directParentClass !== 'metadatabase'
+            || $child->location->file !== 'metadata.php'
+            || !$context->codebase->classExists('MetadataChild')
+            || $context->codebase->classExists('DefinitelyMissing')
+            || $context->codebase->getClassAncestors('MetadataChild') !== ['metadatabase']
+            || $context->codebase->getDirectClassDescendants('MetadataBase') !== ['metadatachild']
+        ) {
+            throw new RuntimeException('Class metadata did not round-trip.');
+        }
+
+        $method = $context->codebase->getMethod('MetadataChild', 'value');
+        $cached = $context->codebase->getMethod('MetadataChild', 'value');
+        $property = $context->codebase->getProperty('MetadataBase', '$value');
+        $hookedProperty = $context->codebase->getProperty('MetadataBase', '$hooked');
+        if (
+            $method === null
+            || $method !== $cached
+            || !$context->codebase->methodExists('MetadataChild', 'VALUE')
+            || !$context->codebase->propertyExists('MetadataBase', '$value')
+            || $property?->type === null
+            || ($hookedProperty?->hooks['get'] ?? null)?->name !== 'get'
+        ) {
+            throw new RuntimeException('Member metadata did not round-trip or cache.');
+        }
+
+        return $method->returnType?->type;
+    }
+}
+
+/** @mago-expect lint:single-class-per-file */
 final class DemoFactoryProvider implements MethodReturnTypeProvider
 {
     public function getTargets(): array
@@ -74,6 +117,7 @@ final class DemoAnalyzerPlugin implements Plugin
     {
         $registry->registerFunctionReturnTypeProvider(new DemoServiceProvider());
         $registry->registerFunctionReturnTypeProvider(new DemoIdentityProvider());
+        $registry->registerFunctionReturnTypeProvider(new DemoMetadataProvider());
         $registry->registerMethodReturnTypeProvider(new DemoFactoryProvider());
     }
 }

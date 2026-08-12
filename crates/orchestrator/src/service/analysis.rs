@@ -93,6 +93,7 @@ impl AnalysisService {
     ///
     /// An `IssueCollection` containing all issues found in the file.
     pub fn oneshot(mut self, file_id: FileId) -> IssueCollection {
+        let external_session = self.plugin_registry.create_external_analysis_session(self.database.files());
         let Ok(file) = self.database.get_ref(&file_id) else {
             tracing::error!("File with ID {:?} not found in database", file_id);
 
@@ -121,8 +122,11 @@ impl AnalysisService {
 
         // Run the analyzer
         let mut analysis_result = AnalysisResult::new(self.symbol_references);
-        let analyzer =
+        let mut analyzer =
             Analyzer::new(&arena, file, &resolved_names, &self.codebase, &self.plugin_registry, self.settings);
+        if let Some(session) = external_session.as_ref() {
+            analyzer = analyzer.with_external_analysis_session(session);
+        }
 
         if let Err(err) = analyzer.analyze(program, &mut analysis_result) {
             issues.push(Issue::error(format!("Analysis error: {err}")));
@@ -145,6 +149,8 @@ impl AnalysisService {
         const ANALYSIS_DURATION_THRESHOLD: Duration = Duration::from_secs(5);
         const ANALYSIS_PROGRESS_PREFIX: &str = "🔬 Analyzing";
 
+        let external_session =
+            self.plugin_registry.create_external_analysis_session(self.database.files()).map(Arc::new);
         let pipeline = ParallelPipeline::new(
             ANALYSIS_PROGRESS_PREFIX,
             self.database,
@@ -197,7 +203,11 @@ impl AnalysisService {
 
             #[cfg(not(target_arch = "wasm32"))]
             let analyzer_new_start = trace_enabled.then(Instant::now);
-            let analyzer = Analyzer::new(arena, &source_file, &resolved_names, &codebase, &plugin_registry, settings);
+            let mut analyzer =
+                Analyzer::new(arena, &source_file, &resolved_names, &codebase, &plugin_registry, settings);
+            if let Some(session) = external_session.as_deref() {
+                analyzer = analyzer.with_external_analysis_session(session);
+            }
             #[cfg(not(target_arch = "wasm32"))]
             if let Some(start) = analyzer_new_start {
                 telemetry_for_closure.analyzer_new_ns.fetch_add(start.elapsed().as_nanos() as u64, Relaxed);

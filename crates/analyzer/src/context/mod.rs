@@ -23,6 +23,7 @@ use crate::artifacts::AnalysisArtifacts;
 use crate::code::IssueCode;
 use crate::context::assertion::AssertionContext;
 use crate::context::block::BlockContext;
+use crate::external::ExternalAnalysisSession;
 use crate::plugin::PluginRegistry;
 use crate::settings::Settings;
 
@@ -50,6 +51,7 @@ where
     pub(super) collector: Collector<'ctx, 'arena, A>,
     pub(super) statement_span: Span,
     pub(super) plugin_registry: &'ctx PluginRegistry,
+    pub(super) external_analysis_session: Option<&'ctx ExternalAnalysisSession>,
 }
 
 impl<'ctx, 'arena, A> Context<'ctx, 'arena, A>
@@ -66,6 +68,7 @@ where
         comments: &'arena [Trivia<'arena>],
         collector: Collector<'ctx, 'arena, A>,
         plugin_registry: &'ctx PluginRegistry,
+        external_analysis_session: Option<&'ctx ExternalAnalysisSession>,
     ) -> Self {
         Self {
             arena,
@@ -79,6 +82,7 @@ where
             statement_span,
             collector,
             plugin_registry,
+            external_analysis_session,
         }
     }
 

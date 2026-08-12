@@ -933,6 +933,7 @@ impl IncrementalAnalysisService {
     /// this to answer "what's the type of `$obj` here?".
     #[must_use]
     pub fn analyze_file_with_artifacts(&self, file_id: FileId) -> Option<(IssueCollection, AnalysisArtifacts)> {
+        let external_session = self.plugin_registry.create_external_analysis_session(self.database.files());
         let file = self.database.get(&file_id).ok()?;
 
         let arena = LocalArena::new();
@@ -950,8 +951,11 @@ impl IncrementalAnalysisService {
         issues.extend(semantics_checker.check(&file, program, &resolved_names));
 
         let mut analysis_result = AnalysisResult::new(SymbolReferences::new());
-        let analyzer =
+        let mut analyzer =
             Analyzer::new(&arena, &file, &resolved_names, &self.codebase, &self.plugin_registry, self.settings.clone());
+        if let Some(session) = external_session.as_ref() {
+            analyzer = analyzer.with_external_analysis_session(session);
+        }
 
         let artifacts = match analyzer.analyze_with_artifacts(program, &mut analysis_result) {
             Ok(artifacts) => artifacts,
@@ -970,6 +974,7 @@ impl IncrementalAnalysisService {
     /// This is useful for LSP single-file analysis. It uses the current codebase
     /// state for type resolution but only reports issues for the specified file.
     pub fn analyze_file(&self, file_id: FileId) -> IssueCollection {
+        let external_session = self.plugin_registry.create_external_analysis_session(self.database.files());
         let Ok(file) = self.database.get(&file_id) else {
             tracing::error!("File with ID {:?} not found in database", file_id);
             return IssueCollection::default();
@@ -990,8 +995,11 @@ impl IncrementalAnalysisService {
         issues.extend(semantics_checker.check(&file, program, &resolved_names));
 
         let mut analysis_result = AnalysisResult::new(SymbolReferences::new());
-        let analyzer =
+        let mut analyzer =
             Analyzer::new(&arena, &file, &resolved_names, &self.codebase, &self.plugin_registry, self.settings.clone());
+        if let Some(session) = external_session.as_ref() {
+            analyzer = analyzer.with_external_analysis_session(session);
+        }
 
         if let Err(err) = analyzer.analyze(program, &mut analysis_result) {
             issues.push(Issue::error(format!("Analysis error: {err}")));
@@ -1029,6 +1037,8 @@ impl IncrementalAnalysisService {
         }
 
         let plugin_registry = &self.plugin_registry;
+        let external_session =
+            self.plugin_registry.create_external_analysis_session(self.database.files()).map(Arc::new);
         let settings = settings.clone();
         let parser_settings = self.parser_settings;
 
@@ -1046,8 +1056,11 @@ impl IncrementalAnalysisService {
                 }
 
                 let semantics_checker = SemanticsChecker::new(settings.version);
-                let analyzer =
+                let mut analyzer =
                     Analyzer::new(arena, &source_file, &resolved_names, codebase, plugin_registry, settings.clone());
+                if let Some(session) = external_session.as_deref() {
+                    analyzer = analyzer.with_external_analysis_session(session);
+                }
 
                 analysis_result.issues.extend(semantics_checker.check(&source_file, program, &resolved_names));
                 analyzer.analyze(program, &mut analysis_result)?;

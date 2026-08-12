@@ -31,6 +31,7 @@ where
             artifacts,
             identifier,
             invocation,
+            context.external_analysis_session,
         )?
     {
         for reported_issue in result.issues {

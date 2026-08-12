@@ -13,6 +13,7 @@ final class ReturnTypeRequest
      * @param non-empty-list<int<0, 65535>> $providerIndices
      */
     public function __construct(
+        public readonly int $generation,
         public readonly bool $method,
         public readonly array $providerIndices,
         public readonly Invocation $invocation,

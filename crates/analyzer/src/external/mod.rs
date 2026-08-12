@@ -13,6 +13,7 @@ use std::time::Instant;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::ttype::union::TUnion;
 use mago_database::file::File;
+use mago_database::file::FileId;
 use mago_extension::Frame;
 use mago_extension::WorkerError;
 use mago_extension::WorkerPool;
@@ -27,9 +28,45 @@ pub use error::ExternalAnalyzerError;
 use protocol::Registration;
 
 mod error;
+mod metadata;
 pub mod protocol;
 
 const SLOW_PROVIDER_THRESHOLD: Duration = Duration::from_millis(5);
+static NEXT_ANALYSIS_GENERATION: AtomicU64 = AtomicU64::new(1);
+
+/// Immutable request context shared by every external hook in one analysis run.
+///
+/// A new session is created for every frozen codebase generation. Keeping the
+/// generation on the request, instead of on the worker pool, makes PHP-side
+/// metadata caches safe when a pool is reused by watch mode or by concurrent
+/// analysis services.
+#[derive(Debug)]
+pub struct ExternalAnalysisSession {
+    generation: u64,
+    source_names: foldhash::HashMap<FileId, Arc<[u8]>>,
+}
+
+impl ExternalAnalysisSession {
+    #[must_use]
+    pub fn from_files(files: impl IntoIterator<Item = Arc<File>>) -> Self {
+        let generation = NEXT_ANALYSIS_GENERATION.fetch_add(1, Ordering::Relaxed);
+        let source_names = files.into_iter().map(|file| (file.id, Arc::<[u8]>::from(file.name.as_ref()))).collect();
+
+        Self { generation, source_names }
+    }
+
+    #[inline]
+    #[must_use]
+    pub(crate) const fn generation(&self) -> u64 {
+        self.generation
+    }
+
+    #[inline]
+    #[must_use]
+    pub(crate) fn source_name(&self, file_id: FileId) -> Option<&[u8]> {
+        self.source_names.get(&file_id).map(AsRef::as_ref)
+    }
+}
 
 #[derive(Debug, Default)]
 struct ExternalAnalyzerTelemetry {
@@ -48,14 +85,52 @@ struct ExternalAnalyzerTelemetry {
     typed_arguments: AtomicU64,
     request_bytes: AtomicU64,
     response_bytes: AtomicU64,
+    nested_requests: AtomicU64,
+    nested_errors: AtomicU64,
+    nested_request_bytes: AtomicU64,
+    nested_response_bytes: AtomicU64,
     comparisons: AtomicU64,
+    metadata_queries: AtomicU64,
     matching_ns: AtomicU64,
     encode_ns: AtomicU64,
     type_snapshot_ns: AtomicU64,
     ipc_ns: AtomicU64,
     comparison_ns: AtomicU64,
+    metadata_query_ns: AtomicU64,
+    nested_ns: AtomicU64,
     decode_ns: AtomicU64,
     lookup_ns: AtomicU64,
+}
+
+impl ExternalAnalyzerTelemetry {
+    fn record_nested_request(
+        &self,
+        request_bytes: usize,
+        elapsed: Duration,
+        result: &Result<(protocol::NestedRequestKind, Vec<u8>), ExternalAnalyzerError>,
+    ) {
+        self.nested_requests.fetch_add(1, Ordering::Relaxed);
+        self.nested_request_bytes.fetch_add(request_bytes as u64, Ordering::Relaxed);
+        self.nested_ns.fetch_add(duration_nanos(elapsed), Ordering::Relaxed);
+
+        let Ok((kind, response)) = result else {
+            self.nested_errors.fetch_add(1, Ordering::Relaxed);
+            self.errors.fetch_add(1, Ordering::Relaxed);
+            return;
+        };
+
+        self.nested_response_bytes.fetch_add(response.len() as u64, Ordering::Relaxed);
+        match kind {
+            protocol::NestedRequestKind::TypeComparison => {
+                self.comparisons.fetch_add(1, Ordering::Relaxed);
+                self.comparison_ns.fetch_add(duration_nanos(elapsed), Ordering::Relaxed);
+            }
+            protocol::NestedRequestKind::CodebaseQuery => {
+                self.metadata_queries.fetch_add(1, Ordering::Relaxed);
+                self.metadata_query_ns.fetch_add(duration_nanos(elapsed), Ordering::Relaxed);
+            }
+        }
+    }
 }
 
 struct LookupTrace<'telemetry> {
@@ -280,9 +355,10 @@ impl ExternalAnalyzerHandle {
         artifacts: &AnalysisArtifacts,
         source_file: &File,
         codebase: &CodebaseMetadata,
+        session: &ExternalAnalysisSession,
     ) -> Result<Option<TUnion>, String> {
         self.get()?
-            .get_function_return_type(function, invocation, artifacts, source_file, codebase)
+            .get_function_return_type(function, invocation, artifacts, source_file, codebase, session)
             .map_err(|error| error.to_string())
     }
 
@@ -294,9 +370,10 @@ impl ExternalAnalyzerHandle {
         artifacts: &AnalysisArtifacts,
         source_file: &File,
         codebase: &CodebaseMetadata,
+        session: &ExternalAnalysisSession,
     ) -> Result<Option<TUnion>, String> {
         self.get()?
-            .get_method_return_type(class, method, invocation, artifacts, source_file, codebase)
+            .get_method_return_type(class, method, invocation, artifacts, source_file, codebase, session)
             .map_err(|error| error.to_string())
     }
 
@@ -393,6 +470,7 @@ where
         artifacts: &AnalysisArtifacts,
         source_file: &File,
         codebase: &CodebaseMetadata,
+        session: &ExternalAnalysisSession,
     ) -> Result<Option<TUnion>, ExternalAnalyzerError> {
         let _lookup_trace =
             self.trace_enabled.then(|| LookupTrace { telemetry: &self.telemetry, started_at: Instant::now() });
@@ -440,6 +518,7 @@ where
                 invocation,
                 artifacts,
                 source_file,
+                session.generation(),
                 self.trace_enabled,
             )
             .inspect_err(|_| {
@@ -459,23 +538,19 @@ where
                 self.telemetry.request_bytes.fetch_add(request.payload.len() as u64, Ordering::Relaxed);
             }
 
-            let comparison_telemetry = &self.telemetry;
+            let nested_telemetry = &self.telemetry;
             let trace_enabled = self.trace_enabled;
             let mut handler = |frame: &Frame| {
-                let comparison_start = trace_enabled.then(Instant::now);
-                if trace_enabled {
-                    comparison_telemetry.comparisons.fetch_add(1, Ordering::Relaxed);
-                }
+                let nested_start = trace_enabled.then(Instant::now);
 
-                let result = protocol::handle_type_comparison_request(&frame.payload, codebase, |handle| {
+                let result = protocol::handle_nested_request(&frame.payload, codebase, session, |handle| {
                     request.types.get(handle).copied()
-                })
-                .map_err(|error| error.to_string().into_bytes());
-                if let Some(start) = comparison_start {
-                    comparison_telemetry.comparison_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
+                });
+                if let Some(start) = nested_start {
+                    nested_telemetry.record_nested_request(frame.payload.len(), start.elapsed(), &result);
                 }
 
-                result
+                result.map(|(_, response)| response).map_err(|error| error.to_string().into_bytes())
             };
 
             let ipc_start = self.trace_enabled.then(Instant::now);
@@ -545,6 +620,7 @@ where
         artifacts: &AnalysisArtifacts,
         source_file: &File,
         codebase: &CodebaseMetadata,
+        session: &ExternalAnalysisSession,
     ) -> Result<Option<TUnion>, ExternalAnalyzerError> {
         let _lookup_trace =
             self.trace_enabled.then(|| LookupTrace { telemetry: &self.telemetry, started_at: Instant::now() });
@@ -594,6 +670,7 @@ where
                 invocation,
                 artifacts,
                 source_file,
+                session.generation(),
                 self.trace_enabled,
             )
             .inspect_err(|_| {
@@ -613,24 +690,19 @@ where
                 self.telemetry.request_bytes.fetch_add(request.payload.len() as u64, Ordering::Relaxed);
             }
 
-            let comparison_telemetry = &self.telemetry;
+            let nested_telemetry = &self.telemetry;
             let trace_enabled = self.trace_enabled;
             let mut handler = |frame: &Frame| {
-                let comparison_start = trace_enabled.then(Instant::now);
-                if trace_enabled {
-                    comparison_telemetry.comparisons.fetch_add(1, Ordering::Relaxed);
-                }
+                let nested_start = trace_enabled.then(Instant::now);
 
-                let result = protocol::handle_type_comparison_request(&frame.payload, codebase, |handle| {
+                let result = protocol::handle_nested_request(&frame.payload, codebase, session, |handle| {
                     request.types.get(handle).copied()
-                })
-                .map_err(|error| error.to_string().into_bytes());
-
-                if let Some(start) = comparison_start {
-                    comparison_telemetry.comparison_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
+                });
+                if let Some(start) = nested_start {
+                    nested_telemetry.record_nested_request(frame.payload.len(), start.elapsed(), &result);
                 }
 
-                result
+                result.map(|(_, response)| response).map_err(|error| error.to_string().into_bytes())
             };
 
             let ipc_start = self.trace_enabled.then(Instant::now);
@@ -824,7 +896,9 @@ impl<T> Drop for ExternalAnalyzer<T> {
         let method_lookups = self.telemetry.method_lookups.load(Ordering::Relaxed);
         let lookups = function_lookups.saturating_add(method_lookups);
         let requests = self.telemetry.requests.load(Ordering::Relaxed);
+        let nested_requests = self.telemetry.nested_requests.load(Ordering::Relaxed);
         let comparisons = self.telemetry.comparisons.load(Ordering::Relaxed);
+        let metadata_queries = self.telemetry.metadata_queries.load(Ordering::Relaxed);
         tracing::trace!(
             function_lookups,
             method_lookups,
@@ -844,8 +918,17 @@ impl<T> Drop for ExternalAnalyzer<T> {
             snapshotted_types = self.telemetry.snapshotted_types.load(Ordering::Relaxed),
             request_bytes = self.telemetry.request_bytes.load(Ordering::Relaxed),
             response_bytes = self.telemetry.response_bytes.load(Ordering::Relaxed),
-            comparisons,
             "External analyzer provider summary."
+        );
+
+        tracing::trace!(
+            nested_requests,
+            nested_errors = self.telemetry.nested_errors.load(Ordering::Relaxed),
+            nested_request_bytes = self.telemetry.nested_request_bytes.load(Ordering::Relaxed),
+            nested_response_bytes = self.telemetry.nested_response_bytes.load(Ordering::Relaxed),
+            comparisons,
+            metadata_queries,
+            "External analyzer nested-query summary."
         );
 
         tracing::trace!(
@@ -854,6 +937,8 @@ impl<T> Drop for ExternalAnalyzer<T> {
             type_snapshot_ms = nanos_millis(self.telemetry.type_snapshot_ns.load(Ordering::Relaxed)),
             ipc_ms = nanos_millis(self.telemetry.ipc_ns.load(Ordering::Relaxed)),
             comparison_ms = nanos_millis(self.telemetry.comparison_ns.load(Ordering::Relaxed)),
+            metadata_query_ms = nanos_millis(self.telemetry.metadata_query_ns.load(Ordering::Relaxed)),
+            nested_query_ms = nanos_millis(self.telemetry.nested_ns.load(Ordering::Relaxed)),
             decode_ms = nanos_millis(self.telemetry.decode_ns.load(Ordering::Relaxed)),
             total_worker_cpu_ms = nanos_millis(self.telemetry.lookup_ns.load(Ordering::Relaxed)),
             average_lookup_micros = average_micros(self.telemetry.lookup_ns.load(Ordering::Relaxed), lookups),
@@ -861,6 +946,14 @@ impl<T> Drop for ExternalAnalyzer<T> {
             average_comparison_micros = average_micros(
                 self.telemetry.comparison_ns.load(Ordering::Relaxed),
                 comparisons,
+            ),
+            average_metadata_query_micros = average_micros(
+                self.telemetry.metadata_query_ns.load(Ordering::Relaxed),
+                metadata_queries,
+            ),
+            average_nested_query_micros = average_micros(
+                self.telemetry.nested_ns.load(Ordering::Relaxed),
+                nested_requests,
             ),
             lifetime = ?self.started_at.map(|start| start.elapsed()).unwrap_or_default(),
             "External analyzer timing summary."

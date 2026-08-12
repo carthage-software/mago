@@ -20,6 +20,7 @@ use crate::artifacts::AnalysisArtifacts;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
+use crate::external::ExternalAnalysisSession;
 use crate::plugin::PluginRegistry;
 use crate::plugin::context::HookContext;
 use crate::plugin::hook::HookAction;
@@ -63,6 +64,7 @@ where
     pub codebase: &'ctx CodebaseMetadata,
     pub settings: Settings,
     pub plugin_registry: &'ctx PluginRegistry,
+    pub external_analysis_session: Option<&'ctx ExternalAnalysisSession>,
 }
 
 impl<'ctx, 'ast, 'arena, A> Analyzer<'ctx, 'ast, 'arena, A>
@@ -77,7 +79,21 @@ where
         plugin_registry: &'ctx PluginRegistry,
         settings: Settings,
     ) -> Self {
-        Self { arena, source_file, resolved_names, codebase, settings, plugin_registry }
+        Self {
+            arena,
+            source_file,
+            resolved_names,
+            codebase,
+            settings,
+            plugin_registry,
+            external_analysis_session: None,
+        }
+    }
+
+    #[must_use]
+    pub fn with_external_analysis_session(mut self, session: &'ctx ExternalAnalysisSession) -> Self {
+        self.external_analysis_session = Some(session);
+        self
     }
 
     /// Runs the analyzer over `program` and accumulates findings into `analysis_result`.
@@ -140,6 +156,7 @@ where
             program.trivia.as_slice(),
             collector,
             self.plugin_registry,
+            self.external_analysis_session,
         );
 
         let mut block_context = BlockContext::new(ScopeContext::new(), context.settings.register_super_globals);
