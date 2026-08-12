@@ -299,6 +299,22 @@ fn inline_code_with_unbalanced_apostrophe_is_closed() {
 }
 
 #[test]
+fn inline_code_ending_with_a_hyphen_is_closed() {
+    let arena = LocalArena::new();
+    let source = b"/**\n * `foo-` is the prefix.\n */";
+    let document = parse(&arena, source);
+
+    assert!(document.errors.is_empty(), "expected no errors, got {:?}", document.errors);
+
+    let texts = texts(&document);
+    let [TextSegment::InlineCode(inline), TextSegment::PlainText(rest)] = texts[0].segments else {
+        panic!("expected inline-code then plain-text, got {:?}", texts[0].segments);
+    };
+    assert_eq!(inline.value, b"foo-");
+    assert_eq!(rest.value, b" is the prefix.");
+}
+
+#[test]
 fn utf8_paragraph_text_is_kept_verbatim() {
     let arena = LocalArena::new();
     let source = "/**\n * 中文段落\n */".as_bytes();

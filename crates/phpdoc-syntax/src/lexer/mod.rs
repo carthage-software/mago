@@ -230,7 +230,9 @@ impl<'arena> DocblockLexer<'arena> {
                 consumed_hyphen = true;
             }
 
-            if !consumed_hyphen {
+            // `scan_identifier` skips its first byte, trusting the caller to have validated it,
+            // so re-entering it after a trailing hyphen would swallow whatever follows.
+            if !consumed_hyphen || !remaining.get(length).is_some_and(is_part_of_identifier) {
                 break;
             }
         }
@@ -461,6 +463,18 @@ mod tests {
             TokenKind::Identifier,
             TokenKind::Whitespace,
             TokenKind::ThisVariable,
+        ]
+    );
+
+    test!(
+        lexes_trailing_hyphen_without_consuming_what_follows,
+        b"`foo-` UTF-8",
+        vec![
+            TokenKind::Backtick,
+            TokenKind::Identifier,
+            TokenKind::Backtick,
+            TokenKind::Whitespace,
+            TokenKind::Identifier,
         ]
     );
 
