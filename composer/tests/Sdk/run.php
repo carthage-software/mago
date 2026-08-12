@@ -234,7 +234,7 @@ $completeType = Type::fromAtomic(new ListType(Type::string(), null, null, true))
 );
 $completeTypeReader = new PayloadReader($completeType->encode());
 expect($completeTypeReader->readU8() === 20, 'A structured type did not use the complete type encoding.');
-expect($completeTypeReader->readU16() === 1 << 4, 'A structured union did not preserve its flags.');
+expect($completeTypeReader->readU16() === (1 << 4), 'A structured union did not preserve its flags.');
 expect($completeTypeReader->readU32() === 1, 'A structured union encoded the wrong atomic count.');
 expect($completeTypeReader->readU8() === 5, 'A structured list did not encode as an array atomic.');
 expect($completeTypeReader->readU8() === 1, 'A structured list encoded the wrong array variant.');

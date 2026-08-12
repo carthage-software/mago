@@ -68,8 +68,6 @@ use function array_slice;
  * @mago-expect lint:cyclomatic-complexity
  * @mago-expect lint:kan-defect
  * @mago-expect lint:no-boolean-flag-parameter
- * @mago-expect lint:psl-array-functions
- * @mago-expect lint:literal-named-argument
  * @mago-expect lint:too-many-methods
  */
 final class TypeCodec
@@ -122,7 +120,6 @@ final class TypeCodec
         }
     }
 
-    /** @mago-expect lint:halstead */
     private static function writeAtomic(PayloadWriter $writer, AtomicType $atomic): void
     {
         if ($atomic instanceof ScalarType) {

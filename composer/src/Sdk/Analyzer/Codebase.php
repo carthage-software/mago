@@ -32,8 +32,6 @@ use function strtolower;
  * @mago-expect lint:cyclomatic-complexity
  * @mago-expect lint:kan-defect
  * @mago-expect lint:too-many-methods
- * @mago-expect lint:psl-array-functions
- * @mago-expect lint:psl-string-functions
  */
 class Codebase
 {

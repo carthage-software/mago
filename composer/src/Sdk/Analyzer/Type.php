@@ -22,8 +22,8 @@ use Mago\Sdk\Analyzer\Type\StringLiteralKind;
 use Mago\Sdk\Analyzer\Type\StringType;
 use Mago\Sdk\Analyzer\Type\TypeFlags;
 use Mago\Sdk\Exception\InvalidArgumentException;
-
 use Mago\Sdk\Internal\Analyzer\TypeCodec;
+
 use function count;
 use function implode;
 use function pack;
@@ -277,12 +277,8 @@ final class Type
      * @param non-empty-list<AtomicType> $atomicTypes
      * @internal
      */
-    public static function reference(
-        int $handle,
-        string $description,
-        array $atomicTypes,
-        TypeFlags $flags,
-    ): self {
+    public static function reference(int $handle, string $description, array $atomicTypes, TypeFlags $flags): self
+    {
         return new self(pack('CN', self::REFERENCE, $handle), $description, $atomicTypes, $flags);
     }
 
