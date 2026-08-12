@@ -21,6 +21,7 @@ use Mago\Sdk\Internal\Protocol\PayloadWriter;
 use Mago\Sdk\PHPVersion;
 use Mago\Sdk\Span;
 
+use function count;
 use function pack;
 use function strncmp;
 use function unpack;
@@ -222,33 +223,48 @@ final class Protocol
         return $writer->finish();
     }
 
-    /** @return list<Type|null>|list<Type> */
+    /**
+     * @return list<Type|null>
+     */
+    public static function readOptionalAnalysisTypeQueryResponse(
+        string $payload,
+        int $generation,
+        string $file,
+        int $operation,
+    ): array {
+        $reader = self::readAnalysisTypeQueryResponsePayload($payload, $generation, $file, $operation);
+        $count = $reader->readCount(1_000_000);
+        $types = [];
+        for ($index = 0; $index < $count; ++$index) {
+            if (!$reader->readBoolean()) {
+                $types[] = null;
+                continue;
+            }
+
+            $types[] = TypeCodec::readComplete($reader);
+        }
+
+        $reader->finish();
+
+        return $types;
+    }
+
+    /**
+     * @return list<Type>
+     */
     public static function readAnalysisTypeQueryResponse(
         string $payload,
         int $generation,
         string $file,
         int $operation,
-        bool $optional,
     ): array {
-        [$kind, $reader] = self::readRequest($payload);
-        if (
-            $kind !== self::ANALYSIS_QUERY_RESPONSE
-            || $reader->readU64() !== $generation
-            || $reader->readU8() !== $operation
-            || $reader->readBytes() !== $file
-        ) {
-            throw new ProtocolException('An analysis artifact response does not match its request.');
-        }
-
+        $reader = self::readAnalysisTypeQueryResponsePayload($payload, $generation, $file, $operation);
         $count = $reader->readCount(1_000_000);
         $types = [];
         for ($index = 0; $index < $count; ++$index) {
-            if ($optional && !$reader->readBoolean()) {
-                $types[] = null;
-                continue;
-            }
             $types[] = TypeCodec::readComplete($reader);
         }
+
         $reader->finish();
 
         return $types;
@@ -280,6 +296,9 @@ final class Protocol
         return $types;
     }
 
+    /**
+     * @param positive-int $requestId
+     */
     public static function readLifecycleRequest(
         int $kind,
         PayloadReader $reader,
@@ -297,22 +316,68 @@ final class Protocol
             $plugins[] = $reader->readU16();
         }
 
-        $analysis = null;
-        if ($kind === self::AFTER_FILE_ANALYSIS_REQUEST) {
-            $analysis = self::readFileAnalysis($reader, $host, $requestId, $generation, $cancellation);
-        } elseif ($kind === self::AFTER_ANALYSIS_REQUEST) {
-            $issueCount = $reader->readU32();
-            $references = self::readReferenceSummary($reader);
-            $fileCount = $reader->readCount(1_000_000);
-            $files = [];
-            for ($index = 0; $index < $fileCount; ++$index) {
-                $files[] = self::readFileAnalysis($reader, $host, $requestId, $generation, $cancellation);
-            }
-            $analysis = new ProjectAnalysis($files, $issueCount, $references);
-        }
+        $analysis = match ($kind) {
+            self::BEFORE_ANALYSIS_REQUEST => null,
+            self::AFTER_FILE_ANALYSIS_REQUEST => self::readFileAnalysis(
+                $reader,
+                $host,
+                $requestId,
+                $generation,
+                $cancellation,
+            ),
+            self::AFTER_ANALYSIS_REQUEST => self::readProjectAnalysis(
+                $reader,
+                $host,
+                $requestId,
+                $generation,
+                $cancellation,
+            ),
+            default => throw new ProtocolException("Unknown analyzer lifecycle request kind {$kind}."),
+        };
+
         $reader->finish();
 
         return new LifecycleRequest($generation, $plugins, $analysis);
+    }
+
+    private static function readAnalysisTypeQueryResponsePayload(
+        string $payload,
+        int $generation,
+        string $file,
+        int $operation,
+    ): PayloadReader {
+        [$kind, $reader] = self::readRequest($payload);
+        if (
+            $kind !== self::ANALYSIS_QUERY_RESPONSE
+            || $reader->readU64() !== $generation
+            || $reader->readU8() !== $operation
+            || $reader->readBytes() !== $file
+        ) {
+            throw new ProtocolException('An analysis artifact response does not match its request.');
+        }
+
+        return $reader;
+    }
+
+    /**
+     * @param positive-int $requestId
+     */
+    private static function readProjectAnalysis(
+        PayloadReader $reader,
+        HostClient $host,
+        int $requestId,
+        int $generation,
+        CancellationTokenInterface $cancellation,
+    ): ProjectAnalysis {
+        $issueCount = $reader->readU32();
+        $references = self::readReferenceSummary($reader);
+        $fileCount = $reader->readCount(1_000_000);
+        $files = [];
+        for ($index = 0; $index < $fileCount; ++$index) {
+            $files[] = self::readFileAnalysis($reader, $host, $requestId, $generation, $cancellation);
+        }
+
+        return new ProjectAnalysis($files, $issueCount, $references);
     }
 
     /** @param list<int|ReportedIssue> $reportedIssues */
@@ -355,6 +420,9 @@ final class Protocol
         return $writer->finish();
     }
 
+    /**
+     * @param positive-int $requestId
+     */
     private static function readFileAnalysis(
         PayloadReader $reader,
         HostClient $host,
@@ -362,12 +430,17 @@ final class Protocol
         int $generation,
         CancellationTokenInterface $cancellation,
     ): FileAnalysis {
+        $file = $reader->readBytes();
+        if ($file === '') {
+            throw new ProtocolException('An analyzer file result contains an empty file name.');
+        }
+
         return new FileAnalysis(
             $host,
             $requestId,
             $generation,
             $cancellation,
-            $reader->readBytes(),
+            $file,
             $reader->readU32(),
             $reader->readU32(),
             $reader->readU32(),

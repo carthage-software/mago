@@ -12,6 +12,7 @@ use Mago\Sdk\Analyzer\PluginDefinition;
 
 /**
  * @internal
+ * @mago-expect lint:excessive-parameter-list
  */
 final class RegisteredPlugin
 {

@@ -43,7 +43,10 @@ final class DemoIdentityProvider implements FunctionReturnTypeProvider
     }
 }
 
-/** @mago-expect lint:single-class-per-file */
+/**
+ * @mago-expect lint:cyclomatic-complexity
+ * @mago-expect lint:single-class-per-file
+ */
 final class DemoMetadataProvider implements FunctionReturnTypeProvider
 {
     public function getTargets(): array

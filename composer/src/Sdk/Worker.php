@@ -29,6 +29,7 @@ use Mago\Sdk\Internal\Linter\RegisteredRule;
 use Mago\Sdk\Internal\Protocol\Frame;
 use Mago\Sdk\Internal\Protocol\FrameCodec;
 use Mago\Sdk\Internal\Protocol\FrameKind;
+use Mago\Sdk\Internal\Protocol\PayloadReader;
 use Mago\Sdk\Internal\SignalCancellationToken;
 use Mago\Sdk\Linter\LintContext;
 use Mago\Sdk\Syntax\NodeKind;
@@ -307,7 +308,9 @@ final class Worker
         }
     }
 
-    /** @param positive-int $requestId */
+    /**
+     * @param positive-int $requestId
+     */
     private function handleRequest(
         string $payload,
         int $requestId,
@@ -407,73 +410,7 @@ final class Worker
             || $kind === AnalyzerProtocol::AFTER_FILE_ANALYSIS_REQUEST
             || $kind === AnalyzerProtocol::AFTER_ANALYSIS_REQUEST
         ) {
-            $request = AnalyzerProtocol::readLifecycleRequest($kind, $reader, $host, $requestId, $cancellation);
-            if ($this->metadataCache === null || $this->metadataCache->generation !== $request->generation) {
-                $this->metadataCache = new MetadataCache($request->generation);
-            }
-            $codebase = new Codebase($host, $requestId, $cancellation, $this->metadataCache);
-            $types = new TypeComparator($host, $requestId, $cancellation);
-            $reportedIssues = [];
-            foreach ($request->pluginIndices as $pluginIndex) {
-                $registered = $this->analyzerPlugins[$pluginIndex] ?? null;
-                if ($registered === null) {
-                    throw new ProtocolException("Mago requested unregistered analyzer plugin index {$pluginIndex}.");
-                }
-
-                $cancellation->throwIfCancelled();
-                try {
-                    if ($kind === AnalyzerProtocol::BEFORE_ANALYSIS_REQUEST) {
-                        $context = new BeforeAnalysisContext($this->phpVersion, $codebase, $types, $cancellation);
-                        foreach ($registered->beforeAnalysisHooks as $hook) {
-                            $hook->beforeAnalysis($context);
-                        }
-                    } elseif ($kind === AnalyzerProtocol::AFTER_FILE_ANALYSIS_REQUEST) {
-                        $analysis = $request->analysis;
-                        if (!$analysis instanceof FileAnalysis) {
-                            throw new ProtocolException('An after-file request has no file analysis.');
-                        }
-                        $context = new AfterFileAnalysisContext(
-                            $this->phpVersion,
-                            $codebase,
-                            $types,
-                            $cancellation,
-                            $analysis,
-                        );
-                        foreach ($registered->afterFileAnalysisHooks as $hook) {
-                            $hook->afterFileAnalysis($context);
-                        }
-                    } else {
-                        $analysis = $request->analysis;
-                        if (!$analysis instanceof ProjectAnalysis) {
-                            throw new ProtocolException('An after-analysis request has no project analysis.');
-                        }
-                        $context = new AfterAnalysisContext(
-                            $this->phpVersion,
-                            $codebase,
-                            $types,
-                            $cancellation,
-                            $analysis,
-                        );
-                        foreach ($registered->afterAnalysisHooks as $hook) {
-                            $hook->afterAnalysis($context);
-                        }
-                    }
-                } catch (Throwable $throwable) {
-                    $identifier = $registered->definition->identifier;
-                    throw new ProtocolException(
-                        "Analyzer lifecycle hook in `{$identifier}` failed: {$throwable->getMessage()}",
-                        0,
-                        $throwable,
-                    );
-                }
-
-                foreach ($context->takeReportedIssues() as $issue) {
-                    $reportedIssues[] = $pluginIndex;
-                    $reportedIssues[] = $issue;
-                }
-            }
-
-            return AnalyzerProtocol::writeLifecycleResponse($kind, $reportedIssues);
+            return $this->handleAnalyzerLifecycleRequest($kind, $reader, $requestId, $host, $cancellation);
         }
 
         if ($kind !== AnalyzerProtocol::RETURN_TYPE_REQUEST) {
@@ -517,6 +454,93 @@ final class Worker
         }
 
         return AnalyzerProtocol::writeReturnTypeResponse(null);
+    }
+
+    /** @param positive-int $requestId */
+    private function handleAnalyzerLifecycleRequest(
+        int $kind,
+        PayloadReader $reader,
+        int $requestId,
+        HostClient $host,
+        CancellationTokenInterface $cancellation,
+    ): string {
+        $request = AnalyzerProtocol::readLifecycleRequest($kind, $reader, $host, $requestId, $cancellation);
+        if ($this->metadataCache === null || $this->metadataCache->generation !== $request->generation) {
+            $this->metadataCache = new MetadataCache($request->generation);
+        }
+
+        $codebase = new Codebase($host, $requestId, $cancellation, $this->metadataCache);
+        $types = new TypeComparator($host, $requestId, $cancellation);
+        $reportedIssues = [];
+        foreach ($request->pluginIndices as $pluginIndex) {
+            $registered = $this->analyzerPlugins[$pluginIndex] ?? null;
+            if ($registered === null) {
+                throw new ProtocolException("Mago requested unregistered analyzer plugin index {$pluginIndex}.");
+            }
+
+            $cancellation->throwIfCancelled();
+            try {
+                $context = match ($kind) {
+                    AnalyzerProtocol::BEFORE_ANALYSIS_REQUEST => new BeforeAnalysisContext(
+                        $this->phpVersion,
+                        $codebase,
+                        $types,
+                        $cancellation,
+                    ),
+                    AnalyzerProtocol::AFTER_FILE_ANALYSIS_REQUEST => new AfterFileAnalysisContext(
+                        $this->phpVersion,
+                        $codebase,
+                        $types,
+                        $cancellation,
+                        $request->analysis instanceof FileAnalysis
+                            ? $request->analysis
+                            : throw new ProtocolException('An after-file request has no file analysis.'),
+                    ),
+                    AnalyzerProtocol::AFTER_ANALYSIS_REQUEST => new AfterAnalysisContext(
+                        $this->phpVersion,
+                        $codebase,
+                        $types,
+                        $cancellation,
+                        $request->analysis instanceof ProjectAnalysis
+                            ? $request->analysis
+                            : throw new ProtocolException('An after-analysis request has no project analysis.'),
+                    ),
+                    default => throw new ProtocolException("Unknown analyzer lifecycle request kind {$kind}."),
+                };
+
+                if ($context instanceof BeforeAnalysisContext) {
+                    foreach ($registered->beforeAnalysisHooks as $hook) {
+                        $hook->beforeAnalysis($context);
+                    }
+                }
+
+                if ($context instanceof AfterFileAnalysisContext) {
+                    foreach ($registered->afterFileAnalysisHooks as $hook) {
+                        $hook->afterFileAnalysis($context);
+                    }
+                }
+
+                if ($context instanceof AfterAnalysisContext) {
+                    foreach ($registered->afterAnalysisHooks as $hook) {
+                        $hook->afterAnalysis($context);
+                    }
+                }
+            } catch (Throwable $throwable) {
+                $identifier = $registered->definition->identifier;
+                throw new ProtocolException(
+                    "Analyzer lifecycle hook in `{$identifier}` failed: {$throwable->getMessage()}",
+                    0,
+                    $throwable,
+                );
+            }
+
+            foreach ($context->takeReportedIssues() as $issue) {
+                $reportedIssues[] = $pluginIndex;
+                $reportedIssues[] = $issue;
+            }
+        }
+
+        return AnalyzerProtocol::writeLifecycleResponse($kind, $reportedIssues);
     }
 
     /**

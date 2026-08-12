@@ -16,6 +16,7 @@ use function array_keys;
  * Completed semantic artifacts for one source file. Expensive data is fetched lazily.
  *
  * @api
+ * @mago-expect lint:excessive-parameter-list
  */
 final class FileAnalysis
 {
@@ -31,6 +32,7 @@ final class FileAnalysis
 
     /**
      * @internal
+     * @param positive-int $requestId
      * @param non-empty-string $file
      */
     public function __construct(
@@ -78,12 +80,11 @@ final class FileAnalysis
                     $missing,
                 ),
             );
-            $types = Protocol::readAnalysisTypeQueryResponse(
+            $types = Protocol::readOptionalAnalysisTypeQueryResponse(
                 $response,
                 $this->generation,
                 $this->file,
                 Protocol::GET_EXPRESSION_TYPES,
-                true,
             );
             foreach (array_keys($missing) as $index => $key) {
                 $this->expressionTypes[$key] = $types[$index];
@@ -152,7 +153,6 @@ final class FileAnalysis
                 $this->generation,
                 $this->file,
                 $operation,
-                false,
             );
         }
 
