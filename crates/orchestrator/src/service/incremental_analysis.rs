@@ -1061,7 +1061,7 @@ impl IncrementalAnalysisService {
     fn run_analyzer_selective(
         &self,
         codebase: &mut CodebaseMetadata,
-        current_symbol_references: SymbolReferences,
+        mut current_symbol_references: SymbolReferences,
         settings: &Settings,
         skip_files: &HashSet<FileId>,
     ) -> Result<SelectiveAnalysisOutput, OrchestratorError> {
@@ -1093,7 +1093,7 @@ impl IncrementalAnalysisService {
         #[cfg(not(target_arch = "wasm32"))]
         let before_start = trace_enabled.then(Instant::now);
         let before_issues = plugin_registry
-            .run_external_before_analysis_hooks(codebase, external_session.as_deref())
+            .run_external_before_analysis_hooks(codebase, &mut current_symbol_references, external_session.as_deref())
             .map_err(mago_analyzer::error::AnalysisError::from)?;
         #[cfg(not(target_arch = "wasm32"))]
         if let Some(start) = before_start {

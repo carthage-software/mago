@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Mago\Sdk\Internal\Analyzer;
 
+use Closure;
 use Mago\Sdk\Analyzer\Argument;
 use Mago\Sdk\Analyzer\ExpressionType;
 use Mago\Sdk\Analyzer\FileAnalysis;
@@ -44,6 +45,7 @@ final class Protocol
     public const AFTER_ANALYSIS_REQUEST = 7;
     public const ANALYSIS_QUERY_REQUEST = 8;
     public const AFTER_FILE_ANALYSIS_BATCH_REQUEST = 9;
+    public const CODEBASE_MUTATION_REQUEST = 10;
     public const GET_EXPRESSION_TYPES = 1;
     public const GET_ALL_EXPRESSION_TYPES = 2;
     public const GET_INFERRED_RETURN_TYPES = 3;
@@ -89,10 +91,16 @@ final class Protocol
     public const TYPE_COMPARISON_EQUAL = 1;
     public const TYPE_COMPARISON_CONTAINED_BY = 2;
     public const TYPE_COMPARISON_CAN_BE_IDENTICAL = 3;
+    public const REMOVE_CLASS_LIKES = 1;
+    public const INSERT_CLASS_LIKES = 2;
+    public const REMOVE_FUNCTIONS = 3;
+    public const INSERT_FUNCTIONS = 4;
+    public const REMOVE_CONSTANTS = 5;
+    public const INSERT_CONSTANTS = 6;
 
     private const MAGIC_U32 = 0x4D41_4E41;
     private const MAJOR = 1;
-    private const MINOR = 0;
+    private const MINOR = 1;
     private const VERSION_U32 = (self::MAJOR << 16) | self::MINOR;
     private const DESCRIBE_RESPONSE = 0x8001;
     private const RETURN_TYPE_RESPONSE = 0x8002;
@@ -103,8 +111,9 @@ final class Protocol
     private const AFTER_ANALYSIS_RESPONSE = 0x8007;
     private const ANALYSIS_QUERY_RESPONSE = 0x8008;
     private const AFTER_FILE_ANALYSIS_BATCH_RESPONSE = 0x8009;
-    private const RETURN_TYPE_REQUEST_HEADER = "MANA\x00\x01\x00\x00\x00\x02\x00\x00";
-    private const UNHANDLED_RETURN_TYPE_RESPONSE = "MANA\x00\x01\x00\x00\x80\x02\x00\x00\x00";
+    private const CODEBASE_MUTATION_RESPONSE = 0x800A;
+    private const RETURN_TYPE_REQUEST_HEADER = "MANA\x00\x01\x00\x01\x00\x02\x00\x00";
+    private const UNHANDLED_RETURN_TYPE_RESPONSE = "MANA\x00\x01\x00\x01\x80\x02\x00\x00\x00";
     private const INVOCATION_FUNCTION = 1;
     private const INVOCATION_METHOD = 2;
 
@@ -573,6 +582,56 @@ final class Protocol
         $reader->finish();
 
         return $result;
+    }
+
+    /** @param list<string> $names */
+    public static function writeCodebaseRemovalRequest(int $generation, int $operation, array $names): string
+    {
+        $writer = self::createMessage(self::CODEBASE_MUTATION_REQUEST);
+        $writer->writeU64($generation);
+        $writer->writeU8($operation);
+        $writer->writeCount($names);
+        foreach ($names as $name) {
+            $writer->writeBytes($name);
+        }
+
+        return $writer->finish();
+    }
+
+    /**
+     * @template T of object
+     * @param list<T> $definitions
+     * @param Closure(PayloadWriter, T): void $write
+     */
+    public static function writeCodebaseInsertionRequest(
+        int $generation,
+        int $operation,
+        array $definitions,
+        Closure $write,
+    ): string {
+        $writer = self::createMessage(self::CODEBASE_MUTATION_REQUEST);
+        $writer->writeU64($generation);
+        $writer->writeU8($operation);
+        $writer->writeCount($definitions);
+        foreach ($definitions as $definition) {
+            $write($writer, $definition);
+        }
+
+        return $writer->finish();
+    }
+
+    /** @return array{PayloadReader, int<0, 4294967295>} */
+    public static function readCodebaseMutationResponse(string $payload, int $generation, int $operation): array
+    {
+        [$kind, $reader] = self::readRequest($payload);
+        if ($kind !== self::CODEBASE_MUTATION_RESPONSE) {
+            throw new ProtocolException("Expected a codebase mutation response, received analyzer message {$kind}.");
+        }
+        if ($reader->readU64() !== $generation || $reader->readU8() !== $operation) {
+            throw new ProtocolException('A codebase mutation response does not match its request.');
+        }
+
+        return [$reader, $reader->readCount(65_536)];
     }
 
     /**

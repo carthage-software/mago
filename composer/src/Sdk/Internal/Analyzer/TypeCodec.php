@@ -98,6 +98,11 @@ final class TypeCodec
         return $writer->finish();
     }
 
+    public static function writeComplete(PayloadWriter $writer, Type $type): void
+    {
+        self::writeUnion($writer, $type);
+    }
+
     private static function writeUnion(PayloadWriter $writer, Type $type): void
     {
         $flags = $type->flags;

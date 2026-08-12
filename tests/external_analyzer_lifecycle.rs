@@ -7,6 +7,7 @@ use std::path::Path;
 use std::process::Command;
 use std::sync::Arc;
 
+use mago_analyzer::external::ExternalAnalysisSession;
 use mago_analyzer::external::ExternalAnalyzer;
 use mago_analyzer::external::ExternalAnalyzerHandle;
 use mago_analyzer::plugin::PluginRegistry;
@@ -63,8 +64,14 @@ fn make_database(changed_file: Option<usize>) -> (Database<'static>, FileId) {
         } else {
             String::new()
         };
+        let extension_usage = if index == 0 {
+            "\nfunction extension_consumer(ExtensionProvided $provided): int {\n    return $provided->answer() + extension_answer(0) + EXTENSION_ANSWER;\n}\n"
+        } else {
+            ""
+        };
+        let inheritance = if index == 0 { " extends ExtensionProvided" } else { "" };
         let contents = format!(
-            "<?php\n\ndeclare(strict_types=1);\n\nfinal class LifecycleClass{index} {{\n    public function value(): int {{ return {value}; }}\n}}\n\nfunction lifecycle_function_{index}(int $value): int {{ return $value + {value}; }}\n{generator}"
+            "<?php\n\ndeclare(strict_types=1);\n\nfinal class LifecycleClass{index}{inheritance} {{\n    public function value(): int {{ return {value}; }}\n}}\n\nfunction lifecycle_function_{index}(int $value): int {{ return $value + {value}; }}\n{extension_usage}{generator}"
         );
         let file = File::new(
             Cow::Owned(format!("src/file{index}.php").into_bytes()),
@@ -168,6 +175,13 @@ fn external_analyzer_lifecycle_is_exact_across_workers_and_incremental_runs() {
     );
 
     let initial = service.analyze().expect("initial lifecycle analysis should succeed");
+    let unexpected = initial
+        .issues
+        .iter()
+        .filter(|issue| issue.code.as_deref().is_none_or(|code| !code.starts_with("lifecycle-")))
+        .map(|issue| (issue.code.as_deref(), issue.message.as_str()))
+        .collect::<Vec<_>>();
+    assert!(unexpected.is_empty(), "unexpected analyzer issues: {unexpected:#?}");
     assert_issue_cardinality(&initial.issues);
     let initial_audit = read_audit(&audit_log);
     assert_eq!(initial_audit.len(), 2 + (FILE_COUNT * 2) + 2);
@@ -190,4 +204,31 @@ fn external_analyzer_lifecycle_is_exact_across_workers_and_incremental_runs() {
             .filter(|entry| entry.1 == "after-file")
             .all(|entry| entry.2.as_deref() == Some("src/file5.php"))
     );
+}
+
+#[test]
+fn failed_before_analysis_hook_discards_its_metadata_transaction() {
+    let repository = Path::new(env!("CARGO_MANIFEST_DIR"));
+    if !php_sdk_is_available(repository) {
+        return;
+    }
+
+    let command = WorkerCommand::new("php")
+        .with_argument(repository.join("composer/tests/Sdk/Fixtures/analyzer-mutation-rollback-worker.php"))
+        .with_current_directory(repository);
+    let pool = WorkerPool::spawn(command, NonZeroUsize::new(1).expect("one is non-zero"), WorkerPoolOptions::default())
+        .expect("PHP rollback worker should start");
+    let analyzer = ExternalAnalyzer::initialize([Arc::new(pool)], PHPVersion::PHP85, &[], false)
+        .expect("PHP rollback analyzer should initialize");
+    let mut registry = PluginRegistry::with_library_providers();
+    registry.set_external_analyzer(Arc::new(ExternalAnalyzerHandle::ready(analyzer)));
+    registry.prepare_external_analyzer().expect("PHP rollback analyzer should prepare");
+
+    let mut codebase = CodebaseMetadata::new();
+    let mut references = SymbolReferences::new();
+    let session = ExternalAnalysisSession::from_files(Vec::<Arc<File>>::new());
+    let result = registry.run_external_before_analysis_hooks(&mut codebase, &mut references, Some(&session));
+
+    assert!(result.is_err(), "the deliberately failing hook should abort");
+    assert!(!codebase.class_like_exists(b"MustRollBack"), "a failed hook must not commit its candidate codebase");
 }

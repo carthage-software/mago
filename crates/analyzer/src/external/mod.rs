@@ -11,6 +11,8 @@ use std::time::Duration;
 use std::time::Instant;
 
 use mago_codex::metadata::CodebaseMetadata;
+use mago_codex::populator::populate_codebase;
+use mago_codex::reference::SymbolReferences;
 use mago_codex::ttype::union::TUnion;
 use mago_database::file::File;
 use mago_database::file::FileId;
@@ -33,6 +35,7 @@ use protocol::Registration;
 mod error;
 mod lifecycle;
 mod metadata;
+mod mutation;
 pub mod protocol;
 
 const SLOW_PROVIDER_THRESHOLD: Duration = Duration::from_millis(5);
@@ -111,6 +114,7 @@ struct ExternalAnalyzerTelemetry {
     nested_response_bytes: AtomicU64,
     comparisons: AtomicU64,
     metadata_queries: AtomicU64,
+    metadata_mutations: AtomicU64,
     analysis_queries: AtomicU64,
     before_analysis_requests: AtomicU64,
     after_file_analysis_requests: AtomicU64,
@@ -127,6 +131,7 @@ struct ExternalAnalyzerTelemetry {
     ipc_ns: AtomicU64,
     comparison_ns: AtomicU64,
     metadata_query_ns: AtomicU64,
+    metadata_mutation_ns: AtomicU64,
     analysis_query_ns: AtomicU64,
     lifecycle_encode_ns: AtomicU64,
     lifecycle_ipc_ns: AtomicU64,
@@ -163,6 +168,10 @@ impl ExternalAnalyzerTelemetry {
             protocol::NestedRequestKind::CodebaseQuery => {
                 self.metadata_queries.fetch_add(1, Ordering::Relaxed);
                 self.metadata_query_ns.fetch_add(duration_nanos(elapsed), Ordering::Relaxed);
+            }
+            protocol::NestedRequestKind::CodebaseMutation => {
+                self.metadata_mutations.fetch_add(1, Ordering::Relaxed);
+                self.metadata_mutation_ns.fetch_add(duration_nanos(elapsed), Ordering::Relaxed);
             }
             protocol::NestedRequestKind::AnalysisQuery => {
                 self.analysis_queries.fetch_add(1, Ordering::Relaxed);
@@ -465,10 +474,11 @@ impl ExternalAnalyzerHandle {
 
     pub(crate) fn run_before_analysis_hooks(
         &self,
-        codebase: &CodebaseMetadata,
+        codebase: &mut CodebaseMetadata,
+        symbol_references: &mut SymbolReferences,
         session: &ExternalAnalysisSession,
     ) -> Result<IssueCollection, String> {
-        self.get()?.run_before_analysis_hooks(codebase, session).map_err(|error| error.to_string())
+        self.get()?.run_before_analysis_hooks(codebase, symbol_references, session).map_err(|error| error.to_string())
     }
 
     pub(crate) fn run_after_file_analysis_hooks(
@@ -672,7 +682,8 @@ where
 
     fn run_before_analysis_hooks(
         &self,
-        codebase: &CodebaseMetadata,
+        codebase: &mut CodebaseMetadata,
+        symbol_references: &mut SymbolReferences,
         session: &ExternalAnalysisSession,
     ) -> Result<IssueCollection, ExternalAnalyzerError> {
         let mut issues = IssueCollection::new();
@@ -681,42 +692,75 @@ where
             if plugins.is_empty() {
                 continue;
             }
-            let lifecycle_start = self.trace_enabled.then(Instant::now);
-            let encode_start = self.trace_enabled.then(Instant::now);
-            let request =
-                lifecycle::encode_before_analysis_request(session.generation(), plugins).inspect_err(|_| {
-                    if self.trace_enabled {
-                        self.telemetry.lifecycle_errors.fetch_add(1, Ordering::Relaxed);
-                        self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
-                    }
-                })?;
-            if let Some(start) = encode_start {
-                self.telemetry.lifecycle_encode_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
-            }
+            for plugin in plugins {
+                let plugin_slice = std::slice::from_ref(plugin);
+                let lifecycle_start = self.trace_enabled.then(Instant::now);
+                let encode_start = self.trace_enabled.then(Instant::now);
+                let request = lifecycle::encode_before_analysis_request(session.generation(), plugin_slice)
+                    .inspect_err(|_| {
+                        if self.trace_enabled {
+                            self.telemetry.lifecycle_errors.fetch_add(1, Ordering::Relaxed);
+                            self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
+                        }
+                    })?;
 
-            let nested_telemetry = &self.telemetry;
-            let trace_enabled = self.trace_enabled;
-            let mut handler = |frame: &Frame| {
-                let nested_start = trace_enabled.then(Instant::now);
-                let result = protocol::handle_nested_request(&frame.payload, codebase, session, |_| None);
-                if let Some(start) = nested_start {
-                    nested_telemetry.record_nested_request(frame.payload.len(), start.elapsed(), &result);
+                if let Some(start) = encode_start {
+                    self.telemetry.lifecycle_encode_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
                 }
 
-                result.map(|(_, response)| response).map_err(|error| error.to_string().into_bytes())
-            };
-            issues.extend(self.dispatch_lifecycle_request(
-                backend,
-                LifecyclePhase::Before,
-                plugins,
-                plugins.len(),
-                request,
-                &mut handler,
-                session,
-                None,
-                lifecycle_start,
-            )?);
+                let nested_telemetry = &self.telemetry;
+                let trace_enabled = self.trace_enabled;
+                let mut candidate: Option<(CodebaseMetadata, SymbolReferences)> = None;
+                let mut handler = |frame: &Frame| {
+                    let nested_start = trace_enabled.then(Instant::now);
+                    let result = match mutation::is_request(&frame.payload) {
+                        Ok(true) => {
+                            let (candidate_codebase, candidate_references) =
+                                candidate.get_or_insert_with(|| (codebase.clone(), symbol_references.clone()));
+                            let result = mutation::handle_request(&frame.payload, candidate_codebase, session);
+                            if result.is_ok() {
+                                populate_codebase(
+                                    candidate_codebase,
+                                    candidate_references,
+                                    mago_word::WordSet::default(),
+                                    HashSet::default(),
+                                );
+                            }
+                            result
+                        }
+                        Ok(false) => {
+                            let visible = candidate.as_ref().map_or(&*codebase, |(candidate, _)| candidate);
+                            protocol::handle_nested_request(&frame.payload, visible, session, |_| None)
+                        }
+                        Err(error) => Err(error),
+                    };
+
+                    if let Some(start) = nested_start {
+                        nested_telemetry.record_nested_request(frame.payload.len(), start.elapsed(), &result);
+                    }
+
+                    result.map(|(_, response)| response).map_err(|error| error.to_string().into_bytes())
+                };
+
+                issues.extend(self.dispatch_lifecycle_request(
+                    backend,
+                    LifecyclePhase::Before,
+                    plugin_slice,
+                    1,
+                    request,
+                    &mut handler,
+                    session,
+                    None,
+                    lifecycle_start,
+                )?);
+
+                if let Some((candidate_codebase, candidate_references)) = candidate {
+                    *codebase = candidate_codebase;
+                    *symbol_references = candidate_references;
+                }
+            }
         }
+
         Ok(issues)
     }
 
@@ -1376,6 +1420,7 @@ impl<T> Drop for ExternalAnalyzer<T> {
         let nested_requests = self.telemetry.nested_requests.load(Ordering::Relaxed);
         let comparisons = self.telemetry.comparisons.load(Ordering::Relaxed);
         let metadata_queries = self.telemetry.metadata_queries.load(Ordering::Relaxed);
+        let metadata_mutations = self.telemetry.metadata_mutations.load(Ordering::Relaxed);
         let analysis_queries = self.telemetry.analysis_queries.load(Ordering::Relaxed);
         let lifecycle_requests = self
             .telemetry
@@ -1412,6 +1457,7 @@ impl<T> Drop for ExternalAnalyzer<T> {
             nested_response_bytes = self.telemetry.nested_response_bytes.load(Ordering::Relaxed),
             comparisons,
             metadata_queries,
+            metadata_mutations,
             analysis_queries,
             "External analyzer nested-query summary."
         );
@@ -1436,6 +1482,7 @@ impl<T> Drop for ExternalAnalyzer<T> {
             ipc_ms = nanos_millis(self.telemetry.ipc_ns.load(Ordering::Relaxed)),
             comparison_ms = nanos_millis(self.telemetry.comparison_ns.load(Ordering::Relaxed)),
             metadata_query_ms = nanos_millis(self.telemetry.metadata_query_ns.load(Ordering::Relaxed)),
+            metadata_mutation_ms = nanos_millis(self.telemetry.metadata_mutation_ns.load(Ordering::Relaxed)),
             analysis_query_ms = nanos_millis(self.telemetry.analysis_query_ns.load(Ordering::Relaxed)),
             nested_query_ms = nanos_millis(self.telemetry.nested_ns.load(Ordering::Relaxed)),
             decode_ms = nanos_millis(self.telemetry.decode_ns.load(Ordering::Relaxed)),
@@ -1449,6 +1496,10 @@ impl<T> Drop for ExternalAnalyzer<T> {
             average_metadata_query_micros = average_micros(
                 self.telemetry.metadata_query_ns.load(Ordering::Relaxed),
                 metadata_queries,
+            ),
+            average_metadata_mutation_micros = average_micros(
+                self.telemetry.metadata_mutation_ns.load(Ordering::Relaxed),
+                metadata_mutations,
             ),
             average_analysis_query_micros = average_micros(
                 self.telemetry.analysis_query_ns.load(Ordering::Relaxed),

@@ -2,6 +2,15 @@
 
 declare(strict_types=1);
 
+use Mago\Sdk\Analyzer\Definition\ClassConstantDefinition;
+use Mago\Sdk\Analyzer\Definition\ClassLikeDefinition;
+use Mago\Sdk\Analyzer\Definition\ConstantDefinition;
+use Mago\Sdk\Analyzer\Definition\EnumCaseDefinition;
+use Mago\Sdk\Analyzer\Definition\FunctionDefinition;
+use Mago\Sdk\Analyzer\Definition\MethodDefinition;
+use Mago\Sdk\Analyzer\Definition\ParameterDefinition;
+use Mago\Sdk\Analyzer\Definition\PropertyDefinition;
+use Mago\Sdk\Analyzer\Definition\TemplateDefinition;
 use Mago\Sdk\Analyzer\FunctionTarget;
 use Mago\Sdk\Analyzer\MethodTarget;
 use Mago\Sdk\Analyzer\PluginDefinition;
@@ -38,6 +47,21 @@ function expect(bool $condition, string $message): void
     if (!$condition) {
         throw new RuntimeException($message);
     }
+}
+
+/**
+ * @param Closure(): object $factory
+ * @param non-empty-string $message
+ */
+function expect_invalid_argument(Closure $factory, string $message): void
+{
+    try {
+        $factory();
+    } catch (InvalidArgumentException) {
+        return;
+    }
+
+    throw new RuntimeException($message);
 }
 
 $writer = new PayloadWriter();
@@ -228,6 +252,61 @@ expect((string) Type::union(Type::string(), Type::null()) === 'string|null', 'Un
 expect((string) Type::nonNegativeInt() === 'non-negative-int', 'Refined integer type was not built.');
 expect((string) Type::nonEmptyString() === 'non-empty-string', 'Refined string type was not built.');
 expect((string) Type::literalInt(-42) === 'int(-42)', 'Literal integer type was not built.');
+
+new ClassLikeDefinition('Vendor\\enum', parentClass: 'Vendor\\ParentType');
+new FunctionDefinition('Vendor\\from');
+new ConstantDefinition('Vendor\\enum');
+new MethodDefinition('class');
+new ClassConstantDefinition('function');
+new EnumCaseDefinition('function');
+new ParameterDefinition('$é');
+new PropertyDefinition('$this');
+new TemplateDefinition('T1', Type::mixed());
+
+expect_invalid_argument(
+    static fn(): object => new ClassLikeDefinition('Vendor\\class'),
+    'Reserved class-like names must be rejected.',
+);
+expect_invalid_argument(
+    static fn(): object => new ClassLikeDefinition('ValidName', parentClass: '1Invalid'),
+    'Invalid parent class names must be rejected.',
+);
+expect_invalid_argument(
+    static fn(): object => new FunctionDefinition('bad-name'),
+    'Invalid function names must be rejected.',
+);
+expect_invalid_argument(
+    static fn(): object => new ConstantDefinition('readonly'),
+    'Reserved global constant names must be rejected.',
+);
+expect_invalid_argument(
+    static fn(): object => new MethodDefinition('Vendor\\method'),
+    'Qualified method names must be rejected.',
+);
+expect_invalid_argument(
+    static fn(): object => new ClassConstantDefinition('CLASS'),
+    'The reserved class constant name must be rejected case-insensitively.',
+);
+expect_invalid_argument(
+    static fn(): object => new EnumCaseDefinition('class'),
+    'The reserved enum case name must be rejected.',
+);
+expect_invalid_argument(
+    static fn(): object => new ParameterDefinition('$'),
+    'A bare dollar sign must not be accepted as a parameter name.',
+);
+expect_invalid_argument(
+    static fn(): object => new ParameterDefinition('$1invalid'),
+    'A parameter name must start with a valid PHP identifier byte.',
+);
+expect_invalid_argument(
+    static fn(): object => new PropertyDefinition('$bad-name'),
+    'A property name must contain only valid PHP identifier bytes.',
+);
+expect_invalid_argument(
+    static fn(): object => new TemplateDefinition('$T', Type::mixed()),
+    'Invalid template names must be rejected.',
+);
 
 $completeType = Type::fromAtomic(new ListType(Type::string(), null, null, true))->withFlags(
     new TypeFlags(possiblyUndefined: true),

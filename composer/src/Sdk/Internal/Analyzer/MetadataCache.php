@@ -21,5 +21,6 @@ final class MetadataCache
 
     public function __construct(
         public readonly int $generation,
+        public readonly bool $enabled = true,
     ) {}
 }

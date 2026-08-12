@@ -10,12 +10,21 @@ use Mago\Sdk\Analyzer\AfterFileAnalysisContext;
 use Mago\Sdk\Analyzer\AfterFileAnalysisHook;
 use Mago\Sdk\Analyzer\BeforeAnalysisContext;
 use Mago\Sdk\Analyzer\BeforeAnalysisHook;
+use Mago\Sdk\Analyzer\Definition\ClassConstantDefinition;
+use Mago\Sdk\Analyzer\Definition\ClassLikeDefinition;
+use Mago\Sdk\Analyzer\Definition\ConstantDefinition;
+use Mago\Sdk\Analyzer\Definition\FunctionDefinition;
+use Mago\Sdk\Analyzer\Definition\MethodDefinition;
+use Mago\Sdk\Analyzer\Definition\ParameterDefinition;
+use Mago\Sdk\Analyzer\Definition\PropertyDefinition;
+use Mago\Sdk\Analyzer\Definition\TemplateDefinition;
 use Mago\Sdk\Analyzer\LifecycleContext;
 use Mago\Sdk\Analyzer\Metadata\ClassLikeMetadata;
 use Mago\Sdk\Analyzer\Plugin;
 use Mago\Sdk\Analyzer\PluginDefinition;
 use Mago\Sdk\Analyzer\PluginRegistry;
 use Mago\Sdk\Analyzer\Type;
+use Mago\Sdk\Analyzer\Type\Variance;
 use Mago\Sdk\Extension;
 use Mago\Sdk\Reporting\Issue;
 use Mago\Sdk\Reporting\Level;
@@ -51,6 +60,35 @@ final class LifecycleProofHook implements BeforeAnalysisHook, AfterFileAnalysisH
 
     public function beforeAnalysis(BeforeAnalysisContext $context): void
     {
+        if ($this->plugin === 'lifecycle-one') {
+            $class = $context->codebase->removeClassLike('ExtensionProvided') ?? new ClassLikeDefinition(
+                name: 'ExtensionProvided',
+                methods: [new MethodDefinition('answer', returnType: Type::int())],
+                properties: [new PropertyDefinition('$value', Type::int())],
+                magicProperties: [new PropertyDefinition('$magic', Type::string())],
+                constants: [new ClassConstantDefinition('ANSWER', Type::int(), valueType: Type::literalInt(42))],
+                templates: [new TemplateDefinition('T', Type::mixed(), Type::int(), Variance::Covariant, true)],
+                typeAliases: ['Answer' => Type::int()],
+                mixins: [Type::namedObject('stdClass')],
+                sealedMethods: true,
+                permittedInheritors: ['LifecycleClass0'],
+            );
+            $function = $context->codebase->removeFunction('extension_answer') ?? new FunctionDefinition(
+                'extension_answer',
+                [new ParameterDefinition('$fallback', Type::int(), defaultType: Type::literalInt(0))],
+                Type::int(),
+                templates: [new TemplateDefinition('T', Type::mixed())],
+            );
+            $constant = $context->codebase->removeConstant('EXTENSION_ANSWER') ?? new ConstantDefinition(
+                'EXTENSION_ANSWER',
+                Type::int(),
+                Type::literalInt(42),
+            );
+            $context->codebase->insertClassLike($class);
+            $context->codebase->insertFunction($function);
+            $context->codebase->insertConstant($constant);
+        }
+
         $base = $this->verifySharedContext($context);
         $this->record('before', null);
         $context->report(Level::Help, 'before', Issue::at('Before-analysis hook ran.', $base->location));
@@ -101,7 +139,9 @@ final class LifecycleProofHook implements BeforeAnalysisHook, AfterFileAnalysisH
         $project = $context->analysis;
         $expectedIssueCount = 2 + (count($project->files) * 2);
         if (count($project->files) !== 96 || $project->issueCount !== $expectedIssueCount) {
-            throw new RuntimeException('The final hook did not receive the complete merged project result.');
+            throw new RuntimeException(
+                "The final hook received {$project->issueCount} issues; expected {$expectedIssueCount}.",
+            );
         }
 
         $names = [];
@@ -137,11 +177,26 @@ final class LifecycleProofHook implements BeforeAnalysisHook, AfterFileAnalysisH
     private function verifySharedContext(LifecycleContext $context): ClassLikeMetadata
     {
         [$base, $missing] = $context->codebase->getMultipleClasses(['LifecycleClass0', 'DefinitelyMissing']);
+        $extensionClass = $context->codebase->getClass('ExtensionProvided');
+        $extensionFunction = $context->codebase->getFunction('extension_answer');
         if (
             $base === null
             || $missing !== null
             || !$context->codebase->classExists('LifecycleClass0')
             || !$context->types->isContainedBy(Type::literalInt(1), Type::int())
+            || $extensionClass === null
+            || count($extensionClass->templates) !== 1
+            || count($extensionClass->typeAliases) !== 1
+            || count($extensionClass->mixins) !== 1
+            || $extensionClass->magicProperties !== ['$magic']
+            || $extensionClass->sealedMethods !== true
+            || $extensionClass->permittedInheritors !== ['lifecycleclass0']
+            || $context->codebase->getMethod('ExtensionProvided', 'answer') === null
+            || $context->codebase->getProperty('ExtensionProvided', '$value') === null
+            || $context->codebase->getClassConstant('ExtensionProvided', 'ANSWER') === null
+            || $extensionFunction === null
+            || count($extensionFunction->templates) !== 1
+            || $context->codebase->getConstant('EXTENSION_ANSWER') === null
         ) {
             throw new RuntimeException('A lifecycle hook cannot use its shared read-only services.');
         }

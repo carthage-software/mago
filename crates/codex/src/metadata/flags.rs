@@ -56,6 +56,12 @@ impl MetadataFlags {
 impl MetadataFlags {
     #[inline]
     #[must_use]
+    pub const fn from_bits(bits: u64) -> Self {
+        Self(bits)
+    }
+
+    #[inline]
+    #[must_use]
     pub const fn empty() -> Self {
         MetadataFlags(0)
     }

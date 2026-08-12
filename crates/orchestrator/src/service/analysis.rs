@@ -130,7 +130,11 @@ impl AnalysisService {
             return issues;
         }
 
-        match self.plugin_registry.run_external_before_analysis_hooks(&self.codebase, external_session.as_ref()) {
+        match self.plugin_registry.run_external_before_analysis_hooks(
+            &mut self.codebase,
+            &mut self.symbol_references,
+            external_session.as_ref(),
+        ) {
             Ok(reported) => issues.extend(reported),
             Err(err) => {
                 issues.push(Issue::error(format!("Analysis error: {err}")));
@@ -241,7 +245,7 @@ impl AnalysisService {
         let telemetry_for_closure = Arc::clone(&telemetry);
 
         let result = pipeline.run(
-            move |codebase| {
+            move |codebase, symbol_references| {
                 before_plugin_registry.prepare_external_analyzer().map_err(AnalysisError::from)?;
                 let capabilities = (
                     before_plugin_registry.has_external_after_file_analysis_hooks().map_err(AnalysisError::from)?,
@@ -251,7 +255,7 @@ impl AnalysisService {
                 #[cfg(not(target_arch = "wasm32"))]
                 let lifecycle_start = trace_enabled.then(Instant::now);
                 let issues = before_plugin_registry
-                    .run_external_before_analysis_hooks(codebase, before_external_session.as_deref())
+                    .run_external_before_analysis_hooks(codebase, symbol_references, before_external_session.as_deref())
                     .map_err(AnalysisError::from)?;
                 #[cfg(not(target_arch = "wasm32"))]
                 if let Some(start) = lifecycle_start {

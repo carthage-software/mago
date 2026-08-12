@@ -1570,7 +1570,7 @@ pub fn populate_union_type(
         return;
     }
 
-    if !unpopulated_union.needs_population() {
+    if !force && !unpopulated_union.needs_population() {
         return;
     }
 

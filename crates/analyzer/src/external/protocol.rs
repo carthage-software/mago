@@ -96,7 +96,7 @@ use crate::invocation::Invocation;
 
 pub const ANALYZER_PROTOCOL_MAGIC: [u8; 4] = *b"MANA";
 pub const ANALYZER_PROTOCOL_MAJOR: u16 = 1;
-pub const ANALYZER_PROTOCOL_MINOR: u16 = 0;
+pub const ANALYZER_PROTOCOL_MINOR: u16 = 1;
 
 const HEADER_LENGTH: usize = 12;
 const INITIAL_MESSAGE_CAPACITY: usize = 256;
@@ -190,6 +190,7 @@ pub(super) struct ReturnTypeRequest<'type_info> {
 pub(super) enum NestedRequestKind {
     TypeComparison,
     CodebaseQuery,
+    CodebaseMutation,
     AnalysisQuery,
 }
 
@@ -1264,7 +1265,10 @@ where
     })
 }
 
-fn decode_complete_union(reader: &mut PayloadReader<'_>, depth: usize) -> Result<TUnion, ExternalAnalyzerError> {
+pub(super) fn decode_complete_union(
+    reader: &mut PayloadReader<'_>,
+    depth: usize,
+) -> Result<TUnion, ExternalAnalyzerError> {
     ensure_type_depth(depth)?;
     let flags = reader.read_u16("complete union flags")?;
     let count = reader.read_count("complete union atomic types", MAXIMUM_TYPE_MEMBERS)?;

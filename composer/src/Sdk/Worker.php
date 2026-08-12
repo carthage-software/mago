@@ -9,6 +9,7 @@ use Mago\Sdk\Analyzer\AfterFileAnalysisContext;
 use Mago\Sdk\Analyzer\BeforeAnalysisContext;
 use Mago\Sdk\Analyzer\Codebase;
 use Mago\Sdk\Analyzer\FileAnalysis;
+use Mago\Sdk\Analyzer\MutableCodebase;
 use Mago\Sdk\Analyzer\PluginRegistry as AnalyzerPluginRegistry;
 use Mago\Sdk\Analyzer\ProjectAnalysis;
 use Mago\Sdk\Analyzer\ReturnTypeProviderContext;
@@ -458,7 +459,11 @@ final class Worker
         return AnalyzerProtocol::writeReturnTypeResponse(null);
     }
 
-    /** @param positive-int $requestId */
+    /**
+     * @param positive-int $requestId
+     * @mago-expect lint:halstead
+     * @mago-expect lint:no-else-clause
+     */
     private function handleAnalyzerLifecycleRequest(
         int $kind,
         PayloadReader $reader,
@@ -467,11 +472,19 @@ final class Worker
         CancellationTokenInterface $cancellation,
     ): string {
         $request = AnalyzerProtocol::readLifecycleRequest($kind, $reader, $host, $requestId, $cancellation);
-        if ($this->metadataCache === null || $this->metadataCache->generation !== $request->generation) {
-            $this->metadataCache = new MetadataCache($request->generation);
+        if ($kind === AnalyzerProtocol::BEFORE_ANALYSIS_REQUEST) {
+            $codebase = new MutableCodebase(
+                $host,
+                $requestId,
+                $cancellation,
+                new MetadataCache($request->generation, false),
+            );
+        } else {
+            if ($this->metadataCache === null || $this->metadataCache->generation !== $request->generation) {
+                $this->metadataCache = new MetadataCache($request->generation);
+            }
+            $codebase = new Codebase($host, $requestId, $cancellation, $this->metadataCache);
         }
-
-        $codebase = new Codebase($host, $requestId, $cancellation, $this->metadataCache);
         $types = new TypeComparator($host, $requestId, $cancellation);
         $reportedIssues = [];
         $analyses = is_array($request->analysis) ? $request->analysis : [$request->analysis];
