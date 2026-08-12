@@ -379,7 +379,7 @@ fn write_class_like(
     )?;
     write_attributes(writer, &metadata.attributes, session)?;
     write_type_aliases(writer, &metadata.type_aliases, session)?;
-    write_unions(writer, &metadata.mixins)?;
+    write_mixins(writer, &metadata.mixins)?;
     write_optional_atomic(writer, metadata.enum_type.as_ref())?;
     write_optional_bool(writer, metadata.has_sealed_methods);
     write_optional_bool(writer, metadata.has_sealed_properties);
@@ -611,10 +611,31 @@ fn write_union(writer: &mut PayloadWriter, union: &TUnion) -> Result<(), Externa
     encode_union_snapshot(writer, union, &mut references, 0)
 }
 
-fn write_unions(writer: &mut PayloadWriter, unions: &[TUnion]) -> Result<(), ExternalAnalyzerError> {
-    writer.write_u32(unions.len() as u32);
-    for union in unions {
-        write_union(writer, union)?;
+trait MixinType {
+    fn type_union(&self) -> &TUnion;
+}
+
+impl MixinType for TUnion {
+    #[inline]
+    fn type_union(&self) -> &TUnion {
+        self
+    }
+}
+
+impl MixinType for TypeMetadata {
+    #[inline]
+    fn type_union(&self) -> &TUnion {
+        &self.type_union
+    }
+}
+
+fn write_mixins<T>(writer: &mut PayloadWriter, mixins: &[T]) -> Result<(), ExternalAnalyzerError>
+where
+    T: MixinType,
+{
+    writer.write_u32(mixins.len() as u32);
+    for mixin in mixins {
+        write_union(writer, mixin.type_union())?;
     }
 
     Ok(())
