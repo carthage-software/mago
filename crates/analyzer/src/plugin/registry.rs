@@ -176,6 +176,10 @@ impl PluginRegistry {
     }
 
     /// Returns whether any enabled external plugin subscribed to per-file completion.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the external analyzer cannot be initialized.
     pub fn has_external_after_file_analysis_hooks(&self) -> PluginResult<bool> {
         self.external_analyzer
             .as_deref()
@@ -186,6 +190,10 @@ impl PluginRegistry {
     }
 
     /// Returns whether any enabled external plugin subscribed to whole-project completion.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the external analyzer cannot be initialized.
     pub fn has_external_after_analysis_hooks(&self) -> PluginResult<bool> {
         self.external_analyzer
             .as_deref()
@@ -196,6 +204,10 @@ impl PluginRegistry {
     }
 
     /// Runs enabled external hooks after the codebase is frozen and before file analysis starts.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when an external hook cannot be dispatched or returns an invalid response.
     pub fn run_external_before_analysis_hooks(
         &self,
         codebase: &CodebaseMetadata,
@@ -211,6 +223,10 @@ impl PluginRegistry {
     }
 
     /// Runs enabled external hooks for one completed file analysis.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when an external hook cannot be dispatched or returns an invalid response.
     pub fn run_external_after_file_analysis_hooks(
         &self,
         file: &File,
@@ -228,6 +244,10 @@ impl PluginRegistry {
     }
 
     /// Runs enabled external hooks for the final merged analysis result.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when an external hook cannot be dispatched or returns an invalid response.
     pub fn run_external_after_analysis_hooks(
         &self,
         result: &crate::analysis_result::AnalysisResult,
