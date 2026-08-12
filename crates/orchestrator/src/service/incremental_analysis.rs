@@ -44,6 +44,8 @@ struct FileState {
     codebase_issues: IssueCollection,
 }
 
+type SelectiveAnalysisOutput = (AnalysisResult, HashMap<FileId, IssueCollection>, Vec<Arc<FileAnalysisSnapshot>>);
+
 /// A self-contained incremental analysis service.
 ///
 /// This service manages all the state needed for incremental analysis:
@@ -88,6 +90,8 @@ impl std::fmt::Debug for IncrementalAnalysisService {
             .field("plugin_registry", &"<Arc<PluginRegistry>>")
             .field("initialized", &self.initialized)
             .field("codebase_issues", &self.codebase_issues.len())
+            .field("lifecycle_issues", &self.lifecycle_issues.len())
+            .field("analysis_snapshots", &self.analysis_snapshots.len())
             .finish()
     }
 }
@@ -1038,8 +1042,7 @@ impl IncrementalAnalysisService {
         current_symbol_references: SymbolReferences,
         settings: &Settings,
         skip_files: &HashSet<FileId>,
-    ) -> Result<(AnalysisResult, HashMap<FileId, IssueCollection>, Vec<Arc<FileAnalysisSnapshot>>), OrchestratorError>
-    {
+    ) -> Result<SelectiveAnalysisOutput, OrchestratorError> {
         #[cfg(not(target_arch = "wasm32"))]
         const ANALYSIS_DURATION_THRESHOLD: Duration = Duration::from_secs(5);
 
