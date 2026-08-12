@@ -5,11 +5,17 @@ declare(strict_types=1);
 namespace Mago\Sdk\Internal\Analyzer;
 
 use Mago\Sdk\Analyzer\Argument;
+use Mago\Sdk\Analyzer\ExpressionType;
+use Mago\Sdk\Analyzer\FileAnalysis;
 use Mago\Sdk\Analyzer\Invocation;
 use Mago\Sdk\Analyzer\Metadata\MemberIdentifier;
+use Mago\Sdk\Analyzer\ProjectAnalysis;
+use Mago\Sdk\Analyzer\ReferenceSummary;
 use Mago\Sdk\Analyzer\Type;
+use Mago\Sdk\CancellationTokenInterface;
 use Mago\Sdk\Exception\ProtocolException;
 use Mago\Sdk\Extension;
+use Mago\Sdk\Internal\HostClient;
 use Mago\Sdk\Internal\Protocol\PayloadReader;
 use Mago\Sdk\Internal\Protocol\PayloadWriter;
 use Mago\Sdk\PHPVersion;
@@ -23,7 +29,6 @@ use function unpack;
  * @internal
  * @mago-expect lint:cyclomatic-complexity
  * @mago-expect lint:kan-defect
- * @mago-expect lint:psl-string-functions
  * @mago-expect lint:too-many-methods
  */
 final class Protocol
@@ -32,6 +37,15 @@ final class Protocol
     public const RETURN_TYPE_REQUEST = 2;
     public const TYPE_COMPARISON_REQUEST = 3;
     public const CODEBASE_QUERY_REQUEST = 4;
+    public const BEFORE_ANALYSIS_REQUEST = 5;
+    public const AFTER_FILE_ANALYSIS_REQUEST = 6;
+    public const AFTER_ANALYSIS_REQUEST = 7;
+    public const ANALYSIS_QUERY_REQUEST = 8;
+    public const GET_EXPRESSION_TYPES = 1;
+    public const GET_ALL_EXPRESSION_TYPES = 2;
+    public const GET_INFERRED_RETURN_TYPES = 3;
+    public const GET_INFERRED_YIELD_KEY_TYPES = 4;
+    public const GET_INFERRED_YIELD_VALUE_TYPES = 5;
     public const GET_CLASS_LIKES = 1;
     public const GET_FUNCTIONS = 2;
     public const GET_METHODS = 3;
@@ -81,6 +95,10 @@ final class Protocol
     private const RETURN_TYPE_RESPONSE = 0x8002;
     private const TYPE_COMPARISON_RESPONSE = 0x8003;
     private const CODEBASE_QUERY_RESPONSE = 0x8004;
+    private const BEFORE_ANALYSIS_RESPONSE = 0x8005;
+    private const AFTER_FILE_ANALYSIS_RESPONSE = 0x8006;
+    private const AFTER_ANALYSIS_RESPONSE = 0x8007;
+    private const ANALYSIS_QUERY_RESPONSE = 0x8008;
     private const RETURN_TYPE_REQUEST_HEADER = "MANA\x00\x01\x00\x00\x00\x02\x00\x00";
     private const UNHANDLED_RETURN_TYPE_RESPONSE = "MANA\x00\x01\x00\x00\x80\x02\x00\x00\x00";
     private const INVOCATION_FUNCTION = 1;
@@ -147,6 +165,11 @@ final class Protocol
                 $writer->writeString($definition->name);
                 $writer->writeString($definition->description);
                 $writer->writeBoolean($definition->defaultEnabled);
+                $flags = 0;
+                $flags |= (int) ($plugin->beforeAnalysisHooks !== []);
+                $flags |= (int) ($plugin->afterFileAnalysisHooks !== []) << 1;
+                $flags |= (int) ($plugin->afterAnalysisHooks !== []) << 2;
+                $writer->writeU8($flags);
                 $writer->writeCount($definition->aliases);
                 foreach ($definition->aliases as $alias) {
                     $writer->writeString($alias);
@@ -175,6 +198,188 @@ final class Protocol
         }
 
         return $writer->finish();
+    }
+
+    /** @param array<string, Span> $spans */
+    public static function writeAnalysisTypeQuery(
+        int $generation,
+        string $file,
+        int $operation,
+        array $spans = [],
+    ): string {
+        $writer = self::createMessage(self::ANALYSIS_QUERY_REQUEST);
+        $writer->writeU64($generation);
+        $writer->writeU8($operation);
+        $writer->writeBytes($file);
+        if ($operation === self::GET_EXPRESSION_TYPES) {
+            $writer->writeCount($spans);
+            foreach ($spans as $span) {
+                $writer->writeU32($span->start);
+                $writer->writeU32($span->end);
+            }
+        }
+
+        return $writer->finish();
+    }
+
+    /** @return list<Type|null>|list<Type> */
+    public static function readAnalysisTypeQueryResponse(
+        string $payload,
+        int $generation,
+        string $file,
+        int $operation,
+        bool $optional,
+    ): array {
+        [$kind, $reader] = self::readRequest($payload);
+        if (
+            $kind !== self::ANALYSIS_QUERY_RESPONSE
+            || $reader->readU64() !== $generation
+            || $reader->readU8() !== $operation
+            || $reader->readBytes() !== $file
+        ) {
+            throw new ProtocolException('An analysis artifact response does not match its request.');
+        }
+
+        $count = $reader->readCount(1_000_000);
+        $types = [];
+        for ($index = 0; $index < $count; ++$index) {
+            if ($optional && !$reader->readBoolean()) {
+                $types[] = null;
+                continue;
+            }
+            $types[] = TypeCodec::readComplete($reader);
+        }
+        $reader->finish();
+
+        return $types;
+    }
+
+    /** @return list<ExpressionType> */
+    public static function readAllExpressionTypesResponse(string $payload, int $generation, string $file): array
+    {
+        [$kind, $reader] = self::readRequest($payload);
+        if (
+            $kind !== self::ANALYSIS_QUERY_RESPONSE
+            || $reader->readU64() !== $generation
+            || $reader->readU8() !== self::GET_ALL_EXPRESSION_TYPES
+            || $reader->readBytes() !== $file
+        ) {
+            throw new ProtocolException('An expression-type response does not match its request.');
+        }
+
+        $count = $reader->readCount(1_000_000);
+        $types = [];
+        for ($index = 0; $index < $count; ++$index) {
+            $types[] = new ExpressionType(
+                new Span($reader->readU32(), $reader->readU32()),
+                TypeCodec::readComplete($reader),
+            );
+        }
+        $reader->finish();
+
+        return $types;
+    }
+
+    public static function readLifecycleRequest(
+        int $kind,
+        PayloadReader $reader,
+        HostClient $host,
+        int $requestId,
+        CancellationTokenInterface $cancellation,
+    ): LifecycleRequest {
+        $generation = $reader->readU64();
+        $pluginCount = $reader->readU16();
+        if ($pluginCount === 0) {
+            throw new ProtocolException('An analyzer lifecycle request contains no plugins.');
+        }
+        $plugins = [];
+        for ($index = 0; $index < $pluginCount; ++$index) {
+            $plugins[] = $reader->readU16();
+        }
+
+        $analysis = null;
+        if ($kind === self::AFTER_FILE_ANALYSIS_REQUEST) {
+            $analysis = self::readFileAnalysis($reader, $host, $requestId, $generation, $cancellation);
+        } elseif ($kind === self::AFTER_ANALYSIS_REQUEST) {
+            $issueCount = $reader->readU32();
+            $references = self::readReferenceSummary($reader);
+            $fileCount = $reader->readCount(1_000_000);
+            $files = [];
+            for ($index = 0; $index < $fileCount; ++$index) {
+                $files[] = self::readFileAnalysis($reader, $host, $requestId, $generation, $cancellation);
+            }
+            $analysis = new ProjectAnalysis($files, $issueCount, $references);
+        }
+        $reader->finish();
+
+        return new LifecycleRequest($generation, $plugins, $analysis);
+    }
+
+    /** @param list<int|ReportedIssue> $reportedIssues */
+    public static function writeLifecycleResponse(int $requestKind, array $reportedIssues): string
+    {
+        $responseKind = match ($requestKind) {
+            self::BEFORE_ANALYSIS_REQUEST => self::BEFORE_ANALYSIS_RESPONSE,
+            self::AFTER_FILE_ANALYSIS_REQUEST => self::AFTER_FILE_ANALYSIS_RESPONSE,
+            self::AFTER_ANALYSIS_REQUEST => self::AFTER_ANALYSIS_RESPONSE,
+            default => throw new ProtocolException("Unknown analyzer lifecycle request kind {$requestKind}."),
+        };
+        $writer = self::createMessage($responseKind);
+        $writer->writeU32(count($reportedIssues) >> 1);
+        for ($index = 0, $count = count($reportedIssues); $index < $count; $index += 2) {
+            /** @var int<0, 65535> $plugin */
+            $plugin = $reportedIssues[$index];
+            /** @var ReportedIssue $reported */
+            $reported = $reportedIssues[$index + 1];
+            $issue = $reported->issue;
+            $writer->writeU16($plugin);
+            $writer->writeU8($reported->level->value);
+            $writer->writeString($reported->code);
+            $writer->writeString($issue->message);
+            $writer->writeCount($issue->notes);
+            foreach ($issue->notes as $note) {
+                $writer->writeString($note);
+            }
+            $writer->writeOptionalString($issue->help);
+            $writer->writeOptionalString($issue->link);
+            $writer->writeCount($issue->annotations);
+            foreach ($issue->annotations as $annotation) {
+                $writer->writeU8($annotation->kind->value);
+                $writer->writeOptionalString($annotation->file);
+                $writer->writeU32($annotation->span->start);
+                $writer->writeU32($annotation->span->end);
+                $writer->writeOptionalString($annotation->message);
+            }
+        }
+
+        return $writer->finish();
+    }
+
+    private static function readFileAnalysis(
+        PayloadReader $reader,
+        HostClient $host,
+        int $requestId,
+        int $generation,
+        CancellationTokenInterface $cancellation,
+    ): FileAnalysis {
+        return new FileAnalysis(
+            $host,
+            $requestId,
+            $generation,
+            $cancellation,
+            $reader->readBytes(),
+            $reader->readU32(),
+            $reader->readU32(),
+            $reader->readU32(),
+            $reader->readU32(),
+            $reader->readU32(),
+            self::readReferenceSummary($reader),
+        );
+    }
+
+    private static function readReferenceSummary(PayloadReader $reader): ReferenceSummary
+    {
+        return new ReferenceSummary($reader->readU64(), $reader->readU64(), $reader->readU64());
     }
 
     public static function readReturnTypeRequest(PayloadReader $reader): ReturnTypeRequest

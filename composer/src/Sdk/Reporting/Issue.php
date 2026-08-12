@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Mago\Sdk\Reporting;
 
 use Mago\Sdk\Exception\InvalidArgumentException;
+use Mago\Sdk\SourceLocation;
 use Mago\Sdk\Span;
 
 /**
@@ -47,6 +48,20 @@ final class Issue
         )]);
     }
 
+    public static function at(string $message, SourceLocation $location, ?string $annotationMessage = null): self
+    {
+        if ($message === '') {
+            throw new InvalidArgumentException('An issue message cannot be empty.');
+        }
+
+        return new self($message, [], null, null, [new Annotation(
+            AnnotationKind::Primary,
+            $location->span,
+            $annotationMessage,
+            $location->file,
+        )]);
+    }
+
     public function withNote(string $note): self
     {
         if ($note === '') {
@@ -79,6 +94,14 @@ final class Issue
         return new self($this->message, $this->notes, $this->help, $this->link, [
             ...$this->annotations,
             new Annotation(AnnotationKind::Secondary, $span, $message),
+        ]);
+    }
+
+    public function withSecondaryLocation(SourceLocation $location, ?string $message = null): self
+    {
+        return new self($this->message, $this->notes, $this->help, $this->link, [
+            ...$this->annotations,
+            new Annotation(AnnotationKind::Secondary, $location->span, $message, $location->file),
         ]);
     }
 }

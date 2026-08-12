@@ -11,11 +11,30 @@ namespace Mago\Sdk\Analyzer;
  */
 final class PluginRegistry
 {
-    /** @var list<FunctionReturnTypeProvider> */
+    /**
+     * @var list<FunctionReturnTypeProvider>
+     */
     private array $functionReturnTypeProviders = [];
 
-    /** @var list<MethodReturnTypeProvider> */
+    /**
+     * @var list<MethodReturnTypeProvider>
+     */
     private array $methodReturnTypeProviders = [];
+
+    /**
+     * @var list<BeforeAnalysisHook>
+     */
+    private array $beforeAnalysisHooks = [];
+
+    /**
+     * @var list<AfterFileAnalysisHook>
+     */
+    private array $afterFileAnalysisHooks = [];
+
+    /**
+     * @var list<AfterAnalysisHook>
+     */
+    private array $afterAnalysisHooks = [];
 
     public function registerFunctionReturnTypeProvider(FunctionReturnTypeProvider $provider): void
     {
@@ -25,6 +44,21 @@ final class PluginRegistry
     public function registerMethodReturnTypeProvider(MethodReturnTypeProvider $provider): void
     {
         $this->methodReturnTypeProviders[] = $provider;
+    }
+
+    public function registerBeforeAnalysisHook(BeforeAnalysisHook $hook): void
+    {
+        $this->beforeAnalysisHooks[] = $hook;
+    }
+
+    public function registerAfterFileAnalysisHook(AfterFileAnalysisHook $hook): void
+    {
+        $this->afterFileAnalysisHooks[] = $hook;
+    }
+
+    public function registerAfterAnalysisHook(AfterAnalysisHook $hook): void
+    {
+        $this->afterAnalysisHooks[] = $hook;
     }
 
     /**
@@ -43,5 +77,35 @@ final class PluginRegistry
     public function getMethodReturnTypeProviders(): array
     {
         return $this->methodReturnTypeProviders;
+    }
+
+    /**
+     * @internal
+     *
+     * @return list<BeforeAnalysisHook>
+     */
+    public function getBeforeAnalysisHooks(): array
+    {
+        return $this->beforeAnalysisHooks;
+    }
+
+    /**
+     * @internal
+     *
+     * @return list<AfterFileAnalysisHook>
+     */
+    public function getAfterFileAnalysisHooks(): array
+    {
+        return $this->afterFileAnalysisHooks;
+    }
+
+    /**
+     * @internal
+     *
+     * @return list<AfterAnalysisHook>
+     */
+    public function getAfterAnalysisHooks(): array
+    {
+        return $this->afterAnalysisHooks;
     }
 }

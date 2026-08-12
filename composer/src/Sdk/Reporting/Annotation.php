@@ -17,5 +17,6 @@ final class Annotation
         public readonly AnnotationKind $kind,
         public readonly Span $span,
         public readonly ?string $message = null,
+        public readonly ?string $file = null,
     ) {}
 }
