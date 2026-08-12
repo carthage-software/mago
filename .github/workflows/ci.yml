@@ -81,6 +81,10 @@ jobs:
         if: matrix.rust == 'stable' && matrix.os == 'ubuntu-latest'
         run: composer install
 
+      - name: Test external analyzer lifecycle SDK
+        if: matrix.rust == 'stable' && matrix.os == 'ubuntu-latest'
+        run: MAGO_REQUIRE_PHP_SDK_TESTS=1 cargo test --test external_analyzer_lifecycle --locked
+
       - name: Validate composer code format
         if: matrix.rust == 'stable' && matrix.os == 'ubuntu-latest'
         run: ./target/release/mago format --dry-run

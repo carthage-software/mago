@@ -1,4 +1,4 @@
-use std::rc::Rc;
+use std::ops::Range;
 use std::sync::Arc;
 
 use foldhash::HashMap;
@@ -28,10 +28,12 @@ pub(super) const BEFORE_ANALYSIS_REQUEST: u16 = 5;
 pub(super) const AFTER_FILE_ANALYSIS_REQUEST: u16 = 6;
 pub(super) const AFTER_ANALYSIS_REQUEST: u16 = 7;
 const ANALYSIS_QUERY_REQUEST: u16 = 8;
+pub(super) const AFTER_FILE_ANALYSIS_BATCH_REQUEST: u16 = 9;
 const BEFORE_ANALYSIS_RESPONSE: u16 = 0x8005;
 const AFTER_FILE_ANALYSIS_RESPONSE: u16 = 0x8006;
 const AFTER_ANALYSIS_RESPONSE: u16 = 0x8007;
 const ANALYSIS_QUERY_RESPONSE: u16 = 0x8008;
+const AFTER_FILE_ANALYSIS_BATCH_RESPONSE: u16 = 0x8009;
 
 const GET_EXPRESSION_TYPES: u8 = 1;
 const GET_ALL_EXPRESSION_TYPES: u8 = 2;
@@ -48,40 +50,113 @@ pub struct FileAnalysisSnapshot {
     file_id: mago_database::file::FileId,
     name: Arc<[u8]>,
     size: u32,
-    expression_types: HashMap<(u32, u32), TUnion>,
-    inferred_return_types: Vec<TUnion>,
-    inferred_yield_key_types: Vec<TUnion>,
-    inferred_yield_value_types: Vec<TUnion>,
-    symbol_references: SymbolReferences,
+    encoded_types: Box<[u8]>,
+    expression_types: HashMap<(u32, u32), Range<usize>>,
+    inferred_return_types: Vec<Range<usize>>,
+    inferred_yield_key_types: Vec<Range<usize>>,
+    inferred_yield_value_types: Vec<Range<usize>>,
+    references: ReferenceSummary,
 }
 
+#[derive(Debug, Clone, Copy)]
+struct ReferenceSummary {
+    body: u64,
+    signature: u64,
+    maps: u64,
+}
+
+/// Number of completed files sent through one external after-file request.
+pub const AFTER_FILE_ANALYSIS_BATCH_SIZE: usize = 32;
+
 impl FileAnalysisSnapshot {
-    #[must_use]
-    pub fn new(file: &File, artifacts: &AnalysisArtifacts) -> Self {
-        Self {
+    /// Builds a compact, thread-safe snapshot of one file's lazy analysis data.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when an inferred type cannot be represented by the extension protocol.
+    pub fn new(file: &File, artifacts: &AnalysisArtifacts) -> Result<Self, ExternalAnalyzerError> {
+        let mut writer = PayloadWriter::new();
+        let mut type_handles = Vec::new();
+        let mut expression_types =
+            HashMap::with_capacity_and_hasher(artifacts.expression_types.len(), foldhash::fast::RandomState::default());
+        for (span, union) in &artifacts.expression_types {
+            expression_types.insert(
+                *span,
+                encode_snapshot_type(&mut writer, union, &mut type_handles).map_err(|error| {
+                    protocol(format!(
+                        "failed to retain expression type at {}:{} in `{}`: {error}",
+                        span.0,
+                        span.1,
+                        String::from_utf8_lossy(&file.name)
+                    ))
+                })?,
+            );
+        }
+
+        let inferred_return_types = encode_snapshot_types(
+            &mut writer,
+            artifacts.inferred_return_types.iter().map(AsRef::as_ref),
+            &mut type_handles,
+        )?;
+        let inferred_yield_key_types =
+            encode_snapshot_types(&mut writer, &artifacts.inferred_yield_key_types, &mut type_handles)?;
+        let inferred_yield_value_types =
+            encode_snapshot_types(&mut writer, &artifacts.inferred_yield_value_types, &mut type_handles)?;
+
+        Ok(Self {
             file_id: file.id,
             name: Arc::from(file.name.as_ref()),
             size: file.size,
-            expression_types: artifacts
-                .expression_types
-                .iter()
-                .map(|(span, union)| (*span, Rc::as_ref(union).clone()))
-                .collect(),
-            inferred_return_types: artifacts
-                .inferred_return_types
-                .iter()
-                .map(|union| Rc::as_ref(union).clone())
-                .collect(),
-            inferred_yield_key_types: artifacts.inferred_yield_key_types.clone(),
-            inferred_yield_value_types: artifacts.inferred_yield_value_types.clone(),
-            symbol_references: artifacts.symbol_references.clone(),
-        }
+            encoded_types: writer.finish().into_boxed_slice(),
+            expression_types,
+            inferred_return_types,
+            inferred_yield_key_types,
+            inferred_yield_value_types,
+            references: ReferenceSummary::from(&artifacts.symbol_references),
+        })
     }
 
     #[must_use]
     pub const fn file_id(&self) -> mago_database::file::FileId {
         self.file_id
     }
+}
+
+impl From<&SymbolReferences> for ReferenceSummary {
+    fn from(references: &SymbolReferences) -> Self {
+        Self {
+            body: references.count_body_references() as u64,
+            signature: references.count_signature_references() as u64,
+            maps: references.total_map_entries() as u64,
+        }
+    }
+}
+
+impl ReferenceSummary {
+    fn write_to(self, writer: &mut PayloadWriter) {
+        writer.write_u64(self.body);
+        writer.write_u64(self.signature);
+        writer.write_u64(self.maps);
+    }
+}
+
+fn encode_snapshot_types<'type_info>(
+    writer: &mut PayloadWriter,
+    types: impl IntoIterator<Item = &'type_info TUnion>,
+    handles: &mut Vec<&'type_info TUnion>,
+) -> Result<Vec<Range<usize>>, ExternalAnalyzerError> {
+    types.into_iter().map(|ty| encode_snapshot_type(writer, ty, handles)).collect()
+}
+
+fn encode_snapshot_type<'type_info>(
+    writer: &mut PayloadWriter,
+    ty: &'type_info TUnion,
+    handles: &mut Vec<&'type_info TUnion>,
+) -> Result<Range<usize>, ExternalAnalyzerError> {
+    handles.clear();
+    let start = writer.len();
+    protocol::encode_union_snapshot(writer, ty, handles, 0)?;
+    Ok(start..writer.len())
 }
 
 pub(super) enum AnalysisStore<'analysis> {
@@ -106,6 +181,23 @@ enum FileView<'analysis> {
     Snapshot(&'analysis FileAnalysisSnapshot),
 }
 
+enum TypeView<'analysis> {
+    Union(&'analysis TUnion),
+    Encoded(&'analysis [u8]),
+}
+
+impl TypeView<'_> {
+    fn write_to(self, writer: &mut PayloadWriter) -> Result<(), ExternalAnalyzerError> {
+        match self {
+            Self::Union(ty) => write_type(writer, ty),
+            Self::Encoded(bytes) => {
+                writer.write_raw(bytes);
+                Ok(())
+            }
+        }
+    }
+}
+
 impl FileView<'_> {
     fn name(&self) -> &[u8] {
         match self {
@@ -128,10 +220,16 @@ impl FileView<'_> {
         }
     }
 
-    fn expression_type(&self, span: &(u32, u32)) -> Option<&TUnion> {
+    fn expression_type(&self, span: &(u32, u32)) -> Option<TypeView<'_>> {
         match self {
-            Self::Artifacts(_, artifacts) => artifacts.expression_types.get(span).map(AsRef::as_ref),
-            Self::Snapshot(file) => file.expression_types.get(span),
+            Self::Artifacts(_, artifacts) => {
+                artifacts.expression_types.get(span).map(AsRef::as_ref).map(TypeView::Union)
+            }
+            Self::Snapshot(file) => file
+                .expression_types
+                .get(span)
+                .and_then(|range| file.encoded_types.get(range.clone()))
+                .map(TypeView::Encoded),
         }
     }
 
@@ -156,7 +254,14 @@ impl FileView<'_> {
             let ty = self
                 .expression_type(&span)
                 .ok_or_else(|| protocol("expression type disappeared while encoding analysis artifacts"))?;
-            write_type(writer, ty)?;
+            ty.write_to(writer).map_err(|error| {
+                protocol(format!(
+                    "failed to encode expression type at {}:{} in `{}`: {error}",
+                    span.0,
+                    span.1,
+                    String::from_utf8_lossy(self.name())
+                ))
+            })?;
         }
 
         Ok(())
@@ -173,29 +278,45 @@ impl FileView<'_> {
                     write_type(writer, ty)?;
                 }
             }
-            Self::Snapshot(file) => write_types(writer, &file.inferred_return_types)?,
+            Self::Snapshot(file) => {
+                write_encoded_types(writer, &file.encoded_types, &file.inferred_return_types)?;
+            }
         }
         Ok(())
     }
 
-    fn inferred_yield_key_types(&self) -> &[TUnion] {
+    fn inferred_yield_key_count(&self) -> usize {
         match self {
-            Self::Artifacts(_, artifacts) => &artifacts.inferred_yield_key_types,
-            Self::Snapshot(file) => &file.inferred_yield_key_types,
+            Self::Artifacts(_, artifacts) => artifacts.inferred_yield_key_types.len(),
+            Self::Snapshot(file) => file.inferred_yield_key_types.len(),
         }
     }
 
-    fn inferred_yield_value_types(&self) -> &[TUnion] {
+    fn inferred_yield_value_count(&self) -> usize {
         match self {
-            Self::Artifacts(_, artifacts) => &artifacts.inferred_yield_value_types,
-            Self::Snapshot(file) => &file.inferred_yield_value_types,
+            Self::Artifacts(_, artifacts) => artifacts.inferred_yield_value_types.len(),
+            Self::Snapshot(file) => file.inferred_yield_value_types.len(),
         }
     }
 
-    fn references(&self) -> &SymbolReferences {
+    fn write_inferred_yield_key_types(&self, writer: &mut PayloadWriter) -> Result<(), ExternalAnalyzerError> {
         match self {
-            Self::Artifacts(_, artifacts) => &artifacts.symbol_references,
-            Self::Snapshot(file) => &file.symbol_references,
+            Self::Artifacts(_, artifacts) => write_types(writer, &artifacts.inferred_yield_key_types),
+            Self::Snapshot(file) => write_encoded_types(writer, &file.encoded_types, &file.inferred_yield_key_types),
+        }
+    }
+
+    fn write_inferred_yield_value_types(&self, writer: &mut PayloadWriter) -> Result<(), ExternalAnalyzerError> {
+        match self {
+            Self::Artifacts(_, artifacts) => write_types(writer, &artifacts.inferred_yield_value_types),
+            Self::Snapshot(file) => write_encoded_types(writer, &file.encoded_types, &file.inferred_yield_value_types),
+        }
+    }
+
+    fn write_reference_summary(&self, writer: &mut PayloadWriter) {
+        match self {
+            Self::Artifacts(_, artifacts) => write_reference_summary(writer, &artifacts.symbol_references),
+            Self::Snapshot(file) => file.references.write_to(writer),
         }
     }
 }
@@ -216,6 +337,20 @@ pub(super) fn encode_after_file_analysis_request(
 ) -> Result<Vec<u8>, ExternalAnalyzerError> {
     let mut writer = lifecycle_writer(AFTER_FILE_ANALYSIS_REQUEST, generation, plugins)?;
     write_file_summary(&mut writer, FileView::Artifacts(file, artifacts))?;
+    Ok(writer.finish())
+}
+
+pub(super) fn encode_after_file_analysis_batch_request(
+    generation: u64,
+    plugins: &[u16],
+    files: &[Arc<FileAnalysisSnapshot>],
+) -> Result<Vec<u8>, ExternalAnalyzerError> {
+    let mut writer = lifecycle_writer(AFTER_FILE_ANALYSIS_BATCH_REQUEST, generation, plugins)?;
+    writer.write_u32(u32::try_from(files.len()).map_err(|_| protocol("after-file batch exceeds u32::MAX files"))?);
+    for file in files {
+        write_file_summary(&mut writer, FileView::Snapshot(file))?;
+    }
+
     Ok(writer.finish())
 }
 
@@ -254,15 +389,13 @@ fn write_file_summary(writer: &mut PayloadWriter, file: FileView<'_>) -> Result<
     writer.write_u32(file.size());
     writer.write_u32(u32::try_from(file.expression_count()).map_err(|_| protocol("too many expression types"))?);
     writer.write_u32(u32::try_from(file.inferred_return_count()).map_err(|_| protocol("too many return types"))?);
-    writer.write_u32(
-        u32::try_from(file.inferred_yield_key_types().len()).map_err(|_| protocol("too many yield key types"))?,
-    );
+    writer.write_u32(u32::try_from(file.inferred_yield_key_count()).map_err(|_| protocol("too many yield key types"))?);
 
     writer.write_u32(
-        u32::try_from(file.inferred_yield_value_types().len()).map_err(|_| protocol("too many yield value types"))?,
+        u32::try_from(file.inferred_yield_value_count()).map_err(|_| protocol("too many yield value types"))?,
     );
 
-    write_reference_summary(writer, file.references());
+    file.write_reference_summary(writer);
     Ok(())
 }
 
@@ -284,6 +417,7 @@ pub(super) fn decode_lifecycle_response(
         BEFORE_ANALYSIS_REQUEST => BEFORE_ANALYSIS_RESPONSE,
         AFTER_FILE_ANALYSIS_REQUEST => AFTER_FILE_ANALYSIS_RESPONSE,
         AFTER_ANALYSIS_REQUEST => AFTER_ANALYSIS_RESPONSE,
+        AFTER_FILE_ANALYSIS_BATCH_REQUEST => AFTER_FILE_ANALYSIS_BATCH_RESPONSE,
         _ => return Err(protocol(format!("unknown lifecycle request kind {request_kind}"))),
     };
 
@@ -417,14 +551,14 @@ pub(super) fn handle_analysis_query(
                 let ty = file.expression_type(&span);
                 writer.write_bool(ty.is_some());
                 if let Some(ty) = ty {
-                    write_type(&mut writer, ty)?;
+                    ty.write_to(&mut writer)?;
                 }
             }
         }
         GET_ALL_EXPRESSION_TYPES => file.write_expression_types(&mut writer)?,
         GET_INFERRED_RETURN_TYPES => file.write_inferred_return_types(&mut writer)?,
-        GET_INFERRED_YIELD_KEY_TYPES => write_types(&mut writer, file.inferred_yield_key_types())?,
-        GET_INFERRED_YIELD_VALUE_TYPES => write_types(&mut writer, file.inferred_yield_value_types())?,
+        GET_INFERRED_YIELD_KEY_TYPES => file.write_inferred_yield_key_types(&mut writer)?,
+        GET_INFERRED_YIELD_VALUE_TYPES => file.write_inferred_yield_value_types(&mut writer)?,
         value => return Err(protocol(format!("unknown analysis query operation {value}"))),
     }
 
@@ -436,6 +570,22 @@ fn write_types(writer: &mut PayloadWriter, types: &[TUnion]) -> Result<(), Exter
     writer.write_u32(u32::try_from(types.len()).map_err(|_| protocol("too many inferred types"))?);
     for ty in types {
         write_type(writer, ty)?;
+    }
+
+    Ok(())
+}
+
+fn write_encoded_types(
+    writer: &mut PayloadWriter,
+    payload: &[u8],
+    ranges: &[Range<usize>],
+) -> Result<(), ExternalAnalyzerError> {
+    writer.write_u32(u32::try_from(ranges.len()).map_err(|_| protocol("too many inferred types"))?);
+    for range in ranges {
+        let bytes = payload
+            .get(range.clone())
+            .ok_or_else(|| protocol("retained analysis type points outside its encoded payload"))?;
+        writer.write_raw(bytes);
     }
 
     Ok(())

@@ -109,6 +109,20 @@ impl PayloadWriter {
         Ok(())
     }
 
+    /// Returns the current payload length.
+    #[must_use]
+    #[inline]
+    pub const fn len(&self) -> usize {
+        self.bytes.len()
+    }
+
+    /// Returns whether the payload is empty.
+    #[must_use]
+    #[inline]
+    pub const fn is_empty(&self) -> bool {
+        self.bytes.is_empty()
+    }
+
     /// Returns the completed payload.
     #[must_use]
     #[inline]

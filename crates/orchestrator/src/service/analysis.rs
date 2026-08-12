@@ -14,6 +14,7 @@ use mago_analyzer::Analyzer;
 use mago_analyzer::analysis_result::AnalysisResult;
 use mago_analyzer::artifacts::AnalysisArtifacts;
 use mago_analyzer::error::AnalysisError;
+use mago_analyzer::external::AFTER_FILE_ANALYSIS_BATCH_SIZE;
 use mago_analyzer::external::FileAnalysisSnapshot;
 use mago_analyzer::plugin::PluginRegistry;
 use mago_analyzer::settings::Settings;
@@ -33,6 +34,7 @@ use mago_semantics::SemanticsChecker;
 use mago_syntax::parser::parse_file_with_settings;
 use mago_syntax::settings::ParserSettings;
 use mago_word::WordSet;
+use rayon::prelude::*;
 
 use crate::error::OrchestratorError;
 use crate::service::pipeline::ParallelPipeline;
@@ -170,7 +172,13 @@ impl AnalysisService {
         issues.extend(analysis_result.issues.iter().cloned());
         issues.extend(self.codebase.take_issues(true));
         if after_analysis {
-            let snapshot = Arc::new(FileAnalysisSnapshot::new(file, &artifacts));
+            let snapshot = match FileAnalysisSnapshot::new(file, &artifacts) {
+                Ok(snapshot) => Arc::new(snapshot),
+                Err(err) => {
+                    issues.push(Issue::error(format!("Analysis error: {err}")));
+                    return issues;
+                }
+            };
             let mut project_result = AnalysisResult::new(analysis_result.symbol_references);
             project_result.issues = issues.clone();
             match self.plugin_registry.run_external_after_analysis_hooks(
@@ -240,9 +248,19 @@ impl AnalysisService {
                     before_plugin_registry.has_external_after_analysis_hooks().map_err(AnalysisError::from)?,
                 );
                 let _result = before_capabilities.set(capabilities);
+                #[cfg(not(target_arch = "wasm32"))]
+                let lifecycle_start = trace_enabled.then(Instant::now);
                 let issues = before_plugin_registry
                     .run_external_before_analysis_hooks(codebase, before_external_session.as_deref())
                     .map_err(AnalysisError::from)?;
+                #[cfg(not(target_arch = "wasm32"))]
+                if let Some(start) = lifecycle_start {
+                    tracing::trace!(
+                        issues = issues.len(),
+                        elapsed = ?start.elapsed(),
+                        "External before-analysis hooks completed."
+                    );
+                }
                 if issues.is_empty() {
                     Ok(None)
                 } else {
@@ -303,24 +321,10 @@ impl AnalysisService {
                 #[cfg(not(target_arch = "wasm32"))]
                 let analyze_start = trace_enabled.then(Instant::now);
                 let artifacts = analyzer.analyze_with_artifacts(program, &mut analysis_result)?;
-                if after_file {
-                    analysis_result.issues.extend(
-                        plugin_registry
-                            .run_external_after_file_analysis_hooks(
-                                &source_file,
-                                &artifacts,
-                                &codebase,
-                                external_session.as_deref(),
-                            )
-                            .map_err(AnalysisError::from)?,
-                    );
-                }
-
                 #[cfg(not(target_arch = "wasm32"))]
                 if let Some(start) = analyze_start {
                     telemetry_for_closure.analyze_ns.fetch_add(start.elapsed().as_nanos() as u64, Relaxed);
                 }
-
                 #[cfg(not(target_arch = "wasm32"))]
                 if let Some(start) = per_file_start {
                     telemetry_for_closure.per_file_total_ns.fetch_add(start.elapsed().as_nanos() as u64, Relaxed);
@@ -337,7 +341,20 @@ impl AnalysisService {
                     );
                 }
 
-                let snapshot = after_analysis.then(|| Arc::new(FileAnalysisSnapshot::new(&source_file, &artifacts)));
+                #[cfg(not(target_arch = "wasm32"))]
+                let snapshot_start = (trace_enabled && (after_file || after_analysis)).then(Instant::now);
+                let snapshot = if after_file || after_analysis {
+                    Some(Arc::new(FileAnalysisSnapshot::new(&source_file, &artifacts).map_err(|error| {
+                        OrchestratorError::General(format!("Failed to retain external analysis data: {error}"))
+                    })?))
+                } else {
+                    None
+                };
+                #[cfg(not(target_arch = "wasm32"))]
+                if let Some(start) = snapshot_start {
+                    telemetry_for_closure.snapshot_ns.fetch_add(start.elapsed().as_nanos() as u64, Relaxed);
+                    telemetry_for_closure.snapshots.fetch_add(1, Relaxed);
+                }
                 Ok(AnalysisTaskResult { result: analysis_result, snapshot })
             },
         );
@@ -383,6 +400,32 @@ impl Reducer<AnalysisTaskResult, AnalysisResult> for AnalysisResultReducer {
         }
 
         aggregated_result.issues.extend(codebase.take_issues(true));
+        let after_file = self.plugin_registry.has_external_after_file_analysis_hooks().map_err(AnalysisError::from)?;
+        if after_file {
+            let started_at = tracing::enabled!(tracing::Level::TRACE).then(Instant::now);
+            let batches = snapshots
+                .par_chunks(AFTER_FILE_ANALYSIS_BATCH_SIZE)
+                .map(|files| {
+                    self.plugin_registry.run_external_after_file_analysis_batch_hooks(
+                        files,
+                        &codebase,
+                        self.external_session.as_deref(),
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(AnalysisError::from)?;
+            let issue_count = batches.iter().map(IssueCollection::len).sum::<usize>();
+            aggregated_result.issues.extend(batches.into_iter().flatten());
+            if let Some(start) = started_at {
+                tracing::trace!(
+                    files = snapshots.len(),
+                    batches = snapshots.len().div_ceil(AFTER_FILE_ANALYSIS_BATCH_SIZE),
+                    issues = issue_count,
+                    elapsed = ?start.elapsed(),
+                    "External after-file hook batches completed."
+                );
+            }
+        }
         aggregated_result.issues.extend(
             self.plugin_registry
                 .run_external_after_analysis_hooks(

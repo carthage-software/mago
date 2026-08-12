@@ -22,6 +22,7 @@ use Mago\Sdk\PHPVersion;
 use Mago\Sdk\Span;
 
 use function count;
+use function intdiv;
 use function pack;
 use function strncmp;
 use function unpack;
@@ -42,6 +43,7 @@ final class Protocol
     public const AFTER_FILE_ANALYSIS_REQUEST = 6;
     public const AFTER_ANALYSIS_REQUEST = 7;
     public const ANALYSIS_QUERY_REQUEST = 8;
+    public const AFTER_FILE_ANALYSIS_BATCH_REQUEST = 9;
     public const GET_EXPRESSION_TYPES = 1;
     public const GET_ALL_EXPRESSION_TYPES = 2;
     public const GET_INFERRED_RETURN_TYPES = 3;
@@ -100,6 +102,7 @@ final class Protocol
     private const AFTER_FILE_ANALYSIS_RESPONSE = 0x8006;
     private const AFTER_ANALYSIS_RESPONSE = 0x8007;
     private const ANALYSIS_QUERY_RESPONSE = 0x8008;
+    private const AFTER_FILE_ANALYSIS_BATCH_RESPONSE = 0x8009;
     private const RETURN_TYPE_REQUEST_HEADER = "MANA\x00\x01\x00\x00\x00\x02\x00\x00";
     private const UNHANDLED_RETURN_TYPE_RESPONSE = "MANA\x00\x01\x00\x00\x80\x02\x00\x00\x00";
     private const INVOCATION_FUNCTION = 1;
@@ -325,6 +328,13 @@ final class Protocol
                 $generation,
                 $cancellation,
             ),
+            self::AFTER_FILE_ANALYSIS_BATCH_REQUEST => self::readFileAnalysisBatch(
+                $reader,
+                $host,
+                $requestId,
+                $generation,
+                $cancellation,
+            ),
             self::AFTER_ANALYSIS_REQUEST => self::readProjectAnalysis(
                 $reader,
                 $host,
@@ -380,22 +390,25 @@ final class Protocol
         return new ProjectAnalysis($files, $issueCount, $references);
     }
 
-    /** @param list<int|ReportedIssue> $reportedIssues */
+    /** @param list<int|ReportedIssue|string|null> $reportedIssues */
     public static function writeLifecycleResponse(int $requestKind, array $reportedIssues): string
     {
         $responseKind = match ($requestKind) {
             self::BEFORE_ANALYSIS_REQUEST => self::BEFORE_ANALYSIS_RESPONSE,
             self::AFTER_FILE_ANALYSIS_REQUEST => self::AFTER_FILE_ANALYSIS_RESPONSE,
             self::AFTER_ANALYSIS_REQUEST => self::AFTER_ANALYSIS_RESPONSE,
+            self::AFTER_FILE_ANALYSIS_BATCH_REQUEST => self::AFTER_FILE_ANALYSIS_BATCH_RESPONSE,
             default => throw new ProtocolException("Unknown analyzer lifecycle request kind {$requestKind}."),
         };
         $writer = self::createMessage($responseKind);
-        $writer->writeU32(count($reportedIssues) >> 1);
-        for ($index = 0, $count = count($reportedIssues); $index < $count; $index += 2) {
+        $writer->writeU32(intdiv(count($reportedIssues), 3));
+        for ($index = 0, $count = count($reportedIssues); $index < $count; $index += 3) {
             /** @var int<0, 65535> $plugin */
             $plugin = $reportedIssues[$index];
             /** @var ReportedIssue $reported */
             $reported = $reportedIssues[$index + 1];
+            /** @var string|null $defaultFile */
+            $defaultFile = $reportedIssues[$index + 2];
             $issue = $reported->issue;
             $writer->writeU16($plugin);
             $writer->writeU8($reported->level->value);
@@ -410,7 +423,7 @@ final class Protocol
             $writer->writeCount($issue->annotations);
             foreach ($issue->annotations as $annotation) {
                 $writer->writeU8($annotation->kind->value);
-                $writer->writeOptionalString($annotation->file);
+                $writer->writeOptionalString($annotation->file ?? $defaultFile);
                 $writer->writeU32($annotation->span->start);
                 $writer->writeU32($annotation->span->end);
                 $writer->writeOptionalString($annotation->message);
@@ -448,6 +461,31 @@ final class Protocol
             $reader->readU32(),
             self::readReferenceSummary($reader),
         );
+    }
+
+    /**
+     * @param positive-int $requestId
+     *
+     * @return non-empty-list<FileAnalysis>
+     */
+    private static function readFileAnalysisBatch(
+        PayloadReader $reader,
+        HostClient $host,
+        int $requestId,
+        int $generation,
+        CancellationTokenInterface $cancellation,
+    ): array {
+        $count = $reader->readCount(1_000_000);
+        if ($count === 0) {
+            throw new ProtocolException('An analyzer after-file batch contains no files.');
+        }
+
+        $files = [];
+        for ($index = 0; $index < $count; ++$index) {
+            $files[] = self::readFileAnalysis($reader, $host, $requestId, $generation, $cancellation);
+        }
+
+        return $files;
     }
 
     private static function readReferenceSummary(PayloadReader $reader): ReferenceSummary

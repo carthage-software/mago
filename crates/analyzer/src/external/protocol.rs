@@ -111,7 +111,10 @@ const MAXIMUM_PLUGINS: usize = 0x4000;
 const MAXIMUM_PROVIDERS: usize = 0x0001_0000;
 const MAXIMUM_TARGETS: usize = 0x0001_0000;
 const MAXIMUM_ALIASES: usize = 256;
-const MAXIMUM_TYPE_DEPTH: usize = 64;
+// Flow-sensitive inference can legitimately build deeply nested shapes after
+// repeated writes. Keep a finite protocol guard, but leave enough room for
+// complete snapshots from real framework codebases such as Symfony.
+const MAXIMUM_TYPE_DEPTH: usize = 256;
 const MAXIMUM_TYPE_MEMBERS: usize = 0x0001_0000;
 
 const TARGET_EXACT: u8 = 1;
@@ -187,6 +190,7 @@ pub(super) struct ReturnTypeRequest<'type_info> {
 pub(super) enum NestedRequestKind {
     TypeComparison,
     CodebaseQuery,
+    AnalysisQuery,
 }
 
 pub(super) fn encode_describe_request(php_version: PHPVersion) -> Vec<u8> {
@@ -1902,6 +1906,21 @@ fn validate_provider_indices(
 #[allow(clippy::unwrap_used)]
 pub(super) mod testing {
     use super::*;
+
+    #[test]
+    fn complete_snapshots_accept_deep_inferred_types() {
+        let mut ty = get_int();
+        for _ in 0..72 {
+            ty = get_list(ty);
+        }
+
+        let mut writer = PayloadWriter::new();
+        let mut types = Vec::new();
+        encode_union_snapshot(&mut writer, &ty, &mut types, 0).unwrap();
+
+        assert_eq!(types.len(), 73);
+        assert!(!writer.finish().is_empty());
+    }
 
     pub fn registration_response() -> Vec<u8> {
         let mut writer = message_writer(DESCRIBE_RESPONSE);

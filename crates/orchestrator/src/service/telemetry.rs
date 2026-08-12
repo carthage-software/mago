@@ -43,6 +43,8 @@ pub(crate) struct AnalysisPhaseTelemetry {
     pub(crate) analyzer_new_ns: AtomicU64,
     pub(crate) semantics_ns: AtomicU64,
     pub(crate) analyze_ns: AtomicU64,
+    pub(crate) snapshot_ns: AtomicU64,
+    pub(crate) snapshots: AtomicU64,
     pub(crate) per_file_total_ns: AtomicU64,
     pub(crate) files: AtomicU64,
 }
@@ -85,6 +87,15 @@ impl AnalysisPhaseTelemetry {
             total_ms(&self.analyze_ns),
             per_file_us(&self.analyze_ns),
         );
+        let snapshots = self.snapshots.load(Relaxed);
+        if snapshots > 0 {
+            tracing::trace!(
+                snapshots,
+                worker_cpu_ms = total_ms(&self.snapshot_ns),
+                average_micros = self.snapshot_ns.load(Relaxed).checked_div(snapshots).unwrap_or_default() / 1_000,
+                "External lifecycle file snapshots were retained."
+            );
+        }
         tracing::trace!(
             "Total worker CPU time across all sub-phases was {:.3} ms (average {:.2} µs per file).",
             total_ms(&self.per_file_total_ns),

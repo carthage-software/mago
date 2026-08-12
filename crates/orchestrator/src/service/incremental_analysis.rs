@@ -1,6 +1,12 @@
 use std::sync::Arc;
 #[cfg(not(target_arch = "wasm32"))]
+use std::sync::atomic::AtomicU64;
+#[cfg(not(target_arch = "wasm32"))]
+use std::sync::atomic::Ordering::Relaxed;
+#[cfg(not(target_arch = "wasm32"))]
 use std::time::Duration;
+#[cfg(not(target_arch = "wasm32"))]
+use std::time::Instant;
 
 use foldhash::HashMap;
 use foldhash::HashSet;
@@ -9,6 +15,7 @@ use mago_allocator::LocalArena;
 use mago_analyzer::Analyzer;
 use mago_analyzer::analysis_result::AnalysisResult;
 use mago_analyzer::artifacts::AnalysisArtifacts;
+use mago_analyzer::external::AFTER_FILE_ANALYSIS_BATCH_SIZE;
 use mago_analyzer::external::FileAnalysisSnapshot;
 use mago_analyzer::plugin::PluginRegistry;
 use mago_analyzer::settings::Settings;
@@ -44,7 +51,12 @@ struct FileState {
     codebase_issues: IssueCollection,
 }
 
-type SelectiveAnalysisOutput = (AnalysisResult, HashMap<FileId, IssueCollection>, Vec<Arc<FileAnalysisSnapshot>>);
+struct SelectiveAnalysisOutput {
+    result: AnalysisResult,
+    per_file_issues: HashMap<FileId, IssueCollection>,
+    snapshots: Vec<Arc<FileAnalysisSnapshot>>,
+    codebase_issues: IssueCollection,
+}
 
 /// A self-contained incremental analysis service.
 ///
@@ -354,12 +366,16 @@ impl IncrementalAnalysisService {
             );
         }
 
-        let (mut analysis_result, per_file_issues, snapshots) =
-            self.run_analyzer_selective(&merged_codebase, symbol_references, &self.settings, &HashSet::default())?;
+        let SelectiveAnalysisOutput {
+            result: mut analysis_result,
+            per_file_issues,
+            snapshots,
+            codebase_issues: all_codebase_issues,
+        } =
+            self.run_analyzer_selective(&mut merged_codebase, symbol_references, &self.settings, &HashSet::default())?;
         self.lifecycle_issues = analysis_result.issues.clone();
         self.analysis_snapshots = snapshots.into_iter().map(|snapshot| (snapshot.file_id(), snapshot)).collect();
 
-        let all_codebase_issues = merged_codebase.take_issues(true);
         analysis_result.issues.extend(all_codebase_issues.iter().cloned());
 
         // Distribute codebase issues to per-file caches.
@@ -684,8 +700,12 @@ impl IncrementalAnalysisService {
                 changed_symbols,
             );
 
-            let (mut analysis_result, mut per_file_issues, snapshots) =
-                self.run_analyzer_selective(&merged_codebase, symbol_references, &self.settings, &files_to_skip)?;
+            let SelectiveAnalysisOutput {
+                result: mut analysis_result,
+                mut per_file_issues,
+                snapshots,
+                codebase_issues: new_codebase_issues,
+            } = self.run_analyzer_selective(&mut merged_codebase, symbol_references, &self.settings, &files_to_skip)?;
             self.lifecycle_issues = std::mem::take(&mut analysis_result.issues);
             self.analysis_snapshots.retain(|file_id, _| current_file_ids.contains(file_id));
             for snapshot in snapshots {
@@ -694,7 +714,6 @@ impl IncrementalAnalysisService {
 
             // Drain codebase issues from metadata and distribute to changed files only.
             // Unchanged files keep their cached codebase_issues from previous runs.
-            let new_codebase_issues = merged_codebase.take_issues(true);
             let changed_file_ids: HashSet<FileId> = new_file_scans.iter().map(|(fid, _)| *fid).collect();
 
             // Clear codebase issues for changed files (they'll be re-distributed below).
@@ -891,15 +910,18 @@ impl IncrementalAnalysisService {
             }
         }
 
-        let (mut analysis_result, mut per_file_issues, snapshots) =
-            self.run_analyzer_selective(&merged_codebase, symbol_references, &self.settings, &files_to_skip)?;
+        let SelectiveAnalysisOutput {
+            result: mut analysis_result,
+            mut per_file_issues,
+            snapshots,
+            codebase_issues: new_codebase_issues,
+        } = self.run_analyzer_selective(&mut merged_codebase, symbol_references, &self.settings, &files_to_skip)?;
         self.lifecycle_issues = std::mem::take(&mut analysis_result.issues);
         self.analysis_snapshots.retain(|file_id, _| current_file_ids.contains(file_id));
         for snapshot in snapshots {
             self.analysis_snapshots.insert(snapshot.file_id(), snapshot);
         }
 
-        let new_codebase_issues = merged_codebase.take_issues(true);
         self.file_states.retain(|id, _| current_file_ids.contains(id));
 
         let changed_file_ids: HashSet<FileId> = new_file_scans.iter().map(|(fid, _)| *fid).collect();
@@ -1038,7 +1060,7 @@ impl IncrementalAnalysisService {
     /// only the files that were actually analyzed (not skipped).
     fn run_analyzer_selective(
         &self,
-        codebase: &CodebaseMetadata,
+        codebase: &mut CodebaseMetadata,
         current_symbol_references: SymbolReferences,
         settings: &Settings,
         skip_files: &HashSet<FileId>,
@@ -1054,6 +1076,12 @@ impl IncrementalAnalysisService {
             .collect::<Result<Vec<_>, _>>()?;
 
         let plugin_registry = &self.plugin_registry;
+        #[cfg(not(target_arch = "wasm32"))]
+        let trace_enabled = tracing::enabled!(tracing::Level::TRACE);
+        #[cfg(not(target_arch = "wasm32"))]
+        let snapshot_ns = AtomicU64::new(0);
+        #[cfg(not(target_arch = "wasm32"))]
+        let snapshot_count = AtomicU64::new(0);
         let external_session =
             self.plugin_registry.create_external_analysis_session(self.database.files()).map(Arc::new);
         plugin_registry.prepare_external_analyzer().map_err(mago_analyzer::error::AnalysisError::from)?;
@@ -1062,9 +1090,19 @@ impl IncrementalAnalysisService {
             .map_err(mago_analyzer::error::AnalysisError::from)?;
         let after_analysis =
             plugin_registry.has_external_after_analysis_hooks().map_err(mago_analyzer::error::AnalysisError::from)?;
+        #[cfg(not(target_arch = "wasm32"))]
+        let before_start = trace_enabled.then(Instant::now);
         let before_issues = plugin_registry
             .run_external_before_analysis_hooks(codebase, external_session.as_deref())
             .map_err(mago_analyzer::error::AnalysisError::from)?;
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(start) = before_start {
+            tracing::trace!(
+                issues = before_issues.len(),
+                elapsed = ?start.elapsed(),
+                "Incremental external before-analysis hooks completed."
+            );
+        }
 
         if host_files.is_empty() && skip_files.is_empty() {
             tracing::warn!("No host files found for analysis.");
@@ -1094,19 +1132,20 @@ impl IncrementalAnalysisService {
 
                 analysis_result.issues.extend(semantics_checker.check(&source_file, program, &resolved_names));
                 let artifacts = analyzer.analyze_with_artifacts(program, &mut analysis_result)?;
-                if after_file {
-                    analysis_result.issues.extend(
-                        plugin_registry
-                            .run_external_after_file_analysis_hooks(
-                                &source_file,
-                                &artifacts,
-                                codebase,
-                                external_session.as_deref(),
-                            )
-                            .map_err(mago_analyzer::error::AnalysisError::from)?,
-                    );
+                #[cfg(not(target_arch = "wasm32"))]
+                let snapshot_start = (trace_enabled && (after_file || after_analysis)).then(Instant::now);
+                let snapshot = if after_file || after_analysis {
+                    Some(Arc::new(FileAnalysisSnapshot::new(&source_file, &artifacts).map_err(|error| {
+                        OrchestratorError::General(format!("Failed to retain external analysis data: {error}"))
+                    })?))
+                } else {
+                    None
+                };
+                #[cfg(not(target_arch = "wasm32"))]
+                if let Some(start) = snapshot_start {
+                    snapshot_ns.fetch_add(start.elapsed().as_nanos() as u64, Relaxed);
+                    snapshot_count.fetch_add(1, Relaxed);
                 }
-                let snapshot = after_analysis.then(|| Arc::new(FileAnalysisSnapshot::new(&source_file, &artifacts)));
 
                 #[cfg(not(target_arch = "wasm32"))]
                 if analysis_result.time_in_analysis > ANALYSIS_DURATION_THRESHOLD {
@@ -1124,6 +1163,16 @@ impl IncrementalAnalysisService {
             })
             .collect::<Result<Vec<_>, OrchestratorError>>()?;
 
+        #[cfg(not(target_arch = "wasm32"))]
+        if trace_enabled {
+            tracing::trace!(
+                analyzed_files = results.len(),
+                retained_snapshots = snapshot_count.load(Relaxed),
+                snapshot_worker_cpu = ?Duration::from_nanos(snapshot_ns.load(Relaxed)),
+                "Incremental external lifecycle parallel-phase summary."
+            );
+        }
+
         let mut aggregated_result = AnalysisResult::new(current_symbol_references);
         aggregated_result.issues = before_issues;
         let mut per_file_issues: HashMap<FileId, IssueCollection> = HashMap::default();
@@ -1135,6 +1184,42 @@ impl IncrementalAnalysisService {
             snapshots.extend(snapshot);
         }
 
+        if after_file {
+            #[cfg(not(target_arch = "wasm32"))]
+            let after_file_start = trace_enabled.then(Instant::now);
+            let batches = snapshots
+                .par_chunks(AFTER_FILE_ANALYSIS_BATCH_SIZE)
+                .map(|files| {
+                    plugin_registry.run_external_after_file_analysis_batch_hooks(
+                        files,
+                        codebase,
+                        external_session.as_deref(),
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(mago_analyzer::error::AnalysisError::from)?;
+            let issue_count = batches.iter().map(IssueCollection::len).sum::<usize>();
+            for issue in batches.into_iter().flatten() {
+                let file_id = issue.annotations.first().map(|annotation| annotation.span.file_id);
+                if let Some(issues) = file_id.and_then(|file_id| per_file_issues.get_mut(&file_id)) {
+                    issues.push(issue);
+                } else {
+                    aggregated_result.issues.push(issue);
+                }
+            }
+            #[cfg(not(target_arch = "wasm32"))]
+            if let Some(start) = after_file_start {
+                tracing::trace!(
+                    files = snapshots.len(),
+                    batches = snapshots.len().div_ceil(AFTER_FILE_ANALYSIS_BATCH_SIZE),
+                    issues = issue_count,
+                    elapsed = ?start.elapsed(),
+                    "Incremental external after-file hook batches completed."
+                );
+            }
+        }
+
+        let codebase_issues = codebase.take_issues(true);
         if after_analysis {
             let analyzed = snapshots.iter().map(|snapshot| snapshot.file_id()).collect::<HashSet<_>>();
             let current = self
@@ -1157,20 +1242,41 @@ impl IncrementalAnalysisService {
             for issues in per_file_issues.values() {
                 project_result.issues.extend(issues.iter().cloned());
             }
+            for (file_id, state) in &self.file_states {
+                if skip_files.contains(file_id) {
+                    project_result.issues.extend(state.analysis_issues.iter().cloned());
+                    project_result.issues.extend(state.codebase_issues.iter().cloned());
+                }
+            }
+            project_result.issues.extend(codebase_issues.iter().cloned());
 
-            aggregated_result.issues.extend(
-                plugin_registry
-                    .run_external_after_analysis_hooks(
-                        &project_result,
-                        &project_files,
-                        codebase,
-                        external_session.as_deref(),
-                    )
-                    .map_err(mago_analyzer::error::AnalysisError::from)?,
-            );
+            #[cfg(not(target_arch = "wasm32"))]
+            let after_start = trace_enabled.then(Instant::now);
+            let after_issues = plugin_registry
+                .run_external_after_analysis_hooks(
+                    &project_result,
+                    &project_files,
+                    codebase,
+                    external_session.as_deref(),
+                )
+                .map_err(mago_analyzer::error::AnalysisError::from)?;
+            #[cfg(not(target_arch = "wasm32"))]
+            if let Some(start) = after_start {
+                tracing::trace!(
+                    files = project_files.len(),
+                    issues = after_issues.len(),
+                    elapsed = ?start.elapsed(),
+                    "Incremental external after-analysis hooks completed."
+                );
+            }
+            aggregated_result.issues.extend(after_issues);
         }
 
-        Ok((aggregated_result, per_file_issues, snapshots))
+        if !after_analysis {
+            snapshots.clear();
+        }
+
+        Ok(SelectiveAnalysisOutput { result: aggregated_result, per_file_issues, snapshots, codebase_issues })
     }
 }
 

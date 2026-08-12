@@ -1,6 +1,7 @@
 //! Plugin registry for managing and dispatching to providers and hooks.
 
 use std::sync::Arc;
+use std::sync::OnceLock;
 
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::metadata::CodebaseMetadata;
@@ -77,6 +78,8 @@ pub struct ProviderResult {
 #[derive(Default)]
 pub struct PluginRegistry {
     external_analyzer: Option<Arc<ExternalAnalyzerHandle>>,
+    external_function_providers: OnceLock<bool>,
+    external_method_providers: OnceLock<bool>,
     function_exact: WordMap<Vec<usize>>,
     function_prefix: Vec<(Word, usize)>,
     function_namespace: Vec<(Word, usize)>,
@@ -120,6 +123,8 @@ impl std::fmt::Debug for PluginRegistry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("PluginRegistry")
             .field("external_analyzer", &self.external_analyzer.is_some())
+            .field("external_function_providers", &self.external_function_providers.get())
+            .field("external_method_providers", &self.external_method_providers.get())
             .field("function_providers", &self.function_providers.len())
             .field("method_providers", &self.method_providers.len())
             .field("program_hooks", &self.program_hooks.len())
@@ -157,11 +162,19 @@ impl PluginRegistry {
     ///
     /// Returns an error when a worker fails to initialize or advertises invalid capabilities.
     pub fn prepare_external_analyzer(&self) -> PluginResult<()> {
-        self.external_analyzer
-            .as_deref()
-            .map(ExternalAnalyzerHandle::prepare)
-            .transpose()
+        let Some(analyzer) = self.external_analyzer.as_deref() else {
+            return Ok(());
+        };
+
+        analyzer
+            .prepare()
             .map_err(|reason| PluginError::InitializationFailed { name: "external analyzer".to_string(), reason })?;
+        let function_providers =
+            analyzer.has_function_return_type_providers().map_err(|reason| PluginError::Internal { reason })?;
+        let method_providers =
+            analyzer.has_method_return_type_providers().map_err(|reason| PluginError::Internal { reason })?;
+        let _function = self.external_function_providers.set(function_providers);
+        let _method = self.external_method_providers.set(method_providers);
         Ok(())
     }
 
@@ -238,6 +251,26 @@ impl PluginRegistry {
             .as_deref()
             .zip(session)
             .map(|(analyzer, session)| analyzer.run_after_file_analysis_hooks(file, artifacts, codebase, session))
+            .transpose()
+            .map(Option::unwrap_or_default)
+            .map_err(|reason| PluginError::Internal { reason })
+    }
+
+    /// Runs enabled external after-file hooks for a batch of completed analyses.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when an external hook cannot be dispatched or returns an invalid response.
+    pub fn run_external_after_file_analysis_batch_hooks(
+        &self,
+        files: &[Arc<FileAnalysisSnapshot>],
+        codebase: &CodebaseMetadata,
+        session: Option<&ExternalAnalysisSession>,
+    ) -> PluginResult<IssueCollection> {
+        self.external_analyzer
+            .as_deref()
+            .zip(session)
+            .map(|(analyzer, session)| analyzer.run_after_file_analysis_batch_hooks(files, codebase, session))
             .transpose()
             .map(Option::unwrap_or_default)
             .map_err(|reason| PluginError::Internal { reason })
@@ -1182,16 +1215,26 @@ impl PluginRegistry {
             all_issues.extend(provider_context.take_issues());
         }
 
-        let return_type = self
-            .external_analyzer
-            .as_deref()
-            .zip(external_session)
-            .map(|(analyzer, session)| {
-                analyzer.get_function_return_type(function_name, invocation, artifacts, source_file, codebase, session)
-            })
-            .transpose()
-            .map_err(|reason| PluginError::Internal { reason })?
-            .flatten();
+        let return_type = if self.external_function_providers.get().copied().unwrap_or(true) {
+            self.external_analyzer
+                .as_deref()
+                .zip(external_session)
+                .map(|(analyzer, session)| {
+                    analyzer.get_function_return_type(
+                        function_name,
+                        invocation,
+                        artifacts,
+                        source_file,
+                        codebase,
+                        session,
+                    )
+                })
+                .transpose()
+                .map_err(|reason| PluginError::Internal { reason })?
+                .flatten()
+        } else {
+            None
+        };
 
         Ok(ProviderResult { return_type, issues: all_issues })
     }
@@ -1227,24 +1270,27 @@ impl PluginRegistry {
             all_issues.extend(provider_context.take_issues());
         }
 
-        let return_type = self
-            .external_analyzer
-            .as_deref()
-            .zip(external_session)
-            .map(|(analyzer, session)| {
-                analyzer.get_method_return_type(
-                    class_name,
-                    method_name,
-                    invocation,
-                    artifacts,
-                    source_file,
-                    codebase,
-                    session,
-                )
-            })
-            .transpose()
-            .map_err(|reason| PluginError::Internal { reason })?
-            .flatten();
+        let return_type = if self.external_method_providers.get().copied().unwrap_or(true) {
+            self.external_analyzer
+                .as_deref()
+                .zip(external_session)
+                .map(|(analyzer, session)| {
+                    analyzer.get_method_return_type(
+                        class_name,
+                        method_name,
+                        invocation,
+                        artifacts,
+                        source_file,
+                        codebase,
+                        session,
+                    )
+                })
+                .transpose()
+                .map_err(|reason| PluginError::Internal { reason })?
+                .flatten()
+        } else {
+            None
+        };
 
         Ok(ProviderResult { return_type, issues: all_issues })
     }
