@@ -809,7 +809,7 @@ mod tests {
     use crate::external::protocol::NestedRequestKind;
 
     fn session(generation: u64) -> ExternalAnalysisSession {
-        ExternalAnalysisSession { generation, source_names: foldhash::HashMap::default() }
+        ExternalAnalysisSession { generation, sources: foldhash::HashMap::default() }
     }
 
     #[test]

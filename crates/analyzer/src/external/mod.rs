@@ -19,15 +19,18 @@ use mago_extension::WorkerError;
 use mago_extension::WorkerPool;
 use mago_extension::WorkerRequestHandler;
 use mago_php_version::PHPVersion;
+use mago_reporting::IssueCollection;
 use mago_word::starts_with_ignore_case;
 
 use crate::artifacts::AnalysisArtifacts;
 use crate::invocation::Invocation;
 
 pub use error::ExternalAnalyzerError;
+pub use lifecycle::FileAnalysisSnapshot;
 use protocol::Registration;
 
 mod error;
+mod lifecycle;
 mod metadata;
 pub mod protocol;
 
@@ -43,16 +46,25 @@ static NEXT_ANALYSIS_GENERATION: AtomicU64 = AtomicU64::new(1);
 #[derive(Debug)]
 pub struct ExternalAnalysisSession {
     generation: u64,
-    source_names: foldhash::HashMap<FileId, Arc<[u8]>>,
+    sources: foldhash::HashMap<FileId, ExternalSource>,
+}
+
+#[derive(Debug)]
+struct ExternalSource {
+    name: Arc<[u8]>,
+    size: u32,
 }
 
 impl ExternalAnalysisSession {
     #[must_use]
     pub fn from_files(files: impl IntoIterator<Item = Arc<File>>) -> Self {
         let generation = NEXT_ANALYSIS_GENERATION.fetch_add(1, Ordering::Relaxed);
-        let source_names = files.into_iter().map(|file| (file.id, Arc::<[u8]>::from(file.name.as_ref()))).collect();
+        let sources = files
+            .into_iter()
+            .map(|file| (file.id, ExternalSource { name: Arc::from(file.name.as_ref()), size: file.size }))
+            .collect();
 
-        Self { generation, source_names }
+        Self { generation, sources }
     }
 
     #[inline]
@@ -64,7 +76,13 @@ impl ExternalAnalysisSession {
     #[inline]
     #[must_use]
     pub(crate) fn source_name(&self, file_id: FileId) -> Option<&[u8]> {
-        self.source_names.get(&file_id).map(AsRef::as_ref)
+        self.sources.get(&file_id).map(|source| source.name.as_ref())
+    }
+
+    fn source(&self, name: &[u8]) -> Option<(FileId, u32)> {
+        self.sources
+            .iter()
+            .find_map(|(file_id, source)| (source.name.as_ref() == name).then_some((*file_id, source.size)))
     }
 }
 
@@ -154,12 +172,16 @@ pub struct ExternalExtension {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExternalPlugin {
+    pub index: u16,
     pub extension: String,
     pub identifier: String,
     pub name: String,
     pub description: String,
     pub aliases: Vec<String>,
     pub default_enabled: bool,
+    pub before_analysis: bool,
+    pub after_file_analysis: bool,
+    pub after_analysis: bool,
 }
 
 impl ExternalPlugin {
@@ -377,6 +399,42 @@ impl ExternalAnalyzerHandle {
             .map_err(|error| error.to_string())
     }
 
+    pub(crate) fn has_after_file_analysis_hooks(&self) -> Result<bool, String> {
+        Ok(self.get()?.backends.iter().any(|backend| !backend.registration.after_file_analysis_plugins.is_empty()))
+    }
+
+    pub(crate) fn has_after_analysis_hooks(&self) -> Result<bool, String> {
+        Ok(self.get()?.backends.iter().any(|backend| !backend.registration.after_analysis_plugins.is_empty()))
+    }
+
+    pub(crate) fn run_before_analysis_hooks(
+        &self,
+        codebase: &CodebaseMetadata,
+        session: &ExternalAnalysisSession,
+    ) -> Result<IssueCollection, String> {
+        self.get()?.run_before_analysis_hooks(codebase, session).map_err(|error| error.to_string())
+    }
+
+    pub(crate) fn run_after_file_analysis_hooks(
+        &self,
+        file: &File,
+        artifacts: &AnalysisArtifacts,
+        codebase: &CodebaseMetadata,
+        session: &ExternalAnalysisSession,
+    ) -> Result<IssueCollection, String> {
+        self.get()?.run_after_file_analysis_hooks(file, artifacts, codebase, session).map_err(|error| error.to_string())
+    }
+
+    pub(crate) fn run_after_analysis_hooks(
+        &self,
+        result: &crate::analysis_result::AnalysisResult,
+        files: &[Arc<FileAnalysisSnapshot>],
+        codebase: &CodebaseMetadata,
+        session: &ExternalAnalysisSession,
+    ) -> Result<IssueCollection, String> {
+        self.get()?.run_after_analysis_hooks(result, files, codebase, session).map_err(|error| error.to_string())
+    }
+
     fn get(&self) -> Result<&ExternalAnalyzer, String> {
         self.analyzer
             .get_or_init(|| {
@@ -463,6 +521,119 @@ impl<T> ExternalAnalyzer<T>
 where
     T: AnalyzerTransport,
 {
+    fn run_before_analysis_hooks(
+        &self,
+        codebase: &CodebaseMetadata,
+        session: &ExternalAnalysisSession,
+    ) -> Result<IssueCollection, ExternalAnalyzerError> {
+        let mut issues = IssueCollection::new();
+        for backend in &self.backends {
+            let plugins = &backend.registration.before_analysis_plugins;
+            if plugins.is_empty() {
+                continue;
+            }
+            let request = lifecycle::encode_before_analysis_request(session.generation(), plugins)?;
+            let mut handler = |frame: &Frame| {
+                protocol::handle_nested_request(&frame.payload, codebase, session, |_| None)
+                    .map(|(_, response)| response)
+                    .map_err(|error| error.to_string().into_bytes())
+            };
+            let response = backend.transport.request_with_handler(request, &mut handler)?;
+            issues.extend(lifecycle::decode_lifecycle_response(
+                &response,
+                lifecycle::BEFORE_ANALYSIS_REQUEST,
+                plugins,
+                &backend.registration.plugins,
+                session,
+                None,
+            )?);
+        }
+        Ok(issues)
+    }
+
+    fn run_after_file_analysis_hooks(
+        &self,
+        file: &File,
+        artifacts: &AnalysisArtifacts,
+        codebase: &CodebaseMetadata,
+        session: &ExternalAnalysisSession,
+    ) -> Result<IssueCollection, ExternalAnalyzerError> {
+        let mut issues = IssueCollection::new();
+        let store = lifecycle::AnalysisStore::File { file, artifacts };
+        for backend in &self.backends {
+            let plugins = &backend.registration.after_file_analysis_plugins;
+            if plugins.is_empty() {
+                continue;
+            }
+
+            let request =
+                lifecycle::encode_after_file_analysis_request(session.generation(), plugins, file, artifacts)?;
+            let mut handler = |frame: &Frame| {
+                let response =
+                    if protocol::message_kind(&frame.payload).map_err(|error| error.to_string().into_bytes())? == 8 {
+                        lifecycle::handle_analysis_query(&frame.payload, session, &store)
+                    } else {
+                        protocol::handle_nested_request(&frame.payload, codebase, session, |_| None)
+                            .map(|(_, response)| response)
+                    };
+                response.map_err(|error| error.to_string().into_bytes())
+            };
+
+            let response = backend.transport.request_with_handler(request, &mut handler)?;
+            issues.extend(lifecycle::decode_lifecycle_response(
+                &response,
+                lifecycle::AFTER_FILE_ANALYSIS_REQUEST,
+                plugins,
+                &backend.registration.plugins,
+                session,
+                Some(file),
+            )?);
+        }
+
+        Ok(issues)
+    }
+
+    fn run_after_analysis_hooks(
+        &self,
+        result: &crate::analysis_result::AnalysisResult,
+        files: &[Arc<FileAnalysisSnapshot>],
+        codebase: &CodebaseMetadata,
+        session: &ExternalAnalysisSession,
+    ) -> Result<IssueCollection, ExternalAnalyzerError> {
+        let mut issues = IssueCollection::new();
+        let store = lifecycle::AnalysisStore::Project(files);
+        for backend in &self.backends {
+            let plugins = &backend.registration.after_analysis_plugins;
+            if plugins.is_empty() {
+                continue;
+            }
+
+            let request = lifecycle::encode_after_analysis_request(session.generation(), plugins, result, files)?;
+            let mut handler = |frame: &Frame| {
+                let response =
+                    if protocol::message_kind(&frame.payload).map_err(|error| error.to_string().into_bytes())? == 8 {
+                        lifecycle::handle_analysis_query(&frame.payload, session, &store)
+                    } else {
+                        protocol::handle_nested_request(&frame.payload, codebase, session, |_| None)
+                            .map(|(_, response)| response)
+                    };
+                response.map_err(|error| error.to_string().into_bytes())
+            };
+
+            let response = backend.transport.request_with_handler(request, &mut handler)?;
+            issues.extend(lifecycle::decode_lifecycle_response(
+                &response,
+                lifecycle::AFTER_ANALYSIS_REQUEST,
+                plugins,
+                &backend.registration.plugins,
+                session,
+                None,
+            )?);
+        }
+
+        Ok(issues)
+    }
+
     pub(crate) fn get_function_return_type(
         &self,
         function: &[u8],
@@ -833,8 +1004,17 @@ where
 
             let advertised_function_providers = registration.function_providers.len();
             let advertised_method_providers = registration.method_providers.len();
+            let enabled_indices = registration
+                .plugins
+                .iter()
+                .filter(|plugin| enabled.contains(plugin.identifier.as_str()))
+                .map(|plugin| plugin.index)
+                .collect::<HashSet<_>>();
             registration.function_providers.retain(|provider| enabled.contains(provider.plugin.as_str()));
             registration.method_providers.retain(|provider| enabled.contains(provider.plugin.as_str()));
+            registration.before_analysis_plugins.retain(|index| enabled_indices.contains(index));
+            registration.after_file_analysis_plugins.retain(|index| enabled_indices.contains(index));
+            registration.after_analysis_plugins.retain(|index| enabled_indices.contains(index));
             extensions.extend(registration.extensions.iter().cloned());
             plugins.extend(registration.plugins.iter().cloned());
             if let Some(start) = backend_start {
@@ -849,6 +1029,9 @@ where
                     disabled_function_providers = advertised_function_providers - registration.function_providers.len(),
                     method_providers = registration.method_providers.len(),
                     disabled_method_providers = advertised_method_providers - registration.method_providers.len(),
+                    before_analysis_plugins = registration.before_analysis_plugins.len(),
+                    after_file_analysis_plugins = registration.after_file_analysis_plugins.len(),
+                    after_analysis_plugins = registration.after_analysis_plugins.len(),
                     elapsed = ?start.elapsed(),
                     "External analyzer backend registered."
                 );
@@ -871,12 +1054,30 @@ where
                 analyzer.backends.iter().map(|backend| backend.registration.function_providers.len()).sum::<usize>();
             let method_providers =
                 analyzer.backends.iter().map(|backend| backend.registration.method_providers.len()).sum::<usize>();
+            let before_analysis_plugins = analyzer
+                .backends
+                .iter()
+                .map(|backend| backend.registration.before_analysis_plugins.len())
+                .sum::<usize>();
+            let after_file_analysis_plugins = analyzer
+                .backends
+                .iter()
+                .map(|backend| backend.registration.after_file_analysis_plugins.len())
+                .sum::<usize>();
+            let after_analysis_plugins = analyzer
+                .backends
+                .iter()
+                .map(|backend| backend.registration.after_analysis_plugins.len())
+                .sum::<usize>();
             tracing::trace!(
                 backends = analyzer.backends.len(),
                 extensions = analyzer.extensions.len(),
                 plugins = analyzer.plugins.len(),
                 function_providers,
                 method_providers,
+                before_analysis_plugins,
+                after_file_analysis_plugins,
+                after_analysis_plugins,
                 elapsed = ?start.elapsed(),
                 "External analyzer initialized."
             );

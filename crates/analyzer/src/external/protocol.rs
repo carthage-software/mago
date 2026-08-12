@@ -170,6 +170,9 @@ pub(super) struct Registration {
     pub plugins: Vec<ExternalPlugin>,
     pub function_providers: Vec<FunctionProvider>,
     pub method_providers: Vec<MethodProvider>,
+    pub before_analysis_plugins: Vec<u16>,
+    pub after_file_analysis_plugins: Vec<u16>,
+    pub after_analysis_plugins: Vec<u16>,
 }
 
 pub(super) struct ReturnTypeRequest<'type_info> {
@@ -203,6 +206,9 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
     let mut plugins = Vec::new();
     let mut function_providers = Vec::new();
     let mut method_providers = Vec::new();
+    let mut before_analysis_plugins = Vec::new();
+    let mut after_file_analysis_plugins = Vec::new();
+    let mut after_analysis_plugins = Vec::new();
     for _ in 0..extension_count {
         let extension_identifier = non_empty(reader.read_string("extension identifier")?, "extension identifier")?;
         let extension_name = non_empty(reader.read_string("extension name")?, "extension name")?;
@@ -214,6 +220,21 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
             let name = non_empty(reader.read_string("plugin name")?, "plugin name")?;
             let description = non_empty(reader.read_string("plugin description")?, "plugin description")?;
             let default_enabled = reader.read_bool("plugin default-enabled flag")?;
+            let lifecycle = reader.read_u8("plugin lifecycle flags")?;
+            if lifecycle & !0b111 != 0 {
+                return Err(protocol(format!("plugin `{identifier}` has unknown lifecycle flags {lifecycle:#04x}")));
+            }
+            let index =
+                u16::try_from(plugins.len()).map_err(|_| protocol("worker registered more than 65,536 plugins"))?;
+            if lifecycle & 1 != 0 {
+                before_analysis_plugins.push(index);
+            }
+            if lifecycle & 2 != 0 {
+                after_file_analysis_plugins.push(index);
+            }
+            if lifecycle & 4 != 0 {
+                after_analysis_plugins.push(index);
+            }
             let alias_count = reader.read_count("plugin aliases", MAXIMUM_ALIASES)?;
             let mut aliases = Vec::with_capacity(alias_count);
             for _ in 0..alias_count {
@@ -270,12 +291,16 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
             }
 
             let plugin = ExternalPlugin {
+                index,
                 extension: extension_identifier.clone(),
                 identifier,
                 name,
                 description,
                 aliases,
                 default_enabled,
+                before_analysis: lifecycle & 1 != 0,
+                after_file_analysis: lifecycle & 2 != 0,
+                after_analysis: lifecycle & 4 != 0,
             };
 
             extension_plugins.push(plugin.clone());
@@ -297,7 +322,15 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
     )?;
 
     validate_provider_indices(method_providers.iter().map(|provider| provider.index), "method return-type provider")?;
-    Ok(Registration { extensions, plugins, function_providers, method_providers })
+    Ok(Registration {
+        extensions,
+        plugins,
+        function_providers,
+        method_providers,
+        before_analysis_plugins,
+        after_file_analysis_plugins,
+        after_analysis_plugins,
+    })
 }
 
 pub(super) fn encode_function_return_type_request<'type_info>(
@@ -1807,7 +1840,7 @@ pub(super) fn message_reader(payload: &[u8], expected_kind: u16) -> Result<Paylo
     Ok(reader)
 }
 
-fn message_kind(payload: &[u8]) -> Result<u16, ExternalAnalyzerError> {
+pub(super) fn message_kind(payload: &[u8]) -> Result<u16, ExternalAnalyzerError> {
     if payload.len() < HEADER_LENGTH {
         return Err(protocol("analyzer message is shorter than its header"));
     }
@@ -1881,6 +1914,7 @@ pub(super) mod testing {
         writer.write_string("Demo analyzer").unwrap();
         writer.write_string("Test provider").unwrap();
         writer.write_bool(true);
+        writer.write_u8(0);
         writer.write_u32(1);
         writer.write_string("example").unwrap();
         writer.write_u32(1);

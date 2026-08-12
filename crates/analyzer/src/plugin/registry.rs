@@ -31,6 +31,7 @@ use crate::artifacts::AnalysisArtifacts;
 use crate::context::block::BlockContext;
 use crate::external::ExternalAnalysisSession;
 use crate::external::ExternalAnalyzerHandle;
+use crate::external::FileAnalysisSnapshot;
 use crate::invocation::Invocation;
 use crate::plugin::PluginError;
 use crate::plugin::context::HookContext;
@@ -172,6 +173,75 @@ impl PluginRegistry {
     ) -> Option<ExternalAnalysisSession> {
         self.external_analyzer.as_ref()?;
         Some(ExternalAnalysisSession::from_files(files))
+    }
+
+    /// Returns whether any enabled external plugin subscribed to per-file completion.
+    pub fn has_external_after_file_analysis_hooks(&self) -> PluginResult<bool> {
+        self.external_analyzer
+            .as_deref()
+            .map(ExternalAnalyzerHandle::has_after_file_analysis_hooks)
+            .transpose()
+            .map(Option::unwrap_or_default)
+            .map_err(|reason| PluginError::Internal { reason })
+    }
+
+    /// Returns whether any enabled external plugin subscribed to whole-project completion.
+    pub fn has_external_after_analysis_hooks(&self) -> PluginResult<bool> {
+        self.external_analyzer
+            .as_deref()
+            .map(ExternalAnalyzerHandle::has_after_analysis_hooks)
+            .transpose()
+            .map(Option::unwrap_or_default)
+            .map_err(|reason| PluginError::Internal { reason })
+    }
+
+    /// Runs enabled external hooks after the codebase is frozen and before file analysis starts.
+    pub fn run_external_before_analysis_hooks(
+        &self,
+        codebase: &CodebaseMetadata,
+        session: Option<&ExternalAnalysisSession>,
+    ) -> PluginResult<IssueCollection> {
+        self.external_analyzer
+            .as_deref()
+            .zip(session)
+            .map(|(analyzer, session)| analyzer.run_before_analysis_hooks(codebase, session))
+            .transpose()
+            .map(Option::unwrap_or_default)
+            .map_err(|reason| PluginError::Internal { reason })
+    }
+
+    /// Runs enabled external hooks for one completed file analysis.
+    pub fn run_external_after_file_analysis_hooks(
+        &self,
+        file: &File,
+        artifacts: &AnalysisArtifacts,
+        codebase: &CodebaseMetadata,
+        session: Option<&ExternalAnalysisSession>,
+    ) -> PluginResult<IssueCollection> {
+        self.external_analyzer
+            .as_deref()
+            .zip(session)
+            .map(|(analyzer, session)| analyzer.run_after_file_analysis_hooks(file, artifacts, codebase, session))
+            .transpose()
+            .map(Option::unwrap_or_default)
+            .map_err(|reason| PluginError::Internal { reason })
+    }
+
+    /// Runs enabled external hooks for the final merged analysis result.
+    pub fn run_external_after_analysis_hooks(
+        &self,
+        result: &crate::analysis_result::AnalysisResult,
+        files: &[Arc<FileAnalysisSnapshot>],
+        codebase: &CodebaseMetadata,
+        session: Option<&ExternalAnalysisSession>,
+    ) -> PluginResult<IssueCollection> {
+        self.external_analyzer
+            .as_deref()
+            .zip(session)
+            .map(|(analyzer, session)| analyzer.run_after_analysis_hooks(result, files, codebase, session))
+            .transpose()
+            .map(Option::unwrap_or_default)
+            .map_err(|reason| PluginError::Internal { reason })
     }
 
     #[inline]
