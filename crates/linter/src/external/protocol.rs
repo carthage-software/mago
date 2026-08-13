@@ -26,6 +26,9 @@ use mago_span::Span;
 use mago_syntax::cst::Node;
 use mago_syntax::cst::NodeKind;
 use mago_syntax::cst::Program;
+use mago_text_edit::Safety;
+use mago_text_edit::TextEdit;
+use mago_text_edit::TextRange;
 use strum::IntoEnumIterator;
 
 use super::ExternalLintError;
@@ -46,6 +49,7 @@ const MAXIMUM_EXTENSIONS_RULES: usize = 0x4000;
 const MAXIMUM_TARGETS_PER_RULE: usize = 512;
 const MAXIMUM_ISSUES_PER_FILE: usize = 1_000_000;
 const MAXIMUM_ANNOTATIONS_PER_ISSUE: usize = 0x0001_0000;
+const MAXIMUM_EDITS_PER_ISSUE: usize = 0x0001_0000;
 const MAXIMUM_NOTES_PER_ISSUE: usize = 0x0001_0000;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -474,7 +478,27 @@ pub(super) fn decode_lint_response(
             return Err(protocol(format!("rule `{code}` reported an issue without a primary annotation")));
         }
 
-        let mut issue = Issue::new(level, message).with_code(code.clone()).with_annotations(annotations);
+        let edit_count = reader.read_count("issue edits", MAXIMUM_EDITS_PER_ISSUE)?;
+        let mut edits = Vec::with_capacity(edit_count);
+        for _ in 0..edit_count {
+            let start = reader.read_u32("edit start")?;
+            let end = reader.read_u32("edit end")?;
+            if start > end || end > file.size {
+                return Err(protocol(format!(
+                    "rule `{code}` reported invalid edit range {start}..{end} for a {}-byte file",
+                    file.size
+                )));
+            }
+
+            let safety = read_safety(&mut reader, "edit safety")?;
+            let new_text = reader.read_bytes("edit replacement")?.to_vec();
+            edits.push(TextEdit::replace(TextRange::new(start, end), new_text).with_safety(safety));
+        }
+
+        let mut issue = Issue::new(level, message)
+            .with_code(code.clone())
+            .with_annotations(annotations)
+            .with_file_edits(file.id, edits);
         issue.notes = notes;
         issue.help = help;
         issue.link = link;
@@ -543,6 +567,15 @@ fn read_annotation_kind(reader: &mut PayloadReader<'_>) -> Result<AnnotationKind
         1 => Ok(AnnotationKind::Primary),
         2 => Ok(AnnotationKind::Secondary),
         value => Err(protocol(format!("invalid annotation kind {value}"))),
+    }
+}
+
+fn read_safety(reader: &mut PayloadReader<'_>, description: &'static str) -> Result<Safety, ExternalLintError> {
+    match reader.read_u8(description)? {
+        1 => Ok(Safety::Safe),
+        2 => Ok(Safety::PotentiallyUnsafe),
+        3 => Ok(Safety::Unsafe),
+        value => Err(protocol(format!("invalid text edit safety {value}"))),
     }
 }
 
@@ -623,6 +656,20 @@ pub(super) mod testing {
                 writer.write_u32(annotation.span.start.offset);
                 writer.write_u32(annotation.span.end.offset);
                 optional_string(&mut writer, annotation.message.as_deref());
+            }
+            writer.write_length(issue.edits.values().map(Vec::len).sum()).unwrap();
+            for edits in issue.edits.values() {
+                for edit in edits {
+                    writer.write_u32(edit.range.start);
+                    writer.write_u32(edit.range.end);
+                    writer.write_u8(match edit.safety {
+                        Safety::Safe => 1,
+                        Safety::PotentiallyUnsafe => 2,
+                        Safety::Unsafe => 3,
+                        _ => 3,
+                    });
+                    writer.write_bytes(&edit.new_text).unwrap();
+                }
             }
         }
 

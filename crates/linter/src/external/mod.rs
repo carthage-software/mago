@@ -446,6 +446,8 @@ mod tests {
     use mago_reporting::Issue;
     use mago_span::Span;
     use mago_syntax::parser::parse_file;
+    use mago_text_edit::Safety;
+    use mago_text_edit::TextEdit;
 
     use crate::Linter;
     use crate::registry::RuleRegistry;
@@ -488,7 +490,11 @@ mod tests {
         );
         let issue = Issue::warning("Do not call this function")
             .with_code("acme/no-run")
-            .with_annotation(Annotation::primary(target_span).with_message("Call occurs here"));
+            .with_annotation(Annotation::primary(target_span).with_message("Call occurs here"))
+            .with_edit(
+                file.id,
+                TextEdit::replace(call_start..call_start + 1, "run_safely").with_safety(Safety::PotentiallyUnsafe),
+            );
         let transport = Arc::new(MockTransport {
             registration: testing::describe_response(
                 "acme/tools",
@@ -505,7 +511,14 @@ mod tests {
 
         let issues = external.lint(&file, program, &resolved_names, None).expect("external lint should succeed");
         assert_eq!(issues.len(), 1);
-        assert_eq!(issues.iter().next().and_then(|issue| issue.code.as_deref()), Some("acme/no-run"));
+        let issue = issues.iter().next().expect("the external issue should exist");
+        assert_eq!(issue.code.as_deref(), Some("acme/no-run"));
+        let edits = issue.edits.get(&file.id).expect("the external issue should retain its edit batch");
+        assert_eq!(edits.len(), 1);
+        assert_eq!(edits[0].range.start, call_start);
+        assert_eq!(edits[0].range.end, call_start + 1);
+        assert_eq!(edits[0].new_text, b"run_safely");
+        assert_eq!(edits[0].safety, Safety::PotentiallyUnsafe);
 
         let request = transport.request.lock().unwrap();
         let request = request.as_ref().expect("one request should be captured");

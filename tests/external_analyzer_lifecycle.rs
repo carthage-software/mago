@@ -27,6 +27,7 @@ use mago_orchestrator::service::incremental_analysis::IncrementalAnalysisService
 use mago_php_version::PHPVersion;
 use mago_reporting::IssueCollection;
 use mago_syntax::settings::ParserSettings;
+use mago_text_edit::Safety;
 use serde::Deserialize;
 
 const FILE_COUNT: usize = 96;
@@ -113,6 +114,26 @@ fn assert_issue_cardinality(issues: &IssueCollection) {
         .expect("the final lifecycle issue should exist");
     assert_eq!(final_issue.annotations.len(), 2);
     assert_ne!(final_issue.annotations[0].span.file_id, final_issue.annotations[1].span.file_id);
+    let final_edits = final_issue
+        .edits
+        .get(&final_issue.annotations[0].span.file_id)
+        .expect("the project-wide edit should resolve its named source file");
+    assert_eq!(final_edits.len(), 1);
+    assert_eq!(final_edits[0].range.start, final_issue.annotations[0].span.start.offset);
+    assert_eq!(final_edits[0].range.end, final_issue.annotations[0].span.end.offset);
+    assert!(final_edits[0].new_text.is_empty());
+    assert_eq!(final_edits[0].safety, Safety::Unsafe);
+
+    for issue in issues.iter().filter(|issue| issue.code.as_deref().is_some_and(|code| code.ends_with("/after-file"))) {
+        assert_eq!(issue.edits.len(), 1);
+        let (file_id, edits) = issue.edits.iter().next().expect("an after-file issue should contain one edit batch");
+        assert_eq!(*file_id, issue.annotations[0].span.file_id);
+        assert_eq!(edits.len(), 1);
+        assert_eq!(edits[0].range.start, 0);
+        assert_eq!(edits[0].range.end, 5);
+        assert_eq!(edits[0].new_text, b"<?php");
+        assert_eq!(edits[0].safety, Safety::PotentiallyUnsafe);
+    }
 }
 
 fn assert_initial_audit(entries: &[AuditEntry]) {

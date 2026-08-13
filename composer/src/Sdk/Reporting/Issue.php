@@ -12,6 +12,7 @@ use Mago\Sdk\Span;
  * A diagnostic reported by a Mago extension.
  *
  * @api
+ * @mago-expect lint:excessive-parameter-list
  */
 final class Issue
 {
@@ -24,6 +25,7 @@ final class Issue
      * @param non-empty-string $message
      * @param list<non-empty-string> $notes
      * @param non-empty-list<Annotation> $annotations
+     * @param list<TextEdit> $edits
      */
     private function __construct(
         string $message,
@@ -31,6 +33,7 @@ final class Issue
         public readonly ?string $help,
         public readonly ?string $link,
         public readonly array $annotations,
+        public readonly array $edits,
     ) {
         $this->message = $message;
     }
@@ -45,7 +48,7 @@ final class Issue
             AnnotationKind::Primary,
             $primarySpan,
             $annotationMessage,
-        )]);
+        )], []);
     }
 
     public static function at(string $message, SourceLocation $location, ?string $annotationMessage = null): self
@@ -59,7 +62,7 @@ final class Issue
             $location->span,
             $annotationMessage,
             $location->file,
-        )]);
+        )], []);
     }
 
     public function withNote(string $note): self
@@ -68,7 +71,14 @@ final class Issue
             throw new InvalidArgumentException('An issue note cannot be empty.');
         }
 
-        return new self($this->message, [...$this->notes, $note], $this->help, $this->link, $this->annotations);
+        return new self(
+            $this->message,
+            [...$this->notes, $note],
+            $this->help,
+            $this->link,
+            $this->annotations,
+            $this->edits,
+        );
     }
 
     public function withHelp(string $help): self
@@ -77,7 +87,7 @@ final class Issue
             throw new InvalidArgumentException('Issue help cannot be empty.');
         }
 
-        return new self($this->message, $this->notes, $help, $this->link, $this->annotations);
+        return new self($this->message, $this->notes, $help, $this->link, $this->annotations, $this->edits);
     }
 
     public function withLink(string $link): self
@@ -86,22 +96,42 @@ final class Issue
             throw new InvalidArgumentException('An issue link cannot be empty.');
         }
 
-        return new self($this->message, $this->notes, $this->help, $link, $this->annotations);
+        return new self($this->message, $this->notes, $this->help, $link, $this->annotations, $this->edits);
     }
 
     public function withSecondaryAnnotation(Span $span, ?string $message = null): self
     {
-        return new self($this->message, $this->notes, $this->help, $this->link, [
-            ...$this->annotations,
-            new Annotation(AnnotationKind::Secondary, $span, $message),
-        ]);
+        return new self(
+            $this->message,
+            $this->notes,
+            $this->help,
+            $this->link,
+            [...$this->annotations, new Annotation(AnnotationKind::Secondary, $span, $message)],
+            $this->edits,
+        );
     }
 
     public function withSecondaryLocation(SourceLocation $location, ?string $message = null): self
     {
-        return new self($this->message, $this->notes, $this->help, $this->link, [
-            ...$this->annotations,
-            new Annotation(AnnotationKind::Secondary, $location->span, $message, $location->file),
-        ]);
+        return new self(
+            $this->message,
+            $this->notes,
+            $this->help,
+            $this->link,
+            [...$this->annotations, new Annotation(AnnotationKind::Secondary, $location->span, $message, $location->file)],
+            $this->edits,
+        );
+    }
+
+    public function withEdit(TextEdit $edit): self
+    {
+        return new self(
+            $this->message,
+            $this->notes,
+            $this->help,
+            $this->link,
+            $this->annotations,
+            [...$this->edits, $edit],
+        );
     }
 }

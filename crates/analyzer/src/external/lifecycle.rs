@@ -14,6 +14,9 @@ use mago_reporting::IssueCollection;
 use mago_reporting::Level;
 use mago_span::Position;
 use mago_span::Span;
+use mago_text_edit::Safety;
+use mago_text_edit::TextEdit;
+use mago_text_edit::TextRange;
 
 use crate::analysis_result::AnalysisResult;
 use crate::artifacts::AnalysisArtifacts;
@@ -42,6 +45,7 @@ const GET_INFERRED_YIELD_KEY_TYPES: u8 = 4;
 const GET_INFERRED_YIELD_VALUE_TYPES: u8 = 5;
 const MAXIMUM_ISSUES: usize = 1_000_000;
 const MAXIMUM_ANNOTATIONS: usize = 0x0001_0000;
+const MAXIMUM_EDITS: usize = 0x0001_0000;
 const MAXIMUM_NOTES: usize = 0x0001_0000;
 const MAXIMUM_TYPE_QUERIES: usize = 1_000_000;
 
@@ -505,17 +509,62 @@ pub(super) fn decode_lifecycle_response(
             )));
         }
 
+        let edit_count = reader.read_count("lifecycle issue edits", MAXIMUM_EDITS)?;
+        let mut edits = HashMap::default();
+        for _ in 0..edit_count {
+            let named_file = if reader.read_bool("lifecycle edit file presence")? {
+                Some(reader.read_bytes("lifecycle edit file")?)
+            } else {
+                None
+            };
+
+            let (file_id, size) = match named_file {
+                Some(name) => session.source(name).ok_or_else(|| {
+                    protocol(format!("lifecycle edit names unknown file `{}`", String::from_utf8_lossy(name)))
+                })?,
+                None => default_file
+                    .map(|file| (file.id, file.size))
+                    .ok_or_else(|| protocol("a project lifecycle edit must name its source file"))?,
+            };
+
+            let start = reader.read_u32("lifecycle edit start")?;
+            let end = reader.read_u32("lifecycle edit end")?;
+            if start > end || end > size {
+                return Err(protocol(format!(
+                    "plugin `{}` reported invalid edit range {start}..{end}",
+                    plugin.identifier
+                )));
+            }
+
+            let safety = read_safety(&mut reader)?;
+            let new_text = reader.read_bytes("lifecycle edit replacement")?.to_vec();
+            edits
+                .entry(file_id)
+                .or_insert_with(Vec::new)
+                .push(TextEdit::replace(TextRange::new(start, end), new_text).with_safety(safety));
+        }
+
         let mut issue = Issue::new(level, message)
             .with_code(format!("{}/{}", plugin.identifier, local_code))
             .with_annotations(annotations);
         issue.notes = notes;
         issue.help = help;
         issue.link = link;
+        issue.edits = edits;
         issues.push(issue);
     }
 
     reader.finish()?;
     Ok(issues)
+}
+
+fn read_safety(reader: &mut PayloadReader<'_>) -> Result<Safety, ExternalAnalyzerError> {
+    match reader.read_u8("lifecycle edit safety")? {
+        1 => Ok(Safety::Safe),
+        2 => Ok(Safety::PotentiallyUnsafe),
+        3 => Ok(Safety::Unsafe),
+        value => Err(protocol(format!("invalid lifecycle text edit safety {value}"))),
+    }
 }
 
 pub(super) fn handle_analysis_query(

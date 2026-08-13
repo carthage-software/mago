@@ -9,6 +9,7 @@ use Mago\Sdk\Linter\Rule;
 use Mago\Sdk\Linter\RuleDefinition;
 use Mago\Sdk\Reporting\Issue;
 use Mago\Sdk\Reporting\Level;
+use Mago\Sdk\Reporting\TextEdit;
 use Mago\Sdk\Syntax\NodeKind;
 
 use function strcasecmp;
@@ -34,8 +35,10 @@ final class PreferArrayAnyRule implements Rule
             return;
         }
 
-        $context->report(Issue::new('Prefer array_any() over Psl\\Iter\\any().', $context->node->span)->withHelp(
-            'Replace this call with array_any().',
-        ));
+        $context->report(
+            Issue::new('Prefer array_any() over Psl\\Iter\\any().', $context->node->span)
+                ->withHelp('Replace this call with array_any().')
+                ->withEdit(TextEdit::replace($resolvedName->span, 'array_any')),
+        );
     }
 }

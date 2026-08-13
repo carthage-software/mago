@@ -24,6 +24,7 @@ use function unpack;
 /**
  * @internal
  * @mago-expect lint:cyclomatic-complexity
+ * @mago-expect lint:kan-defect
  */
 final class Protocol
 {
@@ -211,6 +212,21 @@ final class Protocol
                 $payload .= $annotation->message === null
                     ? "\0"
                     : "\1" . pack('N', strlen($annotation->message)) . $annotation->message;
+            }
+
+            $payload .= pack('N', count($issue->edits));
+            foreach ($issue->edits as $edit) {
+                if ($edit->file !== null) {
+                    throw new ProtocolException('A linter text edit cannot target another file.');
+                }
+
+                $payload .= pack(
+                    'NNCN',
+                    $edit->span->start,
+                    $edit->span->end,
+                    $edit->safety->value,
+                    strlen($edit->newText),
+                ) . $edit->newText;
             }
         }
 

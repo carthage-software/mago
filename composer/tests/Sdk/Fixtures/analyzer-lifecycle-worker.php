@@ -28,6 +28,8 @@ use Mago\Sdk\Analyzer\Type\Variance;
 use Mago\Sdk\Extension;
 use Mago\Sdk\Reporting\Issue;
 use Mago\Sdk\Reporting\Level;
+use Mago\Sdk\Reporting\Safety;
+use Mago\Sdk\Reporting\TextEdit;
 use Mago\Sdk\Span;
 use Mago\Sdk\Worker;
 use RuntimeException;
@@ -120,7 +122,10 @@ final class LifecycleProofHook implements BeforeAnalysisHook, AfterFileAnalysisH
         $context->report(
             Level::Help,
             'after-file',
-            Issue::new('After-file hook ran.', new Span(0, min(5, $analysis->size))),
+            Issue::new('After-file hook ran.', new Span(0, min(5, $analysis->size)))->withEdit(
+                TextEdit::replace(new Span(0, min(5, $analysis->size)), '<?php')
+                    ->withSafety(Safety::PotentiallyUnsafe),
+            ),
         );
     }
 
@@ -166,7 +171,7 @@ final class LifecycleProofHook implements BeforeAnalysisHook, AfterFileAnalysisH
             Issue::at('After-analysis hook ran.', $base->location)->withSecondaryLocation(
                 $child->location,
                 'Cross-file lifecycle annotation.',
-            ),
+            )->withEdit(TextEdit::replaceAt($base->location, '')->withSafety(Safety::Unsafe)),
         );
     }
 
