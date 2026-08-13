@@ -46,6 +46,7 @@ final class Protocol
     public const ANALYSIS_QUERY_REQUEST = 8;
     public const AFTER_FILE_ANALYSIS_BATCH_REQUEST = 9;
     public const CODEBASE_MUTATION_REQUEST = 10;
+    public const INITIALIZE_REQUEST = 11;
     public const GET_EXPRESSION_TYPES = 1;
     public const GET_ALL_EXPRESSION_TYPES = 2;
     public const GET_INFERRED_RETURN_TYPES = 3;
@@ -112,6 +113,7 @@ final class Protocol
     private const ANALYSIS_QUERY_RESPONSE = 0x8008;
     private const AFTER_FILE_ANALYSIS_BATCH_RESPONSE = 0x8009;
     private const CODEBASE_MUTATION_RESPONSE = 0x800A;
+    private const INITIALIZE_RESPONSE = 0x800B;
     private const RETURN_TYPE_REQUEST_HEADER = "MANA\x00\x01\x00\x01\x00\x02\x00\x00";
     private const UNHANDLED_RETURN_TYPE_RESPONSE = "MANA\x00\x01\x00\x01\x80\x02\x00\x00\x00";
     private const INVOCATION_FUNCTION = 1;
@@ -153,6 +155,38 @@ final class Protocol
         return $version;
     }
 
+    /** @return list<int<0, 65535>> */
+    public static function readInitializationRequest(PayloadReader $reader): array
+    {
+        $count = $reader->readCount(65_536);
+        $plugins = [];
+        for ($index = 0; $index < $count; ++$index) {
+            $plugins[] = $reader->readU16();
+        }
+        $reader->finish();
+
+        return $plugins;
+    }
+
+    /**
+     * @param array<int<0, 65535>, list<array{non-empty-string, string}>> $stubs
+     */
+    public static function writeInitializationResponse(array $stubs): string
+    {
+        $writer = self::createMessage(self::INITIALIZE_RESPONSE);
+        $writer->writeCount($stubs);
+        foreach ($stubs as $plugin => $pluginStubs) {
+            $writer->writeU16($plugin);
+            $writer->writeCount($pluginStubs);
+            foreach ($pluginStubs as [$filename, $bytes]) {
+                $writer->writeBytes($filename);
+                $writer->writeBytes($bytes);
+            }
+        }
+
+        return $writer->finish();
+    }
+
     /**
      * @param non-empty-list<Extension> $extensions
      * @param list<RegisteredPlugin> $plugins
@@ -182,6 +216,7 @@ final class Protocol
                 $flags |= (int) ($plugin->beforeAnalysisHooks !== []);
                 $flags |= (int) ($plugin->afterFileAnalysisHooks !== []) << 1;
                 $flags |= (int) ($plugin->afterAnalysisHooks !== []) << 2;
+                $flags |= (int) ($plugin->initializationHooks !== []) << 3;
                 $writer->writeU8($flags);
                 $writer->writeCount($definition->aliases);
                 foreach ($definition->aliases as $alias) {

@@ -1591,7 +1591,7 @@ fn orphan_patch_constant_diagnostic(meta: &ConstantMetadata) -> Issue {
 /// Determines which metadata value to keep when merging duplicates.
 ///
 /// Priority:
-///   1. user-defined > patch > built-in > other.
+///   1. user-defined > patch > external > built-in > other.
 ///   2. non-polyfill > polyfill — tools like rector/phpstan/psalm ship
 ///      skeleton stubs gated by `if (!class_exists('X'))` that should never
 ///      shadow a concrete definition.
@@ -1616,6 +1616,13 @@ fn should_replace_metadata(
 
     if new_is_patch != existing_is_patch {
         return new_is_patch;
+    }
+
+    let new_is_external = new_flags.is_external();
+    let existing_is_external = existing_flags.is_external();
+
+    if new_is_external != existing_is_external {
+        return new_is_external;
     }
 
     let new_is_built_in = new_flags.is_built_in();
@@ -1692,6 +1699,30 @@ mod should_replace_metadata_tests {
         let patch = MetadataFlags::PATCH;
         assert!(should_replace_metadata(builtin, Span::dummy(0, 100), patch, Span::dummy(0, 100)));
         assert!(!should_replace_metadata(patch, Span::dummy(0, 100), builtin, Span::dummy(0, 100)));
+    }
+
+    #[test]
+    fn external_beats_builtin_and_vendored() {
+        let external = MetadataFlags::EXTERNAL;
+        let builtin = MetadataFlags::BUILTIN;
+        let vendored = MetadataFlags::empty();
+
+        assert!(should_replace_metadata(builtin, Span::dummy(0, 100), external, Span::dummy(500, 600)));
+        assert!(!should_replace_metadata(external, Span::dummy(500, 600), builtin, Span::dummy(0, 100)));
+        assert!(should_replace_metadata(vendored, Span::dummy(0, 100), external, Span::dummy(500, 600)));
+        assert!(!should_replace_metadata(external, Span::dummy(500, 600), vendored, Span::dummy(0, 100)));
+    }
+
+    #[test]
+    fn patch_and_user_defined_beat_external() {
+        let external = MetadataFlags::EXTERNAL;
+        let patch = MetadataFlags::PATCH;
+        let user = MetadataFlags::USER_DEFINED;
+
+        assert!(should_replace_metadata(external, Span::dummy(0, 100), patch, Span::dummy(500, 600)));
+        assert!(!should_replace_metadata(patch, Span::dummy(500, 600), external, Span::dummy(0, 100)));
+        assert!(should_replace_metadata(external, Span::dummy(0, 100), user, Span::dummy(500, 600)));
+        assert!(!should_replace_metadata(user, Span::dummy(500, 600), external, Span::dummy(0, 100)));
     }
 
     #[test]

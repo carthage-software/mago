@@ -16,6 +16,7 @@ use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::reference::SymbolReferences;
 use mago_database::Database;
 use mago_database::DatabaseConfiguration;
+use mago_database::DatabaseReader;
 use mago_database::GlobSettings;
 use mago_database::file::File;
 use mago_database::file::FileId;
@@ -23,6 +24,11 @@ use mago_database::file::FileType;
 use mago_extension::WorkerCommand;
 use mago_extension::WorkerPool;
 use mago_extension::WorkerPoolOptions;
+use mago_formatter::settings::FormatSettings;
+use mago_guard::settings::Settings as GuardSettings;
+use mago_linter::settings::Settings as LinterSettings;
+use mago_orchestrator::Orchestrator;
+use mago_orchestrator::OrchestratorConfiguration;
 use mago_orchestrator::service::incremental_analysis::IncrementalAnalysisService;
 use mago_php_version::PHPVersion;
 use mago_reporting::IssueCollection;
@@ -46,7 +52,7 @@ fn php_sdk_is_available(repository: &Path) -> bool {
     available
 }
 
-fn make_database(changed_file: Option<usize>) -> (Database<'static>, FileId) {
+fn make_database(changed_file: Option<usize>, external_sources: &[(Vec<u8>, Vec<u8>)]) -> (Database<'static>, FileId) {
     let configuration = DatabaseConfiguration {
         workspace: Cow::Owned(Path::new("/lifecycle-proof").to_path_buf()),
         paths: vec![Cow::Borrowed(b"src")],
@@ -84,6 +90,10 @@ fn make_database(changed_file: Option<usize>) -> (Database<'static>, FileId) {
             changed_id = file.id;
         }
         database.add(file);
+    }
+
+    for (name, contents) in external_sources {
+        database.add(File::new(Cow::Owned(name.clone()), FileType::External, None, Cow::Owned(contents.clone())));
     }
 
     (database, changed_id)
@@ -137,6 +147,7 @@ fn assert_issue_cardinality(issues: &IssueCollection) {
 }
 
 fn assert_initial_audit(entries: &[AuditEntry]) {
+    assert_eq!(entries.iter().filter(|entry| entry.1 == "initialize").count(), PLUGINS.len() * 3);
     assert_eq!(entries.iter().filter(|entry| entry.1 == "before").count(), PLUGINS.len());
     assert_eq!(entries.iter().filter(|entry| entry.1 == "after-file").count(), FILE_COUNT * PLUGINS.len());
     assert_eq!(entries.iter().filter(|entry| entry.1 == "after").count(), PLUGINS.len());
@@ -150,6 +161,14 @@ fn assert_initial_audit(entries: &[AuditEntry]) {
 
     let workers = entries.iter().filter(|entry| entry.1 == "after-file").map(|entry| entry.3).collect::<HashSet<_>>();
     assert!(workers.len() > 1, "per-file hooks should use more than one worker");
+    for plugin in PLUGINS {
+        let initialization_workers = entries
+            .iter()
+            .filter(|entry| entry.0 == plugin && entry.1 == "initialize")
+            .map(|entry| entry.3)
+            .collect::<HashSet<_>>();
+        assert_eq!(initialization_workers.len(), 3, "initialization must run on every worker");
+    }
 }
 
 #[test]
@@ -179,10 +198,16 @@ fn external_analyzer_lifecycle_is_exact_across_workers_and_incremental_runs() {
             .expect("PHP lifecycle worker pool should start");
     let analyzer = ExternalAnalyzer::initialize([Arc::new(pool)], PHPVersion::PHP85, &[], false)
         .expect("PHP lifecycle analyzer should initialize");
+    let initialization_sources = analyzer
+        .initialization_files()
+        .into_iter()
+        .map(|file| (file.name.into_owned(), file.contents.into_owned()))
+        .collect::<Vec<_>>();
+    assert_eq!(initialization_sources.len(), 1);
     let mut registry = PluginRegistry::with_library_providers();
     registry.set_external_analyzer(Arc::new(ExternalAnalyzerHandle::ready(analyzer)));
 
-    let (database, _) = make_database(None);
+    let (database, _) = make_database(None, &initialization_sources);
     let mut settings = Settings::new(PHPVersion::PHP85);
     settings.find_unused_expressions = false;
     settings.find_unused_definitions = false;
@@ -204,11 +229,23 @@ fn external_analyzer_lifecycle_is_exact_across_workers_and_incremental_runs() {
         .collect::<Vec<_>>();
     assert!(unexpected.is_empty(), "unexpected analyzer issues: {unexpected:#?}");
     assert_issue_cardinality(&initial.issues);
+    let external_annotation = initial
+        .issues
+        .iter()
+        .find(|issue| issue.code.as_deref() == Some("lifecycle-one/after"))
+        .expect("the final lifecycle issue should exist")
+        .annotations[1]
+        .span;
+    assert!(
+        service.database().get_ref(&external_annotation.file_id).is_ok_and(|file| file.file_type.is_external()),
+        "reporting must be able to resolve annotations into external stubs"
+    );
+
     let initial_audit = read_audit(&audit_log);
-    assert_eq!(initial_audit.len(), 2 + (FILE_COUNT * 2) + 2);
+    assert_eq!(initial_audit.len(), (PLUGINS.len() * 3) + 2 + (FILE_COUNT * 2) + 2);
     assert_initial_audit(&initial_audit);
 
-    let (updated_database, changed_file) = make_database(Some(5));
+    let (updated_database, changed_file) = make_database(Some(5), &initialization_sources);
     service.update_database(updated_database.read_only());
     let incremental =
         service.analyze_incremental(Some(&[changed_file])).expect("incremental lifecycle analysis should succeed");
@@ -227,7 +264,7 @@ fn external_analyzer_lifecycle_is_exact_across_workers_and_incremental_runs() {
     );
 
     let first_changed_file = changed_file;
-    let (second_updated_database, second_changed_file) = make_database(Some(6));
+    let (second_updated_database, second_changed_file) = make_database(Some(6), &initialization_sources);
     service.update_database(second_updated_database.read_only());
     let second_incremental = service
         .analyze_incremental(Some(&[first_changed_file, second_changed_file]))
@@ -245,6 +282,63 @@ fn external_analyzer_lifecycle_is_exact_across_workers_and_incremental_runs() {
         .filter_map(|entry| entry.2.as_deref())
         .collect::<HashSet<_>>();
     assert_eq!(analyzed_files, HashSet::from(["src/file5.php", "src/file6.php"]));
+}
+
+#[test]
+fn orchestrator_loads_initialization_stubs_into_the_source_database() {
+    let repository = Path::new(env!("CARGO_MANIFEST_DIR"));
+    if !php_sdk_is_available(repository) {
+        return;
+    }
+
+    let temporary = tempfile::tempdir().expect("temporary lifecycle directory should be created");
+    let audit_log = temporary.path().join("audit.jsonl");
+    std::fs::write(&audit_log, []).expect("lifecycle audit log should be initialized");
+    std::fs::write(temporary.path().join("host.php"), "<?php\nfinal class HostClass {}\n")
+        .expect("host source should be created");
+
+    let command = WorkerCommand::new("php")
+        .with_argument(repository.join("composer/tests/Sdk/Fixtures/analyzer-lifecycle-worker.php"))
+        .with_current_directory(repository)
+        .with_environment("MAGO_LIFECYCLE_AUDIT_LOG", &audit_log);
+    let pool = WorkerPool::spawn(command, NonZeroUsize::MIN, WorkerPoolOptions::default())
+        .expect("PHP lifecycle worker pool should start");
+    let analyzer = ExternalAnalyzer::initialize([Arc::new(pool)], PHPVersion::PHP85, &[], false)
+        .expect("PHP lifecycle analyzer should initialize");
+    let orchestrator = Orchestrator::new(OrchestratorConfiguration {
+        php_version: PHPVersion::PHP85,
+        paths: vec![],
+        includes: vec![],
+        patches: vec![],
+        excludes: vec![],
+        extensions: vec!["php"],
+        glob: GlobSettings::default(),
+        parser_settings: ParserSettings::default(),
+        analyzer_settings: Settings::new(PHPVersion::PHP85),
+        linter_settings: LinterSettings::default(),
+        guard_settings: GuardSettings::default(),
+        formatter_settings: FormatSettings::default(),
+        disable_default_analyzer_plugins: false,
+        analyzer_plugins: vec![],
+        use_progress_bars: false,
+        use_colors: false,
+    });
+
+    orchestrator.set_external_analyzer(analyzer);
+
+    let database = orchestrator
+        .load_database(temporary.path(), true, None, None)
+        .expect("database loading should include initialization stubs");
+    let external = database.files().filter(|file| file.file_type.is_external()).collect::<Vec<_>>();
+    assert_eq!(external.len(), 1);
+    assert!(external[0].path.is_none());
+    assert!(external[0].name.starts_with(b"@mago-extension/"));
+    assert!(
+        external[0]
+            .contents
+            .windows(b"class ExtensionProvided".len())
+            .any(|bytes| { bytes == b"class ExtensionProvided" })
+    );
 }
 
 #[test]
@@ -339,7 +433,7 @@ fn changed_mutation_sets_remove_old_symbols_and_invalidate_all_files() {
     let mut registry = PluginRegistry::with_library_providers();
     registry.set_external_analyzer(Arc::new(ExternalAnalyzerHandle::ready(analyzer)));
 
-    let (database, _) = make_database(None);
+    let (database, _) = make_database(None, &[]);
     let mut settings = Settings::new(PHPVersion::PHP85);
     settings.find_unused_expressions = false;
     settings.find_unused_definitions = false;
@@ -360,7 +454,7 @@ fn changed_mutation_sets_remove_old_symbols_and_invalidate_all_files() {
     let initial_audit = read_audit(&audit_log);
     assert_eq!(initial_audit.iter().filter(|entry| entry.1 == "after-file").count(), FILE_COUNT);
 
-    let (updated_database, changed_file) = make_database(Some(5));
+    let (updated_database, changed_file) = make_database(Some(5), &[]);
     service.update_database(updated_database.read_only());
     service
         .analyze_incremental(Some(&[changed_file]))

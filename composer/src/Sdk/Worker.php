@@ -9,6 +9,7 @@ use Mago\Sdk\Analyzer\AfterFileAnalysisContext;
 use Mago\Sdk\Analyzer\BeforeAnalysisContext;
 use Mago\Sdk\Analyzer\Codebase;
 use Mago\Sdk\Analyzer\FileAnalysis;
+use Mago\Sdk\Analyzer\InitializationContext;
 use Mago\Sdk\Analyzer\MutableCodebase;
 use Mago\Sdk\Analyzer\PluginRegistry as AnalyzerPluginRegistry;
 use Mago\Sdk\Analyzer\ProjectAnalysis;
@@ -206,6 +207,7 @@ final class Worker
                     $definition,
                     $registeredFunctionProviders,
                     $registeredMethodProviders,
+                    $registry->getInitializationHooks(),
                     $registry->getBeforeAnalysisHooks(),
                     $registry->getAfterFileAnalysisHooks(),
                     $registry->getAfterAnalysisHooks(),
@@ -407,6 +409,10 @@ final class Worker
             return AnalyzerProtocol::writeDescribeResponse($this->extensions, $this->analyzerPlugins);
         }
 
+        if ($kind === AnalyzerProtocol::INITIALIZE_REQUEST) {
+            return $this->handleAnalyzerInitialization($reader, $cancellation);
+        }
+
         if (
             $kind === AnalyzerProtocol::BEFORE_ANALYSIS_REQUEST
             || $kind === AnalyzerProtocol::AFTER_FILE_ANALYSIS_REQUEST
@@ -457,6 +463,38 @@ final class Worker
         }
 
         return AnalyzerProtocol::writeReturnTypeResponse(null);
+    }
+
+    private function handleAnalyzerInitialization(
+        PayloadReader $reader,
+        CancellationTokenInterface $cancellation,
+    ): string {
+        $pluginIndices = AnalyzerProtocol::readInitializationRequest($reader);
+        $stubs = [];
+        foreach ($pluginIndices as $pluginIndex) {
+            $registered = $this->analyzerPlugins[$pluginIndex] ?? null;
+            if ($registered === null) {
+                throw new ProtocolException("Mago initialized unregistered analyzer plugin index {$pluginIndex}.");
+            }
+
+            $cancellation->throwIfCancelled();
+            $context = new InitializationContext($this->phpVersion, $cancellation);
+            try {
+                foreach ($registered->initializationHooks as $hook) {
+                    $hook->initialize($context);
+                }
+            } catch (Throwable $throwable) {
+                throw new ProtocolException(
+                    "Analyzer plugin `{$registered->definition->identifier}` failed to initialize: {$throwable->getMessage()}",
+                    0,
+                    $throwable,
+                );
+            }
+
+            $stubs[$pluginIndex] = $context->getStubs();
+        }
+
+        return AnalyzerProtocol::writeInitializationResponse($stubs);
     }
 
     /**

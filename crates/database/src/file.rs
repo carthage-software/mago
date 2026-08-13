@@ -41,6 +41,10 @@ pub enum FileType {
     /// Like vendored files, patches are not actively analyzed, linted, or formatted,
     /// but their metadata takes precedence over both vendored and built-in definitions.
     Patch,
+
+    /// An in-memory source contributed by an external analyzer plugin during initialization.
+    /// External files are scanned for symbols, but are never analyzed, linted, formatted, or fixed.
+    External,
 }
 
 /// A file that's either stored on the host system's file system or in the vendored file system.
@@ -224,6 +228,12 @@ impl FileType {
     #[must_use]
     pub const fn is_patch(self) -> bool {
         matches!(self, FileType::Patch)
+    }
+
+    /// Returns `true` if the file is an in-memory source contributed by an external analyzer plugin.
+    #[must_use]
+    pub const fn is_external(self) -> bool {
+        matches!(self, FileType::External)
     }
 }
 

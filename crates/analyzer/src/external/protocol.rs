@@ -7,6 +7,8 @@ use std::sync::Arc;
 use std::time::Duration;
 use std::time::Instant;
 
+use foldhash::HashSet;
+use foldhash::fast::RandomState;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::misc::GenericParent;
@@ -103,14 +105,17 @@ const INITIAL_MESSAGE_CAPACITY: usize = 256;
 const DESCRIBE_REQUEST: u16 = 1;
 const RETURN_TYPE_REQUEST: u16 = 2;
 const TYPE_COMPARISON_REQUEST: u16 = 3;
+const INITIALIZE_REQUEST: u16 = 11;
 const DESCRIBE_RESPONSE: u16 = 0x8001;
 const RETURN_TYPE_RESPONSE: u16 = 0x8002;
 const TYPE_COMPARISON_RESPONSE: u16 = 0x8003;
+const INITIALIZE_RESPONSE: u16 = 0x800B;
 const MAXIMUM_EXTENSIONS: usize = 0x4000;
 const MAXIMUM_PLUGINS: usize = 0x4000;
 const MAXIMUM_PROVIDERS: usize = 0x0001_0000;
 const MAXIMUM_TARGETS: usize = 0x0001_0000;
 const MAXIMUM_ALIASES: usize = 256;
+const MAXIMUM_STUBS: usize = 0x0001_0000;
 // Flow-sensitive inference can legitimately build deeply nested shapes after
 // repeated writes. Keep a finite protocol guard, but leave enough room for
 // complete snapshots from real framework codebases such as Symfony.
@@ -173,9 +178,17 @@ pub(super) struct Registration {
     pub plugins: Vec<ExternalPlugin>,
     pub function_providers: Vec<FunctionProvider>,
     pub method_providers: Vec<MethodProvider>,
+    pub initialization_plugins: Vec<u16>,
     pub before_analysis_plugins: Vec<u16>,
     pub after_file_analysis_plugins: Vec<u16>,
     pub after_analysis_plugins: Vec<u16>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct InitializationStub {
+    pub plugin: u16,
+    pub filename: Vec<u8>,
+    pub contents: Vec<u8>,
 }
 
 pub(super) struct ReturnTypeRequest<'type_info> {
@@ -200,6 +213,62 @@ pub(super) fn encode_describe_request(php_version: PHPVersion) -> Vec<u8> {
     writer.finish()
 }
 
+pub(super) fn encode_initialization_request(plugins: &[u16]) -> Result<Vec<u8>, ExternalAnalyzerError> {
+    let mut writer = message_writer(INITIALIZE_REQUEST);
+    writer.write_length(plugins.len())?;
+    for plugin in plugins {
+        writer.write_u16(*plugin);
+    }
+
+    Ok(writer.finish())
+}
+
+pub(super) fn decode_initialization_response(
+    payload: &[u8],
+    expected_plugins: &[u16],
+) -> Result<Vec<InitializationStub>, ExternalAnalyzerError> {
+    let mut reader = message_reader(payload, INITIALIZE_RESPONSE)?;
+    let plugin_count = reader.read_count("initialized plugins", MAXIMUM_PLUGINS)?;
+    if plugin_count != expected_plugins.len() {
+        return Err(protocol(format!(
+            "worker initialized {plugin_count} plugins, but Mago requested {}",
+            expected_plugins.len()
+        )));
+    }
+
+    let mut stubs = Vec::new();
+    for expected_plugin in expected_plugins {
+        let plugin = reader.read_u16("initialized plugin index")?;
+        if plugin != *expected_plugin {
+            return Err(protocol(format!(
+                "worker initialized plugin index {plugin}, but Mago expected {expected_plugin}"
+            )));
+        }
+
+        let stub_count = reader.read_count("external stubs", MAXIMUM_STUBS)?;
+        let mut filenames = HashSet::with_capacity_and_hasher(stub_count, RandomState::default());
+        for _ in 0..stub_count {
+            let filename = non_empty(reader.read_bytes("external stub filename")?.to_vec(), "external stub filename")?;
+            if filename.contains(&0) {
+                return Err(protocol("external stub filename contains NUL"));
+            }
+
+            if !filenames.insert(filename.clone()) {
+                return Err(protocol(format!(
+                    "plugin {plugin} returned external stub `{}` more than once",
+                    String::from_utf8_lossy(&filename)
+                )));
+            }
+
+            let contents = reader.read_bytes("external stub contents")?.to_vec();
+            stubs.push(InitializationStub { plugin, filename, contents });
+        }
+    }
+
+    reader.finish()?;
+    Ok(stubs)
+}
+
 pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, ExternalAnalyzerError> {
     let mut reader = message_reader(payload, DESCRIBE_RESPONSE)?;
     let extension_count = reader.read_count("extensions", MAXIMUM_EXTENSIONS)?;
@@ -211,6 +280,7 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
     let mut plugins = Vec::new();
     let mut function_providers = Vec::new();
     let mut method_providers = Vec::new();
+    let mut initialization_plugins = Vec::new();
     let mut before_analysis_plugins = Vec::new();
     let mut after_file_analysis_plugins = Vec::new();
     let mut after_analysis_plugins = Vec::new();
@@ -226,7 +296,7 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
             let description = non_empty(reader.read_string("plugin description")?, "plugin description")?;
             let default_enabled = reader.read_bool("plugin default-enabled flag")?;
             let lifecycle = reader.read_u8("plugin lifecycle flags")?;
-            if lifecycle & !0b111 != 0 {
+            if lifecycle & !0b1111 != 0 {
                 return Err(protocol(format!("plugin `{identifier}` has unknown lifecycle flags {lifecycle:#04x}")));
             }
             let index =
@@ -240,6 +310,11 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
             if lifecycle & 4 != 0 {
                 after_analysis_plugins.push(index);
             }
+
+            if lifecycle & 8 != 0 {
+                initialization_plugins.push(index);
+            }
+
             let alias_count = reader.read_count("plugin aliases", MAXIMUM_ALIASES)?;
             let mut aliases = Vec::with_capacity(alias_count);
             for _ in 0..alias_count {
@@ -303,6 +378,7 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
                 description,
                 aliases,
                 default_enabled,
+                initialization: lifecycle & 8 != 0,
                 before_analysis: lifecycle & 1 != 0,
                 after_file_analysis: lifecycle & 2 != 0,
                 after_analysis: lifecycle & 4 != 0,
@@ -332,6 +408,7 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
         plugins,
         function_providers,
         method_providers,
+        initialization_plugins,
         before_analysis_plugins,
         after_file_analysis_plugins,
         after_analysis_plugins,
@@ -1926,7 +2003,30 @@ pub(super) mod testing {
         assert!(!writer.finish().is_empty());
     }
 
+    #[test]
+    fn initialization_rejects_duplicate_stub_filenames() {
+        let mut writer = message_writer(INITIALIZE_RESPONSE);
+        writer.write_u32(1);
+        writer.write_u16(0);
+        writer.write_u32(2);
+        for _ in 0..2 {
+            writer.write_bytes(b"duplicate.php").unwrap();
+            writer.write_bytes(b"<?php").unwrap();
+        }
+
+        let result = decode_initialization_response(&writer.finish(), &[0]);
+        assert!(matches!(result, Err(ExternalAnalyzerError::Protocol(message)) if message.contains("more than once")));
+    }
+
     pub fn registration_response() -> Vec<u8> {
+        registration_response_with_lifecycle(0)
+    }
+
+    pub fn registration_response_with_initialization() -> Vec<u8> {
+        registration_response_with_lifecycle(8)
+    }
+
+    fn registration_response_with_lifecycle(lifecycle: u8) -> Vec<u8> {
         let mut writer = message_writer(DESCRIBE_RESPONSE);
         writer.write_u32(1);
         writer.write_string("demo/extension").unwrap();
@@ -1937,7 +2037,7 @@ pub(super) mod testing {
         writer.write_string("Demo analyzer").unwrap();
         writer.write_string("Test provider").unwrap();
         writer.write_bool(true);
-        writer.write_u8(0);
+        writer.write_u8(lifecycle);
         writer.write_u32(1);
         writer.write_string("example").unwrap();
         writer.write_u32(1);
@@ -1946,6 +2046,16 @@ pub(super) mod testing {
         writer.write_u8(TARGET_EXACT);
         writer.write_bytes(b"demo_service").unwrap();
         writer.write_u32(0);
+        writer.finish()
+    }
+
+    pub fn initialization_response(filename: &[u8], contents: &[u8]) -> Vec<u8> {
+        let mut writer = message_writer(INITIALIZE_RESPONSE);
+        writer.write_u32(1);
+        writer.write_u16(0);
+        writer.write_u32(1);
+        writer.write_bytes(filename).unwrap();
+        writer.write_bytes(contents).unwrap();
         writer.finish()
     }
 

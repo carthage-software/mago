@@ -1,5 +1,6 @@
 //! Worker-backed analyzer plugins.
 
+use std::borrow::Cow;
 use std::collections::HashSet;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -17,6 +18,7 @@ use mago_codex::symbol::SymbolIdentifier;
 use mago_codex::ttype::union::TUnion;
 use mago_database::file::File;
 use mago_database::file::FileId;
+use mago_database::file::FileType;
 use mago_extension::Frame;
 use mago_extension::WorkerError;
 use mago_extension::WorkerPool;
@@ -297,9 +299,33 @@ pub struct ExternalPlugin {
     pub description: String,
     pub aliases: Vec<String>,
     pub default_enabled: bool,
+    pub initialization: bool,
     pub before_analysis: bool,
     pub after_file_analysis: bool,
     pub after_analysis: bool,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ExternalStub {
+    name: Vec<u8>,
+    contents: Vec<u8>,
+}
+
+impl ExternalStub {
+    fn new(extension: &str, plugin: &str, filename: &[u8], contents: Vec<u8>) -> Self {
+        let mut name = Vec::with_capacity(18 + extension.len() + plugin.len() + filename.len());
+        name.extend_from_slice(b"@mago-extension/");
+        append_path_component(&mut name, extension.as_bytes());
+        name.push(b'/');
+        append_path_component(&mut name, plugin.as_bytes());
+        name.push(b'/');
+        name.extend_from_slice(filename);
+        Self { name, contents }
+    }
+
+    fn to_file(&self) -> File {
+        File::new(Cow::Owned(self.name.clone()), FileType::External, None, Cow::Owned(self.contents.clone()))
+    }
 }
 
 impl ExternalPlugin {
@@ -432,6 +458,7 @@ pub struct ExternalAnalyzer<T = WorkerPool> {
     backends: Box<[Backend<T>]>,
     extensions: Box<[ExternalExtension]>,
     plugins: Box<[ExternalPlugin]>,
+    initialization_stubs: Box<[ExternalStub]>,
     trace_enabled: bool,
     telemetry: ExternalAnalyzerTelemetry,
     started_at: Option<Instant>,
@@ -486,6 +513,10 @@ impl ExternalAnalyzerHandle {
             self.prepare_calls.fetch_add(1, Ordering::Relaxed);
         }
         self.get().map(|_| ())
+    }
+
+    pub(crate) fn initialization_files(&self) -> Result<Vec<File>, String> {
+        Ok(self.get()?.initialization_stubs.iter().map(ExternalStub::to_file).collect())
     }
 
     pub(crate) fn get_function_return_type(
@@ -612,6 +643,7 @@ impl Drop for ExternalAnalyzerHandle {
                 let _result = initializer.join();
             }
         }
+
         if self.trace_enabled {
             tracing::trace!(
                 initialized = self.analyzer.get().is_some(),
@@ -651,6 +683,11 @@ impl<T> ExternalAnalyzer<T> {
     pub fn plugins(&self) -> &[ExternalPlugin] {
         &self.plugins
     }
+
+    #[must_use]
+    pub fn initialization_files(&self) -> Vec<File> {
+        self.initialization_stubs.iter().map(ExternalStub::to_file).collect()
+    }
 }
 
 impl<T> ExternalAnalyzer<T>
@@ -684,6 +721,7 @@ where
                     self.telemetry.after_analysis_requests.fetch_add(1, Ordering::Relaxed);
                 }
             }
+
             self.telemetry.lifecycle_plugins.fetch_add(logical_callbacks as u64, Ordering::Relaxed);
             self.telemetry.lifecycle_request_bytes.fetch_add(request.len() as u64, Ordering::Relaxed);
         }
@@ -695,6 +733,7 @@ where
                 self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
             }
         })?;
+
         if let Some(start) = ipc_start {
             self.telemetry.lifecycle_ipc_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
             self.telemetry.lifecycle_response_bytes.fetch_add(response.len() as u64, Ordering::Relaxed);
@@ -715,6 +754,7 @@ where
                 self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
             }
         })?;
+
         if let Some(start) = decode_start {
             self.telemetry.lifecycle_decode_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
             self.telemetry.lifecycle_issues.fetch_add(issues.len() as u64, Ordering::Relaxed);
@@ -754,10 +794,12 @@ where
             if plugins.is_empty() {
                 continue;
             }
+
             for plugin in plugins {
                 let registered_plugin = backend.registration.plugins.get(usize::from(*plugin)).ok_or_else(|| {
                     error::protocol(format!("before-analysis hook references unknown plugin index {plugin}"))
                 })?;
+
                 let plugin_slice = std::slice::from_ref(plugin);
                 let lifecycle_start = self.trace_enabled.then(Instant::now);
                 let encode_start = self.trace_enabled.then(Instant::now);
@@ -794,6 +836,7 @@ where
                                     registered_plugin.identifier.as_str(),
                                 )
                             });
+
                             let previous_mutation_count = candidate_provenance.mutation_count();
                             let result = mutation::handle_request(
                                 &frame.payload,
@@ -802,9 +845,11 @@ where
                                 origin,
                                 candidate_provenance,
                             );
+
                             if result.is_ok() && candidate_provenance.mutation_count() != previous_mutation_count {
                                 *dirty = true;
                             }
+
                             result
                         }
                         Ok(false) => {
@@ -820,6 +865,7 @@ where
                                     mago_word::WordSet::default(),
                                     HashSet::default(),
                                 );
+
                                 *dirty = false;
                                 if let Some(start) = population_start {
                                     tracing::trace!(
@@ -830,6 +876,7 @@ where
                                     );
                                 }
                             }
+
                             let visible = candidate.as_ref().map_or(&*codebase, |(candidate, _, _, _)| candidate);
                             protocol::handle_nested_request(&frame.payload, visible, session, |_| None)
                         }
@@ -860,6 +907,7 @@ where
                     if plugin_mutations == 0 {
                         continue;
                     }
+
                     let mut candidate_references =
                         candidate_references.unwrap_or_else(|| std::mem::take(symbol_references));
                     let population_start = (trace_enabled && dirty).then(Instant::now);
@@ -871,6 +919,7 @@ where
                             HashSet::default(),
                         );
                     }
+
                     let population_elapsed = population_start.map(|start| start.elapsed());
                     tracing::trace!(
                         extension = registered_plugin.extension,
@@ -880,6 +929,7 @@ where
                         population_elapsed = ?population_elapsed,
                         "Committed external analyzer metadata transaction."
                     );
+
                     session.preserve_source_codebase(codebase);
                     *codebase = candidate_codebase;
                     *symbol_references = candidate_references;
@@ -1406,6 +1456,7 @@ where
         let mut backends = Vec::new();
         let mut extensions = Vec::new();
         let mut plugins = Vec::new();
+        let mut initialization_stubs = Vec::new();
         let mut extension_identifiers = HashSet::new();
         let mut plugin_identifiers = HashSet::new();
 
@@ -1463,9 +1514,43 @@ where
                 .collect::<HashSet<_>>();
             registration.function_providers.retain(|provider| enabled.contains(provider.plugin.as_str()));
             registration.method_providers.retain(|provider| enabled.contains(provider.plugin.as_str()));
+            registration.initialization_plugins.retain(|index| enabled_indices.contains(index));
             registration.before_analysis_plugins.retain(|index| enabled_indices.contains(index));
             registration.after_file_analysis_plugins.retain(|index| enabled_indices.contains(index));
             registration.after_analysis_plugins.retain(|index| enabled_indices.contains(index));
+
+            if !registration.initialization_plugins.is_empty() {
+                let initialize = protocol::encode_initialization_request(&registration.initialization_plugins)?;
+                let responses = transport.broadcast(&initialize)?;
+                let mut decoded = responses.iter().map(|response| {
+                    protocol::decode_initialization_response(response, &registration.initialization_plugins)
+                });
+
+                let Some(first) = decoded.next() else {
+                    return Err(error::protocol("worker pool returned no analyzer initialization responses"));
+                };
+
+                let initialized = first?;
+                for response in decoded {
+                    if response? != initialized {
+                        return Err(ExternalAnalyzerError::InconsistentInitialization);
+                    }
+                }
+
+                for stub in initialized {
+                    let plugin = registration.plugins.get(usize::from(stub.plugin)).ok_or_else(|| {
+                        error::protocol(format!("initialization references unknown plugin index {}", stub.plugin))
+                    })?;
+
+                    initialization_stubs.push(ExternalStub::new(
+                        &plugin.extension,
+                        &plugin.identifier,
+                        &stub.filename,
+                        stub.contents,
+                    ));
+                }
+            }
+
             extensions.extend(registration.extensions.iter().cloned());
             plugins.extend(registration.plugins.iter().cloned());
             if let Some(start) = backend_start {
@@ -1475,6 +1560,7 @@ where
                     response_bytes,
                     extensions = registration.extensions.len(),
                     plugins = registration.plugins.len(),
+                    initialization_plugins = registration.initialization_plugins.len(),
                     enabled_plugins = enabled.len(),
                     function_providers = registration.function_providers.len(),
                     disabled_function_providers = advertised_function_providers - registration.function_providers.len(),
@@ -1495,6 +1581,7 @@ where
             backends: backends.into_boxed_slice(),
             extensions: extensions.into_boxed_slice(),
             plugins: plugins.into_boxed_slice(),
+            initialization_stubs: initialization_stubs.into_boxed_slice(),
             trace_enabled,
             telemetry: ExternalAnalyzerTelemetry::default(),
             started_at,
@@ -1668,6 +1755,20 @@ fn pattern_matches(pattern: &[u8], value: &[u8]) -> bool {
     }
 }
 
+fn append_path_component(target: &mut Vec<u8>, component: &[u8]) {
+    const HEX: &[u8; 16] = b"0123456789ABCDEF";
+
+    for byte in component {
+        if byte.is_ascii_alphanumeric() || matches!(byte, b'-' | b'_' | b'.') {
+            target.push(*byte);
+        } else {
+            target.push(b'%');
+            target.push(HEX[usize::from(byte >> 4)]);
+            target.push(HEX[usize::from(byte & 0x0f)]);
+        }
+    }
+}
+
 fn duration_nanos(duration: Duration) -> u64 {
     u64::try_from(duration.as_nanos()).unwrap_or(u64::MAX)
 }
@@ -1698,6 +1799,12 @@ mod tests {
         requests: Mutex<Vec<Vec<u8>>>,
     }
 
+    #[derive(Debug)]
+    struct InitializationTransport {
+        broadcasts: Mutex<usize>,
+        initialization_responses: Vec<Vec<u8>>,
+    }
+
     impl AnalyzerTransport for TestTransport {
         fn broadcast(&self, _payload: &[u8]) -> Result<Vec<Vec<u8>>, WorkerError> {
             Ok(vec![protocol::testing::registration_response()])
@@ -1713,6 +1820,31 @@ mod tests {
             H: WorkerRequestHandler,
         {
             self.request(payload)
+        }
+    }
+
+    impl AnalyzerTransport for InitializationTransport {
+        fn broadcast(&self, _payload: &[u8]) -> Result<Vec<Vec<u8>>, WorkerError> {
+            let mut broadcasts = self.broadcasts.lock().unwrap();
+            let responses = if *broadcasts == 0 {
+                vec![protocol::testing::registration_response_with_initialization()]
+            } else {
+                self.initialization_responses.clone()
+            };
+
+            *broadcasts += 1;
+            Ok(responses)
+        }
+
+        fn request(&self, _payload: Vec<u8>) -> Result<Vec<u8>, WorkerError> {
+            unreachable!("initialization tests do not issue routed requests")
+        }
+
+        fn request_with_handler<H>(&self, _payload: Vec<u8>, _handler: &mut H) -> Result<Vec<u8>, WorkerError>
+        where
+            H: WorkerRequestHandler,
+        {
+            unreachable!("initialization tests do not issue routed requests")
         }
     }
 
@@ -1743,6 +1875,52 @@ mod tests {
         )
         .expect("registration should succeed");
         assert_eq!(enabled.backends[0].registration.function_providers.len(), 1);
+    }
+
+    #[test]
+    fn initialization_stubs_are_scoped_and_exposed_as_external_files() {
+        let response = protocol::testing::initialization_response(b"framework.php", b"<?php class FrameworkStub {}");
+        let transport = Arc::new(InitializationTransport {
+            broadcasts: Mutex::new(0),
+            initialization_responses: vec![response.clone(), response],
+        });
+
+        let analyzer = ExternalAnalyzer::initialize_transports([Arc::clone(&transport)], PHPVersion::PHP85, &[], false)
+            .expect("initialization should succeed");
+
+        let files = analyzer.initialization_files();
+        assert_eq!(*transport.broadcasts.lock().unwrap(), 2);
+        assert_eq!(files.len(), 1);
+        assert_eq!(files[0].name.as_ref(), b"@mago-extension/demo%2Fextension/demo/framework.php");
+        assert_eq!(files[0].contents.as_ref(), b"<?php class FrameworkStub {}");
+        assert!(files[0].file_type.is_external());
+        assert!(files[0].path.is_none());
+    }
+
+    #[test]
+    fn initialization_requires_identical_stubs_from_every_worker() {
+        let transport = Arc::new(InitializationTransport {
+            broadcasts: Mutex::new(0),
+            initialization_responses: vec![
+                protocol::testing::initialization_response(b"framework.php", b"<?php class First {}"),
+                protocol::testing::initialization_response(b"framework.php", b"<?php class Second {}"),
+            ],
+        });
+
+        let result = ExternalAnalyzer::initialize_transports([transport], PHPVersion::PHP85, &[], false);
+
+        assert!(matches!(result, Err(ExternalAnalyzerError::InconsistentInitialization)));
+    }
+
+    #[test]
+    fn disabled_plugins_are_not_initialized() {
+        let transport =
+            Arc::new(InitializationTransport { broadcasts: Mutex::new(0), initialization_responses: Vec::new() });
+        let analyzer = ExternalAnalyzer::initialize_transports([Arc::clone(&transport)], PHPVersion::PHP85, &[], true)
+            .expect("registration should succeed");
+
+        assert_eq!(*transport.broadcasts.lock().unwrap(), 1);
+        assert!(analyzer.initialization_files().is_empty());
     }
 
     #[test]

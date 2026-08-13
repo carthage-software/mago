@@ -179,6 +179,21 @@ impl PluginRegistry {
         Ok(())
     }
 
+    /// Completes external initialization and returns its in-memory source stubs.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a worker fails to initialize or returns invalid initialization data.
+    pub fn external_initialization_files(&self) -> PluginResult<Vec<File>> {
+        self.prepare_external_analyzer()?;
+        self.external_analyzer
+            .as_deref()
+            .map(ExternalAnalyzerHandle::initialization_files)
+            .transpose()
+            .map(Option::unwrap_or_default)
+            .map_err(|reason| PluginError::Internal { reason })
+    }
+
     /// Creates the immutable external-plugin context for one frozen codebase generation.
     #[must_use]
     pub fn create_external_analysis_session(

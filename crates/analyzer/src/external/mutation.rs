@@ -622,7 +622,7 @@ fn read_visibility(reader: &mut PayloadReader<'_>) -> Result<Visibility, Externa
 
 fn read_flags(reader: &mut PayloadReader<'_>) -> Result<MetadataFlags, ExternalAnalyzerError> {
     let mut flags = MetadataFlags::from_bits(reader.read_u64("metadata flags")?);
-    flags.remove(MetadataFlags::POPULATED | MetadataFlags::BUILTIN | MetadataFlags::PATCH);
+    flags.remove(MetadataFlags::POPULATED | MetadataFlags::BUILTIN | MetadataFlags::PATCH | MetadataFlags::EXTERNAL);
     flags.insert(MetadataFlags::USER_DEFINED);
     Ok(flags)
 }

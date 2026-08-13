@@ -295,6 +295,9 @@ impl AnalyzeCommand {
             &configuration.analyzer.plugins,
             configuration.analyzer.disable_default_plugins,
         );
+        if let Some(external_analyzer) = external_analyzer {
+            orchestrator.set_external_analyzer_handle(external_analyzer);
+        }
 
         let (prelude, database) = rayon::join(
             || {
@@ -314,10 +317,6 @@ impl AnalyzeCommand {
                 database
             },
         );
-
-        if let Some(external_analyzer) = external_analyzer {
-            orchestrator.set_external_analyzer_handle(external_analyzer);
-        }
 
         let Prelude { database: prelude_database, metadata, symbol_references } = prelude;
         let mut database = database?;

@@ -10,21 +10,14 @@ use Mago\Sdk\Analyzer\AfterFileAnalysisContext;
 use Mago\Sdk\Analyzer\AfterFileAnalysisHook;
 use Mago\Sdk\Analyzer\BeforeAnalysisContext;
 use Mago\Sdk\Analyzer\BeforeAnalysisHook;
-use Mago\Sdk\Analyzer\Definition\ClassConstantDefinition;
-use Mago\Sdk\Analyzer\Definition\ClassLikeDefinition;
-use Mago\Sdk\Analyzer\Definition\ConstantDefinition;
-use Mago\Sdk\Analyzer\Definition\FunctionDefinition;
-use Mago\Sdk\Analyzer\Definition\MethodDefinition;
-use Mago\Sdk\Analyzer\Definition\ParameterDefinition;
-use Mago\Sdk\Analyzer\Definition\PropertyDefinition;
-use Mago\Sdk\Analyzer\Definition\TemplateDefinition;
+use Mago\Sdk\Analyzer\InitializationContext;
+use Mago\Sdk\Analyzer\InitializationHook;
 use Mago\Sdk\Analyzer\LifecycleContext;
 use Mago\Sdk\Analyzer\Metadata\ClassLikeMetadata;
 use Mago\Sdk\Analyzer\Plugin;
 use Mago\Sdk\Analyzer\PluginDefinition;
 use Mago\Sdk\Analyzer\PluginRegistry;
 use Mago\Sdk\Analyzer\Type;
-use Mago\Sdk\Analyzer\Type\Variance;
 use Mago\Sdk\Extension;
 use Mago\Sdk\Reporting\Issue;
 use Mago\Sdk\Reporting\Level;
@@ -53,40 +46,59 @@ require_once dirname(__DIR__, 4) . '/vendor/autoload.php';
 /**
  * @mago-expect lint:cyclomatic-complexity
  */
-final class LifecycleProofHook implements BeforeAnalysisHook, AfterFileAnalysisHook, AfterAnalysisHook
+final class LifecycleProofHook implements
+    InitializationHook,
+    BeforeAnalysisHook,
+    AfterFileAnalysisHook,
+    AfterAnalysisHook
 {
     public function __construct(
         private readonly string $plugin,
         private readonly string $auditLog,
     ) {}
 
-    public function beforeAnalysis(BeforeAnalysisContext $context): void
+    public function initialize(InitializationContext $context): void
     {
         if ($this->plugin === 'lifecycle-one') {
-            $class = new ClassLikeDefinition(
-                name: 'ExtensionProvided',
-                methods: [new MethodDefinition('answer', returnType: Type::int())],
-                properties: [new PropertyDefinition('$value', Type::int())],
-                magicProperties: [new PropertyDefinition('$magic', Type::string())],
-                constants: [new ClassConstantDefinition('ANSWER', Type::int(), valueType: Type::literalInt(42))],
-                templates: [new TemplateDefinition('T', Type::mixed(), Type::int(), Variance::Covariant, true)],
-                typeAliases: ['Answer' => Type::int()],
-                mixins: [Type::namedObject('stdClass')],
-                sealedMethods: true,
-                permittedInheritors: ['LifecycleClass0'],
-            );
-            $function = new FunctionDefinition(
-                'extension_answer',
-                [new ParameterDefinition('$fallback', Type::int(), defaultType: Type::literalInt(0))],
-                Type::int(),
-                templates: [new TemplateDefinition('T', Type::mixed())],
-            );
-            $constant = new ConstantDefinition('EXTENSION_ANSWER', Type::int(), Type::literalInt(42));
-            $context->codebase->insertClassLike($class);
-            $context->codebase->insertFunction($function);
-            $context->codebase->insertConstant($constant);
+            $context->addStub('lifecycle.php', <<<'PHP'
+                <?php
+
+                declare(strict_types=1);
+
+                /**
+                 * @template-covariant T of int = int
+                 * @type Answer = int
+                 * @mixin stdClass
+                 * @property string $magic
+                 * @seal-methods
+                 * @inheritors LifecycleClass0
+                 */
+                class ExtensionProvided
+                {
+                    public int $value = 42;
+                    public const int ANSWER = 42;
+
+                    public function answer(): int
+                    {
+                        return 42;
+                    }
+                }
+
+                /** @template T */
+                function extension_answer(int $fallback = 0): int
+                {
+                    return $fallback;
+                }
+
+                const EXTENSION_ANSWER = 42;
+                PHP);
         }
 
+        $this->record('initialize', null);
+    }
+
+    public function beforeAnalysis(BeforeAnalysisContext $context): void
+    {
         $base = $this->verifySharedContext($context);
         $this->record('before', null);
         $context->report(Level::Help, 'before', Issue::at('Before-analysis hook ran.', $base->location));
@@ -122,10 +134,10 @@ final class LifecycleProofHook implements BeforeAnalysisHook, AfterFileAnalysisH
         $context->report(
             Level::Help,
             'after-file',
-            Issue::new('After-file hook ran.', new Span(0, min(5, $analysis->size)))->withEdit(
-                TextEdit::replace(new Span(0, min(5, $analysis->size)), '<?php')
-                    ->withSafety(Safety::PotentiallyUnsafe),
-            ),
+            Issue::new('After-file hook ran.', new Span(0, min(5, $analysis->size)))->withEdit(TextEdit::replace(
+                new Span(0, min(5, $analysis->size)),
+                '<?php',
+            )->withSafety(Safety::PotentiallyUnsafe)),
         );
     }
 
@@ -133,7 +145,8 @@ final class LifecycleProofHook implements BeforeAnalysisHook, AfterFileAnalysisH
     {
         $base = $this->verifySharedContext($context);
         $child = $context->codebase->getClass('LifecycleClass1');
-        if ($child === null) {
+        $external = $context->codebase->getClass('ExtensionProvided');
+        if ($child === null || $external === null) {
             throw new RuntimeException('The final hook cannot query the child class.');
         }
 
@@ -169,8 +182,8 @@ final class LifecycleProofHook implements BeforeAnalysisHook, AfterFileAnalysisH
             Level::Help,
             'after',
             Issue::at('After-analysis hook ran.', $base->location)->withSecondaryLocation(
-                $child->location,
-                'Cross-file lifecycle annotation.',
+                $external->location,
+                'External-stub lifecycle annotation.',
             )->withEdit(TextEdit::replaceAt($base->location, '')->withSafety(Safety::Unsafe)),
         );
     }
@@ -180,26 +193,43 @@ final class LifecycleProofHook implements BeforeAnalysisHook, AfterFileAnalysisH
         [$base, $missing] = $context->codebase->getMultipleClasses(['LifecycleClass0', 'DefinitelyMissing']);
         $extensionClass = $context->codebase->getClass('ExtensionProvided');
         $extensionFunction = $context->codebase->getFunction('extension_answer');
+        if ($base === null || $missing !== null || !$context->codebase->classExists('LifecycleClass0')) {
+            throw new RuntimeException('A lifecycle hook cannot query host classes.');
+        }
+
+        if (!$context->types->isContainedBy(Type::literalInt(1), Type::int())) {
+            throw new RuntimeException('A lifecycle hook cannot compare types.');
+        }
+
+        if ($extensionClass === null) {
+            throw new RuntimeException('A lifecycle hook cannot query an external-stub class.');
+        }
+
         if (
-            $base === null
-            || $missing !== null
-            || !$context->codebase->classExists('LifecycleClass0')
-            || !$context->types->isContainedBy(Type::literalInt(1), Type::int())
-            || $extensionClass === null
-            || count($extensionClass->templates) !== 1
+            count($extensionClass->templates) !== 1
             || count($extensionClass->typeAliases) !== 1
             || count($extensionClass->mixins) !== 1
             || $extensionClass->magicProperties !== ['$magic']
             || $extensionClass->sealedMethods !== true
             || $extensionClass->permittedInheritors !== ['lifecycleclass0']
-            || $context->codebase->getMethod('ExtensionProvided', 'answer') === null
+        ) {
+            throw new RuntimeException('An external-stub class lost rich metadata.');
+        }
+
+        if (
+            $context->codebase->getMethod('ExtensionProvided', 'answer') === null
             || $context->codebase->getProperty('ExtensionProvided', '$value') === null
             || $context->codebase->getClassConstant('ExtensionProvided', 'ANSWER') === null
-            || $extensionFunction === null
-            || count($extensionFunction->templates) !== 1
-            || $context->codebase->getConstant('EXTENSION_ANSWER') === null
         ) {
-            throw new RuntimeException('A lifecycle hook cannot use its shared read-only services.');
+            throw new RuntimeException('An external-stub class lost member metadata.');
+        }
+
+        if ($extensionFunction === null || count($extensionFunction->templates) !== 1) {
+            throw new RuntimeException('A lifecycle hook cannot query an external-stub function.');
+        }
+
+        if ($context->codebase->getConstant('EXTENSION_ANSWER') === null) {
+            throw new RuntimeException('A lifecycle hook cannot query an external-stub constant.');
         }
 
         return $base;
@@ -232,6 +262,7 @@ final class LifecycleProofPlugin implements Plugin
     public function register(PluginRegistry $registry): void
     {
         $hook = new LifecycleProofHook($this->identifier, $this->auditLog);
+        $registry->registerInitializationHook($hook);
         $registry->registerBeforeAnalysisHook($hook);
         $registry->registerAfterFileAnalysisHook($hook);
         $registry->registerAfterAnalysisHook($hook);

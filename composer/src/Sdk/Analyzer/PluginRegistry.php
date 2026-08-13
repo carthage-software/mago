@@ -12,6 +12,11 @@ namespace Mago\Sdk\Analyzer;
 final class PluginRegistry
 {
     /**
+     * @var list<InitializationHook>
+     */
+    private array $initializationHooks = [];
+
+    /**
      * @var list<FunctionReturnTypeProvider>
      */
     private array $functionReturnTypeProviders = [];
@@ -35,6 +40,11 @@ final class PluginRegistry
      * @var list<AfterAnalysisHook>
      */
     private array $afterAnalysisHooks = [];
+
+    public function registerInitializationHook(InitializationHook $hook): void
+    {
+        $this->initializationHooks[] = $hook;
+    }
 
     public function registerFunctionReturnTypeProvider(FunctionReturnTypeProvider $provider): void
     {
@@ -77,6 +87,16 @@ final class PluginRegistry
     public function getMethodReturnTypeProviders(): array
     {
         return $this->methodReturnTypeProviders;
+    }
+
+    /**
+     * @internal
+     *
+     * @return list<InitializationHook>
+     */
+    public function getInitializationHooks(): array
+    {
+        return $this->initializationHooks;
     }
 
     /**

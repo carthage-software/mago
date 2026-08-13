@@ -51,6 +51,7 @@ impl MetadataFlags {
     pub const EXPERIMENTAL: MetadataFlags = MetadataFlags(1 << 40);
     pub const POLYFILL: MetadataFlags = MetadataFlags(1 << 41);
     pub const PATCH: MetadataFlags = MetadataFlags(1 << 42);
+    pub const EXTERNAL: MetadataFlags = MetadataFlags(1 << 43);
 }
 
 impl MetadataFlags {
@@ -341,11 +342,18 @@ impl MetadataFlags {
 
     #[inline]
     #[must_use]
+    pub const fn is_external(self) -> bool {
+        self.contains(Self::EXTERNAL)
+    }
+
+    #[inline]
+    #[must_use]
     pub const fn origin_flags(file_type: FileType) -> Self {
         match file_type {
             FileType::Host => Self::USER_DEFINED,
             FileType::Builtin => Self::BUILTIN,
             FileType::Patch => Self::PATCH,
+            FileType::External => Self::EXTERNAL,
             FileType::Vendored => Self::empty(),
         }
     }

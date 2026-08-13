@@ -271,7 +271,17 @@ impl<'cfg> Orchestrator<'cfg> {
             loader = loader.with_stdin_override(name, content);
         }
 
-        let result = loader.load().map_err(OrchestratorError::Database)?;
+        let mut result = loader.load().map_err(OrchestratorError::Database)?;
+
+        if let Some(registry) = self.plugin_registry.get() {
+            let files = registry
+                .external_initialization_files()
+                .map_err(|error| OrchestratorError::General(error.to_string()))?;
+            result.reserve(files.len());
+            for file in files {
+                result.add(file);
+            }
+        }
 
         Ok(result)
     }
