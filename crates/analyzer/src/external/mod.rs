@@ -13,6 +13,7 @@ use std::time::Instant;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::populator::populate_codebase;
 use mago_codex::reference::SymbolReferences;
+use mago_codex::symbol::SymbolIdentifier;
 use mago_codex::ttype::union::TUnion;
 use mago_database::file::File;
 use mago_database::file::FileId;
@@ -52,6 +53,8 @@ static NEXT_ANALYSIS_GENERATION: AtomicU64 = AtomicU64::new(1);
 pub struct ExternalAnalysisSession {
     generation: u64,
     sources: foldhash::HashMap<FileId, ExternalSource>,
+    mutation_provenance: Mutex<mutation::MutationProvenance>,
+    source_codebase: Mutex<Option<CodebaseMetadata>>,
 }
 
 #[derive(Debug)]
@@ -69,7 +72,12 @@ impl ExternalAnalysisSession {
             .map(|file| (file.id, ExternalSource { name: Arc::from(file.name.as_ref()), size: file.size }))
             .collect();
 
-        Self { generation, sources }
+        Self {
+            generation,
+            sources,
+            mutation_provenance: Mutex::new(mutation::MutationProvenance::default()),
+            source_codebase: Mutex::new(None),
+        }
     }
 
     #[inline]
@@ -88,6 +96,59 @@ impl ExternalAnalysisSession {
         self.sources
             .iter()
             .find_map(|(file_id, source)| (source.name.as_ref() == name).then_some((*file_id, source.size)))
+    }
+
+    /// Returns every symbol or member changed by committed before-analysis hooks.
+    #[must_use]
+    pub fn mutated_symbols(&self) -> foldhash::HashSet<SymbolIdentifier> {
+        match self.mutation_provenance.lock() {
+            Ok(provenance) => provenance.touched_symbols(),
+            Err(poisoned) => poisoned.into_inner().touched_symbols(),
+        }
+    }
+
+    /// Returns the number of committed metadata mutations in this generation.
+    #[must_use]
+    pub fn mutation_count(&self) -> usize {
+        match self.mutation_provenance.lock() {
+            Ok(provenance) => provenance.mutation_count(),
+            Err(poisoned) => poisoned.into_inner().mutation_count(),
+        }
+    }
+
+    /// Returns a deterministic fingerprint of committed metadata mutation requests.
+    #[must_use]
+    pub fn mutation_fingerprint(&self) -> u64 {
+        match self.mutation_provenance.lock() {
+            Ok(provenance) => provenance.fingerprint(),
+            Err(poisoned) => poisoned.into_inner().fingerprint(),
+        }
+    }
+
+    /// Takes the unmodified codebase preserved before the first committed mutation.
+    #[must_use]
+    pub fn take_source_codebase(&self) -> Option<CodebaseMetadata> {
+        match self.source_codebase.lock() {
+            Ok(mut source) => source.take(),
+            Err(poisoned) => poisoned.into_inner().take(),
+        }
+    }
+
+    fn preserve_source_codebase(&self, codebase: &mut CodebaseMetadata) {
+        let mut source = match self.source_codebase.lock() {
+            Ok(source) => source,
+            Err(poisoned) => poisoned.into_inner(),
+        };
+        if source.is_none() {
+            *source = Some(std::mem::take(codebase));
+        }
+    }
+
+    fn set_mutation_provenance(&self, replacement: mutation::MutationProvenance) {
+        match self.mutation_provenance.lock() {
+            Ok(mut provenance) => *provenance = replacement,
+            Err(poisoned) => *poisoned.into_inner() = replacement,
+        }
     }
 }
 
@@ -687,12 +748,16 @@ where
         session: &ExternalAnalysisSession,
     ) -> Result<IssueCollection, ExternalAnalyzerError> {
         let mut issues = IssueCollection::new();
+        let mut provenance = mutation::MutationProvenance::default();
         for backend in &self.backends {
             let plugins = &backend.registration.before_analysis_plugins;
             if plugins.is_empty() {
                 continue;
             }
             for plugin in plugins {
+                let registered_plugin = backend.registration.plugins.get(usize::from(*plugin)).ok_or_else(|| {
+                    error::protocol(format!("before-analysis hook references unknown plugin index {plugin}"))
+                })?;
                 let plugin_slice = std::slice::from_ref(plugin);
                 let lifecycle_start = self.trace_enabled.then(Instant::now);
                 let encode_start = self.trace_enabled.then(Instant::now);
@@ -710,26 +775,62 @@ where
 
                 let nested_telemetry = &self.telemetry;
                 let trace_enabled = self.trace_enabled;
-                let mut candidate: Option<(CodebaseMetadata, SymbolReferences)> = None;
+                let mut candidate: Option<(
+                    CodebaseMetadata,
+                    Option<SymbolReferences>,
+                    mutation::MutationProvenance,
+                    bool,
+                )> = None;
+                let mut origin = None;
                 let mut handler = |frame: &Frame| {
                     let nested_start = trace_enabled.then(Instant::now);
                     let result = match mutation::is_request(&frame.payload) {
                         Ok(true) => {
-                            let (candidate_codebase, candidate_references) =
-                                candidate.get_or_insert_with(|| (codebase.clone(), symbol_references.clone()));
-                            let result = mutation::handle_request(&frame.payload, candidate_codebase, session);
-                            if result.is_ok() {
+                            let (candidate_codebase, _, candidate_provenance, dirty) =
+                                candidate.get_or_insert_with(|| (codebase.clone(), None, provenance.clone(), false));
+                            let origin = origin.get_or_insert_with(|| {
+                                mutation::MutationOrigin::new(
+                                    registered_plugin.extension.as_str(),
+                                    registered_plugin.identifier.as_str(),
+                                )
+                            });
+                            let previous_mutation_count = candidate_provenance.mutation_count();
+                            let result = mutation::handle_request(
+                                &frame.payload,
+                                candidate_codebase,
+                                session,
+                                origin,
+                                candidate_provenance,
+                            );
+                            if result.is_ok() && candidate_provenance.mutation_count() != previous_mutation_count {
+                                *dirty = true;
+                            }
+                            result
+                        }
+                        Ok(false) => {
+                            if let Some((candidate_codebase, candidate_references, _, dirty @ true)) =
+                                candidate.as_mut()
+                            {
+                                let population_start = trace_enabled.then(Instant::now);
+                                let candidate_references =
+                                    candidate_references.get_or_insert_with(|| symbol_references.clone());
                                 populate_codebase(
                                     candidate_codebase,
                                     candidate_references,
                                     mago_word::WordSet::default(),
                                     HashSet::default(),
                                 );
+                                *dirty = false;
+                                if let Some(start) = population_start {
+                                    tracing::trace!(
+                                        extension = registered_plugin.extension,
+                                        plugin = registered_plugin.identifier,
+                                        elapsed = ?start.elapsed(),
+                                        "Populated external analyzer metadata transaction before a nested query."
+                                    );
+                                }
                             }
-                            result
-                        }
-                        Ok(false) => {
-                            let visible = candidate.as_ref().map_or(&*codebase, |(candidate, _)| candidate);
+                            let visible = candidate.as_ref().map_or(&*codebase, |(candidate, _, _, _)| candidate);
                             protocol::handle_nested_request(&frame.payload, visible, session, |_| None)
                         }
                         Err(error) => Err(error),
@@ -754,11 +855,41 @@ where
                     lifecycle_start,
                 )?);
 
-                if let Some((candidate_codebase, candidate_references)) = candidate {
+                if let Some((mut candidate_codebase, candidate_references, candidate_provenance, dirty)) = candidate {
+                    let plugin_mutations = candidate_provenance.mutation_count() - provenance.mutation_count();
+                    if plugin_mutations == 0 {
+                        continue;
+                    }
+                    let mut candidate_references =
+                        candidate_references.unwrap_or_else(|| std::mem::take(symbol_references));
+                    let population_start = (trace_enabled && dirty).then(Instant::now);
+                    if dirty {
+                        populate_codebase(
+                            &mut candidate_codebase,
+                            &mut candidate_references,
+                            mago_word::WordSet::default(),
+                            HashSet::default(),
+                        );
+                    }
+                    let population_elapsed = population_start.map(|start| start.elapsed());
+                    tracing::trace!(
+                        extension = registered_plugin.extension,
+                        plugin = registered_plugin.identifier,
+                        mutations = plugin_mutations,
+                        touched_symbols = candidate_provenance.touched_symbols().len(),
+                        population_elapsed = ?population_elapsed,
+                        "Committed external analyzer metadata transaction."
+                    );
+                    session.preserve_source_codebase(codebase);
                     *codebase = candidate_codebase;
                     *symbol_references = candidate_references;
+                    provenance = candidate_provenance;
                 }
             }
+        }
+
+        if provenance.mutation_count() != 0 {
+            session.set_mutation_provenance(provenance);
         }
 
         Ok(issues)

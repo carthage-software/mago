@@ -115,6 +115,7 @@ final class MutableCodebase extends Codebase
         if ($names === []) {
             return [];
         }
+
         foreach ($names as $name) {
             if ($name === '') {
                 throw new InvalidArgumentException('A codebase mutation name cannot be empty.');

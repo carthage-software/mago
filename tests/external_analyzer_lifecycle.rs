@@ -204,6 +204,26 @@ fn external_analyzer_lifecycle_is_exact_across_workers_and_incremental_runs() {
             .filter(|entry| entry.1 == "after-file")
             .all(|entry| entry.2.as_deref() == Some("src/file5.php"))
     );
+
+    let first_changed_file = changed_file;
+    let (second_updated_database, second_changed_file) = make_database(Some(6));
+    service.update_database(second_updated_database.read_only());
+    let second_incremental = service
+        .analyze_incremental(Some(&[first_changed_file, second_changed_file]))
+        .expect("a second incremental lifecycle analysis should rebuild extension metadata from source state");
+    assert_issue_cardinality(&second_incremental.issues);
+
+    let second_audit = read_audit(&audit_log);
+    let second_incremental_audit = &second_audit[audit.len()..];
+    assert_eq!(second_incremental_audit.iter().filter(|entry| entry.1 == "before").count(), PLUGINS.len());
+    assert_eq!(second_incremental_audit.iter().filter(|entry| entry.1 == "after-file").count(), PLUGINS.len() * 2);
+    assert_eq!(second_incremental_audit.iter().filter(|entry| entry.1 == "after").count(), PLUGINS.len());
+    let analyzed_files = second_incremental_audit
+        .iter()
+        .filter(|entry| entry.1 == "after-file")
+        .filter_map(|entry| entry.2.as_deref())
+        .collect::<HashSet<_>>();
+    assert_eq!(analyzed_files, HashSet::from(["src/file5.php", "src/file6.php"]));
 }
 
 #[test]
@@ -231,4 +251,110 @@ fn failed_before_analysis_hook_discards_its_metadata_transaction() {
 
     assert!(result.is_err(), "the deliberately failing hook should abort");
     assert!(!codebase.class_like_exists(b"MustRollBack"), "a failed hook must not commit its candidate codebase");
+    assert!(
+        codebase.get_function(b"must_roll_back").is_none(),
+        "a failed hook must roll back every function in its candidate codebase"
+    );
+    assert!(
+        codebase.get_constant(b"MUST_ROLL_BACK").is_none(),
+        "a failed hook must roll back every constant in its candidate codebase"
+    );
+}
+
+#[test]
+fn conflicting_before_analysis_hooks_report_the_symbol_owner() {
+    let repository = Path::new(env!("CARGO_MANIFEST_DIR"));
+    if !php_sdk_is_available(repository) {
+        return;
+    }
+
+    let command = WorkerCommand::new("php")
+        .with_argument(repository.join("composer/tests/Sdk/Fixtures/analyzer-mutation-conflict-worker.php"))
+        .with_current_directory(repository);
+    let pool = WorkerPool::spawn(command, NonZeroUsize::new(1).expect("one is non-zero"), WorkerPoolOptions::default())
+        .expect("PHP conflict worker should start");
+    let analyzer = ExternalAnalyzer::initialize([Arc::new(pool)], PHPVersion::PHP85, &[], false)
+        .expect("PHP conflict analyzer should initialize");
+    let mut registry = PluginRegistry::with_library_providers();
+    registry.set_external_analyzer(Arc::new(ExternalAnalyzerHandle::ready(analyzer)));
+    registry.prepare_external_analyzer().expect("PHP conflict analyzer should prepare");
+
+    let mut codebase = CodebaseMetadata::new();
+    let mut references = SymbolReferences::new();
+    let session = ExternalAnalysisSession::from_files(Vec::<Arc<File>>::new());
+    let error = registry
+        .run_external_before_analysis_hooks(&mut codebase, &mut references, Some(&session))
+        .expect_err("the second plugin must not overwrite the first plugin's symbol");
+    let message = error.to_string();
+
+    assert!(message.contains("`ContendedSymbol`"), "the conflict should name the symbol: {message}");
+    assert!(message.contains("`conflict-one`"), "the conflict should name the owning plugin: {message}");
+    assert!(
+        message.contains("`mago/mutation-conflict-proof`"),
+        "the conflict should name the owning extension: {message}"
+    );
+    assert!(codebase.class_like_exists(b"ContendedSymbol"), "the first plugin's committed transaction should remain");
+}
+
+#[test]
+fn changed_mutation_sets_remove_old_symbols_and_invalidate_all_files() {
+    let repository = Path::new(env!("CARGO_MANIFEST_DIR"));
+    if !php_sdk_is_available(repository) {
+        return;
+    }
+
+    let temporary = tempfile::tempdir().expect("temporary mutation generation directory should be created");
+    let audit_log = temporary.path().join("audit.jsonl");
+    std::fs::write(&audit_log, []).expect("mutation generation audit log should be initialized");
+
+    let command = WorkerCommand::new("php")
+        .with_argument(repository.join("composer/tests/Sdk/Fixtures/analyzer-mutation-generation-worker.php"))
+        .with_current_directory(repository)
+        .with_environment("MAGO_MUTATION_GENERATION_AUDIT_LOG", &audit_log);
+    let pool = WorkerPool::spawn(command, NonZeroUsize::new(1).expect("one is non-zero"), WorkerPoolOptions::default())
+        .expect("PHP mutation generation worker should start");
+    let analyzer = ExternalAnalyzer::initialize([Arc::new(pool)], PHPVersion::PHP85, &[], false)
+        .expect("PHP mutation generation analyzer should initialize");
+    let mut registry = PluginRegistry::with_library_providers();
+    registry.set_external_analyzer(Arc::new(ExternalAnalyzerHandle::ready(analyzer)));
+
+    let (database, _) = make_database(None);
+    let mut settings = Settings::new(PHPVersion::PHP85);
+    settings.find_unused_expressions = false;
+    settings.find_unused_definitions = false;
+    let mut service = IncrementalAnalysisService::new(
+        database.read_only(),
+        CodebaseMetadata::new(),
+        SymbolReferences::new(),
+        settings,
+        ParserSettings::default(),
+        Arc::new(registry),
+    );
+
+    service.analyze().expect("initial conditional mutation analysis should succeed");
+    assert!(
+        service.codebase().get_constant(b"EPHEMERAL_EXTENSION_VALUE").is_some(),
+        "the initial generation should expose the extension-owned constant"
+    );
+    let initial_audit = read_audit(&audit_log);
+    assert_eq!(initial_audit.iter().filter(|entry| entry.1 == "after-file").count(), FILE_COUNT);
+
+    let (updated_database, changed_file) = make_database(Some(5));
+    service.update_database(updated_database.read_only());
+    service
+        .analyze_incremental(Some(&[changed_file]))
+        .expect("conditional mutation removal should trigger a correct incremental analysis");
+    assert!(
+        service.codebase().get_constant(b"EPHEMERAL_EXTENSION_VALUE").is_none(),
+        "a mutation omitted from the next generation must not leak from the cached codebase"
+    );
+
+    let audit = read_audit(&audit_log);
+    let incremental_audit = &audit[initial_audit.len()..];
+    assert_eq!(incremental_audit.iter().filter(|entry| entry.1 == "before").count(), 1);
+    assert_eq!(
+        incremental_audit.iter().filter(|entry| entry.1 == "after-file").count(),
+        FILE_COUNT,
+        "changing the mutation set must invalidate every host file"
+    );
 }

@@ -24,8 +24,10 @@
       "composer/src/internal.php"
     ]
   },
-  "scripts": {
-    "test-sdk": "php composer/tests/Sdk/run.php"
+  "autoload-dev": {
+    "psr-4": {
+      "Mago\\Tests\\": "composer/tests/"
+    }
   },
   "suggest": {
     "ext-curl": "To show binary download progress"
@@ -33,5 +35,8 @@
   "require": {
     "php": "~8.1 || ~8.2 || ~8.3 || ~8.4 || ~8.5 || ~8.6",
     "revolt/event-loop": "^1.0.9"
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^10.5"
   }
 }

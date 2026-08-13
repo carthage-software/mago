@@ -1,3 +1,4 @@
+use foldhash::HashMap;
 use foldhash::HashSet;
 
 use mago_codex::metadata::CodebaseMetadata;
@@ -13,6 +14,7 @@ use mago_codex::metadata::property::PropertyMetadata;
 use mago_codex::metadata::ttype::TypeMetadata;
 use mago_codex::misc::GenericParent;
 use mago_codex::misc::VariableIdentifier;
+use mago_codex::symbol::SymbolIdentifier;
 use mago_codex::symbol::SymbolKind;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::template::GenericTemplate;
@@ -45,6 +47,104 @@ const REMOVE_CONSTANTS: u8 = 5;
 const INSERT_CONSTANTS: u8 = 6;
 
 const MAXIMUM_MUTATIONS: usize = 0x0001_0000;
+const MUTATION_BODY_OFFSET: usize = 20;
+
+const FINGERPRINT_OFFSET: u64 = 0xcbf2_9ce4_8422_2325;
+const FINGERPRINT_PRIME: u64 = 0x0000_0100_0000_01b3;
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub(super) struct MutationOrigin {
+    extension: String,
+    plugin: String,
+}
+
+impl MutationOrigin {
+    pub(super) fn new(extension: &str, plugin: &str) -> Self {
+        Self { extension: extension.to_owned(), plugin: plugin.to_owned() }
+    }
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum MutationTarget {
+    ClassLike(Word),
+    Function(Word),
+    Constant(Word),
+}
+
+impl MutationTarget {
+    fn symbol(self) -> SymbolIdentifier {
+        match self {
+            Self::ClassLike(name) | Self::Function(name) | Self::Constant(name) => (name, empty_word()),
+        }
+    }
+}
+
+#[derive(Debug, Clone, Default)]
+pub(super) struct MutationProvenance {
+    owners: HashMap<MutationTarget, MutationOrigin>,
+    touched_symbols: HashSet<SymbolIdentifier>,
+    mutation_count: usize,
+    fingerprint: u64,
+}
+
+impl MutationProvenance {
+    pub(super) fn touched_symbols(&self) -> HashSet<SymbolIdentifier> {
+        self.touched_symbols.clone()
+    }
+
+    pub(super) const fn mutation_count(&self) -> usize {
+        self.mutation_count
+    }
+
+    pub(super) const fn fingerprint(&self) -> u64 {
+        self.fingerprint
+    }
+
+    fn record_removal(&mut self, target: MutationTarget) {
+        self.owners.remove(&target);
+        self.touched_symbols.insert(target.symbol());
+        self.mutation_count += 1;
+    }
+
+    fn record_insertion(&mut self, target: MutationTarget, origin: &MutationOrigin) {
+        self.owners.insert(target, origin.clone());
+        self.touched_symbols.insert(target.symbol());
+        self.mutation_count += 1;
+    }
+
+    fn record_member(&mut self, class: Word, member: Word) {
+        self.touched_symbols.insert((class, member));
+    }
+
+    fn record_request(&mut self, origin: &MutationOrigin, payload: &[u8]) {
+        let mut fingerprint = if self.fingerprint == 0 { FINGERPRINT_OFFSET } else { self.fingerprint };
+        for bytes in [origin.extension.as_bytes(), origin.plugin.as_bytes(), payload] {
+            fingerprint ^= bytes.len() as u64;
+            fingerprint = fingerprint.wrapping_mul(FINGERPRINT_PRIME);
+            fingerprint = hash_bytes(fingerprint, bytes);
+        }
+        self.fingerprint = fingerprint;
+    }
+
+    fn conflict(&self, description: &str, name: Word, target: MutationTarget) -> ExternalAnalyzerError {
+        if let Some(owner) = self.owners.get(&target) {
+            protocol(format!(
+                "{description} `{name}` is already owned by analyzer plugin `{}` from extension `{}`",
+                owner.plugin, owner.extension
+            ))
+        } else {
+            protocol(format!("{description} `{name}` already exists in the source codebase"))
+        }
+    }
+}
+
+fn hash_bytes(mut fingerprint: u64, bytes: &[u8]) -> u64 {
+    for byte in bytes {
+        fingerprint ^= u64::from(*byte);
+        fingerprint = fingerprint.wrapping_mul(FINGERPRINT_PRIME);
+    }
+    fingerprint
+}
 
 pub(super) fn is_request(payload: &[u8]) -> Result<bool, ExternalAnalyzerError> {
     Ok(protocol::message_kind(payload)? == CODEBASE_MUTATION_REQUEST)
@@ -54,6 +154,8 @@ pub(super) fn handle_request(
     payload: &[u8],
     codebase: &mut CodebaseMetadata,
     session: &ExternalAnalysisSession,
+    origin: &MutationOrigin,
+    provenance: &mut MutationProvenance,
 ) -> Result<(NestedRequestKind, Vec<u8>), ExternalAnalyzerError> {
     let mut reader = protocol::message_reader(payload, CODEBASE_MUTATION_REQUEST)?;
     let generation = reader.read_u64("codebase mutation generation")?;
@@ -68,16 +170,20 @@ pub(super) fn handle_request(
     let mut writer = protocol::message_writer(CODEBASE_MUTATION_RESPONSE);
     writer.write_u64(generation);
     writer.write_u8(operation);
+    let previous_mutation_count = provenance.mutation_count();
     match operation {
-        REMOVE_CLASS_LIKES => remove_class_likes(&mut reader, &mut writer, codebase)?,
-        INSERT_CLASS_LIKES => insert_class_likes(&mut reader, &mut writer, codebase)?,
-        REMOVE_FUNCTIONS => remove_functions(&mut reader, &mut writer, codebase)?,
-        INSERT_FUNCTIONS => insert_functions(&mut reader, &mut writer, codebase)?,
-        REMOVE_CONSTANTS => remove_constants(&mut reader, &mut writer, codebase)?,
-        INSERT_CONSTANTS => insert_constants(&mut reader, &mut writer, codebase)?,
+        REMOVE_CLASS_LIKES => remove_class_likes(&mut reader, &mut writer, codebase, provenance)?,
+        INSERT_CLASS_LIKES => insert_class_likes(&mut reader, &mut writer, codebase, origin, provenance)?,
+        REMOVE_FUNCTIONS => remove_functions(&mut reader, &mut writer, codebase, provenance)?,
+        INSERT_FUNCTIONS => insert_functions(&mut reader, &mut writer, codebase, origin, provenance)?,
+        REMOVE_CONSTANTS => remove_constants(&mut reader, &mut writer, codebase, provenance)?,
+        INSERT_CONSTANTS => insert_constants(&mut reader, &mut writer, codebase, origin, provenance)?,
         unknown => return Err(protocol(format!("unknown codebase mutation operation {unknown}"))),
     }
     reader.finish()?;
+    if provenance.mutation_count() != previous_mutation_count {
+        provenance.record_request(origin, payload.get(MUTATION_BODY_OFFSET..).unwrap_or_default());
+    }
 
     Ok((NestedRequestKind::CodebaseMutation, writer.finish()))
 }
@@ -86,6 +192,7 @@ fn remove_class_likes(
     reader: &mut PayloadReader<'_>,
     writer: &mut PayloadWriter,
     codebase: &mut CodebaseMetadata,
+    provenance: &mut MutationProvenance,
 ) -> Result<(), ExternalAnalyzerError> {
     let names = read_names(reader, "class-like removals")?;
     writer.write_u32(names.len() as u32);
@@ -95,8 +202,12 @@ fn remove_class_likes(
         writer.write_bool(removed.is_some());
         if let Some(metadata) = removed {
             write_class_like_definition(writer, &metadata, codebase)?;
+            for method in &metadata.methods {
+                provenance.record_member(lookup, *method);
+            }
             codebase.function_likes.retain(|(scope, _), _| *scope != lookup);
             codebase.symbols.remove(lookup);
+            provenance.record_removal(MutationTarget::ClassLike(lookup));
         }
     }
 
@@ -107,6 +218,8 @@ fn insert_class_likes(
     reader: &mut PayloadReader<'_>,
     writer: &mut PayloadWriter,
     codebase: &mut CodebaseMetadata,
+    origin: &MutationOrigin,
+    provenance: &mut MutationProvenance,
 ) -> Result<(), ExternalAnalyzerError> {
     let count = reader.read_count("class-like insertions", MAXIMUM_MUTATIONS)?;
     let mut definitions = Vec::with_capacity(count);
@@ -117,13 +230,20 @@ fn insert_class_likes(
             return Err(protocol(format!("class-like insertion contains duplicate `{}`", metadata.original_name)));
         }
         if codebase.class_likes.contains_key(&metadata.name) {
-            return Err(protocol(format!("class-like `{}` already exists", metadata.original_name)));
+            return Err(provenance.conflict(
+                "class-like",
+                metadata.original_name,
+                MutationTarget::ClassLike(metadata.name),
+            ));
         }
         definitions.push((metadata, methods));
     }
 
     for (metadata, methods) in definitions {
         let name = metadata.name;
+        for method in &methods {
+            provenance.record_member(name, method.name);
+        }
         match metadata.kind {
             SymbolKind::Class => codebase.symbols.add_class_name(name),
             SymbolKind::Interface => codebase.symbols.add_interface_name(name),
@@ -134,6 +254,7 @@ fn insert_class_likes(
             codebase.function_likes.insert((name, method.name), method);
         }
         codebase.class_likes.insert(name, metadata);
+        provenance.record_insertion(MutationTarget::ClassLike(name), origin);
     }
     writer.write_u32(count as u32);
     Ok(())
@@ -143,6 +264,7 @@ fn remove_functions(
     reader: &mut PayloadReader<'_>,
     writer: &mut PayloadWriter,
     codebase: &mut CodebaseMetadata,
+    provenance: &mut MutationProvenance,
 ) -> Result<(), ExternalAnalyzerError> {
     let names = read_names(reader, "function removals")?;
     writer.write_u32(names.len() as u32);
@@ -152,6 +274,7 @@ fn remove_functions(
         writer.write_bool(removed.is_some());
         if let Some(metadata) = removed {
             write_function_definition(writer, &metadata)?;
+            provenance.record_removal(MutationTarget::Function(lookup));
         }
     }
     Ok(())
@@ -161,6 +284,8 @@ fn insert_functions(
     reader: &mut PayloadReader<'_>,
     writer: &mut PayloadWriter,
     codebase: &mut CodebaseMetadata,
+    origin: &MutationOrigin,
+    provenance: &mut MutationProvenance,
 ) -> Result<(), ExternalAnalyzerError> {
     let count = reader.read_count("function insertions", MAXIMUM_MUTATIONS)?;
     let mut definitions = Vec::with_capacity(count);
@@ -171,13 +296,19 @@ fn insert_functions(
             return Err(protocol(format!("function insertion contains duplicate `{}`", metadata.original_name)));
         }
         if codebase.function_likes.contains_key(&(empty_word(), metadata.name)) {
-            return Err(protocol(format!("function `{}` already exists", metadata.original_name)));
+            return Err(provenance.conflict(
+                "function",
+                metadata.original_name,
+                MutationTarget::Function(metadata.name),
+            ));
         }
         definitions.push(metadata);
     }
 
     for metadata in definitions {
-        codebase.function_likes.insert((empty_word(), metadata.name), metadata);
+        let name = metadata.name;
+        codebase.function_likes.insert((empty_word(), name), metadata);
+        provenance.record_insertion(MutationTarget::Function(name), origin);
     }
     writer.write_u32(count as u32);
     Ok(())
@@ -187,6 +318,7 @@ fn remove_constants(
     reader: &mut PayloadReader<'_>,
     writer: &mut PayloadWriter,
     codebase: &mut CodebaseMetadata,
+    provenance: &mut MutationProvenance,
 ) -> Result<(), ExternalAnalyzerError> {
     let names = read_names(reader, "constant removals")?;
     writer.write_u32(names.len() as u32);
@@ -196,6 +328,7 @@ fn remove_constants(
         writer.write_bool(removed.is_some());
         if let Some(metadata) = removed {
             write_constant_definition(writer, &metadata)?;
+            provenance.record_removal(MutationTarget::Constant(lookup));
         }
     }
     Ok(())
@@ -205,6 +338,8 @@ fn insert_constants(
     reader: &mut PayloadReader<'_>,
     writer: &mut PayloadWriter,
     codebase: &mut CodebaseMetadata,
+    origin: &MutationOrigin,
+    provenance: &mut MutationProvenance,
 ) -> Result<(), ExternalAnalyzerError> {
     let count = reader.read_count("constant insertions", MAXIMUM_MUTATIONS)?;
     let mut definitions = Vec::with_capacity(count);
@@ -216,13 +351,14 @@ fn insert_constants(
             return Err(protocol(format!("constant insertion contains duplicate `{}`", metadata.name)));
         }
         if codebase.constants.contains_key(&lookup) {
-            return Err(protocol(format!("constant `{}` already exists", metadata.name)));
+            return Err(provenance.conflict("constant", metadata.name, MutationTarget::Constant(lookup)));
         }
         definitions.push((lookup, metadata));
     }
 
     for (lookup, metadata) in definitions {
         codebase.constants.insert(lookup, metadata);
+        provenance.record_insertion(MutationTarget::Constant(lookup), origin);
     }
     writer.write_u32(count as u32);
     Ok(())

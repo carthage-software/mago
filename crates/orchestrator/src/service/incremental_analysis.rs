@@ -16,6 +16,7 @@ use mago_analyzer::Analyzer;
 use mago_analyzer::analysis_result::AnalysisResult;
 use mago_analyzer::artifacts::AnalysisArtifacts;
 use mago_analyzer::external::AFTER_FILE_ANALYSIS_BATCH_SIZE;
+use mago_analyzer::external::ExternalAnalysisSession;
 use mago_analyzer::external::FileAnalysisSnapshot;
 use mago_analyzer::plugin::PluginRegistry;
 use mago_analyzer::settings::Settings;
@@ -56,6 +57,10 @@ struct SelectiveAnalysisOutput {
     per_file_issues: HashMap<FileId, IssueCollection>,
     snapshots: Vec<Arc<FileAnalysisSnapshot>>,
     codebase_issues: IssueCollection,
+    source_codebase: Option<CodebaseMetadata>,
+    external_mutations_changed: bool,
+    external_mutation_symbols: HashSet<mago_codex::symbol::SymbolIdentifier>,
+    external_mutation_fingerprint: u64,
 }
 
 /// A self-contained incremental analysis service.
@@ -74,6 +79,7 @@ struct SelectiveAnalysisOutput {
 /// - [`analyze_incremental()`](Self::analyze_incremental): Incremental analysis that only re-scans changed files and skips analysis of unchanged symbols
 pub struct IncrementalAnalysisService {
     database: ReadDatabase,
+    source_codebase: Option<CodebaseMetadata>,
     codebase: CodebaseMetadata,
     symbol_references: SymbolReferences,
     base_codebase: Arc<CodebaseMetadata>,
@@ -86,12 +92,15 @@ pub struct IncrementalAnalysisService {
     codebase_issues: IssueCollection,
     lifecycle_issues: IssueCollection,
     analysis_snapshots: HashMap<FileId, Arc<FileAnalysisSnapshot>>,
+    external_mutation_symbols: HashSet<mago_codex::symbol::SymbolIdentifier>,
+    external_mutation_fingerprint: u64,
 }
 
 impl std::fmt::Debug for IncrementalAnalysisService {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("IncrementalAnalysisService")
             .field("database", &"<ReadDatabase>")
+            .field("source_codebase", &self.source_codebase.as_ref().map(|_| "<CodebaseMetadata>"))
             .field("codebase", &"<CodebaseMetadata>")
             .field("symbol_references", &"<SymbolReferences>")
             .field("base_codebase", &"<Arc<CodebaseMetadata>>")
@@ -104,6 +113,8 @@ impl std::fmt::Debug for IncrementalAnalysisService {
             .field("codebase_issues", &self.codebase_issues.len())
             .field("lifecycle_issues", &self.lifecycle_issues.len())
             .field("analysis_snapshots", &self.analysis_snapshots.len())
+            .field("external_mutation_symbols", &self.external_mutation_symbols.len())
+            .field("external_mutation_fingerprint", &self.external_mutation_fingerprint)
             .finish()
     }
 }
@@ -136,6 +147,7 @@ impl IncrementalAnalysisService {
 
         Self {
             database,
+            source_codebase: None,
             codebase,
             symbol_references,
             base_codebase,
@@ -148,6 +160,8 @@ impl IncrementalAnalysisService {
             codebase_issues: IssueCollection::default(),
             lifecycle_issues: IssueCollection::default(),
             analysis_snapshots: HashMap::default(),
+            external_mutation_symbols: HashSet::default(),
+            external_mutation_fingerprint: 0,
         }
     }
 
@@ -181,6 +195,10 @@ impl IncrementalAnalysisService {
     #[must_use]
     pub fn database(&self) -> &ReadDatabase {
         &self.database
+    }
+
+    fn source_codebase(&self) -> &CodebaseMetadata {
+        self.source_codebase.as_ref().unwrap_or(&self.codebase)
     }
 
     /// Reconstructs the full issue list from cached per-file issues and codebase-level issues.
@@ -351,7 +369,6 @@ impl IncrementalAnalysisService {
 
         let mut symbol_references = (*self.base_symbol_references).clone();
         populate_codebase(&mut merged_codebase, &mut symbol_references, WordSet::default(), HashSet::default());
-
         let mut file_states: HashMap<FileId, FileState> = HashMap::default();
         for (file_id, content_hash, metadata) in staged {
             let entry_keys = metadata.extract_owned_keys(&merged_codebase);
@@ -371,6 +388,10 @@ impl IncrementalAnalysisService {
             per_file_issues,
             snapshots,
             codebase_issues: all_codebase_issues,
+            source_codebase,
+            external_mutations_changed: _,
+            external_mutation_symbols,
+            external_mutation_fingerprint,
         } =
             self.run_analyzer_selective(&mut merged_codebase, symbol_references, &self.settings, &HashSet::default())?;
         self.lifecycle_issues = analysis_result.issues.clone();
@@ -396,8 +417,11 @@ impl IncrementalAnalysisService {
             self.codebase_issues.len(),
         );
 
+        self.source_codebase = source_codebase;
         self.codebase = merged_codebase;
         self.symbol_references = std::mem::take(&mut analysis_result.symbol_references);
+        self.external_mutation_symbols = external_mutation_symbols;
+        self.external_mutation_fingerprint = external_mutation_fingerprint;
         self.initialized = true;
 
         Ok(analysis_result)
@@ -448,13 +472,13 @@ impl IncrementalAnalysisService {
             // in the new scans, and the vendor file it targeted is untouched. Fall back to a full
             // reanalyze so the affected baselines are rebuilt without the patch — the same policy the
             // patch-content-change path below uses.
-            let patch_deleted = self
-                .codebase
+            let source_codebase = self.source_codebase();
+            let patch_deleted = source_codebase
                 .patch_class_likes
                 .values()
                 .map(|meta| meta.span.file_id)
-                .chain(self.codebase.patch_function_likes.values().map(|meta| meta.span.file_id))
-                .chain(self.codebase.patch_constants.values().map(|meta| meta.span.file_id))
+                .chain(source_codebase.patch_function_likes.values().map(|meta| meta.span.file_id))
+                .chain(source_codebase.patch_constants.values().map(|meta| meta.span.file_id))
                 .any(|file_id| !current_file_ids.contains(&file_id));
             if patch_deleted {
                 return self.analyze();
@@ -598,7 +622,7 @@ impl IncrementalAnalysisService {
             let mut new_sigs = CodebaseMetadata::new();
 
             for (file_id, metadata) in &new_file_scans {
-                if let Some(old_sig) = self.codebase.get_file_signature(file_id) {
+                if let Some(old_sig) = self.source_codebase().get_file_signature(file_id) {
                     old_sigs.set_file_signature(*file_id, old_sig.clone());
                 }
                 if let Some(new_sig) = metadata.file_signatures.get(file_id) {
@@ -608,7 +632,7 @@ impl IncrementalAnalysisService {
 
             for &file_id in self.file_states.keys() {
                 if !current_file_ids.contains(&file_id)
-                    && let Some(sig) = self.codebase.get_file_signature(&file_id)
+                    && let Some(sig) = self.source_codebase().get_file_signature(&file_id)
                 {
                     old_sigs.set_file_signature(file_id, sig.clone());
                 }
@@ -622,7 +646,7 @@ impl IncrementalAnalysisService {
 
         if !body_only {
             for &file_id in &unchanged_file_ids {
-                let Some(sig) = self.codebase.get_file_signature(&file_id) else {
+                let Some(sig) = self.source_codebase().get_file_signature(&file_id) else {
                     continue;
                 };
 
@@ -637,7 +661,7 @@ impl IncrementalAnalysisService {
         }
 
         if body_only {
-            let mut merged_codebase = std::mem::take(&mut self.codebase);
+            let mut merged_codebase = self.source_codebase.take().unwrap_or_else(|| std::mem::take(&mut self.codebase));
             // Two-pass update: remove all old entries first, then add all new entries.
             for (file_id, _new_metadata) in &new_file_scans {
                 if let Some(prev_state) = self.file_states.get(file_id) {
@@ -699,12 +723,15 @@ impl IncrementalAnalysisService {
                 HashSet::default(),
                 changed_symbols,
             );
-
             let SelectiveAnalysisOutput {
                 result: mut analysis_result,
                 mut per_file_issues,
                 snapshots,
                 codebase_issues: new_codebase_issues,
+                source_codebase,
+                external_mutations_changed,
+                external_mutation_symbols,
+                external_mutation_fingerprint,
             } = self.run_analyzer_selective(&mut merged_codebase, symbol_references, &self.settings, &files_to_skip)?;
             self.lifecycle_issues = std::mem::take(&mut analysis_result.issues);
             self.analysis_snapshots.retain(|file_id, _| current_file_ids.contains(file_id));
@@ -715,10 +742,15 @@ impl IncrementalAnalysisService {
             // Drain codebase issues from metadata and distribute to changed files only.
             // Unchanged files keep their cached codebase_issues from previous runs.
             let changed_file_ids: HashSet<FileId> = new_file_scans.iter().map(|(fid, _)| *fid).collect();
+            let re_analyzed_unchanged: Vec<FileId> = per_file_issues
+                .keys()
+                .filter(|file_id| self.file_states.contains_key(file_id) && !changed_file_ids.contains(file_id))
+                .copied()
+                .collect();
 
-            // Clear codebase issues for changed files (they'll be re-distributed below).
+            // Clear codebase issues for every file analyzed in this generation.
             for (file_id, state) in self.file_states.iter_mut() {
-                if changed_file_ids.contains(file_id) {
+                if external_mutations_changed || !files_to_skip.contains(file_id) {
                     state.codebase_issues = IssueCollection::default();
                 }
             }
@@ -726,6 +758,14 @@ impl IncrementalAnalysisService {
             // Keep orphan codebase issues; distribute file-attributable ones.
             self.codebase_issues = IssueCollection::default();
             self.distribute_codebase_issues(new_codebase_issues);
+
+            for file_id in re_analyzed_unchanged {
+                if let Some(issues) = per_file_issues.remove(&file_id)
+                    && let Some(state) = self.file_states.get_mut(&file_id)
+                {
+                    state.analysis_issues = issues;
+                }
+            }
 
             for (file_id, metadata) in new_file_scans {
                 let content_hash = file_hashes[&file_id];
@@ -739,14 +779,17 @@ impl IncrementalAnalysisService {
                     .insert(file_id, FileState { content_hash, entry_keys, analysis_issues, codebase_issues });
             }
 
+            self.source_codebase = source_codebase;
             self.codebase = merged_codebase;
             self.symbol_references = std::mem::take(&mut analysis_result.symbol_references);
+            self.external_mutation_symbols = external_mutation_symbols;
+            self.external_mutation_fingerprint = external_mutation_fingerprint;
             analysis_result.issues = self.collect_all_issues();
 
             return Ok(analysis_result);
         }
 
-        let mut merged_codebase = std::mem::take(&mut self.codebase);
+        let mut merged_codebase = self.source_codebase.take().unwrap_or_else(|| std::mem::take(&mut self.codebase));
 
         for (file_id, prev_state) in &self.file_states {
             if !current_file_ids.contains(file_id) {
@@ -833,7 +876,6 @@ impl IncrementalAnalysisService {
             safe_symbol_members,
             dirty_symbols,
         );
-
         let mut files_to_skip: HashSet<FileId> = HashSet::default();
         for &file_id in &unchanged_file_ids {
             if let Some(sig) = merged_codebase.get_file_signature(&file_id) {
@@ -915,6 +957,10 @@ impl IncrementalAnalysisService {
             mut per_file_issues,
             snapshots,
             codebase_issues: new_codebase_issues,
+            source_codebase,
+            external_mutations_changed,
+            external_mutation_symbols,
+            external_mutation_fingerprint,
         } = self.run_analyzer_selective(&mut merged_codebase, symbol_references, &self.settings, &files_to_skip)?;
         self.lifecycle_issues = std::mem::take(&mut analysis_result.issues);
         self.analysis_snapshots.retain(|file_id, _| current_file_ids.contains(file_id));
@@ -934,7 +980,7 @@ impl IncrementalAnalysisService {
         // Clear codebase issues for files that were NOT skipped (their symbols were re-populated).
         // Files in files_to_skip keep their old codebase_issues intact.
         for (file_id, state) in self.file_states.iter_mut() {
-            if !files_to_skip.contains(file_id) {
+            if external_mutations_changed || !files_to_skip.contains(file_id) {
                 state.codebase_issues = IssueCollection::default();
             }
         }
@@ -961,8 +1007,11 @@ impl IncrementalAnalysisService {
             self.file_states.insert(file_id, FileState { content_hash, entry_keys, analysis_issues, codebase_issues });
         }
 
+        self.source_codebase = source_codebase;
         self.codebase = merged_codebase;
         self.symbol_references = std::mem::take(&mut analysis_result.symbol_references);
+        self.external_mutation_symbols = external_mutation_symbols;
+        self.external_mutation_fingerprint = external_mutation_fingerprint;
 
         analysis_result.issues = self.collect_all_issues();
 
@@ -1068,13 +1117,6 @@ impl IncrementalAnalysisService {
         #[cfg(not(target_arch = "wasm32"))]
         const ANALYSIS_DURATION_THRESHOLD: Duration = Duration::from_secs(5);
 
-        let host_files: Vec<_> = self
-            .database
-            .files()
-            .filter(|f| f.file_type == FileType::Host && !skip_files.contains(&f.id))
-            .map(|f| self.database.get(&f.id))
-            .collect::<Result<Vec<_>, _>>()?;
-
         let plugin_registry = &self.plugin_registry;
         #[cfg(not(target_arch = "wasm32"))]
         let trace_enabled = tracing::enabled!(tracing::Level::TRACE);
@@ -1095,16 +1137,44 @@ impl IncrementalAnalysisService {
         let before_issues = plugin_registry
             .run_external_before_analysis_hooks(codebase, &mut current_symbol_references, external_session.as_deref())
             .map_err(mago_analyzer::error::AnalysisError::from)?;
+        let external_mutation_count = external_session.as_deref().map_or(0, ExternalAnalysisSession::mutation_count);
+        let (external_mutation_symbols, external_mutation_fingerprint, source_codebase) =
+            external_session.as_deref().filter(|_| external_mutation_count != 0).map_or_else(
+                || (HashSet::default(), 0, None),
+                |session| (session.mutated_symbols(), session.mutation_fingerprint(), session.take_source_codebase()),
+            );
+        let external_mutations_changed =
+            self.initialized && external_mutation_fingerprint != self.external_mutation_fingerprint;
+
+        if external_mutations_changed {
+            let mut dirty_symbols = self.external_mutation_symbols.clone();
+            dirty_symbols.extend(external_mutation_symbols.iter().copied());
+            current_symbol_references.remove_dirty_symbol_references(&dirty_symbols);
+            populate_codebase(codebase, &mut current_symbol_references, WordSet::default(), HashSet::default());
+        }
+
+        let no_skipped_files = HashSet::default();
+        let effective_skip_files = if external_mutations_changed { &no_skipped_files } else { skip_files };
+        let host_files: Vec<_> = self
+            .database
+            .files()
+            .filter(|file| file.file_type == FileType::Host && !effective_skip_files.contains(&file.id))
+            .map(|file| self.database.get(&file.id))
+            .collect::<Result<Vec<_>, _>>()?;
         #[cfg(not(target_arch = "wasm32"))]
         if let Some(start) = before_start {
             tracing::trace!(
                 issues = before_issues.len(),
+                mutations = external_mutation_count,
+                mutation_symbols = external_mutation_symbols.len(),
+                mutation_fingerprint = external_mutation_fingerprint,
+                mutations_changed = external_mutations_changed,
                 elapsed = ?start.elapsed(),
                 "Incremental external before-analysis hooks completed."
             );
         }
 
-        if host_files.is_empty() && skip_files.is_empty() {
+        if host_files.is_empty() && effective_skip_files.is_empty() {
             tracing::warn!("No host files found for analysis.");
         }
         let settings = settings.clone();
@@ -1243,7 +1313,7 @@ impl IncrementalAnalysisService {
                 project_result.issues.extend(issues.iter().cloned());
             }
             for (file_id, state) in &self.file_states {
-                if skip_files.contains(file_id) {
+                if effective_skip_files.contains(file_id) {
                     project_result.issues.extend(state.analysis_issues.iter().cloned());
                     project_result.issues.extend(state.codebase_issues.iter().cloned());
                 }
@@ -1276,7 +1346,16 @@ impl IncrementalAnalysisService {
             snapshots.clear();
         }
 
-        Ok(SelectiveAnalysisOutput { result: aggregated_result, per_file_issues, snapshots, codebase_issues })
+        Ok(SelectiveAnalysisOutput {
+            result: aggregated_result,
+            per_file_issues,
+            snapshots,
+            codebase_issues,
+            source_codebase,
+            external_mutations_changed,
+            external_mutation_symbols,
+            external_mutation_fingerprint,
+        })
     }
 }
 

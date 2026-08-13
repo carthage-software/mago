@@ -125,11 +125,9 @@ final class DemoAnalyzerPlugin implements Plugin
     }
 }
 
-$extension = new Extension(
+(new Worker(new Extension(
     identifier: 'mago/demo-extension',
     name: 'Mago analyzer extension fixture',
     version: '1.0.0',
     analyzerPlugins: [new DemoAnalyzerPlugin()],
-);
-
-(new Worker($extension))->run();
+)))->run();

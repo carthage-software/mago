@@ -809,7 +809,12 @@ mod tests {
     use crate::external::protocol::NestedRequestKind;
 
     fn session(generation: u64) -> ExternalAnalysisSession {
-        ExternalAnalysisSession { generation, sources: foldhash::HashMap::default() }
+        ExternalAnalysisSession {
+            generation,
+            sources: foldhash::HashMap::default(),
+            mutation_provenance: std::sync::Mutex::new(crate::external::mutation::MutationProvenance::default()),
+            source_codebase: std::sync::Mutex::new(None),
+        }
     }
 
     #[test]

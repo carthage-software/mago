@@ -7,9 +7,12 @@ namespace Mago\Tests\Sdk\Fixtures;
 use Mago\Sdk\Analyzer\BeforeAnalysisContext;
 use Mago\Sdk\Analyzer\BeforeAnalysisHook;
 use Mago\Sdk\Analyzer\Definition\ClassLikeDefinition;
+use Mago\Sdk\Analyzer\Definition\ConstantDefinition;
+use Mago\Sdk\Analyzer\Definition\FunctionDefinition;
 use Mago\Sdk\Analyzer\Plugin;
 use Mago\Sdk\Analyzer\PluginDefinition;
 use Mago\Sdk\Analyzer\PluginRegistry;
+use Mago\Sdk\Analyzer\Type;
 use Mago\Sdk\Extension;
 use Mago\Sdk\Worker;
 use RuntimeException;
@@ -23,6 +26,8 @@ final class FailingMutationHook implements BeforeAnalysisHook
     public function beforeAnalysis(BeforeAnalysisContext $context): void
     {
         $context->codebase->insertClassLike(new ClassLikeDefinition('MustRollBack'));
+        $context->codebase->insertFunction(new FunctionDefinition('must_roll_back', returnType: Type::int()));
+        $context->codebase->insertConstant(new ConstantDefinition('MUST_ROLL_BACK', Type::int()));
         throw new RuntimeException('Deliberate transaction failure.');
     }
 }

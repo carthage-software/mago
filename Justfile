@@ -48,6 +48,10 @@ fix:
 test:
     cargo test --workspace --locked --all-targets
 
+# Runs the PHP SDK test suite.
+test-sdk:
+    vendor/bin/phpunit --configuration composer/phpunit.xml
+
 # Fuzz the PHP lexer. Seeds are drawn from the syntax/analyzer/formatter PHP fixtures.
 fuzz-php-lexer:
     cd crates/syntax/fuzz && cargo +nightly fuzz run lexer \

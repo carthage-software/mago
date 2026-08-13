@@ -81,6 +81,14 @@ jobs:
         if: matrix.rust == 'stable' && matrix.os == 'ubuntu-latest'
         run: composer install
 
+      - name: Install just
+        if: matrix.rust == 'stable' && matrix.os == 'ubuntu-latest'
+        uses: extractions/setup-just@v4
+
+      - name: Test PHP SDK
+        if: matrix.rust == 'stable' && matrix.os == 'ubuntu-latest'
+        run: just test-sdk
+
       - name: Test external analyzer lifecycle SDK
         if: matrix.rust == 'stable' && matrix.os == 'ubuntu-latest'
         run: MAGO_REQUIRE_PHP_SDK_TESTS=1 cargo test --test external_analyzer_lifecycle --locked

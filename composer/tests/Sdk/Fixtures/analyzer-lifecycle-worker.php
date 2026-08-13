@@ -61,7 +61,7 @@ final class LifecycleProofHook implements BeforeAnalysisHook, AfterFileAnalysisH
     public function beforeAnalysis(BeforeAnalysisContext $context): void
     {
         if ($this->plugin === 'lifecycle-one') {
-            $class = $context->codebase->removeClassLike('ExtensionProvided') ?? new ClassLikeDefinition(
+            $class = new ClassLikeDefinition(
                 name: 'ExtensionProvided',
                 methods: [new MethodDefinition('answer', returnType: Type::int())],
                 properties: [new PropertyDefinition('$value', Type::int())],
@@ -73,17 +73,13 @@ final class LifecycleProofHook implements BeforeAnalysisHook, AfterFileAnalysisH
                 sealedMethods: true,
                 permittedInheritors: ['LifecycleClass0'],
             );
-            $function = $context->codebase->removeFunction('extension_answer') ?? new FunctionDefinition(
+            $function = new FunctionDefinition(
                 'extension_answer',
                 [new ParameterDefinition('$fallback', Type::int(), defaultType: Type::literalInt(0))],
                 Type::int(),
                 templates: [new TemplateDefinition('T', Type::mixed())],
             );
-            $constant = $context->codebase->removeConstant('EXTENSION_ANSWER') ?? new ConstantDefinition(
-                'EXTENSION_ANSWER',
-                Type::int(),
-                Type::literalInt(42),
-            );
+            $constant = new ConstantDefinition('EXTENSION_ANSWER', Type::int(), Type::literalInt(42));
             $context->codebase->insertClassLike($class);
             $context->codebase->insertFunction($function);
             $context->codebase->insertConstant($constant);

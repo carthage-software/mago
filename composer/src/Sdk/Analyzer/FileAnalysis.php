@@ -80,12 +80,14 @@ final class FileAnalysis
                     $missing,
                 ),
             );
+
             $types = Protocol::readOptionalAnalysisTypeQueryResponse(
                 $response,
                 $this->generation,
                 $this->file,
                 Protocol::GET_EXPRESSION_TYPES,
             );
+
             foreach (array_keys($missing) as $index => $key) {
                 $this->expressionTypes[$key] = $types[$index];
             }
@@ -148,6 +150,7 @@ final class FileAnalysis
                 $this->requestId,
                 Protocol::writeAnalysisTypeQuery($this->generation, $this->file, $operation),
             );
+
             $this->inferredTypes[$operation] = Protocol::readAnalysisTypeQueryResponse(
                 $response,
                 $this->generation,
