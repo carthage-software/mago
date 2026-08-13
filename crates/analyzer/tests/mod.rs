@@ -671,6 +671,7 @@ test_case!(match_true_and_false);
 test_case!(array_reconcile);
 test_case!(sealed_array_combine);
 test_case!(object_shape);
+test_case!(nullable_object_shape);
 test_case!(optional_object_with_properties);
 test_case!(unsealed_array_overlap);
 test_case!(echo_tag);
