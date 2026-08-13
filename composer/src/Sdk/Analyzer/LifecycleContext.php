@@ -14,8 +14,6 @@ use Mago\Sdk\Reporting\Level;
 /**
  * Common read-only state and diagnostic reporting for analyzer lifecycle hooks.
  *
- * @template-covariant TCodebase of Codebase
- *
  * @api
  */
 abstract class LifecycleContext
@@ -25,7 +23,6 @@ abstract class LifecycleContext
      */
     private array $issues = [];
 
-    /** @param TCodebase $codebase */
     public function __construct(
         public readonly PHPVersion $phpVersion,
         public readonly Codebase $codebase,

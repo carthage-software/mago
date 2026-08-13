@@ -8,7 +8,6 @@ use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
 use mago_codex::metadata::property::PropertyMetadata;
-use mago_codex::reference::SymbolReferences;
 use mago_codex::ttype::union::TUnion;
 use mago_database::file::File;
 use mago_syntax::cst::Class;
@@ -239,14 +238,13 @@ impl PluginRegistry {
     /// Returns an error when an external hook cannot be dispatched or returns an invalid response.
     pub fn run_external_before_analysis_hooks(
         &self,
-        codebase: &mut CodebaseMetadata,
-        symbol_references: &mut SymbolReferences,
+        codebase: &CodebaseMetadata,
         session: Option<&ExternalAnalysisSession>,
     ) -> PluginResult<IssueCollection> {
         self.external_analyzer
             .as_deref()
             .zip(session)
-            .map(|(analyzer, session)| analyzer.run_before_analysis_hooks(codebase, symbol_references, session))
+            .map(|(analyzer, session)| analyzer.run_before_analysis_hooks(codebase, session))
             .transpose()
             .map(Option::unwrap_or_default)
             .map_err(|reason| PluginError::Internal { reason })

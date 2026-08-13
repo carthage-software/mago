@@ -33,7 +33,7 @@ use function strtolower;
  * @mago-expect lint:kan-defect
  * @mago-expect lint:too-many-methods
  */
-class Codebase
+final class Codebase
 {
     /**
      * @internal
@@ -589,7 +589,7 @@ class Codebase
         }
 
         $bucketId = ($operation << 4) | ($classLikeKind ?? 0);
-        $bucket = $this->cache->enabled ? $this->cache->values[$bucketId] ?? [] : [];
+        $bucket = $this->cache->values[$bucketId] ?? [];
         $missingRequests = [];
         $missingKeys = [];
         foreach ($keys as $index => $key) {
@@ -627,9 +627,7 @@ class Codebase
             }
 
             $reader->finish();
-            if ($this->cache->enabled) {
-                $this->cache->values[$bucketId] = $bucket;
-            }
+            $this->cache->values[$bucketId] = $bucket;
         }
 
         $result = [];
@@ -646,7 +644,7 @@ class Codebase
     private function listNames(int $operation, ?int $classLikeKind = null): array
     {
         $bucketId = ($operation << 4) | ($classLikeKind ?? 0);
-        if ($this->cache->enabled && array_key_exists($bucketId, $this->cache->lists)) {
+        if (array_key_exists($bucketId, $this->cache->lists)) {
             return $this->cache->lists[$bucketId];
         }
 
@@ -654,9 +652,7 @@ class Codebase
         $payload = Protocol::writeCodebaseListRequest($this->cache->generation, $operation, $classLikeKind);
         $response = $this->host->request($this->parentRequestId, $payload);
         $names = Protocol::readCodebaseListResponse($response, $this->cache->generation, $operation, $classLikeKind);
-        if ($this->cache->enabled) {
-            $this->cache->lists[$bucketId] = $names;
-        }
+        $this->cache->lists[$bucketId] = $names;
 
         return $names;
     }
@@ -671,7 +667,7 @@ class Codebase
             return [];
         }
 
-        $bucket = $this->cache->enabled ? $this->cache->existence[$predicate] ?? [] : [];
+        $bucket = $this->cache->existence[$predicate] ?? [];
         $keys = [];
         $missingNames = [];
         $missingKeys = [];
@@ -703,9 +699,7 @@ class Codebase
                 );
             }
 
-            if ($this->cache->enabled) {
-                $this->cache->existence[$predicate] = $bucket;
-            }
+            $this->cache->existence[$predicate] = $bucket;
         }
 
         $result = [];
@@ -727,7 +721,7 @@ class Codebase
         }
 
         $bucketId = 256 | $predicate;
-        $bucket = $this->cache->enabled ? $this->cache->existence[$bucketId] ?? [] : [];
+        $bucket = $this->cache->existence[$bucketId] ?? [];
         $keys = [];
         $missingMembers = [];
         $missingKeys = [];
@@ -761,9 +755,7 @@ class Codebase
                 );
             }
 
-            if ($this->cache->enabled) {
-                $this->cache->existence[$bucketId] = $bucket;
-            }
+            $this->cache->existence[$bucketId] = $bucket;
         }
 
         $result = [];
@@ -784,7 +776,7 @@ class Codebase
             return [];
         }
 
-        $bucket = $this->cache->enabled ? $this->cache->relations[$relation] ?? [] : [];
+        $bucket = $this->cache->relations[$relation] ?? [];
         $keys = [];
         $missingNames = [];
         $missingKeys = [];
@@ -816,9 +808,7 @@ class Codebase
                 );
             }
 
-            if ($this->cache->enabled) {
-                $this->cache->relations[$relation] = $bucket;
-            }
+            $this->cache->relations[$relation] = $bucket;
         }
 
         $result = [];

@@ -130,11 +130,7 @@ impl AnalysisService {
             return issues;
         }
 
-        match self.plugin_registry.run_external_before_analysis_hooks(
-            &mut self.codebase,
-            &mut self.symbol_references,
-            external_session.as_ref(),
-        ) {
+        match self.plugin_registry.run_external_before_analysis_hooks(&self.codebase, external_session.as_ref()) {
             Ok(reported) => issues.extend(reported),
             Err(err) => {
                 issues.push(Issue::error(format!("Analysis error: {err}")));
@@ -245,18 +241,20 @@ impl AnalysisService {
         let telemetry_for_closure = Arc::clone(&telemetry);
 
         let result = pipeline.run(
-            move |codebase, symbol_references| {
+            move |codebase, _| {
                 before_plugin_registry.prepare_external_analyzer().map_err(AnalysisError::from)?;
                 let capabilities = (
                     before_plugin_registry.has_external_after_file_analysis_hooks().map_err(AnalysisError::from)?,
                     before_plugin_registry.has_external_after_analysis_hooks().map_err(AnalysisError::from)?,
                 );
+
                 let _result = before_capabilities.set(capabilities);
                 #[cfg(not(target_arch = "wasm32"))]
                 let lifecycle_start = trace_enabled.then(Instant::now);
                 let issues = before_plugin_registry
-                    .run_external_before_analysis_hooks(codebase, symbol_references, before_external_session.as_deref())
+                    .run_external_before_analysis_hooks(codebase, before_external_session.as_deref())
                     .map_err(AnalysisError::from)?;
+
                 #[cfg(not(target_arch = "wasm32"))]
                 if let Some(start) = lifecycle_start {
                     tracing::trace!(
@@ -265,6 +263,7 @@ impl AnalysisService {
                         "External before-analysis hooks completed."
                     );
                 }
+
                 if issues.is_empty() {
                     Ok(None)
                 } else {
@@ -309,6 +308,7 @@ impl AnalysisService {
                 if let Some(session) = external_session.as_deref() {
                     analyzer = analyzer.with_external_analysis_session(session);
                 }
+
                 #[cfg(not(target_arch = "wasm32"))]
                 if let Some(start) = analyzer_new_start {
                     telemetry_for_closure.analyzer_new_ns.fetch_add(start.elapsed().as_nanos() as u64, Relaxed);
@@ -329,6 +329,7 @@ impl AnalysisService {
                 if let Some(start) = analyze_start {
                     telemetry_for_closure.analyze_ns.fetch_add(start.elapsed().as_nanos() as u64, Relaxed);
                 }
+
                 #[cfg(not(target_arch = "wasm32"))]
                 if let Some(start) = per_file_start {
                     telemetry_for_closure.per_file_total_ns.fetch_add(start.elapsed().as_nanos() as u64, Relaxed);
@@ -354,11 +355,13 @@ impl AnalysisService {
                 } else {
                     None
                 };
+
                 #[cfg(not(target_arch = "wasm32"))]
                 if let Some(start) = snapshot_start {
                     telemetry_for_closure.snapshot_ns.fetch_add(start.elapsed().as_nanos() as u64, Relaxed);
                     telemetry_for_closure.snapshots.fetch_add(1, Relaxed);
                 }
+
                 Ok(AnalysisTaskResult { result: analysis_result, snapshot })
             },
         );

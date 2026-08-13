@@ -44,11 +44,14 @@ final class Issue
             throw new InvalidArgumentException('An issue message cannot be empty.');
         }
 
-        return new self($message, [], null, null, [new Annotation(
-            AnnotationKind::Primary,
-            $primarySpan,
-            $annotationMessage,
-        )], []);
+        return new self(
+            $message,
+            [],
+            null,
+            null,
+            [new Annotation(AnnotationKind::Primary, $primarySpan, $annotationMessage)],
+            [],
+        );
     }
 
     public static function at(string $message, SourceLocation $location, ?string $annotationMessage = null): self
@@ -57,12 +60,14 @@ final class Issue
             throw new InvalidArgumentException('An issue message cannot be empty.');
         }
 
-        return new self($message, [], null, null, [new Annotation(
-            AnnotationKind::Primary,
-            $location->span,
-            $annotationMessage,
-            $location->file,
-        )], []);
+        return new self(
+            $message,
+            [],
+            null,
+            null,
+            [new Annotation(AnnotationKind::Primary, $location->span, $annotationMessage, $location->file)],
+            [],
+        );
     }
 
     public function withNote(string $note): self
@@ -118,20 +123,19 @@ final class Issue
             $this->notes,
             $this->help,
             $this->link,
-            [...$this->annotations, new Annotation(AnnotationKind::Secondary, $location->span, $message, $location->file)],
+            [
+                ...$this->annotations,
+                new Annotation(AnnotationKind::Secondary, $location->span, $message, $location->file),
+            ],
             $this->edits,
         );
     }
 
     public function withEdit(TextEdit $edit): self
     {
-        return new self(
-            $this->message,
-            $this->notes,
-            $this->help,
-            $this->link,
-            $this->annotations,
-            [...$this->edits, $edit],
-        );
+        return new self($this->message, $this->notes, $this->help, $this->link, $this->annotations, [
+            ...$this->edits,
+            $edit,
+        ]);
     }
 }

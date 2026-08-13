@@ -220,13 +220,9 @@ final class Protocol
                     throw new ProtocolException('A linter text edit cannot target another file.');
                 }
 
-                $payload .= pack(
-                    'NNCN',
-                    $edit->span->start,
-                    $edit->span->end,
-                    $edit->safety->value,
-                    strlen($edit->newText),
-                ) . $edit->newText;
+                $payload .=
+                    pack('NNCN', $edit->span->start, $edit->span->end, $edit->safety->value, strlen($edit->newText))
+                    . $edit->newText;
             }
         }
 

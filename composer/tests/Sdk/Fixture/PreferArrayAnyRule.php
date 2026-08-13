@@ -35,10 +35,8 @@ final class PreferArrayAnyRule implements Rule
             return;
         }
 
-        $context->report(
-            Issue::new('Prefer array_any() over Psl\\Iter\\any().', $context->node->span)
-                ->withHelp('Replace this call with array_any().')
-                ->withEdit(TextEdit::replace($resolvedName->span, 'array_any')),
-        );
+        $context->report(Issue::new('Prefer array_any() over Psl\\Iter\\any().', $context->node->span)->withHelp(
+            'Replace this call with array_any().',
+        )->withEdit(TextEdit::replace($resolvedName->span, 'array_any')));
     }
 }

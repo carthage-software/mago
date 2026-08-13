@@ -10,8 +10,6 @@ use Mago\Sdk\PHPVersion;
 /**
  * Context passed after the whole analysis result has been merged.
  *
- * @extends LifecycleContext<Codebase>
- *
  * @api
  */
 final class AfterAnalysisContext extends LifecycleContext

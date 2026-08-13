@@ -269,6 +269,7 @@ where
                         replaced_classes.insert(*name);
                     }
                 }
+
                 for (scope, member) in partial.function_likes.keys().chain(partial.patch_function_likes.keys()) {
                     if member.is_empty() {
                         safe_symbols.remove(scope);
@@ -276,15 +277,18 @@ where
                         safe_symbol_members.remove(&(*scope, *member));
                     }
                 }
+
                 for name in partial.constants.keys().chain(partial.patch_constants.keys()) {
                     safe_symbols.remove(name);
                 }
 
                 merged_codex.extend(partial);
             }
+
             if let Some(replaced_classes) = replaced_classes {
                 safe_symbol_members.retain(|(scope, _)| !replaced_classes.contains(scope));
             }
+
             merged_codex.apply_patches_pass();
         });
 
@@ -311,11 +315,10 @@ where
             tracing::warn!("No host files found for analysis after compilation.");
             return self.reducer.reduce(merged_codex, symbol_references, before_map_result.into_iter().collect());
         }
+
         #[cfg(not(target_arch = "wasm32"))]
         let host_count = host_files.len();
-
         let final_codebase = Arc::new(merged_codex);
-
         let main_task_bar = if self.should_use_progress_bar {
             Some(create_progress_bar(host_files.len(), self.task_name, ProgressBarTheme::Green))
         } else {

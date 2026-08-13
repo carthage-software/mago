@@ -17,7 +17,6 @@ use function str_contains;
  * the project, but never analyzes, lints, formats, or fixes them as source files.
  *
  * @api
- * @mago-expect lint:cyclomatic-complexity
  */
 final class InitializationContext
 {

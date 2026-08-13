@@ -203,7 +203,6 @@ pub(super) struct ReturnTypeRequest<'type_info> {
 pub(super) enum NestedRequestKind {
     TypeComparison,
     CodebaseQuery,
-    CodebaseMutation,
     AnalysisQuery,
 }
 
