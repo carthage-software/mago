@@ -14,7 +14,6 @@ use mago_syntax::cst::FunctionLikeParameter;
 use mago_syntax::cst::FunctionLikeReturnTypeHint;
 use mago_syntax::cst::Hint;
 use mago_syntax::cst::Property;
-use mago_syntax::cst::PropertyItem;
 
 use crate::code::IssueCode;
 use crate::context::Context;
@@ -75,33 +74,12 @@ pub fn check_property_type_hint<'arena, A>(
         return;
     }
 
-    let hint = match property {
-        Property::Plain(plain) => plain.hint.as_ref(),
-        Property::Hooked(hooked) => hooked.hint.as_ref(),
-    };
-
     // If it already has a type hint, nothing to check
-    if hint.is_some() {
+    if property.hint().is_some() {
         return;
     }
 
-    let variables = match property {
-        Property::Plain(plain) => plain
-            .items
-            .iter()
-            .filter_map(
-                |item| {
-                    if let PropertyItem::Concrete(concrete) = item { Some(&concrete.variable) } else { None }
-                },
-            )
-            .collect::<Vec<_>>(),
-        Property::Hooked(hooked) => match &hooked.item {
-            PropertyItem::Concrete(concrete) => vec![&concrete.variable],
-            PropertyItem::Abstract(_) => vec![],
-        },
-    };
-
-    for variable in variables {
+    for variable in property.variables() {
         // Skip variables prefixed with `$_`
         if variable.name.starts_with(b"$_") {
             continue;
@@ -345,12 +323,7 @@ pub fn check_imprecise_property_type_hint<'arena, A>(
         return;
     }
 
-    let hint = match property {
-        Property::Plain(plain) => plain.hint.as_ref(),
-        Property::Hooked(hooked) => hooked.hint.as_ref(),
-    };
-
-    let Some(hint) = hint else {
+    let Some(hint) = property.hint() else {
         return;
     };
 
@@ -361,25 +334,13 @@ pub fn check_imprecise_property_type_hint<'arena, A>(
         return;
     }
 
-    let variables = match property {
-        Property::Plain(plain) => plain
-            .items
-            .iter()
-            .filter_map(|item| if let PropertyItem::Concrete(c) = item { Some(c.variable.name) } else { None })
-            .collect::<Vec<_>>(),
-        Property::Hooked(hooked) => match &hooked.item {
-            PropertyItem::Concrete(c) => vec![c.variable.name],
-            PropertyItem::Abstract(_) => vec![],
-        },
-    };
-
     let imprecise = collect_imprecise_hints(hint);
     if imprecise.is_empty() {
         return;
     }
 
-    for variable_name in variables {
-        let variable_name = BytesDisplay(variable_name);
+    for variable in property.variables() {
+        let variable_name = BytesDisplay(variable.name);
         for &(type_name, span) in &imprecise {
             report_imprecise_type(context, type_name, span, &format!("property `{variable_name}`"));
         }
