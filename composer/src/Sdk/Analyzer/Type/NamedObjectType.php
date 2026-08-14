@@ -5,6 +5,9 @@ declare(strict_types=1);
 namespace Mago\Sdk\Analyzer\Type;
 
 use Mago\Sdk\Analyzer\Type;
+use Mago\Sdk\Exception\InvalidArgumentException;
+
+use function count;
 
 /**
  * @api
@@ -25,7 +28,15 @@ final class NamedObjectType implements AtomicType
         public readonly bool $isThis,
         public readonly ?array $intersections,
         public readonly bool $remappedParameters,
-    ) {}
+    ) {
+        if ($name === '') {
+            throw new InvalidArgumentException('A named object type requires a non-empty class-like name.');
+        }
+
+        if ($parameters !== null && $variances !== null && count($parameters) !== count($variances)) {
+            throw new InvalidArgumentException('Named object type parameters and variances must have equal lengths.');
+        }
+    }
 
     public function __toString(): string
     {

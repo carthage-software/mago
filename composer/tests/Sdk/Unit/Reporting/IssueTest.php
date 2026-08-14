@@ -14,6 +14,13 @@ use PHPUnit\Framework\TestCase;
 
 final class IssueTest extends TestCase
 {
+    public function testSourceLocationRejectsAnEmptyFileName(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        new SourceLocation('', new Span(0, 0));
+    }
+
     public function testIssueRetainsImmutableSuggestedEdits(): void
     {
         $location = new SourceLocation('src/example.php', new Span(4, 8));

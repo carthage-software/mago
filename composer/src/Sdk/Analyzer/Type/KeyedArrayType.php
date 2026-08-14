@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace Mago\Sdk\Analyzer\Type;
 
 use Mago\Sdk\Analyzer\Type;
+use Mago\Sdk\Exception\InvalidArgumentException;
 
-/** @api */
+/**
+ * @api
+ */
 final class KeyedArrayType implements AtomicType
 {
     /** @param null|list<ArrayItem> $knownItems */
@@ -15,7 +18,11 @@ final class KeyedArrayType implements AtomicType
         public readonly ?Type $keyType,
         public readonly ?Type $valueType,
         public readonly bool $nonEmpty,
-    ) {}
+    ) {
+        if (($keyType === null) !== ($valueType === null)) {
+            throw new InvalidArgumentException('A keyed array fallback requires both its key and value types.');
+        }
+    }
 
     public function __toString(): string
     {

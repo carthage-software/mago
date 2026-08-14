@@ -5,8 +5,11 @@ declare(strict_types=1);
 namespace Mago\Sdk\Analyzer\Type;
 
 use Mago\Sdk\Analyzer\Type;
+use Mago\Sdk\Exception\InvalidArgumentException;
 
-/** @api */
+/**
+ * @api
+ */
 final class ListType implements AtomicType
 {
     /** @param null|list<ListElement> $knownElements */
@@ -15,7 +18,11 @@ final class ListType implements AtomicType
         public readonly ?array $knownElements,
         public readonly ?int $knownCount,
         public readonly bool $nonEmpty,
-    ) {}
+    ) {
+        if ($knownCount !== null && $knownCount < 0) {
+            throw new InvalidArgumentException('A known list count cannot be negative.');
+        }
+    }
 
     public function __toString(): string
     {
