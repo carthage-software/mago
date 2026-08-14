@@ -56,6 +56,7 @@ const MAXIMUM_NOTES_PER_ISSUE: usize = 0x0001_0000;
 pub(super) struct Registration {
     pub extensions: Vec<super::ExternalExtension>,
     pub rules: Vec<ExternalRule>,
+    pub has_worker_reducer: bool,
 }
 
 #[derive(Debug)]
@@ -221,10 +222,12 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
     let mut rules = Vec::new();
     let mut identifiers = HashSet::with_capacity(extension_count);
     let mut codes = HashSet::new();
+    let mut has_worker_reducer = false;
     for _ in 0..extension_count {
         let identifier = reader.read_string("extension identifier")?;
         let name = reader.read_string("extension name")?;
         let version = reader.read_string("extension version")?;
+        has_worker_reducer |= reader.read_bool("worker reducer flag")?;
         if identifier.is_empty() {
             return Err(protocol("extension identifier cannot be empty"));
         }
@@ -300,7 +303,7 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
     }
 
     reader.finish()?;
-    Ok(Registration { extensions, rules })
+    Ok(Registration { extensions, rules, has_worker_reducer })
 }
 
 pub(super) fn encode_lint_request<'arena>(
@@ -617,6 +620,7 @@ pub(super) mod testing {
             writer.write_string(identifier).unwrap();
             writer.write_string(extension_name).unwrap();
             writer.write_string(version).unwrap();
+            writer.write_bool(false);
             writer.write_length(rules.len()).unwrap();
             for (code, rule_name, description, level, enabled, targets) in *rules {
                 writer.write_string(code).unwrap();

@@ -722,7 +722,14 @@ impl ExternalAnalyzer<WorkerPool> {
         enabled_plugins: &[String],
         disable_defaults: bool,
     ) -> Result<Self, ExternalAnalyzerError> {
-        Self::initialize_transports(pools, php_version, enabled_plugins, disable_defaults)
+        let analyzer = Self::initialize_transports(pools, php_version, enabled_plugins, disable_defaults)?;
+        for backend in &analyzer.backends {
+            if backend.registration.has_worker_reducer {
+                backend.transport.enable_worker_reduction();
+            }
+        }
+
+        Ok(analyzer)
     }
 }
 

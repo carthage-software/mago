@@ -156,7 +156,14 @@ impl ExternalLinter<WorkerPool> {
         pools: impl IntoIterator<Item = Arc<WorkerPool>>,
         php_version: PHPVersion,
     ) -> Result<Self, ExternalLintError> {
-        Self::initialize_transports(pools, php_version)
+        let linter = Self::initialize_transports(pools, php_version)?;
+        for backend in &linter.backends {
+            if backend.registration.has_worker_reducer {
+                backend.transport.enable_worker_reduction();
+            }
+        }
+
+        Ok(linter)
     }
 }
 

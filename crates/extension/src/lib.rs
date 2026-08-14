@@ -11,6 +11,8 @@ pub mod pool;
 pub mod protocol;
 pub mod worker;
 
+mod reduction;
+
 pub use command::WorkerCommand;
 pub use error::PayloadError;
 pub use error::ProtocolError;

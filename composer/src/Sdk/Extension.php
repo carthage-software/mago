@@ -16,6 +16,7 @@ use function strtolower;
  *
  * @api
  * @mago-expect lint:cyclomatic-complexity
+ * @mago-expect lint:excessive-parameter-list
  */
 final class Extension
 {
@@ -42,6 +43,8 @@ final class Extension
     /** @var list<Plugin> */
     public readonly array $analyzerPlugins;
 
+    public readonly ?WorkerReducer $workerReducer;
+
     /**
      * @param string $identifier Stable, globally unique extension identifier.
      * @param string $name Human-readable extension name.
@@ -55,6 +58,7 @@ final class Extension
         string $version,
         array $linterRules = [],
         array $analyzerPlugins = [],
+        ?WorkerReducer $workerReducer = null,
     ) {
         if ($identifier === '') {
             throw new InvalidArgumentException('An extension identifier cannot be empty.');
@@ -97,5 +101,6 @@ final class Extension
         }
 
         $this->analyzerPlugins = $analyzerPlugins;
+        $this->workerReducer = $workerReducer;
     }
 }

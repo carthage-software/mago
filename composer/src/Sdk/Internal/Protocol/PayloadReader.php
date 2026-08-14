@@ -94,9 +94,9 @@ final class PayloadReader
 
     public function readI64(): int
     {
-        /** @var array{v: int} $decoded */
-        $decoded = unpack('Jv', $this->payload, $this->offset);
-        $value = $decoded['v'];
+        /** @var array{1: int} $decoded */
+        $decoded = unpack('J', $this->payload, $this->offset);
+        $value = $decoded[1];
         $this->offset += 8;
 
         return $value;
@@ -104,9 +104,9 @@ final class PayloadReader
 
     public function readF64(): float
     {
-        /** @var array{v: float} $decoded */
-        $decoded = unpack('Ev', $this->payload, $this->offset);
-        $value = $decoded['v'];
+        /** @var array{1: float} $decoded */
+        $decoded = unpack('E', $this->payload, $this->offset);
+        $value = $decoded[1];
         $this->offset += 8;
 
         return $value;

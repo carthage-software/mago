@@ -176,6 +176,7 @@ const SNAPSHOT_PLACEHOLDER: u8 = 17;
 pub(super) struct Registration {
     pub extensions: Vec<ExternalExtension>,
     pub plugins: Vec<ExternalPlugin>,
+    pub has_worker_reducer: bool,
     pub function_providers: Vec<FunctionProvider>,
     pub method_providers: Vec<MethodProvider>,
     pub initialization_plugins: Vec<u16>,
@@ -284,10 +285,12 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
     let mut before_analysis_plugins = Vec::new();
     let mut after_file_analysis_plugins = Vec::new();
     let mut after_analysis_plugins = Vec::new();
+    let mut has_worker_reducer = false;
     for _ in 0..extension_count {
         let extension_identifier = non_empty(reader.read_string("extension identifier")?, "extension identifier")?;
         let extension_name = non_empty(reader.read_string("extension name")?, "extension name")?;
         let extension_version = non_empty(reader.read_string("extension version")?, "extension version")?;
+        has_worker_reducer |= reader.read_bool("worker reducer flag")?;
         let plugin_count = reader.read_count("plugins", MAXIMUM_PLUGINS)?;
         let mut extension_plugins = Vec::with_capacity(plugin_count);
         for _ in 0..plugin_count {
@@ -406,6 +409,7 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
     Ok(Registration {
         extensions,
         plugins,
+        has_worker_reducer,
         function_providers,
         method_providers,
         initialization_plugins,
@@ -2028,6 +2032,7 @@ pub(super) mod testing {
         writer.write_string(extension).unwrap();
         writer.write_string("Demo").unwrap();
         writer.write_string("1.0.0").unwrap();
+        writer.write_bool(false);
         writer.write_u32(1);
         writer.write_string(identifier).unwrap();
         writer.write_string("Demo analyzer").unwrap();
@@ -2053,6 +2058,7 @@ pub(super) mod testing {
         writer.write_string("demo/extension").unwrap();
         writer.write_string("Demo").unwrap();
         writer.write_string("1.0.0").unwrap();
+        writer.write_bool(false);
         writer.write_u32(1);
         writer.write_string("demo").unwrap();
         writer.write_string("Demo analyzer").unwrap();

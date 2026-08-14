@@ -3,6 +3,7 @@ use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::MutexGuard;
 use std::sync::atomic::AtomicBool;
+use std::sync::atomic::AtomicU8;
 use std::sync::atomic::AtomicU64;
 use std::sync::atomic::AtomicUsize;
 use std::sync::atomic::Ordering;
@@ -11,6 +12,7 @@ use std::time::Instant;
 
 use crate::command::WorkerCommand;
 use crate::error::WorkerError;
+use crate::reduction;
 use crate::worker::Worker;
 use crate::worker::WorkerRequestHandler;
 
@@ -19,6 +21,10 @@ const WARMUP_REQUESTS: usize = 8;
 const GROWTH_SAMPLE_MULTIPLIER: usize = 2;
 const GROWTH_REQUEST_NANOS: u64 = 1_000_000;
 const SLOW_REQUEST_THRESHOLD: Duration = Duration::from_millis(10);
+const STATE_RUNNING: u8 = 0;
+const STATE_FINALIZING: u8 = 1;
+const STATE_STOPPING: u8 = 2;
+const STATE_STOPPED: u8 = 3;
 
 #[derive(Debug, Default)]
 struct PoolTelemetry {
@@ -95,7 +101,8 @@ pub struct WorkerPool {
     completed_requests: AtomicUsize,
     request_nanos: AtomicU64,
     cursor: AtomicUsize,
-    shutting_down: AtomicBool,
+    state: AtomicU8,
+    worker_reduction: AtomicBool,
     trace_enabled: bool,
     telemetry: PoolTelemetry,
     started_at: Option<Instant>,
@@ -125,7 +132,8 @@ impl std::fmt::Debug for WorkerPool {
             .field("completed_requests", &self.completed_requests.load(Ordering::Relaxed))
             .field("request_nanos", &self.request_nanos.load(Ordering::Relaxed))
             .field("cursor", &self.cursor.load(Ordering::Relaxed))
-            .field("shutting_down", &self.shutting_down.load(Ordering::Relaxed))
+            .field("state", &pool_state_name(self.state.load(Ordering::Relaxed)))
+            .field("worker_reduction", &self.worker_reduction.load(Ordering::Relaxed))
             .field("trace_enabled", &self.trace_enabled)
             .field("telemetry", &self.telemetry)
             .field("started_at", &self.started_at)
@@ -203,7 +211,8 @@ impl WorkerPool {
             completed_requests: AtomicUsize::new(0),
             request_nanos: AtomicU64::new(0),
             cursor: AtomicUsize::new(0),
-            shutting_down: AtomicBool::new(false),
+            state: AtomicU8::new(STATE_RUNNING),
+            worker_reduction: AtomicBool::new(false),
             trace_enabled,
             telemetry: PoolTelemetry::default(),
             started_at,
@@ -213,13 +222,27 @@ impl WorkerPool {
     /// Number of processes currently active in this pool.
     #[must_use]
     pub fn len(&self) -> usize {
-        if self.shutting_down.load(Ordering::Acquire) { 0 } else { self.active_workers.load(Ordering::Acquire) }
+        if self.state.load(Ordering::Acquire) == STATE_RUNNING {
+            self.active_workers.load(Ordering::Acquire)
+        } else {
+            0
+        }
     }
 
     /// Returns whether this pool has been shut down and can no longer serve requests.
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.shutting_down.load(Ordering::Acquire)
+        self.state.load(Ordering::Acquire) != STATE_RUNNING
+    }
+
+    /// Enables terminal worker-state reduction for this pool.
+    ///
+    /// Capability registration calls this only when at least one logical
+    /// extension advertises a worker reducer. Keeping it opt-in means ordinary
+    /// worker pools pay no shutdown request or payload cost.
+    pub fn enable_worker_reduction(&self) {
+        self.worker_reduction.store(true, Ordering::Release);
+        tracing::trace!(active_workers = self.active_workers.load(Ordering::Relaxed), "Enabled worker reduction.");
     }
 
     /// Sends a request through the least-loaded worker and blocks for its response.
@@ -342,12 +365,16 @@ impl WorkerPool {
     /// error is returned.
     pub fn broadcast(&self, payload: &[u8]) -> Result<Vec<Vec<u8>>, WorkerError> {
         let trace_start = self.trace_enabled.then(Instant::now);
-        if self.shutting_down.load(Ordering::Acquire) {
+        if self.state.load(Ordering::Acquire) != STATE_RUNNING {
             tracing::trace!(payload_bytes = payload.len(), "Rejected extension broadcast while pool is shutting down.");
             return Err(WorkerError::Unavailable);
         }
 
         let _initialization = lock(&self.growth);
+        if self.state.load(Ordering::Acquire) != STATE_RUNNING {
+            tracing::trace!(payload_bytes = payload.len(), "Rejected extension broadcast during pool finalization.");
+            return Err(WorkerError::Unavailable);
+        }
         let active_workers = self.active_workers.load(Ordering::Acquire);
         tracing::trace!(
             workers = active_workers,
@@ -439,7 +466,7 @@ impl WorkerPool {
     /// Gracefully stops every worker, then kills workers that exceed the
     /// configured shutdown grace period.
     pub fn shutdown(&self) {
-        if self.shutting_down.swap(true, Ordering::AcqRel) {
+        if self.state.compare_exchange(STATE_RUNNING, STATE_FINALIZING, Ordering::AcqRel, Ordering::Acquire).is_err() {
             return;
         }
 
@@ -487,9 +514,147 @@ impl WorkerPool {
             );
         }
 
-        let workers: Vec<_> =
-            self.workers.iter().filter_map(|slot| lock(&slot.worker).as_ref().map(Arc::clone)).collect();
-        for worker in &workers {
+        let _lifecycle = lock(&self.growth);
+        if self.worker_reduction.load(Ordering::Acquire)
+            && let Err(error) = self.reduce_worker_state()
+        {
+            tracing::warn!(error = %error, "Extension worker reduction failed; continuing pool shutdown.");
+        }
+
+        self.state.store(STATE_STOPPING, Ordering::Release);
+        let workers =
+            self.workers.iter().filter_map(|slot| lock(&slot.worker).as_ref().map(Arc::clone)).collect::<Vec<_>>();
+        self.shutdown_workers(&workers);
+        self.state.store(STATE_STOPPED, Ordering::Release);
+
+        tracing::trace!("Extension worker pool shut down.");
+    }
+
+    fn reduce_worker_state(&self) -> Result<(), WorkerError> {
+        let started_at = Instant::now();
+        let active_workers = self.active_workers.load(Ordering::Acquire);
+        let workers = (0..active_workers)
+            .map(|index| {
+                let worker = lock(&self.workers[index].worker).as_ref().map(Arc::clone).ok_or_else(|| {
+                    WorkerError::Reduction { worker: index, message: "active worker slot is empty".to_string() }
+                })?;
+                if !worker.is_running() {
+                    return Err(WorkerError::Reduction {
+                        worker: index,
+                        message: "worker stopped before its state could be collected".to_string(),
+                    });
+                }
+
+                Ok(worker)
+            })
+            .collect::<Result<Vec<_>, _>>()?;
+
+        let drain_started_at = Instant::now();
+        while workers.iter().any(|worker| worker.in_flight() != 0) {
+            std::thread::sleep(Duration::from_micros(100));
+        }
+        tracing::trace!(
+            workers = workers.len(),
+            elapsed = ?drain_started_at.elapsed(),
+            "Drained extension requests before worker reduction."
+        );
+
+        let request = reduction::collect_request();
+        tracing::trace!(
+            workers = workers.len(),
+            request_bytes = request.len(),
+            "Collecting process-local extension state from workers."
+        );
+        let results = std::thread::scope(|scope| {
+            workers
+                .iter()
+                .enumerate()
+                .map(|(index, worker)| {
+                    let request = request.clone();
+                    (index, scope.spawn(move || worker.request(request)))
+                })
+                .collect::<Vec<_>>()
+                .into_iter()
+                .map(|(index, handle)| (index, handle.join()))
+                .collect::<Vec<_>>()
+        });
+
+        let mut responses = vec![None; workers.len()];
+        let mut reducers = None;
+        let mut first_error = None;
+        for (index, result) in results {
+            let Ok(result) = result else {
+                first_error.get_or_insert(WorkerError::CoordinatorPanic { worker: index });
+                continue;
+            };
+
+            match result {
+                Ok(response) => match reduction::decode_collect_response(index, &response) {
+                    Ok(worker_has_reducers) => {
+                        if reducers.is_some_and(|reducers| reducers != worker_has_reducers) {
+                            first_error.get_or_insert_with(|| WorkerError::Reduction {
+                                worker: index,
+                                message: "workers advertised inconsistent reducer registrations".to_string(),
+                            });
+                        } else {
+                            reducers = Some(worker_has_reducers);
+                            responses[index] = Some(response);
+                        }
+                    }
+                    Err(error) => {
+                        first_error.get_or_insert(error);
+                    }
+                },
+                Err(error) => {
+                    first_error.get_or_insert(error);
+                }
+            }
+        }
+
+        if let Some(error) = first_error {
+            return Err(error);
+        }
+
+        if reducers != Some(true) {
+            tracing::trace!(workers = workers.len(), "No worker reducer data was collected.");
+            return Ok(());
+        }
+
+        let responses = responses.into_iter().flatten().collect::<Vec<_>>();
+        let leader = &workers[0];
+        let leader_index = leader.id();
+        let followers = &workers[1..];
+        let request = reduction::reduce_request(leader_index, &responses, self.options.maximum_payload_size)?;
+        let response_bytes = responses.iter().map(Vec::len).sum::<usize>();
+        tracing::trace!(
+            leader = leader_index,
+            followers = followers.len(),
+            "Stopping follower extension workers before reduction."
+        );
+        self.shutdown_workers(followers);
+
+        tracing::trace!(
+            leader = leader_index,
+            workers = responses.len(),
+            collected_bytes = response_bytes,
+            request_bytes = request.len(),
+            "Sending the complete worker reduction batch to the surviving worker."
+        );
+        let response = leader.request(request)?;
+        reduction::decode_reduce_response(leader_index, &response)?;
+        tracing::trace!(
+            leader = leader_index,
+            workers = responses.len(),
+            collected_bytes = response_bytes,
+            elapsed = ?started_at.elapsed(),
+            "Extension worker reduction completed."
+        );
+
+        Ok(())
+    }
+
+    fn shutdown_workers(&self, workers: &[Arc<Worker>]) {
+        for worker in workers {
             worker.begin_shutdown();
         }
 
@@ -497,12 +662,10 @@ impl WorkerPool {
         for worker in workers {
             worker.finish_shutdown(started_at, self.options.shutdown_timeout);
         }
-
-        tracing::trace!("Extension worker pool shut down.");
     }
 
     fn reserve_worker(&self) -> Result<(usize, crate::worker::WorkerReservation), WorkerError> {
-        if self.shutting_down.load(Ordering::Acquire) {
+        if self.state.load(Ordering::Acquire) != STATE_RUNNING {
             return Err(WorkerError::Unavailable);
         }
 
@@ -542,10 +705,20 @@ impl WorkerPool {
             && self.should_grow(active_workers)
             && let Some((index, worker)) = self.try_grow(active_workers)?
         {
-            return Ok((index, worker.reserve()));
+            let reservation = worker.reserve();
+            if self.state.load(Ordering::Acquire) != STATE_RUNNING {
+                return Err(WorkerError::Unavailable);
+            }
+
+            return Ok((index, reservation));
         }
 
-        Ok((index, worker.reserve()))
+        let reservation = worker.reserve();
+        if self.state.load(Ordering::Acquire) != STATE_RUNNING {
+            return Err(WorkerError::Unavailable);
+        }
+
+        Ok((index, reservation))
     }
 
     fn ensure_running(&self, index: usize) -> Result<Arc<Worker>, WorkerError> {
@@ -564,7 +737,7 @@ impl WorkerPool {
         reservation: &crate::worker::WorkerReservation,
         result: &Result<Vec<u8>, WorkerError>,
     ) -> Result<(), WorkerError> {
-        if result.is_ok() || reservation.worker().is_running() || self.shutting_down.load(Ordering::Acquire) {
+        if result.is_ok() || reservation.worker().is_running() || self.state.load(Ordering::Acquire) != STATE_RUNNING {
             return Ok(());
         }
 
@@ -614,6 +787,9 @@ impl WorkerPool {
         let Ok(_growth) = self.growth.try_lock() else {
             return Ok(None);
         };
+        if self.state.load(Ordering::Acquire) != STATE_RUNNING {
+            return Ok(None);
+        }
         let active_workers = self.active_workers.load(Ordering::Acquire);
         if active_workers != observed_workers
             || active_workers >= self.workers.len()
@@ -758,6 +934,16 @@ fn nanos_millis(nanos: u64) -> f64 {
 
 fn average_micros(nanos: u64, count: u64) -> u64 {
     nanos.checked_div(count).unwrap_or(0) / 1_000
+}
+
+fn pool_state_name(state: u8) -> &'static str {
+    match state {
+        STATE_RUNNING => "running",
+        STATE_FINALIZING => "finalizing",
+        STATE_STOPPING => "stopping",
+        STATE_STOPPED => "stopped",
+        _ => "unknown",
+    }
 }
 
 #[cfg(test)]

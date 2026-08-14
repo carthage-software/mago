@@ -54,8 +54,10 @@ final class TypeConstructionTest extends TestCase
             static fn(): object => new NamedObjectType('', null, null, false, false, null, false),
             static fn(): object => new FunctionLikeIdentifier(FunctionLikeKind::Method, 'run'),
             static fn(): object => new FunctionLikeIdentifier(FunctionLikeKind::Function_, 'run', 'Example'),
+            static fn(): object => new GenericParent(GenericParentKind::ClassLike, ''),
             static fn(): object => new GenericParent(GenericParentKind::ClassLike, 'Example', 'run'),
             static fn(): object => new GenericParent(GenericParentKind::FunctionLike, 'run'),
+            static fn(): object => new GenericParent(GenericParentKind::FunctionLike, 'Example', ''),
         ];
 
         foreach ($invalid as $construct) {
@@ -66,5 +68,13 @@ final class TypeConstructionTest extends TestCase
                 self::assertNotSame('', $exception->getMessage());
             }
         }
+    }
+
+    public function testGlobalFunctionGenericParentAllowsAnEmptyClassComponent(): void
+    {
+        $parent = new GenericParent(GenericParentKind::FunctionLike, '', 'run');
+
+        self::assertSame('', $parent->name);
+        self::assertSame('run', $parent->member);
     }
 }

@@ -91,6 +91,7 @@ final class Protocol
             $writer->writeString($extension->identifier);
             $writer->writeString($extension->name);
             $writer->writeString($extension->version);
+            $writer->writeBoolean($extension->workerReducer !== null);
             $writer->writeCount($extension->linterRules);
             foreach ($extension->linterRules as $rule) {
                 $definition = $rule->getDefinition();

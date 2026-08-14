@@ -202,6 +202,7 @@ final class Protocol
             $writer->writeString($extension->identifier);
             $writer->writeString($extension->name);
             $writer->writeString($extension->version);
+            $writer->writeBoolean($extension->workerReducer !== null);
             $extensionPlugins = $byExtension[$extension->identifier] ?? [];
             $writer->writeCount($extensionPlugins);
             foreach ($extensionPlugins as $plugin) {

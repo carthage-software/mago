@@ -32,6 +32,7 @@ use Mago\Sdk\Internal\Protocol\FrameCodec;
 use Mago\Sdk\Internal\Protocol\FrameKind;
 use Mago\Sdk\Internal\Protocol\PayloadReader;
 use Mago\Sdk\Internal\SignalCancellationToken;
+use Mago\Sdk\Internal\Worker\Protocol as WorkerProtocol;
 use Mago\Sdk\Linter\LintContext;
 use Mago\Sdk\Syntax\NodeKind;
 use Revolt\EventLoop;
@@ -59,6 +60,8 @@ use const STDOUT;
  * @api
  * @mago-expect lint:cyclomatic-complexity
  * @mago-expect lint:kan-defect
+ * @mago-expect lint:too-many-methods
+ * @mago-expect lint:too-many-properties
  */
 final class Worker
 {
@@ -74,6 +77,9 @@ final class Worker
 
     /** @var list<RegisteredPlugin> */
     private readonly array $analyzerPlugins;
+
+    /** @var list<int<0, max>> */
+    private readonly array $workerReducerIndices;
 
     /** @var list<RegisteredFunctionReturnTypeProvider> */
     private readonly array $functionReturnTypeProviders;
@@ -110,7 +116,8 @@ final class Worker
         $registeredPlugins = [];
         $functionProviders = [];
         $methodProviders = [];
-        foreach ($extensions as $registeredExtension) {
+        $workerReducerIndices = [];
+        foreach ($extensions as $extensionIndex => $registeredExtension) {
             $normalizedExtensionIdentifier = strtolower($registeredExtension->identifier);
             if (array_key_exists($normalizedExtensionIdentifier, $extensionIdentifiers)) {
                 throw new InvalidArgumentException(
@@ -119,6 +126,10 @@ final class Worker
             }
 
             $extensionIdentifiers[$normalizedExtensionIdentifier] = true;
+            if ($registeredExtension->workerReducer !== null) {
+                $workerReducerIndices[] = $extensionIndex;
+            }
+
             foreach ($registeredExtension->linterRules as $rule) {
                 $definition = $rule->getDefinition();
                 if (array_key_exists($definition->code, $ruleCodes)) {
@@ -221,6 +232,7 @@ final class Worker
         $this->extensions = $extensions;
         $this->rules = $rules;
         $this->analyzerPlugins = $registeredPlugins;
+        $this->workerReducerIndices = $workerReducerIndices;
         $this->functionReturnTypeProviders = $functionProviders;
         $this->methodReturnTypeProviders = $methodProviders;
     }
@@ -332,7 +344,58 @@ final class Worker
             return $this->handleAnalyzerRequest($payload, $requestId, $host, $cancellation);
         }
 
+        if (strncmp($payload, 'MEXT', 4) === 0) {
+            return $this->handleWorkerRequest($payload, $cancellation);
+        }
+
         throw new ProtocolException('Unknown Mago extension capability protocol.');
+    }
+
+    private function handleWorkerRequest(string $payload, CancellationTokenInterface $cancellation): string
+    {
+        [$kind, $reader] = WorkerProtocol::readRequest($payload);
+        if ($kind === WorkerProtocol::COLLECT_REQUEST) {
+            $reader->finish();
+            $payloads = [];
+            foreach ($this->workerReducerIndices as $extensionIndex) {
+                $cancellation->throwIfCancelled();
+                $extension = $this->extensions[$extensionIndex];
+                try {
+                    $payloads[$extensionIndex] = $extension->workerReducer?->collect() ?? '';
+                } catch (CancelledException $exception) {
+                    throw $exception;
+                } catch (Throwable $throwable) {
+                    throw new ProtocolException(
+                        "Worker reducer for extension `{$extension->identifier}` failed to collect: {$throwable->getMessage()}",
+                        0,
+                        $throwable,
+                    );
+                }
+            }
+
+            return WorkerProtocol::writeCollectResponse($payloads);
+        }
+
+        $payloadsByExtension = WorkerProtocol::readReduceRequest($reader, $this->workerReducerIndices);
+        foreach ($this->workerReducerIndices as $extensionIndex) {
+            $cancellation->throwIfCancelled();
+            $extension = $this->extensions[$extensionIndex];
+            try {
+                $extension->workerReducer?->reduce(
+                    new WorkerReductionContext($payloadsByExtension[$extensionIndex], $cancellation),
+                );
+            } catch (CancelledException $exception) {
+                throw $exception;
+            } catch (Throwable $throwable) {
+                throw new ProtocolException(
+                    "Worker reducer for extension `{$extension->identifier}` failed to reduce: {$throwable->getMessage()}",
+                    0,
+                    $throwable,
+                );
+            }
+        }
+
+        return WorkerProtocol::writeReduceResponse();
     }
 
     private function handleLinterRequest(string $payload, CancellationTokenInterface $cancellation): string

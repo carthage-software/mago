@@ -125,6 +125,8 @@ pub enum WorkerError {
     Disconnected { worker: usize, message: String },
     /// A lazily started worker advertised different initialization state.
     InconsistentInitialization { worker: usize },
+    /// Terminal state reduction could not complete for a worker.
+    Reduction { worker: usize, message: String },
     /// No live worker was available.
     Unavailable,
     /// A failed worker could not be replaced.
@@ -179,6 +181,9 @@ impl std::fmt::Display for WorkerError {
             }
             Self::InconsistentInitialization { worker } => {
                 write!(formatter, "extension worker {worker} returned inconsistent initialization state")
+            }
+            Self::Reduction { worker, message } => {
+                write!(formatter, "extension worker {worker} reduction failed: {message}")
             }
             Self::Unavailable => formatter.write_str("no extension worker is available"),
             Self::Restart { worker, source } => {
