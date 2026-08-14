@@ -230,8 +230,6 @@ impl<'arena> DocblockLexer<'arena> {
                 consumed_hyphen = true;
             }
 
-            // `scan_identifier` skips its first byte, trusting the caller to have validated it,
-            // so re-entering it after a trailing hyphen would swallow whatever follows.
             if !consumed_hyphen || !remaining.get(length).is_some_and(is_part_of_identifier) {
                 break;
             }
