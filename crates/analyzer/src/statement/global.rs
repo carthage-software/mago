@@ -17,6 +17,7 @@ use crate::context::block::BlockContext;
 use crate::context::block::ReferenceConstraint;
 use crate::context::block::ReferenceConstraintSource;
 use crate::error::AnalysisError;
+use crate::utils::docblock::get_type_from_var_docblock;
 use crate::utils::expression::get_variable_id;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Global<'arena> {
@@ -24,7 +25,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Global<'arena> {
         &'ast self,
         context: &mut Context<'ctx, 'arena, A>,
         block_context: &mut BlockContext<'ctx>,
-        _artifacts: &mut AnalysisArtifacts,
+        artifacts: &mut AnalysisArtifacts,
     ) -> Result<(), AnalysisError>
     where
         A: Arena,
@@ -52,15 +53,33 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Global<'arena> {
 
             let var_id_atom = mago_word::word(var_id);
             let is_argc_or_argv = var_id == b"$argc" || var_id == b"$argv";
-            let global_type = get_global_variable_type(var_id).unwrap_or_else(|| Rc::new(get_mixed()));
+            let known_type = get_global_variable_type(var_id);
+            let docblock_type =
+                get_type_from_var_docblock(context, block_context, artifacts, Some(var_id), self.variables.len() == 1)
+                    .map(|(docblock_type, docblock_type_span)| (Rc::new(docblock_type), docblock_type_span));
 
-            block_context.locals.insert(var_id_atom, global_type);
+            // Incompatibilities between the docblock and a known superglobal type are already
+            // reported by the generic `@var` pass, which sees them in scope before this point.
+            let variable_type = match (&docblock_type, known_type) {
+                (Some((docblock_type, _)), _) => Rc::clone(docblock_type),
+                (None, Some(known_type)) => known_type,
+                (None, None) => Rc::new(get_mixed()),
+            };
+
+            block_context.locals.insert(var_id_atom, variable_type);
 
             if !is_argc_or_argv {
                 block_context.variables_possibly_in_scope.insert(var_id_atom);
                 block_context.by_reference_constraints.insert(
                     var_id_atom,
-                    ReferenceConstraint::new(variable.span(), ReferenceConstraintSource::Global, None),
+                    match &docblock_type {
+                        Some((docblock_type, docblock_type_span)) => ReferenceConstraint::new(
+                            *docblock_type_span,
+                            ReferenceConstraintSource::Global,
+                            Some(Rc::clone(docblock_type)),
+                        ),
+                        None => ReferenceConstraint::new(variable.span(), ReferenceConstraintSource::Global, None),
+                    },
                 );
             }
 

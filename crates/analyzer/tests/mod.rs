@@ -676,6 +676,7 @@ test_case!(optional_object_with_properties);
 test_case!(unsealed_array_overlap);
 test_case!(echo_tag);
 test_case!(var_docblock);
+test_case!(var_docblock_on_global);
 test_case!(redundant_var_docblock);
 test_case!(magic_method_trait);
 test_case!(real_pseudo_method);
