@@ -22,6 +22,9 @@ use mago_reporting::Level;
 use mago_syntax::cst::NodeKind;
 use mago_syntax::cst::Program;
 
+use crate::rule::AnyRule;
+use crate::settings::Settings;
+
 pub use error::ExternalLintError;
 use protocol::Registration;
 
@@ -65,7 +68,7 @@ pub struct ExternalRule {
     pub name: String,
     /// Short rule description.
     pub description: String,
-    /// Severity used unless extension configuration overrides it.
+    /// Severity assigned to issues reported by this rule.
     pub default_level: Level,
     /// Whether the rule runs when no `--only` filter is present.
     pub default_enabled: bool,
@@ -101,6 +104,31 @@ impl LinterTransport for WorkerPool {
 struct Backend<T> {
     transport: Arc<T>,
     registration: Registration,
+    default_plan: ActiveRulePlan,
+}
+
+#[derive(Debug)]
+struct ActiveRulePlan {
+    indices: Box<[u16]>,
+    targets: [bool; u8::MAX as usize + 1],
+}
+
+impl ActiveRulePlan {
+    fn build(rules: &[ExternalRule], enabled: impl Fn(&ExternalRule) -> bool) -> Result<Self, ExternalLintError> {
+        let mut indices = Vec::new();
+        let mut targets = [false; u8::MAX as usize + 1];
+        for (index, rule) in rules.iter().enumerate().filter(|(_, rule)| enabled(rule)) {
+            let index = u16::try_from(index).map_err(|_| {
+                ExternalLintError::Protocol("worker registered more than 65,536 linter rules".to_string())
+            })?;
+            indices.push(index);
+            for target in &rule.targets {
+                targets[*target as usize] = true;
+            }
+        }
+
+        Ok(Self { indices: indices.into_boxed_slice(), targets })
+    }
 }
 
 /// A set of custom linter rules backed by one or more extension worker pools.
@@ -174,19 +202,15 @@ impl<T> ExternalLinter<T> {
             if self.trace_enabled {
                 self.telemetry.backend_checks.fetch_add(1, Ordering::Relaxed);
             }
-            let mut active_rule_indices = Vec::new();
-            let mut target_kinds = [false; u8::MAX as usize + 1];
-            for (rule_index, rule) in backend.registration.rules.iter().enumerate() {
-                if only.map_or(rule.default_enabled, |codes| codes.iter().any(|code| code == &rule.code)) {
-                    let rule_index = u16::try_from(rule_index).map_err(|_| {
-                        ExternalLintError::Protocol("worker registered more than u16::MAX linter rules".to_string())
-                    })?;
-                    active_rule_indices.push(rule_index);
-                    for target in &rule.targets {
-                        target_kinds[*target as usize] = true;
-                    }
-                }
-            }
+            let selected_plan = only
+                .map(|codes| {
+                    ActiveRulePlan::build(&backend.registration.rules, |rule| {
+                        codes.iter().any(|code| code == &rule.code)
+                    })
+                })
+                .transpose()?;
+            let plan = selected_plan.as_ref().unwrap_or(&backend.default_plan);
+            let active_rule_indices = &plan.indices;
 
             if active_rule_indices.is_empty() {
                 if self.trace_enabled {
@@ -200,8 +224,8 @@ impl<T> ExternalLinter<T> {
                 file,
                 program,
                 resolved_names,
-                &active_rule_indices,
-                &target_kinds,
+                active_rule_indices,
+                &plan.targets,
                 self.trace_enabled,
             );
             if let Some(start) = encode_start {
@@ -251,7 +275,7 @@ impl<T> ExternalLinter<T> {
             }
             let decode_start = self.trace_enabled.then(Instant::now);
             let backend_issues =
-                protocol::decode_lint_response(&response, file, &backend.registration.rules, &active_rule_indices)
+                protocol::decode_lint_response(&response, file, &backend.registration.rules, active_rule_indices)
                     .inspect_err(|_| {
                         if self.trace_enabled {
                             self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
@@ -305,7 +329,11 @@ impl<T> ExternalLinter<T> {
         let mut extensions = Vec::new();
         let mut rules = Vec::new();
         let mut extension_identifiers = HashSet::new();
-        let mut rule_codes = HashSet::new();
+        let native_settings = Settings { php_version, ..Settings::default() };
+        let mut rule_codes = AnyRule::get_all_for(&native_settings, None, true)
+            .into_iter()
+            .map(|(rule, _)| rule.code().to_string())
+            .collect::<HashSet<_>>();
 
         for (backend_index, transport) in transports.into_iter().enumerate() {
             let backend_start = trace_enabled.then(Instant::now);
@@ -328,7 +356,7 @@ impl<T> ExternalLinter<T> {
             }
 
             for extension in &registration.extensions {
-                if !extension_identifiers.insert(extension.identifier.clone()) {
+                if !extension_identifiers.insert(extension.identifier.to_ascii_lowercase()) {
                     return Err(ExternalLintError::DuplicateExtension(extension.identifier.clone()));
                 }
             }
@@ -352,7 +380,8 @@ impl<T> ExternalLinter<T> {
                     "External linter backend registered."
                 );
             }
-            backends.push(Backend { transport, registration });
+            let default_plan = ActiveRulePlan::build(&registration.rules, |rule| rule.default_enabled)?;
+            backends.push(Backend { transport, registration, default_plan });
         }
 
         let linter = Self {
@@ -648,6 +677,52 @@ mod tests {
 
         let result = ExternalLinter::initialize_transports([Arc::new(InconsistentTransport)], PHPVersion::PHP85);
         assert!(matches!(result, Err(ExternalLintError::InconsistentRegistration)));
+    }
+
+    #[test]
+    fn rejects_case_insensitive_duplicate_extension_identifiers() {
+        let first = Arc::new(MockTransport {
+            registration: testing::describe_response("Acme/Tools", "Acme", "1", &[]),
+            response: testing::lint_response(&[]),
+            request: Mutex::new(None),
+            workers: 1,
+        });
+        let second = Arc::new(MockTransport {
+            registration: testing::describe_response("acme/tools", "Acme", "2", &[]),
+            response: testing::lint_response(&[]),
+            request: Mutex::new(None),
+            workers: 1,
+        });
+
+        let result = ExternalLinter::initialize_transports([first, second], PHPVersion::PHP85);
+
+        assert!(matches!(result, Err(ExternalLintError::DuplicateExtension(identifier)) if identifier == "acme/tools"));
+    }
+
+    #[test]
+    fn rejects_issue_codes_owned_by_native_rules() {
+        let transport = Arc::new(MockTransport {
+            registration: testing::describe_response(
+                "acme/tools",
+                "Acme",
+                "1",
+                &[(
+                    "array-style",
+                    "Conflicting rule",
+                    "Attempts to shadow a native rule.",
+                    Level::Warning,
+                    true,
+                    &[NodeKind::Array],
+                )],
+            ),
+            response: testing::lint_response(&[]),
+            request: Mutex::new(None),
+            workers: 1,
+        });
+
+        let result = ExternalLinter::initialize_transports([transport], PHPVersion::PHP85);
+
+        assert!(matches!(result, Err(ExternalLintError::DuplicateRule(code)) if code == "array-style"));
     }
 
     #[test]

@@ -2022,6 +2022,27 @@ pub(super) mod testing {
         registration_response_with_lifecycle(0)
     }
 
+    pub fn registration_response_with_plugin(extension: &str, identifier: &str, aliases: &[&str]) -> Vec<u8> {
+        let mut writer = message_writer(DESCRIBE_RESPONSE);
+        writer.write_u32(1);
+        writer.write_string(extension).unwrap();
+        writer.write_string("Demo").unwrap();
+        writer.write_string("1.0.0").unwrap();
+        writer.write_u32(1);
+        writer.write_string(identifier).unwrap();
+        writer.write_string("Demo analyzer").unwrap();
+        writer.write_string("Test provider").unwrap();
+        writer.write_bool(true);
+        writer.write_u8(0);
+        writer.write_u32(aliases.len() as u32);
+        for alias in aliases {
+            writer.write_string(alias).unwrap();
+        }
+        writer.write_u32(0);
+        writer.write_u32(0);
+        writer.finish()
+    }
+
     pub fn registration_response_with_initialization() -> Vec<u8> {
         registration_response_with_lifecycle(8)
     }

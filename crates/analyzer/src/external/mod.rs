@@ -1,6 +1,7 @@
 //! Worker-backed analyzer plugins.
 
 use std::borrow::Cow;
+use std::collections::HashMap;
 use std::collections::HashSet;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -23,10 +24,14 @@ use mago_extension::WorkerPool;
 use mago_extension::WorkerRequestHandler;
 use mago_php_version::PHPVersion;
 use mago_reporting::IssueCollection;
+use mago_word::WordMap;
+use mago_word::ascii_lowercase_word;
+use mago_word::concat_word;
 use mago_word::starts_with_ignore_case;
 
 use crate::artifacts::AnalysisArtifacts;
 use crate::invocation::Invocation;
+use crate::plugin::available_plugins;
 
 pub use error::ExternalAnalyzerError;
 pub use lifecycle::AFTER_FILE_ANALYSIS_BATCH_SIZE;
@@ -345,6 +350,33 @@ impl ProviderIndices {
             Self::Multiple(indices) => indices,
         }
     }
+
+    fn insert_sorted(&mut self, index: u16) {
+        match self {
+            Self::One(existing) if *existing == index => {}
+            Self::One(existing) => {
+                let (first, second) = if *existing < index { (*existing, index) } else { (index, *existing) };
+                *self = Self::Multiple(vec![first, second]);
+            }
+            Self::Multiple(indices) => {
+                if let Err(position) = indices.binary_search(&index) {
+                    indices.insert(position, index);
+                }
+            }
+        }
+    }
+
+    fn from_exact_and_wildcards(exact: &[u16], wildcards: impl IntoIterator<Item = u16>) -> Option<ProviderIndices> {
+        let mut indices = Self::from_iter(exact.iter().copied());
+        for index in wildcards {
+            match &mut indices {
+                Some(indices) => indices.insert_sorted(index),
+                None => indices = Some(Self::One(index)),
+            }
+        }
+
+        indices
+    }
 }
 
 /// Request transport used by worker-backed analyzer providers.
@@ -394,6 +426,85 @@ impl AnalyzerTransport for WorkerPool {
 struct Backend<T> {
     transport: Arc<T>,
     registration: Registration,
+    function_exact: WordMap<Vec<u16>>,
+    function_wildcard: Vec<(u16, Vec<FunctionTarget>)>,
+    method_exact: WordMap<Vec<u16>>,
+    method_wildcard: Vec<(u16, Vec<MethodTarget>)>,
+}
+
+impl<T> Backend<T> {
+    fn new(transport: Arc<T>, registration: Registration) -> Self {
+        let mut function_exact = WordMap::default();
+        let mut function_wildcard = Vec::new();
+        for provider in &registration.function_providers {
+            let mut wildcard_targets = Vec::new();
+            for target in &provider.targets {
+                match target {
+                    FunctionTarget::Exact(name) => {
+                        let indices = function_exact.entry(ascii_lowercase_word(name)).or_insert_with(Vec::new);
+                        if indices.last() != Some(&provider.index) {
+                            indices.push(provider.index);
+                        }
+                    }
+                    FunctionTarget::Prefix(_) | FunctionTarget::Namespace(_) => {
+                        wildcard_targets.push(target.clone());
+                    }
+                }
+            }
+            if !wildcard_targets.is_empty() {
+                function_wildcard.push((provider.index, wildcard_targets));
+            }
+        }
+
+        let mut method_exact = WordMap::default();
+        let mut method_wildcard = Vec::new();
+        for provider in &registration.method_providers {
+            let mut wildcard_targets = Vec::new();
+            for target in &provider.targets {
+                if target.class.contains(&b'*') || target.method.contains(&b'*') {
+                    wildcard_targets.push(target.clone());
+                } else {
+                    let class = ascii_lowercase_word(&target.class);
+                    let method = ascii_lowercase_word(&target.method);
+                    let indices = method_exact.entry(concat_word!(class, b"::", method)).or_insert_with(Vec::new);
+                    if indices.last() != Some(&provider.index) {
+                        indices.push(provider.index);
+                    }
+                }
+            }
+            if !wildcard_targets.is_empty() {
+                method_wildcard.push((provider.index, wildcard_targets));
+            }
+        }
+
+        Self { transport, registration, function_exact, function_wildcard, method_exact, method_wildcard }
+    }
+
+    fn matching_function_providers(&self, function: &[u8]) -> (Option<ProviderIndices>, usize) {
+        let function = ascii_lowercase_word(function);
+        let exact = self.function_exact.get(&function).map_or(&[][..], Vec::as_slice);
+        let candidates = exact.len() + self.function_wildcard.len();
+        let wildcards = self
+            .function_wildcard
+            .iter()
+            .filter(|(_, targets)| targets.iter().any(|target| target.matches(function.as_bytes())))
+            .map(|(index, _)| *index);
+
+        (ProviderIndices::from_exact_and_wildcards(exact, wildcards), candidates)
+    }
+
+    fn matching_method_providers(&self, class: &[u8], method: &[u8]) -> (Option<ProviderIndices>, usize) {
+        let key = concat_word!(ascii_lowercase_word(class), b"::", ascii_lowercase_word(method));
+        let exact = self.method_exact.get(&key).map_or(&[][..], Vec::as_slice);
+        let candidates = exact.len() + self.method_wildcard.len();
+        let wildcards = self
+            .method_wildcard
+            .iter()
+            .filter(|(_, targets)| targets.iter().any(|target| target.matches(class, method)))
+            .map(|(index, _)| *index);
+
+        (ProviderIndices::from_exact_and_wildcards(exact, wildcards), candidates)
+    }
 }
 
 #[derive(Debug)]
@@ -1003,21 +1114,11 @@ where
         let mut dispatched = false;
         for backend in &self.backends {
             let matching_start = self.trace_enabled.then(Instant::now);
+            let (indices, candidates) = backend.matching_function_providers(function);
             if self.trace_enabled {
                 self.telemetry.backend_checks.fetch_add(1, Ordering::Relaxed);
-                self.telemetry
-                    .candidate_providers
-                    .fetch_add(backend.registration.function_providers.len() as u64, Ordering::Relaxed);
+                self.telemetry.candidate_providers.fetch_add(candidates as u64, Ordering::Relaxed);
             }
-
-            let indices = ProviderIndices::from_iter(
-                backend
-                    .registration
-                    .function_providers
-                    .iter()
-                    .filter(|provider| provider.targets.iter().any(|target| target.matches(function)))
-                    .map(|provider| provider.index),
-            );
 
             if let Some(start) = matching_start {
                 self.telemetry.matching_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
@@ -1153,21 +1254,11 @@ where
         let mut dispatched = false;
         for backend in &self.backends {
             let matching_start = self.trace_enabled.then(Instant::now);
+            let (indices, candidates) = backend.matching_method_providers(class, method);
             if self.trace_enabled {
                 self.telemetry.backend_checks.fetch_add(1, Ordering::Relaxed);
-                self.telemetry
-                    .candidate_providers
-                    .fetch_add(backend.registration.method_providers.len() as u64, Ordering::Relaxed);
+                self.telemetry.candidate_providers.fetch_add(candidates as u64, Ordering::Relaxed);
             }
-
-            let indices = ProviderIndices::from_iter(
-                backend
-                    .registration
-                    .method_providers
-                    .iter()
-                    .filter(|provider| provider.targets.iter().any(|target| target.matches(class, method)))
-                    .map(|provider| provider.index),
-            );
 
             if let Some(start) = matching_start {
                 self.telemetry.matching_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
@@ -1308,7 +1399,19 @@ where
         let mut plugins = Vec::new();
         let mut initialization_stubs = Vec::new();
         let mut extension_identifiers = HashSet::new();
-        let mut plugin_identifiers = HashSet::new();
+        let mut plugin_selectors = HashMap::new();
+        for plugin in available_plugins() {
+            for selector in std::iter::once(plugin.id).chain(plugin.aliases.iter().copied()) {
+                let selector = selector.to_ascii_lowercase();
+                if let Some(first) = plugin_selectors.insert(selector.clone(), plugin.id.to_string()) {
+                    return Err(ExternalAnalyzerError::DuplicatePluginSelector {
+                        selector,
+                        first,
+                        second: plugin.id.to_string(),
+                    });
+                }
+            }
+        }
 
         for (backend_index, transport) in transports.into_iter().enumerate() {
             let backend_start = trace_enabled.then(Instant::now);
@@ -1339,8 +1442,17 @@ where
             }
 
             for plugin in &registration.plugins {
-                if !plugin_identifiers.insert(plugin.identifier.to_ascii_lowercase()) {
-                    return Err(ExternalAnalyzerError::DuplicatePlugin(plugin.identifier.clone()));
+                for selector in
+                    std::iter::once(plugin.identifier.as_str()).chain(plugin.aliases.iter().map(String::as_str))
+                {
+                    let selector = selector.to_ascii_lowercase();
+                    if let Some(first) = plugin_selectors.insert(selector.clone(), plugin.identifier.clone()) {
+                        return Err(ExternalAnalyzerError::DuplicatePluginSelector {
+                            selector,
+                            first,
+                            second: plugin.identifier.clone(),
+                        });
+                    }
                 }
             }
 
@@ -1424,7 +1536,7 @@ where
                 );
             }
 
-            backends.push(Backend { transport, registration });
+            backends.push(Backend::new(transport, registration));
         }
 
         let analyzer = Self {
@@ -1657,6 +1769,9 @@ mod tests {
         initialization_responses: Vec<Vec<u8>>,
     }
 
+    #[derive(Debug)]
+    struct RegistrationTransport(Vec<u8>);
+
     impl AnalyzerTransport for TestTransport {
         fn broadcast(&self, _payload: &[u8]) -> Result<Vec<Vec<u8>>, WorkerError> {
             Ok(vec![protocol::testing::registration_response()])
@@ -1700,6 +1815,23 @@ mod tests {
         }
     }
 
+    impl AnalyzerTransport for RegistrationTransport {
+        fn broadcast(&self, _payload: &[u8]) -> Result<Vec<Vec<u8>>, WorkerError> {
+            Ok(vec![self.0.clone()])
+        }
+
+        fn request(&self, _payload: Vec<u8>) -> Result<Vec<u8>, WorkerError> {
+            unreachable!("registration tests do not issue routed requests")
+        }
+
+        fn request_with_handler<H>(&self, _payload: Vec<u8>, _handler: &mut H) -> Result<Vec<u8>, WorkerError>
+        where
+            H: WorkerRequestHandler,
+        {
+            unreachable!("registration tests do not issue routed requests")
+        }
+    }
+
     #[test]
     fn registration_is_decoded_and_filtered() {
         let transport = Arc::new(TestTransport { requests: Mutex::new(Vec::new()) });
@@ -1709,6 +1841,15 @@ mod tests {
         assert_eq!(analyzer.extensions().len(), 1);
         assert_eq!(analyzer.plugins()[0].identifier, "demo");
         assert_eq!(analyzer.backends[0].registration.function_providers.len(), 1);
+    }
+
+    #[test]
+    fn exact_and_wildcard_provider_indices_preserve_registration_order() {
+        let indices =
+            ProviderIndices::from_exact_and_wildcards(&[1, 3], [0, 3, 4]).expect("at least one provider should match");
+
+        assert_eq!(indices.as_slice(), &[0, 1, 3, 4]);
+        assert!(ProviderIndices::from_exact_and_wildcards(&[], []).is_none());
     }
 
     #[test]
@@ -1727,6 +1868,45 @@ mod tests {
         )
         .expect("registration should succeed");
         assert_eq!(enabled.backends[0].registration.function_providers.len(), 1);
+    }
+
+    #[test]
+    fn plugin_selectors_cannot_shadow_native_plugins() {
+        let transport = Arc::new(RegistrationTransport(protocol::testing::registration_response_with_plugin(
+            "demo/extension",
+            "demo",
+            &["StD"],
+        )));
+
+        let result = ExternalAnalyzer::initialize_transports([transport], PHPVersion::PHP85, &[], false);
+
+        assert!(matches!(
+            result,
+            Err(ExternalAnalyzerError::DuplicatePluginSelector { selector, first, second })
+                if selector == "std" && first == "stdlib" && second == "demo"
+        ));
+    }
+
+    #[test]
+    fn plugin_aliases_must_be_unique_across_extension_hosts() {
+        let first = Arc::new(RegistrationTransport(protocol::testing::registration_response_with_plugin(
+            "demo/first",
+            "first",
+            &["shared"],
+        )));
+        let second = Arc::new(RegistrationTransport(protocol::testing::registration_response_with_plugin(
+            "demo/second",
+            "second",
+            &["SHARED"],
+        )));
+
+        let result = ExternalAnalyzer::initialize_transports([first, second], PHPVersion::PHP85, &[], false);
+
+        assert!(matches!(
+            result,
+            Err(ExternalAnalyzerError::DuplicatePluginSelector { selector, first, second })
+                if selector == "shared" && first == "first" && second == "second"
+        ));
     }
 
     #[test]

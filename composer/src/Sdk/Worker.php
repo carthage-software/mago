@@ -106,18 +106,19 @@ final class Worker
         $extensionIdentifiers = [];
         $ruleCodes = [];
         $rules = [];
-        $pluginIdentifiers = [];
+        $pluginSelectors = [];
         $registeredPlugins = [];
         $functionProviders = [];
         $methodProviders = [];
         foreach ($extensions as $registeredExtension) {
-            if (array_key_exists($registeredExtension->identifier, $extensionIdentifiers)) {
+            $normalizedExtensionIdentifier = strtolower($registeredExtension->identifier);
+            if (array_key_exists($normalizedExtensionIdentifier, $extensionIdentifiers)) {
                 throw new InvalidArgumentException(
                     "Extension `{$registeredExtension->identifier}` is registered more than once.",
                 );
             }
 
-            $extensionIdentifiers[$registeredExtension->identifier] = true;
+            $extensionIdentifiers[$normalizedExtensionIdentifier] = true;
             foreach ($registeredExtension->linterRules as $rule) {
                 $definition = $rule->getDefinition();
                 if (array_key_exists($definition->code, $ruleCodes)) {
@@ -137,14 +138,17 @@ final class Worker
 
             foreach ($registeredExtension->analyzerPlugins as $plugin) {
                 $definition = $plugin->getDefinition();
-                $normalizedIdentifier = strtolower($definition->identifier);
-                if (array_key_exists($normalizedIdentifier, $pluginIdentifiers)) {
-                    throw new InvalidArgumentException(
-                        "Analyzer plugin `{$definition->identifier}` is registered by more than one extension.",
-                    );
-                }
+                foreach ([$definition->identifier, ...$definition->aliases] as $selector) {
+                    $normalizedSelector = strtolower($selector);
+                    if (array_key_exists($normalizedSelector, $pluginSelectors)) {
+                        $first = $pluginSelectors[$normalizedSelector];
+                        throw new InvalidArgumentException(
+                            "Analyzer plugin selector `{$selector}` is shared by plugins `{$first}` and `{$definition->identifier}`.",
+                        );
+                    }
 
-                $pluginIdentifiers[$normalizedIdentifier] = true;
+                    $pluginSelectors[$normalizedSelector] = $definition->identifier;
+                }
                 $registry = new AnalyzerPluginRegistry();
                 $plugin->register($registry);
                 $registeredFunctionProviders = [];

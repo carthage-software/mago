@@ -8,7 +8,7 @@ pub enum ExternalAnalyzerError {
     InconsistentRegistration,
     InconsistentInitialization,
     DuplicateExtension(String),
-    DuplicatePlugin(String),
+    DuplicatePluginSelector { selector: String, first: String, second: String },
 }
 
 impl ExternalAnalyzerError {
@@ -32,8 +32,8 @@ impl std::fmt::Display for ExternalAnalyzerError {
             Self::DuplicateExtension(identifier) => {
                 write!(formatter, "external extension `{identifier}` is registered by more than one host")
             }
-            Self::DuplicatePlugin(identifier) => {
-                write!(formatter, "external analyzer plugin `{identifier}` is registered more than once")
+            Self::DuplicatePluginSelector { selector, first, second } => {
+                write!(formatter, "analyzer plugin selector `{selector}` is shared by plugins `{first}` and `{second}`")
             }
         }
     }

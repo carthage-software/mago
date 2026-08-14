@@ -12,7 +12,7 @@ pub enum ExternalLintError {
     InconsistentRegistration,
     /// Two worker pools advertised the same extension identifier.
     DuplicateExtension(String),
-    /// Two external rules advertised the same globally unique issue code.
+    /// An external rule advertised an issue code already owned by another rule.
     DuplicateRule(String),
     /// A source file is too large for the linter wire protocol.
     FileTooLarge(usize),
@@ -29,7 +29,7 @@ impl std::fmt::Display for ExternalLintError {
             Self::DuplicateExtension(identifier) => {
                 write!(formatter, "multiple worker pools advertised extension `{identifier}`")
             }
-            Self::DuplicateRule(code) => write!(formatter, "multiple external rules advertised issue code `{code}`"),
+            Self::DuplicateRule(code) => write!(formatter, "linter issue code `{code}` is registered more than once"),
             Self::FileTooLarge(size) => {
                 write!(formatter, "source file is {size} bytes, exceeding the external linter protocol limit")
             }
