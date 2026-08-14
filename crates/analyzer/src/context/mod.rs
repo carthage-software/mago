@@ -2,6 +2,7 @@ use mago_allocator::Arena;
 use mago_word::Word;
 
 use mago_codex::metadata::CodebaseMetadata;
+use mago_codex::reference::SymbolReferences;
 use mago_codex::ttype::resolution::TypeResolutionContext;
 use mago_collector::Collector;
 use mago_database::file::File;
@@ -52,6 +53,7 @@ where
     pub(super) statement_span: Span,
     pub(super) plugin_registry: &'ctx PluginRegistry,
     pub(super) external_analysis_session: Option<&'ctx ExternalAnalysisSession>,
+    pub(super) additional_symbol_references: Option<&'ctx SymbolReferences>,
 }
 
 impl<'ctx, 'arena, A> Context<'ctx, 'arena, A>
@@ -69,6 +71,7 @@ where
         collector: Collector<'ctx, 'arena, A>,
         plugin_registry: &'ctx PluginRegistry,
         external_analysis_session: Option<&'ctx ExternalAnalysisSession>,
+        additional_symbol_references: Option<&'ctx SymbolReferences>,
     ) -> Self {
         Self {
             arena,
@@ -83,6 +86,7 @@ where
             collector,
             plugin_registry,
             external_analysis_session,
+            additional_symbol_references,
         }
     }
 

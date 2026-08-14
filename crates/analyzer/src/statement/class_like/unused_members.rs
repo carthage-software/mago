@@ -50,6 +50,7 @@ pub fn check_unused_members_with_transitivity<A>(
     class_span: Span,
     class_like_metadata: &ClassLikeMetadata,
     symbol_references: &SymbolReferences,
+    additional_symbol_references: Option<&SymbolReferences>,
     context: &mut Context<'_, '_, A>,
 ) -> HashSet<SymbolIdentifier>
 where
@@ -180,7 +181,7 @@ where
 
     let mut unused_members: HashSet<SymbolIdentifier> = HashSet::default();
     for member in &checkable_members {
-        if !is_member_referenced(symbol_references, &member.symbol_id) {
+        if !is_member_referenced(symbol_references, additional_symbol_references, &member.symbol_id) {
             unused_members.insert(member.symbol_id);
         }
     }
@@ -194,7 +195,13 @@ where
                 continue;
             }
 
-            if all_references_from_unused(symbol_references, &member.symbol_id, &unused_members, &checkable_set) {
+            if all_references_from_unused(
+                symbol_references,
+                additional_symbol_references,
+                &member.symbol_id,
+                &unused_members,
+                &checkable_set,
+            ) {
                 newly_unused.insert(member.symbol_id);
             }
         }
@@ -225,6 +232,19 @@ where
 /// - The member has no references, OR
 /// - All referencing symbols are in the unused set
 fn all_references_from_unused(
+    symbol_references: &SymbolReferences,
+    additional_symbol_references: Option<&SymbolReferences>,
+    symbol_id: &SymbolIdentifier,
+    unused_members: &HashSet<SymbolIdentifier>,
+    checkable_set: &HashSet<SymbolIdentifier>,
+) -> bool {
+    all_references_from_unused_in(symbol_references, symbol_id, unused_members, checkable_set)
+        && additional_symbol_references.is_none_or(|references| {
+            all_references_from_unused_in(references, symbol_id, unused_members, checkable_set)
+        })
+}
+
+fn all_references_from_unused_in(
     symbol_references: &SymbolReferences,
     symbol_id: &SymbolIdentifier,
     unused_members: &HashSet<SymbolIdentifier>,
@@ -261,6 +281,7 @@ pub fn check_write_only_properties<A>(
     class_span: Span,
     class_like_metadata: &ClassLikeMetadata,
     symbol_references: &SymbolReferences,
+    additional_symbol_references: Option<&SymbolReferences>,
     unused_members: &HashSet<SymbolIdentifier>,
     context: &mut Context<'_, '_, A>,
 ) where
@@ -311,12 +332,14 @@ pub fn check_write_only_properties<A>(
             continue;
         }
 
-        if !is_member_referenced(symbol_references, &symbol_id) {
+        if !is_member_referenced(symbol_references, additional_symbol_references, &symbol_id) {
             continue;
         }
 
-        let has_reads = symbol_references.count_property_reads(&symbol_id) > 0;
-        let has_writes = symbol_references.count_property_writes(&symbol_id) > 0;
+        let has_reads = symbol_references.count_property_reads(&symbol_id) > 0
+            || additional_symbol_references.is_some_and(|references| references.count_property_reads(&symbol_id) > 0);
+        let has_writes = symbol_references.count_property_writes(&symbol_id) > 0
+            || additional_symbol_references.is_some_and(|references| references.count_property_writes(&symbol_id) > 0);
 
         if has_writes
             && !has_reads
@@ -329,7 +352,17 @@ pub fn check_write_only_properties<A>(
 
 /// Checks if a member (property or method) is referenced anywhere in the codebase.
 #[inline(always)]
-fn is_member_referenced(symbol_references: &SymbolReferences, symbol_id: &SymbolIdentifier) -> bool {
+fn is_member_referenced(
+    symbol_references: &SymbolReferences,
+    additional_symbol_references: Option<&SymbolReferences>,
+    symbol_id: &SymbolIdentifier,
+) -> bool {
+    is_member_referenced_in(symbol_references, symbol_id)
+        || additional_symbol_references.is_some_and(|references| is_member_referenced_in(references, symbol_id))
+}
+
+#[inline(always)]
+fn is_member_referenced_in(symbol_references: &SymbolReferences, symbol_id: &SymbolIdentifier) -> bool {
     symbol_references.count_referencing_symbols(symbol_id, false) > 0
         || symbol_references.count_referencing_symbols(symbol_id, true) > 0
 }

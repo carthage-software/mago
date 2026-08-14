@@ -10,7 +10,11 @@ use Mago\Sdk\Analyzer\FileAnalysis;
 use Mago\Sdk\Analyzer\Invocation;
 use Mago\Sdk\Analyzer\Metadata\MemberIdentifier;
 use Mago\Sdk\Analyzer\ProjectAnalysis;
+use Mago\Sdk\Analyzer\ReferenceKind;
+use Mago\Sdk\Analyzer\ReferenceOrigin;
 use Mago\Sdk\Analyzer\ReferenceSummary;
+use Mago\Sdk\Analyzer\SymbolReference;
+use Mago\Sdk\Analyzer\SymbolReferences;
 use Mago\Sdk\Analyzer\Type;
 use Mago\Sdk\CancellationTokenInterface;
 use Mago\Sdk\Exception\ProtocolException;
@@ -44,12 +48,15 @@ final class Protocol
     public const AFTER_ANALYSIS_REQUEST = 7;
     public const ANALYSIS_QUERY_REQUEST = 8;
     public const AFTER_FILE_ANALYSIS_BATCH_REQUEST = 9;
+    public const SYMBOL_REFERENCE_QUERY_REQUEST = 10;
     public const INITIALIZE_REQUEST = 11;
     public const GET_EXPRESSION_TYPES = 1;
     public const GET_ALL_EXPRESSION_TYPES = 2;
     public const GET_INFERRED_RETURN_TYPES = 3;
     public const GET_INFERRED_YIELD_KEY_TYPES = 4;
     public const GET_INFERRED_YIELD_VALUE_TYPES = 5;
+    public const GET_REFERENCES_TO = 1;
+    public const GET_REFERENCES_FROM = 2;
     public const GET_CLASS_LIKES = 1;
     public const GET_FUNCTIONS = 2;
     public const GET_METHODS = 3;
@@ -103,6 +110,7 @@ final class Protocol
     private const AFTER_ANALYSIS_RESPONSE = 0x8007;
     private const ANALYSIS_QUERY_RESPONSE = 0x8008;
     private const AFTER_FILE_ANALYSIS_BATCH_RESPONSE = 0x8009;
+    private const SYMBOL_REFERENCE_QUERY_RESPONSE = 0x800A;
     private const INITIALIZE_RESPONSE = 0x800B;
     private const RETURN_TYPE_REQUEST_HEADER = "MANA\x00\x01\x00\x01\x00\x02\x00\x00";
     private const UNHANDLED_RETURN_TYPE_RESPONSE = "MANA\x00\x01\x00\x01\x80\x02\x00\x00\x00";
@@ -414,19 +422,30 @@ final class Protocol
         CancellationTokenInterface $cancellation,
     ): ProjectAnalysis {
         $issueCount = $reader->readU32();
-        $references = self::readReferenceSummary($reader);
+        $summary = self::readReferenceSummary($reader);
         $fileCount = $reader->readCount(1_000_000);
         $files = [];
         for ($index = 0; $index < $fileCount; ++$index) {
             $files[] = self::readFileAnalysis($reader, $host, $requestId, $generation, $cancellation);
         }
 
-        return new ProjectAnalysis($files, $issueCount, $references);
+        return new ProjectAnalysis(
+            $files,
+            $issueCount,
+            new SymbolReferences($host, $requestId, $generation, $cancellation, $summary),
+        );
     }
 
-    /** @param list<int|ReportedIssue|string|null> $reportedIssues */
-    public static function writeLifecycleResponse(int $requestKind, array $reportedIssues): string
-    {
+    /**
+     * @param list<int|ReportedIssue|string|null> $reportedIssues
+     * @param list<int|string|MemberIdentifier|ReferenceOrigin|ReferenceKind> $contributedReferences
+     * @mago-expect lint:halstead
+     */
+    public static function writeLifecycleResponse(
+        int $requestKind,
+        array $reportedIssues,
+        array $contributedReferences = [],
+    ): string {
         $responseKind = match ($requestKind) {
             self::BEFORE_ANALYSIS_REQUEST => self::BEFORE_ANALYSIS_RESPONSE,
             self::AFTER_FILE_ANALYSIS_REQUEST => self::AFTER_FILE_ANALYSIS_RESPONSE,
@@ -470,6 +489,25 @@ final class Protocol
                 $writer->writeU8($edit->safety->value);
                 $writer->writeBytes($edit->newText);
             }
+        }
+
+        $writer->writeU32(intdiv(count($contributedReferences), 4));
+        for ($index = 0, $count = count($contributedReferences); $index < $count; $index += 4) {
+            /** @var int<0, 65535> $plugin */
+            $plugin = $contributedReferences[$index];
+            /** @var string|MemberIdentifier|ReferenceOrigin $source */
+            $source = $contributedReferences[$index + 1];
+            /** @var string|MemberIdentifier $target */
+            $target = $contributedReferences[$index + 2];
+            /** @var ReferenceKind $kind */
+            $kind = $contributedReferences[$index + 3];
+            $writer->writeU16($plugin);
+            self::writeReferenceOrigin(
+                $writer,
+                $source instanceof ReferenceOrigin ? $source : ReferenceOrigin::symbol($source),
+            );
+            self::writeSymbolIdentifier($writer, $target);
+            $writer->writeU8($kind->value);
         }
 
         return $writer->finish();
@@ -834,6 +872,113 @@ final class Protocol
         $reader->finish();
 
         return $results;
+    }
+
+    /**
+     * @param array<string, string|MemberIdentifier|ReferenceOrigin> $queries
+     */
+    public static function writeReferenceQuery(int $generation, int $operation, array $queries): string
+    {
+        $writer = self::createMessage(self::SYMBOL_REFERENCE_QUERY_REQUEST);
+        $writer->writeU64($generation);
+        $writer->writeU8($operation);
+        $writer->writeCount($queries);
+        foreach ($queries as $query) {
+            if ($operation === self::GET_REFERENCES_TO) {
+                /** @var string|MemberIdentifier $query */
+                self::writeSymbolIdentifier($writer, $query);
+                continue;
+            }
+
+            $origin = $query instanceof ReferenceOrigin ? $query : ReferenceOrigin::symbol($query);
+            self::writeReferenceOrigin($writer, $origin);
+        }
+
+        return $writer->finish();
+    }
+
+    /** @return list<list<SymbolReference>> */
+    public static function readReferenceQueryResponse(
+        string $payload,
+        int $generation,
+        int $operation,
+        int $expectedCount,
+    ): array {
+        [$kind, $reader] = self::readRequest($payload);
+        if (
+            $kind !== self::SYMBOL_REFERENCE_QUERY_RESPONSE
+            || $reader->readU64() !== $generation
+            || $reader->readU8() !== $operation
+        ) {
+            throw new ProtocolException('A symbol-reference response does not match its request.');
+        }
+
+        $resultCount = $reader->readCount(1_000_000);
+        if ($resultCount !== $expectedCount) {
+            throw new ProtocolException('A symbol-reference response contains the wrong number of results.');
+        }
+        $results = [];
+        for ($resultIndex = 0; $resultIndex < $resultCount; ++$resultIndex) {
+            $referenceCount = $reader->readCount(1_000_000);
+            $references = [];
+            for ($referenceIndex = 0; $referenceIndex < $referenceCount; ++$referenceIndex) {
+                $source = self::readReferenceOrigin($reader);
+                $target = self::readSymbolIdentifier($reader);
+                $referenceKind = ReferenceKind::tryFrom($reader->readU8());
+                if ($referenceKind === null) {
+                    throw new ProtocolException('A symbol reference has an unknown kind.');
+                }
+
+                $references[] = new SymbolReference($source, $target, $referenceKind);
+            }
+            $results[] = $references;
+        }
+        $reader->finish();
+
+        return $results;
+    }
+
+    private static function writeReferenceOrigin(PayloadWriter $writer, ReferenceOrigin $origin): void
+    {
+        if ($origin->file !== null) {
+            $writer->writeU8(3);
+            $writer->writeBytes($origin->file);
+            return;
+        }
+
+        self::writeSymbolIdentifier($writer, $origin->symbol ?? '');
+    }
+
+    private static function writeSymbolIdentifier(PayloadWriter $writer, string|MemberIdentifier $symbol): void
+    {
+        if ($symbol instanceof MemberIdentifier) {
+            $writer->writeU8(2);
+            $writer->writeBytes($symbol->class);
+            $writer->writeBytes($symbol->member);
+            return;
+        }
+
+        $writer->writeU8(1);
+        $writer->writeBytes($symbol);
+    }
+
+    private static function readReferenceOrigin(PayloadReader $reader): ReferenceOrigin
+    {
+        $kind = $reader->readU8();
+        if ($kind === 3) {
+            return ReferenceOrigin::file($reader->readBytes());
+        }
+
+        return ReferenceOrigin::symbol(self::readSymbolIdentifier($reader, $kind));
+    }
+
+    private static function readSymbolIdentifier(PayloadReader $reader, ?int $kind = null): string|MemberIdentifier
+    {
+        return match ($kind ?? $reader->readU8()) {
+            1 => $reader->readBytes(),
+            2 => new MemberIdentifier($reader->readBytes(), $reader->readBytes()),
+            default => throw new ProtocolException('A symbol reference has an unknown endpoint kind.'),
+        };
     }
 
     /** @param int<0, 65535> $kind */

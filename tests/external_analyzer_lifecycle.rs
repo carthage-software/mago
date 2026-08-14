@@ -51,7 +51,11 @@ fn php_sdk_is_available(repository: &Path) -> bool {
     available
 }
 
-fn make_database(changed_file: Option<usize>, external_sources: &[(Vec<u8>, Vec<u8>)]) -> (Database<'static>, FileId) {
+fn make_database(
+    changed_file: Option<usize>,
+    framework_reference_enabled: bool,
+    external_sources: &[(Vec<u8>, Vec<u8>)],
+) -> (Database<'static>, FileId) {
     let configuration = DatabaseConfiguration {
         workspace: Cow::Owned(Path::new("/lifecycle-proof").to_path_buf()),
         paths: vec![Cow::Borrowed(b"src")],
@@ -76,8 +80,15 @@ fn make_database(changed_file: Option<usize>, external_sources: &[(Vec<u8>, Vec<
             ""
         };
         let inheritance = if index == 0 { " extends ExtensionProvided" } else { "" };
+        let private_methods = if index == 0 {
+            "\n    private function frameworkAction(): void {}\n\n    private function actuallyUnused(): void {}\n"
+        } else {
+            ""
+        };
+        let framework_reference_marker =
+            if index == 0 && framework_reference_enabled { "\nconst ENABLE_FRAMEWORK_ACTION = true;\n" } else { "" };
         let contents = format!(
-            "<?php\n\ndeclare(strict_types=1);\n\nfinal class LifecycleClass{index}{inheritance} {{\n    public function value(): int {{ return {value}; }}\n}}\n\nfunction lifecycle_function_{index}(int $value): int {{ return $value + {value}; }}\n{extension_usage}{generator}"
+            "<?php\n\ndeclare(strict_types=1);\n\nfinal class LifecycleClass{index}{inheritance} {{\n    public function value(): int {{ return {value}; }}\n{private_methods}}}\n\nfunction lifecycle_function_{index}(int $value): int {{ return $value + {value}; }}\n{extension_usage}{framework_reference_marker}{generator}"
         );
         let file = File::new(
             Cow::Owned(format!("src/file{index}.php").into_bytes()),
@@ -110,7 +121,8 @@ fn count_code(issues: &IssueCollection, code: &str) -> usize {
     issues.iter().filter(|issue| issue.code.as_deref() == Some(code)).count()
 }
 
-fn assert_issue_cardinality(issues: &IssueCollection) {
+fn assert_issue_cardinality(issues: &IssueCollection, unused_methods: usize) {
+    assert_eq!(count_code(issues, "unused-method"), unused_methods);
     for plugin in PLUGINS {
         assert_eq!(count_code(issues, &format!("{plugin}/before")), 1);
         assert_eq!(count_code(issues, &format!("{plugin}/after-file")), FILE_COUNT);
@@ -206,10 +218,10 @@ fn external_analyzer_lifecycle_is_exact_across_workers_and_incremental_runs() {
     let mut registry = PluginRegistry::with_library_providers();
     registry.set_external_analyzer(Arc::new(ExternalAnalyzerHandle::ready(analyzer)));
 
-    let (database, _) = make_database(None, &initialization_sources);
+    let (database, _) = make_database(None, true, &initialization_sources);
     let mut settings = Settings::new(PHPVersion::PHP85);
     settings.find_unused_expressions = false;
-    settings.find_unused_definitions = false;
+    settings.find_unused_definitions = true;
     let mut service = IncrementalAnalysisService::new(
         database.read_only(),
         CodebaseMetadata::new(),
@@ -223,11 +235,14 @@ fn external_analyzer_lifecycle_is_exact_across_workers_and_incremental_runs() {
     let unexpected = initial
         .issues
         .iter()
-        .filter(|issue| issue.code.as_deref().is_none_or(|code| !code.starts_with("lifecycle-")))
+        .filter(|issue| {
+            issue.code.as_deref().is_none_or(|code| !code.starts_with("lifecycle-") && code != "unused-method")
+        })
         .map(|issue| (issue.code.as_deref(), issue.message.as_str()))
         .collect::<Vec<_>>();
     assert!(unexpected.is_empty(), "unexpected analyzer issues: {unexpected:#?}");
-    assert_issue_cardinality(&initial.issues);
+    assert_eq!(count_code(&initial.issues, "unused-method"), 1);
+    assert_issue_cardinality(&initial.issues, 1);
     let external_annotation = initial
         .issues
         .iter()
@@ -244,11 +259,11 @@ fn external_analyzer_lifecycle_is_exact_across_workers_and_incremental_runs() {
     assert_eq!(initial_audit.len(), (PLUGINS.len() * 3) + 2 + (FILE_COUNT * 2) + 2);
     assert_initial_audit(&initial_audit);
 
-    let (updated_database, changed_file) = make_database(Some(5), &initialization_sources);
+    let (updated_database, changed_file) = make_database(Some(5), true, &initialization_sources);
     service.update_database(updated_database.read_only());
     let incremental =
         service.analyze_incremental(Some(&[changed_file])).expect("incremental lifecycle analysis should succeed");
-    assert_issue_cardinality(&incremental.issues);
+    assert_issue_cardinality(&incremental.issues, 1);
 
     let audit = read_audit(&audit_log);
     let incremental_audit = &audit[initial_audit.len()..];
@@ -263,12 +278,12 @@ fn external_analyzer_lifecycle_is_exact_across_workers_and_incremental_runs() {
     );
 
     let first_changed_file = changed_file;
-    let (second_updated_database, second_changed_file) = make_database(Some(6), &initialization_sources);
+    let (second_updated_database, second_changed_file) = make_database(Some(6), true, &initialization_sources);
     service.update_database(second_updated_database.read_only());
     let second_incremental = service
         .analyze_incremental(Some(&[first_changed_file, second_changed_file]))
         .expect("a second incremental lifecycle analysis should rebuild extension metadata from source state");
-    assert_issue_cardinality(&second_incremental.issues);
+    assert_issue_cardinality(&second_incremental.issues, 1);
 
     let second_audit = read_audit(&audit_log);
     let second_incremental_audit = &second_audit[audit.len()..];
@@ -281,6 +296,27 @@ fn external_analyzer_lifecycle_is_exact_across_workers_and_incremental_runs() {
         .filter_map(|entry| entry.2.as_deref())
         .collect::<HashSet<_>>();
     assert_eq!(analyzed_files, HashSet::from(["src/file5.php", "src/file6.php"]));
+
+    let (without_framework_reference, _) = make_database(Some(6), false, &initialization_sources);
+    service.update_database(without_framework_reference.read_only());
+    let without_reference = service
+        .analyze_incremental(Some(&[FileId::new(b"src/file0.php")]))
+        .expect("removing an external reference should invalidate cached unused-member issues");
+    assert_issue_cardinality(&without_reference.issues, 2);
+
+    let without_reference_audit = read_audit(&audit_log);
+    let reference_removal_audit = &without_reference_audit[second_audit.len()..];
+    assert_eq!(reference_removal_audit.iter().filter(|entry| entry.1 == "after-file").count(), FILE_COUNT * 2);
+
+    service.update_database(second_updated_database.read_only());
+    let restored_reference = service
+        .analyze_incremental(Some(&[FileId::new(b"src/file0.php")]))
+        .expect("restoring an external reference should invalidate cached unused-member issues");
+    assert_issue_cardinality(&restored_reference.issues, 1);
+
+    let restored_reference_audit = read_audit(&audit_log);
+    let reference_restoration_audit = &restored_reference_audit[without_reference_audit.len()..];
+    assert_eq!(reference_restoration_audit.iter().filter(|entry| entry.1 == "after-file").count(), FILE_COUNT * 2);
 }
 
 #[test]

@@ -30,6 +30,7 @@ use mago_word::concat_word;
 
 use crate::artifacts::AnalysisArtifacts;
 use crate::context::block::BlockContext;
+use crate::external::BeforeAnalysisResult;
 use crate::external::ExternalAnalysisSession;
 use crate::external::ExternalAnalyzerHandle;
 use crate::external::FileAnalysisSnapshot;
@@ -240,7 +241,7 @@ impl PluginRegistry {
         &self,
         codebase: &CodebaseMetadata,
         session: Option<&ExternalAnalysisSession>,
-    ) -> PluginResult<IssueCollection> {
+    ) -> PluginResult<BeforeAnalysisResult> {
         self.external_analyzer
             .as_deref()
             .zip(session)

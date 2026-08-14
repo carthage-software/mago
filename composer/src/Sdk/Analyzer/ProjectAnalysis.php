@@ -22,7 +22,7 @@ final class ProjectAnalysis
     public function __construct(
         public readonly array $files,
         public readonly int $issueCount,
-        public readonly ReferenceSummary $references,
+        public readonly SymbolReferences $references,
     ) {
         $byFile = [];
         foreach ($files as $file) {

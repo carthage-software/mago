@@ -14,9 +14,12 @@ use Mago\Sdk\Analyzer\InitializationContext;
 use Mago\Sdk\Analyzer\InitializationHook;
 use Mago\Sdk\Analyzer\LifecycleContext;
 use Mago\Sdk\Analyzer\Metadata\ClassLikeMetadata;
+use Mago\Sdk\Analyzer\Metadata\MemberIdentifier;
 use Mago\Sdk\Analyzer\Plugin;
 use Mago\Sdk\Analyzer\PluginDefinition;
 use Mago\Sdk\Analyzer\PluginRegistry;
+use Mago\Sdk\Analyzer\ReferenceKind;
+use Mago\Sdk\Analyzer\ReferenceOrigin;
 use Mago\Sdk\Analyzer\Type;
 use Mago\Sdk\Extension;
 use Mago\Sdk\Reporting\Issue;
@@ -45,6 +48,7 @@ require_once dirname(__DIR__, 4) . '/vendor/autoload.php';
 
 /**
  * @mago-expect lint:cyclomatic-complexity
+ * @mago-expect lint:kan-defect
  */
 final class LifecycleProofHook implements
     InitializationHook,
@@ -100,6 +104,11 @@ final class LifecycleProofHook implements
     public function beforeAnalysis(BeforeAnalysisContext $context): void
     {
         $base = $this->verifySharedContext($context);
+        if ($this->plugin === 'lifecycle-one' && $context->codebase->getConstant('ENABLE_FRAMEWORK_ACTION') !== null) {
+            $frameworkAction = new MemberIdentifier('LifecycleClass0', 'frameworkAction');
+            $context->references->add('Symfony\Kernel', $frameworkAction);
+            $context->references->add(ReferenceOrigin::file('config/routes.php'), $frameworkAction);
+        }
         $this->record('before', null);
         $context->report(Level::Help, 'before', Issue::at('Before-analysis hook ran.', $base->location));
     }
@@ -141,6 +150,7 @@ final class LifecycleProofHook implements
         );
     }
 
+    /** @mago-expect lint:halstead */
     public function afterAnalysis(AfterAnalysisContext $context): void
     {
         $base = $this->verifySharedContext($context);
@@ -150,8 +160,9 @@ final class LifecycleProofHook implements
             throw new RuntimeException('The final hook cannot query the child class.');
         }
 
+        $frameworkReferenceEnabled = $context->codebase->getConstant('ENABLE_FRAMEWORK_ACTION') !== null;
         $project = $context->analysis;
-        $expectedIssueCount = 2 + (count($project->files) * 2);
+        $expectedIssueCount = ($frameworkReferenceEnabled ? 3 : 4) + (count($project->files) * 2);
         if (count($project->files) !== 96 || $project->issueCount !== $expectedIssueCount) {
             throw new RuntimeException(
                 "The final hook received {$project->issueCount} issues; expected {$expectedIssueCount}.",
@@ -175,6 +186,68 @@ final class LifecycleProofHook implements
             if ($file !== $project->files[$index]) {
                 throw new RuntimeException('Batched project file lookup lost object identity.');
             }
+        }
+
+        $frameworkAction = new MemberIdentifier('LifecycleClass0', 'frameworkAction');
+        $referencesToAction = $project->references->getReferencesTo($frameworkAction);
+        [$referencesFromKernel, $referencesFromConsumer] = $project->references->getMultipleReferencesFrom([
+            'Symfony\Kernel',
+            'extension_consumer',
+        ]);
+        $kernelReferencesAction = false;
+        $routesReferenceAction = false;
+        foreach ($referencesToAction as $reference) {
+            if ($reference->source->file !== 'config/routes.php') {
+                continue;
+            }
+
+            $routesReferenceAction = true;
+            break;
+        }
+        foreach ($referencesFromKernel as $reference) {
+            if (!$reference->target instanceof MemberIdentifier) {
+                continue;
+            }
+
+            if ($reference->target->class !== 'lifecycleclass0' || $reference->target->member !== 'frameworkaction') {
+                continue;
+            }
+
+            $kernelReferencesAction = true;
+            break;
+        }
+
+        $consumerReferencesAnswer = false;
+        foreach ($referencesFromConsumer as $reference) {
+            if (!$reference->target instanceof MemberIdentifier) {
+                continue;
+            }
+
+            if ($reference->target->class !== 'extensionprovided' || $reference->target->member !== 'answer') {
+                continue;
+            }
+
+            $consumerReferencesAnswer = true;
+            break;
+        }
+        if (
+            count($referencesToAction) !== ($frameworkReferenceEnabled ? 2 : 0)
+            || count($referencesFromKernel) !== ($frameworkReferenceEnabled ? 2 : 0)
+            || $frameworkReferenceEnabled && $referencesToAction[0]->kind !== ReferenceKind::Body
+            || $frameworkReferenceEnabled && $referencesToAction[0]->source->symbol !== 'symfony\kernel'
+            || $kernelReferencesAction !== $frameworkReferenceEnabled
+            || $routesReferenceAction !== $frameworkReferenceEnabled
+            || !$consumerReferencesAnswer
+        ) {
+            throw new RuntimeException('The final merged native and synthetic references did not round-trip.');
+        }
+
+        [$knownReferences, $missingReferences] = $project->references->getMultipleReferencesTo([
+            $frameworkAction,
+            'DefinitelyMissing',
+        ]);
+        if (count($knownReferences) !== ($frameworkReferenceEnabled ? 2 : 0) || $missingReferences !== []) {
+            throw new RuntimeException('A batched final symbol-reference query returned the wrong graph edges.');
         }
 
         $this->record('after', null);

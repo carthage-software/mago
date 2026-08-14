@@ -204,6 +204,7 @@ pub(super) enum NestedRequestKind {
     TypeComparison,
     CodebaseQuery,
     AnalysisQuery,
+    SymbolReferenceQuery,
 }
 
 pub(super) fn encode_describe_request(php_version: PHPVersion) -> Vec<u8> {

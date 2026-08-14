@@ -9,6 +9,7 @@ use mago_allocator::Arena;
 
 use mago_codex::context::ScopeContext;
 use mago_codex::metadata::CodebaseMetadata;
+use mago_codex::reference::SymbolReferences;
 use mago_collector::Collector;
 use mago_database::file::File;
 use mago_names::ResolvedNames;
@@ -65,6 +66,7 @@ where
     pub settings: Settings,
     pub plugin_registry: &'ctx PluginRegistry,
     pub external_analysis_session: Option<&'ctx ExternalAnalysisSession>,
+    pub additional_symbol_references: Option<&'ctx SymbolReferences>,
 }
 
 impl<'ctx, 'ast, 'arena, A> Analyzer<'ctx, 'ast, 'arena, A>
@@ -87,12 +89,19 @@ where
             settings,
             plugin_registry,
             external_analysis_session: None,
+            additional_symbol_references: None,
         }
     }
 
     #[must_use]
     pub fn with_external_analysis_session(mut self, session: &'ctx ExternalAnalysisSession) -> Self {
         self.external_analysis_session = Some(session);
+        self
+    }
+
+    #[must_use]
+    pub fn with_additional_symbol_references(mut self, references: &'ctx SymbolReferences) -> Self {
+        self.additional_symbol_references = Some(references);
         self
     }
 
@@ -157,6 +166,7 @@ where
             collector,
             self.plugin_registry,
             self.external_analysis_session,
+            self.additional_symbol_references,
         );
 
         let mut block_context = BlockContext::new(ScopeContext::new(), context.settings.register_super_globals);

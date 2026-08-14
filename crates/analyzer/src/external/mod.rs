@@ -12,6 +12,7 @@ use std::time::Duration;
 use std::time::Instant;
 
 use mago_codex::metadata::CodebaseMetadata;
+use mago_codex::reference::SymbolReferences;
 use mago_codex::ttype::union::TUnion;
 use mago_database::file::File;
 use mago_database::file::FileId;
@@ -40,6 +41,12 @@ pub mod protocol;
 const SLOW_PROVIDER_THRESHOLD: Duration = Duration::from_millis(5);
 const SLOW_LIFECYCLE_THRESHOLD: Duration = Duration::from_millis(5);
 static NEXT_ANALYSIS_GENERATION: AtomicU64 = AtomicU64::new(1);
+
+#[derive(Debug, Default)]
+pub struct BeforeAnalysisResult {
+    pub issues: IssueCollection,
+    pub references: SymbolReferences,
+}
 
 /// Immutable request context shared by every external hook in one analysis run.
 ///
@@ -114,6 +121,7 @@ struct ExternalAnalyzerTelemetry {
     comparisons: AtomicU64,
     metadata_queries: AtomicU64,
     analysis_queries: AtomicU64,
+    symbol_reference_queries: AtomicU64,
     before_analysis_requests: AtomicU64,
     after_file_analysis_requests: AtomicU64,
     after_file_analysis_files: AtomicU64,
@@ -130,6 +138,7 @@ struct ExternalAnalyzerTelemetry {
     comparison_ns: AtomicU64,
     metadata_query_ns: AtomicU64,
     analysis_query_ns: AtomicU64,
+    symbol_reference_query_ns: AtomicU64,
     lifecycle_encode_ns: AtomicU64,
     lifecycle_ipc_ns: AtomicU64,
     lifecycle_decode_ns: AtomicU64,
@@ -169,6 +178,10 @@ impl ExternalAnalyzerTelemetry {
             protocol::NestedRequestKind::AnalysisQuery => {
                 self.analysis_queries.fetch_add(1, Ordering::Relaxed);
                 self.analysis_query_ns.fetch_add(duration_nanos(elapsed), Ordering::Relaxed);
+            }
+            protocol::NestedRequestKind::SymbolReferenceQuery => {
+                self.symbol_reference_queries.fetch_add(1, Ordering::Relaxed);
+                self.symbol_reference_query_ns.fetch_add(duration_nanos(elapsed), Ordering::Relaxed);
             }
         }
     }
@@ -498,7 +511,7 @@ impl ExternalAnalyzerHandle {
         &self,
         codebase: &CodebaseMetadata,
         session: &ExternalAnalysisSession,
-    ) -> Result<IssueCollection, String> {
+    ) -> Result<BeforeAnalysisResult, String> {
         self.get()?.run_before_analysis_hooks(codebase, session).map_err(|error| error.to_string())
     }
 
@@ -633,8 +646,9 @@ where
         handler: &mut H,
         session: &ExternalAnalysisSession,
         default_file: Option<&File>,
+        codebase: &CodebaseMetadata,
         started_at: Option<Instant>,
-    ) -> Result<IssueCollection, ExternalAnalyzerError>
+    ) -> Result<lifecycle::LifecycleEffects, ExternalAnalyzerError>
     where
         H: WorkerRequestHandler,
     {
@@ -676,6 +690,7 @@ where
             &backend.registration.plugins,
             session,
             default_file,
+            codebase,
         )
         .inspect_err(|_| {
             if self.trace_enabled {
@@ -686,7 +701,7 @@ where
 
         if let Some(start) = decode_start {
             self.telemetry.lifecycle_decode_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
-            self.telemetry.lifecycle_issues.fetch_add(issues.len() as u64, Ordering::Relaxed);
+            self.telemetry.lifecycle_issues.fetch_add(issues.issues.len() as u64, Ordering::Relaxed);
         }
 
         if let Some(start) = started_at {
@@ -700,7 +715,7 @@ where
                     plugins = plugins.len(),
                     file,
                     response_bytes = response.len(),
-                    issues = issues.len(),
+                    issues = issues.issues.len(),
                     elapsed = ?elapsed,
                     "Slow external analyzer lifecycle request completed."
                 );
@@ -714,8 +729,8 @@ where
         &self,
         codebase: &CodebaseMetadata,
         session: &ExternalAnalysisSession,
-    ) -> Result<IssueCollection, ExternalAnalyzerError> {
-        let mut issues = IssueCollection::new();
+    ) -> Result<BeforeAnalysisResult, ExternalAnalyzerError> {
+        let mut result = BeforeAnalysisResult::default();
         for backend in &self.backends {
             let plugins = &backend.registration.before_analysis_plugins;
             if plugins.is_empty() {
@@ -748,7 +763,7 @@ where
                 result.map(|(_, response)| response).map_err(|error| error.to_string().into_bytes())
             };
 
-            issues.extend(self.dispatch_lifecycle_request(
+            let effects = self.dispatch_lifecycle_request(
                 backend,
                 LifecyclePhase::Before,
                 plugins,
@@ -757,11 +772,14 @@ where
                 &mut handler,
                 session,
                 None,
+                codebase,
                 lifecycle_start,
-            )?);
+            )?;
+            result.issues.extend(effects.issues);
+            result.references.extend(effects.references);
         }
 
-        Ok(issues)
+        Ok(result)
     }
 
     fn run_after_file_analysis_hooks(
@@ -810,7 +828,7 @@ where
                 result.map(|(_, response)| response).map_err(|error| error.to_string().into_bytes())
             };
 
-            issues.extend(self.dispatch_lifecycle_request(
+            let effects = self.dispatch_lifecycle_request(
                 backend,
                 LifecyclePhase::AfterFile,
                 plugins,
@@ -819,8 +837,10 @@ where
                 &mut handler,
                 session,
                 Some(file),
+                codebase,
                 lifecycle_start,
-            )?);
+            )?;
+            issues.extend(effects.issues);
         }
 
         Ok(issues)
@@ -876,7 +896,7 @@ where
                 result.map(|(_, response)| response).map_err(|error| error.to_string().into_bytes())
             };
 
-            issues.extend(self.dispatch_lifecycle_request(
+            let effects = self.dispatch_lifecycle_request(
                 backend,
                 LifecyclePhase::AfterFileBatch,
                 plugins,
@@ -885,8 +905,10 @@ where
                 &mut handler,
                 session,
                 None,
+                codebase,
                 lifecycle_start,
-            )?);
+            )?;
+            issues.extend(effects.issues);
         }
 
         Ok(issues)
@@ -894,13 +916,14 @@ where
 
     fn run_after_analysis_hooks(
         &self,
-        result: &crate::analysis_result::AnalysisResult,
+        analysis_result: &crate::analysis_result::AnalysisResult,
         files: &[Arc<FileAnalysisSnapshot>],
         codebase: &CodebaseMetadata,
         session: &ExternalAnalysisSession,
     ) -> Result<IssueCollection, ExternalAnalyzerError> {
         let mut issues = IssueCollection::new();
         let store = lifecycle::AnalysisStore::Project(files);
+        let reference_store = lifecycle::SymbolReferenceStore::new(&analysis_result.symbol_references);
         for backend in &self.backends {
             let plugins = &backend.registration.after_analysis_plugins;
             if plugins.is_empty() {
@@ -909,13 +932,14 @@ where
 
             let lifecycle_start = self.trace_enabled.then(Instant::now);
             let encode_start = self.trace_enabled.then(Instant::now);
-            let request = lifecycle::encode_after_analysis_request(session.generation(), plugins, result, files)
-                .inspect_err(|_| {
-                    if self.trace_enabled {
-                        self.telemetry.lifecycle_errors.fetch_add(1, Ordering::Relaxed);
-                        self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
-                    }
-                })?;
+            let request =
+                lifecycle::encode_after_analysis_request(session.generation(), plugins, analysis_result, files)
+                    .inspect_err(|_| {
+                        if self.trace_enabled {
+                            self.telemetry.lifecycle_errors.fetch_add(1, Ordering::Relaxed);
+                            self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
+                        }
+                    })?;
             if let Some(start) = encode_start {
                 self.telemetry.lifecycle_encode_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
             }
@@ -924,13 +948,18 @@ where
             let trace_enabled = self.trace_enabled;
             let mut handler = |frame: &Frame| {
                 let nested_start = trace_enabled.then(Instant::now);
-                let result =
-                    if protocol::message_kind(&frame.payload).map_err(|error| error.to_string().into_bytes())? == 8 {
-                        lifecycle::handle_analysis_query(&frame.payload, session, &store)
-                            .map(|response| (protocol::NestedRequestKind::AnalysisQuery, response))
-                    } else {
-                        protocol::handle_nested_request(&frame.payload, codebase, session, |_| None)
-                    };
+                let kind = protocol::message_kind(&frame.payload).map_err(|error| error.to_string().into_bytes())?;
+                let result = if kind == 8 {
+                    lifecycle::handle_analysis_query(&frame.payload, session, &store)
+                        .map(|response| (protocol::NestedRequestKind::AnalysisQuery, response))
+                } else if lifecycle::is_symbol_reference_query(&frame.payload)
+                    .map_err(|error| error.to_string().into_bytes())?
+                {
+                    lifecycle::handle_symbol_reference_query(&frame.payload, session, codebase, &reference_store)
+                        .map(|response| (protocol::NestedRequestKind::SymbolReferenceQuery, response))
+                } else {
+                    protocol::handle_nested_request(&frame.payload, codebase, session, |_| None)
+                };
                 if let Some(start) = nested_start {
                     nested_telemetry.record_nested_request(frame.payload.len(), start.elapsed(), &result);
                 }
@@ -938,7 +967,7 @@ where
                 result.map(|(_, response)| response).map_err(|error| error.to_string().into_bytes())
             };
 
-            issues.extend(self.dispatch_lifecycle_request(
+            let effects = self.dispatch_lifecycle_request(
                 backend,
                 LifecyclePhase::After,
                 plugins,
@@ -947,8 +976,10 @@ where
                 &mut handler,
                 session,
                 None,
+                codebase,
                 lifecycle_start,
-            )?);
+            )?;
+            issues.extend(effects.issues);
         }
 
         Ok(issues)
@@ -1458,6 +1489,7 @@ impl<T> Drop for ExternalAnalyzer<T> {
         let comparisons = self.telemetry.comparisons.load(Ordering::Relaxed);
         let metadata_queries = self.telemetry.metadata_queries.load(Ordering::Relaxed);
         let analysis_queries = self.telemetry.analysis_queries.load(Ordering::Relaxed);
+        let symbol_reference_queries = self.telemetry.symbol_reference_queries.load(Ordering::Relaxed);
         let lifecycle_requests = self
             .telemetry
             .before_analysis_requests
@@ -1494,6 +1526,7 @@ impl<T> Drop for ExternalAnalyzer<T> {
             comparisons,
             metadata_queries,
             analysis_queries,
+            symbol_reference_queries,
             "External analyzer nested-query summary."
         );
 
@@ -1518,6 +1551,9 @@ impl<T> Drop for ExternalAnalyzer<T> {
             comparison_ms = nanos_millis(self.telemetry.comparison_ns.load(Ordering::Relaxed)),
             metadata_query_ms = nanos_millis(self.telemetry.metadata_query_ns.load(Ordering::Relaxed)),
             analysis_query_ms = nanos_millis(self.telemetry.analysis_query_ns.load(Ordering::Relaxed)),
+            symbol_reference_query_ms = nanos_millis(
+                self.telemetry.symbol_reference_query_ns.load(Ordering::Relaxed),
+            ),
             nested_query_ms = nanos_millis(self.telemetry.nested_ns.load(Ordering::Relaxed)),
             decode_ms = nanos_millis(self.telemetry.decode_ns.load(Ordering::Relaxed)),
             total_worker_cpu_ms = nanos_millis(self.telemetry.lookup_ns.load(Ordering::Relaxed)),
@@ -1534,6 +1570,10 @@ impl<T> Drop for ExternalAnalyzer<T> {
             average_analysis_query_micros = average_micros(
                 self.telemetry.analysis_query_ns.load(Ordering::Relaxed),
                 analysis_queries,
+            ),
+            average_symbol_reference_query_micros = average_micros(
+                self.telemetry.symbol_reference_query_ns.load(Ordering::Relaxed),
+                symbol_reference_queries,
             ),
             average_nested_query_micros = average_micros(
                 self.telemetry.nested_ns.load(Ordering::Relaxed),

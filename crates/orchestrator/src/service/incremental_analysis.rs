@@ -53,6 +53,8 @@ struct FileState {
 
 struct SelectiveAnalysisOutput {
     result: AnalysisResult,
+    native_symbol_references: SymbolReferences,
+    external_symbol_references: SymbolReferences,
     per_file_issues: HashMap<FileId, IssueCollection>,
     snapshots: Vec<Arc<FileAnalysisSnapshot>>,
     codebase_issues: IssueCollection,
@@ -76,6 +78,8 @@ pub struct IncrementalAnalysisService {
     database: ReadDatabase,
     codebase: CodebaseMetadata,
     symbol_references: SymbolReferences,
+    native_symbol_references: SymbolReferences,
+    external_symbol_references: SymbolReferences,
     base_codebase: Arc<CodebaseMetadata>,
     base_symbol_references: Arc<SymbolReferences>,
     settings: Settings,
@@ -94,6 +98,8 @@ impl std::fmt::Debug for IncrementalAnalysisService {
             .field("database", &"<ReadDatabase>")
             .field("codebase", &"<CodebaseMetadata>")
             .field("symbol_references", &"<SymbolReferences>")
+            .field("native_symbol_references", &"<SymbolReferences>")
+            .field("external_symbol_references", &"<SymbolReferences>")
             .field("base_codebase", &"<Arc<CodebaseMetadata>>")
             .field("base_symbol_references", &"<Arc<SymbolReferences>>")
             .field("settings", &self.settings)
@@ -133,11 +139,14 @@ impl IncrementalAnalysisService {
     ) -> Self {
         let base_codebase = Arc::new(codebase.clone());
         let base_symbol_references = Arc::new(symbol_references.clone());
+        let native_symbol_references = symbol_references.clone();
 
         Self {
             database,
             codebase,
             symbol_references,
+            native_symbol_references,
+            external_symbol_references: SymbolReferences::new(),
             base_codebase,
             base_symbol_references,
             settings,
@@ -367,11 +376,15 @@ impl IncrementalAnalysisService {
 
         let SelectiveAnalysisOutput {
             result: mut analysis_result,
+            native_symbol_references,
+            external_symbol_references,
             per_file_issues,
             snapshots,
             codebase_issues: all_codebase_issues,
         } =
             self.run_analyzer_selective(&mut merged_codebase, symbol_references, &self.settings, &HashSet::default())?;
+        self.external_symbol_references = external_symbol_references;
+        self.native_symbol_references = native_symbol_references;
         self.lifecycle_issues = analysis_result.issues.clone();
         self.analysis_snapshots = snapshots.into_iter().map(|snapshot| (snapshot.file_id(), snapshot)).collect();
 
@@ -646,7 +659,7 @@ impl IncrementalAnalysisService {
             self.apply_scan_results(&mut merged_codebase, &new_file_scans);
 
             let files_to_skip: HashSet<FileId> = unchanged_file_ids.iter().copied().collect();
-            let mut symbol_references = std::mem::take(&mut self.symbol_references);
+            let mut symbol_references = std::mem::take(&mut self.native_symbol_references);
 
             let mut changed_symbols: HashSet<(mago_word::Word, mago_word::Word)> = HashSet::default();
             let mut changed_file_names: Vec<mago_word::Word> = Vec::new();
@@ -700,10 +713,14 @@ impl IncrementalAnalysisService {
             );
             let SelectiveAnalysisOutput {
                 result: mut analysis_result,
+                native_symbol_references,
+                external_symbol_references,
                 mut per_file_issues,
                 snapshots,
                 codebase_issues: new_codebase_issues,
             } = self.run_analyzer_selective(&mut merged_codebase, symbol_references, &self.settings, &files_to_skip)?;
+            self.external_symbol_references = external_symbol_references;
+            self.native_symbol_references = native_symbol_references;
             self.lifecycle_issues = std::mem::take(&mut analysis_result.issues);
             self.analysis_snapshots.retain(|file_id, _| current_file_ids.contains(file_id));
             for snapshot in snapshots {
@@ -779,7 +796,8 @@ impl IncrementalAnalysisService {
         merged_codebase.safe_symbols.clear();
         merged_codebase.safe_symbol_members.clear();
 
-        let Some(global_scope_invalid) = merged_codebase.mark_safe_symbols(&diff, &self.symbol_references) else {
+        let Some(global_scope_invalid) = merged_codebase.mark_safe_symbols(&diff, &self.native_symbol_references)
+        else {
             tracing::warn!("Invalidation cascade too expensive (>5000 steps), falling back to full analysis");
 
             return self.analyze();
@@ -834,7 +852,7 @@ impl IncrementalAnalysisService {
             }
         }
 
-        let mut symbol_references = std::mem::take(&mut self.symbol_references);
+        let mut symbol_references = std::mem::take(&mut self.native_symbol_references);
         symbol_references.remove_dirty_symbol_references(&dirty_symbols);
 
         populate_codebase_targeted(
@@ -922,10 +940,14 @@ impl IncrementalAnalysisService {
 
         let SelectiveAnalysisOutput {
             result: mut analysis_result,
+            native_symbol_references,
+            external_symbol_references,
             mut per_file_issues,
             snapshots,
             codebase_issues: new_codebase_issues,
         } = self.run_analyzer_selective(&mut merged_codebase, symbol_references, &self.settings, &files_to_skip)?;
+        self.external_symbol_references = external_symbol_references;
+        self.native_symbol_references = native_symbol_references;
         self.lifecycle_issues = std::mem::take(&mut analysis_result.issues);
         self.analysis_snapshots.retain(|file_id, _| current_file_ids.contains(file_id));
         for snapshot in snapshots {
@@ -1011,6 +1033,9 @@ impl IncrementalAnalysisService {
         if let Some(session) = external_session.as_ref() {
             analyzer = analyzer.with_external_analysis_session(session);
         }
+        if !self.external_symbol_references.is_empty() {
+            analyzer = analyzer.with_additional_symbol_references(&self.external_symbol_references);
+        }
 
         let artifacts = match analyzer.analyze_with_artifacts(program, &mut analysis_result) {
             Ok(artifacts) => artifacts,
@@ -1055,6 +1080,9 @@ impl IncrementalAnalysisService {
         if let Some(session) = external_session.as_ref() {
             analyzer = analyzer.with_external_analysis_session(session);
         }
+        if !self.external_symbol_references.is_empty() {
+            analyzer = analyzer.with_additional_symbol_references(&self.external_symbol_references);
+        }
 
         if let Err(err) = analyzer.analyze(program, &mut analysis_result) {
             issues.push(Issue::error(format!("Analysis error: {err}")));
@@ -1095,25 +1123,31 @@ impl IncrementalAnalysisService {
             plugin_registry.has_external_after_analysis_hooks().map_err(mago_analyzer::error::AnalysisError::from)?;
         #[cfg(not(target_arch = "wasm32"))]
         let before_start = trace_enabled.then(Instant::now);
-        let before_issues = plugin_registry
+        let before = plugin_registry
             .run_external_before_analysis_hooks(codebase, external_session.as_deref())
             .map_err(mago_analyzer::error::AnalysisError::from)?;
+        let references_changed = before.references != self.external_symbol_references;
+        let external_symbol_references = before.references;
+        let effective_skip_files = if references_changed { HashSet::default() } else { skip_files.clone() };
         let host_files: Vec<_> = self
             .database
             .files()
-            .filter(|file| file.file_type == FileType::Host && !skip_files.contains(&file.id))
+            .filter(|file| file.file_type == FileType::Host && !effective_skip_files.contains(&file.id))
             .map(|file| self.database.get(&file.id))
             .collect::<Result<Vec<_>, _>>()?;
         #[cfg(not(target_arch = "wasm32"))]
         if let Some(start) = before_start {
             tracing::trace!(
-                issues = before_issues.len(),
+                issues = before.issues.len(),
+                contributed_references = external_symbol_references.count_body_references()
+                    + external_symbol_references.count_signature_references(),
+                references_changed,
                 elapsed = ?start.elapsed(),
                 "Incremental external before-analysis hooks completed."
             );
         }
 
-        if host_files.is_empty() && skip_files.is_empty() {
+        if host_files.is_empty() && effective_skip_files.is_empty() {
             tracing::warn!("No host files found for analysis.");
         }
         let settings = settings.clone();
@@ -1137,6 +1171,9 @@ impl IncrementalAnalysisService {
                     Analyzer::new(arena, &source_file, &resolved_names, codebase, plugin_registry, settings.clone());
                 if let Some(session) = external_session.as_deref() {
                     analyzer = analyzer.with_external_analysis_session(session);
+                }
+                if !external_symbol_references.is_empty() {
+                    analyzer = analyzer.with_additional_symbol_references(&external_symbol_references);
                 }
 
                 analysis_result.issues.extend(semantics_checker.check(&source_file, program, &resolved_names));
@@ -1183,7 +1220,7 @@ impl IncrementalAnalysisService {
         }
 
         let mut aggregated_result = AnalysisResult::new(current_symbol_references);
-        aggregated_result.issues = before_issues;
+        aggregated_result.issues = before.issues;
         let mut per_file_issues: HashMap<FileId, IssueCollection> = HashMap::default();
         let mut snapshots = Vec::new();
 
@@ -1228,6 +1265,9 @@ impl IncrementalAnalysisService {
             }
         }
 
+        let native_symbol_references = aggregated_result.symbol_references.clone();
+        aggregated_result.symbol_references.extend(external_symbol_references.clone());
+
         let codebase_issues = codebase.take_issues(true);
         if after_analysis {
             let analyzed = snapshots.iter().map(|snapshot| snapshot.file_id()).collect::<HashSet<_>>();
@@ -1252,7 +1292,7 @@ impl IncrementalAnalysisService {
                 project_result.issues.extend(issues.iter().cloned());
             }
             for (file_id, state) in &self.file_states {
-                if skip_files.contains(file_id) {
+                if effective_skip_files.contains(file_id) {
                     project_result.issues.extend(state.analysis_issues.iter().cloned());
                     project_result.issues.extend(state.codebase_issues.iter().cloned());
                 }
@@ -1285,7 +1325,14 @@ impl IncrementalAnalysisService {
             snapshots.clear();
         }
 
-        Ok(SelectiveAnalysisOutput { result: aggregated_result, per_file_issues, snapshots, codebase_issues })
+        Ok(SelectiveAnalysisOutput {
+            result: aggregated_result,
+            native_symbol_references,
+            external_symbol_references,
+            per_file_issues,
+            snapshots,
+            codebase_issues,
+        })
     }
 }
 

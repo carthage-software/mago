@@ -130,12 +130,19 @@ impl AnalysisService {
             return issues;
         }
 
-        match self.plugin_registry.run_external_before_analysis_hooks(&self.codebase, external_session.as_ref()) {
-            Ok(reported) => issues.extend(reported),
-            Err(err) => {
-                issues.push(Issue::error(format!("Analysis error: {err}")));
-                return issues;
-            }
+        let additional_symbol_references =
+            match self.plugin_registry.run_external_before_analysis_hooks(&self.codebase, external_session.as_ref()) {
+                Ok(reported) => {
+                    issues.extend(reported.issues);
+                    reported.references
+                }
+                Err(err) => {
+                    issues.push(Issue::error(format!("Analysis error: {err}")));
+                    return issues;
+                }
+            };
+        if !additional_symbol_references.is_empty() {
+            self.symbol_references.extend(additional_symbol_references.clone());
         }
 
         let after_file = self.plugin_registry.has_external_after_file_analysis_hooks().unwrap_or_default();
@@ -147,6 +154,9 @@ impl AnalysisService {
             Analyzer::new(&arena, file, &resolved_names, &self.codebase, &self.plugin_registry, self.settings);
         if let Some(session) = external_session.as_ref() {
             analyzer = analyzer.with_external_analysis_session(session);
+        }
+        if !additional_symbol_references.is_empty() {
+            analyzer = analyzer.with_additional_symbol_references(&additional_symbol_references);
         }
 
         let artifacts = match analyzer.analyze_with_artifacts(program, &mut analysis_result) {
@@ -210,6 +220,7 @@ impl AnalysisService {
         let external_session =
             self.plugin_registry.create_external_analysis_session(self.database.files()).map(Arc::new);
         let lifecycle_capabilities = Arc::new(OnceLock::new());
+        let additional_symbol_references = Arc::new(OnceLock::new());
         let reducer = AnalysisResultReducer {
             plugin_registry: Arc::clone(&self.plugin_registry),
             external_session: external_session.clone(),
@@ -232,6 +243,8 @@ impl AnalysisService {
         let before_external_session = external_session.clone();
         let before_capabilities = Arc::clone(&lifecycle_capabilities);
         let map_capabilities = Arc::clone(&lifecycle_capabilities);
+        let before_additional_symbol_references = Arc::clone(&additional_symbol_references);
+        let map_additional_symbol_references = Arc::clone(&additional_symbol_references);
 
         #[cfg(not(target_arch = "wasm32"))]
         let trace_enabled = tracing::enabled!(tracing::Level::TRACE);
@@ -241,7 +254,7 @@ impl AnalysisService {
         let telemetry_for_closure = Arc::clone(&telemetry);
 
         let result = pipeline.run(
-            move |codebase, _| {
+            move |codebase, symbol_references| {
                 before_plugin_registry.prepare_external_analyzer().map_err(AnalysisError::from)?;
                 let capabilities = (
                     before_plugin_registry.has_external_after_file_analysis_hooks().map_err(AnalysisError::from)?,
@@ -251,9 +264,14 @@ impl AnalysisService {
                 let _result = before_capabilities.set(capabilities);
                 #[cfg(not(target_arch = "wasm32"))]
                 let lifecycle_start = trace_enabled.then(Instant::now);
-                let issues = before_plugin_registry
+                let before = before_plugin_registry
                     .run_external_before_analysis_hooks(codebase, before_external_session.as_deref())
                     .map_err(AnalysisError::from)?;
+                if !before.references.is_empty() {
+                    symbol_references.extend(before.references.clone());
+                    let _result = before_additional_symbol_references.set(Arc::new(before.references));
+                }
+                let issues = before.issues;
 
                 #[cfg(not(target_arch = "wasm32"))]
                 if let Some(start) = lifecycle_start {
@@ -307,6 +325,9 @@ impl AnalysisService {
                     Analyzer::new(arena, &source_file, &resolved_names, &codebase, &plugin_registry, settings);
                 if let Some(session) = external_session.as_deref() {
                     analyzer = analyzer.with_external_analysis_session(session);
+                }
+                if let Some(references) = map_additional_symbol_references.get() {
+                    analyzer = analyzer.with_additional_symbol_references(references);
                 }
 
                 #[cfg(not(target_arch = "wasm32"))]

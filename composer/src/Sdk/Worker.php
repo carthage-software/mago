@@ -498,6 +498,7 @@ final class Worker
 
     /**
      * @param positive-int $requestId
+     * @mago-expect lint:halstead
      */
     private function handleAnalyzerLifecycleRequest(
         int $kind,
@@ -513,6 +514,7 @@ final class Worker
         $codebase = new Codebase($host, $requestId, $cancellation, $this->metadataCache);
         $types = new TypeComparator($host, $requestId, $cancellation);
         $reportedIssues = [];
+        $contributedReferences = [];
         $analyses = is_array($request->analysis) ? $request->analysis : [$request->analysis];
         foreach ($analyses as $analysis) {
             foreach ($request->pluginIndices as $pluginIndex) {
@@ -591,10 +593,20 @@ final class Worker
                     $reportedIssues[] = $issue;
                     $reportedIssues[] = $context instanceof AfterFileAnalysisContext ? $context->analysis->file : null;
                 }
+
+                if ($context instanceof BeforeAnalysisContext) {
+                    $references = $context->references->takeReferences();
+                    for ($index = 0, $count = count($references); $index < $count; $index += 3) {
+                        $contributedReferences[] = $pluginIndex;
+                        $contributedReferences[] = $references[$index];
+                        $contributedReferences[] = $references[$index + 1];
+                        $contributedReferences[] = $references[$index + 2];
+                    }
+                }
             }
         }
 
-        return AnalyzerProtocol::writeLifecycleResponse($kind, $reportedIssues);
+        return AnalyzerProtocol::writeLifecycleResponse($kind, $reportedIssues, $contributedReferences);
     }
 
     /**
