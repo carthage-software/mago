@@ -5,6 +5,7 @@ use std::io::Read;
 use std::io::Write;
 use std::process::Child;
 use std::process::ChildStderr;
+use std::process::ChildStdin;
 use std::process::ChildStdout;
 use std::sync::Arc;
 use std::sync::Mutex;
@@ -81,6 +82,38 @@ where
     }
 }
 
+struct AbsentRequestHandler;
+
+impl WorkerRequestHandler for AbsentRequestHandler {
+    fn handle(&mut self, _request: &Frame) -> Result<Vec<u8>, Vec<u8>> {
+        unreachable!("an absent nested-request handler cannot be invoked")
+    }
+}
+
+enum WorkerStdin {
+    Process(ChildStdin),
+    #[cfg(test)]
+    Test(std::net::TcpStream),
+}
+
+impl Write for WorkerStdin {
+    fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
+        match self {
+            Self::Process(stdin) => stdin.write(buffer),
+            #[cfg(test)]
+            Self::Test(stream) => stream.write(buffer),
+        }
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        match self {
+            Self::Process(stdin) => stdin.flush(),
+            #[cfg(test)]
+            Self::Test(stream) => stream.flush(),
+        }
+    }
+}
+
 enum PendingEvent {
     Frame(Frame),
     Failure(WorkerFailure),
@@ -124,7 +157,7 @@ struct WorkerInner {
     next_request_id: AtomicU64,
     in_flight: AtomicUsize,
     maximum_payload_size: usize,
-    writer: Mutex<Option<BufWriter<Box<dyn Write + Send>>>>,
+    writer: Mutex<Option<BufWriter<WorkerStdin>>>,
     child: Mutex<Option<Child>>,
     pending: Mutex<HashMap<u64, mpsc::Sender<PendingEvent>>>,
     stderr: Mutex<StderrTail>,
@@ -324,7 +357,7 @@ impl Worker {
             next_request_id: AtomicU64::new(1),
             in_flight: AtomicUsize::new(0),
             maximum_payload_size: options.maximum_payload_size,
-            writer: Mutex::new(Some(BufWriter::new(Box::new(stdin)))),
+            writer: Mutex::new(Some(BufWriter::new(WorkerStdin::Process(stdin)))),
             child: Mutex::new(Some(child)),
             pending: Mutex::new(HashMap::new()),
             stderr: Mutex::new(StderrTail::new(options.stderr_tail_size)),
@@ -388,7 +421,7 @@ impl Worker {
     }
 
     pub fn request(&self, payload: Vec<u8>) -> Result<Vec<u8>, WorkerError> {
-        self.request_inner(payload, None)
+        self.request_inner::<AbsentRequestHandler>(payload, None)
     }
 
     pub fn request_with_handler<H>(&self, payload: Vec<u8>, handler: &mut H) -> Result<Vec<u8>, WorkerError>
@@ -398,11 +431,10 @@ impl Worker {
         self.request_inner(payload, Some(handler))
     }
 
-    fn request_inner(
-        &self,
-        payload: Vec<u8>,
-        mut handler: Option<&mut dyn WorkerRequestHandler>,
-    ) -> Result<Vec<u8>, WorkerError> {
+    fn request_inner<H>(&self, payload: Vec<u8>, mut handler: Option<&mut H>) -> Result<Vec<u8>, WorkerError>
+    where
+        H: WorkerRequestHandler,
+    {
         if !self.is_running() {
             return Err(self.inner.disconnected("worker is not running"));
         }
@@ -418,9 +450,9 @@ impl Worker {
             return Err(error);
         }
 
-        let deadline = Instant::now() + self.request_timeout;
+        let started_at = Instant::now();
         loop {
-            let Some(remaining) = deadline.checked_duration_since(Instant::now()) else {
+            let Some(remaining) = self.request_timeout.checked_sub(started_at.elapsed()) else {
                 self.timeout(request_id);
                 return Err(WorkerError::Timeout {
                     worker: self.id(),
@@ -487,7 +519,7 @@ impl Worker {
                             self.inner.telemetry.cancellations.fetch_add(1, Ordering::Relaxed);
                         }
                         lock(&self.inner.pending).remove(&request_id);
-                        return Err(self.inner.disconnected(format!("worker cancelled request {request_id}")));
+                        return Err(WorkerError::Cancelled { worker: self.id(), request: request_id });
                     }
                     FrameKind::Shutdown => {
                         self.inner.fail("worker requested shutdown");
@@ -538,7 +570,7 @@ impl Worker {
 
     pub fn shutdown(&self) {
         self.begin_shutdown();
-        self.finish_shutdown(Instant::now() + self.shutdown_timeout);
+        self.finish_shutdown(Instant::now(), self.shutdown_timeout);
     }
 
     pub fn begin_shutdown(&self) {
@@ -573,7 +605,7 @@ impl Worker {
         }
     }
 
-    pub fn finish_shutdown(&self, deadline: Instant) {
+    pub fn finish_shutdown(&self, started_at: Instant, timeout: Duration) {
         if self.inner.state.load(Ordering::Acquire) == STATE_STOPPED {
             self.join_threads();
             self.inner.emit_trace_summary();
@@ -590,12 +622,12 @@ impl Worker {
                     None => true,
                 }
             };
-            let now = Instant::now();
-            if exited || now >= deadline {
+            let elapsed = started_at.elapsed();
+            if exited || elapsed >= timeout {
                 break exited;
             }
 
-            std::thread::sleep(poll_interval.min(deadline.saturating_duration_since(now)));
+            std::thread::sleep(poll_interval.min(timeout.saturating_sub(elapsed)));
             poll_interval = (poll_interval * 2).min(MAXIMUM_SHUTDOWN_POLL_INTERVAL);
         };
 
@@ -634,7 +666,7 @@ impl Worker {
     fn from_streams(
         id: usize,
         reader: impl Read + Send + 'static,
-        writer: impl Write + Send + 'static,
+        writer: std::net::TcpStream,
         options: &WorkerPoolOptions,
     ) -> Arc<Self> {
         let inner = Arc::new(WorkerInner {
@@ -643,7 +675,7 @@ impl Worker {
             next_request_id: AtomicU64::new(1),
             in_flight: AtomicUsize::new(0),
             maximum_payload_size: options.maximum_payload_size,
-            writer: Mutex::new(Some(BufWriter::new(Box::new(writer)))),
+            writer: Mutex::new(Some(BufWriter::new(WorkerStdin::Test(writer)))),
             child: Mutex::new(None),
             pending: Mutex::new(HashMap::new()),
             stderr: Mutex::new(StderrTail::new(options.stderr_tail_size)),
@@ -928,6 +960,30 @@ mod tests {
         assert!(!worker.is_running());
 
         drop(peer_writer);
+        worker.shutdown();
+        peer.join().expect("peer thread should join");
+    }
+
+    #[test]
+    fn reports_worker_cancellation_without_marking_the_worker_disconnected() {
+        let (worker, mut peer_reader, mut peer_writer) = connected_worker(Duration::from_secs(2));
+        let peer = std::thread::spawn(move || {
+            let request = Frame::read_from(&mut peer_reader, 1024)
+                .expect("request should decode")
+                .expect("request should be present");
+            Frame::cancel(request.id).write_to(&mut peer_writer, 1024).expect("cancellation should encode");
+            peer_writer.flush().expect("cancellation should flush");
+
+            let shutdown = Frame::read_from(&mut peer_reader, 1024)
+                .expect("shutdown should decode")
+                .expect("shutdown should be present");
+            assert_eq!(shutdown.kind, FrameKind::Shutdown);
+        });
+
+        let error = worker.request(Vec::new()).expect_err("request should be cancelled");
+        assert!(matches!(error, WorkerError::Cancelled { worker: 0, request: 1 }));
+        assert!(worker.is_running());
+
         worker.shutdown();
         peer.join().expect("peer thread should join");
     }

@@ -115,6 +115,8 @@ pub enum WorkerError {
     Protocol { worker: usize, source: ProtocolError },
     /// A request exceeded its configured deadline.
     Timeout { worker: usize, request: u64, duration: Duration },
+    /// A worker explicitly cancelled an in-flight request.
+    Cancelled { worker: usize, request: u64 },
     /// A worker returned an error response.
     Remote { worker: usize, request: u64, payload: Vec<u8> },
     /// A worker sent a request but no host-side handler was installed.
@@ -160,6 +162,9 @@ impl std::fmt::Display for WorkerError {
                     "extension worker {worker} did not answer request {request} within {} ms",
                     duration.as_millis()
                 )
+            }
+            Self::Cancelled { worker, request } => {
+                write!(formatter, "extension worker {worker} cancelled request {request}")
             }
             Self::Remote { worker, request, payload } => write!(
                 formatter,

@@ -103,6 +103,15 @@ pub struct WorkerPool {
 
 impl std::fmt::Debug for WorkerPool {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let (bootstrap_count, bootstrap_request_bytes, bootstrap_response_bytes) = {
+            let bootstraps = lock(&self.bootstraps);
+            (
+                bootstraps.len(),
+                bootstraps.iter().map(|bootstrap| bootstrap.request.len()).sum::<usize>(),
+                bootstraps.iter().map(|bootstrap| bootstrap.response.len()).sum::<usize>(),
+            )
+        };
+
         formatter
             .debug_struct("WorkerPool")
             .field("command", &self.command)
@@ -110,7 +119,9 @@ impl std::fmt::Debug for WorkerPool {
             .field("worker_count", &self.active_workers.load(Ordering::Relaxed))
             .field("worker_capacity", &self.workers.len())
             .field("growth", &self.growth)
-            .field("bootstraps", &self.bootstraps)
+            .field("bootstrap_count", &bootstrap_count)
+            .field("bootstrap_request_bytes", &bootstrap_request_bytes)
+            .field("bootstrap_response_bytes", &bootstrap_response_bytes)
             .field("completed_requests", &self.completed_requests.load(Ordering::Relaxed))
             .field("request_nanos", &self.request_nanos.load(Ordering::Relaxed))
             .field("cursor", &self.cursor.load(Ordering::Relaxed))
@@ -202,13 +213,13 @@ impl WorkerPool {
     /// Number of processes currently active in this pool.
     #[must_use]
     pub fn len(&self) -> usize {
-        self.active_workers.load(Ordering::Acquire)
+        if self.shutting_down.load(Ordering::Acquire) { 0 } else { self.active_workers.load(Ordering::Acquire) }
     }
 
-    /// A worker pool always contains at least one process.
+    /// Returns whether this pool has been shut down and can no longer serve requests.
     #[must_use]
-    pub const fn is_empty(&self) -> bool {
-        false
+    pub fn is_empty(&self) -> bool {
+        self.shutting_down.load(Ordering::Acquire)
     }
 
     /// Sends a request through the least-loaded worker and blocks for its response.
@@ -482,9 +493,9 @@ impl WorkerPool {
             worker.begin_shutdown();
         }
 
-        let deadline = std::time::Instant::now() + self.options.shutdown_timeout;
+        let started_at = Instant::now();
         for worker in workers {
-            worker.finish_shutdown(deadline);
+            worker.finish_shutdown(started_at, self.options.shutdown_timeout);
         }
 
         tracing::trace!("Extension worker pool shut down.");
@@ -767,6 +778,27 @@ mod tests {
 
     #[cfg(unix)]
     #[test]
+    fn debug_output_redacts_arguments_and_bootstrap_payloads() {
+        let pool = WorkerPool::spawn(
+            WorkerCommand::new("cat").with_argument("secret-argument"),
+            NonZeroUsize::MIN,
+            WorkerPoolOptions::default(),
+        )
+        .expect("worker pool should start");
+        lock(&pool.bootstraps)
+            .push(Bootstrap { request: b"secret-request".to_vec(), response: b"secret-response".to_vec() });
+
+        let debug = format!("{pool:?}");
+        assert!(!debug.contains("secret-argument"));
+        assert!(!debug.contains("secret-request"));
+        assert!(!debug.contains("secret-response"));
+        assert!(debug.contains("bootstrap_count: 1"));
+
+        pool.shutdown();
+    }
+
+    #[cfg(unix)]
+    #[test]
     fn starts_only_two_workers_eagerly() {
         let pool = WorkerPool::spawn_adaptive(
             WorkerCommand::new("cat"),
@@ -792,8 +824,11 @@ mod tests {
         .expect("worker pool should start");
 
         assert_eq!(pool.len(), 3);
+        assert!(!pool.is_empty());
         assert!(pool.workers.iter().all(|slot| lock(&slot.worker).is_some()));
         pool.shutdown();
+        assert_eq!(pool.len(), 0);
+        assert!(pool.is_empty());
     }
 
     #[cfg(unix)]

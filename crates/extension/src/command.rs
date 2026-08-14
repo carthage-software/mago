@@ -20,7 +20,7 @@ impl std::fmt::Debug for WorkerCommand {
         formatter
             .debug_struct("WorkerCommand")
             .field("program", &self.program)
-            .field("arguments", &self.arguments)
+            .field("argument_count", &self.arguments.len())
             .field("current_directory", &self.current_directory)
             .field("environment_keys", &self.environment.iter().map(|(key, _)| key).collect::<Vec<_>>())
             .field("clear_environment", &self.clear_environment)
