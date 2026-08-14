@@ -29,7 +29,8 @@ pub struct ExtensionHostConfiguration {
     /// Program and arguments used to start each worker, without shell parsing.
     ///
     /// The first element is the executable. Remaining elements are passed as
-    /// literal arguments. A relative executable path is resolved from the
+    /// literal arguments. A bare executable name is resolved through `PATH`;
+    /// a relative path with a directory component is resolved from the
     /// effective configuration file's directory.
     pub command: Vec<String>,
 

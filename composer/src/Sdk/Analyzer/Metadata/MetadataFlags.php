@@ -4,7 +4,11 @@ declare(strict_types=1);
 
 namespace Mago\Sdk\Analyzer\Metadata;
 
-/** Immutable semantic flags attached to scanned metadata. @api */
+/**
+ * Immutable semantic flags attached to scanned metadata.
+ *
+ * @api
+ */
 final class MetadataFlags
 {
     public const ABSTRACT = 1;

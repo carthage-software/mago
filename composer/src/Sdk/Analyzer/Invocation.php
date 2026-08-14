@@ -8,7 +8,9 @@ use Mago\Sdk\Span;
 
 use function in_array;
 
-/** @api */
+/**
+ * @api
+ */
 final class Invocation
 {
     /**

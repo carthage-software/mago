@@ -6,7 +6,9 @@ namespace Mago\Sdk\Analyzer\Type;
 
 use Mago\Sdk\Analyzer\Type;
 
-/** @api */
+/**
+ * @api
+ */
 final class ConditionalType implements AtomicType
 {
     public function __construct(

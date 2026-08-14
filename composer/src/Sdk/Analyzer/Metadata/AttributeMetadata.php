@@ -6,7 +6,9 @@ namespace Mago\Sdk\Analyzer\Metadata;
 
 use Mago\Sdk\SourceLocation;
 
-/** @api */
+/**
+ * @api
+ */
 final class AttributeMetadata
 {
     public function __construct(

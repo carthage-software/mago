@@ -7,7 +7,9 @@ namespace Mago\Sdk\Analyzer;
 use Mago\Sdk\CancellationTokenInterface;
 use Mago\Sdk\PHPVersion;
 
-/** @api */
+/**
+ * @api
+ */
 final class ReturnTypeProviderContext
 {
     public function __construct(

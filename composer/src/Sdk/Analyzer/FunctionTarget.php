@@ -6,7 +6,9 @@ namespace Mago\Sdk\Analyzer;
 
 use Mago\Sdk\Exception\InvalidArgumentException;
 
-/** @api */
+/**
+ * @api
+ */
 final class FunctionTarget
 {
     /** @var non-empty-string */

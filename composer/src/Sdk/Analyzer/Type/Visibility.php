@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Mago\Sdk\Analyzer\Type;
 
-/** @api */
+/**
+ * @api
+ */
 enum Visibility
 {
     case Public;

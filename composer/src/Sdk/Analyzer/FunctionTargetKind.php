@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Mago\Sdk\Analyzer;
 
-/** @api */
+/**
+ * @api
+ */
 enum FunctionTargetKind: int
 {
     case Exact = 1;

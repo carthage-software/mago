@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Mago\Sdk\Analyzer\Metadata;
 
-/** @api */
+/**
+ * @api
+ */
 enum FunctionLikeKind
 {
     case Function_;

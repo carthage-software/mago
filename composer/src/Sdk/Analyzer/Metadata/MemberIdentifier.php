@@ -6,7 +6,11 @@ namespace Mago\Sdk\Analyzer\Metadata;
 
 use Mago\Sdk\Exception\InvalidArgumentException;
 
-/** Identifies one class-like member for batched metadata queries. @api */
+/**
+ * Identifies one class-like member for batched metadata queries.
+ *
+ * @api
+ */
 final class MemberIdentifier
 {
     public function __construct(

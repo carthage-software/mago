@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Mago\Sdk\Analyzer\Type;
 
-/** @api */
+/**
+ * @api
+ */
 final class MixedType implements AtomicType
 {
     public function __construct(

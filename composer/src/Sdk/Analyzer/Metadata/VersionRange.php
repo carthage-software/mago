@@ -6,7 +6,9 @@ namespace Mago\Sdk\Analyzer\Metadata;
 
 use Mago\Sdk\PHPVersion;
 
-/** @api */
+/**
+ * @api
+ */
 final class VersionRange
 {
     public function __construct(

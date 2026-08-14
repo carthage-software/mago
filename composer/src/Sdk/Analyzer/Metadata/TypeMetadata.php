@@ -7,7 +7,9 @@ namespace Mago\Sdk\Analyzer\Metadata;
 use Mago\Sdk\Analyzer\Type;
 use Mago\Sdk\SourceLocation;
 
-/** @api */
+/**
+ * @api
+ */
 final class TypeMetadata
 {
     public function __construct(

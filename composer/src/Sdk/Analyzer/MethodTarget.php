@@ -9,7 +9,9 @@ use Mago\Sdk\Exception\InvalidArgumentException;
 use function strlen;
 use function strpos;
 
-/** @api */
+/**
+ * @api
+ */
 final class MethodTarget
 {
     /** @var non-empty-string */
