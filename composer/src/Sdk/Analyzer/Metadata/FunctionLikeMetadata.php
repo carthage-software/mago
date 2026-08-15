@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Mago\Sdk\Analyzer\Metadata;
 
+use Mago\Sdk\Analyzer\Assertion\Assertion;
 use Mago\Sdk\Analyzer\Type\Visibility;
 use Mago\Sdk\SourceLocation;
 
@@ -20,6 +21,9 @@ final class FunctionLikeMetadata
      * @param list<TemplateMetadata> $templates
      * @param list<AttributeMetadata> $attributes
      * @param list<TypeMetadata> $thrownTypes
+     * @param array<string, list<Assertion>> $assertions
+     * @param array<string, list<Assertion>> $ifTrueAssertions
+     * @param array<string, list<Assertion>> $ifFalseAssertions
      * @param list<string> $globalsAccessed
      * @param array<string, TypeMetadata> $whereConstraints
      * @param list<VersionRange> $availableVersions
@@ -36,6 +40,10 @@ final class FunctionLikeMetadata
         public readonly array $templates,
         public readonly array $attributes,
         public readonly array $thrownTypes,
+        public readonly array $assertions,
+        public readonly array $ifTrueAssertions,
+        public readonly array $ifFalseAssertions,
+        public readonly bool $assertionsInferred,
         public readonly array $globalsAccessed,
         public readonly bool $hasDocblock,
         public readonly MetadataFlags $flags,

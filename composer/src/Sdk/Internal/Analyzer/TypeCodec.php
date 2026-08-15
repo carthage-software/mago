@@ -691,7 +691,7 @@ final class TypeCodec
         }
     }
 
-    private static function writeFunctionLikeIdentifier(PayloadWriter $writer, FunctionLikeIdentifier $identifier): void
+    public static function writeFunctionLikeIdentifier(PayloadWriter $writer, FunctionLikeIdentifier $identifier): void
     {
         $writer->writeU8(match ($identifier->kind) {
             FunctionLikeKind::Function_ => 1,

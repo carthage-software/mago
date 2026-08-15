@@ -4,6 +4,19 @@ declare(strict_types=1);
 
 namespace Mago\Sdk\Internal\Analyzer;
 
+use Mago\Sdk\Analyzer\Assertion\ArrayKeyAssertion;
+use Mago\Sdk\Analyzer\Assertion\ArrayKeyAssertionKind;
+use Mago\Sdk\Analyzer\Assertion\Assertion;
+use Mago\Sdk\Analyzer\Assertion\CountabilityAssertion;
+use Mago\Sdk\Analyzer\Assertion\CountabilityAssertionKind;
+use Mago\Sdk\Analyzer\Assertion\IntegerAssertion;
+use Mago\Sdk\Analyzer\Assertion\IntegerAssertionKind;
+use Mago\Sdk\Analyzer\Assertion\SimpleAssertion;
+use Mago\Sdk\Analyzer\Assertion\SimpleAssertionKind;
+use Mago\Sdk\Analyzer\Assertion\TypeAssertion;
+use Mago\Sdk\Analyzer\Assertion\TypeAssertionKind;
+use Mago\Sdk\Analyzer\Assertion\VariableAssertion;
+use Mago\Sdk\Analyzer\Assertion\VariableAssertionKind;
 use Mago\Sdk\Analyzer\Metadata\AttributeMetadata;
 use Mago\Sdk\Analyzer\Metadata\ClassConstantMetadata;
 use Mago\Sdk\Analyzer\Metadata\ClassLikeKind;
@@ -20,6 +33,8 @@ use Mago\Sdk\Analyzer\Metadata\TemplateMetadata;
 use Mago\Sdk\Analyzer\Metadata\TypeMetadata;
 use Mago\Sdk\Analyzer\Metadata\VersionRange;
 use Mago\Sdk\Analyzer\Type;
+use Mago\Sdk\Analyzer\Type\ArrayKey;
+use Mago\Sdk\Analyzer\Type\ArrayKeyKind;
 use Mago\Sdk\Analyzer\Type\GenericParent;
 use Mago\Sdk\Analyzer\Type\GenericParentKind;
 use Mago\Sdk\Analyzer\Type\Variance;
@@ -34,6 +49,7 @@ use Mago\Sdk\Span;
  * @internal
  * @mago-expect lint:cyclomatic-complexity
  * @mago-expect lint:halstead
+ * @mago-expect lint:kan-defect
  * @mago-expect lint:too-many-methods
  */
 final class MetadataCodec
@@ -107,6 +123,10 @@ final class MetadataCodec
         }
 
         $globals = self::readStrings($reader);
+        $assertions = self::readAssertions($reader);
+        $ifTrueAssertions = self::readAssertions($reader);
+        $ifFalseAssertions = self::readAssertions($reader);
+        $assertionsInferred = $reader->readBoolean();
         $hasDocblock = $reader->readBoolean();
         $flags = new MetadataFlags($reader->readU64());
         $availableVersions = self::readVersionRanges($reader);
@@ -140,6 +160,10 @@ final class MetadataCodec
             $templates,
             $attributes,
             $thrownTypes,
+            $assertions,
+            $ifTrueAssertions,
+            $ifFalseAssertions,
+            $assertionsInferred,
             $globals,
             $hasDocblock,
             $flags,
@@ -151,6 +175,88 @@ final class MetadataCodec
             $constructor,
             $whereConstraints,
         );
+    }
+
+    /** @return array<string, list<Assertion>> */
+    private static function readAssertions(PayloadReader $reader): array
+    {
+        $count = $reader->readCount(self::MAXIMUM_MEMBERS);
+        $assertions = [];
+        for ($index = 0; $index < $count; ++$index) {
+            $variable = $reader->readBytes();
+            $assertionCount = $reader->readCount(self::MAXIMUM_MEMBERS);
+            $values = [];
+            for ($assertionIndex = 0; $assertionIndex < $assertionCount; ++$assertionIndex) {
+                $values[] = self::readAssertion($reader);
+            }
+            $assertions[$variable] = $values;
+        }
+
+        return $assertions;
+    }
+
+    private static function readAssertion(PayloadReader $reader): Assertion
+    {
+        return match ($kind = $reader->readU8()) {
+            1 => new SimpleAssertion(SimpleAssertionKind::Any),
+            2 => new TypeAssertion(TypeAssertionKind::IsType, TypeCodec::readComplete($reader)),
+            3 => new TypeAssertion(TypeAssertionKind::IsNotType, TypeCodec::readComplete($reader)),
+            4 => new SimpleAssertion(SimpleAssertionKind::Falsy),
+            5 => new SimpleAssertion(SimpleAssertionKind::Truthy),
+            6 => new TypeAssertion(TypeAssertionKind::IsIdentical, TypeCodec::readComplete($reader)),
+            7 => new TypeAssertion(TypeAssertionKind::IsNotIdentical, TypeCodec::readComplete($reader)),
+            8 => new TypeAssertion(TypeAssertionKind::IsEqual, TypeCodec::readComplete($reader)),
+            9 => new TypeAssertion(TypeAssertionKind::IsNotEqual, TypeCodec::readComplete($reader)),
+            10 => new SimpleAssertion(SimpleAssertionKind::IsEqualIsset),
+            11 => new SimpleAssertion(SimpleAssertionKind::IsIsset),
+            12 => new SimpleAssertion(SimpleAssertionKind::IsNotIsset),
+            13 => new SimpleAssertion(SimpleAssertionKind::HasStringArrayAccess),
+            14 => new SimpleAssertion(SimpleAssertionKind::HasIntOrStringArrayAccess),
+            15 => new SimpleAssertion(SimpleAssertionKind::ArrayKeyExists),
+            16 => new SimpleAssertion(SimpleAssertionKind::ArrayKeyDoesNotExist),
+            17 => new TypeAssertion(TypeAssertionKind::InArray, TypeCodec::readComplete($reader)),
+            18 => new TypeAssertion(TypeAssertionKind::NotInArray, TypeCodec::readComplete($reader)),
+            19 => new ArrayKeyAssertion(ArrayKeyAssertionKind::HasKey, self::readArrayKey($reader)),
+            20 => new ArrayKeyAssertion(ArrayKeyAssertionKind::DoesNotHaveKey, self::readArrayKey($reader)),
+            21 => new ArrayKeyAssertion(ArrayKeyAssertionKind::HasNonnullEntryForKey, self::readArrayKey($reader)),
+            22 => new ArrayKeyAssertion(
+                ArrayKeyAssertionKind::DoesNotHaveNonnullEntryForKey,
+                self::readArrayKey($reader),
+            ),
+            23 => new SimpleAssertion(SimpleAssertionKind::Empty),
+            24 => new SimpleAssertion(SimpleAssertionKind::NonEmpty),
+            25 => new CountabilityAssertion(CountabilityAssertionKind::NonEmpty, $reader->readBoolean()),
+            26 => new SimpleAssertion(SimpleAssertionKind::EmptyCountable),
+            27 => new IntegerAssertion(IntegerAssertionKind::HasExactCount, $reader->readU64()),
+            28 => new IntegerAssertion(IntegerAssertionKind::HasAtLeastCount, $reader->readU64()),
+            29 => new IntegerAssertion(IntegerAssertionKind::DoesNotHaveExactCount, $reader->readU64()),
+            30 => new IntegerAssertion(IntegerAssertionKind::DoesNotHaveAtLeastCount, $reader->readU64()),
+            31 => new IntegerAssertion(IntegerAssertionKind::IsLessThan, $reader->readI64()),
+            32 => new IntegerAssertion(IntegerAssertionKind::IsLessThanOrEqual, $reader->readI64()),
+            33 => new IntegerAssertion(IntegerAssertionKind::IsGreaterThan, $reader->readI64()),
+            34 => new IntegerAssertion(IntegerAssertionKind::IsGreaterThanOrEqual, $reader->readI64()),
+            35 => new IntegerAssertion(IntegerAssertionKind::IsLessThanFromBound, $reader->readI64()),
+            36 => new IntegerAssertion(IntegerAssertionKind::IsLessThanOrEqualFromBound, $reader->readI64()),
+            37 => new IntegerAssertion(IntegerAssertionKind::IsGreaterThanFromBound, $reader->readI64()),
+            38 => new IntegerAssertion(IntegerAssertionKind::IsGreaterThanOrEqualFromBound, $reader->readI64()),
+            39 => new VariableAssertion(VariableAssertionKind::IsLessThan, $reader->readBytes()),
+            40 => new VariableAssertion(VariableAssertionKind::IsLessThanOrEqual, $reader->readBytes()),
+            41 => new VariableAssertion(VariableAssertionKind::IsGreaterThan, $reader->readBytes()),
+            42 => new VariableAssertion(VariableAssertionKind::IsGreaterThanOrEqual, $reader->readBytes()),
+            43 => new SimpleAssertion(SimpleAssertionKind::Countable),
+            44 => new CountabilityAssertion(CountabilityAssertionKind::NotCountable, $reader->readBoolean()),
+            default => throw new ProtocolException("Unknown function-like assertion kind {$kind}."),
+        };
+    }
+
+    private static function readArrayKey(PayloadReader $reader): ArrayKey
+    {
+        return match ($kind = $reader->readU8()) {
+            1 => new ArrayKey(ArrayKeyKind::Integer, $reader->readI64()),
+            2 => new ArrayKey(ArrayKeyKind::String, $reader->readBytes()),
+            3 => new ArrayKey(ArrayKeyKind::ClassLikeConstant, $reader->readBytes(), $reader->readBytes()),
+            default => throw new ProtocolException("Unknown assertion array-key kind {$kind}."),
+        };
     }
 
     public static function readProperty(PayloadReader $reader): PropertyMetadata

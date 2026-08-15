@@ -75,7 +75,21 @@ fn make_database(
             String::new()
         };
         let extension_usage = if index == 0 {
-            "\nfunction extension_consumer(ExtensionProvided $provided): int {\n    return $provided->answer() + extension_answer(0) + EXTENSION_ANSWER;\n}\n"
+            r#"
+/**
+ * @assert int $value
+ * @assert-if-true non-empty-string $text
+ * @assert-if-false null $fallback
+ */
+function lifecycle_assertions(mixed $value, mixed $text, mixed $fallback): bool { return true; }
+
+function extension_consumer(ExtensionProvided $provided): int {
+    return $provided->answer() + extension_answer(0) + EXTENSION_ANSWER;
+}
+
+$lifecycleClosure = function (string $value): string { return $value; };
+$lifecycleArrow = fn(int $value): int => $value;
+"#
         } else {
             ""
         };

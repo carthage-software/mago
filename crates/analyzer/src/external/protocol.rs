@@ -2302,7 +2302,7 @@ fn decode_generic_parent(reader: &mut PayloadReader<'_>) -> Result<GenericParent
     })
 }
 
-fn decode_function_like_identifier(
+pub(super) fn decode_function_like_identifier(
     reader: &mut PayloadReader<'_>,
 ) -> Result<FunctionLikeIdentifier, ExternalAnalyzerError> {
     Ok(match reader.read_u8("function-like identifier kind")? {

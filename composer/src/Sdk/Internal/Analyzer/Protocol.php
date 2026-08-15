@@ -22,6 +22,7 @@ use Mago\Sdk\Analyzer\ReferenceSummary;
 use Mago\Sdk\Analyzer\SymbolReference;
 use Mago\Sdk\Analyzer\SymbolReferences;
 use Mago\Sdk\Analyzer\Type;
+use Mago\Sdk\Analyzer\Type\FunctionLikeIdentifier;
 use Mago\Sdk\CancellationTokenInterface;
 use Mago\Sdk\Exception\ProtocolException;
 use Mago\Sdk\Extension;
@@ -86,6 +87,7 @@ final class Protocol
     public const GET_CLASS_LIKE_RELATIONS = 15;
     public const GET_MAGIC_PROPERTIES = 16;
     public const GET_DECLARING_MAGIC_PROPERTIES = 17;
+    public const GET_FUNCTION_LIKES = 18;
     public const EXISTS_CLASS = 1;
     public const EXISTS_INTERFACE = 2;
     public const EXISTS_TRAIT = 3;
@@ -845,7 +847,7 @@ final class Protocol
     }
 
     /**
-     * @param list<string>|list<MemberIdentifier> $keys
+     * @param list<string>|list<MemberIdentifier>|list<FunctionLikeIdentifier> $keys
      */
     public static function writeCodebaseQueryRequest(
         int $generation,
@@ -861,6 +863,11 @@ final class Protocol
         }
         $writer->writeCount($keys);
         foreach ($keys as $key) {
+            if ($key instanceof FunctionLikeIdentifier) {
+                TypeCodec::writeFunctionLikeIdentifier($writer, $key);
+                continue;
+            }
+
             if ($key instanceof MemberIdentifier) {
                 $writer->writeBytes($key->class);
                 $writer->writeBytes($key->member);

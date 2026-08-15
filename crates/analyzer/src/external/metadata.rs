@@ -1,3 +1,6 @@
+use std::collections::BTreeMap;
+
+use mago_codex::assertion::Assertion;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::metadata::attribute::AttributeMetadata;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
@@ -14,6 +17,7 @@ use mago_codex::metadata::ttype::TypeMetadata;
 use mago_codex::metadata::version_constraint::VersionConstraint;
 use mago_codex::symbol::SymbolKind;
 use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::template::variance::Variance;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::visibility::Visibility;
@@ -25,6 +29,7 @@ use mago_word::Word;
 use crate::external::ExternalAnalysisSession;
 use crate::external::error::ExternalAnalyzerError;
 use crate::external::error::protocol;
+use crate::external::protocol::decode_function_like_identifier;
 use crate::external::protocol::encode_generic_parent;
 use crate::external::protocol::encode_union_snapshot;
 
@@ -48,6 +53,7 @@ const CHECK_MEMBER_EXISTENCE: u8 = 14;
 const GET_CLASS_LIKE_RELATIONS: u8 = 15;
 const GET_MAGIC_PROPERTIES: u8 = 16;
 const GET_DECLARING_MAGIC_PROPERTIES: u8 = 17;
+const GET_FUNCTION_LIKES: u8 = 18;
 
 const ANY_CLASS_LIKE: u8 = 0;
 const CLASS: u8 = 1;
@@ -153,8 +159,26 @@ pub(super) fn handle_query(
                 write_property(writer, metadata, session)
             })
         }),
+        GET_FUNCTION_LIKES => query_function_likes(reader, writer, codebase, session),
         unknown => Err(protocol(format!("unknown codebase query operation {unknown}"))),
     }
+}
+
+fn query_function_likes(
+    reader: &mut PayloadReader<'_>,
+    writer: &mut PayloadWriter,
+    codebase: &CodebaseMetadata,
+    session: &ExternalAnalysisSession,
+) -> Result<(), ExternalAnalyzerError> {
+    let count = reader.read_count("function-like metadata queries", MAXIMUM_QUERIES)?;
+    writer.write_u32(count as u32);
+    for _ in 0..count {
+        let identifier = decode_function_like_identifier(reader)?;
+        write_optional(writer, codebase.get_function_like(&identifier), |writer, metadata| {
+            write_function_like(writer, metadata, session)
+        })?;
+    }
+    Ok(())
 }
 
 fn get_class_like_relations(
@@ -432,6 +456,10 @@ fn write_function_like(
     }
 
     write_words(writer, metadata.globals_accessed.iter().copied())?;
+    write_assertions(writer, &metadata.assertions)?;
+    write_assertions(writer, &metadata.if_true_assertions)?;
+    write_assertions(writer, &metadata.if_false_assertions)?;
+    writer.write_bool(metadata.assertions_inferred);
     writer.write_bool(metadata.has_docblock);
     writer.write_u64(metadata.flags.bits());
     write_version_constraint(writer, &metadata.version_constraint);
@@ -451,6 +479,131 @@ fn write_function_like(
         }
     }
 
+    Ok(())
+}
+
+fn write_assertions(
+    writer: &mut PayloadWriter,
+    assertions: &BTreeMap<Word, Vec<Assertion>>,
+) -> Result<(), ExternalAnalyzerError> {
+    writer.write_u32(assertions.len() as u32);
+    for (variable, values) in assertions {
+        writer.write_bytes(variable.as_bytes())?;
+        writer.write_u32(values.len() as u32);
+        for assertion in values {
+            write_assertion(writer, assertion)?;
+        }
+    }
+    Ok(())
+}
+
+#[allow(clippy::too_many_lines)]
+fn write_assertion(writer: &mut PayloadWriter, assertion: &Assertion) -> Result<(), ExternalAnalyzerError> {
+    let kind = match assertion {
+        Assertion::Any => 1,
+        Assertion::IsType(_) => 2,
+        Assertion::IsNotType(_) => 3,
+        Assertion::Falsy => 4,
+        Assertion::Truthy => 5,
+        Assertion::IsIdentical(_) => 6,
+        Assertion::IsNotIdentical(_) => 7,
+        Assertion::IsEqual(_) => 8,
+        Assertion::IsNotEqual(_) => 9,
+        Assertion::IsEqualIsset => 10,
+        Assertion::IsIsset => 11,
+        Assertion::IsNotIsset => 12,
+        Assertion::HasStringArrayAccess => 13,
+        Assertion::HasIntOrStringArrayAccess => 14,
+        Assertion::ArrayKeyExists => 15,
+        Assertion::ArrayKeyDoesNotExist => 16,
+        Assertion::InArray(_) => 17,
+        Assertion::NotInArray(_) => 18,
+        Assertion::HasArrayKey(_) => 19,
+        Assertion::DoesNotHaveArrayKey(_) => 20,
+        Assertion::HasNonnullEntryForKey(_) => 21,
+        Assertion::DoesNotHaveNonnullEntryForKey(_) => 22,
+        Assertion::Empty => 23,
+        Assertion::NonEmpty => 24,
+        Assertion::NonEmptyCountable(_) => 25,
+        Assertion::EmptyCountable => 26,
+        Assertion::HasExactCount(_) => 27,
+        Assertion::HasAtLeastCount(_) => 28,
+        Assertion::DoesNotHaveExactCount(_) => 29,
+        Assertion::DoesNotHasAtLeastCount(_) => 30,
+        Assertion::IsLessThan(_) => 31,
+        Assertion::IsLessThanOrEqual(_) => 32,
+        Assertion::IsGreaterThan(_) => 33,
+        Assertion::IsGreaterThanOrEqual(_) => 34,
+        Assertion::IsLessThanFromBound(_) => 35,
+        Assertion::IsLessThanOrEqualFromBound(_) => 36,
+        Assertion::IsGreaterThanFromBound(_) => 37,
+        Assertion::IsGreaterThanOrEqualFromBound(_) => 38,
+        Assertion::IsLessThanVariable(_) => 39,
+        Assertion::IsLessThanOrEqualVariable(_) => 40,
+        Assertion::IsGreaterThanVariable(_) => 41,
+        Assertion::IsGreaterThanOrEqualVariable(_) => 42,
+        Assertion::Countable => 43,
+        Assertion::NotCountable(_) => 44,
+    };
+    writer.write_u8(kind);
+
+    match assertion {
+        Assertion::IsType(atomic)
+        | Assertion::IsNotType(atomic)
+        | Assertion::IsIdentical(atomic)
+        | Assertion::IsNotIdentical(atomic)
+        | Assertion::IsEqual(atomic)
+        | Assertion::IsNotEqual(atomic) => write_atomic(writer, atomic)?,
+        Assertion::InArray(union) | Assertion::NotInArray(union) => write_union(writer, union)?,
+        Assertion::HasArrayKey(key)
+        | Assertion::DoesNotHaveArrayKey(key)
+        | Assertion::HasNonnullEntryForKey(key)
+        | Assertion::DoesNotHaveNonnullEntryForKey(key) => write_array_key(writer, key)?,
+        Assertion::NonEmptyCountable(negatable) | Assertion::NotCountable(negatable) => {
+            writer.write_bool(*negatable);
+        }
+        Assertion::HasExactCount(value)
+        | Assertion::HasAtLeastCount(value)
+        | Assertion::DoesNotHaveExactCount(value)
+        | Assertion::DoesNotHasAtLeastCount(value) => writer.write_u64(*value as u64),
+        Assertion::IsLessThan(value)
+        | Assertion::IsLessThanOrEqual(value)
+        | Assertion::IsGreaterThan(value)
+        | Assertion::IsGreaterThanOrEqual(value)
+        | Assertion::IsLessThanFromBound(value)
+        | Assertion::IsLessThanOrEqualFromBound(value)
+        | Assertion::IsGreaterThanFromBound(value)
+        | Assertion::IsGreaterThanOrEqualFromBound(value) => writer.write_u64(*value as u64),
+        Assertion::IsLessThanVariable(variable)
+        | Assertion::IsLessThanOrEqualVariable(variable)
+        | Assertion::IsGreaterThanVariable(variable)
+        | Assertion::IsGreaterThanOrEqualVariable(variable) => writer.write_bytes(variable.as_bytes())?,
+        _ => {}
+    }
+
+    Ok(())
+}
+
+fn write_atomic(writer: &mut PayloadWriter, atomic: &TAtomic) -> Result<(), ExternalAnalyzerError> {
+    write_union(writer, &TUnion::from_atomic(atomic.clone()))
+}
+
+fn write_array_key(writer: &mut PayloadWriter, key: &ArrayKey) -> Result<(), ExternalAnalyzerError> {
+    match key {
+        ArrayKey::Integer(value) => {
+            writer.write_u8(1);
+            writer.write_u64(*value as u64);
+        }
+        ArrayKey::String(value) => {
+            writer.write_u8(2);
+            writer.write_bytes(value.as_bytes())?;
+        }
+        ArrayKey::ClassLikeConstant { class_like_name, constant_name } => {
+            writer.write_u8(3);
+            writer.write_bytes(class_like_name.as_bytes())?;
+            writer.write_bytes(constant_name.as_bytes())?;
+        }
+    }
     Ok(())
 }
 

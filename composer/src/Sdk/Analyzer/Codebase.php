@@ -12,6 +12,8 @@ use Mago\Sdk\Analyzer\Metadata\EnumCaseMetadata;
 use Mago\Sdk\Analyzer\Metadata\FunctionLikeMetadata;
 use Mago\Sdk\Analyzer\Metadata\MemberIdentifier;
 use Mago\Sdk\Analyzer\Metadata\PropertyMetadata;
+use Mago\Sdk\Analyzer\Type\FunctionLikeIdentifier;
+use Mago\Sdk\Analyzer\Type\FunctionLikeKind;
 use Mago\Sdk\CancellationTokenInterface;
 use Mago\Sdk\Exception\InvalidArgumentException;
 use Mago\Sdk\Exception\ProtocolException;
@@ -362,6 +364,38 @@ final class Codebase
         return $this->queryNames(Protocol::GET_FUNCTIONS, $names, null, MetadataCodec::readFunctionLike(...));
     }
 
+    public function getFunctionLike(FunctionLikeIdentifier $identifier): ?FunctionLikeMetadata
+    {
+        return $this->getMultipleFunctionLikes([$identifier])[0] ?? null;
+    }
+
+    /**
+     * @param list<FunctionLikeIdentifier> $identifiers
+     * @return list<FunctionLikeMetadata|null>
+     */
+    public function getMultipleFunctionLikes(array $identifiers): array
+    {
+        $keys = [];
+        foreach ($identifiers as $identifier) {
+            $keys[] = match ($identifier->kind) {
+                FunctionLikeKind::Function_ => "f\0" . strtolower($identifier->name),
+                FunctionLikeKind::Method => "m\0"
+                    . strtolower($identifier->class ?? '')
+                    . "\0"
+                    . strtolower($identifier->name),
+                FunctionLikeKind::Closure => "c\0" . $identifier->name,
+            };
+        }
+
+        return $this->query(
+            Protocol::GET_FUNCTION_LIKES,
+            null,
+            $identifiers,
+            $keys,
+            MetadataCodec::readFunctionLike(...),
+        );
+    }
+
     public function getMethod(string $class, string $method): ?FunctionLikeMetadata
     {
         return $this->getMultipleMethods([new MemberIdentifier($class, $method)])[0] ?? null;
@@ -623,7 +657,7 @@ final class Codebase
 
     /**
      * @template T of object
-     * @param list<string>|list<MemberIdentifier> $requests
+     * @param list<string>|list<MemberIdentifier>|list<FunctionLikeIdentifier> $requests
      * @param list<string> $keys
      * @param Closure(PayloadReader): T $decode
      * @return list<T|null>

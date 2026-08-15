@@ -8,12 +8,15 @@ use Mago\Sdk\Analyzer\AfterAnalysisContext;
 use Mago\Sdk\Analyzer\AfterAnalysisHook;
 use Mago\Sdk\Analyzer\AfterFileAnalysisContext;
 use Mago\Sdk\Analyzer\AfterFileAnalysisHook;
+use Mago\Sdk\Analyzer\Assertion\TypeAssertion;
+use Mago\Sdk\Analyzer\Assertion\TypeAssertionKind;
 use Mago\Sdk\Analyzer\BeforeAnalysisContext;
 use Mago\Sdk\Analyzer\BeforeAnalysisHook;
 use Mago\Sdk\Analyzer\InitializationContext;
 use Mago\Sdk\Analyzer\InitializationHook;
 use Mago\Sdk\Analyzer\LifecycleContext;
 use Mago\Sdk\Analyzer\Metadata\ClassLikeMetadata;
+use Mago\Sdk\Analyzer\Metadata\FunctionLikeKind as MetadataFunctionLikeKind;
 use Mago\Sdk\Analyzer\Metadata\MemberIdentifier;
 use Mago\Sdk\Analyzer\Plugin;
 use Mago\Sdk\Analyzer\PluginDefinition;
@@ -21,6 +24,9 @@ use Mago\Sdk\Analyzer\PluginRegistry;
 use Mago\Sdk\Analyzer\ReferenceKind;
 use Mago\Sdk\Analyzer\ReferenceOrigin;
 use Mago\Sdk\Analyzer\Type;
+use Mago\Sdk\Analyzer\Type\CallableType;
+use Mago\Sdk\Analyzer\Type\FunctionLikeIdentifier;
+use Mago\Sdk\Analyzer\Type\FunctionLikeKind as IdentifierKind;
 use Mago\Sdk\Extension;
 use Mago\Sdk\Reporting\Issue;
 use Mago\Sdk\Reporting\Level;
@@ -31,6 +37,7 @@ use Mago\Sdk\Syntax\NodeKind;
 use Mago\Sdk\Worker;
 use RuntimeException;
 
+use function array_values;
 use function count;
 use function dirname;
 use function file_put_contents;
@@ -116,6 +123,7 @@ final class LifecycleProofHook implements
         $context->report(Level::Help, 'before', Issue::at('Before-analysis hook ran.', $base->location));
     }
 
+    /** @mago-expect lint:halstead */
     public function afterFileAnalysis(AfterFileAnalysisContext $context): void
     {
         $this->verifySharedContext($context);
@@ -176,6 +184,46 @@ final class LifecycleProofHook implements
             || count($analysis->getInferredYieldValueTypes()) !== $analysis->inferredYieldValueCount
         ) {
             throw new RuntimeException('A lazy inferred-type result has the wrong size.');
+        }
+
+        if ($analysis->file === 'src/file0.php') {
+            $identifiers = [];
+            foreach ($expressionTypes as $expressionType) {
+                foreach ($expressionType->type->atomicTypes as $atomicType) {
+                    if (!$atomicType instanceof CallableType) {
+                        continue;
+                    }
+
+                    $identifier = $atomicType->signature?->source;
+                    if ($identifier === null || $identifier->kind !== IdentifierKind::Closure) {
+                        continue;
+                    }
+
+                    $identifiers[$identifier->name] = $identifier;
+                }
+            }
+
+            $identifiers = array_values($identifiers);
+            $functionLikes = $context->codebase->getMultipleFunctionLikes($identifiers);
+            $kinds = [];
+            foreach ($functionLikes as $index => $functionLike) {
+                if ($functionLike === null) {
+                    throw new RuntimeException('A closure identifier did not resolve to function-like metadata.');
+                }
+
+                $identifier = $identifiers[$index];
+                if ($context->codebase->getFunctionLike($identifier) !== $functionLike) {
+                    throw new RuntimeException('Function-like metadata did not preserve cache identity.');
+                }
+                $kinds[$functionLike->kind->name] = true;
+            }
+
+            if (
+                !($kinds[MetadataFunctionLikeKind::Closure->name] ?? false)
+                || !($kinds[MetadataFunctionLikeKind::ArrowFunction->name] ?? false)
+            ) {
+                throw new RuntimeException('Closure and arrow-function metadata did not round-trip by identifier.');
+            }
         }
 
         $this->record('after-file', $analysis->file);
@@ -306,6 +354,11 @@ final class LifecycleProofHook implements
         [$base, $missing] = $context->codebase->getMultipleClasses(['LifecycleClass0', 'DefinitelyMissing']);
         $extensionClass = $context->codebase->getClass('ExtensionProvided');
         $extensionFunction = $context->codebase->getFunction('extension_answer');
+        [$assertingFunction, $answerMethod, $missingFunctionLike] = $context->codebase->getMultipleFunctionLikes([
+            new FunctionLikeIdentifier(IdentifierKind::Function_, 'lifecycle_assertions'),
+            new FunctionLikeIdentifier(IdentifierKind::Method, 'answer', 'ExtensionProvided'),
+            new FunctionLikeIdentifier(IdentifierKind::Closure, '{closure:missing.php:1:1}'),
+        ]);
         if ($base === null || $missing !== null || !$context->codebase->classExists('LifecycleClass0')) {
             throw new RuntimeException('A lifecycle hook cannot query host classes.');
         }
@@ -339,6 +392,28 @@ final class LifecycleProofHook implements
 
         if ($extensionFunction === null || count($extensionFunction->templates) !== 1) {
             throw new RuntimeException('A lifecycle hook cannot query an external-stub function.');
+        }
+
+        $assertion = $assertingFunction?->assertions['$value'][0] ?? null;
+        $ifTrueAssertion = $assertingFunction?->ifTrueAssertions['$text'][0] ?? null;
+        $ifFalseAssertion = $assertingFunction?->ifFalseAssertions['$fallback'][0] ?? null;
+        if (
+            $assertingFunction === null
+            || $answerMethod === null
+            || $answerMethod->kind !== MetadataFunctionLikeKind::Method
+            || $missingFunctionLike !== null
+            || $assertingFunction->assertionsInferred
+            || !$assertion instanceof TypeAssertion
+            || $assertion->kind !== TypeAssertionKind::IsType
+            || !$context->types->equals($assertion->type, Type::int())
+            || !$ifTrueAssertion instanceof TypeAssertion
+            || $ifTrueAssertion->kind !== TypeAssertionKind::IsType
+            || !$context->types->equals($ifTrueAssertion->type, Type::nonEmptyString())
+            || !$ifFalseAssertion instanceof TypeAssertion
+            || $ifFalseAssertion->kind !== TypeAssertionKind::IsType
+            || !$context->types->equals($ifFalseAssertion->type, Type::null())
+        ) {
+            throw new RuntimeException('Function-like assertions or identifier lookup did not round-trip.');
         }
 
         if ($context->codebase->getConstant('EXTENSION_ANSWER') === null) {
