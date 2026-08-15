@@ -81,6 +81,7 @@ use mago_codex::visibility::Visibility;
 use mago_database::file::File;
 use mago_extension::PayloadReader;
 use mago_extension::PayloadWriter;
+use mago_extension::source::write_node_kind_table;
 use mago_php_version::PHPVersion;
 use mago_span::HasSpan;
 use mago_word::word;
@@ -242,6 +243,7 @@ pub(super) enum NestedRequestKind {
 pub(super) fn encode_describe_request(php_version: PHPVersion) -> Vec<u8> {
     let mut writer = message_writer(DESCRIBE_REQUEST);
     writer.write_u32(php_version.to_version_id());
+    write_node_kind_table(&mut writer);
     writer.finish()
 }
 

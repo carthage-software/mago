@@ -10,6 +10,7 @@ use mago_codex::metadata::function_like::FunctionLikeMetadata;
 use mago_codex::metadata::property::PropertyMetadata;
 use mago_codex::ttype::union::TUnion;
 use mago_database::file::File;
+use mago_names::ResolvedNames;
 use mago_reporting::IssueCollection;
 use mago_span::Span;
 use mago_syntax::cst::Class;
@@ -277,6 +278,8 @@ impl PluginRegistry {
     pub fn run_external_after_file_analysis_hooks(
         &self,
         file: &File,
+        program: &Program<'_>,
+        resolved_names: &ResolvedNames<'_>,
         artifacts: &AnalysisArtifacts,
         codebase: &CodebaseMetadata,
         session: Option<&ExternalAnalysisSession>,
@@ -284,7 +287,9 @@ impl PluginRegistry {
         self.external_analyzer
             .as_deref()
             .zip(session)
-            .map(|(analyzer, session)| analyzer.run_after_file_analysis_hooks(file, artifacts, codebase, session))
+            .map(|(analyzer, session)| {
+                analyzer.run_after_file_analysis_hooks(file, program, resolved_names, artifacts, codebase, session)
+            })
             .transpose()
             .map(Option::unwrap_or_default)
             .map_err(|reason| PluginError::Internal { reason })

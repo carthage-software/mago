@@ -82,6 +82,24 @@ final class NodeStore
      * @return list<Node>
      * @mago-expect lint:no-multi-assignments
      */
+    public function getAll(?NodeKind $kind = null): array
+    {
+        $nodes = [];
+        for ($id = 0, $offset = 0; $id < $this->nodeCount; ++$id, $offset += self::RECORD_SIZE) {
+            if ($kind !== null && $this->kinds[ord($this->records[$offset])] !== $kind) {
+                continue;
+            }
+
+            $nodes[] = $this->nodes[$id] ??= $this->materialize($id);
+        }
+
+        return $nodes;
+    }
+
+    /**
+     * @return list<Node>
+     * @mago-expect lint:no-multi-assignments
+     */
     public function getChildren(Node $node): array
     {
         /** @var array{1: int<0, 4294967295>} $decoded */

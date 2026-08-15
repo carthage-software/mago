@@ -91,7 +91,7 @@ fn make_database(
             if index == 0 { "// @mago-expect analysis:lifecycle-one/after-file\n" } else { "" };
         let after_analysis_expectation = if index == 0 { "// @mago-expect analysis:lifecycle-one/after\n" } else { "" };
         let contents = format!(
-            "<?php\n\ndeclare(strict_types=1);\n\n{after_file_expectation}{after_analysis_expectation}final class LifecycleClass{index}{inheritance} {{\n    public function value(): int {{ return {value}; }}\n{private_methods}}}\n\nfunction lifecycle_function_{index}(int $value): int {{ return $value + {value}; }}\n{extension_usage}{framework_reference_marker}{generator}"
+            "<?php\n\n/* exact-in-memory-source:{index}:{value} */\n\ndeclare(strict_types=1);\n\n{after_file_expectation}{after_analysis_expectation}final class LifecycleClass{index}{inheritance} {{\n    public function value(): int {{ return {value}; }}\n{private_methods}}}\n\nfunction lifecycle_function_{index}(int $value): int {{ return $value + {value}; }}\n{extension_usage}{framework_reference_marker}{generator}"
         );
         let file = File::new(
             Cow::Owned(format!("src/file{index}.php").into_bytes()),

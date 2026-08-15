@@ -175,6 +175,8 @@ impl AnalysisService {
         if after_file {
             match self.plugin_registry.run_external_after_file_analysis_hooks(
                 file,
+                program,
+                &resolved_names,
                 &artifacts,
                 &self.codebase,
                 external_session.as_ref(),
@@ -196,7 +198,7 @@ impl AnalysisService {
         issues.extend(analysis_result.issues.iter().cloned());
         issues.extend(self.codebase.take_issues(true));
         if after_analysis {
-            let snapshot = match FileAnalysisSnapshot::new(file, &artifacts) {
+            let snapshot = match FileAnalysisSnapshot::new(file, program, &resolved_names, &artifacts) {
                 Ok(snapshot) => Arc::new(snapshot),
                 Err(err) => {
                     issues.push(Issue::error(format!("Analysis error: {err}")));
@@ -400,9 +402,13 @@ impl AnalysisService {
                 #[cfg(not(target_arch = "wasm32"))]
                 let snapshot_start = (trace_enabled && (after_file || after_analysis)).then(Instant::now);
                 let snapshot = if after_file || after_analysis {
-                    Some(Arc::new(FileAnalysisSnapshot::new(&source_file, &artifacts).map_err(|error| {
-                        OrchestratorError::General(format!("Failed to retain external analysis data: {error}"))
-                    })?))
+                    Some(Arc::new(
+                        FileAnalysisSnapshot::new(&source_file, program, &resolved_names, &artifacts).map_err(
+                            |error| {
+                                OrchestratorError::General(format!("Failed to retain external analysis data: {error}"))
+                            },
+                        )?,
+                    ))
                 } else {
                     None
                 };

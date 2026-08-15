@@ -13,6 +13,10 @@ use std::time::Instant;
 use mago_database::file::File;
 use mago_extension::PayloadReader;
 use mago_extension::PayloadWriter;
+#[cfg(test)]
+use mago_extension::source::NO_NODE;
+use mago_extension::source::SourceSnapshot;
+use mago_extension::source::write_node_kind_table;
 use mago_names::ResolvedNames;
 use mago_php_version::PHPVersion;
 use mago_reporting::Annotation;
@@ -20,15 +24,14 @@ use mago_reporting::AnnotationKind;
 use mago_reporting::Issue;
 use mago_reporting::IssueCollection;
 use mago_reporting::Level;
-use mago_span::HasSpan;
 use mago_span::Position;
 use mago_span::Span;
-use mago_syntax::cst::Node;
 use mago_syntax::cst::NodeKind;
 use mago_syntax::cst::Program;
 use mago_text_edit::Safety;
 use mago_text_edit::TextEdit;
 use mago_text_edit::TextRange;
+#[cfg(test)]
 use strum::IntoEnumIterator;
 
 use super::ExternalLintError;
@@ -43,7 +46,6 @@ const DESCRIBE_REQUEST: u16 = 1;
 const LINT_FILE_REQUEST: u16 = 2;
 const DESCRIBE_RESPONSE: u16 = 0x8001;
 const LINT_FILE_RESPONSE: u16 = 0x8002;
-const NO_PARENT: u32 = u32::MAX;
 const MAXIMUM_EXTENSIONS: usize = 0x4000;
 const MAXIMUM_EXTENSIONS_RULES: usize = 0x4000;
 const MAXIMUM_TARGETS_PER_RULE: usize = 512;
@@ -70,143 +72,10 @@ pub(super) struct LintRequest {
     pub serialization_duration: Duration,
 }
 
-#[derive(Debug)]
-struct SnapshotNode {
-    kind: NodeKind,
-    start: u32,
-    end: u32,
-    parent: Option<u32>,
-    first_child: Option<u32>,
-    next_sibling: Option<u32>,
-    last_child: Option<u32>,
-}
-
-#[derive(Debug)]
-struct FileSnapshot<'source> {
-    nodes: Vec<SnapshotNode>,
-    targets: Vec<u32>,
-    names: Vec<(u32, u32, &'source [u8], bool)>,
-    trivia: Vec<(&'static str, u32, u32)>,
-}
-
-impl<'source> FileSnapshot<'source> {
-    fn build<'ast, 'arena>(
-        file: &'source File,
-        program: &'ast Program<'arena>,
-        resolved_names: &'source ResolvedNames<'arena>,
-        target_kinds: &[bool; u8::MAX as usize + 1],
-    ) -> Result<Option<Self>, ExternalLintError> {
-        if file.contents.len() > u32::MAX as usize {
-            return Err(ExternalLintError::FileTooLarge(file.contents.len()));
-        }
-
-        let mut nodes = Vec::new();
-        let mut targets = Vec::new();
-        let mut target_ranges = Vec::new();
-        let mut stack = Vec::with_capacity(64);
-        let mut subtree_stack = Vec::with_capacity(64);
-        stack.push(Node::Program(program));
-        while let Some(node) = stack.pop() {
-            if target_kinds[node.kind() as usize] {
-                let span = node.span();
-                target_ranges.push((span.start.offset, span.end.offset));
-                Self::append_subtree(node, target_kinds, &mut nodes, &mut targets, &mut subtree_stack)?;
-                continue;
-            }
-
-            let start = stack.len();
-            node.visit_children(|child| stack.push(child));
-            stack[start..].reverse();
-        }
-
-        if targets.is_empty() {
-            return Ok(None);
-        }
-
-        let mut names: Vec<_> = resolved_names
-            .iter()
-            .filter(|(start, end, _, _)| {
-                let range_index = target_ranges.partition_point(|(_, range_end)| range_end <= start);
-                target_ranges
-                    .get(range_index)
-                    .is_some_and(|(range_start, range_end)| range_start <= start && end <= range_end)
-            })
-            .collect();
-        names.sort_unstable_by_key(|(start, end, _, _)| (*start, *end));
-
-        let trivia = program
-            .trivia
-            .iter()
-            .filter(|trivia| trivia.kind.is_comment())
-            .map(|trivia| {
-                let kind = match trivia.kind {
-                    mago_syntax::cst::TriviaKind::SingleLineComment => "SingleLineComment",
-                    mago_syntax::cst::TriviaKind::MultiLineComment => "MultiLineComment",
-                    mago_syntax::cst::TriviaKind::HashComment => "HashComment",
-                    mago_syntax::cst::TriviaKind::DocBlockComment => "DocBlockComment",
-                    mago_syntax::cst::TriviaKind::WhiteSpace => unreachable!("whitespace was filtered out"),
-                };
-
-                (kind, trivia.span.start.offset, trivia.span.end.offset)
-            })
-            .collect();
-
-        Ok(Some(Self { nodes, targets, names, trivia }))
-    }
-
-    fn append_subtree<'ast, 'arena>(
-        root: Node<'ast, 'arena>,
-        target_kinds: &[bool; u8::MAX as usize + 1],
-        nodes: &mut Vec<SnapshotNode>,
-        targets: &mut Vec<u32>,
-        stack: &mut Vec<(Node<'ast, 'arena>, Option<u32>)>,
-    ) -> Result<(), ExternalLintError> {
-        stack.push((root, None));
-        while let Some((node, parent)) = stack.pop() {
-            let identifier =
-                u32::try_from(nodes.len()).map_err(|_| protocol("syntax tree contains more than u32::MAX nodes"))?;
-            let span = node.span();
-            nodes.push(SnapshotNode {
-                kind: node.kind(),
-                start: span.start.offset,
-                end: span.end.offset,
-                parent,
-                first_child: None,
-                next_sibling: None,
-                last_child: None,
-            });
-
-            if let Some(parent) = parent {
-                let previous_sibling = nodes[parent as usize].last_child.replace(identifier);
-                if let Some(previous_sibling) = previous_sibling {
-                    nodes[previous_sibling as usize].next_sibling = Some(identifier);
-                } else {
-                    nodes[parent as usize].first_child = Some(identifier);
-                }
-            }
-
-            if target_kinds[node.kind() as usize] {
-                targets.push(identifier);
-            }
-
-            let start = stack.len();
-            node.visit_children(|child| stack.push((child, Some(identifier))));
-            stack[start..].reverse();
-        }
-
-        Ok(())
-    }
-}
-
 pub(super) fn encode_describe_request(php_version: PHPVersion) -> Vec<u8> {
     let mut writer = message_writer(DESCRIBE_REQUEST);
     writer.write_u32(php_version.to_version_id());
-    writer.write_u32(NodeKind::iter().count() as u32);
-    for kind in NodeKind::iter() {
-        let name = kind.to_string();
-        writer.write_u32(name.len() as u32);
-        writer.write_raw(name.as_bytes());
-    }
+    write_node_kind_table(&mut writer);
 
     writer.finish()
 }
@@ -314,17 +183,20 @@ pub(super) fn encode_lint_request<'arena>(
     target_kinds: &[bool; u8::MAX as usize + 1],
     trace_enabled: bool,
 ) -> Result<Option<LintRequest>, ExternalLintError> {
+    if file.contents.len() > u32::MAX as usize {
+        return Err(ExternalLintError::FileTooLarge(file.contents.len()));
+    }
+
     let snapshot_start = trace_enabled.then(Instant::now);
-    let Some(snapshot) = FileSnapshot::build(file, program, resolved_names, target_kinds)? else {
+    let Some(snapshot) = SourceSnapshot::filtered(program, resolved_names, target_kinds)? else {
         return Ok(None);
     };
     let snapshot_duration = snapshot_start.map_or(Duration::ZERO, |start| start.elapsed());
     let serialization_start = trace_enabled.then(Instant::now);
-    let names_length = snapshot.names.iter().map(|(_, _, name, _)| name.len()).sum::<usize>();
-    let target_count = snapshot.targets.len();
-    let node_count = snapshot.nodes.len();
-    let name_count = snapshot.names.len();
-    let trivia_count = snapshot.trivia.len();
+    let target_count = snapshot.target_count();
+    let node_count = snapshot.node_count();
+    let name_count = snapshot.name_count();
+    let trivia_count = snapshot.trivia_count();
     let payload_capacity = HEADER_LENGTH
         + 4
         + file.name.len()
@@ -332,16 +204,7 @@ pub(super) fn encode_lint_request<'arena>(
         + file.contents.len()
         + 2
         + (active_rules.len() * 2)
-        + 4
-        + (snapshot.targets.len() * 4)
-        + 4
-        + (snapshot.nodes.len() * 21)
-        + 4
-        + (snapshot.names.len() * 17)
-        + 4
-        + names_length
-        + 4
-        + (snapshot.trivia.len() * 9);
+        + snapshot.encoded_len();
     let mut writer = message_writer_with_capacity(LINT_FILE_REQUEST, payload_capacity);
     writer.write_bytes(file.name.as_ref())?;
     writer.write_bytes(file.contents.as_ref())?;
@@ -351,63 +214,7 @@ pub(super) fn encode_lint_request<'arena>(
     for index in active_rules {
         writer.write_u16(*index);
     }
-
-    writer.write_length(snapshot.targets.len())?;
-    for target in snapshot.targets {
-        writer.write_u32(target);
-    }
-
-    // Nodes use fixed-width records so workers can retain the table as packed
-    // bytes and materialize public node objects only when a rule visits them.
-    // Children form an intrusive sibling list, avoiding both a second edge
-    // table on the wire and one allocation per node while building snapshots.
-    writer.write_length(snapshot.nodes.len())?;
-    for node in &snapshot.nodes {
-        writer.write_u8(node.kind as u8);
-        writer.write_u32(node.start);
-        writer.write_u32(node.end);
-        writer.write_u32(node.parent.unwrap_or(NO_PARENT));
-        writer.write_u32(node.first_child.unwrap_or(NO_PARENT));
-        writer.write_u32(node.next_sibling.unwrap_or(NO_PARENT));
-    }
-
-    // Starts are a packed column so PHP builds its lookup with one bulk unpack.
-    // The remaining fixed-width metadata points into one trailing byte buffer.
-    writer.write_length(snapshot.names.len())?;
-    for (start, _, _, _) in &snapshot.names {
-        writer.write_u32(*start);
-    }
-
-    let mut name_offset = 0usize;
-    for (_, end, name, imported) in &snapshot.names {
-        writer.write_u32(*end);
-        writer.write_length(name_offset)?;
-        writer.write_length(name.len())?;
-        writer.write_bool(*imported);
-        name_offset = name_offset
-            .checked_add(name.len())
-            .ok_or_else(|| protocol("resolved names exceed the addressable protocol payload"))?;
-    }
-
-    writer.write_length(names_length)?;
-    for (_, _, name, _) in snapshot.names {
-        writer.write_raw(name);
-    }
-
-    // Trivia kinds are a compact stable discriminant instead of repeated
-    // strings. Objects are constructed lazily if an extension requests them.
-    writer.write_length(snapshot.trivia.len())?;
-    for (kind, start, end) in snapshot.trivia {
-        writer.write_u8(match kind {
-            "SingleLineComment" => 1,
-            "MultiLineComment" => 2,
-            "HashComment" => 3,
-            "DocBlockComment" => 4,
-            _ => unreachable!("file snapshots contain only known comment trivia"),
-        });
-        writer.write_u32(start);
-        writer.write_u32(end);
-    }
+    snapshot.write_to(&mut writer)?;
 
     Ok(Some(LintRequest {
         payload: writer.finish(),
@@ -707,7 +514,7 @@ pub(super) mod testing {
             let start = reader.read_u32("node start")?;
             let end = reader.read_u32("node end")?;
             let parent = match reader.read_u32("node parent")? {
-                NO_PARENT => None,
+                NO_NODE => None,
                 parent => Some(parent),
             };
             let first_child = reader.read_u32("first child")?;
@@ -720,7 +527,7 @@ pub(super) mod testing {
         for (kind, start, end, parent, first_child, _) in &raw_nodes {
             let mut children = Vec::new();
             let mut child = *first_child;
-            while child != NO_PARENT {
+            while child != NO_NODE {
                 children.push(child);
                 if children.len() > node_count {
                     return Err(protocol("cycle in node sibling list"));

@@ -7,7 +7,7 @@ namespace Mago\Sdk\Syntax;
 use Mago\Sdk\Span;
 
 /**
- * One node in the filtered concrete syntax tree sent by Mago.
+ * One node in a concrete syntax tree sent by Mago.
  *
  * @api
  */

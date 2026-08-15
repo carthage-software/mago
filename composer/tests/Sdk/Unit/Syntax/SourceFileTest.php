@@ -44,6 +44,8 @@ final class SourceFileTest extends TestCase
         $targets = $sourceFile->getTargetNodes();
         self::assertCount(2, $targets);
         self::assertSame(NodeKind::FunctionCall, $targets[0]->kind);
+        self::assertCount(3, $sourceFile->getNodes());
+        self::assertSame($targets, $sourceFile->getNodes(NodeKind::FunctionCall));
         self::assertSame($targets, $sourceFile->getChildren($sourceFile->getNode(0)));
         self::assertSame(0, $sourceFile->getParent($targets[0])?->id);
         self::assertSame('123', $sourceFile->getText($targets[0]));

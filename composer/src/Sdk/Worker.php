@@ -514,7 +514,7 @@ final class Worker
     ): string {
         [$kind, $reader] = AnalyzerProtocol::readRequest($payload);
         if ($kind === AnalyzerProtocol::DESCRIBE_REQUEST) {
-            $this->phpVersion = AnalyzerProtocol::readDescribeRequest($reader);
+            [$this->phpVersion, $this->nodeKinds] = AnalyzerProtocol::readDescribeRequest($reader);
 
             return AnalyzerProtocol::writeDescribeResponse($this->extensions, $this->analyzerPlugins);
         }
@@ -686,7 +686,15 @@ final class Worker
         HostClient $host,
         CancellationTokenInterface $cancellation,
     ): string {
-        $request = AnalyzerProtocol::readLifecycleRequest($kind, $reader, $host, $requestId, $cancellation);
+        $request = AnalyzerProtocol::readLifecycleRequest(
+            $kind,
+            $reader,
+            $host,
+            $requestId,
+            $cancellation,
+            $this->phpVersion,
+            $this->nodeKinds,
+        );
         if ($this->metadataCache === null || $this->metadataCache->generation !== $request->generation) {
             $this->metadataCache = new MetadataCache($request->generation);
         }

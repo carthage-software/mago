@@ -12,6 +12,8 @@ use mago_codex::ttype::union::TUnion;
 use mago_database::file::File;
 use mago_extension::PayloadReader;
 use mago_extension::PayloadWriter;
+use mago_extension::source::SourceSnapshot;
+use mago_names::ResolvedNames;
 use mago_reporting::Annotation;
 use mago_reporting::AnnotationKind;
 use mago_reporting::Issue;
@@ -19,6 +21,7 @@ use mago_reporting::IssueCollection;
 use mago_reporting::Level;
 use mago_span::Position;
 use mago_span::Span;
+use mago_syntax::cst::Program;
 use mago_text_edit::Safety;
 use mago_text_edit::TextEdit;
 use mago_text_edit::TextRange;
@@ -54,6 +57,7 @@ const GET_ALL_EXPRESSION_TYPES: u8 = 2;
 const GET_INFERRED_RETURN_TYPES: u8 = 3;
 const GET_INFERRED_YIELD_KEY_TYPES: u8 = 4;
 const GET_INFERRED_YIELD_VALUE_TYPES: u8 = 5;
+const GET_SOURCE_FILE: u8 = 6;
 const GET_REFERENCES_TO: u8 = 1;
 const GET_REFERENCES_FROM: u8 = 2;
 const MAXIMUM_ISSUES: usize = 1_000_000;
@@ -119,6 +123,7 @@ pub struct FileAnalysisSnapshot {
     file_id: mago_database::file::FileId,
     name: Arc<[u8]>,
     size: u32,
+    encoded_source: Box<[u8]>,
     encoded_types: Box<[u8]>,
     expression_types: HashMap<(u32, u32), Range<usize>>,
     inferred_return_types: Vec<Range<usize>>,
@@ -142,8 +147,22 @@ impl FileAnalysisSnapshot {
     ///
     /// # Errors
     ///
-    /// Returns an error when an inferred type cannot be represented by the extension protocol.
-    pub fn new(file: &File, artifacts: &AnalysisArtifacts) -> Result<Self, ExternalAnalyzerError> {
+    /// Returns an error when the source snapshot or an inferred type cannot be represented by the extension protocol.
+    pub fn new(
+        file: &File,
+        program: &Program<'_>,
+        resolved_names: &ResolvedNames<'_>,
+        artifacts: &AnalysisArtifacts,
+    ) -> Result<Self, ExternalAnalyzerError> {
+        let source = SourceSnapshot::complete(program, resolved_names).map_err(|error| {
+            protocol(format!("failed to retain syntax for `{}`: {error}", String::from_utf8_lossy(&file.name)))
+        })?;
+
+        let mut source_writer = PayloadWriter::with_capacity(source.encoded_len());
+        source.write_to(&mut source_writer).map_err(|error| {
+            protocol(format!("failed to encode retained syntax for `{}`: {error}", String::from_utf8_lossy(&file.name)))
+        })?;
+
         let mut writer = PayloadWriter::new();
         let mut type_handles = Vec::new();
         let mut expression_types =
@@ -176,6 +195,7 @@ impl FileAnalysisSnapshot {
             file_id: file.id,
             name: Arc::from(file.name.as_ref()),
             size: file.size,
+            encoded_source: source_writer.finish().into_boxed_slice(),
             encoded_types: writer.finish().into_boxed_slice(),
             expression_types,
             inferred_return_types,
@@ -229,14 +249,21 @@ fn encode_snapshot_type<'type_info>(
 }
 
 pub(super) enum AnalysisStore<'analysis> {
-    File { file: &'analysis File, artifacts: &'analysis AnalysisArtifacts },
+    File {
+        file: &'analysis File,
+        program: &'analysis Program<'analysis>,
+        resolved_names: &'analysis ResolvedNames<'analysis>,
+        artifacts: &'analysis AnalysisArtifacts,
+    },
     Project(&'analysis [Arc<FileAnalysisSnapshot>]),
 }
 
 impl AnalysisStore<'_> {
     fn file(&self, name: &[u8]) -> Option<FileView<'_>> {
         match self {
-            Self::File { file, artifacts } if file.name.as_ref() == name => Some(FileView::Artifacts(file, artifacts)),
+            Self::File { file, program, resolved_names, artifacts } if file.name.as_ref() == name => {
+                Some(FileView::Artifacts(file, program, resolved_names, artifacts))
+            }
             Self::File { .. } => None,
             Self::Project(files) => {
                 files.iter().find(|file| file.name.as_ref() == name).map(|file| FileView::Snapshot(file.as_ref()))
@@ -246,7 +273,12 @@ impl AnalysisStore<'_> {
 }
 
 enum FileView<'analysis> {
-    Artifacts(&'analysis File, &'analysis AnalysisArtifacts),
+    Artifacts(
+        &'analysis File,
+        &'analysis Program<'analysis>,
+        &'analysis ResolvedNames<'analysis>,
+        &'analysis AnalysisArtifacts,
+    ),
     Snapshot(&'analysis FileAnalysisSnapshot),
 }
 
@@ -270,28 +302,28 @@ impl TypeView<'_> {
 impl FileView<'_> {
     fn name(&self) -> &[u8] {
         match self {
-            Self::Artifacts(file, _) => &file.name,
+            Self::Artifacts(file, ..) => &file.name,
             Self::Snapshot(file) => &file.name,
         }
     }
 
     fn size(&self) -> u32 {
         match self {
-            Self::Artifacts(file, _) => file.size,
+            Self::Artifacts(file, ..) => file.size,
             Self::Snapshot(file) => file.size,
         }
     }
 
     fn expression_count(&self) -> usize {
         match self {
-            Self::Artifacts(_, artifacts) => artifacts.expression_types.len(),
+            Self::Artifacts(_, _, _, artifacts) => artifacts.expression_types.len(),
             Self::Snapshot(file) => file.expression_types.len(),
         }
     }
 
     fn expression_type(&self, span: &(u32, u32)) -> Option<TypeView<'_>> {
         match self {
-            Self::Artifacts(_, artifacts) => {
+            Self::Artifacts(_, _, _, artifacts) => {
                 artifacts.expression_types.get(span).map(AsRef::as_ref).map(TypeView::Union)
             }
             Self::Snapshot(file) => file
@@ -304,14 +336,14 @@ impl FileView<'_> {
 
     fn inferred_return_count(&self) -> usize {
         match self {
-            Self::Artifacts(_, artifacts) => artifacts.inferred_return_types.len(),
+            Self::Artifacts(_, _, _, artifacts) => artifacts.inferred_return_types.len(),
             Self::Snapshot(file) => file.inferred_return_types.len(),
         }
     }
 
     fn write_expression_types(&self, writer: &mut PayloadWriter) -> Result<(), ExternalAnalyzerError> {
         let mut spans = match self {
-            Self::Artifacts(_, artifacts) => artifacts.expression_types.keys().copied().collect::<Vec<_>>(),
+            Self::Artifacts(_, _, _, artifacts) => artifacts.expression_types.keys().copied().collect::<Vec<_>>(),
             Self::Snapshot(file) => file.expression_types.keys().copied().collect::<Vec<_>>(),
         };
 
@@ -338,7 +370,7 @@ impl FileView<'_> {
 
     fn write_inferred_return_types(&self, writer: &mut PayloadWriter) -> Result<(), ExternalAnalyzerError> {
         match self {
-            Self::Artifacts(_, artifacts) => {
+            Self::Artifacts(_, _, _, artifacts) => {
                 writer.write_u32(
                     u32::try_from(artifacts.inferred_return_types.len())
                         .map_err(|_| protocol("too many inferred types"))?,
@@ -356,36 +388,64 @@ impl FileView<'_> {
 
     fn inferred_yield_key_count(&self) -> usize {
         match self {
-            Self::Artifacts(_, artifacts) => artifacts.inferred_yield_key_types.len(),
+            Self::Artifacts(_, _, _, artifacts) => artifacts.inferred_yield_key_types.len(),
             Self::Snapshot(file) => file.inferred_yield_key_types.len(),
         }
     }
 
     fn inferred_yield_value_count(&self) -> usize {
         match self {
-            Self::Artifacts(_, artifacts) => artifacts.inferred_yield_value_types.len(),
+            Self::Artifacts(_, _, _, artifacts) => artifacts.inferred_yield_value_types.len(),
             Self::Snapshot(file) => file.inferred_yield_value_types.len(),
         }
     }
 
     fn write_inferred_yield_key_types(&self, writer: &mut PayloadWriter) -> Result<(), ExternalAnalyzerError> {
         match self {
-            Self::Artifacts(_, artifacts) => write_types(writer, &artifacts.inferred_yield_key_types),
+            Self::Artifacts(_, _, _, artifacts) => write_types(writer, &artifacts.inferred_yield_key_types),
             Self::Snapshot(file) => write_encoded_types(writer, &file.encoded_types, &file.inferred_yield_key_types),
         }
     }
 
     fn write_inferred_yield_value_types(&self, writer: &mut PayloadWriter) -> Result<(), ExternalAnalyzerError> {
         match self {
-            Self::Artifacts(_, artifacts) => write_types(writer, &artifacts.inferred_yield_value_types),
+            Self::Artifacts(_, _, _, artifacts) => write_types(writer, &artifacts.inferred_yield_value_types),
             Self::Snapshot(file) => write_encoded_types(writer, &file.encoded_types, &file.inferred_yield_value_types),
         }
     }
 
     fn write_reference_summary(&self, writer: &mut PayloadWriter) {
         match self {
-            Self::Artifacts(_, artifacts) => write_reference_summary(writer, &artifacts.symbol_references),
+            Self::Artifacts(_, _, _, artifacts) => write_reference_summary(writer, &artifacts.symbol_references),
             Self::Snapshot(file) => file.references.write_to(writer),
+        }
+    }
+
+    fn file_id(&self) -> mago_database::file::FileId {
+        match self {
+            Self::Artifacts(file, ..) => file.id,
+            Self::Snapshot(file) => file.file_id,
+        }
+    }
+
+    fn write_source_snapshot(&self, writer: &mut PayloadWriter) -> Result<(), ExternalAnalyzerError> {
+        match self {
+            Self::Artifacts(file, program, resolved_names, _) => {
+                let snapshot = SourceSnapshot::complete(program, resolved_names).map_err(|error| {
+                    protocol(format!(
+                        "failed to snapshot syntax for `{}`: {error}",
+                        String::from_utf8_lossy(&file.name)
+                    ))
+                })?;
+
+                snapshot.write_to(writer).map_err(|error| {
+                    protocol(format!("failed to encode syntax for `{}`: {error}", String::from_utf8_lossy(&file.name)))
+                })
+            }
+            Self::Snapshot(file) => {
+                writer.write_raw(&file.encoded_source);
+                Ok(())
+            }
         }
     }
 }
@@ -402,10 +462,12 @@ pub(super) fn encode_after_file_analysis_request(
     generation: u64,
     plugins: &[u16],
     file: &File,
+    program: &Program<'_>,
+    resolved_names: &ResolvedNames<'_>,
     artifacts: &AnalysisArtifacts,
 ) -> Result<Vec<u8>, ExternalAnalyzerError> {
     let mut writer = lifecycle_writer(AFTER_FILE_ANALYSIS_REQUEST, generation, plugins)?;
-    write_file_summary(&mut writer, FileView::Artifacts(file, artifacts))?;
+    write_file_summary(&mut writer, FileView::Artifacts(file, program, resolved_names, artifacts))?;
     Ok(writer.finish())
 }
 
@@ -725,6 +787,20 @@ pub(super) fn handle_analysis_query(
         GET_INFERRED_RETURN_TYPES => file.write_inferred_return_types(&mut writer)?,
         GET_INFERRED_YIELD_KEY_TYPES => file.write_inferred_yield_key_types(&mut writer)?,
         GET_INFERRED_YIELD_VALUE_TYPES => file.write_inferred_yield_value_types(&mut writer)?,
+        GET_SOURCE_FILE => {
+            let source = session
+                .source_file(file.file_id())
+                .filter(|source| source.name.as_ref() == file.name() && source.size == file.size())
+                .ok_or_else(|| {
+                    protocol(format!(
+                        "analysis source `{}` is unavailable in generation {generation}",
+                        String::from_utf8_lossy(file.name())
+                    ))
+                })?;
+
+            writer.write_bytes(&source.contents)?;
+            file.write_source_snapshot(&mut writer)?;
+        }
         value => return Err(protocol(format!("unknown analysis query operation {value}"))),
     }
 

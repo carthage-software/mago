@@ -22,9 +22,11 @@ use mago_extension::Frame;
 use mago_extension::WorkerError;
 use mago_extension::WorkerPool;
 use mago_extension::WorkerRequestHandler;
+use mago_names::ResolvedNames;
 use mago_php_version::PHPVersion;
 use mago_reporting::IssueCollection;
 use mago_span::Span;
+use mago_syntax::cst::Program;
 use mago_word::WordMap;
 use mago_word::ascii_lowercase_word;
 use mago_word::concat_word;
@@ -81,18 +83,14 @@ pub struct ExternalAnalysisSession {
 
 #[derive(Debug)]
 struct ExternalSource {
-    name: Arc<[u8]>,
-    size: u32,
+    file: Arc<File>,
 }
 
 impl ExternalAnalysisSession {
     #[must_use]
     pub fn from_files(files: impl IntoIterator<Item = Arc<File>>) -> Self {
         let generation = NEXT_ANALYSIS_GENERATION.fetch_add(1, Ordering::Relaxed);
-        let sources = files
-            .into_iter()
-            .map(|file| (file.id, ExternalSource { name: Arc::from(file.name.as_ref()), size: file.size }))
-            .collect();
+        let sources = files.into_iter().map(|file| (file.id, ExternalSource { file })).collect();
 
         Self { generation, sources }
     }
@@ -106,13 +104,17 @@ impl ExternalAnalysisSession {
     #[inline]
     #[must_use]
     pub(crate) fn source_name(&self, file_id: FileId) -> Option<&[u8]> {
-        self.sources.get(&file_id).map(|source| source.name.as_ref())
+        self.sources.get(&file_id).map(|source| source.file.name.as_ref())
     }
 
     fn source(&self, name: &[u8]) -> Option<(FileId, u32)> {
         self.sources
             .iter()
-            .find_map(|(file_id, source)| (source.name.as_ref() == name).then_some((*file_id, source.size)))
+            .find_map(|(file_id, source)| (source.file.name.as_ref() == name).then_some((*file_id, source.file.size)))
+    }
+
+    fn source_file(&self, file_id: FileId) -> Option<&File> {
+        self.sources.get(&file_id).map(|source| source.file.as_ref())
     }
 }
 
@@ -913,11 +915,15 @@ impl ExternalAnalyzerHandle {
     pub(crate) fn run_after_file_analysis_hooks(
         &self,
         file: &File,
+        program: &Program<'_>,
+        resolved_names: &ResolvedNames<'_>,
         artifacts: &AnalysisArtifacts,
         codebase: &CodebaseMetadata,
         session: &ExternalAnalysisSession,
     ) -> Result<IssueCollection, String> {
-        self.get()?.run_after_file_analysis_hooks(file, artifacts, codebase, session).map_err(|error| error.to_string())
+        self.get()?
+            .run_after_file_analysis_hooks(file, program, resolved_names, artifacts, codebase, session)
+            .map_err(|error| error.to_string())
     }
 
     pub(crate) fn run_after_file_analysis_batch_hooks(
@@ -1187,12 +1193,14 @@ where
     fn run_after_file_analysis_hooks(
         &self,
         file: &File,
+        program: &Program<'_>,
+        resolved_names: &ResolvedNames<'_>,
         artifacts: &AnalysisArtifacts,
         codebase: &CodebaseMetadata,
         session: &ExternalAnalysisSession,
     ) -> Result<IssueCollection, ExternalAnalyzerError> {
         let mut issues = IssueCollection::new();
-        let store = lifecycle::AnalysisStore::File { file, artifacts };
+        let store = lifecycle::AnalysisStore::File { file, program, resolved_names, artifacts };
         for backend in &self.backends {
             let plugins = &backend.registration.after_file_analysis_plugins;
             if plugins.is_empty() {
@@ -1201,13 +1209,21 @@ where
 
             let lifecycle_start = self.trace_enabled.then(Instant::now);
             let encode_start = self.trace_enabled.then(Instant::now);
-            let request = lifecycle::encode_after_file_analysis_request(session.generation(), plugins, file, artifacts)
-                .inspect_err(|_| {
-                    if self.trace_enabled {
-                        self.telemetry.lifecycle_errors.fetch_add(1, Ordering::Relaxed);
-                        self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
-                    }
-                })?;
+            let request = lifecycle::encode_after_file_analysis_request(
+                session.generation(),
+                plugins,
+                file,
+                program,
+                resolved_names,
+                artifacts,
+            )
+            .inspect_err(|_| {
+                if self.trace_enabled {
+                    self.telemetry.lifecycle_errors.fetch_add(1, Ordering::Relaxed);
+                    self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
+                }
+            })?;
+
             if let Some(start) = encode_start {
                 self.telemetry.lifecycle_encode_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
             }

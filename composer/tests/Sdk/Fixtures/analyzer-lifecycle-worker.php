@@ -27,6 +27,7 @@ use Mago\Sdk\Reporting\Level;
 use Mago\Sdk\Reporting\Safety;
 use Mago\Sdk\Reporting\TextEdit;
 use Mago\Sdk\Span;
+use Mago\Sdk\Syntax\NodeKind;
 use Mago\Sdk\Worker;
 use RuntimeException;
 
@@ -38,6 +39,8 @@ use function getmypid;
 use function is_string;
 use function json_encode;
 use function min;
+use function str_contains;
+use function strlen;
 use function usleep;
 
 use const FILE_APPEND;
@@ -117,6 +120,26 @@ final class LifecycleProofHook implements
     {
         $this->verifySharedContext($context);
         $analysis = $context->analysis;
+        $source = $analysis->getSourceFile();
+        if (
+            $source !== $analysis->getSourceFile()
+            || $source->path !== $analysis->file
+            || strlen($source->contents) !== $analysis->size
+            || !str_contains($source->contents, '/* exact-in-memory-source:')
+        ) {
+            throw new RuntimeException('The exact analyzed in-memory source did not round-trip lazily.');
+        }
+
+        $programs = $source->getNodes(NodeKind::Program);
+        if (count($programs) !== 1 || $programs[0]->parentId !== null || $source->getChildren($programs[0]) === []) {
+            throw new RuntimeException('The complete analyzed syntax tree did not round-trip.');
+        }
+
+        $resolvedNames = $source->getResolvedNames();
+        if ($resolvedNames === [] || $source->getResolvedName($resolvedNames[0]->span) !== $resolvedNames[0]) {
+            throw new RuntimeException('The analyzed source lost its resolved names.');
+        }
+
         $expressionTypes = $analysis->getAllExpressionTypes();
         if (count($expressionTypes) !== $analysis->expressionCount) {
             throw new RuntimeException('The complete expression-type result has the wrong size.');
@@ -124,9 +147,26 @@ final class LifecycleProofHook implements
 
         if ($expressionTypes !== []) {
             $first = $expressionTypes[0];
-            $types = $analysis->getMultipleExpressionTypes([$first->span, new Span($analysis->size, $analysis->size)]);
+            $expressionNode = null;
+            foreach ($source->getNodes() as $node) {
+                if ($node->span->start !== $first->span->start || $node->span->end !== $first->span->end) {
+                    continue;
+                }
+
+                $expressionNode = $node;
+                break;
+            }
+
+            if ($expressionNode === null) {
+                throw new RuntimeException('An analyzed expression has no matching syntax node.');
+            }
+
+            $types = $analysis->getMultipleExpressionTypes([
+                $expressionNode,
+                new Span($analysis->size, $analysis->size),
+            ]);
             if ($types[0] === null || !$context->types->equals($types[0], $first->type)) {
-                throw new RuntimeException('A lazy expression type did not round-trip.');
+                throw new RuntimeException('A syntax-node expression type did not round-trip.');
             }
         }
 

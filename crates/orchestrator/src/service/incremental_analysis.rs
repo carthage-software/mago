@@ -1202,9 +1202,13 @@ impl IncrementalAnalysisService {
                 #[cfg(not(target_arch = "wasm32"))]
                 let snapshot_start = (trace_enabled && (after_file || after_analysis)).then(Instant::now);
                 let snapshot = if after_file || after_analysis {
-                    Some(Arc::new(FileAnalysisSnapshot::new(&source_file, &artifacts).map_err(|error| {
-                        OrchestratorError::General(format!("Failed to retain external analysis data: {error}"))
-                    })?))
+                    Some(Arc::new(
+                        FileAnalysisSnapshot::new(&source_file, program, &resolved_names, &artifacts).map_err(
+                            |error| {
+                                OrchestratorError::General(format!("Failed to retain external analysis data: {error}"))
+                            },
+                        )?,
+                    ))
                 } else {
                     None
                 };

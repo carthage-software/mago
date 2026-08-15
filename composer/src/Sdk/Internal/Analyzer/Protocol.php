@@ -28,8 +28,11 @@ use Mago\Sdk\Extension;
 use Mago\Sdk\Internal\HostClient;
 use Mago\Sdk\Internal\Protocol\PayloadReader;
 use Mago\Sdk\Internal\Protocol\PayloadWriter;
+use Mago\Sdk\Internal\Syntax\SourceFileCodec;
 use Mago\Sdk\PHPVersion;
 use Mago\Sdk\Span;
+use Mago\Sdk\Syntax\NodeKind;
+use Mago\Sdk\Syntax\SourceFile;
 
 use function count;
 use function intdiv;
@@ -63,6 +66,7 @@ final class Protocol
     public const GET_INFERRED_RETURN_TYPES = 3;
     public const GET_INFERRED_YIELD_KEY_TYPES = 4;
     public const GET_INFERRED_YIELD_VALUE_TYPES = 5;
+    public const GET_SOURCE_FILE = 6;
     public const GET_REFERENCES_TO = 1;
     public const GET_REFERENCES_FROM = 2;
     public const GET_CLASS_LIKES = 1;
@@ -165,12 +169,16 @@ final class Protocol
         return [$message >> 16, new PayloadReader($payload, 12)];
     }
 
-    public static function readDescribeRequest(PayloadReader $reader): PHPVersion
+    /**
+     * @return array{PHPVersion, list<NodeKind>}
+     */
+    public static function readDescribeRequest(PayloadReader $reader): array
     {
         $version = new PHPVersion($reader->readU32());
+        $kinds = SourceFileCodec::readNodeKinds($reader);
         $reader->finish();
 
-        return $version;
+        return [$version, $kinds];
     }
 
     /** @return list<int<0, 65535>> */
@@ -376,7 +384,26 @@ final class Protocol
     }
 
     /**
+     * @param list<NodeKind> $kinds
+     */
+    public static function readSourceFileResponse(
+        string $payload,
+        int $generation,
+        string $file,
+        PHPVersion $phpVersion,
+        array $kinds,
+    ): SourceFile {
+        $reader = self::readAnalysisTypeQueryResponsePayload($payload, $generation, $file, self::GET_SOURCE_FILE);
+        $source = SourceFileCodec::read($reader, $phpVersion, $kinds, $file, $reader->readBytes());
+        $reader->finish();
+
+        return $source;
+    }
+
+    /**
      * @param positive-int $requestId
+     * @param list<NodeKind> $nodeKinds
+     * @mago-expect lint:excessive-parameter-list
      */
     public static function readLifecycleRequest(
         int $kind,
@@ -384,6 +411,8 @@ final class Protocol
         HostClient $host,
         int $requestId,
         CancellationTokenInterface $cancellation,
+        PHPVersion $phpVersion,
+        array $nodeKinds,
     ): LifecycleRequest {
         $generation = $reader->readU64();
         $pluginCount = $reader->readU16();
@@ -403,6 +432,8 @@ final class Protocol
                 $requestId,
                 $generation,
                 $cancellation,
+                $phpVersion,
+                $nodeKinds,
             ),
             self::AFTER_FILE_ANALYSIS_BATCH_REQUEST => self::readFileAnalysisBatch(
                 $reader,
@@ -410,6 +441,8 @@ final class Protocol
                 $requestId,
                 $generation,
                 $cancellation,
+                $phpVersion,
+                $nodeKinds,
             ),
             self::AFTER_ANALYSIS_REQUEST => self::readProjectAnalysis(
                 $reader,
@@ -417,6 +450,8 @@ final class Protocol
                 $requestId,
                 $generation,
                 $cancellation,
+                $phpVersion,
+                $nodeKinds,
             ),
             default => throw new ProtocolException("Unknown analyzer lifecycle request kind {$kind}."),
         };
@@ -447,6 +482,8 @@ final class Protocol
 
     /**
      * @param positive-int $requestId
+     * @param list<NodeKind> $nodeKinds
+     * @mago-expect lint:excessive-parameter-list
      */
     private static function readProjectAnalysis(
         PayloadReader $reader,
@@ -454,13 +491,23 @@ final class Protocol
         int $requestId,
         int $generation,
         CancellationTokenInterface $cancellation,
+        PHPVersion $phpVersion,
+        array $nodeKinds,
     ): ProjectAnalysis {
         $issueCount = $reader->readU32();
         $summary = self::readReferenceSummary($reader);
         $fileCount = $reader->readCount(1_000_000);
         $files = [];
         for ($index = 0; $index < $fileCount; ++$index) {
-            $files[] = self::readFileAnalysis($reader, $host, $requestId, $generation, $cancellation);
+            $files[] = self::readFileAnalysis(
+                $reader,
+                $host,
+                $requestId,
+                $generation,
+                $cancellation,
+                $phpVersion,
+                $nodeKinds,
+            );
         }
 
         return new ProjectAnalysis(
@@ -549,6 +596,8 @@ final class Protocol
 
     /**
      * @param positive-int $requestId
+     * @param list<NodeKind> $nodeKinds
+     * @mago-expect lint:excessive-parameter-list
      */
     private static function readFileAnalysis(
         PayloadReader $reader,
@@ -556,6 +605,8 @@ final class Protocol
         int $requestId,
         int $generation,
         CancellationTokenInterface $cancellation,
+        PHPVersion $phpVersion,
+        array $nodeKinds,
     ): FileAnalysis {
         $file = $reader->readBytes();
         if ($file === '') {
@@ -567,6 +618,8 @@ final class Protocol
             $requestId,
             $generation,
             $cancellation,
+            $phpVersion,
+            $nodeKinds,
             $file,
             $reader->readU32(),
             $reader->readU32(),
@@ -579,8 +632,10 @@ final class Protocol
 
     /**
      * @param positive-int $requestId
+     * @param list<NodeKind> $nodeKinds
      *
      * @return non-empty-list<FileAnalysis>
+     * @mago-expect lint:excessive-parameter-list
      */
     private static function readFileAnalysisBatch(
         PayloadReader $reader,
@@ -588,6 +643,8 @@ final class Protocol
         int $requestId,
         int $generation,
         CancellationTokenInterface $cancellation,
+        PHPVersion $phpVersion,
+        array $nodeKinds,
     ): array {
         $count = $reader->readCount(1_000_000);
         if ($count === 0) {
@@ -596,7 +653,15 @@ final class Protocol
 
         $files = [];
         for ($index = 0; $index < $count; ++$index) {
-            $files[] = self::readFileAnalysis($reader, $host, $requestId, $generation, $cancellation);
+            $files[] = self::readFileAnalysis(
+                $reader,
+                $host,
+                $requestId,
+                $generation,
+                $cancellation,
+                $phpVersion,
+                $nodeKinds,
+            );
         }
 
         return $files;

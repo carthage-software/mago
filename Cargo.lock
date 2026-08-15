@@ -1601,6 +1601,10 @@ name = "mago-extension"
 version = "1.46.0"
 dependencies = [
  "foldhash",
+ "mago-names",
+ "mago-span",
+ "mago-syntax",
+ "strum 0.28.0",
  "tracing",
 ]
 

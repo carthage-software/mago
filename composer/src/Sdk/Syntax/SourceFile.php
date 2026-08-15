@@ -15,7 +15,7 @@ use function strlen;
 use function substr;
 
 /**
- * An immutable, filtered view of one PHP source file.
+ * An immutable syntax view of the exact source analyzed by Mago.
  *
  * @api
  */
@@ -58,6 +58,19 @@ final class SourceFile
         }
 
         return $this->targetNodes = $this->nodes->getMany($this->targetNodeIds);
+    }
+
+    /**
+     * Returns every available node, optionally restricted to one kind.
+     *
+     * Linter snapshots contain only the subtrees selected by active rules;
+     * analyzer snapshots contain the complete syntax tree.
+     *
+     * @return list<Node>
+     */
+    public function getNodes(?NodeKind $kind = null): array
+    {
+        return $this->nodes->getAll($kind);
     }
 
     /**

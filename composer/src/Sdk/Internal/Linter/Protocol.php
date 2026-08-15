@@ -8,13 +8,10 @@ use Mago\Sdk\Exception\ProtocolException;
 use Mago\Sdk\Extension;
 use Mago\Sdk\Internal\Protocol\PayloadReader;
 use Mago\Sdk\Internal\Protocol\PayloadWriter;
-use Mago\Sdk\Internal\Syntax\NodeStore;
-use Mago\Sdk\Internal\Syntax\ResolvedNameStore;
-use Mago\Sdk\Internal\Syntax\TriviaStore;
+use Mago\Sdk\Internal\Syntax\SourceFileCodec;
 use Mago\Sdk\PHPVersion;
 use Mago\Sdk\Reporting\Issue;
 use Mago\Sdk\Syntax\NodeKind;
-use Mago\Sdk\Syntax\SourceFile;
 
 use function count;
 use function pack;
@@ -24,7 +21,6 @@ use function unpack;
 /**
  * @internal
  * @mago-expect lint:cyclomatic-complexity
- * @mago-expect lint:kan-defect
  */
 final class Protocol
 {
@@ -38,7 +34,6 @@ final class Protocol
     private const VERSION_U32 = (self::MAJOR << 16) | self::MINOR;
     private const DESCRIBE_RESPONSE = 0x8001;
     private const LINT_FILE_RESPONSE = 0x8002;
-    private const MAXIMUM_NODE_KINDS = 256;
     private const MAXIMUM_ISSUES = 1_000_000;
 
     /**
@@ -74,7 +69,7 @@ final class Protocol
     public static function readDescribeRequest(PayloadReader $reader): array
     {
         $version = new PHPVersion($reader->readU32());
-        $kinds = self::readNodeKinds($reader);
+        $kinds = SourceFileCodec::readNodeKinds($reader);
         $reader->finish();
 
         return [$version, $kinds];
@@ -118,24 +113,11 @@ final class Protocol
         $file = $reader->readBytes();
         $source = $reader->readBytes();
         $activeRules = self::readActiveRules($reader);
-        $targetIds = self::readNodeIds($reader);
-        $nodeCount = $reader->readU32();
-        $nodeRecords = $reader->readRaw($nodeCount * NodeStore::RECORD_SIZE);
-        $nodes = new NodeStore($kinds, $nodeRecords, $nodeCount);
-        $nameCount = $reader->readU32();
-        $nameStarts = $reader->readRaw($nameCount * ResolvedNameStore::START_SIZE);
-        $nameRecords = $reader->readRaw($nameCount * ResolvedNameStore::RECORD_SIZE);
-        $names = new ResolvedNameStore($nameStarts, $nameRecords, $reader->readBytes(), $nameCount);
-        $triviaCount = $reader->readU32();
-        $triviaRecords = $reader->readRaw($triviaCount * TriviaStore::RECORD_SIZE);
-        $trivia = new TriviaStore($triviaRecords, $triviaCount);
+        $sourceFile = SourceFileCodec::read($reader, $phpVersion, $kinds, $file, $source);
 
         $reader->finish();
 
-        return new LintRequest(
-            $activeRules,
-            new SourceFile($phpVersion, $file, $source, $targetIds, $nodes, $names, $trivia),
-        );
+        return new LintRequest($activeRules, $sourceFile);
     }
 
     /**
@@ -150,36 +132,6 @@ final class Protocol
         }
 
         return $activeRules;
-    }
-
-    /**
-     * @return list<NodeKind>
-     */
-    private static function readNodeKinds(PayloadReader $reader): array
-    {
-        $kinds = NodeKind::cases();
-        $count = $reader->readCount(self::MAXIMUM_NODE_KINDS);
-        if ($count !== count($kinds)) {
-            throw new ProtocolException('The Mago and extension SDK node-kind tables differ.');
-        }
-
-        for ($index = 0; $index < $count; ++$index) {
-            if ($reader->readString() !== $kinds[$index]->value) {
-                throw new ProtocolException('The Mago and extension SDK node-kind tables differ.');
-            }
-        }
-
-        return $kinds;
-    }
-
-    /**
-     * @return array<int, int<0, 4294967295>>
-     */
-    private static function readNodeIds(PayloadReader $reader): array
-    {
-        $count = $reader->readU32();
-
-        return $reader->readU32List($count);
     }
 
     /**
