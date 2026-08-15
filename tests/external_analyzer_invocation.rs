@@ -103,6 +103,20 @@ class HasMany extends Relation {}
 
 final class CustomRelation extends HasMany {}
 
+interface ExternalInterface {}
+
+final class ExternalResult
+{
+    public function path(): string
+    {
+        return '';
+    }
+}
+
+final class ExternalService {}
+
+final class ExternalStaticService {}
+
 interface Marker {}
 
 class DynamicProxy
@@ -150,6 +164,8 @@ function take_string(string $_value): void {}
 
 function take_int(int $_value): void {}
 
+function take_external_result(ExternalResult $_result): void {}
+
 function take_intersection(BaseModel&Marker $_model): void {}
 
 /** @param array<int, string> $_values */
@@ -171,7 +187,19 @@ take_string((new DynamicProxy())->dynamic('instance'));
 take_string((new DynamicProxy())->acceptString('dynamic-signature'));
 take_string_map(DynamicFacade::dynamic('static'));
 take_string((new CustomRelation())->where());
+take_string((new ExternalService())->resolve('instance-provider'));
+take_string(ExternalStaticService::resolve('static-provider'));
 User::callLate();
+
+function use_external_interface(ExternalInterface $service): void
+{
+    take_external_result($service->fetch());
+}
+
+function get_external_path(?ExternalInterface $service): ?string
+{
+    return $service?->fetch()->path();
+}
 
 $user = new User();
 take_user_builder($user->newQuery());
@@ -245,6 +273,18 @@ take_proxy((new DynamicProxy())->dynamic('instance'));
 take_facade(DynamicFacade::dynamic('static'));
 ";
 
+const MISSING_METHOD_SOURCE: &str = r"<?php
+
+declare(strict_types=1);
+
+interface DeclinedContract {}
+
+function test(DeclinedContract $contract): void
+{
+    $contract->missing();
+}
+";
+
 #[test]
 fn external_providers_receive_complete_invocation_context() -> Result<(), Box<dyn std::error::Error>> {
     let observation = analyze_with_fixture(SOURCE, false)?;
@@ -276,6 +316,14 @@ fn external_providers_receive_complete_invocation_context() -> Result<(), Box<dy
             "late-static",
             "method-signature",
             "method-signature-return",
+            "missing-class-return",
+            "missing-class-signature",
+            "missing-interface-return",
+            "missing-interface-return",
+            "missing-interface-signature",
+            "missing-interface-signature",
+            "missing-static-return",
+            "missing-static-signature",
             "property-id-read",
             "property-id-write",
             "property-name-read",
@@ -317,6 +365,21 @@ fn declined_dynamic_methods_preserve_non_documented_method_diagnostics() -> Resu
         ]
     );
     assert!(observation.invocations.is_empty(), "a host without method providers must receive no dynamic requests");
+
+    Ok(())
+}
+
+#[test]
+fn declined_missing_methods_preserve_non_existent_method_diagnostics() -> Result<(), Box<dyn std::error::Error>> {
+    let observation = analyze_with_fixture(MISSING_METHOD_SOURCE, false)?;
+    assert_eq!(
+        observation.issues,
+        [(
+            Some("non-existent-method".to_owned()),
+            "Method `missing` does not exist on type `DeclinedContract`.".to_owned(),
+        )]
+    );
+    assert!(observation.invocations.is_empty(), "a declining provider must not establish the missing method");
 
     Ok(())
 }

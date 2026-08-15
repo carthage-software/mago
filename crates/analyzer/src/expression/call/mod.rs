@@ -77,7 +77,6 @@ fn analyze_invocation_targets<'ctx, 'ast, 'arena, A>(
     encountered_mixed_targets: bool,
     should_add_null: bool,
     object_has_nullsafe_null: bool,
-    all_targets_non_nullable_return: bool,
 ) -> Result<(), AnalysisError>
 where
     A: Arena,
@@ -109,6 +108,7 @@ where
         });
 
     let mut resulting_type = None;
+    let mut all_targets_non_nullable_return = !invocation_targets.is_empty();
     for target in invocation_targets {
         if let InvocationTarget::FunctionLike { metadata, .. } = &target {
             let name = metadata.name;
@@ -164,18 +164,17 @@ where
             &mut argument_types,
         )?;
 
-        resulting_type = Some(add_optional_union_type(
-            fetch_invocation_return_type(
-                context,
-                block_context,
-                artifacts,
-                &invocation,
-                &template_result,
-                &argument_types,
-            )?,
-            resulting_type.as_ref(),
-            context.codebase,
-        ));
+        let return_type = fetch_invocation_return_type(
+            context,
+            block_context,
+            artifacts,
+            &invocation,
+            &template_result,
+            &argument_types,
+        )?;
+
+        all_targets_non_nullable_return &= !return_type.is_nullable();
+        resulting_type = Some(add_optional_union_type(return_type, resulting_type.as_ref(), context.codebase));
 
         post_invocation_process(
             context,

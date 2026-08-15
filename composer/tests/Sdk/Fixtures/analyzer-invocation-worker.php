@@ -136,6 +136,10 @@ final class InvocationMethodProvider implements MethodReturnTypeProvider, Callab
             MethodTarget::exact('DynamicFacade', 'dynamic'),
             MethodTarget::exact('Artisan', 'command'),
             MethodTarget::allMethods('Relation'),
+            MethodTarget::exact('ExternalInterface', 'fetch'),
+            MethodTarget::exact('ExternalService', 'resolve'),
+            MethodTarget::exact('ExternalStaticService', 'resolve'),
+            MethodTarget::exact('DeclinedContract', 'missing'),
         ];
     }
 
@@ -153,6 +157,53 @@ final class InvocationMethodProvider implements MethodReturnTypeProvider, Callab
                     closureThisType: Type::namedObject('ClosureCommand'),
                 ),
             ]);
+        }
+
+        if ($invocation->declaringClass === 'ExternalInterface' && $invocation->name === 'fetch') {
+            $receiver = $invocation->receiverType ?? throw new RuntimeException(
+                'The unresolved interface method received no receiver type.',
+            );
+
+            if (
+                $invocation->kind !== InvocationKind::InstanceMethod
+                || $invocation->arguments !== []
+                || !$context->types->equals($receiver, Type::namedObject('ExternalInterface'))
+            ) {
+                throw new RuntimeException('The unresolved interface method received incorrect invocation context.');
+            }
+
+            InvocationAudit::record('missing-interface-signature');
+
+            return new EffectiveCallableSignature([]);
+        }
+
+        if (
+            ($invocation->declaringClass === 'ExternalService'
+                || $invocation->declaringClass === 'ExternalStaticService')
+            && $invocation->name === 'resolve'
+        ) {
+            $declaringClass = $invocation->declaringClass ?? throw new RuntimeException(
+                'The unresolved class method received no declaring class.',
+            );
+            $receiver = $invocation->receiverType ?? throw new RuntimeException(
+                'The unresolved class method received no receiver type.',
+            );
+            $argument = $invocation->arguments[0] ?? throw new RuntimeException(
+                'The unresolved class method received no argument.',
+            );
+            $static = $declaringClass === 'ExternalStaticService';
+            if (
+                $argument->type !== null
+                || $argument->expression !== ($static ? "'static-provider'" : "'instance-provider'")
+                || $invocation->kind !== ($static ? InvocationKind::StaticMethod : InvocationKind::InstanceMethod)
+                || !$context->types->equals($receiver, Type::namedObject($declaringClass))
+            ) {
+                throw new RuntimeException('The unresolved class method received incorrect invocation context.');
+            }
+
+            InvocationAudit::record($static ? 'missing-static-signature' : 'missing-class-signature');
+
+            return new EffectiveCallableSignature([new CallableParameter('$value', Type::string())]);
         }
 
         if ($invocation->name !== 'acceptstring') {
@@ -219,6 +270,46 @@ final class InvocationMethodProvider implements MethodReturnTypeProvider, Callab
             InvocationAudit::record('relation-subclass');
 
             return Type::string();
+        }
+
+        if ($invocation->declaringClass === 'ExternalInterface' && $invocation->name === 'fetch') {
+            self::assertInvocation($context, InvocationKind::InstanceMethod, 'ExternalInterface');
+            self::assertNamed($named, 'ExternalInterface', 0, 0);
+            InvocationAudit::record('missing-interface-return');
+
+            return Type::namedObject('ExternalResult');
+        }
+
+        if (
+            ($invocation->declaringClass === 'ExternalService'
+                || $invocation->declaringClass === 'ExternalStaticService')
+            && $invocation->name === 'resolve'
+        ) {
+            $declaringClass = $invocation->declaringClass ?? throw new RuntimeException(
+                'The unresolved class method received no declaring class.',
+            );
+
+            $static = $declaringClass === 'ExternalStaticService';
+            self::assertInvocation(
+                $context,
+                $static ? InvocationKind::StaticMethod : InvocationKind::InstanceMethod,
+                $declaringClass,
+            );
+
+            self::assertNamed($named, $declaringClass, 0, 0);
+            $argumentType = $invocation->arguments[0]->type ?? throw new RuntimeException(
+                'The unresolved method return provider received an untyped argument.',
+            );
+
+            self::assertEqual(
+                $context,
+                $argumentType,
+                Type::literalString($static ? 'static-provider' : 'instance-provider'),
+            );
+
+            InvocationAudit::record($static ? 'missing-static-return' : 'missing-class-return');
+
+            return $argumentType;
         }
 
         if ($invocation->name === 'query') {

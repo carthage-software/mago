@@ -1,6 +1,7 @@
 use mago_allocator::Arena;
 use std::sync::Arc;
 
+use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_word::Word;
 use mago_word::ascii_lowercase_word;
 use mago_word::word;
@@ -35,6 +36,7 @@ use crate::resolver::class_name::resolve_classnames_from_expression;
 use crate::resolver::method::MethodResolutionResult;
 use crate::resolver::method::ResolvedMethod;
 use crate::resolver::method::UndocumentedMethod;
+use crate::resolver::method::UnresolvedMethod;
 use crate::resolver::method::report_magic_call_without_call_method;
 use crate::resolver::method::report_non_existent_method;
 use crate::resolver::method::report_possibly_missing_magic_call;
@@ -111,15 +113,6 @@ where
             result.resolved_methods.extend(resolved_methods);
         }
     }
-
-    result.all_methods_non_nullable_return = !result.resolved_methods.is_empty()
-        && result.resolved_methods.iter().all(|resolved_method| {
-            context
-                .codebase
-                .get_method_by_id(&resolved_method.method_identifier)
-                .and_then(|method| method.return_type_metadata.as_ref())
-                .is_some_and(|return_type| !return_type.type_union.is_nullable())
-        });
 
     Ok(result)
 }
@@ -331,8 +324,28 @@ where
         if let Some(fq_class_id) = first_class_id {
             if !could_method_ever_exist {
                 if magic_call_methods.is_empty() {
-                    result.has_invalid_target = true;
-                    report_non_existent_method(context, class_span, method_span, fq_class_id, method_name);
+                    let identifier = FunctionLikeIdentifier::Method(fq_class_id, method_name);
+                    if context.external_analysis_session.is_some()
+                        && context.plugin_registry.may_have_callable_signature_provider(&identifier)
+                        && let Some(class_metadata) = context.codebase.get_class_like(fq_class_id.as_bytes())
+                    {
+                        result.unresolved_methods.push(UnresolvedMethod {
+                            classname: class_metadata.original_name,
+                            method_name,
+                            target_span: class_span,
+                            selector_span: method_span,
+                            class_type: get_static_class_type(
+                                context,
+                                current_class_metadata,
+                                classname,
+                                fq_class_id,
+                                class_metadata,
+                            ),
+                        });
+                    } else {
+                        result.has_invalid_target = true;
+                        report_non_existent_method(context, class_span, method_span, fq_class_id, method_name);
+                    }
                 } else {
                     result.undocumented_methods.extend(magic_call_methods.into_iter().map(|magic_method| {
                         UndocumentedMethod {
@@ -437,7 +450,35 @@ where
         }
     }
 
-    let static_class_type = if let Some(current_class_metadata) = current_class_metadata
+    let static_class_type =
+        get_static_class_type(context, current_class_metadata, classname, fq_class_id, defining_class_metadata);
+
+    // Get the class it was called on - need original name for callable creation
+    let called_on_class_metadata = context.codebase.get_class_like(fq_class_id.as_bytes())?;
+
+    Some(ResolvedMethod {
+        // Use the original name of the class it was called on
+        // This is important for first-class callables with static return types
+        classname: called_on_class_metadata.original_name,
+        method_identifier: declaring_method_id,
+        static_class_type,
+        declaring_object: None,
+        is_static: function_like.method_metadata.as_ref().is_some_and(|m| m.is_static),
+        mixin_without_magic_method: None,
+    })
+}
+
+fn get_static_class_type<A>(
+    context: &Context<'_, '_, A>,
+    current_class_metadata: Option<&ClassLikeMetadata>,
+    classname: &ResolvedClassname,
+    fq_class_id: Word,
+    defining_class_metadata: &ClassLikeMetadata,
+) -> StaticClassType
+where
+    A: Arena,
+{
+    if let Some(current_class_metadata) = current_class_metadata
         && classname.is_relative()
     {
         let object = get_metadata_object(context, current_class_metadata, current_class_metadata);
@@ -455,21 +496,7 @@ where
         StaticClassType::Exact(fq_class_id)
     } else {
         StaticClassType::Name(fq_class_id)
-    };
-
-    // Get the class it was called on - need original name for callable creation
-    let called_on_class_metadata = context.codebase.get_class_like(fq_class_id.as_bytes())?;
-
-    Some(ResolvedMethod {
-        // Use the original name of the class it was called on
-        // This is important for first-class callables with static return types
-        classname: called_on_class_metadata.original_name,
-        method_identifier: declaring_method_id,
-        static_class_type,
-        declaring_object: None,
-        is_static: function_like.method_metadata.as_ref().is_some_and(|m| m.is_static),
-        mixin_without_magic_method: None,
-    })
+    }
 }
 
 fn get_metadata_object<'ctx, A>(

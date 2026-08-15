@@ -45,7 +45,9 @@ use crate::invocation::template_result::populate_template_result_from_invocation
 use crate::plugin::ExpressionHookResult;
 use crate::plugin::context::HookContext;
 use crate::resolver::method::UndocumentedMethod;
+use crate::resolver::method::UnresolvedMethod;
 use crate::resolver::method::report_non_documented_method;
+use crate::resolver::method::report_non_existent_method;
 use crate::resolver::method::resolve_method_targets;
 use crate::utils::expression::get_expression_id;
 use crate::visibility::check_method_visibility;
@@ -286,10 +288,9 @@ where
         block_context.called_methods.insert(method_name);
     }
 
-    let method_resolution =
+    let mut method_resolution =
         resolve_method_targets(context, block_context, artifacts, object, selector, is_null_safe, span)?;
 
-    let has_resolved_methods = !method_resolution.resolved_methods.is_empty();
     let undocumented_template_result =
         (!method_resolution.undocumented_methods.is_empty()).then(|| method_resolution.template_result.clone());
 
@@ -333,6 +334,20 @@ where
         });
     }
 
+    if !method_resolution.unresolved_methods.is_empty() {
+        method_resolution.has_invalid_target |= prepare_unresolved_method_targets(
+            context,
+            artifacts,
+            std::mem::take(&mut method_resolution.unresolved_methods),
+            InvocationArgumentsSource::ArgumentList(argument_list),
+            span,
+            MethodInvocationKind::Instance,
+            &mut invocation_targets,
+        )?;
+    }
+
+    let has_resolved_methods = !invocation_targets.is_empty();
+
     let this_variable = get_expression_id(
         object,
         block_context.scope.get_class_like_name(),
@@ -364,7 +379,6 @@ where
             method_resolution.encountered_mixed,
             is_null_safe && method_resolution.encountered_null,
             artifacts.get_expression_type(object).is_some_and(|t| t.has_nullsafe_null()),
-            method_resolution.all_methods_non_nullable_return,
         )?;
     }
 
@@ -383,6 +397,69 @@ where
     }
 
     Ok(())
+}
+
+/// Gives external callable-signature providers an opportunity to establish
+/// otherwise unresolved methods before Mago reports them as non-existent.
+pub(super) fn prepare_unresolved_method_targets<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
+    artifacts: &AnalysisArtifacts,
+    unresolved_methods: Vec<UnresolvedMethod>,
+    arguments: InvocationArgumentsSource<'_, 'arena>,
+    span: Span,
+    invocation_kind: MethodInvocationKind,
+    targets: &mut Vec<InvocationTarget<'ctx>>,
+) -> Result<bool, AnalysisError>
+where
+    A: Arena,
+{
+    targets.reserve(unresolved_methods.len());
+    let mut has_invalid_target = false;
+    for unresolved in unresolved_methods {
+        let Some(class_like_metadata) = context.codebase.get_class_like(unresolved.classname.as_bytes()) else {
+            report_non_existent_method(
+                context,
+                unresolved.target_span,
+                unresolved.selector_span,
+                unresolved.classname,
+                unresolved.method_name,
+            );
+
+            has_invalid_target = true;
+            continue;
+        };
+
+        let identifier = FunctionLikeIdentifier::Method(class_like_metadata.original_name, unresolved.method_name);
+        let target = InvocationTarget::ExternalMethod {
+            identifier,
+            effective_signature: None,
+            method_context: MethodTargetContext {
+                invocation_kind,
+                declaring_method_id: None,
+                class_like_metadata,
+                class_type: unresolved.class_type,
+                declaring_object_type: None,
+            },
+            span,
+        };
+
+        let mut invocation = Invocation::new(target, arguments, span);
+        if apply_callable_signature(context, artifacts, &identifier, &mut invocation)? {
+            targets.push(invocation.target);
+        } else {
+            report_non_existent_method(
+                context,
+                unresolved.target_span,
+                unresolved.selector_span,
+                unresolved.classname,
+                unresolved.method_name,
+            );
+
+            has_invalid_target = true;
+        }
+    }
+
+    Ok(has_invalid_target)
 }
 
 /// Gives return-type providers the first opportunity to describe an

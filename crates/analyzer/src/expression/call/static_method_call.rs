@@ -12,6 +12,7 @@ use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::expression::call::analyze_invocation_targets;
 use crate::expression::call::method_call::analyze_undocumented_method_return_type;
+use crate::expression::call::method_call::prepare_unresolved_method_targets;
 use crate::invocation::InvocationArgumentsSource;
 use crate::invocation::InvocationTarget;
 use crate::invocation::MethodInvocationKind;
@@ -72,9 +73,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodCall<'arena> {
             }
         }
 
-        let method_resolution =
+        let mut method_resolution =
             resolve_static_method_targets(context, block_context, artifacts, self.class, &self.method, self.span())?;
-        let has_resolved_methods = !method_resolution.resolved_methods.is_empty();
         let undocumented_template_result =
             (!method_resolution.undocumented_methods.is_empty()).then(|| method_resolution.template_result.clone());
 
@@ -123,6 +123,20 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodCall<'arena> {
             });
         }
 
+        if !method_resolution.unresolved_methods.is_empty() {
+            method_resolution.has_invalid_target |= prepare_unresolved_method_targets(
+                context,
+                artifacts,
+                std::mem::take(&mut method_resolution.unresolved_methods),
+                InvocationArgumentsSource::ArgumentList(&self.argument_list),
+                self.span(),
+                MethodInvocationKind::Static,
+                &mut invocation_targets,
+            )?;
+        }
+
+        let has_resolved_methods = !invocation_targets.is_empty();
+
         let class_has_nullsafe_null = artifacts.get_expression_type(self.class).is_some_and(|t| t.has_nullsafe_null());
 
         if has_resolved_methods || method_resolution.undocumented_methods.is_empty() {
@@ -139,7 +153,6 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodCall<'arena> {
                 method_resolution.encountered_mixed,
                 expression_is_nullsafe(self.class) || method_resolution.encountered_null,
                 class_has_nullsafe_null,
-                method_resolution.all_methods_non_nullable_return,
             )?;
         }
 

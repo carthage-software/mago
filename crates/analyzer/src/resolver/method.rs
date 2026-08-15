@@ -1,6 +1,7 @@
 use foldhash::HashSet;
 use mago_allocator::Arena;
 
+use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
@@ -82,6 +83,22 @@ pub struct UndocumentedMethod {
     pub magic_method: ResolvedMethod,
 }
 
+/// An otherwise non-existent method whose diagnostic is deferred until an
+/// external callable-signature provider has had an opportunity to establish it.
+#[derive(Debug, Clone)]
+pub struct UnresolvedMethod {
+    /// The class on which the method was requested.
+    pub classname: Word,
+    /// The requested method name.
+    pub method_name: Word,
+    /// The span of the receiver or class expression.
+    pub target_span: Span,
+    /// The span of the requested method selector.
+    pub selector_span: Span,
+    /// The receiver used by external signature and return-type providers.
+    pub class_type: StaticClassType,
+}
+
 /// Represents a method found in a mixin where the calling class lacks the required magic method.
 #[derive(Debug, Clone)]
 pub struct MixinWithoutMagicMethod {
@@ -120,6 +137,8 @@ pub struct MethodResolutionResult {
     /// Undocumented calls handled by `__call` or `__callStatic` whose diagnostics
     /// must wait until return-type providers have had an opportunity to resolve them.
     pub undocumented_methods: Vec<UndocumentedMethod>,
+    /// Missing methods that may be established by an external callable provider.
+    pub unresolved_methods: Vec<UnresolvedMethod>,
     /// True if any selector was dynamic (e.g., from a generic string), making the method name unknown.
     pub has_dynamic_selector: bool,
     /// True if any resolution path involved an object with an ambiguous type (e.g., `mixed`, generic `object`).
@@ -130,10 +149,6 @@ pub struct MethodResolutionResult {
     pub encountered_mixed: bool,
     /// True if an access on a `null` type was encountered.
     pub encountered_null: bool,
-    /// True if all resolved methods have non-nullable return types.
-    /// When combined with `encountered_null` and nullsafe access, indicates
-    /// the null in the result type came ONLY from nullsafe short-circuit.
-    pub all_methods_non_nullable_return: bool,
 }
 
 /// Resolves all possible method targets from an object expression and a member selector.
@@ -267,15 +282,28 @@ where
 
                         if !has_method_assertion {
                             if resolved_magic_call_method.is_empty() {
-                                report_non_existent_method(
-                                    context,
-                                    object.span(),
-                                    selector.span(),
-                                    classname,
-                                    method_name,
-                                );
+                                let identifier = FunctionLikeIdentifier::Method(classname, method_name);
+                                if context.external_analysis_session.is_some()
+                                    && context.plugin_registry.may_have_callable_signature_provider(&identifier)
+                                {
+                                    result.unresolved_methods.push(UnresolvedMethod {
+                                        classname,
+                                        method_name,
+                                        target_span: object.span(),
+                                        selector_span: selector.span(),
+                                        class_type: StaticClassType::Object(obj_type.clone()),
+                                    });
+                                } else {
+                                    report_non_existent_method(
+                                        context,
+                                        object.span(),
+                                        selector.span(),
+                                        classname,
+                                        method_name,
+                                    );
 
-                                result.has_invalid_target = true;
+                                    result.has_invalid_target = true;
+                                }
                             } else {
                                 result.undocumented_methods.extend(resolved_magic_call_method.iter().cloned().map(
                                     |magic_method| UndocumentedMethod {
@@ -335,17 +363,6 @@ where
     for method_id in asserted_descendant_method_references {
         artifacts.symbol_references.add_reference_for_method_call(&block_context.scope, &method_id);
     }
-
-    // Compute whether all resolved methods have non-nullable return types.
-    // This is used to determine if null in the result type came only from nullsafe short-circuit.
-    result.all_methods_non_nullable_return = !result.resolved_methods.is_empty()
-        && result.resolved_methods.iter().all(|resolved_method| {
-            context
-                .codebase
-                .get_method_by_id(&resolved_method.method_identifier)
-                .and_then(|method| method.return_type_metadata.as_ref())
-                .is_some_and(|return_type| !return_type.type_union.is_nullable())
-        });
 
     Ok(result)
 }
@@ -861,7 +878,7 @@ where
     );
 }
 
-pub(super) fn report_non_existent_method<A>(
+pub(crate) fn report_non_existent_method<A>(
     context: &mut Context<'_, '_, A>,
     obj_span: Span,
     selector_span: Span,
