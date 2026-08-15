@@ -3,7 +3,6 @@
 use std::borrow::Cow;
 use std::num::NonZeroUsize;
 use std::path::Path;
-use std::process::Command;
 use std::sync::Arc;
 
 use mago_analyzer::external::ExternalAnalyzer;
@@ -386,16 +385,6 @@ fn declined_missing_methods_preserve_non_existent_method_diagnostics() -> Result
 
 fn analyze_with_fixture(source: &str, function_only: bool) -> Result<AnalysisObservation, Box<dyn std::error::Error>> {
     let repository = Path::new(env!("CARGO_MANIFEST_DIR"));
-    let sdk_available = repository.join("vendor/autoload.php").is_file()
-        && Command::new("php").arg("--version").output().is_ok_and(|output| output.status.success());
-    assert!(
-        sdk_available || std::env::var_os("MAGO_REQUIRE_PHP_SDK_TESTS").is_none(),
-        "PHP and vendor dependencies are required for the external invocation-context test"
-    );
-    if !sdk_available {
-        return Ok(AnalysisObservation { issues: Vec::new(), invocations: Vec::new() });
-    }
-
     let temporary = tempfile::tempdir()?;
     let audit = temporary.path().join("invocations.txt");
     std::fs::write(&audit, [])?;

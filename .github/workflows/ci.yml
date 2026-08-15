@@ -48,6 +48,21 @@ jobs:
           restore-keys: |
             ${{ runner.os }}-cargo-${{ matrix.rust }}-
 
+      - name: Install PHP
+        uses: shivammathur/setup-php@master
+        with:
+          php-version: "8.3"
+          tools: "composer:v2"
+
+      - name: Install composer dependencies
+        run: composer install
+
+      - name: Install just
+        uses: extractions/setup-just@v4
+
+      - name: Test PHP SDK
+        run: just test-sdk
+
       - name: cargo check
         if: matrix.os == 'macos-latest'
         run: cargo check --workspace --locked
@@ -69,29 +84,6 @@ jobs:
       - name: cargo build
         if: matrix.rust == 'stable'
         run: cargo build --release --locked
-
-      - name: Install PHP
-        if: matrix.rust == 'stable' && matrix.os == 'ubuntu-latest'
-        uses: shivammathur/setup-php@master
-        with:
-          php-version: "8.3"
-          tools: "composer:v2"
-
-      - name: Install composer dependencies
-        if: matrix.rust == 'stable' && matrix.os == 'ubuntu-latest'
-        run: composer install
-
-      - name: Install just
-        if: matrix.rust == 'stable' && matrix.os == 'ubuntu-latest'
-        uses: extractions/setup-just@v4
-
-      - name: Test PHP SDK
-        if: matrix.rust == 'stable' && matrix.os == 'ubuntu-latest'
-        run: just test-sdk
-
-      - name: Test external analyzer lifecycle SDK
-        if: matrix.rust == 'stable' && matrix.os == 'ubuntu-latest'
-        run: MAGO_REQUIRE_PHP_SDK_TESTS=1 cargo test --test external_analyzer_lifecycle --locked
 
       - name: Validate composer code format
         if: matrix.rust == 'stable' && matrix.os == 'ubuntu-latest'
