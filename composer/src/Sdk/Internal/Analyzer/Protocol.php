@@ -13,6 +13,9 @@ use Mago\Sdk\Analyzer\Invocation;
 use Mago\Sdk\Analyzer\InvocationKind;
 use Mago\Sdk\Analyzer\Metadata\MemberIdentifier;
 use Mago\Sdk\Analyzer\ProjectAnalysis;
+use Mago\Sdk\Analyzer\PropertyAccess;
+use Mago\Sdk\Analyzer\PropertyAccessKind;
+use Mago\Sdk\Analyzer\PropertyType;
 use Mago\Sdk\Analyzer\ReferenceKind;
 use Mago\Sdk\Analyzer\ReferenceOrigin;
 use Mago\Sdk\Analyzer\ReferenceSummary;
@@ -54,6 +57,7 @@ final class Protocol
     public const SYMBOL_REFERENCE_QUERY_REQUEST = 10;
     public const INITIALIZE_REQUEST = 11;
     public const CALLABLE_SIGNATURE_REQUEST = 12;
+    public const PROPERTY_TYPE_REQUEST = 13;
     public const GET_EXPRESSION_TYPES = 1;
     public const GET_ALL_EXPRESSION_TYPES = 2;
     public const GET_INFERRED_RETURN_TYPES = 3;
@@ -120,6 +124,7 @@ final class Protocol
     private const SYMBOL_REFERENCE_QUERY_RESPONSE = 0x800A;
     private const INITIALIZE_RESPONSE = 0x800B;
     private const CALLABLE_SIGNATURE_RESPONSE = 0x800C;
+    private const PROPERTY_TYPE_RESPONSE = 0x800D;
     private const RETURN_TYPE_REQUEST_HEADER = "MANA\x00\x01\x00\x01\x00\x02\x00\x00";
     private const CALLABLE_SIGNATURE_REQUEST_HEADER = "MANA\x00\x01\x00\x01\x00\x0C\x00\x00";
     private const UNHANDLED_RETURN_TYPE_RESPONSE = "MANA\x00\x01\x00\x01\x80\x02\x00\x00\x00";
@@ -203,6 +208,7 @@ final class Protocol
     /**
      * @param non-empty-list<Extension> $extensions
      * @param list<RegisteredPlugin> $plugins
+     * @mago-expect lint:halstead
      */
     public static function writeDescribeResponse(array $extensions, array $plugins): string
     {
@@ -256,6 +262,16 @@ final class Protocol
                     foreach ($provider->targets as $target) {
                         $writer->writeBytes($target->class);
                         $writer->writeBytes($target->method);
+                    }
+                }
+
+                $writer->writeCount($plugin->propertyProviders);
+                foreach ($plugin->propertyProviders as $provider) {
+                    $writer->writeU16($provider->index);
+                    $writer->writeCount($provider->targets);
+                    foreach ($provider->targets as $target) {
+                        $writer->writeBytes($target->class);
+                        $writer->writeBytes($target->property);
                     }
                 }
             }
@@ -683,6 +699,58 @@ final class Protocol
             $flags |= (int) $parameter->variadic << 1;
             $flags |= (int) $parameter->hasDefault << 2;
             $writer->writeU8($flags);
+        }
+
+        return $writer->finish();
+    }
+
+    public static function readPropertyTypeRequest(PayloadReader $reader): PropertyTypeRequest
+    {
+        $generation = $reader->readU64();
+        $providerCount = $reader->readU16();
+        if ($providerCount === 0) {
+            throw new ProtocolException('A property-type request contains no providers.');
+        }
+
+        $providers = [];
+        for ($index = 0; $index < $providerCount; ++$index) {
+            $providers[] = $reader->readU16();
+        }
+
+        $class = $reader->readBytes();
+        $property = $reader->readBytes();
+        $kind = match ($encodedKind = $reader->readU8()) {
+            1 => PropertyAccessKind::Read,
+            2 => PropertyAccessKind::Write,
+            default => throw new ProtocolException("Unknown analyzer property access kind {$encodedKind}."),
+        };
+        $receiverType = TypeCodec::read($reader);
+        $span = new Span($reader->readU32(), $reader->readU32());
+        $reader->finish();
+
+        return new PropertyTypeRequest(
+            $generation,
+            $providers,
+            new PropertyAccess($class, $property, $kind, $receiverType, $span),
+        );
+    }
+
+    public static function writePropertyTypeResponse(?PropertyType $type): string
+    {
+        if ($type === null) {
+            return pack('N3C', self::MAGIC_U32, self::VERSION_U32, self::PROPERTY_TYPE_RESPONSE << 16, 0);
+        }
+
+        $writer = self::createMessage(self::PROPERTY_TYPE_RESPONSE);
+        $writer->writeBoolean(true);
+        $writer->writeBoolean($type->readType !== null);
+        if ($type->readType !== null) {
+            $writer->writeRaw($type->readType->encode());
+        }
+
+        $writer->writeBoolean($type->writeType !== null);
+        if ($type->writeType !== null) {
+            $writer->writeRaw($type->writeType->encode());
         }
 
         return $writer->finish();

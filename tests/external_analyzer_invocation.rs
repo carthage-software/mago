@@ -41,6 +41,13 @@ class Builder
 /** @property string $magic */
 class BaseModel
 {
+    public function __get(string $property): mixed
+    {
+        return null;
+    }
+
+    public function __set(string $property, mixed $value): void {}
+
     public static function query(): mixed
     {
         return null;
@@ -83,6 +90,18 @@ class BaseModel
 }
 
 final class User extends BaseModel {}
+
+class Relation
+{
+    public function __call(string $name, array $arguments): mixed
+    {
+        return null;
+    }
+}
+
+class HasMany extends Relation {}
+
+final class CustomRelation extends HasMany {}
 
 interface Marker {}
 
@@ -129,6 +148,8 @@ function take_user(User $_user): void {}
 
 function take_string(string $_value): void {}
 
+function take_int(int $_value): void {}
+
 function take_intersection(BaseModel&Marker $_model): void {}
 
 /** @param array<int, string> $_values */
@@ -149,10 +170,22 @@ take_string_builders(User::magicValues());
 take_string((new DynamicProxy())->dynamic('instance'));
 take_string((new DynamicProxy())->acceptString('dynamic-signature'));
 take_string_map(DynamicFacade::dynamic('static'));
+take_string((new CustomRelation())->where());
 User::callLate();
 
 $user = new User();
 take_user_builder($user->newQuery());
+take_string($user->name);
+$user->name = 123;
+take_string($user->name);
+take_int($user->id);
+take_user($user->self);
+$user->secret = 'token';
+// @mago-expect analysis:invalid-property-write
+$user->id = 'forbidden';
+// @mago-expect analysis:invalid-property-read
+// @mago-expect analysis:no-value
+echo $user->secret;
 
 /** @var Builder<User> $builder */
 $builder = new Builder();
@@ -243,6 +276,14 @@ fn external_providers_receive_complete_invocation_context() -> Result<(), Box<dy
             "late-static",
             "method-signature",
             "method-signature-return",
+            "property-id-read",
+            "property-id-write",
+            "property-name-read",
+            "property-name-write",
+            "property-secret-read",
+            "property-secret-write",
+            "property-self-read",
+            "relation-subclass",
             "static"
         ]
     );

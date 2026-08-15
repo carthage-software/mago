@@ -86,6 +86,7 @@ use mago_span::HasSpan;
 use mago_word::word;
 
 use crate::artifacts::AnalysisArtifacts;
+use crate::external::EffectivePropertyType;
 use crate::external::ExternalAnalysisSession;
 use crate::external::ExternalExtension;
 use crate::external::ExternalPlugin;
@@ -93,6 +94,9 @@ use crate::external::FunctionProvider;
 use crate::external::FunctionTarget;
 use crate::external::MethodProvider;
 use crate::external::MethodTarget;
+use crate::external::PropertyAccessKind;
+use crate::external::PropertyProvider;
+use crate::external::PropertyTarget;
 use crate::external::error::ExternalAnalyzerError;
 use crate::external::error::protocol;
 use crate::external::metadata;
@@ -112,11 +116,13 @@ const RETURN_TYPE_REQUEST: u16 = 2;
 const TYPE_COMPARISON_REQUEST: u16 = 3;
 const INITIALIZE_REQUEST: u16 = 11;
 const CALLABLE_SIGNATURE_REQUEST: u16 = 12;
+const PROPERTY_TYPE_REQUEST: u16 = 13;
 const DESCRIBE_RESPONSE: u16 = 0x8001;
 const RETURN_TYPE_RESPONSE: u16 = 0x8002;
 const TYPE_COMPARISON_RESPONSE: u16 = 0x8003;
 const INITIALIZE_RESPONSE: u16 = 0x800B;
 const CALLABLE_SIGNATURE_RESPONSE: u16 = 0x800C;
+const PROPERTY_TYPE_RESPONSE: u16 = 0x800D;
 const MAXIMUM_EXTENSIONS: usize = 0x4000;
 const MAXIMUM_PLUGINS: usize = 0x4000;
 const MAXIMUM_PROVIDERS: usize = 0x0001_0000;
@@ -187,6 +193,7 @@ pub(super) struct Registration {
     pub has_worker_reducer: bool,
     pub function_providers: Vec<FunctionProvider>,
     pub method_providers: Vec<MethodProvider>,
+    pub property_providers: Vec<PropertyProvider>,
     pub initialization_plugins: Vec<u16>,
     pub before_analysis_plugins: Vec<u16>,
     pub after_file_analysis_plugins: Vec<u16>,
@@ -207,6 +214,13 @@ pub(super) struct ReturnTypeRequest<'type_info> {
     pub snapshotted_types: usize,
     pub arguments: usize,
     pub typed_arguments: usize,
+    pub type_snapshot_duration: Duration,
+}
+
+pub(super) struct PropertyTypeRequest<'type_info> {
+    pub payload: Vec<u8>,
+    pub types: Vec<Cow<'type_info, TUnion>>,
+    pub snapshotted_types: usize,
     pub type_snapshot_duration: Duration,
 }
 
@@ -298,6 +312,7 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
     let mut plugins = Vec::new();
     let mut function_providers = Vec::new();
     let mut method_providers = Vec::new();
+    let mut property_providers = Vec::new();
     let mut initialization_plugins = Vec::new();
     let mut before_analysis_plugins = Vec::new();
     let mut after_file_analysis_plugins = Vec::new();
@@ -413,6 +428,28 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
                 });
             }
 
+            let property_count = reader.read_count("property providers", MAXIMUM_PROVIDERS)?;
+            for _ in 0..property_count {
+                let index = reader.read_u16("property provider index")?;
+                let target_count = reader.read_count("property targets", MAXIMUM_TARGETS)?;
+                if target_count == 0 {
+                    return Err(protocol(format!("property provider {index} has no targets")));
+                }
+
+                let mut targets = Vec::with_capacity(target_count);
+                for _ in 0..target_count {
+                    let class =
+                        non_empty(reader.read_bytes("property target class")?.to_vec(), "property target class")?;
+                    let property =
+                        non_empty(reader.read_bytes("property target property")?.to_vec(), "property target property")?;
+                    validate_method_pattern(&class)?;
+                    validate_property_pattern(&property)?;
+                    targets.push(PropertyTarget { class, property });
+                }
+
+                property_providers.push(PropertyProvider { plugin: identifier.clone(), index, targets });
+            }
+
             let plugin = ExternalPlugin {
                 index,
                 extension: extension_identifier.clone(),
@@ -446,12 +483,14 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
     )?;
 
     validate_provider_indices(method_providers.iter().map(|provider| provider.index), "method return-type provider")?;
+    validate_provider_indices(property_providers.iter().map(|provider| provider.index), "property type provider")?;
     Ok(Registration {
         extensions,
         plugins,
         has_worker_reducer,
         function_providers,
         method_providers,
+        property_providers,
         initialization_plugins,
         before_analysis_plugins,
         after_file_analysis_plugins,
@@ -577,6 +616,74 @@ pub(super) fn encode_method_callable_signature_request<'type_info>(
         generation,
         trace_enabled,
     )
+}
+
+pub(super) fn encode_property_type_request<'type_info>(
+    provider_indices: &[u16],
+    class: &[u8],
+    property: &[u8],
+    access: PropertyAccessKind,
+    receiver_type: &'type_info TUnion,
+    span: mago_span::Span,
+    generation: u64,
+    trace_enabled: bool,
+) -> Result<PropertyTypeRequest<'type_info>, ExternalAnalyzerError> {
+    let mut writer = message_writer(PROPERTY_TYPE_REQUEST);
+    writer.write_u64(generation);
+    writer.write_u16(
+        u16::try_from(provider_indices.len()).map_err(|_| protocol("more than u16::MAX providers matched"))?,
+    );
+    for index in provider_indices {
+        writer.write_u16(*index);
+    }
+
+    writer.write_bytes(class)?;
+    writer.write_bytes(property)?;
+    writer.write_u8(match access {
+        PropertyAccessKind::Read => 1,
+        PropertyAccessKind::Write => 2,
+    });
+    let snapshot_start = trace_enabled.then(Instant::now);
+    let mut references = Vec::new();
+    encode_union_snapshot(&mut writer, receiver_type, &mut references, 0)?;
+    let type_snapshot_duration = snapshot_start.map_or(Duration::ZERO, |start| start.elapsed());
+    writer.write_u32(span.start.offset);
+    writer.write_u32(span.end.offset);
+
+    Ok(PropertyTypeRequest {
+        payload: writer.finish(),
+        snapshotted_types: references.len(),
+        types: references.into_iter().map(Cow::Borrowed).collect(),
+        type_snapshot_duration,
+    })
+}
+
+pub(super) fn decode_property_type_response<'type_info>(
+    payload: &[u8],
+    resolve: impl Fn(usize) -> Option<&'type_info TUnion>,
+) -> Result<Option<EffectivePropertyType>, ExternalAnalyzerError> {
+    let mut reader = message_reader(payload, PROPERTY_TYPE_RESPONSE)?;
+    if !reader.read_bool("property type handled flag")? {
+        reader.finish()?;
+        return Ok(None);
+    }
+
+    let read_type = if reader.read_bool("property read type presence")? {
+        Some(decode_type(&mut reader, &resolve, 0)?)
+    } else {
+        None
+    };
+    let write_type = if reader.read_bool("property write type presence")? {
+        Some(decode_type(&mut reader, &resolve, 0)?)
+    } else {
+        None
+    };
+    if read_type.is_none() && write_type.is_none() {
+        return Err(protocol("handled property type response contains neither a read nor write type"));
+    }
+
+    reader.finish()?;
+    Ok(Some(EffectivePropertyType { read_type, write_type }))
 }
 
 fn encode_return_type_request<'type_info>(
@@ -2297,6 +2404,15 @@ fn validate_method_pattern(pattern: &[u8]) -> Result<(), ExternalAnalyzerError> 
     Ok(())
 }
 
+fn validate_property_pattern(pattern: &[u8]) -> Result<(), ExternalAnalyzerError> {
+    validate_method_pattern(pattern)?;
+    if pattern.starts_with(b"$") {
+        return Err(protocol("property target names must not begin with `$`"));
+    }
+
+    Ok(())
+}
+
 fn validate_provider_indices(
     indices: impl IntoIterator<Item = u16>,
     provider_kind: &str,
@@ -2394,6 +2510,25 @@ pub(super) mod testing {
         assert!(matches!(result, Err(ExternalAnalyzerError::Protocol(message)) if message.contains("variable name")));
     }
 
+    #[test]
+    fn property_type_response_resolves_request_type_handles() {
+        let request_type = get_literal_string(word(b"value"));
+        let mut writer = message_writer(PROPERTY_TYPE_RESPONSE);
+        writer.write_bool(true);
+        writer.write_bool(true);
+        writer.write_u8(TYPE_REFERENCE);
+        writer.write_u32(0);
+        writer.write_bool(true);
+        writer.write_u8(TYPE_REFERENCE);
+        writer.write_u32(0);
+
+        let property = decode_property_type_response(&writer.finish(), |handle| (handle == 0).then_some(&request_type))
+            .unwrap()
+            .unwrap();
+        assert_eq!(property.read_type.as_ref(), Some(&request_type));
+        assert_eq!(property.write_type.as_ref(), Some(&request_type));
+    }
+
     pub fn registration_response() -> Vec<u8> {
         registration_response_with_lifecycle(0)
     }
@@ -2415,6 +2550,7 @@ pub(super) mod testing {
         for alias in aliases {
             writer.write_string(alias).unwrap();
         }
+        writer.write_u32(0);
         writer.write_u32(0);
         writer.write_u32(0);
         writer.finish()
@@ -2445,6 +2581,7 @@ pub(super) mod testing {
         writer.write_u32(1);
         writer.write_u8(TARGET_EXACT);
         writer.write_bytes(b"demo_service").unwrap();
+        writer.write_u32(0);
         writer.write_u32(0);
         writer.finish()
     }

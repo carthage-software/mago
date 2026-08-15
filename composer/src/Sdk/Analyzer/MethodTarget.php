@@ -10,6 +10,10 @@ use function strlen;
 use function strpos;
 
 /**
+ * Selects method calls handled by a return-type or callable-signature provider.
+ *
+ * Exact classes also match their subclasses and implementations.
+ *
  * @api
  */
 final class MethodTarget

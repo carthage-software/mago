@@ -238,6 +238,7 @@ where
     let resulting_type = Rc::new(resulting_type.unwrap_or_else(get_never));
 
     if context.settings.memoize_properties
+        && !resolution_result.has_unreadable_property
         && let Some(property_access_id) = property_access_id
     {
         // Memoize the written value so later reads of the same access see it — but only to the

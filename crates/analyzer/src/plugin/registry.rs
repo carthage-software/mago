@@ -10,6 +10,8 @@ use mago_codex::metadata::function_like::FunctionLikeMetadata;
 use mago_codex::metadata::property::PropertyMetadata;
 use mago_codex::ttype::union::TUnion;
 use mago_database::file::File;
+use mago_reporting::IssueCollection;
+use mago_span::Span;
 use mago_syntax::cst::Class;
 use mago_syntax::cst::Enum;
 use mago_syntax::cst::Expression;
@@ -31,9 +33,11 @@ use mago_word::concat_word;
 use crate::artifacts::AnalysisArtifacts;
 use crate::context::block::BlockContext;
 use crate::external::BeforeAnalysisResult;
+use crate::external::EffectivePropertyType;
 use crate::external::ExternalAnalysisSession;
 use crate::external::ExternalAnalyzerHandle;
 use crate::external::FileAnalysisSnapshot;
+use crate::external::PropertyAccessKind;
 use crate::invocation::EffectiveCallableSignature;
 use crate::invocation::Invocation;
 use crate::plugin::PluginError;
@@ -70,8 +74,6 @@ use crate::plugin::provider::throw::ExpressionThrowTypeProvider;
 use crate::plugin::provider::throw::FunctionThrowTypeProvider;
 use crate::plugin::provider::throw::MethodThrowTypeProvider;
 
-use mago_reporting::IssueCollection;
-
 pub struct ProviderResult {
     pub return_type: Option<TUnion>,
     pub issues: Vec<ReportedIssue>,
@@ -84,6 +86,7 @@ pub struct PluginRegistry {
     external_method_providers: OnceLock<bool>,
     external_function_signature_providers: OnceLock<bool>,
     external_method_signature_providers: OnceLock<bool>,
+    external_property_providers: OnceLock<bool>,
     function_exact: WordMap<Vec<usize>>,
     function_prefix: Vec<(Word, usize)>,
     function_namespace: Vec<(Word, usize)>,
@@ -129,6 +132,7 @@ impl std::fmt::Debug for PluginRegistry {
             .field("external_analyzer", &self.external_analyzer.is_some())
             .field("external_function_providers", &self.external_function_providers.get())
             .field("external_method_providers", &self.external_method_providers.get())
+            .field("external_property_providers", &self.external_property_providers.get())
             .field("external_function_signature_providers", &self.external_function_signature_providers.get())
             .field("external_method_signature_providers", &self.external_method_signature_providers.get())
             .field("function_providers", &self.function_providers.len())
@@ -183,10 +187,13 @@ impl PluginRegistry {
             analyzer.has_function_callable_signature_providers().map_err(|reason| PluginError::Internal { reason })?;
         let method_signature_providers =
             analyzer.has_method_callable_signature_providers().map_err(|reason| PluginError::Internal { reason })?;
+        let property_providers =
+            analyzer.has_property_type_providers().map_err(|reason| PluginError::Internal { reason })?;
         let _function = self.external_function_providers.set(function_providers);
         let _method = self.external_method_providers.set(method_providers);
         let _function_signature = self.external_function_signature_providers.set(function_signature_providers);
         let _method_signature = self.external_method_signature_providers.set(method_signature_providers);
+        let _property = self.external_property_providers.set(property_providers);
         Ok(())
     }
 
@@ -1390,6 +1397,42 @@ impl PluginRegistry {
         };
 
         Ok(ProviderResult { return_type, issues: all_issues })
+    }
+
+    #[inline]
+    #[must_use]
+    pub(crate) fn may_have_property_type_provider(&self) -> bool {
+        self.external_analyzer.is_some() && self.external_property_providers.get().copied().unwrap_or(true)
+    }
+
+    /// Requests an external provider's effective magic-property contract.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when an external property provider fails or returns an invalid response.
+    pub(crate) fn get_property_type(
+        &self,
+        codebase: &CodebaseMetadata,
+        class: &[u8],
+        property: &[u8],
+        access: PropertyAccessKind,
+        receiver_type: &TUnion,
+        span: Span,
+        external_session: Option<&ExternalAnalysisSession>,
+    ) -> PluginResult<Option<EffectivePropertyType>> {
+        if !self.external_property_providers.get().copied().unwrap_or(true) {
+            return Ok(None);
+        }
+
+        self.external_analyzer
+            .as_deref()
+            .zip(external_session)
+            .map(|(analyzer, session)| {
+                analyzer.get_property_type(class, property, access, receiver_type, span, codebase, session)
+            })
+            .transpose()
+            .map(Option::flatten)
+            .map_err(|reason| PluginError::Internal { reason })
     }
 
     #[inline]

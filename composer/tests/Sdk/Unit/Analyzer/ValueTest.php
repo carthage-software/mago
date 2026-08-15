@@ -7,6 +7,8 @@ namespace Mago\Tests\Sdk\Unit\Analyzer;
 use Mago\Sdk\Analyzer\FunctionTarget;
 use Mago\Sdk\Analyzer\MethodTarget;
 use Mago\Sdk\Analyzer\PluginDefinition;
+use Mago\Sdk\Analyzer\PropertyTarget;
+use Mago\Sdk\Analyzer\PropertyType;
 use Mago\Sdk\Analyzer\Type;
 use Mago\Sdk\Exception\InvalidArgumentException;
 use Mago\Sdk\Span;
@@ -28,6 +30,25 @@ final class ValueTest extends TestCase
         self::assertSame(['example'], $plugin->aliases);
         self::assertSame('demo', FunctionTarget::exact('demo')->value);
         self::assertSame('*', MethodTarget::anyClass('create')->class);
+        self::assertSame('*', PropertyTarget::allProperties('Model')->property);
+
+        $property = new PropertyType(Type::string(), Type::int());
+        self::assertSame('string', (string) $property->readType);
+        self::assertSame('int', (string) $property->writeType);
+    }
+
+    public function testPropertyTypeRequiresAtLeastOneAccessType(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        new PropertyType();
+    }
+
+    public function testPropertyTargetRejectsDollarPrefixedNames(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        PropertyTarget::exact('Model', '$name');
     }
 
     public function testTypeFactoriesBuildExpectedTypes(): void

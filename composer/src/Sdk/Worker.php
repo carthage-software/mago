@@ -15,6 +15,7 @@ use Mago\Sdk\Analyzer\InitializationContext;
 use Mago\Sdk\Analyzer\InvocationKind;
 use Mago\Sdk\Analyzer\PluginRegistry as AnalyzerPluginRegistry;
 use Mago\Sdk\Analyzer\ProjectAnalysis;
+use Mago\Sdk\Analyzer\PropertyTypeProviderContext;
 use Mago\Sdk\Analyzer\ReturnTypeProviderContext;
 use Mago\Sdk\Analyzer\TypeComparator;
 use Mago\Sdk\Exception\CancelledException;
@@ -25,6 +26,7 @@ use Mago\Sdk\Internal\Analyzer\Protocol as AnalyzerProtocol;
 use Mago\Sdk\Internal\Analyzer\RegisteredFunctionReturnTypeProvider;
 use Mago\Sdk\Internal\Analyzer\RegisteredMethodReturnTypeProvider;
 use Mago\Sdk\Internal\Analyzer\RegisteredPlugin;
+use Mago\Sdk\Internal\Analyzer\RegisteredPropertyTypeProvider;
 use Mago\Sdk\Internal\HostClient;
 use Mago\Sdk\Internal\Io\ResourceReader;
 use Mago\Sdk\Internal\Io\ResourceWriter;
@@ -90,6 +92,9 @@ final class Worker
     /** @var list<RegisteredMethodReturnTypeProvider> */
     private readonly array $methodReturnTypeProviders;
 
+    /** @var list<RegisteredPropertyTypeProvider> */
+    private readonly array $propertyTypeProviders;
+
     /**
      * @var list<int<0, 65535>>
      */
@@ -109,6 +114,9 @@ final class Worker
 
     private ?MetadataCache $metadataCache = null;
 
+    /**
+     * @mago-expect lint:halstead
+     */
     public function __construct(Extension $extension, Extension ...$additionalExtensions)
     {
         $extensions = [$extension, ...array_values($additionalExtensions)];
@@ -119,6 +127,7 @@ final class Worker
         $registeredPlugins = [];
         $functionProviders = [];
         $methodProviders = [];
+        $propertyProviders = [];
         $workerReducerIndices = [];
         foreach ($extensions as $extensionIndex => $registeredExtension) {
             $normalizedExtensionIdentifier = strtolower($registeredExtension->identifier);
@@ -217,6 +226,32 @@ final class Worker
                     $registeredMethodProviders[] = $registeredProvider;
                 }
 
+                $registeredPropertyProviders = [];
+                foreach ($registry->getPropertyTypeProviders() as $provider) {
+                    $targets = $provider->getTargets();
+                    if ($targets === []) {
+                        throw new InvalidArgumentException(
+                            "A property type provider in `{$definition->identifier}` has no targets.",
+                        );
+                    }
+
+                    $providerIndex = count($propertyProviders);
+                    if ($providerIndex > 65_535) {
+                        throw new InvalidArgumentException(
+                            'A worker cannot register more than 65,536 property type providers.',
+                        );
+                    }
+
+                    $registeredProvider = new RegisteredPropertyTypeProvider(
+                        $providerIndex,
+                        $definition->identifier,
+                        $provider,
+                        $targets,
+                    );
+                    $propertyProviders[] = $registeredProvider;
+                    $registeredPropertyProviders[] = $registeredProvider;
+                }
+
                 $registeredPlugins[] = new RegisteredPlugin(
                     count($registeredPlugins),
                     $registeredExtension->identifier,
@@ -224,6 +259,7 @@ final class Worker
                     $definition,
                     $registeredFunctionProviders,
                     $registeredMethodProviders,
+                    $registeredPropertyProviders,
                     $registry->getInitializationHooks(),
                     $registry->getBeforeAnalysisHooks(),
                     $registry->getAfterFileAnalysisHooks(),
@@ -238,6 +274,7 @@ final class Worker
         $this->workerReducerIndices = $workerReducerIndices;
         $this->functionReturnTypeProviders = $functionProviders;
         $this->methodReturnTypeProviders = $methodProviders;
+        $this->propertyTypeProviders = $propertyProviders;
     }
 
     /**
@@ -493,6 +530,46 @@ final class Worker
             || $kind === AnalyzerProtocol::AFTER_FILE_ANALYSIS_BATCH_REQUEST
         ) {
             return $this->handleAnalyzerLifecycleRequest($kind, $reader, $requestId, $host, $cancellation);
+        }
+
+        if ($kind === AnalyzerProtocol::PROPERTY_TYPE_REQUEST) {
+            $request = AnalyzerProtocol::readPropertyTypeRequest($reader);
+            if ($this->metadataCache === null || $this->metadataCache->generation !== $request->generation) {
+                $this->metadataCache = new MetadataCache($request->generation);
+            }
+
+            $codebase = new Codebase($host, $requestId, $cancellation, $this->metadataCache);
+            foreach ($request->providerIndices as $providerIndex) {
+                $registered = $this->propertyTypeProviders[$providerIndex] ?? null;
+                if ($registered === null) {
+                    throw new ProtocolException(
+                        "Mago requested unregistered property type provider index {$providerIndex}.",
+                    );
+                }
+
+                $cancellation->throwIfCancelled();
+                try {
+                    $type = $registered->provider->getPropertyType(new PropertyTypeProviderContext(
+                        $this->phpVersion,
+                        $codebase,
+                        $request->access,
+                        new TypeComparator($host, $requestId, $cancellation),
+                        $cancellation,
+                    ));
+                } catch (Throwable $throwable) {
+                    throw new ProtocolException(
+                        "Property type provider in `{$registered->plugin}` failed: {$throwable->getMessage()}",
+                        0,
+                        $throwable,
+                    );
+                }
+
+                if ($type !== null) {
+                    return AnalyzerProtocol::writePropertyTypeResponse($type);
+                }
+            }
+
+            return AnalyzerProtocol::writePropertyTypeResponse(null);
         }
 
         if ($kind !== AnalyzerProtocol::RETURN_TYPE_REQUEST && $kind !== AnalyzerProtocol::CALLABLE_SIGNATURE_REQUEST) {

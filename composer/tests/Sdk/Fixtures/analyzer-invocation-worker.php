@@ -16,6 +16,11 @@ use Mago\Sdk\Analyzer\MethodTarget;
 use Mago\Sdk\Analyzer\Plugin;
 use Mago\Sdk\Analyzer\PluginDefinition;
 use Mago\Sdk\Analyzer\PluginRegistry;
+use Mago\Sdk\Analyzer\PropertyAccessKind;
+use Mago\Sdk\Analyzer\PropertyTarget;
+use Mago\Sdk\Analyzer\PropertyType;
+use Mago\Sdk\Analyzer\PropertyTypeProvider;
+use Mago\Sdk\Analyzer\PropertyTypeProviderContext;
 use Mago\Sdk\Analyzer\ReturnTypeProviderContext;
 use Mago\Sdk\Analyzer\Type;
 use Mago\Sdk\Analyzer\Type\CallableParameter;
@@ -130,6 +135,7 @@ final class InvocationMethodProvider implements MethodReturnTypeProvider, Callab
             MethodTarget::exact('DynamicProxy', 'acceptString'),
             MethodTarget::exact('DynamicFacade', 'dynamic'),
             MethodTarget::exact('Artisan', 'command'),
+            MethodTarget::allMethods('Relation'),
         ];
     }
 
@@ -205,6 +211,14 @@ final class InvocationMethodProvider implements MethodReturnTypeProvider, Callab
             InvocationAudit::record('closure-this-return');
 
             return Type::void();
+        }
+
+        if ($invocation->declaringClass === 'CustomRelation' && $invocation->name === 'where') {
+            self::assertInvocation($context, InvocationKind::InstanceMethod, 'CustomRelation');
+            self::assertNamed($named, 'CustomRelation', 0, 0);
+            InvocationAudit::record('relation-subclass');
+
+            return Type::string();
         }
 
         if ($invocation->name === 'query') {
@@ -435,6 +449,42 @@ final class InvocationMethodProvider implements MethodReturnTypeProvider, Callab
 /**
  * @mago-expect lint:single-class-per-file
  */
+final class InvocationPropertyProvider implements PropertyTypeProvider
+{
+    public function getTargets(): array
+    {
+        return [PropertyTarget::allProperties('BaseModel')];
+    }
+
+    public function getPropertyType(PropertyTypeProviderContext $context): ?PropertyType
+    {
+        $access = $context->access;
+        if (
+            $access->class !== 'User'
+            || !$context->types->equals($access->receiverType, Type::namedObject('User'))
+        ) {
+            throw new RuntimeException('A property provider received incorrect subclass or receiver context.');
+        }
+
+        $operation = match ($access->kind) {
+            PropertyAccessKind::Read => 'read',
+            PropertyAccessKind::Write => 'write',
+        };
+        InvocationAudit::record("property-{$access->property}-{$operation}");
+
+        return match ($access->property) {
+            'name' => new PropertyType(Type::string(), Type::int()),
+            'id' => new PropertyType(readType: Type::int()),
+            'secret' => new PropertyType(writeType: Type::string()),
+            'self' => new PropertyType(readType: $access->receiverType),
+            default => null,
+        };
+    }
+}
+
+/**
+ * @mago-expect lint:single-class-per-file
+ */
 final class InvocationPlugin implements Plugin
 {
     public function __construct(
@@ -456,6 +506,7 @@ final class InvocationPlugin implements Plugin
         if ($this->registerMethodProvider) {
             $registry->registerMethodReturnTypeProvider(new InvocationMethodProvider());
         }
+        $registry->registerPropertyTypeProvider(new InvocationPropertyProvider());
     }
 }
 

@@ -27,6 +27,11 @@ final class PluginRegistry
     private array $methodReturnTypeProviders = [];
 
     /**
+     * @var list<PropertyTypeProvider>
+     */
+    private array $propertyTypeProviders = [];
+
+    /**
      * @var list<BeforeAnalysisHook>
      */
     private array $beforeAnalysisHooks = [];
@@ -54,6 +59,11 @@ final class PluginRegistry
     public function registerMethodReturnTypeProvider(MethodReturnTypeProvider $provider): void
     {
         $this->methodReturnTypeProviders[] = $provider;
+    }
+
+    public function registerPropertyTypeProvider(PropertyTypeProvider $provider): void
+    {
+        $this->propertyTypeProviders[] = $provider;
     }
 
     public function registerBeforeAnalysisHook(BeforeAnalysisHook $hook): void
@@ -87,6 +97,15 @@ final class PluginRegistry
     public function getMethodReturnTypeProviders(): array
     {
         return $this->methodReturnTypeProviders;
+    }
+
+    /**
+     * @internal
+     * @return list<PropertyTypeProvider>
+     */
+    public function getPropertyTypeProviders(): array
+    {
+        return $this->propertyTypeProviders;
     }
 
     /**
