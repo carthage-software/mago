@@ -1744,6 +1744,7 @@ dependencies = [
  "mago-analyzer",
  "mago-bytes",
  "mago-codex",
+ "mago-collector",
  "mago-database",
  "mago-formatter",
  "mago-guard",

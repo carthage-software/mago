@@ -143,7 +143,7 @@ final class LifecycleProofHook implements
         $context->report(
             Level::Help,
             'after-file',
-            Issue::new('After-file hook ran.', new Span(0, min(5, $analysis->size)))->withEdit(TextEdit::replace(
+            Issue::new('After-file hook ran.', new Span(0, $analysis->size))->withEdit(TextEdit::replace(
                 new Span(0, min(5, $analysis->size)),
                 '<?php',
             )->withSafety(Safety::PotentiallyUnsafe)),
@@ -162,7 +162,7 @@ final class LifecycleProofHook implements
 
         $frameworkReferenceEnabled = $context->codebase->getConstant('ENABLE_FRAMEWORK_ACTION') !== null;
         $project = $context->analysis;
-        $expectedIssueCount = ($frameworkReferenceEnabled ? 3 : 4) + (count($project->files) * 2);
+        $expectedIssueCount = ($frameworkReferenceEnabled ? 3 : 4) + (count($project->files) * 2) - 1;
         if (count($project->files) !== 96 || $project->issueCount !== $expectedIssueCount) {
             throw new RuntimeException(
                 "The final hook received {$project->issueCount} issues; expected {$expectedIssueCount}.",

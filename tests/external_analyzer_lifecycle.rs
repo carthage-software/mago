@@ -87,8 +87,11 @@ fn make_database(
         };
         let framework_reference_marker =
             if index == 0 && framework_reference_enabled { "\nconst ENABLE_FRAMEWORK_ACTION = true;\n" } else { "" };
+        let after_file_expectation =
+            if index == 0 { "// @mago-expect analysis:lifecycle-one/after-file\n" } else { "" };
+        let after_analysis_expectation = if index == 0 { "// @mago-expect analysis:lifecycle-one/after\n" } else { "" };
         let contents = format!(
-            "<?php\n\ndeclare(strict_types=1);\n\nfinal class LifecycleClass{index}{inheritance} {{\n    public function value(): int {{ return {value}; }}\n{private_methods}}}\n\nfunction lifecycle_function_{index}(int $value): int {{ return $value + {value}; }}\n{extension_usage}{framework_reference_marker}{generator}"
+            "<?php\n\ndeclare(strict_types=1);\n\n{after_file_expectation}{after_analysis_expectation}final class LifecycleClass{index}{inheritance} {{\n    public function value(): int {{ return {value}; }}\n{private_methods}}}\n\nfunction lifecycle_function_{index}(int $value): int {{ return $value + {value}; }}\n{extension_usage}{framework_reference_marker}{generator}"
         );
         let file = File::new(
             Cow::Owned(format!("src/file{index}.php").into_bytes()),
@@ -123,15 +126,19 @@ fn count_code(issues: &IssueCollection, code: &str) -> usize {
 
 fn assert_issue_cardinality(issues: &IssueCollection, unused_methods: usize) {
     assert_eq!(count_code(issues, "unused-method"), unused_methods);
+    assert_eq!(count_code(issues, "unfulfilled-expect"), 0);
     for plugin in PLUGINS {
         assert_eq!(count_code(issues, &format!("{plugin}/before")), 1);
-        assert_eq!(count_code(issues, &format!("{plugin}/after-file")), FILE_COUNT);
-        assert_eq!(count_code(issues, &format!("{plugin}/after")), 1);
+        assert_eq!(
+            count_code(issues, &format!("{plugin}/after-file")),
+            FILE_COUNT - usize::from(plugin == "lifecycle-one")
+        );
+        assert_eq!(count_code(issues, &format!("{plugin}/after")), usize::from(plugin != "lifecycle-one"));
     }
 
     let final_issue = issues
         .iter()
-        .find(|issue| issue.code.as_deref() == Some("lifecycle-one/after"))
+        .find(|issue| issue.code.as_deref() == Some("lifecycle-two/after"))
         .expect("the final lifecycle issue should exist");
     assert_eq!(final_issue.annotations.len(), 2);
     assert_ne!(final_issue.annotations[0].span.file_id, final_issue.annotations[1].span.file_id);
@@ -246,7 +253,7 @@ fn external_analyzer_lifecycle_is_exact_across_workers_and_incremental_runs() {
     let external_annotation = initial
         .issues
         .iter()
-        .find(|issue| issue.code.as_deref() == Some("lifecycle-one/after"))
+        .find(|issue| issue.code.as_deref() == Some("lifecycle-two/after"))
         .expect("the final lifecycle issue should exist")
         .annotations[1]
         .span;

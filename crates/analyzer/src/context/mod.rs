@@ -208,7 +208,13 @@ where
     /// unreported issues. Used by [`crate::Analyzer::analyze_with_artifacts`]
     /// when the caller needs to retain ownership of [`AnalysisArtifacts`]
     /// after analysis completes.
-    pub fn finish_collector(self, analysis_result: &mut AnalysisResult) {
-        analysis_result.issues.extend(self.collector.finish());
+    pub fn finish_collector(self, analysis_result: &mut AnalysisResult, defer_pragmas: bool) {
+        if defer_pragmas {
+            let (issues, pragmas) = self.collector.defer();
+            analysis_result.issues.extend(issues);
+            analysis_result.add_deferred_pragmas(pragmas);
+        } else {
+            analysis_result.issues.extend(self.collector.finish());
+        }
     }
 }

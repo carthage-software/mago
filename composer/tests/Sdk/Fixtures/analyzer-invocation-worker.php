@@ -129,12 +129,26 @@ final class InvocationMethodProvider implements MethodReturnTypeProvider, Callab
             MethodTarget::exact('DynamicProxy', 'dynamic'),
             MethodTarget::exact('DynamicProxy', 'acceptString'),
             MethodTarget::exact('DynamicFacade', 'dynamic'),
+            MethodTarget::exact('Artisan', 'command'),
         ];
     }
 
     public function getCallableSignature(CallableSignatureProviderContext $context): ?EffectiveCallableSignature
     {
         $invocation = $context->invocation;
+        if ($invocation->declaringClass === 'Artisan' && $invocation->name === 'command') {
+            InvocationAudit::record('closure-this-signature');
+
+            return new EffectiveCallableSignature([
+                new CallableParameter('$signature', Type::string()),
+                new CallableParameter(
+                    name: '$callback',
+                    type: Type::namedObject('Closure'),
+                    closureThisType: Type::namedObject('ClosureCommand'),
+                ),
+            ]);
+        }
+
         if ($invocation->name !== 'acceptstring') {
             return null;
         }
@@ -185,6 +199,13 @@ final class InvocationMethodProvider implements MethodReturnTypeProvider, Callab
             'A method provider received no receiver type.',
         );
         $named = self::named($receiver);
+
+        if ($invocation->declaringClass === 'Artisan' && $invocation->name === 'command') {
+            self::assertInvocation($context, InvocationKind::StaticMethod, 'Artisan');
+            InvocationAudit::record('closure-this-return');
+
+            return Type::void();
+        }
 
         if ($invocation->name === 'query') {
             self::assertInvocation($context, InvocationKind::StaticMethod, 'BaseModel');

@@ -655,6 +655,7 @@ final class Protocol
         return pack('N3C', self::MAGIC_U32, self::VERSION_U32, self::RETURN_TYPE_RESPONSE << 16, 1) . $type->encode();
     }
 
+    /** @mago-expect lint:halstead */
     public static function writeCallableSignatureResponse(?EffectiveCallableSignature $signature): string
     {
         if ($signature === null) {
@@ -670,6 +671,11 @@ final class Protocol
             $writer->writeBoolean($parameter->type !== null);
             if ($parameter->type !== null) {
                 $writer->writeRaw($parameter->type->encode());
+            }
+
+            $writer->writeBoolean($parameter->closureThisType !== null);
+            if ($parameter->closureThisType !== null) {
+                $writer->writeRaw($parameter->closureThisType->encode());
             }
 
             $flags = 0;

@@ -27,6 +27,7 @@ use mago_codex::populator::populate_codebase_targeted;
 use mago_codex::reference::SymbolReferences;
 use mago_codex::scanner::scan_program;
 use mago_codex::signature_builder;
+use mago_collector::DeferredPragmas;
 use mago_database::DatabaseReader;
 use mago_database::ReadDatabase;
 use mago_database::file::FileId;
@@ -41,6 +42,7 @@ use mago_word::WordSet;
 use rayon::prelude::*;
 
 use crate::error::OrchestratorError;
+use crate::service::issue_reconciliation::DeferredIssueReconciler;
 
 /// Per-file cached state for incremental analysis.
 #[derive(Debug, Clone)]
@@ -49,6 +51,7 @@ struct FileState {
     entry_keys: CodebaseEntryKeys,
     analysis_issues: IssueCollection,
     codebase_issues: IssueCollection,
+    deferred_pragmas: Option<DeferredPragmas>,
 }
 
 struct SelectiveAnalysisOutput {
@@ -56,6 +59,7 @@ struct SelectiveAnalysisOutput {
     native_symbol_references: SymbolReferences,
     external_symbol_references: SymbolReferences,
     per_file_issues: HashMap<FileId, IssueCollection>,
+    per_file_pragmas: HashMap<FileId, DeferredPragmas>,
     snapshots: Vec<Arc<FileAnalysisSnapshot>>,
     codebase_issues: IssueCollection,
 }
@@ -370,6 +374,7 @@ impl IncrementalAnalysisService {
                     entry_keys,
                     analysis_issues: IssueCollection::default(),
                     codebase_issues: IssueCollection::default(),
+                    deferred_pragmas: None,
                 },
             );
         }
@@ -379,6 +384,7 @@ impl IncrementalAnalysisService {
             native_symbol_references,
             external_symbol_references,
             per_file_issues,
+            per_file_pragmas,
             snapshots,
             codebase_issues: all_codebase_issues,
         } =
@@ -399,6 +405,7 @@ impl IncrementalAnalysisService {
             analysis_result.issues.extend(issues.iter().cloned());
             if let Some(state) = self.file_states.get_mut(&file_id) {
                 state.analysis_issues = issues;
+                state.deferred_pragmas = per_file_pragmas.get(&file_id).cloned();
             }
         }
 
@@ -716,6 +723,7 @@ impl IncrementalAnalysisService {
                 native_symbol_references,
                 external_symbol_references,
                 mut per_file_issues,
+                per_file_pragmas,
                 snapshots,
                 codebase_issues: new_codebase_issues,
             } = self.run_analyzer_selective(&mut merged_codebase, symbol_references, &self.settings, &files_to_skip)?;
@@ -752,6 +760,7 @@ impl IncrementalAnalysisService {
                     && let Some(state) = self.file_states.get_mut(&file_id)
                 {
                     state.analysis_issues = issues;
+                    state.deferred_pragmas = per_file_pragmas.get(&file_id).cloned();
                 }
             }
 
@@ -763,8 +772,11 @@ impl IncrementalAnalysisService {
                 let entry_keys = metadata.extract_owned_keys(&merged_codebase);
                 let codebase_issues =
                     self.file_states.get(&file_id).map(|s| s.codebase_issues.clone()).unwrap_or_default();
-                self.file_states
-                    .insert(file_id, FileState { content_hash, entry_keys, analysis_issues, codebase_issues });
+                let deferred_pragmas = per_file_pragmas.get(&file_id).cloned();
+                self.file_states.insert(
+                    file_id,
+                    FileState { content_hash, entry_keys, analysis_issues, codebase_issues, deferred_pragmas },
+                );
             }
 
             self.codebase = merged_codebase;
@@ -943,6 +955,7 @@ impl IncrementalAnalysisService {
             native_symbol_references,
             external_symbol_references,
             mut per_file_issues,
+            per_file_pragmas,
             snapshots,
             codebase_issues: new_codebase_issues,
         } = self.run_analyzer_selective(&mut merged_codebase, symbol_references, &self.settings, &files_to_skip)?;
@@ -980,6 +993,7 @@ impl IncrementalAnalysisService {
                 && let Some(state) = self.file_states.get_mut(&file_id)
             {
                 state.analysis_issues = issues;
+                state.deferred_pragmas = per_file_pragmas.get(&file_id).cloned();
             }
         }
 
@@ -990,7 +1004,11 @@ impl IncrementalAnalysisService {
             // not clobber a rival file that won the tiebreak over this one.
             let entry_keys = metadata.extract_owned_keys(&merged_codebase);
             let codebase_issues = self.file_states.get(&file_id).map(|s| s.codebase_issues.clone()).unwrap_or_default();
-            self.file_states.insert(file_id, FileState { content_hash, entry_keys, analysis_issues, codebase_issues });
+            let deferred_pragmas = per_file_pragmas.get(&file_id).cloned();
+            self.file_states.insert(
+                file_id,
+                FileState { content_hash, entry_keys, analysis_issues, codebase_issues, deferred_pragmas },
+            );
         }
 
         self.codebase = merged_codebase;
@@ -1169,6 +1187,9 @@ impl IncrementalAnalysisService {
                 let semantics_checker = SemanticsChecker::new(settings.version);
                 let mut analyzer =
                     Analyzer::new(arena, &source_file, &resolved_names, codebase, plugin_registry, settings.clone());
+                if after_file || after_analysis {
+                    analyzer = analyzer.with_deferred_pragmas();
+                }
                 if let Some(session) = external_session.as_deref() {
                     analyzer = analyzer.with_external_analysis_session(session);
                 }
@@ -1222,11 +1243,20 @@ impl IncrementalAnalysisService {
         let mut aggregated_result = AnalysisResult::new(current_symbol_references);
         aggregated_result.issues = before.issues;
         let mut per_file_issues: HashMap<FileId, IssueCollection> = HashMap::default();
+        let mut per_file_pragmas: HashMap<FileId, DeferredPragmas> = HashMap::default();
         let mut snapshots = Vec::new();
 
-        for (file_id, result, snapshot) in results {
+        for (file_id, mut result, snapshot) in results {
+            let mut deferred_pragmas = result.take_deferred_pragmas();
             aggregated_result.symbol_references.extend(result.symbol_references);
             per_file_issues.insert(file_id, result.issues);
+            if let Some(pragmas) = deferred_pragmas.pop() {
+                per_file_pragmas.insert(file_id, pragmas);
+            }
+            debug_assert!(
+                deferred_pragmas.is_empty(),
+                "one file analysis must produce at most one deferred pragma state",
+            );
             snapshots.extend(snapshot);
         }
 
@@ -1262,6 +1292,22 @@ impl IncrementalAnalysisService {
                     elapsed = ?start.elapsed(),
                     "Incremental external after-file hook batches completed."
                 );
+            }
+        }
+
+        let cached_pragmas =
+            effective_skip_files.iter().filter_map(|file_id| self.file_states.get(file_id)?.deferred_pragmas.clone());
+        let mut pragma_reconciler = DeferredIssueReconciler::new(
+            cached_pragmas.chain(per_file_pragmas.values().cloned()),
+            self.database.files(),
+        );
+        aggregated_result.issues = pragma_reconciler.reconcile(std::mem::take(&mut aggregated_result.issues))?;
+        for issues in per_file_issues.values_mut() {
+            *issues = pragma_reconciler.reconcile(std::mem::take(issues))?;
+        }
+        for (file_id, pragmas) in &mut per_file_pragmas {
+            if let Some(reconciled) = pragma_reconciler.state(*file_id) {
+                *pragmas = reconciled.clone();
             }
         }
 
@@ -1318,8 +1364,10 @@ impl IncrementalAnalysisService {
                     "Incremental external after-analysis hooks completed."
                 );
             }
-            aggregated_result.issues.extend(after_issues);
+            aggregated_result.issues.extend(pragma_reconciler.reconcile(after_issues)?);
         }
+
+        aggregated_result.issues.extend(pragma_reconciler.finish()?);
 
         if !after_analysis {
             snapshots.clear();
@@ -1330,6 +1378,7 @@ impl IncrementalAnalysisService {
             native_symbol_references,
             external_symbol_references,
             per_file_issues,
+            per_file_pragmas,
             snapshots,
             codebase_issues,
         })

@@ -1012,6 +1012,11 @@ fn encode_callable_snapshot<'type_info>(
                     encode_union_snapshot_inner(writer, parameter_type, types, depth + 1)?;
                 }
 
+                writer.write_bool(parameter.get_closure_this_type().is_some());
+                if let Some(closure_this_type) = parameter.get_closure_this_type() {
+                    encode_union_snapshot_inner(writer, closure_this_type, types, depth + 1)?;
+                }
+
                 writer.write_bool(parameter.is_by_reference());
                 writer.write_bool(parameter.is_variadic());
                 writer.write_bool(parameter.has_default());
@@ -1467,6 +1472,12 @@ where
             None
         };
 
+        let closure_this_type = if reader.read_bool("effective callable parameter closure-this type presence")? {
+            Some(Arc::new(decode_type(&mut reader, &request_type, 0)?))
+        } else {
+            None
+        };
+
         let flags = reader.read_u8("effective callable parameter flags")?;
         if flags & !0b111 != 0 {
             return Err(protocol(format!("effective callable parameter has unknown flags {flags:#04x}")));
@@ -1488,7 +1499,11 @@ where
         }
 
         optional |= has_default || variadic;
-        parameters.push(TCallableParameter::new(parameter_type, by_reference, variadic, has_default).with_name(name));
+        parameters.push(
+            TCallableParameter::new(parameter_type, by_reference, variadic, has_default)
+                .with_name(name)
+                .with_closure_this_type(closure_this_type),
+        );
     }
 
     reader.finish()?;
@@ -1854,6 +1869,12 @@ fn decode_complete_callable(reader: &mut PayloadReader<'_>, depth: usize) -> Res
             None
         };
 
+        let closure_this_type = if reader.read_bool("callable parameter closure-this type presence")? {
+            Some(Arc::new(decode_complete_union(reader, depth + 1)?))
+        } else {
+            None
+        };
+
         parameters.push(
             TCallableParameter::new(
                 parameter_type,
@@ -1861,7 +1882,8 @@ fn decode_complete_callable(reader: &mut PayloadReader<'_>, depth: usize) -> Res
                 reader.read_bool("callable parameter variadic flag")?,
                 reader.read_bool("callable parameter default flag")?,
             )
-            .with_name(name),
+            .with_name(name)
+            .with_closure_this_type(closure_this_type),
         );
     }
 
@@ -2337,6 +2359,9 @@ pub(super) mod testing {
         writer.write_bool(true);
         writer.write_u8(TYPE_REFERENCE);
         writer.write_u32(0);
+        writer.write_bool(true);
+        writer.write_u8(TYPE_REFERENCE);
+        writer.write_u32(0);
         writer.write_u8(0b101);
 
         let signature =
@@ -2348,6 +2373,7 @@ pub(super) mod testing {
         let parameter = &signature.parameters[0];
         assert_eq!(parameter.get_name().map(|name| name.0.as_bytes()), Some(b"$value".as_slice()));
         assert_eq!(parameter.get_type_signature(), Some(&request_type));
+        assert_eq!(parameter.get_closure_this_type(), Some(&request_type));
         assert!(parameter.is_by_reference());
         assert!(!parameter.is_variadic());
         assert!(parameter.has_default());

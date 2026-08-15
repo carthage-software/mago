@@ -428,7 +428,7 @@ impl<'ctx> InvocationTargetParameter<'ctx> {
             InvocationTargetParameter::FunctionLike(metadata) => {
                 metadata.closure_this_type.as_ref().map(|type_metadata| &type_metadata.type_union)
             }
-            _ => None,
+            InvocationTargetParameter::Callable(parameter) => parameter.get_closure_this_type(),
         }
     }
 

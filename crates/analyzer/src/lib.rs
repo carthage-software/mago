@@ -67,6 +67,7 @@ where
     pub plugin_registry: &'ctx PluginRegistry,
     pub external_analysis_session: Option<&'ctx ExternalAnalysisSession>,
     pub additional_symbol_references: Option<&'ctx SymbolReferences>,
+    defer_pragmas: bool,
 }
 
 impl<'ctx, 'ast, 'arena, A> Analyzer<'ctx, 'ast, 'arena, A>
@@ -90,6 +91,7 @@ where
             plugin_registry,
             external_analysis_session: None,
             additional_symbol_references: None,
+            defer_pragmas: false,
         }
     }
 
@@ -102,6 +104,14 @@ where
     #[must_use]
     pub fn with_additional_symbol_references(mut self, references: &'ctx SymbolReferences) -> Self {
         self.additional_symbol_references = Some(references);
+        self
+    }
+
+    /// Defers unused and unfulfilled pragma reporting until external lifecycle
+    /// diagnostics have been collected.
+    #[must_use]
+    pub fn with_deferred_pragmas(mut self) -> Self {
+        self.defer_pragmas = true;
         self
     }
 
@@ -186,7 +196,7 @@ where
                 }
 
                 analysis_result.symbol_references.extend(std::mem::take(&mut artifacts.symbol_references));
-                context.finish_collector(analysis_result);
+                context.finish_collector(analysis_result, self.defer_pragmas);
 
                 #[cfg(not(target_arch = "wasm32"))]
                 {
@@ -222,7 +232,7 @@ where
         #[cfg(not(target_arch = "wasm32"))]
         let finish_start = trace_enabled.then(std::time::Instant::now);
         analysis_result.symbol_references.extend(std::mem::take(&mut artifacts.symbol_references));
-        context.finish_collector(analysis_result);
+        context.finish_collector(analysis_result, self.defer_pragmas);
         #[cfg(not(target_arch = "wasm32"))]
         if let Some(start) = finish_start {
             telemetry::record_finish(start.elapsed());

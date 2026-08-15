@@ -14,10 +14,18 @@ final class EffectiveCallableSignatureTest extends TestCase
 {
     public function testValidSignatureRetainsItsContract(): void
     {
-        $parameter = new CallableParameter('$value', Type::string(), byReference: true, hasDefault: true);
+        $closureThisType = Type::namedObject('ClosureCommand');
+        $parameter = new CallableParameter(
+            '$value',
+            Type::string(),
+            $closureThisType,
+            byReference: true,
+            hasDefault: true,
+        );
         $signature = new EffectiveCallableSignature([$parameter], false);
 
         self::assertSame([$parameter], $signature->parameters);
+        self::assertSame($closureThisType, $parameter->closureThisType);
         self::assertFalse($signature->allowsNamedArguments);
     }
 

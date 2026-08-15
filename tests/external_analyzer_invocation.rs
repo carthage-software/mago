@@ -102,6 +102,16 @@ class DynamicFacade
     }
 }
 
+class ClosureCommand
+{
+    public function comment(string $message): void {}
+}
+
+class Artisan
+{
+    public static function command(string $signature, Closure $callback): void {}
+}
+
 function external_function(): mixed
 {
     return null;
@@ -129,6 +139,9 @@ function take_string_builders(array $_builders): void {}
 
 take_string(external_function());
 take_string(collect('function'));
+Artisan::command('inspire', function (): void {
+    $this->comment('Be inspired!');
+});
 take_user_builder(User::query());
 take_string(User::echoArgument('value'));
 take_string(User::acceptString('method'));
@@ -214,6 +227,8 @@ fn external_providers_receive_complete_invocation_context() -> Result<(), Box<dy
         invocations,
         [
             "argument-handle",
+            "closure-this-return",
+            "closure-this-signature",
             "complete-composite",
             "dynamic-instance",
             "dynamic-signature",

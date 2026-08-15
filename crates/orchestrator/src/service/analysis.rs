@@ -26,6 +26,7 @@ use mago_codex::reference::SymbolReferences;
 use mago_codex::scanner::scan_program;
 use mago_database::DatabaseReader;
 use mago_database::ReadDatabase;
+use mago_database::file::File;
 use mago_database::file::FileId;
 use mago_names::resolver::NameResolver;
 use mago_reporting::Issue;
@@ -37,6 +38,7 @@ use mago_word::WordSet;
 use rayon::prelude::*;
 
 use crate::error::OrchestratorError;
+use crate::service::issue_reconciliation::DeferredIssueReconciler;
 use crate::service::pipeline::ParallelPipeline;
 use crate::service::pipeline::Reducer;
 #[cfg(not(target_arch = "wasm32"))]
@@ -152,6 +154,9 @@ impl AnalysisService {
         let mut analysis_result = AnalysisResult::new(self.symbol_references);
         let mut analyzer =
             Analyzer::new(&arena, file, &resolved_names, &self.codebase, &self.plugin_registry, self.settings);
+        if after_file || after_analysis {
+            analyzer = analyzer.with_deferred_pragmas();
+        }
         if let Some(session) = external_session.as_ref() {
             analyzer = analyzer.with_external_analysis_session(session);
         }
@@ -179,6 +184,15 @@ impl AnalysisService {
             }
         }
 
+        let mut pragma_reconciler =
+            DeferredIssueReconciler::new(analysis_result.take_deferred_pragmas(), self.database.files());
+        analysis_result.issues = match pragma_reconciler.reconcile(std::mem::take(&mut analysis_result.issues)) {
+            Ok(issues) => issues,
+            Err(error) => {
+                issues.push(Issue::error(format!("Analysis error: {error}")));
+                return issues;
+            }
+        };
         issues.extend(analysis_result.issues.iter().cloned());
         issues.extend(self.codebase.take_issues(true));
         if after_analysis {
@@ -197,9 +211,17 @@ impl AnalysisService {
                 &self.codebase,
                 external_session.as_ref(),
             ) {
-                Ok(reported) => issues.extend(reported),
+                Ok(reported) => match pragma_reconciler.reconcile(reported) {
+                    Ok(reported) => issues.extend(reported),
+                    Err(error) => issues.push(Issue::error(format!("Analysis error: {error}"))),
+                },
                 Err(err) => issues.push(Issue::error(format!("Analysis error: {err}"))),
             }
+        }
+
+        match pragma_reconciler.finish() {
+            Ok(reported) => issues.extend(reported),
+            Err(error) => issues.push(Issue::error(format!("Analysis error: {error}"))),
         }
 
         issues
@@ -224,6 +246,11 @@ impl AnalysisService {
         let reducer = AnalysisResultReducer {
             plugin_registry: Arc::clone(&self.plugin_registry),
             external_session: external_session.clone(),
+            files: if external_session.is_some() {
+                self.database.files().collect::<Vec<_>>().into()
+            } else {
+                Arc::from([])
+            },
         };
 
         let pipeline = ParallelPipeline::new(
@@ -323,6 +350,9 @@ impl AnalysisService {
                 let analyzer_new_start = trace_enabled.then(Instant::now);
                 let mut analyzer =
                     Analyzer::new(arena, &source_file, &resolved_names, &codebase, &plugin_registry, settings);
+                if after_file || after_analysis {
+                    analyzer = analyzer.with_deferred_pragmas();
+                }
                 if let Some(session) = external_session.as_deref() {
                     analyzer = analyzer.with_external_analysis_session(session);
                 }
@@ -411,6 +441,7 @@ struct AnalysisTaskResult {
 struct AnalysisResultReducer {
     plugin_registry: Arc<PluginRegistry>,
     external_session: Option<Arc<mago_analyzer::external::ExternalAnalysisSession>>,
+    files: Arc<[Arc<File>]>,
 }
 
 impl Reducer<AnalysisTaskResult, AnalysisResult> for AnalysisResultReducer {
@@ -454,16 +485,20 @@ impl Reducer<AnalysisTaskResult, AnalysisResult> for AnalysisResultReducer {
                 );
             }
         }
-        aggregated_result.issues.extend(
-            self.plugin_registry
-                .run_external_after_analysis_hooks(
-                    &aggregated_result,
-                    &snapshots,
-                    &codebase,
-                    self.external_session.as_deref(),
-                )
-                .map_err(AnalysisError::from)?,
-        );
+        let mut pragma_reconciler =
+            DeferredIssueReconciler::new(aggregated_result.take_deferred_pragmas(), self.files.iter().cloned());
+        aggregated_result.issues = pragma_reconciler.reconcile(std::mem::take(&mut aggregated_result.issues))?;
+        let after_issues = self
+            .plugin_registry
+            .run_external_after_analysis_hooks(
+                &aggregated_result,
+                &snapshots,
+                &codebase,
+                self.external_session.as_deref(),
+            )
+            .map_err(AnalysisError::from)?;
+        aggregated_result.issues.extend(pragma_reconciler.reconcile(after_issues)?);
+        aggregated_result.issues.extend(pragma_reconciler.finish()?);
 
         Ok(aggregated_result)
     }

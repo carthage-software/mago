@@ -3,6 +3,7 @@ use foldhash::HashSet;
 use mago_allocator::prelude::*;
 
 use mago_database::file::File;
+use mago_database::file::FileId;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::IssueCollection;
@@ -76,6 +77,37 @@ where
     /// If true, skip reporting unfulfilled-expect warnings.
     /// Used during incremental/diff analysis where some symbols are skipped.
     skip_unfulfilled_expect: bool,
+}
+
+/// Owned pragma state retained while diagnostics may still arrive after a file's
+/// primary analysis has completed.
+#[derive(Debug, Clone)]
+pub struct DeferredPragmas {
+    file_id: FileId,
+    pragmas: std::vec::Vec<OwnedPragma>,
+    disabled_codes: std::vec::Vec<&'static str>,
+    active_codes: Option<std::vec::Vec<String>>,
+    aliases: HashMap<&'static str, &'static str>,
+    link_template: Option<&'static str>,
+    skip_unfulfilled_expect: bool,
+}
+
+#[derive(Debug, Clone)]
+struct OwnedPragma {
+    kind: PragmaKind,
+    span: Span,
+    trivia_span: Span,
+    scope_span: Option<Span>,
+    start_line: u32,
+    end_line: u32,
+    own_line: bool,
+    category: String,
+    code: String,
+    code_span: Span,
+    count_span: Option<Span>,
+    expected_matches: u16,
+    matches: u16,
+    description: String,
 }
 
 impl<'ctx, 'arena, A> Collector<'ctx, 'arena, A>
@@ -478,6 +510,38 @@ where
         issues
     }
 
+    /// Defers unused and unfulfilled pragma diagnostics while preserving every
+    /// match already consumed by this collector.
+    ///
+    /// The returned state can reconcile diagnostics produced by project-wide
+    /// phases without reparsing the source file or losing counted pragma matches.
+    #[inline]
+    #[must_use]
+    pub fn defer(mut self) -> (IssueCollection, Option<DeferredPragmas>) {
+        let issues = std::mem::take(&mut self.issues);
+        if self.pragmas.is_empty() {
+            return (issues, None);
+        }
+
+        let pragmas = self.pragmas.iter().map(OwnedPragma::from).collect();
+        let disabled_codes = self.disabled_codes.iter().copied().collect();
+        let active_codes =
+            self.active_codes.as_ref().map(|codes| codes.iter().map(|code| (*code).to_owned()).collect());
+
+        (
+            issues,
+            Some(DeferredPragmas {
+                file_id: self.file.id,
+                pragmas,
+                disabled_codes,
+                active_codes,
+                aliases: self.aliases,
+                link_template: self.link_template,
+                skip_unfulfilled_expect: self.skip_unfulfilled_expect,
+            }),
+        )
+    }
+
     /// Returns `true` if this pragma should be skipped (not reported) due to inactive codes.
     fn is_pragma_skipped(&self, pragma: &Pragma<'arena>) -> bool {
         pragma.kind == PragmaKind::Expect
@@ -681,5 +745,107 @@ where
         }
 
         best_match_index.map(|i| &mut self.pragmas[i])
+    }
+}
+
+impl DeferredPragmas {
+    /// Returns the file whose analysis pragmas are represented by this state.
+    #[inline]
+    #[must_use]
+    pub const fn file_id(&self) -> FileId {
+        self.file_id
+    }
+
+    /// Reconciles late diagnostics while retaining the updated pragma state for
+    /// another project-wide phase.
+    #[must_use]
+    pub fn reconcile(&mut self, file: &File, issues: IssueCollection) -> IssueCollection {
+        debug_assert_eq!(file.id, self.file_id, "deferred pragmas must be reconciled against their source file");
+
+        let arena = LocalArena::new();
+        let mut collector = self.clone().into_collector(&arena, file);
+        collector.extend(issues);
+        let (issues, state) = collector.defer();
+        if let Some(state) = state {
+            *self = state;
+        }
+
+        issues
+    }
+
+    /// Finalizes the retained state and reports genuinely unused or unfulfilled pragmas.
+    #[must_use]
+    pub fn finish(self, file: &File) -> IssueCollection {
+        debug_assert_eq!(file.id, self.file_id, "deferred pragmas must be finalized against their source file");
+
+        let arena = LocalArena::new();
+        self.into_collector(&arena, file).finish()
+    }
+
+    fn into_collector<'ctx, 'arena>(
+        self,
+        arena: &'arena LocalArena,
+        file: &'ctx File,
+    ) -> Collector<'ctx, 'arena, LocalArena> {
+        let pragmas = self.pragmas.into_iter().map(|pragma| pragma.allocate(arena)).collect_in(arena);
+        let disabled_codes = self.disabled_codes.into_iter().collect_in(arena);
+        let active_codes = self
+            .active_codes
+            .map(|codes| codes.into_iter().map(|code| arena.alloc_str(&code) as &str).collect_in(arena));
+
+        Collector {
+            arena,
+            file,
+            pragmas,
+            issues: IssueCollection::new(),
+            recordings: Vec::new_in(arena),
+            disabled_codes,
+            active_codes,
+            aliases: self.aliases,
+            link_template: self.link_template,
+            skip_unfulfilled_expect: self.skip_unfulfilled_expect,
+        }
+    }
+}
+
+impl From<&Pragma<'_>> for OwnedPragma {
+    fn from(pragma: &Pragma<'_>) -> Self {
+        Self {
+            kind: pragma.kind,
+            span: pragma.span,
+            trivia_span: pragma.trivia_span,
+            scope_span: pragma.scope_span,
+            start_line: pragma.start_line,
+            end_line: pragma.end_line,
+            own_line: pragma.own_line,
+            category: pragma.category.to_owned(),
+            code: pragma.code.to_owned(),
+            code_span: pragma.code_span,
+            count_span: pragma.count_span,
+            expected_matches: pragma.expected_matches,
+            matches: pragma.matches,
+            description: pragma.description.to_owned(),
+        }
+    }
+}
+
+impl OwnedPragma {
+    fn allocate(self, arena: &LocalArena) -> Pragma<'_> {
+        Pragma {
+            kind: self.kind,
+            span: self.span,
+            trivia_span: self.trivia_span,
+            scope_span: self.scope_span,
+            start_line: self.start_line,
+            end_line: self.end_line,
+            own_line: self.own_line,
+            category: arena.alloc_str(&self.category),
+            code: arena.alloc_str(&self.code),
+            code_span: self.code_span,
+            count_span: self.count_span,
+            expected_matches: self.expected_matches,
+            matches: self.matches,
+            description: arena.alloc_str(&self.description),
+        }
     }
 }
