@@ -333,9 +333,20 @@ final class ManagedTestCase extends FrameworkTestCase
 (new ManagedTestCase())->getApplication();
 ";
 
+const ISSUE_FILTER_SOURCE: &str = r"<?php
+
+declare(strict_types=1);
+
+// issue-filter-batch-proof
+function known_function(): void {}
+
+filtered_missing();
+retained_missing();
+";
+
 #[test]
 fn external_providers_receive_complete_invocation_context() -> Result<(), Box<dyn std::error::Error>> {
-    let observation = analyze_with_fixture(SOURCE, false, false)?;
+    let observation = analyze_with_fixture(SOURCE, false, false, false)?;
     assert!(
         observation.issues.is_empty(),
         "complete external invocation context should preserve precise types: {:#?}",
@@ -390,7 +401,7 @@ fn external_providers_receive_complete_invocation_context() -> Result<(), Box<dy
 
 #[test]
 fn analyzer_without_method_providers_sends_no_method_request() -> Result<(), Box<dyn std::error::Error>> {
-    let observation = analyze_with_fixture(NO_METHOD_PROVIDER_SOURCE, true, false)?;
+    let observation = analyze_with_fixture(NO_METHOD_PROVIDER_SOURCE, true, false, false)?;
     assert!(observation.issues.is_empty(), "native method analysis should remain unchanged: {:#?}", observation.issues);
     assert!(observation.invocations.is_empty(), "a host without method providers must not receive method requests");
 
@@ -399,7 +410,7 @@ fn analyzer_without_method_providers_sends_no_method_request() -> Result<(), Box
 
 #[test]
 fn declined_dynamic_methods_preserve_non_documented_method_diagnostics() -> Result<(), Box<dyn std::error::Error>> {
-    let observation = analyze_with_fixture(UNDOCUMENTED_METHOD_SOURCE, true, false)?;
+    let observation = analyze_with_fixture(UNDOCUMENTED_METHOD_SOURCE, true, false, false)?;
     assert_eq!(
         observation.issues,
         [
@@ -420,7 +431,7 @@ fn declined_dynamic_methods_preserve_non_documented_method_diagnostics() -> Resu
 
 #[test]
 fn declined_missing_methods_preserve_non_existent_method_diagnostics() -> Result<(), Box<dyn std::error::Error>> {
-    let observation = analyze_with_fixture(MISSING_METHOD_SOURCE, false, false)?;
+    let observation = analyze_with_fixture(MISSING_METHOD_SOURCE, false, false, false)?;
     assert_eq!(
         observation.issues,
         [(
@@ -435,10 +446,22 @@ fn declined_missing_methods_preserve_non_existent_method_diagnostics() -> Result
 
 #[test]
 fn declined_property_initialization_preserves_uninitialized_diagnostic() -> Result<(), Box<dyn std::error::Error>> {
-    let observation = analyze_with_fixture(DECLINED_PROPERTY_INITIALIZATION_SOURCE, false, true)?;
+    let observation = analyze_with_fixture(DECLINED_PROPERTY_INITIALIZATION_SOURCE, false, true, false)?;
     assert_eq!(observation.issues.len(), 1, "a declining provider must preserve the native diagnostic");
     assert_eq!(observation.issues[0].0.as_deref(), Some("uninitialized-property"));
     assert!(observation.invocations.is_empty(), "a declining provider must not claim initialization");
+
+    Ok(())
+}
+
+#[test]
+fn external_issue_filters_batch_and_remove_selected_native_diagnostics() -> Result<(), Box<dyn std::error::Error>> {
+    let observation = analyze_with_fixture(ISSUE_FILTER_SOURCE, true, false, true)?;
+    assert_eq!(observation.issues.len(), 1, "only the explicitly filtered native issue should be suppressed");
+    assert_eq!(observation.issues[0].0.as_deref(), Some("non-existent-function"));
+    assert!(observation.issues[0].1.contains("`retained_missing`"));
+    assert_eq!(observation.invocations.len(), 2, "both issues from the file should reach the worker batch");
+    assert!(observation.invocations.iter().all(|entry| entry.starts_with("issue-filter-")));
 
     Ok(())
 }
@@ -447,6 +470,7 @@ fn analyze_with_fixture(
     source: &str,
     function_only: bool,
     decline_property_initialization: bool,
+    register_issue_filter: bool,
 ) -> Result<AnalysisObservation, Box<dyn std::error::Error>> {
     let repository = Path::new(env!("CARGO_MANIFEST_DIR"));
     let temporary = tempfile::tempdir()?;
@@ -461,6 +485,9 @@ fn analyze_with_fixture(
     }
     if decline_property_initialization {
         command = command.with_environment("MAGO_INVOCATION_DECLINE_PROPERTY_INITIALIZATION", "1");
+    }
+    if register_issue_filter {
+        command = command.with_environment("MAGO_INVOCATION_ISSUE_FILTER", "1");
     }
     let pool = WorkerPool::spawn(command, NonZeroUsize::MIN, WorkerPoolOptions::default())?;
     let external = ExternalAnalyzer::initialize([Arc::new(pool)], PHPVersion::PHP85, &[], false)?;

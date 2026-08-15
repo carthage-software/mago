@@ -240,8 +240,12 @@ where
 
         // Filter issues through registered issue filter hooks
         if self.plugin_registry.has_issue_filter_hooks() {
-            analysis_result.issues =
-                self.plugin_registry.filter_issues(self.source_file, std::mem::take(&mut analysis_result.issues));
+            analysis_result.issues = self.plugin_registry.filter_issues(
+                self.source_file,
+                std::mem::take(&mut analysis_result.issues),
+                self.codebase,
+                self.external_analysis_session,
+            )?;
         }
 
         #[cfg(not(target_arch = "wasm32"))]

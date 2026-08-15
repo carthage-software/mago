@@ -124,6 +124,12 @@ struct ExternalAnalyzerTelemetry {
     method_lookups: AtomicU64,
     property_lookups: AtomicU64,
     property_initialization_lookups: AtomicU64,
+    issue_filter_batches: AtomicU64,
+    issue_filter_candidates: AtomicU64,
+    issue_filter_removed: AtomicU64,
+    issue_filter_errors: AtomicU64,
+    issue_filter_request_bytes: AtomicU64,
+    issue_filter_response_bytes: AtomicU64,
     signature_lookups: AtomicU64,
     backend_checks: AtomicU64,
     candidate_providers: AtomicU64,
@@ -170,6 +176,10 @@ struct ExternalAnalyzerTelemetry {
     lifecycle_ipc_ns: AtomicU64,
     lifecycle_decode_ns: AtomicU64,
     lifecycle_ns: AtomicU64,
+    issue_filter_encode_ns: AtomicU64,
+    issue_filter_ipc_ns: AtomicU64,
+    issue_filter_decode_ns: AtomicU64,
+    issue_filter_ns: AtomicU64,
     nested_ns: AtomicU64,
     decode_ns: AtomicU64,
     lookup_ns: AtomicU64,
@@ -367,6 +377,12 @@ struct PropertyProvider {
     targets: Vec<PropertyTarget>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct IssueFilterHookRegistration {
+    plugin: String,
+    index: u16,
+}
+
 type PropertyProviderExactIndex = WordMap<Vec<u16>>;
 type PropertyProviderWildcardIndex = Vec<(u16, Vec<PropertyTarget>)>;
 
@@ -487,6 +503,7 @@ struct Backend<T> {
     property_wildcard: PropertyProviderWildcardIndex,
     property_initialization_exact: PropertyProviderExactIndex,
     property_initialization_wildcard: PropertyProviderWildcardIndex,
+    issue_filter_indices: Box<[u16]>,
 }
 
 impl<T> Backend<T> {
@@ -573,6 +590,7 @@ impl<T> Backend<T> {
         let (property_exact, property_wildcard) = index_property_providers(&registration.property_providers);
         let (property_initialization_exact, property_initialization_wildcard) =
             index_property_providers(&registration.property_initialization_providers);
+        let issue_filter_indices = registration.issue_filter_hooks.iter().map(|hook| hook.index).collect::<Box<[_]>>();
 
         Self {
             transport,
@@ -589,6 +607,7 @@ impl<T> Backend<T> {
             property_wildcard,
             property_initialization_exact,
             property_initialization_wildcard,
+            issue_filter_indices,
         }
     }
 
@@ -945,6 +964,20 @@ impl ExternalAnalyzerHandle {
             .any(|backend| !backend.registration.property_initialization_providers.is_empty()))
     }
 
+    pub(crate) fn has_issue_filter_hooks(&self) -> Result<bool, String> {
+        Ok(self.get()?.backends.iter().any(|backend| !backend.issue_filter_indices.is_empty()))
+    }
+
+    pub(crate) fn filter_issues(
+        &self,
+        file: &File,
+        issues: IssueCollection,
+        codebase: &CodebaseMetadata,
+        session: &ExternalAnalysisSession,
+    ) -> Result<IssueCollection, String> {
+        self.get()?.filter_issues(file, issues, codebase, session).map_err(|error| error.to_string())
+    }
+
     pub(crate) fn has_function_callable_signature_providers(&self) -> Result<bool, String> {
         Ok(self
             .get()?
@@ -1105,6 +1138,109 @@ impl<T> ExternalAnalyzer<T>
 where
     T: AnalyzerTransport,
 {
+    fn filter_issues(
+        &self,
+        file: &File,
+        mut issues: IssueCollection,
+        codebase: &CodebaseMetadata,
+        session: &ExternalAnalysisSession,
+    ) -> Result<IssueCollection, ExternalAnalyzerError> {
+        for backend in &self.backends {
+            let hooks = &backend.issue_filter_indices;
+            if hooks.is_empty() || issues.is_empty() {
+                continue;
+            }
+
+            let started_at = self.trace_enabled.then(Instant::now);
+            let encode_start = self.trace_enabled.then(Instant::now);
+            let issue_count = issues.len();
+            let request = protocol::encode_issue_filter_request(hooks, file, &issues, session.generation(), session)
+                .inspect_err(|_| {
+                    if self.trace_enabled {
+                        self.telemetry.issue_filter_errors.fetch_add(1, Ordering::Relaxed);
+                        self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
+                    }
+                })?;
+            if let Some(start) = encode_start {
+                self.telemetry.issue_filter_encode_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
+                self.telemetry.issue_filter_batches.fetch_add(1, Ordering::Relaxed);
+                self.telemetry.issue_filter_candidates.fetch_add(issue_count as u64, Ordering::Relaxed);
+                self.telemetry.issue_filter_request_bytes.fetch_add(request.len() as u64, Ordering::Relaxed);
+            }
+
+            let nested_telemetry = &self.telemetry;
+            let trace_enabled = self.trace_enabled;
+            let mut handler = |frame: &Frame| {
+                let nested_start = trace_enabled.then(Instant::now);
+                let result = protocol::handle_nested_request(&frame.payload, codebase, session, |_| None);
+                if let Some(start) = nested_start {
+                    nested_telemetry.record_nested_request(frame.payload.len(), start.elapsed(), &result);
+                }
+
+                result.map(|(_, response)| response).map_err(|error| error.to_string().into_bytes())
+            };
+
+            let ipc_start = self.trace_enabled.then(Instant::now);
+            let response = backend.transport.request_with_handler(request, &mut handler).inspect_err(|_| {
+                if self.trace_enabled {
+                    self.telemetry.issue_filter_errors.fetch_add(1, Ordering::Relaxed);
+                    self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
+                }
+            })?;
+
+            if let Some(start) = ipc_start {
+                self.telemetry.issue_filter_ipc_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
+                self.telemetry.issue_filter_response_bytes.fetch_add(response.len() as u64, Ordering::Relaxed);
+            }
+
+            let decode_start = self.trace_enabled.then(Instant::now);
+            let removed = protocol::decode_issue_filter_response(&response, issue_count).inspect_err(|_| {
+                if self.trace_enabled {
+                    self.telemetry.issue_filter_errors.fetch_add(1, Ordering::Relaxed);
+                    self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
+                }
+            })?;
+
+            if let Some(start) = decode_start {
+                self.telemetry.issue_filter_decode_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
+                self.telemetry.issue_filter_removed.fetch_add(removed.len() as u64, Ordering::Relaxed);
+            }
+
+            let removed_count = removed.len();
+            if removed_count != 0 {
+                let mut removed = removed.into_iter();
+                let mut next_removed = removed.next();
+                issues = IssueCollection::from(issues.into_iter().enumerate().filter_map(|(index, issue)| {
+                    if next_removed == Some(index) {
+                        next_removed = removed.next();
+                        None
+                    } else {
+                        Some(issue)
+                    }
+                }));
+            }
+
+            if let Some(start) = started_at {
+                let elapsed = start.elapsed();
+                self.telemetry.issue_filter_ns.fetch_add(duration_nanos(elapsed), Ordering::Relaxed);
+                if elapsed >= SLOW_LIFECYCLE_THRESHOLD {
+                    tracing::trace!(
+                        file = %String::from_utf8_lossy(&file.name),
+                        hooks = hooks.len(),
+                        candidates = issue_count,
+                        removed = removed_count,
+                        retained = issues.len(),
+                        response_bytes = response.len(),
+                        elapsed = ?elapsed,
+                        "Slow external analyzer issue-filter batch completed."
+                    );
+                }
+            }
+        }
+
+        Ok(issues)
+    }
+
     fn dispatch_lifecycle_request<H>(
         &self,
         backend: &Backend<T>,
@@ -2338,6 +2474,7 @@ where
             let advertised_method_providers = registration.method_providers.len();
             let advertised_property_providers = registration.property_providers.len();
             let advertised_property_initialization_providers = registration.property_initialization_providers.len();
+            let advertised_issue_filter_hooks = registration.issue_filter_hooks.len();
             let enabled_indices = registration
                 .plugins
                 .iter()
@@ -2350,6 +2487,7 @@ where
             registration
                 .property_initialization_providers
                 .retain(|provider| enabled.contains(provider.plugin.as_str()));
+            registration.issue_filter_hooks.retain(|hook| enabled.contains(hook.plugin.as_str()));
             registration.initialization_plugins.retain(|index| enabled_indices.contains(index));
             registration.before_analysis_plugins.retain(|index| enabled_indices.contains(index));
             registration.after_file_analysis_plugins.retain(|index| enabled_indices.contains(index));
@@ -2407,6 +2545,8 @@ where
                     property_initialization_providers = registration.property_initialization_providers.len(),
                     disabled_property_initialization_providers = advertised_property_initialization_providers
                         - registration.property_initialization_providers.len(),
+                    issue_filter_hooks = registration.issue_filter_hooks.len(),
+                    disabled_issue_filter_hooks = advertised_issue_filter_hooks - registration.issue_filter_hooks.len(),
                     before_analysis_plugins = registration.before_analysis_plugins.len(),
                     after_file_analysis_plugins = registration.after_file_analysis_plugins.len(),
                     after_analysis_plugins = registration.after_analysis_plugins.len(),
@@ -2440,6 +2580,8 @@ where
                 .iter()
                 .map(|backend| backend.registration.property_initialization_providers.len())
                 .sum::<usize>();
+            let issue_filter_hooks =
+                analyzer.backends.iter().map(|backend| backend.registration.issue_filter_hooks.len()).sum::<usize>();
             let before_analysis_plugins = analyzer
                 .backends
                 .iter()
@@ -2463,6 +2605,7 @@ where
                 method_providers,
                 property_providers,
                 property_initialization_providers,
+                issue_filter_hooks,
                 before_analysis_plugins,
                 after_file_analysis_plugins,
                 after_analysis_plugins,
@@ -2556,6 +2699,17 @@ impl<T> Drop for ExternalAnalyzer<T> {
             "External analyzer lifecycle summary."
         );
 
+        let issue_filter_batches = self.telemetry.issue_filter_batches.load(Ordering::Relaxed);
+        tracing::trace!(
+            issue_filter_batches,
+            candidates = self.telemetry.issue_filter_candidates.load(Ordering::Relaxed),
+            removed = self.telemetry.issue_filter_removed.load(Ordering::Relaxed),
+            errors = self.telemetry.issue_filter_errors.load(Ordering::Relaxed),
+            request_bytes = self.telemetry.issue_filter_request_bytes.load(Ordering::Relaxed),
+            response_bytes = self.telemetry.issue_filter_response_bytes.load(Ordering::Relaxed),
+            "External analyzer issue-filter summary."
+        );
+
         tracing::trace!(
             matching_ms = nanos_millis(self.telemetry.matching_ns.load(Ordering::Relaxed)),
             encode_ms = nanos_millis(self.telemetry.encode_ns.load(Ordering::Relaxed)),
@@ -2604,6 +2758,16 @@ impl<T> Drop for ExternalAnalyzer<T> {
             average_lifecycle_request_micros =
                 average_micros(self.telemetry.lifecycle_ns.load(Ordering::Relaxed), lifecycle_requests,),
             "External analyzer lifecycle timing summary."
+        );
+
+        tracing::trace!(
+            issue_filter_encode_ms = nanos_millis(self.telemetry.issue_filter_encode_ns.load(Ordering::Relaxed)),
+            issue_filter_ipc_ms = nanos_millis(self.telemetry.issue_filter_ipc_ns.load(Ordering::Relaxed)),
+            issue_filter_decode_ms = nanos_millis(self.telemetry.issue_filter_decode_ns.load(Ordering::Relaxed)),
+            issue_filter_worker_cpu_ms = nanos_millis(self.telemetry.issue_filter_ns.load(Ordering::Relaxed)),
+            average_issue_filter_batch_micros =
+                average_micros(self.telemetry.issue_filter_ns.load(Ordering::Relaxed), issue_filter_batches),
+            "External analyzer issue-filter timing summary."
         );
     }
 }

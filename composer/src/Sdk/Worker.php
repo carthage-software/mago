@@ -13,6 +13,8 @@ use Mago\Sdk\Analyzer\Codebase;
 use Mago\Sdk\Analyzer\FileAnalysis;
 use Mago\Sdk\Analyzer\InitializationContext;
 use Mago\Sdk\Analyzer\InvocationKind;
+use Mago\Sdk\Analyzer\IssueFilterContext;
+use Mago\Sdk\Analyzer\IssueFilterDecision;
 use Mago\Sdk\Analyzer\PluginRegistry as AnalyzerPluginRegistry;
 use Mago\Sdk\Analyzer\ProjectAnalysis;
 use Mago\Sdk\Analyzer\PropertyInitializationProviderContext;
@@ -25,6 +27,7 @@ use Mago\Sdk\Exception\ProtocolException;
 use Mago\Sdk\Internal\Analyzer\MetadataCache;
 use Mago\Sdk\Internal\Analyzer\Protocol as AnalyzerProtocol;
 use Mago\Sdk\Internal\Analyzer\RegisteredFunctionReturnTypeProvider;
+use Mago\Sdk\Internal\Analyzer\RegisteredIssueFilterHook;
 use Mago\Sdk\Internal\Analyzer\RegisteredMethodReturnTypeProvider;
 use Mago\Sdk\Internal\Analyzer\RegisteredPlugin;
 use Mago\Sdk\Internal\Analyzer\RegisteredPropertyInitializationProvider;
@@ -100,6 +103,9 @@ final class Worker
     /** @var list<RegisteredPropertyInitializationProvider> */
     private readonly array $propertyInitializationProviders;
 
+    /** @var list<RegisteredIssueFilterHook> */
+    private readonly array $issueFilterHooks;
+
     /**
      * @var list<int<0, 65535>>
      */
@@ -134,6 +140,7 @@ final class Worker
         $methodProviders = [];
         $propertyProviders = [];
         $propertyInitializationProviders = [];
+        $issueFilterHooks = [];
         $workerReducerIndices = [];
         foreach ($extensions as $extensionIndex => $registeredExtension) {
             $normalizedExtensionIdentifier = strtolower($registeredExtension->identifier);
@@ -284,6 +291,20 @@ final class Worker
                     $registeredPropertyInitializationProviders[] = $registeredProvider;
                 }
 
+                $registeredIssueFilterHooks = [];
+                foreach ($registry->getIssueFilterHooks() as $hook) {
+                    $hookIndex = count($issueFilterHooks);
+                    if ($hookIndex > 65_535) {
+                        throw new InvalidArgumentException(
+                            'A worker cannot register more than 65,536 analyzer issue-filter hooks.',
+                        );
+                    }
+
+                    $registeredHook = new RegisteredIssueFilterHook($hookIndex, $definition->identifier, $hook);
+                    $issueFilterHooks[] = $registeredHook;
+                    $registeredIssueFilterHooks[] = $registeredHook;
+                }
+
                 $registeredPlugins[] = new RegisteredPlugin(
                     count($registeredPlugins),
                     $registeredExtension->identifier,
@@ -293,6 +314,7 @@ final class Worker
                     $registeredMethodProviders,
                     $registeredPropertyProviders,
                     $registeredPropertyInitializationProviders,
+                    $registeredIssueFilterHooks,
                     $registry->getInitializationHooks(),
                     $registry->getBeforeAnalysisHooks(),
                     $registry->getAfterFileAnalysisHooks(),
@@ -309,6 +331,7 @@ final class Worker
         $this->methodReturnTypeProviders = $methodProviders;
         $this->propertyTypeProviders = $propertyProviders;
         $this->propertyInitializationProviders = $propertyInitializationProviders;
+        $this->issueFilterHooks = $issueFilterHooks;
     }
 
     /**
@@ -649,6 +672,55 @@ final class Worker
             }
 
             return AnalyzerProtocol::writePropertyInitializationResponse(false);
+        }
+
+        if ($kind === AnalyzerProtocol::ISSUE_FILTER_REQUEST) {
+            $request = AnalyzerProtocol::readIssueFilterRequest($reader);
+            if ($this->metadataCache === null || $this->metadataCache->generation !== $request->generation) {
+                $this->metadataCache = new MetadataCache($request->generation);
+            }
+
+            $codebase = new Codebase($host, $requestId, $cancellation, $this->metadataCache);
+            $types = new TypeComparator($host, $requestId, $cancellation);
+            $removed = [];
+            foreach ($request->issues as $issueIndex => $issue) {
+                $context = new IssueFilterContext(
+                    $this->phpVersion,
+                    $codebase,
+                    $types,
+                    $cancellation,
+                    $request->file,
+                    $request->contents,
+                    $issue,
+                );
+
+                foreach ($request->hookIndices as $hookIndex) {
+                    $registered = $this->issueFilterHooks[$hookIndex] ?? null;
+                    if ($registered === null) {
+                        throw new ProtocolException(
+                            "Mago requested unregistered analyzer issue-filter hook index {$hookIndex}.",
+                        );
+                    }
+
+                    $cancellation->throwIfCancelled();
+                    try {
+                        $decision = $registered->hook->filterIssue($context);
+                    } catch (Throwable $throwable) {
+                        throw new ProtocolException(
+                            "Analyzer issue-filter hook in `{$registered->plugin}` failed: {$throwable->getMessage()}",
+                            0,
+                            $throwable,
+                        );
+                    }
+
+                    if ($decision === IssueFilterDecision::Remove) {
+                        $removed[] = $issueIndex;
+                        break;
+                    }
+                }
+            }
+
+            return AnalyzerProtocol::writeIssueFilterResponse(count($request->issues), $removed);
         }
 
         if ($kind !== AnalyzerProtocol::RETURN_TYPE_REQUEST && $kind !== AnalyzerProtocol::CALLABLE_SIGNATURE_REQUEST) {

@@ -10,6 +10,9 @@ use Mago\Sdk\Analyzer\EffectiveCallableSignature;
 use Mago\Sdk\Analyzer\FunctionReturnTypeProvider;
 use Mago\Sdk\Analyzer\FunctionTarget;
 use Mago\Sdk\Analyzer\InvocationKind;
+use Mago\Sdk\Analyzer\IssueFilterContext;
+use Mago\Sdk\Analyzer\IssueFilterDecision;
+use Mago\Sdk\Analyzer\IssueFilterHook;
 use Mago\Sdk\Analyzer\Metadata\MemberIdentifier;
 use Mago\Sdk\Analyzer\MethodReturnTypeProvider;
 use Mago\Sdk\Analyzer\MethodTarget;
@@ -28,6 +31,7 @@ use Mago\Sdk\Analyzer\Type;
 use Mago\Sdk\Analyzer\Type\CallableParameter;
 use Mago\Sdk\Analyzer\Type\NamedObjectType;
 use Mago\Sdk\Extension;
+use Mago\Sdk\Reporting\Level;
 use Mago\Sdk\Worker;
 use RuntimeException;
 
@@ -37,6 +41,7 @@ use function file_put_contents;
 use function getenv;
 use function is_string;
 use function sort;
+use function str_contains;
 use function strtolower;
 
 use const FILE_APPEND;
@@ -605,12 +610,44 @@ final class InvocationPropertyInitializationProvider implements PropertyInitiali
 }
 
 /**
+ * @mago-expect lint:cyclomatic-complexity
+ * @mago-expect lint:single-class-per-file
+ */
+final class InvocationIssueFilterHook implements IssueFilterHook
+{
+    public function filterIssue(IssueFilterContext $context): IssueFilterDecision
+    {
+        if (
+            $context->file !== 'src/invocation.php'
+            || !str_contains($context->contents, 'issue-filter-batch-proof')
+            || !$context->codebase->functionExists('known_function')
+            || !$context->types->equals(Type::string(), Type::string())
+            || $context->issue->level !== Level::Error
+            || $context->issue->annotations === []
+        ) {
+            throw new RuntimeException('An issue-filter hook received incomplete file or diagnostic context.');
+        }
+
+        InvocationAudit::record('issue-filter-' . $context->issue->message);
+        if (
+            $context->issue->code === 'non-existent-function'
+            && str_contains($context->issue->message, '`filtered_missing`')
+        ) {
+            return IssueFilterDecision::Remove;
+        }
+
+        return IssueFilterDecision::Keep;
+    }
+}
+
+/**
  * @mago-expect lint:single-class-per-file
  */
 final class InvocationPlugin implements Plugin
 {
     public function __construct(
         private readonly bool $registerMethodProvider,
+        private readonly bool $registerIssueFilter,
     ) {}
 
     public function getDefinition(): PluginDefinition
@@ -630,14 +667,18 @@ final class InvocationPlugin implements Plugin
         }
         $registry->registerPropertyTypeProvider(new InvocationPropertyProvider());
         $registry->registerPropertyInitializationProvider(new InvocationPropertyInitializationProvider());
+        if ($this->registerIssueFilter) {
+            $registry->registerIssueFilterHook(new InvocationIssueFilterHook());
+        }
     }
 }
 
 $registerMethodProvider = getenv('MAGO_INVOCATION_FUNCTION_ONLY') !== '1';
+$registerIssueFilter = getenv('MAGO_INVOCATION_ISSUE_FILTER') === '1';
 
 (new Worker(new Extension(
     identifier: 'mago/invocation-proof',
     name: 'Mago invocation proof',
     version: '1.0.0',
-    analyzerPlugins: [new InvocationPlugin($registerMethodProvider)],
+    analyzerPlugins: [new InvocationPlugin($registerMethodProvider, $registerIssueFilter)],
 )))->run();

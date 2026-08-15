@@ -89,6 +89,7 @@ pub struct PluginRegistry {
     external_method_signature_providers: OnceLock<bool>,
     external_property_providers: OnceLock<bool>,
     external_property_initialization_providers: OnceLock<bool>,
+    external_issue_filter_hooks: OnceLock<bool>,
     function_exact: WordMap<Vec<usize>>,
     function_prefix: Vec<(Word, usize)>,
     function_namespace: Vec<(Word, usize)>,
@@ -136,6 +137,7 @@ impl std::fmt::Debug for PluginRegistry {
             .field("external_method_providers", &self.external_method_providers.get())
             .field("external_property_providers", &self.external_property_providers.get())
             .field("external_property_initialization_providers", &self.external_property_initialization_providers.get())
+            .field("external_issue_filter_hooks", &self.external_issue_filter_hooks.get())
             .field("external_function_signature_providers", &self.external_function_signature_providers.get())
             .field("external_method_signature_providers", &self.external_method_signature_providers.get())
             .field("function_providers", &self.function_providers.len())
@@ -194,6 +196,8 @@ impl PluginRegistry {
             analyzer.has_property_type_providers().map_err(|reason| PluginError::Internal { reason })?;
         let property_initialization_providers =
             analyzer.has_property_initialization_providers().map_err(|reason| PluginError::Internal { reason })?;
+        let issue_filter_hooks =
+            analyzer.has_issue_filter_hooks().map_err(|reason| PluginError::Internal { reason })?;
         let _function = self.external_function_providers.set(function_providers);
         let _method = self.external_method_providers.set(method_providers);
         let _function_signature = self.external_function_signature_providers.set(function_signature_providers);
@@ -201,6 +205,7 @@ impl PluginRegistry {
         let _property = self.external_property_providers.set(property_providers);
         let _property_initialization =
             self.external_property_initialization_providers.set(property_initialization_providers);
+        let _issue_filters = self.external_issue_filter_hooks.set(issue_filter_hooks);
         Ok(())
     }
 
@@ -716,6 +721,7 @@ impl PluginRegistry {
     #[must_use]
     pub fn has_issue_filter_hooks(&self) -> bool {
         !self.issue_filter_hooks.is_empty()
+            || (self.external_analyzer.is_some() && self.external_issue_filter_hooks.get().copied().unwrap_or(true))
     }
 
     #[inline]
@@ -1786,29 +1792,46 @@ impl PluginRegistry {
     /// Filter issues through all registered issue filter hooks.
     ///
     /// Returns a new `IssueCollection` with filtered issues.
-    #[must_use]
-    pub fn filter_issues(&self, file: &File, issues: IssueCollection) -> IssueCollection {
-        if self.issue_filter_hooks.is_empty() {
-            return issues;
-        }
-
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a native hook fails or an external issue batch cannot be filtered.
+    pub fn filter_issues(
+        &self,
+        file: &File,
+        issues: IssueCollection,
+        codebase: &CodebaseMetadata,
+        session: Option<&ExternalAnalysisSession>,
+    ) -> PluginResult<IssueCollection> {
         let mut filtered = IssueCollection::default();
+        if self.issue_filter_hooks.is_empty() {
+            filtered = issues;
+        } else {
+            filtered.reserve(issues.len());
+            for issue in issues {
+                let mut keep = true;
+                for hook in &self.issue_filter_hooks {
+                    if hook.filter_issue(file, &issue)? == IssueFilterDecision::Remove {
+                        keep = false;
+                        break;
+                    }
+                }
 
-        for issue in issues {
-            let mut keep = true;
-            for hook in &self.issue_filter_hooks {
-                if hook.filter_issue(file, &issue) == Ok(IssueFilterDecision::Remove) {
-                    keep = false;
-                    break;
+                if keep {
+                    filtered.push(issue);
                 }
             }
-
-            if keep {
-                filtered.push(issue);
-            }
         }
 
-        filtered
+        if filtered.is_empty() || !self.external_issue_filter_hooks.get().copied().unwrap_or(true) {
+            return Ok(filtered);
+        }
+
+        let Some((analyzer, session)) = self.external_analyzer.as_deref().zip(session) else {
+            return Ok(filtered);
+        };
+
+        analyzer.filter_issues(file, filtered, codebase, session).map_err(|reason| PluginError::Internal { reason })
     }
 }
 

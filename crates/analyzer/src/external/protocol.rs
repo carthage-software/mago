@@ -84,7 +84,12 @@ use mago_extension::PayloadReader;
 use mago_extension::PayloadWriter;
 use mago_extension::source::write_node_kind_table;
 use mago_php_version::PHPVersion;
+use mago_reporting::AnnotationKind;
+use mago_reporting::Issue;
+use mago_reporting::IssueCollection;
+use mago_reporting::Level;
 use mago_span::HasSpan;
+use mago_text_edit::Safety;
 use mago_word::word;
 
 use crate::artifacts::AnalysisArtifacts;
@@ -94,6 +99,7 @@ use crate::external::ExternalExtension;
 use crate::external::ExternalPlugin;
 use crate::external::FunctionProvider;
 use crate::external::FunctionTarget;
+use crate::external::IssueFilterHookRegistration;
 use crate::external::MethodProvider;
 use crate::external::MethodTarget;
 use crate::external::PropertyAccessKind;
@@ -120,6 +126,7 @@ const INITIALIZE_REQUEST: u16 = 11;
 const CALLABLE_SIGNATURE_REQUEST: u16 = 12;
 const PROPERTY_TYPE_REQUEST: u16 = 13;
 const PROPERTY_INITIALIZATION_REQUEST: u16 = 14;
+const ISSUE_FILTER_REQUEST: u16 = 15;
 const DESCRIBE_RESPONSE: u16 = 0x8001;
 const RETURN_TYPE_RESPONSE: u16 = 0x8002;
 const TYPE_COMPARISON_RESPONSE: u16 = 0x8003;
@@ -127,6 +134,7 @@ const INITIALIZE_RESPONSE: u16 = 0x800B;
 const CALLABLE_SIGNATURE_RESPONSE: u16 = 0x800C;
 const PROPERTY_TYPE_RESPONSE: u16 = 0x800D;
 const PROPERTY_INITIALIZATION_RESPONSE: u16 = 0x800E;
+const ISSUE_FILTER_RESPONSE: u16 = 0x800F;
 const MAXIMUM_EXTENSIONS: usize = 0x4000;
 const MAXIMUM_PLUGINS: usize = 0x4000;
 const MAXIMUM_PROVIDERS: usize = 0x0001_0000;
@@ -138,6 +146,7 @@ const MAXIMUM_STUBS: usize = 0x0001_0000;
 // complete snapshots from real framework codebases such as Symfony.
 const MAXIMUM_TYPE_DEPTH: usize = 256;
 const MAXIMUM_TYPE_MEMBERS: usize = 0x0001_0000;
+const MAXIMUM_ISSUES: usize = 1_000_000;
 
 const TARGET_EXACT: u8 = 1;
 const TARGET_PREFIX: u8 = 2;
@@ -199,6 +208,7 @@ pub(super) struct Registration {
     pub method_providers: Vec<MethodProvider>,
     pub property_providers: Vec<PropertyProvider>,
     pub property_initialization_providers: Vec<PropertyProvider>,
+    pub issue_filter_hooks: Vec<IssueFilterHookRegistration>,
     pub initialization_plugins: Vec<u16>,
     pub before_analysis_plugins: Vec<u16>,
     pub after_file_analysis_plugins: Vec<u16>,
@@ -320,6 +330,7 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
     let mut method_providers = Vec::new();
     let mut property_providers = Vec::new();
     let mut property_initialization_providers = Vec::new();
+    let mut issue_filter_hooks = Vec::new();
     let mut initialization_plugins = Vec::new();
     let mut before_analysis_plugins = Vec::new();
     let mut after_file_analysis_plugins = Vec::new();
@@ -486,6 +497,14 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
                 property_initialization_providers.push(PropertyProvider { plugin: identifier.clone(), index, targets });
             }
 
+            let issue_filter_count = reader.read_count("issue-filter hooks", MAXIMUM_PROVIDERS)?;
+            for _ in 0..issue_filter_count {
+                issue_filter_hooks.push(IssueFilterHookRegistration {
+                    plugin: identifier.clone(),
+                    index: reader.read_u16("issue-filter hook index")?,
+                });
+            }
+
             let plugin = ExternalPlugin {
                 index,
                 extension: extension_identifier.clone(),
@@ -524,6 +543,7 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
         property_initialization_providers.iter().map(|provider| provider.index),
         "property initialization provider",
     )?;
+    validate_provider_indices(issue_filter_hooks.iter().map(|hook| hook.index), "issue-filter hook")?;
     Ok(Registration {
         extensions,
         plugins,
@@ -532,6 +552,7 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
         method_providers,
         property_providers,
         property_initialization_providers,
+        issue_filter_hooks,
         initialization_plugins,
         before_analysis_plugins,
         after_file_analysis_plugins,
@@ -754,6 +775,164 @@ pub(super) fn decode_property_initialization_response(payload: &[u8]) -> Result<
     let initialized = reader.read_bool("property initialized flag")?;
     reader.finish()?;
     Ok(initialized)
+}
+
+pub(super) fn encode_issue_filter_request(
+    hook_indices: &[u16],
+    file: &File,
+    issues: &IssueCollection,
+    generation: u64,
+    session: &ExternalAnalysisSession,
+) -> Result<Vec<u8>, ExternalAnalyzerError> {
+    if hook_indices.is_empty() {
+        return Err(protocol("an issue-filter request must contain at least one hook"));
+    }
+
+    if issues.is_empty() {
+        return Err(protocol("an issue-filter request must contain at least one issue"));
+    }
+
+    if issues.len() > MAXIMUM_ISSUES {
+        return Err(protocol(format!("an issue-filter request exceeds the {MAXIMUM_ISSUES} issue limit")));
+    }
+
+    let mut writer = message_writer(ISSUE_FILTER_REQUEST);
+    writer.write_u64(generation);
+    writer.write_u16(
+        u16::try_from(hook_indices.len()).map_err(|_| protocol("more than u16::MAX issue-filter hooks matched"))?,
+    );
+
+    for index in hook_indices {
+        writer.write_u16(*index);
+    }
+
+    writer.write_bytes(&file.name)?;
+    writer.write_bytes(&file.contents)?;
+    writer.write_u32(u32::try_from(issues.len()).map_err(|_| protocol("more than u32::MAX issues to filter"))?);
+    for issue in issues {
+        write_issue_filter_candidate(&mut writer, issue, file, session)?;
+    }
+
+    Ok(writer.finish())
+}
+
+pub(super) fn decode_issue_filter_response(
+    payload: &[u8],
+    expected_issues: usize,
+) -> Result<Vec<usize>, ExternalAnalyzerError> {
+    let mut reader = message_reader(payload, ISSUE_FILTER_RESPONSE)?;
+    let issue_count = reader.read_count("issue-filter candidates", MAXIMUM_ISSUES)?;
+    if issue_count != expected_issues {
+        return Err(protocol(format!("worker filtered {issue_count} issues, but Mago sent {expected_issues}")));
+    }
+
+    let removed_count = reader.read_count("removed issues", issue_count)?;
+    let mut removed = Vec::with_capacity(removed_count);
+    for _ in 0..removed_count {
+        let index = reader.read_u32("removed issue index")? as usize;
+        if index >= issue_count {
+            return Err(protocol(format!("worker removed out-of-range issue index {index}")));
+        }
+
+        if removed.last().is_some_and(|previous| *previous >= index) {
+            return Err(protocol("worker issue removals are not strictly increasing"));
+        }
+
+        removed.push(index);
+    }
+
+    reader.finish()?;
+    Ok(removed)
+}
+
+fn write_issue_filter_candidate(
+    writer: &mut PayloadWriter,
+    issue: &Issue,
+    default_file: &File,
+    session: &ExternalAnalysisSession,
+) -> Result<(), ExternalAnalyzerError> {
+    writer.write_u8(match issue.level {
+        Level::Note => 1,
+        Level::Help => 2,
+        Level::Warning => 3,
+        Level::Error => 4,
+    });
+    writer.write_bool(issue.code.is_some());
+    if let Some(code) = &issue.code {
+        writer.write_string(code)?;
+    }
+
+    writer.write_string(&issue.message)?;
+    writer.write_u32(u32::try_from(issue.notes.len()).map_err(|_| protocol("too many issue notes"))?);
+    for note in &issue.notes {
+        writer.write_string(note)?;
+    }
+
+    write_optional_string(writer, issue.help.as_deref())?;
+    write_optional_string(writer, issue.link.as_deref())?;
+    writer.write_u32(u32::try_from(issue.annotations.len()).map_err(|_| protocol("too many issue annotations"))?);
+    for annotation in &issue.annotations {
+        writer.write_u8(match annotation.kind {
+            AnnotationKind::Primary => 1,
+            AnnotationKind::Secondary => 2,
+        });
+
+        write_issue_source(writer, annotation.span.file_id, default_file, session)?;
+        writer.write_u32(annotation.span.start.offset);
+        writer.write_u32(annotation.span.end.offset);
+        write_optional_string(writer, annotation.message.as_deref())?;
+    }
+
+    let edit_count = issue.edits.values().map(Vec::len).sum::<usize>();
+    writer.write_u32(u32::try_from(edit_count).map_err(|_| protocol("too many issue edits"))?);
+    let mut edit_files = issue.edits.iter().collect::<Vec<_>>();
+    edit_files.sort_unstable_by_key(|(file_id, _)| **file_id);
+    for (file_id, edits) in edit_files {
+        for edit in edits {
+            write_issue_source(writer, *file_id, default_file, session)?;
+            writer.write_u32(edit.range.start);
+            writer.write_u32(edit.range.end);
+            #[allow(unreachable_patterns)]
+            writer.write_u8(match edit.safety {
+                Safety::Safe => 1,
+                Safety::PotentiallyUnsafe => 2,
+                Safety::Unsafe => 3,
+                _ => 3,
+            });
+
+            writer.write_bytes(&edit.new_text)?;
+        }
+    }
+
+    Ok(())
+}
+
+fn write_issue_source(
+    writer: &mut PayloadWriter,
+    file_id: mago_database::file::FileId,
+    default_file: &File,
+    session: &ExternalAnalysisSession,
+) -> Result<(), ExternalAnalyzerError> {
+    if file_id == default_file.id {
+        writer.write_bool(false);
+        return Ok(());
+    }
+
+    let name = session
+        .source_name(file_id)
+        .ok_or_else(|| protocol(format!("issue references unknown source file identifier {}", file_id.as_u64())))?;
+    writer.write_bool(true);
+    writer.write_bytes(name)?;
+    Ok(())
+}
+
+fn write_optional_string(writer: &mut PayloadWriter, value: Option<&str>) -> Result<(), ExternalAnalyzerError> {
+    writer.write_bool(value.is_some());
+    if let Some(value) = value {
+        writer.write_string(value)?;
+    }
+
+    Ok(())
 }
 
 fn encode_return_type_request<'type_info>(
@@ -2609,6 +2788,23 @@ pub(super) mod testing {
         }
     }
 
+    #[test]
+    fn issue_filter_response_requires_ordered_in_range_removals() {
+        let mut writer = message_writer(ISSUE_FILTER_RESPONSE);
+        writer.write_u32(4);
+        writer.write_u32(2);
+        writer.write_u32(0);
+        writer.write_u32(3);
+        assert_eq!(decode_issue_filter_response(&writer.finish(), 4).unwrap(), vec![0, 3]);
+
+        let mut writer = message_writer(ISSUE_FILTER_RESPONSE);
+        writer.write_u32(4);
+        writer.write_u32(2);
+        writer.write_u32(2);
+        writer.write_u32(2);
+        decode_issue_filter_response(&writer.finish(), 4).unwrap_err();
+    }
+
     pub fn registration_response() -> Vec<u8> {
         registration_response_with_lifecycle(0)
     }
@@ -2630,6 +2826,7 @@ pub(super) mod testing {
         for alias in aliases {
             writer.write_string(alias).unwrap();
         }
+        writer.write_u32(0);
         writer.write_u32(0);
         writer.write_u32(0);
         writer.write_u32(0);
@@ -2662,6 +2859,7 @@ pub(super) mod testing {
         writer.write_u32(1);
         writer.write_u8(TARGET_EXACT);
         writer.write_bytes(b"demo_service").unwrap();
+        writer.write_u32(0);
         writer.write_u32(0);
         writer.write_u32(0);
         writer.write_u32(0);

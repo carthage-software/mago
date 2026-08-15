@@ -25,6 +25,14 @@ final class TextEdit
         public readonly ?string $file,
     ) {}
 
+    /**
+     * @internal
+     */
+    public static function fromPayload(Span $span, string $newText, Safety $safety, ?string $file): self
+    {
+        return new self($span, $newText, $safety, $file);
+    }
+
     public static function delete(Span $span): self
     {
         return new self($span, '', Safety::Safe, null);

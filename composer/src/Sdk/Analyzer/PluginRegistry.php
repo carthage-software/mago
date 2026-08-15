@@ -37,6 +37,11 @@ final class PluginRegistry
     private array $propertyInitializationProviders = [];
 
     /**
+     * @var list<IssueFilterHook>
+     */
+    private array $issueFilterHooks = [];
+
+    /**
      * @var list<BeforeAnalysisHook>
      */
     private array $beforeAnalysisHooks = [];
@@ -74,6 +79,11 @@ final class PluginRegistry
     public function registerPropertyInitializationProvider(PropertyInitializationProvider $provider): void
     {
         $this->propertyInitializationProviders[] = $provider;
+    }
+
+    public function registerIssueFilterHook(IssueFilterHook $hook): void
+    {
+        $this->issueFilterHooks[] = $hook;
     }
 
     public function registerBeforeAnalysisHook(BeforeAnalysisHook $hook): void
@@ -125,6 +135,16 @@ final class PluginRegistry
     public function getPropertyInitializationProviders(): array
     {
         return $this->propertyInitializationProviders;
+    }
+
+    /**
+     * @internal
+     *
+     * @return list<IssueFilterHook>
+     */
+    public function getIssueFilterHooks(): array
+    {
+        return $this->issueFilterHooks;
     }
 
     /**

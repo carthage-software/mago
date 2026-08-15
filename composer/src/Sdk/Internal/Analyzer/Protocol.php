@@ -31,6 +31,12 @@ use Mago\Sdk\Internal\Protocol\PayloadReader;
 use Mago\Sdk\Internal\Protocol\PayloadWriter;
 use Mago\Sdk\Internal\Syntax\SourceFileCodec;
 use Mago\Sdk\PHPVersion;
+use Mago\Sdk\Reporting\Annotation;
+use Mago\Sdk\Reporting\AnnotationKind;
+use Mago\Sdk\Reporting\Level;
+use Mago\Sdk\Reporting\ReportedIssue as ReportingReportedIssue;
+use Mago\Sdk\Reporting\Safety;
+use Mago\Sdk\Reporting\TextEdit;
 use Mago\Sdk\Span;
 use Mago\Sdk\Syntax\NodeKind;
 use Mago\Sdk\Syntax\SourceFile;
@@ -63,6 +69,7 @@ final class Protocol
     public const CALLABLE_SIGNATURE_REQUEST = 12;
     public const PROPERTY_TYPE_REQUEST = 13;
     public const PROPERTY_INITIALIZATION_REQUEST = 14;
+    public const ISSUE_FILTER_REQUEST = 15;
     public const GET_EXPRESSION_TYPES = 1;
     public const GET_ALL_EXPRESSION_TYPES = 2;
     public const GET_INFERRED_RETURN_TYPES = 3;
@@ -133,6 +140,11 @@ final class Protocol
     private const CALLABLE_SIGNATURE_RESPONSE = 0x800C;
     private const PROPERTY_TYPE_RESPONSE = 0x800D;
     private const PROPERTY_INITIALIZATION_RESPONSE = 0x800E;
+    private const ISSUE_FILTER_RESPONSE = 0x800F;
+    private const MAXIMUM_ISSUES = 1_000_000;
+    private const MAXIMUM_ISSUE_NOTES = 0x0001_0000;
+    private const MAXIMUM_ISSUE_ANNOTATIONS = 0x0001_0000;
+    private const MAXIMUM_ISSUE_EDITS = 0x0001_0000;
     private const RETURN_TYPE_REQUEST_HEADER = "MANA\x00\x01\x00\x01\x00\x02\x00\x00";
     private const CALLABLE_SIGNATURE_REQUEST_HEADER = "MANA\x00\x01\x00\x01\x00\x0C\x00\x00";
     private const UNHANDLED_RETURN_TYPE_RESPONSE = "MANA\x00\x01\x00\x01\x80\x02\x00\x00\x00";
@@ -295,6 +307,11 @@ final class Protocol
                         $writer->writeBytes($target->class);
                         $writer->writeBytes($target->property);
                     }
+                }
+
+                $writer->writeCount($plugin->issueFilterHooks);
+                foreach ($plugin->issueFilterHooks as $hook) {
+                    $writer->writeU16($hook->index);
                 }
             }
         }
@@ -868,6 +885,119 @@ final class Protocol
             self::PROPERTY_INITIALIZATION_RESPONSE << 16,
             (int) $initialized,
         );
+    }
+
+    public static function readIssueFilterRequest(PayloadReader $reader): IssueFilterRequest
+    {
+        $generation = $reader->readU64();
+        $hookCount = $reader->readU16();
+        if ($hookCount === 0) {
+            throw new ProtocolException('An issue-filter request contains no hooks.');
+        }
+
+        $hooks = [];
+        for ($index = 0; $index < $hookCount; ++$index) {
+            $hooks[] = $reader->readU16();
+        }
+
+        $file = $reader->readBytes();
+        if ($file === '') {
+            throw new ProtocolException('An issue-filter request has an empty file name.');
+        }
+
+        $contents = $reader->readBytes();
+        $issueCount = $reader->readCount(self::MAXIMUM_ISSUES);
+        if ($issueCount === 0) {
+            throw new ProtocolException('An issue-filter request contains no issues.');
+        }
+
+        $issues = [];
+        for ($index = 0; $index < $issueCount; ++$index) {
+            $issues[] = self::readReportedIssue($reader);
+        }
+
+        $reader->finish();
+        return new IssueFilterRequest($generation, $hooks, $file, $contents, $issues);
+    }
+
+    /**
+     * @param list<int<0, max>> $removedIndices
+     */
+    public static function writeIssueFilterResponse(int $issueCount, array $removedIndices): string
+    {
+        $writer = self::createMessage(self::ISSUE_FILTER_RESPONSE);
+        $writer->writeU32($issueCount);
+        $writer->writeCount($removedIndices);
+        foreach ($removedIndices as $index) {
+            $writer->writeU32($index);
+        }
+
+        return $writer->finish();
+    }
+
+    private static function readReportedIssue(PayloadReader $reader): ReportingReportedIssue
+    {
+        $level = match ($value = $reader->readU8()) {
+            1 => Level::Note,
+            2 => Level::Help,
+            3 => Level::Warning,
+            4 => Level::Error,
+            default => throw new ProtocolException("Invalid issue-filter severity {$value}."),
+        };
+
+        $code = $reader->readOptionalString();
+        if ($code === '') {
+            throw new ProtocolException('An issue-filter candidate has an empty issue code.');
+        }
+
+        $message = $reader->readString();
+        if ($message === '') {
+            throw new ProtocolException('An issue-filter candidate has an empty message.');
+        }
+
+        $noteCount = $reader->readCount(self::MAXIMUM_ISSUE_NOTES);
+        $notes = [];
+        for ($index = 0; $index < $noteCount; ++$index) {
+            $note = $reader->readString();
+            if ($note === '') {
+                throw new ProtocolException('An issue-filter candidate has an empty note.');
+            }
+
+            $notes[] = $note;
+        }
+
+        $help = $reader->readOptionalString();
+        $link = $reader->readOptionalString();
+        $annotationCount = $reader->readCount(self::MAXIMUM_ISSUE_ANNOTATIONS);
+        $annotations = [];
+        for ($index = 0; $index < $annotationCount; ++$index) {
+            $kind = match ($value = $reader->readU8()) {
+                1 => AnnotationKind::Primary,
+                2 => AnnotationKind::Secondary,
+                default => throw new ProtocolException("Invalid issue-filter annotation kind {$value}."),
+            };
+
+            $file = $reader->readOptionalString();
+            $span = new Span($reader->readU32(), $reader->readU32());
+            $annotations[] = new Annotation($kind, $span, $reader->readOptionalString(), $file);
+        }
+
+        $editCount = $reader->readCount(self::MAXIMUM_ISSUE_EDITS);
+        $edits = [];
+        for ($index = 0; $index < $editCount; ++$index) {
+            $file = $reader->readOptionalString();
+            $span = new Span($reader->readU32(), $reader->readU32());
+            $safety = match ($value = $reader->readU8()) {
+                1 => Safety::Safe,
+                2 => Safety::PotentiallyUnsafe,
+                3 => Safety::Unsafe,
+                default => throw new ProtocolException("Invalid issue-filter edit safety {$value}."),
+            };
+
+            $edits[] = TextEdit::fromPayload($span, $reader->readBytes(), $safety, $file);
+        }
+
+        return new ReportingReportedIssue($level, $code, $message, $notes, $help, $link, $annotations, $edits);
     }
 
     public static function writeTypeComparisonRequest(int $operation, Type $left, Type $right): string
