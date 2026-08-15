@@ -116,6 +116,30 @@ final class ExternalService {}
 
 final class ExternalStaticService {}
 
+class FrameworkTestCase {}
+
+final class ManagedTestCase extends FrameworkTestCase
+{
+    public ExternalResult $application;
+
+    private ExternalResult $native;
+
+    public function __construct()
+    {
+        $this->native = new ExternalResult();
+    }
+
+    public function getApplication(): ExternalResult
+    {
+        return $this->application;
+    }
+
+    public function getNative(): ExternalResult
+    {
+        return $this->native;
+    }
+}
+
 interface Marker {}
 
 class DynamicProxy
@@ -189,6 +213,8 @@ take_string((new CustomRelation())->where());
 take_string((new ExternalService())->resolve('instance-provider'));
 take_string(ExternalStaticService::resolve('static-provider'));
 User::callLate();
+(new ManagedTestCase())->getApplication();
+(new ManagedTestCase())->getNative();
 
 function use_external_interface(ExternalInterface $service): void
 {
@@ -284,9 +310,32 @@ function test(DeclinedContract $contract): void
 }
 ";
 
+const DECLINED_PROPERTY_INITIALIZATION_SOURCE: &str = r"<?php
+
+declare(strict_types=1);
+
+final class ExternalResult {}
+
+class FrameworkTestCase {}
+
+final class ManagedTestCase extends FrameworkTestCase
+{
+    public ExternalResult $application;
+
+    public function __construct() {}
+
+    public function getApplication(): ExternalResult
+    {
+        return $this->application;
+    }
+}
+
+(new ManagedTestCase())->getApplication();
+";
+
 #[test]
 fn external_providers_receive_complete_invocation_context() -> Result<(), Box<dyn std::error::Error>> {
-    let observation = analyze_with_fixture(SOURCE, false)?;
+    let observation = analyze_with_fixture(SOURCE, false, false)?;
     assert!(
         observation.issues.is_empty(),
         "complete external invocation context should preserve precise types: {:#?}",
@@ -325,6 +374,7 @@ fn external_providers_receive_complete_invocation_context() -> Result<(), Box<dy
             "missing-static-signature",
             "property-id-read",
             "property-id-write",
+            "property-initialization",
             "property-name-read",
             "property-name-write",
             "property-secret-read",
@@ -340,7 +390,7 @@ fn external_providers_receive_complete_invocation_context() -> Result<(), Box<dy
 
 #[test]
 fn analyzer_without_method_providers_sends_no_method_request() -> Result<(), Box<dyn std::error::Error>> {
-    let observation = analyze_with_fixture(NO_METHOD_PROVIDER_SOURCE, true)?;
+    let observation = analyze_with_fixture(NO_METHOD_PROVIDER_SOURCE, true, false)?;
     assert!(observation.issues.is_empty(), "native method analysis should remain unchanged: {:#?}", observation.issues);
     assert!(observation.invocations.is_empty(), "a host without method providers must not receive method requests");
 
@@ -349,7 +399,7 @@ fn analyzer_without_method_providers_sends_no_method_request() -> Result<(), Box
 
 #[test]
 fn declined_dynamic_methods_preserve_non_documented_method_diagnostics() -> Result<(), Box<dyn std::error::Error>> {
-    let observation = analyze_with_fixture(UNDOCUMENTED_METHOD_SOURCE, true)?;
+    let observation = analyze_with_fixture(UNDOCUMENTED_METHOD_SOURCE, true, false)?;
     assert_eq!(
         observation.issues,
         [
@@ -370,7 +420,7 @@ fn declined_dynamic_methods_preserve_non_documented_method_diagnostics() -> Resu
 
 #[test]
 fn declined_missing_methods_preserve_non_existent_method_diagnostics() -> Result<(), Box<dyn std::error::Error>> {
-    let observation = analyze_with_fixture(MISSING_METHOD_SOURCE, false)?;
+    let observation = analyze_with_fixture(MISSING_METHOD_SOURCE, false, false)?;
     assert_eq!(
         observation.issues,
         [(
@@ -383,7 +433,21 @@ fn declined_missing_methods_preserve_non_existent_method_diagnostics() -> Result
     Ok(())
 }
 
-fn analyze_with_fixture(source: &str, function_only: bool) -> Result<AnalysisObservation, Box<dyn std::error::Error>> {
+#[test]
+fn declined_property_initialization_preserves_uninitialized_diagnostic() -> Result<(), Box<dyn std::error::Error>> {
+    let observation = analyze_with_fixture(DECLINED_PROPERTY_INITIALIZATION_SOURCE, false, true)?;
+    assert_eq!(observation.issues.len(), 1, "a declining provider must preserve the native diagnostic");
+    assert_eq!(observation.issues[0].0.as_deref(), Some("uninitialized-property"));
+    assert!(observation.invocations.is_empty(), "a declining provider must not claim initialization");
+
+    Ok(())
+}
+
+fn analyze_with_fixture(
+    source: &str,
+    function_only: bool,
+    decline_property_initialization: bool,
+) -> Result<AnalysisObservation, Box<dyn std::error::Error>> {
     let repository = Path::new(env!("CARGO_MANIFEST_DIR"));
     let temporary = tempfile::tempdir()?;
     let audit = temporary.path().join("invocations.txt");
@@ -394,6 +458,9 @@ fn analyze_with_fixture(source: &str, function_only: bool) -> Result<AnalysisObs
         .with_environment("MAGO_INVOCATION_AUDIT_LOG", &audit);
     if function_only {
         command = command.with_environment("MAGO_INVOCATION_FUNCTION_ONLY", "1");
+    }
+    if decline_property_initialization {
+        command = command.with_environment("MAGO_INVOCATION_DECLINE_PROPERTY_INITIALIZATION", "1");
     }
     let pool = WorkerPool::spawn(command, NonZeroUsize::MIN, WorkerPoolOptions::default())?;
     let external = ExternalAnalyzer::initialize([Arc::new(pool)], PHPVersion::PHP85, &[], false)?;
@@ -419,6 +486,7 @@ fn analyze_with_fixture(source: &str, function_only: bool) -> Result<AnalysisObs
 
     let mut settings = Settings::new(PHPVersion::PHP85);
     settings.find_unused_parameters = false;
+    settings.check_property_initialization = true;
     let mut service = IncrementalAnalysisService::new(
         database.read_only(),
         CodebaseMetadata::new(),

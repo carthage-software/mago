@@ -17,6 +17,8 @@ use Mago\Sdk\Analyzer\Plugin;
 use Mago\Sdk\Analyzer\PluginDefinition;
 use Mago\Sdk\Analyzer\PluginRegistry;
 use Mago\Sdk\Analyzer\PropertyAccessKind;
+use Mago\Sdk\Analyzer\PropertyInitializationProvider;
+use Mago\Sdk\Analyzer\PropertyInitializationProviderContext;
 use Mago\Sdk\Analyzer\PropertyTarget;
 use Mago\Sdk\Analyzer\PropertyType;
 use Mago\Sdk\Analyzer\PropertyTypeProvider;
@@ -573,6 +575,38 @@ final class InvocationPropertyProvider implements PropertyTypeProvider
 /**
  * @mago-expect lint:single-class-per-file
  */
+final class InvocationPropertyInitializationProvider implements PropertyInitializationProvider
+{
+    public function getTargets(): array
+    {
+        return [PropertyTarget::exact('FrameworkTestCase', 'application')];
+    }
+
+    public function isPropertyInitialized(PropertyInitializationProviderContext $context): bool
+    {
+        $declaredType = $context->property->declaredType?->type;
+        if (
+            $context->declaringClass !== 'ManagedTestCase'
+            || $context->property->name !== '$application'
+            || $declaredType === null
+            || !$context->types->equals($declaredType, Type::namedObject('ExternalResult'))
+            || $context->codebase->getClass($context->declaringClass) === null
+        ) {
+            throw new RuntimeException('A property initialization provider received incomplete declared metadata.');
+        }
+
+        if (getenv('MAGO_INVOCATION_DECLINE_PROPERTY_INITIALIZATION') === '1') {
+            return false;
+        }
+
+        InvocationAudit::record('property-initialization');
+        return true;
+    }
+}
+
+/**
+ * @mago-expect lint:single-class-per-file
+ */
 final class InvocationPlugin implements Plugin
 {
     public function __construct(
@@ -595,6 +629,7 @@ final class InvocationPlugin implements Plugin
             $registry->registerMethodReturnTypeProvider(new InvocationMethodProvider());
         }
         $registry->registerPropertyTypeProvider(new InvocationPropertyProvider());
+        $registry->registerPropertyInitializationProvider(new InvocationPropertyInitializationProvider());
     }
 }
 

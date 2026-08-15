@@ -62,6 +62,7 @@ final class Protocol
     public const INITIALIZE_REQUEST = 11;
     public const CALLABLE_SIGNATURE_REQUEST = 12;
     public const PROPERTY_TYPE_REQUEST = 13;
+    public const PROPERTY_INITIALIZATION_REQUEST = 14;
     public const GET_EXPRESSION_TYPES = 1;
     public const GET_ALL_EXPRESSION_TYPES = 2;
     public const GET_INFERRED_RETURN_TYPES = 3;
@@ -131,6 +132,7 @@ final class Protocol
     private const INITIALIZE_RESPONSE = 0x800B;
     private const CALLABLE_SIGNATURE_RESPONSE = 0x800C;
     private const PROPERTY_TYPE_RESPONSE = 0x800D;
+    private const PROPERTY_INITIALIZATION_RESPONSE = 0x800E;
     private const RETURN_TYPE_REQUEST_HEADER = "MANA\x00\x01\x00\x01\x00\x02\x00\x00";
     private const CALLABLE_SIGNATURE_REQUEST_HEADER = "MANA\x00\x01\x00\x01\x00\x0C\x00\x00";
     private const UNHANDLED_RETURN_TYPE_RESPONSE = "MANA\x00\x01\x00\x01\x80\x02\x00\x00\x00";
@@ -277,6 +279,16 @@ final class Protocol
 
                 $writer->writeCount($plugin->propertyProviders);
                 foreach ($plugin->propertyProviders as $provider) {
+                    $writer->writeU16($provider->index);
+                    $writer->writeCount($provider->targets);
+                    foreach ($provider->targets as $target) {
+                        $writer->writeBytes($target->class);
+                        $writer->writeBytes($target->property);
+                    }
+                }
+
+                $writer->writeCount($plugin->propertyInitializationProviders);
+                foreach ($plugin->propertyInitializationProviders as $provider) {
                     $writer->writeU16($provider->index);
                     $writer->writeCount($provider->targets);
                     foreach ($provider->targets as $target) {
@@ -821,6 +833,41 @@ final class Protocol
         }
 
         return $writer->finish();
+    }
+
+    public static function readPropertyInitializationRequest(PayloadReader $reader): PropertyInitializationRequest
+    {
+        $generation = $reader->readU64();
+        $providerCount = $reader->readU16();
+        if ($providerCount === 0) {
+            throw new ProtocolException('A property-initialization request contains no providers.');
+        }
+
+        $providers = [];
+        for ($index = 0; $index < $providerCount; ++$index) {
+            $providers[] = $reader->readU16();
+        }
+
+        $declaringClass = $reader->readBytes();
+        if ($declaringClass === '') {
+            throw new ProtocolException('A property-initialization request has an empty declaring class.');
+        }
+
+        $property = MetadataCodec::readProperty($reader);
+        $reader->finish();
+
+        return new PropertyInitializationRequest($generation, $providers, $declaringClass, $property);
+    }
+
+    public static function writePropertyInitializationResponse(bool $initialized): string
+    {
+        return pack(
+            'N3C',
+            self::MAGIC_U32,
+            self::VERSION_U32,
+            self::PROPERTY_INITIALIZATION_RESPONSE << 16,
+            (int) $initialized,
+        );
     }
 
     public static function writeTypeComparisonRequest(int $operation, Type $left, Type $right): string

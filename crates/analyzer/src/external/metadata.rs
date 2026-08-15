@@ -625,7 +625,7 @@ fn write_parameter(
     Ok(())
 }
 
-fn write_property(
+pub(super) fn write_property(
     writer: &mut PayloadWriter,
     metadata: &PropertyMetadata,
     session: &ExternalAnalysisSession,

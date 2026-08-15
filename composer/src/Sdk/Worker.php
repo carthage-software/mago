@@ -15,6 +15,7 @@ use Mago\Sdk\Analyzer\InitializationContext;
 use Mago\Sdk\Analyzer\InvocationKind;
 use Mago\Sdk\Analyzer\PluginRegistry as AnalyzerPluginRegistry;
 use Mago\Sdk\Analyzer\ProjectAnalysis;
+use Mago\Sdk\Analyzer\PropertyInitializationProviderContext;
 use Mago\Sdk\Analyzer\PropertyTypeProviderContext;
 use Mago\Sdk\Analyzer\ReturnTypeProviderContext;
 use Mago\Sdk\Analyzer\TypeComparator;
@@ -26,6 +27,7 @@ use Mago\Sdk\Internal\Analyzer\Protocol as AnalyzerProtocol;
 use Mago\Sdk\Internal\Analyzer\RegisteredFunctionReturnTypeProvider;
 use Mago\Sdk\Internal\Analyzer\RegisteredMethodReturnTypeProvider;
 use Mago\Sdk\Internal\Analyzer\RegisteredPlugin;
+use Mago\Sdk\Internal\Analyzer\RegisteredPropertyInitializationProvider;
 use Mago\Sdk\Internal\Analyzer\RegisteredPropertyTypeProvider;
 use Mago\Sdk\Internal\HostClient;
 use Mago\Sdk\Internal\Io\ResourceReader;
@@ -95,6 +97,9 @@ final class Worker
     /** @var list<RegisteredPropertyTypeProvider> */
     private readonly array $propertyTypeProviders;
 
+    /** @var list<RegisteredPropertyInitializationProvider> */
+    private readonly array $propertyInitializationProviders;
+
     /**
      * @var list<int<0, 65535>>
      */
@@ -128,6 +133,7 @@ final class Worker
         $functionProviders = [];
         $methodProviders = [];
         $propertyProviders = [];
+        $propertyInitializationProviders = [];
         $workerReducerIndices = [];
         foreach ($extensions as $extensionIndex => $registeredExtension) {
             $normalizedExtensionIdentifier = strtolower($registeredExtension->identifier);
@@ -252,6 +258,32 @@ final class Worker
                     $registeredPropertyProviders[] = $registeredProvider;
                 }
 
+                $registeredPropertyInitializationProviders = [];
+                foreach ($registry->getPropertyInitializationProviders() as $provider) {
+                    $targets = $provider->getTargets();
+                    if ($targets === []) {
+                        throw new InvalidArgumentException(
+                            "A property initialization provider in `{$definition->identifier}` has no targets.",
+                        );
+                    }
+
+                    $providerIndex = count($propertyInitializationProviders);
+                    if ($providerIndex > 65_535) {
+                        throw new InvalidArgumentException(
+                            'A worker cannot register more than 65,536 property initialization providers.',
+                        );
+                    }
+
+                    $registeredProvider = new RegisteredPropertyInitializationProvider(
+                        $providerIndex,
+                        $definition->identifier,
+                        $provider,
+                        $targets,
+                    );
+                    $propertyInitializationProviders[] = $registeredProvider;
+                    $registeredPropertyInitializationProviders[] = $registeredProvider;
+                }
+
                 $registeredPlugins[] = new RegisteredPlugin(
                     count($registeredPlugins),
                     $registeredExtension->identifier,
@@ -260,6 +292,7 @@ final class Worker
                     $registeredFunctionProviders,
                     $registeredMethodProviders,
                     $registeredPropertyProviders,
+                    $registeredPropertyInitializationProviders,
                     $registry->getInitializationHooks(),
                     $registry->getBeforeAnalysisHooks(),
                     $registry->getAfterFileAnalysisHooks(),
@@ -275,6 +308,7 @@ final class Worker
         $this->functionReturnTypeProviders = $functionProviders;
         $this->methodReturnTypeProviders = $methodProviders;
         $this->propertyTypeProviders = $propertyProviders;
+        $this->propertyInitializationProviders = $propertyInitializationProviders;
     }
 
     /**
@@ -572,6 +606,49 @@ final class Worker
             }
 
             return AnalyzerProtocol::writePropertyTypeResponse(null);
+        }
+
+        if ($kind === AnalyzerProtocol::PROPERTY_INITIALIZATION_REQUEST) {
+            $request = AnalyzerProtocol::readPropertyInitializationRequest($reader);
+            if ($this->metadataCache === null || $this->metadataCache->generation !== $request->generation) {
+                $this->metadataCache = new MetadataCache($request->generation);
+            }
+
+            $codebase = new Codebase($host, $requestId, $cancellation, $this->metadataCache);
+            foreach ($request->providerIndices as $providerIndex) {
+                $registered = $this->propertyInitializationProviders[$providerIndex] ?? null;
+                if ($registered === null) {
+                    throw new ProtocolException(
+                        "Mago requested unregistered property initialization provider index {$providerIndex}.",
+                    );
+                }
+
+                $cancellation->throwIfCancelled();
+                try {
+                    $initialized = $registered->provider->isPropertyInitialized(
+                        new PropertyInitializationProviderContext(
+                            $this->phpVersion,
+                            $codebase,
+                            $request->declaringClass,
+                            $request->property,
+                            new TypeComparator($host, $requestId, $cancellation),
+                            $cancellation,
+                        ),
+                    );
+                } catch (Throwable $throwable) {
+                    throw new ProtocolException(
+                        "Property initialization provider in `{$registered->plugin}` failed: {$throwable->getMessage()}",
+                        0,
+                        $throwable,
+                    );
+                }
+
+                if ($initialized) {
+                    return AnalyzerProtocol::writePropertyInitializationResponse(true);
+                }
+            }
+
+            return AnalyzerProtocol::writePropertyInitializationResponse(false);
         }
 
         if ($kind !== AnalyzerProtocol::RETURN_TYPE_REQUEST && $kind !== AnalyzerProtocol::CALLABLE_SIGNATURE_REQUEST) {

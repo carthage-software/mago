@@ -12,6 +12,7 @@ use foldhash::HashSet;
 use foldhash::fast::RandomState;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::metadata::CodebaseMetadata;
+use mago_codex::metadata::property::PropertyMetadata;
 use mago_codex::misc::GenericParent;
 use mago_codex::misc::VariableIdentifier;
 use mago_codex::ttype::TType;
@@ -118,12 +119,14 @@ const TYPE_COMPARISON_REQUEST: u16 = 3;
 const INITIALIZE_REQUEST: u16 = 11;
 const CALLABLE_SIGNATURE_REQUEST: u16 = 12;
 const PROPERTY_TYPE_REQUEST: u16 = 13;
+const PROPERTY_INITIALIZATION_REQUEST: u16 = 14;
 const DESCRIBE_RESPONSE: u16 = 0x8001;
 const RETURN_TYPE_RESPONSE: u16 = 0x8002;
 const TYPE_COMPARISON_RESPONSE: u16 = 0x8003;
 const INITIALIZE_RESPONSE: u16 = 0x800B;
 const CALLABLE_SIGNATURE_RESPONSE: u16 = 0x800C;
 const PROPERTY_TYPE_RESPONSE: u16 = 0x800D;
+const PROPERTY_INITIALIZATION_RESPONSE: u16 = 0x800E;
 const MAXIMUM_EXTENSIONS: usize = 0x4000;
 const MAXIMUM_PLUGINS: usize = 0x4000;
 const MAXIMUM_PROVIDERS: usize = 0x0001_0000;
@@ -195,6 +198,7 @@ pub(super) struct Registration {
     pub function_providers: Vec<FunctionProvider>,
     pub method_providers: Vec<MethodProvider>,
     pub property_providers: Vec<PropertyProvider>,
+    pub property_initialization_providers: Vec<PropertyProvider>,
     pub initialization_plugins: Vec<u16>,
     pub before_analysis_plugins: Vec<u16>,
     pub after_file_analysis_plugins: Vec<u16>,
@@ -315,6 +319,7 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
     let mut function_providers = Vec::new();
     let mut method_providers = Vec::new();
     let mut property_providers = Vec::new();
+    let mut property_initialization_providers = Vec::new();
     let mut initialization_plugins = Vec::new();
     let mut before_analysis_plugins = Vec::new();
     let mut after_file_analysis_plugins = Vec::new();
@@ -452,6 +457,35 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
                 property_providers.push(PropertyProvider { plugin: identifier.clone(), index, targets });
             }
 
+            let property_initialization_count =
+                reader.read_count("property initialization providers", MAXIMUM_PROVIDERS)?;
+            for _ in 0..property_initialization_count {
+                let index = reader.read_u16("property initialization provider index")?;
+                let target_count = reader.read_count("property initialization targets", MAXIMUM_TARGETS)?;
+                if target_count == 0 {
+                    return Err(protocol(format!("property initialization provider {index} has no targets")));
+                }
+
+                let mut targets = Vec::with_capacity(target_count);
+                for _ in 0..target_count {
+                    let class = non_empty(
+                        reader.read_bytes("property initialization target class")?.to_vec(),
+                        "property initialization target class",
+                    )?;
+
+                    let property = non_empty(
+                        reader.read_bytes("property initialization target property")?.to_vec(),
+                        "property initialization target property",
+                    )?;
+
+                    validate_method_pattern(&class)?;
+                    validate_property_pattern(&property)?;
+                    targets.push(PropertyTarget { class, property });
+                }
+
+                property_initialization_providers.push(PropertyProvider { plugin: identifier.clone(), index, targets });
+            }
+
             let plugin = ExternalPlugin {
                 index,
                 extension: extension_identifier.clone(),
@@ -486,6 +520,10 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
 
     validate_provider_indices(method_providers.iter().map(|provider| provider.index), "method return-type provider")?;
     validate_provider_indices(property_providers.iter().map(|provider| provider.index), "property type provider")?;
+    validate_provider_indices(
+        property_initialization_providers.iter().map(|provider| provider.index),
+        "property initialization provider",
+    )?;
     Ok(Registration {
         extensions,
         plugins,
@@ -493,6 +531,7 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
         function_providers,
         method_providers,
         property_providers,
+        property_initialization_providers,
         initialization_plugins,
         before_analysis_plugins,
         after_file_analysis_plugins,
@@ -686,6 +725,35 @@ pub(super) fn decode_property_type_response<'type_info>(
 
     reader.finish()?;
     Ok(Some(EffectivePropertyType { read_type, write_type }))
+}
+
+pub(super) fn encode_property_initialization_request(
+    provider_indices: &[u16],
+    declaring_class: &[u8],
+    property: &PropertyMetadata,
+    generation: u64,
+    session: &ExternalAnalysisSession,
+) -> Result<Vec<u8>, ExternalAnalyzerError> {
+    let mut writer = message_writer(PROPERTY_INITIALIZATION_REQUEST);
+    writer.write_u64(generation);
+    writer.write_u16(
+        u16::try_from(provider_indices.len()).map_err(|_| protocol("more than u16::MAX providers matched"))?,
+    );
+
+    for index in provider_indices {
+        writer.write_u16(*index);
+    }
+
+    writer.write_bytes(declaring_class)?;
+    metadata::write_property(&mut writer, property, session)?;
+    Ok(writer.finish())
+}
+
+pub(super) fn decode_property_initialization_response(payload: &[u8]) -> Result<bool, ExternalAnalyzerError> {
+    let mut reader = message_reader(payload, PROPERTY_INITIALIZATION_RESPONSE)?;
+    let initialized = reader.read_bool("property initialized flag")?;
+    reader.finish()?;
+    Ok(initialized)
 }
 
 fn encode_return_type_request<'type_info>(
@@ -2531,6 +2599,16 @@ pub(super) mod testing {
         assert_eq!(property.write_type.as_ref(), Some(&request_type));
     }
 
+    #[test]
+    fn property_initialization_response_preserves_decision() {
+        for initialized in [false, true] {
+            let mut writer = message_writer(PROPERTY_INITIALIZATION_RESPONSE);
+            writer.write_bool(initialized);
+
+            assert_eq!(decode_property_initialization_response(&writer.finish()).unwrap(), initialized);
+        }
+    }
+
     pub fn registration_response() -> Vec<u8> {
         registration_response_with_lifecycle(0)
     }
@@ -2552,6 +2630,7 @@ pub(super) mod testing {
         for alias in aliases {
             writer.write_string(alias).unwrap();
         }
+        writer.write_u32(0);
         writer.write_u32(0);
         writer.write_u32(0);
         writer.write_u32(0);
@@ -2583,6 +2662,7 @@ pub(super) mod testing {
         writer.write_u32(1);
         writer.write_u8(TARGET_EXACT);
         writer.write_bytes(b"demo_service").unwrap();
+        writer.write_u32(0);
         writer.write_u32(0);
         writer.write_u32(0);
         writer.finish()

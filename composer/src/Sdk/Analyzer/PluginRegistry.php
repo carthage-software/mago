@@ -32,6 +32,11 @@ final class PluginRegistry
     private array $propertyTypeProviders = [];
 
     /**
+     * @var list<PropertyInitializationProvider>
+     */
+    private array $propertyInitializationProviders = [];
+
+    /**
      * @var list<BeforeAnalysisHook>
      */
     private array $beforeAnalysisHooks = [];
@@ -64,6 +69,11 @@ final class PluginRegistry
     public function registerPropertyTypeProvider(PropertyTypeProvider $provider): void
     {
         $this->propertyTypeProviders[] = $provider;
+    }
+
+    public function registerPropertyInitializationProvider(PropertyInitializationProvider $provider): void
+    {
+        $this->propertyInitializationProviders[] = $provider;
     }
 
     public function registerBeforeAnalysisHook(BeforeAnalysisHook $hook): void
@@ -106,6 +116,15 @@ final class PluginRegistry
     public function getPropertyTypeProviders(): array
     {
         return $this->propertyTypeProviders;
+    }
+
+    /**
+     * @internal
+     * @return list<PropertyInitializationProvider>
+     */
+    public function getPropertyInitializationProviders(): array
+    {
+        return $this->propertyInitializationProviders;
     }
 
     /**

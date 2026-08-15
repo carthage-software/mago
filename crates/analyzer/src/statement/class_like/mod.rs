@@ -1108,7 +1108,13 @@ where
     check_class_like_constants(context, class_like_metadata, members);
 
     crate::readonly::finalize_class_writes(context, artifacts, class_like_metadata);
-    initialization::check_property_initialization(context, artifacts, class_like_metadata, declaration_span, name_span);
+    initialization::check_property_initialization(
+        context,
+        artifacts,
+        class_like_metadata,
+        declaration_span,
+        name_span,
+    )?;
 
     Ok(())
 }

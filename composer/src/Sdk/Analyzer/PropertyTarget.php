@@ -10,7 +10,7 @@ use function strlen;
 use function strpos;
 
 /**
- * Selects instance-property accesses handled by a property type provider.
+ * Selects properties handled by a property type or initialization provider.
  *
  * Exact classes also match their subclasses and implementations.
  * Property names do not include the leading `$`.

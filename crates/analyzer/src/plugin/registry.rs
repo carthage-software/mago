@@ -88,6 +88,7 @@ pub struct PluginRegistry {
     external_function_signature_providers: OnceLock<bool>,
     external_method_signature_providers: OnceLock<bool>,
     external_property_providers: OnceLock<bool>,
+    external_property_initialization_providers: OnceLock<bool>,
     function_exact: WordMap<Vec<usize>>,
     function_prefix: Vec<(Word, usize)>,
     function_namespace: Vec<(Word, usize)>,
@@ -134,6 +135,7 @@ impl std::fmt::Debug for PluginRegistry {
             .field("external_function_providers", &self.external_function_providers.get())
             .field("external_method_providers", &self.external_method_providers.get())
             .field("external_property_providers", &self.external_property_providers.get())
+            .field("external_property_initialization_providers", &self.external_property_initialization_providers.get())
             .field("external_function_signature_providers", &self.external_function_signature_providers.get())
             .field("external_method_signature_providers", &self.external_method_signature_providers.get())
             .field("function_providers", &self.function_providers.len())
@@ -190,11 +192,15 @@ impl PluginRegistry {
             analyzer.has_method_callable_signature_providers().map_err(|reason| PluginError::Internal { reason })?;
         let property_providers =
             analyzer.has_property_type_providers().map_err(|reason| PluginError::Internal { reason })?;
+        let property_initialization_providers =
+            analyzer.has_property_initialization_providers().map_err(|reason| PluginError::Internal { reason })?;
         let _function = self.external_function_providers.set(function_providers);
         let _method = self.external_method_providers.set(method_providers);
         let _function_signature = self.external_function_signature_providers.set(function_signature_providers);
         let _method_signature = self.external_method_signature_providers.set(method_signature_providers);
         let _property = self.external_property_providers.set(property_providers);
+        let _property_initialization =
+            self.external_property_initialization_providers.set(property_initialization_providers);
         Ok(())
     }
 
@@ -702,6 +708,8 @@ impl PluginRegistry {
     #[must_use]
     pub fn has_property_initialization_providers(&self) -> bool {
         !self.property_initialization_providers.is_empty()
+            || (self.external_analyzer.is_some()
+                && self.external_property_initialization_providers.get().copied().unwrap_or(true))
     }
 
     #[inline]
@@ -1452,22 +1460,37 @@ impl PluginRegistry {
         self.method_providers.len()
     }
 
-    /// Check if a property should be considered initialized by any registered provider.
+    /// Checks whether any registered provider considers a property initialized.
     ///
-    /// Returns `true` if any provider considers the property initialized.
-    #[must_use]
+    /// # Errors
+    ///
+    /// Returns an error when an external property initialization provider fails or returns an invalid response.
     pub fn is_property_initialized(
         &self,
+        codebase: &CodebaseMetadata,
         class_metadata: &ClassLikeMetadata,
         property_metadata: &PropertyMetadata,
-    ) -> bool {
+        external_session: Option<&ExternalAnalysisSession>,
+    ) -> PluginResult<bool> {
         for provider in &self.property_initialization_providers {
             if provider.is_property_initialized(class_metadata, property_metadata) {
-                return true;
+                return Ok(true);
             }
         }
 
-        false
+        if !self.external_property_initialization_providers.get().copied().unwrap_or(true) {
+            return Ok(false);
+        }
+
+        self.external_analyzer
+            .as_deref()
+            .zip(external_session)
+            .map(|(analyzer, session)| {
+                analyzer.is_property_initialized(class_metadata.name.as_bytes(), property_metadata, codebase, session)
+            })
+            .transpose()
+            .map(|initialized| initialized.unwrap_or(false))
+            .map_err(|reason| PluginError::Internal { reason })
     }
 
     fn get_function_assertion_provider_indices(&self, name: &[u8]) -> Vec<usize> {

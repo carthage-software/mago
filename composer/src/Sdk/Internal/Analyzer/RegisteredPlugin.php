@@ -22,6 +22,7 @@ final class RegisteredPlugin
      * @param list<RegisteredFunctionReturnTypeProvider> $functionProviders
      * @param list<RegisteredMethodReturnTypeProvider> $methodProviders
      * @param list<RegisteredPropertyTypeProvider> $propertyProviders
+     * @param list<RegisteredPropertyInitializationProvider> $propertyInitializationProviders
      * @param list<InitializationHook> $initializationHooks
      * @param list<BeforeAnalysisHook> $beforeAnalysisHooks
      * @param list<AfterFileAnalysisHook> $afterFileAnalysisHooks
@@ -35,6 +36,7 @@ final class RegisteredPlugin
         public readonly array $functionProviders,
         public readonly array $methodProviders,
         public readonly array $propertyProviders,
+        public readonly array $propertyInitializationProviders,
         public readonly array $initializationHooks,
         public readonly array $beforeAnalysisHooks,
         public readonly array $afterFileAnalysisHooks,
