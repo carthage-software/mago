@@ -178,13 +178,13 @@ final class InvocationMethodProvider implements MethodReturnTypeProvider, Callab
         }
 
         if (
-            ($invocation->declaringClass === 'ExternalService'
-                || $invocation->declaringClass === 'ExternalStaticService')
+            (
+                $invocation->declaringClass === 'ExternalService'
+                || $invocation->declaringClass === 'ExternalStaticService'
+            )
             && $invocation->name === 'resolve'
         ) {
-            $declaringClass = $invocation->declaringClass ?? throw new RuntimeException(
-                'The unresolved class method received no declaring class.',
-            );
+            $declaringClass = $invocation->declaringClass;
             $receiver = $invocation->receiverType ?? throw new RuntimeException(
                 'The unresolved class method received no receiver type.',
             );
@@ -281,13 +281,13 @@ final class InvocationMethodProvider implements MethodReturnTypeProvider, Callab
         }
 
         if (
-            ($invocation->declaringClass === 'ExternalService'
-                || $invocation->declaringClass === 'ExternalStaticService')
+            (
+                $invocation->declaringClass === 'ExternalService'
+                || $invocation->declaringClass === 'ExternalStaticService'
+            )
             && $invocation->name === 'resolve'
         ) {
-            $declaringClass = $invocation->declaringClass ?? throw new RuntimeException(
-                'The unresolved class method received no declaring class.',
-            );
+            $declaringClass = $invocation->declaringClass;
 
             $static = $declaringClass === 'ExternalStaticService';
             self::assertInvocation(
@@ -550,10 +550,7 @@ final class InvocationPropertyProvider implements PropertyTypeProvider
     public function getPropertyType(PropertyTypeProviderContext $context): ?PropertyType
     {
         $access = $context->access;
-        if (
-            $access->class !== 'User'
-            || !$context->types->equals($access->receiverType, Type::namedObject('User'))
-        ) {
+        if ($access->class !== 'User' || !$context->types->equals($access->receiverType, Type::namedObject('User'))) {
             throw new RuntimeException('A property provider received incorrect subclass or receiver context.');
         }
 

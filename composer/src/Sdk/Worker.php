@@ -549,13 +549,15 @@ final class Worker
 
                 $cancellation->throwIfCancelled();
                 try {
-                    $type = $registered->provider->getPropertyType(new PropertyTypeProviderContext(
-                        $this->phpVersion,
-                        $codebase,
-                        $request->access,
-                        new TypeComparator($host, $requestId, $cancellation),
-                        $cancellation,
-                    ));
+                    $type = $registered->provider->getPropertyType(
+                        new PropertyTypeProviderContext(
+                            $this->phpVersion,
+                            $codebase,
+                            $request->access,
+                            new TypeComparator($host, $requestId, $cancellation),
+                            $cancellation,
+                        ),
+                    );
                 } catch (Throwable $throwable) {
                     throw new ProtocolException(
                         "Property type provider in `{$registered->plugin}` failed: {$throwable->getMessage()}",
