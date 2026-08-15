@@ -74,11 +74,11 @@ final class TypeCodec
 {
     private const MAXIMUM_MEMBERS = 65_536;
 
-    public static function read(PayloadReader $reader, string $description): Type
+    public static function read(PayloadReader $reader, ?string $description = null): Type
     {
         [$handle, $flags, $atomicTypes] = self::readUnion($reader, true);
 
-        return Type::reference($handle, $description, $atomicTypes, $flags);
+        return Type::reference($handle, $description ?? self::describeAtomics($atomicTypes), $atomicTypes, $flags);
     }
 
     public static function readComplete(PayloadReader $reader): Type

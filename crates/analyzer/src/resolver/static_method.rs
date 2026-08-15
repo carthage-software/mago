@@ -34,8 +34,8 @@ use crate::resolver::class_name::ResolvedClassname;
 use crate::resolver::class_name::resolve_classnames_from_expression;
 use crate::resolver::method::MethodResolutionResult;
 use crate::resolver::method::ResolvedMethod;
+use crate::resolver::method::UndocumentedMethod;
 use crate::resolver::method::report_magic_call_without_call_method;
-use crate::resolver::method::report_non_documented_method;
 use crate::resolver::method::report_non_existent_method;
 use crate::resolver::method::report_possibly_missing_magic_call;
 use crate::resolver::selector::resolve_member_selector;
@@ -210,7 +210,7 @@ where
     let mut resolved_methods = vec![];
     let mut could_method_ever_exist = false;
     let mut first_class_id = None;
-    let mut magic_call_could_exist = false;
+    let mut magic_call_methods = Vec::new();
 
     let magic_method_to_check = if classname.is_parent() { word("__call") } else { word("__callStatic") };
     if let Some(fq_class_id) = classname.fqcn {
@@ -224,7 +224,8 @@ where
             None,
         );
 
-        magic_call_could_exist |= resolved_magic_call_method.is_some();
+        let has_magic_static_call = resolved_magic_call_method.is_some();
+        magic_call_methods.extend(resolved_magic_call_method);
 
         let (could_method_exist, resolved_method) = resolve_method_from_class_id(
             fq_class_id,
@@ -232,7 +233,7 @@ where
             classname.is_object_instance(),
             classname.is_from_class_string(),
             method_name,
-            resolved_magic_call_method.is_some(),
+            has_magic_static_call,
             Some(result),
         );
 
@@ -259,7 +260,8 @@ where
             None,
         );
 
-        magic_call_could_exist |= resolved_magic_call_method.is_some();
+        let has_magic_static_call = resolved_magic_call_method.is_some();
+        magic_call_methods.extend(resolved_magic_call_method);
 
         let (could_method_exist, resolved_method) = resolve_method_from_class_id(
             fq_class_id,
@@ -267,7 +269,7 @@ where
             intersection.is_object_instance() || classname.is_object_instance(),
             intersection.is_from_class_string(),
             method_name,
-            resolved_magic_call_method.is_some(),
+            has_magic_static_call,
             Some(result),
         );
 
@@ -296,7 +298,7 @@ where
             access_span,
         )
     {
-        if magic_call_could_exist {
+        if !magic_call_methods.is_empty() {
             resolved_methods.push(resolved_method);
         } else {
             if class_metadata.flags.is_final() {
@@ -327,14 +329,23 @@ where
 
     if resolved_methods.is_empty() {
         if let Some(fq_class_id) = first_class_id {
-            result.has_invalid_target = true;
-
             if !could_method_ever_exist {
-                if magic_call_could_exist {
-                    report_non_documented_method(context, class_span, method_span, fq_class_id, method_name);
-                } else {
+                if magic_call_methods.is_empty() {
+                    result.has_invalid_target = true;
                     report_non_existent_method(context, class_span, method_span, fq_class_id, method_name);
+                } else {
+                    result.undocumented_methods.extend(magic_call_methods.into_iter().map(|magic_method| {
+                        UndocumentedMethod {
+                            classname: magic_method.classname,
+                            method_name,
+                            target_span: class_span,
+                            selector_span: method_span,
+                            magic_method,
+                        }
+                    }));
                 }
+            } else {
+                result.has_invalid_target = true;
             }
         } else {
             result.has_ambiguous_target = true;

@@ -197,7 +197,7 @@ final class Type
         $payload = pack('CN', self::NAMED_OBJECT, strlen($class)) . $class . pack('N', count($parameters));
         $descriptions = [];
         foreach ($parameters as $parameter) {
-            $payload .= $parameter->payload;
+            $payload .= $parameter->encode();
             $descriptions[] = $parameter->description;
         }
 
@@ -217,7 +217,7 @@ final class Type
     public static function array(self $key, self $value): self
     {
         return new self(
-            pack('C', self::ARRAY) . $key->payload . $value->payload,
+            pack('C', self::ARRAY) . $key->encode() . $value->encode(),
             "array<{$key->description}, {$value->description}>",
             [new KeyedArrayType(null, $key, $value, false)],
             new TypeFlags(),
@@ -227,7 +227,7 @@ final class Type
     public static function list(self $element): self
     {
         return new self(
-            pack('C', self::LIST) . $element->payload,
+            pack('C', self::LIST) . $element->encode(),
             "list<{$element->description}>",
             [new ListType($element, null, null, false)],
             new TypeFlags(),
@@ -241,7 +241,7 @@ final class Type
         $descriptions = [];
         $atomicTypes = [];
         foreach ($members as $member) {
-            $payload .= $member->payload;
+            $payload .= $member->encode();
             $descriptions[] = $member->description;
             foreach ($member->atomicTypes as $atomicType) {
                 $atomicTypes[] = $atomicType;

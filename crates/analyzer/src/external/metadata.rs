@@ -46,6 +46,8 @@ const GET_DECLARING_PROPERTIES: u8 = 12;
 const CHECK_EXISTENCE: u8 = 13;
 const CHECK_MEMBER_EXISTENCE: u8 = 14;
 const GET_CLASS_LIKE_RELATIONS: u8 = 15;
+const GET_MAGIC_PROPERTIES: u8 = 16;
+const GET_DECLARING_MAGIC_PROPERTIES: u8 = 17;
 
 const ANY_CLASS_LIKE: u8 = 0;
 const CLASS: u8 = 1;
@@ -70,6 +72,7 @@ const EXISTS_METHOD: u8 = 1;
 const EXISTS_PROPERTY: u8 = 2;
 const EXISTS_CLASS_CONSTANT: u8 = 3;
 const EXISTS_ENUM_CASE: u8 = 4;
+const EXISTS_MAGIC_PROPERTY: u8 = 5;
 
 const DIRECT_DESCENDANTS: u8 = 1;
 const ALL_DESCENDANTS: u8 = 2;
@@ -140,6 +143,16 @@ pub(super) fn handle_query(
         CHECK_EXISTENCE => check_existence(reader, writer, codebase),
         CHECK_MEMBER_EXISTENCE => check_member_existence(reader, writer, codebase),
         GET_CLASS_LIKE_RELATIONS => get_class_like_relations(reader, writer, codebase),
+        GET_MAGIC_PROPERTIES => query_members(reader, writer, |class, member, writer| {
+            write_optional(writer, codebase.get_magic_property(class, member), |writer, metadata| {
+                write_property(writer, metadata, session)
+            })
+        }),
+        GET_DECLARING_MAGIC_PROPERTIES => query_members(reader, writer, |class, member, writer| {
+            write_optional(writer, codebase.get_declaring_magic_property(class, member), |writer, metadata| {
+                write_property(writer, metadata, session)
+            })
+        }),
         unknown => Err(protocol(format!("unknown codebase query operation {unknown}"))),
     }
 }
@@ -178,7 +191,7 @@ fn check_member_existence(
     codebase: &CodebaseMetadata,
 ) -> Result<(), ExternalAnalyzerError> {
     let predicate = reader.read_u8("member existence predicate")?;
-    if !(EXISTS_METHOD..=EXISTS_ENUM_CASE).contains(&predicate) {
+    if !(EXISTS_METHOD..=EXISTS_MAGIC_PROPERTY).contains(&predicate) {
         return Err(protocol(format!("unknown member existence predicate {predicate}")));
     }
 
@@ -189,6 +202,7 @@ fn check_member_existence(
             EXISTS_PROPERTY => codebase.property_exists(class, member),
             EXISTS_CLASS_CONSTANT => codebase.class_constant_exists(class, member),
             EXISTS_ENUM_CASE => codebase.get_enum_case(class, member).is_some(),
+            EXISTS_MAGIC_PROPERTY => codebase.magic_property_exists(class, member),
             _ => unreachable!(),
         });
 

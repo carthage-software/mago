@@ -33,13 +33,19 @@ use crate::expression::call::analyze_invocation_targets;
 use crate::invocation::Invocation;
 use crate::invocation::InvocationArgumentsSource;
 use crate::invocation::InvocationTarget;
+use crate::invocation::MethodInvocationKind;
 use crate::invocation::MethodTargetContext;
+use crate::invocation::analyzer::analyze_invocation;
+use crate::invocation::analyzer::apply_callable_signature;
 use crate::invocation::post_process::post_invocation_process;
+use crate::invocation::return_type_fetcher::fetch_declared_invocation_return_type;
+use crate::invocation::return_type_fetcher::fetch_function_like_provider_return_type;
 use crate::invocation::return_type_fetcher::fetch_invocation_return_type;
 use crate::invocation::template_result::populate_template_result_from_invocation;
 use crate::plugin::ExpressionHookResult;
 use crate::plugin::context::HookContext;
-use crate::resolver::method::ResolvedMethod;
+use crate::resolver::method::UndocumentedMethod;
+use crate::resolver::method::report_non_documented_method;
 use crate::resolver::method::resolve_method_targets;
 use crate::utils::expression::get_expression_id;
 use crate::visibility::check_method_visibility;
@@ -209,6 +215,7 @@ where
     let mut template_result = TemplateResult::default();
 
     let method_target_context = MethodTargetContext {
+        invocation_kind: MethodInvocationKind::Instance,
         declaring_method_id: Some(method_identifier),
         class_like_metadata,
         class_type: StaticClassType::Object(object_type.clone()),
@@ -223,6 +230,7 @@ where
             ),
             metadata: method_metadata,
             inferred_return_type: None,
+            effective_signature: None,
             method_context: Some(method_target_context),
             span,
         },
@@ -281,17 +289,9 @@ where
     let method_resolution =
         resolve_method_targets(context, block_context, artifacts, object, selector, is_null_safe, span)?;
 
-    if method_resolution.resolved_methods.is_empty() && !method_resolution.magic_call_methods.is_empty() {
-        return analyze_magic_call_return_type(
-            context,
-            block_context,
-            artifacts,
-            method_resolution.magic_call_methods,
-            method_resolution.template_result,
-            argument_list,
-            span,
-        );
-    }
+    let has_resolved_methods = !method_resolution.resolved_methods.is_empty();
+    let undocumented_template_result =
+        (!method_resolution.undocumented_methods.is_empty()).then(|| method_resolution.template_result.clone());
 
     let mut invocation_targets = vec![];
     for resolved_method in method_resolution.resolved_methods {
@@ -313,6 +313,7 @@ where
         crate::utils::availability::check_method_availability(context, method_metadata, &method_display, span);
 
         let method_target_context = MethodTargetContext {
+            invocation_kind: MethodInvocationKind::Instance,
             declaring_method_id: Some(resolved_method.method_identifier),
             class_like_metadata: metadata,
             class_type: resolved_method.static_class_type,
@@ -326,6 +327,7 @@ where
             ),
             metadata: method_metadata,
             inferred_return_type: None,
+            effective_signature: None,
             method_context: Some(method_target_context),
             span,
         });
@@ -348,43 +350,62 @@ where
             .push(vec![mago_codex::assertion::Assertion::IsNotType(mago_codex::ttype::atomic::TAtomic::Null)]);
     }
 
-    analyze_invocation_targets(
-        context,
-        block_context,
-        artifacts,
-        method_resolution.template_result,
-        invocation_targets,
-        InvocationArgumentsSource::ArgumentList(argument_list),
-        span,
-        this_variable.as_ref().map(|w| w.as_bytes()),
-        method_resolution.has_invalid_target,
-        method_resolution.encountered_mixed,
-        is_null_safe && method_resolution.encountered_null,
-        artifacts.get_expression_type(object).is_some_and(|t| t.has_nullsafe_null()),
-        method_resolution.all_methods_non_nullable_return,
-    )
+    if has_resolved_methods || method_resolution.undocumented_methods.is_empty() {
+        analyze_invocation_targets(
+            context,
+            block_context,
+            artifacts,
+            method_resolution.template_result,
+            invocation_targets,
+            InvocationArgumentsSource::ArgumentList(argument_list),
+            span,
+            this_variable.as_ref().map(|w| w.as_bytes()),
+            method_resolution.has_invalid_target,
+            method_resolution.encountered_mixed,
+            is_null_safe && method_resolution.encountered_null,
+            artifacts.get_expression_type(object).is_some_and(|t| t.has_nullsafe_null()),
+            method_resolution.all_methods_non_nullable_return,
+        )?;
+    }
+
+    if !method_resolution.undocumented_methods.is_empty() {
+        analyze_undocumented_method_return_type(
+            context,
+            block_context,
+            artifacts,
+            method_resolution.undocumented_methods,
+            undocumented_template_result.as_ref().expect("undocumented calls have a template result"),
+            argument_list,
+            span,
+            MethodInvocationKind::Instance,
+            !has_resolved_methods,
+        )?;
+    }
+
+    Ok(())
 }
 
-/// Infers the result type of an undocumented magic method call from the
-/// declared return type of `__call` (e.g. `static`), since there is no concrete
-/// method to resolve against.
+/// Gives return-type providers the first opportunity to describe an
+/// undocumented magic call, then falls back to the magic method's declaration.
 #[allow(clippy::expect_used)]
-fn analyze_magic_call_return_type<'ctx, 'arena, A>(
+pub(super) fn analyze_undocumented_method_return_type<'ctx, 'arena, A>(
     context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    magic_call_methods: Vec<ResolvedMethod>,
-    template_result: TemplateResult,
+    undocumented_methods: Vec<UndocumentedMethod>,
+    template_result: &TemplateResult,
     argument_list: &ArgumentList<'arena>,
     span: Span,
+    invocation_kind: MethodInvocationKind,
+    analyze_arguments: bool,
 ) -> Result<(), AnalysisError>
 where
     A: Arena,
 {
-    argument_list.analyze(context, block_context, artifacts)?;
-
+    let mut arguments_analyzed = !analyze_arguments;
     let mut resulting_type: Option<TUnion> = None;
-    for magic_call_method in magic_call_methods {
+    for undocumented_method in undocumented_methods {
+        let magic_call_method = undocumented_method.magic_method;
         let class_like_metadata = context
             .codebase
             .get_class_like(magic_call_method.classname.as_bytes())
@@ -395,6 +416,8 @@ where
             .get_method_by_id(&magic_call_method.method_identifier)
             .expect("method metadata should exist for resolved magic call method");
 
+        let requested_identifier =
+            FunctionLikeIdentifier::Method(undocumented_method.classname, undocumented_method.method_name);
         let target = InvocationTarget::FunctionLike {
             identifier: FunctionLikeIdentifier::Method(
                 magic_call_method.method_identifier.get_class_name(),
@@ -402,7 +425,9 @@ where
             ),
             metadata: method_metadata,
             inferred_return_type: None,
+            effective_signature: None,
             method_context: Some(MethodTargetContext {
+                invocation_kind,
                 declaring_method_id: Some(magic_call_method.method_identifier),
                 class_like_metadata,
                 class_type: magic_call_method.static_class_type,
@@ -411,20 +436,71 @@ where
             span,
         };
 
-        let invocation = Invocation::new(target, InvocationArgumentsSource::None(span), span);
-        let return_type = fetch_invocation_return_type(
+        let mut invocation = Invocation::new(target, InvocationArgumentsSource::ArgumentList(argument_list), span);
+        let signature_handled = if context.external_analysis_session.is_some()
+            && context.plugin_registry.may_have_callable_signature_provider(&requested_identifier)
+        {
+            apply_callable_signature(context, artifacts, &requested_identifier, &mut invocation)?
+        } else {
+            false
+        };
+
+        let mut invocation_template_result = template_result.clone();
+        let mut parameter_types = WordMap::default();
+        if signature_handled && analyze_arguments {
+            analyze_invocation(
+                context,
+                block_context,
+                artifacts,
+                &mut invocation,
+                None,
+                &mut invocation_template_result,
+                &mut parameter_types,
+            )?;
+
+            arguments_analyzed = true;
+        } else if !arguments_analyzed {
+            argument_list.analyze(context, block_context, artifacts)?;
+            arguments_analyzed = true;
+        }
+
+        let return_type = match fetch_function_like_provider_return_type(
             context,
             block_context,
             artifacts,
+            &requested_identifier,
             &invocation,
-            &template_result,
-            &WordMap::default(),
-        )?;
+        )? {
+            Some(return_type) => return_type,
+            None => {
+                if !signature_handled {
+                    report_non_documented_method(
+                        context,
+                        undocumented_method.target_span,
+                        undocumented_method.selector_span,
+                        undocumented_method.classname,
+                        undocumented_method.method_name,
+                    );
+                }
+
+                fetch_declared_invocation_return_type(
+                    context,
+                    &invocation,
+                    &invocation_template_result,
+                    &parameter_types,
+                )
+            }
+        };
 
         resulting_type = Some(add_optional_union_type(return_type, resulting_type.as_ref(), context.codebase));
     }
 
-    artifacts.set_expression_type(&span, resulting_type.unwrap_or_else(get_mixed));
+    let mut resulting_type = resulting_type.unwrap_or_else(get_mixed);
+    if let Some(existing_type) = artifacts.get_expression_type(&span) {
+        resulting_type = add_optional_union_type(resulting_type, Some(existing_type), context.codebase);
+    }
+
+    artifacts.set_expression_type(&span, resulting_type);
 
     Ok(())
 }

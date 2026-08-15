@@ -2,6 +2,7 @@
 
 #![allow(clippy::big_endian_bytes, reason = "network byte order is part of the stable analyzer wire format")]
 
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 use std::time::Duration;
@@ -59,6 +60,7 @@ use mago_codex::ttype::atomic::scalar::string::TStringCasing;
 use mago_codex::ttype::atomic::scalar::string::TStringLiteral;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator;
+use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::get_bool;
 use mago_codex::ttype::get_false;
 use mago_codex::ttype::get_float;
@@ -94,7 +96,10 @@ use crate::external::MethodTarget;
 use crate::external::error::ExternalAnalyzerError;
 use crate::external::error::protocol;
 use crate::external::metadata;
+use crate::invocation::EffectiveCallableSignature;
 use crate::invocation::Invocation;
+use crate::invocation::MethodInvocationKind;
+use crate::invocation::MethodTargetContext;
 
 pub const ANALYZER_PROTOCOL_MAGIC: [u8; 4] = *b"MANA";
 pub const ANALYZER_PROTOCOL_MAJOR: u16 = 1;
@@ -106,10 +111,12 @@ const DESCRIBE_REQUEST: u16 = 1;
 const RETURN_TYPE_REQUEST: u16 = 2;
 const TYPE_COMPARISON_REQUEST: u16 = 3;
 const INITIALIZE_REQUEST: u16 = 11;
+const CALLABLE_SIGNATURE_REQUEST: u16 = 12;
 const DESCRIBE_RESPONSE: u16 = 0x8001;
 const RETURN_TYPE_RESPONSE: u16 = 0x8002;
 const TYPE_COMPARISON_RESPONSE: u16 = 0x8003;
 const INITIALIZE_RESPONSE: u16 = 0x800B;
+const CALLABLE_SIGNATURE_RESPONSE: u16 = 0x800C;
 const MAXIMUM_EXTENSIONS: usize = 0x4000;
 const MAXIMUM_PLUGINS: usize = 0x4000;
 const MAXIMUM_PROVIDERS: usize = 0x0001_0000;
@@ -126,7 +133,8 @@ const TARGET_EXACT: u8 = 1;
 const TARGET_PREFIX: u8 = 2;
 const TARGET_NAMESPACE: u8 = 3;
 const INVOCATION_FUNCTION: u8 = 1;
-const INVOCATION_METHOD: u8 = 2;
+const INVOCATION_INSTANCE_METHOD: u8 = 2;
+const INVOCATION_STATIC_METHOD: u8 = 3;
 
 const TYPE_REFERENCE: u8 = 0;
 const TYPE_MIXED: u8 = 1;
@@ -194,10 +202,19 @@ pub(super) struct InitializationStub {
 
 pub(super) struct ReturnTypeRequest<'type_info> {
     pub payload: Vec<u8>,
-    pub types: Vec<&'type_info TUnion>,
+    pub types: Vec<Cow<'type_info, TUnion>>,
+    pub receiver_type_count: usize,
+    pub snapshotted_types: usize,
     pub arguments: usize,
     pub typed_arguments: usize,
     pub type_snapshot_duration: Duration,
+}
+
+pub(super) fn resolve_type_handle<'type_info>(
+    types: &'type_info [Cow<'_, TUnion>],
+    handle: usize,
+) -> Option<&'type_info TUnion> {
+    types.get(handle).map(Cow::as_ref)
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -327,6 +344,13 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
             let function_count = reader.read_count("function providers", MAXIMUM_PROVIDERS)?;
             for _ in 0..function_count {
                 let index = reader.read_u16("function provider index")?;
+                let capabilities = reader.read_u8("function provider capabilities")?;
+                if capabilities & !1 != 0 {
+                    return Err(protocol(format!(
+                        "function provider {index} has unknown capabilities {capabilities:#04x}"
+                    )));
+                }
+
                 let target_count = reader.read_count("function targets", MAXIMUM_TARGETS)?;
                 if target_count == 0 {
                     return Err(protocol(format!("function provider {index} has no targets")));
@@ -349,12 +373,23 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
                     });
                 }
 
-                function_providers.push(FunctionProvider { plugin: identifier.clone(), index, targets });
+                function_providers.push(FunctionProvider {
+                    plugin: identifier.clone(),
+                    index,
+                    callable_signature: capabilities & 1 != 0,
+                    targets,
+                });
             }
 
             let method_count = reader.read_count("method providers", MAXIMUM_PROVIDERS)?;
             for _ in 0..method_count {
                 let index = reader.read_u16("method provider index")?;
+                let capabilities = reader.read_u8("method provider capabilities")?;
+                if capabilities & !1 != 0 {
+                    return Err(protocol(format!(
+                        "method provider {index} has unknown capabilities {capabilities:#04x}"
+                    )));
+                }
                 let target_count = reader.read_count("method targets", MAXIMUM_TARGETS)?;
                 if target_count == 0 {
                     return Err(protocol(format!("method provider {index} has no targets")));
@@ -370,7 +405,12 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
                     targets.push(MethodTarget { class, method });
                 }
 
-                method_providers.push(MethodProvider { plugin: identifier.clone(), index, targets });
+                method_providers.push(MethodProvider {
+                    plugin: identifier.clone(),
+                    index,
+                    callable_signature: capabilities & 1 != 0,
+                    targets,
+                });
             }
 
             let plugin = ExternalPlugin {
@@ -429,8 +469,10 @@ pub(super) fn encode_function_return_type_request<'type_info>(
     trace_enabled: bool,
 ) -> Result<ReturnTypeRequest<'type_info>, ExternalAnalyzerError> {
     encode_return_type_request(
+        RETURN_TYPE_REQUEST,
         provider_indices,
         INVOCATION_FUNCTION,
+        None,
         None,
         name,
         invocation,
@@ -451,10 +493,83 @@ pub(super) fn encode_method_return_type_request<'type_info>(
     generation: u64,
     trace_enabled: bool,
 ) -> Result<ReturnTypeRequest<'type_info>, ExternalAnalyzerError> {
+    let method_context = invocation
+        .target
+        .get_method_context()
+        .ok_or_else(|| protocol("external method return-type provider request is missing its method context"))?;
+    let invocation_kind = match method_context.invocation_kind {
+        MethodInvocationKind::Instance => INVOCATION_INSTANCE_METHOD,
+        MethodInvocationKind::Static => INVOCATION_STATIC_METHOD,
+    };
+
+    let receiver_type = get_method_receiver_type(method_context)?;
+
     encode_return_type_request(
+        RETURN_TYPE_REQUEST,
         provider_indices,
-        INVOCATION_METHOD,
+        invocation_kind,
         Some(class),
+        Some(&receiver_type),
+        method,
+        invocation,
+        artifacts,
+        source_file,
+        generation,
+        trace_enabled,
+    )
+}
+
+pub(super) fn encode_function_callable_signature_request<'type_info>(
+    provider_indices: &[u16],
+    name: &[u8],
+    invocation: &Invocation<'_, '_, '_>,
+    artifacts: &'type_info AnalysisArtifacts,
+    source_file: &File,
+    generation: u64,
+    trace_enabled: bool,
+) -> Result<ReturnTypeRequest<'type_info>, ExternalAnalyzerError> {
+    encode_return_type_request(
+        CALLABLE_SIGNATURE_REQUEST,
+        provider_indices,
+        INVOCATION_FUNCTION,
+        None,
+        None,
+        name,
+        invocation,
+        artifacts,
+        source_file,
+        generation,
+        trace_enabled,
+    )
+}
+
+pub(super) fn encode_method_callable_signature_request<'type_info>(
+    provider_indices: &[u16],
+    class: &[u8],
+    method: &[u8],
+    invocation: &Invocation<'_, '_, '_>,
+    artifacts: &'type_info AnalysisArtifacts,
+    source_file: &File,
+    generation: u64,
+    trace_enabled: bool,
+) -> Result<ReturnTypeRequest<'type_info>, ExternalAnalyzerError> {
+    let method_context = invocation
+        .target
+        .get_method_context()
+        .ok_or_else(|| protocol("external method callable-signature provider request is missing its method context"))?;
+    let invocation_kind = match method_context.invocation_kind {
+        MethodInvocationKind::Instance => INVOCATION_INSTANCE_METHOD,
+        MethodInvocationKind::Static => INVOCATION_STATIC_METHOD,
+    };
+
+    let receiver_type = get_method_receiver_type(method_context)?;
+
+    encode_return_type_request(
+        CALLABLE_SIGNATURE_REQUEST,
+        provider_indices,
+        invocation_kind,
+        Some(class),
+        Some(&receiver_type),
         method,
         invocation,
         artifacts,
@@ -465,9 +580,11 @@ pub(super) fn encode_method_return_type_request<'type_info>(
 }
 
 fn encode_return_type_request<'type_info>(
+    message_kind: u16,
     provider_indices: &[u16],
     invocation_kind: u8,
     class: Option<&[u8]>,
+    receiver_type: Option<&TUnion>,
     name: &[u8],
     invocation: &Invocation<'_, '_, '_>,
     artifacts: &'type_info AnalysisArtifacts,
@@ -475,9 +592,8 @@ fn encode_return_type_request<'type_info>(
     generation: u64,
     trace_enabled: bool,
 ) -> Result<ReturnTypeRequest<'type_info>, ExternalAnalyzerError> {
-    let mut writer = message_writer(RETURN_TYPE_REQUEST);
-    let mut types = Vec::new();
-    let mut typed_arguments = 0usize;
+    let mut writer = message_writer(message_kind);
+    let include_argument_types = message_kind == RETURN_TYPE_REQUEST;
     let mut type_snapshot_duration = Duration::ZERO;
     writer.write_u64(generation);
     writer.write_u8(invocation_kind);
@@ -489,14 +605,67 @@ fn encode_return_type_request<'type_info>(
         writer.write_u16(*index);
     }
 
-    if let Some(class) = class {
-        writer.write_bytes(class)?;
+    match (invocation_kind, class, receiver_type) {
+        (INVOCATION_FUNCTION, None, None) => {}
+        (INVOCATION_INSTANCE_METHOD | INVOCATION_STATIC_METHOD, Some(class), Some(receiver_type)) => {
+            writer.write_bytes(class)?;
+            writer.write_bytes(name)?;
+            let snapshot_start = trace_enabled.then(Instant::now);
+            let mut receiver_type_references = Vec::new();
+            encode_union_snapshot(&mut writer, receiver_type, &mut receiver_type_references, 0)?;
+            if let Some(start) = snapshot_start {
+                type_snapshot_duration = type_snapshot_duration.saturating_add(start.elapsed());
+            }
+
+            writer.write_u32(invocation.span.start.offset);
+            writer.write_u32(invocation.span.end.offset);
+            let receiver_types = receiver_type_references.into_iter().cloned().collect();
+            return encode_return_type_arguments(
+                writer,
+                invocation,
+                artifacts,
+                source_file,
+                receiver_types,
+                0,
+                type_snapshot_duration,
+                trace_enabled,
+                include_argument_types,
+            );
+        }
+        _ => return Err(protocol("analyzer invocation kind, declaring class, and receiver type are inconsistent")),
     }
 
     writer.write_bytes(name)?;
     writer.write_u32(invocation.span.start.offset);
     writer.write_u32(invocation.span.end.offset);
 
+    encode_return_type_arguments(
+        writer,
+        invocation,
+        artifacts,
+        source_file,
+        Vec::new(),
+        0,
+        type_snapshot_duration,
+        trace_enabled,
+        include_argument_types,
+    )
+}
+
+#[allow(clippy::too_many_arguments)]
+fn encode_return_type_arguments<'type_info>(
+    mut writer: PayloadWriter,
+    invocation: &Invocation<'_, '_, '_>,
+    artifacts: &'type_info AnalysisArtifacts,
+    source_file: &File,
+    receiver_types: Vec<TUnion>,
+    mut typed_arguments: usize,
+    mut type_snapshot_duration: Duration,
+    trace_enabled: bool,
+    include_argument_types: bool,
+) -> Result<ReturnTypeRequest<'type_info>, ExternalAnalyzerError> {
+    let receiver_type_count = receiver_types.len();
+    let mut argument_types = Vec::new();
     let argument_count = invocation.arguments_source.argument_count();
     writer
         .write_u16(u16::try_from(argument_count).map_err(|_| protocol("invocation has more than u16::MAX arguments"))?);
@@ -514,26 +683,44 @@ fn encode_return_type_request<'type_info>(
             .unwrap_or_default();
 
         writer.write_bytes(expression)?;
-        let argument_type = value.and_then(|value| artifacts.get_expression_type(value));
+        let argument_type =
+            include_argument_types.then(|| value.and_then(|value| artifacts.get_expression_type(value))).flatten();
         writer.write_bool(argument_type.is_some());
         if let Some(argument_type) = argument_type {
             typed_arguments += 1;
             writer.write_bytes(argument_type.get_id().as_bytes())?;
             let snapshot_start = trace_enabled.then(Instant::now);
-            encode_union_snapshot(&mut writer, argument_type, &mut types, 0)?;
+            encode_union_snapshot_with_offset(&mut writer, argument_type, &mut argument_types, receiver_type_count, 0)?;
             if let Some(start) = snapshot_start {
                 type_snapshot_duration = type_snapshot_duration.saturating_add(start.elapsed());
             }
         }
     }
 
+    let mut types = Vec::with_capacity(receiver_type_count + argument_types.len());
+    types.extend(receiver_types.into_iter().map(Cow::Owned));
+    types.extend(argument_types.into_iter().map(Cow::Borrowed));
+
     Ok(ReturnTypeRequest {
         payload: writer.finish(),
+        snapshotted_types: types.len(),
+        receiver_type_count,
         types,
         arguments: argument_count,
         typed_arguments,
         type_snapshot_duration,
     })
+}
+
+fn get_method_receiver_type(method_context: &MethodTargetContext<'_>) -> Result<TUnion, ExternalAnalyzerError> {
+    let object = match &method_context.class_type {
+        StaticClassType::None => return Err(protocol("external method return-type provider has no receiver type")),
+        StaticClassType::Exact(name) => TObject::Named(TNamedObject::new(*name)),
+        StaticClassType::Name(name) => TObject::Named(TNamedObject::new_static(*name)),
+        StaticClassType::Object(object) => object.clone(),
+    };
+
+    Ok(TUnion::from_atomic(TAtomic::Object(object)))
 }
 
 pub(super) fn encode_union_snapshot<'type_info>(
@@ -542,9 +729,45 @@ pub(super) fn encode_union_snapshot<'type_info>(
     types: &mut Vec<&'type_info TUnion>,
     depth: usize,
 ) -> Result<(), ExternalAnalyzerError> {
+    encode_union_snapshot_with_offset(writer, union, types, 0, depth)
+}
+
+fn encode_union_snapshot_with_offset<'type_info>(
+    writer: &mut PayloadWriter,
+    union: &'type_info TUnion,
+    types: &mut Vec<&'type_info TUnion>,
+    offset: usize,
+    depth: usize,
+) -> Result<(), ExternalAnalyzerError> {
+    let mut table = SnapshotTypeTable { offset, types };
+    encode_union_snapshot_inner(writer, union, &mut table, depth)
+}
+
+struct SnapshotTypeTable<'table, 'type_info> {
+    offset: usize,
+    types: &'table mut Vec<&'type_info TUnion>,
+}
+
+impl<'type_info> SnapshotTypeTable<'_, 'type_info> {
+    fn push(&mut self, union: &'type_info TUnion) -> Result<u32, ExternalAnalyzerError> {
+        let handle = self
+            .offset
+            .checked_add(self.types.len())
+            .and_then(|handle| u32::try_from(handle).ok())
+            .ok_or_else(|| protocol("external type handle exceeds u32::MAX"))?;
+        self.types.push(union);
+        Ok(handle)
+    }
+}
+
+fn encode_union_snapshot_inner<'type_info>(
+    writer: &mut PayloadWriter,
+    union: &'type_info TUnion,
+    types: &mut SnapshotTypeTable<'_, 'type_info>,
+    depth: usize,
+) -> Result<(), ExternalAnalyzerError> {
     ensure_type_depth(depth)?;
-    let handle = u32::try_from(types.len()).map_err(|_| protocol("external type handle exceeds u32::MAX"))?;
-    types.push(union);
+    let handle = types.push(union)?;
     writer.write_u32(handle);
     let mut flags = 0u16;
     flags |= u16::from(union.had_template());
@@ -571,7 +794,7 @@ pub(super) fn encode_union_snapshot<'type_info>(
 fn encode_atomic_snapshot<'type_info>(
     writer: &mut PayloadWriter,
     atomic: &'type_info TAtomic,
-    types: &mut Vec<&'type_info TUnion>,
+    types: &mut SnapshotTypeTable<'_, 'type_info>,
     depth: usize,
 ) -> Result<(), ExternalAnalyzerError> {
     ensure_type_depth(depth)?;
@@ -607,8 +830,8 @@ fn encode_atomic_snapshot<'type_info>(
         }
         TAtomic::Iterable(iterable) => {
             writer.write_u8(SNAPSHOT_ITERABLE);
-            encode_union_snapshot(writer, &iterable.key_type, types, depth + 1)?;
-            encode_union_snapshot(writer, &iterable.value_type, types, depth + 1)?;
+            encode_union_snapshot_inner(writer, &iterable.key_type, types, depth + 1)?;
+            encode_union_snapshot_inner(writer, &iterable.value_type, types, depth + 1)?;
             encode_optional_atomic_snapshots(writer, iterable.intersection_types.as_deref(), types, depth + 1)?;
         }
         TAtomic::Resource(resource) => {
@@ -626,7 +849,7 @@ fn encode_atomic_snapshot<'type_info>(
         TAtomic::GenericParameter(parameter) => {
             writer.write_u8(SNAPSHOT_GENERIC_PARAMETER);
             writer.write_bytes(parameter.parameter_name.as_bytes())?;
-            encode_union_snapshot(writer, &parameter.constraint, types, depth + 1)?;
+            encode_union_snapshot_inner(writer, &parameter.constraint, types, depth + 1)?;
             encode_generic_parent(writer, parameter.defining_entity)?;
             encode_optional_atomic_snapshots(writer, parameter.intersection_types.as_deref(), types, depth + 1)?;
         }
@@ -636,10 +859,10 @@ fn encode_atomic_snapshot<'type_info>(
         }
         TAtomic::Conditional(conditional) => {
             writer.write_u8(SNAPSHOT_CONDITIONAL);
-            encode_union_snapshot(writer, &conditional.subject, types, depth + 1)?;
-            encode_union_snapshot(writer, &conditional.target, types, depth + 1)?;
-            encode_union_snapshot(writer, &conditional.then, types, depth + 1)?;
-            encode_union_snapshot(writer, &conditional.otherwise, types, depth + 1)?;
+            encode_union_snapshot_inner(writer, &conditional.subject, types, depth + 1)?;
+            encode_union_snapshot_inner(writer, &conditional.target, types, depth + 1)?;
+            encode_union_snapshot_inner(writer, &conditional.then, types, depth + 1)?;
+            encode_union_snapshot_inner(writer, &conditional.otherwise, types, depth + 1)?;
             writer.write_bool(conditional.negated);
         }
         TAtomic::Derived(derived) => {
@@ -663,7 +886,7 @@ fn encode_atomic_snapshot<'type_info>(
 fn encode_scalar_snapshot<'type_info>(
     writer: &mut PayloadWriter,
     scalar: &'type_info TScalar,
-    types: &mut Vec<&'type_info TUnion>,
+    types: &mut SnapshotTypeTable<'_, 'type_info>,
     depth: usize,
 ) -> Result<(), ExternalAnalyzerError> {
     match scalar {
@@ -769,7 +992,7 @@ fn encode_scalar_snapshot<'type_info>(
 fn encode_callable_snapshot<'type_info>(
     writer: &mut PayloadWriter,
     callable: &'type_info TCallable,
-    types: &mut Vec<&'type_info TUnion>,
+    types: &mut SnapshotTypeTable<'_, 'type_info>,
     depth: usize,
 ) -> Result<(), ExternalAnalyzerError> {
     match callable {
@@ -786,7 +1009,7 @@ fn encode_callable_snapshot<'type_info>(
 
                 writer.write_bool(parameter.get_type_signature().is_some());
                 if let Some(parameter_type) = parameter.get_type_signature() {
-                    encode_union_snapshot(writer, parameter_type, types, depth + 1)?;
+                    encode_union_snapshot_inner(writer, parameter_type, types, depth + 1)?;
                 }
 
                 writer.write_bool(parameter.is_by_reference());
@@ -796,7 +1019,7 @@ fn encode_callable_snapshot<'type_info>(
 
             writer.write_bool(signature.return_type.is_some());
             if let Some(return_type) = signature.return_type.as_deref() {
-                encode_union_snapshot(writer, return_type, types, depth + 1)?;
+                encode_union_snapshot_inner(writer, return_type, types, depth + 1)?;
             }
 
             writer.write_bool(signature.source.is_some());
@@ -811,8 +1034,8 @@ fn encode_callable_snapshot<'type_info>(
                     writer.write_bytes(name.0.as_bytes())?;
                 }
 
-                encode_union_snapshot(writer, &constraint.input_type, types, depth + 1)?;
-                encode_union_snapshot(writer, &constraint.parameter_type, types, depth + 1)?;
+                encode_union_snapshot_inner(writer, &constraint.input_type, types, depth + 1)?;
+                encode_union_snapshot_inner(writer, &constraint.parameter_type, types, depth + 1)?;
             }
         }
         TCallable::Alias(identifier) => {
@@ -828,7 +1051,7 @@ fn encode_callable_snapshot<'type_info>(
 fn encode_object_snapshot<'type_info>(
     writer: &mut PayloadWriter,
     object: &'type_info TObject,
-    types: &mut Vec<&'type_info TUnion>,
+    types: &mut SnapshotTypeTable<'_, 'type_info>,
     depth: usize,
 ) -> Result<(), ExternalAnalyzerError> {
     match object {
@@ -855,7 +1078,7 @@ fn encode_object_snapshot<'type_info>(
             for (name, (optional, property_type)) in &shape.known_properties {
                 writer.write_bytes(name.as_bytes())?;
                 writer.write_bool(*optional);
-                encode_union_snapshot(writer, property_type, types, depth + 1)?;
+                encode_union_snapshot_inner(writer, property_type, types, depth + 1)?;
             }
         }
         TObject::HasMethod(method) => {
@@ -876,20 +1099,20 @@ fn encode_object_snapshot<'type_info>(
 fn encode_array_snapshot<'type_info>(
     writer: &mut PayloadWriter,
     array: &'type_info TArray,
-    types: &mut Vec<&'type_info TUnion>,
+    types: &mut SnapshotTypeTable<'_, 'type_info>,
     depth: usize,
 ) -> Result<(), ExternalAnalyzerError> {
     match array {
         TArray::List(list) => {
             writer.write_u8(1);
-            encode_union_snapshot(writer, &list.element_type, types, depth + 1)?;
+            encode_union_snapshot_inner(writer, &list.element_type, types, depth + 1)?;
             writer.write_bool(list.known_elements.is_some());
             if let Some(elements) = &list.known_elements {
                 write_snapshot_count(writer, elements.len(), "known list elements")?;
                 for (index, (optional, element_type)) in elements {
                     writer.write_u64(*index as u64);
                     writer.write_bool(*optional);
-                    encode_union_snapshot(writer, element_type, types, depth + 1)?;
+                    encode_union_snapshot_inner(writer, element_type, types, depth + 1)?;
                 }
             }
 
@@ -908,14 +1131,14 @@ fn encode_array_snapshot<'type_info>(
                 for (key, (optional, value_type)) in items {
                     encode_array_key(writer, key)?;
                     writer.write_bool(*optional);
-                    encode_union_snapshot(writer, value_type, types, depth + 1)?;
+                    encode_union_snapshot_inner(writer, value_type, types, depth + 1)?;
                 }
             }
 
             writer.write_bool(keyed.parameters.is_some());
             if let Some((key_type, value_type)) = &keyed.parameters {
-                encode_union_snapshot(writer, key_type, types, depth + 1)?;
-                encode_union_snapshot(writer, value_type, types, depth + 1)?;
+                encode_union_snapshot_inner(writer, key_type, types, depth + 1)?;
+                encode_union_snapshot_inner(writer, value_type, types, depth + 1)?;
             }
 
             writer.write_bool(keyed.non_empty);
@@ -928,7 +1151,7 @@ fn encode_array_snapshot<'type_info>(
 fn encode_reference_snapshot<'type_info>(
     writer: &mut PayloadWriter,
     reference: &'type_info TReference,
-    types: &mut Vec<&'type_info TUnion>,
+    types: &mut SnapshotTypeTable<'_, 'type_info>,
     depth: usize,
 ) -> Result<(), ExternalAnalyzerError> {
     match reference {
@@ -979,28 +1202,28 @@ fn encode_reference_snapshot<'type_info>(
 fn encode_derived_snapshot<'type_info>(
     writer: &mut PayloadWriter,
     derived: &'type_info TDerived,
-    types: &mut Vec<&'type_info TUnion>,
+    types: &mut SnapshotTypeTable<'_, 'type_info>,
     depth: usize,
 ) -> Result<(), ExternalAnalyzerError> {
     match derived {
         TDerived::KeyOf(value) => {
             writer.write_u8(1);
-            encode_union_snapshot(writer, value.get_target_type(), types, depth + 1)?;
+            encode_union_snapshot_inner(writer, value.get_target_type(), types, depth + 1)?;
         }
         TDerived::ValueOf(value) => {
             writer.write_u8(2);
-            encode_union_snapshot(writer, value.get_target_type(), types, depth + 1)?;
+            encode_union_snapshot_inner(writer, value.get_target_type(), types, depth + 1)?;
         }
         TDerived::IntMask(mask) => {
             writer.write_u8(3);
             write_snapshot_count(writer, mask.get_values().len(), "int-mask values")?;
             for value in mask.get_values() {
-                encode_union_snapshot(writer, value, types, depth + 1)?;
+                encode_union_snapshot_inner(writer, value, types, depth + 1)?;
             }
         }
         TDerived::IntMaskOf(value) => {
             writer.write_u8(4);
-            encode_union_snapshot(writer, value.get_target_type(), types, depth + 1)?;
+            encode_union_snapshot_inner(writer, value.get_target_type(), types, depth + 1)?;
         }
         TDerived::PropertiesOf(properties) => {
             writer.write_u8(5);
@@ -1011,26 +1234,26 @@ fn encode_derived_snapshot<'type_info>(
                 Some(Visibility::Private) => 3,
             });
 
-            encode_union_snapshot(writer, properties.get_target_type(), types, depth + 1)?;
+            encode_union_snapshot_inner(writer, properties.get_target_type(), types, depth + 1)?;
         }
         TDerived::IndexAccess(access) => {
             writer.write_u8(6);
-            encode_union_snapshot(writer, access.get_target_type(), types, depth + 1)?;
-            encode_union_snapshot(writer, access.get_index_type(), types, depth + 1)?;
+            encode_union_snapshot_inner(writer, access.get_target_type(), types, depth + 1)?;
+            encode_union_snapshot_inner(writer, access.get_index_type(), types, depth + 1)?;
         }
         TDerived::New(new_type) => {
             writer.write_u8(7);
-            encode_union_snapshot(writer, new_type.get_target_type(), types, depth + 1)?;
+            encode_union_snapshot_inner(writer, new_type.get_target_type(), types, depth + 1)?;
         }
         TDerived::TemplateType(template) => {
             writer.write_u8(8);
-            encode_union_snapshot(writer, template.get_object(), types, depth + 1)?;
-            encode_union_snapshot(writer, template.get_class_name(), types, depth + 1)?;
-            encode_union_snapshot(writer, template.get_template_name(), types, depth + 1)?;
+            encode_union_snapshot_inner(writer, template.get_object(), types, depth + 1)?;
+            encode_union_snapshot_inner(writer, template.get_class_name(), types, depth + 1)?;
+            encode_union_snapshot_inner(writer, template.get_template_name(), types, depth + 1)?;
         }
         TDerived::Intersection(intersection) => {
             writer.write_u8(9);
-            encode_union_snapshot(writer, intersection.get_base_type(), types, depth + 1)?;
+            encode_union_snapshot_inner(writer, intersection.get_base_type(), types, depth + 1)?;
             let intersections = intersection.get_intersection_types().unwrap_or_default();
             write_snapshot_count(writer, intersections.len(), "derived intersections")?;
             for atomic in intersections {
@@ -1045,14 +1268,14 @@ fn encode_derived_snapshot<'type_info>(
 fn encode_optional_unions<'type_info>(
     writer: &mut PayloadWriter,
     unions: Option<&'type_info [TUnion]>,
-    types: &mut Vec<&'type_info TUnion>,
+    types: &mut SnapshotTypeTable<'_, 'type_info>,
     depth: usize,
 ) -> Result<(), ExternalAnalyzerError> {
     writer.write_bool(unions.is_some());
     if let Some(unions) = unions {
         write_snapshot_count(writer, unions.len(), "nested union types")?;
         for union in unions {
-            encode_union_snapshot(writer, union, types, depth + 1)?;
+            encode_union_snapshot_inner(writer, union, types, depth + 1)?;
         }
     }
     Ok(())
@@ -1061,7 +1284,7 @@ fn encode_optional_unions<'type_info>(
 fn encode_optional_atomic_snapshots<'type_info>(
     writer: &mut PayloadWriter,
     atomics: Option<&'type_info [TAtomic]>,
-    types: &mut Vec<&'type_info TUnion>,
+    types: &mut SnapshotTypeTable<'_, 'type_info>,
     depth: usize,
 ) -> Result<(), ExternalAnalyzerError> {
     writer.write_bool(atomics.is_some());
@@ -1199,6 +1422,77 @@ where
         if reader.read_bool("handled flag")? { Some(decode_type(&mut reader, &argument_type, 0)?) } else { None };
     reader.finish()?;
     Ok(result)
+}
+
+pub(super) fn decode_callable_signature_response<'type_info, F>(
+    payload: &[u8],
+    request_type: F,
+) -> Result<Option<EffectiveCallableSignature>, ExternalAnalyzerError>
+where
+    F: Fn(usize) -> Option<&'type_info TUnion>,
+{
+    let mut reader = message_reader(payload, CALLABLE_SIGNATURE_RESPONSE)?;
+    if !reader.read_bool("handled flag")? {
+        reader.finish()?;
+        return Ok(None);
+    }
+
+    let allows_named_arguments = reader.read_bool("allows named arguments flag")?;
+    let count = reader.read_count("effective callable parameters", MAXIMUM_TYPE_MEMBERS)?;
+    let mut parameters = Vec::with_capacity(count);
+    let mut names = HashSet::with_capacity_and_hasher(count, RandomState::default());
+    let mut optional = false;
+    for index in 0..count {
+        let name = if reader.read_bool("effective callable parameter name presence")? {
+            let name = reader.read_bytes("effective callable parameter name")?;
+            if !is_valid_variable_name(name) {
+                return Err(protocol("effective callable parameter name must be a PHP variable name"));
+            }
+
+            if !names.insert(name.to_vec()) {
+                return Err(protocol(format!(
+                    "effective callable parameter `{}` is duplicated",
+                    String::from_utf8_lossy(name)
+                )));
+            }
+
+            Some(VariableIdentifier(word(name)))
+        } else {
+            None
+        };
+
+        let parameter_type = if reader.read_bool("effective callable parameter type presence")? {
+            Some(Arc::new(decode_type(&mut reader, &request_type, 0)?))
+        } else {
+            None
+        };
+
+        let flags = reader.read_u8("effective callable parameter flags")?;
+        if flags & !0b111 != 0 {
+            return Err(protocol(format!("effective callable parameter has unknown flags {flags:#04x}")));
+        }
+
+        let by_reference = flags & 1 != 0;
+        let variadic = flags & 2 != 0;
+        let has_default = flags & 4 != 0;
+        if variadic && index + 1 != count {
+            return Err(protocol("effective variadic callable parameter must be last"));
+        }
+
+        if variadic && has_default {
+            return Err(protocol("effective variadic callable parameter cannot have a default"));
+        }
+
+        if optional && !has_default && !variadic {
+            return Err(protocol("required effective callable parameter cannot follow an optional one"));
+        }
+
+        optional |= has_default || variadic;
+        parameters.push(TCallableParameter::new(parameter_type, by_reference, variadic, has_default).with_name(name));
+    }
+
+    reader.finish()?;
+    Ok(Some(EffectiveCallableSignature { parameters, allows_named_arguments }))
 }
 
 pub(super) fn handle_type_comparison_request<'type_info, F>(
@@ -1962,6 +2256,15 @@ where
     if value.as_ref().is_empty() { Err(protocol(format!("{field} cannot be empty"))) } else { Ok(value) }
 }
 
+fn is_valid_variable_name(name: &[u8]) -> bool {
+    let Some((&first, rest)) = name.strip_prefix(b"$").and_then(|name| name.split_first()) else {
+        return false;
+    };
+
+    (first == b'_' || first.is_ascii_alphabetic() || first >= 0x80)
+        && rest.iter().all(|byte| *byte == b'_' || byte.is_ascii_alphanumeric() || *byte >= 0x80)
+}
+
 fn validate_method_pattern(pattern: &[u8]) -> Result<(), ExternalAnalyzerError> {
     if let Some(star) = pattern.iter().position(|byte| *byte == b'*')
         && star + 1 != pattern.len()
@@ -2022,6 +2325,49 @@ pub(super) mod testing {
         assert!(matches!(result, Err(ExternalAnalyzerError::Protocol(message)) if message.contains("more than once")));
     }
 
+    #[test]
+    fn callable_signature_response_resolves_request_type_handles() {
+        let request_type = get_literal_string(word(b"value"));
+        let mut writer = message_writer(CALLABLE_SIGNATURE_RESPONSE);
+        writer.write_bool(true);
+        writer.write_bool(false);
+        writer.write_u32(1);
+        writer.write_bool(true);
+        writer.write_bytes(b"$value").unwrap();
+        writer.write_bool(true);
+        writer.write_u8(TYPE_REFERENCE);
+        writer.write_u32(0);
+        writer.write_u8(0b101);
+
+        let signature =
+            decode_callable_signature_response(&writer.finish(), |handle| (handle == 0).then_some(&request_type))
+                .unwrap()
+                .unwrap();
+        assert!(!signature.allows_named_arguments);
+        assert_eq!(signature.parameters.len(), 1);
+        let parameter = &signature.parameters[0];
+        assert_eq!(parameter.get_name().map(|name| name.0.as_bytes()), Some(b"$value".as_slice()));
+        assert_eq!(parameter.get_type_signature(), Some(&request_type));
+        assert!(parameter.is_by_reference());
+        assert!(!parameter.is_variadic());
+        assert!(parameter.has_default());
+    }
+
+    #[test]
+    fn callable_signature_response_rejects_invalid_parameter_names() {
+        let mut writer = message_writer(CALLABLE_SIGNATURE_RESPONSE);
+        writer.write_bool(true);
+        writer.write_bool(true);
+        writer.write_u32(1);
+        writer.write_bool(true);
+        writer.write_bytes(b"$").unwrap();
+        writer.write_bool(false);
+        writer.write_u8(0);
+
+        let result = decode_callable_signature_response(&writer.finish(), |_| None);
+        assert!(matches!(result, Err(ExternalAnalyzerError::Protocol(message)) if message.contains("variable name")));
+    }
+
     pub fn registration_response() -> Vec<u8> {
         registration_response_with_lifecycle(0)
     }
@@ -2069,6 +2415,7 @@ pub(super) mod testing {
         writer.write_string("example").unwrap();
         writer.write_u32(1);
         writer.write_u16(0);
+        writer.write_u8(0);
         writer.write_u32(1);
         writer.write_u8(TARGET_EXACT);
         writer.write_bytes(b"demo_service").unwrap();

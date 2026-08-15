@@ -11,8 +11,10 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::expression::call::analyze_invocation_targets;
+use crate::expression::call::method_call::analyze_undocumented_method_return_type;
 use crate::invocation::InvocationArgumentsSource;
 use crate::invocation::InvocationTarget;
+use crate::invocation::MethodInvocationKind;
 use crate::invocation::MethodTargetContext;
 use crate::plugin::ExpressionHookResult;
 use crate::plugin::context::HookContext;
@@ -72,6 +74,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodCall<'arena> {
 
         let method_resolution =
             resolve_static_method_targets(context, block_context, artifacts, self.class, &self.method, self.span())?;
+        let has_resolved_methods = !method_resolution.resolved_methods.is_empty();
+        let undocumented_template_result =
+            (!method_resolution.undocumented_methods.is_empty()).then(|| method_resolution.template_result.clone());
 
         let mut invocation_targets = vec![];
         for resolved_method in method_resolution.resolved_methods {
@@ -98,6 +103,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodCall<'arena> {
             );
 
             let method_target_context = MethodTargetContext {
+                invocation_kind: MethodInvocationKind::Static,
                 declaring_method_id: Some(resolved_method.method_identifier),
                 class_like_metadata: metadata,
                 class_type: resolved_method.static_class_type,
@@ -111,6 +117,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodCall<'arena> {
                 ),
                 metadata: method_metadata,
                 inferred_return_type: None,
+                effective_signature: None,
                 method_context: Some(method_target_context),
                 span: self.span(),
             });
@@ -118,21 +125,37 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodCall<'arena> {
 
         let class_has_nullsafe_null = artifacts.get_expression_type(self.class).is_some_and(|t| t.has_nullsafe_null());
 
-        analyze_invocation_targets(
-            context,
-            block_context,
-            artifacts,
-            method_resolution.template_result,
-            invocation_targets,
-            InvocationArgumentsSource::ArgumentList(&self.argument_list),
-            self.span(),
-            None,
-            method_resolution.has_invalid_target,
-            method_resolution.encountered_mixed,
-            expression_is_nullsafe(self.class) || method_resolution.encountered_null,
-            class_has_nullsafe_null,
-            method_resolution.all_methods_non_nullable_return,
-        )?;
+        if has_resolved_methods || method_resolution.undocumented_methods.is_empty() {
+            analyze_invocation_targets(
+                context,
+                block_context,
+                artifacts,
+                method_resolution.template_result,
+                invocation_targets,
+                InvocationArgumentsSource::ArgumentList(&self.argument_list),
+                self.span(),
+                None,
+                method_resolution.has_invalid_target,
+                method_resolution.encountered_mixed,
+                expression_is_nullsafe(self.class) || method_resolution.encountered_null,
+                class_has_nullsafe_null,
+                method_resolution.all_methods_non_nullable_return,
+            )?;
+        }
+
+        if !method_resolution.undocumented_methods.is_empty() {
+            analyze_undocumented_method_return_type(
+                context,
+                block_context,
+                artifacts,
+                method_resolution.undocumented_methods,
+                undocumented_template_result.as_ref().expect("undocumented calls have a template result"),
+                &self.argument_list,
+                self.span(),
+                MethodInvocationKind::Static,
+                !has_resolved_methods,
+            )?;
+        }
 
         if context.plugin_registry.has_static_method_call_hooks() {
             let mut hook_context = HookContext::new(context.codebase, context.source_file, block_context, artifacts);

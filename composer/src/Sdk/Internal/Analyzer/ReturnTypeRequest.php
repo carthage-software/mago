@@ -14,7 +14,6 @@ final class ReturnTypeRequest
      */
     public function __construct(
         public readonly int $generation,
-        public readonly bool $method,
         public readonly array $providerIndices,
         public readonly Invocation $invocation,
     ) {}

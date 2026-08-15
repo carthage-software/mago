@@ -7,9 +7,12 @@ namespace Mago\Sdk;
 use Mago\Sdk\Analyzer\AfterAnalysisContext;
 use Mago\Sdk\Analyzer\AfterFileAnalysisContext;
 use Mago\Sdk\Analyzer\BeforeAnalysisContext;
+use Mago\Sdk\Analyzer\CallableSignatureProvider;
+use Mago\Sdk\Analyzer\CallableSignatureProviderContext;
 use Mago\Sdk\Analyzer\Codebase;
 use Mago\Sdk\Analyzer\FileAnalysis;
 use Mago\Sdk\Analyzer\InitializationContext;
+use Mago\Sdk\Analyzer\InvocationKind;
 use Mago\Sdk\Analyzer\PluginRegistry as AnalyzerPluginRegistry;
 use Mago\Sdk\Analyzer\ProjectAnalysis;
 use Mago\Sdk\Analyzer\ReturnTypeProviderContext;
@@ -461,7 +464,11 @@ final class Worker
         return LinterProtocol::writeLintResponse($reportedIssues);
     }
 
-    /** @param positive-int $requestId */
+    /**
+     * @param positive-int $requestId
+     *
+     * @mago-expect lint:halstead
+     */
     private function handleAnalyzerRequest(
         string $payload,
         int $requestId,
@@ -488,7 +495,7 @@ final class Worker
             return $this->handleAnalyzerLifecycleRequest($kind, $reader, $requestId, $host, $cancellation);
         }
 
-        if ($kind !== AnalyzerProtocol::RETURN_TYPE_REQUEST) {
+        if ($kind !== AnalyzerProtocol::RETURN_TYPE_REQUEST && $kind !== AnalyzerProtocol::CALLABLE_SIGNATURE_REQUEST) {
             throw new ProtocolException("Unknown analyzer request kind {$kind}.");
         }
 
@@ -497,7 +504,9 @@ final class Worker
             $this->metadataCache = new MetadataCache($request->generation);
         }
         $codebase = new Codebase($host, $requestId, $cancellation, $this->metadataCache);
-        $providers = $request->method ? $this->methodReturnTypeProviders : $this->functionReturnTypeProviders;
+        $providers = $request->invocation->kind === InvocationKind::Function
+            ? $this->functionReturnTypeProviders
+            : $this->methodReturnTypeProviders;
         foreach ($request->providerIndices as $providerIndex) {
             $registered = $providers[$providerIndex] ?? null;
             if ($registered === null) {
@@ -506,6 +515,30 @@ final class Worker
 
             $cancellation->throwIfCancelled();
             try {
+                if ($kind === AnalyzerProtocol::CALLABLE_SIGNATURE_REQUEST) {
+                    if (!$registered->provider instanceof CallableSignatureProvider) {
+                        throw new ProtocolException(
+                            "Mago requested a callable signature from analyzer provider {$providerIndex}, but it does not advertise that capability.",
+                        );
+                    }
+
+                    $signature = $registered->provider->getCallableSignature(
+                        new CallableSignatureProviderContext(
+                            $this->phpVersion,
+                            $codebase,
+                            $request->invocation,
+                            new TypeComparator($host, $requestId, $cancellation),
+                            $cancellation,
+                        ),
+                    );
+
+                    if ($signature !== null) {
+                        return AnalyzerProtocol::writeCallableSignatureResponse($signature);
+                    }
+
+                    continue;
+                }
+
                 $type = $registered->provider->getReturnType(
                     new ReturnTypeProviderContext(
                         $this->phpVersion,
@@ -528,7 +561,9 @@ final class Worker
             }
         }
 
-        return AnalyzerProtocol::writeReturnTypeResponse(null);
+        return $kind === AnalyzerProtocol::CALLABLE_SIGNATURE_REQUEST
+            ? AnalyzerProtocol::writeCallableSignatureResponse(null)
+            : AnalyzerProtocol::writeReturnTypeResponse(null);
     }
 
     private function handleAnalyzerInitialization(

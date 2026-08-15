@@ -177,6 +177,7 @@ where
 
                     targets.push(InvocationTarget::Callable {
                         signature: callable_signature.clone(),
+                        effective_signature: None,
                         span: expression.span(),
                         source: callable_signature.get_source(),
                     });
@@ -192,6 +193,7 @@ where
         } else if atomic.can_be_callable() {
             targets.push(InvocationTarget::Callable {
                 signature: TCallableSignature::mixed(false),
+                effective_signature: None,
                 span: expression.span(),
                 source: None,
             });

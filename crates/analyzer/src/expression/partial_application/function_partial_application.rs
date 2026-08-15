@@ -115,11 +115,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for FunctionPartialApplication<'aren
                     identifier,
                     metadata,
                     inferred_return_type: None,
+                    effective_signature: None,
                     method_context: None,
                     span: self.function.span(),
                 };
 
-                let invocation = Invocation::new(
+                let mut invocation = Invocation::new(
                     invocation_target,
                     InvocationArgumentsSource::PartialArgumentList(&self.argument_list),
                     self.span(),
@@ -132,7 +133,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for FunctionPartialApplication<'aren
                     context,
                     block_context,
                     artifacts,
-                    &invocation,
+                    &mut invocation,
                     None,
                     &mut template_result,
                     &mut parameter_types,

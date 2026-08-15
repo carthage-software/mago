@@ -480,6 +480,52 @@ final class Codebase
         return $this->queryMembers(Protocol::GET_PROPERTIES, $properties, MetadataCodec::readProperty(...));
     }
 
+    public function getMagicProperty(string $class, string $property): ?PropertyMetadata
+    {
+        return $this->getMultipleMagicProperties([new MemberIdentifier($class, $property)])[0] ?? null;
+    }
+
+    public function magicPropertyExists(string $class, string $property): bool
+    {
+        return $this->checkMultipleMagicPropertiesExist([new MemberIdentifier($class, $property)])[0] ?? false;
+    }
+
+    /**
+     * @param list<MemberIdentifier> $properties
+     * @return list<bool>
+     */
+    public function checkMultipleMagicPropertiesExist(array $properties): array
+    {
+        return $this->checkMemberExistence(Protocol::EXISTS_MAGIC_PROPERTY, $properties);
+    }
+
+    /**
+     * @param list<MemberIdentifier> $properties
+     * @return list<PropertyMetadata|null>
+     */
+    public function getMultipleMagicProperties(array $properties): array
+    {
+        return $this->queryMembers(Protocol::GET_MAGIC_PROPERTIES, $properties, MetadataCodec::readProperty(...));
+    }
+
+    public function getDeclaringMagicProperty(string $class, string $property): ?PropertyMetadata
+    {
+        return $this->getMultipleDeclaringMagicProperties([new MemberIdentifier($class, $property)])[0] ?? null;
+    }
+
+    /**
+     * @param list<MemberIdentifier> $properties
+     * @return list<PropertyMetadata|null>
+     */
+    public function getMultipleDeclaringMagicProperties(array $properties): array
+    {
+        return $this->queryMembers(
+            Protocol::GET_DECLARING_MAGIC_PROPERTIES,
+            $properties,
+            MetadataCodec::readProperty(...),
+        );
+    }
+
     public function getClassConstant(string $class, string $constant): ?ClassConstantMetadata
     {
         return $this->getMultipleClassConstants([new MemberIdentifier($class, $constant)])[0] ?? null;

@@ -27,6 +27,7 @@ use crate::error::AnalysisError;
 use crate::invocation::Invocation;
 use crate::invocation::InvocationArgumentsSource;
 use crate::invocation::InvocationTarget;
+use crate::invocation::MethodInvocationKind;
 use crate::invocation::MethodTargetContext;
 use crate::invocation::analyzer::analyze_invocation;
 use crate::visibility::check_method_visibility;
@@ -296,7 +297,7 @@ where
 
     artifacts.symbol_references.add_reference_for_method_call(&block_context.scope, &declaring_constructor_id);
 
-    let invocation = Invocation {
+    let mut invocation = Invocation {
         target: InvocationTarget::FunctionLike {
             identifier: FunctionLikeIdentifier::Method(
                 declaring_constructor_id.get_class_name(),
@@ -304,10 +305,12 @@ where
             ),
             metadata: constructor,
             inferred_return_type: None,
+            effective_signature: None,
             method_context: Some(MethodTargetContext {
+                invocation_kind: MethodInvocationKind::Instance,
                 declaring_method_id: Some(declaring_constructor_id),
                 class_like_metadata: metadata,
-                class_type: StaticClassType::None,
+                class_type: StaticClassType::Exact(metadata.original_name),
                 declaring_object_type: None,
             }),
             span: attribute.name.span(),
@@ -325,7 +328,7 @@ where
         context,
         block_context,
         artifacts,
-        &invocation,
+        &mut invocation,
         Some((metadata.name, None)),
         &mut template_result,
         &mut argument_types,

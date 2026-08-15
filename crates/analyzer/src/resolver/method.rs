@@ -43,7 +43,7 @@ use crate::utils::names::display_method_name;
 use crate::visibility::check_method_visibility;
 use crate::visibility::is_method_visible;
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ResolvedMethod {
     /// The name of the class this method is called on, not necessarily the same
     /// as the class of the method itself, especially in cases of inheritance.
@@ -62,6 +62,24 @@ pub struct ResolvedMethod {
     /// If Some, this method was found in a mixin but the target class lacks the magic method
     /// needed to forward the call. Contains the mixin class name and whether the target is final.
     pub mixin_without_magic_method: Option<MixinWithoutMagicMethod>,
+}
+
+/// An otherwise undocumented method call that can be handled by a magic method.
+///
+/// Reporting is deferred until return-type providers have had an opportunity to
+/// describe the requested method.
+#[derive(Debug, Clone)]
+pub struct UndocumentedMethod {
+    /// The class on which the undocumented method was requested.
+    pub classname: Word,
+    /// The requested method name, rather than `__call` or `__callStatic`.
+    pub method_name: Word,
+    /// The span of the receiver or class expression.
+    pub target_span: Span,
+    /// The span of the requested method selector.
+    pub selector_span: Span,
+    /// The magic method which handles the call at runtime.
+    pub magic_method: ResolvedMethod,
 }
 
 /// Represents a method found in a mixin where the calling class lacks the required magic method.
@@ -99,9 +117,9 @@ pub struct MethodResolutionResult {
     pub template_result: TemplateResult,
     /// A list of resolved methods, each with its template result and identifiers.
     pub resolved_methods: Vec<ResolvedMethod>,
-    /// `__call` methods to fall back to when a called method is not declared but
-    /// is handled by a magic `__call`.
-    pub magic_call_methods: Vec<ResolvedMethod>,
+    /// Undocumented calls handled by `__call` or `__callStatic` whose diagnostics
+    /// must wait until return-type providers have had an opportunity to resolve them.
+    pub undocumented_methods: Vec<UndocumentedMethod>,
     /// True if any selector was dynamic (e.g., from a generic string), making the method name unknown.
     pub has_dynamic_selector: bool,
     /// True if any resolution path involved an object with an ambiguous type (e.g., `mixed`, generic `object`).
@@ -219,7 +237,6 @@ where
                 &mut result,
             );
 
-            let mut had_undocumented_magic_call = false;
             for &method_name in &method_names {
                 let resolved_methods = resolve_method_from_object(
                     context,
@@ -260,15 +277,15 @@ where
 
                                 result.has_invalid_target = true;
                             } else {
-                                report_non_documented_method(
-                                    context,
-                                    object.span(),
-                                    selector.span(),
-                                    classname,
-                                    method_name,
-                                );
-
-                                had_undocumented_magic_call = true;
+                                result.undocumented_methods.extend(resolved_magic_call_method.iter().cloned().map(
+                                    |magic_method| UndocumentedMethod {
+                                        classname,
+                                        method_name,
+                                        target_span: object.span(),
+                                        selector_span: selector.span(),
+                                        magic_method,
+                                    },
+                                ));
                             }
                         }
                     } else {
@@ -307,10 +324,6 @@ where
                 }
 
                 result.resolved_methods.extend(resolved_methods);
-            }
-
-            if had_undocumented_magic_call {
-                result.magic_call_methods.extend(resolved_magic_call_method);
             }
         }
     } else {
@@ -870,7 +883,7 @@ pub(super) fn report_non_existent_method<A>(
     );
 }
 
-pub(super) fn report_non_documented_method<A>(
+pub(crate) fn report_non_documented_method<A>(
     context: &mut Context<'_, '_, A>,
     obj_span: Span,
     selector_span: Span,

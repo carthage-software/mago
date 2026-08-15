@@ -111,7 +111,7 @@ pub fn analyze_invocation<'ctx, 'arena, A>(
     context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    invocation: &Invocation<'ctx, '_, 'arena>,
+    invocation: &mut Invocation<'ctx, '_, 'arena>,
     calling_class_like: Option<(Word, Option<&TAtomic>)>,
     template_result: &mut TemplateResult,
     parameter_types: &mut WordMap<TUnion>,
@@ -119,6 +119,14 @@ pub fn analyze_invocation<'ctx, 'arena, A>(
 where
     A: Arena,
 {
+    if context.external_analysis_session.is_some()
+        && !invocation.target.has_effective_signature()
+        && let Some(identifier) = invocation.target.get_function_like_identifier().copied()
+        && context.plugin_registry.may_have_callable_signature_provider(&identifier)
+    {
+        apply_callable_signature(context, artifacts, &identifier, invocation)?;
+    }
+
     if !context.settings.allow_side_effects_in_conditions
         && block_context.flags.inside_conditional()
         && !invocation.target.is_pure_or_mutation_free()
@@ -1148,6 +1156,36 @@ where
     check_template_result(context, template_result, invocation.span);
 
     Ok(())
+}
+
+/// Installs a provider-supplied signature for an explicit callable identity.
+///
+/// # Errors
+///
+/// Returns an error when an external provider fails or returns an invalid response.
+pub(crate) fn apply_callable_signature<'ctx, 'arena, A>(
+    context: &Context<'ctx, 'arena, A>,
+    artifacts: &AnalysisArtifacts,
+    identifier: &FunctionLikeIdentifier,
+    invocation: &mut Invocation<'ctx, '_, 'arena>,
+) -> Result<bool, AnalysisError>
+where
+    A: Arena,
+{
+    let Some(signature) = context.plugin_registry.get_function_like_callable_signature(
+        context.codebase,
+        context.source_file,
+        artifacts,
+        identifier,
+        invocation,
+        context.external_analysis_session,
+    )?
+    else {
+        return Ok(false);
+    };
+
+    invocation.target.set_effective_signature(signature);
+    Ok(true)
 }
 
 /// Instantiates first-class generic callables from the surrounding call's other arguments.

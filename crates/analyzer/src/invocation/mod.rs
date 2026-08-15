@@ -53,9 +53,18 @@ pub struct Invocation<'ctx, 'ast, 'arena> {
     pub span: Span,
 }
 
+/// Parameter contract supplied by a provider before argument analysis.
+#[derive(Debug, Clone)]
+pub struct EffectiveCallableSignature {
+    pub parameters: Vec<TCallableParameter>,
+    pub allows_named_arguments: bool,
+}
+
 /// Context information for method call resolution.
 #[derive(Debug, Clone)]
 pub struct MethodTargetContext<'ctx> {
+    /// Whether the source invocation uses instance-method or static-method syntax.
+    pub invocation_kind: MethodInvocationKind,
     /// The method identifier, if statically resolved.
     pub declaring_method_id: Option<MethodIdentifier>,
     /// Metadata for the class the method is being called on (not necessarily where it's declared).
@@ -70,6 +79,15 @@ pub struct MethodTargetContext<'ctx> {
     pub declaring_object_type: Option<TNamedObject>,
 }
 
+/// The source-level form of a method invocation.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum MethodInvocationKind {
+    /// An instance method invocation such as `$object->method()`.
+    Instance,
+    /// A static method invocation such as `ClassName::method()`.
+    Static,
+}
+
 /// The target of an invocation (function, method, or callable).
 #[derive(Debug, Clone)]
 pub enum InvocationTarget<'ctx> {
@@ -79,6 +97,8 @@ pub enum InvocationTarget<'ctx> {
         source: Option<FunctionLikeIdentifier>,
         /// The callable's type signature.
         signature: TCallableSignature,
+        /// Provider-supplied parameter contract, when one handled this call.
+        effective_signature: Option<EffectiveCallableSignature>,
         /// The span of the callable expression.
         span: Span,
     },
@@ -90,6 +110,8 @@ pub enum InvocationTarget<'ctx> {
         metadata: &'ctx FunctionLikeMetadata,
         /// Inferred return type (used for closures/arrow functions).
         inferred_return_type: Option<Arc<TUnion>>,
+        /// Provider-supplied parameter contract, when one handled this call.
+        effective_signature: Option<EffectiveCallableSignature>,
         /// Method call context, if applicable.
         method_context: Option<MethodTargetContext<'ctx>>,
         /// The span of the callable part.
@@ -289,8 +311,28 @@ impl<'ctx> InvocationTarget<'ctx> {
     #[inline]
     pub const fn allows_named_arguments(&self) -> bool {
         match self {
+            InvocationTarget::Callable { effective_signature: Some(signature), .. }
+            | InvocationTarget::FunctionLike { effective_signature: Some(signature), .. } => {
+                signature.allows_named_arguments
+            }
             InvocationTarget::FunctionLike { metadata, .. } => !metadata.flags.forbids_named_arguments(),
-            _ => false,
+            InvocationTarget::Callable { .. } => false,
+        }
+    }
+
+    #[inline]
+    pub(crate) fn set_effective_signature(&mut self, signature: EffectiveCallableSignature) {
+        match self {
+            InvocationTarget::Callable { effective_signature, .. }
+            | InvocationTarget::FunctionLike { effective_signature, .. } => *effective_signature = Some(signature),
+        }
+    }
+
+    #[inline]
+    pub(crate) const fn has_effective_signature(&self) -> bool {
+        match self {
+            InvocationTarget::Callable { effective_signature, .. }
+            | InvocationTarget::FunctionLike { effective_signature, .. } => effective_signature.is_some(),
         }
     }
 
@@ -307,6 +349,8 @@ impl<'ctx> InvocationTarget<'ctx> {
     #[must_use]
     pub fn parameter_count(&self) -> usize {
         match self {
+            InvocationTarget::Callable { effective_signature: Some(signature), .. }
+            | InvocationTarget::FunctionLike { effective_signature: Some(signature), .. } => signature.parameters.len(),
             InvocationTarget::Callable { signature, .. } => signature.parameters.len(),
             InvocationTarget::FunctionLike { metadata, .. } => metadata.parameters.len(),
         }
@@ -319,6 +363,10 @@ impl<'ctx> InvocationTarget<'ctx> {
         'ctx: 'target,
     {
         match self {
+            InvocationTarget::Callable { effective_signature: Some(signature), .. }
+            | InvocationTarget::FunctionLike { effective_signature: Some(signature), .. } => {
+                signature.parameters.get(index).map(InvocationTargetParameter::Callable)
+            }
             InvocationTarget::Callable { signature, .. } => {
                 signature.parameters.get(index).map(InvocationTargetParameter::Callable)
             }

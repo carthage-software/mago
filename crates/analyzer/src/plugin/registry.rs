@@ -34,6 +34,7 @@ use crate::external::BeforeAnalysisResult;
 use crate::external::ExternalAnalysisSession;
 use crate::external::ExternalAnalyzerHandle;
 use crate::external::FileAnalysisSnapshot;
+use crate::invocation::EffectiveCallableSignature;
 use crate::invocation::Invocation;
 use crate::plugin::PluginError;
 use crate::plugin::context::HookContext;
@@ -81,6 +82,8 @@ pub struct PluginRegistry {
     external_analyzer: Option<Arc<ExternalAnalyzerHandle>>,
     external_function_providers: OnceLock<bool>,
     external_method_providers: OnceLock<bool>,
+    external_function_signature_providers: OnceLock<bool>,
+    external_method_signature_providers: OnceLock<bool>,
     function_exact: WordMap<Vec<usize>>,
     function_prefix: Vec<(Word, usize)>,
     function_namespace: Vec<(Word, usize)>,
@@ -126,6 +129,8 @@ impl std::fmt::Debug for PluginRegistry {
             .field("external_analyzer", &self.external_analyzer.is_some())
             .field("external_function_providers", &self.external_function_providers.get())
             .field("external_method_providers", &self.external_method_providers.get())
+            .field("external_function_signature_providers", &self.external_function_signature_providers.get())
+            .field("external_method_signature_providers", &self.external_method_signature_providers.get())
             .field("function_providers", &self.function_providers.len())
             .field("method_providers", &self.method_providers.len())
             .field("program_hooks", &self.program_hooks.len())
@@ -174,8 +179,14 @@ impl PluginRegistry {
             analyzer.has_function_return_type_providers().map_err(|reason| PluginError::Internal { reason })?;
         let method_providers =
             analyzer.has_method_return_type_providers().map_err(|reason| PluginError::Internal { reason })?;
+        let function_signature_providers =
+            analyzer.has_function_callable_signature_providers().map_err(|reason| PluginError::Internal { reason })?;
+        let method_signature_providers =
+            analyzer.has_method_callable_signature_providers().map_err(|reason| PluginError::Internal { reason })?;
         let _function = self.external_function_providers.set(function_providers);
         let _method = self.external_method_providers.set(method_providers);
+        let _function_signature = self.external_function_signature_providers.set(function_signature_providers);
+        let _method_signature = self.external_method_signature_providers.set(method_signature_providers);
         Ok(())
     }
 
@@ -1160,6 +1171,76 @@ impl PluginRegistry {
         }
 
         indices
+    }
+
+    #[inline]
+    #[must_use]
+    pub(crate) fn may_have_callable_signature_provider(&self, function_like: &FunctionLikeIdentifier) -> bool {
+        if self.external_analyzer.is_none() {
+            return false;
+        }
+
+        match function_like {
+            FunctionLikeIdentifier::Function(_) => {
+                self.external_function_signature_providers.get().copied().unwrap_or(true)
+            }
+            FunctionLikeIdentifier::Method(_, _) => {
+                self.external_method_signature_providers.get().copied().unwrap_or(true)
+            }
+            FunctionLikeIdentifier::Closure(_) => false,
+        }
+    }
+
+    /// Requests an external provider's effective callable signature before argument analysis.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when an external provider fails or returns an invalid response.
+    pub fn get_function_like_callable_signature<'ctx>(
+        &self,
+        codebase: &'ctx CodebaseMetadata,
+        source_file: &'ctx File,
+        artifacts: &AnalysisArtifacts,
+        function_like: &FunctionLikeIdentifier,
+        invocation: &Invocation<'ctx, '_, '_>,
+        external_session: Option<&ExternalAnalysisSession>,
+    ) -> PluginResult<Option<EffectiveCallableSignature>> {
+        let Some((analyzer, session)) = self.external_analyzer.as_deref().zip(external_session) else {
+            return Ok(None);
+        };
+
+        match function_like {
+            FunctionLikeIdentifier::Function(name)
+                if self.external_function_signature_providers.get().copied().unwrap_or(true) =>
+            {
+                analyzer
+                    .get_function_callable_signature(
+                        name.as_bytes(),
+                        invocation,
+                        artifacts,
+                        source_file,
+                        codebase,
+                        session,
+                    )
+                    .map_err(|reason| PluginError::Internal { reason })
+            }
+            FunctionLikeIdentifier::Method(class, method)
+                if self.external_method_signature_providers.get().copied().unwrap_or(true) =>
+            {
+                analyzer
+                    .get_method_callable_signature(
+                        class.as_bytes(),
+                        method.as_bytes(),
+                        invocation,
+                        artifacts,
+                        source_file,
+                        codebase,
+                        session,
+                    )
+                    .map_err(|reason| PluginError::Internal { reason })
+            }
+            _ => Ok(None),
+        }
     }
 
     /// # Errors

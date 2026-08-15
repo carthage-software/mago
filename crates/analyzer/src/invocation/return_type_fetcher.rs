@@ -1,4 +1,5 @@
 use mago_allocator::Arena;
+use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::template::TemplateResult;
 use mago_codex::ttype::union::TUnion;
@@ -22,27 +23,83 @@ pub fn fetch_invocation_return_type<'ctx, 'arena, A>(
 where
     A: Arena,
 {
-    // Try to get a custom return type from plugins
-    if let Some(identifier) = invocation.target.get_function_like_identifier()
-        && let Some(result) = context.plugin_registry.get_function_like_return_type(
-            context.codebase,
-            context.source_file,
-            block_context,
-            artifacts,
-            identifier,
-            invocation,
-            context.external_analysis_session,
-        )?
-    {
+    if let Some(return_type) = fetch_invocation_provider_return_type(context, block_context, artifacts, invocation)? {
+        return Ok(return_type);
+    }
+
+    Ok(fetch_declared_invocation_return_type(context, invocation, template_result, parameters))
+}
+
+/// Requests a custom return type from registered providers and reports provider issues.
+///
+/// # Errors
+///
+/// Returns an error if a return-type provider fails.
+pub(crate) fn fetch_invocation_provider_return_type<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
+    block_context: &BlockContext<'ctx>,
+    artifacts: &AnalysisArtifacts,
+    invocation: &Invocation<'ctx, '_, 'arena>,
+) -> Result<Option<TUnion>, AnalysisError>
+where
+    A: Arena,
+{
+    let Some(identifier) = invocation.target.get_function_like_identifier() else {
+        return Ok(None);
+    };
+
+    fetch_function_like_provider_return_type(context, block_context, artifacts, identifier, invocation)
+}
+
+/// Requests a custom return type for an explicit function-like identifier.
+///
+/// This permits dynamic method calls to match the method requested by the user
+/// while retaining `__call` or `__callStatic` as the invocation's native target.
+///
+/// # Errors
+///
+/// Returns an error if a return-type provider fails.
+pub(crate) fn fetch_function_like_provider_return_type<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
+    block_context: &BlockContext<'ctx>,
+    artifacts: &AnalysisArtifacts,
+    identifier: &FunctionLikeIdentifier,
+    invocation: &Invocation<'ctx, '_, 'arena>,
+) -> Result<Option<TUnion>, AnalysisError>
+where
+    A: Arena,
+{
+    if let Some(result) = context.plugin_registry.get_function_like_return_type(
+        context.codebase,
+        context.source_file,
+        block_context,
+        artifacts,
+        identifier,
+        invocation,
+        context.external_analysis_session,
+    )? {
         for reported_issue in result.issues {
             context.collector.report_with_code(reported_issue.code, reported_issue.issue);
         }
 
         if let Some(ty) = result.return_type {
-            return Ok(ty);
+            return Ok(Some(ty));
         }
     }
 
+    Ok(None)
+}
+
+/// Resolves the declared return type of an invocation without consulting providers.
+pub(crate) fn fetch_declared_invocation_return_type<A>(
+    context: &Context<'_, '_, A>,
+    invocation: &Invocation<'_, '_, '_>,
+    template_result: &TemplateResult,
+    parameters: &WordMap<TUnion>,
+) -> TUnion
+where
+    A: Arena,
+{
     let mut resulting_type = if let Some(return_type) = invocation.target.get_return_type().cloned() {
         resolve_invocation_type(context, invocation, template_result, parameters, return_type)
     } else {
@@ -55,5 +112,5 @@ where
         resulting_type.set_by_reference(true);
     }
 
-    Ok(resulting_type)
+    resulting_type
 }

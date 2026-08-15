@@ -30,6 +30,7 @@ use mago_word::concat_word;
 use mago_word::starts_with_ignore_case;
 
 use crate::artifacts::AnalysisArtifacts;
+use crate::invocation::EffectiveCallableSignature;
 use crate::invocation::Invocation;
 use crate::plugin::available_plugins;
 
@@ -106,12 +107,15 @@ impl ExternalAnalysisSession {
 struct ExternalAnalyzerTelemetry {
     function_lookups: AtomicU64,
     method_lookups: AtomicU64,
+    signature_lookups: AtomicU64,
     backend_checks: AtomicU64,
     candidate_providers: AtomicU64,
     matched_providers: AtomicU64,
     unmatched_lookups: AtomicU64,
     requests: AtomicU64,
+    signature_requests: AtomicU64,
     provided_types: AtomicU64,
+    provided_signatures: AtomicU64,
     declined_requests: AtomicU64,
     errors: AtomicU64,
     snapshotted_types: AtomicU64,
@@ -314,6 +318,7 @@ impl MethodTarget {
 struct FunctionProvider {
     plugin: String,
     index: u16,
+    callable_signature: bool,
     targets: Vec<FunctionTarget>,
 }
 
@@ -321,6 +326,7 @@ struct FunctionProvider {
 struct MethodProvider {
     plugin: String,
     index: u16,
+    callable_signature: bool,
     targets: Vec<MethodTarget>,
 }
 
@@ -428,16 +434,23 @@ struct Backend<T> {
     registration: Registration,
     function_exact: WordMap<Vec<u16>>,
     function_wildcard: Vec<(u16, Vec<FunctionTarget>)>,
+    function_signature_exact: WordMap<Vec<u16>>,
+    function_signature_wildcard: Vec<(u16, Vec<FunctionTarget>)>,
     method_exact: WordMap<Vec<u16>>,
     method_wildcard: Vec<(u16, Vec<MethodTarget>)>,
+    method_signature_exact: WordMap<Vec<u16>>,
+    method_signature_wildcard: Vec<(u16, Vec<MethodTarget>)>,
 }
 
 impl<T> Backend<T> {
     fn new(transport: Arc<T>, registration: Registration) -> Self {
         let mut function_exact = WordMap::default();
         let mut function_wildcard = Vec::new();
+        let mut function_signature_exact = WordMap::default();
+        let mut function_signature_wildcard = Vec::new();
         for provider in &registration.function_providers {
             let mut wildcard_targets = Vec::new();
+            let mut signature_wildcard_targets = Vec::new();
             for target in &provider.targets {
                 match target {
                     FunctionTarget::Exact(name) => {
@@ -445,24 +458,44 @@ impl<T> Backend<T> {
                         if indices.last() != Some(&provider.index) {
                             indices.push(provider.index);
                         }
+
+                        if provider.callable_signature {
+                            let indices =
+                                function_signature_exact.entry(ascii_lowercase_word(name)).or_insert_with(Vec::new);
+                            if indices.last() != Some(&provider.index) {
+                                indices.push(provider.index);
+                            }
+                        }
                     }
                     FunctionTarget::Prefix(_) | FunctionTarget::Namespace(_) => {
                         wildcard_targets.push(target.clone());
+                        if provider.callable_signature {
+                            signature_wildcard_targets.push(target.clone());
+                        }
                     }
                 }
             }
             if !wildcard_targets.is_empty() {
                 function_wildcard.push((provider.index, wildcard_targets));
             }
+            if !signature_wildcard_targets.is_empty() {
+                function_signature_wildcard.push((provider.index, signature_wildcard_targets));
+            }
         }
 
         let mut method_exact = WordMap::default();
         let mut method_wildcard = Vec::new();
+        let mut method_signature_exact = WordMap::default();
+        let mut method_signature_wildcard = Vec::new();
         for provider in &registration.method_providers {
             let mut wildcard_targets = Vec::new();
+            let mut signature_wildcard_targets = Vec::new();
             for target in &provider.targets {
                 if target.class.contains(&b'*') || target.method.contains(&b'*') {
                     wildcard_targets.push(target.clone());
+                    if provider.callable_signature {
+                        signature_wildcard_targets.push(target.clone());
+                    }
                 } else {
                     let class = ascii_lowercase_word(&target.class);
                     let method = ascii_lowercase_word(&target.method);
@@ -470,14 +503,38 @@ impl<T> Backend<T> {
                     if indices.last() != Some(&provider.index) {
                         indices.push(provider.index);
                     }
+
+                    if provider.callable_signature {
+                        let indices =
+                            method_signature_exact.entry(concat_word!(class, b"::", method)).or_insert_with(Vec::new);
+                        if indices.last() != Some(&provider.index) {
+                            indices.push(provider.index);
+                        }
+                    }
                 }
             }
+
             if !wildcard_targets.is_empty() {
                 method_wildcard.push((provider.index, wildcard_targets));
             }
+
+            if !signature_wildcard_targets.is_empty() {
+                method_signature_wildcard.push((provider.index, signature_wildcard_targets));
+            }
         }
 
-        Self { transport, registration, function_exact, function_wildcard, method_exact, method_wildcard }
+        Self {
+            transport,
+            registration,
+            function_exact,
+            function_wildcard,
+            function_signature_exact,
+            function_signature_wildcard,
+            method_exact,
+            method_wildcard,
+            method_signature_exact,
+            method_signature_wildcard,
+        }
     }
 
     fn matching_function_providers(&self, function: &[u8]) -> (Option<ProviderIndices>, usize) {
@@ -499,6 +556,32 @@ impl<T> Backend<T> {
         let candidates = exact.len() + self.method_wildcard.len();
         let wildcards = self
             .method_wildcard
+            .iter()
+            .filter(|(_, targets)| targets.iter().any(|target| target.matches(class, method)))
+            .map(|(index, _)| *index);
+
+        (ProviderIndices::from_exact_and_wildcards(exact, wildcards), candidates)
+    }
+
+    fn matching_function_signature_providers(&self, function: &[u8]) -> (Option<ProviderIndices>, usize) {
+        let function = ascii_lowercase_word(function);
+        let exact = self.function_signature_exact.get(&function).map_or(&[][..], Vec::as_slice);
+        let candidates = exact.len() + self.function_signature_wildcard.len();
+        let wildcards = self
+            .function_signature_wildcard
+            .iter()
+            .filter(|(_, targets)| targets.iter().any(|target| target.matches(function.as_bytes())))
+            .map(|(index, _)| *index);
+
+        (ProviderIndices::from_exact_and_wildcards(exact, wildcards), candidates)
+    }
+
+    fn matching_method_signature_providers(&self, class: &[u8], method: &[u8]) -> (Option<ProviderIndices>, usize) {
+        let key = concat_word!(ascii_lowercase_word(class), b"::", ascii_lowercase_word(method));
+        let exact = self.method_signature_exact.get(&key).map_or(&[][..], Vec::as_slice);
+        let candidates = exact.len() + self.method_signature_wildcard.len();
+        let wildcards = self
+            .method_signature_wildcard
             .iter()
             .filter(|(_, targets)| targets.iter().any(|target| target.matches(class, method)))
             .map(|(index, _)| *index);
@@ -602,6 +685,35 @@ impl ExternalAnalyzerHandle {
             .map_err(|error| error.to_string())
     }
 
+    pub(crate) fn get_function_callable_signature(
+        &self,
+        function: &[u8],
+        invocation: &Invocation<'_, '_, '_>,
+        artifacts: &AnalysisArtifacts,
+        source_file: &File,
+        codebase: &CodebaseMetadata,
+        session: &ExternalAnalysisSession,
+    ) -> Result<Option<EffectiveCallableSignature>, String> {
+        self.get()?
+            .get_function_callable_signature(function, invocation, artifacts, source_file, codebase, session)
+            .map_err(|error| error.to_string())
+    }
+
+    pub(crate) fn get_method_callable_signature(
+        &self,
+        class: &[u8],
+        method: &[u8],
+        invocation: &Invocation<'_, '_, '_>,
+        artifacts: &AnalysisArtifacts,
+        source_file: &File,
+        codebase: &CodebaseMetadata,
+        session: &ExternalAnalysisSession,
+    ) -> Result<Option<EffectiveCallableSignature>, String> {
+        self.get()?
+            .get_method_callable_signature(class, method, invocation, artifacts, source_file, codebase, session)
+            .map_err(|error| error.to_string())
+    }
+
     pub(crate) fn has_after_file_analysis_hooks(&self) -> Result<bool, String> {
         Ok(self.get()?.backends.iter().any(|backend| !backend.registration.after_file_analysis_plugins.is_empty()))
     }
@@ -612,6 +724,22 @@ impl ExternalAnalyzerHandle {
 
     pub(crate) fn has_method_return_type_providers(&self) -> Result<bool, String> {
         Ok(self.get()?.backends.iter().any(|backend| !backend.registration.method_providers.is_empty()))
+    }
+
+    pub(crate) fn has_function_callable_signature_providers(&self) -> Result<bool, String> {
+        Ok(self
+            .get()?
+            .backends
+            .iter()
+            .any(|backend| backend.registration.function_providers.iter().any(|provider| provider.callable_signature)))
+    }
+
+    pub(crate) fn has_method_callable_signature_providers(&self) -> Result<bool, String> {
+        Ok(self
+            .get()?
+            .backends
+            .iter()
+            .any(|backend| backend.registration.method_providers.iter().any(|provider| provider.callable_signature)))
     }
 
     pub(crate) fn has_after_analysis_hooks(&self) -> Result<bool, String> {
@@ -1103,6 +1231,235 @@ where
         Ok(issues)
     }
 
+    fn dispatch_callable_signature_request(
+        &self,
+        backend: &Backend<T>,
+        request: protocol::ReturnTypeRequest<'_>,
+        codebase: &CodebaseMetadata,
+        session: &ExternalAnalysisSession,
+    ) -> Result<Option<EffectiveCallableSignature>, ExternalAnalyzerError> {
+        if self.trace_enabled {
+            self.telemetry.requests.fetch_add(1, Ordering::Relaxed);
+            self.telemetry.signature_requests.fetch_add(1, Ordering::Relaxed);
+            self.telemetry.snapshotted_types.fetch_add(request.snapshotted_types as u64, Ordering::Relaxed);
+            self.telemetry.arguments.fetch_add(request.arguments as u64, Ordering::Relaxed);
+            self.telemetry.typed_arguments.fetch_add(request.typed_arguments as u64, Ordering::Relaxed);
+            self.telemetry
+                .type_snapshot_ns
+                .fetch_add(duration_nanos(request.type_snapshot_duration), Ordering::Relaxed);
+            self.telemetry.request_bytes.fetch_add(request.payload.len() as u64, Ordering::Relaxed);
+        }
+
+        let nested_telemetry = &self.telemetry;
+        let trace_enabled = self.trace_enabled;
+        let mut handler = |frame: &Frame| {
+            let nested_start = trace_enabled.then(Instant::now);
+            let result = protocol::handle_nested_request(&frame.payload, codebase, session, |handle| {
+                protocol::resolve_type_handle(&request.types, handle)
+            });
+            if let Some(start) = nested_start {
+                nested_telemetry.record_nested_request(frame.payload.len(), start.elapsed(), &result);
+            }
+
+            result.map(|(_, response)| response).map_err(|error| error.to_string().into_bytes())
+        };
+
+        let ipc_start = self.trace_enabled.then(Instant::now);
+        let response = backend.transport.request_with_handler(request.payload, &mut handler).inspect_err(|_| {
+            if self.trace_enabled {
+                self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
+            }
+        })?;
+
+        if let Some(start) = ipc_start {
+            self.telemetry.ipc_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
+            self.telemetry.response_bytes.fetch_add(response.len() as u64, Ordering::Relaxed);
+        }
+
+        let decode_start = self.trace_enabled.then(Instant::now);
+        let result = protocol::decode_callable_signature_response(&response, |handle| {
+            protocol::resolve_type_handle(&request.types, handle)
+        })
+        .inspect_err(|_| {
+            if self.trace_enabled {
+                self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
+            }
+        })?;
+
+        if let Some(start) = decode_start {
+            self.telemetry.decode_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
+        }
+
+        if self.trace_enabled {
+            if result.is_some() {
+                self.telemetry.provided_signatures.fetch_add(1, Ordering::Relaxed);
+            } else {
+                self.telemetry.declined_requests.fetch_add(1, Ordering::Relaxed);
+            }
+        }
+
+        Ok(result)
+    }
+
+    pub(crate) fn get_function_callable_signature(
+        &self,
+        function: &[u8],
+        invocation: &Invocation<'_, '_, '_>,
+        artifacts: &AnalysisArtifacts,
+        source_file: &File,
+        codebase: &CodebaseMetadata,
+        session: &ExternalAnalysisSession,
+    ) -> Result<Option<EffectiveCallableSignature>, ExternalAnalyzerError> {
+        let _lookup_trace =
+            self.trace_enabled.then(|| LookupTrace { telemetry: &self.telemetry, started_at: Instant::now() });
+        if self.trace_enabled {
+            self.telemetry.signature_lookups.fetch_add(1, Ordering::Relaxed);
+        }
+
+        for backend in &self.backends {
+            let matching_start = self.trace_enabled.then(Instant::now);
+            let (indices, candidates) = backend.matching_function_signature_providers(function);
+            if self.trace_enabled {
+                self.telemetry.backend_checks.fetch_add(1, Ordering::Relaxed);
+                self.telemetry.candidate_providers.fetch_add(candidates as u64, Ordering::Relaxed);
+            }
+
+            if let Some(start) = matching_start {
+                self.telemetry.matching_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
+            }
+
+            let Some(indices) = indices else {
+                continue;
+            };
+
+            if self.trace_enabled {
+                self.telemetry.matched_providers.fetch_add(indices.as_slice().len() as u64, Ordering::Relaxed);
+            }
+
+            let encode_start = self.trace_enabled.then(Instant::now);
+            let provider_start = self.trace_enabled.then(Instant::now);
+            let request = protocol::encode_function_callable_signature_request(
+                indices.as_slice(),
+                function,
+                invocation,
+                artifacts,
+                source_file,
+                session.generation(),
+                self.trace_enabled,
+            )
+            .inspect_err(|_| {
+                if self.trace_enabled {
+                    self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
+                }
+            })?;
+
+            if let Some(start) = encode_start {
+                self.telemetry.encode_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
+            }
+
+            let signature = self.dispatch_callable_signature_request(backend, request, codebase, session)?;
+            if let Some(start) = provider_start
+                && start.elapsed() >= SLOW_PROVIDER_THRESHOLD
+            {
+                tracing::trace!(
+                    function = %mago_bytes::BytesDisplay(function),
+                    providers = indices.as_slice().len(),
+                    elapsed = ?start.elapsed(),
+                    provided = signature.is_some(),
+                    "Slow external function callable-signature provider request completed."
+                );
+            }
+
+            if let Some(signature) = signature {
+                return Ok(Some(signature));
+            }
+        }
+
+        Ok(None)
+    }
+
+    pub(crate) fn get_method_callable_signature(
+        &self,
+        class: &[u8],
+        method: &[u8],
+        invocation: &Invocation<'_, '_, '_>,
+        artifacts: &AnalysisArtifacts,
+        source_file: &File,
+        codebase: &CodebaseMetadata,
+        session: &ExternalAnalysisSession,
+    ) -> Result<Option<EffectiveCallableSignature>, ExternalAnalyzerError> {
+        let _lookup_trace =
+            self.trace_enabled.then(|| LookupTrace { telemetry: &self.telemetry, started_at: Instant::now() });
+        if self.trace_enabled {
+            self.telemetry.signature_lookups.fetch_add(1, Ordering::Relaxed);
+        }
+
+        for backend in &self.backends {
+            let matching_start = self.trace_enabled.then(Instant::now);
+            let (indices, candidates) = backend.matching_method_signature_providers(class, method);
+            if self.trace_enabled {
+                self.telemetry.backend_checks.fetch_add(1, Ordering::Relaxed);
+                self.telemetry.candidate_providers.fetch_add(candidates as u64, Ordering::Relaxed);
+            }
+
+            if let Some(start) = matching_start {
+                self.telemetry.matching_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
+            }
+
+            let Some(indices) = indices else {
+                continue;
+            };
+
+            if self.trace_enabled {
+                self.telemetry.matched_providers.fetch_add(indices.as_slice().len() as u64, Ordering::Relaxed);
+            }
+
+            let declaring_class =
+                codebase.get_class_like(class).map_or(class, |metadata| metadata.original_name.as_bytes());
+            let encode_start = self.trace_enabled.then(Instant::now);
+            let provider_start = self.trace_enabled.then(Instant::now);
+            let request = protocol::encode_method_callable_signature_request(
+                indices.as_slice(),
+                declaring_class,
+                method,
+                invocation,
+                artifacts,
+                source_file,
+                session.generation(),
+                self.trace_enabled,
+            )
+            .inspect_err(|_| {
+                if self.trace_enabled {
+                    self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
+                }
+            })?;
+
+            if let Some(start) = encode_start {
+                self.telemetry.encode_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
+            }
+
+            let signature = self.dispatch_callable_signature_request(backend, request, codebase, session)?;
+            if let Some(start) = provider_start
+                && start.elapsed() >= SLOW_PROVIDER_THRESHOLD
+            {
+                tracing::trace!(
+                    class = %mago_bytes::BytesDisplay(class),
+                    method = %mago_bytes::BytesDisplay(method),
+                    providers = indices.as_slice().len(),
+                    elapsed = ?start.elapsed(),
+                    provided = signature.is_some(),
+                    "Slow external method callable-signature provider request completed."
+                );
+            }
+
+            if let Some(signature) = signature {
+                return Ok(Some(signature));
+            }
+        }
+
+        Ok(None)
+    }
+
     pub(crate) fn get_function_return_type(
         &self,
         function: &[u8],
@@ -1159,7 +1516,7 @@ where
 
             if let Some(start) = encode_start {
                 self.telemetry.encode_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
-                self.telemetry.snapshotted_types.fetch_add(request.types.len() as u64, Ordering::Relaxed);
+                self.telemetry.snapshotted_types.fetch_add(request.snapshotted_types as u64, Ordering::Relaxed);
                 self.telemetry.arguments.fetch_add(request.arguments as u64, Ordering::Relaxed);
                 self.telemetry.typed_arguments.fetch_add(request.typed_arguments as u64, Ordering::Relaxed);
                 self.telemetry
@@ -1174,7 +1531,7 @@ where
                 let nested_start = trace_enabled.then(Instant::now);
 
                 let result = protocol::handle_nested_request(&frame.payload, codebase, session, |handle| {
-                    request.types.get(handle).copied()
+                    protocol::resolve_type_handle(&request.types, handle)
                 });
                 if let Some(start) = nested_start {
                     nested_telemetry.record_nested_request(frame.payload.len(), start.elapsed(), &result);
@@ -1196,12 +1553,14 @@ where
             }
 
             let decode_start = self.trace_enabled.then(Instant::now);
-            let result = protocol::decode_return_type_response(&response, |handle| request.types.get(handle).copied())
-                .inspect_err(|_| {
-                    if self.trace_enabled {
-                        self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
-                    }
-                })?;
+            let result = protocol::decode_return_type_response(&response, |handle| {
+                protocol::resolve_type_handle(&request.types, handle)
+            })
+            .inspect_err(|_| {
+                if self.trace_enabled {
+                    self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
+                }
+            })?;
 
             if let Some(start) = decode_start {
                 self.telemetry.decode_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
@@ -1274,6 +1633,8 @@ where
             let Some(indices) = indices else {
                 continue;
             };
+            let declaring_class =
+                codebase.get_class_like(class).map_or(class, |metadata| metadata.original_name.as_bytes());
 
             dispatched = true;
             let provider_start = self.trace_enabled.then(Instant::now);
@@ -1285,7 +1646,7 @@ where
             let encode_start = self.trace_enabled.then(Instant::now);
             let request = protocol::encode_method_return_type_request(
                 indices.as_slice(),
-                class,
+                declaring_class,
                 method,
                 invocation,
                 artifacts,
@@ -1301,7 +1662,7 @@ where
 
             if let Some(start) = encode_start {
                 self.telemetry.encode_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
-                self.telemetry.snapshotted_types.fetch_add(request.types.len() as u64, Ordering::Relaxed);
+                self.telemetry.snapshotted_types.fetch_add(request.snapshotted_types as u64, Ordering::Relaxed);
                 self.telemetry.arguments.fetch_add(request.arguments as u64, Ordering::Relaxed);
                 self.telemetry.typed_arguments.fetch_add(request.typed_arguments as u64, Ordering::Relaxed);
                 self.telemetry
@@ -1316,7 +1677,7 @@ where
                 let nested_start = trace_enabled.then(Instant::now);
 
                 let result = protocol::handle_nested_request(&frame.payload, codebase, session, |handle| {
-                    request.types.get(handle).copied()
+                    protocol::resolve_type_handle(&request.types, handle)
                 });
                 if let Some(start) = nested_start {
                     nested_telemetry.record_nested_request(frame.payload.len(), start.elapsed(), &result);
@@ -1337,12 +1698,14 @@ where
             }
 
             let decode_start = self.trace_enabled.then(Instant::now);
-            let result = protocol::decode_return_type_response(&response, |handle| request.types.get(handle).copied())
-                .inspect_err(|_| {
-                    if self.trace_enabled {
-                        self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
-                    }
-                })?;
+            let result = protocol::decode_return_type_response(&response, |handle| {
+                protocol::resolve_type_handle(&request.types, handle)
+            })
+            .inspect_err(|_| {
+                if self.trace_enabled {
+                    self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
+                }
+            })?;
 
             if let Some(start) = decode_start {
                 self.telemetry.decode_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
@@ -1357,7 +1720,7 @@ where
                     providers = indices.as_slice().len(),
                     arguments = request.arguments,
                     typed_arguments = request.typed_arguments,
-                    argument_types = request.types.len(),
+                    argument_types = request.types.len() - request.receiver_type_count,
                     response_bytes = response.len(),
                     elapsed = ?start.elapsed(),
                     provided = result.is_some(),
@@ -1602,7 +1965,8 @@ impl<T> Drop for ExternalAnalyzer<T> {
 
         let function_lookups = self.telemetry.function_lookups.load(Ordering::Relaxed);
         let method_lookups = self.telemetry.method_lookups.load(Ordering::Relaxed);
-        let lookups = function_lookups.saturating_add(method_lookups);
+        let signature_lookups = self.telemetry.signature_lookups.load(Ordering::Relaxed);
+        let lookups = function_lookups.saturating_add(method_lookups).saturating_add(signature_lookups);
         let requests = self.telemetry.requests.load(Ordering::Relaxed);
         let nested_requests = self.telemetry.nested_requests.load(Ordering::Relaxed);
         let comparisons = self.telemetry.comparisons.load(Ordering::Relaxed);
@@ -1618,6 +1982,7 @@ impl<T> Drop for ExternalAnalyzer<T> {
         tracing::trace!(
             function_lookups,
             method_lookups,
+            signature_lookups,
             backend_checks = self.telemetry.backend_checks.load(Ordering::Relaxed),
             candidate_providers = self.telemetry.candidate_providers.load(Ordering::Relaxed),
             matched_providers = self.telemetry.matched_providers.load(Ordering::Relaxed),
@@ -1626,7 +1991,9 @@ impl<T> Drop for ExternalAnalyzer<T> {
         );
         tracing::trace!(
             requests,
+            signature_requests = self.telemetry.signature_requests.load(Ordering::Relaxed),
             provided_types = self.telemetry.provided_types.load(Ordering::Relaxed),
+            provided_signatures = self.telemetry.provided_signatures.load(Ordering::Relaxed),
             declined_requests = self.telemetry.declined_requests.load(Ordering::Relaxed),
             errors = self.telemetry.errors.load(Ordering::Relaxed),
             arguments = self.telemetry.arguments.load(Ordering::Relaxed),
@@ -1848,6 +2215,8 @@ mod tests {
         assert_eq!(analyzer.extensions().len(), 1);
         assert_eq!(analyzer.plugins()[0].identifier, "demo");
         assert_eq!(analyzer.backends[0].registration.function_providers.len(), 1);
+        assert!(analyzer.backends[0].matching_function_providers(b"demo_service").0.is_some());
+        assert!(analyzer.backends[0].matching_function_signature_providers(b"demo_service").0.is_none());
     }
 
     #[test]

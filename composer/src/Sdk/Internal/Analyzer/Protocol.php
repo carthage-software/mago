@@ -5,9 +5,12 @@ declare(strict_types=1);
 namespace Mago\Sdk\Internal\Analyzer;
 
 use Mago\Sdk\Analyzer\Argument;
+use Mago\Sdk\Analyzer\CallableSignatureProvider;
+use Mago\Sdk\Analyzer\EffectiveCallableSignature;
 use Mago\Sdk\Analyzer\ExpressionType;
 use Mago\Sdk\Analyzer\FileAnalysis;
 use Mago\Sdk\Analyzer\Invocation;
+use Mago\Sdk\Analyzer\InvocationKind;
 use Mago\Sdk\Analyzer\Metadata\MemberIdentifier;
 use Mago\Sdk\Analyzer\ProjectAnalysis;
 use Mago\Sdk\Analyzer\ReferenceKind;
@@ -50,6 +53,7 @@ final class Protocol
     public const AFTER_FILE_ANALYSIS_BATCH_REQUEST = 9;
     public const SYMBOL_REFERENCE_QUERY_REQUEST = 10;
     public const INITIALIZE_REQUEST = 11;
+    public const CALLABLE_SIGNATURE_REQUEST = 12;
     public const GET_EXPRESSION_TYPES = 1;
     public const GET_ALL_EXPRESSION_TYPES = 2;
     public const GET_INFERRED_RETURN_TYPES = 3;
@@ -72,6 +76,8 @@ final class Protocol
     public const CHECK_EXISTENCE = 13;
     public const CHECK_MEMBER_EXISTENCE = 14;
     public const GET_CLASS_LIKE_RELATIONS = 15;
+    public const GET_MAGIC_PROPERTIES = 16;
+    public const GET_DECLARING_MAGIC_PROPERTIES = 17;
     public const EXISTS_CLASS = 1;
     public const EXISTS_INTERFACE = 2;
     public const EXISTS_TRAIT = 3;
@@ -86,6 +92,7 @@ final class Protocol
     public const EXISTS_PROPERTY = 2;
     public const EXISTS_CLASS_CONSTANT = 3;
     public const EXISTS_ENUM_CASE = 4;
+    public const EXISTS_MAGIC_PROPERTY = 5;
     public const DIRECT_DESCENDANTS = 1;
     public const ALL_DESCENDANTS = 2;
     public const ALL_ANCESTORS = 3;
@@ -112,16 +119,24 @@ final class Protocol
     private const AFTER_FILE_ANALYSIS_BATCH_RESPONSE = 0x8009;
     private const SYMBOL_REFERENCE_QUERY_RESPONSE = 0x800A;
     private const INITIALIZE_RESPONSE = 0x800B;
+    private const CALLABLE_SIGNATURE_RESPONSE = 0x800C;
     private const RETURN_TYPE_REQUEST_HEADER = "MANA\x00\x01\x00\x01\x00\x02\x00\x00";
+    private const CALLABLE_SIGNATURE_REQUEST_HEADER = "MANA\x00\x01\x00\x01\x00\x0C\x00\x00";
     private const UNHANDLED_RETURN_TYPE_RESPONSE = "MANA\x00\x01\x00\x01\x80\x02\x00\x00\x00";
+    private const UNHANDLED_CALLABLE_SIGNATURE_RESPONSE = "MANA\x00\x01\x00\x01\x80\x0C\x00\x00\x00";
     private const INVOCATION_FUNCTION = 1;
-    private const INVOCATION_METHOD = 2;
+    private const INVOCATION_INSTANCE_METHOD = 2;
+    private const INVOCATION_STATIC_METHOD = 3;
 
     /** @return array{int<0, 65535>, PayloadReader} */
     public static function readRequest(string $payload): array
     {
         if (strncmp($payload, self::RETURN_TYPE_REQUEST_HEADER, 12) === 0) {
             return [self::RETURN_TYPE_REQUEST, new PayloadReader($payload, 12)];
+        }
+
+        if (strncmp($payload, self::CALLABLE_SIGNATURE_REQUEST_HEADER, 12) === 0) {
+            return [self::CALLABLE_SIGNATURE_REQUEST, new PayloadReader($payload, 12)];
         }
 
         /** @var array{1: int<0, 4294967295>, 2: int<0, 4294967295>, 3: int<0, 4294967295>} $header */
@@ -225,6 +240,7 @@ final class Protocol
                 $writer->writeCount($plugin->functionProviders);
                 foreach ($plugin->functionProviders as $provider) {
                     $writer->writeU16($provider->index);
+                    $writer->writeU8((int) ($provider->provider instanceof CallableSignatureProvider));
                     $writer->writeCount($provider->targets);
                     foreach ($provider->targets as $target) {
                         $writer->writeU8($target->kind->value);
@@ -235,6 +251,7 @@ final class Protocol
                 $writer->writeCount($plugin->methodProviders);
                 foreach ($plugin->methodProviders as $provider) {
                     $writer->writeU16($provider->index);
+                    $writer->writeU8((int) ($provider->provider instanceof CallableSignatureProvider));
                     $writer->writeCount($provider->targets);
                     foreach ($provider->targets as $target) {
                         $writer->writeBytes($target->class);
@@ -577,10 +594,13 @@ final class Protocol
     public static function readReturnTypeRequest(PayloadReader $reader): ReturnTypeRequest
     {
         $generation = $reader->readU64();
-        $kind = $reader->readU8();
-        if ($kind !== self::INVOCATION_FUNCTION && $kind !== self::INVOCATION_METHOD) {
-            throw new ProtocolException("Unknown analyzer invocation kind {$kind}.");
-        }
+        $encodedKind = $reader->readU8();
+        $kind = match ($encodedKind) {
+            self::INVOCATION_FUNCTION => InvocationKind::Function,
+            self::INVOCATION_INSTANCE_METHOD => InvocationKind::InstanceMethod,
+            self::INVOCATION_STATIC_METHOD => InvocationKind::StaticMethod,
+            default => throw new ProtocolException("Unknown analyzer invocation kind {$encodedKind}."),
+        };
 
         $providerCount = $reader->readU16();
         if ($providerCount === 0) {
@@ -591,11 +611,14 @@ final class Protocol
             $providers[] = $reader->readU16();
         }
 
-        $class = $kind === self::INVOCATION_METHOD ? $reader->readBytes() : null;
+        $method = $kind !== InvocationKind::Function;
+        $declaringClass = $method ? $reader->readBytes() : null;
         $name = $reader->readBytes();
-        if ($name === '' || $class === '') {
+        if ($name === '' || $declaringClass === '') {
             throw new ProtocolException('Analyzer invocation names cannot be empty.');
         }
+
+        $receiverType = $method ? TypeCodec::read($reader) : null;
 
         $span = new Span($reader->readU32(), $reader->readU32());
         $argumentCount = $reader->readU16();
@@ -618,9 +641,8 @@ final class Protocol
 
         return new ReturnTypeRequest(
             $generation,
-            $kind === self::INVOCATION_METHOD,
             $providers,
-            new Invocation($name, $class, $span, $arguments),
+            new Invocation($kind, $name, $declaringClass, $receiverType, $span, $arguments),
         );
     }
 
@@ -631,6 +653,33 @@ final class Protocol
         }
 
         return pack('N3C', self::MAGIC_U32, self::VERSION_U32, self::RETURN_TYPE_RESPONSE << 16, 1) . $type->encode();
+    }
+
+    public static function writeCallableSignatureResponse(?EffectiveCallableSignature $signature): string
+    {
+        if ($signature === null) {
+            return self::UNHANDLED_CALLABLE_SIGNATURE_RESPONSE;
+        }
+
+        $writer = self::createMessage(self::CALLABLE_SIGNATURE_RESPONSE);
+        $writer->writeBoolean(true);
+        $writer->writeBoolean($signature->allowsNamedArguments);
+        $writer->writeCount($signature->parameters);
+        foreach ($signature->parameters as $parameter) {
+            $writer->writeOptionalString($parameter->name);
+            $writer->writeBoolean($parameter->type !== null);
+            if ($parameter->type !== null) {
+                $writer->writeRaw($parameter->type->encode());
+            }
+
+            $flags = 0;
+            $flags |= (int) $parameter->byReference;
+            $flags |= (int) $parameter->variadic << 1;
+            $flags |= (int) $parameter->hasDefault << 2;
+            $writer->writeU8($flags);
+        }
+
+        return $writer->finish();
     }
 
     public static function writeTypeComparisonRequest(int $operation, Type $left, Type $right): string

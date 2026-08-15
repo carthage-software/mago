@@ -32,6 +32,7 @@ use crate::error::AnalysisError;
 use crate::invocation::Invocation;
 use crate::invocation::InvocationArgumentsSource;
 use crate::invocation::InvocationTarget;
+use crate::invocation::MethodInvocationKind;
 use crate::invocation::MethodTargetContext;
 use crate::invocation::analyzer::analyze_invocation;
 use crate::invocation::post_process::post_invocation_process;
@@ -150,14 +151,14 @@ where
             }
         }
 
-        let invocation: Invocation<'ctx, 'ast, 'arena> = Invocation::new(target, invocation_arguments, call_span);
+        let mut invocation: Invocation<'ctx, 'ast, 'arena> = Invocation::new(target, invocation_arguments, call_span);
         let mut argument_types = WordMap::default();
 
         analyze_invocation(
             context,
             block_context,
             artifacts,
-            &invocation,
+            &mut invocation,
             None,
             &mut template_result,
             &mut argument_types,
@@ -458,6 +459,7 @@ where
             };
 
             Some(MethodTargetContext {
+                invocation_kind: MethodInvocationKind::Static,
                 declaring_method_id,
                 class_like_metadata,
                 class_type: StaticClassType::Name(original_class_name),
@@ -470,7 +472,14 @@ where
         None
     };
 
-    Some(InvocationTarget::FunctionLike { identifier, metadata, inferred_return_type, method_context, span })
+    Some(InvocationTarget::FunctionLike {
+        identifier,
+        metadata,
+        inferred_return_type,
+        effective_signature: None,
+        method_context,
+        span,
+    })
 }
 
 fn inspect_arguments<'ctx, 'arena, A>(

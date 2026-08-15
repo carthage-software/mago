@@ -249,6 +249,16 @@ impl CodebaseMetadata {
             .is_some_and(|meta| meta.appearing_property_ids.contains_key(&property_name))
     }
 
+    /// Checks if a magic `@property*` exists on a class-like, including inherited tags.
+    /// Class name is case-insensitive, property name is case-sensitive.
+    #[inline]
+    #[must_use]
+    pub fn magic_property_exists(&self, class: &[u8], property: &[u8]) -> bool {
+        let lowercase_class = ascii_lowercase_word(class);
+        let property_name = word(property);
+        self.class_likes.get(&lowercase_class).is_some_and(|meta| meta.magic_property_ids.contains_key(&property_name))
+    }
+
     /// Checks if a class constant or enum case exists on a class-like.
     /// Class name is case-insensitive, constant/case name is case-sensitive.
     #[inline]
@@ -459,6 +469,16 @@ impl CodebaseMetadata {
         self.class_likes.get(&lowercase_class)?.properties.get(&property_name)
     }
 
+    /// Retrieves magic `@property*` metadata declared directly on a class-like.
+    /// Class name is case-insensitive, property name is case-sensitive.
+    #[inline]
+    #[must_use]
+    pub fn get_magic_property(&self, class: &[u8], property: &[u8]) -> Option<&PropertyMetadata> {
+        let lowercase_class = ascii_lowercase_word(class);
+        let property_name = word(property);
+        self.class_likes.get(&lowercase_class)?.magic_properties.get(&property_name)
+    }
+
     /// Retrieves the property metadata, potentially from a parent class if inherited.
     #[inline]
     #[must_use]
@@ -467,6 +487,17 @@ impl CodebaseMetadata {
         let property_name = word(property);
         let declaring_class = self.class_likes.get(&lowercase_class)?.declaring_property_ids.get(&property_name)?;
         self.class_likes.get(declaring_class)?.properties.get(&property_name)
+    }
+
+    /// Retrieves magic `@property*` metadata, potentially from an inherited tag.
+    /// Class name is case-insensitive, property name is case-sensitive.
+    #[inline]
+    #[must_use]
+    pub fn get_declaring_magic_property(&self, class: &[u8], property: &[u8]) -> Option<&PropertyMetadata> {
+        let lowercase_class = ascii_lowercase_word(class);
+        let property_name = word(property);
+        let declaring_class = self.class_likes.get(&lowercase_class)?.magic_property_ids.get(&property_name)?;
+        self.class_likes.get(declaring_class)?.magic_properties.get(&property_name)
     }
     // Type Resolution
 
