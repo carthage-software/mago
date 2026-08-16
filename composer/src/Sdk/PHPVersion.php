@@ -6,8 +6,6 @@ namespace Mago\Sdk;
 
 use Mago\Sdk\Exception\InvalidArgumentException;
 
-use function intdiv;
-
 /**
  * The PHP language version selected by Mago for the current operation.
  *
@@ -22,7 +20,7 @@ final class PHPVersion
     public readonly int $id;
 
     /**
-     * @param int $id PHP_VERSION_ID-style integer.
+     * @param int $id Version components packed as `0xMMMMmmpp`.
      */
     public function __construct(int $id)
     {
@@ -35,26 +33,26 @@ final class PHPVersion
 
     public static function fromParts(int $major, int $minor, int $patch = 0): self
     {
-        if ($major < 0 || $major > 429_496 || $minor < 0 || $minor > 99 || $patch < 0 || $patch > 99) {
+        if ($major < 0 || $major > 65_535 || $minor < 0 || $minor > 255 || $patch < 0 || $patch > 255) {
             throw new InvalidArgumentException('PHP version parts are outside their supported ranges.');
         }
 
-        return new self(($major * 10_000) + ($minor * 100) + $patch);
+        return new self(($major << 16) | ($minor << 8) | $patch);
     }
 
     public function major(): int
     {
-        return intdiv($this->id, 10_000);
+        return $this->id >> 16;
     }
 
     public function minor(): int
     {
-        return intdiv($this->id % 10_000, 100);
+        return ($this->id >> 8) & 0xff;
     }
 
     public function patch(): int
     {
-        return $this->id % 100;
+        return $this->id & 0xff;
     }
 
     public function isAtLeast(self $other): bool
