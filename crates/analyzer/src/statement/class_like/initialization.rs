@@ -427,15 +427,10 @@ where
 {
     let mut all_initialized = WordSet::default();
 
-    // No class initializers configured
-    if context.settings.class_initializers.is_empty() {
-        return all_initialized;
-    }
-
     let class_name = class_like_metadata.name;
     let class_is_final = class_like_metadata.flags.is_final();
 
-    for initializer_name in context.settings.applicable_class_initializers(class_like_metadata) {
+    for initializer_name in context.applicable_class_initializers(class_like_metadata) {
         if let Some(method_id) = class_like_metadata.declaring_method_ids.get(&initializer_name) {
             let declaring_class_name = method_id.get_class_name();
 
@@ -458,7 +453,7 @@ where
             break;
         };
 
-        for initializer_name in context.settings.applicable_class_initializers(parent_meta) {
+        for initializer_name in context.applicable_class_initializers(parent_meta) {
             if let Some(method_id) = parent_meta.declaring_method_ids.get(&initializer_name) {
                 let declaring_class_name = method_id.get_class_name();
 
@@ -489,7 +484,6 @@ where
 
     let has_any_initializer = {
         let current_has = context
-            .settings
             .applicable_class_initializers(class_like_metadata)
             .any(|init_name| class_like_metadata.declaring_method_ids.contains_key(&init_name));
 
@@ -503,7 +497,6 @@ where
                     break;
                 };
                 if context
-                    .settings
                     .applicable_class_initializers(parent_meta)
                     .any(|init_name| parent_meta.declaring_method_ids.contains_key(&init_name))
                 {
@@ -524,7 +517,6 @@ where
             };
 
             let parent_has_initializer = context
-                .settings
                 .applicable_class_initializers(parent_meta)
                 .any(|init_name| parent_meta.declaring_method_ids.contains_key(&init_name));
 
@@ -559,7 +551,7 @@ where
     }
 
     if let Some(class_meta) = context.codebase.get_class_like(class_name.as_bytes())
-        && context.settings.is_class_initializer_for(class_meta, method_name)
+        && context.is_class_initializer_for(class_meta, method_name)
     {
         return true;
     }

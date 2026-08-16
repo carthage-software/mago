@@ -105,7 +105,7 @@ pub(crate) fn check_property_write<A>(
         && context
             .codebase
             .get_class_like(current_class.as_bytes())
-            .is_some_and(|metadata| context.settings.is_class_initializer_for(metadata, function_like.name));
+            .is_some_and(|metadata| context.is_class_initializer_for(metadata, function_like.name));
 
     let mut local_state = if guard_proves_uninitialized {
         LocalInitializationState::Uninitialized
@@ -514,7 +514,6 @@ where
     }
     roots.extend(
         context
-            .settings
             .applicable_class_initializers(class_metadata)
             .filter(|method| class_metadata.declaring_method_ids.contains_key(method)),
     );

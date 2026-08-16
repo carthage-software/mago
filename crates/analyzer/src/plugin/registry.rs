@@ -90,6 +90,7 @@ pub struct PluginRegistry {
     external_method_signature_providers: OnceLock<bool>,
     external_property_providers: OnceLock<bool>,
     external_property_initialization_providers: OnceLock<bool>,
+    external_class_initializer_providers: OnceLock<bool>,
     external_issue_filter_hooks: OnceLock<bool>,
     function_exact: WordMap<Vec<usize>>,
     function_prefix: Vec<(Word, usize)>,
@@ -138,6 +139,7 @@ impl std::fmt::Debug for PluginRegistry {
             .field("external_method_providers", &self.external_method_providers.get())
             .field("external_property_providers", &self.external_property_providers.get())
             .field("external_property_initialization_providers", &self.external_property_initialization_providers.get())
+            .field("external_class_initializer_providers", &self.external_class_initializer_providers.get())
             .field("external_issue_filter_hooks", &self.external_issue_filter_hooks.get())
             .field("external_function_signature_providers", &self.external_function_signature_providers.get())
             .field("external_method_signature_providers", &self.external_method_signature_providers.get())
@@ -197,6 +199,8 @@ impl PluginRegistry {
             analyzer.has_property_type_providers().map_err(|reason| PluginError::Internal { reason })?;
         let property_initialization_providers =
             analyzer.has_property_initialization_providers().map_err(|reason| PluginError::Internal { reason })?;
+        let class_initializer_providers =
+            analyzer.has_class_initializer_providers().map_err(|reason| PluginError::Internal { reason })?;
         let issue_filter_hooks =
             analyzer.has_issue_filter_hooks().map_err(|reason| PluginError::Internal { reason })?;
         let _function = self.external_function_providers.set(function_providers);
@@ -206,6 +210,7 @@ impl PluginRegistry {
         let _property = self.external_property_providers.set(property_providers);
         let _property_initialization =
             self.external_property_initialization_providers.set(property_initialization_providers);
+        let _class_initializer = self.external_class_initializer_providers.set(class_initializer_providers);
         let _issue_filters = self.external_issue_filter_hooks.set(issue_filter_hooks);
         Ok(())
     }
@@ -1439,6 +1444,12 @@ impl PluginRegistry {
         self.external_analyzer.is_some() && self.external_property_providers.get().copied().unwrap_or(true)
     }
 
+    #[inline]
+    #[must_use]
+    pub(crate) fn may_have_class_initializer_provider(&self) -> bool {
+        self.external_analyzer.is_some() && self.external_class_initializer_providers.get().copied().unwrap_or(true)
+    }
+
     /// Requests an external provider's effective magic-property contract.
     ///
     /// # Errors
@@ -1511,6 +1522,30 @@ impl PluginRegistry {
             })
             .transpose()
             .map(|initialized| initialized.unwrap_or(false))
+            .map_err(|reason| PluginError::Internal { reason })
+    }
+
+    /// Returns framework lifecycle methods that initialize properties on `class_metadata`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when an external class initializer provider fails or returns an invalid response.
+    pub fn get_class_initializers(
+        &self,
+        codebase: &CodebaseMetadata,
+        class_metadata: &ClassLikeMetadata,
+        external_session: Option<&ExternalAnalysisSession>,
+    ) -> PluginResult<WordSet> {
+        if !self.external_class_initializer_providers.get().copied().unwrap_or(true) {
+            return Ok(WordSet::default());
+        }
+
+        self.external_analyzer
+            .as_deref()
+            .zip(external_session)
+            .map(|(analyzer, session)| analyzer.get_class_initializers(class_metadata, codebase, session))
+            .transpose()
+            .map(Option::unwrap_or_default)
             .map_err(|reason| PluginError::Internal { reason })
     }
 

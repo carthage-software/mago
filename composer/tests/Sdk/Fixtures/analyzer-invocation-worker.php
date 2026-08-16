@@ -6,6 +6,9 @@ namespace Mago\Tests\Sdk\Fixtures;
 
 use Mago\Sdk\Analyzer\CallableSignatureOverride;
 use Mago\Sdk\Analyzer\CallableSignatureProviderContext;
+use Mago\Sdk\Analyzer\ClassInitializerProvider;
+use Mago\Sdk\Analyzer\ClassInitializerProviderContext;
+use Mago\Sdk\Analyzer\ClassTarget;
 use Mago\Sdk\Analyzer\EffectiveCallableSignature;
 use Mago\Sdk\Analyzer\FunctionReturnTypeProvider;
 use Mago\Sdk\Analyzer\FunctionTarget;
@@ -617,6 +620,28 @@ final class InvocationPropertyInitializationProvider implements PropertyInitiali
 }
 
 /**
+ * @mago-expect lint:single-class-per-file
+ */
+final class InvocationClassInitializerProvider implements ClassInitializerProvider
+{
+    public function getTargets(): array
+    {
+        return [ClassTarget::exact('FrameworkTestCase')];
+    }
+
+    public function getClassInitializers(ClassInitializerProviderContext $context): array
+    {
+        if (!$context->codebase->methodExists($context->class->name, 'setUp')) {
+            return [];
+        }
+
+        InvocationAudit::record('class-initializer-' . strtolower($context->class->name));
+
+        return ['setUp'];
+    }
+}
+
+/**
  * @mago-expect lint:cyclomatic-complexity
  * @mago-expect lint:single-class-per-file
  */
@@ -679,6 +704,7 @@ final class InvocationPlugin implements Plugin
         }
         $registry->registerPropertyTypeProvider(new InvocationPropertyProvider());
         $registry->registerPropertyInitializationProvider(new InvocationPropertyInitializationProvider());
+        $registry->registerClassInitializerProvider(new InvocationClassInitializerProvider());
         if ($this->registerIssueFilter) {
             $registry->registerIssueFilterHook(new InvocationIssueFilterHook());
         }

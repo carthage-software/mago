@@ -13,6 +13,7 @@ use std::time::Duration;
 use std::time::Instant;
 
 use mago_codex::metadata::CodebaseMetadata;
+use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::reference::SymbolReferences;
 use mago_codex::ttype::union::TUnion;
 use mago_database::file::File;
@@ -29,6 +30,7 @@ use mago_span::Span;
 use mago_syntax::cst::NodeKind;
 use mago_syntax::cst::Program;
 use mago_word::WordMap;
+use mago_word::WordSet;
 use mago_word::ascii_lowercase_word;
 use mago_word::concat_word;
 use mago_word::starts_with_ignore_case;
@@ -144,6 +146,7 @@ struct ExternalAnalyzerTelemetry {
     method_lookups: AtomicU64,
     property_lookups: AtomicU64,
     property_initialization_lookups: AtomicU64,
+    class_initializer_lookups: AtomicU64,
     issue_filter_batches: AtomicU64,
     issue_filter_candidates: AtomicU64,
     issue_filter_removed: AtomicU64,
@@ -161,6 +164,7 @@ struct ExternalAnalyzerTelemetry {
     signature_requests: AtomicU64,
     provided_types: AtomicU64,
     initialized_properties: AtomicU64,
+    provided_class_initializers: AtomicU64,
     provided_signatures: AtomicU64,
     declined_requests: AtomicU64,
     errors: AtomicU64,
@@ -431,6 +435,13 @@ struct PropertyProvider {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
+struct ClassInitializerProvider {
+    plugin: String,
+    index: u16,
+    targets: Vec<Vec<u8>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
 struct IssueFilterHookRegistration {
     plugin: String,
     index: u16,
@@ -448,6 +459,8 @@ struct NodeAnalysisHookRegistration {
 
 type PropertyProviderExactIndex = WordMap<Vec<u16>>;
 type PropertyProviderWildcardIndex = Vec<(u16, Vec<PropertyTarget>)>;
+type ClassProviderExactIndex = WordMap<Vec<u16>>;
+type ClassProviderWildcardIndex = Vec<(u16, Vec<Vec<u8>>)>;
 
 enum ProviderIndices {
     One(u16),
@@ -608,6 +621,8 @@ struct Backend<T> {
     property_wildcard: PropertyProviderWildcardIndex,
     property_initialization_exact: PropertyProviderExactIndex,
     property_initialization_wildcard: PropertyProviderWildcardIndex,
+    class_initializer_exact: ClassProviderExactIndex,
+    class_initializer_wildcard: ClassProviderWildcardIndex,
     issue_filter_indices: Box<[u16]>,
     issue_filter_codes: foldhash::HashSet<String>,
 }
@@ -736,6 +751,8 @@ impl<T> Backend<T> {
         let (property_exact, property_wildcard) = index_property_providers(&registration.property_providers);
         let (property_initialization_exact, property_initialization_wildcard) =
             index_property_providers(&registration.property_initialization_providers);
+        let (class_initializer_exact, class_initializer_wildcard) =
+            index_class_providers(&registration.class_initializer_providers);
         let issue_filter_indices = registration.issue_filter_hooks.iter().map(|hook| hook.index).collect::<Box<[_]>>();
         let issue_filter_codes =
             registration.issue_filter_hooks.iter().flat_map(|hook| hook.codes.iter().cloned()).collect();
@@ -776,6 +793,8 @@ impl<T> Backend<T> {
             property_wildcard,
             property_initialization_exact,
             property_initialization_wildcard,
+            class_initializer_exact,
+            class_initializer_wildcard,
             issue_filter_indices,
             issue_filter_codes,
         }
@@ -940,6 +959,84 @@ impl<T> Backend<T> {
             property,
         )
     }
+
+    fn matching_class_initializer_providers(
+        &self,
+        codebase: &CodebaseMetadata,
+        class: &[u8],
+    ) -> (Option<ProviderIndices>, usize) {
+        let (exact, exact_candidates) = matching_exact_class_providers(&self.class_initializer_exact, codebase, class);
+        let candidates = exact_candidates + self.class_initializer_wildcard.len();
+        let wildcards = self
+            .class_initializer_wildcard
+            .iter()
+            .filter(|(_, targets)| targets.iter().any(|target| class_pattern_matches(codebase, target, class)))
+            .map(|(index, _)| *index);
+
+        (ProviderIndices::add_wildcards(exact, wildcards), candidates)
+    }
+}
+
+fn index_class_providers(
+    providers: &[ClassInitializerProvider],
+) -> (ClassProviderExactIndex, ClassProviderWildcardIndex) {
+    let mut exact = WordMap::default();
+    let mut wildcard = Vec::new();
+    for provider in providers {
+        let mut wildcard_targets = Vec::new();
+        for target in &provider.targets {
+            if target.contains(&b'*') {
+                wildcard_targets.push(target.clone());
+            } else {
+                let indices = exact.entry(ascii_lowercase_word(target)).or_insert_with(Vec::new);
+                if indices.last() != Some(&provider.index) {
+                    indices.push(provider.index);
+                }
+            }
+        }
+
+        if !wildcard_targets.is_empty() {
+            wildcard.push((provider.index, wildcard_targets));
+        }
+    }
+
+    (exact, wildcard)
+}
+
+fn matching_exact_class_providers(
+    index: &ClassProviderExactIndex,
+    codebase: &CodebaseMetadata,
+    class: &[u8],
+) -> (Option<ProviderIndices>, usize) {
+    let class = ascii_lowercase_word(class);
+    let mut providers: Option<ProviderIndices> = None;
+    let mut candidates = 0;
+    let classes =
+        std::iter::once(class).chain(codebase.get_class_like(class.as_bytes()).into_iter().flat_map(|metadata| {
+            metadata
+                .all_parent_classes
+                .iter()
+                .chain(&metadata.all_parent_interfaces)
+                .chain(&metadata.used_traits)
+                .chain(&metadata.require_extends)
+                .chain(&metadata.require_implements)
+                .copied()
+        }));
+
+    for candidate in classes {
+        let Some(indices) = index.get(&candidate) else {
+            continue;
+        };
+        candidates += indices.len();
+        for provider in indices {
+            match &mut providers {
+                Some(providers) => providers.insert_sorted(*provider),
+                None => providers = Some(ProviderIndices::One(*provider)),
+            }
+        }
+    }
+
+    (providers, candidates)
 }
 
 fn index_property_providers(
@@ -1176,6 +1273,15 @@ impl ExternalAnalyzerHandle {
             .map_err(|error| error.to_string())
     }
 
+    pub(crate) fn get_class_initializers(
+        &self,
+        class: &ClassLikeMetadata,
+        codebase: &CodebaseMetadata,
+        session: &ExternalAnalysisSession,
+    ) -> Result<WordSet, String> {
+        self.get()?.get_class_initializers(class, codebase, session).map_err(|error| error.to_string())
+    }
+
     pub(crate) fn has_after_file_analysis_hooks(&self) -> Result<bool, String> {
         Ok(self.get()?.backends.iter().any(|backend| {
             !backend.registration.after_file_analysis_plugins.is_empty()
@@ -1205,6 +1311,10 @@ impl ExternalAnalyzerHandle {
             .backends
             .iter()
             .any(|backend| !backend.registration.property_initialization_providers.is_empty()))
+    }
+
+    pub(crate) fn has_class_initializer_providers(&self) -> Result<bool, String> {
+        Ok(self.get()?.backends.iter().any(|backend| !backend.registration.class_initializer_providers.is_empty()))
     }
 
     pub(crate) fn has_issue_filter_hooks(&self) -> Result<bool, String> {
@@ -2804,6 +2914,122 @@ where
         Ok(false)
     }
 
+    pub(crate) fn get_class_initializers(
+        &self,
+        class: &ClassLikeMetadata,
+        codebase: &CodebaseMetadata,
+        session: &ExternalAnalysisSession,
+    ) -> Result<WordSet, ExternalAnalyzerError> {
+        let _lookup_trace =
+            self.trace_enabled.then(|| LookupTrace { telemetry: &self.telemetry, started_at: Instant::now() });
+        if self.trace_enabled {
+            self.telemetry.class_initializer_lookups.fetch_add(1, Ordering::Relaxed);
+        }
+
+        let mut initializers = WordSet::default();
+        let mut dispatched = false;
+        for backend in &self.backends {
+            let matching_start = self.trace_enabled.then(Instant::now);
+            let (indices, candidates) = backend.matching_class_initializer_providers(codebase, class.name.as_bytes());
+            if self.trace_enabled {
+                self.telemetry.backend_checks.fetch_add(1, Ordering::Relaxed);
+                self.telemetry.candidate_providers.fetch_add(candidates as u64, Ordering::Relaxed);
+            }
+            if let Some(start) = matching_start {
+                self.telemetry.matching_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
+            }
+
+            let Some(indices) = indices else {
+                continue;
+            };
+            dispatched = true;
+            let provider_start = self.trace_enabled.then(Instant::now);
+            if self.trace_enabled {
+                self.telemetry.requests.fetch_add(1, Ordering::Relaxed);
+                self.telemetry.matched_providers.fetch_add(indices.as_slice().len() as u64, Ordering::Relaxed);
+            }
+
+            let encode_start = self.trace_enabled.then(Instant::now);
+            let request =
+                protocol::encode_class_initializer_request(indices.as_slice(), class, session.generation(), session)
+                    .inspect_err(|_| {
+                        if self.trace_enabled {
+                            self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
+                        }
+                    })?;
+            if let Some(start) = encode_start {
+                self.telemetry.encode_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
+                self.telemetry.request_bytes.fetch_add(request.len() as u64, Ordering::Relaxed);
+            }
+
+            let nested_telemetry = &self.telemetry;
+            let trace_enabled = self.trace_enabled;
+            let mut handler = |frame: &Frame| {
+                let nested_start = trace_enabled.then(Instant::now);
+                let result = protocol::handle_nested_request(&frame.payload, codebase, session, |_| None);
+                if let Some(start) = nested_start {
+                    nested_telemetry.record_nested_request(frame.payload.len(), start.elapsed(), &result);
+                }
+
+                result.map(|(_, response)| response).map_err(|error| error.to_string().into_bytes())
+            };
+
+            let ipc_start = self.trace_enabled.then(Instant::now);
+            if self.trace_enabled {
+                self.telemetry.ipc_requests.fetch_add(1, Ordering::Relaxed);
+            }
+            let response = backend
+                .transport
+                .request_with_handler_affinity(request, class.name.as_bytes(), &mut handler)
+                .inspect_err(|_| {
+                    if self.trace_enabled {
+                        self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
+                    }
+                })?;
+            if let Some(start) = ipc_start {
+                self.telemetry.ipc_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
+                self.telemetry.response_bytes.fetch_add(response.len() as u64, Ordering::Relaxed);
+            }
+
+            let decode_start = self.trace_enabled.then(Instant::now);
+            let provided = protocol::decode_class_initializer_response(&response).inspect_err(|_| {
+                if self.trace_enabled {
+                    self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
+                }
+            })?;
+            if let Some(start) = decode_start {
+                self.telemetry.decode_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
+            }
+            if self.trace_enabled {
+                self.telemetry.provided_class_initializers.fetch_add(provided.len() as u64, Ordering::Relaxed);
+                if provided.is_empty() {
+                    self.telemetry.declined_requests.fetch_add(1, Ordering::Relaxed);
+                }
+            }
+
+            if let Some(start) = provider_start
+                && start.elapsed() >= SLOW_PROVIDER_THRESHOLD
+            {
+                tracing::trace!(
+                    class = %class.original_name,
+                    providers = indices.as_slice().len(),
+                    initializers = provided.len(),
+                    response_bytes = response.len(),
+                    elapsed = ?start.elapsed(),
+                    "Slow external class initializer provider request completed."
+                );
+            }
+
+            initializers.extend(provided);
+        }
+
+        if self.trace_enabled && !dispatched {
+            self.telemetry.unmatched_lookups.fetch_add(1, Ordering::Relaxed);
+        }
+
+        Ok(initializers)
+    }
+
     fn initialize_transports(
         transports: impl IntoIterator<Item = Arc<T>>,
         php_version: PHPVersion,
@@ -2896,6 +3122,7 @@ where
             let advertised_method_providers = registration.method_providers.len();
             let advertised_property_providers = registration.property_providers.len();
             let advertised_property_initialization_providers = registration.property_initialization_providers.len();
+            let advertised_class_initializer_providers = registration.class_initializer_providers.len();
             let advertised_issue_filter_hooks = registration.issue_filter_hooks.len();
             let advertised_node_analysis_hooks = registration.node_analysis_hooks.len();
             let enabled_indices = registration
@@ -2910,6 +3137,7 @@ where
             registration
                 .property_initialization_providers
                 .retain(|provider| enabled.contains(provider.plugin.as_str()));
+            registration.class_initializer_providers.retain(|provider| enabled.contains(provider.plugin.as_str()));
             registration.issue_filter_hooks.retain(|hook| enabled.contains(hook.plugin.as_str()));
             registration.node_analysis_hooks.retain(|hook| enabled.contains(hook.plugin.as_str()));
             registration.initialization_plugins.retain(|index| enabled_indices.contains(index));
@@ -2970,6 +3198,9 @@ where
                     property_initialization_providers = registration.property_initialization_providers.len(),
                     disabled_property_initialization_providers = advertised_property_initialization_providers
                         - registration.property_initialization_providers.len(),
+                    class_initializer_providers = registration.class_initializer_providers.len(),
+                    disabled_class_initializer_providers = advertised_class_initializer_providers
+                        - registration.class_initializer_providers.len(),
                     issue_filter_hooks = registration.issue_filter_hooks.len(),
                     disabled_issue_filter_hooks = advertised_issue_filter_hooks - registration.issue_filter_hooks.len(),
                     node_analysis_hooks = registration.node_analysis_hooks.len(),
@@ -3011,6 +3242,11 @@ where
                 .iter()
                 .map(|backend| backend.registration.property_initialization_providers.len())
                 .sum::<usize>();
+            let class_initializer_providers = analyzer
+                .backends
+                .iter()
+                .map(|backend| backend.registration.class_initializer_providers.len())
+                .sum::<usize>();
             let issue_filter_hooks =
                 analyzer.backends.iter().map(|backend| backend.registration.issue_filter_hooks.len()).sum::<usize>();
             let node_analysis_hooks =
@@ -3038,6 +3274,7 @@ where
                 method_providers,
                 property_providers,
                 property_initialization_providers,
+                class_initializer_providers,
                 issue_filter_hooks,
                 node_analysis_hooks,
                 before_analysis_plugins,
@@ -3062,11 +3299,13 @@ impl<T> Drop for ExternalAnalyzer<T> {
         let method_lookups = self.telemetry.method_lookups.load(Ordering::Relaxed);
         let property_lookups = self.telemetry.property_lookups.load(Ordering::Relaxed);
         let property_initialization_lookups = self.telemetry.property_initialization_lookups.load(Ordering::Relaxed);
+        let class_initializer_lookups = self.telemetry.class_initializer_lookups.load(Ordering::Relaxed);
         let signature_lookups = self.telemetry.signature_lookups.load(Ordering::Relaxed);
         let lookups = function_lookups
             .saturating_add(method_lookups)
             .saturating_add(property_lookups)
             .saturating_add(property_initialization_lookups)
+            .saturating_add(class_initializer_lookups)
             .saturating_add(signature_lookups);
         let requests = self.telemetry.requests.load(Ordering::Relaxed);
         let ipc_requests = self.telemetry.ipc_requests.load(Ordering::Relaxed);
@@ -3087,6 +3326,7 @@ impl<T> Drop for ExternalAnalyzer<T> {
             method_lookups,
             property_lookups,
             property_initialization_lookups,
+            class_initializer_lookups,
             signature_lookups,
             backend_checks = self.telemetry.backend_checks.load(Ordering::Relaxed),
             candidate_providers = self.telemetry.candidate_providers.load(Ordering::Relaxed),
@@ -3101,6 +3341,7 @@ impl<T> Drop for ExternalAnalyzer<T> {
             signature_requests = self.telemetry.signature_requests.load(Ordering::Relaxed),
             provided_types = self.telemetry.provided_types.load(Ordering::Relaxed),
             initialized_properties = self.telemetry.initialized_properties.load(Ordering::Relaxed),
+            provided_class_initializers = self.telemetry.provided_class_initializers.load(Ordering::Relaxed),
             provided_signatures = self.telemetry.provided_signatures.load(Ordering::Relaxed),
             declined_requests = self.telemetry.declined_requests.load(Ordering::Relaxed),
             errors = self.telemetry.errors.load(Ordering::Relaxed),

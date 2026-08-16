@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Mago\Tests\Sdk\Unit\Analyzer;
 
+use Mago\Sdk\Analyzer\ClassTarget;
 use Mago\Sdk\Analyzer\FunctionTarget;
 use Mago\Sdk\Analyzer\MethodTarget;
 use Mago\Sdk\Analyzer\PluginDefinition;
@@ -29,6 +30,8 @@ final class ValueTest extends TestCase
 
         self::assertSame(['example'], $plugin->aliases);
         self::assertSame('demo', FunctionTarget::exact('demo')->value);
+        self::assertSame('Model', ClassTarget::exact('Model')->class);
+        self::assertSame('*', ClassTarget::any()->class);
         self::assertSame('*', MethodTarget::anyClass('create')->class);
         self::assertSame('*', PropertyTarget::allProperties('Model')->property);
 
@@ -49,6 +52,13 @@ final class ValueTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
 
         PropertyTarget::exact('Model', '$name');
+    }
+
+    public function testClassTargetRejectsEmbeddedWildcards(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        new ClassTarget('App\\*\\Model');
     }
 
     public function testTypeFactoriesBuildExpectedTypes(): void

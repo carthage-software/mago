@@ -41,6 +41,11 @@ final class PluginRegistry
     private array $propertyInitializationProviders = [];
 
     /**
+     * @var list<ClassInitializerProvider>
+     */
+    private array $classInitializerProviders = [];
+
+    /**
      * @var list<IssueFilterHook>
      */
     private array $issueFilterHooks = [];
@@ -88,6 +93,11 @@ final class PluginRegistry
     public function registerPropertyInitializationProvider(PropertyInitializationProvider $provider): void
     {
         $this->propertyInitializationProviders[] = $provider;
+    }
+
+    public function registerClassInitializerProvider(ClassInitializerProvider $provider): void
+    {
+        $this->classInitializerProviders[] = $provider;
     }
 
     public function registerIssueFilterHook(IssueFilterHook $hook): void
@@ -166,6 +176,15 @@ final class PluginRegistry
     public function getPropertyInitializationProviders(): array
     {
         return $this->propertyInitializationProviders;
+    }
+
+    /**
+     * @internal
+     * @return list<ClassInitializerProvider>
+     */
+    public function getClassInitializerProviders(): array
+    {
+        return $this->classInitializerProviders;
     }
 
     /**

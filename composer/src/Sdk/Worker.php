@@ -9,6 +9,7 @@ use Mago\Sdk\Analyzer\AfterFileAnalysisContext;
 use Mago\Sdk\Analyzer\BeforeAnalysisContext;
 use Mago\Sdk\Analyzer\CallableSignatureProvider;
 use Mago\Sdk\Analyzer\CallableSignatureProviderContext;
+use Mago\Sdk\Analyzer\ClassInitializerProviderContext;
 use Mago\Sdk\Analyzer\Codebase;
 use Mago\Sdk\Analyzer\FileAnalysis;
 use Mago\Sdk\Analyzer\InitializationContext;
@@ -25,8 +26,10 @@ use Mago\Sdk\Analyzer\TypeComparator;
 use Mago\Sdk\Exception\CancelledException;
 use Mago\Sdk\Exception\InvalidArgumentException;
 use Mago\Sdk\Exception\ProtocolException;
+use Mago\Sdk\Internal\Analyzer\DefinitionName;
 use Mago\Sdk\Internal\Analyzer\MetadataCache;
 use Mago\Sdk\Internal\Analyzer\Protocol as AnalyzerProtocol;
+use Mago\Sdk\Internal\Analyzer\RegisteredClassInitializerProvider;
 use Mago\Sdk\Internal\Analyzer\RegisteredFunctionReturnTypeProvider;
 use Mago\Sdk\Internal\Analyzer\RegisteredIssueFilterHook;
 use Mago\Sdk\Internal\Analyzer\RegisteredMethodReturnTypeProvider;
@@ -109,6 +112,9 @@ final class Worker
     /** @var list<RegisteredPropertyInitializationProvider> */
     private readonly array $propertyInitializationProviders;
 
+    /** @var list<RegisteredClassInitializerProvider> */
+    private readonly array $classInitializerProviders;
+
     /** @var list<RegisteredIssueFilterHook> */
     private readonly array $issueFilterHooks;
 
@@ -146,6 +152,7 @@ final class Worker
         $methodProviders = [];
         $propertyProviders = [];
         $propertyInitializationProviders = [];
+        $classInitializerProviders = [];
         $issueFilterHooks = [];
         $nodeAnalysisHooks = [];
         $workerReducerIndices = [];
@@ -298,6 +305,32 @@ final class Worker
                     $registeredPropertyInitializationProviders[] = $registeredProvider;
                 }
 
+                $registeredClassInitializerProviders = [];
+                foreach ($registry->getClassInitializerProviders() as $provider) {
+                    $targets = $provider->getTargets();
+                    if ($targets === []) {
+                        throw new InvalidArgumentException(
+                            "A class initializer provider in `{$definition->identifier}` has no targets.",
+                        );
+                    }
+
+                    $providerIndex = count($classInitializerProviders);
+                    if ($providerIndex > 65_535) {
+                        throw new InvalidArgumentException(
+                            'A worker cannot register more than 65,536 class initializer providers.',
+                        );
+                    }
+
+                    $registeredProvider = new RegisteredClassInitializerProvider(
+                        $providerIndex,
+                        $definition->identifier,
+                        $provider,
+                        $targets,
+                    );
+                    $classInitializerProviders[] = $registeredProvider;
+                    $registeredClassInitializerProviders[] = $registeredProvider;
+                }
+
                 $registeredIssueFilterHooks = [];
                 foreach ($registry->getIssueFilterHooks() as $hook) {
                     $codes = $hook->getCodes();
@@ -389,6 +422,7 @@ final class Worker
                     $registeredMethodProviders,
                     $registeredPropertyProviders,
                     $registeredPropertyInitializationProviders,
+                    $registeredClassInitializerProviders,
                     $registeredIssueFilterHooks,
                     $registry->getInitializationHooks(),
                     $registry->getBeforeAnalysisHooks(),
@@ -409,6 +443,7 @@ final class Worker
         $this->methodReturnTypeProviders = $methodProviders;
         $this->propertyTypeProviders = $propertyProviders;
         $this->propertyInitializationProviders = $propertyInitializationProviders;
+        $this->classInitializerProviders = $classInitializerProviders;
         $this->issueFilterHooks = $issueFilterHooks;
     }
 
@@ -754,6 +789,48 @@ final class Worker
             }
 
             return AnalyzerProtocol::writePropertyInitializationResponse(false);
+        }
+
+        if ($kind === AnalyzerProtocol::CLASS_INITIALIZER_REQUEST) {
+            $request = AnalyzerProtocol::readClassInitializerRequest($reader);
+            if ($this->metadataCache === null || $this->metadataCache->generation !== $request->generation) {
+                $this->metadataCache = new MetadataCache($request->generation);
+            }
+
+            $codebase = new Codebase($host, $requestId, $cancellation, $this->metadataCache);
+            $initializers = [];
+            foreach ($request->providerIndices as $providerIndex) {
+                $registered = $this->classInitializerProviders[$providerIndex] ?? null;
+                if ($registered === null) {
+                    throw new ProtocolException(
+                        "Mago requested unregistered class initializer provider index {$providerIndex}.",
+                    );
+                }
+
+                $cancellation->throwIfCancelled();
+                try {
+                    $provided = $registered->provider->getClassInitializers(
+                        new ClassInitializerProviderContext(
+                            $this->phpVersion,
+                            $codebase,
+                            $request->class,
+                            $cancellation,
+                        ),
+                    );
+                    foreach ($provided as $initializer) {
+                        DefinitionName::assertIdentifier($initializer, 'A class initializer method name');
+                        $initializers[$initializer] = $initializer;
+                    }
+                } catch (Throwable $throwable) {
+                    throw new ProtocolException(
+                        "Class initializer provider in `{$registered->plugin}` failed: {$throwable->getMessage()}",
+                        0,
+                        $throwable,
+                    );
+                }
+            }
+
+            return AnalyzerProtocol::writeClassInitializerResponse(array_values($initializers));
         }
 
         if ($kind === AnalyzerProtocol::ISSUE_FILTER_REQUEST) {

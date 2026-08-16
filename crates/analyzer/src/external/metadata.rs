@@ -382,7 +382,7 @@ where
     Ok(())
 }
 
-fn write_class_like(
+pub(super) fn write_class_like(
     writer: &mut PayloadWriter,
     metadata: &ClassLikeMetadata,
     session: &ExternalAnalysisSession,

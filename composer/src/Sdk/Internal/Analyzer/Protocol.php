@@ -74,6 +74,7 @@ final class Protocol
     public const PROPERTY_TYPE_REQUEST = 13;
     public const PROPERTY_INITIALIZATION_REQUEST = 14;
     public const ISSUE_FILTER_REQUEST = 15;
+    public const CLASS_INITIALIZER_REQUEST = 17;
     public const GET_EXPRESSION_TYPES = 1;
     public const GET_ALL_EXPRESSION_TYPES = 2;
     public const GET_INFERRED_RETURN_TYPES = 3;
@@ -147,6 +148,7 @@ final class Protocol
     private const PROPERTY_INITIALIZATION_RESPONSE = 0x800E;
     private const ISSUE_FILTER_RESPONSE = 0x800F;
     private const TYPE_COMPARISON_BATCH_RESPONSE = 0x8010;
+    private const CLASS_INITIALIZER_RESPONSE = 0x8011;
     private const MAXIMUM_ISSUES = 1_000_000;
     private const MAXIMUM_ISSUE_NOTES = 0x0001_0000;
     private const MAXIMUM_ISSUE_ANNOTATIONS = 0x0001_0000;
@@ -325,6 +327,15 @@ final class Protocol
                     foreach ($provider->targets as $target) {
                         $writer->writeBytes($target->class);
                         $writer->writeBytes($target->property);
+                    }
+                }
+
+                $writer->writeCount($plugin->classInitializerProviders);
+                foreach ($plugin->classInitializerProviders as $provider) {
+                    $writer->writeU16($provider->index);
+                    $writer->writeCount($provider->targets);
+                    foreach ($provider->targets as $target) {
+                        $writer->writeBytes($target->class);
                     }
                 }
 
@@ -969,6 +980,37 @@ final class Protocol
             self::PROPERTY_INITIALIZATION_RESPONSE << 16,
             (int) $initialized,
         );
+    }
+
+    public static function readClassInitializerRequest(PayloadReader $reader): ClassInitializerRequest
+    {
+        $generation = $reader->readU64();
+        $providerCount = $reader->readU16();
+        if ($providerCount === 0) {
+            throw new ProtocolException('A class-initializer request contains no providers.');
+        }
+
+        $providers = [];
+        for ($index = 0; $index < $providerCount; ++$index) {
+            $providers[] = $reader->readU16();
+        }
+
+        $class = MetadataCodec::readClassLike($reader);
+        $reader->finish();
+
+        return new ClassInitializerRequest($generation, $providers, $class);
+    }
+
+    /** @param list<non-empty-string> $initializers */
+    public static function writeClassInitializerResponse(array $initializers): string
+    {
+        $writer = self::createMessage(self::CLASS_INITIALIZER_RESPONSE);
+        $writer->writeCount($initializers);
+        foreach ($initializers as $initializer) {
+            $writer->writeBytes($initializer);
+        }
+
+        return $writer->finish();
     }
 
     public static function readIssueFilterRequest(PayloadReader $reader): IssueFilterRequest

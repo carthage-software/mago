@@ -12,6 +12,7 @@ use foldhash::HashSet;
 use foldhash::fast::RandomState;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::metadata::CodebaseMetadata;
+use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::metadata::property::PropertyMetadata;
 use mago_codex::misc::GenericParent;
 use mago_codex::misc::VariableIdentifier;
@@ -90,9 +91,11 @@ use mago_reporting::Level;
 use mago_span::HasSpan;
 use mago_syntax::cst::NodeKind;
 use mago_text_edit::Safety;
+use mago_word::WordSet;
 use mago_word::word;
 
 use crate::artifacts::AnalysisArtifacts;
+use crate::external::ClassInitializerProvider;
 use crate::external::EffectivePropertyType;
 use crate::external::ExternalAnalysisSession;
 use crate::external::ExternalExtension;
@@ -129,6 +132,7 @@ const PROPERTY_TYPE_REQUEST: u16 = 13;
 const PROPERTY_INITIALIZATION_REQUEST: u16 = 14;
 const ISSUE_FILTER_REQUEST: u16 = 15;
 const TYPE_COMPARISON_BATCH_REQUEST: u16 = 16;
+const CLASS_INITIALIZER_REQUEST: u16 = 17;
 const DESCRIBE_RESPONSE: u16 = 0x8001;
 const RETURN_TYPE_RESPONSE: u16 = 0x8002;
 const TYPE_COMPARISON_RESPONSE: u16 = 0x8003;
@@ -138,6 +142,7 @@ const PROPERTY_TYPE_RESPONSE: u16 = 0x800D;
 const PROPERTY_INITIALIZATION_RESPONSE: u16 = 0x800E;
 const ISSUE_FILTER_RESPONSE: u16 = 0x800F;
 const TYPE_COMPARISON_BATCH_RESPONSE: u16 = 0x8010;
+const CLASS_INITIALIZER_RESPONSE: u16 = 0x8011;
 const MAXIMUM_EXTENSIONS: usize = 0x4000;
 const MAXIMUM_PLUGINS: usize = 0x4000;
 const MAXIMUM_PROVIDERS: usize = 0x0001_0000;
@@ -212,6 +217,7 @@ pub(super) struct Registration {
     pub method_providers: Vec<MethodProvider>,
     pub property_providers: Vec<PropertyProvider>,
     pub property_initialization_providers: Vec<PropertyProvider>,
+    pub class_initializer_providers: Vec<ClassInitializerProvider>,
     pub issue_filter_hooks: Vec<IssueFilterHookRegistration>,
     pub node_analysis_hooks: Vec<NodeAnalysisHookRegistration>,
     pub initialization_plugins: Vec<u16>,
@@ -338,6 +344,7 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
     let mut method_providers = Vec::new();
     let mut property_providers = Vec::new();
     let mut property_initialization_providers = Vec::new();
+    let mut class_initializer_providers = Vec::new();
     let mut issue_filter_hooks = Vec::new();
     let mut node_analysis_hooks = Vec::new();
     let mut initialization_plugins = Vec::new();
@@ -513,6 +520,31 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
                 property_initialization_providers.push(PropertyProvider { plugin: identifier.clone(), index, targets });
             }
 
+            let class_initializer_count = reader.read_count("class initializer providers", MAXIMUM_PROVIDERS)?;
+            for _ in 0..class_initializer_count {
+                let index = reader.read_u16("class initializer provider index")?;
+                let target_count = reader.read_count("class initializer targets", MAXIMUM_TARGETS)?;
+                if target_count == 0 {
+                    return Err(protocol(format!("class initializer provider {index} has no targets")));
+                }
+
+                let mut targets = Vec::with_capacity(target_count);
+                for _ in 0..target_count {
+                    let target = non_empty(
+                        reader.read_bytes("class initializer target class")?.to_vec(),
+                        "class initializer target class",
+                    )?;
+                    validate_method_pattern(&target)?;
+                    targets.push(target);
+                }
+
+                class_initializer_providers.push(ClassInitializerProvider {
+                    plugin: identifier.clone(),
+                    index,
+                    targets,
+                });
+            }
+
             let issue_filter_count = reader.read_count("issue-filter hooks", MAXIMUM_PROVIDERS)?;
             for _ in 0..issue_filter_count {
                 let index = reader.read_u16("issue-filter hook index")?;
@@ -619,6 +651,10 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
         property_initialization_providers.iter().map(|provider| provider.index),
         "property initialization provider",
     )?;
+    validate_provider_indices(
+        class_initializer_providers.iter().map(|provider| provider.index),
+        "class initializer provider",
+    )?;
     validate_provider_indices(issue_filter_hooks.iter().map(|hook| hook.index), "issue-filter hook")?;
     validate_provider_indices(node_analysis_hooks.iter().map(|hook| hook.index), "node-analysis hook")?;
     Ok(Registration {
@@ -629,6 +665,7 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
         method_providers,
         property_providers,
         property_initialization_providers,
+        class_initializer_providers,
         issue_filter_hooks,
         node_analysis_hooks,
         initialization_plugins,
@@ -862,6 +899,39 @@ pub(super) fn decode_property_initialization_response(payload: &[u8]) -> Result<
     let initialized = reader.read_bool("property initialized flag")?;
     reader.finish()?;
     Ok(initialized)
+}
+
+pub(super) fn encode_class_initializer_request(
+    provider_indices: &[u16],
+    class: &ClassLikeMetadata,
+    generation: u64,
+    session: &ExternalAnalysisSession,
+) -> Result<Vec<u8>, ExternalAnalyzerError> {
+    let mut writer = message_writer(CLASS_INITIALIZER_REQUEST);
+    writer.write_u64(generation);
+    writer.write_u16(
+        u16::try_from(provider_indices.len()).map_err(|_| protocol("more than u16::MAX providers matched"))?,
+    );
+    for index in provider_indices {
+        writer.write_u16(*index);
+    }
+    metadata::write_class_like(&mut writer, class, session)?;
+    Ok(writer.finish())
+}
+
+pub(super) fn decode_class_initializer_response(payload: &[u8]) -> Result<WordSet, ExternalAnalyzerError> {
+    let mut reader = message_reader(payload, CLASS_INITIALIZER_RESPONSE)?;
+    let count = reader.read_count("class initializer methods", MAXIMUM_TARGETS)?;
+    let mut methods = WordSet::default();
+    for _ in 0..count {
+        let method = non_empty(reader.read_bytes("class initializer method")?, "class initializer method")?;
+        if !is_valid_identifier(method) {
+            return Err(protocol("class initializer method must be a valid PHP identifier"));
+        }
+        methods.insert(mago_word::ascii_lowercase_word(method));
+    }
+    reader.finish()?;
+    Ok(methods)
 }
 
 pub(super) fn encode_issue_filter_request(
@@ -2772,6 +2842,15 @@ fn is_valid_variable_name(name: &[u8]) -> bool {
         && rest.iter().all(|byte| *byte == b'_' || byte.is_ascii_alphanumeric() || *byte >= 0x80)
 }
 
+fn is_valid_identifier(name: &[u8]) -> bool {
+    let Some((&first, rest)) = name.split_first() else {
+        return false;
+    };
+
+    (first == b'_' || first.is_ascii_alphabetic() || first >= 0x80)
+        && rest.iter().all(|byte| *byte == b'_' || byte.is_ascii_alphanumeric() || *byte >= 0x80)
+}
+
 fn validate_method_pattern(pattern: &[u8]) -> Result<(), ExternalAnalyzerError> {
     if let Some(star) = pattern.iter().position(|byte| *byte == b'*')
         && star + 1 != pattern.len()
@@ -2966,6 +3045,30 @@ pub(super) mod testing {
     }
 
     #[test]
+    fn class_initializer_response_normalizes_and_deduplicates_methods() {
+        let mut writer = message_writer(CLASS_INITIALIZER_RESPONSE);
+        writer.write_u32(3);
+        writer.write_bytes(b"setUp").unwrap();
+        writer.write_bytes(b"initialize").unwrap();
+        writer.write_bytes(b"SETUP").unwrap();
+
+        let methods = decode_class_initializer_response(&writer.finish()).unwrap();
+        assert_eq!(methods.len(), 2);
+        assert!(methods.contains(&word(b"setup")));
+        assert!(methods.contains(&word(b"initialize")));
+    }
+
+    #[test]
+    fn class_initializer_response_rejects_invalid_method_names() {
+        let mut writer = message_writer(CLASS_INITIALIZER_RESPONSE);
+        writer.write_u32(1);
+        writer.write_bytes(b"not-a-method").unwrap();
+
+        let result = decode_class_initializer_response(&writer.finish());
+        assert!(matches!(result, Err(ExternalAnalyzerError::Protocol(message)) if message.contains("identifier")));
+    }
+
+    #[test]
     fn issue_filter_response_requires_ordered_in_range_removals() {
         let mut writer = message_writer(ISSUE_FILTER_RESPONSE);
         writer.write_u32(4);
@@ -3009,6 +3112,7 @@ pub(super) mod testing {
         writer.write_u32(0);
         writer.write_u32(0);
         writer.write_u32(0);
+        writer.write_u32(0);
         writer.finish()
     }
 
@@ -3037,6 +3141,7 @@ pub(super) mod testing {
         writer.write_u32(1);
         writer.write_u8(TARGET_EXACT);
         writer.write_bytes(b"demo_service").unwrap();
+        writer.write_u32(0);
         writer.write_u32(0);
         writer.write_u32(0);
         writer.write_u32(0);

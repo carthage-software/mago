@@ -66,7 +66,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodCall<'arena> {
                     .and_then(|m| m.direct_parent_class)
                     .and_then(|p| context.codebase.get_class_like(p.as_bytes()));
                 if let Some(parent_meta) = parent_meta
-                    && context.settings.is_class_initializer_for(parent_meta, method_name)
+                    && context.is_class_initializer_for(parent_meta, method_name)
                 {
                     block_context.calls_parent_initializer = Some(method_name);
                 }

@@ -813,6 +813,8 @@ where
         return Ok(());
     }
 
+    context.prepare_class_initializers(class_like_metadata)?;
+
     let name = &class_like_metadata.original_name;
 
     let mut checked_signatures: HashSet<(Word, Word)> = HashSet::default();

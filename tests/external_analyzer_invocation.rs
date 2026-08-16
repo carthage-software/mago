@@ -116,13 +116,28 @@ final class ExternalService {}
 
 final class ExternalStaticService {}
 
-class FrameworkTestCase {}
+class FrameworkTestCase
+{
+    protected ExternalResult $framework;
+
+    protected function setUp(): void
+    {
+        $this->framework = new ExternalResult();
+    }
+
+    public function getFramework(): ExternalResult
+    {
+        return $this->framework;
+    }
+}
 
 final class ManagedTestCase extends FrameworkTestCase
 {
     public ExternalResult $application;
 
     private ExternalResult $native;
+
+    private ExternalResult $lifecycle;
 
     public function __construct()
     {
@@ -137,6 +152,17 @@ final class ManagedTestCase extends FrameworkTestCase
     public function getNative(): ExternalResult
     {
         return $this->native;
+    }
+
+    protected function setUp(): void
+    {
+        parent::setUp();
+        $this->lifecycle = new ExternalResult();
+    }
+
+    public function getLifecycle(): ExternalResult
+    {
+        return $this->lifecycle;
     }
 }
 
@@ -215,6 +241,8 @@ take_string(ExternalStaticService::resolve('static-provider'));
 User::callLate();
 (new ManagedTestCase())->getApplication();
 (new ManagedTestCase())->getNative();
+(new ManagedTestCase())->getFramework();
+(new ManagedTestCase())->getLifecycle();
 
 function use_external_interface(ExternalInterface $service): void
 {
@@ -359,6 +387,8 @@ fn external_providers_receive_complete_invocation_context() -> Result<(), Box<dy
         invocations,
         [
             "argument-handle",
+            "class-initializer-frameworktestcase",
+            "class-initializer-managedtestcase",
             "closure-this-return",
             "closure-this-signature",
             "complete-composite",
