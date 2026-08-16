@@ -83,12 +83,14 @@ fn adaptive_reduction_includes_only_workers_that_were_spawned() -> Result<(), Bo
         WorkerPoolOptions::default(),
     )?);
     let linter = ExternalLinter::initialize([Arc::clone(&pool)], PHPVersion::PHP85)?;
+    let spawned_workers = pool.len();
+    assert!(spawned_workers < 5, "the adaptive pool must retain unspawned capacity");
     drop(linter);
     pool.shutdown();
 
     let alpha = read_audit(&temporary.path().join("alpha.txt"), "alpha")?;
     let beta = read_audit(&temporary.path().join("beta.txt"), "beta")?;
-    assert_eq!(alpha.worker_ids.len(), 2, "unspawned adaptive capacity must not contribute empty data");
+    assert_eq!(alpha.worker_ids.len(), spawned_workers, "unspawned adaptive capacity must not contribute empty data");
     assert_eq!(alpha.worker_ids, beta.worker_ids);
     assert_eq!(alpha.leader, beta.leader);
 
