@@ -1210,8 +1210,8 @@ impl IncrementalAnalysisService {
             .map_err(mago_analyzer::error::AnalysisError::from)?;
         let after_analysis =
             plugin_registry.has_external_after_analysis_hooks().map_err(mago_analyzer::error::AnalysisError::from)?;
-        let node_analysis_targets =
-            plugin_registry.external_node_analysis_target_kinds().map_err(mago_analyzer::error::AnalysisError::from)?;
+        let node_analysis_requirements =
+            plugin_registry.external_node_analysis_requirements().map_err(mago_analyzer::error::AnalysisError::from)?;
         #[cfg(not(target_arch = "wasm32"))]
         let before_start = trace_enabled.then(Instant::now);
         let before = plugin_registry
@@ -1281,7 +1281,7 @@ impl IncrementalAnalysisService {
                             program,
                             &resolved_names,
                             &artifacts,
-                            node_analysis_targets.as_ref(),
+                            node_analysis_requirements.as_ref(),
                         )
                         .map_err(|error| {
                             OrchestratorError::General(format!("Failed to retain external analysis data: {error}"))

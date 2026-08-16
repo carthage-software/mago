@@ -362,7 +362,24 @@ impl Registration {
 
     fn file_analysis_requires_expression_types(&self, plugins: &[u16]) -> bool {
         self.plugins.iter().any(|plugin| plugins.contains(&plugin.index) && plugin.after_file_expression_types)
-            || self.node_analysis_hooks.iter().any(|hook| plugins.contains(&hook.plugin_index) && hook.expression_types)
+            || self.node_analysis_hooks.iter().any(|hook| {
+                plugins.contains(&hook.plugin_index) && hook.requirements & NODE_REQUIREMENT_EXPRESSION_TYPES != 0
+            })
+    }
+
+    fn node_analysis_requirements(&self) -> Option<NodeAnalysisRequirements> {
+        let mut targets = [false; u8::MAX as usize + 1];
+        let mut requirements = [0; u8::MAX as usize + 1];
+        let mut any = false;
+        for hook in &self.node_analysis_hooks {
+            for target in &hook.targets {
+                targets[*target as usize] = true;
+                requirements[*target as usize] |= hook.requirements;
+                any = true;
+            }
+        }
+
+        any.then_some(NodeAnalysisRequirements { targets, requirements })
     }
 }
 
@@ -469,8 +486,53 @@ struct NodeAnalysisHookRegistration {
     plugin: String,
     plugin_index: u16,
     index: u16,
-    expression_types: bool,
+    requirements: u8,
     targets: Vec<NodeKind>,
+}
+
+pub(super) const NODE_REQUIREMENT_EXPRESSION_TYPES: u8 = 1;
+pub(super) const NODE_REQUIREMENT_TARGET_EXPRESSION_TYPES: u8 = 1 << 1;
+pub(super) const NODE_REQUIREMENT_RECEIVER_TYPE: u8 = 1 << 2;
+pub(super) const NODE_REQUIREMENT_ARGUMENT_TYPES: u8 = 1 << 3;
+pub(super) const NODE_REQUIREMENT_TARGET_SUBTREE: u8 = 1 << 4;
+pub(super) const NODE_REQUIREMENT_SOURCE_TEXT: u8 = 1 << 5;
+pub(super) const NODE_REQUIREMENTS_ALL: u8 = NODE_REQUIREMENT_EXPRESSION_TYPES
+    | NODE_REQUIREMENT_TARGET_EXPRESSION_TYPES
+    | NODE_REQUIREMENT_RECEIVER_TYPE
+    | NODE_REQUIREMENT_ARGUMENT_TYPES
+    | NODE_REQUIREMENT_TARGET_SUBTREE
+    | NODE_REQUIREMENT_SOURCE_TEXT;
+
+/// Syntax targets and embedded data requested by external node-analysis hooks.
+#[derive(Debug, Clone, Copy)]
+pub struct NodeAnalysisRequirements {
+    targets: [bool; u8::MAX as usize + 1],
+    requirements: [u8; u8::MAX as usize + 1],
+}
+
+impl NodeAnalysisRequirements {
+    #[inline]
+    #[must_use]
+    pub(crate) const fn targets(&self) -> &[bool; u8::MAX as usize + 1] {
+        &self.targets
+    }
+
+    #[inline]
+    #[must_use]
+    pub(crate) const fn requirements(&self, kind: NodeKind) -> u8 {
+        self.requirements[kind as usize]
+    }
+
+    #[must_use]
+    pub(crate) fn subtree_targets(&self) -> [bool; u8::MAX as usize + 1] {
+        self.requirements.map(|requirements| requirements & NODE_REQUIREMENT_TARGET_SUBTREE != 0)
+    }
+
+    #[inline]
+    #[must_use]
+    pub(crate) fn includes_source_text(&self) -> bool {
+        self.requirements.iter().any(|requirements| requirements & NODE_REQUIREMENT_SOURCE_TEXT != 0)
+    }
 }
 
 type PropertyProviderExactIndex = WordMap<Vec<u16>>;
@@ -1375,8 +1437,8 @@ impl ExternalAnalyzerHandle {
         }))
     }
 
-    pub(crate) fn node_analysis_target_kinds(&self) -> Result<Option<[bool; u8::MAX as usize + 1]>, String> {
-        Ok(self.get()?.node_analysis_target_kinds())
+    pub(crate) fn node_analysis_requirements(&self) -> Result<Option<NodeAnalysisRequirements>, String> {
+        Ok(self.get()?.node_analysis_requirements())
     }
 
     pub(crate) fn has_function_return_type_providers(&self) -> Result<bool, String> {
@@ -1572,19 +1634,21 @@ impl<T> ExternalAnalyzer<T> {
         self.initialization_stubs.iter().map(ExternalStub::to_file).collect()
     }
 
-    fn node_analysis_target_kinds(&self) -> Option<[bool; u8::MAX as usize + 1]> {
+    fn node_analysis_requirements(&self) -> Option<NodeAnalysisRequirements> {
         let mut targets = [false; u8::MAX as usize + 1];
+        let mut requirements = [0; u8::MAX as usize + 1];
         let mut any = false;
         for backend in &self.backends {
             for hook in &backend.registration.node_analysis_hooks {
                 for target in &hook.targets {
                     targets[*target as usize] = true;
+                    requirements[*target as usize] |= hook.requirements;
                     any = true;
                 }
             }
         }
 
-        any.then_some(targets)
+        any.then_some(NodeAnalysisRequirements { targets, requirements })
     }
 }
 
@@ -1879,13 +1943,13 @@ where
         session: &ExternalAnalysisSession,
     ) -> Result<AfterFileAnalysisResult, ExternalAnalyzerError> {
         let mut result = AfterFileAnalysisResult::default();
-        let node_analysis_targets = self.node_analysis_target_kinds();
+        let node_analysis_requirements = self.node_analysis_requirements();
         let store = lifecycle::AnalysisStore::File {
             file,
             program,
             resolved_names,
             artifacts,
-            node_analysis_targets: node_analysis_targets.as_ref(),
+            node_analysis_targets: node_analysis_requirements.as_ref().map(NodeAnalysisRequirements::targets),
         };
         for backend in &self.backends {
             let plugins = backend.registration.file_analysis_plugins();
@@ -1893,7 +1957,10 @@ where
                 continue;
             }
             let include_expression_types = backend.registration.file_analysis_requires_expression_types(&plugins);
-            let embed_source = !backend.registration.node_analysis_hooks.is_empty();
+            let backend_node_requirements = backend
+                .registration
+                .node_analysis_requirements()
+                .filter(|requirements| lifecycle::has_node_analysis_target(program, requirements));
 
             let lifecycle_start = self.trace_enabled.then(Instant::now);
             let encode_start = self.trace_enabled.then(Instant::now);
@@ -1905,8 +1972,7 @@ where
                 resolved_names,
                 artifacts,
                 include_expression_types,
-                node_analysis_targets.as_ref(),
-                embed_source,
+                backend_node_requirements.as_ref(),
             )
             .inspect_err(|_| {
                 if self.trace_enabled {
@@ -1986,7 +2052,7 @@ where
             }
             let store = lifecycle::AnalysisStore::Project(files);
             let include_expression_types = backend.registration.file_analysis_requires_expression_types(&plugins);
-            let embed_source = !backend.registration.node_analysis_hooks.is_empty();
+            let backend_node_requirements = backend.registration.node_analysis_requirements();
 
             let lifecycle_start = self.trace_enabled.then(Instant::now);
             let encode_start = self.trace_enabled.then(Instant::now);
@@ -1995,7 +2061,7 @@ where
                 &plugins,
                 files,
                 include_expression_types,
-                embed_source,
+                backend_node_requirements.as_ref(),
                 session,
             )
             .inspect_err(|_| {

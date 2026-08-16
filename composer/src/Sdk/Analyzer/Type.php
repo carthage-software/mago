@@ -317,7 +317,7 @@ final class Type
         }
 
         return $atomic->refinement instanceof ClassLikeStringType
-            && $atomic->refinement->variant === ClassLikeStringVariant::Literal
+        && $atomic->refinement->variant === ClassLikeStringVariant::Literal
             ? $atomic->refinement->literal
             : null;
     }
@@ -331,8 +331,8 @@ final class Type
         $atomic = $this->atomicTypes[0];
 
         return $atomic instanceof ScalarType
-            && $atomic->refinement instanceof ClassLikeStringType
-            && $atomic->refinement->variant === ClassLikeStringVariant::Literal
+        && $atomic->refinement instanceof ClassLikeStringType
+        && $atomic->refinement->variant === ClassLikeStringVariant::Literal
             ? $atomic->refinement->literal
             : null;
     }

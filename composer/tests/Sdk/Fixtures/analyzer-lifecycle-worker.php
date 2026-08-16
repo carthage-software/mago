@@ -37,6 +37,7 @@ use Mago\Sdk\Reporting\Level;
 use Mago\Sdk\Reporting\Safety;
 use Mago\Sdk\Reporting\TextEdit;
 use Mago\Sdk\Span;
+use Mago\Sdk\Syntax\CallExpression;
 use Mago\Sdk\Syntax\NodeKind;
 use Mago\Sdk\Worker;
 use RuntimeException;
@@ -78,22 +79,40 @@ final class LifecycleProofHook implements
 
     public function getRequirements(): array
     {
-        return [FileAnalysisRequirement::ExpressionTypes];
+        return [
+            FileAnalysisRequirement::ExpressionTypes,
+            FileAnalysisRequirement::TargetExpressionTypes,
+            FileAnalysisRequirement::ReceiverType,
+            FileAnalysisRequirement::ArgumentTypes,
+            FileAnalysisRequirement::TargetSubtree,
+            FileAnalysisRequirement::SourceText,
+        ];
     }
 
     public function getTargets(): array
     {
-        return [NodeKind::FunctionCall];
+        return [NodeKind::FunctionCall, NodeKind::MethodCall];
     }
 
     public function analyze(NodeAnalysisContext $context): void
     {
         if (
-            $context->node->kind !== NodeKind::FunctionCall
-            || $context->source !== $context->analysis->getSourceFile()
+            $context->node->kind !== NodeKind::FunctionCall && $context->node->kind !== NodeKind::MethodCall
             || $context->source->path !== $context->analysis->file
+            || $context->source->contents === ''
         ) {
             throw new RuntimeException('A targeted node hook received an inconsistent analysis snapshot.');
+        }
+
+        $call = CallExpression::fromNode($context->source, $context->node);
+        if (
+            $context->targetType === null
+            || (string) $context->targetType !== (string) $context->analysis->getExpressionType($context->node)
+            || count($context->argumentTypes) !== count($call->arguments)
+            || $call->isFunction() && $context->receiverType !== null
+            || $call->isMethod() && $context->receiverType === null
+        ) {
+            throw new RuntimeException('A targeted node hook received inconsistent fine-grained types.');
         }
 
         $this->record('node', $context->analysis->file);
@@ -301,10 +320,8 @@ final class LifecycleProofHook implements
         $frameworkReferenceEnabled = $context->codebase->getConstant('ENABLE_FRAMEWORK_ACTION') !== null;
         $lateReferenceEnabled = $context->codebase->getConstant('ENABLE_LATE_FRAMEWORK_ACTION') !== null;
         $project = $context->analysis;
-        $expectedIssueCount = 3
-            + ($frameworkReferenceEnabled ? 0 : 1)
-            + ($lateReferenceEnabled ? 0 : 1)
-            + (count($project->files) * 2)
+        $expectedIssueCount =
+            3 + ($frameworkReferenceEnabled ? 0 : 1) + ($lateReferenceEnabled ? 0 : 1) + (count($project->files) * 2)
             - 1;
         if (count($project->files) !== 96 || $project->issueCount !== $expectedIssueCount) {
             throw new RuntimeException(
@@ -385,9 +402,11 @@ final class LifecycleProofHook implements
             || !$consumerReferencesAnswer
             || count($referencesToLateAction) !== ($lateReferenceEnabled ? 1 : 0)
             || $lateReferenceEnabled
-                && (!$referencesToLateAction[0]->source->symbol instanceof MemberIdentifier
-                    || $referencesToLateAction[0]->source->symbol->class !== 'lifecycleclass5'
-                    || $referencesToLateAction[0]->source->symbol->member !== 'value')
+            && (
+                !$referencesToLateAction[0]->source->symbol instanceof MemberIdentifier
+                || $referencesToLateAction[0]->source->symbol->class !== 'lifecycleclass5'
+                || $referencesToLateAction[0]->source->symbol->member !== 'value'
+            )
         ) {
             throw new RuntimeException('The final merged native and synthetic references did not round-trip.');
         }

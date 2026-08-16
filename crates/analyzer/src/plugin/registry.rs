@@ -39,6 +39,7 @@ use crate::external::EffectivePropertyType;
 use crate::external::ExternalAnalysisSession;
 use crate::external::ExternalAnalyzerHandle;
 use crate::external::FileAnalysisSnapshot;
+use crate::external::NodeAnalysisRequirements;
 use crate::external::PropertyAccessKind;
 use crate::invocation::EffectiveCallableSignature;
 use crate::invocation::Invocation;
@@ -254,15 +255,15 @@ impl PluginRegistry {
             .map_err(|reason| PluginError::Internal { reason })
     }
 
-    /// Returns the union of syntax kinds targeted by enabled external analyzer hooks.
+    /// Returns the syntax targets and embedded data requested by enabled external analyzer hooks.
     ///
     /// # Errors
     ///
     /// Returns an error when the external analyzer cannot be initialized.
-    pub fn external_node_analysis_target_kinds(&self) -> PluginResult<Option<[bool; u8::MAX as usize + 1]>> {
+    pub fn external_node_analysis_requirements(&self) -> PluginResult<Option<NodeAnalysisRequirements>> {
         self.external_analyzer
             .as_deref()
-            .map(ExternalAnalyzerHandle::node_analysis_target_kinds)
+            .map(ExternalAnalyzerHandle::node_analysis_requirements)
             .transpose()
             .map(Option::flatten)
             .map_err(|reason| PluginError::Internal { reason })

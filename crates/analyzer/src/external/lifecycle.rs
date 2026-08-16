@@ -21,8 +21,10 @@ use mago_reporting::AnnotationKind;
 use mago_reporting::Issue;
 use mago_reporting::IssueCollection;
 use mago_reporting::Level;
+use mago_span::HasSpan;
 use mago_span::Position;
 use mago_span::Span;
+use mago_syntax::cst::Node;
 use mago_syntax::cst::Program;
 use mago_text_edit::Safety;
 use mago_text_edit::TextEdit;
@@ -37,6 +39,10 @@ use crate::artifacts::AnalysisArtifacts;
 
 use super::ExternalAnalysisSession;
 use super::ExternalPlugin;
+use super::NODE_REQUIREMENT_ARGUMENT_TYPES;
+use super::NODE_REQUIREMENT_RECEIVER_TYPE;
+use super::NODE_REQUIREMENT_TARGET_EXPRESSION_TYPES;
+use super::NodeAnalysisRequirements;
 use super::error::ExternalAnalyzerError;
 use super::error::protocol;
 use super::protocol;
@@ -128,6 +134,8 @@ pub struct FileAnalysisSnapshot {
     name: Arc<[u8]>,
     size: u32,
     encoded_source: Box<[u8]>,
+    encoded_target_source: Box<[u8]>,
+    encoded_target_analysis: Box<[u8]>,
     encoded_types: Box<[u8]>,
     expression_types: HashMap<(u32, u32), Range<usize>>,
     inferred_return_types: Vec<Range<usize>>,
@@ -147,6 +155,19 @@ struct ReferenceSummary {
 /// Number of completed files sent through one external after-file request.
 pub const AFTER_FILE_ANALYSIS_BATCH_SIZE: usize = 32;
 
+pub(super) fn has_node_analysis_target(program: &Program<'_>, requirements: &NodeAnalysisRequirements) -> bool {
+    let mut stack = Vec::with_capacity(64);
+    stack.push(Node::Program(program));
+    while let Some(node) = stack.pop() {
+        if requirements.targets()[node.kind() as usize] {
+            return true;
+        }
+        node.visit_children(|child| stack.push(child));
+    }
+
+    false
+}
+
 impl FileAnalysisSnapshot {
     /// Builds a compact, thread-safe snapshot of one file's lazy analysis data.
     ///
@@ -158,18 +179,67 @@ impl FileAnalysisSnapshot {
         program: &Program<'_>,
         resolved_names: &ResolvedNames<'_>,
         artifacts: &AnalysisArtifacts,
-        node_analysis_targets: Option<&[bool; u8::MAX as usize + 1]>,
+        node_analysis_requirements: Option<&NodeAnalysisRequirements>,
     ) -> Result<Self, ExternalAnalyzerError> {
-        let source =
-            SourceSnapshot::complete_with_targets(program, resolved_names, node_analysis_targets).map_err(|error| {
-                protocol(format!("failed to retain syntax for `{}`: {error}", String::from_utf8_lossy(&file.name)))
-            })?;
-        let node_analysis_targets = source.target_count();
+        let source = SourceSnapshot::complete_with_targets(
+            program,
+            resolved_names,
+            node_analysis_requirements.map(NodeAnalysisRequirements::targets),
+        )
+        .map_err(|error| {
+            protocol(format!("failed to retain syntax for `{}`: {error}", String::from_utf8_lossy(&file.name)))
+        })?;
+        let matched_target_count = source.target_count();
 
         let mut source_writer = PayloadWriter::with_capacity(source.encoded_len());
         source.write_to(&mut source_writer).map_err(|error| {
             protocol(format!("failed to encode retained syntax for `{}`: {error}", String::from_utf8_lossy(&file.name)))
         })?;
+
+        let (encoded_target_source, encoded_target_analysis, node_analysis_targets) = if let Some(requirements) =
+            node_analysis_requirements.filter(|_| matched_target_count != 0)
+        {
+            let subtree_targets = requirements.subtree_targets();
+            let target_source = SourceSnapshot::targeted(
+                program,
+                resolved_names,
+                requirements.targets(),
+                &subtree_targets,
+                requirements.includes_source_text(),
+            )
+            .map_err(|error| {
+                protocol(format!(
+                    "failed to retain targeted syntax for `{}`: {error}",
+                    String::from_utf8_lossy(&file.name)
+                ))
+            })?;
+            if let Some(target_source) = target_source {
+                let target_count = target_source.target_count();
+                if target_count != matched_target_count {
+                    return Err(protocol(format!(
+                        "complete syntax contains {matched_target_count} targets, but targeted syntax contains {target_count}"
+                    )));
+                }
+                let mut target_source_writer = PayloadWriter::with_capacity(target_source.encoded_len());
+                target_source.write_to(&mut target_source_writer).map_err(|error| {
+                    protocol(format!(
+                        "failed to encode targeted syntax for `{}`: {error}",
+                        String::from_utf8_lossy(&file.name)
+                    ))
+                })?;
+                let mut target_analysis_writer = PayloadWriter::new();
+                write_target_analysis(&mut target_analysis_writer, program, artifacts, requirements, target_count)?;
+                (
+                    target_source_writer.finish().into_boxed_slice(),
+                    target_analysis_writer.finish().into_boxed_slice(),
+                    target_count,
+                )
+            } else {
+                (Box::default(), Box::default(), 0)
+            }
+        } else {
+            (Box::default(), Box::default(), 0)
+        };
 
         let mut writer = PayloadWriter::new();
         let mut type_handles = Vec::new();
@@ -204,6 +274,8 @@ impl FileAnalysisSnapshot {
             name: Arc::from(file.name.as_ref()),
             size: file.size,
             encoded_source: source_writer.finish().into_boxed_slice(),
+            encoded_target_source,
+            encoded_target_analysis,
             encoded_types: writer.finish().into_boxed_slice(),
             expression_types,
             inferred_return_types,
@@ -260,6 +332,93 @@ fn encode_snapshot_type<'type_info>(
     let start = writer.len();
     protocol::encode_union_snapshot(writer, ty, handles, 0)?;
     Ok(start..writer.len())
+}
+
+fn write_target_analysis(
+    writer: &mut PayloadWriter,
+    program: &Program<'_>,
+    artifacts: &AnalysisArtifacts,
+    requirements: &NodeAnalysisRequirements,
+    expected_count: usize,
+) -> Result<(), ExternalAnalyzerError> {
+    writer.write_u32(u32::try_from(expected_count).map_err(|_| protocol("too many node-analysis targets"))?);
+    let mut written = 0usize;
+    let mut stack = Vec::with_capacity(64);
+    stack.push(Node::Program(program));
+    while let Some(node) = stack.pop() {
+        if requirements.targets()[node.kind() as usize] {
+            let requested = requirements.requirements(node.kind());
+            writer.write_u8(requested);
+            if requested & NODE_REQUIREMENT_TARGET_EXPRESSION_TYPES != 0 {
+                write_optional_expression_type(writer, artifacts, Some(node.span()))?;
+            }
+            if requested & NODE_REQUIREMENT_RECEIVER_TYPE != 0 {
+                write_optional_expression_type(writer, artifacts, receiver_span(node))?;
+            }
+            if requested & NODE_REQUIREMENT_ARGUMENT_TYPES != 0 {
+                write_argument_types(writer, artifacts, node)?;
+            }
+            written += 1;
+        }
+
+        let start = stack.len();
+        node.visit_children(|child| stack.push(child));
+        stack[start..].reverse();
+    }
+
+    if written != expected_count {
+        return Err(protocol(format!(
+            "targeted syntax contains {expected_count} targets, but {written} target records were encoded"
+        )));
+    }
+
+    Ok(())
+}
+
+fn write_optional_expression_type(
+    writer: &mut PayloadWriter,
+    artifacts: &AnalysisArtifacts,
+    span: Option<Span>,
+) -> Result<(), ExternalAnalyzerError> {
+    let ty = span.and_then(|span| artifacts.expression_types.get(&(span.start.offset, span.end.offset)));
+    writer.write_bool(ty.is_some());
+    if let Some(ty) = ty {
+        write_type(writer, ty)?;
+    }
+    Ok(())
+}
+
+fn receiver_span(node: Node<'_, '_>) -> Option<Span> {
+    match node {
+        Node::MethodCall(call) => Some(call.object.span()),
+        Node::NullSafeMethodCall(call) => Some(call.object.span()),
+        Node::StaticMethodCall(call) => Some(call.class.span()),
+        _ => None,
+    }
+}
+
+fn write_argument_types(
+    writer: &mut PayloadWriter,
+    artifacts: &AnalysisArtifacts,
+    node: Node<'_, '_>,
+) -> Result<(), ExternalAnalyzerError> {
+    let arguments = match node {
+        Node::FunctionCall(call) => Some(&call.argument_list.arguments),
+        Node::MethodCall(call) => Some(&call.argument_list.arguments),
+        Node::NullSafeMethodCall(call) => Some(&call.argument_list.arguments),
+        Node::StaticMethodCall(call) => Some(&call.argument_list.arguments),
+        _ => None,
+    };
+    let Some(arguments) = arguments else {
+        writer.write_u32(0);
+        return Ok(());
+    };
+
+    writer.write_u32(u32::try_from(arguments.len()).map_err(|_| protocol("too many call arguments"))?);
+    for argument in arguments.iter() {
+        write_optional_expression_type(writer, artifacts, Some(argument.value().span()))?;
+    }
+    Ok(())
 }
 
 pub(super) enum AnalysisStore<'analysis> {
@@ -523,6 +682,44 @@ impl FileView<'_> {
             }
         }
     }
+
+    fn write_target_source_snapshot(
+        &self,
+        writer: &mut PayloadWriter,
+        requirements: &NodeAnalysisRequirements,
+    ) -> Result<(), ExternalAnalyzerError> {
+        match self {
+            Self::Artifacts(file, program, resolved_names, artifacts, _) => {
+                let subtree_targets = requirements.subtree_targets();
+                let snapshot = SourceSnapshot::targeted(
+                    program,
+                    resolved_names,
+                    requirements.targets(),
+                    &subtree_targets,
+                    requirements.includes_source_text(),
+                )
+                .map_err(|error| {
+                    protocol(format!(
+                        "failed to snapshot targeted syntax for `{}`: {error}",
+                        String::from_utf8_lossy(&file.name)
+                    ))
+                })?
+                .ok_or_else(|| protocol("targeted file summary contains no matching syntax nodes"))?;
+                snapshot.write_to(writer).map_err(|error| {
+                    protocol(format!(
+                        "failed to encode targeted syntax for `{}`: {error}",
+                        String::from_utf8_lossy(&file.name)
+                    ))
+                })?;
+                write_target_analysis(writer, program, artifacts, requirements, snapshot.target_count())
+            }
+            Self::Snapshot(file) => {
+                writer.write_raw(&file.encoded_target_source);
+                writer.write_raw(&file.encoded_target_analysis);
+                Ok(())
+            }
+        }
+    }
 }
 
 fn write_expression_type_records(
@@ -557,15 +754,23 @@ pub(super) fn encode_after_file_analysis_request(
     resolved_names: &ResolvedNames<'_>,
     artifacts: &AnalysisArtifacts,
     include_expression_types: bool,
-    node_analysis_targets: Option<&[bool; u8::MAX as usize + 1]>,
-    embed_source: bool,
+    node_analysis_requirements: Option<&NodeAnalysisRequirements>,
 ) -> Result<Vec<u8>, ExternalAnalyzerError> {
     let mut writer = lifecycle_writer(AFTER_FILE_ANALYSIS_REQUEST, generation, plugins)?;
     write_file_summary(
         &mut writer,
-        FileView::Artifacts(file, program, resolved_names, artifacts, node_analysis_targets),
+        FileView::Artifacts(
+            file,
+            program,
+            resolved_names,
+            artifacts,
+            node_analysis_requirements.map(NodeAnalysisRequirements::targets),
+        ),
         include_expression_types,
-        embed_source.then_some(file.contents.as_ref()),
+        node_analysis_requirements,
+        node_analysis_requirements
+            .is_some_and(NodeAnalysisRequirements::includes_source_text)
+            .then_some(file.contents.as_ref()),
     )?;
     Ok(writer.finish())
 }
@@ -575,13 +780,14 @@ pub(super) fn encode_after_file_analysis_batch_request(
     plugins: &[u16],
     files: &[Arc<FileAnalysisSnapshot>],
     include_expression_types: bool,
-    embed_source: bool,
+    node_analysis_requirements: Option<&NodeAnalysisRequirements>,
     session: &ExternalAnalysisSession,
 ) -> Result<Vec<u8>, ExternalAnalyzerError> {
     let mut writer = lifecycle_writer(AFTER_FILE_ANALYSIS_BATCH_REQUEST, generation, plugins)?;
     writer.write_u32(u32::try_from(files.len()).map_err(|_| protocol("after-file batch exceeds u32::MAX files"))?);
     for file in files {
-        let contents = if embed_source {
+        let file_node_analysis_requirements = node_analysis_requirements.filter(|_| file.has_node_analysis_targets());
+        let contents = if file_node_analysis_requirements.is_some_and(NodeAnalysisRequirements::includes_source_text) {
             Some(
                 session
                     .source_file(file.file_id())
@@ -599,7 +805,13 @@ pub(super) fn encode_after_file_analysis_batch_request(
         } else {
             None
         };
-        write_file_summary(&mut writer, FileView::Snapshot(file), include_expression_types, contents)?;
+        write_file_summary(
+            &mut writer,
+            FileView::Snapshot(file),
+            include_expression_types,
+            file_node_analysis_requirements,
+            contents,
+        )?;
     }
 
     Ok(writer.finish())
@@ -617,7 +829,7 @@ pub(super) fn encode_after_analysis_request(
     write_reference_summary(&mut writer, &result.symbol_references);
     writer.write_u32(u32::try_from(files.len()).map_err(|_| protocol("analysis has more than u32::MAX files"))?);
     for file in files {
-        write_file_summary(&mut writer, FileView::Snapshot(file), false, None)?;
+        write_file_summary(&mut writer, FileView::Snapshot(file), false, None, None)?;
     }
 
     Ok(writer.finish())
@@ -639,6 +851,7 @@ fn write_file_summary(
     writer: &mut PayloadWriter,
     file: FileView<'_>,
     include_expression_types: bool,
+    node_analysis_requirements: Option<&NodeAnalysisRequirements>,
     source_contents: Option<&[u8]>,
 ) -> Result<(), ExternalAnalyzerError> {
     writer.write_bytes(file.name())?;
@@ -656,10 +869,13 @@ fn write_file_summary(
     if include_expression_types {
         file.write_expression_type_snapshot(writer)?;
     }
-    writer.write_bool(source_contents.is_some());
-    if let Some(contents) = source_contents {
-        writer.write_bytes(contents)?;
-        file.write_source_snapshot(writer)?;
+    writer.write_bool(node_analysis_requirements.is_some());
+    if let Some(requirements) = node_analysis_requirements {
+        writer.write_bool(source_contents.is_some());
+        if let Some(contents) = source_contents {
+            writer.write_bytes(contents)?;
+        }
+        file.write_target_source_snapshot(writer, requirements)?;
     }
     Ok(())
 }

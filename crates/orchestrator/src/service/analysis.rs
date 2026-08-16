@@ -150,7 +150,7 @@ impl AnalysisService {
 
         let after_file = self.plugin_registry.has_external_after_file_analysis_hooks().unwrap_or_default();
         let after_analysis = self.plugin_registry.has_external_after_analysis_hooks().unwrap_or_default();
-        let node_analysis_targets = self.plugin_registry.external_node_analysis_target_kinds().unwrap_or_default();
+        let node_analysis_requirements = self.plugin_registry.external_node_analysis_requirements().unwrap_or_default();
 
         // Run the analyzer
         let mut analysis_result = AnalysisResult::new(self.symbol_references);
@@ -217,7 +217,7 @@ impl AnalysisService {
                 program,
                 &resolved_names,
                 &artifacts,
-                node_analysis_targets.as_ref(),
+                node_analysis_requirements.as_ref(),
             ) {
                 Ok(snapshot) => Arc::new(snapshot),
                 Err(err) => {
@@ -308,7 +308,7 @@ impl AnalysisService {
                 let capabilities = (
                     before_plugin_registry.has_external_after_file_analysis_hooks().map_err(AnalysisError::from)?,
                     before_plugin_registry.has_external_after_analysis_hooks().map_err(AnalysisError::from)?,
-                    before_plugin_registry.external_node_analysis_target_kinds().map_err(AnalysisError::from)?,
+                    before_plugin_registry.external_node_analysis_requirements().map_err(AnalysisError::from)?,
                 );
 
                 let _result = before_capabilities.set(capabilities);
@@ -341,7 +341,7 @@ impl AnalysisService {
                 }
             },
             move |(settings, parser_settings), arena, source_file, codebase| {
-                let (after_file, after_analysis, node_analysis_targets) =
+                let (after_file, after_analysis, node_analysis_requirements) =
                     map_capabilities.get().copied().unwrap_or_default();
 
                 #[cfg(not(target_arch = "wasm32"))]
@@ -430,7 +430,7 @@ impl AnalysisService {
                             program,
                             &resolved_names,
                             &artifacts,
-                            node_analysis_targets.as_ref(),
+                            node_analysis_requirements.as_ref(),
                         )
                         .map_err(|error| {
                             OrchestratorError::General(format!("Failed to retain external analysis data: {error}"))

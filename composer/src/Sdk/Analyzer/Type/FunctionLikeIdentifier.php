@@ -38,7 +38,9 @@ final class FunctionLikeIdentifier
             return $this->name === $other->name;
         }
 
-        return strcasecmp($this->name, $other->name) === 0
-            && ($this->class === null || strcasecmp($this->class, $other->class ?? '') === 0);
+        return (
+            strcasecmp($this->name, $other->name) === 0
+            && ($this->class === null || strcasecmp($this->class, $other->class ?? '') === 0)
+        );
     }
 }

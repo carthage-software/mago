@@ -6,6 +6,7 @@ namespace Mago\Sdk\Syntax;
 
 use Mago\Sdk\Exception\InvalidArgumentException;
 
+use function count;
 use function str_starts_with;
 
 /**
@@ -70,6 +71,7 @@ final class CallExpression
             }
             $value = self::unwrapExpression($source, $value);
             $arguments[] = new CallArgument(
+                count($arguments),
                 $argument,
                 $value,
                 $named ? $source->getText($parts[0]) : null,

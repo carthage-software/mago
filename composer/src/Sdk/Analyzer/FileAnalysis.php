@@ -4,7 +4,9 @@ declare(strict_types=1);
 
 namespace Mago\Sdk\Analyzer;
 
+use LogicException;
 use Mago\Sdk\CancellationTokenInterface;
+use Mago\Sdk\Internal\Analyzer\NodeAnalysisData;
 use Mago\Sdk\Internal\Analyzer\Protocol;
 use Mago\Sdk\Internal\Analyzer\TypeCodec;
 use Mago\Sdk\Internal\HostClient;
@@ -29,6 +31,7 @@ use function unpack;
  * @api
  * @mago-expect lint:cyclomatic-complexity
  * @mago-expect lint:excessive-parameter-list
+ * @mago-expect lint:too-many-methods
  */
 final class FileAnalysis
 {
@@ -42,12 +45,13 @@ final class FileAnalysis
      */
     private array $inferredTypes = [];
 
-    private ?SourceFile $sourceFile;
+    private ?SourceFile $sourceFile = null;
 
     /**
      * @internal
      * @param positive-int $requestId
      * @param list<NodeKind> $nodeKinds
+     * @param list<NodeAnalysisData> $nodeAnalysisData
      * @param non-empty-string $file
      */
     public function __construct(
@@ -57,7 +61,8 @@ final class FileAnalysis
         private readonly CancellationTokenInterface $cancellation,
         private readonly PHPVersion $phpVersion,
         private readonly array $nodeKinds,
-        ?SourceFile $sourceFile,
+        private readonly ?SourceFile $nodeSourceFile,
+        private readonly array $nodeAnalysisData,
         private readonly bool $hasLocalExpressionTypes,
         private readonly string $expressionTypeRecords,
         private readonly string $encodedExpressionTypes,
@@ -68,9 +73,7 @@ final class FileAnalysis
         public readonly int $inferredYieldKeyCount,
         public readonly int $inferredYieldValueCount,
         public readonly ReferenceSummary $references,
-    ) {
-        $this->sourceFile = $sourceFile;
-    }
+    ) {}
 
     public function getExpressionType(Node|Span $selection): ?Type
     {
@@ -168,6 +171,33 @@ final class FileAnalysis
             $this->file,
             $this->phpVersion,
             $this->nodeKinds,
+        );
+    }
+
+    /** @internal */
+    public function getNodeSourceFile(): SourceFile
+    {
+        return (
+            $this->nodeSourceFile ?? throw new LogicException('This file analysis contains no targeted node syntax.')
+        );
+    }
+
+    /** @internal */
+    public function hasNodeAnalysisTargets(): bool
+    {
+        return $this->nodeAnalysisData !== [];
+    }
+
+    /**
+     * @internal
+     * @param non-negative-int $index
+     */
+    public function getNodeAnalysisData(int $index): NodeAnalysisData
+    {
+        return (
+            $this->nodeAnalysisData[$index] ?? throw new LogicException(
+                "This file analysis contains no target data at index {$index}.",
+            )
         );
     }
 

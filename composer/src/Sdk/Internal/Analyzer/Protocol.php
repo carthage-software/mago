@@ -370,7 +370,14 @@ final class Protocol
                     $writer->writeU16($hook->index);
                     $requirements = 0;
                     foreach ($hook->requirements as $requirement) {
-                        $requirements |= (int) ($requirement === FileAnalysisRequirement::ExpressionTypes);
+                        $requirements |= match ($requirement) {
+                            FileAnalysisRequirement::ExpressionTypes => 1,
+                            FileAnalysisRequirement::TargetExpressionTypes => 1 << 1,
+                            FileAnalysisRequirement::ReceiverType => 1 << 2,
+                            FileAnalysisRequirement::ArgumentTypes => 1 << 3,
+                            FileAnalysisRequirement::TargetSubtree => 1 << 4,
+                            FileAnalysisRequirement::SourceText => 1 << 5,
+                        };
                     }
                     $writer->writeU8($requirements);
                     $writer->writeCount($hook->targets);
@@ -749,9 +756,27 @@ final class Protocol
             $encodedExpressionTypes = $reader->readBytes();
         }
         $sourceFile = null;
+        $nodeAnalysisData = [];
         if ($reader->readBoolean()) {
-            $contents = $reader->readBytes();
+            $contents = $reader->readBoolean() ? $reader->readBytes() : '';
             $sourceFile = SourceFileCodec::read($reader, $phpVersion, $nodeKinds, $file, $contents);
+            $targetCount = $reader->readCount(1_000_000);
+            if ($targetCount !== count($sourceFile->getTargetNodes())) {
+                throw new ProtocolException('Node-analysis data does not match the targeted syntax snapshot.');
+            }
+            for ($index = 0; $index < $targetCount; ++$index) {
+                $requirements = $reader->readU8();
+                $targetType = ($requirements & (1 << 1)) !== 0 ? self::readOptionalType($reader) : null;
+                $receiverType = ($requirements & (1 << 2)) !== 0 ? self::readOptionalType($reader) : null;
+                $argumentTypes = [];
+                if (($requirements & (1 << 3)) !== 0) {
+                    $argumentCount = $reader->readCount(1_000_000);
+                    for ($argumentIndex = 0; $argumentIndex < $argumentCount; ++$argumentIndex) {
+                        $argumentTypes[] = self::readOptionalType($reader);
+                    }
+                }
+                $nodeAnalysisData[] = new NodeAnalysisData($targetType, $receiverType, $argumentTypes);
+            }
         }
 
         return new FileAnalysis(
@@ -762,6 +787,7 @@ final class Protocol
             $phpVersion,
             $nodeKinds,
             $sourceFile,
+            $nodeAnalysisData,
             $hasLocalExpressionTypes,
             $expressionTypeRecords,
             $encodedExpressionTypes,
@@ -815,6 +841,11 @@ final class Protocol
     private static function readReferenceSummary(PayloadReader $reader): ReferenceSummary
     {
         return new ReferenceSummary($reader->readU64(), $reader->readU64(), $reader->readU64());
+    }
+
+    private static function readOptionalType(PayloadReader $reader): ?Type
+    {
+        return $reader->readBoolean() ? TypeCodec::readComplete($reader) : null;
     }
 
     public static function readReturnTypeRequest(PayloadReader $reader): ReturnTypeRequest

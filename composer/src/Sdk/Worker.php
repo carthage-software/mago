@@ -1141,11 +1141,11 @@ final class Worker
         int $pluginIndex,
         array &$reportedIssues,
     ): void {
-        if ($registered->nodeAnalysisHooks === []) {
+        if ($registered->nodeAnalysisHooks === [] || !$context->analysis->hasNodeAnalysisTargets()) {
             return;
         }
 
-        $source = $context->analysis->getSourceFile();
+        $source = $context->analysis->getNodeSourceFile();
         $targetIndex = 0;
         foreach ($source->getTargetNodes() as $node) {
             if (($targetIndex++ & 63) === 0) {
@@ -1157,7 +1157,12 @@ final class Worker
                 continue;
             }
 
-            $nodeContext = new NodeAnalysisContext($context, $source, $node);
+            $nodeContext = new NodeAnalysisContext(
+                $context,
+                $source,
+                $node,
+                $context->analysis->getNodeAnalysisData($targetIndex - 1),
+            );
             foreach ($hooks as $hook) {
                 $hook->hook->analyze($nodeContext);
                 foreach ($nodeContext->takeReportedIssues() as $issue) {

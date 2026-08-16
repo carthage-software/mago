@@ -108,6 +108,7 @@ use crate::external::FunctionTarget;
 use crate::external::IssueFilterHookRegistration;
 use crate::external::MethodProvider;
 use crate::external::MethodTarget;
+use crate::external::NODE_REQUIREMENTS_ALL;
 use crate::external::NodeAnalysisHookRegistration;
 use crate::external::PropertyAccessKind;
 use crate::external::PropertyProvider;
@@ -614,7 +615,7 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
             for _ in 0..node_hook_count {
                 let hook_index = reader.read_u16("node-analysis hook index")?;
                 let requirements = reader.read_u8("node-analysis hook requirements")?;
-                if requirements & !1 != 0 {
+                if requirements & !NODE_REQUIREMENTS_ALL != 0 {
                     return Err(protocol(format!(
                         "node-analysis hook {hook_index} has unknown requirements {requirements:#04x}"
                     )));
@@ -643,7 +644,7 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
                     plugin: identifier.clone(),
                     plugin_index: index,
                     index: hook_index,
-                    expression_types: requirements & 1 != 0,
+                    requirements,
                     targets,
                 });
                 if !node_analysis_plugins.contains(&index) {

@@ -129,6 +129,7 @@ impl<'source> SourceSnapshot<'source> {
             return Ok(None);
         }
 
+        let target_ranges = merge_ranges(target_ranges);
         let mut names = resolved_names
             .iter()
             .filter(|(start, end, _, _)| {
@@ -141,6 +142,85 @@ impl<'source> SourceSnapshot<'source> {
         names.sort_unstable_by_key(|(start, end, _, _)| (*start, *end));
 
         Ok(Some(Self { nodes, targets, names, trivia: collect_trivia(program) }))
+    }
+
+    /// Builds the minimal syntax snapshot needed by targeted analyzer hooks.
+    ///
+    /// Every matching target is included. A target's descendants are included
+    /// only when its kind is enabled in `subtree_kinds`.
+    ///
+    /// Returns `None` when the file has no matching target nodes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the filtered syntax tree exceeds the protocol's
+    /// `u32` address space.
+    pub fn targeted<'ast, 'arena>(
+        program: &'ast Program<'arena>,
+        resolved_names: &'source ResolvedNames<'arena>,
+        target_kinds: &[bool; u8::MAX as usize + 1],
+        subtree_kinds: &[bool; u8::MAX as usize + 1],
+        include_trivia: bool,
+    ) -> Result<Option<Self>, PayloadError> {
+        let mut nodes = Vec::new();
+        let mut targets = Vec::new();
+        let mut included_ranges = Vec::new();
+        let mut stack = Vec::with_capacity(64);
+        let mut subtree_stack = Vec::with_capacity(64);
+        stack.push(Node::Program(program));
+        while let Some(node) = stack.pop() {
+            let target = target_kinds[node.kind() as usize];
+            if target && subtree_kinds[node.kind() as usize] {
+                let span = node.span();
+                included_ranges.push((span.start.offset, span.end.offset));
+                Self::append_subtree(node, Some(target_kinds), &mut nodes, &mut targets, &mut subtree_stack)?;
+                continue;
+            }
+
+            if target {
+                let identifier =
+                    u32::try_from(nodes.len()).map_err(|_| PayloadError::LengthOverflow { length: nodes.len() })?;
+                let span = node.span();
+                included_ranges.push((span.start.offset, span.end.offset));
+                nodes.push(SnapshotNode {
+                    kind: node.kind(),
+                    start: span.start.offset,
+                    end: span.end.offset,
+                    parent: None,
+                    first_child: None,
+                    next_sibling: None,
+                    last_child: None,
+                });
+                targets.push(identifier);
+            }
+
+            let start = stack.len();
+            node.visit_children(|child| stack.push(child));
+            stack[start..].reverse();
+        }
+
+        if targets.is_empty() {
+            return Ok(None);
+        }
+
+        let included_ranges = merge_ranges(included_ranges);
+        let mut names = resolved_names
+            .iter()
+            .filter(|(start, end, _, _)| {
+                let range_index = included_ranges.partition_point(|(_, range_end)| range_end <= start);
+                included_ranges
+                    .get(range_index)
+                    .is_some_and(|(range_start, range_end)| range_start <= start && end <= range_end)
+            })
+            .collect::<Vec<_>>();
+        names.sort_unstable_by_key(|(start, end, _, _)| (*start, *end));
+
+        Ok(Some(Self {
+            nodes,
+            targets,
+            names,
+            trivia: if include_trivia { collect_trivia(program) } else { Vec::new() },
+        }))
     }
 
     fn append_subtree<'ast, 'arena>(
@@ -270,6 +350,21 @@ impl<'source> SourceSnapshot<'source> {
     pub const fn trivia_count(&self) -> usize {
         self.trivia.len()
     }
+}
+
+fn merge_ranges(mut ranges: Vec<(u32, u32)>) -> Vec<(u32, u32)> {
+    ranges.sort_unstable();
+    let mut merged: Vec<(u32, u32)> = Vec::with_capacity(ranges.len());
+    for (start, end) in ranges {
+        if let Some((_, previous_end)) = merged.last_mut()
+            && start <= *previous_end
+        {
+            *previous_end = (*previous_end).max(end);
+        } else {
+            merged.push((start, end));
+        }
+    }
+    merged
 }
 
 fn collect_trivia(program: &Program<'_>) -> Vec<(u8, u32, u32)> {

@@ -11,7 +11,11 @@ namespace Mago\Sdk\Syntax;
  */
 final class CallArgument
 {
+    /**
+     * @param non-negative-int $index Source-order index in the containing call.
+     */
     public function __construct(
+        public readonly int $index,
         public readonly Node $node,
         public readonly Node $value,
         public readonly ?string $name,
