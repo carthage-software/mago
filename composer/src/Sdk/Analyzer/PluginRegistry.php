@@ -46,6 +46,16 @@ final class PluginRegistry
     private array $classInitializerProviders = [];
 
     /**
+     * @var list<MethodTarget>
+     */
+    private array $entryPoints = [];
+
+    /**
+     * @var list<AttributedEntryPoint>
+     */
+    private array $attributedEntryPoints = [];
+
+    /**
      * @var list<IssueFilterHook>
      */
     private array $issueFilterHooks = [];
@@ -98,6 +108,27 @@ final class PluginRegistry
     public function registerClassInitializerProvider(ClassInitializerProvider $provider): void
     {
         $this->classInitializerProviders[] = $provider;
+    }
+
+    /**
+     * Marks methods matching the target as framework entry points.
+     *
+     * Mago resolves the declaration and records the reference without invoking
+     * the extension during analysis.
+     */
+    public function registerEntryPoint(MethodTarget $target): void
+    {
+        $this->entryPoints[] = $target;
+    }
+
+    /**
+     * Marks methods carrying an attribute as framework entry points.
+     *
+     * The class target matches subclasses and implementations.
+     */
+    public function registerAttributedEntryPoint(string|ClassTarget $class, string $attribute): void
+    {
+        $this->attributedEntryPoints[] = new AttributedEntryPoint($class, $attribute);
     }
 
     public function registerIssueFilterHook(IssueFilterHook $hook): void
@@ -185,6 +216,24 @@ final class PluginRegistry
     public function getClassInitializerProviders(): array
     {
         return $this->classInitializerProviders;
+    }
+
+    /**
+     * @internal
+     * @return list<MethodTarget>
+     */
+    public function getEntryPoints(): array
+    {
+        return $this->entryPoints;
+    }
+
+    /**
+     * @internal
+     * @return list<AttributedEntryPoint>
+     */
+    public function getAttributedEntryPoints(): array
+    {
+        return $this->attributedEntryPoints;
     }
 
     /**

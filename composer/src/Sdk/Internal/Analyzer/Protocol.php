@@ -339,6 +339,18 @@ final class Protocol
                     }
                 }
 
+                $writer->writeCount($plugin->entryPoints);
+                foreach ($plugin->entryPoints as $entryPoint) {
+                    $writer->writeBytes($entryPoint->class);
+                    $writer->writeBytes($entryPoint->method);
+                }
+
+                $writer->writeCount($plugin->attributedEntryPoints);
+                foreach ($plugin->attributedEntryPoints as $entryPoint) {
+                    $writer->writeBytes($entryPoint->class->class);
+                    $writer->writeBytes($entryPoint->attribute);
+                }
+
                 $writer->writeCount($plugin->issueFilterHooks);
                 foreach ($plugin->issueFilterHooks as $hook) {
                     $writer->writeU16($hook->index);
@@ -677,9 +689,11 @@ final class Protocol
             $discoveryFile = $contributedReferences[$index + 4];
             $writer->writeU16($plugin);
             if ($requestKind !== self::BEFORE_ANALYSIS_REQUEST) {
-                $writer->writeString($discoveryFile ?? throw new ProtocolException(
-                    'A late symbol-reference contribution has no discovery file.',
-                ));
+                $writer->writeString(
+                    $discoveryFile ?? throw new ProtocolException(
+                        'A late symbol-reference contribution has no discovery file.',
+                    ),
+                );
             }
 
             self::writeReferenceOrigin(

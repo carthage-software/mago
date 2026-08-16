@@ -92,11 +92,14 @@ use mago_span::HasSpan;
 use mago_syntax::cst::NodeKind;
 use mago_text_edit::Safety;
 use mago_word::WordSet;
+use mago_word::ascii_lowercase_word;
 use mago_word::word;
 
 use crate::artifacts::AnalysisArtifacts;
+use crate::external::AttributedEntryPoint;
 use crate::external::ClassInitializerProvider;
 use crate::external::EffectivePropertyType;
+use crate::external::EntryPoint;
 use crate::external::ExternalAnalysisSession;
 use crate::external::ExternalExtension;
 use crate::external::ExternalPlugin;
@@ -218,6 +221,8 @@ pub(super) struct Registration {
     pub property_providers: Vec<PropertyProvider>,
     pub property_initialization_providers: Vec<PropertyProvider>,
     pub class_initializer_providers: Vec<ClassInitializerProvider>,
+    pub entry_points: Vec<EntryPoint>,
+    pub attributed_entry_points: Vec<AttributedEntryPoint>,
     pub issue_filter_hooks: Vec<IssueFilterHookRegistration>,
     pub node_analysis_hooks: Vec<NodeAnalysisHookRegistration>,
     pub initialization_plugins: Vec<u16>,
@@ -345,6 +350,8 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
     let mut property_providers = Vec::new();
     let mut property_initialization_providers = Vec::new();
     let mut class_initializer_providers = Vec::new();
+    let mut entry_points = Vec::new();
+    let mut attributed_entry_points = Vec::new();
     let mut issue_filter_hooks = Vec::new();
     let mut node_analysis_hooks = Vec::new();
     let mut initialization_plugins = Vec::new();
@@ -545,6 +552,39 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
                 });
             }
 
+            let entry_point_count = reader.read_count("entry points", MAXIMUM_TARGETS)?;
+            for _ in 0..entry_point_count {
+                let class = non_empty(reader.read_bytes("entry point class")?.to_vec(), "entry point class")?;
+                let method = non_empty(reader.read_bytes("entry point method")?.to_vec(), "entry point method")?;
+                validate_method_pattern(&class)?;
+                validate_method_pattern(&method)?;
+                entry_points.push(EntryPoint {
+                    plugin: identifier.clone(),
+                    source: ascii_lowercase_word(identifier.as_bytes()),
+                    target: MethodTarget { class, method },
+                });
+            }
+
+            let attributed_entry_point_count = reader.read_count("attributed entry points", MAXIMUM_TARGETS)?;
+            for _ in 0..attributed_entry_point_count {
+                let class = non_empty(
+                    reader.read_bytes("attributed entry point class")?.to_vec(),
+                    "attributed entry point class",
+                )?;
+                let attribute =
+                    non_empty(reader.read_bytes("entry point attribute")?.to_vec(), "entry point attribute")?;
+                validate_method_pattern(&class)?;
+                if !is_valid_symbol_name(&attribute) {
+                    return Err(protocol("entry point attribute must be a valid PHP class-like name"));
+                }
+                attributed_entry_points.push(AttributedEntryPoint {
+                    plugin: identifier.clone(),
+                    source: ascii_lowercase_word(identifier.as_bytes()),
+                    class,
+                    attribute,
+                });
+            }
+
             let issue_filter_count = reader.read_count("issue-filter hooks", MAXIMUM_PROVIDERS)?;
             for _ in 0..issue_filter_count {
                 let index = reader.read_u16("issue-filter hook index")?;
@@ -666,6 +706,8 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
         property_providers,
         property_initialization_providers,
         class_initializer_providers,
+        entry_points,
+        attributed_entry_points,
         issue_filter_hooks,
         node_analysis_hooks,
         initialization_plugins,
@@ -2851,6 +2893,10 @@ fn is_valid_identifier(name: &[u8]) -> bool {
         && rest.iter().all(|byte| *byte == b'_' || byte.is_ascii_alphanumeric() || *byte >= 0x80)
 }
 
+fn is_valid_symbol_name(name: &[u8]) -> bool {
+    name.split(|byte| *byte == b'\\').all(is_valid_identifier)
+}
+
 fn validate_method_pattern(pattern: &[u8]) -> Result<(), ExternalAnalyzerError> {
     if let Some(star) = pattern.iter().position(|byte| *byte == b'*')
         && star + 1 != pattern.len()
@@ -3069,6 +3115,48 @@ pub(super) mod testing {
     }
 
     #[test]
+    fn registration_preserves_declarative_entry_points() {
+        let mut writer = message_writer(DESCRIBE_RESPONSE);
+        writer.write_u32(1);
+        writer.write_string("demo/extension").unwrap();
+        writer.write_string("Demo").unwrap();
+        writer.write_string("1.0.0").unwrap();
+        writer.write_bool(false);
+        writer.write_u32(1);
+        writer.write_string("demo/plugin").unwrap();
+        writer.write_string("Demo plugin").unwrap();
+        writer.write_string("Tests declarative entry points").unwrap();
+        writer.write_bool(true);
+        writer.write_u8(0);
+        writer.write_u32(0);
+        writer.write_u32(0);
+        writer.write_u32(0);
+        writer.write_u32(0);
+        writer.write_u32(0);
+        writer.write_u32(0);
+        writer.write_u32(1);
+        writer.write_bytes(b"FrameworkTestCase").unwrap();
+        writer.write_bytes(b"test*").unwrap();
+        writer.write_u32(1);
+        writer.write_bytes(b"FrameworkTestCase").unwrap();
+        writer.write_bytes(b"Framework\\Test").unwrap();
+        writer.write_u32(0);
+        writer.write_u32(0);
+
+        let registration = decode_registration(&writer.finish()).unwrap();
+        assert_eq!(registration.entry_points.len(), 1);
+        assert_eq!(registration.entry_points[0].plugin, "demo/plugin");
+        assert_eq!(registration.entry_points[0].source, word(b"demo/plugin"));
+        assert_eq!(registration.entry_points[0].target.class, b"FrameworkTestCase");
+        assert_eq!(registration.entry_points[0].target.method, b"test*");
+        assert_eq!(registration.attributed_entry_points.len(), 1);
+        assert_eq!(registration.attributed_entry_points[0].plugin, "demo/plugin");
+        assert_eq!(registration.attributed_entry_points[0].source, word(b"demo/plugin"));
+        assert_eq!(registration.attributed_entry_points[0].class, b"FrameworkTestCase");
+        assert_eq!(registration.attributed_entry_points[0].attribute, b"Framework\\Test");
+    }
+
+    #[test]
     fn issue_filter_response_requires_ordered_in_range_removals() {
         let mut writer = message_writer(ISSUE_FILTER_RESPONSE);
         writer.write_u32(4);
@@ -3113,6 +3201,8 @@ pub(super) mod testing {
         writer.write_u32(0);
         writer.write_u32(0);
         writer.write_u32(0);
+        writer.write_u32(0);
+        writer.write_u32(0);
         writer.finish()
     }
 
@@ -3141,6 +3231,8 @@ pub(super) mod testing {
         writer.write_u32(1);
         writer.write_u8(TARGET_EXACT);
         writer.write_bytes(b"demo_service").unwrap();
+        writer.write_u32(0);
+        writer.write_u32(0);
         writer.write_u32(0);
         writer.write_u32(0);
         writer.write_u32(0);

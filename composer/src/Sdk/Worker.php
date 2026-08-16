@@ -423,6 +423,8 @@ final class Worker
                     $registeredPropertyProviders,
                     $registeredPropertyInitializationProviders,
                     $registeredClassInitializerProviders,
+                    $registry->getEntryPoints(),
+                    $registry->getAttributedEntryPoints(),
                     $registeredIssueFilterHooks,
                     $registry->getInitializationHooks(),
                     $registry->getBeforeAnalysisHooks(),

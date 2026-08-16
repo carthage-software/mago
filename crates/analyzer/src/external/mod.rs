@@ -29,6 +29,7 @@ use mago_reporting::IssueCollection;
 use mago_span::Span;
 use mago_syntax::cst::NodeKind;
 use mago_syntax::cst::Program;
+use mago_word::Word;
 use mago_word::WordMap;
 use mago_word::WordSet;
 use mago_word::ascii_lowercase_word;
@@ -439,6 +440,21 @@ struct ClassInitializerProvider {
     plugin: String,
     index: u16,
     targets: Vec<Vec<u8>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct EntryPoint {
+    plugin: String,
+    source: Word,
+    target: MethodTarget,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct AttributedEntryPoint {
+    plugin: String,
+    source: Word,
+    class: Vec<u8>,
+    attribute: Vec<u8>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -974,6 +990,76 @@ impl<T> Backend<T> {
             .map(|(index, _)| *index);
 
         (ProviderIndices::add_wildcards(exact, wildcards), candidates)
+    }
+
+    fn contribute_entry_point_references(
+        &self,
+        codebase: &CodebaseMetadata,
+        references: &mut SymbolReferences,
+    ) -> usize {
+        if self.registration.entry_points.is_empty() && self.registration.attributed_entry_points.is_empty() {
+            return 0;
+        }
+
+        let mut matches = 0;
+        for class in codebase.class_likes.values() {
+            for entry_point in &self.registration.entry_points {
+                if !class_pattern_matches(codebase, &entry_point.target.class, class.name.as_bytes()) {
+                    continue;
+                }
+
+                let mut matched_class = false;
+                for (method, declaring_method) in &class.declaring_method_ids {
+                    if !pattern_matches(&entry_point.target.method, method.as_bytes()) {
+                        continue;
+                    }
+
+                    references.add_symbol_reference_to_class_member(
+                        entry_point.source,
+                        (declaring_method.get_class_name(), declaring_method.get_method_name()),
+                        false,
+                    );
+                    matched_class = true;
+                    matches += 1;
+                }
+                if matched_class {
+                    references.add_symbol_reference_to_symbol(entry_point.source, class.name, false);
+                }
+            }
+
+            for entry_point in &self.registration.attributed_entry_points {
+                if !class_pattern_matches(codebase, &entry_point.class, class.name.as_bytes()) {
+                    continue;
+                }
+
+                let mut matched_class = false;
+                for declaring_method in class.declaring_method_ids.values() {
+                    let Some(method) = codebase.get_method_by_id(declaring_method) else {
+                        continue;
+                    };
+                    if !method
+                        .attributes
+                        .iter()
+                        .any(|attribute| attribute.name.as_bytes().eq_ignore_ascii_case(&entry_point.attribute))
+                    {
+                        continue;
+                    }
+
+                    references.add_symbol_reference_to_class_member(
+                        entry_point.source,
+                        (declaring_method.get_class_name(), declaring_method.get_method_name()),
+                        false,
+                    );
+                    matched_class = true;
+                    matches += 1;
+                }
+                if matched_class {
+                    references.add_symbol_reference_to_symbol(entry_point.source, class.name, false);
+                }
+            }
+        }
+
+        matches
     }
 }
 
@@ -1719,6 +1805,21 @@ where
     ) -> Result<BeforeAnalysisResult, ExternalAnalyzerError> {
         let mut result = BeforeAnalysisResult::default();
         for backend in &self.backends {
+            let entry_point_start = self.trace_enabled.then(Instant::now);
+            let entry_point_matches = backend.contribute_entry_point_references(codebase, &mut result.references);
+            if let Some(start) = entry_point_start
+                && (!backend.registration.entry_points.is_empty()
+                    || !backend.registration.attributed_entry_points.is_empty())
+            {
+                tracing::trace!(
+                    entry_points = backend.registration.entry_points.len(),
+                    attributed_entry_points = backend.registration.attributed_entry_points.len(),
+                    matches = entry_point_matches,
+                    elapsed = ?start.elapsed(),
+                    "Declarative external entry points resolved."
+                );
+            }
+
             let plugins = &backend.registration.before_analysis_plugins;
             if plugins.is_empty() {
                 continue;
@@ -3123,6 +3224,8 @@ where
             let advertised_property_providers = registration.property_providers.len();
             let advertised_property_initialization_providers = registration.property_initialization_providers.len();
             let advertised_class_initializer_providers = registration.class_initializer_providers.len();
+            let advertised_entry_points = registration.entry_points.len();
+            let advertised_attributed_entry_points = registration.attributed_entry_points.len();
             let advertised_issue_filter_hooks = registration.issue_filter_hooks.len();
             let advertised_node_analysis_hooks = registration.node_analysis_hooks.len();
             let enabled_indices = registration
@@ -3138,6 +3241,8 @@ where
                 .property_initialization_providers
                 .retain(|provider| enabled.contains(provider.plugin.as_str()));
             registration.class_initializer_providers.retain(|provider| enabled.contains(provider.plugin.as_str()));
+            registration.entry_points.retain(|entry_point| enabled.contains(entry_point.plugin.as_str()));
+            registration.attributed_entry_points.retain(|entry_point| enabled.contains(entry_point.plugin.as_str()));
             registration.issue_filter_hooks.retain(|hook| enabled.contains(hook.plugin.as_str()));
             registration.node_analysis_hooks.retain(|hook| enabled.contains(hook.plugin.as_str()));
             registration.initialization_plugins.retain(|index| enabled_indices.contains(index));
@@ -3201,6 +3306,11 @@ where
                     class_initializer_providers = registration.class_initializer_providers.len(),
                     disabled_class_initializer_providers = advertised_class_initializer_providers
                         - registration.class_initializer_providers.len(),
+                    entry_points = registration.entry_points.len(),
+                    disabled_entry_points = advertised_entry_points - registration.entry_points.len(),
+                    attributed_entry_points = registration.attributed_entry_points.len(),
+                    disabled_attributed_entry_points = advertised_attributed_entry_points
+                        - registration.attributed_entry_points.len(),
                     issue_filter_hooks = registration.issue_filter_hooks.len(),
                     disabled_issue_filter_hooks = advertised_issue_filter_hooks - registration.issue_filter_hooks.len(),
                     node_analysis_hooks = registration.node_analysis_hooks.len(),
@@ -3247,6 +3357,13 @@ where
                 .iter()
                 .map(|backend| backend.registration.class_initializer_providers.len())
                 .sum::<usize>();
+            let entry_points =
+                analyzer.backends.iter().map(|backend| backend.registration.entry_points.len()).sum::<usize>();
+            let attributed_entry_points = analyzer
+                .backends
+                .iter()
+                .map(|backend| backend.registration.attributed_entry_points.len())
+                .sum::<usize>();
             let issue_filter_hooks =
                 analyzer.backends.iter().map(|backend| backend.registration.issue_filter_hooks.len()).sum::<usize>();
             let node_analysis_hooks =
@@ -3275,6 +3392,8 @@ where
                 property_providers,
                 property_initialization_providers,
                 class_initializer_providers,
+                entry_points,
+                attributed_entry_points,
                 issue_filter_hooks,
                 node_analysis_hooks,
                 before_analysis_plugins,

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Mago\Tests\Sdk\Unit\Analyzer;
 
+use Mago\Sdk\Analyzer\ClassTarget;
+use Mago\Sdk\Analyzer\MethodTarget;
 use Mago\Sdk\Analyzer\NodeAnalysisContext;
 use Mago\Sdk\Analyzer\NodeAnalysisHook;
 use Mago\Sdk\Analyzer\PluginRegistry;
@@ -33,6 +35,27 @@ final class PluginRegistryTest extends TestCase
         $registry->registerNodeAnalysisHook($second);
 
         self::assertSame([$first, $second], $registry->getNodeAnalysisHooks());
+    }
+
+    public function testFrameworkEntryPointsPreserveRegistrationOrder(): void
+    {
+        $registry = new PluginRegistry();
+        $first = MethodTarget::exact('FrameworkTestCase', 'test*');
+        $second = MethodTarget::exact('FrameworkTestCase', 'setUp');
+
+        $registry->registerEntryPoint($first);
+        $registry->registerEntryPoint($second);
+        $registry->registerAttributedEntryPoint('FrameworkTestCase', 'FrameworkTest');
+        $registry->registerAttributedEntryPoint(ClassTarget::exact('FrameworkTestCase'), 'FrameworkDataProvider');
+
+        self::assertSame([$first, $second], $registry->getEntryPoints());
+
+        $attributed = $registry->getAttributedEntryPoints();
+        self::assertCount(2, $attributed);
+        self::assertSame('FrameworkTestCase', $attributed[0]->class->class);
+        self::assertSame('FrameworkTest', $attributed[0]->attribute);
+        self::assertSame('FrameworkTestCase', $attributed[1]->class->class);
+        self::assertSame('FrameworkDataProvider', $attributed[1]->attribute);
     }
 
     private static function nodeAnalysisHook(NodeKind $target): NodeAnalysisHook

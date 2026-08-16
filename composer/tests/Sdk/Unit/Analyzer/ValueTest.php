@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Mago\Tests\Sdk\Unit\Analyzer;
 
+use Mago\Sdk\Analyzer\AttributedEntryPoint;
 use Mago\Sdk\Analyzer\ClassTarget;
 use Mago\Sdk\Analyzer\FunctionTarget;
 use Mago\Sdk\Analyzer\MethodTarget;
@@ -40,6 +41,9 @@ final class ValueTest extends TestCase
         self::assertSame('*', ClassTarget::any()->class);
         self::assertSame('*', MethodTarget::anyClass('create')->class);
         self::assertSame('*', PropertyTarget::allProperties('Model')->property);
+        $entryPoint = new AttributedEntryPoint('FrameworkTestCase', 'FrameworkTest');
+        self::assertSame('FrameworkTestCase', $entryPoint->class->class);
+        self::assertSame('FrameworkTest', $entryPoint->attribute);
 
         $method = new FunctionLikeIdentifier(FunctionLikeKind::Method, 'run', 'Job');
         self::assertTrue($method->equals(new FunctionLikeIdentifier(FunctionLikeKind::Method, 'RUN', 'job')));
@@ -69,6 +73,13 @@ final class ValueTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
 
         new ClassTarget('App\\*\\Model');
+    }
+
+    public function testAttributedEntryPointRejectsAnEmptyAttribute(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        new AttributedEntryPoint('FrameworkTestCase', '');
     }
 
     public function testTypeFactoriesBuildExpectedTypes(): void

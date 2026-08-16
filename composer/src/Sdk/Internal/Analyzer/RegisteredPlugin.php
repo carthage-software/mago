@@ -6,8 +6,10 @@ namespace Mago\Sdk\Internal\Analyzer;
 
 use Mago\Sdk\Analyzer\AfterAnalysisHook;
 use Mago\Sdk\Analyzer\AfterFileAnalysisHook;
+use Mago\Sdk\Analyzer\AttributedEntryPoint;
 use Mago\Sdk\Analyzer\BeforeAnalysisHook;
 use Mago\Sdk\Analyzer\InitializationHook;
+use Mago\Sdk\Analyzer\MethodTarget;
 use Mago\Sdk\Analyzer\Plugin;
 use Mago\Sdk\Analyzer\PluginDefinition;
 
@@ -24,6 +26,8 @@ final class RegisteredPlugin
      * @param list<RegisteredPropertyTypeProvider> $propertyProviders
      * @param list<RegisteredPropertyInitializationProvider> $propertyInitializationProviders
      * @param list<RegisteredClassInitializerProvider> $classInitializerProviders
+     * @param list<MethodTarget> $entryPoints
+     * @param list<AttributedEntryPoint> $attributedEntryPoints
      * @param list<RegisteredIssueFilterHook> $issueFilterHooks
      * @param list<InitializationHook> $initializationHooks
      * @param list<BeforeAnalysisHook> $beforeAnalysisHooks
@@ -42,6 +46,8 @@ final class RegisteredPlugin
         public readonly array $propertyProviders,
         public readonly array $propertyInitializationProviders,
         public readonly array $classInitializerProviders,
+        public readonly array $entryPoints,
+        public readonly array $attributedEntryPoints,
         public readonly array $issueFilterHooks,
         public readonly array $initializationHooks,
         public readonly array $beforeAnalysisHooks,
