@@ -251,6 +251,9 @@ final class LifecycleProofHook implements
                 }
 
                 $identifier = $identifiers[$index];
+                if (!$functionLike->identifier->equals($identifier)) {
+                    throw new RuntimeException('Function-like metadata did not preserve its stable identifier.');
+                }
                 if ($context->codebase->getFunctionLike($identifier) !== $functionLike) {
                     throw new RuntimeException('Function-like metadata did not preserve cache identity.');
                 }
@@ -400,11 +403,13 @@ final class LifecycleProofHook implements
         );
     }
 
+    /** @mago-expect lint:halstead */
     private function verifySharedContext(LifecycleContext $context): ClassLikeMetadata
     {
         [$base, $missing] = $context->codebase->getMultipleClasses(['LifecycleClass0', 'DefinitelyMissing']);
         $extensionClass = $context->codebase->getClass('ExtensionProvided');
         $extensionFunction = $context->codebase->getFunction('extension_answer');
+        $inheritedAnswerMethod = $context->codebase->getDeclaringMethod('LifecycleClass0', 'answer');
         [$assertingFunction, $answerMethod, $missingFunctionLike] = $context->codebase->getMultipleFunctionLikes([
             new FunctionLikeIdentifier(IdentifierKind::Function_, 'lifecycle_assertions'),
             new FunctionLikeIdentifier(IdentifierKind::Method, 'answer', 'ExtensionProvided'),
@@ -450,7 +455,12 @@ final class LifecycleProofHook implements
             throw new RuntimeException('An external-stub class lost member metadata.');
         }
 
-        if ($extensionFunction === null || count($extensionFunction->templates) !== 1) {
+        if (
+            $extensionFunction === null
+            || count($extensionFunction->templates) !== 1
+            || $extensionFunction->identifier->kind !== IdentifierKind::Function_
+            || $extensionFunction->identifier->name !== 'extension_answer'
+        ) {
             throw new RuntimeException('A lifecycle hook cannot query an external-stub function.');
         }
 
@@ -461,6 +471,11 @@ final class LifecycleProofHook implements
             $assertingFunction === null
             || $answerMethod === null
             || $answerMethod->kind !== MetadataFunctionLikeKind::Method
+            || $answerMethod->identifier->kind !== IdentifierKind::Method
+            || $answerMethod->identifier->class !== 'ExtensionProvided'
+            || $answerMethod->identifier->name !== 'answer'
+            || $inheritedAnswerMethod === null
+            || !$inheritedAnswerMethod->identifier->equals($answerMethod->identifier)
             || $missingFunctionLike !== null
             || $assertingFunction->assertionsInferred
             || !$assertion instanceof TypeAssertion

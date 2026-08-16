@@ -11,6 +11,8 @@ use Mago\Sdk\Analyzer\PluginDefinition;
 use Mago\Sdk\Analyzer\PropertyTarget;
 use Mago\Sdk\Analyzer\PropertyType;
 use Mago\Sdk\Analyzer\Type;
+use Mago\Sdk\Analyzer\Type\FunctionLikeIdentifier;
+use Mago\Sdk\Analyzer\Type\FunctionLikeKind;
 use Mago\Sdk\Exception\InvalidArgumentException;
 use Mago\Sdk\Span;
 use PHPUnit\Framework\TestCase;
@@ -34,6 +36,10 @@ final class ValueTest extends TestCase
         self::assertSame('*', ClassTarget::any()->class);
         self::assertSame('*', MethodTarget::anyClass('create')->class);
         self::assertSame('*', PropertyTarget::allProperties('Model')->property);
+
+        $method = new FunctionLikeIdentifier(FunctionLikeKind::Method, 'run', 'Job');
+        self::assertTrue($method->equals(new FunctionLikeIdentifier(FunctionLikeKind::Method, 'RUN', 'job')));
+        self::assertFalse($method->equals(new FunctionLikeIdentifier(FunctionLikeKind::Method, 'stop', 'Job')));
 
         $property = new PropertyType(Type::string(), Type::int());
         self::assertSame('string', (string) $property->readType);

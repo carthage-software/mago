@@ -1207,7 +1207,7 @@ final class TypeCodec
         };
     }
 
-    private static function readFunctionLikeIdentifier(PayloadReader $reader): FunctionLikeIdentifier
+    public static function readFunctionLikeIdentifier(PayloadReader $reader): FunctionLikeIdentifier
     {
         return match ($kind = $reader->readU8()) {
             1 => new FunctionLikeIdentifier(FunctionLikeKind::Function_, $reader->readBytes()),

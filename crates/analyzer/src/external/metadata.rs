@@ -1,6 +1,8 @@
 use std::collections::BTreeMap;
 
 use mago_codex::assertion::Assertion;
+use mago_codex::identifier::function_like::FunctionLikeIdentifier;
+use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::metadata::attribute::AttributeMetadata;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
@@ -25,11 +27,13 @@ use mago_extension::PayloadReader;
 use mago_extension::PayloadWriter;
 use mago_span::Span;
 use mago_word::Word;
+use mago_word::word;
 
 use crate::external::ExternalAnalysisSession;
 use crate::external::error::ExternalAnalyzerError;
 use crate::external::error::protocol;
 use crate::external::protocol::decode_function_like_identifier;
+use crate::external::protocol::encode_function_like_identifier;
 use crate::external::protocol::encode_generic_parent;
 use crate::external::protocol::encode_union_snapshot;
 
@@ -105,12 +109,12 @@ pub(super) fn handle_query(
         GET_CLASS_LIKES => query_class_likes(reader, writer, codebase, session),
         GET_FUNCTIONS => query_names(reader, writer, |name, writer| {
             write_optional(writer, codebase.get_function(name), |writer, metadata| {
-                write_function_like(writer, metadata, session)
+                write_function_like(writer, FunctionLikeIdentifier::Function(metadata.original_name), metadata, session)
             })
         }),
         GET_METHODS => query_members(reader, writer, |class, member, writer| {
             write_optional(writer, codebase.get_method(class, member), |writer, metadata| {
-                write_function_like(writer, metadata, session)
+                write_function_like(writer, method_identifier(codebase, class, member, metadata), metadata, session)
             })
         }),
         GET_CONSTANTS => query_names(reader, writer, |name, writer| {
@@ -138,7 +142,7 @@ pub(super) fn handle_query(
         LIST_CONSTANTS => list_constants(reader, writer, codebase),
         GET_DECLARING_METHODS => query_members(reader, writer, |class, member, writer| {
             write_optional(writer, codebase.get_declaring_method(class, member), |writer, metadata| {
-                write_function_like(writer, metadata, session)
+                write_function_like(writer, method_identifier(codebase, class, member, metadata), metadata, session)
             })
         }),
         GET_DECLARING_PROPERTIES => query_members(reader, writer, |class, member, writer| {
@@ -175,7 +179,12 @@ fn query_function_likes(
     for _ in 0..count {
         let identifier = decode_function_like_identifier(reader)?;
         write_optional(writer, codebase.get_function_like(&identifier), |writer, metadata| {
-            write_function_like(writer, metadata, session)
+            write_function_like(
+                writer,
+                canonical_function_like_identifier(codebase, identifier, metadata),
+                metadata,
+                session,
+            )
         })?;
     }
     Ok(())
@@ -427,9 +436,11 @@ pub(super) fn write_class_like(
 
 fn write_function_like(
     writer: &mut PayloadWriter,
+    identifier: FunctionLikeIdentifier,
     metadata: &FunctionLikeMetadata,
     session: &ExternalAnalysisSession,
 ) -> Result<(), ExternalAnalyzerError> {
+    encode_function_like_identifier(writer, identifier)?;
     writer.write_u8(match metadata.kind {
         FunctionLikeKind::Function => 1,
         FunctionLikeKind::Method => 2,
@@ -480,6 +491,34 @@ fn write_function_like(
     }
 
     Ok(())
+}
+
+fn canonical_function_like_identifier(
+    codebase: &CodebaseMetadata,
+    identifier: FunctionLikeIdentifier,
+    metadata: &FunctionLikeMetadata,
+) -> FunctionLikeIdentifier {
+    match identifier {
+        FunctionLikeIdentifier::Function(_) => FunctionLikeIdentifier::Function(metadata.original_name),
+        FunctionLikeIdentifier::Method(class, method) => {
+            method_identifier(codebase, class.as_bytes(), method.as_bytes(), metadata)
+        }
+        FunctionLikeIdentifier::Closure(_) => FunctionLikeIdentifier::Closure(metadata.name),
+    }
+}
+
+fn method_identifier(
+    codebase: &CodebaseMetadata,
+    class: &[u8],
+    method: &[u8],
+    metadata: &FunctionLikeMetadata,
+) -> FunctionLikeIdentifier {
+    let declaring = codebase.get_declaring_method_identifier(&MethodIdentifier::new(word(class), word(method)));
+    let class = codebase
+        .get_class_like(declaring.get_class_name().as_bytes())
+        .map_or(declaring.get_class_name(), |metadata| metadata.original_name);
+
+    FunctionLikeIdentifier::Method(class, metadata.original_name)
 }
 
 fn write_assertions(

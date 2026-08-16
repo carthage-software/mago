@@ -94,6 +94,7 @@ final class MetadataCodec
 
     public static function readFunctionLike(PayloadReader $reader): FunctionLikeMetadata
     {
+        $identifier = TypeCodec::readFunctionLikeIdentifier($reader);
         $kind = match ($value = $reader->readU8()) {
             1 => FunctionLikeKind::Function_,
             2 => FunctionLikeKind::Method,
@@ -149,6 +150,7 @@ final class MetadataCodec
         }
 
         return new FunctionLikeMetadata(
+            $identifier,
             $kind,
             $name,
             $originalName,

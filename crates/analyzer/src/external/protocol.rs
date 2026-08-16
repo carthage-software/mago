@@ -1860,7 +1860,7 @@ pub(super) fn encode_generic_parent(
     Ok(())
 }
 
-fn encode_function_like_identifier(
+pub(super) fn encode_function_like_identifier(
     writer: &mut PayloadWriter,
     identifier: FunctionLikeIdentifier,
 ) -> Result<(), ExternalAnalyzerError> {

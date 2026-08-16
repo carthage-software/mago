@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Mago\Sdk\Analyzer\Metadata;
 
 use Mago\Sdk\Analyzer\Assertion\Assertion;
+use Mago\Sdk\Analyzer\Type\FunctionLikeIdentifier;
 use Mago\Sdk\Analyzer\Type\Visibility;
 use Mago\Sdk\SourceLocation;
 
@@ -29,6 +30,7 @@ final class FunctionLikeMetadata
      * @param list<VersionRange> $availableVersions
      */
     public function __construct(
+        public readonly FunctionLikeIdentifier $identifier,
         public readonly FunctionLikeKind $kind,
         public readonly string $name,
         public readonly string $originalName,
