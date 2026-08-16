@@ -368,6 +368,9 @@ impl Registration {
             || self.method_call_analysis_hooks.iter().any(|hook| {
                 plugins.contains(&hook.plugin_index) && hook.requirements & NODE_REQUIREMENT_EXPRESSION_TYPES != 0
             })
+            || self.class_like_analysis_hooks.iter().any(|hook| {
+                plugins.contains(&hook.plugin_index) && hook.requirements & NODE_REQUIREMENT_EXPRESSION_TYPES != 0
+            })
     }
 
     fn node_analysis_requirements(&self) -> Option<NodeAnalysisRequirements> {
@@ -386,7 +389,11 @@ impl Registration {
             Arc::from(self.method_call_analysis_hooks.clone().into_boxed_slice());
         any |= !method_call_hooks.is_empty();
 
-        any.then_some(NodeAnalysisRequirements { targets, requirements, method_call_hooks })
+        let class_like_hooks: Arc<[ClassLikeAnalysisHookRegistration]> =
+            Arc::from(self.class_like_analysis_hooks.clone().into_boxed_slice());
+        any |= !class_like_hooks.is_empty();
+
+        any.then_some(NodeAnalysisRequirements { targets, requirements, method_call_hooks, class_like_hooks })
     }
 }
 
@@ -507,6 +514,16 @@ struct MethodCallAnalysisHookRegistration {
     route: u32,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct ClassLikeAnalysisHookRegistration {
+    plugin: String,
+    plugin_index: u16,
+    index: u16,
+    requirements: u8,
+    ancestors: Vec<Word>,
+    route: u32,
+}
+
 pub(super) const NODE_REQUIREMENT_EXPRESSION_TYPES: u8 = 1;
 pub(super) const NODE_REQUIREMENT_TARGET_EXPRESSION_TYPES: u8 = 1 << 1;
 pub(super) const NODE_REQUIREMENT_RECEIVER_TYPE: u8 = 1 << 2;
@@ -526,6 +543,7 @@ pub struct NodeAnalysisRequirements {
     targets: [bool; u8::MAX as usize + 1],
     requirements: [u8; u8::MAX as usize + 1],
     method_call_hooks: Arc<[MethodCallAnalysisHookRegistration]>,
+    class_like_hooks: Arc<[ClassLikeAnalysisHookRegistration]>,
 }
 
 impl NodeAnalysisRequirements {
@@ -546,6 +564,7 @@ impl NodeAnalysisRequirements {
     pub(crate) fn includes_source_text(&self) -> bool {
         self.requirements.iter().any(|requirements| requirements & NODE_REQUIREMENT_SOURCE_TEXT != 0)
             || self.method_call_hooks.iter().any(|hook| hook.requirements & NODE_REQUIREMENT_SOURCE_TEXT != 0)
+            || self.class_like_hooks.iter().any(|hook| hook.requirements & NODE_REQUIREMENT_SOURCE_TEXT != 0)
     }
 }
 
@@ -1674,7 +1693,15 @@ impl<T> ExternalAnalyzer<T> {
             .into();
         any |= !method_call_hooks.is_empty();
 
-        any.then_some(NodeAnalysisRequirements { targets, requirements, method_call_hooks })
+        let class_like_hooks: Arc<[ClassLikeAnalysisHookRegistration]> = self
+            .backends
+            .iter()
+            .flat_map(|backend| backend.registration.class_like_analysis_hooks.iter().cloned())
+            .collect::<Vec<_>>()
+            .into();
+        any |= !class_like_hooks.is_empty();
+
+        any.then_some(NodeAnalysisRequirements { targets, requirements, method_call_hooks, class_like_hooks })
     }
 }
 
@@ -1983,10 +2010,9 @@ where
                 continue;
             }
             let include_expression_types = backend.registration.file_analysis_requires_expression_types(&plugins);
-            let backend_node_requirements = backend
-                .registration
-                .node_analysis_requirements()
-                .filter(|requirements| lifecycle::has_node_analysis_target(program, artifacts, codebase, requirements));
+            let backend_node_requirements = backend.registration.node_analysis_requirements().filter(|requirements| {
+                lifecycle::has_node_analysis_target(program, artifacts, resolved_names, codebase, requirements)
+            });
 
             let lifecycle_start = self.trace_enabled.then(Instant::now);
             let encode_start = self.trace_enabled.then(Instant::now);
@@ -3326,6 +3352,7 @@ where
             let advertised_issue_filter_hooks = registration.issue_filter_hooks.len();
             let advertised_node_analysis_hooks = registration.node_analysis_hooks.len();
             let advertised_method_call_analysis_hooks = registration.method_call_analysis_hooks.len();
+            let advertised_class_like_analysis_hooks = registration.class_like_analysis_hooks.len();
             let enabled_indices = registration
                 .plugins
                 .iter()
@@ -3344,9 +3371,13 @@ where
             registration.issue_filter_hooks.retain(|hook| enabled.contains(hook.plugin.as_str()));
             registration.node_analysis_hooks.retain(|hook| enabled.contains(hook.plugin.as_str()));
             registration.method_call_analysis_hooks.retain(|hook| enabled.contains(hook.plugin.as_str()));
+            registration.class_like_analysis_hooks.retain(|hook| enabled.contains(hook.plugin.as_str()));
             let backend_route = u16::try_from(backend_index)
                 .map_err(|_| error::protocol("more than 65,536 external analyzer backends were configured"))?;
             for hook in &mut registration.method_call_analysis_hooks {
+                hook.route = (u32::from(backend_route) << 16) | u32::from(hook.index);
+            }
+            for hook in &mut registration.class_like_analysis_hooks {
                 hook.route = (u32::from(backend_route) << 16) | u32::from(hook.index);
             }
             registration.initialization_plugins.retain(|index| enabled_indices.contains(index));
@@ -3422,6 +3453,9 @@ where
                     method_call_analysis_hooks = registration.method_call_analysis_hooks.len(),
                     disabled_method_call_analysis_hooks = advertised_method_call_analysis_hooks
                         - registration.method_call_analysis_hooks.len(),
+                    class_like_analysis_hooks = registration.class_like_analysis_hooks.len(),
+                    disabled_class_like_analysis_hooks = advertised_class_like_analysis_hooks
+                        - registration.class_like_analysis_hooks.len(),
                     before_analysis_plugins = registration.before_analysis_plugins.len(),
                     after_file_analysis_plugins = registration.after_file_analysis_plugins.len(),
                     after_analysis_plugins = registration.after_analysis_plugins.len(),
@@ -3480,6 +3514,11 @@ where
                 .iter()
                 .map(|backend| backend.registration.method_call_analysis_hooks.len())
                 .sum::<usize>();
+            let class_like_analysis_hooks = analyzer
+                .backends
+                .iter()
+                .map(|backend| backend.registration.class_like_analysis_hooks.len())
+                .sum::<usize>();
             let before_analysis_plugins = analyzer
                 .backends
                 .iter()
@@ -3509,6 +3548,7 @@ where
                 issue_filter_hooks,
                 node_analysis_hooks,
                 method_call_analysis_hooks,
+                class_like_analysis_hooks,
                 before_analysis_plugins,
                 after_file_analysis_plugins,
                 after_analysis_plugins,

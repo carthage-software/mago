@@ -407,6 +407,27 @@ final class Protocol
                         $writer->writeBytes($target->method);
                     }
                 }
+
+                $writer->writeCount($plugin->classLikeAnalysisHooks);
+                foreach ($plugin->classLikeAnalysisHooks as $hook) {
+                    $writer->writeU16($hook->index);
+                    $requirements = 0;
+                    foreach ($hook->requirements as $requirement) {
+                        $requirements |= match ($requirement) {
+                            FileAnalysisRequirement::ExpressionTypes => 1,
+                            FileAnalysisRequirement::TargetExpressionTypes => 1 << 1,
+                            FileAnalysisRequirement::ReceiverType => 1 << 2,
+                            FileAnalysisRequirement::ArgumentTypes => 1 << 3,
+                            FileAnalysisRequirement::TargetSubtree => 1 << 4,
+                            FileAnalysisRequirement::SourceText => 1 << 5,
+                        };
+                    }
+                    $writer->writeU8($requirements);
+                    $writer->writeCount($hook->targets);
+                    foreach ($hook->targets as $target) {
+                        $writer->writeBytes($target->ancestor);
+                    }
+                }
             }
         }
 
@@ -799,19 +820,19 @@ final class Protocol
                         $argumentTypes[] = self::readOptionalType($reader);
                     }
                 }
-                $methodCallHookIndices = [];
+                $targetedHookIndices = [];
                 $routeCount = $reader->readCount(1_000_000);
                 for ($routeIndex = 0; $routeIndex < $routeCount; ++$routeIndex) {
                     $route = $reader->readU32();
                     if (($route >> 16) === $backend) {
-                        $methodCallHookIndices[] = $route & 0xffff;
+                        $targetedHookIndices[] = $route & 0xffff;
                     }
                 }
                 $nodeAnalysisData[] = new NodeAnalysisData(
                     $targetType,
                     $receiverType,
                     $argumentTypes,
-                    $methodCallHookIndices,
+                    $targetedHookIndices,
                 );
             }
         }

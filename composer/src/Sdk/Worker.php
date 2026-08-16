@@ -30,6 +30,7 @@ use Mago\Sdk\Internal\Analyzer\DefinitionName;
 use Mago\Sdk\Internal\Analyzer\MetadataCache;
 use Mago\Sdk\Internal\Analyzer\Protocol as AnalyzerProtocol;
 use Mago\Sdk\Internal\Analyzer\RegisteredClassInitializerProvider;
+use Mago\Sdk\Internal\Analyzer\RegisteredClassLikeAnalysisHook;
 use Mago\Sdk\Internal\Analyzer\RegisteredFunctionReturnTypeProvider;
 use Mago\Sdk\Internal\Analyzer\RegisteredIssueFilterHook;
 use Mago\Sdk\Internal\Analyzer\RegisteredMethodCallAnalysisHook;
@@ -157,6 +158,7 @@ final class Worker
         $issueFilterHooks = [];
         $nodeAnalysisHooks = [];
         $methodCallAnalysisHooks = [];
+        $classLikeAnalysisHooks = [];
         $workerReducerIndices = [];
         foreach ($extensions as $extensionIndex => $registeredExtension) {
             $normalizedExtensionIdentifier = strtolower($registeredExtension->identifier);
@@ -466,6 +468,57 @@ final class Worker
                     $registeredMethodCallAnalysisHooksByIndex[$hookIndex] = $registeredHook;
                 }
 
+                $registeredClassLikeAnalysisHooks = [];
+                $registeredClassLikeAnalysisHooksByIndex = [];
+                foreach ($registry->getClassLikeAnalysisHooks() as $hook) {
+                    $targets = $hook->getTargets();
+                    if ($targets === []) {
+                        throw new InvalidArgumentException(
+                            "A class-like analysis hook in `{$definition->identifier}` has no targets.",
+                        );
+                    }
+
+                    $seenTargets = [];
+                    foreach ($targets as $target) {
+                        $key = strtolower($target->ancestor);
+                        if (array_key_exists($key, $seenTargets)) {
+                            throw new InvalidArgumentException(
+                                "A class-like analysis hook in `{$definition->identifier}` targets descendants of `{$target->ancestor}` more than once.",
+                            );
+                        }
+                        $seenTargets[$key] = true;
+                    }
+
+                    $requirements = $hook->getRequirements();
+                    $seenRequirements = [];
+                    foreach ($requirements as $requirement) {
+                        if (array_key_exists($requirement->name, $seenRequirements)) {
+                            throw new InvalidArgumentException(
+                                "A class-like analysis hook in `{$definition->identifier}` requests `{$requirement->name}` more than once.",
+                            );
+                        }
+                        $seenRequirements[$requirement->name] = true;
+                    }
+
+                    $hookIndex = count($classLikeAnalysisHooks);
+                    if ($hookIndex > 65_535) {
+                        throw new InvalidArgumentException(
+                            'A worker cannot register more than 65,536 analyzer class-like analysis hooks.',
+                        );
+                    }
+
+                    $registeredHook = new RegisteredClassLikeAnalysisHook(
+                        $hookIndex,
+                        $definition->identifier,
+                        $hook,
+                        $targets,
+                        $requirements,
+                    );
+                    $classLikeAnalysisHooks[] = $registeredHook;
+                    $registeredClassLikeAnalysisHooks[] = $registeredHook;
+                    $registeredClassLikeAnalysisHooksByIndex[$hookIndex] = $registeredHook;
+                }
+
                 $registeredPlugins[] = new RegisteredPlugin(
                     count($registeredPlugins),
                     $registeredExtension->identifier,
@@ -486,6 +539,8 @@ final class Worker
                     $registeredNodeAnalysisHooksByNodeKind,
                     $registeredMethodCallAnalysisHooks,
                     $registeredMethodCallAnalysisHooksByIndex,
+                    $registeredClassLikeAnalysisHooks,
+                    $registeredClassLikeAnalysisHooksByIndex,
                     $registry->getAfterAnalysisHooks(),
                     $registry->shouldMemoizeProviders(),
                 );
@@ -1197,7 +1252,9 @@ final class Worker
         array &$reportedIssues,
     ): void {
         if (
-            $registered->nodeAnalysisHooks === [] && $registered->methodCallAnalysisHooks === []
+            $registered->nodeAnalysisHooks === []
+            && $registered->methodCallAnalysisHooks === []
+            && $registered->classLikeAnalysisHooks === []
             || !$context->analysis->hasNodeAnalysisTargets()
         ) {
             return;
@@ -1212,7 +1269,7 @@ final class Worker
 
             $hooks = $registered->nodeAnalysisHooksByNodeKind[$node->kind->value] ?? [];
             $data = $context->analysis->getNodeAnalysisData($targetIndex - 1);
-            if ($hooks === [] && $data->methodCallHookIndices === []) {
+            if ($hooks === [] && $data->targetedHookIndices === []) {
                 continue;
             }
 
@@ -1226,8 +1283,20 @@ final class Worker
                 }
             }
 
-            foreach ($data->methodCallHookIndices as $hookIndex) {
-                $hook = $registered->methodCallAnalysisHooksByIndex[$hookIndex] ?? null;
+            $targetedHooks = match ($node->kind) {
+                NodeKind::Class_,
+                NodeKind::Enum,
+                NodeKind::Interface,
+                NodeKind::Trait,
+                    => $registered->classLikeAnalysisHooksByIndex,
+                NodeKind::MethodCall,
+                NodeKind::NullSafeMethodCall,
+                NodeKind::StaticMethodCall,
+                    => $registered->methodCallAnalysisHooksByIndex,
+                default => [],
+            };
+            foreach ($data->targetedHookIndices as $hookIndex) {
+                $hook = $targetedHooks[$hookIndex] ?? null;
                 if ($hook === null) {
                     continue;
                 }

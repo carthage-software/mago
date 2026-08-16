@@ -13,12 +13,12 @@ final class NodeAnalysisData
 {
     /**
      * @param list<Type|null> $argumentTypes
-     * @param list<int<0, 65535>> $methodCallHookIndices
+     * @param list<int<0, 65535>> $targetedHookIndices
      */
     public function __construct(
         public readonly ?Type $targetType,
         public readonly ?Type $receiverType,
         public readonly array $argumentTypes,
-        public readonly array $methodCallHookIndices,
+        public readonly array $targetedHookIndices,
     ) {}
 }

@@ -12,6 +12,8 @@ use Mago\Sdk\Analyzer\Assertion\TypeAssertion;
 use Mago\Sdk\Analyzer\Assertion\TypeAssertionKind;
 use Mago\Sdk\Analyzer\BeforeAnalysisContext;
 use Mago\Sdk\Analyzer\BeforeAnalysisHook;
+use Mago\Sdk\Analyzer\ClassLikeAnalysisHook;
+use Mago\Sdk\Analyzer\ClassLikeTarget;
 use Mago\Sdk\Analyzer\FileAnalysisRequirement;
 use Mago\Sdk\Analyzer\InitializationContext;
 use Mago\Sdk\Analyzer\InitializationHook;
@@ -601,6 +603,47 @@ final class LifecycleMethodCallHook implements MethodCallAnalysisHook
 /**
  * @mago-expect lint:single-class-per-file
  */
+final class LifecycleClassLikeHook implements ClassLikeAnalysisHook
+{
+    public function __construct(
+        private readonly string $plugin,
+        private readonly string $auditLog,
+    ) {}
+
+    public function getTargets(): array
+    {
+        return [ClassLikeTarget::descendantsOf('ExtensionProvided')];
+    }
+
+    public function getRequirements(): array
+    {
+        return [FileAnalysisRequirement::TargetSubtree, FileAnalysisRequirement::SourceText];
+    }
+
+    public function analyze(NodeAnalysisContext $context): void
+    {
+        if (
+            $context->node->kind !== NodeKind::Class_
+            || !str_contains($context->source->getText($context->node->span), 'class LifecycleClass0')
+        ) {
+            throw new RuntimeException('A descendant class-like hook received an unrelated declaration.');
+        }
+
+        $record = json_encode([
+            $this->plugin,
+            'class-like',
+            $context->analysis->file,
+            getmypid(),
+        ], JSON_THROW_ON_ERROR);
+        if (file_put_contents($this->auditLog, $record . "\n", FILE_APPEND | LOCK_EX) === false) {
+            throw new RuntimeException('Unable to append to the lifecycle audit log.');
+        }
+    }
+}
+
+/**
+ * @mago-expect lint:single-class-per-file
+ */
 final class LifecycleProofPlugin implements Plugin
 {
     public function __construct(
@@ -621,6 +664,7 @@ final class LifecycleProofPlugin implements Plugin
         $registry->registerAfterFileAnalysisHook($hook);
         $registry->registerNodeAnalysisHook($hook);
         $registry->registerMethodCallAnalysisHook(new LifecycleMethodCallHook($this->identifier, $this->auditLog));
+        $registry->registerClassLikeAnalysisHook(new LifecycleClassLikeHook($this->identifier, $this->auditLog));
         $registry->registerAfterAnalysisHook($hook);
     }
 }

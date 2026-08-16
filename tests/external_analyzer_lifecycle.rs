@@ -187,6 +187,7 @@ fn assert_initial_audit(entries: &[AuditEntry]) {
     assert_eq!(entries.iter().filter(|entry| entry.1 == "after-file").count(), FILE_COUNT * PLUGINS.len());
     assert_eq!(entries.iter().filter(|entry| entry.1 == "node").count(), PLUGINS.len() * 3);
     assert_eq!(entries.iter().filter(|entry| entry.1 == "method-call").count(), PLUGINS.len());
+    assert_eq!(entries.iter().filter(|entry| entry.1 == "class-like").count(), PLUGINS.len());
     assert_eq!(entries.iter().filter(|entry| entry.1 == "after").count(), PLUGINS.len());
 
     let callbacks = entries
@@ -282,7 +283,7 @@ fn external_analyzer_lifecycle_is_exact_across_workers_and_incremental_runs() {
     );
 
     let initial_audit = read_audit(&audit_log);
-    assert_eq!(initial_audit.len(), (PLUGINS.len() * 7) + 2 + (FILE_COUNT * 2) + 2);
+    assert_eq!(initial_audit.len(), (PLUGINS.len() * 7) + 2 + (FILE_COUNT * 2) + 4);
     assert_initial_audit(&initial_audit);
 
     let (updated_database, changed_file) = make_database(Some(5), true, true, &initialization_sources);
@@ -296,6 +297,7 @@ fn external_analyzer_lifecycle_is_exact_across_workers_and_incremental_runs() {
     assert_eq!(incremental_audit.iter().filter(|entry| entry.1 == "before").count(), PLUGINS.len());
     assert_eq!(incremental_audit.iter().filter(|entry| entry.1 == "after-file").count(), PLUGINS.len());
     assert_eq!(incremental_audit.iter().filter(|entry| entry.1 == "node").count(), 0);
+    assert_eq!(incremental_audit.iter().filter(|entry| entry.1 == "class-like").count(), 0);
     assert_eq!(incremental_audit.iter().filter(|entry| entry.1 == "after").count(), PLUGINS.len());
     assert!(
         incremental_audit

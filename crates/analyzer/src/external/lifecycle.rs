@@ -161,7 +161,7 @@ type NodeTargetKey = (u8, u32, u32);
 struct NodeAnalysisTarget<'ast, 'arena> {
     node: Node<'ast, 'arena>,
     requirements: u8,
-    method_call_hook_routes: Vec<u32>,
+    targeted_hook_routes: Vec<u32>,
 }
 
 struct NodeAnalysisPlan<'ast, 'arena> {
@@ -181,6 +181,7 @@ impl<'ast, 'arena> NodeAnalysisPlan<'ast, 'arena> {
 fn build_node_analysis_plan<'ast, 'arena>(
     program: &'ast Program<'arena>,
     artifacts: &AnalysisArtifacts,
+    resolved_names: &ResolvedNames<'arena>,
     codebase: &CodebaseMetadata,
     requirements: &NodeAnalysisRequirements,
 ) -> NodeAnalysisPlan<'ast, 'arena> {
@@ -203,7 +204,7 @@ fn build_node_analysis_plan<'ast, 'arena>(
         let kind = node.kind();
         let span = node.span();
         let mut requested = requirements.requirements(kind);
-        let mut method_call_hook_routes = Vec::new();
+        let mut targeted_hook_routes = Vec::new();
         if is_method_call_kind(kind)
             && let Some(call_range) =
                 method_calls.as_ref().and_then(|calls| calls.get(&(span.start.offset, span.end.offset)))
@@ -212,15 +213,26 @@ fn build_node_analysis_plan<'ast, 'arena>(
             for hook in requirements.method_call_hooks.iter() {
                 if method_call_matches_hook(calls, hook, codebase) {
                     requested |= hook.requirements;
-                    method_call_hook_routes.push(hook.route);
+                    targeted_hook_routes.push(hook.route);
                 }
             }
         }
 
-        if requirements.targets()[kind as usize] || !method_call_hook_routes.is_empty() {
+        if !requirements.class_like_hooks.is_empty()
+            && let Some(class_like) = class_like_name(node, resolved_names)
+        {
+            for hook in requirements.class_like_hooks.iter() {
+                if class_like_matches_hook(class_like, hook, codebase) {
+                    requested |= hook.requirements;
+                    targeted_hook_routes.push(hook.route);
+                }
+            }
+        }
+
+        if requirements.targets()[kind as usize] || !targeted_hook_routes.is_empty() {
             let index = targets.len();
             by_node.insert((kind as u8, span.start.offset, span.end.offset), index);
-            targets.push(NodeAnalysisTarget { node, requirements: requested, method_call_hook_routes });
+            targets.push(NodeAnalysisTarget { node, requirements: requested, targeted_hook_routes });
         }
 
         let start = stack.len();
@@ -252,13 +264,40 @@ fn method_call_matches_hook(
     })
 }
 
+fn class_like_name<'arena>(node: Node<'_, 'arena>, resolved_names: &ResolvedNames<'arena>) -> Option<&'arena [u8]> {
+    match node {
+        Node::Class(class) => resolved_names.resolve(&class.name),
+        Node::Enum(r#enum) => resolved_names.resolve(&r#enum.name),
+        Node::Interface(interface) => resolved_names.resolve(&interface.name),
+        Node::Trait(r#trait) => resolved_names.resolve(&r#trait.name),
+        _ => None,
+    }
+}
+
+fn class_like_matches_hook(
+    class_like: &[u8],
+    hook: &super::ClassLikeAnalysisHookRegistration,
+    codebase: &CodebaseMetadata,
+) -> bool {
+    let class_like = ascii_lowercase_word(class_like);
+    let Some(metadata) = codebase.class_likes.get(&class_like) else {
+        return false;
+    };
+
+    hook.ancestors.iter().any(|ancestor| {
+        class_like != *ancestor
+            && (metadata.all_parent_classes.contains(ancestor) || metadata.all_parent_interfaces.contains(ancestor))
+    })
+}
+
 pub(super) fn has_node_analysis_target(
     program: &Program<'_>,
     artifacts: &AnalysisArtifacts,
+    resolved_names: &ResolvedNames<'_>,
     codebase: &CodebaseMetadata,
     requirements: &NodeAnalysisRequirements,
 ) -> bool {
-    !build_node_analysis_plan(program, artifacts, codebase, requirements).targets.is_empty()
+    !build_node_analysis_plan(program, artifacts, resolved_names, codebase, requirements).targets.is_empty()
 }
 
 impl FileAnalysisSnapshot {
@@ -276,7 +315,7 @@ impl FileAnalysisSnapshot {
         node_analysis_requirements: Option<&NodeAnalysisRequirements>,
     ) -> Result<Self, ExternalAnalyzerError> {
         let node_analysis_plan = node_analysis_requirements
-            .map(|requirements| build_node_analysis_plan(program, artifacts, codebase, requirements));
+            .map(|requirements| build_node_analysis_plan(program, artifacts, resolved_names, codebase, requirements));
         let source = SourceSnapshot::complete_with_target_filter(program, resolved_names, |node| {
             node_analysis_plan.as_ref().is_some_and(|plan| plan.configuration(node).is_some())
         })
@@ -452,10 +491,10 @@ fn write_target_analysis(
             write_argument_types(writer, artifacts, target.node)?;
         }
         writer.write_u32(
-            u32::try_from(target.method_call_hook_routes.len())
-                .map_err(|_| protocol("too many method-call hook routes matched one call"))?,
+            u32::try_from(target.targeted_hook_routes.len())
+                .map_err(|_| protocol("too many targeted analysis hook routes matched one node"))?,
         );
-        for route in &target.method_call_hook_routes {
+        for route in &target.targeted_hook_routes {
             writer.write_u32(*route);
         }
     }
@@ -848,7 +887,7 @@ pub(super) fn encode_after_file_analysis_request(
 ) -> Result<Vec<u8>, ExternalAnalyzerError> {
     let mut writer = lifecycle_writer(AFTER_FILE_ANALYSIS_REQUEST, generation, plugins)?;
     let node_analysis_plan = node_analysis_requirements
-        .map(|requirements| build_node_analysis_plan(program, artifacts, codebase, requirements));
+        .map(|requirements| build_node_analysis_plan(program, artifacts, resolved_names, codebase, requirements));
     write_file_summary(
         &mut writer,
         FileView::Artifacts(
@@ -1564,5 +1603,50 @@ fn read_level(reader: &mut PayloadReader<'_>) -> Result<Level, ExternalAnalyzerE
         3 => Ok(Level::Warning),
         4 => Ok(Level::Error),
         value => Err(protocol(format!("invalid lifecycle issue level {value}"))),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use mago_codex::metadata::CodebaseMetadata;
+    use mago_codex::metadata::class_like::ClassLikeMetadata;
+    use mago_codex::metadata::flags::MetadataFlags;
+    use mago_span::Span;
+    use mago_word::word;
+
+    use super::class_like_matches_hook;
+    use crate::external::ClassLikeAnalysisHookRegistration;
+
+    #[test]
+    fn descendant_target_excludes_the_ancestor_declaration() {
+        let ancestor = word(b"frameworktestcase");
+        let child = word(b"applicationtest");
+        let mut codebase = CodebaseMetadata::new();
+        codebase.class_likes.insert(
+            ancestor,
+            ClassLikeMetadata::new(
+                ancestor,
+                word(b"FrameworkTestCase"),
+                Span::dummy(0, 10),
+                None,
+                MetadataFlags::empty(),
+            ),
+        );
+        let mut child_metadata =
+            ClassLikeMetadata::new(child, word(b"ApplicationTest"), Span::dummy(11, 20), None, MetadataFlags::empty());
+        child_metadata.all_parent_classes.insert(ancestor);
+        codebase.class_likes.insert(child, child_metadata);
+
+        let hook = ClassLikeAnalysisHookRegistration {
+            plugin: "demo".to_string(),
+            plugin_index: 0,
+            index: 0,
+            requirements: 0,
+            ancestors: vec![ancestor],
+            route: 0,
+        };
+
+        assert!(!class_like_matches_hook(b"FrameworkTestCase", &hook, &codebase));
+        assert!(class_like_matches_hook(b"ApplicationTest", &hook, &codebase));
     }
 }

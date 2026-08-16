@@ -98,6 +98,7 @@ use mago_word::word;
 use crate::artifacts::AnalysisArtifacts;
 use crate::external::AttributedEntryPoint;
 use crate::external::ClassInitializerProvider;
+use crate::external::ClassLikeAnalysisHookRegistration;
 use crate::external::EffectivePropertyType;
 use crate::external::EntryPoint;
 use crate::external::ExternalAnalysisSession;
@@ -228,6 +229,7 @@ pub(super) struct Registration {
     pub issue_filter_hooks: Vec<IssueFilterHookRegistration>,
     pub node_analysis_hooks: Vec<NodeAnalysisHookRegistration>,
     pub method_call_analysis_hooks: Vec<MethodCallAnalysisHookRegistration>,
+    pub class_like_analysis_hooks: Vec<ClassLikeAnalysisHookRegistration>,
     pub initialization_plugins: Vec<u16>,
     pub before_analysis_plugins: Vec<u16>,
     pub after_file_analysis_plugins: Vec<u16>,
@@ -358,6 +360,7 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
     let mut issue_filter_hooks = Vec::new();
     let mut node_analysis_hooks = Vec::new();
     let mut method_call_analysis_hooks = Vec::new();
+    let mut class_like_analysis_hooks = Vec::new();
     let mut initialization_plugins = Vec::new();
     let mut before_analysis_plugins = Vec::new();
     let mut after_file_analysis_plugins = Vec::new();
@@ -703,6 +706,54 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
                 }
             }
 
+            let class_like_hook_count = reader.read_count("class-like analysis hooks", MAXIMUM_PROVIDERS)?;
+            for _ in 0..class_like_hook_count {
+                let hook_index = reader.read_u16("class-like analysis hook index")?;
+                let requirements = reader.read_u8("class-like analysis hook requirements")?;
+                if requirements & !NODE_REQUIREMENTS_ALL != 0 {
+                    return Err(protocol(format!(
+                        "class-like analysis hook {hook_index} has unknown requirements {requirements:#04x}"
+                    )));
+                }
+                let target_count = reader.read_count("class-like analysis hook targets", MAXIMUM_TARGETS)?;
+                if target_count == 0 {
+                    return Err(protocol(format!("class-like analysis hook {hook_index} has no targets")));
+                }
+
+                let mut ancestors = Vec::with_capacity(target_count);
+                let mut unique_ancestors = HashSet::with_capacity_and_hasher(target_count, RandomState::default());
+                for _ in 0..target_count {
+                    let ancestor = non_empty(
+                        reader.read_bytes("class-like analysis target ancestor")?.to_vec(),
+                        "class-like analysis target ancestor",
+                    )?;
+                    if !is_valid_symbol_name(&ancestor) {
+                        return Err(protocol(format!(
+                            "class-like analysis hook {hook_index} target must be a valid PHP class-like name"
+                        )));
+                    }
+                    let ancestor = ascii_lowercase_word(&ancestor);
+                    if !unique_ancestors.insert(ancestor) {
+                        return Err(protocol(format!(
+                            "class-like analysis hook {hook_index} targets descendants of the same ancestor more than once"
+                        )));
+                    }
+                    ancestors.push(ancestor);
+                }
+
+                class_like_analysis_hooks.push(ClassLikeAnalysisHookRegistration {
+                    plugin: identifier.clone(),
+                    plugin_index: index,
+                    index: hook_index,
+                    requirements,
+                    ancestors,
+                    route: 0,
+                });
+                if !node_analysis_plugins.contains(&index) {
+                    node_analysis_plugins.push(index);
+                }
+            }
+
             let plugin = ExternalPlugin {
                 index,
                 extension: extension_identifier.clone(),
@@ -715,7 +766,7 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
                 before_analysis: lifecycle & 1 != 0,
                 after_file_analysis: lifecycle & 2 != 0,
                 after_file_expression_types: lifecycle & 16 != 0,
-                node_analysis: node_hook_count != 0 || method_call_hook_count != 0,
+                node_analysis: node_hook_count != 0 || method_call_hook_count != 0 || class_like_hook_count != 0,
                 after_analysis: lifecycle & 4 != 0,
             };
 
@@ -750,6 +801,7 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
     validate_provider_indices(issue_filter_hooks.iter().map(|hook| hook.index), "issue-filter hook")?;
     validate_provider_indices(node_analysis_hooks.iter().map(|hook| hook.index), "node-analysis hook")?;
     validate_provider_indices(method_call_analysis_hooks.iter().map(|hook| hook.index), "method-call analysis hook")?;
+    validate_provider_indices(class_like_analysis_hooks.iter().map(|hook| hook.index), "class-like analysis hook")?;
     Ok(Registration {
         extensions,
         plugins,
@@ -764,6 +816,7 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
         issue_filter_hooks,
         node_analysis_hooks,
         method_call_analysis_hooks,
+        class_like_analysis_hooks,
         initialization_plugins,
         before_analysis_plugins,
         after_file_analysis_plugins,
@@ -3196,6 +3249,8 @@ pub(super) mod testing {
         writer.write_bytes(b"Framework\\Test").unwrap();
         writer.write_u32(0);
         writer.write_u32(0);
+        writer.write_u32(0);
+        writer.write_u32(0);
 
         let registration = decode_registration(&writer.finish()).unwrap();
         assert_eq!(registration.entry_points.len(), 1);
@@ -3257,6 +3312,8 @@ pub(super) mod testing {
         writer.write_u32(0);
         writer.write_u32(0);
         writer.write_u32(0);
+        writer.write_u32(0);
+        writer.write_u32(0);
         writer.finish()
     }
 
@@ -3285,6 +3342,8 @@ pub(super) mod testing {
         writer.write_u32(1);
         writer.write_u8(TARGET_EXACT);
         writer.write_bytes(b"demo_service").unwrap();
+        writer.write_u32(0);
+        writer.write_u32(0);
         writer.write_u32(0);
         writer.write_u32(0);
         writer.write_u32(0);

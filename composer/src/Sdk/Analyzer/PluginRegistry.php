@@ -81,6 +81,11 @@ final class PluginRegistry
     private array $methodCallAnalysisHooks = [];
 
     /**
+     * @var list<ClassLikeAnalysisHook>
+     */
+    private array $classLikeAnalysisHooks = [];
+
+    /**
      * @var list<AfterAnalysisHook>
      */
     private array $afterAnalysisHooks = [];
@@ -159,6 +164,11 @@ final class PluginRegistry
     public function registerMethodCallAnalysisHook(MethodCallAnalysisHook $hook): void
     {
         $this->methodCallAnalysisHooks[] = $hook;
+    }
+
+    public function registerClassLikeAnalysisHook(ClassLikeAnalysisHook $hook): void
+    {
+        $this->classLikeAnalysisHooks[] = $hook;
     }
 
     public function registerAfterAnalysisHook(AfterAnalysisHook $hook): void
@@ -304,6 +314,16 @@ final class PluginRegistry
     public function getMethodCallAnalysisHooks(): array
     {
         return $this->methodCallAnalysisHooks;
+    }
+
+    /**
+     * @internal
+     *
+     * @return list<ClassLikeAnalysisHook>
+     */
+    public function getClassLikeAnalysisHooks(): array
+    {
+        return $this->classLikeAnalysisHooks;
     }
 
     /**

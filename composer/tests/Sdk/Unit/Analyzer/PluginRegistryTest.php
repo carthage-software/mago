@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Mago\Tests\Sdk\Unit\Analyzer;
 
+use Mago\Sdk\Analyzer\ClassLikeAnalysisHook;
+use Mago\Sdk\Analyzer\ClassLikeTarget;
 use Mago\Sdk\Analyzer\ClassTarget;
 use Mago\Sdk\Analyzer\MethodCallAnalysisHook;
 use Mago\Sdk\Analyzer\MethodTarget;
@@ -48,6 +50,18 @@ final class PluginRegistryTest extends TestCase
         $registry->registerMethodCallAnalysisHook($second);
 
         self::assertSame([$first, $second], $registry->getMethodCallAnalysisHooks());
+    }
+
+    public function testClassLikeAnalysisHooksPreserveRegistrationOrder(): void
+    {
+        $registry = new PluginRegistry();
+        $first = self::classLikeAnalysisHook(ClassLikeTarget::descendantsOf('FrameworkTestCase'));
+        $second = self::classLikeAnalysisHook(ClassLikeTarget::descendantsOf('FrameworkExtension'));
+
+        $registry->registerClassLikeAnalysisHook($first);
+        $registry->registerClassLikeAnalysisHook($second);
+
+        self::assertSame([$first, $second], $registry->getClassLikeAnalysisHooks());
     }
 
     public function testFrameworkEntryPointsPreserveRegistrationOrder(): void
@@ -97,6 +111,27 @@ final class PluginRegistryTest extends TestCase
         return new class($target) implements MethodCallAnalysisHook {
             public function __construct(
                 private readonly MethodTarget $target,
+            ) {}
+
+            public function getTargets(): array
+            {
+                return [$this->target];
+            }
+
+            public function getRequirements(): array
+            {
+                return [];
+            }
+
+            public function analyze(NodeAnalysisContext $context): void {}
+        };
+    }
+
+    private static function classLikeAnalysisHook(ClassLikeTarget $target): ClassLikeAnalysisHook
+    {
+        return new class($target) implements ClassLikeAnalysisHook {
+            public function __construct(
+                private readonly ClassLikeTarget $target,
             ) {}
 
             public function getTargets(): array
