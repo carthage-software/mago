@@ -33,6 +33,7 @@ use mago_word::concat_word;
 
 use crate::artifacts::AnalysisArtifacts;
 use crate::context::block::BlockContext;
+use crate::external::AfterFileAnalysisResult;
 use crate::external::BeforeAnalysisResult;
 use crate::external::EffectivePropertyType;
 use crate::external::ExternalAnalysisSession;
@@ -308,7 +309,7 @@ impl PluginRegistry {
         artifacts: &AnalysisArtifacts,
         codebase: &CodebaseMetadata,
         session: Option<&ExternalAnalysisSession>,
-    ) -> PluginResult<IssueCollection> {
+    ) -> PluginResult<AfterFileAnalysisResult> {
         self.external_analyzer
             .as_deref()
             .zip(session)
@@ -330,7 +331,7 @@ impl PluginRegistry {
         files: &[Arc<FileAnalysisSnapshot>],
         codebase: &CodebaseMetadata,
         session: Option<&ExternalAnalysisSession>,
-    ) -> PluginResult<IssueCollection> {
+    ) -> PluginResult<AfterFileAnalysisResult> {
         self.external_analyzer
             .as_deref()
             .zip(session)

@@ -62,6 +62,21 @@ pub struct BeforeAnalysisResult {
     pub references: SymbolReferences,
 }
 
+#[derive(Debug, Default)]
+pub struct AfterFileAnalysisResult {
+    pub issues: IssueCollection,
+    pub references_by_file: foldhash::HashMap<FileId, SymbolReferences>,
+}
+
+fn extend_references_by_file(
+    target: &mut foldhash::HashMap<FileId, SymbolReferences>,
+    source: impl IntoIterator<Item = (FileId, SymbolReferences)>,
+) {
+    for (file_id, references) in source {
+        target.entry(file_id).or_default().extend(references);
+    }
+}
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum PropertyAccessKind {
     Read,
@@ -1242,7 +1257,7 @@ impl ExternalAnalyzerHandle {
         artifacts: &AnalysisArtifacts,
         codebase: &CodebaseMetadata,
         session: &ExternalAnalysisSession,
-    ) -> Result<IssueCollection, String> {
+    ) -> Result<AfterFileAnalysisResult, String> {
         self.get()?
             .run_after_file_analysis_hooks(file, program, resolved_names, artifacts, codebase, session)
             .map_err(|error| error.to_string())
@@ -1253,7 +1268,7 @@ impl ExternalAnalyzerHandle {
         files: &[Arc<FileAnalysisSnapshot>],
         codebase: &CodebaseMetadata,
         session: &ExternalAnalysisSession,
-    ) -> Result<IssueCollection, String> {
+    ) -> Result<AfterFileAnalysisResult, String> {
         self.get()?.run_after_file_analysis_batch_hooks(files, codebase, session).map_err(|error| error.to_string())
     }
 
@@ -1651,8 +1666,8 @@ where
         artifacts: &AnalysisArtifacts,
         codebase: &CodebaseMetadata,
         session: &ExternalAnalysisSession,
-    ) -> Result<IssueCollection, ExternalAnalyzerError> {
-        let mut issues = IssueCollection::new();
+    ) -> Result<AfterFileAnalysisResult, ExternalAnalyzerError> {
+        let mut result = AfterFileAnalysisResult::default();
         let node_analysis_targets = self.node_analysis_target_kinds();
         let store = lifecycle::AnalysisStore::File {
             file,
@@ -1723,10 +1738,11 @@ where
                 codebase,
                 lifecycle_start,
             )?;
-            issues.extend(effects.issues);
+            result.issues.extend(effects.issues);
+            extend_references_by_file(&mut result.references_by_file, effects.references_by_file);
         }
 
-        Ok(issues)
+        Ok(result)
     }
 
     fn run_after_file_analysis_batch_hooks(
@@ -1734,12 +1750,12 @@ where
         files: &[Arc<FileAnalysisSnapshot>],
         codebase: &CodebaseMetadata,
         session: &ExternalAnalysisSession,
-    ) -> Result<IssueCollection, ExternalAnalyzerError> {
+    ) -> Result<AfterFileAnalysisResult, ExternalAnalyzerError> {
         if files.is_empty() {
-            return Ok(IssueCollection::new());
+            return Ok(AfterFileAnalysisResult::default());
         }
 
-        let mut issues = IssueCollection::new();
+        let mut result = AfterFileAnalysisResult::default();
         for backend in &self.backends {
             let plugins = backend.registration.file_analysis_plugins();
             if plugins.is_empty() {
@@ -1812,10 +1828,11 @@ where
                 codebase,
                 lifecycle_start,
             )?;
-            issues.extend(effects.issues);
+            result.issues.extend(effects.issues);
+            extend_references_by_file(&mut result.references_by_file, effects.references_by_file);
         }
 
-        Ok(issues)
+        Ok(result)
     }
 
     fn run_after_analysis_hooks(

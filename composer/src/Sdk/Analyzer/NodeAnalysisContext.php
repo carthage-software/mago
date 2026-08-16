@@ -16,12 +16,16 @@ final class NodeAnalysisContext extends LifecycleContext
 {
     public readonly FileAnalysis $analysis;
 
+    /** References shared by every hook targeting this file. */
+    public readonly ReferenceRegistry $references;
+
     public function __construct(
         AfterFileAnalysisContext $context,
         public readonly SourceFile $source,
         public readonly Node $node,
     ) {
         $this->analysis = $context->analysis;
+        $this->references = $context->references;
         parent::__construct($context->phpVersion, $context->codebase, $context->types, $context->cancellation);
     }
 }

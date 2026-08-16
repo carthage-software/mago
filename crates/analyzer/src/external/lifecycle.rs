@@ -11,6 +11,7 @@ use mago_codex::reference::SymbolReferences;
 use mago_codex::symbol::SymbolIdentifier;
 use mago_codex::ttype::union::TUnion;
 use mago_database::file::File;
+use mago_database::file::FileId;
 use mago_extension::PayloadReader;
 use mago_extension::PayloadWriter;
 use mago_extension::source::SourceSnapshot;
@@ -74,6 +75,7 @@ const EXPRESSION_TYPE_PREFETCH: usize = 16;
 pub(super) struct LifecycleEffects {
     pub issues: IssueCollection,
     pub references: SymbolReferences,
+    pub references_by_file: HashMap<FileId, SymbolReferences>,
 }
 
 pub(super) struct SymbolReferenceStore<'analysis> {
@@ -815,19 +817,39 @@ pub(super) fn decode_lifecycle_response(
     }
 
     let reference_count = reader.read_count("lifecycle contributed references", MAXIMUM_REFERENCES)?;
-    if request_kind != BEFORE_ANALYSIS_REQUEST && reference_count != 0 {
-        return Err(protocol("only before-analysis hooks may contribute symbol references"));
+    if request_kind == AFTER_ANALYSIS_REQUEST && reference_count != 0 {
+        return Err(protocol("after-analysis hooks may not contribute symbol references"));
     }
 
     let mut references = SymbolReferences::new();
+    let mut references_by_file = HashMap::<FileId, SymbolReferences>::default();
     for _ in 0..reference_count {
         let plugin_index = reader.read_u16("reference contribution plugin index")?;
         if !active_plugins.contains(&plugin_index) {
             return Err(protocol(format!("worker contributed a reference for inactive plugin index {plugin_index}")));
         }
+
         let plugin = plugins.get(plugin_index as usize).ok_or_else(|| {
             protocol(format!("worker contributed a reference for unknown plugin index {plugin_index}"))
         })?;
+
+        let discovery_file = if request_kind == BEFORE_ANALYSIS_REQUEST {
+            None
+        } else {
+            let name = reader.read_bytes("reference contribution discovery file")?;
+            Some(
+                session
+                    .source(name)
+                    .ok_or_else(|| {
+                        protocol(format!(
+                            "reference contribution names unknown discovery file `{}`",
+                            String::from_utf8_lossy(name)
+                        ))
+                    })?
+                    .0,
+            )
+        };
+
         let source = read_reference_origin(&mut reader, codebase)?;
         let target = read_symbol_identifier(&mut reader, codebase, true)?;
         let kind = read_reference_kind(&mut reader)?;
@@ -835,6 +857,8 @@ pub(super) fn decode_lifecycle_response(
             protocol(format!("plugin `{}` contributed an invalid reference: {reason}", plugin.identifier))
         })?;
 
+        let references =
+            discovery_file.map_or(&mut references, |file_id| references_by_file.entry(file_id).or_default());
         match kind {
             SymbolReferenceKind::Body => references.add_reference(source, target, false),
             SymbolReferenceKind::Signature => references.add_reference(source, target, true),
@@ -866,7 +890,7 @@ pub(super) fn decode_lifecycle_response(
     }
 
     reader.finish()?;
-    Ok(LifecycleEffects { issues, references })
+    Ok(LifecycleEffects { issues, references, references_by_file })
 }
 
 fn read_safety(reader: &mut PayloadReader<'_>) -> Result<Safety, ExternalAnalyzerError> {

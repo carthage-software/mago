@@ -8,10 +8,12 @@ use std::time::Duration;
 use std::time::Instant;
 
 use foldhash::HashSet;
-use mago_allocator::LocalArena;
+use rayon::prelude::*;
 
+use mago_allocator::LocalArena;
 use mago_analyzer::Analyzer;
 use mago_analyzer::analysis_result::AnalysisResult;
+use mago_analyzer::analysis_result::LateSymbolReferenceIssueReconciler;
 use mago_analyzer::artifacts::AnalysisArtifacts;
 use mago_analyzer::error::AnalysisError;
 use mago_analyzer::external::AFTER_FILE_ANALYSIS_BATCH_SIZE;
@@ -35,7 +37,6 @@ use mago_semantics::SemanticsChecker;
 use mago_syntax::parser::parse_file_with_settings;
 use mago_syntax::settings::ParserSettings;
 use mago_word::WordSet;
-use rayon::prelude::*;
 
 use crate::error::OrchestratorError;
 use crate::service::issue_reconciliation::DeferredIssueReconciler;
@@ -182,7 +183,19 @@ impl AnalysisService {
                 &self.codebase,
                 external_session.as_ref(),
             ) {
-                Ok(reported) => analysis_result.issues.extend(reported),
+                Ok(reported) => {
+                    analysis_result.issues.extend(reported.issues);
+                    let has_late_references = !reported.references_by_file.is_empty();
+                    for references in reported.references_by_file.into_values() {
+                        analysis_result.symbol_references.extend(references);
+                    }
+
+                    if has_late_references {
+                        analysis_result.issues =
+                            LateSymbolReferenceIssueReconciler::new(&self.codebase, &analysis_result.symbol_references)
+                                .reconcile(std::mem::take(&mut analysis_result.issues));
+                    }
+                }
                 Err(err) => issues.push(Issue::error(format!("Analysis error: {err}"))),
             }
         }
@@ -493,8 +506,21 @@ impl Reducer<AnalysisTaskResult, AnalysisResult> for AnalysisResultReducer {
                 })
                 .collect::<Result<Vec<_>, _>>()
                 .map_err(AnalysisError::from)?;
-            let issue_count = batches.iter().map(IssueCollection::len).sum::<usize>();
-            aggregated_result.issues.extend(batches.into_iter().flatten());
+            let issue_count = batches.iter().map(|batch| batch.issues.len()).sum::<usize>();
+            let has_late_references = batches.iter().any(|batch| !batch.references_by_file.is_empty());
+            for batch in batches {
+                aggregated_result.issues.extend(batch.issues);
+                for references in batch.references_by_file.into_values() {
+                    aggregated_result.symbol_references.extend(references);
+                }
+            }
+
+            if has_late_references {
+                aggregated_result.issues =
+                    LateSymbolReferenceIssueReconciler::new(&codebase, &aggregated_result.symbol_references)
+                        .reconcile(std::mem::take(&mut aggregated_result.issues));
+            }
+
             if let Some(start) = started_at {
                 tracing::trace!(
                     files = snapshots.len(),
@@ -505,6 +531,7 @@ impl Reducer<AnalysisTaskResult, AnalysisResult> for AnalysisResultReducer {
                 );
             }
         }
+
         let mut pragma_reconciler =
             DeferredIssueReconciler::new(aggregated_result.take_deferred_pragmas(), self.files.iter().cloned());
         aggregated_result.issues = pragma_reconciler.reconcile(std::mem::take(&mut aggregated_result.issues))?;

@@ -10,10 +10,12 @@ use std::time::Instant;
 
 use foldhash::HashMap;
 use foldhash::HashSet;
-use mago_allocator::LocalArena;
+use rayon::prelude::*;
 
+use mago_allocator::LocalArena;
 use mago_analyzer::Analyzer;
 use mago_analyzer::analysis_result::AnalysisResult;
+use mago_analyzer::analysis_result::LateSymbolReferenceIssueReconciler;
 use mago_analyzer::artifacts::AnalysisArtifacts;
 use mago_analyzer::external::AFTER_FILE_ANALYSIS_BATCH_SIZE;
 use mago_analyzer::external::FileAnalysisSnapshot;
@@ -39,7 +41,6 @@ use mago_semantics::SemanticsChecker;
 use mago_syntax::parser::parse_file_with_settings;
 use mago_syntax::settings::ParserSettings;
 use mago_word::WordSet;
-use rayon::prelude::*;
 
 use crate::error::OrchestratorError;
 use crate::service::issue_reconciliation::DeferredIssueReconciler;
@@ -49,15 +50,19 @@ use crate::service::issue_reconciliation::DeferredIssueReconciler;
 struct FileState {
     content_hash: u64,
     entry_keys: CodebaseEntryKeys,
+    unreconciled_analysis_issues: IssueCollection,
     analysis_issues: IssueCollection,
     codebase_issues: IssueCollection,
     deferred_pragmas: Option<DeferredPragmas>,
+    late_symbol_references: SymbolReferences,
 }
 
 struct SelectiveAnalysisOutput {
     result: AnalysisResult,
     native_symbol_references: SymbolReferences,
     external_symbol_references: SymbolReferences,
+    late_symbol_references: SymbolReferences,
+    late_symbol_references_by_file: HashMap<FileId, SymbolReferences>,
     per_file_issues: HashMap<FileId, IssueCollection>,
     per_file_pragmas: HashMap<FileId, DeferredPragmas>,
     snapshots: Vec<Arc<FileAnalysisSnapshot>>,
@@ -84,6 +89,7 @@ pub struct IncrementalAnalysisService {
     symbol_references: SymbolReferences,
     native_symbol_references: SymbolReferences,
     external_symbol_references: SymbolReferences,
+    late_symbol_references: SymbolReferences,
     base_codebase: Arc<CodebaseMetadata>,
     base_symbol_references: Arc<SymbolReferences>,
     settings: Settings,
@@ -104,6 +110,7 @@ impl std::fmt::Debug for IncrementalAnalysisService {
             .field("symbol_references", &"<SymbolReferences>")
             .field("native_symbol_references", &"<SymbolReferences>")
             .field("external_symbol_references", &"<SymbolReferences>")
+            .field("late_symbol_references", &"<SymbolReferences>")
             .field("base_codebase", &"<Arc<CodebaseMetadata>>")
             .field("base_symbol_references", &"<Arc<SymbolReferences>>")
             .field("settings", &self.settings)
@@ -151,6 +158,7 @@ impl IncrementalAnalysisService {
             symbol_references,
             native_symbol_references,
             external_symbol_references: SymbolReferences::new(),
+            late_symbol_references: SymbolReferences::new(),
             base_codebase,
             base_symbol_references,
             settings,
@@ -300,6 +308,20 @@ impl IncrementalAnalysisService {
         issues
     }
 
+    fn refresh_late_reference_issues(&mut self) {
+        if self.late_symbol_references.is_empty() {
+            for state in self.file_states.values_mut() {
+                state.analysis_issues = state.unreconciled_analysis_issues.clone();
+            }
+            return;
+        }
+
+        let reconciler = LateSymbolReferenceIssueReconciler::new(&self.codebase, &self.symbol_references);
+        for state in self.file_states.values_mut() {
+            state.analysis_issues = reconciler.reconcile(state.unreconciled_analysis_issues.clone());
+        }
+    }
+
     /// Runs a full analysis from scratch.
     ///
     /// After this call, [`analyze_incremental()`](Self::analyze_incremental) can be used
@@ -372,9 +394,11 @@ impl IncrementalAnalysisService {
                 FileState {
                     content_hash,
                     entry_keys,
+                    unreconciled_analysis_issues: IssueCollection::default(),
                     analysis_issues: IssueCollection::default(),
                     codebase_issues: IssueCollection::default(),
                     deferred_pragmas: None,
+                    late_symbol_references: SymbolReferences::new(),
                 },
             );
         }
@@ -383,6 +407,8 @@ impl IncrementalAnalysisService {
             result: mut analysis_result,
             native_symbol_references,
             external_symbol_references,
+            late_symbol_references,
+            late_symbol_references_by_file,
             per_file_issues,
             per_file_pragmas,
             snapshots,
@@ -390,11 +416,10 @@ impl IncrementalAnalysisService {
         } =
             self.run_analyzer_selective(&mut merged_codebase, symbol_references, &self.settings, &HashSet::default())?;
         self.external_symbol_references = external_symbol_references;
+        self.late_symbol_references = late_symbol_references;
         self.native_symbol_references = native_symbol_references;
         self.lifecycle_issues = analysis_result.issues.clone();
         self.analysis_snapshots = snapshots.into_iter().map(|snapshot| (snapshot.file_id(), snapshot)).collect();
-
-        analysis_result.issues.extend(all_codebase_issues.iter().cloned());
 
         // Distribute codebase issues to per-file caches.
         self.file_states = file_states;
@@ -402,21 +427,24 @@ impl IncrementalAnalysisService {
         self.distribute_codebase_issues(all_codebase_issues);
 
         for (file_id, issues) in per_file_issues {
-            analysis_result.issues.extend(issues.iter().cloned());
             if let Some(state) = self.file_states.get_mut(&file_id) {
+                state.unreconciled_analysis_issues = issues.clone();
                 state.analysis_issues = issues;
                 state.deferred_pragmas = per_file_pragmas.get(&file_id).cloned();
+                state.late_symbol_references =
+                    late_symbol_references_by_file.get(&file_id).cloned().unwrap_or_default();
             }
         }
 
+        self.codebase = merged_codebase;
+        self.symbol_references = std::mem::take(&mut analysis_result.symbol_references);
+        self.refresh_late_reference_issues();
+        analysis_result.issues = self.collect_all_issues();
         tracing::debug!(
             "Initial analysis: {} total issues ({} codebase-level)",
             analysis_result.issues.len(),
             self.codebase_issues.len(),
         );
-
-        self.codebase = merged_codebase;
-        self.symbol_references = std::mem::take(&mut analysis_result.symbol_references);
         self.initialized = true;
 
         Ok(analysis_result)
@@ -722,12 +750,15 @@ impl IncrementalAnalysisService {
                 result: mut analysis_result,
                 native_symbol_references,
                 external_symbol_references,
+                late_symbol_references,
+                mut late_symbol_references_by_file,
                 mut per_file_issues,
                 per_file_pragmas,
                 snapshots,
                 codebase_issues: new_codebase_issues,
             } = self.run_analyzer_selective(&mut merged_codebase, symbol_references, &self.settings, &files_to_skip)?;
             self.external_symbol_references = external_symbol_references;
+            self.late_symbol_references = late_symbol_references;
             self.native_symbol_references = native_symbol_references;
             self.lifecycle_issues = std::mem::take(&mut analysis_result.issues);
             self.analysis_snapshots.retain(|file_id, _| current_file_ids.contains(file_id));
@@ -759,8 +790,10 @@ impl IncrementalAnalysisService {
                 if let Some(issues) = per_file_issues.remove(&file_id)
                     && let Some(state) = self.file_states.get_mut(&file_id)
                 {
+                    state.unreconciled_analysis_issues = issues.clone();
                     state.analysis_issues = issues;
                     state.deferred_pragmas = per_file_pragmas.get(&file_id).cloned();
+                    state.late_symbol_references = late_symbol_references_by_file.remove(&file_id).unwrap_or_default();
                 }
             }
 
@@ -773,14 +806,24 @@ impl IncrementalAnalysisService {
                 let codebase_issues =
                     self.file_states.get(&file_id).map(|s| s.codebase_issues.clone()).unwrap_or_default();
                 let deferred_pragmas = per_file_pragmas.get(&file_id).cloned();
+                let late_symbol_references = late_symbol_references_by_file.remove(&file_id).unwrap_or_default();
                 self.file_states.insert(
                     file_id,
-                    FileState { content_hash, entry_keys, analysis_issues, codebase_issues, deferred_pragmas },
+                    FileState {
+                        content_hash,
+                        entry_keys,
+                        unreconciled_analysis_issues: analysis_issues.clone(),
+                        analysis_issues,
+                        codebase_issues,
+                        deferred_pragmas,
+                        late_symbol_references,
+                    },
                 );
             }
 
             self.codebase = merged_codebase;
             self.symbol_references = std::mem::take(&mut analysis_result.symbol_references);
+            self.refresh_late_reference_issues();
             analysis_result.issues = self.collect_all_issues();
 
             return Ok(analysis_result);
@@ -954,12 +997,15 @@ impl IncrementalAnalysisService {
             result: mut analysis_result,
             native_symbol_references,
             external_symbol_references,
+            late_symbol_references,
+            mut late_symbol_references_by_file,
             mut per_file_issues,
             per_file_pragmas,
             snapshots,
             codebase_issues: new_codebase_issues,
         } = self.run_analyzer_selective(&mut merged_codebase, symbol_references, &self.settings, &files_to_skip)?;
         self.external_symbol_references = external_symbol_references;
+        self.late_symbol_references = late_symbol_references;
         self.native_symbol_references = native_symbol_references;
         self.lifecycle_issues = std::mem::take(&mut analysis_result.issues);
         self.analysis_snapshots.retain(|file_id, _| current_file_ids.contains(file_id));
@@ -992,8 +1038,10 @@ impl IncrementalAnalysisService {
             if let Some(issues) = per_file_issues.remove(&file_id)
                 && let Some(state) = self.file_states.get_mut(&file_id)
             {
+                state.unreconciled_analysis_issues = issues.clone();
                 state.analysis_issues = issues;
                 state.deferred_pragmas = per_file_pragmas.get(&file_id).cloned();
+                state.late_symbol_references = late_symbol_references_by_file.remove(&file_id).unwrap_or_default();
             }
         }
 
@@ -1005,15 +1053,24 @@ impl IncrementalAnalysisService {
             let entry_keys = metadata.extract_owned_keys(&merged_codebase);
             let codebase_issues = self.file_states.get(&file_id).map(|s| s.codebase_issues.clone()).unwrap_or_default();
             let deferred_pragmas = per_file_pragmas.get(&file_id).cloned();
+            let late_symbol_references = late_symbol_references_by_file.remove(&file_id).unwrap_or_default();
             self.file_states.insert(
                 file_id,
-                FileState { content_hash, entry_keys, analysis_issues, codebase_issues, deferred_pragmas },
+                FileState {
+                    content_hash,
+                    entry_keys,
+                    unreconciled_analysis_issues: analysis_issues.clone(),
+                    analysis_issues,
+                    codebase_issues,
+                    deferred_pragmas,
+                    late_symbol_references,
+                },
             );
         }
 
         self.codebase = merged_codebase;
         self.symbol_references = std::mem::take(&mut analysis_result.symbol_references);
-
+        self.refresh_late_reference_issues();
         analysis_result.issues = self.collect_all_issues();
 
         Ok(analysis_result)
@@ -1063,7 +1120,14 @@ impl IncrementalAnalysisService {
             }
         };
 
-        issues.extend(analysis_result.issues);
+        if self.late_symbol_references.is_empty() {
+            issues.extend(analysis_result.issues);
+        } else {
+            issues.extend(
+                LateSymbolReferenceIssueReconciler::new(&self.codebase, &self.symbol_references)
+                    .reconcile(analysis_result.issues),
+            );
+        }
         Some((issues, artifacts))
     }
 
@@ -1106,7 +1170,14 @@ impl IncrementalAnalysisService {
             issues.push(Issue::error(format!("Analysis error: {err}")));
         }
 
-        issues.extend(analysis_result.issues);
+        if self.late_symbol_references.is_empty() {
+            issues.extend(analysis_result.issues);
+        } else {
+            issues.extend(
+                LateSymbolReferenceIssueReconciler::new(&self.codebase, &self.symbol_references)
+                    .reconcile(analysis_result.issues),
+            );
+        }
         issues
     }
 
@@ -1271,6 +1342,8 @@ impl IncrementalAnalysisService {
             snapshots.extend(snapshot);
         }
 
+        let mut late_symbol_references_by_file = HashMap::<FileId, SymbolReferences>::default();
+
         if after_file {
             #[cfg(not(target_arch = "wasm32"))]
             let after_file_start = trace_enabled.then(Instant::now);
@@ -1285,13 +1358,18 @@ impl IncrementalAnalysisService {
                 })
                 .collect::<Result<Vec<_>, _>>()
                 .map_err(mago_analyzer::error::AnalysisError::from)?;
-            let issue_count = batches.iter().map(IssueCollection::len).sum::<usize>();
-            for issue in batches.into_iter().flatten() {
-                let file_id = issue.annotations.first().map(|annotation| annotation.span.file_id);
-                if let Some(issues) = file_id.and_then(|file_id| per_file_issues.get_mut(&file_id)) {
-                    issues.push(issue);
-                } else {
-                    aggregated_result.issues.push(issue);
+            let issue_count = batches.iter().map(|batch| batch.issues.len()).sum::<usize>();
+            for batch in batches {
+                for issue in batch.issues {
+                    let file_id = issue.annotations.first().map(|annotation| annotation.span.file_id);
+                    if let Some(issues) = file_id.and_then(|file_id| per_file_issues.get_mut(&file_id)) {
+                        issues.push(issue);
+                    } else {
+                        aggregated_result.issues.push(issue);
+                    }
+                }
+                for (file_id, references) in batch.references_by_file {
+                    late_symbol_references_by_file.entry(file_id).or_default().extend(references);
                 }
             }
             #[cfg(not(target_arch = "wasm32"))]
@@ -1304,6 +1382,16 @@ impl IncrementalAnalysisService {
                     "Incremental external after-file hook batches completed."
                 );
             }
+        }
+
+        let mut late_symbol_references = SymbolReferences::new();
+        for file_id in &effective_skip_files {
+            if let Some(state) = self.file_states.get(file_id) {
+                late_symbol_references.extend(state.late_symbol_references.clone());
+            }
+        }
+        for references in late_symbol_references_by_file.values() {
+            late_symbol_references.extend(references.clone());
         }
 
         let cached_pragmas =
@@ -1324,6 +1412,7 @@ impl IncrementalAnalysisService {
 
         let native_symbol_references = aggregated_result.symbol_references.clone();
         aggregated_result.symbol_references.extend(external_symbol_references.clone());
+        aggregated_result.symbol_references.extend(late_symbol_references.clone());
 
         let codebase_issues = codebase.take_issues(true);
         if after_analysis {
@@ -1345,12 +1434,21 @@ impl IncrementalAnalysisService {
 
             let mut project_result = AnalysisResult::new(aggregated_result.symbol_references.clone());
             project_result.issues.extend(aggregated_result.issues.iter().cloned());
-            for issues in per_file_issues.values() {
-                project_result.issues.extend(issues.iter().cloned());
+            let late_reconciler = (!late_symbol_references.is_empty())
+                .then(|| LateSymbolReferenceIssueReconciler::new(codebase, &aggregated_result.symbol_references));
+            for issues in per_file_issues.values().cloned() {
+                project_result.issues.extend(match late_reconciler.as_ref() {
+                    Some(reconciler) => reconciler.reconcile(issues),
+                    None => issues,
+                });
             }
             for (file_id, state) in &self.file_states {
                 if effective_skip_files.contains(file_id) {
-                    project_result.issues.extend(state.analysis_issues.iter().cloned());
+                    let issues = state.unreconciled_analysis_issues.clone();
+                    project_result.issues.extend(match late_reconciler.as_ref() {
+                        Some(reconciler) => reconciler.reconcile(issues),
+                        None => issues,
+                    });
                     project_result.issues.extend(state.codebase_issues.iter().cloned());
                 }
             }
@@ -1388,6 +1486,8 @@ impl IncrementalAnalysisService {
             result: aggregated_result,
             native_symbol_references,
             external_symbol_references,
+            late_symbol_references,
+            late_symbol_references_by_file,
             per_file_issues,
             per_file_pragmas,
             snapshots,

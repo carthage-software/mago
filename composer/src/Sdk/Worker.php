@@ -1034,13 +1034,16 @@ final class Worker
                     $reportedIssues[] = $context instanceof AfterFileAnalysisContext ? $context->analysis->file : null;
                 }
 
-                if ($context instanceof BeforeAnalysisContext) {
+                if ($context instanceof BeforeAnalysisContext || $context instanceof AfterFileAnalysisContext) {
                     $references = $context->references->takeReferences();
                     for ($index = 0, $count = count($references); $index < $count; $index += 3) {
                         $contributedReferences[] = $pluginIndex;
                         $contributedReferences[] = $references[$index];
                         $contributedReferences[] = $references[$index + 1];
                         $contributedReferences[] = $references[$index + 2];
+                        $contributedReferences[] = $context instanceof AfterFileAnalysisContext
+                            ? $context->analysis->file
+                            : null;
                     }
                 }
             }

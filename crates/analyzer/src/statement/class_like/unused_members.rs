@@ -11,10 +11,14 @@
 //! and are not reported. This also covers magic methods (`__construct`, `__call`, etc.)
 //! since they all start with double underscore.
 
+use foldhash::HashMap;
 use foldhash::HashSet;
 use mago_allocator::Arena;
 
+use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
+use mago_codex::reference::ReferenceOrigin;
+use mago_codex::reference::SymbolReferenceKind;
 use mago_codex::reference::SymbolReferences;
 use mago_codex::symbol::SymbolIdentifier;
 use mago_reporting::Annotation;
@@ -37,6 +41,13 @@ struct CheckableMember {
     is_property: bool,
 }
 
+#[derive(Debug)]
+pub(crate) struct UnusedMemberSpans {
+    pub unused_methods: HashSet<Span>,
+    pub unused_properties: HashSet<Span>,
+    pub read_properties: HashSet<Span>,
+}
+
 /// Check for unused members (properties and methods) with transitive analysis.
 ///
 /// This function detects:
@@ -56,16 +67,33 @@ pub fn check_unused_members_with_transitivity<A>(
 where
     A: Arena,
 {
-    if class_like_metadata.kind.is_trait() {
-        return HashSet::default();
+    let checkable_members = collect_checkable_members(class_name, class_like_metadata, context.codebase);
+    let unused_members = find_unused_members(&checkable_members, symbol_references, additional_symbol_references);
+
+    for member in &checkable_members {
+        if unused_members.contains(&member.symbol_id) {
+            if member.is_property {
+                report_unused_property(context, class_span, member.display_name, member.span);
+            } else {
+                report_unused_method(context, class_span, member.display_name, member.span);
+            }
+        }
     }
 
-    if class_like_metadata.kind.is_interface() {
-        return HashSet::default();
+    unused_members
+}
+
+fn collect_checkable_members(
+    class_name: Word,
+    class_like_metadata: &ClassLikeMetadata,
+    codebase: &CodebaseMetadata,
+) -> Vec<CheckableMember> {
+    if class_like_metadata.kind.is_trait() || class_like_metadata.kind.is_interface() {
+        return Vec::new();
     }
 
     let is_final = class_like_metadata.flags.is_final() || class_like_metadata.kind.is_enum();
-    let mut checkable_members: Vec<CheckableMember> = Vec::new();
+    let mut checkable_members = Vec::new();
 
     for (property_name, property) in &class_like_metadata.properties {
         if let Some(declaring_class) = class_like_metadata.declaring_property_ids.get(property_name)
@@ -106,7 +134,7 @@ where
         if class_like_metadata
             .used_traits
             .iter()
-            .any(|trait_name| context.codebase.property_exists(trait_name.as_bytes(), property_name.as_bytes()))
+            .any(|trait_name| codebase.property_exists(trait_name.as_bytes(), property_name.as_bytes()))
         {
             // trait property override, could be used in the trait itself.
             continue;
@@ -129,7 +157,7 @@ where
             continue;
         }
 
-        let Some(method_metadata) = context.codebase.function_likes.get(&(class_name, *method_name)) else {
+        let Some(method_metadata) = codebase.function_likes.get(&(class_name, *method_name)) else {
             continue;
         };
 
@@ -160,7 +188,7 @@ where
         if class_like_metadata
             .used_traits
             .iter()
-            .any(|trait_name| context.codebase.method_exists(trait_name.as_bytes(), method_name.as_bytes()))
+            .any(|trait_name| codebase.method_exists(trait_name.as_bytes(), method_name.as_bytes()))
         {
             // non-abstract trait method override, could be used in the trait itself.
             continue;
@@ -175,22 +203,26 @@ where
         });
     }
 
-    if checkable_members.is_empty() {
-        return HashSet::default();
-    }
+    checkable_members
+}
 
+fn find_unused_members(
+    checkable_members: &[CheckableMember],
+    symbol_references: &SymbolReferences,
+    additional_symbol_references: Option<&SymbolReferences>,
+) -> HashSet<SymbolIdentifier> {
     let mut unused_members: HashSet<SymbolIdentifier> = HashSet::default();
-    for member in &checkable_members {
+    for member in checkable_members {
         if !is_member_referenced(symbol_references, additional_symbol_references, &member.symbol_id) {
             unused_members.insert(member.symbol_id);
         }
     }
 
-    let checkable_set: HashSet<SymbolIdentifier> = checkable_members.iter().map(|m| m.symbol_id).collect();
+    let checkable_set: HashSet<SymbolIdentifier> = checkable_members.iter().map(|member| member.symbol_id).collect();
     loop {
         let mut newly_unused: HashSet<SymbolIdentifier> = HashSet::default();
 
-        for member in &checkable_members {
+        for member in checkable_members {
             if unused_members.contains(&member.symbol_id) {
                 continue;
             }
@@ -213,14 +245,99 @@ where
         unused_members.extend(newly_unused);
     }
 
-    for member in &checkable_members {
-        if unused_members.contains(&member.symbol_id) {
-            if member.is_property {
-                report_unused_property(context, class_span, member.display_name, member.span);
-            } else {
-                report_unused_method(context, class_span, member.display_name, member.span);
+    unused_members
+}
+
+pub(crate) fn find_unused_member_spans(
+    codebase: &CodebaseMetadata,
+    symbol_references: &SymbolReferences,
+) -> UnusedMemberSpans {
+    let mut referencing_symbols = HashMap::<SymbolIdentifier, HashSet<SymbolIdentifier>>::default();
+    let mut externally_referenced = HashSet::<SymbolIdentifier>::default();
+    let mut read_properties = HashSet::<SymbolIdentifier>::default();
+    symbol_references.for_each_reference(|source, target, kind| {
+        if matches!(kind, SymbolReferenceKind::Body | SymbolReferenceKind::Signature) {
+            match source {
+                ReferenceOrigin::Symbol(source) => {
+                    referencing_symbols.entry(target).or_default().insert(source);
+                }
+                ReferenceOrigin::File(_) => {
+                    externally_referenced.insert(target);
+                }
+            }
+        } else if kind == SymbolReferenceKind::PropertyRead {
+            read_properties.insert(target);
+        }
+    });
+
+    let mut spans = UnusedMemberSpans {
+        unused_methods: HashSet::default(),
+        unused_properties: HashSet::default(),
+        read_properties: HashSet::default(),
+    };
+    for (class_name, class_like_metadata) in &codebase.class_likes {
+        let checkable_members = collect_checkable_members(*class_name, class_like_metadata, codebase);
+        let unused_members =
+            find_unused_members_from_index(&checkable_members, &referencing_symbols, &externally_referenced);
+        for member in checkable_members {
+            if unused_members.contains(&member.symbol_id) {
+                if member.is_property {
+                    spans.unused_properties.insert(member.span);
+                } else {
+                    spans.unused_methods.insert(member.span);
+                }
             }
         }
+
+        for (property_name, property) in &class_like_metadata.properties {
+            let symbol_id = (*class_name, *property_name);
+            if read_properties.contains(&symbol_id)
+                && let Some(property_span) = property.name_span.or(property.span)
+            {
+                spans.read_properties.insert(property_span);
+            }
+        }
+    }
+
+    spans
+}
+
+fn find_unused_members_from_index(
+    checkable_members: &[CheckableMember],
+    referencing_symbols: &HashMap<SymbolIdentifier, HashSet<SymbolIdentifier>>,
+    externally_referenced: &HashSet<SymbolIdentifier>,
+) -> HashSet<SymbolIdentifier> {
+    let checkable_set = checkable_members.iter().map(|member| member.symbol_id).collect::<HashSet<_>>();
+    let mut unused_members = checkable_members
+        .iter()
+        .filter(|member| {
+            !externally_referenced.contains(&member.symbol_id)
+                && referencing_symbols.get(&member.symbol_id).is_none_or(HashSet::is_empty)
+        })
+        .map(|member| member.symbol_id)
+        .collect::<HashSet<_>>();
+
+    loop {
+        let mut newly_unused = HashSet::default();
+        for member in checkable_members {
+            if unused_members.contains(&member.symbol_id) || externally_referenced.contains(&member.symbol_id) {
+                continue;
+            }
+
+            let all_references_are_unused = referencing_symbols.get(&member.symbol_id).is_none_or(|references| {
+                references.iter().all(|source| checkable_set.contains(source) && unused_members.contains(source))
+            });
+
+            if all_references_are_unused {
+                newly_unused.insert(member.symbol_id);
+            }
+        }
+
+        if newly_unused.is_empty() {
+            break;
+        }
+
+        unused_members.extend(newly_unused);
     }
 
     unused_members

@@ -595,7 +595,8 @@ final class Protocol
 
     /**
      * @param list<int|ReportedIssue|string|null> $reportedIssues
-     * @param list<int|string|MemberIdentifier|ReferenceOrigin|ReferenceKind> $contributedReferences
+     * @param list<int|string|MemberIdentifier|ReferenceOrigin|ReferenceKind|null> $contributedReferences
+     *
      * @mago-expect lint:halstead
      */
     public static function writeLifecycleResponse(
@@ -610,6 +611,7 @@ final class Protocol
             self::AFTER_FILE_ANALYSIS_BATCH_REQUEST => self::AFTER_FILE_ANALYSIS_BATCH_RESPONSE,
             default => throw new ProtocolException("Unknown analyzer lifecycle request kind {$requestKind}."),
         };
+
         $writer = self::createMessage($responseKind);
         $writer->writeU32(intdiv(count($reportedIssues), 3));
         for ($index = 0, $count = count($reportedIssues); $index < $count; $index += 3) {
@@ -628,6 +630,7 @@ final class Protocol
             foreach ($issue->notes as $note) {
                 $writer->writeString($note);
             }
+
             $writer->writeOptionalString($issue->help);
             $writer->writeOptionalString($issue->link);
             $writer->writeCount($issue->annotations);
@@ -638,6 +641,7 @@ final class Protocol
                 $writer->writeU32($annotation->span->end);
                 $writer->writeOptionalString($annotation->message);
             }
+
             $writer->writeCount($issue->edits);
             foreach ($issue->edits as $edit) {
                 $writer->writeOptionalString($edit->file ?? $defaultFile);
@@ -648,8 +652,8 @@ final class Protocol
             }
         }
 
-        $writer->writeU32(intdiv(count($contributedReferences), 4));
-        for ($index = 0, $count = count($contributedReferences); $index < $count; $index += 4) {
+        $writer->writeU32(intdiv(count($contributedReferences), 5));
+        for ($index = 0, $count = count($contributedReferences); $index < $count; $index += 5) {
             /** @var int<0, 65535> $plugin */
             $plugin = $contributedReferences[$index];
             /** @var string|MemberIdentifier|ReferenceOrigin $source */
@@ -658,7 +662,15 @@ final class Protocol
             $target = $contributedReferences[$index + 2];
             /** @var ReferenceKind $kind */
             $kind = $contributedReferences[$index + 3];
+            /** @var string|null $discoveryFile */
+            $discoveryFile = $contributedReferences[$index + 4];
             $writer->writeU16($plugin);
+            if ($requestKind !== self::BEFORE_ANALYSIS_REQUEST) {
+                $writer->writeString($discoveryFile ?? throw new ProtocolException(
+                    'A late symbol-reference contribution has no discovery file.',
+                ));
+            }
+
             self::writeReferenceOrigin(
                 $writer,
                 $source instanceof ReferenceOrigin ? $source : ReferenceOrigin::symbol($source),

@@ -166,6 +166,17 @@ final class LifecycleProofHook implements
             throw new RuntimeException('The exact analyzed in-memory source did not round-trip lazily.');
         }
 
+        if (
+            $this->plugin === 'lifecycle-one'
+            && $analysis->file === 'src/file5.php'
+            && $context->codebase->getConstant('ENABLE_LATE_FRAMEWORK_ACTION') !== null
+        ) {
+            $context->references->add(
+                new MemberIdentifier('LifecycleClass5', 'value'),
+                new MemberIdentifier('LifecycleClass0', 'lateFrameworkAction'),
+            );
+        }
+
         $programs = $source->getNodes(NodeKind::Program);
         if (count($programs) !== 1 || $programs[0]->parentId !== null || $source->getChildren($programs[0]) === []) {
             throw new RuntimeException('The complete analyzed syntax tree did not round-trip.');
@@ -277,8 +288,13 @@ final class LifecycleProofHook implements
         }
 
         $frameworkReferenceEnabled = $context->codebase->getConstant('ENABLE_FRAMEWORK_ACTION') !== null;
+        $lateReferenceEnabled = $context->codebase->getConstant('ENABLE_LATE_FRAMEWORK_ACTION') !== null;
         $project = $context->analysis;
-        $expectedIssueCount = ($frameworkReferenceEnabled ? 3 : 4) + (count($project->files) * 2) - 1;
+        $expectedIssueCount = 3
+            + ($frameworkReferenceEnabled ? 0 : 1)
+            + ($lateReferenceEnabled ? 0 : 1)
+            + (count($project->files) * 2)
+            - 1;
         if (count($project->files) !== 96 || $project->issueCount !== $expectedIssueCount) {
             throw new RuntimeException(
                 "The final hook received {$project->issueCount} issues; expected {$expectedIssueCount}.",
@@ -305,7 +321,9 @@ final class LifecycleProofHook implements
         }
 
         $frameworkAction = new MemberIdentifier('LifecycleClass0', 'frameworkAction');
+        $lateFrameworkAction = new MemberIdentifier('LifecycleClass0', 'lateFrameworkAction');
         $referencesToAction = $project->references->getReferencesTo($frameworkAction);
+        $referencesToLateAction = $project->references->getReferencesTo($lateFrameworkAction);
         [$referencesFromKernel, $referencesFromConsumer] = $project->references->getMultipleReferencesFrom([
             'Symfony\Kernel',
             'extension_consumer',
@@ -354,6 +372,11 @@ final class LifecycleProofHook implements
             || $kernelReferencesAction !== $frameworkReferenceEnabled
             || $routesReferenceAction !== $frameworkReferenceEnabled
             || !$consumerReferencesAnswer
+            || count($referencesToLateAction) !== ($lateReferenceEnabled ? 1 : 0)
+            || $lateReferenceEnabled
+                && (!$referencesToLateAction[0]->source->symbol instanceof MemberIdentifier
+                    || $referencesToLateAction[0]->source->symbol->class !== 'lifecycleclass5'
+                    || $referencesToLateAction[0]->source->symbol->member !== 'value')
         ) {
             throw new RuntimeException('The final merged native and synthetic references did not round-trip.');
         }

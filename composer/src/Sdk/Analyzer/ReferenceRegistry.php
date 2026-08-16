@@ -8,7 +8,10 @@ use Mago\Sdk\Analyzer\Metadata\MemberIdentifier;
 use Mago\Sdk\Exception\InvalidArgumentException;
 
 /**
- * Collects framework-known references before parallel analysis starts.
+ * Collects framework-known symbol references.
+ *
+ * A before-analysis registry contributes project-wide references. An after-file
+ * or node-analysis registry contributes references scoped to the analyzed file.
  *
  * @api
  */

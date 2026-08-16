@@ -14,6 +14,13 @@ use Mago\Sdk\PHPVersion;
  */
 final class AfterFileAnalysisContext extends LifecycleContext
 {
+    /**
+     * References discovered from this file.
+     *
+     * Mago replaces this file's previous contributions whenever the file is reanalyzed.
+     */
+    public readonly ReferenceRegistry $references;
+
     public function __construct(
         PHPVersion $phpVersion,
         Codebase $codebase,
@@ -22,5 +29,7 @@ final class AfterFileAnalysisContext extends LifecycleContext
         public readonly FileAnalysis $analysis,
     ) {
         parent::__construct($phpVersion, $codebase, $types, $cancellation);
+
+        $this->references = new ReferenceRegistry();
     }
 }
