@@ -158,6 +158,7 @@ struct ExternalAnalyzerTelemetry {
     nested_errors: AtomicU64,
     nested_request_bytes: AtomicU64,
     nested_response_bytes: AtomicU64,
+    comparison_batches: AtomicU64,
     comparisons: AtomicU64,
     metadata_queries: AtomicU64,
     analysis_queries: AtomicU64,
@@ -213,6 +214,11 @@ impl ExternalAnalyzerTelemetry {
         match kind {
             protocol::NestedRequestKind::TypeComparison => {
                 self.comparisons.fetch_add(1, Ordering::Relaxed);
+                self.comparison_ns.fetch_add(duration_nanos(elapsed), Ordering::Relaxed);
+            }
+            protocol::NestedRequestKind::TypeComparisonBatch(count) => {
+                self.comparison_batches.fetch_add(1, Ordering::Relaxed);
+                self.comparisons.fetch_add(*count as u64, Ordering::Relaxed);
                 self.comparison_ns.fetch_add(duration_nanos(elapsed), Ordering::Relaxed);
             }
             protocol::NestedRequestKind::CodebaseQuery => {
@@ -3048,6 +3054,7 @@ impl<T> Drop for ExternalAnalyzer<T> {
         let requests = self.telemetry.requests.load(Ordering::Relaxed);
         let ipc_requests = self.telemetry.ipc_requests.load(Ordering::Relaxed);
         let nested_requests = self.telemetry.nested_requests.load(Ordering::Relaxed);
+        let comparison_batches = self.telemetry.comparison_batches.load(Ordering::Relaxed);
         let comparisons = self.telemetry.comparisons.load(Ordering::Relaxed);
         let metadata_queries = self.telemetry.metadata_queries.load(Ordering::Relaxed);
         let analysis_queries = self.telemetry.analysis_queries.load(Ordering::Relaxed);
@@ -3093,6 +3100,7 @@ impl<T> Drop for ExternalAnalyzer<T> {
             nested_errors = self.telemetry.nested_errors.load(Ordering::Relaxed),
             nested_request_bytes = self.telemetry.nested_request_bytes.load(Ordering::Relaxed),
             nested_response_bytes = self.telemetry.nested_response_bytes.load(Ordering::Relaxed),
+            comparison_batches,
             comparisons,
             metadata_queries,
             analysis_queries,

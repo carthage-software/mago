@@ -30,6 +30,7 @@ use Mago\Sdk\Analyzer\Type;
 use Mago\Sdk\Analyzer\Type\CallableType;
 use Mago\Sdk\Analyzer\Type\FunctionLikeIdentifier;
 use Mago\Sdk\Analyzer\Type\FunctionLikeKind as IdentifierKind;
+use Mago\Sdk\Analyzer\TypeComparison;
 use Mago\Sdk\Extension;
 use Mago\Sdk\Reporting\Issue;
 use Mago\Sdk\Reporting\Level;
@@ -392,6 +393,15 @@ final class LifecycleProofHook implements
 
         if (!$context->types->isContainedBy(Type::literalInt(1), Type::int())) {
             throw new RuntimeException('A lifecycle hook cannot compare types.');
+        }
+        $comparisons = [
+            TypeComparison::equal(Type::int(), Type::int()),
+            TypeComparison::containedBy(Type::literalInt(1), Type::int()),
+            TypeComparison::canBeIdentical(Type::int(), Type::string()),
+            TypeComparison::containedBy(Type::literalInt(1), Type::int()),
+        ];
+        if ($context->types->compareMultiple($comparisons) !== [true, true, false, true]) {
+            throw new RuntimeException('A lifecycle hook cannot batch mixed or duplicate type comparisons.');
         }
 
         if ($extensionClass === null) {

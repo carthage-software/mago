@@ -25,6 +25,7 @@ use Mago\Sdk\Analyzer\SymbolReference;
 use Mago\Sdk\Analyzer\SymbolReferences;
 use Mago\Sdk\Analyzer\Type;
 use Mago\Sdk\Analyzer\Type\FunctionLikeIdentifier;
+use Mago\Sdk\Analyzer\TypeComparison;
 use Mago\Sdk\Analyzer\UndeclaredReturnTypeProvider;
 use Mago\Sdk\CancellationTokenInterface;
 use Mago\Sdk\Exception\ProtocolException;
@@ -125,6 +126,7 @@ final class Protocol
     public const TYPE_COMPARISON_EQUAL = 1;
     public const TYPE_COMPARISON_CONTAINED_BY = 2;
     public const TYPE_COMPARISON_CAN_BE_IDENTICAL = 3;
+    private const TYPE_COMPARISON_BATCH_REQUEST = 16;
     private const MAGIC_U32 = 0x4D41_4E41;
     private const MAJOR = 1;
     private const MINOR = 0;
@@ -144,6 +146,7 @@ final class Protocol
     private const PROPERTY_TYPE_RESPONSE = 0x800D;
     private const PROPERTY_INITIALIZATION_RESPONSE = 0x800E;
     private const ISSUE_FILTER_RESPONSE = 0x800F;
+    private const TYPE_COMPARISON_BATCH_RESPONSE = 0x8010;
     private const MAXIMUM_ISSUES = 1_000_000;
     private const MAXIMUM_ISSUE_NOTES = 0x0001_0000;
     private const MAXIMUM_ISSUE_ANNOTATIONS = 0x0001_0000;
@@ -1069,12 +1072,12 @@ final class Protocol
         return new ReportingReportedIssue($level, $code, $message, $notes, $help, $link, $annotations, $edits);
     }
 
-    public static function writeTypeComparisonRequest(int $operation, Type $left, Type $right): string
+    public static function writeTypeComparisonRequest(int $operation, string $left, string $right): string
     {
         $writer = self::createMessage(self::TYPE_COMPARISON_REQUEST);
         $writer->writeU8($operation);
-        $writer->writeRaw($left->encode());
-        $writer->writeRaw($right->encode());
+        $writer->writeRaw($left);
+        $writer->writeRaw($right);
 
         return $writer->finish();
     }
@@ -1090,6 +1093,52 @@ final class Protocol
         $reader->finish();
 
         return $result;
+    }
+
+    /**
+     * @param non-empty-list<TypeComparison> $comparisons
+     */
+    public static function writeTypeComparisonBatchRequest(array $comparisons): string
+    {
+        $writer = self::createMessage(self::TYPE_COMPARISON_BATCH_REQUEST);
+        $writer->writeCount($comparisons);
+        foreach ($comparisons as $comparison) {
+            $writer->writeU8($comparison->kind->value);
+            $writer->writeRaw($comparison->encodeLeft());
+            $writer->writeRaw($comparison->encodeRight());
+        }
+
+        return $writer->finish();
+    }
+
+    /** @return list<bool> */
+    public static function readTypeComparisonBatchResponse(string $payload, int $expectedCount): array
+    {
+        return self::readTypeComparisonResults($payload, $expectedCount);
+    }
+
+    /** @return list<bool> */
+    private static function readTypeComparisonResults(string $payload, int $expectedCount): array
+    {
+        [$kind, $reader] = self::readRequest($payload);
+        if ($kind !== self::TYPE_COMPARISON_BATCH_RESPONSE) {
+            throw new ProtocolException(
+                "Expected a type comparison batch response, received analyzer message {$kind}.",
+            );
+        }
+
+        $count = $reader->readCount(65_536);
+        if ($count !== $expectedCount) {
+            throw new ProtocolException("Expected {$expectedCount} type comparison results, received {$count}.");
+        }
+
+        $results = [];
+        for ($index = 0; $index < $count; ++$index) {
+            $results[] = $reader->readBoolean();
+        }
+
+        $reader->finish();
+        return $results;
     }
 
     /**

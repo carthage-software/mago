@@ -128,6 +128,7 @@ const CALLABLE_SIGNATURE_REQUEST: u16 = 12;
 const PROPERTY_TYPE_REQUEST: u16 = 13;
 const PROPERTY_INITIALIZATION_REQUEST: u16 = 14;
 const ISSUE_FILTER_REQUEST: u16 = 15;
+const TYPE_COMPARISON_BATCH_REQUEST: u16 = 16;
 const DESCRIBE_RESPONSE: u16 = 0x8001;
 const RETURN_TYPE_RESPONSE: u16 = 0x8002;
 const TYPE_COMPARISON_RESPONSE: u16 = 0x8003;
@@ -136,6 +137,7 @@ const CALLABLE_SIGNATURE_RESPONSE: u16 = 0x800C;
 const PROPERTY_TYPE_RESPONSE: u16 = 0x800D;
 const PROPERTY_INITIALIZATION_RESPONSE: u16 = 0x800E;
 const ISSUE_FILTER_RESPONSE: u16 = 0x800F;
+const TYPE_COMPARISON_BATCH_RESPONSE: u16 = 0x8010;
 const MAXIMUM_EXTENSIONS: usize = 0x4000;
 const MAXIMUM_PLUGINS: usize = 0x4000;
 const MAXIMUM_PROVIDERS: usize = 0x0001_0000;
@@ -147,6 +149,7 @@ const MAXIMUM_STUBS: usize = 0x0001_0000;
 // complete snapshots from real framework codebases such as Symfony.
 const MAXIMUM_TYPE_DEPTH: usize = 256;
 const MAXIMUM_TYPE_MEMBERS: usize = 0x0001_0000;
+const MAXIMUM_TYPE_COMPARISONS: usize = 0x0001_0000;
 const MAXIMUM_ISSUES: usize = 1_000_000;
 
 const TARGET_EXACT: u8 = 1;
@@ -253,6 +256,7 @@ pub(super) fn resolve_type_handle<'type_info>(
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum NestedRequestKind {
     TypeComparison,
+    TypeComparisonBatch(usize),
     CodebaseQuery,
     AnalysisQuery,
     SymbolReferenceQuery,
@@ -1966,28 +1970,63 @@ where
     let operation = reader.read_u8("type comparison operation")?;
     let left = decode_type(&mut reader, &argument_type, 0)?;
     let right = decode_type(&mut reader, &argument_type, 0)?;
+    let result = compare_types(operation, &left, &right, codebase)?;
     reader.finish()?;
-
-    let result = match operation {
-        TYPE_COMPARISON_EQUAL => left == right,
-        TYPE_COMPARISON_CONTAINED_BY => union_comparator::is_contained_by(
-            codebase,
-            &left,
-            &right,
-            false,
-            false,
-            false,
-            &mut ComparisonResult::default(),
-        ),
-        TYPE_COMPARISON_CAN_BE_IDENTICAL => {
-            union_comparator::can_expression_types_be_identical(codebase, &left, &right, false, false)
-        }
-        unknown => return Err(protocol(format!("unknown type comparison operation {unknown}"))),
-    };
 
     let mut writer = message_writer(TYPE_COMPARISON_RESPONSE);
     writer.write_bool(result);
     Ok(writer.finish())
+}
+
+fn handle_type_comparison_batch_request<'type_info, F>(
+    payload: &[u8],
+    codebase: &CodebaseMetadata,
+    argument_type: F,
+) -> Result<(usize, Vec<u8>), ExternalAnalyzerError>
+where
+    F: Fn(usize) -> Option<&'type_info TUnion>,
+{
+    let mut reader = message_reader(payload, TYPE_COMPARISON_BATCH_REQUEST)?;
+    let count = reader.read_count("type comparisons", MAXIMUM_TYPE_COMPARISONS)?;
+    if count == 0 {
+        return Err(protocol("type comparison request contains no comparisons"));
+    }
+    let mut writer = message_writer(TYPE_COMPARISON_BATCH_RESPONSE);
+    writer.write_u32(count as u32);
+    for _ in 0..count {
+        let operation = reader.read_u8("type comparison operation")?;
+        let left = decode_type(&mut reader, &argument_type, 0)?;
+        let right = decode_type(&mut reader, &argument_type, 0)?;
+        let result = compare_types(operation, &left, &right, codebase)?;
+        writer.write_bool(result);
+    }
+    reader.finish()?;
+
+    Ok((count, writer.finish()))
+}
+
+fn compare_types(
+    operation: u8,
+    left: &TUnion,
+    right: &TUnion,
+    codebase: &CodebaseMetadata,
+) -> Result<bool, ExternalAnalyzerError> {
+    match operation {
+        TYPE_COMPARISON_EQUAL => Ok(left == right),
+        TYPE_COMPARISON_CONTAINED_BY => Ok(union_comparator::is_contained_by(
+            codebase,
+            left,
+            right,
+            false,
+            false,
+            false,
+            &mut ComparisonResult::default(),
+        )),
+        TYPE_COMPARISON_CAN_BE_IDENTICAL => {
+            Ok(union_comparator::can_expression_types_be_identical(codebase, left, right, false, false))
+        }
+        unknown => Err(protocol(format!("unknown type comparison operation {unknown}"))),
+    }
 }
 
 pub(super) fn handle_nested_request<'type_info, F>(
@@ -2003,6 +2042,8 @@ where
     match kind {
         TYPE_COMPARISON_REQUEST => handle_type_comparison_request(payload, codebase, argument_type)
             .map(|response| (NestedRequestKind::TypeComparison, response)),
+        TYPE_COMPARISON_BATCH_REQUEST => handle_type_comparison_batch_request(payload, codebase, argument_type)
+            .map(|(count, response)| (NestedRequestKind::TypeComparisonBatch(count), response)),
         metadata::CODEBASE_QUERY_REQUEST => {
             let mut reader = message_reader(payload, metadata::CODEBASE_QUERY_REQUEST)?;
             let mut writer = message_writer(metadata::CODEBASE_QUERY_RESPONSE);
@@ -2798,6 +2839,54 @@ pub(super) mod testing {
 
         let result = decode_initialization_response(&writer.finish(), &[0]);
         assert!(matches!(result, Err(ExternalAnalyzerError::Protocol(message)) if message.contains("more than once")));
+    }
+
+    #[test]
+    fn type_comparison_requests_keep_the_singleton_fast_path() {
+        let mut writer = message_writer(TYPE_COMPARISON_REQUEST);
+        writer.write_u8(TYPE_COMPARISON_CONTAINED_BY);
+        writer.write_u8(TYPE_TRUE);
+        writer.write_u8(TYPE_BOOL);
+
+        let response = handle_type_comparison_request(&writer.finish(), &CodebaseMetadata::new(), |_| None).unwrap();
+        let mut reader = message_reader(&response, TYPE_COMPARISON_RESPONSE).unwrap();
+        assert!(reader.read_bool("contained-by result").unwrap());
+        reader.finish().unwrap();
+    }
+
+    #[test]
+    fn type_comparison_requests_batch_mixed_operations() {
+        let mut writer = message_writer(TYPE_COMPARISON_BATCH_REQUEST);
+        writer.write_u32(3);
+        writer.write_u8(TYPE_COMPARISON_EQUAL);
+        writer.write_u8(TYPE_INT);
+        writer.write_u8(TYPE_INT);
+        writer.write_u8(TYPE_COMPARISON_CONTAINED_BY);
+        writer.write_u8(TYPE_TRUE);
+        writer.write_u8(TYPE_BOOL);
+        writer.write_u8(TYPE_COMPARISON_CAN_BE_IDENTICAL);
+        writer.write_u8(TYPE_INT);
+        writer.write_u8(TYPE_STRING);
+
+        let (count, response) =
+            handle_type_comparison_batch_request(&writer.finish(), &CodebaseMetadata::new(), |_| None).unwrap();
+        assert_eq!(count, 3);
+
+        let mut reader = message_reader(&response, TYPE_COMPARISON_BATCH_RESPONSE).unwrap();
+        assert_eq!(reader.read_count("type comparison results", MAXIMUM_TYPE_COMPARISONS).unwrap(), 3);
+        assert!(reader.read_bool("equal result").unwrap());
+        assert!(reader.read_bool("contained-by result").unwrap());
+        assert!(!reader.read_bool("identity result").unwrap());
+        reader.finish().unwrap();
+    }
+
+    #[test]
+    fn type_comparison_requests_reject_empty_batches() {
+        let mut writer = message_writer(TYPE_COMPARISON_BATCH_REQUEST);
+        writer.write_u32(0);
+
+        let result = handle_type_comparison_batch_request(&writer.finish(), &CodebaseMetadata::new(), |_| None);
+        assert!(matches!(result, Err(ExternalAnalyzerError::Protocol(message)) if message.contains("no comparisons")));
     }
 
     #[test]

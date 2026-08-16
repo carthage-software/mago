@@ -30,6 +30,7 @@ use Mago\Sdk\Analyzer\ReturnTypeProviderContext;
 use Mago\Sdk\Analyzer\Type;
 use Mago\Sdk\Analyzer\Type\CallableParameter;
 use Mago\Sdk\Analyzer\Type\NamedObjectType;
+use Mago\Sdk\Analyzer\TypeComparison;
 use Mago\Sdk\Extension;
 use Mago\Sdk\Reporting\Level;
 use Mago\Sdk\Worker;
@@ -497,7 +498,13 @@ final class InvocationMethodProvider implements MethodReturnTypeProvider, Callab
 
     private static function assertEqual(ReturnTypeProviderContext $context, Type $actual, Type $expected): void
     {
-        if (!$context->types->equals($actual, $expected)) {
+        $comparisons = [
+            TypeComparison::equal($actual, $expected),
+            TypeComparison::containedBy($actual, $expected),
+            TypeComparison::canBeIdentical($actual, $expected),
+            TypeComparison::equal($actual, $expected),
+        ];
+        if ($context->types->compareMultiple($comparisons) !== [true, true, true, true]) {
             throw new RuntimeException('The received receiver type is not usable with TypeComparator.');
         }
     }
