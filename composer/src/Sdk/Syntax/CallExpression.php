@@ -52,7 +52,7 @@ final class CallExpression
         );
         $member = $function ? null : $children[1] ?? null;
         $argumentList = $children[$function ? 1 : 2] ?? null;
-        if ($argumentList?->kind !== NodeKind::ArgumentList) {
+        if ($argumentList === null || $argumentList->kind !== NodeKind::ArgumentList) {
             throw new InvalidArgumentException('A call node has no argument list.');
         }
 
@@ -143,7 +143,11 @@ final class CallExpression
         }
         $selector = $source->getChildren($this->member)[0] ?? null;
 
-        return $selector?->kind === NodeKind::LocalIdentifier ? $source->getText($selector) : null;
+        if ($selector === null || $selector->kind !== NodeKind::LocalIdentifier) {
+            return null;
+        }
+
+        return $source->getText($selector);
     }
 
     private static function unwrapExpression(SourceFile $source, Node $node): Node

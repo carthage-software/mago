@@ -1604,6 +1604,7 @@ dependencies = [
  "mago-names",
  "mago-span",
  "mago-syntax",
+ "rand 0.9.4",
  "strum 0.28.0",
  "tracing",
 ]

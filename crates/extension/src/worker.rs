@@ -3,8 +3,15 @@ use std::io::BufReader;
 use std::io::BufWriter;
 use std::io::Read;
 use std::io::Write;
+#[cfg(windows)]
+use std::net::Ipv4Addr;
+#[cfg(windows)]
+use std::net::TcpListener;
+#[cfg(windows)]
+use std::net::TcpStream;
 use std::process::Child;
 use std::process::ChildStderr;
+#[cfg(not(windows))]
 use std::process::ChildStdin;
 use std::process::ChildStdout;
 use std::sync::Arc;
@@ -38,6 +45,14 @@ const STATE_FAILED: u8 = 3;
 const IO_THREAD_STACK_SIZE: usize = 256 * 1024;
 const INITIAL_SHUTDOWN_POLL_INTERVAL: Duration = Duration::from_micros(50);
 const MAXIMUM_SHUTDOWN_POLL_INTERVAL: Duration = Duration::from_millis(1);
+#[cfg(windows)]
+const INPUT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
+#[cfg(windows)]
+const INPUT_AUTHENTICATION_TIMEOUT: Duration = Duration::from_secs(2);
+#[cfg(windows)]
+const INPUT_ADDRESS_ENVIRONMENT_VARIABLE: &str = "MAGO_EXTENSION_INPUT_ADDRESS";
+#[cfg(windows)]
+const INPUT_TOKEN_ENVIRONMENT_VARIABLE: &str = "MAGO_EXTENSION_INPUT_TOKEN";
 
 #[derive(Debug, Default)]
 struct WorkerTelemetry {
@@ -91,7 +106,10 @@ impl WorkerRequestHandler for AbsentRequestHandler {
 }
 
 enum WorkerStdin {
+    #[cfg(not(windows))]
     Process(ChildStdin),
+    #[cfg(windows)]
+    Socket(TcpStream),
     #[cfg(test)]
     Test(std::net::TcpStream),
 }
@@ -99,7 +117,10 @@ enum WorkerStdin {
 impl Write for WorkerStdin {
     fn write(&mut self, buffer: &[u8]) -> std::io::Result<usize> {
         match self {
+            #[cfg(not(windows))]
             Self::Process(stdin) => stdin.write(buffer),
+            #[cfg(windows)]
+            Self::Socket(stream) => stream.write(buffer),
             #[cfg(test)]
             Self::Test(stream) => stream.write(buffer),
         }
@@ -107,7 +128,10 @@ impl Write for WorkerStdin {
 
     fn flush(&mut self) -> std::io::Result<()> {
         match self {
+            #[cfg(not(windows))]
             Self::Process(stdin) => stdin.flush(),
+            #[cfg(windows)]
+            Self::Socket(stream) => stream.flush(),
             #[cfg(test)]
             Self::Test(stream) => stream.flush(),
         }
@@ -341,15 +365,36 @@ impl Worker {
             working_directory = ?command.current_directory(),
             "Spawning extension worker process."
         );
-        let mut child = command
-            .build()
-            .spawn()
+        let mut process = command.build();
+        #[cfg(windows)]
+        let (input_listener, input_address, input_token) = prepare_windows_input()
             .map_err(|source| WorkerError::Spawn { program: command.program().to_owned(), source })?;
+        #[cfg(windows)]
+        process
+            .env(INPUT_ADDRESS_ENVIRONMENT_VARIABLE, input_address)
+            .env(INPUT_TOKEN_ENVIRONMENT_VARIABLE, &input_token);
 
-        let stdin = take_pipe(id, "stdin", child.stdin.take(), &mut child)?;
+        let mut child =
+            process.spawn().map_err(|source| WorkerError::Spawn { program: command.program().to_owned(), source })?;
+
+        let process_stdin = take_pipe(id, "stdin", child.stdin.take(), &mut child)?;
         let stdout = take_pipe(id, "stdout", child.stdout.take(), &mut child)?;
         let stderr = take_pipe(id, "stderr", child.stderr.take(), &mut child)?;
         let process_id = child.id();
+        #[cfg(windows)]
+        let stdin = match accept_windows_input(&input_listener, &input_token, &mut child) {
+            Ok(stream) => {
+                drop(process_stdin);
+                WorkerStdin::Socket(stream)
+            }
+            Err(source) => {
+                let _result = child.kill();
+                let _result = child.wait();
+                return Err(WorkerError::Spawn { program: command.program().to_owned(), source });
+            }
+        };
+        #[cfg(not(windows))]
+        let stdin = WorkerStdin::Process(process_stdin);
 
         let inner = Arc::new(WorkerInner {
             id,
@@ -357,7 +402,7 @@ impl Worker {
             next_request_id: AtomicU64::new(1),
             in_flight: AtomicUsize::new(0),
             maximum_payload_size: options.maximum_payload_size,
-            writer: Mutex::new(Some(BufWriter::new(WorkerStdin::Process(stdin)))),
+            writer: Mutex::new(Some(BufWriter::new(stdin))),
             child: Mutex::new(Some(child)),
             pending: Mutex::new(HashMap::new()),
             stderr: Mutex::new(StderrTail::new(options.stderr_tail_size)),
@@ -736,6 +781,67 @@ impl WorkerReservation {
 impl Drop for WorkerReservation {
     fn drop(&mut self) {
         self.worker.inner.in_flight.fetch_sub(1, Ordering::Relaxed);
+    }
+}
+
+#[cfg(windows)]
+fn prepare_windows_input() -> std::io::Result<(TcpListener, String, String)> {
+    const HEX: &[u8; 16] = b"0123456789abcdef";
+
+    let listener = TcpListener::bind((Ipv4Addr::LOCALHOST, 0))?;
+    listener.set_nonblocking(true)?;
+    let address = listener.local_addr()?.to_string();
+    let random = rand::random::<[u8; 16]>();
+    let mut token = String::with_capacity(random.len() * 2);
+    for byte in random {
+        token.push(char::from(HEX[usize::from(byte >> 4)]));
+        token.push(char::from(HEX[usize::from(byte & 0x0f)]));
+    }
+
+    Ok((listener, address, token))
+}
+
+#[cfg(windows)]
+fn accept_windows_input(listener: &TcpListener, token: &str, child: &mut Child) -> std::io::Result<TcpStream> {
+    let deadline = Instant::now() + INPUT_CONNECT_TIMEOUT;
+    loop {
+        match listener.accept() {
+            Ok((mut stream, peer)) => {
+                if !peer.ip().is_loopback() {
+                    continue;
+                }
+
+                stream.set_read_timeout(Some(INPUT_AUTHENTICATION_TIMEOUT))?;
+                let mut received = vec![0; token.len()];
+                stream.read_exact(&mut received)?;
+                if received != token.as_bytes() {
+                    continue;
+                }
+
+                stream.set_read_timeout(None)?;
+                stream.set_nodelay(true)?;
+                tracing::trace!(process = child.id(), %peer, "Extension worker connected its Windows input stream.");
+                return Ok(stream);
+            }
+            Err(error) if error.kind() == std::io::ErrorKind::WouldBlock => {}
+            Err(error) => return Err(error),
+        }
+
+        if let Some(status) = child.try_wait()? {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::BrokenPipe,
+                format!("extension worker exited with {status} before connecting its Windows input stream"),
+            ));
+        }
+
+        if Instant::now() >= deadline {
+            return Err(std::io::Error::new(
+                std::io::ErrorKind::TimedOut,
+                "extension worker did not connect its Windows input stream",
+            ));
+        }
+
+        std::thread::sleep(Duration::from_millis(1));
     }
 }
 

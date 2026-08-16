@@ -36,6 +36,7 @@ use Mago\Sdk\Internal\Analyzer\RegisteredPropertyInitializationProvider;
 use Mago\Sdk\Internal\Analyzer\RegisteredPropertyTypeProvider;
 use Mago\Sdk\Internal\Analyzer\ReportedIssue;
 use Mago\Sdk\Internal\HostClient;
+use Mago\Sdk\Internal\Io\InputTransport;
 use Mago\Sdk\Internal\Io\ResourceReader;
 use Mago\Sdk\Internal\Io\ResourceWriter;
 use Mago\Sdk\Internal\Linter\Protocol as LinterProtocol;
@@ -55,6 +56,7 @@ use function array_key_exists;
 use function array_values;
 use function count;
 use function defined;
+use function fclose;
 use function fwrite;
 use function in_array;
 use function is_array;
@@ -427,7 +429,8 @@ final class Worker
         int $maximumPayloadSize = FrameCodec::DEFAULT_MAXIMUM_PAYLOAD_SIZE,
     ): void {
         $codec = new FrameCodec($maximumPayloadSize);
-        $reader = new ResourceReader($input ?? STDIN);
+        $connectedInput = $input === null ? InputTransport::connect() : null;
+        $reader = new ResourceReader($input ?? $connectedInput ?? STDIN);
         $writer = new ResourceWriter($output ?? STDOUT);
         $host = new HostClient($codec, $writer);
 
@@ -494,6 +497,9 @@ final class Worker
         } finally {
             $reader->close();
             $writer->close();
+            if ($connectedInput !== null) {
+                fclose($connectedInput);
+            }
             while (ob_get_level() > $outputBufferLevel) {
                 ob_end_flush();
             }

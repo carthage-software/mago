@@ -17,8 +17,10 @@ use function stream_set_write_buffer;
 use function strlen;
 use function substr;
 
+use const PHP_OS_FAMILY;
+
 /**
- * A serialized, non-blocking writer specialized for Mago's worker pipe.
+ * A serialized writer specialized for Mago's worker pipe.
  *
  * @internal
  * @mago-expect lint:cyclomatic-complexity
@@ -29,6 +31,8 @@ final class ResourceWriter
      * @var resource
      */
     private readonly mixed $stream;
+
+    private readonly bool $nonBlocking;
 
     private string $watcher = '';
 
@@ -53,19 +57,23 @@ final class ResourceWriter
             throw new InvalidArgumentException('The worker output must be an open stream resource.');
         }
 
-        if (!stream_set_blocking($stream, false)) {
+        $nonBlocking = stream_set_blocking($stream, false);
+        if (!$nonBlocking && PHP_OS_FAMILY !== 'Windows') {
             throw new InvalidArgumentException('The worker output stream cannot be made non-blocking.');
         }
 
         stream_set_write_buffer($stream, 0);
         $this->stream = $stream;
-        $this->watcher = EventLoop::onWritable($stream, function (): void {
+        $this->nonBlocking = $nonBlocking;
+        if ($nonBlocking) {
+            $this->watcher = EventLoop::onWritable($stream, function (): void {
+                EventLoop::disable($this->watcher);
+                $suspension = $this->suspension;
+                $this->suspension = null;
+                $suspension?->resume();
+            });
             EventLoop::disable($this->watcher);
-            $suspension = $this->suspension;
-            $this->suspension = null;
-            $suspension?->resume();
-        });
-        EventLoop::disable($this->watcher);
+        }
     }
 
     /**
@@ -102,7 +110,9 @@ final class ResourceWriter
 
     public function close(): void
     {
-        EventLoop::cancel($this->watcher);
+        if ($this->watcher !== '') {
+            EventLoop::cancel($this->watcher);
+        }
     }
 
     private function writeAll(string $bytes): void
@@ -134,6 +144,10 @@ final class ResourceWriter
 
     private function awaitWritable(): void
     {
+        if (!$this->nonBlocking) {
+            return;
+        }
+
         $suspension = EventLoop::getSuspension();
         $this->suspension = $suspension;
         EventLoop::enable($this->watcher);
