@@ -54,6 +54,7 @@ use function unpack;
 /**
  * @internal
  * @mago-expect lint:cyclomatic-complexity
+ * @mago-expect lint:excessive-parameter-list
  * @mago-expect lint:kan-defect
  * @mago-expect lint:too-many-methods
  */
@@ -101,6 +102,7 @@ final class Protocol
     public const GET_MAGIC_PROPERTIES = 16;
     public const GET_DECLARING_MAGIC_PROPERTIES = 17;
     public const GET_FUNCTION_LIKES = 18;
+    public const FIND_METHODS = 19;
     public const EXISTS_CLASS = 1;
     public const EXISTS_INTERFACE = 2;
     public const EXISTS_TRAIT = 3;
@@ -160,6 +162,9 @@ final class Protocol
     private const INVOCATION_FUNCTION = 1;
     private const INVOCATION_INSTANCE_METHOD = 2;
     private const INVOCATION_STATIC_METHOD = 3;
+    private const METHOD_SEARCH_ANY_CLASS = 0;
+    private const METHOD_SEARCH_EXACT_CLASS = 1;
+    private const METHOD_SEARCH_DESCENDANTS = 2;
 
     /** @return array{int<0, 65535>, PayloadReader} */
     public static function readRequest(string $payload): array
@@ -1265,6 +1270,57 @@ final class Protocol
         }
 
         return [$reader, $reader->readCount(65_536)];
+    }
+
+    /** @param list<string> $withAnyAttribute */
+    public static function writeCodebaseFindMethodsRequest(
+        int $generation,
+        ?string $class,
+        ?string $descendantsOf,
+        string $name,
+        array $withAnyAttribute,
+        int $fields,
+        bool $declaredOnly,
+    ): string {
+        $writer = self::createMessage(self::CODEBASE_QUERY_REQUEST);
+        $writer->writeU64($generation);
+        $writer->writeU8(self::FIND_METHODS);
+        $writer->writeU8(match (true) {
+            $class !== null => self::METHOD_SEARCH_EXACT_CLASS,
+            $descendantsOf !== null => self::METHOD_SEARCH_DESCENDANTS,
+            default => self::METHOD_SEARCH_ANY_CLASS,
+        });
+        $target = $class ?? $descendantsOf;
+        if ($target !== null) {
+            $writer->writeBytes($target);
+        }
+        $writer->writeBytes($name);
+        $writer->writeBoolean($declaredOnly);
+        $writer->writeCount($withAnyAttribute);
+        foreach ($withAnyAttribute as $attribute) {
+            $writer->writeBytes($attribute);
+        }
+        $writer->writeU32($fields);
+
+        return $writer->finish();
+    }
+
+    /** @return array{PayloadReader, int<0, 4294967295>} */
+    public static function readCodebaseFindMethodsResponse(string $payload, int $generation, int $fields): array
+    {
+        [$kind, $reader] = self::readRequest($payload);
+        if ($kind !== self::CODEBASE_QUERY_RESPONSE) {
+            throw new ProtocolException("Expected a codebase query response, received analyzer message {$kind}.");
+        }
+        if (
+            $reader->readU64() !== $generation
+            || $reader->readU8() !== self::FIND_METHODS
+            || $reader->readU32() !== $fields
+        ) {
+            throw new ProtocolException('A projected method query response does not match its request.');
+        }
+
+        return [$reader, $reader->readCount(1_000_000)];
     }
 
     public static function writeCodebaseListRequest(int $generation, int $operation, ?int $classLikeKind = null): string

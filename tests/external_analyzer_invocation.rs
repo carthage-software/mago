@@ -116,10 +116,21 @@ final class ExternalService {}
 
 final class ExternalStaticService {}
 
+final class Attribute
+{
+    public const int TARGET_METHOD = 4;
+
+    public function __construct(public int $flags = 0) {}
+}
+
+#[Attribute(Attribute::TARGET_METHOD)]
+final class FrameworkInitializer {}
+
 class FrameworkTestCase
 {
     protected ExternalResult $framework;
 
+    #[FrameworkInitializer]
     protected function setUp(): void
     {
         $this->framework = new ExternalResult();
@@ -154,6 +165,7 @@ final class ManagedTestCase extends FrameworkTestCase
         return $this->native;
     }
 
+    #[FrameworkInitializer]
     protected function setUp(): void
     {
         parent::setUp();

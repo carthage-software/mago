@@ -17,8 +17,8 @@ use Mago\Sdk\Analyzer\Assertion\TypeAssertion;
 use Mago\Sdk\Analyzer\Assertion\TypeAssertionKind;
 use Mago\Sdk\Analyzer\Assertion\VariableAssertion;
 use Mago\Sdk\Analyzer\Assertion\VariableAssertionKind;
-use Mago\Sdk\Analyzer\Metadata\AttributeMetadata;
 use Mago\Sdk\Analyzer\Metadata\AttributeArgumentMetadata;
+use Mago\Sdk\Analyzer\Metadata\AttributeMetadata;
 use Mago\Sdk\Analyzer\Metadata\ClassConstantMetadata;
 use Mago\Sdk\Analyzer\Metadata\ClassLikeKind;
 use Mago\Sdk\Analyzer\Metadata\ClassLikeMetadata;
@@ -26,7 +26,10 @@ use Mago\Sdk\Analyzer\Metadata\ConstantMetadata;
 use Mago\Sdk\Analyzer\Metadata\EnumCaseMetadata;
 use Mago\Sdk\Analyzer\Metadata\FunctionLikeKind;
 use Mago\Sdk\Analyzer\Metadata\FunctionLikeMetadata;
+use Mago\Sdk\Analyzer\Metadata\MemberIdentifier;
 use Mago\Sdk\Analyzer\Metadata\MetadataFlags;
+use Mago\Sdk\Analyzer\Metadata\MethodFields;
+use Mago\Sdk\Analyzer\Metadata\MethodMetadataProjection;
 use Mago\Sdk\Analyzer\Metadata\ParameterMetadata;
 use Mago\Sdk\Analyzer\Metadata\PropertyHookMetadata;
 use Mago\Sdk\Analyzer\Metadata\PropertyMetadata;
@@ -177,6 +180,130 @@ final class MetadataCodec
             $static,
             $constructor,
             $whereConstraints,
+        );
+    }
+
+    public static function readMethodProjection(PayloadReader $reader, int $fields): MethodMetadataProjection
+    {
+        $method = new MemberIdentifier($reader->readBytes(), $reader->readBytes());
+        $identifier = TypeCodec::readFunctionLikeIdentifier($reader);
+        $name = null;
+        $originalName = null;
+        if (($fields & MethodFields::NAMES) !== 0) {
+            $name = $reader->readBytes();
+            $originalName = $reader->readBytes();
+        }
+
+        $location = null;
+        $nameLocation = null;
+        if (($fields & MethodFields::LOCATIONS) !== 0) {
+            $location = self::readLocation($reader);
+            $nameLocation = self::readOptionalLocation($reader);
+        }
+
+        $parameters = null;
+        if (($fields & MethodFields::PARAMETERS) !== 0) {
+            $parameters = [];
+            $count = $reader->readCount(self::MAXIMUM_MEMBERS);
+            for ($index = 0; $index < $count; ++$index) {
+                $parameters[] = self::readParameter($reader);
+            }
+        }
+
+        $declaredReturnType = null;
+        $returnType = null;
+        if (($fields & MethodFields::RETURN_TYPES) !== 0) {
+            $declaredReturnType = self::readOptionalTypeMetadata($reader);
+            $returnType = self::readOptionalTypeMetadata($reader);
+        }
+
+        $templates = null;
+        if (($fields & MethodFields::TEMPLATES) !== 0) {
+            $templates = self::readTemplates($reader);
+        }
+
+        $attributes = null;
+        if (($fields & MethodFields::ATTRIBUTES) !== 0) {
+            $attributes = self::readAttributes($reader);
+        }
+
+        $thrownTypes = null;
+        if (($fields & MethodFields::THROWN_TYPES) !== 0) {
+            $thrownTypes = [];
+            $count = $reader->readCount(self::MAXIMUM_MEMBERS);
+            for ($index = 0; $index < $count; ++$index) {
+                $thrownTypes[] = self::readTypeMetadata($reader);
+            }
+        }
+
+        $assertions = null;
+        $ifTrueAssertions = null;
+        $ifFalseAssertions = null;
+        $assertionsInferred = null;
+        if (($fields & MethodFields::ASSERTIONS) !== 0) {
+            $assertions = self::readAssertions($reader);
+            $ifTrueAssertions = self::readAssertions($reader);
+            $ifFalseAssertions = self::readAssertions($reader);
+            $assertionsInferred = $reader->readBoolean();
+        }
+
+        $globalsAccessed = ($fields & MethodFields::GLOBALS) !== 0 ? self::readStrings($reader) : null;
+        $hasDocblock = ($fields & MethodFields::DOCBLOCK) !== 0 ? $reader->readBoolean() : null;
+        $flags = ($fields & MethodFields::FLAGS) !== 0 ? new MetadataFlags($reader->readU64()) : null;
+        $availableVersions = ($fields & MethodFields::AVAILABLE_VERSIONS) !== 0
+            ? self::readVersionRanges($reader)
+            : null;
+
+        $visibility = null;
+        $final = null;
+        $abstract = null;
+        $static = null;
+        $constructor = null;
+        if (($fields & MethodFields::METHOD_DETAILS) !== 0) {
+            $visibility = self::readVisibility($reader);
+            $final = $reader->readBoolean();
+            $abstract = $reader->readBoolean();
+            $static = $reader->readBoolean();
+            $constructor = $reader->readBoolean();
+        }
+
+        $whereConstraints = null;
+        if (($fields & MethodFields::WHERE_CONSTRAINTS) !== 0) {
+            $whereConstraints = [];
+            $count = $reader->readCount(self::MAXIMUM_MEMBERS);
+            for ($index = 0; $index < $count; ++$index) {
+                $whereConstraints[$reader->readBytes()] = self::readTypeMetadata($reader);
+            }
+        }
+
+        return new MethodMetadataProjection(
+            method: $method,
+            identifier: $identifier,
+            fields: $fields,
+            name: $name,
+            originalName: $originalName,
+            location: $location,
+            nameLocation: $nameLocation,
+            parameters: $parameters,
+            declaredReturnType: $declaredReturnType,
+            returnType: $returnType,
+            templates: $templates,
+            attributes: $attributes,
+            thrownTypes: $thrownTypes,
+            assertions: $assertions,
+            ifTrueAssertions: $ifTrueAssertions,
+            ifFalseAssertions: $ifFalseAssertions,
+            assertionsInferred: $assertionsInferred,
+            globalsAccessed: $globalsAccessed,
+            hasDocblock: $hasDocblock,
+            flags: $flags,
+            availableVersions: $availableVersions,
+            visibility: $visibility,
+            final: $final,
+            abstract: $abstract,
+            static: $static,
+            constructor: $constructor,
+            whereConstraints: $whereConstraints,
         );
     }
 

@@ -11,6 +11,8 @@ use Mago\Sdk\Analyzer\Metadata\ConstantMetadata;
 use Mago\Sdk\Analyzer\Metadata\EnumCaseMetadata;
 use Mago\Sdk\Analyzer\Metadata\FunctionLikeMetadata;
 use Mago\Sdk\Analyzer\Metadata\MemberIdentifier;
+use Mago\Sdk\Analyzer\Metadata\MethodFields;
+use Mago\Sdk\Analyzer\Metadata\MethodMetadataProjection;
 use Mago\Sdk\Analyzer\Metadata\PropertyMetadata;
 use Mago\Sdk\Analyzer\Type\FunctionLikeIdentifier;
 use Mago\Sdk\Analyzer\Type\FunctionLikeKind;
@@ -24,7 +26,12 @@ use Mago\Sdk\Internal\HostClient;
 use Mago\Sdk\Internal\Protocol\PayloadReader;
 
 use function array_key_exists;
+use function array_keys;
 use function count;
+use function implode;
+use function sort;
+use function strlen;
+use function strpos;
 use function strtolower;
 
 /**
@@ -436,6 +443,93 @@ final class Codebase
     public function getMultipleMethods(array $methods): array
     {
         return $this->queryMembers(Protocol::GET_METHODS, $methods, MetadataCodec::readFunctionLike(...));
+    }
+
+    /**
+     * Finds visible methods while selecting only the metadata fields needed by the extension.
+     *
+     * Exactly one of `$class` and `$descendantsOf` may be supplied. Attribute filters use
+     * OR semantics. `$name` accepts an exact name or one trailing `*`. `$declaredOnly`
+     * excludes inherited and trait-provided methods. Results are ordered by appearing
+     * class and method name. Identifiers are returned even when `$fields` is zero.
+     *
+     * @param list<string> $withAnyAttribute
+     * @return list<MethodMetadataProjection>
+     * @mago-expect lint:excessive-parameter-list
+     * @mago-expect lint:no-boolean-flag-parameter
+     */
+    public function findMethods(
+        ?string $class = null,
+        ?string $descendantsOf = null,
+        string $name = '*',
+        array $withAnyAttribute = [],
+        int $fields = MethodFields::ALL,
+        bool $declaredOnly = false,
+    ): array {
+        if ($class === '' || $descendantsOf === '') {
+            throw new InvalidArgumentException('A method search class name cannot be empty.');
+        }
+        if ($class !== null && $descendantsOf !== null) {
+            throw new InvalidArgumentException('A method search cannot target one class and descendants at once.');
+        }
+        if ($name === '') {
+            throw new InvalidArgumentException('A method search name pattern cannot be empty.');
+        }
+        $wildcard = strpos($name, '*');
+        if ($wildcard !== false && $wildcard !== (strlen($name) - 1)) {
+            throw new InvalidArgumentException('Method search wildcards are only allowed at the end.');
+        }
+        if ($fields < 0 || ($fields & ~MethodFields::ALL) !== 0) {
+            throw new InvalidArgumentException('A method search contains unknown projection fields.');
+        }
+
+        $attributes = [];
+        foreach ($withAnyAttribute as $attribute) {
+            if ($attribute === '') {
+                throw new InvalidArgumentException('A method search attribute name cannot be empty.');
+            }
+            $attributes[strtolower($attribute)] = true;
+        }
+        $attributes = array_keys($attributes);
+        sort($attributes);
+
+        $key =
+            strtolower($class ?? '')
+            . "\0"
+            . strtolower($descendantsOf ?? '')
+            . "\0"
+            . strtolower($name)
+            . "\0"
+            . implode("\0", $attributes)
+            . "\0"
+            . $fields
+            . "\0"
+            . ($declaredOnly ? '1' : '0');
+        if (array_key_exists($key, $this->cache->methodProjections)) {
+            return $this->cache->methodProjections[$key];
+        }
+
+        $this->cancellation->throwIfCancelled();
+        $payload = Protocol::writeCodebaseFindMethodsRequest(
+            $this->cache->generation,
+            $class,
+            $descendantsOf,
+            $name,
+            $attributes,
+            $fields,
+            $declaredOnly,
+        );
+        $response = $this->host->request($this->parentRequestId, $payload);
+        [$reader, $count] = Protocol::readCodebaseFindMethodsResponse($response, $this->cache->generation, $fields);
+
+        $methods = [];
+        for ($index = 0; $index < $count; ++$index) {
+            $methods[] = MetadataCodec::readMethodProjection($reader, $fields);
+        }
+        $reader->finish();
+        $this->cache->methodProjections[$key] = $methods;
+
+        return $methods;
     }
 
     public function getConstant(string $name): ?ConstantMetadata

@@ -27,6 +27,7 @@ use mago_extension::PayloadReader;
 use mago_extension::PayloadWriter;
 use mago_span::Span;
 use mago_word::Word;
+use mago_word::ascii_lowercase_word;
 use mago_word::word;
 
 use crate::external::ExternalAnalysisSession;
@@ -58,6 +59,7 @@ const GET_CLASS_LIKE_RELATIONS: u8 = 15;
 const GET_MAGIC_PROPERTIES: u8 = 16;
 const GET_DECLARING_MAGIC_PROPERTIES: u8 = 17;
 const GET_FUNCTION_LIKES: u8 = 18;
+const FIND_METHODS: u8 = 19;
 
 const ANY_CLASS_LIKE: u8 = 0;
 const CLASS: u8 = 1;
@@ -66,6 +68,27 @@ const TRAIT: u8 = 3;
 const ENUM: u8 = 4;
 
 const MAXIMUM_QUERIES: usize = 0x0001_0000;
+const MAXIMUM_METHOD_PROJECTIONS: usize = 0x000F_4240;
+
+const METHOD_SEARCH_ANY_CLASS: u8 = 0;
+const METHOD_SEARCH_EXACT_CLASS: u8 = 1;
+const METHOD_SEARCH_DESCENDANTS: u8 = 2;
+
+const METHOD_FIELDS_NAMES: u32 = 1;
+const METHOD_FIELDS_LOCATIONS: u32 = 1 << 1;
+const METHOD_FIELDS_PARAMETERS: u32 = 1 << 2;
+const METHOD_FIELDS_RETURN_TYPES: u32 = 1 << 3;
+const METHOD_FIELDS_TEMPLATES: u32 = 1 << 4;
+const METHOD_FIELDS_ATTRIBUTES: u32 = 1 << 5;
+const METHOD_FIELDS_THROWN_TYPES: u32 = 1 << 6;
+const METHOD_FIELDS_ASSERTIONS: u32 = 1 << 7;
+const METHOD_FIELDS_GLOBALS: u32 = 1 << 8;
+const METHOD_FIELDS_DOCBLOCK: u32 = 1 << 9;
+const METHOD_FIELDS_FLAGS: u32 = 1 << 10;
+const METHOD_FIELDS_AVAILABLE_VERSIONS: u32 = 1 << 11;
+const METHOD_FIELDS_METHOD_DETAILS: u32 = 1 << 12;
+const METHOD_FIELDS_WHERE_CONSTRAINTS: u32 = 1 << 13;
+const METHOD_FIELDS_ALL: u32 = (1 << 14) - 1;
 
 const EXISTS_CLASS: u8 = 1;
 const EXISTS_INTERFACE: u8 = 2;
@@ -164,8 +187,240 @@ pub(super) fn handle_query(
             })
         }),
         GET_FUNCTION_LIKES => query_function_likes(reader, writer, codebase, session),
+        FIND_METHODS => find_methods(reader, writer, codebase, session),
         unknown => Err(protocol(format!("unknown codebase query operation {unknown}"))),
     }
+}
+
+#[allow(clippy::too_many_lines)]
+fn find_methods(
+    reader: &mut PayloadReader<'_>,
+    writer: &mut PayloadWriter,
+    codebase: &CodebaseMetadata,
+    session: &ExternalAnalysisSession,
+) -> Result<(), ExternalAnalyzerError> {
+    let started = tracing::enabled!(tracing::Level::TRACE).then(std::time::Instant::now);
+    let class_filter = reader.read_u8("method search class filter")?;
+    let class = match class_filter {
+        METHOD_SEARCH_ANY_CLASS => None,
+        METHOD_SEARCH_EXACT_CLASS | METHOD_SEARCH_DESCENDANTS => {
+            let class = reader.read_bytes("method search class")?;
+            if class.is_empty() {
+                return Err(protocol("method search class cannot be empty"));
+            }
+
+            Some(ascii_lowercase_word(class))
+        }
+        unknown => return Err(protocol(format!("unknown method search class filter {unknown}"))),
+    };
+
+    let pattern = reader.read_bytes("method search name pattern")?;
+    if pattern.is_empty() {
+        return Err(protocol("method search name pattern cannot be empty"));
+    }
+    let prefix = pattern.ends_with(b"*");
+    let pattern = if prefix { &pattern[..pattern.len() - 1] } else { pattern };
+    if pattern.contains(&b'*') {
+        return Err(protocol("method search wildcards are only allowed at the end"));
+    }
+    let pattern = ascii_lowercase_word(pattern);
+    let declared_only = reader.read_bool("method search declared-only filter")?;
+
+    let attribute_count = reader.read_count("method search attribute filters", MAXIMUM_QUERIES)?;
+    let mut attributes = Vec::with_capacity(attribute_count);
+    for _ in 0..attribute_count {
+        let attribute = reader.read_bytes("method search attribute")?;
+        if attribute.is_empty() {
+            return Err(protocol("method search attribute cannot be empty"));
+        }
+        attributes.push(ascii_lowercase_word(attribute));
+    }
+
+    let fields = reader.read_u32("method projection fields")?;
+    if fields & !METHOD_FIELDS_ALL != 0 {
+        return Err(protocol(format!("method projection contains unknown fields {fields:#x}")));
+    }
+    writer.write_u32(fields);
+
+    let mut scanned_classes = 0usize;
+    let mut scanned_methods = 0usize;
+    let mut matches = Vec::new();
+    let mut collect = |class_like: &ClassLikeMetadata| {
+        scanned_classes += 1;
+        for (method_name, declaring) in &class_like.declaring_method_ids {
+            scanned_methods += 1;
+            let matches_name =
+                if prefix { method_name.as_bytes().starts_with(pattern.as_bytes()) } else { *method_name == pattern };
+            if !matches_name || (declared_only && declaring.get_class_name() != class_like.name) {
+                continue;
+            }
+
+            let Some(metadata) = codebase.get_method_by_id(declaring) else {
+                continue;
+            };
+            if !attributes.is_empty()
+                && !metadata.attributes.iter().any(|attribute| {
+                    attributes
+                        .iter()
+                        .any(|requested| attribute.name.as_bytes().eq_ignore_ascii_case(requested.as_bytes()))
+                })
+            {
+                continue;
+            }
+
+            matches.push((class_like.name, *method_name, *declaring));
+        }
+    };
+
+    match (class_filter, class) {
+        (METHOD_SEARCH_EXACT_CLASS, Some(class)) => {
+            if let Some(class_like) = codebase.class_likes.get(&class) {
+                collect(class_like);
+            }
+        }
+        (METHOD_SEARCH_DESCENDANTS, Some(class)) => {
+            for class_like in codebase.class_likes.values() {
+                if class_like.name != class && codebase.is_instance_of(class_like.name.as_bytes(), class.as_bytes()) {
+                    collect(class_like);
+                }
+            }
+        }
+        (METHOD_SEARCH_ANY_CLASS, None) => {
+            for class_like in codebase.class_likes.values() {
+                collect(class_like);
+            }
+        }
+        _ => unreachable!(),
+    }
+
+    if matches.len() > MAXIMUM_METHOD_PROJECTIONS {
+        return Err(protocol(format!(
+            "method search returned {} results, exceeding the limit of {MAXIMUM_METHOD_PROJECTIONS}",
+            matches.len()
+        )));
+    }
+    matches.sort_unstable_by(|(left_class, left_method, _), (right_class, right_method, _)| {
+        left_class
+            .as_bytes()
+            .cmp(right_class.as_bytes())
+            .then_with(|| left_method.as_bytes().cmp(right_method.as_bytes()))
+    });
+
+    writer.write_u32(matches.len() as u32);
+    for (class_name, method_name, declaring) in &matches {
+        let class_like = codebase
+            .class_likes
+            .get(class_name)
+            .ok_or_else(|| protocol("method projection references a missing class-like"))?;
+        let metadata = codebase
+            .get_method_by_id(declaring)
+            .ok_or_else(|| protocol("method projection references missing method metadata"))?;
+        write_method_projection(writer, class_like, *method_name, metadata, fields, codebase, session)?;
+    }
+
+    if let Some(started) = started {
+        tracing::trace!(
+            class_filter,
+            fields,
+            declared_only,
+            attribute_filters = attributes.len(),
+            scanned_classes,
+            scanned_methods,
+            matched_methods = matches.len(),
+            elapsed_us = started.elapsed().as_micros(),
+            "completed projected method metadata query"
+        );
+    }
+
+    Ok(())
+}
+
+fn write_method_projection(
+    writer: &mut PayloadWriter,
+    class_like: &ClassLikeMetadata,
+    method_name: Word,
+    metadata: &FunctionLikeMetadata,
+    fields: u32,
+    codebase: &CodebaseMetadata,
+    session: &ExternalAnalysisSession,
+) -> Result<(), ExternalAnalyzerError> {
+    writer.write_bytes(class_like.original_name.as_bytes())?;
+    writer.write_bytes(metadata.original_name.as_bytes())?;
+    encode_function_like_identifier(
+        writer,
+        method_identifier(codebase, class_like.name.as_bytes(), method_name.as_bytes(), metadata),
+    )?;
+
+    if fields & METHOD_FIELDS_NAMES != 0 {
+        writer.write_bytes(metadata.name.as_bytes())?;
+        writer.write_bytes(metadata.original_name.as_bytes())?;
+    }
+    if fields & METHOD_FIELDS_LOCATIONS != 0 {
+        write_location(writer, metadata.span, session)?;
+        write_optional_location(writer, metadata.name_span, session)?;
+    }
+    if fields & METHOD_FIELDS_PARAMETERS != 0 {
+        writer.write_u32(metadata.parameters.len() as u32);
+        for parameter in &metadata.parameters {
+            write_parameter(writer, parameter, session)?;
+        }
+    }
+    if fields & METHOD_FIELDS_RETURN_TYPES != 0 {
+        write_optional_type_metadata(writer, metadata.return_type_declaration_metadata.as_ref(), session)?;
+        write_optional_type_metadata(writer, metadata.return_type_metadata.as_ref(), session)?;
+    }
+    if fields & METHOD_FIELDS_TEMPLATES != 0 {
+        write_templates(writer, &metadata.template_types, None, None)?;
+    }
+    if fields & METHOD_FIELDS_ATTRIBUTES != 0 {
+        write_attributes(writer, &metadata.attributes, session)?;
+    }
+    if fields & METHOD_FIELDS_THROWN_TYPES != 0 {
+        writer.write_u32(metadata.thrown_types.len() as u32);
+        for thrown in &metadata.thrown_types {
+            write_type_metadata(writer, thrown, session)?;
+        }
+    }
+    if fields & METHOD_FIELDS_ASSERTIONS != 0 {
+        write_assertions(writer, &metadata.assertions)?;
+        write_assertions(writer, &metadata.if_true_assertions)?;
+        write_assertions(writer, &metadata.if_false_assertions)?;
+        writer.write_bool(metadata.assertions_inferred);
+    }
+    if fields & METHOD_FIELDS_GLOBALS != 0 {
+        write_words(writer, metadata.globals_accessed.iter().copied())?;
+    }
+    if fields & METHOD_FIELDS_DOCBLOCK != 0 {
+        writer.write_bool(metadata.has_docblock);
+    }
+    if fields & METHOD_FIELDS_FLAGS != 0 {
+        writer.write_u64(metadata.flags.bits());
+    }
+    if fields & METHOD_FIELDS_AVAILABLE_VERSIONS != 0 {
+        write_version_constraint(writer, &metadata.version_constraint);
+    }
+
+    let method = metadata.method_metadata.as_ref();
+    if fields & METHOD_FIELDS_METHOD_DETAILS != 0 {
+        let method = method.ok_or_else(|| protocol("method projection targets non-method metadata"))?;
+        write_visibility(writer, method.visibility);
+        writer.write_bool(method.is_final);
+        writer.write_bool(method.is_abstract);
+        writer.write_bool(method.is_static);
+        writer.write_bool(method.is_constructor);
+    }
+    if fields & METHOD_FIELDS_WHERE_CONSTRAINTS != 0 {
+        let mut constraints =
+            method.map(|method| method.where_constraints.iter().collect::<Vec<_>>()).unwrap_or_default();
+        constraints.sort_unstable_by(|(left, _), (right, _)| left.as_bytes().cmp(right.as_bytes()));
+        writer.write_u32(constraints.len() as u32);
+        for (name, constraint) in constraints {
+            writer.write_bytes(name.as_bytes())?;
+            write_type_metadata(writer, constraint, session)?;
+        }
+    }
+
+    Ok(())
 }
 
 fn query_function_likes(
@@ -1064,5 +1319,52 @@ mod tests {
         let error = protocol::handle_nested_request(&writer.finish(), &codebase, &session, |_| None)
             .expect_err("stale metadata queries must fail");
         assert!(error.to_string().contains("active generation is 19"));
+    }
+
+    #[test]
+    fn projected_method_query_returns_an_empty_ordered_result() {
+        let session = session(23);
+        let codebase = CodebaseMetadata::new();
+        let mut writer = protocol::message_writer(CODEBASE_QUERY_REQUEST);
+        writer.write_u64(23);
+        writer.write_u8(FIND_METHODS);
+        writer.write_u8(METHOD_SEARCH_ANY_CLASS);
+        writer.write_bytes(b"set*").expect("pattern should fit in a frame");
+        writer.write_bool(false);
+        writer.write_u32(0);
+        writer.write_u32(METHOD_FIELDS_NAMES | METHOD_FIELDS_ATTRIBUTES);
+
+        let (kind, response) = protocol::handle_nested_request(&writer.finish(), &codebase, &session, |_| None)
+            .expect("projected method query should succeed");
+        assert_eq!(kind, NestedRequestKind::CodebaseQuery);
+
+        let mut reader = protocol::message_reader(&response, CODEBASE_QUERY_RESPONSE)
+            .expect("metadata response should have a valid header");
+        assert_eq!(reader.read_u64("generation").expect("generation should decode"), 23);
+        assert_eq!(reader.read_u8("operation").expect("operation should decode"), FIND_METHODS);
+        assert_eq!(
+            reader.read_u32("projection fields").expect("projection fields should decode"),
+            METHOD_FIELDS_NAMES | METHOD_FIELDS_ATTRIBUTES
+        );
+        assert_eq!(reader.read_u32("result count").expect("result count should decode"), 0);
+        reader.finish().expect("metadata response should contain no trailing bytes");
+    }
+
+    #[test]
+    fn projected_method_query_rejects_unknown_fields() {
+        let session = session(29);
+        let codebase = CodebaseMetadata::new();
+        let mut writer = protocol::message_writer(CODEBASE_QUERY_REQUEST);
+        writer.write_u64(29);
+        writer.write_u8(FIND_METHODS);
+        writer.write_u8(METHOD_SEARCH_ANY_CLASS);
+        writer.write_bytes(b"*").expect("pattern should fit in a frame");
+        writer.write_bool(false);
+        writer.write_u32(0);
+        writer.write_u32(1 << 31);
+
+        let error = protocol::handle_nested_request(&writer.finish(), &codebase, &session, |_| None)
+            .expect_err("unknown method projection fields must fail");
+        assert!(error.to_string().contains("unknown fields"));
     }
 }

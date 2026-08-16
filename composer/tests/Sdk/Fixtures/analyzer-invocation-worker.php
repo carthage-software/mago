@@ -17,6 +17,7 @@ use Mago\Sdk\Analyzer\IssueFilterContext;
 use Mago\Sdk\Analyzer\IssueFilterDecision;
 use Mago\Sdk\Analyzer\IssueFilterHook;
 use Mago\Sdk\Analyzer\Metadata\MemberIdentifier;
+use Mago\Sdk\Analyzer\Metadata\MethodFields;
 use Mago\Sdk\Analyzer\MethodReturnTypeProvider;
 use Mago\Sdk\Analyzer\MethodTarget;
 use Mago\Sdk\Analyzer\Plugin;
@@ -620,6 +621,7 @@ final class InvocationPropertyInitializationProvider implements PropertyInitiali
 }
 
 /**
+ * @mago-expect lint:cyclomatic-complexity
  * @mago-expect lint:single-class-per-file
  */
 final class InvocationClassInitializerProvider implements ClassInitializerProvider
@@ -631,7 +633,60 @@ final class InvocationClassInitializerProvider implements ClassInitializerProvid
 
     public function getClassInitializers(ClassInitializerProviderContext $context): array
     {
-        if (!$context->codebase->methodExists($context->class->name, 'setUp')) {
+        $fields = MethodFields::NAMES | MethodFields::ATTRIBUTES;
+        $methods = $context->codebase->findMethods(class: $context->class->name, name: 'set*', fields: $fields);
+        $cached = $context->codebase->findMethods(class: $context->class->name, name: 'set*', fields: $fields);
+        if (count($methods) !== count($cached) || $methods !== [] && $methods[0] !== $cached[0]) {
+            throw new RuntimeException('Projected method metadata bypassed its generation cache.');
+        }
+        if ($methods === []) {
+            return [];
+        }
+        if (
+            count($methods) !== 1
+            || !$methods[0]->has($fields)
+            || $methods[0]->originalName !== 'setUp'
+            || $methods[0]->parameters !== null
+        ) {
+            throw new RuntimeException('Projected method metadata was incomplete.');
+        }
+
+        if (
+            strtolower($context->class->name) === 'frameworktestcase'
+            && $context->codebase->classExists('FrameworkInitializer')
+        ) {
+            $complete = $context->codebase->findMethods(class: 'FrameworkTestCase', name: 'setUp');
+            $attributed = $context->codebase->findMethods(
+                descendantsOf: 'FrameworkTestCase',
+                name: 'set*',
+                withAnyAttribute: ['frameworkinitializer'],
+                fields: MethodFields::NAMES,
+                declaredOnly: true,
+            );
+            $descendants = $context->codebase->findMethods(
+                descendantsOf: 'FrameworkTestCase',
+                name: 'setUp',
+                fields: MethodFields::NAMES,
+                declaredOnly: true,
+            );
+            if (
+                count($complete) !== 1
+                || !$complete[0]->has(MethodFields::ALL)
+                || $complete[0]->location === null
+                || $complete[0]->parameters !== []
+                || $complete[0]->returnType === null
+                || $complete[0]->visibility === null
+                || count($attributed) !== 1
+                || $attributed[0]->method->class !== 'ManagedTestCase'
+                || count($descendants) !== 1
+                || $descendants[0]->method->class !== 'ManagedTestCase'
+                || $descendants[0]->identifier->class !== 'ManagedTestCase'
+            ) {
+                throw new RuntimeException('Projected descendant method filtering returned an incorrect result.');
+            }
+        }
+
+        if (strtolower($methods[0]->identifier->class ?? '') !== strtolower($context->class->name)) {
             return [];
         }
 
