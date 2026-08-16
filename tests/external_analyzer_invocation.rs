@@ -116,6 +116,14 @@ final class ExternalService {}
 
 final class ExternalStaticService {}
 
+final class ExternalAssertions
+{
+    public static function isString(mixed $value): bool
+    {
+        return true;
+    }
+}
+
 final class Attribute
 {
     public const int TARGET_METHOD = 4;
@@ -211,6 +219,8 @@ function external_function(): mixed
     return null;
 }
 
+function external_assert_string(mixed $value): void {}
+
 function collect(array $value): mixed
 {
     return null;
@@ -236,6 +246,15 @@ function take_string_map(array $_values): void {}
 function take_string_builders(array $_builders): void {}
 
 take_string(external_function());
+/** @var mixed $asserted */
+$asserted = 'asserted';
+external_assert_string($asserted);
+take_string($asserted);
+/** @var mixed $conditional */
+$conditional = 'conditional';
+if (ExternalAssertions::isString($conditional)) {
+    take_string($conditional);
+}
 take_string(collect('function'));
 Artisan::command('inspire', function (): void {
     $this->comment('Be inspired!');
@@ -409,12 +428,14 @@ fn external_providers_receive_complete_invocation_context() -> Result<(), Box<dy
             "dynamic-signature-return",
             "dynamic-static",
             "function",
+            "function-assertion",
             "function-signature",
             "function-signature-return",
             "generic",
             "instance",
             "intersection",
             "late-static",
+            "method-assertion",
             "method-signature",
             "method-signature-return",
             "missing-class-return",

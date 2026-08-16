@@ -4,20 +4,26 @@ declare(strict_types=1);
 
 namespace Mago\Tests\Sdk\Fixtures;
 
+use Mago\Sdk\Analyzer\Assertion\TypeAssertion;
+use Mago\Sdk\Analyzer\Assertion\TypeAssertionKind;
+use Mago\Sdk\Analyzer\AssertionProviderContext;
 use Mago\Sdk\Analyzer\CallableSignatureOverride;
 use Mago\Sdk\Analyzer\CallableSignatureProviderContext;
 use Mago\Sdk\Analyzer\ClassInitializerProvider;
 use Mago\Sdk\Analyzer\ClassInitializerProviderContext;
 use Mago\Sdk\Analyzer\ClassTarget;
 use Mago\Sdk\Analyzer\EffectiveCallableSignature;
+use Mago\Sdk\Analyzer\FunctionAssertionProvider;
 use Mago\Sdk\Analyzer\FunctionReturnTypeProvider;
 use Mago\Sdk\Analyzer\FunctionTarget;
+use Mago\Sdk\Analyzer\InvocationAssertions;
 use Mago\Sdk\Analyzer\InvocationKind;
 use Mago\Sdk\Analyzer\IssueFilterContext;
 use Mago\Sdk\Analyzer\IssueFilterDecision;
 use Mago\Sdk\Analyzer\IssueFilterHook;
 use Mago\Sdk\Analyzer\Metadata\MemberIdentifier;
 use Mago\Sdk\Analyzer\Metadata\MethodFields;
+use Mago\Sdk\Analyzer\MethodAssertionProvider;
 use Mago\Sdk\Analyzer\MethodReturnTypeProvider;
 use Mago\Sdk\Analyzer\MethodTarget;
 use Mago\Sdk\Analyzer\Plugin;
@@ -121,6 +127,60 @@ final class InvocationFunctionProvider implements FunctionReturnTypeProvider, Ca
         InvocationAudit::record('function');
 
         return Type::string();
+    }
+}
+
+/** @mago-expect lint:single-class-per-file */
+final class InvocationFunctionAssertionProvider implements FunctionAssertionProvider
+{
+    public function getTargets(): array
+    {
+        return [FunctionTarget::exact('external_assert_string')];
+    }
+
+    public function getAssertions(AssertionProviderContext $context): ?InvocationAssertions
+    {
+        $argument = $context->invocation->getArgument(0, 'value') ?? throw new RuntimeException(
+            'The function assertion proof received no argument.',
+        );
+        if ($argument->type === null || !$context->types->equals($argument->type, Type::mixed())) {
+            throw new RuntimeException('The function assertion proof received an incorrect argument type.');
+        }
+
+        InvocationAudit::record('function-assertion');
+
+        return new InvocationAssertions(assertions: [
+            '$value' => [new TypeAssertion(TypeAssertionKind::IsType, Type::string())],
+        ]);
+    }
+}
+
+/** @mago-expect lint:single-class-per-file */
+final class InvocationMethodAssertionProvider implements MethodAssertionProvider
+{
+    public function getTargets(): array
+    {
+        return [MethodTarget::exact('ExternalAssertions', 'isString')];
+    }
+
+    public function getAssertions(AssertionProviderContext $context): ?InvocationAssertions
+    {
+        $argument = $context->invocation->getArgument(0, 'value') ?? throw new RuntimeException(
+            'The method assertion proof received no argument.',
+        );
+        if (
+            $context->invocation->kind !== InvocationKind::StaticMethod
+            || $argument->type === null
+            || !$context->types->equals($argument->type, Type::mixed())
+        ) {
+            throw new RuntimeException('The method assertion proof received incorrect invocation context.');
+        }
+
+        InvocationAudit::record('method-assertion');
+
+        return new InvocationAssertions(ifTrueAssertions: [
+            '$value' => [new TypeAssertion(TypeAssertionKind::IsType, Type::string())],
+        ]);
     }
 }
 
@@ -754,6 +814,8 @@ final class InvocationPlugin implements Plugin
     public function register(PluginRegistry $registry): void
     {
         $registry->registerFunctionReturnTypeProvider(new InvocationFunctionProvider());
+        $registry->registerFunctionAssertionProvider(new InvocationFunctionAssertionProvider());
+        $registry->registerMethodAssertionProvider(new InvocationMethodAssertionProvider());
         if ($this->registerMethodProvider) {
             $registry->registerMethodReturnTypeProvider(new InvocationMethodProvider());
         }

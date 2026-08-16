@@ -89,6 +89,8 @@ pub struct PluginRegistry {
     external_method_providers: OnceLock<bool>,
     external_function_signature_providers: OnceLock<bool>,
     external_method_signature_providers: OnceLock<bool>,
+    external_function_assertion_providers: OnceLock<bool>,
+    external_method_assertion_providers: OnceLock<bool>,
     external_property_providers: OnceLock<bool>,
     external_property_initialization_providers: OnceLock<bool>,
     external_class_initializer_providers: OnceLock<bool>,
@@ -146,6 +148,8 @@ impl std::fmt::Debug for PluginRegistry {
             .field("external_method_call_analysis_hooks", &self.external_method_call_analysis_hooks.get())
             .field("external_function_signature_providers", &self.external_function_signature_providers.get())
             .field("external_method_signature_providers", &self.external_method_signature_providers.get())
+            .field("external_function_assertion_providers", &self.external_function_assertion_providers.get())
+            .field("external_method_assertion_providers", &self.external_method_assertion_providers.get())
             .field("function_providers", &self.function_providers.len())
             .field("method_providers", &self.method_providers.len())
             .field("program_hooks", &self.program_hooks.len())
@@ -198,6 +202,10 @@ impl PluginRegistry {
             analyzer.has_function_callable_signature_providers().map_err(|reason| PluginError::Internal { reason })?;
         let method_signature_providers =
             analyzer.has_method_callable_signature_providers().map_err(|reason| PluginError::Internal { reason })?;
+        let function_assertion_providers =
+            analyzer.has_function_assertion_providers().map_err(|reason| PluginError::Internal { reason })?;
+        let method_assertion_providers =
+            analyzer.has_method_assertion_providers().map_err(|reason| PluginError::Internal { reason })?;
         let property_providers =
             analyzer.has_property_type_providers().map_err(|reason| PluginError::Internal { reason })?;
         let property_initialization_providers =
@@ -212,6 +220,8 @@ impl PluginRegistry {
         let _method = self.external_method_providers.set(method_providers);
         let _function_signature = self.external_function_signature_providers.set(function_signature_providers);
         let _method_signature = self.external_method_signature_providers.set(method_signature_providers);
+        let _function_assertion = self.external_function_assertion_providers.set(function_assertion_providers);
+        let _method_assertion = self.external_method_assertion_providers.set(method_assertion_providers);
         let _property = self.external_property_providers.set(property_providers);
         let _property_initialization =
             self.external_property_initialization_providers.set(property_initialization_providers);
@@ -1618,7 +1628,9 @@ impl PluginRegistry {
         indices
     }
 
-    #[must_use]
+    /// # Errors
+    ///
+    /// Returns an error when an external assertion provider fails or returns an invalid response.
     pub fn get_function_like_assertions<'ctx>(
         &self,
         codebase: &'ctx CodebaseMetadata,
@@ -1627,7 +1639,8 @@ impl PluginRegistry {
         artifacts: &AnalysisArtifacts,
         function_like: &FunctionLikeIdentifier,
         invocation: &Invocation<'ctx, '_, '_>,
-    ) -> Option<InvocationAssertions> {
+        external_session: Option<&ExternalAnalysisSession>,
+    ) -> PluginResult<Option<InvocationAssertions>> {
         match function_like {
             FunctionLikeIdentifier::Function(name) => self.get_function_assertions(
                 codebase,
@@ -1636,6 +1649,7 @@ impl PluginRegistry {
                 artifacts,
                 name.as_bytes(),
                 invocation,
+                external_session,
             ),
             FunctionLikeIdentifier::Method(class_name, method_name) => self.get_method_assertions(
                 codebase,
@@ -1645,13 +1659,17 @@ impl PluginRegistry {
                 class_name.as_bytes(),
                 method_name.as_bytes(),
                 invocation,
+                external_session,
             ),
-            _ => None,
+            _ => Ok(None),
         }
     }
 
     /// Get assertions for a function invocation from registered providers.
-    #[must_use]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when an external assertion provider fails or returns an invalid response.
     pub fn get_function_assertions<'ctx>(
         &self,
         codebase: &'ctx CodebaseMetadata,
@@ -1660,9 +1678,12 @@ impl PluginRegistry {
         artifacts: &AnalysisArtifacts,
         function_name: &[u8],
         invocation: &Invocation<'ctx, '_, '_>,
-    ) -> Option<InvocationAssertions> {
-        if self.function_assertion_providers.is_empty() {
-            return None;
+        external_session: Option<&ExternalAnalysisSession>,
+    ) -> PluginResult<Option<InvocationAssertions>> {
+        let may_have_external = self.external_analyzer.is_some()
+            && self.external_function_assertion_providers.get().copied().unwrap_or(true);
+        if self.function_assertion_providers.is_empty() && !may_have_external {
+            return Ok(None);
         }
 
         let indices = self.get_function_assertion_provider_indices(function_name);
@@ -1675,15 +1696,30 @@ impl PluginRegistry {
                 self.function_assertion_providers[idx].get_assertions(&provider_context, &invocation_info)
                 && !assertions.is_empty()
             {
-                return Some(assertions);
+                return Ok(Some(assertions));
             }
         }
 
-        None
+        if !may_have_external {
+            return Ok(None);
+        }
+
+        self.external_analyzer
+            .as_deref()
+            .zip(external_session)
+            .map(|(analyzer, session)| {
+                analyzer.get_function_assertions(function_name, invocation, artifacts, source_file, codebase, session)
+            })
+            .transpose()
+            .map(Option::flatten)
+            .map_err(|reason| PluginError::Internal { reason })
     }
 
     /// Get assertions for a method invocation from registered providers.
-    #[must_use]
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when an external assertion provider fails or returns an invalid response.
     pub fn get_method_assertions<'ctx>(
         &self,
         codebase: &'ctx CodebaseMetadata,
@@ -1693,9 +1729,12 @@ impl PluginRegistry {
         class_name: &[u8],
         method_name: &[u8],
         invocation: &Invocation<'ctx, '_, '_>,
-    ) -> Option<InvocationAssertions> {
-        if self.method_assertion_providers.is_empty() {
-            return None;
+        external_session: Option<&ExternalAnalysisSession>,
+    ) -> PluginResult<Option<InvocationAssertions>> {
+        let may_have_external =
+            self.external_analyzer.is_some() && self.external_method_assertion_providers.get().copied().unwrap_or(true);
+        if self.method_assertion_providers.is_empty() && !may_have_external {
+            return Ok(None);
         }
 
         let indices = self.get_method_assertion_provider_indices(class_name, method_name);
@@ -1711,11 +1750,31 @@ impl PluginRegistry {
                 &invocation_info,
             ) && !assertions.is_empty()
             {
-                return Some(assertions);
+                return Ok(Some(assertions));
             }
         }
 
-        None
+        if !may_have_external {
+            return Ok(None);
+        }
+
+        self.external_analyzer
+            .as_deref()
+            .zip(external_session)
+            .map(|(analyzer, session)| {
+                analyzer.get_method_assertions(
+                    class_name,
+                    method_name,
+                    invocation,
+                    artifacts,
+                    source_file,
+                    codebase,
+                    session,
+                )
+            })
+            .transpose()
+            .map(Option::flatten)
+            .map_err(|reason| PluginError::Internal { reason })
     }
 
     fn get_function_throw_provider_indices(&self, name: &[u8]) -> Vec<usize> {

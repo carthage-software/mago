@@ -16,6 +16,7 @@ use Mago\Sdk\Analyzer\Assertion\TypeAssertion;
 use Mago\Sdk\Analyzer\Assertion\TypeAssertionKind;
 use Mago\Sdk\Analyzer\Assertion\VariableAssertion;
 use Mago\Sdk\Analyzer\Assertion\VariableAssertionKind;
+use Mago\Sdk\Analyzer\InvocationAssertions;
 use Mago\Sdk\Analyzer\Type;
 use Mago\Sdk\Analyzer\Type\ArrayKey;
 use Mago\Sdk\Analyzer\Type\ArrayKeyKind;
@@ -56,5 +57,25 @@ final class AssertionTest extends TestCase
         $this->expectException(InvalidArgumentException::class);
 
         new VariableAssertion(VariableAssertionKind::IsGreaterThan, '');
+    }
+
+    public function testInvocationAssertionsRetainImmediateAndConditionalFacts(): void
+    {
+        $string = new TypeAssertion(TypeAssertionKind::IsType, Type::string());
+        $assertions = new InvocationAssertions(
+            assertions: ['$value' => [$string]],
+            ifTrueAssertions: ['$truthy' => [new SimpleAssertion(SimpleAssertionKind::Truthy)]],
+            ifFalseAssertions: ['$falsy' => [new SimpleAssertion(SimpleAssertionKind::Falsy)]],
+        );
+
+        self::assertSame(['$value' => [$string]], $assertions->assertions);
+        self::assertFalse($assertions->isEmpty());
+    }
+
+    public function testInvocationAssertionsRejectEmptyFactLists(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+
+        new InvocationAssertions(assertions: ['$value' => []]);
     }
 }

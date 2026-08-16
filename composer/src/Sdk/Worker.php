@@ -6,6 +6,7 @@ namespace Mago\Sdk;
 
 use Mago\Sdk\Analyzer\AfterAnalysisContext;
 use Mago\Sdk\Analyzer\AfterFileAnalysisContext;
+use Mago\Sdk\Analyzer\AssertionProviderContext;
 use Mago\Sdk\Analyzer\BeforeAnalysisContext;
 use Mago\Sdk\Analyzer\CallableSignatureProvider;
 use Mago\Sdk\Analyzer\CallableSignatureProviderContext;
@@ -31,8 +32,10 @@ use Mago\Sdk\Internal\Analyzer\MetadataCache;
 use Mago\Sdk\Internal\Analyzer\Protocol as AnalyzerProtocol;
 use Mago\Sdk\Internal\Analyzer\RegisteredClassInitializerProvider;
 use Mago\Sdk\Internal\Analyzer\RegisteredClassLikeAnalysisHook;
+use Mago\Sdk\Internal\Analyzer\RegisteredFunctionAssertionProvider;
 use Mago\Sdk\Internal\Analyzer\RegisteredFunctionReturnTypeProvider;
 use Mago\Sdk\Internal\Analyzer\RegisteredIssueFilterHook;
+use Mago\Sdk\Internal\Analyzer\RegisteredMethodAssertionProvider;
 use Mago\Sdk\Internal\Analyzer\RegisteredMethodCallAnalysisHook;
 use Mago\Sdk\Internal\Analyzer\RegisteredMethodReturnTypeProvider;
 use Mago\Sdk\Internal\Analyzer\RegisteredNodeAnalysisHook;
@@ -108,6 +111,12 @@ final class Worker
     /** @var list<RegisteredMethodReturnTypeProvider> */
     private readonly array $methodReturnTypeProviders;
 
+    /** @var list<RegisteredFunctionAssertionProvider> */
+    private readonly array $functionAssertionProviders;
+
+    /** @var list<RegisteredMethodAssertionProvider> */
+    private readonly array $methodAssertionProviders;
+
     /** @var list<RegisteredPropertyTypeProvider> */
     private readonly array $propertyTypeProviders;
 
@@ -152,6 +161,8 @@ final class Worker
         $registeredPlugins = [];
         $functionProviders = [];
         $methodProviders = [];
+        $functionAssertionProviders = [];
+        $methodAssertionProviders = [];
         $propertyProviders = [];
         $propertyInitializationProviders = [];
         $classInitializerProviders = [];
@@ -255,6 +266,58 @@ final class Worker
                     );
                     $methodProviders[] = $registeredProvider;
                     $registeredMethodProviders[] = $registeredProvider;
+                }
+
+                $registeredFunctionAssertionProviders = [];
+                foreach ($registry->getFunctionAssertionProviders() as $provider) {
+                    $targets = $provider->getTargets();
+                    if ($targets === []) {
+                        throw new InvalidArgumentException(
+                            "A function assertion provider in `{$definition->identifier}` has no targets.",
+                        );
+                    }
+
+                    $providerIndex = count($functionAssertionProviders);
+                    if ($providerIndex > 65_535) {
+                        throw new InvalidArgumentException(
+                            'A worker cannot register more than 65,536 function assertion providers.',
+                        );
+                    }
+
+                    $registeredProvider = new RegisteredFunctionAssertionProvider(
+                        $providerIndex,
+                        $definition->identifier,
+                        $provider,
+                        $targets,
+                    );
+                    $functionAssertionProviders[] = $registeredProvider;
+                    $registeredFunctionAssertionProviders[] = $registeredProvider;
+                }
+
+                $registeredMethodAssertionProviders = [];
+                foreach ($registry->getMethodAssertionProviders() as $provider) {
+                    $targets = $provider->getTargets();
+                    if ($targets === []) {
+                        throw new InvalidArgumentException(
+                            "A method assertion provider in `{$definition->identifier}` has no targets.",
+                        );
+                    }
+
+                    $providerIndex = count($methodAssertionProviders);
+                    if ($providerIndex > 65_535) {
+                        throw new InvalidArgumentException(
+                            'A worker cannot register more than 65,536 method assertion providers.',
+                        );
+                    }
+
+                    $registeredProvider = new RegisteredMethodAssertionProvider(
+                        $providerIndex,
+                        $definition->identifier,
+                        $provider,
+                        $targets,
+                    );
+                    $methodAssertionProviders[] = $registeredProvider;
+                    $registeredMethodAssertionProviders[] = $registeredProvider;
                 }
 
                 $registeredPropertyProviders = [];
@@ -526,6 +589,8 @@ final class Worker
                     $definition,
                     $registeredFunctionProviders,
                     $registeredMethodProviders,
+                    $registeredFunctionAssertionProviders,
+                    $registeredMethodAssertionProviders,
                     $registeredPropertyProviders,
                     $registeredPropertyInitializationProviders,
                     $registeredClassInitializerProviders,
@@ -553,6 +618,8 @@ final class Worker
         $this->workerReducerIndices = $workerReducerIndices;
         $this->functionReturnTypeProviders = $functionProviders;
         $this->methodReturnTypeProviders = $methodProviders;
+        $this->functionAssertionProviders = $functionAssertionProviders;
+        $this->methodAssertionProviders = $methodAssertionProviders;
         $this->propertyTypeProviders = $propertyProviders;
         $this->propertyInitializationProviders = $propertyInitializationProviders;
         $this->classInitializerProviders = $classInitializerProviders;
@@ -998,7 +1065,11 @@ final class Worker
             return AnalyzerProtocol::writeIssueFilterResponse(count($request->issues), $removed);
         }
 
-        if ($kind !== AnalyzerProtocol::RETURN_TYPE_REQUEST && $kind !== AnalyzerProtocol::CALLABLE_SIGNATURE_REQUEST) {
+        if (
+            $kind !== AnalyzerProtocol::RETURN_TYPE_REQUEST
+            && $kind !== AnalyzerProtocol::CALLABLE_SIGNATURE_REQUEST
+            && $kind !== AnalyzerProtocol::ASSERTION_REQUEST
+        ) {
             throw new ProtocolException("Unknown analyzer request kind {$kind}.");
         }
 
@@ -1007,10 +1078,48 @@ final class Worker
             $this->metadataCache = new MetadataCache($request->generation);
         }
         $codebase = new Codebase($host, $requestId, $cancellation, $this->metadataCache);
+        $types = new TypeComparator($host, $requestId, $cancellation, $this->metadataCache);
+        if ($kind === AnalyzerProtocol::ASSERTION_REQUEST) {
+            $providers = $request->invocation->kind === InvocationKind::Function
+                ? $this->functionAssertionProviders
+                : $this->methodAssertionProviders;
+            $context = new AssertionProviderContext(
+                $this->phpVersion,
+                $codebase,
+                $request->invocation,
+                $types,
+                $cancellation,
+            );
+            foreach ($request->providerIndices as $providerIndex) {
+                $registered = $providers[$providerIndex] ?? null;
+                if ($registered === null) {
+                    throw new ProtocolException(
+                        "Mago requested unregistered analyzer assertion provider index {$providerIndex}.",
+                    );
+                }
+
+                $cancellation->throwIfCancelled();
+                try {
+                    $assertions = $registered->provider->getAssertions($context);
+                } catch (Throwable $throwable) {
+                    throw new ProtocolException(
+                        "Analyzer assertion provider in `{$registered->plugin}` failed: {$throwable->getMessage()}",
+                        0,
+                        $throwable,
+                    );
+                }
+
+                if ($assertions !== null && !$assertions->isEmpty()) {
+                    return AnalyzerProtocol::writeAssertionResponse($assertions);
+                }
+            }
+
+            return AnalyzerProtocol::writeAssertionResponse(null);
+        }
+
         $providers = $request->invocation->kind === InvocationKind::Function
             ? $this->functionReturnTypeProviders
             : $this->methodReturnTypeProviders;
-        $types = new TypeComparator($host, $requestId, $cancellation, $this->metadataCache);
         if ($kind === AnalyzerProtocol::CALLABLE_SIGNATURE_REQUEST) {
             $context = new CallableSignatureProviderContext(
                 $this->phpVersion,

@@ -10,6 +10,8 @@ use std::time::Instant;
 
 use foldhash::HashSet;
 use foldhash::fast::RandomState;
+use mago_algebra::assertion_set::Conjunction;
+use mago_codex::assertion::Assertion;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
@@ -91,6 +93,7 @@ use mago_reporting::Level;
 use mago_span::HasSpan;
 use mago_syntax::cst::NodeKind;
 use mago_text_edit::Safety;
+use mago_word::Word;
 use mago_word::WordSet;
 use mago_word::ascii_lowercase_word;
 use mago_word::word;
@@ -139,6 +142,7 @@ const PROPERTY_INITIALIZATION_REQUEST: u16 = 14;
 const ISSUE_FILTER_REQUEST: u16 = 15;
 const TYPE_COMPARISON_BATCH_REQUEST: u16 = 16;
 const CLASS_INITIALIZER_REQUEST: u16 = 17;
+const ASSERTION_REQUEST: u16 = 18;
 const DESCRIBE_RESPONSE: u16 = 0x8001;
 const RETURN_TYPE_RESPONSE: u16 = 0x8002;
 const TYPE_COMPARISON_RESPONSE: u16 = 0x8003;
@@ -149,6 +153,7 @@ const PROPERTY_INITIALIZATION_RESPONSE: u16 = 0x800E;
 const ISSUE_FILTER_RESPONSE: u16 = 0x800F;
 const TYPE_COMPARISON_BATCH_RESPONSE: u16 = 0x8010;
 const CLASS_INITIALIZER_RESPONSE: u16 = 0x8011;
+const ASSERTION_RESPONSE: u16 = 0x8012;
 const MAXIMUM_EXTENSIONS: usize = 0x4000;
 const MAXIMUM_PLUGINS: usize = 0x4000;
 const MAXIMUM_PROVIDERS: usize = 0x0001_0000;
@@ -221,6 +226,8 @@ pub(super) struct Registration {
     pub has_worker_reducer: bool,
     pub function_providers: Vec<FunctionProvider>,
     pub method_providers: Vec<MethodProvider>,
+    pub function_assertion_providers: Vec<FunctionAssertionProvider>,
+    pub method_assertion_providers: Vec<MethodAssertionProvider>,
     pub property_providers: Vec<PropertyProvider>,
     pub property_initialization_providers: Vec<PropertyProvider>,
     pub class_initializer_providers: Vec<ClassInitializerProvider>,
@@ -235,6 +242,22 @@ pub(super) struct Registration {
     pub after_file_analysis_plugins: Vec<u16>,
     pub node_analysis_plugins: Vec<u16>,
     pub after_analysis_plugins: Vec<u16>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct FunctionAssertionProvider {
+    pub plugin: String,
+    pub index: u16,
+    pub memoize: bool,
+    pub targets: Vec<FunctionTarget>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub(super) struct MethodAssertionProvider {
+    pub plugin: String,
+    pub index: u16,
+    pub memoize: bool,
+    pub targets: Vec<MethodTarget>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -352,6 +375,8 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
     let mut plugins = Vec::new();
     let mut function_providers = Vec::new();
     let mut method_providers = Vec::new();
+    let mut function_assertion_providers = Vec::new();
+    let mut method_assertion_providers = Vec::new();
     let mut property_providers = Vec::new();
     let mut property_initialization_providers = Vec::new();
     let mut class_initializer_providers = Vec::new();
@@ -754,6 +779,79 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
                 }
             }
 
+            let function_assertion_count = reader.read_count("function assertion providers", MAXIMUM_PROVIDERS)?;
+            for _ in 0..function_assertion_count {
+                let provider_index = reader.read_u16("function assertion provider index")?;
+                let memoize = reader.read_bool("function assertion provider memoization flag")?;
+                let target_count = reader.read_count("function assertion provider targets", MAXIMUM_TARGETS)?;
+                if target_count == 0 {
+                    return Err(protocol(format!("function assertion provider {provider_index} has no targets")));
+                }
+
+                let mut targets = Vec::with_capacity(target_count);
+                for _ in 0..target_count {
+                    let kind = reader.read_u8("function assertion target kind")?;
+                    let mut value = non_empty(
+                        reader.read_bytes("function assertion target")?.to_vec(),
+                        "function assertion target",
+                    )?;
+                    targets.push(match kind {
+                        TARGET_EXACT => FunctionTarget::Exact(value),
+                        TARGET_PREFIX => FunctionTarget::Prefix(value),
+                        TARGET_NAMESPACE => {
+                            if value.last() != Some(&b'\\') {
+                                value.push(b'\\');
+                            }
+                            FunctionTarget::Namespace(value)
+                        }
+                        _ => {
+                            return Err(protocol(format!(
+                                "function assertion provider {provider_index} has unknown target kind {kind}"
+                            )));
+                        }
+                    });
+                }
+
+                function_assertion_providers.push(FunctionAssertionProvider {
+                    plugin: identifier.clone(),
+                    index: provider_index,
+                    memoize,
+                    targets,
+                });
+            }
+
+            let method_assertion_count = reader.read_count("method assertion providers", MAXIMUM_PROVIDERS)?;
+            for _ in 0..method_assertion_count {
+                let provider_index = reader.read_u16("method assertion provider index")?;
+                let memoize = reader.read_bool("method assertion provider memoization flag")?;
+                let target_count = reader.read_count("method assertion provider targets", MAXIMUM_TARGETS)?;
+                if target_count == 0 {
+                    return Err(protocol(format!("method assertion provider {provider_index} has no targets")));
+                }
+
+                let mut targets = Vec::with_capacity(target_count);
+                for _ in 0..target_count {
+                    let class = non_empty(
+                        reader.read_bytes("method assertion target class")?.to_vec(),
+                        "method assertion target class",
+                    )?;
+                    let method = non_empty(
+                        reader.read_bytes("method assertion target method")?.to_vec(),
+                        "method assertion target method",
+                    )?;
+                    validate_method_pattern(&class)?;
+                    validate_method_pattern(&method)?;
+                    targets.push(MethodTarget { class, method });
+                }
+
+                method_assertion_providers.push(MethodAssertionProvider {
+                    plugin: identifier.clone(),
+                    index: provider_index,
+                    memoize,
+                    targets,
+                });
+            }
+
             let plugin = ExternalPlugin {
                 index,
                 extension: extension_identifier.clone(),
@@ -802,12 +900,22 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
     validate_provider_indices(node_analysis_hooks.iter().map(|hook| hook.index), "node-analysis hook")?;
     validate_provider_indices(method_call_analysis_hooks.iter().map(|hook| hook.index), "method-call analysis hook")?;
     validate_provider_indices(class_like_analysis_hooks.iter().map(|hook| hook.index), "class-like analysis hook")?;
+    validate_provider_indices(
+        function_assertion_providers.iter().map(|provider| provider.index),
+        "function assertion provider",
+    )?;
+    validate_provider_indices(
+        method_assertion_providers.iter().map(|provider| provider.index),
+        "method assertion provider",
+    )?;
     Ok(Registration {
         extensions,
         plugins,
         has_worker_reducer,
         function_providers,
         method_providers,
+        function_assertion_providers,
+        method_assertion_providers,
         property_providers,
         property_initialization_providers,
         class_initializer_providers,
@@ -939,6 +1047,69 @@ pub(super) fn encode_method_callable_signature_request<'type_info>(
 
     encode_return_type_request(
         CALLABLE_SIGNATURE_REQUEST,
+        provider_indices,
+        invocation_kind,
+        Some(class),
+        Some(&receiver_type),
+        method,
+        invocation,
+        artifacts,
+        source_file,
+        generation,
+        memoize,
+        trace_enabled,
+    )
+}
+
+pub(super) fn encode_function_assertion_request<'type_info>(
+    provider_indices: &[u16],
+    name: &[u8],
+    invocation: &Invocation<'_, '_, '_>,
+    artifacts: &'type_info AnalysisArtifacts,
+    source_file: &File,
+    generation: u64,
+    memoize: bool,
+    trace_enabled: bool,
+) -> Result<ReturnTypeRequest<'type_info>, ExternalAnalyzerError> {
+    encode_return_type_request(
+        ASSERTION_REQUEST,
+        provider_indices,
+        INVOCATION_FUNCTION,
+        None,
+        None,
+        name,
+        invocation,
+        artifacts,
+        source_file,
+        generation,
+        memoize,
+        trace_enabled,
+    )
+}
+
+pub(super) fn encode_method_assertion_request<'type_info>(
+    provider_indices: &[u16],
+    class: &[u8],
+    method: &[u8],
+    invocation: &Invocation<'_, '_, '_>,
+    artifacts: &'type_info AnalysisArtifacts,
+    source_file: &File,
+    generation: u64,
+    memoize: bool,
+    trace_enabled: bool,
+) -> Result<ReturnTypeRequest<'type_info>, ExternalAnalyzerError> {
+    let method_context = invocation
+        .target
+        .get_method_context()
+        .ok_or_else(|| protocol("external method assertion provider request is missing its method context"))?;
+    let invocation_kind = match method_context.invocation_kind {
+        MethodInvocationKind::Instance => INVOCATION_INSTANCE_METHOD,
+        MethodInvocationKind::Static => INVOCATION_STATIC_METHOD,
+    };
+    let receiver_type = get_method_receiver_type(method_context)?;
+
+    encode_return_type_request(
+        ASSERTION_REQUEST,
         provider_indices,
         invocation_kind,
         Some(class),
@@ -1256,7 +1427,7 @@ fn encode_return_type_request<'type_info>(
     trace_enabled: bool,
 ) -> Result<ReturnTypeRequest<'type_info>, ExternalAnalyzerError> {
     let mut writer = message_writer(message_kind);
-    let include_argument_types = message_kind == RETURN_TYPE_REQUEST;
+    let include_argument_types = message_kind == RETURN_TYPE_REQUEST || message_kind == ASSERTION_REQUEST;
     let mut type_snapshot_duration = Duration::ZERO;
     writer.write_u64(generation);
     writer.write_u8(invocation_kind);
@@ -2175,6 +2346,154 @@ where
 
     reader.finish()?;
     Ok(Some(EffectiveCallableSignature { parameters, allows_named_arguments }))
+}
+
+pub(super) fn decode_assertion_response<'type_info, F>(
+    payload: &[u8],
+    request_type: F,
+) -> Result<Option<crate::plugin::provider::assertion::InvocationAssertions>, ExternalAnalyzerError>
+where
+    F: Fn(usize) -> Option<&'type_info TUnion>,
+{
+    let mut reader = message_reader(payload, ASSERTION_RESPONSE)?;
+    if !reader.read_bool("handled flag")? {
+        reader.finish()?;
+        return Ok(None);
+    }
+
+    let type_assertions = decode_assertion_map(&mut reader, &request_type)?;
+    let if_true = decode_assertion_map(&mut reader, &request_type)?;
+    let if_false = decode_assertion_map(&mut reader, &request_type)?;
+    reader.finish()?;
+
+    let assertions = crate::plugin::provider::assertion::InvocationAssertions { type_assertions, if_true, if_false };
+    if assertions.is_empty() {
+        return Err(protocol("handled assertion provider response contains no assertions"));
+    }
+
+    Ok(Some(assertions))
+}
+
+fn decode_assertion_map<'type_info, F>(
+    reader: &mut PayloadReader<'_>,
+    request_type: &F,
+) -> Result<BTreeMap<Word, Conjunction<Assertion>>, ExternalAnalyzerError>
+where
+    F: Fn(usize) -> Option<&'type_info TUnion>,
+{
+    let count = reader.read_count("invocation assertion parameters", MAXIMUM_TYPE_MEMBERS)?;
+    let mut assertions = BTreeMap::new();
+    for _ in 0..count {
+        let parameter = reader.read_bytes("invocation assertion parameter")?;
+        if !is_valid_variable_name(parameter) {
+            return Err(protocol("invocation assertion parameter must be a PHP variable name"));
+        }
+
+        let assertion_count = reader.read_count("invocation assertion facts", MAXIMUM_TYPE_MEMBERS)?;
+        if assertion_count == 0 {
+            return Err(protocol("invocation assertion parameter has no facts"));
+        }
+        let mut facts = Vec::with_capacity(assertion_count);
+        for _ in 0..assertion_count {
+            facts.push(decode_assertion(reader, request_type)?);
+        }
+
+        if assertions.insert(word(parameter), facts).is_some() {
+            return Err(protocol("invocation assertion parameter is duplicated"));
+        }
+    }
+
+    Ok(assertions)
+}
+
+#[allow(clippy::too_many_lines)]
+fn decode_assertion<'type_info, F>(
+    reader: &mut PayloadReader<'_>,
+    request_type: &F,
+) -> Result<Assertion, ExternalAnalyzerError>
+where
+    F: Fn(usize) -> Option<&'type_info TUnion>,
+{
+    Ok(match reader.read_u8("invocation assertion kind")? {
+        1 => Assertion::Any,
+        2 => Assertion::IsType(decode_assertion_atomic(reader, request_type)?),
+        3 => Assertion::IsNotType(decode_assertion_atomic(reader, request_type)?),
+        4 => Assertion::Falsy,
+        5 => Assertion::Truthy,
+        6 => Assertion::IsIdentical(decode_assertion_atomic(reader, request_type)?),
+        7 => Assertion::IsNotIdentical(decode_assertion_atomic(reader, request_type)?),
+        8 => Assertion::IsEqual(decode_assertion_atomic(reader, request_type)?),
+        9 => Assertion::IsNotEqual(decode_assertion_atomic(reader, request_type)?),
+        10 => Assertion::IsEqualIsset,
+        11 => Assertion::IsIsset,
+        12 => Assertion::IsNotIsset,
+        13 => Assertion::HasStringArrayAccess,
+        14 => Assertion::HasIntOrStringArrayAccess,
+        15 => Assertion::ArrayKeyExists,
+        16 => Assertion::ArrayKeyDoesNotExist,
+        17 => Assertion::InArray(decode_type(reader, request_type, 0)?),
+        18 => Assertion::NotInArray(decode_type(reader, request_type, 0)?),
+        19 => Assertion::HasArrayKey(decode_assertion_array_key(reader)?),
+        20 => Assertion::DoesNotHaveArrayKey(decode_assertion_array_key(reader)?),
+        21 => Assertion::HasNonnullEntryForKey(decode_assertion_array_key(reader)?),
+        22 => Assertion::DoesNotHaveNonnullEntryForKey(decode_assertion_array_key(reader)?),
+        23 => Assertion::Empty,
+        24 => Assertion::NonEmpty,
+        25 => Assertion::NonEmptyCountable(reader.read_bool("non-empty countable negatable flag")?),
+        26 => Assertion::EmptyCountable,
+        27 => Assertion::HasExactCount(decode_assertion_count(reader)?),
+        28 => Assertion::HasAtLeastCount(decode_assertion_count(reader)?),
+        29 => Assertion::DoesNotHaveExactCount(decode_assertion_count(reader)?),
+        30 => Assertion::DoesNotHasAtLeastCount(decode_assertion_count(reader)?),
+        31 => Assertion::IsLessThan(reader.read_u64("less-than bound")? as i64),
+        32 => Assertion::IsLessThanOrEqual(reader.read_u64("less-than-or-equal bound")? as i64),
+        33 => Assertion::IsGreaterThan(reader.read_u64("greater-than bound")? as i64),
+        34 => Assertion::IsGreaterThanOrEqual(reader.read_u64("greater-than-or-equal bound")? as i64),
+        35 => Assertion::IsLessThanFromBound(reader.read_u64("derived less-than bound")? as i64),
+        36 => Assertion::IsLessThanOrEqualFromBound(reader.read_u64("derived less-than-or-equal bound")? as i64),
+        37 => Assertion::IsGreaterThanFromBound(reader.read_u64("derived greater-than bound")? as i64),
+        38 => Assertion::IsGreaterThanOrEqualFromBound(reader.read_u64("derived greater-than-or-equal bound")? as i64),
+        39 => Assertion::IsLessThanVariable(word(reader.read_bytes("less-than variable")?)),
+        40 => Assertion::IsLessThanOrEqualVariable(word(reader.read_bytes("less-than-or-equal variable")?)),
+        41 => Assertion::IsGreaterThanVariable(word(reader.read_bytes("greater-than variable")?)),
+        42 => Assertion::IsGreaterThanOrEqualVariable(word(reader.read_bytes("greater-than-or-equal variable")?)),
+        43 => Assertion::Countable,
+        44 => Assertion::NotCountable(reader.read_bool("not-countable negatable flag")?),
+        unknown => return Err(protocol(format!("unknown invocation assertion kind {unknown}"))),
+    })
+}
+
+fn decode_assertion_atomic<'type_info, F>(
+    reader: &mut PayloadReader<'_>,
+    request_type: &F,
+) -> Result<TAtomic, ExternalAnalyzerError>
+where
+    F: Fn(usize) -> Option<&'type_info TUnion>,
+{
+    let union = decode_type(reader, request_type, 0)?;
+    let mut types = union.types.into_owned();
+    if types.len() != 1 {
+        return Err(protocol("invocation type assertion requires exactly one atomic type"));
+    }
+
+    types.pop().ok_or_else(|| protocol("invocation type assertion contains no atomic type"))
+}
+
+fn decode_assertion_array_key(reader: &mut PayloadReader<'_>) -> Result<ArrayKey, ExternalAnalyzerError> {
+    Ok(match reader.read_u8("invocation assertion array-key kind")? {
+        1 => ArrayKey::Integer(reader.read_u64("invocation assertion integer array key")? as i64),
+        2 => ArrayKey::String(word(reader.read_bytes("invocation assertion string array key")?)),
+        3 => ArrayKey::ClassLikeConstant {
+            class_like_name: word(reader.read_bytes("invocation assertion array-key class")?),
+            constant_name: word(reader.read_bytes("invocation assertion array-key constant")?),
+        },
+        unknown => return Err(protocol(format!("unknown invocation assertion array-key kind {unknown}"))),
+    })
+}
+
+fn decode_assertion_count(reader: &mut PayloadReader<'_>) -> Result<usize, ExternalAnalyzerError> {
+    usize::try_from(reader.read_u64("invocation assertion count")?)
+        .map_err(|_| protocol("invocation assertion count exceeds usize::MAX"))
 }
 
 pub(super) fn handle_type_comparison_request<'type_info, F>(
@@ -3188,6 +3507,40 @@ pub(super) mod testing {
     }
 
     #[test]
+    fn assertion_response_resolves_request_type_handles() {
+        let request_type = get_literal_string(word(b"value"));
+        let mut writer = message_writer(ASSERTION_RESPONSE);
+        writer.write_bool(true);
+        writer.write_u32(1);
+        writer.write_bytes(b"$value").unwrap();
+        writer.write_u32(1);
+        writer.write_u8(2);
+        writer.write_u8(TYPE_REFERENCE);
+        writer.write_u32(0);
+        writer.write_u32(0);
+        writer.write_u32(0);
+
+        let assertions = decode_assertion_response(&writer.finish(), |handle| (handle == 0).then_some(&request_type))
+            .unwrap()
+            .unwrap();
+        assert_eq!(
+            assertions.type_assertions.get(&word(b"$value")),
+            Some(&vec![Assertion::IsType(request_type.types.first().unwrap().clone())])
+        );
+    }
+
+    #[test]
+    fn assertion_response_rejects_empty_handled_result() {
+        let mut writer = message_writer(ASSERTION_RESPONSE);
+        writer.write_bool(true);
+        writer.write_u32(0);
+        writer.write_u32(0);
+        writer.write_u32(0);
+
+        decode_assertion_response(&writer.finish(), |_| None).unwrap_err();
+    }
+
+    #[test]
     fn property_initialization_response_preserves_decision() {
         for initialized in [false, true] {
             let mut writer = message_writer(PROPERTY_INITIALIZATION_RESPONSE);
@@ -3247,6 +3600,8 @@ pub(super) mod testing {
         writer.write_u32(1);
         writer.write_bytes(b"FrameworkTestCase").unwrap();
         writer.write_bytes(b"Framework\\Test").unwrap();
+        writer.write_u32(0);
+        writer.write_u32(0);
         writer.write_u32(0);
         writer.write_u32(0);
         writer.write_u32(0);
@@ -3314,6 +3669,8 @@ pub(super) mod testing {
         writer.write_u32(0);
         writer.write_u32(0);
         writer.write_u32(0);
+        writer.write_u32(0);
+        writer.write_u32(0);
         writer.finish()
     }
 
@@ -3342,6 +3699,8 @@ pub(super) mod testing {
         writer.write_u32(1);
         writer.write_u8(TARGET_EXACT);
         writer.write_bytes(b"demo_service").unwrap();
+        writer.write_u32(0);
+        writer.write_u32(0);
         writer.write_u32(0);
         writer.write_u32(0);
         writer.write_u32(0);

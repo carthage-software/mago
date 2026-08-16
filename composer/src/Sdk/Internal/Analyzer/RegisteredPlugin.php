@@ -23,6 +23,8 @@ final class RegisteredPlugin
      * @param non-empty-string $extension
      * @param list<RegisteredFunctionReturnTypeProvider> $functionProviders
      * @param list<RegisteredMethodReturnTypeProvider> $methodProviders
+     * @param list<RegisteredFunctionAssertionProvider> $functionAssertionProviders
+     * @param list<RegisteredMethodAssertionProvider> $methodAssertionProviders
      * @param list<RegisteredPropertyTypeProvider> $propertyProviders
      * @param list<RegisteredPropertyInitializationProvider> $propertyInitializationProviders
      * @param list<RegisteredClassInitializerProvider> $classInitializerProviders
@@ -47,6 +49,8 @@ final class RegisteredPlugin
         public readonly PluginDefinition $definition,
         public readonly array $functionProviders,
         public readonly array $methodProviders,
+        public readonly array $functionAssertionProviders,
+        public readonly array $methodAssertionProviders,
         public readonly array $propertyProviders,
         public readonly array $propertyInitializationProviders,
         public readonly array $classInitializerProviders,

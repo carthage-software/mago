@@ -12,6 +12,7 @@ use std::thread::JoinHandle;
 use std::time::Duration;
 use std::time::Instant;
 
+use crate::plugin::provider::assertion::InvocationAssertions;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::reference::SymbolReferences;
@@ -155,6 +156,7 @@ struct ExternalAnalyzerTelemetry {
     issue_filter_request_bytes: AtomicU64,
     issue_filter_response_bytes: AtomicU64,
     signature_lookups: AtomicU64,
+    assertion_lookups: AtomicU64,
     backend_checks: AtomicU64,
     candidate_providers: AtomicU64,
     matched_providers: AtomicU64,
@@ -163,10 +165,12 @@ struct ExternalAnalyzerTelemetry {
     ipc_requests: AtomicU64,
     provider_cache_hits: AtomicU64,
     signature_requests: AtomicU64,
+    assertion_requests: AtomicU64,
     provided_types: AtomicU64,
     initialized_properties: AtomicU64,
     provided_class_initializers: AtomicU64,
     provided_signatures: AtomicU64,
+    provided_assertions: AtomicU64,
     declined_requests: AtomicU64,
     errors: AtomicU64,
     snapshotted_types: AtomicU64,
@@ -720,14 +724,20 @@ struct Backend<T> {
     provider_response_cache: Mutex<ProviderResponseCache>,
     function_capabilities: Box<[u8]>,
     method_capabilities: Box<[u8]>,
+    function_assertion_capabilities: Box<[u8]>,
+    method_assertion_capabilities: Box<[u8]>,
     function_exact: WordMap<Vec<u16>>,
     function_wildcard: Vec<(u16, Vec<FunctionTarget>)>,
     function_signature_exact: WordMap<Vec<u16>>,
     function_signature_wildcard: Vec<(u16, Vec<FunctionTarget>)>,
+    function_assertion_exact: WordMap<Vec<u16>>,
+    function_assertion_wildcard: Vec<(u16, Vec<FunctionTarget>)>,
     method_exact: WordMap<Vec<u16>>,
     method_wildcard: Vec<(u16, Vec<MethodTarget>)>,
     method_signature_exact: WordMap<Vec<u16>>,
     method_signature_wildcard: Vec<(u16, Vec<MethodTarget>)>,
+    method_assertion_exact: WordMap<Vec<u16>>,
+    method_assertion_wildcard: Vec<(u16, Vec<MethodTarget>)>,
     property_exact: PropertyProviderExactIndex,
     property_wildcard: PropertyProviderWildcardIndex,
     property_initialization_exact: PropertyProviderExactIndex,
@@ -819,6 +829,27 @@ impl<T> Backend<T> {
             }
         }
 
+        let mut function_assertion_exact = WordMap::default();
+        let mut function_assertion_wildcard = Vec::new();
+        for provider in &registration.function_assertion_providers {
+            let mut wildcard_targets = Vec::new();
+            for target in &provider.targets {
+                match target {
+                    FunctionTarget::Exact(name) => {
+                        let indices =
+                            function_assertion_exact.entry(ascii_lowercase_word(name)).or_insert_with(Vec::new);
+                        if indices.last() != Some(&provider.index) {
+                            indices.push(provider.index);
+                        }
+                    }
+                    FunctionTarget::Prefix(_) | FunctionTarget::Namespace(_) => wildcard_targets.push(target.clone()),
+                }
+            }
+            if !wildcard_targets.is_empty() {
+                function_assertion_wildcard.push((provider.index, wildcard_targets));
+            }
+        }
+
         let mut method_exact = WordMap::default();
         let mut method_wildcard = Vec::new();
         let mut method_signature_exact = WordMap::default();
@@ -859,6 +890,28 @@ impl<T> Backend<T> {
             }
         }
 
+        let mut method_assertion_exact = WordMap::default();
+        let mut method_assertion_wildcard = Vec::new();
+        for provider in &registration.method_assertion_providers {
+            let mut wildcard_targets = Vec::new();
+            for target in &provider.targets {
+                if target.class.contains(&b'*') || target.method.contains(&b'*') {
+                    wildcard_targets.push(target.clone());
+                } else {
+                    let class = ascii_lowercase_word(&target.class);
+                    let method = ascii_lowercase_word(&target.method);
+                    let indices =
+                        method_assertion_exact.entry(concat_word!(class, b"::", method)).or_insert_with(Vec::new);
+                    if indices.last() != Some(&provider.index) {
+                        indices.push(provider.index);
+                    }
+                }
+            }
+            if !wildcard_targets.is_empty() {
+                method_assertion_wildcard.push((provider.index, wildcard_targets));
+            }
+        }
+
         let (property_exact, property_wildcard) = index_property_providers(&registration.property_providers);
         let (property_initialization_exact, property_initialization_wildcard) =
             index_property_providers(&registration.property_initialization_providers);
@@ -885,6 +938,16 @@ impl<T> Backend<T> {
                     | (u8::from(provider.memoize) * PROVIDER_MEMOIZED)
             },
         );
+        let function_assertion_capabilities = provider_capabilities(
+            &registration.function_assertion_providers,
+            |provider| provider.index,
+            |provider| u8::from(provider.memoize) * PROVIDER_MEMOIZED,
+        );
+        let method_assertion_capabilities = provider_capabilities(
+            &registration.method_assertion_providers,
+            |provider| provider.index,
+            |provider| u8::from(provider.memoize) * PROVIDER_MEMOIZED,
+        );
 
         Self {
             transport,
@@ -892,14 +955,20 @@ impl<T> Backend<T> {
             provider_response_cache: Mutex::new(ProviderResponseCache::default()),
             function_capabilities,
             method_capabilities,
+            function_assertion_capabilities,
+            method_assertion_capabilities,
             function_exact,
             function_wildcard,
             function_signature_exact,
             function_signature_wildcard,
+            function_assertion_exact,
+            function_assertion_wildcard,
             method_exact,
             method_wildcard,
             method_signature_exact,
             method_signature_wildcard,
+            method_assertion_exact,
+            method_assertion_wildcard,
             property_exact,
             property_wildcard,
             property_initialization_exact,
@@ -1045,6 +1114,57 @@ impl<T> Backend<T> {
         });
 
         (indices, candidates)
+    }
+
+    fn matching_function_assertion_providers(&self, function: &[u8]) -> (Option<ProviderIndices>, usize) {
+        let function = ascii_lowercase_word(function);
+        let exact = self.function_assertion_exact.get(&function).map_or(&[][..], Vec::as_slice);
+        let candidates = exact.len() + self.function_assertion_wildcard.len();
+        let wildcards = self
+            .function_assertion_wildcard
+            .iter()
+            .filter(|(_, targets)| targets.iter().any(|target| target.matches(function.as_bytes())))
+            .map(|(index, _)| *index);
+
+        (ProviderIndices::from_exact_and_wildcards(exact, wildcards), candidates)
+    }
+
+    fn matching_method_assertion_providers(
+        &self,
+        codebase: &CodebaseMetadata,
+        class: &[u8],
+        method: &[u8],
+    ) -> (Option<ProviderIndices>, usize) {
+        let (exact, exact_candidates) = matching_exact_member_providers(
+            &self.method_assertion_exact,
+            codebase,
+            class,
+            ascii_lowercase_word(method).as_bytes(),
+        );
+        let candidates = exact_candidates + self.method_assertion_wildcard.len();
+        let wildcards = self
+            .method_assertion_wildcard
+            .iter()
+            .filter(|(_, targets)| targets.iter().any(|target| target.matches(codebase, class, method)))
+            .map(|(index, _)| *index);
+
+        (ProviderIndices::add_wildcards(exact, wildcards), candidates)
+    }
+
+    fn memoizes_function_assertion_providers(&self, indices: &[u16]) -> bool {
+        indices.iter().all(|index| {
+            self.function_assertion_capabilities
+                .get(usize::from(*index))
+                .is_some_and(|capabilities| capabilities & PROVIDER_MEMOIZED != 0)
+        })
+    }
+
+    fn memoizes_method_assertion_providers(&self, indices: &[u16]) -> bool {
+        indices.iter().all(|index| {
+            self.method_assertion_capabilities
+                .get(usize::from(*index))
+                .is_some_and(|capabilities| capabilities & PROVIDER_MEMOIZED != 0)
+        })
     }
 
     fn matching_property_providers(
@@ -1427,6 +1547,35 @@ impl ExternalAnalyzerHandle {
             .map_err(|error| error.to_string())
     }
 
+    pub(crate) fn get_function_assertions(
+        &self,
+        function: &[u8],
+        invocation: &Invocation<'_, '_, '_>,
+        artifacts: &AnalysisArtifacts,
+        source_file: &File,
+        codebase: &CodebaseMetadata,
+        session: &ExternalAnalysisSession,
+    ) -> Result<Option<InvocationAssertions>, String> {
+        self.get()?
+            .get_function_assertions(function, invocation, artifacts, source_file, codebase, session)
+            .map_err(|error| error.to_string())
+    }
+
+    pub(crate) fn get_method_assertions(
+        &self,
+        class: &[u8],
+        method: &[u8],
+        invocation: &Invocation<'_, '_, '_>,
+        artifacts: &AnalysisArtifacts,
+        source_file: &File,
+        codebase: &CodebaseMetadata,
+        session: &ExternalAnalysisSession,
+    ) -> Result<Option<InvocationAssertions>, String> {
+        self.get()?
+            .get_method_assertions(class, method, invocation, artifacts, source_file, codebase, session)
+            .map_err(|error| error.to_string())
+    }
+
     pub(crate) fn get_property_type(
         &self,
         class: &[u8],
@@ -1530,6 +1679,14 @@ impl ExternalAnalyzerHandle {
             .backends
             .iter()
             .any(|backend| backend.registration.method_providers.iter().any(|provider| provider.callable_signature)))
+    }
+
+    pub(crate) fn has_function_assertion_providers(&self) -> Result<bool, String> {
+        Ok(self.get()?.backends.iter().any(|backend| !backend.registration.function_assertion_providers.is_empty()))
+    }
+
+    pub(crate) fn has_method_assertion_providers(&self) -> Result<bool, String> {
+        Ok(self.get()?.backends.iter().any(|backend| !backend.registration.method_assertion_providers.is_empty()))
     }
 
     pub(crate) fn has_after_analysis_hooks(&self) -> Result<bool, String> {
@@ -2238,6 +2395,251 @@ where
         }
 
         Ok(issues)
+    }
+
+    fn dispatch_assertion_request(
+        &self,
+        backend: &Backend<T>,
+        request: protocol::ReturnTypeRequest<'_>,
+        affinity: &[u8],
+        codebase: &CodebaseMetadata,
+        session: &ExternalAnalysisSession,
+    ) -> Result<Option<InvocationAssertions>, ExternalAnalyzerError> {
+        if self.trace_enabled {
+            self.telemetry.requests.fetch_add(1, Ordering::Relaxed);
+            self.telemetry.assertion_requests.fetch_add(1, Ordering::Relaxed);
+            self.telemetry.snapshotted_types.fetch_add(request.snapshotted_types as u64, Ordering::Relaxed);
+            self.telemetry.arguments.fetch_add(request.arguments as u64, Ordering::Relaxed);
+            self.telemetry.typed_arguments.fetch_add(request.typed_arguments as u64, Ordering::Relaxed);
+            self.telemetry
+                .type_snapshot_ns
+                .fetch_add(duration_nanos(request.type_snapshot_duration), Ordering::Relaxed);
+            self.telemetry.request_bytes.fetch_add(request.payload.len() as u64, Ordering::Relaxed);
+        }
+
+        let nested_telemetry = &self.telemetry;
+        let trace_enabled = self.trace_enabled;
+        let mut handler = |frame: &Frame| {
+            let nested_start = trace_enabled.then(Instant::now);
+            let result = protocol::handle_nested_request(&frame.payload, codebase, session, |handle| {
+                protocol::resolve_type_handle(&request.types, handle)
+            });
+            if let Some(start) = nested_start {
+                nested_telemetry.record_nested_request(frame.payload.len(), start.elapsed(), &result);
+            }
+
+            result.map(|(_, response)| response).map_err(|error| error.to_string().into_bytes())
+        };
+
+        let generation = session.generation();
+        let cache_key = request.memoize.then(|| request.payload.clone());
+        let cached = cache_key.as_deref().and_then(|cache_key| {
+            backend
+                .provider_response_cache
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .get(generation, cache_key)
+        });
+        let response = if let Some(response) = cached {
+            if self.trace_enabled {
+                self.telemetry.provider_cache_hits.fetch_add(1, Ordering::Relaxed);
+            }
+            response
+        } else {
+            let ipc_start = self.trace_enabled.then(Instant::now);
+            if self.trace_enabled {
+                self.telemetry.ipc_requests.fetch_add(1, Ordering::Relaxed);
+            }
+            let response = backend
+                .transport
+                .request_with_handler_affinity(request.payload, affinity, &mut handler)
+                .inspect_err(|_| {
+                    if self.trace_enabled {
+                        self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
+                    }
+                })?;
+
+            if let Some(start) = ipc_start {
+                self.telemetry.ipc_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
+                self.telemetry.response_bytes.fetch_add(response.len() as u64, Ordering::Relaxed);
+            }
+            if let Some(cache_key) = cache_key {
+                backend.provider_response_cache.lock().unwrap_or_else(std::sync::PoisonError::into_inner).insert(
+                    generation,
+                    cache_key,
+                    response.clone(),
+                );
+            }
+            response
+        };
+
+        let decode_start = self.trace_enabled.then(Instant::now);
+        let result = protocol::decode_assertion_response(&response, |handle| {
+            protocol::resolve_type_handle(&request.types, handle)
+        })
+        .inspect_err(|_| {
+            if self.trace_enabled {
+                self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
+            }
+        })?;
+
+        if let Some(start) = decode_start {
+            self.telemetry.decode_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
+        }
+        if self.trace_enabled {
+            if result.is_some() {
+                self.telemetry.provided_assertions.fetch_add(1, Ordering::Relaxed);
+            } else {
+                self.telemetry.declined_requests.fetch_add(1, Ordering::Relaxed);
+            }
+        }
+
+        Ok(result)
+    }
+
+    pub(crate) fn get_function_assertions(
+        &self,
+        function: &[u8],
+        invocation: &Invocation<'_, '_, '_>,
+        artifacts: &AnalysisArtifacts,
+        source_file: &File,
+        codebase: &CodebaseMetadata,
+        session: &ExternalAnalysisSession,
+    ) -> Result<Option<InvocationAssertions>, ExternalAnalyzerError> {
+        let _lookup_trace =
+            self.trace_enabled.then(|| LookupTrace { telemetry: &self.telemetry, started_at: Instant::now() });
+        if self.trace_enabled {
+            self.telemetry.assertion_lookups.fetch_add(1, Ordering::Relaxed);
+        }
+
+        for backend in &self.backends {
+            let matching_start = self.trace_enabled.then(Instant::now);
+            let (indices, candidates) = backend.matching_function_assertion_providers(function);
+            if self.trace_enabled {
+                self.telemetry.backend_checks.fetch_add(1, Ordering::Relaxed);
+                self.telemetry.candidate_providers.fetch_add(candidates as u64, Ordering::Relaxed);
+            }
+            if let Some(start) = matching_start {
+                self.telemetry.matching_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
+            }
+
+            let Some(indices) = indices else {
+                continue;
+            };
+            let memoize = backend.memoizes_function_assertion_providers(indices.as_slice());
+            if self.trace_enabled {
+                self.telemetry.matched_providers.fetch_add(indices.as_slice().len() as u64, Ordering::Relaxed);
+            }
+
+            let encode_start = self.trace_enabled.then(Instant::now);
+            let provider_start = self.trace_enabled.then(Instant::now);
+            let request = protocol::encode_function_assertion_request(
+                indices.as_slice(),
+                function,
+                invocation,
+                artifacts,
+                source_file,
+                session.generation(),
+                memoize,
+                self.trace_enabled,
+            )?;
+            if let Some(start) = encode_start {
+                self.telemetry.encode_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
+            }
+
+            let assertions = self.dispatch_assertion_request(backend, request, function, codebase, session)?;
+            if let Some(start) = provider_start
+                && start.elapsed() >= SLOW_PROVIDER_THRESHOLD
+            {
+                tracing::trace!(
+                    function = %mago_bytes::BytesDisplay(function),
+                    providers = indices.as_slice().len(),
+                    elapsed = ?start.elapsed(),
+                    provided = assertions.is_some(),
+                    "Slow external function assertion provider request completed."
+                );
+            }
+            if assertions.is_some() {
+                return Ok(assertions);
+            }
+        }
+
+        Ok(None)
+    }
+
+    pub(crate) fn get_method_assertions(
+        &self,
+        class: &[u8],
+        method: &[u8],
+        invocation: &Invocation<'_, '_, '_>,
+        artifacts: &AnalysisArtifacts,
+        source_file: &File,
+        codebase: &CodebaseMetadata,
+        session: &ExternalAnalysisSession,
+    ) -> Result<Option<InvocationAssertions>, ExternalAnalyzerError> {
+        let _lookup_trace =
+            self.trace_enabled.then(|| LookupTrace { telemetry: &self.telemetry, started_at: Instant::now() });
+        if self.trace_enabled {
+            self.telemetry.assertion_lookups.fetch_add(1, Ordering::Relaxed);
+        }
+
+        for backend in &self.backends {
+            let matching_start = self.trace_enabled.then(Instant::now);
+            let (indices, candidates) = backend.matching_method_assertion_providers(codebase, class, method);
+            if self.trace_enabled {
+                self.telemetry.backend_checks.fetch_add(1, Ordering::Relaxed);
+                self.telemetry.candidate_providers.fetch_add(candidates as u64, Ordering::Relaxed);
+            }
+            if let Some(start) = matching_start {
+                self.telemetry.matching_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
+            }
+
+            let Some(indices) = indices else {
+                continue;
+            };
+            let memoize = backend.memoizes_method_assertion_providers(indices.as_slice());
+            if self.trace_enabled {
+                self.telemetry.matched_providers.fetch_add(indices.as_slice().len() as u64, Ordering::Relaxed);
+            }
+
+            let declaring_class =
+                codebase.get_class_like(class).map_or(class, |metadata| metadata.original_name.as_bytes());
+            let encode_start = self.trace_enabled.then(Instant::now);
+            let provider_start = self.trace_enabled.then(Instant::now);
+            let request = protocol::encode_method_assertion_request(
+                indices.as_slice(),
+                declaring_class,
+                method,
+                invocation,
+                artifacts,
+                source_file,
+                session.generation(),
+                memoize,
+                self.trace_enabled,
+            )?;
+            if let Some(start) = encode_start {
+                self.telemetry.encode_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
+            }
+
+            let assertions = self.dispatch_assertion_request(backend, request, class, codebase, session)?;
+            if let Some(start) = provider_start
+                && start.elapsed() >= SLOW_PROVIDER_THRESHOLD
+            {
+                tracing::trace!(
+                    class = %mago_bytes::BytesDisplay(class),
+                    method = %mago_bytes::BytesDisplay(method),
+                    providers = indices.as_slice().len(),
+                    elapsed = ?start.elapsed(),
+                    provided = assertions.is_some(),
+                    "Slow external method assertion provider request completed."
+                );
+            }
+            if assertions.is_some() {
+                return Ok(assertions);
+            }
+        }
+
+        Ok(None)
     }
 
     fn dispatch_callable_signature_request(
@@ -3344,6 +3746,8 @@ where
 
             let advertised_function_providers = registration.function_providers.len();
             let advertised_method_providers = registration.method_providers.len();
+            let advertised_function_assertion_providers = registration.function_assertion_providers.len();
+            let advertised_method_assertion_providers = registration.method_assertion_providers.len();
             let advertised_property_providers = registration.property_providers.len();
             let advertised_property_initialization_providers = registration.property_initialization_providers.len();
             let advertised_class_initializer_providers = registration.class_initializer_providers.len();
@@ -3361,6 +3765,8 @@ where
                 .collect::<HashSet<_>>();
             registration.function_providers.retain(|provider| enabled.contains(provider.plugin.as_str()));
             registration.method_providers.retain(|provider| enabled.contains(provider.plugin.as_str()));
+            registration.function_assertion_providers.retain(|provider| enabled.contains(provider.plugin.as_str()));
+            registration.method_assertion_providers.retain(|provider| enabled.contains(provider.plugin.as_str()));
             registration.property_providers.retain(|provider| enabled.contains(provider.plugin.as_str()));
             registration
                 .property_initialization_providers
@@ -3433,6 +3839,12 @@ where
                     disabled_function_providers = advertised_function_providers - registration.function_providers.len(),
                     method_providers = registration.method_providers.len(),
                     disabled_method_providers = advertised_method_providers - registration.method_providers.len(),
+                    function_assertion_providers = registration.function_assertion_providers.len(),
+                    disabled_function_assertion_providers = advertised_function_assertion_providers
+                        - registration.function_assertion_providers.len(),
+                    method_assertion_providers = registration.method_assertion_providers.len(),
+                    disabled_method_assertion_providers = advertised_method_assertion_providers
+                        - registration.method_assertion_providers.len(),
                     property_providers = registration.property_providers.len(),
                     disabled_property_providers = advertised_property_providers - registration.property_providers.len(),
                     property_initialization_providers = registration.property_initialization_providers.len(),
@@ -3573,12 +3985,14 @@ impl<T> Drop for ExternalAnalyzer<T> {
         let property_initialization_lookups = self.telemetry.property_initialization_lookups.load(Ordering::Relaxed);
         let class_initializer_lookups = self.telemetry.class_initializer_lookups.load(Ordering::Relaxed);
         let signature_lookups = self.telemetry.signature_lookups.load(Ordering::Relaxed);
+        let assertion_lookups = self.telemetry.assertion_lookups.load(Ordering::Relaxed);
         let lookups = function_lookups
             .saturating_add(method_lookups)
             .saturating_add(property_lookups)
             .saturating_add(property_initialization_lookups)
             .saturating_add(class_initializer_lookups)
-            .saturating_add(signature_lookups);
+            .saturating_add(signature_lookups)
+            .saturating_add(assertion_lookups);
         let requests = self.telemetry.requests.load(Ordering::Relaxed);
         let ipc_requests = self.telemetry.ipc_requests.load(Ordering::Relaxed);
         let nested_requests = self.telemetry.nested_requests.load(Ordering::Relaxed);
@@ -3600,6 +4014,7 @@ impl<T> Drop for ExternalAnalyzer<T> {
             property_initialization_lookups,
             class_initializer_lookups,
             signature_lookups,
+            assertion_lookups,
             backend_checks = self.telemetry.backend_checks.load(Ordering::Relaxed),
             candidate_providers = self.telemetry.candidate_providers.load(Ordering::Relaxed),
             matched_providers = self.telemetry.matched_providers.load(Ordering::Relaxed),
@@ -3611,10 +4026,12 @@ impl<T> Drop for ExternalAnalyzer<T> {
             ipc_requests,
             provider_cache_hits = self.telemetry.provider_cache_hits.load(Ordering::Relaxed),
             signature_requests = self.telemetry.signature_requests.load(Ordering::Relaxed),
+            assertion_requests = self.telemetry.assertion_requests.load(Ordering::Relaxed),
             provided_types = self.telemetry.provided_types.load(Ordering::Relaxed),
             initialized_properties = self.telemetry.initialized_properties.load(Ordering::Relaxed),
             provided_class_initializers = self.telemetry.provided_class_initializers.load(Ordering::Relaxed),
             provided_signatures = self.telemetry.provided_signatures.load(Ordering::Relaxed),
+            provided_assertions = self.telemetry.provided_assertions.load(Ordering::Relaxed),
             declined_requests = self.telemetry.declined_requests.load(Ordering::Relaxed),
             errors = self.telemetry.errors.load(Ordering::Relaxed),
             arguments = self.telemetry.arguments.load(Ordering::Relaxed),

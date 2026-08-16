@@ -31,6 +31,16 @@ final class PluginRegistry
     private array $methodReturnTypeProviders = [];
 
     /**
+     * @var list<FunctionAssertionProvider>
+     */
+    private array $functionAssertionProviders = [];
+
+    /**
+     * @var list<MethodAssertionProvider>
+     */
+    private array $methodAssertionProviders = [];
+
+    /**
      * @var list<PropertyTypeProvider>
      */
     private array $propertyTypeProviders = [];
@@ -103,6 +113,16 @@ final class PluginRegistry
     public function registerMethodReturnTypeProvider(MethodReturnTypeProvider $provider): void
     {
         $this->methodReturnTypeProviders[] = $provider;
+    }
+
+    public function registerFunctionAssertionProvider(FunctionAssertionProvider $provider): void
+    {
+        $this->functionAssertionProviders[] = $provider;
+    }
+
+    public function registerMethodAssertionProvider(MethodAssertionProvider $provider): void
+    {
+        $this->methodAssertionProviders[] = $provider;
     }
 
     public function registerPropertyTypeProvider(PropertyTypeProvider $provider): void
@@ -209,6 +229,24 @@ final class PluginRegistry
     public function getMethodReturnTypeProviders(): array
     {
         return $this->methodReturnTypeProviders;
+    }
+
+    /**
+     * @internal
+     * @return list<FunctionAssertionProvider>
+     */
+    public function getFunctionAssertionProviders(): array
+    {
+        return $this->functionAssertionProviders;
+    }
+
+    /**
+     * @internal
+     * @return list<MethodAssertionProvider>
+     */
+    public function getMethodAssertionProviders(): array
+    {
+        return $this->methodAssertionProviders;
     }
 
     /**

@@ -12,6 +12,7 @@ use Mago\Sdk\Analyzer\ExpressionType;
 use Mago\Sdk\Analyzer\FileAnalysis;
 use Mago\Sdk\Analyzer\FileAnalysisRequirement;
 use Mago\Sdk\Analyzer\Invocation;
+use Mago\Sdk\Analyzer\InvocationAssertions;
 use Mago\Sdk\Analyzer\InvocationKind;
 use Mago\Sdk\Analyzer\Metadata\MemberIdentifier;
 use Mago\Sdk\Analyzer\ProjectAnalysis;
@@ -76,6 +77,7 @@ final class Protocol
     public const PROPERTY_INITIALIZATION_REQUEST = 14;
     public const ISSUE_FILTER_REQUEST = 15;
     public const CLASS_INITIALIZER_REQUEST = 17;
+    public const ASSERTION_REQUEST = 18;
     public const GET_EXPRESSION_TYPES = 1;
     public const GET_ALL_EXPRESSION_TYPES = 2;
     public const GET_INFERRED_RETURN_TYPES = 3;
@@ -151,14 +153,17 @@ final class Protocol
     private const ISSUE_FILTER_RESPONSE = 0x800F;
     private const TYPE_COMPARISON_BATCH_RESPONSE = 0x8010;
     private const CLASS_INITIALIZER_RESPONSE = 0x8011;
+    private const ASSERTION_RESPONSE = 0x8012;
     private const MAXIMUM_ISSUES = 1_000_000;
     private const MAXIMUM_ISSUE_NOTES = 0x0001_0000;
     private const MAXIMUM_ISSUE_ANNOTATIONS = 0x0001_0000;
     private const MAXIMUM_ISSUE_EDITS = 0x0001_0000;
     private const RETURN_TYPE_REQUEST_HEADER = "MANA\x00\x01\x00\x01\x00\x02\x00\x00";
     private const CALLABLE_SIGNATURE_REQUEST_HEADER = "MANA\x00\x01\x00\x01\x00\x0C\x00\x00";
+    private const ASSERTION_REQUEST_HEADER = "MANA\x00\x01\x00\x01\x00\x12\x00\x00";
     private const UNHANDLED_RETURN_TYPE_RESPONSE = "MANA\x00\x01\x00\x01\x80\x02\x00\x00\x00";
     private const UNHANDLED_CALLABLE_SIGNATURE_RESPONSE = "MANA\x00\x01\x00\x01\x80\x0C\x00\x00\x00";
+    private const UNHANDLED_ASSERTION_RESPONSE = "MANA\x00\x01\x00\x01\x80\x12\x00\x00\x00";
     private const INVOCATION_FUNCTION = 1;
     private const INVOCATION_INSTANCE_METHOD = 2;
     private const INVOCATION_STATIC_METHOD = 3;
@@ -175,6 +180,10 @@ final class Protocol
 
         if (strncmp($payload, self::CALLABLE_SIGNATURE_REQUEST_HEADER, 12) === 0) {
             return [self::CALLABLE_SIGNATURE_REQUEST, new PayloadReader($payload, 12)];
+        }
+
+        if (strncmp($payload, self::ASSERTION_REQUEST_HEADER, 12) === 0) {
+            return [self::ASSERTION_REQUEST, new PayloadReader($payload, 12)];
         }
 
         /** @var array{1: int<0, 4294967295>, 2: int<0, 4294967295>, 3: int<0, 4294967295>} $header */
@@ -426,6 +435,28 @@ final class Protocol
                     $writer->writeCount($hook->targets);
                     foreach ($hook->targets as $target) {
                         $writer->writeBytes($target->ancestor);
+                    }
+                }
+
+                $writer->writeCount($plugin->functionAssertionProviders);
+                foreach ($plugin->functionAssertionProviders as $provider) {
+                    $writer->writeU16($provider->index);
+                    $writer->writeBoolean($plugin->memoizeProviders);
+                    $writer->writeCount($provider->targets);
+                    foreach ($provider->targets as $target) {
+                        $writer->writeU8($target->kind->value);
+                        $writer->writeBytes($target->value);
+                    }
+                }
+
+                $writer->writeCount($plugin->methodAssertionProviders);
+                foreach ($plugin->methodAssertionProviders as $provider) {
+                    $writer->writeU16($provider->index);
+                    $writer->writeBoolean($plugin->memoizeProviders);
+                    $writer->writeCount($provider->targets);
+                    foreach ($provider->targets as $target) {
+                        $writer->writeBytes($target->class);
+                        $writer->writeBytes($target->method);
                     }
                 }
             }
@@ -999,6 +1030,19 @@ final class Protocol
             $flags |= (int) $parameter->hasDefault << 2;
             $writer->writeU8($flags);
         }
+
+        return $writer->finish();
+    }
+
+    public static function writeAssertionResponse(?InvocationAssertions $assertions): string
+    {
+        if ($assertions === null || $assertions->isEmpty()) {
+            return self::UNHANDLED_ASSERTION_RESPONSE;
+        }
+
+        $writer = self::createMessage(self::ASSERTION_RESPONSE);
+        $writer->writeBoolean(true);
+        AssertionCodec::write($writer, $assertions);
 
         return $writer->finish();
     }
