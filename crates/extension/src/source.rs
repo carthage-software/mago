@@ -82,10 +82,26 @@ impl<'source> SourceSnapshot<'source> {
         resolved_names: &'source ResolvedNames<'arena>,
         target_kinds: Option<&[bool; u8::MAX as usize + 1]>,
     ) -> Result<Self, PayloadError> {
+        Self::complete_with_target_filter(program, resolved_names, |node| {
+            target_kinds.is_some_and(|target_kinds| target_kinds[node.kind() as usize])
+        })
+    }
+
+    /// Builds a complete snapshot and records nodes accepted by `is_target`.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the syntax tree exceeds the protocol's `u32`
+    /// address space.
+    pub fn complete_with_target_filter<'ast, 'arena>(
+        program: &'ast Program<'arena>,
+        resolved_names: &'source ResolvedNames<'arena>,
+        mut is_target: impl FnMut(Node<'ast, 'arena>) -> bool,
+    ) -> Result<Self, PayloadError> {
         let mut nodes = Vec::new();
         let mut targets = Vec::new();
         let mut stack = Vec::with_capacity(64);
-        Self::append_subtree(Node::Program(program), target_kinds, &mut nodes, &mut targets, &mut stack)?;
+        Self::append_subtree(Node::Program(program), &mut is_target, &mut nodes, &mut targets, &mut stack)?;
 
         let mut names = resolved_names.iter().collect::<Vec<_>>();
         names.sort_unstable_by_key(|(start, end, _, _)| (*start, *end));
@@ -116,7 +132,13 @@ impl<'source> SourceSnapshot<'source> {
             if target_kinds[node.kind() as usize] {
                 let span = node.span();
                 target_ranges.push((span.start.offset, span.end.offset));
-                Self::append_subtree(node, Some(target_kinds), &mut nodes, &mut targets, &mut subtree_stack)?;
+                Self::append_subtree(
+                    node,
+                    &mut |child| target_kinds[child.kind() as usize],
+                    &mut nodes,
+                    &mut targets,
+                    &mut subtree_stack,
+                )?;
                 continue;
             }
 
@@ -162,6 +184,29 @@ impl<'source> SourceSnapshot<'source> {
         subtree_kinds: &[bool; u8::MAX as usize + 1],
         include_trivia: bool,
     ) -> Result<Option<Self>, PayloadError> {
+        Self::targeted_with_filter(
+            program,
+            resolved_names,
+            |node| target_kinds[node.kind() as usize].then_some(subtree_kinds[node.kind() as usize]),
+            include_trivia,
+        )
+    }
+
+    /// Builds the minimal syntax snapshot for dynamically selected targets.
+    ///
+    /// The selector returns `Some(include_subtree)` for target nodes and `None`
+    /// for unrelated nodes.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the filtered syntax tree exceeds the protocol's
+    /// `u32` address space.
+    pub fn targeted_with_filter<'ast, 'arena>(
+        program: &'ast Program<'arena>,
+        resolved_names: &'source ResolvedNames<'arena>,
+        mut target: impl FnMut(Node<'ast, 'arena>) -> Option<bool>,
+        include_trivia: bool,
+    ) -> Result<Option<Self>, PayloadError> {
         let mut nodes = Vec::new();
         let mut targets = Vec::new();
         let mut included_ranges = Vec::new();
@@ -169,15 +214,21 @@ impl<'source> SourceSnapshot<'source> {
         let mut subtree_stack = Vec::with_capacity(64);
         stack.push(Node::Program(program));
         while let Some(node) = stack.pop() {
-            let target = target_kinds[node.kind() as usize];
-            if target && subtree_kinds[node.kind() as usize] {
+            let target_configuration = target(node);
+            if target_configuration == Some(true) {
                 let span = node.span();
                 included_ranges.push((span.start.offset, span.end.offset));
-                Self::append_subtree(node, Some(target_kinds), &mut nodes, &mut targets, &mut subtree_stack)?;
+                Self::append_subtree(
+                    node,
+                    &mut |child| target(child).is_some(),
+                    &mut nodes,
+                    &mut targets,
+                    &mut subtree_stack,
+                )?;
                 continue;
             }
 
-            if target {
+            if target_configuration.is_some() {
                 let identifier =
                     u32::try_from(nodes.len()).map_err(|_| PayloadError::LengthOverflow { length: nodes.len() })?;
                 let span = node.span();
@@ -225,7 +276,7 @@ impl<'source> SourceSnapshot<'source> {
 
     fn append_subtree<'ast, 'arena>(
         root: Node<'ast, 'arena>,
-        target_kinds: Option<&[bool; u8::MAX as usize + 1]>,
+        is_target: &mut impl FnMut(Node<'ast, 'arena>) -> bool,
         nodes: &mut Vec<SnapshotNode>,
         targets: &mut Vec<u32>,
         stack: &mut Vec<(Node<'ast, 'arena>, Option<u32>)>,
@@ -254,7 +305,7 @@ impl<'source> SourceSnapshot<'source> {
                 }
             }
 
-            if target_kinds.is_some_and(|target_kinds| target_kinds[node.kind() as usize]) {
+            if is_target(node) {
                 targets.push(identifier);
             }
 

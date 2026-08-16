@@ -24,6 +24,7 @@ use mago_word::concat_word;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
+use crate::artifacts::ResolvedMethodCall;
 use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
@@ -44,6 +45,59 @@ pub mod function_call;
 pub mod method_call;
 pub mod pipe;
 pub mod static_method_call;
+
+fn record_external_method_call<A>(
+    context: &Context<'_, '_, A>,
+    artifacts: &mut AnalysisArtifacts,
+    targets: &[InvocationTarget<'_>],
+    span: Span,
+) where
+    A: Arena,
+{
+    record_external_method_call_targets(
+        context,
+        artifacts,
+        targets.iter().filter_map(|target| {
+            let FunctionLikeIdentifier::Method(class, method) = target.get_function_like_identifier()? else {
+                return None;
+            };
+            Some((
+                target
+                    .get_method_context()
+                    .map_or(*class, |method_context| method_context.class_like_metadata.original_name),
+                *method,
+            ))
+        }),
+        span,
+    );
+}
+
+pub(super) fn record_external_method_call_targets<A>(
+    context: &Context<'_, '_, A>,
+    artifacts: &mut AnalysisArtifacts,
+    targets: impl IntoIterator<Item = (Word, Word)>,
+    span: Span,
+) where
+    A: Arena,
+{
+    if !context.plugin_registry.has_external_method_call_analysis_hooks() {
+        return;
+    }
+
+    let span = (span.start.offset, span.end.offset);
+    for (class, method) in targets {
+        if artifacts
+            .resolved_method_calls
+            .iter()
+            .rev()
+            .take_while(|target| target.span == span)
+            .any(|target| target.class == class && target.method == method)
+        {
+            continue;
+        }
+        artifacts.resolved_method_calls.push(ResolvedMethodCall { span, class, method });
+    }
+}
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Call<'arena> {
     fn analyze<'ctx, A>(

@@ -217,6 +217,7 @@ impl AnalysisService {
                 program,
                 &resolved_names,
                 &artifacts,
+                &self.codebase,
                 node_analysis_requirements.as_ref(),
             ) {
                 Ok(snapshot) => Arc::new(snapshot),
@@ -342,7 +343,7 @@ impl AnalysisService {
             },
             move |(settings, parser_settings), arena, source_file, codebase| {
                 let (after_file, after_analysis, node_analysis_requirements) =
-                    map_capabilities.get().copied().unwrap_or_default();
+                    map_capabilities.get().cloned().unwrap_or_default();
 
                 #[cfg(not(target_arch = "wasm32"))]
                 let per_file_start = trace_enabled.then(Instant::now);
@@ -430,6 +431,7 @@ impl AnalysisService {
                             program,
                             &resolved_names,
                             &artifacts,
+                            &codebase,
                             node_analysis_requirements.as_ref(),
                         )
                         .map_err(|error| {

@@ -385,6 +385,28 @@ final class Protocol
                         $writer->writeString($target->value);
                     }
                 }
+
+                $writer->writeCount($plugin->methodCallAnalysisHooks);
+                foreach ($plugin->methodCallAnalysisHooks as $hook) {
+                    $writer->writeU16($hook->index);
+                    $requirements = 0;
+                    foreach ($hook->requirements as $requirement) {
+                        $requirements |= match ($requirement) {
+                            FileAnalysisRequirement::ExpressionTypes => 1,
+                            FileAnalysisRequirement::TargetExpressionTypes => 1 << 1,
+                            FileAnalysisRequirement::ReceiverType => 1 << 2,
+                            FileAnalysisRequirement::ArgumentTypes => 1 << 3,
+                            FileAnalysisRequirement::TargetSubtree => 1 << 4,
+                            FileAnalysisRequirement::SourceText => 1 << 5,
+                        };
+                    }
+                    $writer->writeU8($requirements);
+                    $writer->writeCount($hook->targets);
+                    foreach ($hook->targets as $target) {
+                        $writer->writeBytes($target->class);
+                        $writer->writeBytes($target->method);
+                    }
+                }
             }
         }
 
@@ -723,6 +745,7 @@ final class Protocol
      * @param positive-int $requestId
      * @param list<NodeKind> $nodeKinds
      * @mago-expect lint:excessive-parameter-list
+     * @mago-expect lint:halstead
      */
     private static function readFileAnalysis(
         PayloadReader $reader,
@@ -758,6 +781,7 @@ final class Protocol
         $sourceFile = null;
         $nodeAnalysisData = [];
         if ($reader->readBoolean()) {
+            $backend = $reader->readU16();
             $contents = $reader->readBoolean() ? $reader->readBytes() : '';
             $sourceFile = SourceFileCodec::read($reader, $phpVersion, $nodeKinds, $file, $contents);
             $targetCount = $reader->readCount(1_000_000);
@@ -775,7 +799,20 @@ final class Protocol
                         $argumentTypes[] = self::readOptionalType($reader);
                     }
                 }
-                $nodeAnalysisData[] = new NodeAnalysisData($targetType, $receiverType, $argumentTypes);
+                $methodCallHookIndices = [];
+                $routeCount = $reader->readCount(1_000_000);
+                for ($routeIndex = 0; $routeIndex < $routeCount; ++$routeIndex) {
+                    $route = $reader->readU32();
+                    if (($route >> 16) === $backend) {
+                        $methodCallHookIndices[] = $route & 0xffff;
+                    }
+                }
+                $nodeAnalysisData[] = new NodeAnalysisData(
+                    $targetType,
+                    $receiverType,
+                    $argumentTypes,
+                    $methodCallHookIndices,
+                );
             }
         }
 

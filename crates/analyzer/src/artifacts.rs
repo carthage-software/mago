@@ -25,6 +25,14 @@ pub struct ClosureBindScope {
     pub has_this: bool,
 }
 
+/// One semantic receiver and method target retained for a source-level call.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub struct ResolvedMethodCall {
+    pub span: (u32, u32),
+    pub class: Word,
+    pub method: Word,
+}
+
 #[derive(Debug, Clone)]
 pub struct AnalysisArtifacts {
     pub expression_types: HashMap<(u32, u32), Rc<TUnion>>,
@@ -44,6 +52,7 @@ pub struct AnalysisArtifacts {
     pub method_calls_parent_constructor: HashMap<(Word, Word), bool>,
     pub method_calls_parent_initializer: HashMap<(Word, Word), Word>,
     pub closure_bind_scope: Option<ClosureBindScope>,
+    pub resolved_method_calls: Vec<ResolvedMethodCall>,
     pub(crate) pending_readonly_property_writes: Vec<PendingReadonlyPropertyWrite>,
 }
 
@@ -74,6 +83,7 @@ impl AnalysisArtifacts {
             method_calls_parent_constructor: HashMap::default(),
             method_calls_parent_initializer: HashMap::default(),
             closure_bind_scope: None,
+            resolved_method_calls: Vec::new(),
             pending_readonly_property_writes: Vec::new(),
         }
     }

@@ -32,6 +32,7 @@ use Mago\Sdk\Internal\Analyzer\Protocol as AnalyzerProtocol;
 use Mago\Sdk\Internal\Analyzer\RegisteredClassInitializerProvider;
 use Mago\Sdk\Internal\Analyzer\RegisteredFunctionReturnTypeProvider;
 use Mago\Sdk\Internal\Analyzer\RegisteredIssueFilterHook;
+use Mago\Sdk\Internal\Analyzer\RegisteredMethodCallAnalysisHook;
 use Mago\Sdk\Internal\Analyzer\RegisteredMethodReturnTypeProvider;
 use Mago\Sdk\Internal\Analyzer\RegisteredNodeAnalysisHook;
 use Mago\Sdk\Internal\Analyzer\RegisteredPlugin;
@@ -155,6 +156,7 @@ final class Worker
         $classInitializerProviders = [];
         $issueFilterHooks = [];
         $nodeAnalysisHooks = [];
+        $methodCallAnalysisHooks = [];
         $workerReducerIndices = [];
         foreach ($extensions as $extensionIndex => $registeredExtension) {
             $normalizedExtensionIdentifier = strtolower($registeredExtension->identifier);
@@ -413,6 +415,57 @@ final class Worker
                     }
                 }
 
+                $registeredMethodCallAnalysisHooks = [];
+                $registeredMethodCallAnalysisHooksByIndex = [];
+                foreach ($registry->getMethodCallAnalysisHooks() as $hook) {
+                    $targets = $hook->getTargets();
+                    if ($targets === []) {
+                        throw new InvalidArgumentException(
+                            "A method-call analysis hook in `{$definition->identifier}` has no targets.",
+                        );
+                    }
+
+                    $seenTargets = [];
+                    foreach ($targets as $target) {
+                        $key = strtolower($target->class) . '::' . strtolower($target->method);
+                        if (array_key_exists($key, $seenTargets)) {
+                            throw new InvalidArgumentException(
+                                "A method-call analysis hook in `{$definition->identifier}` targets `{$target->class}::{$target->method}` more than once.",
+                            );
+                        }
+                        $seenTargets[$key] = true;
+                    }
+
+                    $requirements = $hook->getRequirements();
+                    $seenRequirements = [];
+                    foreach ($requirements as $requirement) {
+                        if (array_key_exists($requirement->name, $seenRequirements)) {
+                            throw new InvalidArgumentException(
+                                "A method-call analysis hook in `{$definition->identifier}` requests `{$requirement->name}` more than once.",
+                            );
+                        }
+                        $seenRequirements[$requirement->name] = true;
+                    }
+
+                    $hookIndex = count($methodCallAnalysisHooks);
+                    if ($hookIndex > 65_535) {
+                        throw new InvalidArgumentException(
+                            'A worker cannot register more than 65,536 analyzer method-call analysis hooks.',
+                        );
+                    }
+
+                    $registeredHook = new RegisteredMethodCallAnalysisHook(
+                        $hookIndex,
+                        $definition->identifier,
+                        $hook,
+                        $targets,
+                        $requirements,
+                    );
+                    $methodCallAnalysisHooks[] = $registeredHook;
+                    $registeredMethodCallAnalysisHooks[] = $registeredHook;
+                    $registeredMethodCallAnalysisHooksByIndex[$hookIndex] = $registeredHook;
+                }
+
                 $registeredPlugins[] = new RegisteredPlugin(
                     count($registeredPlugins),
                     $registeredExtension->identifier,
@@ -431,6 +484,8 @@ final class Worker
                     $registry->getAfterFileAnalysisHooks(),
                     $registeredNodeAnalysisHooks,
                     $registeredNodeAnalysisHooksByNodeKind,
+                    $registeredMethodCallAnalysisHooks,
+                    $registeredMethodCallAnalysisHooksByIndex,
                     $registry->getAfterAnalysisHooks(),
                     $registry->shouldMemoizeProviders(),
                 );
@@ -1141,7 +1196,10 @@ final class Worker
         int $pluginIndex,
         array &$reportedIssues,
     ): void {
-        if ($registered->nodeAnalysisHooks === [] || !$context->analysis->hasNodeAnalysisTargets()) {
+        if (
+            $registered->nodeAnalysisHooks === [] && $registered->methodCallAnalysisHooks === []
+            || !$context->analysis->hasNodeAnalysisTargets()
+        ) {
             return;
         }
 
@@ -1153,17 +1211,27 @@ final class Worker
             }
 
             $hooks = $registered->nodeAnalysisHooksByNodeKind[$node->kind->value] ?? [];
-            if ($hooks === []) {
+            $data = $context->analysis->getNodeAnalysisData($targetIndex - 1);
+            if ($hooks === [] && $data->methodCallHookIndices === []) {
                 continue;
             }
 
-            $nodeContext = new NodeAnalysisContext(
-                $context,
-                $source,
-                $node,
-                $context->analysis->getNodeAnalysisData($targetIndex - 1),
-            );
+            $nodeContext = new NodeAnalysisContext($context, $source, $node, $data);
             foreach ($hooks as $hook) {
+                $hook->hook->analyze($nodeContext);
+                foreach ($nodeContext->takeReportedIssues() as $issue) {
+                    $reportedIssues[] = $pluginIndex;
+                    $reportedIssues[] = $issue;
+                    $reportedIssues[] = $context->analysis->file;
+                }
+            }
+
+            foreach ($data->methodCallHookIndices as $hookIndex) {
+                $hook = $registered->methodCallAnalysisHooksByIndex[$hookIndex] ?? null;
+                if ($hook === null) {
+                    continue;
+                }
+
                 $hook->hook->analyze($nodeContext);
                 foreach ($nodeContext->takeReportedIssues() as $issue) {
                     $reportedIssues[] = $pluginIndex;

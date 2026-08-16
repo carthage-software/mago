@@ -34,6 +34,8 @@ final class RegisteredPlugin
      * @param list<AfterFileAnalysisHook> $afterFileAnalysisHooks
      * @param list<RegisteredNodeAnalysisHook> $nodeAnalysisHooks
      * @param array<string, non-empty-list<RegisteredNodeAnalysisHook>> $nodeAnalysisHooksByNodeKind
+     * @param list<RegisteredMethodCallAnalysisHook> $methodCallAnalysisHooks
+     * @param array<int<0, 65535>, RegisteredMethodCallAnalysisHook> $methodCallAnalysisHooksByIndex
      * @param list<AfterAnalysisHook> $afterAnalysisHooks
      */
     public function __construct(
@@ -54,6 +56,8 @@ final class RegisteredPlugin
         public readonly array $afterFileAnalysisHooks,
         public readonly array $nodeAnalysisHooks,
         public readonly array $nodeAnalysisHooksByNodeKind,
+        public readonly array $methodCallAnalysisHooks,
+        public readonly array $methodCallAnalysisHooksByIndex,
         public readonly array $afterAnalysisHooks,
         public readonly bool $memoizeProviders,
     ) {}

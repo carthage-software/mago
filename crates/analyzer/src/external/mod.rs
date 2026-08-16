@@ -365,6 +365,9 @@ impl Registration {
             || self.node_analysis_hooks.iter().any(|hook| {
                 plugins.contains(&hook.plugin_index) && hook.requirements & NODE_REQUIREMENT_EXPRESSION_TYPES != 0
             })
+            || self.method_call_analysis_hooks.iter().any(|hook| {
+                plugins.contains(&hook.plugin_index) && hook.requirements & NODE_REQUIREMENT_EXPRESSION_TYPES != 0
+            })
     }
 
     fn node_analysis_requirements(&self) -> Option<NodeAnalysisRequirements> {
@@ -379,7 +382,11 @@ impl Registration {
             }
         }
 
-        any.then_some(NodeAnalysisRequirements { targets, requirements })
+        let method_call_hooks: Arc<[MethodCallAnalysisHookRegistration]> =
+            Arc::from(self.method_call_analysis_hooks.clone().into_boxed_slice());
+        any |= !method_call_hooks.is_empty();
+
+        any.then_some(NodeAnalysisRequirements { targets, requirements, method_call_hooks })
     }
 }
 
@@ -490,6 +497,16 @@ struct NodeAnalysisHookRegistration {
     targets: Vec<NodeKind>,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct MethodCallAnalysisHookRegistration {
+    plugin: String,
+    plugin_index: u16,
+    index: u16,
+    requirements: u8,
+    targets: Vec<MethodTarget>,
+    route: u32,
+}
+
 pub(super) const NODE_REQUIREMENT_EXPRESSION_TYPES: u8 = 1;
 pub(super) const NODE_REQUIREMENT_TARGET_EXPRESSION_TYPES: u8 = 1 << 1;
 pub(super) const NODE_REQUIREMENT_RECEIVER_TYPE: u8 = 1 << 2;
@@ -504,10 +521,11 @@ pub(super) const NODE_REQUIREMENTS_ALL: u8 = NODE_REQUIREMENT_EXPRESSION_TYPES
     | NODE_REQUIREMENT_SOURCE_TEXT;
 
 /// Syntax targets and embedded data requested by external node-analysis hooks.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub struct NodeAnalysisRequirements {
     targets: [bool; u8::MAX as usize + 1],
     requirements: [u8; u8::MAX as usize + 1],
+    method_call_hooks: Arc<[MethodCallAnalysisHookRegistration]>,
 }
 
 impl NodeAnalysisRequirements {
@@ -523,15 +541,11 @@ impl NodeAnalysisRequirements {
         self.requirements[kind as usize]
     }
 
-    #[must_use]
-    pub(crate) fn subtree_targets(&self) -> [bool; u8::MAX as usize + 1] {
-        self.requirements.map(|requirements| requirements & NODE_REQUIREMENT_TARGET_SUBTREE != 0)
-    }
-
     #[inline]
     #[must_use]
     pub(crate) fn includes_source_text(&self) -> bool {
         self.requirements.iter().any(|requirements| requirements & NODE_REQUIREMENT_SOURCE_TEXT != 0)
+            || self.method_call_hooks.iter().any(|hook| hook.requirements & NODE_REQUIREMENT_SOURCE_TEXT != 0)
     }
 }
 
@@ -1469,6 +1483,10 @@ impl ExternalAnalyzerHandle {
         Ok(self.get()?.backends.iter().any(|backend| !backend.issue_filter_indices.is_empty()))
     }
 
+    pub(crate) fn has_method_call_analysis_hooks(&self) -> Result<bool, String> {
+        Ok(self.get()?.backends.iter().any(|backend| !backend.registration.method_call_analysis_hooks.is_empty()))
+    }
+
     pub(crate) fn filter_issues(
         &self,
         file: &File,
@@ -1648,7 +1666,15 @@ impl<T> ExternalAnalyzer<T> {
             }
         }
 
-        any.then_some(NodeAnalysisRequirements { targets, requirements })
+        let method_call_hooks: Arc<[MethodCallAnalysisHookRegistration]> = self
+            .backends
+            .iter()
+            .flat_map(|backend| backend.registration.method_call_analysis_hooks.iter().cloned())
+            .collect::<Vec<_>>()
+            .into();
+        any |= !method_call_hooks.is_empty();
+
+        any.then_some(NodeAnalysisRequirements { targets, requirements, method_call_hooks })
     }
 }
 
@@ -1951,7 +1977,7 @@ where
             artifacts,
             node_analysis_targets: node_analysis_requirements.as_ref().map(NodeAnalysisRequirements::targets),
         };
-        for backend in &self.backends {
+        for (backend_index, backend) in self.backends.iter().enumerate() {
             let plugins = backend.registration.file_analysis_plugins();
             if plugins.is_empty() {
                 continue;
@@ -1960,7 +1986,7 @@ where
             let backend_node_requirements = backend
                 .registration
                 .node_analysis_requirements()
-                .filter(|requirements| lifecycle::has_node_analysis_target(program, requirements));
+                .filter(|requirements| lifecycle::has_node_analysis_target(program, artifacts, codebase, requirements));
 
             let lifecycle_start = self.trace_enabled.then(Instant::now);
             let encode_start = self.trace_enabled.then(Instant::now);
@@ -1971,8 +1997,11 @@ where
                 program,
                 resolved_names,
                 artifacts,
+                codebase,
                 include_expression_types,
                 backend_node_requirements.as_ref(),
+                u16::try_from(backend_index)
+                    .map_err(|_| error::protocol("external analyzer backend exceeds u16::MAX"))?,
             )
             .inspect_err(|_| {
                 if self.trace_enabled {
@@ -2033,7 +2062,7 @@ where
         }
 
         let mut result = AfterFileAnalysisResult::default();
-        for backend in &self.backends {
+        for (backend_index, backend) in self.backends.iter().enumerate() {
             let plugins = backend.registration.file_analysis_plugins();
             if plugins.is_empty() {
                 continue;
@@ -2063,6 +2092,8 @@ where
                 include_expression_types,
                 backend_node_requirements.as_ref(),
                 session,
+                u16::try_from(backend_index)
+                    .map_err(|_| error::protocol("external analyzer backend exceeds u16::MAX"))?,
             )
             .inspect_err(|_| {
                 if self.trace_enabled {
@@ -3294,6 +3325,7 @@ where
             let advertised_attributed_entry_points = registration.attributed_entry_points.len();
             let advertised_issue_filter_hooks = registration.issue_filter_hooks.len();
             let advertised_node_analysis_hooks = registration.node_analysis_hooks.len();
+            let advertised_method_call_analysis_hooks = registration.method_call_analysis_hooks.len();
             let enabled_indices = registration
                 .plugins
                 .iter()
@@ -3311,6 +3343,12 @@ where
             registration.attributed_entry_points.retain(|entry_point| enabled.contains(entry_point.plugin.as_str()));
             registration.issue_filter_hooks.retain(|hook| enabled.contains(hook.plugin.as_str()));
             registration.node_analysis_hooks.retain(|hook| enabled.contains(hook.plugin.as_str()));
+            registration.method_call_analysis_hooks.retain(|hook| enabled.contains(hook.plugin.as_str()));
+            let backend_route = u16::try_from(backend_index)
+                .map_err(|_| error::protocol("more than 65,536 external analyzer backends were configured"))?;
+            for hook in &mut registration.method_call_analysis_hooks {
+                hook.route = (u32::from(backend_route) << 16) | u32::from(hook.index);
+            }
             registration.initialization_plugins.retain(|index| enabled_indices.contains(index));
             registration.before_analysis_plugins.retain(|index| enabled_indices.contains(index));
             registration.after_file_analysis_plugins.retain(|index| enabled_indices.contains(index));
@@ -3381,6 +3419,9 @@ where
                     disabled_issue_filter_hooks = advertised_issue_filter_hooks - registration.issue_filter_hooks.len(),
                     node_analysis_hooks = registration.node_analysis_hooks.len(),
                     disabled_node_analysis_hooks = advertised_node_analysis_hooks - registration.node_analysis_hooks.len(),
+                    method_call_analysis_hooks = registration.method_call_analysis_hooks.len(),
+                    disabled_method_call_analysis_hooks = advertised_method_call_analysis_hooks
+                        - registration.method_call_analysis_hooks.len(),
                     before_analysis_plugins = registration.before_analysis_plugins.len(),
                     after_file_analysis_plugins = registration.after_file_analysis_plugins.len(),
                     after_analysis_plugins = registration.after_analysis_plugins.len(),
@@ -3434,6 +3475,11 @@ where
                 analyzer.backends.iter().map(|backend| backend.registration.issue_filter_hooks.len()).sum::<usize>();
             let node_analysis_hooks =
                 analyzer.backends.iter().map(|backend| backend.registration.node_analysis_hooks.len()).sum::<usize>();
+            let method_call_analysis_hooks = analyzer
+                .backends
+                .iter()
+                .map(|backend| backend.registration.method_call_analysis_hooks.len())
+                .sum::<usize>();
             let before_analysis_plugins = analyzer
                 .backends
                 .iter()
@@ -3462,6 +3508,7 @@ where
                 attributed_entry_points,
                 issue_filter_hooks,
                 node_analysis_hooks,
+                method_call_analysis_hooks,
                 before_analysis_plugins,
                 after_file_analysis_plugins,
                 after_analysis_plugins,

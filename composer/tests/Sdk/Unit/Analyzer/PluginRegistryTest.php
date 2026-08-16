@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Mago\Tests\Sdk\Unit\Analyzer;
 
 use Mago\Sdk\Analyzer\ClassTarget;
+use Mago\Sdk\Analyzer\MethodCallAnalysisHook;
 use Mago\Sdk\Analyzer\MethodTarget;
 use Mago\Sdk\Analyzer\NodeAnalysisContext;
 use Mago\Sdk\Analyzer\NodeAnalysisHook;
@@ -37,6 +38,18 @@ final class PluginRegistryTest extends TestCase
         self::assertSame([$first, $second], $registry->getNodeAnalysisHooks());
     }
 
+    public function testMethodCallAnalysisHooksPreserveRegistrationOrder(): void
+    {
+        $registry = new PluginRegistry();
+        $first = self::methodCallAnalysisHook(MethodTarget::exact('FrameworkTestCase', 'assert*'));
+        $second = self::methodCallAnalysisHook(MethodTarget::exact('MockObject', 'method'));
+
+        $registry->registerMethodCallAnalysisHook($first);
+        $registry->registerMethodCallAnalysisHook($second);
+
+        self::assertSame([$first, $second], $registry->getMethodCallAnalysisHooks());
+    }
+
     public function testFrameworkEntryPointsPreserveRegistrationOrder(): void
     {
         $registry = new PluginRegistry();
@@ -63,6 +76,27 @@ final class PluginRegistryTest extends TestCase
         return new class($target) implements NodeAnalysisHook {
             public function __construct(
                 private readonly NodeKind $target,
+            ) {}
+
+            public function getTargets(): array
+            {
+                return [$this->target];
+            }
+
+            public function getRequirements(): array
+            {
+                return [];
+            }
+
+            public function analyze(NodeAnalysisContext $context): void {}
+        };
+    }
+
+    private static function methodCallAnalysisHook(MethodTarget $target): MethodCallAnalysisHook
+    {
+        return new class($target) implements MethodCallAnalysisHook {
+            public function __construct(
+                private readonly MethodTarget $target,
             ) {}
 
             public function getTargets(): array

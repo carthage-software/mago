@@ -19,6 +19,8 @@ use Mago\Sdk\Analyzer\LifecycleContext;
 use Mago\Sdk\Analyzer\Metadata\ClassLikeMetadata;
 use Mago\Sdk\Analyzer\Metadata\FunctionLikeKind as MetadataFunctionLikeKind;
 use Mago\Sdk\Analyzer\Metadata\MemberIdentifier;
+use Mago\Sdk\Analyzer\MethodCallAnalysisHook;
+use Mago\Sdk\Analyzer\MethodTarget;
 use Mago\Sdk\Analyzer\NodeAnalysisContext;
 use Mago\Sdk\Analyzer\NodeAnalysisHook;
 use Mago\Sdk\Analyzer\Plugin;
@@ -150,6 +152,11 @@ final class LifecycleProofHook implements
                     public function answer(): int
                     {
                         return 42;
+                    }
+
+                    public function unrelated(): int
+                    {
+                        return 0;
                     }
                 }
 
@@ -552,6 +559,48 @@ final class LifecycleProofHook implements
 /**
  * @mago-expect lint:single-class-per-file
  */
+final class LifecycleMethodCallHook implements MethodCallAnalysisHook
+{
+    public function __construct(
+        private readonly string $plugin,
+        private readonly string $auditLog,
+    ) {}
+
+    public function getTargets(): array
+    {
+        return [MethodTarget::exact('ExtensionProvided', 'answer')];
+    }
+
+    public function getRequirements(): array
+    {
+        return [FileAnalysisRequirement::ReceiverType, FileAnalysisRequirement::TargetSubtree];
+    }
+
+    public function analyze(NodeAnalysisContext $context): void
+    {
+        $call = CallExpression::fromNode($context->source, $context->node);
+        if ($context->node->kind !== NodeKind::MethodCall || $call->getName($context->source) !== 'answer') {
+            throw new RuntimeException('A targeted method-call hook received an unrelated call.');
+        }
+        if ($context->receiverType === null || !str_contains((string) $context->receiverType, 'LifecycleClass0')) {
+            throw new RuntimeException('A targeted method-call hook did not receive its requested receiver type.');
+        }
+
+        $record = json_encode([
+            $this->plugin,
+            'method-call',
+            $context->analysis->file,
+            getmypid(),
+        ], JSON_THROW_ON_ERROR);
+        if (file_put_contents($this->auditLog, $record . "\n", FILE_APPEND | LOCK_EX) === false) {
+            throw new RuntimeException('Unable to append to the lifecycle audit log.');
+        }
+    }
+}
+
+/**
+ * @mago-expect lint:single-class-per-file
+ */
 final class LifecycleProofPlugin implements Plugin
 {
     public function __construct(
@@ -571,6 +620,7 @@ final class LifecycleProofPlugin implements Plugin
         $registry->registerBeforeAnalysisHook($hook);
         $registry->registerAfterFileAnalysisHook($hook);
         $registry->registerNodeAnalysisHook($hook);
+        $registry->registerMethodCallAnalysisHook(new LifecycleMethodCallHook($this->identifier, $this->auditLog));
         $registry->registerAfterAnalysisHook($hook);
     }
 }

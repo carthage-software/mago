@@ -30,6 +30,8 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::expression::call::analyze_invocation_targets;
+use crate::expression::call::record_external_method_call;
+use crate::expression::call::record_external_method_call_targets;
 use crate::invocation::Invocation;
 use crate::invocation::InvocationArgumentsSource;
 use crate::invocation::InvocationTarget;
@@ -347,6 +349,16 @@ where
     }
 
     let has_resolved_methods = !invocation_targets.is_empty();
+
+    record_external_method_call(context, artifacts, &invocation_targets, span);
+    if !method_resolution.undocumented_methods.is_empty() {
+        record_external_method_call_targets(
+            context,
+            artifacts,
+            method_resolution.undocumented_methods.iter().map(|method| (method.classname, method.method_name)),
+            span,
+        );
+    }
 
     let this_variable = get_expression_id(
         object,

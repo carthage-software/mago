@@ -36,6 +36,7 @@ use mago_word::word;
 
 use crate::analysis_result::AnalysisResult;
 use crate::artifacts::AnalysisArtifacts;
+use crate::artifacts::ResolvedMethodCall;
 
 use super::ExternalAnalysisSession;
 use super::ExternalPlugin;
@@ -155,17 +156,109 @@ struct ReferenceSummary {
 /// Number of completed files sent through one external after-file request.
 pub const AFTER_FILE_ANALYSIS_BATCH_SIZE: usize = 32;
 
-pub(super) fn has_node_analysis_target(program: &Program<'_>, requirements: &NodeAnalysisRequirements) -> bool {
+type NodeTargetKey = (u8, u32, u32);
+
+struct NodeAnalysisTarget<'ast, 'arena> {
+    node: Node<'ast, 'arena>,
+    requirements: u8,
+    method_call_hook_routes: Vec<u32>,
+}
+
+struct NodeAnalysisPlan<'ast, 'arena> {
+    targets: Vec<NodeAnalysisTarget<'ast, 'arena>>,
+    by_node: HashMap<NodeTargetKey, usize>,
+}
+
+impl<'ast, 'arena> NodeAnalysisPlan<'ast, 'arena> {
+    fn configuration(&self, node: Node<'ast, 'arena>) -> Option<bool> {
+        let span = node.span();
+        self.by_node
+            .get(&(node.kind() as u8, span.start.offset, span.end.offset))
+            .map(|index| self.targets[*index].requirements & super::NODE_REQUIREMENT_TARGET_SUBTREE != 0)
+    }
+}
+
+fn build_node_analysis_plan<'ast, 'arena>(
+    program: &'ast Program<'arena>,
+    artifacts: &AnalysisArtifacts,
+    codebase: &CodebaseMetadata,
+    requirements: &NodeAnalysisRequirements,
+) -> NodeAnalysisPlan<'ast, 'arena> {
+    let (method_calls, method_call_targets) = if requirements.method_call_hooks.is_empty() {
+        (None, None)
+    } else {
+        let mut targets = artifacts.resolved_method_calls.iter().collect::<Vec<_>>();
+        targets.sort_unstable_by_key(|target| target.span);
+        let mut calls = HashMap::<(u32, u32), Range<usize>>::default();
+        for (index, call) in targets.iter().enumerate() {
+            calls.entry(call.span).and_modify(|range| range.end = index + 1).or_insert(index..index + 1);
+        }
+        (Some(calls), Some(targets))
+    };
+    let mut targets = Vec::new();
+    let mut by_node = HashMap::default();
     let mut stack = Vec::with_capacity(64);
     stack.push(Node::Program(program));
     while let Some(node) = stack.pop() {
-        if requirements.targets()[node.kind() as usize] {
-            return true;
+        let kind = node.kind();
+        let span = node.span();
+        let mut requested = requirements.requirements(kind);
+        let mut method_call_hook_routes = Vec::new();
+        if is_method_call_kind(kind)
+            && let Some(call_range) =
+                method_calls.as_ref().and_then(|calls| calls.get(&(span.start.offset, span.end.offset)))
+        {
+            let calls = &method_call_targets.as_deref().unwrap_or_default()[call_range.clone()];
+            for hook in requirements.method_call_hooks.iter() {
+                if method_call_matches_hook(calls, hook, codebase) {
+                    requested |= hook.requirements;
+                    method_call_hook_routes.push(hook.route);
+                }
+            }
         }
+
+        if requirements.targets()[kind as usize] || !method_call_hook_routes.is_empty() {
+            let index = targets.len();
+            by_node.insert((kind as u8, span.start.offset, span.end.offset), index);
+            targets.push(NodeAnalysisTarget { node, requirements: requested, method_call_hook_routes });
+        }
+
+        let start = stack.len();
         node.visit_children(|child| stack.push(child));
+        stack[start..].reverse();
     }
 
-    false
+    NodeAnalysisPlan { targets, by_node }
+}
+
+fn is_method_call_kind(kind: mago_syntax::cst::NodeKind) -> bool {
+    matches!(
+        kind,
+        mago_syntax::cst::NodeKind::MethodCall
+            | mago_syntax::cst::NodeKind::NullSafeMethodCall
+            | mago_syntax::cst::NodeKind::StaticMethodCall
+    )
+}
+
+fn method_call_matches_hook(
+    calls: &[&ResolvedMethodCall],
+    hook: &super::MethodCallAnalysisHookRegistration,
+    codebase: &CodebaseMetadata,
+) -> bool {
+    calls.iter().any(|call_target| {
+        hook.targets
+            .iter()
+            .any(|target| target.matches(codebase, call_target.class.as_bytes(), call_target.method.as_bytes()))
+    })
+}
+
+pub(super) fn has_node_analysis_target(
+    program: &Program<'_>,
+    artifacts: &AnalysisArtifacts,
+    codebase: &CodebaseMetadata,
+    requirements: &NodeAnalysisRequirements,
+) -> bool {
+    !build_node_analysis_plan(program, artifacts, codebase, requirements).targets.is_empty()
 }
 
 impl FileAnalysisSnapshot {
@@ -179,13 +272,14 @@ impl FileAnalysisSnapshot {
         program: &Program<'_>,
         resolved_names: &ResolvedNames<'_>,
         artifacts: &AnalysisArtifacts,
+        codebase: &CodebaseMetadata,
         node_analysis_requirements: Option<&NodeAnalysisRequirements>,
     ) -> Result<Self, ExternalAnalyzerError> {
-        let source = SourceSnapshot::complete_with_targets(
-            program,
-            resolved_names,
-            node_analysis_requirements.map(NodeAnalysisRequirements::targets),
-        )
+        let node_analysis_plan = node_analysis_requirements
+            .map(|requirements| build_node_analysis_plan(program, artifacts, codebase, requirements));
+        let source = SourceSnapshot::complete_with_target_filter(program, resolved_names, |node| {
+            node_analysis_plan.as_ref().is_some_and(|plan| plan.configuration(node).is_some())
+        })
         .map_err(|error| {
             protocol(format!("failed to retain syntax for `{}`: {error}", String::from_utf8_lossy(&file.name)))
         })?;
@@ -196,16 +290,14 @@ impl FileAnalysisSnapshot {
             protocol(format!("failed to encode retained syntax for `{}`: {error}", String::from_utf8_lossy(&file.name)))
         })?;
 
-        let (encoded_target_source, encoded_target_analysis, node_analysis_targets) = if let Some(requirements) =
-            node_analysis_requirements.filter(|_| matched_target_count != 0)
+        let (encoded_target_source, encoded_target_analysis, node_analysis_targets) = if let Some(plan) =
+            node_analysis_plan.as_ref().filter(|_| matched_target_count != 0)
         {
-            let subtree_targets = requirements.subtree_targets();
-            let target_source = SourceSnapshot::targeted(
+            let target_source = SourceSnapshot::targeted_with_filter(
                 program,
                 resolved_names,
-                requirements.targets(),
-                &subtree_targets,
-                requirements.includes_source_text(),
+                |node| plan.configuration(node),
+                node_analysis_requirements.is_some_and(NodeAnalysisRequirements::includes_source_text),
             )
             .map_err(|error| {
                 protocol(format!(
@@ -228,7 +320,7 @@ impl FileAnalysisSnapshot {
                     ))
                 })?;
                 let mut target_analysis_writer = PayloadWriter::new();
-                write_target_analysis(&mut target_analysis_writer, program, artifacts, requirements, target_count)?;
+                write_target_analysis(&mut target_analysis_writer, artifacts, plan, target_count)?;
                 (
                     target_source_writer.finish().into_boxed_slice(),
                     target_analysis_writer.finish().into_boxed_slice(),
@@ -336,40 +428,36 @@ fn encode_snapshot_type<'type_info>(
 
 fn write_target_analysis(
     writer: &mut PayloadWriter,
-    program: &Program<'_>,
     artifacts: &AnalysisArtifacts,
-    requirements: &NodeAnalysisRequirements,
+    plan: &NodeAnalysisPlan<'_, '_>,
     expected_count: usize,
 ) -> Result<(), ExternalAnalyzerError> {
-    writer.write_u32(u32::try_from(expected_count).map_err(|_| protocol("too many node-analysis targets"))?);
-    let mut written = 0usize;
-    let mut stack = Vec::with_capacity(64);
-    stack.push(Node::Program(program));
-    while let Some(node) = stack.pop() {
-        if requirements.targets()[node.kind() as usize] {
-            let requested = requirements.requirements(node.kind());
-            writer.write_u8(requested);
-            if requested & NODE_REQUIREMENT_TARGET_EXPRESSION_TYPES != 0 {
-                write_optional_expression_type(writer, artifacts, Some(node.span()))?;
-            }
-            if requested & NODE_REQUIREMENT_RECEIVER_TYPE != 0 {
-                write_optional_expression_type(writer, artifacts, receiver_span(node))?;
-            }
-            if requested & NODE_REQUIREMENT_ARGUMENT_TYPES != 0 {
-                write_argument_types(writer, artifacts, node)?;
-            }
-            written += 1;
-        }
-
-        let start = stack.len();
-        node.visit_children(|child| stack.push(child));
-        stack[start..].reverse();
-    }
-
-    if written != expected_count {
+    if plan.targets.len() != expected_count {
         return Err(protocol(format!(
-            "targeted syntax contains {expected_count} targets, but {written} target records were encoded"
+            "targeted syntax contains {expected_count} targets, but the analysis plan contains {}",
+            plan.targets.len()
         )));
+    }
+    writer.write_u32(u32::try_from(expected_count).map_err(|_| protocol("too many node-analysis targets"))?);
+    for target in &plan.targets {
+        let requested = target.requirements;
+        writer.write_u8(requested);
+        if requested & NODE_REQUIREMENT_TARGET_EXPRESSION_TYPES != 0 {
+            write_optional_expression_type(writer, artifacts, Some(target.node.span()))?;
+        }
+        if requested & NODE_REQUIREMENT_RECEIVER_TYPE != 0 {
+            write_optional_expression_type(writer, artifacts, receiver_span(target.node))?;
+        }
+        if requested & NODE_REQUIREMENT_ARGUMENT_TYPES != 0 {
+            write_argument_types(writer, artifacts, target.node)?;
+        }
+        writer.write_u32(
+            u32::try_from(target.method_call_hook_routes.len())
+                .map_err(|_| protocol("too many method-call hook routes matched one call"))?,
+        );
+        for route in &target.method_call_hook_routes {
+            writer.write_u32(*route);
+        }
     }
 
     Ok(())
@@ -686,17 +774,17 @@ impl FileView<'_> {
     fn write_target_source_snapshot(
         &self,
         writer: &mut PayloadWriter,
-        requirements: &NodeAnalysisRequirements,
+        plan: Option<&NodeAnalysisPlan<'_, '_>>,
+        include_trivia: bool,
     ) -> Result<(), ExternalAnalyzerError> {
         match self {
             Self::Artifacts(file, program, resolved_names, artifacts, _) => {
-                let subtree_targets = requirements.subtree_targets();
-                let snapshot = SourceSnapshot::targeted(
+                let plan = plan.ok_or_else(|| protocol("targeted file summary is missing its node-analysis plan"))?;
+                let snapshot = SourceSnapshot::targeted_with_filter(
                     program,
                     resolved_names,
-                    requirements.targets(),
-                    &subtree_targets,
-                    requirements.includes_source_text(),
+                    |node| plan.configuration(node),
+                    include_trivia,
                 )
                 .map_err(|error| {
                     protocol(format!(
@@ -711,7 +799,7 @@ impl FileView<'_> {
                         String::from_utf8_lossy(&file.name)
                     ))
                 })?;
-                write_target_analysis(writer, program, artifacts, requirements, snapshot.target_count())
+                write_target_analysis(writer, artifacts, plan, snapshot.target_count())
             }
             Self::Snapshot(file) => {
                 writer.write_raw(&file.encoded_target_source);
@@ -753,10 +841,14 @@ pub(super) fn encode_after_file_analysis_request(
     program: &Program<'_>,
     resolved_names: &ResolvedNames<'_>,
     artifacts: &AnalysisArtifacts,
+    codebase: &CodebaseMetadata,
     include_expression_types: bool,
     node_analysis_requirements: Option<&NodeAnalysisRequirements>,
+    backend: u16,
 ) -> Result<Vec<u8>, ExternalAnalyzerError> {
     let mut writer = lifecycle_writer(AFTER_FILE_ANALYSIS_REQUEST, generation, plugins)?;
+    let node_analysis_plan = node_analysis_requirements
+        .map(|requirements| build_node_analysis_plan(program, artifacts, codebase, requirements));
     write_file_summary(
         &mut writer,
         FileView::Artifacts(
@@ -768,6 +860,8 @@ pub(super) fn encode_after_file_analysis_request(
         ),
         include_expression_types,
         node_analysis_requirements,
+        node_analysis_plan.as_ref(),
+        backend,
         node_analysis_requirements
             .is_some_and(NodeAnalysisRequirements::includes_source_text)
             .then_some(file.contents.as_ref()),
@@ -782,6 +876,7 @@ pub(super) fn encode_after_file_analysis_batch_request(
     include_expression_types: bool,
     node_analysis_requirements: Option<&NodeAnalysisRequirements>,
     session: &ExternalAnalysisSession,
+    backend: u16,
 ) -> Result<Vec<u8>, ExternalAnalyzerError> {
     let mut writer = lifecycle_writer(AFTER_FILE_ANALYSIS_BATCH_REQUEST, generation, plugins)?;
     writer.write_u32(u32::try_from(files.len()).map_err(|_| protocol("after-file batch exceeds u32::MAX files"))?);
@@ -810,6 +905,8 @@ pub(super) fn encode_after_file_analysis_batch_request(
             FileView::Snapshot(file),
             include_expression_types,
             file_node_analysis_requirements,
+            None,
+            backend,
             contents,
         )?;
     }
@@ -829,7 +926,7 @@ pub(super) fn encode_after_analysis_request(
     write_reference_summary(&mut writer, &result.symbol_references);
     writer.write_u32(u32::try_from(files.len()).map_err(|_| protocol("analysis has more than u32::MAX files"))?);
     for file in files {
-        write_file_summary(&mut writer, FileView::Snapshot(file), false, None, None)?;
+        write_file_summary(&mut writer, FileView::Snapshot(file), false, None, None, 0, None)?;
     }
 
     Ok(writer.finish())
@@ -852,6 +949,8 @@ fn write_file_summary(
     file: FileView<'_>,
     include_expression_types: bool,
     node_analysis_requirements: Option<&NodeAnalysisRequirements>,
+    node_analysis_plan: Option<&NodeAnalysisPlan<'_, '_>>,
+    backend: u16,
     source_contents: Option<&[u8]>,
 ) -> Result<(), ExternalAnalyzerError> {
     writer.write_bytes(file.name())?;
@@ -870,12 +969,17 @@ fn write_file_summary(
         file.write_expression_type_snapshot(writer)?;
     }
     writer.write_bool(node_analysis_requirements.is_some());
-    if let Some(requirements) = node_analysis_requirements {
+    if node_analysis_requirements.is_some() {
+        writer.write_u16(backend);
         writer.write_bool(source_contents.is_some());
         if let Some(contents) = source_contents {
             writer.write_bytes(contents)?;
         }
-        file.write_target_source_snapshot(writer, requirements)?;
+        file.write_target_source_snapshot(
+            writer,
+            node_analysis_plan,
+            node_analysis_requirements.is_some_and(NodeAnalysisRequirements::includes_source_text),
+        )?;
     }
     Ok(())
 }

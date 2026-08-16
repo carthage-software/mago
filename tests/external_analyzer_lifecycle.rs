@@ -84,8 +84,8 @@ fn make_database(
  */
 function lifecycle_assertions(mixed $value, mixed $text, mixed $fallback): bool { return true; }
 
-function extension_consumer(ExtensionProvided $provided): int {
-    return $provided->answer() + extension_answer(0) + EXTENSION_ANSWER;
+function extension_consumer(LifecycleClass0 $provided): int {
+    return $provided->answer() + $provided->unrelated() + extension_answer(0) + EXTENSION_ANSWER;
 }
 
 $lifecycleClosure = function (string $value): string { return $value; };
@@ -185,7 +185,8 @@ fn assert_initial_audit(entries: &[AuditEntry]) {
     assert_eq!(entries.iter().filter(|entry| entry.1 == "initialize").count(), PLUGINS.len() * 3);
     assert_eq!(entries.iter().filter(|entry| entry.1 == "before").count(), PLUGINS.len());
     assert_eq!(entries.iter().filter(|entry| entry.1 == "after-file").count(), FILE_COUNT * PLUGINS.len());
-    assert_eq!(entries.iter().filter(|entry| entry.1 == "node").count(), PLUGINS.len() * 2);
+    assert_eq!(entries.iter().filter(|entry| entry.1 == "node").count(), PLUGINS.len() * 3);
+    assert_eq!(entries.iter().filter(|entry| entry.1 == "method-call").count(), PLUGINS.len());
     assert_eq!(entries.iter().filter(|entry| entry.1 == "after").count(), PLUGINS.len());
 
     let callbacks = entries
@@ -281,7 +282,7 @@ fn external_analyzer_lifecycle_is_exact_across_workers_and_incremental_runs() {
     );
 
     let initial_audit = read_audit(&audit_log);
-    assert_eq!(initial_audit.len(), (PLUGINS.len() * 5) + 2 + (FILE_COUNT * 2) + 2);
+    assert_eq!(initial_audit.len(), (PLUGINS.len() * 7) + 2 + (FILE_COUNT * 2) + 2);
     assert_initial_audit(&initial_audit);
 
     let (updated_database, changed_file) = make_database(Some(5), true, true, &initialization_sources);

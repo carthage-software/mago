@@ -13,6 +13,8 @@ use crate::error::AnalysisError;
 use crate::expression::call::analyze_invocation_targets;
 use crate::expression::call::method_call::analyze_undocumented_method_return_type;
 use crate::expression::call::method_call::prepare_unresolved_method_targets;
+use crate::expression::call::record_external_method_call;
+use crate::expression::call::record_external_method_call_targets;
 use crate::invocation::InvocationArgumentsSource;
 use crate::invocation::InvocationTarget;
 use crate::invocation::MethodInvocationKind;
@@ -136,6 +138,16 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodCall<'arena> {
         }
 
         let has_resolved_methods = !invocation_targets.is_empty();
+
+        record_external_method_call(context, artifacts, &invocation_targets, self.span());
+        if !method_resolution.undocumented_methods.is_empty() {
+            record_external_method_call_targets(
+                context,
+                artifacts,
+                method_resolution.undocumented_methods.iter().map(|method| (method.classname, method.method_name)),
+                self.span(),
+            );
+        }
 
         let class_has_nullsafe_null = artifacts.get_expression_type(self.class).is_some_and(|t| t.has_nullsafe_null());
 

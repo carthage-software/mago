@@ -93,6 +93,7 @@ pub struct PluginRegistry {
     external_property_initialization_providers: OnceLock<bool>,
     external_class_initializer_providers: OnceLock<bool>,
     external_issue_filter_hooks: OnceLock<bool>,
+    external_method_call_analysis_hooks: OnceLock<bool>,
     function_exact: WordMap<Vec<usize>>,
     function_prefix: Vec<(Word, usize)>,
     function_namespace: Vec<(Word, usize)>,
@@ -142,6 +143,7 @@ impl std::fmt::Debug for PluginRegistry {
             .field("external_property_initialization_providers", &self.external_property_initialization_providers.get())
             .field("external_class_initializer_providers", &self.external_class_initializer_providers.get())
             .field("external_issue_filter_hooks", &self.external_issue_filter_hooks.get())
+            .field("external_method_call_analysis_hooks", &self.external_method_call_analysis_hooks.get())
             .field("external_function_signature_providers", &self.external_function_signature_providers.get())
             .field("external_method_signature_providers", &self.external_method_signature_providers.get())
             .field("function_providers", &self.function_providers.len())
@@ -204,6 +206,8 @@ impl PluginRegistry {
             analyzer.has_class_initializer_providers().map_err(|reason| PluginError::Internal { reason })?;
         let issue_filter_hooks =
             analyzer.has_issue_filter_hooks().map_err(|reason| PluginError::Internal { reason })?;
+        let method_call_analysis_hooks =
+            analyzer.has_method_call_analysis_hooks().map_err(|reason| PluginError::Internal { reason })?;
         let _function = self.external_function_providers.set(function_providers);
         let _method = self.external_method_providers.set(method_providers);
         let _function_signature = self.external_function_signature_providers.set(function_signature_providers);
@@ -213,7 +217,14 @@ impl PluginRegistry {
             self.external_property_initialization_providers.set(property_initialization_providers);
         let _class_initializer = self.external_class_initializer_providers.set(class_initializer_providers);
         let _issue_filters = self.external_issue_filter_hooks.set(issue_filter_hooks);
+        let _method_call_analysis = self.external_method_call_analysis_hooks.set(method_call_analysis_hooks);
         Ok(())
+    }
+
+    #[inline]
+    #[must_use]
+    pub(crate) fn has_external_method_call_analysis_hooks(&self) -> bool {
+        self.external_analyzer.is_some() && self.external_method_call_analysis_hooks.get().copied().unwrap_or(true)
     }
 
     /// Completes external initialization and returns its in-memory source stubs.

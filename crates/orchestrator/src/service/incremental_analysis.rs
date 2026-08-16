@@ -1281,6 +1281,7 @@ impl IncrementalAnalysisService {
                             program,
                             &resolved_names,
                             &artifacts,
+                            codebase,
                             node_analysis_requirements.as_ref(),
                         )
                         .map_err(|error| {
