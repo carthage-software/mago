@@ -59,10 +59,13 @@
     const entries = data.versions.filter((v) => v && typeof v.id === "string");
     if (entries.length === 0) return;
 
+    const mainArr = entries.filter((v) => v.label === "main");
+    const latestMain = mainArr.length > 0 ? mainArr[0] : null;
+
     const stable = entries
       .filter((v) => v.stable === true)
-      .sort((a, b) => compareSemver(a.id, b.id));
-    const latestStable = stable.length > 0 ? stable[stable.length - 1] : null;
+      .sort((a, b) => -compareSemver(a.id, b.id));
+    const latestStable = stable.length > 0 ? stable[0] : null;
 
     const items = [];
     if (latestStable) {
@@ -73,7 +76,15 @@
         active: false,
       });
     }
-    for (const version of entries) {
+    if (latestMain) {
+      items.push({
+        id: latestMain.id,
+        label: latestMain.label,
+        url: buildUrl("main"),
+        active: false,
+      });
+    }
+    for (const version of stable) {
       items.push({
         id: version.id,
         label: typeof version.label === "string" ? version.label : version.id,
