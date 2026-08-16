@@ -2919,6 +2919,7 @@ pub(super) mod testing {
         writer.write_u32(0);
         writer.write_u32(0);
         writer.write_u32(0);
+        writer.write_u32(0);
         writer.finish()
     }
 
@@ -2947,6 +2948,7 @@ pub(super) mod testing {
         writer.write_u32(1);
         writer.write_u8(TARGET_EXACT);
         writer.write_bytes(b"demo_service").unwrap();
+        writer.write_u32(0);
         writer.write_u32(0);
         writer.write_u32(0);
         writer.write_u32(0);
