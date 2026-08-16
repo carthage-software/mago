@@ -15,6 +15,7 @@ use Mago\Sdk\Analyzer\InitializationContext;
 use Mago\Sdk\Analyzer\InvocationKind;
 use Mago\Sdk\Analyzer\IssueFilterContext;
 use Mago\Sdk\Analyzer\IssueFilterDecision;
+use Mago\Sdk\Analyzer\NodeAnalysisContext;
 use Mago\Sdk\Analyzer\PluginRegistry as AnalyzerPluginRegistry;
 use Mago\Sdk\Analyzer\ProjectAnalysis;
 use Mago\Sdk\Analyzer\PropertyInitializationProviderContext;
@@ -29,9 +30,11 @@ use Mago\Sdk\Internal\Analyzer\Protocol as AnalyzerProtocol;
 use Mago\Sdk\Internal\Analyzer\RegisteredFunctionReturnTypeProvider;
 use Mago\Sdk\Internal\Analyzer\RegisteredIssueFilterHook;
 use Mago\Sdk\Internal\Analyzer\RegisteredMethodReturnTypeProvider;
+use Mago\Sdk\Internal\Analyzer\RegisteredNodeAnalysisHook;
 use Mago\Sdk\Internal\Analyzer\RegisteredPlugin;
 use Mago\Sdk\Internal\Analyzer\RegisteredPropertyInitializationProvider;
 use Mago\Sdk\Internal\Analyzer\RegisteredPropertyTypeProvider;
+use Mago\Sdk\Internal\Analyzer\ReportedIssue;
 use Mago\Sdk\Internal\HostClient;
 use Mago\Sdk\Internal\Io\ResourceReader;
 use Mago\Sdk\Internal\Io\ResourceWriter;
@@ -53,6 +56,7 @@ use function array_values;
 use function count;
 use function defined;
 use function fwrite;
+use function in_array;
 use function is_array;
 use function ob_end_flush;
 use function ob_get_level;
@@ -141,6 +145,7 @@ final class Worker
         $propertyProviders = [];
         $propertyInitializationProviders = [];
         $issueFilterHooks = [];
+        $nodeAnalysisHooks = [];
         $workerReducerIndices = [];
         foreach ($extensions as $extensionIndex => $registeredExtension) {
             $normalizedExtensionIdentifier = strtolower($registeredExtension->identifier);
@@ -293,6 +298,22 @@ final class Worker
 
                 $registeredIssueFilterHooks = [];
                 foreach ($registry->getIssueFilterHooks() as $hook) {
+                    $codes = $hook->getCodes();
+                    if ($codes === []) {
+                        throw new InvalidArgumentException(
+                            "An issue-filter hook in `{$definition->identifier}` has no target codes.",
+                        );
+                    }
+                    $seenCodes = [];
+                    foreach ($codes as $code) {
+                        if (array_key_exists($code, $seenCodes)) {
+                            throw new InvalidArgumentException(
+                                "An issue-filter hook in `{$definition->identifier}` targets issue code `{$code}` more than once.",
+                            );
+                        }
+                        $seenCodes[$code] = true;
+                    }
+
                     $hookIndex = count($issueFilterHooks);
                     if ($hookIndex > 65_535) {
                         throw new InvalidArgumentException(
@@ -300,9 +321,61 @@ final class Worker
                         );
                     }
 
-                    $registeredHook = new RegisteredIssueFilterHook($hookIndex, $definition->identifier, $hook);
+                    $registeredHook = new RegisteredIssueFilterHook($hookIndex, $definition->identifier, $hook, $codes);
                     $issueFilterHooks[] = $registeredHook;
                     $registeredIssueFilterHooks[] = $registeredHook;
+                }
+
+                $registeredNodeAnalysisHooks = [];
+                $registeredNodeAnalysisHooksByNodeKind = [];
+                foreach ($registry->getNodeAnalysisHooks() as $hook) {
+                    $targets = $hook->getTargets();
+                    if ($targets === []) {
+                        throw new InvalidArgumentException(
+                            "A node-analysis hook in `{$definition->identifier}` has no targets.",
+                        );
+                    }
+
+                    $seenTargets = [];
+                    foreach ($targets as $target) {
+                        if (array_key_exists($target->value, $seenTargets)) {
+                            throw new InvalidArgumentException(
+                                "A node-analysis hook in `{$definition->identifier}` targets `{$target->value}` more than once.",
+                            );
+                        }
+                        $seenTargets[$target->value] = true;
+                    }
+
+                    $requirements = $hook->getRequirements();
+                    $seenRequirements = [];
+                    foreach ($requirements as $requirement) {
+                        if (array_key_exists($requirement->name, $seenRequirements)) {
+                            throw new InvalidArgumentException(
+                                "A node-analysis hook in `{$definition->identifier}` requests `{$requirement->name}` more than once.",
+                            );
+                        }
+                        $seenRequirements[$requirement->name] = true;
+                    }
+
+                    $hookIndex = count($nodeAnalysisHooks);
+                    if ($hookIndex > 65_535) {
+                        throw new InvalidArgumentException(
+                            'A worker cannot register more than 65,536 analyzer node-analysis hooks.',
+                        );
+                    }
+
+                    $registeredHook = new RegisteredNodeAnalysisHook(
+                        $hookIndex,
+                        $definition->identifier,
+                        $hook,
+                        $targets,
+                        $requirements,
+                    );
+                    $nodeAnalysisHooks[] = $registeredHook;
+                    $registeredNodeAnalysisHooks[] = $registeredHook;
+                    foreach ($targets as $target) {
+                        $registeredNodeAnalysisHooksByNodeKind[$target->value][] = $registeredHook;
+                    }
                 }
 
                 $registeredPlugins[] = new RegisteredPlugin(
@@ -318,7 +391,10 @@ final class Worker
                     $registry->getInitializationHooks(),
                     $registry->getBeforeAnalysisHooks(),
                     $registry->getAfterFileAnalysisHooks(),
+                    $registeredNodeAnalysisHooks,
+                    $registeredNodeAnalysisHooksByNodeKind,
                     $registry->getAfterAnalysisHooks(),
+                    $registry->shouldMemoizeProviders(),
                 );
             }
         }
@@ -611,7 +687,7 @@ final class Worker
                             $this->phpVersion,
                             $codebase,
                             $request->access,
-                            new TypeComparator($host, $requestId, $cancellation),
+                            new TypeComparator($host, $requestId, $cancellation, $this->metadataCache),
                             $cancellation,
                         ),
                     );
@@ -654,7 +730,7 @@ final class Worker
                             $codebase,
                             $request->declaringClass,
                             $request->property,
-                            new TypeComparator($host, $requestId, $cancellation),
+                            new TypeComparator($host, $requestId, $cancellation, $this->metadataCache),
                             $cancellation,
                         ),
                     );
@@ -681,7 +757,7 @@ final class Worker
             }
 
             $codebase = new Codebase($host, $requestId, $cancellation, $this->metadataCache);
-            $types = new TypeComparator($host, $requestId, $cancellation);
+            $types = new TypeComparator($host, $requestId, $cancellation, $this->metadataCache);
             $removed = [];
             foreach ($request->issues as $issueIndex => $issue) {
                 $context = new IssueFilterContext(
@@ -700,6 +776,10 @@ final class Worker
                         throw new ProtocolException(
                             "Mago requested unregistered analyzer issue-filter hook index {$hookIndex}.",
                         );
+                    }
+
+                    if ($context->issue->code === null || !in_array($context->issue->code, $registered->codes, true)) {
+                        continue;
                     }
 
                     $cancellation->throwIfCancelled();
@@ -735,6 +815,54 @@ final class Worker
         $providers = $request->invocation->kind === InvocationKind::Function
             ? $this->functionReturnTypeProviders
             : $this->methodReturnTypeProviders;
+        $types = new TypeComparator($host, $requestId, $cancellation, $this->metadataCache);
+        if ($kind === AnalyzerProtocol::CALLABLE_SIGNATURE_REQUEST) {
+            $context = new CallableSignatureProviderContext(
+                $this->phpVersion,
+                $codebase,
+                $request->invocation,
+                $types,
+                $cancellation,
+            );
+            foreach ($request->providerIndices as $providerIndex) {
+                $registered = $providers[$providerIndex] ?? null;
+                if ($registered === null) {
+                    throw new ProtocolException(
+                        "Mago requested unregistered analyzer provider index {$providerIndex}.",
+                    );
+                }
+
+                $cancellation->throwIfCancelled();
+                try {
+                    if (!$registered->provider instanceof CallableSignatureProvider) {
+                        throw new ProtocolException(
+                            "Mago requested a callable signature from analyzer provider {$providerIndex}, but it does not advertise that capability.",
+                        );
+                    }
+
+                    $signature = $registered->provider->getCallableSignature($context);
+                    if ($signature !== null) {
+                        return AnalyzerProtocol::writeCallableSignatureResponse($signature);
+                    }
+                } catch (Throwable $throwable) {
+                    throw new ProtocolException(
+                        "Analyzer provider in `{$registered->plugin}` failed: {$throwable->getMessage()}",
+                        0,
+                        $throwable,
+                    );
+                }
+            }
+
+            return AnalyzerProtocol::writeCallableSignatureResponse(null);
+        }
+
+        $context = new ReturnTypeProviderContext(
+            $this->phpVersion,
+            $codebase,
+            $request->invocation,
+            $types,
+            $cancellation,
+        );
         foreach ($request->providerIndices as $providerIndex) {
             $registered = $providers[$providerIndex] ?? null;
             if ($registered === null) {
@@ -743,39 +871,7 @@ final class Worker
 
             $cancellation->throwIfCancelled();
             try {
-                if ($kind === AnalyzerProtocol::CALLABLE_SIGNATURE_REQUEST) {
-                    if (!$registered->provider instanceof CallableSignatureProvider) {
-                        throw new ProtocolException(
-                            "Mago requested a callable signature from analyzer provider {$providerIndex}, but it does not advertise that capability.",
-                        );
-                    }
-
-                    $signature = $registered->provider->getCallableSignature(
-                        new CallableSignatureProviderContext(
-                            $this->phpVersion,
-                            $codebase,
-                            $request->invocation,
-                            new TypeComparator($host, $requestId, $cancellation),
-                            $cancellation,
-                        ),
-                    );
-
-                    if ($signature !== null) {
-                        return AnalyzerProtocol::writeCallableSignatureResponse($signature);
-                    }
-
-                    continue;
-                }
-
-                $type = $registered->provider->getReturnType(
-                    new ReturnTypeProviderContext(
-                        $this->phpVersion,
-                        $codebase,
-                        $request->invocation,
-                        new TypeComparator($host, $requestId, $cancellation),
-                        $cancellation,
-                    ),
-                );
+                $type = $registered->provider->getReturnType($context);
             } catch (Throwable $throwable) {
                 throw new ProtocolException(
                     "Analyzer provider in `{$registered->plugin}` failed: {$throwable->getMessage()}",
@@ -789,9 +885,7 @@ final class Worker
             }
         }
 
-        return $kind === AnalyzerProtocol::CALLABLE_SIGNATURE_REQUEST
-            ? AnalyzerProtocol::writeCallableSignatureResponse(null)
-            : AnalyzerProtocol::writeReturnTypeResponse(null);
+        return AnalyzerProtocol::writeReturnTypeResponse(null);
     }
 
     private function handleAnalyzerInitialization(
@@ -850,7 +944,7 @@ final class Worker
             $this->metadataCache = new MetadataCache($request->generation);
         }
         $codebase = new Codebase($host, $requestId, $cancellation, $this->metadataCache);
-        $types = new TypeComparator($host, $requestId, $cancellation);
+        $types = new TypeComparator($host, $requestId, $cancellation, $this->metadataCache);
         $reportedIssues = [];
         $contributedReferences = [];
         $analyses = is_array($request->analysis) ? $request->analysis : [$request->analysis];
@@ -910,6 +1004,8 @@ final class Worker
                         foreach ($registered->afterFileAnalysisHooks as $hook) {
                             $hook->afterFileAnalysis($context);
                         }
+
+                        $this->runNodeAnalysisHooks($registered, $context, $pluginIndex, $reportedIssues);
                     }
 
                     if ($context instanceof AfterAnalysisContext) {
@@ -945,6 +1041,44 @@ final class Worker
         }
 
         return AnalyzerProtocol::writeLifecycleResponse($kind, $reportedIssues, $contributedReferences);
+    }
+
+    /**
+     * @param int<0, 65535> $pluginIndex
+     * @param list<int|ReportedIssue|string|null> $reportedIssues
+     */
+    private function runNodeAnalysisHooks(
+        RegisteredPlugin $registered,
+        AfterFileAnalysisContext $context,
+        int $pluginIndex,
+        array &$reportedIssues,
+    ): void {
+        if ($registered->nodeAnalysisHooks === []) {
+            return;
+        }
+
+        $source = $context->analysis->getSourceFile();
+        $targetIndex = 0;
+        foreach ($source->getTargetNodes() as $node) {
+            if (($targetIndex++ & 63) === 0) {
+                $context->cancellation->throwIfCancelled();
+            }
+
+            $hooks = $registered->nodeAnalysisHooksByNodeKind[$node->kind->value] ?? [];
+            if ($hooks === []) {
+                continue;
+            }
+
+            $nodeContext = new NodeAnalysisContext($context, $source, $node);
+            foreach ($hooks as $hook) {
+                $hook->hook->analyze($nodeContext);
+                foreach ($nodeContext->takeReportedIssues() as $issue) {
+                    $reportedIssues[] = $pluginIndex;
+                    $reportedIssues[] = $issue;
+                    $reportedIssues[] = $context->analysis->file;
+                }
+            }
+        }
     }
 
     /**

@@ -11,6 +11,8 @@ use Mago\Sdk\Internal\Syntax\TriviaStore;
 use Mago\Sdk\PHPVersion;
 use Mago\Sdk\Span;
 
+use function array_pop;
+use function count;
 use function strlen;
 use function substr;
 
@@ -18,6 +20,8 @@ use function substr;
  * An immutable syntax view of the exact source analyzed by Mago.
  *
  * @api
+ * @mago-expect lint:cyclomatic-complexity
+ * @mago-expect lint:too-many-methods
  */
 final class SourceFile
 {
@@ -92,6 +96,41 @@ final class SourceFile
     public function getChildren(Node $node): array
     {
         return $this->nodes->getChildren($node);
+    }
+
+    /**
+     * @return list<Node>
+     */
+    public function getAncestors(Node $node): array
+    {
+        $ancestors = [];
+        while (($node = $this->getParent($node)) !== null) {
+            $ancestors[] = $node;
+        }
+
+        return $ancestors;
+    }
+
+    /**
+     * Returns descendants in source order, optionally restricted to one kind.
+     *
+     * @return list<Node>
+     */
+    public function getDescendants(Node $node, ?NodeKind $kind = null): array
+    {
+        $descendants = [];
+        $stack = [$node];
+        while (($current = array_pop($stack)) !== null) {
+            $children = $this->getChildren($current);
+            for ($index = count($children) - 1; $index >= 0; --$index) {
+                $stack[] = $children[$index];
+            }
+            if ($current !== $node && ($kind === null || $current->kind === $kind)) {
+                $descendants[] = $current;
+            }
+        }
+
+        return $descendants;
     }
 
     public function getText(Node|Span $selection): string

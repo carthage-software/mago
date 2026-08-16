@@ -8,9 +8,13 @@ namespace Mago\Sdk\Analyzer;
  * Collects the semantic providers contributed by one analyzer plugin.
  *
  * @api
+ * @mago-expect lint:too-many-methods
+ * @mago-expect lint:too-many-properties
  */
 final class PluginRegistry
 {
+    private bool $memoizeProviders = false;
+
     /**
      * @var list<InitializationHook>
      */
@@ -50,6 +54,11 @@ final class PluginRegistry
      * @var list<AfterFileAnalysisHook>
      */
     private array $afterFileAnalysisHooks = [];
+
+    /**
+     * @var list<NodeAnalysisHook>
+     */
+    private array $nodeAnalysisHooks = [];
 
     /**
      * @var list<AfterAnalysisHook>
@@ -96,9 +105,31 @@ final class PluginRegistry
         $this->afterFileAnalysisHooks[] = $hook;
     }
 
+    public function registerNodeAnalysisHook(NodeAnalysisHook $hook): void
+    {
+        $this->nodeAnalysisHooks[] = $hook;
+    }
+
     public function registerAfterAnalysisHook(AfterAnalysisHook $hook): void
     {
         $this->afterAnalysisHooks[] = $hook;
+    }
+
+    /**
+     * Memoize function and method provider results for identical invocations within one frozen analysis generation.
+     *
+     * This includes callable-signature results. Enable it only when every registered function and method provider is
+     * deterministic and does not depend on source locations, invocation order, or externally mutable state.
+     */
+    public function enableProviderMemoization(): void
+    {
+        $this->memoizeProviders = true;
+    }
+
+    /** @internal */
+    public function shouldMemoizeProviders(): bool
+    {
+        return $this->memoizeProviders;
     }
 
     /**
@@ -175,6 +206,16 @@ final class PluginRegistry
     public function getAfterFileAnalysisHooks(): array
     {
         return $this->afterFileAnalysisHooks;
+    }
+
+    /**
+     * @internal
+     *
+     * @return list<NodeAnalysisHook>
+     */
+    public function getNodeAnalysisHooks(): array
+    {
+        return $this->nodeAnalysisHooks;
     }
 
     /**

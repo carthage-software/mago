@@ -149,6 +149,7 @@ impl AnalysisService {
 
         let after_file = self.plugin_registry.has_external_after_file_analysis_hooks().unwrap_or_default();
         let after_analysis = self.plugin_registry.has_external_after_analysis_hooks().unwrap_or_default();
+        let node_analysis_targets = self.plugin_registry.external_node_analysis_target_kinds().unwrap_or_default();
 
         // Run the analyzer
         let mut analysis_result = AnalysisResult::new(self.symbol_references);
@@ -198,7 +199,13 @@ impl AnalysisService {
         issues.extend(analysis_result.issues.iter().cloned());
         issues.extend(self.codebase.take_issues(true));
         if after_analysis {
-            let snapshot = match FileAnalysisSnapshot::new(file, program, &resolved_names, &artifacts) {
+            let snapshot = match FileAnalysisSnapshot::new(
+                file,
+                program,
+                &resolved_names,
+                &artifacts,
+                node_analysis_targets.as_ref(),
+            ) {
                 Ok(snapshot) => Arc::new(snapshot),
                 Err(err) => {
                     issues.push(Issue::error(format!("Analysis error: {err}")));
@@ -288,6 +295,7 @@ impl AnalysisService {
                 let capabilities = (
                     before_plugin_registry.has_external_after_file_analysis_hooks().map_err(AnalysisError::from)?,
                     before_plugin_registry.has_external_after_analysis_hooks().map_err(AnalysisError::from)?,
+                    before_plugin_registry.external_node_analysis_target_kinds().map_err(AnalysisError::from)?,
                 );
 
                 let _result = before_capabilities.set(capabilities);
@@ -320,7 +328,8 @@ impl AnalysisService {
                 }
             },
             move |(settings, parser_settings), arena, source_file, codebase| {
-                let (after_file, after_analysis) = map_capabilities.get().copied().unwrap_or_default();
+                let (after_file, after_analysis, node_analysis_targets) =
+                    map_capabilities.get().copied().unwrap_or_default();
 
                 #[cfg(not(target_arch = "wasm32"))]
                 let per_file_start = trace_enabled.then(Instant::now);
@@ -403,11 +412,16 @@ impl AnalysisService {
                 let snapshot_start = (trace_enabled && (after_file || after_analysis)).then(Instant::now);
                 let snapshot = if after_file || after_analysis {
                     Some(Arc::new(
-                        FileAnalysisSnapshot::new(&source_file, program, &resolved_names, &artifacts).map_err(
-                            |error| {
-                                OrchestratorError::General(format!("Failed to retain external analysis data: {error}"))
-                            },
-                        )?,
+                        FileAnalysisSnapshot::new(
+                            &source_file,
+                            program,
+                            &resolved_names,
+                            &artifacts,
+                            node_analysis_targets.as_ref(),
+                        )
+                        .map_err(|error| {
+                            OrchestratorError::General(format!("Failed to retain external analysis data: {error}"))
+                        })?,
                     ))
                 } else {
                     None

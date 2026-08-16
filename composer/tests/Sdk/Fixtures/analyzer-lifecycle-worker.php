@@ -12,12 +12,15 @@ use Mago\Sdk\Analyzer\Assertion\TypeAssertion;
 use Mago\Sdk\Analyzer\Assertion\TypeAssertionKind;
 use Mago\Sdk\Analyzer\BeforeAnalysisContext;
 use Mago\Sdk\Analyzer\BeforeAnalysisHook;
+use Mago\Sdk\Analyzer\FileAnalysisRequirement;
 use Mago\Sdk\Analyzer\InitializationContext;
 use Mago\Sdk\Analyzer\InitializationHook;
 use Mago\Sdk\Analyzer\LifecycleContext;
 use Mago\Sdk\Analyzer\Metadata\ClassLikeMetadata;
 use Mago\Sdk\Analyzer\Metadata\FunctionLikeKind as MetadataFunctionLikeKind;
 use Mago\Sdk\Analyzer\Metadata\MemberIdentifier;
+use Mago\Sdk\Analyzer\NodeAnalysisContext;
+use Mago\Sdk\Analyzer\NodeAnalysisHook;
 use Mago\Sdk\Analyzer\Plugin;
 use Mago\Sdk\Analyzer\PluginDefinition;
 use Mago\Sdk\Analyzer\PluginRegistry;
@@ -64,12 +67,36 @@ final class LifecycleProofHook implements
     InitializationHook,
     BeforeAnalysisHook,
     AfterFileAnalysisHook,
+    NodeAnalysisHook,
     AfterAnalysisHook
 {
     public function __construct(
         private readonly string $plugin,
         private readonly string $auditLog,
     ) {}
+
+    public function getRequirements(): array
+    {
+        return [FileAnalysisRequirement::ExpressionTypes];
+    }
+
+    public function getTargets(): array
+    {
+        return [NodeKind::FunctionCall];
+    }
+
+    public function analyze(NodeAnalysisContext $context): void
+    {
+        if (
+            $context->node->kind !== NodeKind::FunctionCall
+            || $context->source !== $context->analysis->getSourceFile()
+            || $context->source->path !== $context->analysis->file
+        ) {
+            throw new RuntimeException('A targeted node hook received an inconsistent analysis snapshot.');
+        }
+
+        $this->record('node', $context->analysis->file);
+    }
 
     public function initialize(InitializationContext $context): void
     {
@@ -453,6 +480,7 @@ final class LifecycleProofPlugin implements Plugin
         $registry->registerInitializationHook($hook);
         $registry->registerBeforeAnalysisHook($hook);
         $registry->registerAfterFileAnalysisHook($hook);
+        $registry->registerNodeAnalysisHook($hook);
         $registry->registerAfterAnalysisHook($hook);
     }
 }

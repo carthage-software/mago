@@ -86,9 +86,9 @@ use mago_extension::source::write_node_kind_table;
 use mago_php_version::PHPVersion;
 use mago_reporting::AnnotationKind;
 use mago_reporting::Issue;
-use mago_reporting::IssueCollection;
 use mago_reporting::Level;
 use mago_span::HasSpan;
+use mago_syntax::cst::NodeKind;
 use mago_text_edit::Safety;
 use mago_word::word;
 
@@ -102,6 +102,7 @@ use crate::external::FunctionTarget;
 use crate::external::IssueFilterHookRegistration;
 use crate::external::MethodProvider;
 use crate::external::MethodTarget;
+use crate::external::NodeAnalysisHookRegistration;
 use crate::external::PropertyAccessKind;
 use crate::external::PropertyProvider;
 use crate::external::PropertyTarget;
@@ -209,9 +210,11 @@ pub(super) struct Registration {
     pub property_providers: Vec<PropertyProvider>,
     pub property_initialization_providers: Vec<PropertyProvider>,
     pub issue_filter_hooks: Vec<IssueFilterHookRegistration>,
+    pub node_analysis_hooks: Vec<NodeAnalysisHookRegistration>,
     pub initialization_plugins: Vec<u16>,
     pub before_analysis_plugins: Vec<u16>,
     pub after_file_analysis_plugins: Vec<u16>,
+    pub node_analysis_plugins: Vec<u16>,
     pub after_analysis_plugins: Vec<u16>,
 }
 
@@ -224,6 +227,7 @@ pub(super) struct InitializationStub {
 
 pub(super) struct ReturnTypeRequest<'type_info> {
     pub payload: Vec<u8>,
+    pub memoize: bool,
     pub types: Vec<Cow<'type_info, TUnion>>,
     pub receiver_type_count: usize,
     pub snapshotted_types: usize,
@@ -331,9 +335,11 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
     let mut property_providers = Vec::new();
     let mut property_initialization_providers = Vec::new();
     let mut issue_filter_hooks = Vec::new();
+    let mut node_analysis_hooks = Vec::new();
     let mut initialization_plugins = Vec::new();
     let mut before_analysis_plugins = Vec::new();
     let mut after_file_analysis_plugins = Vec::new();
+    let mut node_analysis_plugins = Vec::new();
     let mut after_analysis_plugins = Vec::new();
     let mut has_worker_reducer = false;
     for _ in 0..extension_count {
@@ -349,7 +355,7 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
             let description = non_empty(reader.read_string("plugin description")?, "plugin description")?;
             let default_enabled = reader.read_bool("plugin default-enabled flag")?;
             let lifecycle = reader.read_u8("plugin lifecycle flags")?;
-            if lifecycle & !0b1111 != 0 {
+            if lifecycle & !0b1_1111 != 0 {
                 return Err(protocol(format!("plugin `{identifier}` has unknown lifecycle flags {lifecycle:#04x}")));
             }
             let index =
@@ -378,7 +384,7 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
             for _ in 0..function_count {
                 let index = reader.read_u16("function provider index")?;
                 let capabilities = reader.read_u8("function provider capabilities")?;
-                if capabilities & !1 != 0 {
+                if capabilities & !15 != 0 {
                     return Err(protocol(format!(
                         "function provider {index} has unknown capabilities {capabilities:#04x}"
                     )));
@@ -410,6 +416,9 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
                     plugin: identifier.clone(),
                     index,
                     callable_signature: capabilities & 1 != 0,
+                    overrides_declared_signature: capabilities & 2 != 0,
+                    undeclared_return_type_only: capabilities & 4 != 0,
+                    memoize: capabilities & 8 != 0,
                     targets,
                 });
             }
@@ -418,7 +427,7 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
             for _ in 0..method_count {
                 let index = reader.read_u16("method provider index")?;
                 let capabilities = reader.read_u8("method provider capabilities")?;
-                if capabilities & !1 != 0 {
+                if capabilities & !15 != 0 {
                     return Err(protocol(format!(
                         "method provider {index} has unknown capabilities {capabilities:#04x}"
                     )));
@@ -442,6 +451,9 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
                     plugin: identifier.clone(),
                     index,
                     callable_signature: capabilities & 1 != 0,
+                    overrides_declared_signature: capabilities & 2 != 0,
+                    undeclared_return_type_only: capabilities & 4 != 0,
+                    memoize: capabilities & 8 != 0,
                     targets,
                 });
             }
@@ -499,10 +511,68 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
 
             let issue_filter_count = reader.read_count("issue-filter hooks", MAXIMUM_PROVIDERS)?;
             for _ in 0..issue_filter_count {
-                issue_filter_hooks.push(IssueFilterHookRegistration {
+                let index = reader.read_u16("issue-filter hook index")?;
+                let code_count = reader.read_count("issue-filter hook target codes", MAXIMUM_TARGETS)?;
+                if code_count == 0 {
+                    return Err(protocol(format!("issue-filter hook {index} has no target codes")));
+                }
+
+                let mut codes = Vec::with_capacity(code_count);
+                for _ in 0..code_count {
+                    let code = reader.read_string("issue-filter hook target code")?;
+                    if code.is_empty() {
+                        return Err(protocol(format!("issue-filter hook {index} targets an empty issue code")));
+                    }
+                    if codes.contains(&code) {
+                        return Err(protocol(format!(
+                            "issue-filter hook {index} targets issue code `{code}` more than once"
+                        )));
+                    }
+                    codes.push(code);
+                }
+
+                issue_filter_hooks.push(IssueFilterHookRegistration { plugin: identifier.clone(), index, codes });
+            }
+
+            let node_hook_count = reader.read_count("node-analysis hooks", MAXIMUM_PROVIDERS)?;
+            for _ in 0..node_hook_count {
+                let hook_index = reader.read_u16("node-analysis hook index")?;
+                let requirements = reader.read_u8("node-analysis hook requirements")?;
+                if requirements & !1 != 0 {
+                    return Err(protocol(format!(
+                        "node-analysis hook {hook_index} has unknown requirements {requirements:#04x}"
+                    )));
+                }
+                let target_count = reader.read_count("node-analysis hook targets", MAXIMUM_TARGETS)?;
+                if target_count == 0 {
+                    return Err(protocol(format!("node-analysis hook {hook_index} has no targets")));
+                }
+
+                let mut targets = Vec::with_capacity(target_count);
+                let mut unique_targets = HashSet::with_capacity_and_hasher(target_count, RandomState::default());
+                for _ in 0..target_count {
+                    let target_name = reader.read_str("node-analysis hook target")?;
+                    let target = target_name.parse::<NodeKind>().map_err(|_| {
+                        protocol(format!("node-analysis hook {hook_index} targets unknown node kind `{target_name}`"))
+                    })?;
+                    if !unique_targets.insert(target) {
+                        return Err(protocol(format!(
+                            "node-analysis hook {hook_index} lists node kind `{target_name}` more than once"
+                        )));
+                    }
+                    targets.push(target);
+                }
+
+                node_analysis_hooks.push(NodeAnalysisHookRegistration {
                     plugin: identifier.clone(),
-                    index: reader.read_u16("issue-filter hook index")?,
+                    plugin_index: index,
+                    index: hook_index,
+                    expression_types: requirements & 1 != 0,
+                    targets,
                 });
+                if !node_analysis_plugins.contains(&index) {
+                    node_analysis_plugins.push(index);
+                }
             }
 
             let plugin = ExternalPlugin {
@@ -516,6 +586,8 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
                 initialization: lifecycle & 8 != 0,
                 before_analysis: lifecycle & 1 != 0,
                 after_file_analysis: lifecycle & 2 != 0,
+                after_file_expression_types: lifecycle & 16 != 0,
+                node_analysis: node_hook_count != 0,
                 after_analysis: lifecycle & 4 != 0,
             };
 
@@ -544,6 +616,7 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
         "property initialization provider",
     )?;
     validate_provider_indices(issue_filter_hooks.iter().map(|hook| hook.index), "issue-filter hook")?;
+    validate_provider_indices(node_analysis_hooks.iter().map(|hook| hook.index), "node-analysis hook")?;
     Ok(Registration {
         extensions,
         plugins,
@@ -553,9 +626,11 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
         property_providers,
         property_initialization_providers,
         issue_filter_hooks,
+        node_analysis_hooks,
         initialization_plugins,
         before_analysis_plugins,
         after_file_analysis_plugins,
+        node_analysis_plugins,
         after_analysis_plugins,
     })
 }
@@ -567,6 +642,7 @@ pub(super) fn encode_function_return_type_request<'type_info>(
     artifacts: &'type_info AnalysisArtifacts,
     source_file: &File,
     generation: u64,
+    memoize: bool,
     trace_enabled: bool,
 ) -> Result<ReturnTypeRequest<'type_info>, ExternalAnalyzerError> {
     encode_return_type_request(
@@ -580,6 +656,7 @@ pub(super) fn encode_function_return_type_request<'type_info>(
         artifacts,
         source_file,
         generation,
+        memoize,
         trace_enabled,
     )
 }
@@ -592,6 +669,7 @@ pub(super) fn encode_method_return_type_request<'type_info>(
     artifacts: &'type_info AnalysisArtifacts,
     source_file: &File,
     generation: u64,
+    memoize: bool,
     trace_enabled: bool,
 ) -> Result<ReturnTypeRequest<'type_info>, ExternalAnalyzerError> {
     let method_context = invocation
@@ -616,6 +694,7 @@ pub(super) fn encode_method_return_type_request<'type_info>(
         artifacts,
         source_file,
         generation,
+        memoize,
         trace_enabled,
     )
 }
@@ -627,6 +706,7 @@ pub(super) fn encode_function_callable_signature_request<'type_info>(
     artifacts: &'type_info AnalysisArtifacts,
     source_file: &File,
     generation: u64,
+    memoize: bool,
     trace_enabled: bool,
 ) -> Result<ReturnTypeRequest<'type_info>, ExternalAnalyzerError> {
     encode_return_type_request(
@@ -640,6 +720,7 @@ pub(super) fn encode_function_callable_signature_request<'type_info>(
         artifacts,
         source_file,
         generation,
+        memoize,
         trace_enabled,
     )
 }
@@ -652,6 +733,7 @@ pub(super) fn encode_method_callable_signature_request<'type_info>(
     artifacts: &'type_info AnalysisArtifacts,
     source_file: &File,
     generation: u64,
+    memoize: bool,
     trace_enabled: bool,
 ) -> Result<ReturnTypeRequest<'type_info>, ExternalAnalyzerError> {
     let method_context = invocation
@@ -676,6 +758,7 @@ pub(super) fn encode_method_callable_signature_request<'type_info>(
         artifacts,
         source_file,
         generation,
+        memoize,
         trace_enabled,
     )
 }
@@ -780,7 +863,7 @@ pub(super) fn decode_property_initialization_response(payload: &[u8]) -> Result<
 pub(super) fn encode_issue_filter_request(
     hook_indices: &[u16],
     file: &File,
-    issues: &IssueCollection,
+    issues: &[&Issue],
     generation: u64,
     session: &ExternalAnalysisSession,
 ) -> Result<Vec<u8>, ExternalAnalyzerError> {
@@ -946,6 +1029,7 @@ fn encode_return_type_request<'type_info>(
     artifacts: &'type_info AnalysisArtifacts,
     source_file: &File,
     generation: u64,
+    memoize: bool,
     trace_enabled: bool,
 ) -> Result<ReturnTypeRequest<'type_info>, ExternalAnalyzerError> {
     let mut writer = message_writer(message_kind);
@@ -973,8 +1057,8 @@ fn encode_return_type_request<'type_info>(
                 type_snapshot_duration = type_snapshot_duration.saturating_add(start.elapsed());
             }
 
-            writer.write_u32(invocation.span.start.offset);
-            writer.write_u32(invocation.span.end.offset);
+            writer.write_u32(if memoize { 0 } else { invocation.span.start.offset });
+            writer.write_u32(if memoize { 0 } else { invocation.span.end.offset });
             let receiver_types = receiver_type_references.into_iter().cloned().collect();
             return encode_return_type_arguments(
                 writer,
@@ -984,6 +1068,7 @@ fn encode_return_type_request<'type_info>(
                 receiver_types,
                 0,
                 type_snapshot_duration,
+                memoize,
                 trace_enabled,
                 include_argument_types,
             );
@@ -992,8 +1077,8 @@ fn encode_return_type_request<'type_info>(
     }
 
     writer.write_bytes(name)?;
-    writer.write_u32(invocation.span.start.offset);
-    writer.write_u32(invocation.span.end.offset);
+    writer.write_u32(if memoize { 0 } else { invocation.span.start.offset });
+    writer.write_u32(if memoize { 0 } else { invocation.span.end.offset });
 
     encode_return_type_arguments(
         writer,
@@ -1003,6 +1088,7 @@ fn encode_return_type_request<'type_info>(
         Vec::new(),
         0,
         type_snapshot_duration,
+        memoize,
         trace_enabled,
         include_argument_types,
     )
@@ -1017,6 +1103,7 @@ fn encode_return_type_arguments<'type_info>(
     receiver_types: Vec<TUnion>,
     mut typed_arguments: usize,
     mut type_snapshot_duration: Duration,
+    memoize: bool,
     trace_enabled: bool,
     include_argument_types: bool,
 ) -> Result<ReturnTypeRequest<'type_info>, ExternalAnalyzerError> {
@@ -1030,8 +1117,8 @@ fn encode_return_type_arguments<'type_info>(
         writer.write_bool(argument.is_unpacked());
         writer.write_bool(argument.is_placeholder());
         let span = argument.span();
-        writer.write_u32(span.start.offset);
-        writer.write_u32(span.end.offset);
+        writer.write_u32(if memoize { 0 } else { span.start.offset });
+        writer.write_u32(if memoize { 0 } else { span.end.offset });
         let value = argument.value();
         let expression = value
             .map(HasSpan::span)
@@ -1059,6 +1146,7 @@ fn encode_return_type_arguments<'type_info>(
 
     Ok(ReturnTypeRequest {
         payload: writer.finish(),
+        memoize,
         snapshotted_types: types.len(),
         receiver_type_count,
         types,

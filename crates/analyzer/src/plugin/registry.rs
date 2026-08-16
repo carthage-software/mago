@@ -248,6 +248,20 @@ impl PluginRegistry {
             .map_err(|reason| PluginError::Internal { reason })
     }
 
+    /// Returns the union of syntax kinds targeted by enabled external analyzer hooks.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the external analyzer cannot be initialized.
+    pub fn external_node_analysis_target_kinds(&self) -> PluginResult<Option<[bool; u8::MAX as usize + 1]>> {
+        self.external_analyzer
+            .as_deref()
+            .map(ExternalAnalyzerHandle::node_analysis_target_kinds)
+            .transpose()
+            .map(Option::flatten)
+            .map_err(|reason| PluginError::Internal { reason })
+    }
+
     /// Returns whether any enabled external plugin subscribed to whole-project completion.
     ///
     /// # Errors

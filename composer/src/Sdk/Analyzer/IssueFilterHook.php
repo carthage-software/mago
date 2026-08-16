@@ -15,5 +15,15 @@ namespace Mago\Sdk\Analyzer;
  */
 interface IssueFilterHook
 {
+    /**
+     * Native analyzer issue codes this hook may filter.
+     *
+     * Mago uses these targets to avoid sending unrelated diagnostics across
+     * the extension boundary.
+     *
+     * @return non-empty-list<non-empty-string>
+     */
+    public function getCodes(): array;
+
     public function filterIssue(IssueFilterContext $context): IssueFilterDecision;
 }

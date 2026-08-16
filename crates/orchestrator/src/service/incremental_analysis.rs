@@ -1139,6 +1139,8 @@ impl IncrementalAnalysisService {
             .map_err(mago_analyzer::error::AnalysisError::from)?;
         let after_analysis =
             plugin_registry.has_external_after_analysis_hooks().map_err(mago_analyzer::error::AnalysisError::from)?;
+        let node_analysis_targets =
+            plugin_registry.external_node_analysis_target_kinds().map_err(mago_analyzer::error::AnalysisError::from)?;
         #[cfg(not(target_arch = "wasm32"))]
         let before_start = trace_enabled.then(Instant::now);
         let before = plugin_registry
@@ -1203,11 +1205,16 @@ impl IncrementalAnalysisService {
                 let snapshot_start = (trace_enabled && (after_file || after_analysis)).then(Instant::now);
                 let snapshot = if after_file || after_analysis {
                     Some(Arc::new(
-                        FileAnalysisSnapshot::new(&source_file, program, &resolved_names, &artifacts).map_err(
-                            |error| {
-                                OrchestratorError::General(format!("Failed to retain external analysis data: {error}"))
-                            },
-                        )?,
+                        FileAnalysisSnapshot::new(
+                            &source_file,
+                            program,
+                            &resolved_names,
+                            &artifacts,
+                            node_analysis_targets.as_ref(),
+                        )
+                        .map_err(|error| {
+                            OrchestratorError::General(format!("Failed to retain external analysis data: {error}"))
+                        })?,
                     ))
                 } else {
                     None

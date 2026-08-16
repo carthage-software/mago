@@ -26,6 +26,7 @@ use mago_names::ResolvedNames;
 use mago_php_version::PHPVersion;
 use mago_reporting::IssueCollection;
 use mago_span::Span;
+use mago_syntax::cst::NodeKind;
 use mago_syntax::cst::Program;
 use mago_word::WordMap;
 use mago_word::ascii_lowercase_word;
@@ -49,6 +50,10 @@ pub mod protocol;
 
 const SLOW_PROVIDER_THRESHOLD: Duration = Duration::from_millis(5);
 const SLOW_LIFECYCLE_THRESHOLD: Duration = Duration::from_millis(5);
+const MAXIMUM_PROVIDER_RESPONSE_CACHE_ENTRIES: usize = 0x0001_0000;
+const PROVIDER_OVERRIDES_DECLARED_SIGNATURE: u8 = 1 << 0;
+const PROVIDER_UNDECLARED_RETURN_TYPE_ONLY: u8 = 1 << 1;
+const PROVIDER_MEMOIZED: u8 = 1 << 2;
 static NEXT_ANALYSIS_GENERATION: AtomicU64 = AtomicU64::new(1);
 
 #[derive(Debug, Default)]
@@ -136,6 +141,8 @@ struct ExternalAnalyzerTelemetry {
     matched_providers: AtomicU64,
     unmatched_lookups: AtomicU64,
     requests: AtomicU64,
+    ipc_requests: AtomicU64,
+    provider_cache_hits: AtomicU64,
     signature_requests: AtomicU64,
     provided_types: AtomicU64,
     initialized_properties: AtomicU64,
@@ -282,6 +289,8 @@ pub struct ExternalPlugin {
     pub initialization: bool,
     pub before_analysis: bool,
     pub after_file_analysis: bool,
+    pub after_file_expression_types: bool,
+    pub node_analysis: bool,
     pub after_analysis: bool,
 }
 
@@ -311,6 +320,23 @@ impl ExternalStub {
 impl ExternalPlugin {
     fn matches(&self, name: &str) -> bool {
         self.identifier.eq_ignore_ascii_case(name) || self.aliases.iter().any(|alias| alias.eq_ignore_ascii_case(name))
+    }
+}
+
+impl Registration {
+    fn file_analysis_plugins(&self) -> Vec<u16> {
+        let mut plugins =
+            Vec::with_capacity(self.after_file_analysis_plugins.len().saturating_add(self.node_analysis_plugins.len()));
+        plugins.extend_from_slice(&self.after_file_analysis_plugins);
+        plugins.extend_from_slice(&self.node_analysis_plugins);
+        plugins.sort_unstable();
+        plugins.dedup();
+        plugins
+    }
+
+    fn file_analysis_requires_expression_types(&self, plugins: &[u16]) -> bool {
+        self.plugins.iter().any(|plugin| plugins.contains(&plugin.index) && plugin.after_file_expression_types)
+            || self.node_analysis_hooks.iter().any(|hook| plugins.contains(&hook.plugin_index) && hook.expression_types)
     }
 }
 
@@ -347,6 +373,9 @@ struct FunctionProvider {
     plugin: String,
     index: u16,
     callable_signature: bool,
+    overrides_declared_signature: bool,
+    undeclared_return_type_only: bool,
+    memoize: bool,
     targets: Vec<FunctionTarget>,
 }
 
@@ -355,6 +384,9 @@ struct MethodProvider {
     plugin: String,
     index: u16,
     callable_signature: bool,
+    overrides_declared_signature: bool,
+    undeclared_return_type_only: bool,
+    memoize: bool,
     targets: Vec<MethodTarget>,
 }
 
@@ -381,6 +413,16 @@ struct PropertyProvider {
 struct IssueFilterHookRegistration {
     plugin: String,
     index: u16,
+    codes: Vec<String>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+struct NodeAnalysisHookRegistration {
+    plugin: String,
+    plugin_index: u16,
+    index: u16,
+    expression_types: bool,
+    targets: Vec<NodeKind>,
 }
 
 type PropertyProviderExactIndex = WordMap<Vec<u16>>;
@@ -446,6 +488,9 @@ impl ProviderIndices {
 
 /// Request transport used by worker-backed analyzer providers.
 pub trait AnalyzerTransport: std::fmt::Debug + Send + Sync {
+    /// Starts preparing additional transport capacity for a sustained parallel workload.
+    fn prepare_capacity(self: &Arc<Self>) {}
+
     /// Sends initialization data to every worker process.
     ///
     /// # Errors
@@ -468,9 +513,33 @@ pub trait AnalyzerTransport: std::fmt::Debug + Send + Sync {
     fn request_with_handler<H>(&self, payload: Vec<u8>, handler: &mut H) -> Result<Vec<u8>, WorkerError>
     where
         H: WorkerRequestHandler;
+
+    /// Sends a provider request with a stable process-local cache key.
+    ///
+    /// The default implementation preserves compatibility with transports
+    /// that do not expose worker affinity.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the worker or nested query handler fails.
+    fn request_with_handler_affinity<H>(
+        &self,
+        payload: Vec<u8>,
+        _affinity: &[u8],
+        handler: &mut H,
+    ) -> Result<Vec<u8>, WorkerError>
+    where
+        H: WorkerRequestHandler,
+    {
+        self.request_with_handler(payload, handler)
+    }
 }
 
 impl AnalyzerTransport for WorkerPool {
+    fn prepare_capacity(self: &Arc<Self>) {
+        Self::prepare_capacity(self);
+    }
+
     fn broadcast(&self, payload: &[u8]) -> Result<Vec<Vec<u8>>, WorkerError> {
         Self::broadcast(self, payload)
     }
@@ -485,12 +554,27 @@ impl AnalyzerTransport for WorkerPool {
     {
         Self::request_with_handler(self, payload, handler)
     }
+
+    fn request_with_handler_affinity<H>(
+        &self,
+        payload: Vec<u8>,
+        affinity: &[u8],
+        handler: &mut H,
+    ) -> Result<Vec<u8>, WorkerError>
+    where
+        H: WorkerRequestHandler,
+    {
+        Self::request_with_handler_affinity(self, payload, affinity, handler)
+    }
 }
 
 #[derive(Debug)]
 struct Backend<T> {
     transport: Arc<T>,
     registration: Registration,
+    provider_response_cache: Mutex<ProviderResponseCache>,
+    function_capabilities: Box<[u8]>,
+    method_capabilities: Box<[u8]>,
     function_exact: WordMap<Vec<u16>>,
     function_wildcard: Vec<(u16, Vec<FunctionTarget>)>,
     function_signature_exact: WordMap<Vec<u16>>,
@@ -504,6 +588,47 @@ struct Backend<T> {
     property_initialization_exact: PropertyProviderExactIndex,
     property_initialization_wildcard: PropertyProviderWildcardIndex,
     issue_filter_indices: Box<[u16]>,
+    issue_filter_codes: foldhash::HashSet<String>,
+}
+
+#[derive(Debug, Default)]
+struct ProviderResponseCache {
+    generation: u64,
+    responses: foldhash::HashMap<Vec<u8>, Vec<u8>>,
+}
+
+impl ProviderResponseCache {
+    fn get(&mut self, generation: u64, request: &[u8]) -> Option<Vec<u8>> {
+        self.select_generation(generation);
+        self.responses.get(request).cloned()
+    }
+
+    fn insert(&mut self, generation: u64, request: Vec<u8>, response: Vec<u8>) {
+        self.select_generation(generation);
+        if self.responses.len() < MAXIMUM_PROVIDER_RESPONSE_CACHE_ENTRIES {
+            self.responses.insert(request, response);
+        }
+    }
+
+    fn select_generation(&mut self, generation: u64) {
+        if self.generation != generation {
+            self.generation = generation;
+            self.responses.clear();
+        }
+    }
+}
+
+fn provider_capabilities<P>(providers: &[P], index: impl Fn(&P) -> u16, flags: impl Fn(&P) -> u8) -> Box<[u8]> {
+    let Some(maximum) = providers.iter().map(&index).max() else {
+        return Box::new([]);
+    };
+
+    let mut capabilities = vec![0; usize::from(maximum) + 1];
+    for provider in providers {
+        capabilities[usize::from(index(provider))] = flags(provider);
+    }
+
+    capabilities.into_boxed_slice()
 }
 
 impl<T> Backend<T> {
@@ -591,10 +716,33 @@ impl<T> Backend<T> {
         let (property_initialization_exact, property_initialization_wildcard) =
             index_property_providers(&registration.property_initialization_providers);
         let issue_filter_indices = registration.issue_filter_hooks.iter().map(|hook| hook.index).collect::<Box<[_]>>();
+        let issue_filter_codes =
+            registration.issue_filter_hooks.iter().flat_map(|hook| hook.codes.iter().cloned()).collect();
+        let function_capabilities = provider_capabilities(
+            &registration.function_providers,
+            |provider| provider.index,
+            |provider| {
+                (u8::from(provider.overrides_declared_signature) * PROVIDER_OVERRIDES_DECLARED_SIGNATURE)
+                    | (u8::from(provider.undeclared_return_type_only) * PROVIDER_UNDECLARED_RETURN_TYPE_ONLY)
+                    | (u8::from(provider.memoize) * PROVIDER_MEMOIZED)
+            },
+        );
+        let method_capabilities = provider_capabilities(
+            &registration.method_providers,
+            |provider| provider.index,
+            |provider| {
+                (u8::from(provider.overrides_declared_signature) * PROVIDER_OVERRIDES_DECLARED_SIGNATURE)
+                    | (u8::from(provider.undeclared_return_type_only) * PROVIDER_UNDECLARED_RETURN_TYPE_ONLY)
+                    | (u8::from(provider.memoize) * PROVIDER_MEMOIZED)
+            },
+        );
 
         Self {
             transport,
             registration,
+            provider_response_cache: Mutex::new(ProviderResponseCache::default()),
+            function_capabilities,
+            method_capabilities,
             function_exact,
             function_wildcard,
             function_signature_exact,
@@ -608,10 +756,11 @@ impl<T> Backend<T> {
             property_initialization_exact,
             property_initialization_wildcard,
             issue_filter_indices,
+            issue_filter_codes,
         }
     }
 
-    fn matching_function_providers(&self, function: &[u8]) -> (Option<ProviderIndices>, usize) {
+    fn matching_function_providers(&self, function: &[u8], declared: bool) -> (Option<ProviderIndices>, usize) {
         let function = ascii_lowercase_word(function);
         let exact = self.function_exact.get(&function).map_or(&[][..], Vec::as_slice);
         let candidates = exact.len() + self.function_wildcard.len();
@@ -621,7 +770,34 @@ impl<T> Backend<T> {
             .filter(|(_, targets)| targets.iter().any(|target| target.matches(function.as_bytes())))
             .map(|(index, _)| *index);
 
-        (ProviderIndices::from_exact_and_wildcards(exact, wildcards), candidates)
+        let indices = ProviderIndices::from_exact_and_wildcards(exact, wildcards);
+        let indices = indices.and_then(|indices| {
+            ProviderIndices::from_iter(indices.as_slice().iter().copied().filter(|index| {
+                !declared
+                    || self
+                        .function_capabilities
+                        .get(usize::from(*index))
+                        .is_some_and(|capabilities| capabilities & PROVIDER_UNDECLARED_RETURN_TYPE_ONLY == 0)
+            }))
+        });
+
+        (indices, candidates)
+    }
+
+    fn memoizes_function_providers(&self, indices: &[u16]) -> bool {
+        indices.iter().all(|index| {
+            self.function_capabilities
+                .get(usize::from(*index))
+                .is_some_and(|capabilities| capabilities & PROVIDER_MEMOIZED != 0)
+        })
+    }
+
+    fn memoizes_method_providers(&self, indices: &[u16]) -> bool {
+        indices.iter().all(|index| {
+            self.method_capabilities
+                .get(usize::from(*index))
+                .is_some_and(|capabilities| capabilities & PROVIDER_MEMOIZED != 0)
+        })
     }
 
     fn matching_method_providers(
@@ -629,6 +805,7 @@ impl<T> Backend<T> {
         codebase: &CodebaseMetadata,
         class: &[u8],
         method: &[u8],
+        declared: bool,
     ) -> (Option<ProviderIndices>, usize) {
         let (exact, exact_candidates) = matching_exact_member_providers(
             &self.method_exact,
@@ -643,10 +820,25 @@ impl<T> Backend<T> {
             .filter(|(_, targets)| targets.iter().any(|target| target.matches(codebase, class, method)))
             .map(|(index, _)| *index);
 
-        (ProviderIndices::add_wildcards(exact, wildcards), candidates)
+        let indices = ProviderIndices::add_wildcards(exact, wildcards);
+        let indices = indices.and_then(|indices| {
+            ProviderIndices::from_iter(indices.as_slice().iter().copied().filter(|index| {
+                !declared
+                    || self
+                        .method_capabilities
+                        .get(usize::from(*index))
+                        .is_some_and(|capabilities| capabilities & PROVIDER_UNDECLARED_RETURN_TYPE_ONLY == 0)
+            }))
+        });
+
+        (indices, candidates)
     }
 
-    fn matching_function_signature_providers(&self, function: &[u8]) -> (Option<ProviderIndices>, usize) {
+    fn matching_function_signature_providers(
+        &self,
+        function: &[u8],
+        declared: bool,
+    ) -> (Option<ProviderIndices>, usize) {
         let function = ascii_lowercase_word(function);
         let exact = self.function_signature_exact.get(&function).map_or(&[][..], Vec::as_slice);
         let candidates = exact.len() + self.function_signature_wildcard.len();
@@ -656,7 +848,18 @@ impl<T> Backend<T> {
             .filter(|(_, targets)| targets.iter().any(|target| target.matches(function.as_bytes())))
             .map(|(index, _)| *index);
 
-        (ProviderIndices::from_exact_and_wildcards(exact, wildcards), candidates)
+        let indices = ProviderIndices::from_exact_and_wildcards(exact, wildcards);
+        let indices = indices.and_then(|indices| {
+            ProviderIndices::from_iter(indices.as_slice().iter().copied().filter(|index| {
+                !declared
+                    || self
+                        .function_capabilities
+                        .get(usize::from(*index))
+                        .is_some_and(|capabilities| capabilities & PROVIDER_OVERRIDES_DECLARED_SIGNATURE != 0)
+            }))
+        });
+
+        (indices, candidates)
     }
 
     fn matching_method_signature_providers(
@@ -664,6 +867,7 @@ impl<T> Backend<T> {
         codebase: &CodebaseMetadata,
         class: &[u8],
         method: &[u8],
+        declared: bool,
     ) -> (Option<ProviderIndices>, usize) {
         let (exact, exact_candidates) = matching_exact_member_providers(
             &self.method_signature_exact,
@@ -678,7 +882,18 @@ impl<T> Backend<T> {
             .filter(|(_, targets)| targets.iter().any(|target| target.matches(codebase, class, method)))
             .map(|(index, _)| *index);
 
-        (ProviderIndices::add_wildcards(exact, wildcards), candidates)
+        let indices = ProviderIndices::add_wildcards(exact, wildcards);
+        let indices = indices.and_then(|indices| {
+            ProviderIndices::from_iter(indices.as_slice().iter().copied().filter(|index| {
+                !declared
+                    || self
+                        .method_capabilities
+                        .get(usize::from(*index))
+                        .is_some_and(|capabilities| capabilities & PROVIDER_OVERRIDES_DECLARED_SIGNATURE != 0)
+            }))
+        });
+
+        (indices, candidates)
     }
 
     fn matching_property_providers(
@@ -941,7 +1156,14 @@ impl ExternalAnalyzerHandle {
     }
 
     pub(crate) fn has_after_file_analysis_hooks(&self) -> Result<bool, String> {
-        Ok(self.get()?.backends.iter().any(|backend| !backend.registration.after_file_analysis_plugins.is_empty()))
+        Ok(self.get()?.backends.iter().any(|backend| {
+            !backend.registration.after_file_analysis_plugins.is_empty()
+                || !backend.registration.node_analysis_plugins.is_empty()
+        }))
+    }
+
+    pub(crate) fn node_analysis_target_kinds(&self) -> Result<Option<[bool; u8::MAX as usize + 1]>, String> {
+        Ok(self.get()?.node_analysis_target_kinds())
     }
 
     pub(crate) fn has_function_return_type_providers(&self) -> Result<bool, String> {
@@ -1132,6 +1354,21 @@ impl<T> ExternalAnalyzer<T> {
     pub fn initialization_files(&self) -> Vec<File> {
         self.initialization_stubs.iter().map(ExternalStub::to_file).collect()
     }
+
+    fn node_analysis_target_kinds(&self) -> Option<[bool; u8::MAX as usize + 1]> {
+        let mut targets = [false; u8::MAX as usize + 1];
+        let mut any = false;
+        for backend in &self.backends {
+            for hook in &backend.registration.node_analysis_hooks {
+                for target in &hook.targets {
+                    targets[*target as usize] = true;
+                    any = true;
+                }
+            }
+        }
+
+        any.then_some(targets)
+    }
 }
 
 impl<T> ExternalAnalyzer<T>
@@ -1151,16 +1388,29 @@ where
                 continue;
             }
 
+            let mut candidate_indices = Vec::new();
+            let mut candidates = Vec::new();
+            for (index, issue) in issues.iter().enumerate() {
+                if issue.code.as_ref().is_some_and(|code| backend.issue_filter_codes.contains(code)) {
+                    candidate_indices.push(index);
+                    candidates.push(issue);
+                }
+            }
+            if candidates.is_empty() {
+                continue;
+            }
+
             let started_at = self.trace_enabled.then(Instant::now);
             let encode_start = self.trace_enabled.then(Instant::now);
-            let issue_count = issues.len();
-            let request = protocol::encode_issue_filter_request(hooks, file, &issues, session.generation(), session)
-                .inspect_err(|_| {
-                    if self.trace_enabled {
-                        self.telemetry.issue_filter_errors.fetch_add(1, Ordering::Relaxed);
-                        self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
-                    }
-                })?;
+            let issue_count = candidates.len();
+            let request =
+                protocol::encode_issue_filter_request(hooks, file, &candidates, session.generation(), session)
+                    .inspect_err(|_| {
+                        if self.trace_enabled {
+                            self.telemetry.issue_filter_errors.fetch_add(1, Ordering::Relaxed);
+                            self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
+                        }
+                    })?;
             if let Some(start) = encode_start {
                 self.telemetry.issue_filter_encode_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
                 self.telemetry.issue_filter_batches.fetch_add(1, Ordering::Relaxed);
@@ -1200,6 +1450,7 @@ where
                     self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
                 }
             })?;
+            let removed = removed.into_iter().map(|index| candidate_indices[index]).collect::<Vec<_>>();
 
             if let Some(start) = decode_start {
                 self.telemetry.issue_filter_decode_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
@@ -1341,7 +1592,6 @@ where
             if plugins.is_empty() {
                 continue;
             }
-
             let lifecycle_start = self.trace_enabled.then(Instant::now);
             let encode_start = self.trace_enabled.then(Instant::now);
             let request =
@@ -1397,22 +1647,34 @@ where
         session: &ExternalAnalysisSession,
     ) -> Result<IssueCollection, ExternalAnalyzerError> {
         let mut issues = IssueCollection::new();
-        let store = lifecycle::AnalysisStore::File { file, program, resolved_names, artifacts };
+        let node_analysis_targets = self.node_analysis_target_kinds();
+        let store = lifecycle::AnalysisStore::File {
+            file,
+            program,
+            resolved_names,
+            artifacts,
+            node_analysis_targets: node_analysis_targets.as_ref(),
+        };
         for backend in &self.backends {
-            let plugins = &backend.registration.after_file_analysis_plugins;
+            let plugins = backend.registration.file_analysis_plugins();
             if plugins.is_empty() {
                 continue;
             }
+            let include_expression_types = backend.registration.file_analysis_requires_expression_types(&plugins);
+            let embed_source = !backend.registration.node_analysis_hooks.is_empty();
 
             let lifecycle_start = self.trace_enabled.then(Instant::now);
             let encode_start = self.trace_enabled.then(Instant::now);
             let request = lifecycle::encode_after_file_analysis_request(
                 session.generation(),
-                plugins,
+                &plugins,
                 file,
                 program,
                 resolved_names,
                 artifacts,
+                include_expression_types,
+                node_analysis_targets.as_ref(),
+                embed_source,
             )
             .inspect_err(|_| {
                 if self.trace_enabled {
@@ -1446,7 +1708,7 @@ where
             let effects = self.dispatch_lifecycle_request(
                 backend,
                 LifecyclePhase::AfterFile,
-                plugins,
+                &plugins,
                 plugins.len(),
                 request,
                 &mut handler,
@@ -1472,22 +1734,43 @@ where
         }
 
         let mut issues = IssueCollection::new();
-        let store = lifecycle::AnalysisStore::Project(files);
         for backend in &self.backends {
-            let plugins = &backend.registration.after_file_analysis_plugins;
+            let plugins = backend.registration.file_analysis_plugins();
             if plugins.is_empty() {
                 continue;
             }
 
+            let targeted_files;
+            let files = if backend.registration.after_file_analysis_plugins.is_empty() {
+                targeted_files =
+                    files.iter().filter(|file| file.has_node_analysis_targets()).cloned().collect::<Vec<_>>();
+                targeted_files.as_slice()
+            } else {
+                files
+            };
+            if files.is_empty() {
+                continue;
+            }
+            let store = lifecycle::AnalysisStore::Project(files);
+            let include_expression_types = backend.registration.file_analysis_requires_expression_types(&plugins);
+            let embed_source = !backend.registration.node_analysis_hooks.is_empty();
+
             let lifecycle_start = self.trace_enabled.then(Instant::now);
             let encode_start = self.trace_enabled.then(Instant::now);
-            let request = lifecycle::encode_after_file_analysis_batch_request(session.generation(), plugins, files)
-                .inspect_err(|_| {
-                    if self.trace_enabled {
-                        self.telemetry.lifecycle_errors.fetch_add(1, Ordering::Relaxed);
-                        self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
-                    }
-                })?;
+            let request = lifecycle::encode_after_file_analysis_batch_request(
+                session.generation(),
+                &plugins,
+                files,
+                include_expression_types,
+                embed_source,
+                session,
+            )
+            .inspect_err(|_| {
+                if self.trace_enabled {
+                    self.telemetry.lifecycle_errors.fetch_add(1, Ordering::Relaxed);
+                    self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
+                }
+            })?;
             if let Some(start) = encode_start {
                 self.telemetry.lifecycle_encode_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
                 self.telemetry.after_file_analysis_files.fetch_add(files.len() as u64, Ordering::Relaxed);
@@ -1514,7 +1797,7 @@ where
             let effects = self.dispatch_lifecycle_request(
                 backend,
                 LifecyclePhase::AfterFileBatch,
-                plugins,
+                &plugins,
                 plugins.len().saturating_mul(files.len()),
                 request,
                 &mut handler,
@@ -1604,6 +1887,7 @@ where
         &self,
         backend: &Backend<T>,
         request: protocol::ReturnTypeRequest<'_>,
+        affinity: &[u8],
         codebase: &CodebaseMetadata,
         session: &ExternalAnalysisSession,
     ) -> Result<Option<EffectiveCallableSignature>, ExternalAnalyzerError> {
@@ -1633,17 +1917,47 @@ where
             result.map(|(_, response)| response).map_err(|error| error.to_string().into_bytes())
         };
 
-        let ipc_start = self.trace_enabled.then(Instant::now);
-        let response = backend.transport.request_with_handler(request.payload, &mut handler).inspect_err(|_| {
+        let generation = session.generation();
+        let cache_key = request.memoize.then(|| request.payload.clone());
+        let cached = cache_key.as_deref().and_then(|cache_key| {
+            backend
+                .provider_response_cache
+                .lock()
+                .unwrap_or_else(std::sync::PoisonError::into_inner)
+                .get(generation, cache_key)
+        });
+        let response = if let Some(response) = cached {
             if self.trace_enabled {
-                self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
+                self.telemetry.provider_cache_hits.fetch_add(1, Ordering::Relaxed);
             }
-        })?;
+            response
+        } else {
+            let ipc_start = self.trace_enabled.then(Instant::now);
+            if self.trace_enabled {
+                self.telemetry.ipc_requests.fetch_add(1, Ordering::Relaxed);
+            }
+            let response = backend
+                .transport
+                .request_with_handler_affinity(request.payload, affinity, &mut handler)
+                .inspect_err(|_| {
+                    if self.trace_enabled {
+                        self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
+                    }
+                })?;
 
-        if let Some(start) = ipc_start {
-            self.telemetry.ipc_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
-            self.telemetry.response_bytes.fetch_add(response.len() as u64, Ordering::Relaxed);
-        }
+            if let Some(start) = ipc_start {
+                self.telemetry.ipc_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
+                self.telemetry.response_bytes.fetch_add(response.len() as u64, Ordering::Relaxed);
+            }
+            if let Some(cache_key) = cache_key {
+                backend.provider_response_cache.lock().unwrap_or_else(std::sync::PoisonError::into_inner).insert(
+                    generation,
+                    cache_key,
+                    response.clone(),
+                );
+            }
+            response
+        };
 
         let decode_start = self.trace_enabled.then(Instant::now);
         let result = protocol::decode_callable_signature_response(&response, |handle| {
@@ -1687,7 +2001,8 @@ where
 
         for backend in &self.backends {
             let matching_start = self.trace_enabled.then(Instant::now);
-            let (indices, candidates) = backend.matching_function_signature_providers(function);
+            let (indices, candidates) =
+                backend.matching_function_signature_providers(function, codebase.get_function(function).is_some());
             if self.trace_enabled {
                 self.telemetry.backend_checks.fetch_add(1, Ordering::Relaxed);
                 self.telemetry.candidate_providers.fetch_add(candidates as u64, Ordering::Relaxed);
@@ -1700,6 +2015,7 @@ where
             let Some(indices) = indices else {
                 continue;
             };
+            let memoize = backend.memoizes_function_providers(indices.as_slice());
 
             if self.trace_enabled {
                 self.telemetry.matched_providers.fetch_add(indices.as_slice().len() as u64, Ordering::Relaxed);
@@ -1714,6 +2030,7 @@ where
                 artifacts,
                 source_file,
                 session.generation(),
+                memoize,
                 self.trace_enabled,
             )
             .inspect_err(|_| {
@@ -1726,7 +2043,7 @@ where
                 self.telemetry.encode_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
             }
 
-            let signature = self.dispatch_callable_signature_request(backend, request, codebase, session)?;
+            let signature = self.dispatch_callable_signature_request(backend, request, function, codebase, session)?;
             if let Some(start) = provider_start
                 && start.elapsed() >= SLOW_PROVIDER_THRESHOLD
             {
@@ -1765,7 +2082,12 @@ where
 
         for backend in &self.backends {
             let matching_start = self.trace_enabled.then(Instant::now);
-            let (indices, candidates) = backend.matching_method_signature_providers(codebase, class, method);
+            let (indices, candidates) = backend.matching_method_signature_providers(
+                codebase,
+                class,
+                method,
+                codebase.get_declaring_method(class, method).is_some(),
+            );
             if self.trace_enabled {
                 self.telemetry.backend_checks.fetch_add(1, Ordering::Relaxed);
                 self.telemetry.candidate_providers.fetch_add(candidates as u64, Ordering::Relaxed);
@@ -1778,6 +2100,7 @@ where
             let Some(indices) = indices else {
                 continue;
             };
+            let memoize = backend.memoizes_method_providers(indices.as_slice());
 
             if self.trace_enabled {
                 self.telemetry.matched_providers.fetch_add(indices.as_slice().len() as u64, Ordering::Relaxed);
@@ -1795,6 +2118,7 @@ where
                 artifacts,
                 source_file,
                 session.generation(),
+                memoize,
                 self.trace_enabled,
             )
             .inspect_err(|_| {
@@ -1807,7 +2131,7 @@ where
                 self.telemetry.encode_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
             }
 
-            let signature = self.dispatch_callable_signature_request(backend, request, codebase, session)?;
+            let signature = self.dispatch_callable_signature_request(backend, request, class, codebase, session)?;
             if let Some(start) = provider_start
                 && start.elapsed() >= SLOW_PROVIDER_THRESHOLD
             {
@@ -1844,10 +2168,11 @@ where
             self.telemetry.function_lookups.fetch_add(1, Ordering::Relaxed);
         }
 
+        let declared = codebase.get_function(function).is_some();
         let mut dispatched = false;
         for backend in &self.backends {
             let matching_start = self.trace_enabled.then(Instant::now);
-            let (indices, candidates) = backend.matching_function_providers(function);
+            let (indices, candidates) = backend.matching_function_providers(function, declared);
             if self.trace_enabled {
                 self.telemetry.backend_checks.fetch_add(1, Ordering::Relaxed);
                 self.telemetry.candidate_providers.fetch_add(candidates as u64, Ordering::Relaxed);
@@ -1860,6 +2185,7 @@ where
             let Some(indices) = indices else {
                 continue;
             };
+            let memoize = backend.memoizes_function_providers(indices.as_slice());
             dispatched = true;
             let provider_start = self.trace_enabled.then(Instant::now);
             if self.trace_enabled {
@@ -1875,6 +2201,7 @@ where
                 artifacts,
                 source_file,
                 session.generation(),
+                memoize,
                 self.trace_enabled,
             )
             .inspect_err(|_| {
@@ -1893,6 +2220,7 @@ where
                     .fetch_add(duration_nanos(request.type_snapshot_duration), Ordering::Relaxed);
                 self.telemetry.request_bytes.fetch_add(request.payload.len() as u64, Ordering::Relaxed);
             }
+            let cache_key = request.memoize.then(|| request.payload.clone());
 
             let nested_telemetry = &self.telemetry;
             let trace_enabled = self.trace_enabled;
@@ -1909,17 +2237,44 @@ where
                 result.map(|(_, response)| response).map_err(|error| error.to_string().into_bytes())
             };
 
-            let ipc_start = self.trace_enabled.then(Instant::now);
-            let response = backend.transport.request_with_handler(request.payload, &mut handler).inspect_err(|_| {
+            let cached = cache_key.as_deref().and_then(|cache_key| {
+                backend
+                    .provider_response_cache
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .get(session.generation(), cache_key)
+            });
+            let response = if let Some(response) = cached {
                 if self.trace_enabled {
-                    self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
+                    self.telemetry.provider_cache_hits.fetch_add(1, Ordering::Relaxed);
                 }
-            })?;
-
-            if let Some(start) = ipc_start {
-                self.telemetry.ipc_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
-                self.telemetry.response_bytes.fetch_add(response.len() as u64, Ordering::Relaxed);
-            }
+                response
+            } else {
+                let ipc_start = self.trace_enabled.then(Instant::now);
+                if self.trace_enabled {
+                    self.telemetry.ipc_requests.fetch_add(1, Ordering::Relaxed);
+                }
+                let response = backend
+                    .transport
+                    .request_with_handler_affinity(request.payload, function, &mut handler)
+                    .inspect_err(|_| {
+                        if self.trace_enabled {
+                            self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
+                        }
+                    })?;
+                if let Some(start) = ipc_start {
+                    self.telemetry.ipc_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
+                    self.telemetry.response_bytes.fetch_add(response.len() as u64, Ordering::Relaxed);
+                }
+                if let Some(cache_key) = cache_key {
+                    backend.provider_response_cache.lock().unwrap_or_else(std::sync::PoisonError::into_inner).insert(
+                        session.generation(),
+                        cache_key,
+                        response.clone(),
+                    );
+                }
+                response
+            };
 
             let decode_start = self.trace_enabled.then(Instant::now);
             let result = protocol::decode_return_type_response(&response, |handle| {
@@ -1986,10 +2341,11 @@ where
             self.telemetry.method_lookups.fetch_add(1, Ordering::Relaxed);
         }
 
+        let declared = codebase.get_declaring_method(class, method).is_some();
         let mut dispatched = false;
         for backend in &self.backends {
             let matching_start = self.trace_enabled.then(Instant::now);
-            let (indices, candidates) = backend.matching_method_providers(codebase, class, method);
+            let (indices, candidates) = backend.matching_method_providers(codebase, class, method, declared);
             if self.trace_enabled {
                 self.telemetry.backend_checks.fetch_add(1, Ordering::Relaxed);
                 self.telemetry.candidate_providers.fetch_add(candidates as u64, Ordering::Relaxed);
@@ -2002,6 +2358,7 @@ where
             let Some(indices) = indices else {
                 continue;
             };
+            let memoize = backend.memoizes_method_providers(indices.as_slice());
             let declaring_class =
                 codebase.get_class_like(class).map_or(class, |metadata| metadata.original_name.as_bytes());
 
@@ -2021,6 +2378,7 @@ where
                 artifacts,
                 source_file,
                 session.generation(),
+                memoize,
                 self.trace_enabled,
             )
             .inspect_err(|_| {
@@ -2039,6 +2397,7 @@ where
                     .fetch_add(duration_nanos(request.type_snapshot_duration), Ordering::Relaxed);
                 self.telemetry.request_bytes.fetch_add(request.payload.len() as u64, Ordering::Relaxed);
             }
+            let cache_key = request.memoize.then(|| request.payload.clone());
 
             let nested_telemetry = &self.telemetry;
             let trace_enabled = self.trace_enabled;
@@ -2055,16 +2414,44 @@ where
                 result.map(|(_, response)| response).map_err(|error| error.to_string().into_bytes())
             };
 
-            let ipc_start = self.trace_enabled.then(Instant::now);
-            let response = backend.transport.request_with_handler(request.payload, &mut handler).inspect_err(|_| {
+            let cached = cache_key.as_deref().and_then(|cache_key| {
+                backend
+                    .provider_response_cache
+                    .lock()
+                    .unwrap_or_else(std::sync::PoisonError::into_inner)
+                    .get(session.generation(), cache_key)
+            });
+            let response = if let Some(response) = cached {
                 if self.trace_enabled {
-                    self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
+                    self.telemetry.provider_cache_hits.fetch_add(1, Ordering::Relaxed);
                 }
-            })?;
-            if let Some(start) = ipc_start {
-                self.telemetry.ipc_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
-                self.telemetry.response_bytes.fetch_add(response.len() as u64, Ordering::Relaxed);
-            }
+                response
+            } else {
+                let ipc_start = self.trace_enabled.then(Instant::now);
+                if self.trace_enabled {
+                    self.telemetry.ipc_requests.fetch_add(1, Ordering::Relaxed);
+                }
+                let response = backend
+                    .transport
+                    .request_with_handler_affinity(request.payload, class, &mut handler)
+                    .inspect_err(|_| {
+                        if self.trace_enabled {
+                            self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
+                        }
+                    })?;
+                if let Some(start) = ipc_start {
+                    self.telemetry.ipc_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
+                    self.telemetry.response_bytes.fetch_add(response.len() as u64, Ordering::Relaxed);
+                }
+                if let Some(cache_key) = cache_key {
+                    backend.provider_response_cache.lock().unwrap_or_else(std::sync::PoisonError::into_inner).insert(
+                        session.generation(),
+                        cache_key,
+                        response.clone(),
+                    );
+                }
+                response
+            };
 
             let decode_start = self.trace_enabled.then(Instant::now);
             let result = protocol::decode_return_type_response(&response, |handle| {
@@ -2197,11 +2584,17 @@ where
             };
 
             let ipc_start = self.trace_enabled.then(Instant::now);
-            let response = backend.transport.request_with_handler(request.payload, &mut handler).inspect_err(|_| {
-                if self.trace_enabled {
-                    self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
-                }
-            })?;
+            if self.trace_enabled {
+                self.telemetry.ipc_requests.fetch_add(1, Ordering::Relaxed);
+            }
+            let response = backend
+                .transport
+                .request_with_handler_affinity(request.payload, class, &mut handler)
+                .inspect_err(|_| {
+                    if self.trace_enabled {
+                        self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
+                    }
+                })?;
             if let Some(start) = ipc_start {
                 self.telemetry.ipc_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
                 self.telemetry.response_bytes.fetch_add(response.len() as u64, Ordering::Relaxed);
@@ -2326,11 +2719,17 @@ where
             };
 
             let ipc_start = self.trace_enabled.then(Instant::now);
-            let response = backend.transport.request_with_handler(request, &mut handler).inspect_err(|_| {
-                if self.trace_enabled {
-                    self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
-                }
-            })?;
+            if self.trace_enabled {
+                self.telemetry.ipc_requests.fetch_add(1, Ordering::Relaxed);
+            }
+            let response = backend
+                .transport
+                .request_with_handler_affinity(request, declaring_class, &mut handler)
+                .inspect_err(|_| {
+                    if self.trace_enabled {
+                        self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
+                    }
+                })?;
 
             if let Some(start) = ipc_start {
                 self.telemetry.ipc_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
@@ -2475,6 +2874,7 @@ where
             let advertised_property_providers = registration.property_providers.len();
             let advertised_property_initialization_providers = registration.property_initialization_providers.len();
             let advertised_issue_filter_hooks = registration.issue_filter_hooks.len();
+            let advertised_node_analysis_hooks = registration.node_analysis_hooks.len();
             let enabled_indices = registration
                 .plugins
                 .iter()
@@ -2488,9 +2888,11 @@ where
                 .property_initialization_providers
                 .retain(|provider| enabled.contains(provider.plugin.as_str()));
             registration.issue_filter_hooks.retain(|hook| enabled.contains(hook.plugin.as_str()));
+            registration.node_analysis_hooks.retain(|hook| enabled.contains(hook.plugin.as_str()));
             registration.initialization_plugins.retain(|index| enabled_indices.contains(index));
             registration.before_analysis_plugins.retain(|index| enabled_indices.contains(index));
             registration.after_file_analysis_plugins.retain(|index| enabled_indices.contains(index));
+            registration.node_analysis_plugins.retain(|index| enabled_indices.contains(index));
             registration.after_analysis_plugins.retain(|index| enabled_indices.contains(index));
 
             if !registration.initialization_plugins.is_empty() {
@@ -2547,12 +2949,18 @@ where
                         - registration.property_initialization_providers.len(),
                     issue_filter_hooks = registration.issue_filter_hooks.len(),
                     disabled_issue_filter_hooks = advertised_issue_filter_hooks - registration.issue_filter_hooks.len(),
+                    node_analysis_hooks = registration.node_analysis_hooks.len(),
+                    disabled_node_analysis_hooks = advertised_node_analysis_hooks - registration.node_analysis_hooks.len(),
                     before_analysis_plugins = registration.before_analysis_plugins.len(),
                     after_file_analysis_plugins = registration.after_file_analysis_plugins.len(),
                     after_analysis_plugins = registration.after_analysis_plugins.len(),
                     elapsed = ?start.elapsed(),
                     "External analyzer backend registered."
                 );
+            }
+
+            if !registration.after_file_analysis_plugins.is_empty() || !registration.node_analysis_plugins.is_empty() {
+                transport.prepare_capacity();
             }
 
             backends.push(Backend::new(transport, registration));
@@ -2582,6 +2990,8 @@ where
                 .sum::<usize>();
             let issue_filter_hooks =
                 analyzer.backends.iter().map(|backend| backend.registration.issue_filter_hooks.len()).sum::<usize>();
+            let node_analysis_hooks =
+                analyzer.backends.iter().map(|backend| backend.registration.node_analysis_hooks.len()).sum::<usize>();
             let before_analysis_plugins = analyzer
                 .backends
                 .iter()
@@ -2606,6 +3016,7 @@ where
                 property_providers,
                 property_initialization_providers,
                 issue_filter_hooks,
+                node_analysis_hooks,
                 before_analysis_plugins,
                 after_file_analysis_plugins,
                 after_analysis_plugins,
@@ -2635,6 +3046,7 @@ impl<T> Drop for ExternalAnalyzer<T> {
             .saturating_add(property_initialization_lookups)
             .saturating_add(signature_lookups);
         let requests = self.telemetry.requests.load(Ordering::Relaxed);
+        let ipc_requests = self.telemetry.ipc_requests.load(Ordering::Relaxed);
         let nested_requests = self.telemetry.nested_requests.load(Ordering::Relaxed);
         let comparisons = self.telemetry.comparisons.load(Ordering::Relaxed);
         let metadata_queries = self.telemetry.metadata_queries.load(Ordering::Relaxed);
@@ -2660,6 +3072,8 @@ impl<T> Drop for ExternalAnalyzer<T> {
         );
         tracing::trace!(
             requests,
+            ipc_requests,
+            provider_cache_hits = self.telemetry.provider_cache_hits.load(Ordering::Relaxed),
             signature_requests = self.telemetry.signature_requests.load(Ordering::Relaxed),
             provided_types = self.telemetry.provided_types.load(Ordering::Relaxed),
             initialized_properties = self.telemetry.initialized_properties.load(Ordering::Relaxed),
@@ -2725,7 +3139,7 @@ impl<T> Drop for ExternalAnalyzer<T> {
             decode_ms = nanos_millis(self.telemetry.decode_ns.load(Ordering::Relaxed)),
             total_worker_cpu_ms = nanos_millis(self.telemetry.lookup_ns.load(Ordering::Relaxed)),
             average_lookup_micros = average_micros(self.telemetry.lookup_ns.load(Ordering::Relaxed), lookups),
-            average_request_micros = average_micros(self.telemetry.ipc_ns.load(Ordering::Relaxed), requests),
+            average_request_micros = average_micros(self.telemetry.ipc_ns.load(Ordering::Relaxed), ipc_requests),
             average_comparison_micros = average_micros(
                 self.telemetry.comparison_ns.load(Ordering::Relaxed),
                 comparisons,
@@ -2918,8 +3332,8 @@ mod tests {
         assert_eq!(analyzer.extensions().len(), 1);
         assert_eq!(analyzer.plugins()[0].identifier, "demo");
         assert_eq!(analyzer.backends[0].registration.function_providers.len(), 1);
-        assert!(analyzer.backends[0].matching_function_providers(b"demo_service").0.is_some());
-        assert!(analyzer.backends[0].matching_function_signature_providers(b"demo_service").0.is_none());
+        assert!(analyzer.backends[0].matching_function_providers(b"demo_service", false).0.is_some());
+        assert!(analyzer.backends[0].matching_function_signature_providers(b"demo_service", false).0.is_none());
     }
 
     #[test]
@@ -2929,6 +3343,19 @@ mod tests {
 
         assert_eq!(indices.as_slice(), &[0, 1, 3, 4]);
         assert!(ProviderIndices::from_exact_and_wildcards(&[], []).is_none());
+    }
+
+    #[test]
+    fn provider_response_cache_is_scoped_to_one_analysis_generation() {
+        let mut cache = ProviderResponseCache::default();
+        cache.insert(1, b"request".to_vec(), b"first".to_vec());
+
+        assert_eq!(cache.get(1, b"request"), Some(b"first".to_vec()));
+        assert_eq!(cache.get(2, b"request"), None);
+
+        cache.insert(2, b"request".to_vec(), b"second".to_vec());
+        assert_eq!(cache.get(2, b"request"), Some(b"second".to_vec()));
+        assert_eq!(cache.get(1, b"request"), None);
     }
 
     #[test]

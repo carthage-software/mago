@@ -68,10 +68,24 @@ impl<'source> SourceSnapshot<'source> {
         program: &'ast Program<'arena>,
         resolved_names: &'source ResolvedNames<'arena>,
     ) -> Result<Self, PayloadError> {
+        Self::complete_with_targets(program, resolved_names, None)
+    }
+
+    /// Builds a complete snapshot and records nodes matching analyzer-hook targets.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the syntax tree exceeds the protocol's `u32`
+    /// address space.
+    pub fn complete_with_targets<'ast, 'arena>(
+        program: &'ast Program<'arena>,
+        resolved_names: &'source ResolvedNames<'arena>,
+        target_kinds: Option<&[bool; u8::MAX as usize + 1]>,
+    ) -> Result<Self, PayloadError> {
         let mut nodes = Vec::new();
         let mut targets = Vec::new();
         let mut stack = Vec::with_capacity(64);
-        Self::append_subtree(Node::Program(program), None, &mut nodes, &mut targets, &mut stack)?;
+        Self::append_subtree(Node::Program(program), target_kinds, &mut nodes, &mut targets, &mut stack)?;
 
         let mut names = resolved_names.iter().collect::<Vec<_>>();
         names.sort_unstable_by_key(|(start, end, _, _)| (*start, *end));

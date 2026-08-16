@@ -6,7 +6,9 @@ namespace Mago\Sdk\Analyzer;
 
 use Mago\Sdk\CancellationTokenInterface;
 use Mago\Sdk\Internal\Analyzer\Protocol;
+use Mago\Sdk\Internal\Analyzer\TypeCodec;
 use Mago\Sdk\Internal\HostClient;
+use Mago\Sdk\Internal\Protocol\PayloadReader;
 use Mago\Sdk\PHPVersion;
 use Mago\Sdk\Span;
 use Mago\Sdk\Syntax\Node;
@@ -15,9 +17,14 @@ use Mago\Sdk\Syntax\SourceFile;
 
 use function array_key_exists;
 use function array_keys;
+use function count;
+use function strlen;
+use function unpack;
 
 /**
- * Completed semantic artifacts for one source file. Expensive data is fetched lazily.
+ * Completed semantic artifacts for one source file.
+ *
+ * Data requested by a registered hook may be embedded in the lifecycle batch. Other expensive data is fetched lazily.
  *
  * @api
  * @mago-expect lint:cyclomatic-complexity
@@ -35,7 +42,7 @@ final class FileAnalysis
      */
     private array $inferredTypes = [];
 
-    private ?SourceFile $sourceFile = null;
+    private ?SourceFile $sourceFile;
 
     /**
      * @internal
@@ -50,6 +57,10 @@ final class FileAnalysis
         private readonly CancellationTokenInterface $cancellation,
         private readonly PHPVersion $phpVersion,
         private readonly array $nodeKinds,
+        ?SourceFile $sourceFile,
+        private readonly bool $hasLocalExpressionTypes,
+        private readonly string $expressionTypeRecords,
+        private readonly string $encodedExpressionTypes,
         public readonly string $file,
         public readonly int $size,
         public readonly int $expressionCount,
@@ -57,7 +68,9 @@ final class FileAnalysis
         public readonly int $inferredYieldKeyCount,
         public readonly int $inferredYieldValueCount,
         public readonly ReferenceSummary $references,
-    ) {}
+    ) {
+        $this->sourceFile = $sourceFile;
+    }
 
     public function getExpressionType(Node|Span $selection): ?Type
     {
@@ -82,7 +95,13 @@ final class FileAnalysis
             }
         }
 
-        if ($missing !== []) {
+        if ($missing !== [] && $this->hasLocalExpressionTypes) {
+            foreach ($missing as $key => $span) {
+                $this->expressionTypes[$key] = $this->readLocalExpressionType($span);
+            }
+        }
+
+        if ($missing !== [] && !$this->hasLocalExpressionTypes) {
             $this->cancellation->throwIfCancelled();
             $response = $this->host->request(
                 $this->requestId,
@@ -94,7 +113,7 @@ final class FileAnalysis
                 ),
             );
 
-            $types = Protocol::readOptionalAnalysisTypeQueryResponse(
+            [$types, $prefetched] = Protocol::readOptionalAnalysisTypeQueryResponse(
                 $response,
                 $this->generation,
                 $this->file,
@@ -103,6 +122,15 @@ final class FileAnalysis
 
             foreach (array_keys($missing) as $index => $key) {
                 $this->expressionTypes[$key] = $types[$index];
+            }
+            for ($index = 0, $count = count($prefetched); $index < $count; $index += 3) {
+                /** @var int $start */
+                $start = $prefetched[$index];
+                /** @var int $end */
+                $end = $prefetched[$index + 1];
+                /** @var Type $type */
+                $type = $prefetched[$index + 2];
+                $this->expressionTypes[$start . ':' . $end] = $type;
             }
         }
 
@@ -117,7 +145,8 @@ final class FileAnalysis
     /**
      * Returns the exact in-memory source analyzed by Mago, including its complete syntax and resolved names.
      *
-     * The snapshot is requested only on the first call and is never reconstructed from the filesystem.
+     * When it was not embedded in the lifecycle batch, the snapshot is requested on the first call. It is never
+     * reconstructed from the filesystem.
      *
      * @mago-expect lint:halstead
      */
@@ -201,5 +230,32 @@ final class FileAnalysis
         }
 
         return $this->inferredTypes[$operation];
+    }
+
+    private function readLocalExpressionType(Span $span): ?Type
+    {
+        $low = 0;
+        $high = $this->expressionCount - 1;
+        while ($low <= $high) {
+            $middle = ($low + $high) >> 1;
+            /** @var array{1: int<0, 4294967295>, 2: int<0, 4294967295>, 3: int<0, 4294967295>, 4: int<0, 4294967295>} $record */
+            $record = unpack('N4', $this->expressionTypeRecords, $middle * 16);
+            if ($record[1] < $span->start || $record[1] === $span->start && $record[2] < $span->end) {
+                $low = $middle + 1;
+                continue;
+            }
+            if ($record[1] > $span->start || $record[2] > $span->end) {
+                $high = $middle - 1;
+                continue;
+            }
+
+            if (($record[3] + $record[4]) > strlen($this->encodedExpressionTypes)) {
+                return null;
+            }
+
+            return TypeCodec::readComplete(new PayloadReader($this->encodedExpressionTypes, $record[3]));
+        }
+
+        return null;
     }
 }

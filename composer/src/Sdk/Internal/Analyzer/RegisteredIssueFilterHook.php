@@ -13,10 +13,12 @@ final class RegisteredIssueFilterHook
 {
     /**
      * @param non-empty-string $plugin
+     * @param non-empty-list<non-empty-string> $codes
      */
     public function __construct(
         public readonly int $index,
         public readonly string $plugin,
         public readonly IssueFilterHook $hook,
+        public readonly array $codes,
     ) {}
 }

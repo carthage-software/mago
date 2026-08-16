@@ -19,6 +19,9 @@ final class MetadataCache
     /** @var array<int, array<string, list<string>>> */
     public array $relations = [];
 
+    /** @var array<string, bool> */
+    public array $typeComparisons = [];
+
     public function __construct(
         public readonly int $generation,
     ) {}

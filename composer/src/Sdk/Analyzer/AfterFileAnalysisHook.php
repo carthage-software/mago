@@ -11,5 +11,8 @@ namespace Mago\Sdk\Analyzer;
  */
 interface AfterFileAnalysisHook
 {
+    /** @return list<FileAnalysisRequirement> */
+    public function getRequirements(): array;
+
     public function afterFileAnalysis(AfterFileAnalysisContext $context): void;
 }

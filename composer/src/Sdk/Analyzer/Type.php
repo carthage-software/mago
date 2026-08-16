@@ -320,6 +320,12 @@ final class Type
         return pack('C', self::COMPLETE) . TypeCodec::encode($this);
     }
 
+    /** @internal */
+    public function isRequestReference(): bool
+    {
+        return $this->payload !== '' && $this->payload[0] === "\0";
+    }
+
     public function __toString(): string
     {
         return $this->description;

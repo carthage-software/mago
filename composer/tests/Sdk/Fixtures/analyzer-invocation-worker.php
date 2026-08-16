@@ -4,7 +4,7 @@ declare(strict_types=1);
 
 namespace Mago\Tests\Sdk\Fixtures;
 
-use Mago\Sdk\Analyzer\CallableSignatureProvider;
+use Mago\Sdk\Analyzer\CallableSignatureOverride;
 use Mago\Sdk\Analyzer\CallableSignatureProviderContext;
 use Mago\Sdk\Analyzer\EffectiveCallableSignature;
 use Mago\Sdk\Analyzer\FunctionReturnTypeProvider;
@@ -68,7 +68,7 @@ final class InvocationAudit
  * @mago-expect lint:cyclomatic-complexity
  * @mago-expect lint:single-class-per-file
  */
-final class InvocationFunctionProvider implements FunctionReturnTypeProvider, CallableSignatureProvider
+final class InvocationFunctionProvider implements FunctionReturnTypeProvider, CallableSignatureOverride
 {
     public function getTargets(): array
     {
@@ -125,7 +125,7 @@ final class InvocationFunctionProvider implements FunctionReturnTypeProvider, Ca
  * @mago-expect lint:kan-defect
  * @mago-expect lint:single-class-per-file
  */
-final class InvocationMethodProvider implements MethodReturnTypeProvider, CallableSignatureProvider
+final class InvocationMethodProvider implements MethodReturnTypeProvider, CallableSignatureOverride
 {
     public function getTargets(): array
     {
@@ -615,6 +615,11 @@ final class InvocationPropertyInitializationProvider implements PropertyInitiali
  */
 final class InvocationIssueFilterHook implements IssueFilterHook
 {
+    public function getCodes(): array
+    {
+        return ['non-existent-function'];
+    }
+
     public function filterIssue(IssueFilterContext $context): IssueFilterDecision
     {
         if (

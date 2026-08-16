@@ -8,7 +8,9 @@ namespace Mago\Sdk\Analyzer;
  * Supplies the effective parameters accepted by a targeted callable.
  *
  * This optional capability may be implemented by a registered function or
- * method return-type provider. Mago asks for it before analyzing arguments.
+ * method return-type provider. Mago asks for it before analyzing arguments
+ * when the callable has no declared signature. Implement
+ * {@see CallableSignatureOverride} to replace existing declarations as well.
  * Returning `null` delegates to the next matching provider and ultimately the
  * declared signature. A non-null result replaces that signature's parameters;
  * the ordinary return-type callback still runs after argument analysis.

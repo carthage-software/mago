@@ -5,10 +5,12 @@ declare(strict_types=1);
 namespace Mago\Sdk\Internal\Analyzer;
 
 use Mago\Sdk\Analyzer\Argument;
+use Mago\Sdk\Analyzer\CallableSignatureOverride;
 use Mago\Sdk\Analyzer\CallableSignatureProvider;
 use Mago\Sdk\Analyzer\EffectiveCallableSignature;
 use Mago\Sdk\Analyzer\ExpressionType;
 use Mago\Sdk\Analyzer\FileAnalysis;
+use Mago\Sdk\Analyzer\FileAnalysisRequirement;
 use Mago\Sdk\Analyzer\Invocation;
 use Mago\Sdk\Analyzer\InvocationKind;
 use Mago\Sdk\Analyzer\Metadata\MemberIdentifier;
@@ -23,6 +25,7 @@ use Mago\Sdk\Analyzer\SymbolReference;
 use Mago\Sdk\Analyzer\SymbolReferences;
 use Mago\Sdk\Analyzer\Type;
 use Mago\Sdk\Analyzer\Type\FunctionLikeIdentifier;
+use Mago\Sdk\Analyzer\UndeclaredReturnTypeProvider;
 use Mago\Sdk\CancellationTokenInterface;
 use Mago\Sdk\Exception\ProtocolException;
 use Mago\Sdk\Extension;
@@ -261,6 +264,11 @@ final class Protocol
                 $flags |= (int) ($plugin->afterFileAnalysisHooks !== []) << 1;
                 $flags |= (int) ($plugin->afterAnalysisHooks !== []) << 2;
                 $flags |= (int) ($plugin->initializationHooks !== []) << 3;
+                foreach ($plugin->afterFileAnalysisHooks as $hook) {
+                    foreach ($hook->getRequirements() as $requirement) {
+                        $flags |= (int) ($requirement === FileAnalysisRequirement::ExpressionTypes) << 4;
+                    }
+                }
                 $writer->writeU8($flags);
                 $writer->writeCount($definition->aliases);
                 foreach ($definition->aliases as $alias) {
@@ -270,7 +278,11 @@ final class Protocol
                 $writer->writeCount($plugin->functionProviders);
                 foreach ($plugin->functionProviders as $provider) {
                     $writer->writeU16($provider->index);
-                    $writer->writeU8((int) ($provider->provider instanceof CallableSignatureProvider));
+                    $capabilities = (int) ($provider->provider instanceof CallableSignatureProvider);
+                    $capabilities |= (int) ($provider->provider instanceof CallableSignatureOverride) << 1;
+                    $capabilities |= (int) ($provider->provider instanceof UndeclaredReturnTypeProvider) << 2;
+                    $capabilities |= (int) $plugin->memoizeProviders << 3;
+                    $writer->writeU8($capabilities);
                     $writer->writeCount($provider->targets);
                     foreach ($provider->targets as $target) {
                         $writer->writeU8($target->kind->value);
@@ -281,7 +293,11 @@ final class Protocol
                 $writer->writeCount($plugin->methodProviders);
                 foreach ($plugin->methodProviders as $provider) {
                     $writer->writeU16($provider->index);
-                    $writer->writeU8((int) ($provider->provider instanceof CallableSignatureProvider));
+                    $capabilities = (int) ($provider->provider instanceof CallableSignatureProvider);
+                    $capabilities |= (int) ($provider->provider instanceof CallableSignatureOverride) << 1;
+                    $capabilities |= (int) ($provider->provider instanceof UndeclaredReturnTypeProvider) << 2;
+                    $capabilities |= (int) $plugin->memoizeProviders << 3;
+                    $writer->writeU8($capabilities);
                     $writer->writeCount($provider->targets);
                     foreach ($provider->targets as $target) {
                         $writer->writeBytes($target->class);
@@ -312,6 +328,24 @@ final class Protocol
                 $writer->writeCount($plugin->issueFilterHooks);
                 foreach ($plugin->issueFilterHooks as $hook) {
                     $writer->writeU16($hook->index);
+                    $writer->writeCount($hook->codes);
+                    foreach ($hook->codes as $code) {
+                        $writer->writeString($code);
+                    }
+                }
+
+                $writer->writeCount($plugin->nodeAnalysisHooks);
+                foreach ($plugin->nodeAnalysisHooks as $hook) {
+                    $writer->writeU16($hook->index);
+                    $requirements = 0;
+                    foreach ($hook->requirements as $requirement) {
+                        $requirements |= (int) ($requirement === FileAnalysisRequirement::ExpressionTypes);
+                    }
+                    $writer->writeU8($requirements);
+                    $writer->writeCount($hook->targets);
+                    foreach ($hook->targets as $target) {
+                        $writer->writeString($target->value);
+                    }
                 }
             }
         }
@@ -342,7 +376,7 @@ final class Protocol
     }
 
     /**
-     * @return list<Type|null>
+     * @return array{list<Type|null>, list<int|Type>}
      */
     public static function readOptionalAnalysisTypeQueryResponse(
         string $payload,
@@ -362,9 +396,17 @@ final class Protocol
             $types[] = TypeCodec::readComplete($reader);
         }
 
+        $prefetched = [];
+        $count = $reader->readCount(1_000_000);
+        for ($index = 0; $index < $count; ++$index) {
+            $prefetched[] = $reader->readU32();
+            $prefetched[] = $reader->readU32();
+            $prefetched[] = TypeCodec::readComplete($reader);
+        }
+
         $reader->finish();
 
-        return $types;
+        return [$types, $prefetched];
     }
 
     /**
@@ -644,6 +686,29 @@ final class Protocol
             throw new ProtocolException('An analyzer file result contains an empty file name.');
         }
 
+        $size = $reader->readU32();
+        $expressionCount = $reader->readU32();
+        $inferredReturnCount = $reader->readU32();
+        $inferredYieldKeyCount = $reader->readU32();
+        $inferredYieldValueCount = $reader->readU32();
+        $references = self::readReferenceSummary($reader);
+        $hasLocalExpressionTypes = $reader->readBoolean();
+        $expressionTypeRecords = '';
+        $encodedExpressionTypes = '';
+        if ($hasLocalExpressionTypes) {
+            $localExpressionCount = $reader->readCount(1_000_000);
+            if ($localExpressionCount !== $expressionCount) {
+                throw new ProtocolException('An eager expression-type index does not match its file summary.');
+            }
+            $expressionTypeRecords = $reader->readRaw($localExpressionCount * 16);
+            $encodedExpressionTypes = $reader->readBytes();
+        }
+        $sourceFile = null;
+        if ($reader->readBoolean()) {
+            $contents = $reader->readBytes();
+            $sourceFile = SourceFileCodec::read($reader, $phpVersion, $nodeKinds, $file, $contents);
+        }
+
         return new FileAnalysis(
             $host,
             $requestId,
@@ -651,13 +716,17 @@ final class Protocol
             $cancellation,
             $phpVersion,
             $nodeKinds,
+            $sourceFile,
+            $hasLocalExpressionTypes,
+            $expressionTypeRecords,
+            $encodedExpressionTypes,
             $file,
-            $reader->readU32(),
-            $reader->readU32(),
-            $reader->readU32(),
-            $reader->readU32(),
-            $reader->readU32(),
-            self::readReferenceSummary($reader),
+            $size,
+            $expressionCount,
+            $inferredReturnCount,
+            $inferredYieldKeyCount,
+            $inferredYieldValueCount,
+            $references,
         );
     }
 
