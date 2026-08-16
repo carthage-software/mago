@@ -11,8 +11,12 @@ use Mago\Sdk\Analyzer\PluginDefinition;
 use Mago\Sdk\Analyzer\PropertyTarget;
 use Mago\Sdk\Analyzer\PropertyType;
 use Mago\Sdk\Analyzer\Type;
+use Mago\Sdk\Analyzer\Type\ClassLikeStringType;
+use Mago\Sdk\Analyzer\Type\ClassLikeStringVariant;
 use Mago\Sdk\Analyzer\Type\FunctionLikeIdentifier;
 use Mago\Sdk\Analyzer\Type\FunctionLikeKind;
+use Mago\Sdk\Analyzer\Type\ScalarType;
+use Mago\Sdk\Analyzer\Type\ScalarTypeKind;
 use Mago\Sdk\Exception\InvalidArgumentException;
 use Mago\Sdk\Span;
 use PHPUnit\Framework\TestCase;
@@ -74,5 +78,25 @@ final class ValueTest extends TestCase
         self::assertSame('non-negative-int', (string) Type::nonNegativeInt());
         self::assertSame('non-empty-string', (string) Type::nonEmptyString());
         self::assertSame('int(-42)', (string) Type::literalInt(-42));
+    }
+
+    public function testLiteralValuesCanBeReadWithoutInspectingAtomicTypes(): void
+    {
+        $classString = Type::fromAtomics(
+            new ScalarType(
+                ScalarTypeKind::ClassLikeString,
+                new ClassLikeStringType(ClassLikeStringVariant::Literal, literal: 'App\\Example'),
+            ),
+        );
+
+        self::assertSame(-42, Type::literalInt(-42)->getLiteralInt());
+        self::assertSame('value', Type::literalString('value')->getLiteralString());
+        self::assertTrue(Type::true()->getLiteralBool());
+        self::assertFalse(Type::false()->getLiteralBool());
+        self::assertSame('App\\Example', $classString->getLiteralString());
+        self::assertSame('App\\Example', $classString->getLiteralClassString());
+        self::assertNull(Type::literalString('App\\Example')->getLiteralClassString());
+        self::assertNull(Type::string()->getLiteralString());
+        self::assertNull(Type::bool()->getLiteralBool());
     }
 }

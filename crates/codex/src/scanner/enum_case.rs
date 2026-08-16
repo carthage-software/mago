@@ -30,7 +30,7 @@ where
 {
     let span = case.span();
     let verdict = evaluate_version_attributes(&case.attribute_lists, context, context.php_version);
-    let attributes = scan_attribute_lists(&case.attribute_lists, context);
+    let attributes = scan_attribute_lists(&case.attribute_lists, context, scope, Some(enum_name));
 
     match &case.item {
         EnumCaseItem::Unit(item) => {

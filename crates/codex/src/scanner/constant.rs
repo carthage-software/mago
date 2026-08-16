@@ -36,7 +36,7 @@ where
 {
     let verdict = evaluate_version_attributes(&constant.attribute_lists, context, context.php_version);
 
-    let attributes = scan_attribute_lists(&constant.attribute_lists, context);
+    let attributes = scan_attribute_lists(&constant.attribute_lists, context, scope, None);
     let document = parse_docblock(context, constant);
 
     let flags = MetadataFlags::origin_flags(context.file.file_type);

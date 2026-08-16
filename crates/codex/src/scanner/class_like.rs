@@ -343,7 +343,7 @@ where
     let mut class_like_metadata = ClassLikeMetadata::new(name, original_name, span, name_span, flags);
     class_like_metadata.version_constraint = verdict.constraint;
 
-    class_like_metadata.attributes = scan_attribute_lists(attribute_lists, context);
+    class_like_metadata.attributes = scan_attribute_lists(attribute_lists, context, scope, Some(original_name));
     class_like_metadata.enum_type = match enum_type {
         Some(EnumBackingTypeHint { hint: Hint::String(_), .. }) => Some(TAtomic::Scalar(TScalar::string())),
         Some(EnumBackingTypeHint { hint: Hint::Integer(_), .. }) => Some(TAtomic::Scalar(TScalar::int())),

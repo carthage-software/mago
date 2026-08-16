@@ -90,6 +90,7 @@ where
 
     let mut property_metadata = PropertyMetadata::new(*name, flags);
 
+    property_metadata.attributes.clone_from(&parameter_metadata.attributes);
     property_metadata.set_default_type_metadata(default_type_metadata);
     property_metadata.set_name_span(Some(name_span));
     property_metadata.set_span(Some(parameter.span()));
@@ -100,7 +101,8 @@ where
 
     if let Some(hook_list) = &parameter.hooks {
         for hook in &hook_list.hooks {
-            let mut hook_metadata = scan_property_hook(hook, &property_metadata, context, scope);
+            let mut hook_metadata =
+                scan_property_hook(hook, &property_metadata, context, scope, Some(class_like_metadata.original_name));
             class_like_metadata.issues.extend(hook_metadata.take_issues());
             property_metadata.hooks.insert(hook_metadata.name, hook_metadata);
         }
@@ -182,6 +184,12 @@ where
     match property {
         Property::Plain(plain_property) => {
             let verdict = evaluate_version_attributes(&plain_property.attribute_lists, context, context.php_version);
+            let attributes = scan_attribute_lists(
+                &plain_property.attribute_lists,
+                context,
+                scope,
+                Some(class_like_metadata.original_name),
+            );
 
             plain_property
                 .items
@@ -230,6 +238,7 @@ where
 
                     let mut metadata = PropertyMetadata::new(name, item_flags);
 
+                    metadata.attributes.clone_from(&attributes);
                     metadata.set_name_span(Some(name_span));
                     metadata.set_default_type_metadata(default_type);
                     metadata.set_visibility(read_visibility, write_visibility);
@@ -265,6 +274,12 @@ where
         }
         Property::Hooked(hooked_property) => {
             let verdict = evaluate_version_attributes(&hooked_property.attribute_lists, context, context.php_version);
+            let attributes = scan_attribute_lists(
+                &hooked_property.attribute_lists,
+                context,
+                scope,
+                Some(class_like_metadata.original_name),
+            );
 
             let (name, name_span, has_default, default_type) =
                 scan_property_item(&hooked_property.item, classname, context, scope);
@@ -293,6 +308,7 @@ where
 
             let mut metadata = PropertyMetadata::new(name, flags);
 
+            metadata.attributes = attributes;
             metadata.set_name_span(Some(name_span));
             metadata.set_default_type_metadata(default_type);
             metadata.set_span(Some(hooked_property.span()));
@@ -317,7 +333,8 @@ where
             }
 
             for hook in &hooked_property.hook_list.hooks {
-                let mut hook_metadata = scan_property_hook(hook, &metadata, context, scope);
+                let mut hook_metadata =
+                    scan_property_hook(hook, &metadata, context, scope, Some(class_like_metadata.original_name));
                 class_like_metadata.issues.extend(hook_metadata.take_issues());
                 metadata.hooks.insert(hook_metadata.name, hook_metadata);
             }
@@ -343,6 +360,7 @@ fn scan_property_hook<'arena, A>(
     property_metadata: &PropertyMetadata,
     context: &mut Context<'_, 'arena, A>,
     scope: &NamespaceScope,
+    classname: Option<Word>,
 ) -> PropertyHookMetadata
 where
     A: Arena,
@@ -368,7 +386,7 @@ where
         None
     };
 
-    let attributes = scan_attribute_lists(&hook.attribute_lists, context);
+    let attributes = scan_attribute_lists(&hook.attribute_lists, context, scope, classname);
 
     let mut has_docblock = false;
     let mut return_type_metadata = None;

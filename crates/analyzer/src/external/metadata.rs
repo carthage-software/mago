@@ -678,6 +678,7 @@ pub(super) fn write_property(
     write_optional_type_metadata(writer, metadata.type_metadata.as_ref(), session)?;
     write_optional_type_metadata(writer, metadata.write_type_metadata.as_ref(), session)?;
     write_optional_type_metadata(writer, metadata.default_type_metadata.as_ref(), session)?;
+    write_attributes(writer, &metadata.attributes, session)?;
     writer.write_u64(metadata.flags.bits());
     write_property_hooks(writer, &metadata.hooks, session)?;
     write_version_constraint(writer, &metadata.version_constraint);
@@ -874,6 +875,14 @@ fn write_attributes(
     for attribute in attributes {
         writer.write_bytes(attribute.name.as_bytes())?;
         write_location(writer, attribute.span, session)?;
+        writer.write_u32(attribute.arguments.len() as u32);
+        for argument in &attribute.arguments {
+            write_optional_word(writer, argument.name)?;
+            write_location(writer, argument.span, session)?;
+            write_optional_location(writer, argument.name_span, session)?;
+            write_optional_location(writer, argument.value_span, session)?;
+            write_optional_union(writer, argument.value_type.as_ref())?;
+        }
     }
 
     Ok(())

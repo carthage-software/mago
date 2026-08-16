@@ -18,6 +18,7 @@ use Mago\Sdk\Analyzer\Assertion\TypeAssertionKind;
 use Mago\Sdk\Analyzer\Assertion\VariableAssertion;
 use Mago\Sdk\Analyzer\Assertion\VariableAssertionKind;
 use Mago\Sdk\Analyzer\Metadata\AttributeMetadata;
+use Mago\Sdk\Analyzer\Metadata\AttributeArgumentMetadata;
 use Mago\Sdk\Analyzer\Metadata\ClassConstantMetadata;
 use Mago\Sdk\Analyzer\Metadata\ClassLikeKind;
 use Mago\Sdk\Analyzer\Metadata\ClassLikeMetadata;
@@ -273,6 +274,7 @@ final class MetadataCodec
             self::readOptionalTypeMetadata($reader),
             self::readOptionalTypeMetadata($reader),
             self::readOptionalTypeMetadata($reader),
+            self::readAttributes($reader),
             new MetadataFlags($reader->readU64()),
             self::readPropertyHooks($reader),
             self::readVersionRanges($reader),
@@ -416,7 +418,20 @@ final class MetadataCodec
         $count = $reader->readCount(self::MAXIMUM_MEMBERS);
         $attributes = [];
         for ($index = 0; $index < $count; ++$index) {
-            $attributes[] = new AttributeMetadata($reader->readBytes(), self::readLocation($reader));
+            $name = $reader->readBytes();
+            $location = self::readLocation($reader);
+            $arguments = [];
+            $argumentCount = $reader->readCount(self::MAXIMUM_MEMBERS);
+            for ($argumentIndex = 0; $argumentIndex < $argumentCount; ++$argumentIndex) {
+                $arguments[] = new AttributeArgumentMetadata(
+                    $reader->readOptionalString(),
+                    self::readLocation($reader),
+                    self::readOptionalLocation($reader),
+                    self::readOptionalLocation($reader),
+                    self::readOptionalType($reader),
+                );
+            }
+            $attributes[] = new AttributeMetadata($name, $location, $arguments);
         }
 
         return $attributes;

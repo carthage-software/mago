@@ -14,6 +14,7 @@ use Mago\Sdk\SourceLocation;
 final class PropertyMetadata
 {
     /**
+     * @param list<AttributeMetadata> $attributes
      * @param array<string, PropertyHookMetadata> $hooks
      * @param list<VersionRange> $availableVersions
      */
@@ -27,6 +28,7 @@ final class PropertyMetadata
         public readonly ?TypeMetadata $type,
         public readonly ?TypeMetadata $writeType,
         public readonly ?TypeMetadata $defaultType,
+        public readonly array $attributes,
         public readonly MetadataFlags $flags,
         public readonly array $hooks,
         public readonly array $availableVersions,

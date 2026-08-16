@@ -44,7 +44,7 @@ where
 {
     let verdict = evaluate_version_attributes(&constant.attribute_lists, context, context.php_version);
 
-    let attributes = scan_attribute_lists(&constant.attribute_lists, context);
+    let attributes = scan_attribute_lists(&constant.attribute_lists, context, scope, classname);
     let visibility =
         constant.modifiers.get_first_visibility().and_then(|m| Visibility::try_from(m).ok()).unwrap_or_default();
     let is_final = constant.modifiers.contains_final();

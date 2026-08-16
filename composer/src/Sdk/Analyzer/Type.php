@@ -6,6 +6,8 @@ namespace Mago\Sdk\Analyzer;
 
 use Mago\Sdk\Analyzer\Type\AnyObjectType;
 use Mago\Sdk\Analyzer\Type\AtomicType;
+use Mago\Sdk\Analyzer\Type\ClassLikeStringType;
+use Mago\Sdk\Analyzer\Type\ClassLikeStringVariant;
 use Mago\Sdk\Analyzer\Type\IntegerType;
 use Mago\Sdk\Analyzer\Type\IntegerTypeKind;
 use Mago\Sdk\Analyzer\Type\KeyedArrayType;
@@ -26,6 +28,7 @@ use Mago\Sdk\Internal\Analyzer\TypeCodec;
 
 use function count;
 use function implode;
+use function is_bool;
 use function pack;
 use function strlen;
 
@@ -303,11 +306,46 @@ final class Type
         }
 
         $atomic = $this->atomicTypes[0];
-        if (!$atomic instanceof ScalarType || !$atomic->refinement instanceof StringType) {
+        if (!$atomic instanceof ScalarType) {
             return null;
         }
 
-        return $atomic->refinement->literalKind === StringLiteralKind::Value ? $atomic->refinement->literalValue : null;
+        if ($atomic->refinement instanceof StringType) {
+            return $atomic->refinement->literalKind === StringLiteralKind::Value
+                ? $atomic->refinement->literalValue
+                : null;
+        }
+
+        return $atomic->refinement instanceof ClassLikeStringType
+            && $atomic->refinement->variant === ClassLikeStringVariant::Literal
+            ? $atomic->refinement->literal
+            : null;
+    }
+
+    public function getLiteralClassString(): ?string
+    {
+        if (count($this->atomicTypes) !== 1) {
+            return null;
+        }
+
+        $atomic = $this->atomicTypes[0];
+
+        return $atomic instanceof ScalarType
+            && $atomic->refinement instanceof ClassLikeStringType
+            && $atomic->refinement->variant === ClassLikeStringVariant::Literal
+            ? $atomic->refinement->literal
+            : null;
+    }
+
+    public function getLiteralBool(): ?bool
+    {
+        if (count($this->atomicTypes) !== 1) {
+            return null;
+        }
+
+        $atomic = $this->atomicTypes[0];
+
+        return $atomic instanceof ScalarType && is_bool($atomic->refinement) ? $atomic->refinement : null;
     }
 
     /** @internal */

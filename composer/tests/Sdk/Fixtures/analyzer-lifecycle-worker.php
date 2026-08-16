@@ -107,6 +107,12 @@ final class LifecycleProofHook implements
 
                 declare(strict_types=1);
 
+                #[\Attribute(\Attribute::TARGET_METHOD | \Attribute::TARGET_PROPERTY)]
+                final class ExtensionMarker
+                {
+                    public function __construct(public string $value, public bool $enabled = true) {}
+                }
+
                 /**
                  * @template-covariant T of int = int
                  * @type Answer = int
@@ -117,9 +123,11 @@ final class LifecycleProofHook implements
                  */
                 class ExtensionProvided
                 {
+                    #[ExtensionMarker('property')]
                     public int $value = 42;
                     public const int ANSWER = 42;
 
+                    #[ExtensionMarker(ExtensionProvided::class, enabled: false)]
                     public function answer(): int
                     {
                         return 42;
@@ -409,6 +417,7 @@ final class LifecycleProofHook implements
         [$base, $missing] = $context->codebase->getMultipleClasses(['LifecycleClass0', 'DefinitelyMissing']);
         $extensionClass = $context->codebase->getClass('ExtensionProvided');
         $extensionFunction = $context->codebase->getFunction('extension_answer');
+        $extensionProperty = $context->codebase->getProperty('ExtensionProvided', '$value');
         $inheritedAnswerMethod = $context->codebase->getDeclaringMethod('LifecycleClass0', 'answer');
         [$assertingFunction, $answerMethod, $missingFunctionLike] = $context->codebase->getMultipleFunctionLikes([
             new FunctionLikeIdentifier(IdentifierKind::Function_, 'lifecycle_assertions'),
@@ -467,6 +476,11 @@ final class LifecycleProofHook implements
         $assertion = $assertingFunction?->assertions['$value'][0] ?? null;
         $ifTrueAssertion = $assertingFunction?->ifTrueAssertions['$text'][0] ?? null;
         $ifFalseAssertion = $assertingFunction?->ifFalseAssertions['$fallback'][0] ?? null;
+        $methodAttribute = $answerMethod?->attributes[0] ?? null;
+        $methodValue = $methodAttribute?->getArgument(0);
+        $methodEnabled = $methodAttribute?->getArgument(1, 'enabled');
+        $propertyAttribute = $extensionProperty?->attributes[0] ?? null;
+        $propertyValue = $propertyAttribute?->getArgument(0);
         if (
             $assertingFunction === null
             || $answerMethod === null
@@ -476,6 +490,15 @@ final class LifecycleProofHook implements
             || $answerMethod->identifier->name !== 'answer'
             || $inheritedAnswerMethod === null
             || !$inheritedAnswerMethod->identifier->equals($answerMethod->identifier)
+            || $methodAttribute?->name !== 'ExtensionMarker'
+            || $methodValue === null
+            || $methodValue->valueType?->getLiteralString() !== 'ExtensionProvided'
+            || $methodValue->valueLocation === null
+            || $methodEnabled === null
+            || $methodEnabled->name !== 'enabled'
+            || $methodEnabled->nameLocation === null
+            || $methodEnabled->valueType?->getLiteralBool() !== false
+            || $propertyValue?->valueType?->getLiteralString() !== 'property'
             || $missingFunctionLike !== null
             || $assertingFunction->assertionsInferred
             || !$assertion instanceof TypeAssertion
