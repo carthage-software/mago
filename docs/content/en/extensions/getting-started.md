@@ -8,6 +8,8 @@ nav_section = "Extensions"
 
 This guide uses Mago's bundled PHP SDK to create an extension containing one linter rule that reports `eval` expressions. Extensions may use another language by implementing the same worker protocol.
 
+For a ready-to-customize PHP project, start with the [Mago extension template](https://github.com/carthage-software/mago-extension-template). It includes an extension factory, linter and analyzer examples, corpus tests, PHPUnit tests, Mago configuration, and CI. Clone it, replace the `Acme` placeholders, and use the walkthrough below to understand each component.
+
 ## Requirements
 
 - A Composer project using `carthage-software/mago`.
