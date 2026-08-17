@@ -15,6 +15,7 @@ use crate::metadata::class_like_constant::ClassLikeConstantMetadata;
 use crate::metadata::flags::MetadataFlags;
 use crate::scanner::Context;
 use crate::scanner::attribute::scan_attribute_lists;
+use crate::scanner::docblock::apply_common_metadata_flag;
 use crate::scanner::docblock::find_most_trusted_tag;
 use crate::scanner::docblock::parse_docblock;
 use crate::scanner::inference::infer;
@@ -93,19 +94,11 @@ where
 
             if let Some(document) = document.as_ref() {
                 for tag in document.tags() {
+                    if apply_common_metadata_flag(&mut meta.flags, &tag.value) {
+                        continue;
+                    }
+
                     match &tag.value {
-                        TagValue::Deprecated(_) => {
-                            meta.flags |= MetadataFlags::DEPRECATED;
-                        }
-                        TagValue::NotDeprecated(_) => {
-                            meta.flags.set(MetadataFlags::DEPRECATED, false);
-                        }
-                        TagValue::Internal(_) => {
-                            meta.flags |= MetadataFlags::INTERNAL;
-                        }
-                        TagValue::Experimental(_) => {
-                            meta.flags |= MetadataFlags::EXPERIMENTAL;
-                        }
                         TagValue::Final(_) => {
                             meta.flags |= MetadataFlags::FINAL;
                         }

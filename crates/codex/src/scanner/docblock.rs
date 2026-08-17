@@ -4,6 +4,7 @@ use mago_phpdoc_syntax::cst::AssertSubject;
 use mago_phpdoc_syntax::cst::Document;
 use mago_phpdoc_syntax::cst::ParamTagValue;
 use mago_phpdoc_syntax::cst::Tag;
+use mago_phpdoc_syntax::cst::TagValue;
 use mago_phpdoc_syntax::cst::TagVendor;
 use mago_phpdoc_syntax::cst::TypelessParamTagValue;
 use mago_phpdoc_syntax::cst::r#type::Type;
@@ -13,6 +14,7 @@ use mago_word::Word;
 use mago_word::concat_word;
 use mago_word::word;
 
+use crate::metadata::flags::MetadataFlags;
 use crate::scanner::Context;
 
 const VENDORS_BY_ASCENDING_TRUST: [Option<TagVendor>; 5] =
@@ -69,6 +71,23 @@ pub fn find_most_trusted_tag<'arena, T>(
     }
 
     selected.map(|(_, value)| value)
+}
+
+/// Applies a docblock tag shared by every declaration metadata kind.
+///
+/// Returns whether the tag was handled.
+#[inline]
+pub fn apply_common_metadata_flag(flags: &mut MetadataFlags, value: &TagValue<'_>) -> bool {
+    match value {
+        TagValue::Deprecated(_) => flags.insert(MetadataFlags::DEPRECATED),
+        TagValue::NotDeprecated(_) => flags.remove(MetadataFlags::DEPRECATED),
+        TagValue::Internal(_) => flags.insert(MetadataFlags::INTERNAL),
+        TagValue::Experimental(_) => flags.insert(MetadataFlags::EXPERIMENTAL),
+        TagValue::Api(_) => flags.insert(MetadataFlags::API),
+        _ => return false,
+    }
+
+    true
 }
 
 pub fn for_each_tag_by_ascending_trust<'arena>(

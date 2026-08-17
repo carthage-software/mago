@@ -22,6 +22,7 @@ use crate::misc::VariableIdentifier;
 use crate::scanner::Context;
 use crate::scanner::attribute::scan_attribute_lists;
 use crate::scanner::docblock::HookParamTag;
+use crate::scanner::docblock::apply_common_metadata_flag;
 use crate::scanner::docblock::find_most_trusted_tag;
 use crate::scanner::docblock::parse_docblock;
 use crate::scanner::inference::infer;
@@ -570,19 +571,11 @@ fn update_property_metadata_from_docblock(
     allow_param_tag: bool,
 ) {
     for tag in document.tags() {
+        if apply_common_metadata_flag(&mut property_metadata.flags, &tag.value) {
+            continue;
+        }
+
         match &tag.value {
-            TagValue::Internal(_) => {
-                property_metadata.flags |= MetadataFlags::INTERNAL;
-            }
-            TagValue::Experimental(_) => {
-                property_metadata.flags |= MetadataFlags::EXPERIMENTAL;
-            }
-            TagValue::Deprecated(_) => {
-                property_metadata.flags |= MetadataFlags::DEPRECATED;
-            }
-            TagValue::NotDeprecated(_) => {
-                property_metadata.flags.set(MetadataFlags::DEPRECATED, false);
-            }
             TagValue::Readonly(_) => {
                 property_metadata.flags |= MetadataFlags::READONLY;
             }

@@ -53,6 +53,7 @@ use crate::scanner::TemplateConstraintList;
 use crate::scanner::attribute::get_attribute_flags;
 use crate::scanner::attribute::scan_attribute_lists;
 use crate::scanner::class_like_constant::scan_class_like_constants;
+use crate::scanner::docblock::apply_common_metadata_flag;
 use crate::scanner::docblock::parse_docblock;
 use crate::scanner::enum_case::scan_enum_case;
 use crate::scanner::property::scan_properties;
@@ -449,6 +450,10 @@ where
         }
 
         for tag in document.tags() {
+            if apply_common_metadata_flag(&mut class_like_metadata.flags, &tag.value) {
+                continue;
+            }
+
             match &tag.value {
                 TagValue::EnumInterface(_) => {
                     if class_like_metadata.kind.is_interface() {
@@ -457,21 +462,6 @@ where
                 }
                 TagValue::Final(_) => {
                     class_like_metadata.flags |= MetadataFlags::FINAL;
-                }
-                TagValue::Deprecated(_) => {
-                    class_like_metadata.flags |= MetadataFlags::DEPRECATED;
-                }
-                TagValue::NotDeprecated(_) => {
-                    class_like_metadata.flags.set(MetadataFlags::DEPRECATED, false);
-                }
-                TagValue::Internal(_) => {
-                    class_like_metadata.flags |= MetadataFlags::INTERNAL;
-                }
-                TagValue::Experimental(_) => {
-                    class_like_metadata.flags |= MetadataFlags::EXPERIMENTAL;
-                }
-                TagValue::Api(_) => {
-                    class_like_metadata.flags |= MetadataFlags::API;
                 }
                 TagValue::ConsistentConstructor(_) => {
                     class_like_metadata.flags |= MetadataFlags::CONSISTENT_CONSTRUCTOR;

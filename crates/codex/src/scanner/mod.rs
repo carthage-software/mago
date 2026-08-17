@@ -736,7 +736,7 @@ where
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
-mod polyfill_tests {
+mod tests {
     use mago_allocator::LocalArena;
     use std::borrow::Cow;
 

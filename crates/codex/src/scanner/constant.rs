@@ -17,6 +17,7 @@ use crate::metadata::constant::ConstantMetadata;
 use crate::metadata::flags::MetadataFlags;
 use crate::scanner::Context;
 use crate::scanner::attribute::scan_attribute_lists;
+use crate::scanner::docblock::apply_common_metadata_flag;
 use crate::scanner::docblock::find_most_trusted_tag;
 use crate::scanner::docblock::parse_docblock;
 use crate::scanner::inference::infer;
@@ -126,21 +127,7 @@ fn process_constant_docblock(
     }
 
     for tag in document.tags() {
-        match &tag.value {
-            TagValue::Deprecated(_) => {
-                metadata.flags |= MetadataFlags::DEPRECATED;
-            }
-            TagValue::NotDeprecated(_) => {
-                metadata.flags.set(MetadataFlags::DEPRECATED, false);
-            }
-            TagValue::Internal(_) => {
-                metadata.flags |= MetadataFlags::INTERNAL;
-            }
-            TagValue::Experimental(_) => {
-                metadata.flags |= MetadataFlags::EXPERIMENTAL;
-            }
-            _ => {}
-        }
+        apply_common_metadata_flag(&mut metadata.flags, &tag.value);
     }
 
     let var = find_most_trusted_tag(document, |tag| match &tag.value {

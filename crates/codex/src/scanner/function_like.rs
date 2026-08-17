@@ -46,6 +46,7 @@ use crate::scanner::Context;
 use crate::scanner::assertion_inference::infer_assertions_from_block_body;
 use crate::scanner::assertion_inference::infer_assertions_from_expression_body;
 use crate::scanner::attribute::scan_attribute_lists;
+use crate::scanner::docblock::apply_common_metadata_flag;
 use crate::scanner::docblock::assertion_subject_word;
 use crate::scanner::docblock::find_most_trusted_tag;
 use crate::scanner::docblock::for_each_tag_by_ascending_trust;
@@ -407,19 +408,11 @@ fn scan_function_like_docblock<A>(
             Element::Code(_) => continue,
         };
 
+        if apply_common_metadata_flag(&mut metadata.flags, &tag.value) {
+            continue;
+        }
+
         match &tag.value {
-            TagValue::Deprecated(_) => {
-                metadata.flags |= MetadataFlags::DEPRECATED;
-            }
-            TagValue::NotDeprecated(_) => {
-                metadata.flags.set(MetadataFlags::DEPRECATED, false);
-            }
-            TagValue::Internal(_) => {
-                metadata.flags |= MetadataFlags::INTERNAL;
-            }
-            TagValue::Experimental(_) => {
-                metadata.flags |= MetadataFlags::EXPERIMENTAL;
-            }
             TagValue::MustUse(_) => {
                 metadata.flags |= MetadataFlags::MUST_USE;
             }
