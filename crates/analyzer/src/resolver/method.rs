@@ -229,15 +229,23 @@ where
                 continue;
             }
 
-            let TAtomic::Object(obj_type) = object_atomic else {
-                if object_atomic.is_mixed() {
-                    result.encountered_mixed = true;
-                } else {
-                    result.has_invalid_target = true;
+            let closure_object;
+            let obj_type = match object_atomic {
+                TAtomic::Object(obj_type) => obj_type,
+                TAtomic::Callable(callable) if callable.is_closure() => {
+                    closure_object = TObject::new_named(word("Closure"));
+                    &closure_object
                 }
+                _ => {
+                    if object_atomic.is_mixed() {
+                        result.encountered_mixed = true;
+                    } else {
+                        result.has_invalid_target = true;
+                    }
 
-                report_call_on_non_object(context, object_atomic, object.span(), selector.span());
-                continue;
+                    report_call_on_non_object(context, object_atomic, object.span(), selector.span());
+                    continue;
+                }
             };
 
             let resolved_magic_call_method = resolve_method_from_object(

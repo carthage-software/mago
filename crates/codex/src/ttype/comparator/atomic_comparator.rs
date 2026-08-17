@@ -258,8 +258,8 @@ pub fn is_contained_by(
         return false;
     }
 
-    if let TAtomic::Callable(TCallable::Signature(input_signature)) = input_type_part
-        && input_signature.is_closure()
+    if let TAtomic::Callable(input_callable) = input_type_part
+        && input_callable.is_closure()
         && let TAtomic::Object(TObject::Named(container_object)) = container_type_part
         && container_object.get_name().as_bytes().eq_ignore_ascii_case(b"Closure")
     {
@@ -293,7 +293,8 @@ pub fn is_contained_by(
     }
 
     if matches!(container_type_part, TAtomic::Object(TObject::Any))
-        && let TAtomic::Object(_) = input_type_part
+        && (matches!(input_type_part, TAtomic::Object(_))
+            || matches!(input_type_part, TAtomic::Callable(callable) if callable.is_closure()))
     {
         return true;
     }

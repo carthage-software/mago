@@ -772,6 +772,7 @@ impl TUnion {
         template_types
     }
 
+    #[must_use]
     pub fn is_objecty(&self) -> bool {
         for atomic in self.types.as_ref() {
             if let &TAtomic::Object(_) = atomic {
@@ -779,7 +780,7 @@ impl TUnion {
             }
 
             if let TAtomic::Callable(callable) = atomic
-                && callable.get_signature().is_none_or(super::atomic::callable::TCallableSignature::is_closure)
+                && callable.is_closure()
             {
                 continue;
             }

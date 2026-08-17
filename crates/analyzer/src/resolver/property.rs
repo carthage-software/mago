@@ -161,17 +161,25 @@ where
             continue;
         }
 
-        let TAtomic::Object(object) = object_atomic else {
-            result.has_invalid_path = true;
-            if object_type.is_mixed() {
-                result.encountered_mixed = true;
+        let closure_object;
+        let object = match object_atomic {
+            TAtomic::Object(object) => object,
+            TAtomic::Callable(callable) if callable.is_closure() => {
+                closure_object = TObject::new_named(word("Closure"));
+                &closure_object
             }
+            _ => {
+                result.has_invalid_path = true;
+                if object_type.is_mixed() {
+                    result.encountered_mixed = true;
+                }
 
-            if !block_context.flags.inside_isset() || !object_atomic.is_mixed() {
-                report_access_on_non_object(context, object_atomic, property_selector, object_expression.span());
+                if !block_context.flags.inside_isset() || !object_atomic.is_mixed() {
+                    report_access_on_non_object(context, object_atomic, property_selector, object_expression.span());
+                }
+
+                continue;
             }
-
-            continue;
         };
 
         let classname = match object {

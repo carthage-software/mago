@@ -198,12 +198,11 @@ impl TAtomic {
         matches!(self, TAtomic::Object(TObject::Enum(TEnum { case: Some(_), .. })))
     }
 
+    #[must_use]
     pub fn is_object_type(&self) -> bool {
         match self {
             TAtomic::Object(_) => true,
-            TAtomic::Callable(callable) => {
-                callable.get_signature().is_none_or(callable::TCallableSignature::is_closure)
-            }
+            TAtomic::Callable(callable) => callable.is_closure(),
             TAtomic::GenericParameter(parameter) => parameter.is_constrained_as_objecty(),
             _ => false,
         }

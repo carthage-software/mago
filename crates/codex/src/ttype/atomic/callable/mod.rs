@@ -195,6 +195,15 @@ impl TCallableSignature {
 }
 
 impl TCallable {
+    #[inline]
+    #[must_use]
+    pub const fn is_closure(&self) -> bool {
+        match self {
+            TCallable::Signature(signature) => signature.is_closure(),
+            TCallable::Alias(identifier) => identifier.is_closure(),
+        }
+    }
+
     /// Checks if this representation is a concrete `Signature`.
     #[inline]
     #[must_use]

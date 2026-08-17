@@ -18,7 +18,6 @@ use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
 use mago_codex::ttype::atomic::array::list::TList;
-use mago_codex::ttype::atomic::callable::TCallableSignature;
 use mago_codex::ttype::atomic::mixed::TMixed;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::object::named::TNamedObject;
@@ -1568,7 +1567,7 @@ where
             },
 
             TAtomic::Callable(callable) => {
-                if callable.get_signature().is_none_or(TCallableSignature::is_closure) {
+                if callable.is_closure() {
                     context.collector.report_with_code(
                         IssueCode::InvalidTypeCast,
                         Issue::error("Cannot cast type `Closure` to `string`.")
