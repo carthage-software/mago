@@ -237,7 +237,7 @@ where
         return Ok(());
     };
 
-    let mut scope = ScopeContext::new();
+    let mut scope = ScopeContext::new(parent_block_context.scope.get_reference_origin());
     scope.set_class_like(parent_block_context.scope.get_class_like());
     scope.set_static(false);
 

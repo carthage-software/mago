@@ -9,12 +9,14 @@ use mago_allocator::Arena;
 
 use mago_codex::context::ScopeContext;
 use mago_codex::metadata::CodebaseMetadata;
+use mago_codex::reference::ReferenceOrigin;
 use mago_codex::reference::SymbolReferences;
 use mago_collector::Collector;
 use mago_database::file::File;
 use mago_names::ResolvedNames;
 use mago_span::HasSpan;
 use mago_syntax::cst::Program;
+use mago_word::word;
 
 use crate::analysis_result::AnalysisResult;
 use crate::artifacts::AnalysisArtifacts;
@@ -179,7 +181,10 @@ where
             self.additional_symbol_references,
         );
 
-        let mut block_context = BlockContext::new(ScopeContext::new(), context.settings.register_super_globals);
+        let mut block_context = BlockContext::new(
+            ScopeContext::new(ReferenceOrigin::File(word(context.source_file.name.as_ref()))),
+            context.settings.register_super_globals,
+        );
         let mut artifacts = AnalysisArtifacts::new();
         #[cfg(not(target_arch = "wasm32"))]
         if let Some(start) = setup_start {

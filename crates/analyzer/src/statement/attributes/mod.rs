@@ -8,6 +8,7 @@ use mago_codex::flags::attribute::AttributeFlags;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
+use mago_codex::reference::ReferenceOrigin;
 use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::template::TemplateResult;
 use mago_reporting::Annotation;
@@ -79,7 +80,7 @@ where
         return Ok(());
     }
 
-    let mut scope = ScopeContext::new();
+    let mut scope = ScopeContext::new(ReferenceOrigin::Symbol((class_like_metadata.name, mago_word::empty_word())));
     scope.set_class_like(Some(class_like_metadata));
     scope.set_static(true);
 

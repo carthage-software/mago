@@ -509,6 +509,8 @@ impl IncrementalAnalysisService {
             return Ok(AnalysisResult::new(SymbolReferences::new()));
         }
 
+        let current_file_names: WordSet = source_files.iter().map(|file| mago_word::word(file.name.as_ref())).collect();
+
         let mut changed_files = Vec::new();
         let mut unchanged_file_ids = Vec::with_capacity(source_files.len());
         let mut file_hashes: HashMap<FileId, u64> = HashMap::default();
@@ -753,6 +755,7 @@ impl IncrementalAnalysisService {
 
             let files_to_skip: HashSet<FileId> = unchanged_file_ids.iter().copied().collect();
             let mut symbol_references = std::mem::take(&mut self.native_symbol_references);
+            symbol_references.retain_references_from_files(&current_file_names);
 
             let mut changed_symbols: HashSet<(mago_word::Word, mago_word::Word)> = HashSet::default();
             let mut changed_file_names: Vec<mago_word::Word> = Vec::new();
@@ -909,8 +912,7 @@ impl IncrementalAnalysisService {
         merged_codebase.safe_symbols.clear();
         merged_codebase.safe_symbol_members.clear();
 
-        let Some(global_scope_invalid) = merged_codebase.mark_safe_symbols(&diff, &self.native_symbol_references)
-        else {
+        let Some(invalid_files) = merged_codebase.mark_safe_symbols(&diff, &self.native_symbol_references) else {
             tracing::warn!("Invalidation cascade too expensive (>5000 steps), falling back to full analysis");
 
             return self.analyze();
@@ -966,6 +968,7 @@ impl IncrementalAnalysisService {
         }
 
         let mut symbol_references = std::mem::take(&mut self.native_symbol_references);
+        symbol_references.retain_references_from_files(&current_file_names);
         symbol_references.remove_dirty_symbol_references(&dirty_symbols);
 
         populate_codebase_targeted(
@@ -977,13 +980,15 @@ impl IncrementalAnalysisService {
         );
         let mut files_to_skip: HashSet<FileId> = HashSet::default();
         for &file_id in &unchanged_file_ids {
+            let file_invalid = self
+                .database
+                .get(&file_id)
+                .is_ok_and(|file| invalid_files.contains(&mago_word::word(file.name.as_ref())));
             if let Some(sig) = merged_codebase.get_file_signature(&file_id) {
-                let all_safe = if sig.ast_nodes.is_empty() {
-                    // A file with no named top-level symbols contains only
-                    // global-scope code. Global-scope code is tracked under the
-                    // (empty, empty) pseudo-symbol in the reference graph, so
-                    // check whether that pseudo-symbol was invalidated.
-                    !global_scope_invalid
+                let all_safe = if file_invalid {
+                    false
+                } else if sig.ast_nodes.is_empty() {
+                    true
                 } else {
                     sig.ast_nodes.iter().all(|node| {
                         let symbol_safe = node.name.is_empty() || merged_codebase.safe_symbols.contains(&node.name);
@@ -1000,6 +1005,15 @@ impl IncrementalAnalysisService {
                 }
             }
         }
+
+        let reanalyzed_file_names: WordSet = new_file_scans
+            .iter()
+            .map(|(file_id, _)| *file_id)
+            .chain(unchanged_file_ids.iter().copied().filter(|file_id| !files_to_skip.contains(file_id)))
+            .filter_map(|file_id| self.database.get(&file_id).ok())
+            .map(|file| mago_word::word(file.name.as_ref()))
+            .collect();
+        symbol_references.remove_references_from_files(&reanalyzed_file_names);
 
         // For files that will be re-analyzed (not skipped), remove their symbols from
         // safe_symbols/safe_symbol_members. When diff=true, the analyzer skips safe classes,

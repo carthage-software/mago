@@ -1261,6 +1261,11 @@ pub fn populate_atomic_type(
                     ReferenceSource::ClassLikeMember(in_signature, a, b) => {
                         symbol_references.add_class_member_reference_to_symbol((*a, *b), name, *in_signature);
                     }
+                    ReferenceSource::File(in_signature, file) => symbol_references.add_file_reference_to_class_member(
+                        *file,
+                        (name, mago_word::empty_word()),
+                        *in_signature,
+                    ),
                 }
             }
         }
@@ -1314,6 +1319,8 @@ pub fn populate_atomic_type(
                         ReferenceSource::ClassLikeMember(in_signature, a, b) => {
                             symbol_references.add_class_member_reference_to_symbol((*a, *b), *name, *in_signature);
                         }
+                        ReferenceSource::File(in_signature, file) => symbol_references
+                            .add_file_reference_to_class_member(*file, (*name, mago_word::empty_word()), *in_signature),
                     }
                 }
 
@@ -1364,6 +1371,8 @@ pub fn populate_atomic_type(
                                 (*class_like_name, *member_name),
                                 *in_signature,
                             ),
+                        ReferenceSource::File(in_signature, file) => symbol_references
+                            .add_file_reference_to_class_member(*file, (*class_like_name, *member_name), *in_signature),
                     }
                 }
             }

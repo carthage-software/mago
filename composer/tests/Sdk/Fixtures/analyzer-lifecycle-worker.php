@@ -52,6 +52,7 @@ use function dirname;
 use function file_put_contents;
 use function getenv;
 use function getmypid;
+use function in_array;
 use function is_string;
 use function json_encode;
 use function min;
@@ -377,8 +378,21 @@ final class LifecycleProofPlugin implements
 
         $frameworkAction = new MemberIdentifier('LifecycleClass0', 'frameworkAction');
         $lateFrameworkAction = new MemberIdentifier('LifecycleClass0', 'lateFrameworkAction');
+        $topLevelValue = new MemberIdentifier('LifecycleClass0', 'value');
+        $topLevelProperty = new MemberIdentifier('LifecycleClass0', '$topLevelProperty');
+        $closureSource = new MemberIdentifier('LifecycleClass0', 'closureSource');
+        $closureTarget = new MemberIdentifier('LifecycleClass0', 'closureTarget');
+        $fileClosureTarget = new MemberIdentifier('LifecycleClass0', 'fileClosureTarget');
+        $fileArrowTarget = new MemberIdentifier('LifecycleClass0', 'fileArrowTarget');
         $referencesToAction = $project->references->getReferencesTo($frameworkAction);
         $referencesToLateAction = $project->references->getReferencesTo($lateFrameworkAction);
+        $referencesToTopLevelValue = $project->references->getReferencesTo($topLevelValue);
+        $referencesToTopLevelProperty = $project->references->getReferencesTo($topLevelProperty);
+        $referencesToClosureSource = $project->references->getReferencesTo($closureSource);
+        $referencesToClosureTarget = $project->references->getReferencesTo($closureTarget);
+        $referencesToFileClosureTarget = $project->references->getReferencesTo($fileClosureTarget);
+        $referencesToFileArrowTarget = $project->references->getReferencesTo($fileArrowTarget);
+        $referencesToTopLevelFunction = $project->references->getReferencesTo('lifecycle_function_0');
         [$referencesFromKernel, $referencesFromConsumer] = $project->references->getMultipleReferencesFrom([
             'Symfony\Kernel',
             'extension_consumer',
@@ -436,6 +450,43 @@ final class LifecycleProofPlugin implements
             )
         ) {
             throw new RuntimeException('The final merged native and synthetic references did not round-trip.');
+        }
+
+        if (
+            count($referencesToTopLevelValue) !== 1
+            || $referencesToTopLevelValue[0]->source->file !== 'src/file0.php'
+            || $referencesToTopLevelValue[0]->kind !== ReferenceKind::Body
+            || count($referencesToClosureSource) !== 1
+            || $referencesToClosureSource[0]->source->file !== 'src/file0.php'
+            || count($referencesToClosureTarget) !== 1
+            || !$referencesToClosureTarget[0]->source->symbol instanceof MemberIdentifier
+            || $referencesToClosureTarget[0]->source->symbol->class !== 'lifecycleclass0'
+            || $referencesToClosureTarget[0]->source->symbol->member !== 'closuresource'
+            || count($referencesToFileClosureTarget) !== 1
+            || $referencesToFileClosureTarget[0]->source->file !== 'src/file0.php'
+            || count($referencesToFileArrowTarget) !== 1
+            || $referencesToFileArrowTarget[0]->source->file !== 'src/file0.php'
+            || count($referencesToTopLevelFunction) !== 1
+            || $referencesToTopLevelFunction[0]->source->file !== 'src/file0.php'
+        ) {
+            throw new RuntimeException('Native references did not retain their file and enclosing-symbol origins.');
+        }
+
+        $propertyKinds = [];
+        foreach ($referencesToTopLevelProperty as $reference) {
+            if ($reference->source->file !== 'src/file0.php') {
+                throw new RuntimeException('A top-level property reference did not retain its file origin.');
+            }
+
+            $propertyKinds[] = $reference->kind->name;
+        }
+        if (
+            count($referencesToTopLevelProperty) !== 3
+            || !in_array(ReferenceKind::Body->name, $propertyKinds, true)
+            || !in_array(ReferenceKind::PropertyRead->name, $propertyKinds, true)
+            || !in_array(ReferenceKind::PropertyWrite->name, $propertyKinds, true)
+        ) {
+            throw new RuntimeException('Top-level property references did not retain their semantic kinds.');
         }
 
         [$knownReferences, $missingReferences] = $project->references->getMultipleReferencesTo([

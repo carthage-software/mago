@@ -786,13 +786,14 @@ mod tests {
     use std::rc::Rc;
 
     use mago_codex::context::ScopeContext;
+    use mago_codex::reference::ReferenceOrigin;
     use mago_codex::ttype::get_mixed;
     use mago_word::word;
 
     use super::BlockContext;
 
     fn block_context_with_locals(vars: &[&str]) -> BlockContext<'static> {
-        let mut block_context = BlockContext::new(ScopeContext::new(), false);
+        let mut block_context = BlockContext::new(ScopeContext::new(ReferenceOrigin::File(word("test.php"))), false);
         for variable in vars {
             let variable_atom = word(variable);
             block_context.locals.insert(variable_atom, Rc::new(get_mixed()));

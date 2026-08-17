@@ -13,6 +13,7 @@ use mago_codex::metadata::function_like::FunctionLikeMetadata;
 use mago_codex::metadata::property::PropertyMetadata;
 use mago_codex::metadata::ttype::TypeMetadata;
 use mago_codex::misc::GenericParent;
+use mago_codex::reference::ReferenceOrigin;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::generic::TGenericParameter;
@@ -1018,7 +1019,7 @@ where
     check_class_like_properties(context, class_like_metadata);
     check_docblock_declared_members(context, class_like_metadata, declaration_span);
 
-    let mut scope = ScopeContext::new();
+    let mut scope = ScopeContext::new(ReferenceOrigin::Symbol((class_like_metadata.name, mago_word::empty_word())));
     scope.set_class_like(Some(class_like_metadata));
     scope.set_static(true);
 

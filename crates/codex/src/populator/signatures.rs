@@ -31,6 +31,13 @@ pub fn populate_function_like_metadata(
             ReferenceSource::ClassLikeMember(_, a, b) => {
                 symbol_references.add_class_member_reference_to_symbol((*a, *b), attribute_metadata.name, true);
             }
+            ReferenceSource::File(_, file) => {
+                symbol_references.add_file_reference_to_class_member(
+                    *file,
+                    (attribute_metadata.name, mago_word::empty_word()),
+                    true,
+                );
+            }
         }
     }
 
@@ -112,6 +119,11 @@ pub fn populate_function_like_metadata(
                 }
                 ReferenceSource::ClassLikeMember(in_signature, a, b) => symbol_references
                     .add_class_member_reference_to_symbol((*a, *b), attribute_metadata.name, *in_signature),
+                ReferenceSource::File(in_signature, file) => symbol_references.add_file_reference_to_class_member(
+                    *file,
+                    (attribute_metadata.name, mago_word::empty_word()),
+                    *in_signature,
+                ),
             }
         }
     }

@@ -4,29 +4,32 @@ use crate::identifier::function_like::FunctionLikeIdentifier;
 use crate::metadata::class_like::ClassLikeMetadata;
 use crate::metadata::function_like::FunctionLikeMetadata;
 use crate::metadata::property_hook::PropertyHookMetadata;
+use crate::reference::ReferenceOrigin;
 use crate::reference::ReferenceSource;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 #[allow(clippy::field_scoped_visibility_modifiers)]
 pub struct ScopeContext<'ctx> {
+    reference_origin: ReferenceOrigin,
     pub(crate) function_like: Option<&'ctx FunctionLikeMetadata>,
     pub(crate) class_like: Option<&'ctx ClassLikeMetadata>,
     pub(crate) property_hook: Option<(Word, &'ctx PropertyHookMetadata)>,
     pub(crate) is_static: bool,
 }
 
-impl Default for ScopeContext<'_> {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl<'ctx> ScopeContext<'ctx> {
-    /// Creates a new `ScopeContext` representing a default global, static scope.
+    /// Creates a new `ScopeContext` with the origin used for references recorded in this scope.
     #[inline]
     #[must_use]
-    pub fn new() -> Self {
-        Self { function_like: None, class_like: None, property_hook: None, is_static: true }
+    pub const fn new(reference_origin: ReferenceOrigin) -> Self {
+        Self { reference_origin, function_like: None, class_like: None, property_hook: None, is_static: true }
+    }
+
+    /// Returns the symbol or file from which references in this scope originate.
+    #[inline]
+    #[must_use]
+    pub const fn get_reference_origin(&self) -> ReferenceOrigin {
+        self.reference_origin
     }
 
     /// Returns whether the current scope is a global scope.
@@ -150,16 +153,12 @@ impl<'ctx> ScopeContext<'ctx> {
     #[inline]
     #[must_use]
     pub fn get_reference_source(&self) -> Option<ReferenceSource> {
-        if let Some(calling_functionlike_id) = self.get_function_like_identifier() {
-            match calling_functionlike_id {
-                FunctionLikeIdentifier::Function(name) => Some(ReferenceSource::Symbol(false, name)),
-                FunctionLikeIdentifier::Method(class_name, method_name) => {
-                    Some(ReferenceSource::ClassLikeMember(false, class_name, method_name))
-                }
-                _ => None,
+        match self.reference_origin {
+            ReferenceOrigin::Symbol((symbol, member)) if member.is_empty() => {
+                Some(ReferenceSource::Symbol(false, symbol))
             }
-        } else {
-            None
+            ReferenceOrigin::Symbol((symbol, member)) => Some(ReferenceSource::ClassLikeMember(false, symbol, member)),
+            ReferenceOrigin::File(file) => Some(ReferenceSource::File(false, file)),
         }
     }
 }

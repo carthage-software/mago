@@ -367,6 +367,10 @@ fn all_references_from_unused_in(
     unused_members: &HashSet<SymbolIdentifier>,
     checkable_set: &HashSet<SymbolIdentifier>,
 ) -> bool {
+    if symbol_references.has_file_reference_to_symbol(*symbol_id) {
+        return false;
+    }
+
     let referencing_symbols = symbol_references.get_references_to_symbol(*symbol_id);
 
     if referencing_symbols.is_empty() {

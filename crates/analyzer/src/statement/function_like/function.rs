@@ -1,10 +1,12 @@
 use mago_allocator::Arena;
 use mago_codex::context::ScopeContext;
+use mago_codex::reference::ReferenceOrigin;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::cst::Function;
+use mago_word::empty_word;
 use mago_word::word;
 
 use crate::analyzable::Analyzable;
@@ -91,7 +93,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Function<'arena> {
             }
         }
 
-        let mut scope = ScopeContext::new();
+        let mut scope = ScopeContext::new(ReferenceOrigin::Symbol((function_metadata.name, empty_word())));
         scope.set_class_like(block_context.scope.get_class_like());
         scope.set_function_like(Some(function_metadata));
 

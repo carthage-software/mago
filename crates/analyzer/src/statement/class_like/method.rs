@@ -5,6 +5,7 @@ use mago_word::concat_word;
 use mago_word::word;
 
 use mago_codex::identifier::method::MethodIdentifier;
+use mago_codex::reference::ReferenceOrigin;
 
 use mago_span::HasSpan;
 use mago_syntax::cst::Method;
@@ -76,7 +77,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Method<'arena> {
         }
 
         if let MethodBody::Concrete(concrete_body) = &self.body {
-            let mut scope = ScopeContext::new();
+            let mut scope =
+                ScopeContext::new(ReferenceOrigin::Symbol((class_like_metadata.name, method_metadata.name)));
             scope.set_class_like(Some(class_like_metadata));
             scope.set_function_like(Some(method_metadata));
             scope.set_static(self.is_static());

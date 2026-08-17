@@ -1234,15 +1234,9 @@ pub(super) fn decode_lifecycle_response(
                 references.add_functionlike_return_reference(source, target);
             }
             SymbolReferenceKind::PropertyRead => {
-                let ReferenceOrigin::Symbol(source) = source else {
-                    return Err(protocol("a property-read reference must originate from a symbol"));
-                };
                 references.add_property_read_reference(source, target);
             }
             SymbolReferenceKind::PropertyWrite => {
-                let ReferenceOrigin::Symbol(source) = source else {
-                    return Err(protocol("a property-write reference must originate from a symbol"));
-                };
                 references.add_property_write_reference(source, target);
             }
         }
@@ -1443,6 +1437,9 @@ fn write_reference_origin(writer: &mut PayloadWriter, source: ReferenceOrigin) -
     match source {
         ReferenceOrigin::Symbol(symbol) => write_symbol_identifier(writer, symbol),
         ReferenceOrigin::File(file) => {
+            if file.is_empty() {
+                return Err(protocol("reference origin file cannot be empty"));
+            }
             writer.write_u8(3);
             writer.write_bytes(file.as_bytes())?;
             Ok(())
@@ -1507,6 +1504,10 @@ fn normalize_symbol(codebase: &CodebaseMetadata, bytes: &[u8], target: bool) -> 
 }
 
 fn write_symbol_identifier(writer: &mut PayloadWriter, symbol: SymbolIdentifier) -> Result<(), ExternalAnalyzerError> {
+    if symbol.0.is_empty() {
+        return Err(protocol("symbol reference name cannot be empty"));
+    }
+
     if symbol.1.is_empty() {
         writer.write_u8(1);
         writer.write_bytes(symbol.0.as_bytes())?;
@@ -1611,10 +1612,15 @@ mod tests {
     use mago_codex::metadata::CodebaseMetadata;
     use mago_codex::metadata::class_like::ClassLikeMetadata;
     use mago_codex::metadata::flags::MetadataFlags;
+    use mago_codex::reference::ReferenceOrigin;
+    use mago_extension::PayloadWriter;
     use mago_span::Span;
+    use mago_word::empty_word;
     use mago_word::word;
 
     use super::class_like_matches_hook;
+    use super::write_reference_origin;
+    use super::write_symbol_identifier;
     use crate::external::ClassLikeAnalysisHookRegistration;
 
     #[test]
@@ -1647,5 +1653,12 @@ mod tests {
 
         assert!(!class_like_matches_hook(b"FrameworkTestCase", &hook, &codebase));
         assert!(class_like_matches_hook(b"ApplicationTest", &hook, &codebase));
+    }
+
+    #[test]
+    fn outbound_reference_endpoints_reject_empty_names() {
+        let mut writer = PayloadWriter::new();
+        assert!(write_symbol_identifier(&mut writer, (empty_word(), empty_word())).is_err());
+        assert!(write_reference_origin(&mut writer, ReferenceOrigin::File(empty_word())).is_err());
     }
 }
