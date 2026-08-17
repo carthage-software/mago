@@ -298,6 +298,15 @@ where
                     found_parent = true;
                 }
 
+                if !found_parent
+                    && let Some(parent) = self_meta.direct_parent_class
+                    && self_meta.invalid_dependencies.contains(&parent)
+                {
+                    let origin = ResolutionOrigin::Named { is_parent: true, is_self: false };
+                    possible_types.push(ResolvedClassname::new(Some(parent), origin, false));
+                    found_parent = true;
+                }
+
                 if !found_parent && self_meta.kind.is_trait() && !self_meta.require_extends.is_empty() {
                     let mut intersections = get_intersections_from_metadata(context, self_meta);
                     // SAFETY: we know that there is at least one intersection here.

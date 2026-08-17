@@ -21,6 +21,8 @@ use mago_names::resolver::NameResolver;
 use mago_prelude::Prelude;
 use mago_syntax::parser::parse_file;
 use mago_word::WordSet;
+use mago_word::ascii_lowercase_word;
+use mago_word::word;
 
 static PRELUDE: LazyLock<Prelude> = LazyLock::new(Prelude::build);
 static PLUGIN_REGISTRY: LazyLock<PluginRegistry> = LazyLock::new(PluginRegistry::with_library_providers);
@@ -30,17 +32,24 @@ pub struct TestCase<'src> {
     name: &'src str,
     content: &'src [u8],
     settings: Option<Settings>,
+    expected_property_reads: Vec<(&'src str, &'src str, usize)>,
 }
 
 impl<'src> TestCase<'src> {
     #[must_use]
     pub fn new(name: &'src str, content: &'src [u8]) -> Self {
-        Self { name, content, settings: None }
+        Self { name, content, settings: None, expected_property_reads: Vec::new() }
     }
 
     #[must_use]
     pub fn settings(mut self, settings: Settings) -> Self {
         self.settings = Some(settings);
+        self
+    }
+
+    #[must_use]
+    pub fn expect_property_reads(mut self, class: &'src str, property: &'src str, count: usize) -> Self {
+        self.expected_property_reads.push((class, property, count));
         self
     }
 
@@ -123,6 +132,16 @@ fn run_test_case_inner(config: TestCase) {
 
     if let Err(err) = analysis_run_result {
         panic!("Test '{}': Expected analysis to succeed, but it failed with an error: {}", config.name, err);
+    }
+
+    for (class, property, expected) in config.expected_property_reads {
+        let symbol = (ascii_lowercase_word(class.as_bytes()), word(property.as_bytes()));
+        let actual = analysis_result.symbol_references.count_property_reads(&symbol);
+        assert_eq!(
+            expected, actual,
+            "Test '{}': expected {expected} read reference(s) to {class}::{property}, found {actual}",
+            config.name,
+        );
     }
 
     verify_reported_issues(config.name, analysis_result, metadata);

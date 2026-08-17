@@ -112,6 +112,32 @@ pub struct ClassLikeMetadata {
 }
 
 impl ClassLikeMetadata {
+    /// Returns whether this class-like's inherited metadata is incomplete.
+    ///
+    /// Synthetic enum contracts are materialized by the scanner and do not make
+    /// an enum incomplete when their own metadata is unavailable.
+    #[inline]
+    #[must_use]
+    pub fn has_incomplete_hierarchy(&self) -> bool {
+        if self.invalid_dependencies.is_empty() {
+            return false;
+        }
+
+        if !self.kind.is_enum() {
+            return true;
+        }
+
+        self.invalid_dependencies.iter().any(|dependency| {
+            !matches!(
+                dependency.as_bytes(),
+                b"unitenum"
+                    | b"backedenum"
+                    | b"__internal_do_not_use__intbackedenum"
+                    | b"__internal_do_not_use__stringbackedenum"
+            )
+        })
+    }
+
     #[must_use]
     pub fn new(
         name: Word,

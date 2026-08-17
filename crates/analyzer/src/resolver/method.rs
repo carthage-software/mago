@@ -289,6 +289,11 @@ where
                         let has_method_assertion = type_has_method_assertion(obj_type, method_name_bytes);
 
                         if !has_method_assertion {
+                            let has_incomplete_hierarchy = context
+                                .codebase
+                                .get_class_like(classname.as_bytes())
+                                .is_some_and(ClassLikeMetadata::has_incomplete_hierarchy);
+
                             if resolved_magic_call_method.is_empty() {
                                 let identifier = FunctionLikeIdentifier::Method(classname, method_name);
                                 if context.external_analysis_session.is_some()
@@ -301,6 +306,9 @@ where
                                         selector_span: selector.span(),
                                         class_type: StaticClassType::Object(obj_type.clone()),
                                     });
+                                    result.encountered_mixed |= has_incomplete_hierarchy;
+                                } else if has_incomplete_hierarchy {
+                                    result.encountered_mixed = true;
                                 } else {
                                     report_non_existent_method(
                                         context,

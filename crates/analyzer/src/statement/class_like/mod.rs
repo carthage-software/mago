@@ -432,6 +432,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Class<'arena> {
                 break 'check_unused false;
             }
 
+            if class_like_metadata.flags.is_unchecked() || class_like_metadata.has_incomplete_hierarchy() {
+                break 'check_unused false;
+            }
+
             if !context.settings.diff {
                 break 'check_unused true;
             }
@@ -690,7 +694,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Enum<'arena> {
             override_attribute::check_override_attribute(class_like_metadata, self.members.as_slice(), context);
         }
 
-        if context.settings.find_unused_definitions {
+        if context.settings.find_unused_definitions
+            && !class_like_metadata.flags.is_unchecked()
+            && !class_like_metadata.has_incomplete_hierarchy()
+        {
             let additional_symbol_references = context.additional_symbol_references;
             unused_members::check_unused_members_with_transitivity(
                 class_like_metadata.name,
@@ -829,11 +836,9 @@ where
         }
     }
 
-    if !class_like_metadata.invalid_dependencies.is_empty() {
-        return Ok(());
-    }
+    let has_complete_hierarchy = !class_like_metadata.has_incomplete_hierarchy();
 
-    if !class_like_metadata.kind.is_trait() && !class_like_metadata.flags.is_abstract() {
+    if has_complete_hierarchy && !class_like_metadata.kind.is_trait() && !class_like_metadata.flags.is_abstract() {
         for (method_name, method_id) in &class_like_metadata.declaring_method_ids {
             if class_like_metadata.kind.is_enum() {
                 if method_name.as_bytes().eq_ignore_ascii_case(b"cases") {
@@ -1015,7 +1020,9 @@ where
         }
     }
 
-    check_unused_template_parameters(context, class_like_metadata);
+    if has_complete_hierarchy {
+        check_unused_template_parameters(context, class_like_metadata);
+    }
     check_class_like_properties(context, class_like_metadata);
     check_docblock_declared_members(context, class_like_metadata, declaration_span);
 
@@ -1110,14 +1117,16 @@ where
     // so we can compare their inferred values
     check_class_like_constants(context, class_like_metadata, members);
 
-    crate::readonly::finalize_class_writes(context, artifacts, class_like_metadata);
-    initialization::check_property_initialization(
-        context,
-        artifacts,
-        class_like_metadata,
-        declaration_span,
-        name_span,
-    )?;
+    if has_complete_hierarchy {
+        crate::readonly::finalize_class_writes(context, artifacts, class_like_metadata);
+        initialization::check_property_initialization(
+            context,
+            artifacts,
+            class_like_metadata,
+            declaration_span,
+            name_span,
+        )?;
+    }
 
     Ok(())
 }

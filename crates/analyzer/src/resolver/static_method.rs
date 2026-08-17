@@ -325,6 +325,12 @@ where
             if !could_method_ever_exist {
                 if magic_call_methods.is_empty() {
                     let identifier = FunctionLikeIdentifier::Method(fq_class_id, method_name);
+                    let has_incomplete_hierarchy = context
+                        .codebase
+                        .get_class_like(fq_class_id.as_bytes())
+                        .or(current_class_metadata)
+                        .is_some_and(ClassLikeMetadata::has_incomplete_hierarchy);
+
                     if context.external_analysis_session.is_some()
                         && context.plugin_registry.may_have_callable_signature_provider(&identifier)
                         && let Some(class_metadata) = context.codebase.get_class_like(fq_class_id.as_bytes())
@@ -342,6 +348,9 @@ where
                                 class_metadata,
                             ),
                         });
+                        result.encountered_mixed |= has_incomplete_hierarchy;
+                    } else if has_incomplete_hierarchy {
+                        result.encountered_mixed = true;
                     } else {
                         result.has_invalid_target = true;
                         report_non_existent_method(context, class_span, method_span, fq_class_id, method_name);

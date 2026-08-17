@@ -124,6 +124,13 @@ where
 
             // Handle regular constants and enum cases
             let Some(metadata) = context.codebase.get_class_like(fq_class_id.as_bytes()) else {
+                if class_resolution.is_parent()
+                    && block_context.scope.get_class_like().is_some_and(ClassLikeMetadata::has_incomplete_hierarchy)
+                {
+                    result.has_ambiguous_path = true;
+                    continue;
+                }
+
                 result.has_invalid_path = true;
                 report_non_existent_class(context, fq_class_id, class_expr.span());
                 continue;
@@ -383,6 +390,10 @@ where
 
             return Some(ResolvedConstant { const_type });
         }
+    }
+
+    if metadata.has_incomplete_hierarchy() {
+        return Some(ResolvedConstant { const_type: get_mixed() });
     }
 
     // Not found, report error.

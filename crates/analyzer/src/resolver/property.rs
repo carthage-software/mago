@@ -917,6 +917,11 @@ where
             });
         }
 
+        if class_metadata.has_incomplete_hierarchy() {
+            result.has_ambiguous_path = true;
+            return None;
+        }
+
         result.has_invalid_path = true;
 
         if !class_metadata.flags.is_final() || class_metadata.kind.is_interface() || class_metadata.kind.is_trait() {

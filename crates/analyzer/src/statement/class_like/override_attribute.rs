@@ -71,6 +71,10 @@ pub fn check_override_attribute<'ctx, 'arena, A>(
 
         let lowercase_name = ascii_lowercase_word(method.name.value);
         let Some(parent_class_names) = metadata.overridden_method_ids.get(&lowercase_name) else {
+            if metadata.has_incomplete_hierarchy() {
+                continue;
+            }
+
             if let Some(attribute) = override_attribute {
                 let mut issue = Issue::error(format!("Invalid `#[Override]` attribute on `{class_name}::{name}`."))
                     .with_code(IssueCode::InvalidOverrideAttribute)

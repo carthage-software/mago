@@ -429,18 +429,20 @@ where
     } else if let Some(argument_list) = &argument_list
         && !argument_list.arguments.is_empty()
     {
-        context.collector.report_with_code(
-            IssueCode::TooManyArguments,
-            Issue::error(format!(
-                "Class `{classname_str}` has no `__construct` method, but arguments were provided to `new`."
-            ))
-            .with_annotation(Annotation::primary(argument_list.span()).with_message("Arguments provided here"))
-            .with_annotation(
-                Annotation::secondary(class_expression_span)
-                    .with_message(format!("For class `{classname_str}` which has no constructor")),
-            )
-            .with_help("Remove the arguments, or define a `__construct` method in the class if arguments are needed for initialization."),
-        );
+        if !metadata.has_incomplete_hierarchy() {
+            context.collector.report_with_code(
+                IssueCode::TooManyArguments,
+                Issue::error(format!(
+                    "Class `{classname_str}` has no `__construct` method, but arguments were provided to `new`."
+                ))
+                .with_annotation(Annotation::primary(argument_list.span()).with_message("Arguments provided here"))
+                .with_annotation(
+                    Annotation::secondary(class_expression_span)
+                        .with_message(format!("For class `{classname_str}` which has no constructor")),
+                )
+                .with_help("Remove the arguments, or define a `__construct` method in the class if arguments are needed for initialization."),
+            );
+        }
 
         argument_list.analyze(context, block_context, artifacts)?;
     } else if !metadata.template_types.is_empty() {
@@ -615,12 +617,14 @@ where
     } else if let Some(argument_list) = argument_list
         && !argument_list.arguments.is_empty()
     {
-        context.collector.report_with_code(
-            IssueCode::TooManyArguments,
-            Issue::error("Anonymous class has no `__construct` method, but arguments were provided.")
-                .with_annotation(Annotation::primary(argument_list.span()).with_message("Arguments provided here"))
-                .with_help("Remove the arguments, or define a `__construct` method in the anonymous class."),
-        );
+        if !class_like_metadata.has_incomplete_hierarchy() {
+            context.collector.report_with_code(
+                IssueCode::TooManyArguments,
+                Issue::error("Anonymous class has no `__construct` method, but arguments were provided.")
+                    .with_annotation(Annotation::primary(argument_list.span()).with_message("Arguments provided here"))
+                    .with_help("Remove the arguments, or define a `__construct` method in the anonymous class."),
+            );
+        }
 
         argument_list.analyze(context, block_context, artifacts)?;
     } else {

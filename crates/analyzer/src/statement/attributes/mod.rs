@@ -275,19 +275,25 @@ where
     let Some(constructor) = context.codebase.get_method_by_id(&declaring_constructor_id) else {
         if let Some(argument_list) = &attribute.argument_list {
             if !argument_list.arguments.is_empty() {
-                let attribute_name = metadata.original_name;
-                context.collector.report_with_code(
-                    IssueCode::TooManyArguments,
-                    Issue::error(format!(
-                        "Attribute class `{attribute_name}` has no `__construct` method, but arguments were provided."
-                    ))
-                    .with_annotation(Annotation::primary(argument_list.span()).with_message("Arguments provided here"))
-                    .with_annotation(
-                        Annotation::secondary(attribute.name.span())
-                            .with_message(format!("Attribute class `{attribute_name}` has no constructor")),
-                    )
-                    .with_help("Remove the arguments, or define a public `__construct` method on the attribute class."),
-                );
+                if !metadata.has_incomplete_hierarchy() {
+                    let attribute_name = metadata.original_name;
+                    context.collector.report_with_code(
+                        IssueCode::TooManyArguments,
+                        Issue::error(format!(
+                            "Attribute class `{attribute_name}` has no `__construct` method, but arguments were provided."
+                        ))
+                        .with_annotation(
+                            Annotation::primary(argument_list.span()).with_message("Arguments provided here"),
+                        )
+                        .with_annotation(
+                            Annotation::secondary(attribute.name.span())
+                                .with_message(format!("Attribute class `{attribute_name}` has no constructor")),
+                        )
+                        .with_help(
+                            "Remove the arguments, or define a public `__construct` method on the attribute class.",
+                        ),
+                    );
+                }
             }
 
             argument_list.analyze(context, block_context, artifacts)?;
