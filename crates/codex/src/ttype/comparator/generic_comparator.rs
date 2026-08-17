@@ -187,23 +187,14 @@ pub(crate) fn update_failed_result_from_nested(
     atomic_comparison_result: &mut ComparisonResult,
     param_comparison_result: &ComparisonResult,
 ) {
-    atomic_comparison_result.type_coerced = Some(if let Some(val) = atomic_comparison_result.type_coerced {
-        val
-    } else {
-        param_comparison_result.type_coerced.unwrap_or(false)
-    });
+    fn merge(destination: &mut Option<bool>, source: Option<bool>) {
+        *destination = Some(destination.unwrap_or(source.unwrap_or(false)));
+    }
 
-    atomic_comparison_result.type_coerced_from_nested_mixed =
-        Some(if let Some(val) = atomic_comparison_result.type_coerced_from_nested_mixed {
-            val
-        } else {
-            param_comparison_result.type_coerced_from_nested_mixed.unwrap_or(false)
-        });
-
-    atomic_comparison_result.type_coerced_from_as_mixed =
-        Some(if let Some(val) = atomic_comparison_result.type_coerced_from_as_mixed {
-            val
-        } else {
-            param_comparison_result.type_coerced_from_as_mixed.unwrap_or(false)
-        });
+    merge(&mut atomic_comparison_result.type_coerced, param_comparison_result.type_coerced);
+    merge(
+        &mut atomic_comparison_result.type_coerced_from_nested_mixed,
+        param_comparison_result.type_coerced_from_nested_mixed,
+    );
+    merge(&mut atomic_comparison_result.type_coerced_from_as_mixed, param_comparison_result.type_coerced_from_as_mixed);
 }

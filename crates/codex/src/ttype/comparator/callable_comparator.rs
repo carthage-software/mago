@@ -96,9 +96,6 @@ pub(crate) fn is_contained_by(
             codebase,
             container_parameter_type,
             input_parameter_type,
-            false,
-            false,
-            false,
             &mut parameter_comparison_result,
         ) {
             return false;

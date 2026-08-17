@@ -14,7 +14,6 @@ pub fn is_contained_by(
     atomic_comparison_result: &mut ComparisonResult,
 ) -> bool {
     match (container_type_part, input_type_part) {
-        (TAtomic::Null, TAtomic::Null) => return true,
         (
             TAtomic::Scalar(TScalar::Numeric),
             TAtomic::Scalar(TScalar::Integer(_) | TScalar::Float(_) | TScalar::Numeric),
@@ -42,13 +41,7 @@ pub fn is_contained_by(
         {
             return true;
         }
-        (TAtomic::Scalar(TScalar::Bool(c)), TAtomic::Scalar(TScalar::Bool(_))) if c.is_general() => {
-            return true;
-        }
-        (TAtomic::Scalar(TScalar::Bool(c)), TAtomic::Scalar(TScalar::Bool(i))) if c.is_true() && i.is_true() => {
-            return true;
-        }
-        (TAtomic::Scalar(TScalar::Bool(c)), TAtomic::Scalar(TScalar::Bool(i))) if c.is_false() && i.is_false() => {
+        (TAtomic::Scalar(TScalar::Bool(c)), TAtomic::Scalar(TScalar::Bool(i))) if c.is_general() || c == i => {
             return true;
         }
         (TAtomic::Scalar(TScalar::String(c)), TAtomic::Scalar(TScalar::String(i))) => {
@@ -80,22 +73,14 @@ pub fn is_contained_by(
                 return false;
             }
 
-            if !i.is_empty() {
-                match c.casing {
-                    TStringCasing::Lowercase => {
-                        if !i.is_lowercase() {
-                            return false;
-                        }
-                    }
-                    TStringCasing::Uppercase => {
-                        if !i.is_uppercase() {
-                            return false;
-                        }
-                    }
-                    TStringCasing::Unspecified => {
-                        // No need to check the input casing if the container is unspecified.
-                    }
-                }
+            let casing_mismatch = match c.casing {
+                TStringCasing::Lowercase => !i.is_lowercase(),
+                TStringCasing::Uppercase => !i.is_uppercase(),
+                TStringCasing::Unspecified => false,
+            };
+
+            if !i.is_empty() && casing_mismatch {
+                return false;
             }
 
             if c.is_unspecified_literal() && !i.is_literal_origin() {
@@ -129,33 +114,17 @@ pub fn is_contained_by(
         _ => {}
     }
 
-    if matches!(input_type_part, TAtomic::Scalar(TScalar::String(s)) if s.is_boring())
-        && container_type_part.is_string_subtype()
-    {
-        atomic_comparison_result.type_coerced = Some(true);
+    let input_coerces_to_container = (matches!(input_type_part, TAtomic::Scalar(TScalar::String(s)) if s.is_boring())
+        && container_type_part.is_string_subtype())
+        || (matches!(input_type_part, TAtomic::Scalar(TScalar::Bool(input)) if input.is_general())
+            && matches!(container_type_part, TAtomic::Scalar(TScalar::Bool(container)) if !container.is_general()))
+        || (matches!(input_type_part, TAtomic::Scalar(TScalar::ArrayKey))
+            && (container_type_part.is_int() || container_type_part.is_any_string()))
+        || (matches!(input_type_part, TAtomic::Scalar(TScalar::String(s)) if s.is_non_empty && !s.is_truthy)
+            && matches!(container_type_part, TAtomic::Scalar(TScalar::ClassLikeString(_))));
 
-        return false;
-    }
-
-    if (matches!(input_type_part, TAtomic::Scalar(TScalar::Bool(input)) if input.is_general()))
-        && matches!(container_type_part, TAtomic::Scalar(TScalar::Bool(container)) if !container.is_general())
-    {
+    if input_coerces_to_container {
         atomic_comparison_result.type_coerced = Some(true);
-        return false;
-    }
-
-    if matches!(input_type_part, TAtomic::Scalar(TScalar::ArrayKey))
-        && (container_type_part.is_int() || container_type_part.is_any_string())
-    {
-        atomic_comparison_result.type_coerced = Some(true);
-        return false;
-    }
-
-    if matches!(input_type_part, TAtomic::Scalar(TScalar::String(s)) if s.is_non_empty && !s.is_truthy)
-        && matches!(container_type_part, TAtomic::Scalar(TScalar::ClassLikeString(_)))
-    {
-        atomic_comparison_result.type_coerced = Some(true);
-        return false;
     }
 
     false

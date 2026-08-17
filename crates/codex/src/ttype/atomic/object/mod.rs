@@ -13,6 +13,65 @@ use crate::ttype::atomic::object::named::TNamedObject;
 use crate::ttype::atomic::object::with_properties::TObjectWithProperties;
 use crate::ttype::union::TUnion;
 
+macro_rules! has_member_ttype_impl {
+    ($member_type:ident, $member_field:ident, $id_prefix:literal) => {
+        impl TType for $member_type {
+            fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
+                self.intersection_types
+                    .as_ref()
+                    .map(|types| types.iter().map(TypeRef::Atomic).collect())
+                    .unwrap_or_default()
+            }
+
+            fn can_be_intersected(&self) -> bool {
+                true
+            }
+
+            fn get_intersection_types(&self) -> Option<&[TAtomic]> {
+                self.intersection_types.as_deref()
+            }
+
+            fn get_intersection_types_mut(&mut self) -> Option<&mut Vec<TAtomic>> {
+                self.intersection_types.as_mut()
+            }
+
+            fn has_intersection_types(&self) -> bool {
+                self.intersection_types.as_ref().is_some_and(|v| !v.is_empty())
+            }
+
+            fn add_intersection_type(&mut self, intersection_type: TAtomic) -> bool {
+                if let Some(intersection_types) = self.intersection_types.as_mut() {
+                    intersection_types.push(intersection_type);
+                } else {
+                    self.intersection_types = Some(vec![intersection_type]);
+                }
+
+                true
+            }
+
+            fn get_id(&self) -> Word {
+                let mut result = concat_word!($id_prefix, self.$member_field, b"'>");
+
+                if let Some(intersection_types) = self.get_intersection_types() {
+                    result = append_intersection_ids(result, intersection_types, None);
+                }
+
+                result
+            }
+
+            fn get_pretty_id_with_indent(&self, indent: usize) -> Word {
+                let mut result = concat_word!($id_prefix, self.$member_field, b"'>");
+
+                if let Some(intersection_types) = self.get_intersection_types() {
+                    result = append_intersection_ids(result, intersection_types, Some(indent));
+                }
+
+                result
+            }
+        }
+    };
+}
+
 pub mod r#enum;
 pub mod has_method;
 pub mod has_property;

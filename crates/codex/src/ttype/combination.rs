@@ -20,7 +20,6 @@ pub struct CombinationFlags(u32);
 
 impl CombinationFlags {
     pub const HAS_OBJECT_TOP_TYPE: CombinationFlags = CombinationFlags(1 << 0);
-    pub const LIST_ARRAY_SOMETIMES_FILLED: CombinationFlags = CombinationFlags(1 << 1);
     pub const LIST_ARRAY_ALWAYS_FILLED: CombinationFlags = CombinationFlags(1 << 2);
     pub const KEYED_ARRAY_SOMETIMES_FILLED: CombinationFlags = CombinationFlags(1 << 3);
     pub const KEYED_ARRAY_ALWAYS_FILLED: CombinationFlags = CombinationFlags(1 << 4);
@@ -143,7 +142,6 @@ pub struct TypeCombination {
     pub enum_names: HashSet<(Word, Option<Word>)>,
     pub object_type_params: WordMap<(Word, Vec<TUnion>)>,
     pub object_static: WordMap<bool>,
-    pub list_array_counts: Option<HashSet<usize>>,
     pub keyed_array_entries: BTreeMap<ArrayKey, (bool, TUnion)>,
     pub list_array_entries: BTreeMap<usize, (bool, TUnion)>,
     pub keyed_array_parameters: Option<(TUnion, TUnion)>,
@@ -153,7 +151,6 @@ pub struct TypeCombination {
     pub integers: Vec<TInteger>,
     pub literal_strings: WordSet,
     pub literal_floats: Vec<OrderedFloat<f64>>,
-    pub class_string_types: WordMap<TAtomic>,
     pub derived_types: HashSet<TDerived>,
 }
 
@@ -173,7 +170,6 @@ impl TypeCombination {
             value_types: WordMap::default(),
             object_type_params: WordMap::default(),
             object_static: WordMap::default(),
-            list_array_counts: Some(HashSet::default()),
             keyed_array_entries: BTreeMap::new(),
             list_array_entries: BTreeMap::new(),
             keyed_array_parameters: None,
@@ -183,7 +179,6 @@ impl TypeCombination {
             literal_strings: WordSet::default(),
             integers: Vec::new(),
             literal_floats: Vec::new(),
-            class_string_types: WordMap::default(),
             enum_names: HashSet::default(),
             derived_types: HashSet::default(),
         }
@@ -206,7 +201,6 @@ impl TypeCombination {
                 && self.enum_names.is_empty()
                 && self.literal_strings.is_empty()
                 && self.literal_floats.is_empty()
-                && self.class_string_types.is_empty()
                 && self.integers.is_empty()
                 && self.derived_types.is_empty();
         }
@@ -221,32 +215,5 @@ impl std::ops::BitOr for CombinationFlags {
     #[inline]
     fn bitor(self, rhs: Self) -> Self::Output {
         CombinationFlags(self.0 | rhs.0)
-    }
-}
-
-impl std::ops::BitAnd for CombinationFlags {
-    type Output = Self;
-
-    #[inline]
-    fn bitand(self, rhs: Self) -> Self::Output {
-        CombinationFlags(self.0 & rhs.0)
-    }
-}
-
-impl std::ops::BitXor for CombinationFlags {
-    type Output = Self;
-
-    #[inline]
-    fn bitxor(self, rhs: Self) -> Self::Output {
-        CombinationFlags(self.0 ^ rhs.0)
-    }
-}
-
-impl std::ops::Not for CombinationFlags {
-    type Output = Self;
-
-    #[inline]
-    fn not(self) -> Self::Output {
-        CombinationFlags(!self.0)
     }
 }

@@ -32,34 +32,21 @@ pub fn is_contained_by(
 
     let mut all_types_contain = true;
 
-    let mut nested_comparison_result = ComparisonResult::new();
-    if !union_comparator::is_contained_by(
-        codebase,
-        &input_k,
-        &container_k,
-        false,
-        input_k.ignore_falsable_issues(),
-        inside_assertion,
-        &mut nested_comparison_result,
-    ) {
-        all_types_contain = false;
+    for (input, container) in [(&input_k, &container_k), (&input_v, &container_v)] {
+        let mut nested_comparison_result = ComparisonResult::new();
+        if !union_comparator::is_contained_by(
+            codebase,
+            input,
+            container,
+            false,
+            input.ignore_falsable_issues(),
+            inside_assertion,
+            &mut nested_comparison_result,
+        ) {
+            all_types_contain = false;
 
-        update_failed_result_from_nested(atomic_comparison_result, &nested_comparison_result);
-    }
-
-    let mut nested_comparison_result = ComparisonResult::new();
-    if !union_comparator::is_contained_by(
-        codebase,
-        &input_v,
-        &container_v,
-        false,
-        input_v.ignore_falsable_issues(),
-        inside_assertion,
-        &mut nested_comparison_result,
-    ) {
-        all_types_contain = false;
-
-        update_failed_result_from_nested(atomic_comparison_result, &nested_comparison_result);
+            update_failed_result_from_nested(atomic_comparison_result, &nested_comparison_result);
+        }
     }
 
     all_types_contain

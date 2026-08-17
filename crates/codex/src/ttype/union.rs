@@ -1060,14 +1060,7 @@ impl TUnion {
     /// an integer type without a known upper bound.
     #[must_use]
     pub fn get_maximum_int_value(&self) -> Option<i64> {
-        let mut types = self.types.iter();
-        let mut maximum = types.next()?.get_maximum_int_value()?;
-
-        for atomic in types {
-            maximum = maximum.max(atomic.get_maximum_int_value()?);
-        }
-
-        Some(maximum)
+        self.types.iter().map(TAtomic::get_maximum_int_value).reduce(|first, second| Some(first?.max(second?)))?
     }
 
     /// Returns the minimum possible integer value across all types in this union.
@@ -1076,14 +1069,7 @@ impl TUnion {
     /// an integer type without a known lower bound.
     #[must_use]
     pub fn get_minimum_int_value(&self) -> Option<i64> {
-        let mut types = self.types.iter();
-        let mut minimum = types.next()?.get_minimum_int_value()?;
-
-        for atomic in types {
-            minimum = minimum.min(atomic.get_minimum_int_value()?);
-        }
-
-        Some(minimum)
+        self.types.iter().map(TAtomic::get_minimum_int_value).reduce(|first, second| Some(first?.min(second?)))?
     }
 
     #[must_use]
@@ -1124,36 +1110,31 @@ impl TUnion {
         }
     }
 
-    #[must_use]
-    pub fn has_literal_float(&self) -> bool {
+    fn any_scalar(&self, is_matching: fn(&TScalar) -> bool) -> bool {
         self.types.iter().any(|atomic| match atomic {
-            TAtomic::Scalar(scalar) => scalar.is_literal_float(),
+            TAtomic::Scalar(scalar) => is_matching(scalar),
             _ => false,
         })
+    }
+
+    #[must_use]
+    pub fn has_literal_float(&self) -> bool {
+        self.any_scalar(TScalar::is_literal_float)
     }
 
     #[must_use]
     pub fn has_literal_int(&self) -> bool {
-        self.types.iter().any(|atomic| match atomic {
-            TAtomic::Scalar(scalar) => scalar.is_literal_int(),
-            _ => false,
-        })
+        self.any_scalar(TScalar::is_literal_int)
     }
 
     #[must_use]
     pub fn has_literal_string(&self) -> bool {
-        self.types.iter().any(|atomic| match atomic {
-            TAtomic::Scalar(scalar) => scalar.is_known_literal_string(),
-            _ => false,
-        })
+        self.any_scalar(TScalar::is_known_literal_string)
     }
 
     #[must_use]
     pub fn has_literal_value(&self) -> bool {
-        self.types.iter().any(|atomic| match atomic {
-            TAtomic::Scalar(scalar) => scalar.is_literal_value(),
-            _ => false,
-        })
+        self.any_scalar(TScalar::is_literal_value)
     }
 
     #[must_use]
@@ -1314,36 +1295,14 @@ impl PartialEq for TUnion {
         }
 
         // Check self ⊆ other
-        for i in 0..len {
-            let mut has_match = false;
-            for j in 0..len {
-                if self.types[i] == other.types[j] {
-                    has_match = true;
-                    break;
-                }
-            }
 
-            if !has_match {
-                return false;
-            }
+        fn is_subset(first: &[TAtomic], second: &[TAtomic]) -> bool {
+            first.iter().all(|atomic| second.contains(atomic))
         }
 
         // Check other ⊆ self (needed when duplicates exist in either side)
-        for i in 0..len {
-            let mut has_match = false;
-            for j in 0..len {
-                if other.types[i] == self.types[j] {
-                    has_match = true;
-                    break;
-                }
-            }
 
-            if !has_match {
-                return false;
-            }
-        }
-
-        true
+        is_subset(&self.types, &other.types) && is_subset(&other.types, &self.types)
     }
 }
 

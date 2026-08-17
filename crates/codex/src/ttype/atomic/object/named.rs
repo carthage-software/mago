@@ -5,6 +5,7 @@ use mago_word::word;
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
 use crate::ttype::atomic::TAtomic;
+use crate::ttype::atomic::append_intersection_ids;
 use crate::ttype::template::variance::Variance;
 use crate::ttype::union::TUnion;
 
@@ -53,45 +54,21 @@ impl TNamedObject {
     #[inline]
     #[must_use]
     pub fn new_with_type_parameters(name: Word, type_parameters: Option<Vec<TUnion>>) -> Self {
-        Self {
-            name,
-            type_parameters,
-            variances: None,
-            is_static: false,
-            is_this: false,
-            remapped_parameters: false,
-            intersection_types: None,
-        }
+        Self::new(name).with_type_parameters(type_parameters)
     }
 
     /// Creates metadata representing the `static` type (same class, possibly different instance).
     #[inline]
     #[must_use]
     pub fn new_static(name: Word) -> Self {
-        Self {
-            name,
-            type_parameters: None,
-            variances: None,
-            is_static: true,
-            is_this: false,
-            remapped_parameters: false,
-            intersection_types: None,
-        }
+        Self::new(name).with_is_static(true)
     }
 
     /// Creates metadata representing the `$this` variable (same instance).
     #[inline]
     #[must_use]
     pub fn new_this(name: Word) -> Self {
-        Self {
-            name,
-            type_parameters: None,
-            variances: None,
-            is_static: true,
-            is_this: true,
-            remapped_parameters: false,
-            intersection_types: None,
-        }
+        Self { is_this: true, ..Self::new_static(name) }
     }
 
     /// Returns the `Word` for the primary class/interface name.
@@ -244,15 +221,7 @@ impl TType for TNamedObject {
         }
 
         if let Some(intersection_types) = self.get_intersection_types() {
-            for atomic in intersection_types {
-                let atomic_id = atomic.get_id();
-
-                result = if atomic.has_intersection_types() {
-                    concat_word!(result, b"&(", atomic_id, b")")
-                } else {
-                    concat_word!(result, b"&", atomic_id)
-                };
-            }
+            result = append_intersection_ids(result, intersection_types, None);
         }
 
         if self.is_this {
@@ -298,15 +267,7 @@ impl TType for TNamedObject {
         }
 
         if let Some(intersection_types) = self.get_intersection_types() {
-            for atomic in intersection_types {
-                let atomic_id = atomic.get_pretty_id_with_indent(indent);
-
-                result = if atomic.has_intersection_types() {
-                    concat_word!(result, b"&(", atomic_id, b")")
-                } else {
-                    concat_word!(result, b"&", atomic_id)
-                };
-            }
+            result = append_intersection_ids(result, intersection_types, Some(indent));
         }
 
         if self.is_this {

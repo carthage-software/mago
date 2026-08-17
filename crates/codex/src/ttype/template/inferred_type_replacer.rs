@@ -20,7 +20,6 @@ use crate::ttype::combiner;
 use crate::ttype::get_mixed;
 use crate::ttype::get_never;
 use crate::ttype::intersect_union_types;
-use crate::ttype::template::TemplateBound;
 use crate::ttype::template::TemplateResult;
 use crate::ttype::template::bounds::get_most_specific_type_from_bounds;
 use crate::ttype::template::bounds::get_root_template_type;
@@ -67,17 +66,13 @@ pub fn replace_with_polarity(
                     }
                 }
 
-                let key = parameter_name;
-
                 let template_type = replace_template_parameter(
-                    &template_result.lower_bounds,
                     *parameter_name,
                     defining_entity,
                     codebase,
                     constraint,
                     intersection_types.as_ref(),
                     template_result,
-                    *key,
                 );
 
                 if let Some(template_type) = template_type {
@@ -152,17 +147,15 @@ pub fn replace_with_polarity(
     union.clone_with_types(combiner::combine(new_types, codebase, combiner::CombinerOptions::default()))
 }
 
-#[allow(clippy::too_many_arguments)]
 fn replace_template_parameter(
-    inferred_lower_bounds: &HashMap<Word, HashMap<GenericParent, Vec<TemplateBound>>>,
     parameter_name: Word,
     defining_entity: &GenericParent,
     codebase: &CodebaseMetadata,
     constraint: &TUnion,
     intersection_types: Option<&Vec<TAtomic>>,
     template_result: &TemplateResult,
-    key: Word,
 ) -> Option<TUnion> {
+    let inferred_lower_bounds = &template_result.lower_bounds;
     let mut template_type = None;
     let traversed_type =
         get_root_template_type(inferred_lower_bounds, parameter_name, defining_entity, HashSet::default(), codebase);
@@ -183,33 +176,13 @@ fn replace_template_parameter(
                     .collect();
 
                 for atomic_template_type in template_type_inner.types.to_mut() {
-                    if !atomic_template_type.can_be_intersected() {
-                        continue;
-                    }
-
-                    match atomic_template_type {
-                        TAtomic::Object(TObject::Named(n)) => {
-                            if let Some(existing) = n.get_intersection_types_mut() {
-                                existing.extend(replaced_intersection_parts.clone());
-                            } else {
-                                n.intersection_types = Some(replaced_intersection_parts.clone());
-                            }
+                    if matches!(
+                        atomic_template_type,
+                        TAtomic::Object(TObject::Named(_)) | TAtomic::Iterable(_) | TAtomic::GenericParameter(_)
+                    ) {
+                        for part in &replaced_intersection_parts {
+                            atomic_template_type.add_intersection_type(part.clone());
                         }
-                        TAtomic::Iterable(i) => {
-                            if let Some(existing) = i.get_intersection_types_mut() {
-                                existing.extend(replaced_intersection_parts.clone());
-                            } else {
-                                i.intersection_types = Some(replaced_intersection_parts.clone());
-                            }
-                        }
-                        TAtomic::GenericParameter(g) => {
-                            if let Some(existing) = &mut g.intersection_types {
-                                existing.extend(replaced_intersection_parts.clone());
-                            } else {
-                                g.intersection_types = Some(replaced_intersection_parts.clone());
-                            }
-                        }
-                        _ => {}
                     }
                 }
             } else {
@@ -228,7 +201,7 @@ fn replace_template_parameter(
                 if let GenericParent::ClassLike(classlike_name) = defining_entity
                     && let Some(metadata) = codebase.get_class_like(classlike_name.as_bytes())
                     && let Some(extended_parameter_map) = metadata.template_extended_parameters.get(&metadata.name)
-                    && let Some(param) = extended_parameter_map.get(&key)
+                    && let Some(param) = extended_parameter_map.get(&parameter_name)
                     && let TAtomic::GenericParameter(TGenericParameter { parameter_name, .. }) = param.get_single()
                     && let Some(bounds_map) = inferred_lower_bounds.get(parameter_name)
                     && let Some(bounds) = bounds_map.get(defining_entity)

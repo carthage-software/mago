@@ -1,5 +1,7 @@
 use std::borrow::Cow;
 
+use mago_word::Word;
+
 use crate::metadata::CodebaseMetadata;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::object::TObject;
@@ -38,14 +40,11 @@ pub fn is_contained_by(
                 return true;
             }
 
-            if codebase.enum_exists(value.as_bytes()) {
-                Cow::Owned(TAtomic::Object(TObject::Enum(TEnum::new(*value))))
-            } else {
-                Cow::Owned(TAtomic::Object(TObject::Named(TNamedObject::new(*value))))
-            }
+            Cow::Owned(class_name_object(codebase, *value))
         }
-        TClassLikeString::Generic { constraint, .. } => Cow::Borrowed(constraint.as_ref()),
-        TClassLikeString::OfType { constraint, .. } => Cow::Borrowed(constraint.as_ref()),
+        TClassLikeString::Generic { constraint, .. } | TClassLikeString::OfType { constraint, .. } => {
+            Cow::Borrowed(constraint.as_ref())
+        }
     };
 
     let fake_input_type = match input_scalar {
@@ -54,25 +53,16 @@ pub fn is_contained_by(
                 return false;
             }
 
-            if codebase.enum_exists(string_value.as_bytes()) {
-                Cow::Owned(TAtomic::Object(TObject::Enum(TEnum::new(*string_value))))
-            } else {
-                Cow::Owned(TAtomic::Object(TObject::Named(TNamedObject::new(*string_value))))
-            }
+            Cow::Owned(class_name_object(codebase, *string_value))
         }
         TScalar::ClassLikeString(input_class_string) => match input_class_string {
             TClassLikeString::Any { .. } => {
                 return matches!(fake_container_type.as_ref(), TAtomic::Object(TObject::Any));
             }
-            TClassLikeString::Literal { value } => {
-                if codebase.enum_exists(value.as_bytes()) {
-                    Cow::Owned(TAtomic::Object(TObject::Enum(TEnum::new(*value))))
-                } else {
-                    Cow::Owned(TAtomic::Object(TObject::Named(TNamedObject::new(*value))))
-                }
+            TClassLikeString::Literal { value } => Cow::Owned(class_name_object(codebase, *value)),
+            TClassLikeString::Generic { constraint, .. } | TClassLikeString::OfType { constraint, .. } => {
+                Cow::Borrowed(constraint.as_ref())
             }
-            TClassLikeString::Generic { constraint, .. } => Cow::Borrowed(constraint.as_ref()),
-            TClassLikeString::OfType { constraint, .. } => Cow::Borrowed(constraint.as_ref()),
         },
         _ => {
             return false;
@@ -86,6 +76,14 @@ pub fn is_contained_by(
         inside_assertion,
         atomic_comparison_result,
     )
+}
+
+fn class_name_object(codebase: &CodebaseMetadata, name: Word) -> TAtomic {
+    if codebase.enum_exists(name.as_bytes()) {
+        TAtomic::Object(TObject::Enum(TEnum::new(name)))
+    } else {
+        TAtomic::Object(TObject::Named(TNamedObject::new(name)))
+    }
 }
 
 fn is_valid_class_string(bytes: &[u8]) -> bool {

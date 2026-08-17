@@ -314,44 +314,20 @@ pub(crate) fn expand_atomic(
             *skip_key = true;
             new_return_type_parts.extend(expand_alias(alias, codebase, options));
         }
-        TAtomic::Derived(derived) => match derived {
-            TDerived::KeyOf(key_of) => {
-                *skip_key = true;
-                new_return_type_parts.extend(expand_key_of(key_of, codebase, options));
-            }
-            TDerived::ValueOf(value_of) => {
-                *skip_key = true;
-                new_return_type_parts.extend(expand_value_of(value_of, codebase, options));
-            }
-            TDerived::IndexAccess(index_access) => {
-                *skip_key = true;
-                new_return_type_parts.extend(expand_index_access(index_access, codebase, options));
-            }
-            TDerived::IntMask(int_mask) => {
-                *skip_key = true;
-                new_return_type_parts.extend(expand_int_mask(int_mask, codebase, options));
-            }
-            TDerived::IntMaskOf(int_mask_of) => {
-                *skip_key = true;
-                new_return_type_parts.extend(expand_int_mask_of(int_mask_of, codebase, options));
-            }
-            TDerived::PropertiesOf(properties_of) => {
-                *skip_key = true;
-                new_return_type_parts.extend(expand_properties_of(properties_of, codebase, options));
-            }
-            TDerived::New(new_type) => {
-                *skip_key = true;
-                new_return_type_parts.extend(expand_new(new_type, codebase, options));
-            }
-            TDerived::TemplateType(template_type) => {
-                *skip_key = true;
-                new_return_type_parts.extend(expand_template_type(template_type, codebase, options));
-            }
-            TDerived::Intersection(intersection) => {
-                *skip_key = true;
-                new_return_type_parts.extend(expand_derived_intersection(intersection, codebase, options));
-            }
-        },
+        TAtomic::Derived(derived) => {
+            *skip_key = true;
+            new_return_type_parts.extend(match derived {
+                TDerived::KeyOf(key_of) => expand_key_of(key_of, codebase, options),
+                TDerived::ValueOf(value_of) => expand_value_of(value_of, codebase, options),
+                TDerived::IndexAccess(index_access) => expand_index_access(index_access, codebase, options),
+                TDerived::IntMask(int_mask) => expand_int_mask(int_mask, codebase, options),
+                TDerived::IntMaskOf(int_mask_of) => expand_int_mask_of(int_mask_of, codebase, options),
+                TDerived::PropertiesOf(properties_of) => expand_properties_of(properties_of, codebase, options),
+                TDerived::New(new_type) => expand_new(new_type, codebase, options),
+                TDerived::TemplateType(template_type) => expand_template_type(template_type, codebase, options),
+                TDerived::Intersection(intersection) => expand_derived_intersection(intersection, codebase, options),
+            });
+        }
         TAtomic::Iterable(iterable) => {
             expand_union(codebase, Arc::make_mut(&mut iterable.key_type), options);
             expand_union(codebase, Arc::make_mut(&mut iterable.value_type), options);

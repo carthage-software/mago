@@ -269,11 +269,6 @@ impl TInteger {
     #[inline]
     #[must_use]
     pub const fn contains(&self, input: TInteger) -> bool {
-        use TInteger::From;
-        use TInteger::Literal;
-        use TInteger::Range;
-        use TInteger::To;
-
         // Rule: An `Unspecified` container can hold any input type.
         if self.is_unspecified() {
             return true;
@@ -945,17 +940,17 @@ impl TType for TInteger {
     }
 }
 
+use TInteger::From;
+use TInteger::Literal;
+use TInteger::Range;
+use TInteger::To;
+use TInteger::Unspecified;
+use TInteger::UnspecifiedLiteral;
+
 impl Add for TInteger {
     type Output = TInteger;
 
     fn add(self, other: TInteger) -> TInteger {
-        use TInteger::From;
-        use TInteger::Literal;
-        use TInteger::Range;
-        use TInteger::To;
-        use TInteger::Unspecified;
-        use TInteger::UnspecifiedLiteral;
-
         match (self, other) {
             (Unspecified, _) | (_, Unspecified) => Unspecified,
             (UnspecifiedLiteral | Literal(_), UnspecifiedLiteral) | (UnspecifiedLiteral, Literal(_)) => {
@@ -980,13 +975,6 @@ impl Sub for TInteger {
     type Output = TInteger;
 
     fn sub(self, other: TInteger) -> TInteger {
-        use TInteger::From;
-        use TInteger::Literal;
-        use TInteger::Range;
-        use TInteger::To;
-        use TInteger::Unspecified;
-        use TInteger::UnspecifiedLiteral;
-
         match (self, other) {
             (Unspecified, _) | (_, Unspecified) => Unspecified,
             (UnspecifiedLiteral | Literal(_), UnspecifiedLiteral) | (UnspecifiedLiteral, Literal(_)) => {
@@ -1013,13 +1001,6 @@ impl Mul for TInteger {
     type Output = TInteger;
 
     fn mul(self, other: TInteger) -> TInteger {
-        use TInteger::From;
-        use TInteger::Literal;
-        use TInteger::Range;
-        use TInteger::To;
-        use TInteger::Unspecified;
-        use TInteger::UnspecifiedLiteral;
-
         match (self, other) {
             (Unspecified, _) | (_, Unspecified) => Unspecified,
             (UnspecifiedLiteral | Literal(_), UnspecifiedLiteral) | (UnspecifiedLiteral, Literal(_)) => {
@@ -1070,13 +1051,6 @@ impl Div for TInteger {
     type Output = TInteger;
 
     fn div(self, rhs: Self) -> Self::Output {
-        use TInteger::From;
-        use TInteger::Literal;
-        use TInteger::Range;
-        use TInteger::To;
-        use TInteger::Unspecified;
-        use TInteger::UnspecifiedLiteral;
-
         match (self, rhs) {
             (Unspecified, _) | (_, Unspecified) => Unspecified,
             (UnspecifiedLiteral | Literal(_), UnspecifiedLiteral) | (UnspecifiedLiteral, Literal(_)) => {
@@ -1087,76 +1061,64 @@ impl Div for TInteger {
             (Literal(l1), Literal(l2)) => {
                 if l1 == 0 {
                     Literal(0)
-                } else if l2 == 0 || (l1 == i64::MIN && l2 == -1) {
+                } else if l1 == i64::MIN && l2 == -1 {
                     Unspecified
                 } else {
                     Literal(l1 / l2)
                 }
             }
             (Literal(l), From(f)) => {
-                if f > 0 {
-                    let v = l / f;
+                let v = l / f;
 
-                    if v == 0 {
-                        Literal(0)
-                    } else if l >= 0 {
-                        Range(0, v)
-                    } else {
-                        Range(v, 0)
-                    }
+                if v == 0 {
+                    Literal(0)
+                } else if l >= 0 {
+                    Range(0, v)
                 } else {
-                    Unspecified
+                    Range(v, 0)
                 }
             }
             (Literal(l), To(t)) => {
-                if t < 0 {
-                    if l >= 0 { Range(l / t, 0) } else { Range(0, l / t) }
+                if l >= 0 {
+                    Range(l / t, 0)
                 } else {
-                    Unspecified
+                    Range(0, l / t)
                 }
             }
-            (From(f), Literal(l)) => match l.cmp(&0) {
-                Ordering::Greater => From(f / l),
-                Ordering::Less => To(f / l),
-                Ordering::Equal => Unspecified,
-            },
-            (To(t), Literal(l)) => match l.cmp(&0) {
-                Ordering::Greater => To(t / l),
-                Ordering::Less => From(t / l),
-                Ordering::Equal => Unspecified,
-            },
-            (Range(f, t), Literal(l)) => match l.cmp(&0) {
-                Ordering::Greater => Range(f / l, t / l),
-                Ordering::Less => Range(t / l, f / l),
-                Ordering::Equal => Unspecified,
-            },
-            (Literal(l), Range(f, t)) => {
-                if f > 0 || t < 0 {
-                    let p1 = l / f;
-                    let p2 = l / t;
-
-                    let f = min(p1, p2);
-                    let t = max(p1, p2);
-
-                    Range(f, t)
+            (From(f), Literal(l)) => {
+                if l > 0 {
+                    From(f / l)
                 } else {
-                    Unspecified
+                    To(f / l)
                 }
+            }
+            (To(t), Literal(l)) => {
+                if l > 0 {
+                    To(t / l)
+                } else {
+                    From(t / l)
+                }
+            }
+            (Range(f, t), Literal(l)) => {
+                if l > 0 {
+                    Range(f / l, t / l)
+                } else {
+                    Range(t / l, f / l)
+                }
+            }
+            (Literal(l), Range(f, t)) => {
+                let p1 = l / f;
+                let p2 = l / t;
+
+                Range(min(p1, p2), max(p1, p2))
             }
             (Range(f1, t1), Range(f2, t2)) => {
-                if f2 > 0 || t2 < 0 {
-                    let p1 = f1 / f2;
-                    let p2 = f1 / t2;
-                    let p3 = t1 / f2;
-                    let p4 = t1 / t2;
+                let p1 = f1 / f2;
+                let p2 = f1 / t2;
+                let p3 = t1 / f2;
+                let p4 = t1 / t2;
 
-                    let f = min(min(p1, p2), min(p3, p4));
-                    let t = max(max(p1, p2), max(p3, p4));
-
-                    Range(f, t)
-                } else {
-                    Unspecified
-                }
+                Range(min(min(p1, p2), min(p3, p4)), max(max(p1, p2), max(p3, p4)))
             }
             _ => Unspecified,
         }
@@ -1167,21 +1129,13 @@ impl Rem for TInteger {
     type Output = TInteger;
 
     fn rem(self, rhs: Self) -> Self::Output {
-        use TInteger::From;
-        use TInteger::Literal;
-        use TInteger::Range;
-        use TInteger::To;
-        use TInteger::Unspecified;
-        use TInteger::UnspecifiedLiteral;
-
         match (self, rhs) {
             (UnspecifiedLiteral | Literal(_), UnspecifiedLiteral) | (UnspecifiedLiteral, Literal(_)) => {
                 if rhs.can_be_zero() { Unspecified } else { UnspecifiedLiteral }
             }
             (UnspecifiedLiteral, _) | (_, UnspecifiedLiteral) => Unspecified,
             (Unspecified, other) => match other {
-                Unspecified => Unspecified,
-                UnspecifiedLiteral => Unspecified,
+                Unspecified | UnspecifiedLiteral => Unspecified,
                 Literal(n) => {
                     if n == 0 {
                         // Division by zero is a potential error.
@@ -1240,51 +1194,31 @@ impl Rem for TInteger {
                     Unspecified
                 }
             }
-            (From(f), Literal(l)) => match l.cmp(&0) {
-                Ordering::Greater => {
-                    if f >= 0 {
-                        Range(0, l - 1)
-                    } else {
-                        Range(-(l - 1), l - 1)
-                    }
+            (From(f), Literal(l)) => {
+                if l > 0 {
+                    if f >= 0 { Range(0, l - 1) } else { Range(-(l - 1), l - 1) }
+                } else if f >= 0 {
+                    Range(0, l.saturating_neg().saturating_sub(1))
+                } else {
+                    Range(l.saturating_add(1), l.saturating_neg().saturating_sub(1))
                 }
-                Ordering::Less => {
-                    if f >= 0 {
-                        Range(0, l.saturating_neg().saturating_sub(1))
-                    } else {
-                        Range(l.saturating_add(1), l.saturating_neg().saturating_sub(1))
-                    }
-                }
-                Ordering::Equal => Unspecified,
-            },
-            (To(t), Literal(l)) if l != 0 => {
+            }
+            (To(t), Literal(l)) => {
                 let abs_l = l.abs();
 
                 if t <= 0 { Range(-(abs_l - 1), 0) } else { Range(-(abs_l - 1), abs_l - 1) }
             }
-            (Range(f, t), Literal(l)) => match l.cmp(&0) {
-                Ordering::Greater => {
-                    if f >= 0 {
-                        Range(0, (l - 1).min(t))
-                    } else if t <= 0 {
-                        Range((-(l - 1)).max(f), 0)
-                    } else {
-                        Range(-(l - 1), l - 1)
-                    }
-                }
-                Ordering::Less => {
-                    let v = l.abs();
+            (Range(f, t), Literal(l)) => {
+                let v = l.abs();
 
-                    if f >= 0 {
-                        Range(0, (v - 1).min(t))
-                    } else if t <= 0 {
-                        Range((-(v - 1)).max(f), 0)
-                    } else {
-                        Range(-(v - 1), v - 1)
-                    }
+                if f >= 0 {
+                    Range(0, (v - 1).min(t))
+                } else if t <= 0 {
+                    Range((-(v - 1)).max(f), 0)
+                } else {
+                    Range(-(v - 1), v - 1)
                 }
-                Ordering::Equal => Unspecified,
-            },
+            }
             _ => Unspecified,
         }
     }
@@ -1322,10 +1256,6 @@ impl BitAnd for TInteger {
 
     /// Performs a bitwise AND operation.
     fn bitand(self, rhs: Self) -> Self::Output {
-        use TInteger::Literal;
-        use TInteger::Unspecified;
-        use TInteger::UnspecifiedLiteral;
-
         match (self, rhs) {
             (Literal(l), Literal(r)) => Literal(l & r),
             (UnspecifiedLiteral | Literal(_), UnspecifiedLiteral) | (UnspecifiedLiteral, Literal(_)) => {
@@ -1359,10 +1289,6 @@ impl BitOr for TInteger {
 
     /// Performs a bitwise OR operation.
     fn bitor(self, rhs: Self) -> Self::Output {
-        use TInteger::Literal;
-        use TInteger::Unspecified;
-        use TInteger::UnspecifiedLiteral;
-
         match (self, rhs) {
             (Literal(l), Literal(r)) => Literal(l | r),
             (UnspecifiedLiteral | Literal(_), UnspecifiedLiteral) | (UnspecifiedLiteral, Literal(_)) => {
@@ -1398,10 +1324,6 @@ impl BitXor for TInteger {
 
     /// Performs a bitwise XOR operation.
     fn bitxor(self, rhs: Self) -> Self::Output {
-        use TInteger::Literal;
-        use TInteger::Unspecified;
-        use TInteger::UnspecifiedLiteral;
-
         match (self, rhs) {
             (Literal(l), Literal(r)) => Literal(l ^ r),
             (Literal(0), other) | (other, Literal(0)) => other,
@@ -1432,13 +1354,6 @@ impl Shl<TInteger> for TInteger {
 
     /// Performs a bitwise left shift (`<<`) operation.
     fn shl(self, rhs: TInteger) -> Self::Output {
-        use TInteger::From;
-        use TInteger::Literal;
-        use TInteger::Range;
-        use TInteger::To;
-        use TInteger::Unspecified;
-        use TInteger::UnspecifiedLiteral;
-
         match (self, rhs) {
             (Literal(0), _) => Literal(0),
             (Literal(l), Literal(r)) => {
@@ -1499,13 +1414,6 @@ impl Shr for TInteger {
 
     /// Performs a bitwise arithmetic right shift (`>>`) operation.
     fn shr(self, rhs: TInteger) -> Self::Output {
-        use TInteger::From;
-        use TInteger::Literal;
-        use TInteger::Range;
-        use TInteger::To;
-        use TInteger::Unspecified;
-        use TInteger::UnspecifiedLiteral;
-
         match (self, rhs) {
             (Literal(l), Literal(r)) => {
                 if !(0..64).contains(&r) {
@@ -1919,8 +1827,6 @@ mod tests {
 
     #[test]
     fn test_contains() {
-        use TInteger::*;
-
         assert!(Literal(5).contains(Literal(5)));
         assert!(!Literal(5).contains(From(5)));
         assert!(!Literal(5).contains(To(5)));

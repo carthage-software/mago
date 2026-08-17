@@ -59,26 +59,14 @@ pub fn is_contained_by(
 ///
 /// This is intentionally narrower than normal generic containment. It is used where a
 /// native, non-generic PHP type declaration is compared with a PHPDoc specialization.
-#[allow(clippy::too_many_arguments)]
 pub fn is_contained_by_with_erased_template_arguments(
     codebase: &CodebaseMetadata,
     input_type: &TUnion,
     container_type: &TUnion,
-    ignore_null: bool,
-    ignore_false: bool,
-    inside_assertion: bool,
     union_comparison_result: &mut ComparisonResult,
 ) -> bool {
     let mut direct_result = ComparisonResult::new();
-    if is_contained_by(
-        codebase,
-        input_type,
-        container_type,
-        ignore_null,
-        ignore_false,
-        inside_assertion,
-        &mut direct_result,
-    ) {
+    if is_contained_by(codebase, input_type, container_type, false, false, false, &mut direct_result) {
         *union_comparison_result = direct_result;
         return true;
     }
@@ -88,15 +76,7 @@ pub fn is_contained_by_with_erased_template_arguments(
         return false;
     };
 
-    is_contained_by(
-        codebase,
-        input_type,
-        &relaxed_container,
-        ignore_null,
-        ignore_false,
-        inside_assertion,
-        union_comparison_result,
-    )
+    is_contained_by(codebase, input_type, &relaxed_container, false, false, false, union_comparison_result)
 }
 
 fn replace_erased_template_arguments(input_type: &TUnion, container_type: &TUnion) -> Option<TUnion> {
@@ -205,9 +185,6 @@ fn is_contained_by_atomic(
     let container_atomic_types = container_type.types.as_ref();
     let input_from_template_fallback = input_type.from_template_fallback();
     let mut type_match_found = false;
-    let mut all_type_coerced = None;
-    let mut all_type_coerced_from_nested_mixed = None;
-    let mut all_type_coerced_from_as_mixed = None;
     let mut some_type_coerced = false;
     let mut some_type_coerced_from_nested_mixed = false;
 
@@ -310,13 +287,6 @@ fn is_contained_by_atomic(
             &mut atomic_comparison_result,
         );
 
-        if (input_type_part.is_mixed() || matches!(input_type_part, TAtomic::Scalar(TScalar::ArrayKey)))
-            && input_from_template_fallback
-            && atomic_comparison_result.type_coerced_from_nested_mixed.unwrap_or(false)
-        {
-            atomic_comparison_result.type_coerced_from_as_mixed = Some(true);
-        }
-
         if is_atomic_contained_by {
             if let Some(replacement_atomic_type) = atomic_comparison_result.replacement_atomic_type {
                 if let Some(replacement_union_type) = &mut union_comparison_result.replacement_union_type {
@@ -343,37 +313,8 @@ fn is_contained_by_atomic(
             some_type_coerced_from_nested_mixed = true;
         }
 
-        if !atomic_comparison_result.type_coerced.unwrap_or(false) || !all_type_coerced.unwrap_or(true) {
-            all_type_coerced = Some(false);
-        } else {
-            all_type_coerced = Some(true);
-        }
-
-        if !atomic_comparison_result.type_coerced_from_nested_mixed.unwrap_or(false)
-            || !all_type_coerced_from_nested_mixed.unwrap_or(true)
-        {
-            all_type_coerced_from_nested_mixed = Some(false);
-        } else {
-            all_type_coerced_from_nested_mixed = Some(true);
-        }
-
         if is_atomic_contained_by {
             type_match_found = true;
-            all_type_coerced_from_nested_mixed = Some(false);
-            all_type_coerced_from_as_mixed = Some(false);
-            all_type_coerced = Some(false);
-        }
-    }
-
-    if all_type_coerced.unwrap_or(false) {
-        union_comparison_result.type_coerced = Some(true);
-    }
-
-    if all_type_coerced_from_nested_mixed.unwrap_or(false) {
-        union_comparison_result.type_coerced_from_nested_mixed = Some(true);
-
-        if input_from_template_fallback || all_type_coerced_from_as_mixed.unwrap_or(false) {
-            union_comparison_result.type_coerced_from_as_mixed = Some(true);
         }
     }
 
@@ -388,7 +329,7 @@ fn is_contained_by_atomic(
     if some_type_coerced_from_nested_mixed {
         union_comparison_result.type_coerced_from_nested_mixed = Some(true);
 
-        if input_from_template_fallback || all_type_coerced_from_as_mixed.unwrap_or(false) {
+        if input_from_template_fallback {
             union_comparison_result.type_coerced_from_as_mixed = Some(true);
         }
     }

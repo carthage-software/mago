@@ -375,73 +375,47 @@ impl TString {
 impl TType for TString {
     #[inline]
     fn get_id(&self) -> Word {
-        let s = match &self.literal {
+        let literal_infix: &[u8] = match &self.literal {
             Some(TStringLiteral::Value(s)) => return concat_word!(b"string('", s, b"')"),
-            Some(_) => {
-                if self.is_truthy {
-                    if self.is_numeric {
-                        "truthy-numeric-literal-string"
-                    } else {
-                        match self.casing {
-                            TStringCasing::Lowercase => "truthy-lowercase-literal-string",
-                            TStringCasing::Uppercase => "truthy-uppercase-literal-string",
-                            TStringCasing::Unspecified => "truthy-literal-string",
-                        }
-                    }
-                } else if self.is_numeric {
-                    "numeric-literal-string"
-                } else if self.is_non_empty {
-                    match self.casing {
-                        TStringCasing::Lowercase => "lowercase-non-empty-literal-string",
-                        TStringCasing::Uppercase => "uppercase-non-empty-literal-string",
-                        TStringCasing::Unspecified => "non-empty-literal-string",
-                    }
-                } else {
-                    match self.casing {
-                        TStringCasing::Lowercase => "lowercase-literal-string",
-                        TStringCasing::Uppercase => "uppercase-literal-string",
-                        TStringCasing::Unspecified => "literal-string",
-                    }
+            Some(_) => b"literal-",
+            None => b"",
+        };
+
+        if self.is_callable && literal_infix.is_empty() {
+            return word(match self.casing {
+                TStringCasing::Lowercase => "lowercase-callable-string",
+                TStringCasing::Uppercase => "uppercase-callable-string",
+                TStringCasing::Unspecified => "callable-string",
+            });
+        }
+
+        let stem: &[u8] = if self.is_truthy {
+            if self.is_numeric {
+                b"truthy-numeric-"
+            } else {
+                match self.casing {
+                    TStringCasing::Lowercase => b"truthy-lowercase-",
+                    TStringCasing::Uppercase => b"truthy-uppercase-",
+                    TStringCasing::Unspecified => b"truthy-",
                 }
             }
-            None => {
-                if self.is_callable {
-                    return word(match self.casing {
-                        TStringCasing::Lowercase => "lowercase-callable-string",
-                        TStringCasing::Uppercase => "uppercase-callable-string",
-                        TStringCasing::Unspecified => "callable-string",
-                    });
-                }
-
-                if self.is_truthy {
-                    if self.is_numeric {
-                        "truthy-numeric-string"
-                    } else {
-                        match self.casing {
-                            TStringCasing::Lowercase => "truthy-lowercase-string",
-                            TStringCasing::Uppercase => "truthy-uppercase-string",
-                            TStringCasing::Unspecified => "truthy-string",
-                        }
-                    }
-                } else if self.is_numeric {
-                    "numeric-string"
-                } else if self.is_non_empty {
-                    match self.casing {
-                        TStringCasing::Lowercase => "lowercase-non-empty-string",
-                        TStringCasing::Uppercase => "uppercase-non-empty-string",
-                        TStringCasing::Unspecified => "non-empty-string",
-                    }
-                } else {
-                    match self.casing {
-                        TStringCasing::Lowercase => "lowercase-string",
-                        TStringCasing::Uppercase => "uppercase-string",
-                        TStringCasing::Unspecified => "string",
-                    }
-                }
+        } else if self.is_numeric {
+            b"numeric-"
+        } else if self.is_non_empty {
+            match self.casing {
+                TStringCasing::Lowercase => b"lowercase-non-empty-",
+                TStringCasing::Uppercase => b"uppercase-non-empty-",
+                TStringCasing::Unspecified => b"non-empty-",
+            }
+        } else {
+            match self.casing {
+                TStringCasing::Lowercase => b"lowercase-",
+                TStringCasing::Uppercase => b"uppercase-",
+                TStringCasing::Unspecified => b"",
             }
         };
 
-        word(s)
+        concat_word!(stem, literal_infix, b"string")
     }
 }
 

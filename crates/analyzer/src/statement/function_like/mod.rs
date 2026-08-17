@@ -316,9 +316,6 @@ where
                     context.codebase,
                     &effective_type,
                     &expanded_native,
-                    false,
-                    false,
-                    false,
                     &mut ComparisonResult::default(),
                 );
 

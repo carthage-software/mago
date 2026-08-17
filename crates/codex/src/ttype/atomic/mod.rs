@@ -2,6 +2,7 @@ use std::sync::Arc;
 
 use mago_word::Word;
 use mago_word::ascii_lowercase_word;
+use mago_word::concat_word;
 use mago_word::word;
 
 use crate::metadata::CodebaseMetadata;
@@ -469,113 +470,6 @@ impl TAtomic {
 
     #[inline]
     #[must_use]
-    pub const fn is_any_string(&self) -> bool {
-        matches!(
-            self,
-            TAtomic::Scalar(scalar) if scalar.is_any_string()
-        )
-    }
-
-    #[inline]
-    #[must_use]
-    pub const fn is_string(&self) -> bool {
-        matches!(
-            self,
-            TAtomic::Scalar(scalar) if scalar.is_string()
-        )
-    }
-
-    #[inline]
-    #[must_use]
-    pub const fn is_string_of_literal_origin(&self) -> bool {
-        matches!(
-            self,
-            TAtomic::Scalar(scalar) if scalar.is_literal_origin_string()
-        )
-    }
-
-    #[inline]
-    #[must_use]
-    pub const fn is_non_empty_string(&self) -> bool {
-        matches!(
-            self,
-            TAtomic::Scalar(scalar) if scalar.is_non_empty_string()
-        )
-    }
-
-    #[inline]
-    #[must_use]
-    pub const fn is_known_literal_string(&self) -> bool {
-        matches!(
-            self,
-            TAtomic::Scalar(scalar) if scalar.is_known_literal_string()
-        )
-    }
-
-    #[inline]
-    #[must_use]
-    pub const fn is_literal_class_string(&self) -> bool {
-        matches!(
-            self,
-            TAtomic::Scalar(scalar) if scalar.is_literal_class_string()
-        )
-    }
-
-    #[must_use]
-    pub const fn is_string_subtype(&self) -> bool {
-        matches!(
-            self,
-            TAtomic::Scalar(scalar) if scalar.is_non_boring_string()
-        )
-    }
-
-    #[inline]
-    #[must_use]
-    pub const fn is_array_key(&self) -> bool {
-        matches!(
-            self,
-            TAtomic::Scalar(scalar) if scalar.is_array_key()
-        )
-    }
-
-    #[inline]
-    #[must_use]
-    pub const fn is_int(&self) -> bool {
-        matches!(
-            self,
-            TAtomic::Scalar(scalar) if scalar.is_int()
-        )
-    }
-
-    #[inline]
-    #[must_use]
-    pub const fn is_literal_int(&self) -> bool {
-        matches!(
-            self,
-            TAtomic::Scalar(scalar) if scalar.is_literal_int()
-        )
-    }
-
-    #[inline]
-    #[must_use]
-    pub const fn is_float(&self) -> bool {
-        matches!(
-            self,
-            TAtomic::Scalar(scalar) if scalar.is_float()
-        )
-    }
-
-    #[inline]
-    #[must_use]
-    pub const fn is_literal_float(&self) -> bool {
-        matches!(
-            self,
-            TAtomic::Scalar(scalar) if scalar.is_literal_float()
-        )
-    }
-
-    #[inline]
-    #[must_use]
     pub const fn is_null(&self) -> bool {
         matches!(self, TAtomic::Null)
     }
@@ -584,51 +478,6 @@ impl TAtomic {
     #[must_use]
     pub const fn is_void(&self) -> bool {
         matches!(self, TAtomic::Void)
-    }
-
-    #[inline]
-    #[must_use]
-    pub const fn is_bool(&self) -> bool {
-        matches!(
-            self,
-            TAtomic::Scalar(scalar) if scalar.is_bool()
-        )
-    }
-
-    #[inline]
-    #[must_use]
-    pub const fn is_general_bool(&self) -> bool {
-        matches!(
-            self,
-            TAtomic::Scalar(scalar) if scalar.is_general_bool()
-        )
-    }
-
-    #[inline]
-    #[must_use]
-    pub const fn is_general_string(&self) -> bool {
-        matches!(
-            self,
-            TAtomic::Scalar(scalar) if scalar.is_general_string()
-        )
-    }
-
-    #[inline]
-    #[must_use]
-    pub const fn is_true(&self) -> bool {
-        matches!(
-            self,
-            TAtomic::Scalar(scalar) if scalar.is_true()
-        )
-    }
-
-    #[inline]
-    #[must_use]
-    pub const fn is_false(&self) -> bool {
-        matches!(
-            self,
-            TAtomic::Scalar(scalar) if scalar.is_false()
-        )
     }
 
     #[inline]
@@ -772,291 +621,196 @@ impl TAtomic {
     }
 
     #[must_use]
-    pub fn get_literal_string_value(&self) -> Option<&[u8]> {
-        match self {
-            TAtomic::Scalar(scalar) => scalar.get_known_literal_string_value(),
-            _ => None,
-        }
-    }
-
-    #[must_use]
-    pub fn get_class_string_value(&self) -> Option<Word> {
-        match self {
-            TAtomic::Scalar(scalar) => scalar.get_literal_class_string_value(),
-            _ => None,
-        }
-    }
-
-    #[must_use]
     pub fn get_integer(&self) -> Option<TInteger> {
         match self {
             TAtomic::Scalar(TScalar::Integer(integer)) => Some(*integer),
             _ => None,
         }
     }
+}
 
-    #[must_use]
-    pub fn get_literal_int_value(&self) -> Option<i64> {
-        match self {
-            TAtomic::Scalar(scalar) => scalar.get_literal_int_value(),
-            _ => None,
-        }
+macro_rules! scalar_forwarding_predicates {
+    ($($method:ident => $scalar_method:ident),* $(,)?) => {
+        $(
+            #[inline]
+            #[must_use]
+            pub const fn $method(&self) -> bool {
+                matches!(self, TAtomic::Scalar(scalar) if scalar.$scalar_method())
+            }
+        )*
+    };
+}
+
+macro_rules! scalar_forwarding_getters {
+    ($($method:ident => $scalar_method:ident -> $return_type:ty),* $(,)?) => {
+        $(
+            #[inline]
+            #[must_use]
+            pub fn $method(&self) -> Option<$return_type> {
+                match self {
+                    TAtomic::Scalar(scalar) => scalar.$scalar_method(),
+                    _ => None,
+                }
+            }
+        )*
+    };
+}
+
+impl TAtomic {
+    scalar_forwarding_predicates! {
+        is_any_string => is_any_string,
+        is_string => is_string,
+        is_string_of_literal_origin => is_literal_origin_string,
+        is_non_empty_string => is_non_empty_string,
+        is_known_literal_string => is_known_literal_string,
+        is_literal_class_string => is_literal_class_string,
+        is_string_subtype => is_non_boring_string,
+        is_array_key => is_array_key,
+        is_int => is_int,
+        is_literal_int => is_literal_int,
+        is_float => is_float,
+        is_literal_float => is_literal_float,
+        is_bool => is_bool,
+        is_general_bool => is_general_bool,
+        is_general_string => is_general_string,
+        is_true => is_true,
+        is_false => is_false,
     }
 
-    #[must_use]
-    pub fn get_maximum_int_value(&self) -> Option<i64> {
-        match self {
-            TAtomic::Scalar(scalar) => scalar.get_maximum_int_value(),
-            _ => None,
-        }
+    scalar_forwarding_getters! {
+        get_literal_string_value => get_known_literal_string_value -> &[u8],
+        get_class_string_value => get_literal_class_string_value -> Word,
+        get_literal_int_value => get_literal_int_value -> i64,
+        get_maximum_int_value => get_maximum_int_value -> i64,
+        get_minimum_int_value => get_minimum_int_value -> i64,
+        get_literal_float_value => get_literal_float_value -> f64,
     }
+}
 
-    #[must_use]
-    pub fn get_minimum_int_value(&self) -> Option<i64> {
-        match self {
-            TAtomic::Scalar(scalar) => scalar.get_minimum_int_value(),
-            _ => None,
+macro_rules! with_inner_ttype {
+    ($self:expr, $ttype:ident => $body:expr, $fallback:expr) => {
+        match $self {
+            TAtomic::Scalar($ttype) => $body,
+            TAtomic::Callable($ttype) => $body,
+            TAtomic::Mixed($ttype) => $body,
+            TAtomic::Object($ttype) => $body,
+            TAtomic::Array($ttype) => $body,
+            TAtomic::Iterable($ttype) => $body,
+            TAtomic::Resource($ttype) => $body,
+            TAtomic::Reference($ttype) => $body,
+            TAtomic::GenericParameter($ttype) => $body,
+            TAtomic::Conditional($ttype) => $body,
+            TAtomic::Derived($ttype) => $body,
+            TAtomic::Alias($ttype) => $body,
+            _ => $fallback,
         }
-    }
-
-    #[must_use]
-    pub fn get_literal_float_value(&self) -> Option<f64> {
-        match self {
-            TAtomic::Scalar(scalar) => scalar.get_literal_float_value(),
-            _ => None,
-        }
-    }
+    };
 }
 
 impl TType for TAtomic {
     fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
-        match self {
-            TAtomic::Array(ttype) => ttype.get_child_nodes(),
-            TAtomic::Callable(ttype) => ttype.get_child_nodes(),
-            TAtomic::Conditional(ttype) => ttype.get_child_nodes(),
-            TAtomic::Derived(ttype) => ttype.get_child_nodes(),
-            TAtomic::GenericParameter(ttype) => ttype.get_child_nodes(),
-            TAtomic::Iterable(ttype) => ttype.get_child_nodes(),
-            TAtomic::Mixed(ttype) => ttype.get_child_nodes(),
-            TAtomic::Object(ttype) => ttype.get_child_nodes(),
-            TAtomic::Reference(ttype) => ttype.get_child_nodes(),
-            TAtomic::Resource(ttype) => ttype.get_child_nodes(),
-            TAtomic::Scalar(ttype) => ttype.get_child_nodes(),
-            TAtomic::Alias(ttype) => ttype.get_child_nodes(),
-            _ => vec![],
-        }
+        with_inner_ttype!(self, ttype => ttype.get_child_nodes(), vec![])
     }
 
     fn can_be_intersected(&self) -> bool {
-        match self {
-            TAtomic::Object(ttype) => ttype.can_be_intersected(),
-            TAtomic::Reference(ttype) => ttype.can_be_intersected(),
-            TAtomic::GenericParameter(ttype) => ttype.can_be_intersected(),
-            TAtomic::Iterable(ttype) => ttype.can_be_intersected(),
-            TAtomic::Array(ttype) => ttype.can_be_intersected(),
-            TAtomic::Callable(ttype) => ttype.can_be_intersected(),
-            TAtomic::Mixed(ttype) => ttype.can_be_intersected(),
-            TAtomic::Scalar(ttype) => ttype.can_be_intersected(),
-            TAtomic::Resource(ttype) => ttype.can_be_intersected(),
-            TAtomic::Conditional(ttype) => ttype.can_be_intersected(),
-            TAtomic::Derived(ttype) => ttype.can_be_intersected(),
-            TAtomic::Alias(ttype) => ttype.can_be_intersected(),
-            _ => false,
-        }
+        with_inner_ttype!(self, ttype => ttype.can_be_intersected(), false)
     }
 
     fn get_intersection_types(&self) -> Option<&[TAtomic]> {
-        match self {
-            TAtomic::Object(ttype) => ttype.get_intersection_types(),
-            TAtomic::Reference(ttype) => ttype.get_intersection_types(),
-            TAtomic::GenericParameter(ttype) => ttype.get_intersection_types(),
-            TAtomic::Iterable(ttype) => ttype.get_intersection_types(),
-            TAtomic::Array(ttype) => ttype.get_intersection_types(),
-            TAtomic::Callable(ttype) => ttype.get_intersection_types(),
-            TAtomic::Mixed(ttype) => ttype.get_intersection_types(),
-            TAtomic::Scalar(ttype) => ttype.get_intersection_types(),
-            TAtomic::Resource(ttype) => ttype.get_intersection_types(),
-            TAtomic::Conditional(ttype) => ttype.get_intersection_types(),
-            TAtomic::Derived(ttype) => ttype.get_intersection_types(),
-            TAtomic::Alias(ttype) => ttype.get_intersection_types(),
-            _ => None,
-        }
+        with_inner_ttype!(self, ttype => ttype.get_intersection_types(), None)
     }
 
     fn get_intersection_types_mut(&mut self) -> Option<&mut Vec<TAtomic>> {
-        match self {
-            TAtomic::Object(ttype) => ttype.get_intersection_types_mut(),
-            TAtomic::Reference(ttype) => ttype.get_intersection_types_mut(),
-            TAtomic::GenericParameter(ttype) => ttype.get_intersection_types_mut(),
-            TAtomic::Iterable(ttype) => ttype.get_intersection_types_mut(),
-            TAtomic::Array(ttype) => ttype.get_intersection_types_mut(),
-            TAtomic::Callable(ttype) => ttype.get_intersection_types_mut(),
-            TAtomic::Mixed(ttype) => ttype.get_intersection_types_mut(),
-            TAtomic::Scalar(ttype) => ttype.get_intersection_types_mut(),
-            TAtomic::Resource(ttype) => ttype.get_intersection_types_mut(),
-            TAtomic::Conditional(ttype) => ttype.get_intersection_types_mut(),
-            TAtomic::Derived(ttype) => ttype.get_intersection_types_mut(),
-            TAtomic::Alias(ttype) => ttype.get_intersection_types_mut(),
-            _ => None,
-        }
+        with_inner_ttype!(self, ttype => ttype.get_intersection_types_mut(), None)
     }
 
     fn has_intersection_types(&self) -> bool {
-        match self {
-            TAtomic::Object(ttype) => ttype.has_intersection_types(),
-            TAtomic::Reference(ttype) => ttype.has_intersection_types(),
-            TAtomic::GenericParameter(ttype) => ttype.has_intersection_types(),
-            TAtomic::Iterable(ttype) => ttype.has_intersection_types(),
-            TAtomic::Array(ttype) => ttype.has_intersection_types(),
-            TAtomic::Callable(ttype) => ttype.has_intersection_types(),
-            TAtomic::Mixed(ttype) => ttype.has_intersection_types(),
-            TAtomic::Scalar(ttype) => ttype.has_intersection_types(),
-            TAtomic::Resource(ttype) => ttype.has_intersection_types(),
-            TAtomic::Conditional(ttype) => ttype.has_intersection_types(),
-            TAtomic::Derived(ttype) => ttype.has_intersection_types(),
-            TAtomic::Alias(ttype) => ttype.has_intersection_types(),
-            _ => false,
-        }
+        with_inner_ttype!(self, ttype => ttype.has_intersection_types(), false)
     }
 
     fn add_intersection_type(&mut self, intersection_type: TAtomic) -> bool {
-        match self {
-            TAtomic::Object(ttype) => ttype.add_intersection_type(intersection_type),
-            TAtomic::Reference(ttype) => ttype.add_intersection_type(intersection_type),
-            TAtomic::GenericParameter(ttype) => ttype.add_intersection_type(intersection_type),
-            TAtomic::Iterable(ttype) => ttype.add_intersection_type(intersection_type),
-            TAtomic::Array(ttype) => ttype.add_intersection_type(intersection_type),
-            TAtomic::Callable(ttype) => ttype.add_intersection_type(intersection_type),
-            TAtomic::Mixed(ttype) => ttype.add_intersection_type(intersection_type),
-            TAtomic::Scalar(ttype) => ttype.add_intersection_type(intersection_type),
-            TAtomic::Resource(ttype) => ttype.add_intersection_type(intersection_type),
-            TAtomic::Conditional(ttype) => ttype.add_intersection_type(intersection_type),
-            TAtomic::Derived(ttype) => ttype.add_intersection_type(intersection_type),
-            TAtomic::Alias(ttype) => ttype.add_intersection_type(intersection_type),
-            _ => false,
-        }
+        with_inner_ttype!(self, ttype => ttype.add_intersection_type(intersection_type), false)
     }
 
     fn needs_population(&self) -> bool {
-        if let Some(intersection) = self.get_intersection_types() {
-            for intersection_type in intersection {
-                if intersection_type.needs_population() {
-                    return true;
-                }
-            }
+        if let Some(intersection) = self.get_intersection_types()
+            && intersection.iter().any(|intersection_type| intersection_type.needs_population())
+        {
+            return true;
         }
 
-        match self {
-            TAtomic::Object(ttype) => ttype.needs_population(),
-            TAtomic::Reference(ttype) => ttype.needs_population(),
-            TAtomic::GenericParameter(ttype) => ttype.needs_population(),
-            TAtomic::Iterable(ttype) => ttype.needs_population(),
-            TAtomic::Array(ttype) => ttype.needs_population(),
-            TAtomic::Callable(ttype) => ttype.needs_population(),
-            TAtomic::Conditional(ttype) => ttype.needs_population(),
-            TAtomic::Derived(ttype) => ttype.needs_population(),
-            TAtomic::Scalar(ttype) => ttype.needs_population(),
-            TAtomic::Mixed(ttype) => ttype.needs_population(),
-            TAtomic::Resource(ttype) => ttype.needs_population(),
-            TAtomic::Alias(ttype) => ttype.needs_population(),
-            _ => false,
-        }
+        with_inner_ttype!(self, ttype => ttype.needs_population(), false)
     }
 
     #[inline]
     fn is_expandable(&self) -> bool {
-        if let Some(intersection) = self.get_intersection_types() {
-            for intersection_type in intersection {
-                if intersection_type.is_expandable() {
-                    return true;
-                }
-            }
+        if let Some(intersection) = self.get_intersection_types()
+            && intersection.iter().any(|intersection_type| intersection_type.is_expandable())
+        {
+            return true;
         }
 
-        match self {
-            TAtomic::Object(ttype) => ttype.is_expandable(),
-            TAtomic::Reference(ttype) => ttype.is_expandable(),
-            TAtomic::GenericParameter(ttype) => ttype.is_expandable(),
-            TAtomic::Iterable(ttype) => ttype.is_expandable(),
-            TAtomic::Array(ttype) => ttype.is_expandable(),
-            TAtomic::Callable(ttype) => ttype.is_expandable(),
-            TAtomic::Conditional(ttype) => ttype.is_expandable(),
-            TAtomic::Derived(ttype) => ttype.is_expandable(),
-            TAtomic::Scalar(ttype) => ttype.is_expandable(),
-            TAtomic::Mixed(ttype) => ttype.is_expandable(),
-            TAtomic::Resource(ttype) => ttype.is_expandable(),
-            TAtomic::Alias(ttype) => ttype.is_expandable(),
-            _ => false,
-        }
+        with_inner_ttype!(self, ttype => ttype.is_expandable(), false)
     }
 
     fn is_complex(&self) -> bool {
-        if let Some(intersection) = self.get_intersection_types() {
-            for intersection_type in intersection {
-                if intersection_type.is_complex() {
-                    return true;
-                }
-            }
+        if let Some(intersection) = self.get_intersection_types()
+            && intersection.iter().any(|intersection_type| intersection_type.is_complex())
+        {
+            return true;
         }
 
-        match self {
-            TAtomic::Object(ttype) => ttype.is_complex(),
-            TAtomic::Reference(ttype) => ttype.is_complex(),
-            TAtomic::GenericParameter(ttype) => ttype.is_complex(),
-            TAtomic::Iterable(ttype) => ttype.is_complex(),
-            TAtomic::Array(ttype) => ttype.is_complex(),
-            TAtomic::Callable(ttype) => ttype.is_complex(),
-            TAtomic::Conditional(ttype) => ttype.is_complex(),
-            TAtomic::Derived(ttype) => ttype.is_complex(),
-            TAtomic::Scalar(ttype) => ttype.is_complex(),
-            TAtomic::Mixed(ttype) => ttype.is_complex(),
-            TAtomic::Resource(ttype) => ttype.is_complex(),
-            TAtomic::Alias(ttype) => ttype.is_complex(),
-            _ => false,
-        }
+        with_inner_ttype!(self, ttype => ttype.is_complex(), false)
     }
 
     fn get_id(&self) -> Word {
-        match self {
-            TAtomic::Scalar(scalar) => scalar.get_id(),
-            TAtomic::Array(array) => array.get_id(),
-            TAtomic::Callable(callable) => callable.get_id(),
-            TAtomic::Object(object) => object.get_id(),
-            TAtomic::Reference(reference) => reference.get_id(),
-            TAtomic::Mixed(mixed) => mixed.get_id(),
-            TAtomic::Resource(resource) => resource.get_id(),
-            TAtomic::Iterable(iterable) => iterable.get_id(),
-            TAtomic::GenericParameter(parameter) => parameter.get_id(),
-            TAtomic::Conditional(conditional) => conditional.get_id(),
-            TAtomic::Alias(alias) => alias.get_id(),
-            TAtomic::Derived(derived) => derived.get_id(),
+        with_inner_ttype!(self, ttype => ttype.get_id(), match self {
             TAtomic::Variable(name) => *name,
             TAtomic::Never => word("never"),
             TAtomic::Null => word("null"),
             TAtomic::Void => word("void"),
-            TAtomic::Placeholder => word("_"),
-        }
+            _ => word("_"),
+        })
     }
 
     fn get_pretty_id_with_indent(&self, indent: usize) -> Word {
-        match self {
-            TAtomic::Scalar(scalar) => scalar.get_pretty_id_with_indent(indent),
-            TAtomic::Array(array) => array.get_pretty_id_with_indent(indent),
-            TAtomic::Callable(callable) => callable.get_pretty_id_with_indent(indent),
-            TAtomic::Object(object) => object.get_pretty_id_with_indent(indent),
-            TAtomic::Reference(reference) => reference.get_pretty_id_with_indent(indent),
-            TAtomic::Mixed(mixed) => mixed.get_pretty_id_with_indent(indent),
-            TAtomic::Resource(resource) => resource.get_pretty_id_with_indent(indent),
-            TAtomic::Iterable(iterable) => iterable.get_pretty_id_with_indent(indent),
-            TAtomic::GenericParameter(parameter) => parameter.get_pretty_id_with_indent(indent),
-            TAtomic::Conditional(conditional) => conditional.get_pretty_id_with_indent(indent),
-            TAtomic::Alias(alias) => alias.get_pretty_id_with_indent(indent),
-            TAtomic::Derived(derived) => derived.get_pretty_id_with_indent(indent),
+        with_inner_ttype!(self, ttype => ttype.get_pretty_id_with_indent(indent), match self {
             TAtomic::Variable(name) => *name,
             TAtomic::Never => word("never"),
             TAtomic::Null => word("null"),
             TAtomic::Void => word("void"),
-            TAtomic::Placeholder => word("_"),
+            _ => word("_"),
+        })
+    }
+}
+
+pub(crate) fn append_intersection_ids(mut base: Word, intersection_types: &[TAtomic], indent: Option<usize>) -> Word {
+    for atomic in intersection_types {
+        let atomic_id = match indent {
+            Some(indent) => atomic.get_pretty_id_with_indent(indent),
+            None => atomic.get_id(),
+        };
+
+        base = if atomic.has_intersection_types() {
+            concat_word!(base, b"&(", atomic_id, b")")
+        } else {
+            concat_word!(base, b"&", atomic_id)
+        };
+    }
+
+    base
+}
+
+fn add_symbol_reference(reference_source: &ReferenceSource, symbol_references: &mut SymbolReferences, name: Word) {
+    match reference_source {
+        ReferenceSource::Symbol(in_signature, a) => {
+            symbol_references.add_symbol_reference_to_symbol(*a, name, *in_signature);
+        }
+        ReferenceSource::ClassLikeMember(in_signature, a, b) => {
+            symbol_references.add_class_member_reference_to_symbol((*a, *b), name, *in_signature);
+        }
+        ReferenceSource::File(in_signature, file) => {
+            symbol_references.add_file_reference_to_class_member(*file, (name, mago_word::empty_word()), *in_signature);
         }
     }
 }
@@ -1068,75 +822,54 @@ pub fn populate_atomic_type(
     symbol_references: &mut SymbolReferences,
     force: bool,
 ) {
+    macro_rules! populate {
+        (union $target:expr) => {
+            populate_union_type($target, codebase_symbols, reference_source, symbol_references, force)
+        };
+        (atomic $target:expr) => {
+            populate_atomic_type($target, codebase_symbols, reference_source, symbol_references, force)
+        };
+    }
+
     match unpopulated_atomic {
         TAtomic::Array(array) => match array {
             TArray::List(list) => {
-                populate_union_type(
-                    Arc::make_mut(&mut list.element_type),
-                    codebase_symbols,
-                    reference_source,
-                    symbol_references,
-                    force,
-                );
+                populate!(union Arc::make_mut(&mut list.element_type));
 
                 if let Some(known_elements) = list.known_elements.as_mut() {
                     for (_, element_type) in known_elements.values_mut() {
-                        populate_union_type(element_type, codebase_symbols, reference_source, symbol_references, force);
+                        populate!(union element_type);
                     }
                 }
             }
             TArray::Keyed(keyed_array) => {
                 if let Some(known_items) = keyed_array.known_items.as_mut() {
                     for (_, item_type) in known_items.values_mut() {
-                        populate_union_type(item_type, codebase_symbols, reference_source, symbol_references, force);
+                        populate!(union item_type);
                     }
                 }
 
                 if let Some(parameters) = &mut keyed_array.parameters {
-                    populate_union_type(
-                        Arc::make_mut(&mut parameters.0),
-                        codebase_symbols,
-                        reference_source,
-                        symbol_references,
-                        force,
-                    );
+                    populate!(union Arc::make_mut(&mut parameters.0));
 
-                    populate_union_type(
-                        Arc::make_mut(&mut parameters.1),
-                        codebase_symbols,
-                        reference_source,
-                        symbol_references,
-                        force,
-                    );
+                    populate!(union Arc::make_mut(&mut parameters.1));
                 }
             }
         },
         TAtomic::Callable(TCallable::Signature(signature)) => {
             if let Some(return_type) = signature.get_return_type_mut() {
-                populate_union_type(return_type, codebase_symbols, reference_source, symbol_references, force);
+                populate!(union return_type);
             }
 
             for param in signature.get_parameters_mut() {
                 if let Some(param_type) = param.get_type_signature_mut() {
-                    populate_union_type(param_type, codebase_symbols, reference_source, symbol_references, force);
+                    populate!(union param_type);
                 }
             }
 
             for constraint in &mut signature.constraints {
-                populate_union_type(
-                    Arc::make_mut(&mut constraint.input_type),
-                    codebase_symbols,
-                    reference_source,
-                    symbol_references,
-                    force,
-                );
-                populate_union_type(
-                    Arc::make_mut(&mut constraint.parameter_type),
-                    codebase_symbols,
-                    reference_source,
-                    symbol_references,
-                    force,
-                );
+                populate!(union Arc::make_mut(&mut constraint.input_type));
+                populate!(union Arc::make_mut(&mut constraint.parameter_type));
             }
         }
         TAtomic::Object(TObject::Named(named_object)) => {
@@ -1150,70 +883,34 @@ pub fn populate_atomic_type(
             } else {
                 if let Some(type_parameters) = named_object.get_type_parameters_mut() {
                     for parameter in type_parameters {
-                        populate_union_type(parameter, codebase_symbols, reference_source, symbol_references, force);
+                        populate!(union parameter);
                     }
                 }
 
                 if let Some(intersection_types) = named_object.get_intersection_types_mut() {
                     for intersection_type in intersection_types {
-                        populate_atomic_type(
-                            intersection_type,
-                            codebase_symbols,
-                            reference_source,
-                            symbol_references,
-                            force,
-                        );
+                        populate!(atomic intersection_type);
                     }
                 }
             }
 
             if let Some(reference_source) = reference_source {
-                match reference_source {
-                    ReferenceSource::Symbol(in_signature, a) => {
-                        symbol_references.add_symbol_reference_to_symbol(*a, name, *in_signature);
-                    }
-                    ReferenceSource::ClassLikeMember(in_signature, a, b) => {
-                        symbol_references.add_class_member_reference_to_symbol((*a, *b), name, *in_signature);
-                    }
-                    ReferenceSource::File(in_signature, file) => symbol_references.add_file_reference_to_class_member(
-                        *file,
-                        (name, mago_word::empty_word()),
-                        *in_signature,
-                    ),
-                }
+                add_symbol_reference(reference_source, symbol_references, name);
             }
         }
         TAtomic::Object(TObject::WithProperties(keyed_array)) => {
             for (_, item_type) in keyed_array.known_properties.values_mut() {
-                populate_union_type(item_type, codebase_symbols, reference_source, symbol_references, force);
+                populate!(union item_type);
             }
         }
         TAtomic::Iterable(iterable) => {
-            populate_union_type(
-                iterable.get_key_type_mut(),
-                codebase_symbols,
-                reference_source,
-                symbol_references,
-                force,
-            );
+            populate!(union iterable.get_key_type_mut());
 
-            populate_union_type(
-                iterable.get_value_type_mut(),
-                codebase_symbols,
-                reference_source,
-                symbol_references,
-                force,
-            );
+            populate!(union iterable.get_value_type_mut());
 
             if let Some(intersection_types) = iterable.get_intersection_types_mut() {
                 for intersection_type in intersection_types {
-                    populate_atomic_type(
-                        intersection_type,
-                        codebase_symbols,
-                        reference_source,
-                        symbol_references,
-                        force,
-                    );
+                    populate!(atomic intersection_type);
                 }
             }
         }
@@ -1221,21 +918,12 @@ pub fn populate_atomic_type(
             TReference::Symbol { name, parameters, variances, intersection_types } => {
                 if let Some(parameters) = parameters {
                     for parameter in parameters {
-                        populate_union_type(parameter, codebase_symbols, reference_source, symbol_references, force);
+                        populate!(union parameter);
                     }
                 }
 
                 if let Some(reference_source) = reference_source {
-                    match reference_source {
-                        ReferenceSource::Symbol(in_signature, a) => {
-                            symbol_references.add_symbol_reference_to_symbol(*a, *name, *in_signature);
-                        }
-                        ReferenceSource::ClassLikeMember(in_signature, a, b) => {
-                            symbol_references.add_class_member_reference_to_symbol((*a, *b), *name, *in_signature);
-                        }
-                        ReferenceSource::File(in_signature, file) => symbol_references
-                            .add_file_reference_to_class_member(*file, (*name, mago_word::empty_word()), *in_signature),
-                    }
+                    add_symbol_reference(reference_source, symbol_references, *name);
                 }
 
                 if let Some(symbol_kind) = codebase_symbols.get_kind(ascii_lowercase_word(name.as_bytes())) {
@@ -1246,13 +934,7 @@ pub fn populate_atomic_type(
                             intersection_types
                                 .into_iter()
                                 .map(|mut intersection_type| {
-                                    populate_atomic_type(
-                                        &mut intersection_type,
-                                        codebase_symbols,
-                                        reference_source,
-                                        symbol_references,
-                                        force,
-                                    );
+                                    populate!(atomic &mut intersection_type);
 
                                     intersection_type
                                 })
@@ -1295,141 +977,57 @@ pub fn populate_atomic_type(
             }
         },
         TAtomic::GenericParameter(TGenericParameter { constraint, intersection_types, .. }) => {
-            populate_union_type(
-                Arc::make_mut(constraint),
-                codebase_symbols,
-                reference_source,
-                symbol_references,
-                force,
-            );
+            populate!(union Arc::make_mut(constraint));
 
             if let Some(intersection_types) = intersection_types.as_mut() {
                 for intersection_type in intersection_types {
-                    populate_atomic_type(
-                        intersection_type,
-                        codebase_symbols,
-                        reference_source,
-                        symbol_references,
-                        force,
-                    );
+                    populate!(atomic intersection_type);
                 }
             }
         }
         TAtomic::Scalar(TScalar::ClassLikeString(
             TClassLikeString::OfType { constraint, .. } | TClassLikeString::Generic { constraint, .. },
         )) => {
-            populate_atomic_type(
-                Arc::make_mut(constraint),
-                codebase_symbols,
-                reference_source,
-                symbol_references,
-                force,
-            );
+            populate!(atomic Arc::make_mut(constraint));
         }
         TAtomic::Conditional(conditional) => {
-            populate_union_type(
-                conditional.get_subject_mut(),
-                codebase_symbols,
-                reference_source,
-                symbol_references,
-                force,
-            );
+            populate!(union conditional.get_subject_mut());
 
-            populate_union_type(
-                conditional.get_target_mut(),
-                codebase_symbols,
-                reference_source,
-                symbol_references,
-                force,
-            );
+            populate!(union conditional.get_target_mut());
 
-            populate_union_type(
-                conditional.get_then_mut(),
-                codebase_symbols,
-                reference_source,
-                symbol_references,
-                force,
-            );
+            populate!(union conditional.get_then_mut());
 
-            populate_union_type(
-                conditional.get_otherwise_mut(),
-                codebase_symbols,
-                reference_source,
-                symbol_references,
-                force,
-            );
+            populate!(union conditional.get_otherwise_mut());
         }
         TAtomic::Derived(derived) => match derived {
             TDerived::IntMask(int_mask) => {
                 for value in int_mask.get_values_mut() {
-                    populate_union_type(value, codebase_symbols, reference_source, symbol_references, force);
+                    populate!(union value);
                 }
             }
             TDerived::IndexAccess(index_access) => {
-                populate_union_type(
-                    index_access.get_target_type_mut(),
-                    codebase_symbols,
-                    reference_source,
-                    symbol_references,
-                    force,
-                );
+                populate!(union index_access.get_target_type_mut());
 
-                populate_union_type(
-                    index_access.get_index_type_mut(),
-                    codebase_symbols,
-                    reference_source,
-                    symbol_references,
-                    force,
-                );
+                populate!(union index_access.get_index_type_mut());
             }
             TDerived::TemplateType(template_type) => {
-                populate_union_type(
-                    template_type.get_object_mut(),
-                    codebase_symbols,
-                    reference_source,
-                    symbol_references,
-                    force,
-                );
+                populate!(union template_type.get_object_mut());
 
-                populate_union_type(
-                    template_type.get_class_name_mut(),
-                    codebase_symbols,
-                    reference_source,
-                    symbol_references,
-                    force,
-                );
+                populate!(union template_type.get_class_name_mut());
 
-                populate_union_type(
-                    template_type.get_template_name_mut(),
-                    codebase_symbols,
-                    reference_source,
-                    symbol_references,
-                    force,
-                );
+                populate!(union template_type.get_template_name_mut());
             }
             TDerived::Intersection(intersection) => {
-                populate_union_type(
-                    intersection.get_base_type_mut(),
-                    codebase_symbols,
-                    reference_source,
-                    symbol_references,
-                    force,
-                );
+                populate!(union intersection.get_base_type_mut());
                 if let Some(intersection_types) = intersection.get_intersection_types_mut() {
                     for intersection_type in intersection_types {
-                        populate_atomic_type(
-                            intersection_type,
-                            codebase_symbols,
-                            reference_source,
-                            symbol_references,
-                            force,
-                        );
+                        populate!(atomic intersection_type);
                     }
                 }
             }
             _ => {
                 if let Some(target) = derived.get_target_type_mut() {
-                    populate_union_type(target, codebase_symbols, reference_source, symbol_references, force);
+                    populate!(union target);
                 }
             }
         },

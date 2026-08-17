@@ -4,6 +4,7 @@ use mago_word::concat_word;
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
 use crate::ttype::atomic::TAtomic;
+use crate::ttype::atomic::append_intersection_ids;
 
 /// Represents an object type that has a known method from a `method_exists()` check.
 ///
@@ -41,70 +42,4 @@ impl TObjectHasMethod {
     }
 }
 
-impl TType for TObjectHasMethod {
-    fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
-        self.intersection_types.as_ref().map(|types| types.iter().map(TypeRef::Atomic).collect()).unwrap_or_default()
-    }
-
-    fn can_be_intersected(&self) -> bool {
-        true
-    }
-
-    fn get_intersection_types(&self) -> Option<&[TAtomic]> {
-        self.intersection_types.as_deref()
-    }
-
-    fn get_intersection_types_mut(&mut self) -> Option<&mut Vec<TAtomic>> {
-        self.intersection_types.as_mut()
-    }
-
-    fn has_intersection_types(&self) -> bool {
-        self.intersection_types.as_ref().is_some_and(|v| !v.is_empty())
-    }
-
-    fn add_intersection_type(&mut self, intersection_type: TAtomic) -> bool {
-        if let Some(intersection_types) = self.intersection_types.as_mut() {
-            intersection_types.push(intersection_type);
-        } else {
-            self.intersection_types = Some(vec![intersection_type]);
-        }
-
-        true
-    }
-
-    fn get_id(&self) -> Word {
-        let mut result = concat_word!(b"has-method<'", self.method, b"'>");
-
-        if let Some(intersection_types) = self.get_intersection_types() {
-            for atomic in intersection_types {
-                let atomic_id = atomic.get_id();
-
-                result = if atomic.has_intersection_types() {
-                    concat_word!(result, b"&(", atomic_id, b")")
-                } else {
-                    concat_word!(result, b"&", atomic_id)
-                };
-            }
-        }
-
-        result
-    }
-
-    fn get_pretty_id_with_indent(&self, indent: usize) -> Word {
-        let mut result = concat_word!(b"has-method<'", self.method, b"'>");
-
-        if let Some(intersection_types) = self.get_intersection_types() {
-            for atomic in intersection_types {
-                let atomic_id = atomic.get_pretty_id_with_indent(indent);
-
-                result = if atomic.has_intersection_types() {
-                    concat_word!(result, b"&(", atomic_id, b")")
-                } else {
-                    concat_word!(result, b"&", atomic_id)
-                };
-            }
-        }
-
-        result
-    }
-}
+has_member_ttype_impl!(TObjectHasMethod, method, b"has-method<'");

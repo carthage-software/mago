@@ -47,6 +47,32 @@ use crate::ttype::union::TUnion;
 use crate::ttype::wrap_atomic;
 use crate::ttype::*;
 
+fn get_nullable_union_from_type(
+    inner: &Type<'_>,
+    scope: &NamespaceScope,
+    type_context: &TypeResolutionContext,
+    classname: Option<Word>,
+) -> Result<TUnion, TypeError> {
+    Ok(match inner {
+        Type::Null(_) => get_null(),
+        Type::String(_) => get_nullable_string(),
+        Type::Int(_) => get_nullable_int(),
+        Type::Float(_) => get_nullable_float(),
+        Type::Object(object) if object.properties.is_none() => get_nullable_object(),
+        Type::Scalar(_) => get_nullable_scalar(),
+        _ => get_union_from_type(inner, scope, type_context, classname)?.as_nullable(),
+    })
+}
+
+fn get_non_empty_string_intersection(other: &Type<'_>) -> Option<TUnion> {
+    match other {
+        Type::String(_) | Type::NonEmptyString(_) => Some(get_non_empty_string()),
+        Type::LowercaseString(_) | Type::NonEmptyLowercaseString(_) => Some(get_non_empty_lowercase_string()),
+        Type::UppercaseString(_) | Type::NonEmptyUppercaseString(_) => Some(get_non_empty_uppercase_string()),
+        _ => None,
+    }
+}
+
 /// Converts a parsed `PHPDoc` type node into a semantic `TUnion` type representation,
 /// resolving names, templates, and keywords into their semantic counterparts.
 ///
@@ -81,33 +107,15 @@ pub fn get_union_from_type(
         Type::Parenthesized(parenthesized_type) => {
             get_union_from_type(parenthesized_type.inner, scope, type_context, classname)?
         }
-        Type::Nullable(nullable_type) => match nullable_type.inner {
-            Type::Null(_) => get_null(),
-            Type::String(_) => get_nullable_string(),
-            Type::Int(_) => get_nullable_int(),
-            Type::Float(_) => get_nullable_float(),
-            Type::Object(object) if object.properties.is_none() => get_nullable_object(),
-            Type::Scalar(_) => get_nullable_scalar(),
-            _ => get_union_from_type(nullable_type.inner, scope, type_context, classname)?.as_nullable(),
-        },
-        Type::Union(UnionType { left, right, .. }) if matches!(**left, Type::Null(_)) => match *right {
-            Type::Null(_) => get_null(),
-            Type::String(_) => get_nullable_string(),
-            Type::Int(_) => get_nullable_int(),
-            Type::Float(_) => get_nullable_float(),
-            Type::Object(object) if object.properties.is_none() => get_nullable_object(),
-            Type::Scalar(_) => get_nullable_scalar(),
-            _ => get_union_from_type(right, scope, type_context, classname)?.as_nullable(),
-        },
-        Type::Union(UnionType { left, right, .. }) if matches!(**right, Type::Null(_)) => match *left {
-            Type::Null(_) => get_null(),
-            Type::String(_) => get_nullable_string(),
-            Type::Int(_) => get_nullable_int(),
-            Type::Float(_) => get_nullable_float(),
-            Type::Object(object) if object.properties.is_none() => get_nullable_object(),
-            Type::Scalar(_) => get_nullable_scalar(),
-            _ => get_union_from_type(left, scope, type_context, classname)?.as_nullable(),
-        },
+        Type::Nullable(nullable_type) => {
+            get_nullable_union_from_type(nullable_type.inner, scope, type_context, classname)?
+        }
+        Type::Union(UnionType { left, right, .. }) if matches!(**left, Type::Null(_)) => {
+            get_nullable_union_from_type(right, scope, type_context, classname)?
+        }
+        Type::Union(UnionType { left, right, .. }) if matches!(**right, Type::Null(_)) => {
+            get_nullable_union_from_type(left, scope, type_context, classname)?
+        }
         Type::Union(union_type) => {
             let left = get_union_from_type(union_type.left, scope, type_context, classname)?;
             let right = get_union_from_type(union_type.right, scope, type_context, classname)?;
@@ -117,28 +125,16 @@ pub fn get_union_from_type(
             TUnion::from_vec(combined_types)
         }
         Type::Intersection(intersection) => {
-            if matches!(intersection.left, Type::NonEmptyString(_)) {
-                match intersection.right {
-                    Type::String(_) => return Ok(get_non_empty_string()),
-                    Type::NonEmptyString(_) => return Ok(get_non_empty_string()),
-                    Type::LowercaseString(_) => return Ok(get_non_empty_lowercase_string()),
-                    Type::NonEmptyLowercaseString(_) => return Ok(get_non_empty_lowercase_string()),
-                    Type::UppercaseString(_) => return Ok(get_non_empty_uppercase_string()),
-                    Type::NonEmptyUppercaseString(_) => return Ok(get_non_empty_uppercase_string()),
-                    _ => {}
-                }
+            if matches!(intersection.left, Type::NonEmptyString(_))
+                && let Some(string_union) = get_non_empty_string_intersection(intersection.right)
+            {
+                return Ok(string_union);
             }
 
-            if matches!(intersection.right, Type::NonEmptyString(_)) {
-                match intersection.left {
-                    Type::String(_) => return Ok(get_non_empty_string()),
-                    Type::NonEmptyString(_) => return Ok(get_non_empty_string()),
-                    Type::LowercaseString(_) => return Ok(get_non_empty_lowercase_string()),
-                    Type::NonEmptyLowercaseString(_) => return Ok(get_non_empty_lowercase_string()),
-                    Type::UppercaseString(_) => return Ok(get_non_empty_uppercase_string()),
-                    Type::NonEmptyUppercaseString(_) => return Ok(get_non_empty_uppercase_string()),
-                    _ => {}
-                }
+            if matches!(intersection.right, Type::NonEmptyString(_))
+                && let Some(string_union) = get_non_empty_string_intersection(intersection.left)
+            {
+                return Ok(string_union);
             }
 
             let object_and_callable = (matches!(intersection.left, Type::Object(_))
@@ -272,36 +268,14 @@ pub fn get_union_from_type(
             return Err(TypeError::UnsupportedType(ttype.to_string(), ttype.span()));
         }
         Type::MemberReference(member_reference) => {
-            let class_like_name = match &member_reference.kind {
-                ReferenceKind::Self_(_) | ReferenceKind::Static(_) => {
-                    let Some(classname) = classname else {
-                        return Err(TypeError::InvalidType(
-                            ttype.to_string(),
-                            "Cannot resolve `self` type reference outside of a class context".to_string(),
-                            member_reference.span(),
-                        ));
-                    };
-
-                    classname
-                }
-                ReferenceKind::Identifier(identifier) if identifier.value.eq(b"this") => {
-                    let Some(classname) = classname else {
-                        return Err(TypeError::InvalidType(
-                            ttype.to_string(),
-                            "Cannot resolve `self` type reference outside of a class context".to_string(),
-                            member_reference.span(),
-                        ));
-                    };
-
-                    classname
-                }
-                ReferenceKind::Parent(_) => word("parent"),
-                ReferenceKind::Identifier(identifier) => {
-                    let (class_like_name, _) = scope.resolve(NameKind::Default, identifier.value);
-
-                    word(&class_like_name)
-                }
-            };
+            let class_like_name = get_reference_class_name(
+                &member_reference.kind,
+                scope,
+                classname,
+                ttype,
+                member_reference.span(),
+                false,
+            )?;
 
             let member_selector = match member_reference.member {
                 MemberReferenceSelector::Wildcard(_) => TReferenceMemberSelector::Wildcard,
@@ -331,36 +305,14 @@ pub fn get_union_from_type(
             wrap_atomic(TAtomic::Reference(TReference::Global { selector }))
         }
         Type::AliasReference(alias_reference) => {
-            let class_like_name = match &alias_reference.class {
-                ReferenceKind::Self_(_) | ReferenceKind::Static(_) => {
-                    let Some(classname) = classname else {
-                        return Err(TypeError::InvalidType(
-                            ttype.to_string(),
-                            "Cannot resolve `self` type reference outside of a class context".to_string(),
-                            alias_reference.span(),
-                        ));
-                    };
-
-                    classname
-                }
-                ReferenceKind::Identifier(identifier) if identifier.value.eq(b"this") => {
-                    let Some(classname) = classname else {
-                        return Err(TypeError::InvalidType(
-                            ttype.to_string(),
-                            "Cannot resolve `self` type reference outside of a class context".to_string(),
-                            alias_reference.span(),
-                        ));
-                    };
-
-                    classname
-                }
-                ReferenceKind::Parent(_) => word("parent"),
-                ReferenceKind::Identifier(identifier) => {
-                    let (class_like_name, _) = scope.resolve(NameKind::Default, identifier.value);
-
-                    ascii_lowercase_word(&class_like_name)
-                }
-            };
+            let class_like_name = get_reference_class_name(
+                &alias_reference.class,
+                scope,
+                classname,
+                ttype,
+                alias_reference.span(),
+                true,
+            )?;
 
             let alias_name = match alias_reference.alias {
                 AliasName::Identifier(identifier) => word(identifier.value),
@@ -557,31 +509,18 @@ pub fn get_union_from_type(
             ))))
         }
         Type::PropertiesOf(properties_of_type) => {
+            let target_type = Arc::new(get_union_from_type(
+                &properties_of_type.parameter.entry.inner,
+                scope,
+                type_context,
+                classname,
+            )?);
+
             TUnion::from_atomic(TAtomic::Derived(TDerived::PropertiesOf(match properties_of_type.filter {
-                PropertiesOfFilter::All => TPropertiesOf::new(Arc::new(get_union_from_type(
-                    &properties_of_type.parameter.entry.inner,
-                    scope,
-                    type_context,
-                    classname,
-                )?)),
-                PropertiesOfFilter::Public => TPropertiesOf::public(Arc::new(get_union_from_type(
-                    &properties_of_type.parameter.entry.inner,
-                    scope,
-                    type_context,
-                    classname,
-                )?)),
-                PropertiesOfFilter::Protected => TPropertiesOf::protected(Arc::new(get_union_from_type(
-                    &properties_of_type.parameter.entry.inner,
-                    scope,
-                    type_context,
-                    classname,
-                )?)),
-                PropertiesOfFilter::Private => TPropertiesOf::private(Arc::new(get_union_from_type(
-                    &properties_of_type.parameter.entry.inner,
-                    scope,
-                    type_context,
-                    classname,
-                )?)),
+                PropertiesOfFilter::All => TPropertiesOf::new(target_type),
+                PropertiesOfFilter::Public => TPropertiesOf::public(target_type),
+                PropertiesOfFilter::Protected => TPropertiesOf::protected(target_type),
+                PropertiesOfFilter::Private => TPropertiesOf::private(target_type),
             })))
         }
         Type::IndexAccess(index_access_type) => {
@@ -594,6 +533,59 @@ pub fn get_union_from_type(
             return Err(TypeError::UnsupportedType(ttype.to_string(), ttype.span()));
         }
     })
+}
+
+fn get_reference_class_name(
+    kind: &ReferenceKind<'_>,
+    scope: &NamespaceScope,
+    classname: Option<Word>,
+    ttype: &Type<'_>,
+    reference_span: Span,
+    lowercase_resolved_identifier: bool,
+) -> Result<Word, TypeError> {
+    let require_classname = || {
+        classname.ok_or_else(|| {
+            TypeError::InvalidType(
+                ttype.to_string(),
+                "Cannot resolve `self` type reference outside of a class context".to_string(),
+                reference_span,
+            )
+        })
+    };
+
+    Ok(match kind {
+        ReferenceKind::Self_(_) | ReferenceKind::Static(_) => require_classname()?,
+        ReferenceKind::Identifier(identifier) if identifier.value.eq(b"this") => require_classname()?,
+        ReferenceKind::Parent(_) => word("parent"),
+        ReferenceKind::Identifier(identifier) => {
+            let (class_like_name, _) = scope.resolve(NameKind::Default, identifier.value);
+
+            if lowercase_resolved_identifier { ascii_lowercase_word(&class_like_name) } else { word(&class_like_name) }
+        }
+    })
+}
+
+fn get_array_key_from_shape_key(key: &ShapeKey<'_>, scope: &NamespaceScope, classname: Option<Word>) -> ArrayKey {
+    match key {
+        ShapeKey::String { value, .. } => ArrayKey::String(word(value)),
+        ShapeKey::Integer { value, .. } => ArrayKey::Integer(*value),
+        ShapeKey::ClassLikeConstant { class_name, constant_name, .. } => {
+            let class_like_name = if class_name.value.eq_ignore_ascii_case(b"self")
+                || class_name.value.eq_ignore_ascii_case(b"static")
+                || class_name.value.eq(b"this")
+                || class_name.value.eq(b"$this")
+            {
+                classname.unwrap_or_else(|| word(class_name.value))
+            } else if class_name.value.eq_ignore_ascii_case(b"parent") {
+                word("parent")
+            } else {
+                let (resolved, _) = scope.resolve(NameKind::Default, class_name.value);
+                word(&resolved)
+            };
+
+            ArrayKey::ClassLikeConstant { class_like_name, constant_name: word(constant_name.value) }
+        }
+    }
 }
 
 fn create_deferred_intersection(atomic: TAtomic) -> Option<TAtomic> {
@@ -678,26 +670,7 @@ fn get_shape_from_type(
                 let field_is_optional = field.is_optional();
 
                 let offset = if let Some(field_key) = field.key.as_ref() {
-                    let array_key = match field_key.key {
-                        ShapeKey::String { value, .. } => ArrayKey::String(word(value)),
-                        ShapeKey::Integer { value, .. } => ArrayKey::Integer(value),
-                        ShapeKey::ClassLikeConstant { class_name, constant_name, .. } => {
-                            let class_like_name = if class_name.value.eq_ignore_ascii_case(b"self")
-                                || class_name.value.eq_ignore_ascii_case(b"static")
-                                || class_name.value.eq(b"this")
-                                || class_name.value.eq(b"$this")
-                            {
-                                classname.unwrap_or_else(|| word(class_name.value))
-                            } else if class_name.value.eq_ignore_ascii_case(b"parent") {
-                                word("parent")
-                            } else {
-                                let (resolved, _) = scope.resolve(NameKind::Default, class_name.value);
-                                word(&resolved)
-                            };
-
-                            ArrayKey::ClassLikeConstant { class_like_name, constant_name: word(constant_name.value) }
-                        }
-                    };
+                    let array_key = get_array_key_from_shape_key(&field_key.key, scope, classname);
 
                     if let ArrayKey::Integer(offset) = array_key {
                         if offset > 0 && (offset as usize) == next_offset {
@@ -770,26 +743,7 @@ fn get_shape_from_type(
                 let field_is_optional = field.is_optional();
 
                 let array_key = if let Some(field_key) = field.key.as_ref() {
-                    let array_key = match field_key.key {
-                        ShapeKey::String { value, .. } => ArrayKey::String(word(value)),
-                        ShapeKey::Integer { value, .. } => ArrayKey::Integer(value),
-                        ShapeKey::ClassLikeConstant { class_name, constant_name, .. } => {
-                            let class_like_name = if class_name.value.eq_ignore_ascii_case(b"self")
-                                || class_name.value.eq_ignore_ascii_case(b"static")
-                                || class_name.value.eq(b"this")
-                                || class_name.value.eq(b"$this")
-                            {
-                                classname.unwrap_or_else(|| word(class_name.value))
-                            } else if class_name.value.eq_ignore_ascii_case(b"parent") {
-                                word("parent")
-                            } else {
-                                let (resolved, _) = scope.resolve(NameKind::Default, class_name.value);
-                                word(&resolved)
-                            };
-
-                            ArrayKey::ClassLikeConstant { class_like_name, constant_name: word(constant_name.value) }
-                        }
-                    };
+                    let array_key = get_array_key_from_shape_key(&field_key.key, scope, classname);
 
                     if let ArrayKey::Integer(offset) = array_key
                         && offset >= next_offset

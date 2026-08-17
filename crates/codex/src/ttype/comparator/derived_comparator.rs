@@ -36,25 +36,21 @@ pub fn is_contained_by(
         };
 
         return match (derived_container, derived_input) {
-            (TDerived::KeyOf(key_of_container), TDerived::KeyOf(key_of_input)) => union_comparator::is_contained_by(
-                codebase,
-                key_of_input.get_target_type(),
-                key_of_container.get_target_type(),
-                false,
-                false,
-                inside_assertion,
-                atomic_comparison_result,
-            ),
-            (TDerived::ValueOf(value_of_container), TDerived::ValueOf(value_of_input)) => {
-                union_comparator::is_contained_by(
-                    codebase,
-                    value_of_input.get_target_type(),
-                    value_of_container.get_target_type(),
-                    false,
-                    false,
-                    inside_assertion,
-                    atomic_comparison_result,
-                )
+            (TDerived::KeyOf(_), TDerived::KeyOf(_))
+            | (TDerived::ValueOf(_), TDerived::ValueOf(_))
+            | (TDerived::PropertiesOf(_), TDerived::PropertiesOf(_)) => {
+                match (derived_input.get_target_type(), derived_container.get_target_type()) {
+                    (Some(input_target), Some(container_target)) => union_comparator::is_contained_by(
+                        codebase,
+                        input_target,
+                        container_target,
+                        false,
+                        false,
+                        inside_assertion,
+                        atomic_comparison_result,
+                    ),
+                    _ => false,
+                }
             }
             (TDerived::IndexAccess(index_access_container), TDerived::IndexAccess(index_access_input)) => {
                 let container_indexed = TIndexAccess::get_indexed_access_result(
@@ -96,17 +92,6 @@ pub fn is_contained_by(
                     }
                     _ => false,
                 }
-            }
-            (TDerived::PropertiesOf(properties_of_container), TDerived::PropertiesOf(properties_of_input)) => {
-                union_comparator::is_contained_by(
-                    codebase,
-                    properties_of_input.get_target_type(),
-                    properties_of_container.get_target_type(),
-                    false,
-                    false,
-                    inside_assertion,
-                    atomic_comparison_result,
-                )
             }
             _ => false,
         };

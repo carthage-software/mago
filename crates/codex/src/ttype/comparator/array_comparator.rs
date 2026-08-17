@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::collections::BTreeMap;
 
 use crate::metadata::CodebaseMetadata;
 use crate::ttype::atomic::TAtomic;
@@ -9,20 +10,47 @@ use crate::ttype::atomic::scalar::int::TInteger;
 use crate::ttype::comparator::ComparisonResult;
 use crate::ttype::comparator::union_comparator;
 use crate::ttype::get_never;
+use crate::ttype::union::TUnion;
 use crate::ttype::wrap_atomic;
 
-pub(crate) fn is_contained_by(
-    codebase: &CodebaseMetadata,
-    input_type_part: &TAtomic,
-    container_type_part: &TAtomic,
-    inside_assertion: bool,
-    atomic_comparison_result: &mut ComparisonResult,
-) -> bool {
-    let (TAtomic::Array(input_array), TAtomic::Array(container_array)) = (input_type_part, container_type_part) else {
-        return false;
-    };
+fn has_required_known_entry(array: &TArray) -> bool {
+    match array {
+        TArray::List(list) => {
+            list.known_elements.as_ref().is_some_and(|elements| elements.values().any(|(is_optional, _)| !*is_optional))
+        }
+        TArray::Keyed(keyed_array) => {
+            keyed_array.known_items.as_ref().is_some_and(|items| items.values().any(|(is_optional, _)| !*is_optional))
+        }
+    }
+}
 
-    is_array_contained_by_array(codebase, input_array, container_array, inside_assertion, atomic_comparison_result)
+fn key_and_value_types(array: &TArray) -> (Option<Cow<'_, TUnion>>, Cow<'_, TUnion>) {
+    match array {
+        TArray::List(list) => (
+            Some(Cow::Owned(wrap_atomic(TAtomic::Scalar(TScalar::Integer(TInteger::non_negative()))))),
+            Cow::Borrowed(list.element_type.as_ref()),
+        ),
+        TArray::Keyed(keyed_array) => match &keyed_array.parameters {
+            Some((key_type, value_type)) => {
+                (Some(Cow::Borrowed(key_type.as_ref())), Cow::Borrowed(value_type.as_ref()))
+            }
+            None => (None, Cow::Owned(get_never())),
+        },
+    }
+}
+
+fn known_items_view(array: &TArray) -> Option<Cow<'_, BTreeMap<ArrayKey, (bool, TUnion)>>> {
+    match array {
+        TArray::Keyed(keyed_array) => keyed_array.known_items.as_ref().map(Cow::Borrowed),
+        TArray::List(list) => list.known_elements.as_ref().map(|elements| {
+            Cow::Owned(
+                elements
+                    .iter()
+                    .map(|(index, value_tuple)| (ArrayKey::Integer(*index as i64), value_tuple.clone()))
+                    .collect(),
+            )
+        }),
+    }
 }
 
 pub(crate) fn is_array_contained_by_array(
@@ -36,129 +64,25 @@ pub(crate) fn is_array_contained_by_array(
         return false;
     }
 
-    if container_array.is_non_empty() && !input_array.is_non_empty() {
-        let input_has_required_key = match input_array {
-            TArray::List(list) => list
-                .known_elements
-                .as_ref()
-                .is_some_and(|elements| elements.values().any(|(is_optional, _)| !*is_optional)),
-            TArray::Keyed(keyed_array) => keyed_array
-                .known_items
-                .as_ref()
-                .is_some_and(|items| items.values().any(|(is_optional, _)| !*is_optional)),
-        };
-
-        if !input_has_required_key {
-            return false;
-        }
+    if container_array.is_non_empty() && !input_array.is_non_empty() && !has_required_known_entry(input_array) {
+        return false;
     }
 
     if input_array.is_empty() {
-        match container_array {
-            TArray::List(list) => {
-                if list.non_empty {
-                    return false;
-                }
-
-                let Some(known_elements) = &list.known_elements else {
-                    return true;
-                };
-
-                for (is_optional, _) in known_elements.values() {
-                    if !*is_optional {
-                        return false;
-                    }
-                }
-            }
-            TArray::Keyed(keyed_array) => {
-                if keyed_array.non_empty {
-                    return false;
-                }
-
-                let Some(known_items) = &keyed_array.known_items else {
-                    return true;
-                };
-
-                for (is_optional, _) in known_items.values() {
-                    if !*is_optional {
-                        return false;
-                    }
-                }
-            }
-        }
-
-        return true;
+        return !container_array.is_non_empty() && !has_required_known_entry(container_array);
     }
 
-    let container_key_type;
-    let container_value_type;
-    match container_array {
-        TArray::List(list) => {
-            container_key_type =
-                Some(Cow::Owned(wrap_atomic(TAtomic::Scalar(TScalar::Integer(TInteger::non_negative())))));
-            container_value_type = Cow::Borrowed(list.element_type.as_ref());
-        }
-
-        TArray::Keyed(keyed_array) => {
-            if let Some((k, v)) = &keyed_array.parameters {
-                container_key_type = Some(Cow::Borrowed(k.as_ref()));
-                container_value_type = Cow::Borrowed(v.as_ref());
-            } else {
-                container_key_type = None;
-                container_value_type = Cow::Owned(get_never());
-            }
-        }
+    if container_array.is_list()
+        && matches!(input_array, TArray::Keyed(keyed_array) if keyed_array.parameters.is_some())
+    {
+        return false;
     }
 
-    let input_key_type;
-    let input_value_type;
-    match input_array {
-        TArray::List(list) => {
-            input_key_type = Some(Cow::Owned(wrap_atomic(TAtomic::Scalar(TScalar::Integer(TInteger::non_negative())))));
-            input_value_type = Cow::Borrowed(list.element_type.as_ref());
-        }
-        TArray::Keyed(keyed_array) => {
-            if let Some((k, v)) = &keyed_array.parameters {
-                if container_array.is_list() {
-                    return false; // A keyed array cannot be contained by a list.
-                }
+    let (container_key_type, container_value_type) = key_and_value_types(container_array);
+    let (input_key_type, input_value_type) = key_and_value_types(input_array);
 
-                input_key_type = Some(Cow::Borrowed(k.as_ref()));
-                input_value_type = Cow::Borrowed(v.as_ref());
-            } else {
-                input_key_type = None;
-                input_value_type = Cow::Owned(get_never());
-            }
-        }
-    }
-
-    let input_known_items_cow = if let TArray::Keyed(input_keyed) = input_array {
-        input_keyed.known_items.as_ref().map(Cow::Borrowed)
-    } else if let TArray::List(input_list) = input_array {
-        input_list.known_elements.as_ref().map(|elements| {
-            let keyed_view = elements
-                .iter()
-                .map(|(index, value_tuple)| (ArrayKey::Integer(*index as i64), value_tuple.clone()))
-                .collect();
-            Cow::Owned(keyed_view)
-        })
-    } else {
-        None
-    };
-
-    let container_known_items = if let TArray::Keyed(container_keyed) = container_array {
-        container_keyed.known_items.as_ref().map(Cow::Borrowed)
-    } else if let TArray::List(container_list) = container_array {
-        container_list.known_elements.as_ref().map(|elements| {
-            let keyed_view = elements
-                .iter()
-                .map(|(index, value_tuple)| (ArrayKey::Integer(*index as i64), value_tuple.clone()))
-                .collect();
-            Cow::Owned(keyed_view)
-        })
-    } else {
-        None
-    };
+    let input_known_items_cow = known_items_view(input_array);
+    let container_known_items = known_items_view(container_array);
 
     if let Some(input_known_items) = &input_known_items_cow {
         for (input_key, (input_is_optional, input_item_value_type)) in input_known_items.iter() {

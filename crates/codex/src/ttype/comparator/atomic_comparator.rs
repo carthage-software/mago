@@ -1,3 +1,5 @@
+use std::sync::Arc;
+
 use mago_word::concat_word;
 use mago_word::word;
 
@@ -9,7 +11,6 @@ use crate::ttype::atomic::array::TArray;
 use crate::ttype::atomic::array::keyed::TKeyedArray;
 use crate::ttype::atomic::callable::TCallable;
 use crate::ttype::atomic::generic::TGenericParameter;
-use crate::ttype::atomic::iterable::TIterable;
 use crate::ttype::atomic::object::TObject;
 use crate::ttype::atomic::object::r#enum::TEnum;
 use crate::ttype::atomic::object::named::TNamedObject;
@@ -28,6 +29,7 @@ use crate::ttype::comparator::object_comparator;
 use crate::ttype::comparator::resource_comparator;
 use crate::ttype::comparator::scalar_comparator;
 use crate::ttype::comparator::union_comparator;
+use crate::ttype::union::TUnion;
 
 use super::iterable_comparator;
 
@@ -268,13 +270,13 @@ pub fn is_contained_by(
         return resource_comparator::is_contained_by(input_type_part, container_type_part);
     }
 
-    if let TAtomic::Array(_) = container_type_part
-        && let TAtomic::Array(_) = input_type_part
+    if let TAtomic::Array(container_array) = container_type_part
+        && let TAtomic::Array(input_array) = input_type_part
     {
-        return array_comparator::is_contained_by(
+        return array_comparator::is_array_contained_by_array(
             codebase,
-            input_type_part,
-            container_type_part,
+            input_array,
+            container_array,
             inside_assertion,
             atomic_comparison_result,
         );
@@ -446,14 +448,6 @@ pub fn is_contained_by(
     if let TAtomic::GenericParameter(container_generic) = container_type_part
         && let TAtomic::GenericParameter(input_generic) = input_type_part
     {
-        if inside_assertion
-            && (input_generic.parameter_name != container_generic.parameter_name
-                || input_generic.defining_entity != container_generic.defining_entity)
-            && !is_forwarded_template_parameter(codebase, input_generic, container_generic)
-        {
-            return false;
-        }
-
         return union_comparator::is_contained_by(
             codebase,
             &input_generic.constraint,
@@ -495,66 +489,20 @@ pub fn is_contained_by(
         return true;
     }
 
-    if matches!(input_type_part, TAtomic::Object(TObject::Any))
-        && matches!(container_type_part, TAtomic::Object(TObject::Any))
-    {
-        return true;
-    }
-
     if let TAtomic::GenericParameter(TGenericParameter { constraint: container_constraint, .. }) = container_type_part {
-        for container_extends_type_part in container_constraint.types.iter() {
-            if inside_assertion
-                && is_contained_by(
+        return inside_assertion
+            && container_constraint.types.iter().any(|container_extends_type_part| {
+                is_contained_by(
                     codebase,
                     input_type_part,
                     container_extends_type_part,
                     inside_assertion,
                     atomic_comparison_result,
                 )
-            {
-                return true;
-            }
-        }
-
-        return false;
+            });
     }
 
-    if let TAtomic::Iterable(TIterable { intersection_types: input_intersection_types, .. }) = input_type_part
-        && let Some(input_intersection_types) = input_intersection_types
-    {
-        for input_intersection_type in input_intersection_types {
-            if is_contained_by(
-                codebase,
-                input_intersection_type,
-                container_type_part,
-                inside_assertion,
-                atomic_comparison_result,
-            ) {
-                return true;
-            }
-        }
-    }
-
-    if let TAtomic::GenericParameter(TGenericParameter {
-        intersection_types: input_intersection_types,
-        constraint: input_constraint,
-        ..
-    }) = input_type_part
-    {
-        if let Some(input_intersection_types) = input_intersection_types {
-            for input_intersection_type in input_intersection_types {
-                if is_contained_by(
-                    codebase,
-                    input_intersection_type,
-                    container_type_part,
-                    inside_assertion,
-                    atomic_comparison_result,
-                ) {
-                    return true;
-                }
-            }
-        }
-
+    if let TAtomic::GenericParameter(TGenericParameter { constraint: input_constraint, .. }) = input_type_part {
         for input_constraint_part in input_constraint.types.iter() {
             if matches!(input_constraint_part, TAtomic::Null) && matches!(container_type_part, TAtomic::Null) {
                 continue;
@@ -635,16 +583,9 @@ pub(crate) fn can_be_identical(
         };
     }
 
-    if matches!(first_part, TAtomic::Callable(_))
-        && !matches!(second_part, TAtomic::Callable(_))
-        && second_part.can_be_callable()
-    {
-        return true;
-    }
-
-    if matches!(second_part, TAtomic::Callable(_))
-        && !matches!(first_part, TAtomic::Callable(_))
+    if matches!(first_part, TAtomic::Callable(_)) != matches!(second_part, TAtomic::Callable(_))
         && first_part.can_be_callable()
+        && second_part.can_be_callable()
     {
         return true;
     }
@@ -892,6 +833,50 @@ fn strings_can_be_identical(lhs: &TString, rhs: &TString) -> bool {
     true
 }
 
+fn entry_can_match_parameters(
+    codebase: &CodebaseMetadata,
+    entry: &(bool, TUnion),
+    parameters: Option<&(Arc<TUnion>, Arc<TUnion>)>,
+    inside_assertion: bool,
+) -> bool {
+    match parameters {
+        Some(parameters) => union_comparator::can_expression_types_be_identical(
+            codebase,
+            &entry.1,
+            &parameters.1,
+            inside_assertion,
+            false,
+        ),
+        None => entry.0,
+    }
+}
+
+fn parameters_can_be_identical(
+    codebase: &CodebaseMetadata,
+    first_array: &TKeyedArray,
+    second_array: &TKeyedArray,
+    inside_assertion: bool,
+) -> bool {
+    match (&first_array.parameters, &second_array.parameters) {
+        (Some(first_parameters), Some(second_parameters)) => {
+            union_comparator::can_expression_types_be_identical(
+                codebase,
+                &first_parameters.0,
+                &second_parameters.0,
+                inside_assertion,
+                false,
+            ) && union_comparator::can_expression_types_be_identical(
+                codebase,
+                &first_parameters.1,
+                &second_parameters.1,
+                inside_assertion,
+                false,
+            )
+        }
+        _ => true,
+    }
+}
+
 fn keyed_arrays_can_be_identical(
     first_array: &TKeyedArray,
     second_array: &TKeyedArray,
@@ -899,24 +884,7 @@ fn keyed_arrays_can_be_identical(
     inside_assertion: bool,
 ) -> bool {
     if first_array.non_empty || second_array.non_empty {
-        return match (&first_array.parameters, &second_array.parameters) {
-            (None | Some(_), None) | (None, Some(_)) => true,
-            (Some(first_parameters), Some(second_parameters)) => {
-                union_comparator::can_expression_types_be_identical(
-                    codebase,
-                    &first_parameters.0,
-                    &second_parameters.0,
-                    inside_assertion,
-                    false,
-                ) && union_comparator::can_expression_types_be_identical(
-                    codebase,
-                    &first_parameters.1,
-                    &second_parameters.1,
-                    inside_assertion,
-                    false,
-                )
-            }
-        };
+        return parameters_can_be_identical(codebase, first_array, second_array, inside_assertion);
     }
 
     match (&first_array.known_items, &second_array.known_items) {
@@ -938,32 +906,22 @@ fn keyed_arrays_can_be_identical(
                         }
                     }
                     (Some(first_entry), None) => {
-                        if let Some(second_parameters) = &second_array.parameters {
-                            if !union_comparator::can_expression_types_be_identical(
-                                codebase,
-                                &first_entry.1,
-                                &second_parameters.1,
-                                inside_assertion,
-                                false,
-                            ) {
-                                return false;
-                            }
-                        } else if !first_entry.0 {
+                        if !entry_can_match_parameters(
+                            codebase,
+                            first_entry,
+                            second_array.parameters.as_ref(),
+                            inside_assertion,
+                        ) {
                             return false;
                         }
                     }
                     (None, Some(second_entry)) => {
-                        if let Some(first_parameters) = &first_array.parameters {
-                            if !union_comparator::can_expression_types_be_identical(
-                                codebase,
-                                &first_parameters.1,
-                                &second_entry.1,
-                                inside_assertion,
-                                false,
-                            ) {
-                                return false;
-                            }
-                        } else if !second_entry.0 {
+                        if !entry_can_match_parameters(
+                            codebase,
+                            second_entry,
+                            first_array.parameters.as_ref(),
+                            inside_assertion,
+                        ) {
                             return false;
                         }
                     }
@@ -976,34 +934,24 @@ fn keyed_arrays_can_be_identical(
         }
         (Some(first_known_items), None) => {
             for first_entry in first_known_items.values() {
-                if let Some(second_parameters) = &second_array.parameters {
-                    if !union_comparator::can_expression_types_be_identical(
-                        codebase,
-                        &first_entry.1,
-                        &second_parameters.1,
-                        inside_assertion,
-                        false,
-                    ) {
-                        return false;
-                    }
-                } else if !first_entry.0 {
+                if !entry_can_match_parameters(
+                    codebase,
+                    first_entry,
+                    second_array.parameters.as_ref(),
+                    inside_assertion,
+                ) {
                     return false;
                 }
             }
         }
         (None, Some(second_known_items)) => {
             for second_entry in second_known_items.values() {
-                if let Some(first_parameters) = &first_array.parameters {
-                    if !union_comparator::can_expression_types_be_identical(
-                        codebase,
-                        &first_parameters.1,
-                        &second_entry.1,
-                        inside_assertion,
-                        false,
-                    ) {
-                        return false;
-                    }
-                } else if !second_entry.0 {
+                if !entry_can_match_parameters(
+                    codebase,
+                    second_entry,
+                    first_array.parameters.as_ref(),
+                    inside_assertion,
+                ) {
                     return false;
                 }
             }
@@ -1011,24 +959,7 @@ fn keyed_arrays_can_be_identical(
         _ => {}
     }
 
-    match (&first_array.parameters, &second_array.parameters) {
-        (None | Some(_), None) | (None, Some(_)) => true,
-        (Some(first_parameters), Some(second_parameters)) => {
-            union_comparator::can_expression_types_be_identical(
-                codebase,
-                &first_parameters.0,
-                &second_parameters.0,
-                inside_assertion,
-                false,
-            ) && union_comparator::can_expression_types_be_identical(
-                codebase,
-                &first_parameters.1,
-                &second_parameters.1,
-                inside_assertion,
-                false,
-            )
-        }
-    }
+    parameters_can_be_identical(codebase, first_array, second_array, inside_assertion)
 }
 
 #[cfg(test)]

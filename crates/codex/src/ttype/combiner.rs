@@ -617,18 +617,8 @@ fn scrape_type_properties(
         std::mem::swap(&mut sealed_arrays, &mut combination.sealed_arrays);
         for array in std::iter::once(array).chain(sealed_arrays) {
             match array {
-                TArray::List(TList { element_type, known_elements, non_empty, known_count }) => {
-                    if non_empty {
-                        if let Some(ref mut existing_counts) = combination.list_array_counts {
-                            if let Some(known_count) = known_count {
-                                existing_counts.insert(known_count);
-                            } else {
-                                combination.list_array_counts = None;
-                            }
-                        }
-
-                        combination.flags.insert(CombinationFlags::LIST_ARRAY_SOMETIMES_FILLED);
-                    } else {
+                TArray::List(TList { element_type, known_elements, non_empty, known_count: _ }) => {
+                    if !non_empty {
                         combination.flags.remove(CombinationFlags::LIST_ARRAY_ALWAYS_FILLED);
                     }
 
