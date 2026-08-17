@@ -12,7 +12,7 @@ namespace Mago\Sdk\Analyzer;
 interface CodebaseScanHook
 {
     /**
-     * @return non-empty-list<SourceFileTarget>
+     * @return non-empty-list<non-empty-string>
      */
     public function getTargets(): array;
 

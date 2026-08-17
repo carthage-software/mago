@@ -428,107 +428,8 @@ impl WorkerPool {
     /// restarted after failure. All coordinator threads are joined before the
     /// error is returned.
     pub fn broadcast(&self, payload: &[u8]) -> Result<Vec<Vec<u8>>, WorkerError> {
-        let trace_start = self.trace_enabled.then(Instant::now);
-        if self.state.load(Ordering::Acquire) != STATE_RUNNING {
-            tracing::trace!(payload_bytes = payload.len(), "Rejected extension broadcast while pool is shutting down.");
-            return Err(WorkerError::Unavailable);
-        }
-
-        let _initialization = lock(&self.growth);
-        if self.state.load(Ordering::Acquire) != STATE_RUNNING {
-            tracing::trace!(payload_bytes = payload.len(), "Rejected extension broadcast during pool finalization.");
-            return Err(WorkerError::Unavailable);
-        }
-        let active_workers = self.active_workers.load(Ordering::Acquire);
-        tracing::trace!(
-            workers = active_workers,
-            payload_bytes = payload.len(),
-            "Broadcasting extension initialization request."
-        );
-        let workers = (0..active_workers)
-            .map(|index| self.ensure_running(index).map(|worker| (index, worker)))
-            .collect::<Result<Vec<_>, _>>()?;
-
-        let results = std::thread::scope(|scope| {
-            workers
-                .into_iter()
-                .map(|(index, worker)| {
-                    (
-                        index,
-                        scope.spawn(move || {
-                            let reservation = worker.reserve();
-                            let result = reservation.worker().request(payload.to_vec());
-                            (reservation, result)
-                        }),
-                    )
-                })
-                .collect::<Vec<_>>()
-                .into_iter()
-                .map(|(index, handle)| (index, handle.join()))
-                .collect::<Vec<_>>()
-        });
-
-        let mut responses = vec![None; active_workers];
-        let mut first_error = None;
-        for (index, result) in results {
-            let Ok((reservation, result)) = result else {
-                first_error.get_or_insert(WorkerError::CoordinatorPanic { worker: index });
-                continue;
-            };
-
-            if let Err(error) = self.recover_if_needed(index, &reservation, &result) {
-                first_error.get_or_insert(error);
-            }
-
-            match result {
-                Ok(response) => responses[index] = Some(response),
-                Err(error) => {
-                    first_error.get_or_insert(error);
-                }
-            }
-        }
-
-        if let Some(error) = first_error {
-            if let Some(start) = trace_start {
-                self.telemetry.broadcasts.fetch_add(1, Ordering::Relaxed);
-                self.telemetry.broadcast_workers.fetch_add(active_workers as u64, Ordering::Relaxed);
-                self.telemetry.broadcast_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
-                tracing::trace!(
-                    workers = active_workers,
-                    payload_bytes = payload.len(),
-                    elapsed = ?start.elapsed(),
-                    error = %error,
-                    "Extension initialization broadcast failed."
-                );
-            }
-            return Err(error);
-        }
-
-        let responses = responses.into_iter().flatten().collect::<Vec<_>>();
-        let response_bytes = responses.iter().map(Vec::len).sum::<usize>();
-        if let Some(response) = responses.first() {
-            lock(&self.bootstraps).push(Bootstrap {
-                group: None,
-                request: payload.to_vec(),
-                response: response.clone(),
-            });
-        }
-
-        if let Some(start) = trace_start {
-            let elapsed = start.elapsed();
-            self.telemetry.broadcasts.fetch_add(1, Ordering::Relaxed);
-            self.telemetry.broadcast_workers.fetch_add(active_workers as u64, Ordering::Relaxed);
-            self.telemetry.broadcast_ns.fetch_add(duration_nanos(elapsed), Ordering::Relaxed);
-            tracing::trace!(
-                workers = active_workers,
-                request_bytes = payload.len(),
-                response_bytes,
-                elapsed = ?elapsed,
-                "Extension initialization broadcast completed."
-            );
-        }
-
-        Ok(responses)
+        let mut responses = self.broadcast_inner(None, &[payload.to_vec()])?;
+        Ok(responses.pop().unwrap_or_default())
     }
 
     /// Returns the maximum payload accepted by a worker frame.
@@ -549,6 +450,10 @@ impl WorkerPool {
     ///
     /// Returns an error if any worker cannot process the complete sequence.
     pub fn broadcast_sequence(&self, group: u64, payloads: &[Vec<u8>]) -> Result<Vec<Vec<Vec<u8>>>, WorkerError> {
+        self.broadcast_inner(Some(group), payloads)
+    }
+
+    fn broadcast_inner(&self, group: Option<u64>, payloads: &[Vec<u8>]) -> Result<Vec<Vec<Vec<u8>>>, WorkerError> {
         let trace_start = self.trace_enabled.then(Instant::now);
         if self.state.load(Ordering::Acquire) != STATE_RUNNING {
             return Err(WorkerError::Unavailable);
@@ -604,14 +509,8 @@ impl WorkerPool {
                 continue;
             };
 
-            if result.is_err() && !reservation.worker().is_running() {
-                let failed = lock(&self.workers[worker_index].worker).as_ref().map(Arc::clone);
-                if let Some(failed) = failed
-                    && reservation.matches(&failed)
-                    && let Err(error) = self.restart(worker_index, &failed)
-                {
-                    first_error.get_or_insert(error);
-                }
+            if let Err(error) = self.recover_if_needed(worker_index, &reservation, &result) {
+                first_error.get_or_insert(error);
             }
 
             match result {
@@ -627,6 +526,15 @@ impl WorkerPool {
         }
 
         if let Some(error) = first_error {
+            self.record_broadcast(payloads.len(), active_workers, trace_start);
+            tracing::trace!(
+                ?group,
+                workers = active_workers,
+                requests = payloads.len(),
+                request_bytes = payloads.iter().map(Vec::len).sum::<usize>(),
+                error = %error,
+                "Extension broadcast failed."
+            );
             return Err(error);
         }
 
@@ -639,35 +547,42 @@ impl WorkerPool {
             .zip(&responses)
             .filter_map(|(request, responses)| {
                 responses.first().map(|response| Bootstrap {
-                    group: Some(group),
+                    group,
                     request: request.clone(),
                     response: response.clone(),
                 })
             })
             .collect::<Vec<_>>();
         let mut bootstraps = lock(&self.bootstraps);
-        bootstraps.retain(|bootstrap| bootstrap.group != Some(group));
+        if group.is_some() {
+            bootstraps.retain(|bootstrap| bootstrap.group != group);
+        }
         bootstraps.extend(replacements);
         drop(bootstraps);
 
         if let Some(start) = trace_start {
-            self.telemetry.broadcasts.fetch_add(payloads.len() as u64, Ordering::Relaxed);
-            self.telemetry
-                .broadcast_workers
-                .fetch_add(payloads.len().saturating_mul(active_workers) as u64, Ordering::Relaxed);
-            self.telemetry.broadcast_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
+            self.record_broadcast(payloads.len(), active_workers, Some(start));
             tracing::trace!(
-                group,
+                ?group,
                 workers = active_workers,
                 requests = payloads.len(),
                 request_bytes = payloads.iter().map(Vec::len).sum::<usize>(),
                 response_bytes = responses.iter().flatten().map(Vec::len).sum::<usize>(),
                 elapsed = ?start.elapsed(),
-                "Extension state-replacement broadcast completed."
+                "Extension broadcast completed."
             );
         }
 
         Ok(responses)
+    }
+
+    fn record_broadcast(&self, requests: usize, workers: usize, started_at: Option<Instant>) {
+        let Some(started_at) = started_at else {
+            return;
+        };
+        self.telemetry.broadcasts.fetch_add(requests as u64, Ordering::Relaxed);
+        self.telemetry.broadcast_workers.fetch_add(requests.saturating_mul(workers) as u64, Ordering::Relaxed);
+        self.telemetry.broadcast_ns.fetch_add(duration_nanos(started_at.elapsed()), Ordering::Relaxed);
     }
 
     /// Gracefully stops every worker, then kills workers that exceed the
@@ -944,11 +859,11 @@ impl WorkerPool {
         self.restart(index, &worker)
     }
 
-    fn recover_if_needed(
+    fn recover_if_needed<T>(
         &self,
         index: usize,
         reservation: &crate::worker::WorkerReservation,
-        result: &Result<Vec<u8>, WorkerError>,
+        result: &Result<T, WorkerError>,
     ) -> Result<(), WorkerError> {
         if result.is_ok() || reservation.worker().is_running() || self.state.load(Ordering::Acquire) != STATE_RUNNING {
             return Ok(());

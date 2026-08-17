@@ -14,7 +14,6 @@ use Mago\Sdk\Analyzer\MethodTarget;
 use Mago\Sdk\Analyzer\NodeAnalysisContext;
 use Mago\Sdk\Analyzer\NodeAnalysisHook;
 use Mago\Sdk\Analyzer\PluginRegistry;
-use Mago\Sdk\Analyzer\SourceFileTarget;
 use Mago\Sdk\Syntax\NodeKind;
 use PHPUnit\Framework\TestCase;
 
@@ -130,7 +129,7 @@ final class PluginRegistryTest extends TestCase
 
             public function getTargets(): array
             {
-                return [new SourceFileTarget($this->pattern)];
+                return [$this->pattern];
             }
 
             public function scan(CodebaseScanContext $context): void {}

@@ -28,7 +28,6 @@ use Mago\Sdk\Analyzer\PluginDefinition;
 use Mago\Sdk\Analyzer\PropertyInitializationProvider;
 use Mago\Sdk\Analyzer\PropertyTarget;
 use Mago\Sdk\Analyzer\PropertyTypeProvider;
-use Mago\Sdk\Analyzer\SourceFileTarget;
 use Mago\Sdk\Syntax\NodeKind;
 
 /**
@@ -50,7 +49,7 @@ final class RegisteredPlugin
      * @param list<AttributedEntryPoint> $attributedEntryPoints
      * @param list<RegisteredTargetedCallback<IssueFilterHook, string>> $issueFilterHooks
      * @param list<InitializationHook> $initializationHooks
-     * @param list<RegisteredTargetedCallback<CodebaseScanHook, SourceFileTarget>> $codebaseScanHooks
+     * @param list<RegisteredTargetedCallback<CodebaseScanHook, non-empty-string>> $codebaseScanHooks
      * @param list<BeforeAnalysisHook> $beforeAnalysisHooks
      * @param list<AfterFileAnalysisHook> $afterFileAnalysisHooks
      * @param list<RegisteredTargetedCallback<NodeAnalysisHook, NodeKind>> $nodeAnalysisHooks

@@ -4,9 +4,9 @@ use std::borrow::Cow;
 use std::collections::HashSet;
 use std::num::NonZeroUsize;
 use std::path::Path;
-use std::process::Command;
 use std::sync::Arc;
 
+use mago_analyzer::external::AFTER_FILE_ANALYSIS_BATCH_SIZE;
 use mago_analyzer::external::ExternalAnalyzer;
 use mago_analyzer::external::ExternalAnalyzerHandle;
 use mago_analyzer::plugin::PluginRegistry;
@@ -14,7 +14,6 @@ use mago_analyzer::settings::Settings;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::reference::SymbolReferences;
 use mago_database::Database;
-use mago_database::DatabaseConfiguration;
 use mago_database::DatabaseReader;
 use mago_database::GlobSettings;
 use mago_database::file::File;
@@ -35,21 +34,13 @@ use mago_syntax::settings::ParserSettings;
 use mago_text_edit::Safety;
 use serde::Deserialize;
 
-const FILE_COUNT: usize = 96;
+mod common;
+
+const FILE_COUNT: usize = AFTER_FILE_ANALYSIS_BATCH_SIZE + 1;
 const PLUGINS: [&str; 2] = ["lifecycle-one", "lifecycle-two"];
 
 #[derive(Debug, Deserialize)]
 struct AuditEntry(String, String, Option<String>, u32);
-
-fn php_sdk_is_available(repository: &Path) -> bool {
-    let available = repository.join("vendor/autoload.php").is_file()
-        && Command::new("php").arg("--version").output().is_ok_and(|output| output.status.success());
-    assert!(
-        available || std::env::var_os("MAGO_REQUIRE_PHP_SDK_TESTS").is_none(),
-        "PHP and vendor dependencies are required for the external analyzer lifecycle test"
-    );
-    available
-}
 
 fn make_database(
     changed_file: Option<usize>,
@@ -57,15 +48,7 @@ fn make_database(
     late_reference_enabled: bool,
     external_sources: &[(Vec<u8>, Vec<u8>)],
 ) -> (Database<'static>, FileId) {
-    let configuration = DatabaseConfiguration {
-        workspace: Cow::Owned(Path::new("/lifecycle-proof").to_path_buf()),
-        paths: vec![Cow::Borrowed(b"src")],
-        includes: vec![],
-        patches: vec![],
-        excludes: vec![],
-        extensions: vec![Cow::Borrowed(b"php")],
-        glob: GlobSettings::default(),
-    };
+    let configuration = common::database_configuration("/lifecycle-proof", vec![Cow::Borrowed(b"src")]);
     let mut database = Database::new(configuration);
     let mut changed_id = FileId::zero();
     for index in 0..FILE_COUNT {
@@ -219,7 +202,7 @@ fn external_analyzer_lifecycle_is_exact_across_workers_and_incremental_runs() {
     }
 
     let repository = Path::new(env!("CARGO_MANIFEST_DIR"));
-    if !php_sdk_is_available(repository) {
+    if !common::php_sdk_is_available(repository, "the external analyzer lifecycle test") {
         return;
     }
 
@@ -372,7 +355,7 @@ fn external_analyzer_lifecycle_is_exact_across_workers_and_incremental_runs() {
 #[test]
 fn orchestrator_loads_initialization_stubs_into_the_source_database() {
     let repository = Path::new(env!("CARGO_MANIFEST_DIR"));
-    if !php_sdk_is_available(repository) {
+    if !common::php_sdk_is_available(repository, "the external analyzer initialization-stub test") {
         return;
     }
 

@@ -760,42 +760,7 @@ final class InvocationClassInitializerProvider implements ClassInitializerProvid
  * @mago-expect lint:cyclomatic-complexity
  * @mago-expect lint:single-class-per-file
  */
-final class InvocationIssueFilterHook implements IssueFilterHook
-{
-    public function getCodes(): array
-    {
-        return ['non-existent-function'];
-    }
-
-    public function filterIssue(IssueFilterContext $context): IssueFilterDecision
-    {
-        if (
-            $context->file !== 'src/invocation.php'
-            || !str_contains($context->contents, 'issue-filter-batch-proof')
-            || !$context->codebase->functionExists('known_function')
-            || !$context->types->equals(Type::string(), Type::string())
-            || $context->issue->level !== Level::Error
-            || $context->issue->annotations === []
-        ) {
-            throw new RuntimeException('An issue-filter hook received incomplete file or diagnostic context.');
-        }
-
-        InvocationAudit::record('issue-filter-' . $context->issue->message);
-        if (
-            $context->issue->code === 'non-existent-function'
-            && str_contains($context->issue->message, '`filtered_missing`')
-        ) {
-            return IssueFilterDecision::Remove;
-        }
-
-        return IssueFilterDecision::Keep;
-    }
-}
-
-/**
- * @mago-expect lint:single-class-per-file
- */
-final class InvocationPlugin implements Plugin
+final class InvocationPlugin implements IssueFilterHook, Plugin
 {
     public function __construct(
         private readonly bool $registerMethodProvider,
@@ -823,8 +788,37 @@ final class InvocationPlugin implements Plugin
         $registry->registerPropertyInitializationProvider(new InvocationPropertyInitializationProvider());
         $registry->registerClassInitializerProvider(new InvocationClassInitializerProvider());
         if ($this->registerIssueFilter) {
-            $registry->registerIssueFilterHook(new InvocationIssueFilterHook());
+            $registry->registerIssueFilterHook($this);
         }
+    }
+
+    public function getCodes(): array
+    {
+        return ['non-existent-function'];
+    }
+
+    public function filterIssue(IssueFilterContext $context): IssueFilterDecision
+    {
+        if (
+            $context->file !== 'src/invocation.php'
+            || !str_contains($context->contents, 'issue-filter-batch-proof')
+            || !$context->codebase->functionExists('known_function')
+            || !$context->types->equals(Type::string(), Type::string())
+            || $context->issue->level !== Level::Error
+            || $context->issue->annotations === []
+        ) {
+            throw new RuntimeException('An issue-filter hook received incomplete file or diagnostic context.');
+        }
+
+        InvocationAudit::record('issue-filter-' . $context->issue->message);
+        if (
+            $context->issue->code === 'non-existent-function'
+            && str_contains($context->issue->message, '`filtered_missing`')
+        ) {
+            return IssueFilterDecision::Remove;
+        }
+
+        return IssueFilterDecision::Keep;
     }
 }
 

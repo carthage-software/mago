@@ -4,7 +4,6 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::num::NonZeroUsize;
 use std::path::Path;
-use std::process::Command;
 use std::sync::Arc;
 
 use mago_analyzer::external::ExternalAnalyzer;
@@ -14,8 +13,6 @@ use mago_analyzer::settings::Settings;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::reference::SymbolReferences;
 use mago_database::Database;
-use mago_database::DatabaseConfiguration;
-use mago_database::GlobSettings;
 use mago_database::file::File;
 use mago_database::file::FileId;
 use mago_database::file::FileType;
@@ -26,23 +23,12 @@ use mago_orchestrator::service::incremental_analysis::IncrementalAnalysisService
 use mago_php_version::PHPVersion;
 use mago_syntax::settings::ParserSettings;
 
+mod common;
+
 type AuditEntry = (u32, BTreeMap<String, Vec<String>>);
 
-fn php_sdk_is_available(repository: &Path) -> bool {
-    repository.join("vendor/autoload.php").is_file()
-        && Command::new("php").arg("--version").output().is_ok_and(|output| output.status.success())
-}
-
 fn database(first: &str, ignored: usize) -> (Database<'static>, FileId, FileId) {
-    let configuration = DatabaseConfiguration {
-        workspace: Cow::Owned(Path::new("/scan-proof").to_path_buf()),
-        paths: vec![Cow::Borrowed(b".")],
-        includes: vec![],
-        patches: vec![],
-        excludes: vec![],
-        extensions: vec![Cow::Borrowed(b"php")],
-        glob: GlobSettings::default(),
-    };
+    let configuration = common::database_configuration("/scan-proof", vec![Cow::Borrowed(b".")]);
     let mut database = Database::new(configuration);
     let first = File::new(
         Cow::Borrowed(b"database/migrations/001.php"),
@@ -87,7 +73,7 @@ fn audit(path: &Path) -> Vec<AuditEntry> {
 #[test]
 fn filtered_first_parse_snapshots_refresh_every_worker_incrementally() {
     let repository = Path::new(env!("CARGO_MANIFEST_DIR"));
-    if !php_sdk_is_available(repository) {
+    if !common::php_sdk_is_available(repository, "the external analyzer scan test") {
         return;
     }
 

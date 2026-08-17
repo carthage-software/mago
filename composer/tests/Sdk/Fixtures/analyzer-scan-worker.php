@@ -9,7 +9,6 @@ use Mago\Sdk\Analyzer\CodebaseScanHook;
 use Mago\Sdk\Analyzer\Plugin;
 use Mago\Sdk\Analyzer\PluginDefinition;
 use Mago\Sdk\Analyzer\PluginRegistry;
-use Mago\Sdk\Analyzer\SourceFileTarget;
 use Mago\Sdk\Extension;
 use Mago\Sdk\Syntax\NodeKind;
 use Mago\Sdk\Worker;
@@ -30,10 +29,8 @@ use const LOCK_EX;
 
 require_once dirname(__DIR__, 4) . '/vendor/autoload.php';
 
-/**
- * @mago-expect lint:cyclomatic-complexity
- */
-final class CodebaseScanProofHook implements CodebaseScanHook
+/** @mago-expect lint:cyclomatic-complexity */
+final class CodebaseScanProofPlugin implements CodebaseScanHook, Plugin
 {
     /** @var array<string, list<string>> */
     private array $values = [];
@@ -44,7 +41,17 @@ final class CodebaseScanProofHook implements CodebaseScanHook
 
     public function getTargets(): array
     {
-        return [new SourceFileTarget('database/migrations/**/*.php')];
+        return ['database/migrations/**/*.php'];
+    }
+
+    public function getDefinition(): PluginDefinition
+    {
+        return new PluginDefinition('codebase-scan-proof', 'Codebase scan proof', 'Exercises filtered source scans.');
+    }
+
+    public function register(PluginRegistry $registry): void
+    {
+        $registry->registerCodebaseScanHook($this);
     }
 
     public function scan(CodebaseScanContext $context): void
@@ -82,40 +89,18 @@ final class CodebaseScanProofHook implements CodebaseScanHook
 }
 
 /** @mago-expect lint:single-class-per-file */
-final class CodebaseScanProofPlugin implements Plugin
-{
-    public function __construct(
-        private readonly string $auditLog,
-    ) {}
-
-    public function getDefinition(): PluginDefinition
-    {
-        return new PluginDefinition('codebase-scan-proof', 'Codebase scan proof', 'Exercises filtered source scans.');
-    }
-
-    public function register(PluginRegistry $registry): void
-    {
-        $registry->registerCodebaseScanHook(new CodebaseScanProofHook($this->auditLog));
-    }
-}
-
-/** @mago-expect lint:single-class-per-file */
-final class DisabledCodebaseScanHook implements CodebaseScanHook
+final class DisabledCodebaseScanPlugin implements CodebaseScanHook, Plugin
 {
     public function getTargets(): array
     {
-        return [new SourceFileTarget('database/migrations/**/*.php')];
+        return ['database/migrations/**/*.php'];
     }
 
     public function scan(CodebaseScanContext $context): void
     {
         throw new RuntimeException('A disabled plugin received a codebase-scan batch.');
     }
-}
 
-/** @mago-expect lint:single-class-per-file */
-final class DisabledCodebaseScanPlugin implements Plugin
-{
     public function getDefinition(): PluginDefinition
     {
         return new PluginDefinition(
@@ -128,7 +113,7 @@ final class DisabledCodebaseScanPlugin implements Plugin
 
     public function register(PluginRegistry $registry): void
     {
-        $registry->registerCodebaseScanHook(new DisabledCodebaseScanHook());
+        $registry->registerCodebaseScanHook($this);
     }
 }
 

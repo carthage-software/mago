@@ -3,7 +3,6 @@
 use std::borrow::Cow;
 use std::num::NonZeroUsize;
 use std::path::Path;
-use std::process::Command;
 use std::sync::Arc;
 
 use mago_analyzer::external::ExternalAnalyzer;
@@ -13,8 +12,6 @@ use mago_analyzer::settings::Settings;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::reference::SymbolReferences;
 use mago_database::Database;
-use mago_database::DatabaseConfiguration;
-use mago_database::GlobSettings;
 use mago_database::file::File;
 use mago_database::file::FileType;
 use mago_extension::WorkerCommand;
@@ -24,6 +21,8 @@ use mago_orchestrator::service::incremental_analysis::IncrementalAnalysisService
 use mago_php_version::PHPVersion;
 use mago_syntax::settings::ParserSettings;
 use mago_word::word;
+
+mod common;
 
 const SOURCE: &str = r"<?php
 
@@ -55,21 +54,11 @@ final class ConcreteTest extends FrameworkTestCase
 }
 ";
 
-fn php_sdk_is_available(repository: &Path) -> bool {
-    let available = repository.join("vendor/autoload.php").is_file()
-        && Command::new("php").arg("--version").output().is_ok_and(|output| output.status.success());
-    assert!(
-        available || std::env::var_os("MAGO_REQUIRE_PHP_SDK_TESTS").is_none(),
-        "PHP and vendor dependencies are required for the external analyzer entry-point test"
-    );
-    available
-}
-
 #[test]
 fn declarative_entry_points_reference_inherited_trait_and_attributed_methods_without_callbacks()
 -> Result<(), Box<dyn std::error::Error>> {
     let repository = Path::new(env!("CARGO_MANIFEST_DIR"));
-    if !php_sdk_is_available(repository) {
+    if !common::php_sdk_is_available(repository, "the external analyzer entry-point test") {
         return Ok(());
     }
 
@@ -81,15 +70,7 @@ fn declarative_entry_points_reference_inherited_trait_and_attributed_methods_wit
     let mut registry = PluginRegistry::with_library_providers();
     registry.set_external_analyzer(Arc::new(ExternalAnalyzerHandle::ready(external)));
 
-    let configuration = DatabaseConfiguration {
-        workspace: Cow::Owned(Path::new("/entry-point-proof").to_path_buf()),
-        paths: vec![Cow::Borrowed(b"src")],
-        includes: vec![],
-        patches: vec![],
-        excludes: vec![],
-        extensions: vec![Cow::Borrowed(b"php")],
-        glob: GlobSettings::default(),
-    };
+    let configuration = common::database_configuration("/entry-point-proof", vec![Cow::Borrowed(b"src")]);
     let mut database = Database::new(configuration);
     database.add(File::new(
         Cow::Borrowed(b"src/entry-points.php"),

@@ -27,7 +27,6 @@ use Mago\Sdk\Analyzer\PropertyType;
 use Mago\Sdk\Analyzer\ReferenceKind;
 use Mago\Sdk\Analyzer\ReferenceOrigin;
 use Mago\Sdk\Analyzer\ReferenceSummary;
-use Mago\Sdk\Analyzer\SourceFileTarget;
 use Mago\Sdk\Analyzer\SymbolReference;
 use Mago\Sdk\Analyzer\SymbolReferences;
 use Mago\Sdk\Analyzer\TargetedAnalysisHook;
@@ -55,6 +54,7 @@ use Mago\Sdk\Syntax\SourceFile;
 
 use function count;
 use function intdiv;
+use function is_string;
 use function pack;
 use function strncmp;
 use function unpack;
@@ -378,7 +378,7 @@ final class Protocol
             $writer->writeU16($registration->index);
             self::writeRegistrationHeader($writer, $registration, $header, $memoize);
 
-            /** @var non-empty-list<FunctionTarget|MethodTarget|PropertyTarget|ClassTarget|NodeKind|ClassLikeTarget|SourceFileTarget> $targets */
+            /** @var non-empty-list<FunctionTarget|MethodTarget|PropertyTarget|ClassTarget|NodeKind|ClassLikeTarget|non-empty-string> $targets */
             $targets = $registration->targets;
             $writer->writeCount($targets);
             foreach ($targets as $target) {
@@ -437,7 +437,7 @@ final class Protocol
     /** @mago-expect lint:halstead */
     private static function writeRegistrationTarget(
         PayloadWriter $writer,
-        FunctionTarget|MethodTarget|PropertyTarget|ClassTarget|NodeKind|ClassLikeTarget|SourceFileTarget $target,
+        FunctionTarget|MethodTarget|PropertyTarget|ClassTarget|NodeKind|ClassLikeTarget|string $target,
     ): void {
         if ($target instanceof FunctionTarget) {
             $writer->writeU8($target->kind->value);
@@ -460,8 +460,8 @@ final class Protocol
             return;
         }
 
-        if ($target instanceof SourceFileTarget) {
-            $writer->writeString($target->pattern);
+        if (is_string($target)) {
+            $writer->writeString($target);
 
             return;
         }

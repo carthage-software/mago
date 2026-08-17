@@ -39,7 +39,6 @@ use Mago\Sdk\Analyzer\PropertyTarget;
 use Mago\Sdk\Analyzer\PropertyTypeProvider;
 use Mago\Sdk\Analyzer\PropertyTypeProviderContext;
 use Mago\Sdk\Analyzer\ReturnTypeProviderContext;
-use Mago\Sdk\Analyzer\SourceFileTarget;
 use Mago\Sdk\Analyzer\TargetedAnalysisHook;
 use Mago\Sdk\Analyzer\TargetedProvider;
 use Mago\Sdk\Analyzer\TypeComparator;
@@ -80,6 +79,7 @@ use function is_array;
 use function ob_end_flush;
 use function ob_get_level;
 use function ob_start;
+use function str_contains;
 use function strncmp;
 use function strtolower;
 
@@ -138,7 +138,7 @@ final class Worker
     /** @var list<RegisteredTargetedCallback<IssueFilterHook, string>> */
     private readonly array $issueFilterHooks;
 
-    /** @var list<RegisteredTargetedCallback<CodebaseScanHook, SourceFileTarget>> */
+    /** @var list<RegisteredTargetedCallback<CodebaseScanHook, non-empty-string>> */
     private readonly array $codebaseScanHooks;
 
     /**
@@ -312,7 +312,15 @@ final class Worker
                     $codebaseScanHooks,
                     $definition->identifier,
                     'codebase-scan hook',
-                    static fn(SourceFileTarget $target): string => $target->pattern,
+                    static function (string $pattern): string {
+                        if ($pattern === '' || str_contains($pattern, "\0")) {
+                            throw new InvalidArgumentException(
+                                'A codebase-scan target must be non-empty and cannot contain NUL.',
+                            );
+                        }
+
+                        return $pattern;
+                    },
                 );
 
                 $registeredNodeAnalysisHooks = self::registerTargetedCallbacks(

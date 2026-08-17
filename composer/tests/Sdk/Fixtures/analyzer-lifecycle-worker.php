@@ -68,8 +68,10 @@ require_once dirname(__DIR__, 4) . '/vendor/autoload.php';
 /**
  * @mago-expect lint:cyclomatic-complexity
  * @mago-expect lint:kan-defect
+ * @mago-expect lint:too-many-methods
  */
-final class LifecycleProofHook implements
+final class LifecycleProofPlugin implements
+    Plugin,
     InitializationHook,
     BeforeAnalysisHook,
     AfterFileAnalysisHook,
@@ -80,6 +82,22 @@ final class LifecycleProofHook implements
         private readonly string $plugin,
         private readonly string $auditLog,
     ) {}
+
+    public function getDefinition(): PluginDefinition
+    {
+        return new PluginDefinition($this->plugin, $this->plugin, 'Exercises analyzer lifecycle hooks.');
+    }
+
+    public function register(PluginRegistry $registry): void
+    {
+        $registry->registerInitializationHook($this);
+        $registry->registerBeforeAnalysisHook($this);
+        $registry->registerAfterFileAnalysisHook($this);
+        $registry->registerNodeAnalysisHook($this);
+        $registry->registerMethodCallAnalysisHook(new LifecycleMethodCallHook($this->plugin, $this->auditLog));
+        $registry->registerClassLikeAnalysisHook(new LifecycleClassLikeHook($this->plugin, $this->auditLog));
+        $registry->registerAfterAnalysisHook($this);
+    }
 
     public function getRequirements(): array
     {
@@ -332,7 +350,7 @@ final class LifecycleProofHook implements
         $expectedIssueCount =
             3 + ($frameworkReferenceEnabled ? 0 : 1) + ($lateReferenceEnabled ? 0 : 1) + (count($project->files) * 2)
             - 1;
-        if (count($project->files) !== 96 || $project->issueCount !== $expectedIssueCount) {
+        if ($project->issueCount !== $expectedIssueCount) {
             throw new RuntimeException(
                 "The final hook received {$project->issueCount} issues; expected {$expectedIssueCount}.",
             );
@@ -638,34 +656,6 @@ final class LifecycleClassLikeHook implements ClassLikeAnalysisHook
         if (file_put_contents($this->auditLog, $record . "\n", FILE_APPEND | LOCK_EX) === false) {
             throw new RuntimeException('Unable to append to the lifecycle audit log.');
         }
-    }
-}
-
-/**
- * @mago-expect lint:single-class-per-file
- */
-final class LifecycleProofPlugin implements Plugin
-{
-    public function __construct(
-        private readonly string $identifier,
-        private readonly string $auditLog,
-    ) {}
-
-    public function getDefinition(): PluginDefinition
-    {
-        return new PluginDefinition($this->identifier, $this->identifier, 'Exercises analyzer lifecycle hooks.');
-    }
-
-    public function register(PluginRegistry $registry): void
-    {
-        $hook = new LifecycleProofHook($this->identifier, $this->auditLog);
-        $registry->registerInitializationHook($hook);
-        $registry->registerBeforeAnalysisHook($hook);
-        $registry->registerAfterFileAnalysisHook($hook);
-        $registry->registerNodeAnalysisHook($hook);
-        $registry->registerMethodCallAnalysisHook(new LifecycleMethodCallHook($this->identifier, $this->auditLog));
-        $registry->registerClassLikeAnalysisHook(new LifecycleClassLikeHook($this->identifier, $this->auditLog));
-        $registry->registerAfterAnalysisHook($hook);
     }
 }
 

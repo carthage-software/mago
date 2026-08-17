@@ -70,7 +70,7 @@ pub(crate) fn initialize_external_linter(
     if let Some(start) = trace_start {
         tracing::trace!(
             extensions = linter.extensions().len(),
-            rules = linter.rules().len(),
+            rules = linter.extensions().iter().map(|extension| extension.rules.len()).sum::<usize>(),
             elapsed = ?start.elapsed(),
             "External linter hosts initialized."
         );
@@ -141,7 +141,7 @@ pub(crate) fn initialize_external_analyzer(
     if let Some(start) = trace_start {
         tracing::trace!(
             extensions = analyzer.extensions().len(),
-            plugins = analyzer.plugins().len(),
+            plugins = analyzer.extensions().iter().map(|extension| extension.plugins.len()).sum::<usize>(),
             elapsed = ?start.elapsed(),
             "External analyzer hosts initialized."
         );

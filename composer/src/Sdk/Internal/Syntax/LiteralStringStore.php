@@ -17,11 +17,6 @@ final class LiteralStringStore
     public const RECORD_SIZE = 12;
 
     /**
-     * @var array<int<0, 4294967295>, string>
-     */
-    private array $values = [];
-
-    /**
      * @param int<0, 4294967295> $count
      */
     public function __construct(
@@ -35,11 +30,6 @@ final class LiteralStringStore
      */
     public function find(int $node): ?string
     {
-        $cached = $this->values[$node] ?? null;
-        if ($cached !== null) {
-            return $cached;
-        }
-
         $low = 0;
         $high = $this->count - 1;
         while ($low <= $high) {
@@ -55,7 +45,7 @@ final class LiteralStringStore
                 continue;
             }
 
-            return $this->values[$node] = substr($this->bytes, $record[2], $record[3]);
+            return substr($this->bytes, $record[2], $record[3]);
         }
 
         return null;

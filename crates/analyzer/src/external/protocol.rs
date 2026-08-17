@@ -109,11 +109,9 @@ use crate::external::EntryPoint;
 use crate::external::ExternalAnalysisSession;
 use crate::external::ExternalExtension;
 use crate::external::ExternalPlugin;
-use crate::external::FunctionAssertionProvider;
 use crate::external::FunctionProvider;
 use crate::external::FunctionTarget;
 use crate::external::IssueFilterHookRegistration;
-use crate::external::MethodAssertionProvider;
 use crate::external::MethodCallAnalysisHookRegistration;
 use crate::external::MethodProvider;
 use crate::external::MethodTarget;
@@ -233,8 +231,8 @@ pub(super) struct Registration {
     pub has_worker_reducer: bool,
     pub function_providers: Vec<FunctionProvider>,
     pub method_providers: Vec<MethodProvider>,
-    pub function_assertion_providers: Vec<FunctionAssertionProvider>,
-    pub method_assertion_providers: Vec<MethodAssertionProvider>,
+    pub function_assertion_providers: Vec<FunctionProvider>,
+    pub method_assertion_providers: Vec<MethodProvider>,
     pub property_providers: Vec<PropertyProvider>,
     pub property_initialization_providers: Vec<PropertyProvider>,
     pub class_initializer_providers: Vec<ClassInitializerProvider>,
@@ -795,7 +793,7 @@ fn read_function_target(
             if value.last() != Some(&b'\\') {
                 value.push(b'\\');
             }
-            FunctionTarget::Namespace(value)
+            FunctionTarget::Prefix(value)
         }
         _ => return Err(protocol(format!("{description} {index} has unknown target kind {kind}"))),
     })
@@ -3017,13 +3015,7 @@ pub(super) fn decode_function_like_identifier(
 }
 
 pub(super) fn message_writer(kind: u16) -> PayloadWriter {
-    let mut writer = PayloadWriter::with_capacity(INITIAL_MESSAGE_CAPACITY);
-    writer.write_raw(&ANALYZER_PROTOCOL_MAGIC);
-    writer.write_u16(ANALYZER_PROTOCOL_MAJOR);
-    writer.write_u16(ANALYZER_PROTOCOL_MINOR);
-    writer.write_u16(kind);
-    writer.write_u16(0);
-    writer
+    message_writer_with_capacity(kind, INITIAL_MESSAGE_CAPACITY)
 }
 
 pub(super) fn message_writer_with_capacity(kind: u16, capacity: usize) -> PayloadWriter {

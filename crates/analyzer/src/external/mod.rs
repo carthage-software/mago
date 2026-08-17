@@ -109,19 +109,14 @@ pub(crate) struct EffectivePropertyType {
 #[derive(Debug)]
 pub struct ExternalAnalysisSession {
     generation: u64,
-    sources: foldhash::HashMap<FileId, ExternalSource>,
-}
-
-#[derive(Debug)]
-struct ExternalSource {
-    file: Arc<File>,
+    sources: foldhash::HashMap<FileId, Arc<File>>,
 }
 
 impl ExternalAnalysisSession {
     #[must_use]
     pub fn from_files(files: impl IntoIterator<Item = Arc<File>>) -> Self {
         let generation = NEXT_ANALYSIS_GENERATION.fetch_add(1, Ordering::Relaxed);
-        let sources = files.into_iter().map(|file| (file.id, ExternalSource { file })).collect();
+        let sources = files.into_iter().map(|file| (file.id, file)).collect();
 
         Self { generation, sources }
     }
@@ -135,17 +130,15 @@ impl ExternalAnalysisSession {
     #[inline]
     #[must_use]
     pub(crate) fn source_name(&self, file_id: FileId) -> Option<&[u8]> {
-        self.sources.get(&file_id).map(|source| source.file.name.as_ref())
+        self.sources.get(&file_id).map(|file| file.name.as_ref())
     }
 
     fn source(&self, name: &[u8]) -> Option<(FileId, u32)> {
-        self.sources
-            .iter()
-            .find_map(|(file_id, source)| (source.file.name.as_ref() == name).then_some((*file_id, source.file.size)))
+        self.sources.iter().find_map(|(file_id, file)| (file.name.as_ref() == name).then_some((*file_id, file.size)))
     }
 
     fn source_file(&self, file_id: FileId) -> Option<&File> {
-        self.sources.get(&file_id).map(|source| source.file.as_ref())
+        self.sources.get(&file_id).map(AsRef::as_ref)
     }
 }
 
@@ -412,14 +405,13 @@ impl Registration {
 enum FunctionTarget {
     Exact(Vec<u8>),
     Prefix(Vec<u8>),
-    Namespace(Vec<u8>),
 }
 
 impl FunctionTarget {
     fn matches(&self, name: &[u8]) -> bool {
         match self {
             Self::Exact(target) => name.eq_ignore_ascii_case(target),
-            Self::Prefix(prefix) | Self::Namespace(prefix) => starts_with_ignore_case(name, prefix),
+            Self::Prefix(prefix) => starts_with_ignore_case(name, prefix),
         }
     }
 }
@@ -472,8 +464,6 @@ struct ProviderRegistration<T> {
 
 type FunctionProvider = ProviderRegistration<FunctionTarget>;
 type MethodProvider = ProviderRegistration<MethodTarget>;
-type FunctionAssertionProvider = ProviderRegistration<FunctionTarget>;
-type MethodAssertionProvider = ProviderRegistration<MethodTarget>;
 type PropertyProvider = ProviderRegistration<PropertyTarget>;
 type ClassInitializerProvider = ProviderRegistration<Vec<u8>>;
 type IssueFilterHookRegistration = ProviderRegistration<String>;
@@ -867,13 +857,13 @@ impl<T> Backend<T> {
     fn matching_function_providers(&self, function: &[u8], declared: bool) -> (Option<ProviderIndices>, usize) {
         let (indices, candidates) =
             matching_function_provider_indices(&self.function_exact, &self.function_wildcard, function);
-        let indices = filter_provider_indices(indices, |index| {
-            !declared
-                || self
-                    .function_capabilities
-                    .get(usize::from(index))
-                    .is_some_and(|capabilities| capabilities & PROVIDER_UNDECLARED_RETURN_TYPE_ONLY == 0)
-        });
+        let indices = filter_declared_provider_indices(
+            indices,
+            &self.function_capabilities,
+            declared,
+            PROVIDER_UNDECLARED_RETURN_TYPE_ONLY,
+            false,
+        );
         (indices, candidates)
     }
 
@@ -894,13 +884,13 @@ impl<T> Backend<T> {
     ) -> (Option<ProviderIndices>, usize) {
         let (indices, candidates) =
             matching_method_provider_indices(&self.method_exact, &self.method_wildcard, codebase, class, method);
-        let indices = filter_provider_indices(indices, |index| {
-            !declared
-                || self
-                    .method_capabilities
-                    .get(usize::from(index))
-                    .is_some_and(|capabilities| capabilities & PROVIDER_UNDECLARED_RETURN_TYPE_ONLY == 0)
-        });
+        let indices = filter_declared_provider_indices(
+            indices,
+            &self.method_capabilities,
+            declared,
+            PROVIDER_UNDECLARED_RETURN_TYPE_ONLY,
+            false,
+        );
         (indices, candidates)
     }
 
@@ -914,13 +904,13 @@ impl<T> Backend<T> {
             &self.function_signature_wildcard,
             function,
         );
-        let indices = filter_provider_indices(indices, |index| {
-            !declared
-                || self
-                    .function_capabilities
-                    .get(usize::from(index))
-                    .is_some_and(|capabilities| capabilities & PROVIDER_OVERRIDES_DECLARED_SIGNATURE != 0)
-        });
+        let indices = filter_declared_provider_indices(
+            indices,
+            &self.function_capabilities,
+            declared,
+            PROVIDER_OVERRIDES_DECLARED_SIGNATURE,
+            true,
+        );
         (indices, candidates)
     }
 
@@ -938,13 +928,13 @@ impl<T> Backend<T> {
             class,
             method,
         );
-        let indices = filter_provider_indices(indices, |index| {
-            !declared
-                || self
-                    .method_capabilities
-                    .get(usize::from(index))
-                    .is_some_and(|capabilities| capabilities & PROVIDER_OVERRIDES_DECLARED_SIGNATURE != 0)
-        });
+        let indices = filter_declared_provider_indices(
+            indices,
+            &self.method_capabilities,
+            declared,
+            PROVIDER_OVERRIDES_DECLARED_SIGNATURE,
+            true,
+        );
         (indices, candidates)
     }
 
@@ -1125,7 +1115,7 @@ fn index_function_providers<'provider>(
                     exact.entry(ascii_lowercase_word(name)).or_insert_with(Vec::new),
                     provider.index,
                 ),
-                FunctionTarget::Prefix(_) | FunctionTarget::Namespace(_) => wildcard_targets.push(target.clone()),
+                FunctionTarget::Prefix(_) => wildcard_targets.push(target.clone()),
             }
         }
         if !wildcard_targets.is_empty() {
@@ -1209,6 +1199,22 @@ fn filter_provider_indices(
 ) -> Option<ProviderIndices> {
     indices.and_then(|indices| {
         ProviderIndices::from_iter(indices.as_slice().iter().copied().filter(|&index| predicate(index)))
+    })
+}
+
+fn filter_declared_provider_indices(
+    indices: Option<ProviderIndices>,
+    capabilities: &[u8],
+    declared: bool,
+    capability: u8,
+    required: bool,
+) -> Option<ProviderIndices> {
+    if !declared {
+        return indices;
+    }
+
+    filter_provider_indices(indices, |index| {
+        capabilities.get(usize::from(index)).is_some_and(|flags| (flags & capability != 0) == required)
     })
 }
 
@@ -1330,7 +1336,6 @@ fn class_hierarchy<'codebase>(
 pub struct ExternalAnalyzer<T = WorkerPool> {
     backends: Box<[Backend<T>]>,
     extensions: Box<[ExternalExtension]>,
-    plugins: Box<[ExternalPlugin]>,
     initialization_stubs: Box<[ExternalStub]>,
     trace_enabled: bool,
     telemetry: ExternalAnalyzerTelemetry,
@@ -1502,11 +1507,6 @@ impl<T> ExternalAnalyzer<T> {
     #[must_use]
     pub fn extensions(&self) -> &[ExternalExtension] {
         &self.extensions
-    }
-
-    #[must_use]
-    pub fn plugins(&self) -> &[ExternalPlugin] {
-        &self.plugins
     }
 
     #[must_use]
@@ -3033,7 +3033,6 @@ where
         let describe = protocol::encode_describe_request(php_version);
         let mut backends = Vec::new();
         let mut extensions = Vec::new();
-        let mut plugins = Vec::new();
         let mut initialization_stubs = Vec::new();
         let mut extension_identifiers = HashSet::new();
         let mut plugin_selectors = HashMap::new();
@@ -3178,7 +3177,6 @@ where
             }
 
             extensions.extend(registration.extensions.iter().cloned());
-            plugins.extend(registration.plugins.iter().cloned());
             if let Some(start) = backend_start {
                 tracing::trace!(
                     backend = backend_index,
@@ -3242,7 +3240,6 @@ where
         let analyzer = Self {
             backends: backends.into_boxed_slice(),
             extensions: extensions.into_boxed_slice(),
-            plugins: plugins.into_boxed_slice(),
             initialization_stubs: initialization_stubs.into_boxed_slice(),
             trace_enabled,
             telemetry: ExternalAnalyzerTelemetry::default(),
@@ -3305,7 +3302,7 @@ where
             tracing::trace!(
                 backends = analyzer.backends.len(),
                 extensions = analyzer.extensions.len(),
-                plugins = analyzer.plugins.len(),
+                plugins = analyzer.extensions.iter().map(|extension| extension.plugins.len()).sum::<usize>(),
                 function_providers,
                 method_providers,
                 property_providers,
@@ -3641,7 +3638,7 @@ mod tests {
             .expect("registration should succeed");
 
         assert_eq!(analyzer.extensions().len(), 1);
-        assert_eq!(analyzer.plugins()[0].identifier, "demo");
+        assert_eq!(analyzer.extensions()[0].plugins[0].identifier, "demo");
         assert_eq!(analyzer.backends[0].registration.function_providers.len(), 1);
         assert!(analyzer.backends[0].matching_function_providers(b"demo_service", false).0.is_some());
         assert!(analyzer.backends[0].matching_function_signature_providers(b"demo_service", false).0.is_none());

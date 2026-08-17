@@ -51,7 +51,7 @@ final class SourceFileCodec
             $nodes,
             $names,
             new TriviaStore($triviaRecords, $triviaCount),
-            new LiteralStringStore('', '', 0),
+            null,
         );
     }
 

@@ -60,8 +60,6 @@ struct ExternalLintTelemetry {
 /// Metadata advertised for one custom linter rule.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct ExternalRule {
-    /// Identifier of the extension that owns this rule.
-    pub extension: String,
     /// Globally unique issue code reported by the rule.
     pub code: String,
     /// Human-readable rule name.
@@ -136,7 +134,6 @@ impl ActiveRulePlan {
 pub struct ExternalLinter<T = WorkerPool> {
     backends: Box<[Backend<T>]>,
     extensions: Box<[ExternalExtension]>,
-    rules: Box<[ExternalRule]>,
     trace_enabled: bool,
     telemetry: ExternalLintTelemetry,
     started_at: Option<Instant>,
@@ -174,10 +171,10 @@ impl<T> ExternalLinter<T> {
         &self.extensions
     }
 
-    /// Returns metadata for every registered custom rule.
+    /// Returns whether an external rule uses `code`.
     #[must_use]
-    pub fn rules(&self) -> &[ExternalRule] {
-        &self.rules
+    pub fn contains_rule(&self, code: &str) -> bool {
+        self.extensions.iter().any(|extension| extension.rules.iter().any(|rule| rule.code == code))
     }
 }
 
@@ -334,7 +331,6 @@ impl<T> ExternalLinter<T> {
         let describe = protocol::encode_describe_request(php_version);
         let mut backends = Vec::new();
         let mut extensions = Vec::new();
-        let mut rules = Vec::new();
         let mut extension_identifiers = HashSet::new();
         let native_settings = Settings { php_version, ..Settings::default() };
         let mut rule_codes = AnyRule::get_all_for(&native_settings, None, true)
@@ -375,7 +371,6 @@ impl<T> ExternalLinter<T> {
             }
 
             extensions.extend(registration.extensions.iter().cloned());
-            rules.extend(registration.rules.iter().cloned());
             if let Some(start) = backend_start {
                 tracing::trace!(
                     backend = backend_index,
@@ -394,7 +389,6 @@ impl<T> ExternalLinter<T> {
         let linter = Self {
             backends: backends.into_boxed_slice(),
             extensions: extensions.into_boxed_slice(),
-            rules: rules.into_boxed_slice(),
             trace_enabled,
             telemetry: ExternalLintTelemetry::default(),
             started_at,
@@ -403,7 +397,7 @@ impl<T> ExternalLinter<T> {
             tracing::trace!(
                 backends = linter.backends.len(),
                 extensions = linter.extensions.len(),
-                rules = linter.rules.len(),
+                rules = linter.extensions.iter().map(|extension| extension.rules.len()).sum::<usize>(),
                 elapsed = ?start.elapsed(),
                 "External linter initialized."
             );
@@ -768,8 +762,7 @@ mod tests {
         assert_eq!(external.extensions().len(), 2);
         assert_eq!(external.extensions()[0].identifier, "acme/iteration");
         assert_eq!(external.extensions()[1].identifier, "acme/architecture");
-        assert_eq!(external.rules().len(), 2);
-        assert_eq!(external.rules()[0].extension, "acme/iteration");
-        assert_eq!(external.rules()[1].extension, "acme/architecture");
+        assert!(external.contains_rule("acme/prefer-array-any"));
+        assert!(external.contains_rule("acme/no-interface"));
     }
 }

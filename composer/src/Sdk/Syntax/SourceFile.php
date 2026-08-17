@@ -49,7 +49,7 @@ final class SourceFile
         private readonly NodeStore $nodes,
         private readonly ResolvedNameStore $resolvedNames,
         private readonly TriviaStore $trivia,
-        private readonly LiteralStringStore $literalStrings,
+        private readonly ?LiteralStringStore $literalStrings,
     ) {
         $this->targetNodeIds = $targetNodeIds;
     }
@@ -184,7 +184,7 @@ final class SourceFile
      */
     public function getLiteralString(Node $node): ?string
     {
-        return $this->literalStrings->find($node->id);
+        return $this->literalStrings?->find($node->id);
     }
 
     /**

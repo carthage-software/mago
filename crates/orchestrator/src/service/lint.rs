@@ -99,7 +99,7 @@ impl LintService {
             && !self
                 .external_linter
                 .as_ref()
-                .is_some_and(|external| external.rules().iter().any(|rule| only.iter().any(|code| code == &rule.code)))
+                .is_some_and(|external| only.iter().any(|code| external.contains_rule(code)))
         {
             tracing::warn!("No rules found for the specified 'only' filter: {:?}", only);
         }

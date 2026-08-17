@@ -12,8 +12,6 @@ use mago_analyzer::settings::Settings;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::reference::SymbolReferences;
 use mago_database::Database;
-use mago_database::DatabaseConfiguration;
-use mago_database::GlobSettings;
 use mago_database::file::File;
 use mago_database::file::FileType;
 use mago_extension::WorkerCommand;
@@ -22,6 +20,8 @@ use mago_extension::WorkerPoolOptions;
 use mago_orchestrator::service::incremental_analysis::IncrementalAnalysisService;
 use mago_php_version::PHPVersion;
 use mago_syntax::settings::ParserSettings;
+
+mod common;
 
 const SOURCE: &str = r"<?php
 
@@ -557,15 +557,7 @@ fn analyze_with_fixture(
     let mut registry = PluginRegistry::with_library_providers();
     registry.set_external_analyzer(Arc::new(ExternalAnalyzerHandle::ready(external)));
 
-    let configuration = DatabaseConfiguration {
-        workspace: Cow::Owned(Path::new("/invocation-proof").to_path_buf()),
-        paths: vec![Cow::Borrowed(b"src")],
-        includes: vec![],
-        patches: vec![],
-        excludes: vec![],
-        extensions: vec![Cow::Borrowed(b"php")],
-        glob: GlobSettings::default(),
-    };
+    let configuration = common::database_configuration("/invocation-proof", vec![Cow::Borrowed(b"src")]);
     let mut database = Database::new(configuration);
     database.add(File::new(
         Cow::Borrowed(b"src/invocation.php"),

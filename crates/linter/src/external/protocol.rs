@@ -157,7 +157,6 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
             }
 
             extension_rules.push(ExternalRule {
-                extension: identifier.clone(),
                 code,
                 name: rule_name,
                 description,
