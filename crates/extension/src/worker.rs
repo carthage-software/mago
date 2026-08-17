@@ -7,7 +7,7 @@ use std::io::Write;
 use std::net::Ipv4Addr;
 #[cfg(windows)]
 use std::net::TcpListener;
-#[cfg(windows)]
+#[cfg(any(windows, test))]
 use std::net::TcpStream;
 use std::process::Child;
 use std::process::ChildStderr;
@@ -47,7 +47,7 @@ const INITIAL_SHUTDOWN_POLL_INTERVAL: Duration = Duration::from_micros(50);
 const MAXIMUM_SHUTDOWN_POLL_INTERVAL: Duration = Duration::from_millis(1);
 #[cfg(windows)]
 const INPUT_CONNECT_TIMEOUT: Duration = Duration::from_secs(10);
-#[cfg(windows)]
+#[cfg(any(windows, test))]
 const INPUT_AUTHENTICATION_TIMEOUT: Duration = Duration::from_secs(2);
 #[cfg(windows)]
 const INPUT_ADDRESS_ENVIRONMENT_VARIABLE: &str = "MAGO_EXTENSION_INPUT_ADDRESS";
@@ -811,14 +811,10 @@ fn accept_windows_input(listener: &TcpListener, token: &str, child: &mut Child) 
                     continue;
                 }
 
-                stream.set_read_timeout(Some(INPUT_AUTHENTICATION_TIMEOUT))?;
-                let mut received = vec![0; token.len()];
-                stream.read_exact(&mut received)?;
-                if received != token.as_bytes() {
+                if !authenticate_windows_input(&mut stream, token)? {
                     continue;
                 }
 
-                stream.set_read_timeout(None)?;
                 stream.set_nodelay(true)?;
                 tracing::trace!(process = child.id(), %peer, "Extension worker connected its Windows input stream.");
                 return Ok(stream);
@@ -843,6 +839,16 @@ fn accept_windows_input(listener: &TcpListener, token: &str, child: &mut Child) 
 
         std::thread::sleep(Duration::from_millis(1));
     }
+}
+
+#[cfg(any(windows, test))]
+fn authenticate_windows_input(stream: &mut TcpStream, token: &str) -> std::io::Result<bool> {
+    stream.set_nonblocking(false)?;
+    stream.set_read_timeout(Some(INPUT_AUTHENTICATION_TIMEOUT))?;
+    let mut received = vec![0; token.len()];
+    stream.read_exact(&mut received)?;
+    stream.set_read_timeout(None)?;
+    Ok(received == token.as_bytes())
 }
 
 fn take_pipe<T>(id: usize, name: &'static str, pipe: Option<T>, child: &mut Child) -> Result<T, WorkerError> {
@@ -953,6 +959,27 @@ mod tests {
         tail.extend(b"abcdefgh");
 
         assert_eq!(tail.display(), "efgh");
+    }
+
+    #[test]
+    fn windows_input_authentication_waits_for_a_delayed_token() {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).expect("listener should bind");
+        let address = listener.local_addr().expect("listener should have an address");
+        let sender = std::thread::spawn(move || {
+            let mut stream = TcpStream::connect(address).expect("peer should connect");
+            std::thread::sleep(Duration::from_millis(25));
+            stream.write_all(b"0123456789abcdef0123456789abcdef").expect("token should be written");
+        });
+
+        let (mut stream, _) = listener.accept().expect("host should accept peer");
+        stream.set_nonblocking(true).expect("accepted stream should become non-blocking");
+
+        assert!(
+            authenticate_windows_input(&mut stream, "0123456789abcdef0123456789abcdef")
+                .expect("authentication should wait for the token")
+        );
+
+        sender.join().expect("sender should finish");
     }
 
     #[test]
