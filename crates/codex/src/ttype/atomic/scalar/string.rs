@@ -374,7 +374,6 @@ impl TString {
 
 impl TType for TString {
     #[inline]
-
     fn get_id(&self) -> Word {
         let s = match &self.literal {
             Some(TStringLiteral::Value(s)) => return concat_word!(b"string('", s, b"')"),

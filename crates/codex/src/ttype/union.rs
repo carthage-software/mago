@@ -1497,17 +1497,13 @@ fn widened_scalar(scalar: &TScalar, kind: WidenKind) -> Option<TScalar> {
         (TScalar::Integer(integer), WidenKind::Scalars) if !matches!(integer, TInteger::Unspecified) => {
             Some(TScalar::Integer(TInteger::Unspecified))
         }
-        (TScalar::Integer(integer), WidenKind::Literals)
-            if matches!(integer, TInteger::Literal(_) | TInteger::UnspecifiedLiteral) =>
-        {
+        (TScalar::Integer(TInteger::Literal(_) | TInteger::UnspecifiedLiteral), WidenKind::Literals) => {
             Some(TScalar::Integer(TInteger::Unspecified))
         }
         (TScalar::Float(float), WidenKind::Scalars) if !matches!(float, TFloat::Float) => {
             Some(TScalar::Float(TFloat::Float))
         }
-        (TScalar::Float(float), WidenKind::Literals)
-            if matches!(float, TFloat::Literal(_) | TFloat::UnspecifiedLiteral) =>
-        {
+        (TScalar::Float(TFloat::Literal(_) | TFloat::UnspecifiedLiteral), WidenKind::Literals) => {
             Some(TScalar::Float(TFloat::Float))
         }
         (TScalar::Bool(boolean), _) if !boolean.is_general() => Some(TScalar::Bool(TBool::general())),

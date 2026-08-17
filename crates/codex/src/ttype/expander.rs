@@ -151,7 +151,7 @@ pub enum StaticClassType {
     Object(TObject),
 }
 
-#[derive(Debug)]
+#[derive(Debug, Default)]
 pub struct TypeExpansionOptions {
     pub self_class: Option<Word>,
     pub static_class_type: StaticClassType,
@@ -161,17 +161,6 @@ pub struct TypeExpansionOptions {
     /// to the receiver. Elsewhere the mixin relationship between two class names
     /// says nothing about how a value was obtained, so no rebinding happens.
     pub allow_mixin_static_rebind: bool,
-}
-
-impl Default for TypeExpansionOptions {
-    fn default() -> Self {
-        Self {
-            self_class: None,
-            static_class_type: StaticClassType::default(),
-            function_is_final: false,
-            allow_mixin_static_rebind: false,
-        }
-    }
 }
 
 /// Expands a type union, resolving special types like `self`, `static`, `parent`,
@@ -2519,7 +2508,7 @@ mod tests {
         let alias = TAlias::new(ascii_lowercase_word(b"foo"), word("SelfAlias"));
         let input = TUnion::from_atomic(TAtomic::Alias(alias));
 
-        let options = TypeExpansionOptions { ..Default::default() };
+        let options = TypeExpansionOptions::default();
         let mut actual = input;
         expand_union(&codebase, &mut actual, &options);
 

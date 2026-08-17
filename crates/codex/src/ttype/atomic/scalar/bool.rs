@@ -64,7 +64,6 @@ impl TBool {
 
 impl TType for TBool {
     #[inline]
-
     fn get_id(&self) -> Word {
         match self.value {
             Some(true) => word("true"),

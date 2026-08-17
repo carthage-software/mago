@@ -915,7 +915,6 @@ impl TInteger {
 
 impl TType for TInteger {
     #[inline]
-
     fn get_id(&self) -> Word {
         match self {
             TInteger::Literal(value) => {

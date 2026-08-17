@@ -124,7 +124,6 @@ impl From<f64> for TFloat {
 
 impl TType for TFloat {
     #[inline]
-
     fn get_id(&self) -> Word {
         match self {
             Self::Float => word("float"),

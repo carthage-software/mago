@@ -192,13 +192,7 @@ where
         expander::expand_union(
             context.codebase,
             &mut resulting_union,
-            &TypeExpansionOptions {
-                self_class,
-                static_class_type,
-                function_is_final,
-                allow_mixin_static_rebind,
-                ..Default::default()
-            },
+            &TypeExpansionOptions { self_class, static_class_type, function_is_final, allow_mixin_static_rebind },
         );
     }
 
