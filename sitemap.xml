@@ -3,6 +3,30 @@
   <url><loc>https://mago.carthage.software/main/en/</loc></url>
   <url><loc>https://mago.carthage.software/main/en/benchmarks</loc></url>
   <url><loc>https://mago.carthage.software/main/en/contributing</loc></url>
+  <url><loc>https://mago.carthage.software/main/en/extensions/analyzer/analysis-results-and-references</loc></url>
+  <url><loc>https://mago.carthage.software/main/en/extensions/analyzer/assertion-providers</loc></url>
+  <url><loc>https://mago.carthage.software/main/en/extensions/analyzer/codebase-metadata</loc></url>
+  <url><loc>https://mago.carthage.software/main/en/extensions/analyzer/entry-points-and-issue-filtering</loc></url>
+  <url><loc>https://mago.carthage.software/main/en/extensions/analyzer/lifecycle-hooks</loc></url>
+  <url><loc>https://mago.carthage.software/main/en/extensions/analyzer/overview</loc></url>
+  <url><loc>https://mago.carthage.software/main/en/extensions/analyzer/properties-and-initialization</loc></url>
+  <url><loc>https://mago.carthage.software/main/en/extensions/analyzer/return-types-and-callable-signatures</loc></url>
+  <url><loc>https://mago.carthage.software/main/en/extensions/analyzer/targeted-analysis-hooks</loc></url>
+  <url><loc>https://mago.carthage.software/main/en/extensions/analyzer/types-and-comparisons</loc></url>
+  <url><loc>https://mago.carthage.software/main/en/extensions/architecture</loc></url>
+  <url><loc>https://mago.carthage.software/main/en/extensions/configuration</loc></url>
+  <url><loc>https://mago.carthage.software/main/en/extensions/development/packaging-and-compatibility</loc></url>
+  <url><loc>https://mago.carthage.software/main/en/extensions/development/performance</loc></url>
+  <url><loc>https://mago.carthage.software/main/en/extensions/development/testing-and-debugging</loc></url>
+  <url><loc>https://mago.carthage.software/main/en/extensions/getting-started</loc></url>
+  <url><loc>https://mago.carthage.software/main/en/extensions/linter/overview</loc></url>
+  <url><loc>https://mago.carthage.software/main/en/extensions/linter/rules</loc></url>
+  <url><loc>https://mago.carthage.software/main/en/extensions/overview</loc></url>
+  <url><loc>https://mago.carthage.software/main/en/extensions/reference/sdk-index</loc></url>
+  <url><loc>https://mago.carthage.software/main/en/extensions/sdk/extensions-and-workers</loc></url>
+  <url><loc>https://mago.carthage.software/main/en/extensions/sdk/reporting</loc></url>
+  <url><loc>https://mago.carthage.software/main/en/extensions/sdk/syntax-and-source</loc></url>
+  <url><loc>https://mago.carthage.software/main/en/extensions/sdk/worker-reduction</loc></url>
   <url><loc>https://mago.carthage.software/main/en/faq</loc></url>
   <url><loc>https://mago.carthage.software/main/en/fundamentals/baseline</loc></url>
   <url><loc>https://mago.carthage.software/main/en/fundamentals/command-line-interface</loc></url>
