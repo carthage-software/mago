@@ -298,6 +298,21 @@ pub fn is_contained_by(
         return true;
     }
 
+    if let TAtomic::Object(TObject::HasMethod(container_has_method)) = container_type_part {
+        return match input_type_part {
+            TAtomic::Object(TObject::Named(input_object)) => {
+                codebase.method_exists(input_object.get_name().as_bytes(), container_has_method.get_method().as_bytes())
+            }
+            TAtomic::Object(TObject::Enum(input_enum)) => {
+                codebase.method_exists(input_enum.get_name().as_bytes(), container_has_method.get_method().as_bytes())
+            }
+            TAtomic::Object(TObject::HasMethod(input_has_method)) => {
+                input_has_method.has_method(container_has_method.get_method().as_bytes())
+            }
+            _ => false,
+        };
+    }
+
     if let TAtomic::Object(TObject::WithProperties(container_object_with_properties)) = container_type_part
         && let TAtomic::Object(input_object) = input_type_part
     {
