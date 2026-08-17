@@ -84,7 +84,7 @@ where
         match assertion_type {
             TAtomic::Scalar(TScalar::Generic) => {
                 return intersect_simple!(
-                    TAtomic::Scalar(scalar) if !scalar.is_generic(),
+                    TAtomic::Scalar(_),
                     TAtomic::Mixed(_),
                     context,
                     get_scalar(),
