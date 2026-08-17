@@ -185,8 +185,4 @@ impl TType for TDerived {
             TDerived::Intersection(intersection) => intersection.get_id(),
         }
     }
-
-    fn get_pretty_id_with_indent(&self, _indent: usize) -> Word {
-        self.get_id()
-    }
 }

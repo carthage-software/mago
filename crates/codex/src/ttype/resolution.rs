@@ -3,7 +3,6 @@ use mago_word::WordMap;
 use mago_word::WordSet;
 
 use crate::ttype::template::GenericTemplate;
-use crate::ttype::union::TUnion;
 
 /// Holds contextual information necessary for resolving generic template types (`@template`).
 ///
@@ -15,10 +14,6 @@ use crate::ttype::union::TUnion;
 pub struct TypeResolutionContext {
     /// Definitions of template types available in this context, including their constraints.
     template_definitions: WordMap<Vec<GenericTemplate>>,
-
-    /// Concrete types that template parameters (often from an outer scope) resolve to
-    /// within this specific context.
-    resolved_template_types: WordMap<TUnion>,
 
     /// Type aliases defined in the current class scope (from @type tags).
     type_aliases: WordSet,
@@ -41,7 +36,6 @@ impl TypeResolutionContext {
     pub fn new() -> Self {
         Self {
             template_definitions: WordMap::default(),
-            resolved_template_types: WordMap::default(),
             type_aliases: WordSet::default(),
             imported_type_aliases: WordMap::default(),
         }
@@ -51,10 +45,7 @@ impl TypeResolutionContext {
     #[inline]
     #[must_use]
     pub fn is_empty(&self) -> bool {
-        self.template_definitions.is_empty()
-            && self.resolved_template_types.is_empty()
-            && self.type_aliases.is_empty()
-            && self.imported_type_aliases.is_empty()
+        self.template_definitions.is_empty() && self.type_aliases.is_empty() && self.imported_type_aliases.is_empty()
     }
 
     /// Adds a template type definition (e.g., from an `@template T of Constraint` tag).
@@ -69,43 +60,10 @@ impl TypeResolutionContext {
         self
     }
 
-    /// Adds a mapping indicating that a template parameter resolves to a specific concrete type
-    /// within this context.
-    ///
-    /// # Arguments
-    ///
-    /// * `name`: The name of the template parameter (e.g., `"T"`).
-    /// * `resolved_type`: The concrete `TUnion` type that `name` resolves to here.
-    #[must_use]
-    pub fn with_resolved_template_type(mut self, name: Word, resolved_type: TUnion) -> Self {
-        self.resolved_template_types.insert(name, resolved_type);
-        self
-    }
-
-    /// Returns a reference to the template definitions map.
-    #[inline]
-    #[must_use]
-    pub fn get_template_definitions(&self) -> &WordMap<Vec<GenericTemplate>> {
-        &self.template_definitions
-    }
-
     /// Returns a mutable reference to the template definitions map.
     #[inline]
     pub fn get_template_definitions_mut(&mut self) -> &mut WordMap<Vec<GenericTemplate>> {
         &mut self.template_definitions
-    }
-
-    /// Returns a reference to the resolved template types map.
-    #[inline]
-    #[must_use]
-    pub fn get_resolved_template_types(&self) -> &WordMap<TUnion> {
-        &self.resolved_template_types
-    }
-
-    /// Returns a mutable reference to the resolved template types map.
-    #[inline]
-    pub fn get_resolved_template_types_mut(&mut self) -> &mut WordMap<TUnion> {
-        &mut self.resolved_template_types
     }
 
     /// Looks up the constraints for a specific template parameter defined in this context.
@@ -193,51 +151,5 @@ impl TypeResolutionContext {
     #[must_use]
     pub fn get_imported_type_alias(&self, name: Word) -> Option<&(Word, Word)> {
         self.imported_type_aliases.get(&name)
-    }
-
-    /// Checks if a specific imported type alias is defined in this context.
-    ///
-    /// # Arguments
-    ///
-    /// * `name`: The local name of the imported alias to check.
-    #[must_use]
-    pub fn has_imported_type_alias(&self, name: Word) -> bool {
-        self.imported_type_aliases.contains_key(&name)
-    }
-
-    /// Looks up the concrete type that a specific template parameter resolves to in this context.
-    ///
-    /// # Arguments
-    ///
-    /// * `name`: The name of the template parameter (e.g., `"T"`) to look up.
-    ///
-    /// # Returns
-    ///
-    /// `Some` containing a reference to the resolved `TUnion` type if found, `None` otherwise.
-    #[must_use]
-    pub fn get_resolved_template_type(&self, name: Word) -> Option<&TUnion> {
-        self.resolved_template_types.get(&name)
-    }
-
-    /// Checks if this context contains any template definitions or resolved template types.
-    #[inline]
-    #[must_use]
-    pub fn has_templates(&self) -> bool {
-        !self.template_definitions.is_empty() || !self.resolved_template_types.is_empty()
-    }
-
-    /// Checks if a specific template parameter has a concrete resolved type in this context.
-    #[inline]
-    #[must_use]
-    pub fn is_template_resolved(&self, name: Word) -> bool {
-        self.resolved_template_types.contains_key(&name)
-    }
-
-    /// Merges another `TypeResolutionContext` into this one, combining their template definitions
-    /// and resolved types.
-    #[inline]
-    pub fn merge(&mut self, other: TypeResolutionContext) {
-        self.template_definitions.extend(other.template_definitions);
-        self.resolved_template_types.extend(other.resolved_template_types);
     }
 }

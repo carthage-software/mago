@@ -143,15 +143,7 @@ impl TType for TValueOf {
         true
     }
 
-    fn is_complex(&self) -> bool {
-        false
-    }
-
     fn get_id(&self) -> Word {
         concat_word!(b"value-of<", self.0.get_id(), b">")
-    }
-
-    fn get_pretty_id_with_indent(&self, _indent: usize) -> Word {
-        self.get_id()
     }
 }

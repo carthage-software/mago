@@ -55,13 +55,12 @@ use crate::invocation::MethodTargetContext;
 pub struct InferenceOptions {
     pub infer_only_if_new: bool,
     pub argument_offset: Option<usize>,
-    pub source_span: Option<Span>,
     pub is_top_level: bool,
 }
 
 impl Default for InferenceOptions {
     fn default() -> Self {
-        Self { infer_only_if_new: false, argument_offset: None, source_span: None, is_top_level: true }
+        Self { infer_only_if_new: false, argument_offset: None, is_top_level: true }
     }
 }
 
@@ -763,7 +762,6 @@ fn infer_templates_from_input_and_container_types<A>(
                                     inferred_bound,
                                     DefinitionReplacementOptions { appearance_depth, ..Default::default() },
                                     options.argument_offset,
-                                    options.source_span,
                                 );
                             }
                         }
@@ -890,7 +888,6 @@ fn infer_templates_from_input_and_container_types<A>(
                     lower_bound_type,
                     DefinitionReplacementOptions { appearance_depth: 1, ..Default::default() },
                     options.argument_offset,
-                    options.source_span,
                 );
             }
             _ => {}
@@ -1019,7 +1016,6 @@ fn infer_templates_from_input_and_container_types<A>(
             residual_input_type.clone(),
             DefinitionReplacementOptions { appearance_depth: 1, ..Default::default() },
             options.argument_offset,
-            options.source_span,
         );
     }
 
@@ -1065,7 +1061,6 @@ fn infer_templates_from_input_and_container_types<A>(
                 re_resolved_constraint,
                 DefinitionReplacementOptions { appearance_depth: 1, ..Default::default() },
                 options.argument_offset,
-                options.source_span,
             );
         }
     }
@@ -1129,7 +1124,7 @@ pub fn infer_templates_for_method_call<'ctx, A>(
             &where_constraint.type_union,
             &actual_type,
             template_result,
-            InferenceOptions { source_span: Some(where_constraint.span), ..Default::default() },
+            InferenceOptions::default(),
             &mut Vec::default(),
         );
     }
@@ -1174,7 +1169,6 @@ pub fn infer_parameter_templates_from_argument<A>(
         InferenceOptions {
             infer_only_if_new: is_callable_argument,
             argument_offset: Some(argument_offset),
-            source_span: Some(argument_span),
             ..Default::default()
         },
         &mut violations,

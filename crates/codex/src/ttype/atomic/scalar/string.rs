@@ -56,32 +56,11 @@ impl TStringLiteral {
         TStringLiteral::Value(word(value))
     }
 
-    /// Creates the 'Value' literal state from a static string slice.
-    #[inline]
-    #[must_use]
-    pub fn value_from_static_str(value: &'static str) -> Self {
-        TStringLiteral::Value(word(value))
-    }
-
-    /// Creates the 'Value' literal state from a string slice.
-    #[inline]
-    #[must_use]
-    pub fn value_from_str(value: &str) -> Self {
-        TStringLiteral::Value(word(value))
-    }
-
     /// Checks if this represents an unspecified literal value.
     #[inline]
     #[must_use]
     pub const fn is_unspecified(&self) -> bool {
         matches!(self, TStringLiteral::Unspecified)
-    }
-
-    /// Checks if this represents a literal with a known value.
-    #[inline]
-    #[must_use]
-    pub const fn is_value(&self) -> bool {
-        matches!(self, TStringLiteral::Value(_))
     }
 
     /// Returns the known literal string value, if available.
@@ -140,25 +119,11 @@ impl TString {
         Self::new(None, false, false, false, false, TStringCasing::Lowercase)
     }
 
-    /// Creates a non-empty lowercase string instance.
-    #[inline]
-    #[must_use]
-    pub const fn non_empty_lowercase() -> Self {
-        Self::new(None, false, false, true, false, TStringCasing::Lowercase)
-    }
-
     /// Creates a uppercase string instance.
     #[inline]
     #[must_use]
     pub const fn uppercase() -> Self {
         Self::new(None, false, false, false, false, TStringCasing::Uppercase)
-    }
-
-    /// Creates a non-empty uppercase string instance.
-    #[inline]
-    #[must_use]
-    pub const fn non_empty_uppercase() -> Self {
-        Self::new(None, false, false, true, false, TStringCasing::Uppercase)
     }
 
     /// Creates a truthy string instance.
@@ -278,18 +243,6 @@ impl TString {
         matches!(self.literal, Some(TStringLiteral::Value(_)))
     }
 
-    /// Checks if this string is guaranteed to be a specific literal value.
-    ///
-    /// Returns `true` if the string is a known literal and matches the provided value.
-    #[inline]
-    #[must_use]
-    pub fn is_specific_literal(&self, value: &[u8]) -> bool {
-        match &self.literal {
-            Some(TStringLiteral::Value(s)) => s.as_bytes() == value,
-            _ => false,
-        }
-    }
-
     /// Returns the known literal string value, if available.
     #[inline]
     #[must_use]
@@ -392,13 +345,6 @@ impl TString {
         }
     }
 
-    /// Returns the literal state (`Unspecified` or `Value(...)`) if the origin is literal.
-    #[inline]
-    #[must_use]
-    pub const fn literal_state(&self) -> Option<&TStringLiteral> {
-        self.literal.as_ref()
-    }
-
     // Returns a new instance with the same properties but without the literal value.
     #[inline]
     #[must_use]
@@ -427,18 +373,7 @@ impl TString {
 }
 
 impl TType for TString {
-    fn needs_population(&self) -> bool {
-        false
-    }
-
     #[inline]
-    fn is_expandable(&self) -> bool {
-        false
-    }
-
-    fn is_complex(&self) -> bool {
-        false
-    }
 
     fn get_id(&self) -> Word {
         let s = match &self.literal {
@@ -508,10 +443,6 @@ impl TType for TString {
         };
 
         word(s)
-    }
-
-    fn get_pretty_id_with_indent(&self, _indent: usize) -> Word {
-        self.get_id()
     }
 }
 

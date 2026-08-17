@@ -40,13 +40,6 @@ pub enum TObject {
 }
 
 impl TObject {
-    /// Creates a new `Object` representing the generic `object`.
-    #[inline]
-    #[must_use]
-    pub const fn new_any() -> Self {
-        TObject::Any
-    }
-
     /// Creates a new `Object` representing an object with specific known properties.
     ///
     /// The `sealed` flag indicates whether the object is sealed (no additional properties will exist beyond those known).
@@ -63,13 +56,6 @@ impl TObject {
     #[must_use]
     pub fn new_named(name: Word) -> Self {
         TObject::Named(TNamedObject::new(name))
-    }
-
-    /// Creates a new `Object` representing `$this` for a given class name.
-    #[inline]
-    #[must_use]
-    pub fn new_named_this(name: Word) -> Self {
-        TObject::Named(TNamedObject::new_this(name))
     }
 
     /// Creates a new `TObject` representing an enum.
@@ -100,13 +86,6 @@ impl TObject {
         TObject::HasProperty(TObjectHasProperty::new(property))
     }
 
-    /// Checks if this represents the generic `object` type.
-    #[inline]
-    #[must_use]
-    pub const fn is_any(&self) -> bool {
-        matches!(self, TObject::Any)
-    }
-
     /// Checks if this represents a specific named object type (including intersections).
     #[inline]
     #[must_use]
@@ -119,79 +98,6 @@ impl TObject {
     #[must_use]
     pub const fn is_enum(&self) -> bool {
         matches!(self, TObject::Enum(_))
-    }
-
-    /// Checks if this represents an object that has a name.
-    #[inline]
-    #[must_use]
-    pub const fn has_name(&self) -> bool {
-        matches!(self, TObject::Named(_) | TObject::Enum(_))
-    }
-
-    /// Checks if this is a `HasMethod` variant.
-    #[inline]
-    #[must_use]
-    pub const fn is_has_method(&self) -> bool {
-        matches!(self, TObject::HasMethod(_))
-    }
-
-    /// Checks if this is a `HasProperty` variant.
-    #[inline]
-    #[must_use]
-    pub const fn is_has_property(&self) -> bool {
-        matches!(self, TObject::HasProperty(_))
-    }
-
-    /// Returns a reference to the `TObjectHasMethod` data if this is a `HasMethod` variant.
-    #[inline]
-    #[must_use]
-    pub const fn get_has_method_type(&self) -> Option<&TObjectHasMethod> {
-        if let TObject::HasMethod(data) = self { Some(data) } else { None }
-    }
-
-    /// Returns a mutable reference to the `TObjectHasMethod` data if this is a `HasMethod` variant.
-    #[inline]
-    pub fn get_has_method_type_mut(&mut self) -> Option<&mut TObjectHasMethod> {
-        if let TObject::HasMethod(data) = self { Some(data) } else { None }
-    }
-
-    /// Returns a reference to the `TObjectHasProperty` data if this is a `HasProperty` variant.
-    #[inline]
-    #[must_use]
-    pub const fn get_has_property_type(&self) -> Option<&TObjectHasProperty> {
-        if let TObject::HasProperty(data) = self { Some(data) } else { None }
-    }
-
-    /// Returns a mutable reference to the `TObjectHasProperty` data if this is a `HasProperty` variant.
-    #[inline]
-    pub fn get_has_property_type_mut(&mut self) -> Option<&mut TObjectHasProperty> {
-        if let TObject::HasProperty(data) = self { Some(data) } else { None }
-    }
-
-    /// Returns a reference to the `NamedObject` data if this is a `Named` variant.
-    #[inline]
-    #[must_use]
-    pub const fn get_named_object_type(&self) -> Option<&TNamedObject> {
-        if let TObject::Named(data) = self { Some(data) } else { None }
-    }
-
-    /// Returns a mutable reference to the `NamedObject` data if this is a `Named` variant.
-    #[inline]
-    pub fn get_named_object_type_mut(&mut self) -> Option<&mut TNamedObject> {
-        if let TObject::Named(data) = self { Some(data) } else { None }
-    }
-
-    /// Returns a reference to the `Enum` data if this is an `Enum` variant.
-    #[inline]
-    #[must_use]
-    pub const fn get_enum_type(&self) -> Option<&TEnum> {
-        if let TObject::Enum(data) = self { Some(data) } else { None }
-    }
-
-    /// Returns a mutable reference to the `Enum` data if this is an `Enum` variant.
-    #[inline]
-    pub fn get_enum_type_mut(&mut self) -> Option<&mut TEnum> {
-        if let TObject::Enum(data) = self { Some(data) } else { None }
     }
 
     /// Returns the primary name identifier if this is a `Named` or `Enum` variant.
@@ -211,18 +117,6 @@ impl TObject {
     pub fn get_type_parameters(&self) -> Option<&[TUnion]> {
         match self {
             TObject::Named(named_object) => named_object.get_type_parameters(),
-            _ => None,
-        }
-    }
-
-    /// Returns a slice of the additional intersection types if this supports them.
-    #[inline]
-    #[must_use]
-    pub fn get_intersection_types(&self) -> Option<&[TAtomic]> {
-        match self {
-            TObject::Named(named_object) => named_object.get_intersection_types(),
-            TObject::HasMethod(has_method) => has_method.get_intersection_types(),
-            TObject::HasProperty(has_property) => has_property.get_intersection_types(),
             _ => None,
         }
     }

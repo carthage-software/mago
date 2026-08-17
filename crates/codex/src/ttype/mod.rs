@@ -13,7 +13,6 @@ use crate::ttype::atomic::array::TArray;
 use crate::ttype::atomic::array::keyed::TKeyedArray;
 use crate::ttype::atomic::array::list::TList;
 use crate::ttype::atomic::generic::TGenericParameter;
-use crate::ttype::atomic::iterable::TIterable;
 use crate::ttype::atomic::object::TObject;
 use crate::ttype::atomic::object::named::TNamedObject;
 use crate::ttype::atomic::scalar::TScalar;
@@ -36,13 +35,11 @@ use crate::ttype::shared::EMPTY_ATOMIC_SLICE;
 use crate::ttype::shared::EMPTY_KEYED_ARRAY_ATOMIC;
 use crate::ttype::shared::EMPTY_SCALAR_ATOMIC_SLICE;
 use crate::ttype::shared::EMPTY_STRING_ATOMIC;
-use crate::ttype::shared::ENUM_STRING_ATOMIC;
 use crate::ttype::shared::FALSE_ATOMIC;
 use crate::ttype::shared::FLOAT_ATOMIC;
 use crate::ttype::shared::INT_ATOMIC;
 use crate::ttype::shared::INT_FLOAT_ATOMIC_SLICE;
 use crate::ttype::shared::INT_STRING_ATOMIC_SLICE;
-use crate::ttype::shared::INTERFACE_STRING_ATOMIC;
 use crate::ttype::shared::ISSET_FROM_LOOP_MIXED_ATOMIC;
 use crate::ttype::shared::LOWERCASE_CALLABLE_STRING_ATOMIC;
 use crate::ttype::shared::LOWERCASE_STRING_ATOMIC;
@@ -77,7 +74,6 @@ use crate::ttype::shared::RESOURCE_ATOMIC;
 use crate::ttype::shared::SCALAR_ATOMIC;
 use crate::ttype::shared::SIGNUM_RESULT_SLICE;
 use crate::ttype::shared::STRING_ATOMIC;
-use crate::ttype::shared::TRAIT_STRING_ATOMIC;
 use crate::ttype::shared::TRUE_ATOMIC;
 use crate::ttype::shared::TRUTHY_LOWERCASE_STRING_ATOMIC;
 use crate::ttype::shared::TRUTHY_MIXED_ATOMIC;
@@ -169,13 +165,19 @@ pub trait TType {
         false
     }
 
-    fn needs_population(&self) -> bool;
+    fn needs_population(&self) -> bool {
+        false
+    }
 
-    fn is_expandable(&self) -> bool;
+    fn is_expandable(&self) -> bool {
+        false
+    }
 
     /// Returns true if this type has complex structure that benefits from
     /// multiline formatting when used as a generic parameter.
-    fn is_complex(&self) -> bool;
+    fn is_complex(&self) -> bool {
+        false
+    }
 
     /// Return a human-readable atom for this type, which is
     /// suitable for use in error messages or debugging.
@@ -188,7 +190,9 @@ pub trait TType {
         self.get_pretty_id_with_indent(0)
     }
 
-    fn get_pretty_id_with_indent(&self, indent: usize) -> Word;
+    fn get_pretty_id_with_indent(&self, _indent: usize) -> Word {
+        self.get_id()
+    }
 }
 
 /// Implements the `TType` trait for `TypeRef`.
@@ -525,64 +529,8 @@ pub fn get_string_with_props(
 
 #[inline]
 #[must_use]
-pub fn get_literal_class_string(value: Word) -> TUnion {
-    TUnion::from_single(Cow::Owned(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::literal(value)))))
-}
-
-#[inline]
-#[must_use]
 pub fn get_class_string() -> TUnion {
     TUnion::from_single(Cow::Borrowed(CLASS_STRING_ATOMIC))
-}
-
-#[inline]
-#[must_use]
-pub fn get_class_string_of_type(constraint: TAtomic) -> TUnion {
-    TUnion::from_single(Cow::Owned(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::class_string_of_type(
-        constraint,
-    )))))
-}
-
-#[inline]
-#[must_use]
-pub fn get_interface_string() -> TUnion {
-    TUnion::from_single(Cow::Borrowed(INTERFACE_STRING_ATOMIC))
-}
-
-#[inline]
-#[must_use]
-pub fn get_interface_string_of_type(constraint: TAtomic) -> TUnion {
-    TUnion::from_single(Cow::Owned(TAtomic::Scalar(TScalar::ClassLikeString(
-        TClassLikeString::interface_string_of_type(constraint),
-    ))))
-}
-
-#[inline]
-#[must_use]
-pub fn get_enum_string() -> TUnion {
-    TUnion::from_single(Cow::Borrowed(ENUM_STRING_ATOMIC))
-}
-
-#[inline]
-#[must_use]
-pub fn get_enum_string_of_type(constraint: TAtomic) -> TUnion {
-    TUnion::from_single(Cow::Owned(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::enum_string_of_type(
-        constraint,
-    )))))
-}
-
-#[inline]
-#[must_use]
-pub fn get_trait_string() -> TUnion {
-    TUnion::from_single(Cow::Borrowed(TRAIT_STRING_ATOMIC))
-}
-
-#[inline]
-#[must_use]
-pub fn get_trait_string_of_type(constraint: TAtomic) -> TUnion {
-    TUnion::from_single(Cow::Owned(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::trait_string_of_type(
-        constraint,
-    )))))
 }
 
 #[inline]
@@ -861,12 +809,6 @@ pub fn get_named_object(name: Word, type_resolution_context: Option<&TypeResolut
 
 #[inline]
 #[must_use]
-pub fn get_iterable(key_parameter: TUnion, value_parameter: TUnion) -> TUnion {
-    wrap_atomic(TAtomic::Iterable(TIterable::new(Arc::new(key_parameter), Arc::new(value_parameter))))
-}
-
-#[inline]
-#[must_use]
 pub fn get_list(element_type: TUnion) -> TUnion {
     wrap_atomic(TAtomic::Array(TArray::List(TList::new(Arc::new(element_type)))))
 }
@@ -1086,7 +1028,6 @@ pub fn intersect_union_types(type_1: &TUnion, type_2: &TUnion, codebase: &Codeba
             false,
             &mut ComparisonResult::default(),
         ) {
-            intersection_performed = true;
             combined_type = Some(type_1.clone());
         } else if union_comparator::is_contained_by(
             codebase,
@@ -1097,7 +1038,6 @@ pub fn intersect_union_types(type_1: &TUnion, type_2: &TUnion, codebase: &Codeba
             false,
             &mut ComparisonResult::default(),
         ) {
-            intersection_performed = true;
             combined_type = Some(type_2.clone());
         }
     }
@@ -1111,10 +1051,6 @@ pub fn intersect_union_types(type_1: &TUnion, type_2: &TUnion, codebase: &Codeba
         final_type.set_ignore_nullable_issues(type_1.ignore_nullable_issues() && type_2.ignore_nullable_issues());
 
         return Some(final_type);
-    }
-
-    if !intersection_performed && type_1.get_id() != type_2.get_id() {
-        return None;
     }
 
     None

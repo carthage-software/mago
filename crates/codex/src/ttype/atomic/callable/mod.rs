@@ -125,40 +125,11 @@ impl TCallableSignature {
         self.is_closure
     }
 
-    /// Checks if the callable has a source, indicating it is an alias or reference to another function-like construct.
-    #[inline]
-    #[must_use]
-    pub const fn has_source(&self) -> bool {
-        self.source.is_some()
-    }
-
     /// Returns the source of the callable, if it is an alias or reference to another function-like construct.
     #[inline]
     #[must_use]
     pub fn get_source(&self) -> Option<FunctionLikeIdentifier> {
         self.source
-    }
-
-    /// Clones the signature as a closure, setting `is_closure` to `true`.
-    #[inline]
-    #[must_use]
-    pub fn clone_as_closure(&self) -> Self {
-        Self {
-            is_pure: self.is_pure,
-            is_closure: true,
-            parameters: self.parameters.clone(),
-            return_type: self.return_type.clone(),
-            source: self.source,
-            constraints: self.constraints.clone(),
-        }
-    }
-
-    /// Returns a new instance with `is_pure` set to the given value.
-    #[inline]
-    #[must_use]
-    pub fn with_pure(mut self, is_pure: bool) -> Self {
-        self.is_pure = is_pure;
-        self
     }
 
     /// Returns a new instance with the given parameters.
@@ -202,20 +173,6 @@ impl TCallable {
             TCallable::Signature(signature) => signature.is_closure(),
             TCallable::Alias(identifier) => identifier.is_closure(),
         }
-    }
-
-    /// Checks if this representation is a concrete `Signature`.
-    #[inline]
-    #[must_use]
-    pub const fn is_signature(&self) -> bool {
-        matches!(self, TCallable::Signature(_))
-    }
-
-    /// Checks if this representation is an `Alias` to another function-like.
-    #[inline]
-    #[must_use]
-    pub const fn is_alias(&self) -> bool {
-        matches!(self, TCallable::Alias(_))
     }
 
     /// Returns a reference to the `CallableSignature` if this is the `Signature` variant.

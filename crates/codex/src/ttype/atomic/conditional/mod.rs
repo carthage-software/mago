@@ -29,36 +29,16 @@ impl TConditional {
         Self { subject, target, then, otherwise, negated }
     }
 
-    #[must_use]
-    pub fn get_subject(&self) -> &TUnion {
-        &self.subject
-    }
-
     pub fn get_subject_mut(&mut self) -> &mut TUnion {
         Arc::make_mut(&mut self.subject)
-    }
-
-    #[must_use]
-    pub fn get_target(&self) -> &TUnion {
-        &self.target
     }
 
     pub fn get_target_mut(&mut self) -> &mut TUnion {
         Arc::make_mut(&mut self.target)
     }
 
-    #[must_use]
-    pub fn get_then(&self) -> &TUnion {
-        &self.then
-    }
-
     pub fn get_then_mut(&mut self) -> &mut TUnion {
         Arc::make_mut(&mut self.then)
-    }
-
-    #[must_use]
-    pub fn get_otherwise(&self) -> &TUnion {
-        &self.otherwise
     }
 
     pub fn get_otherwise_mut(&mut self) -> &mut TUnion {
@@ -92,10 +72,6 @@ impl TType for TConditional {
         true
     }
 
-    fn is_complex(&self) -> bool {
-        false
-    }
-
     fn get_id(&self) -> Word {
         concat_word!(
             "(",
@@ -108,9 +84,5 @@ impl TType for TConditional {
             self.otherwise.get_id(),
             ")"
         )
-    }
-
-    fn get_pretty_id_with_indent(&self, _indent: usize) -> Word {
-        self.get_id()
     }
 }

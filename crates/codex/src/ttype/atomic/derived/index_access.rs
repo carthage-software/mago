@@ -170,15 +170,7 @@ impl TType for TIndexAccess {
         true
     }
 
-    fn is_complex(&self) -> bool {
-        false
-    }
-
     fn get_id(&self) -> Word {
         concat_word!(self.target_type.get_id(), b"[", self.index_type.get_id(), b"]")
-    }
-
-    fn get_pretty_id_with_indent(&self, _indent: usize) -> Word {
-        self.get_id()
     }
 }

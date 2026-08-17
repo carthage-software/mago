@@ -85,12 +85,6 @@ pub const NUMERIC_TRUTHY_STRING_ATOMIC: &TAtomic =
     &TAtomic::Scalar(TScalar::String(TString::new(None, true, true, false, false, TStringCasing::Unspecified)));
 /// A static `TAtomic` representing the `class-string` type.
 pub const CLASS_STRING_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::class_string());
-/// A static `TAtomic` representing the `interface-string` type.
-pub const INTERFACE_STRING_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::interface_string());
-/// A static `TAtomic` representing the `enum-string` type.
-pub const ENUM_STRING_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::enum_string());
-/// A static `TAtomic` representing the `trait-string` type.
-pub const TRAIT_STRING_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::trait_string());
 /// A static `TAtomic` representing the `float` type.
 pub const FLOAT_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::float());
 /// A static `TAtomic` representing the `literal-float` type (unspecified literal).
@@ -101,10 +95,6 @@ pub const MIXED_ATOMIC: &TAtomic = &TAtomic::Mixed(TMixed::new());
 pub const ISSET_FROM_LOOP_MIXED_ATOMIC: &TAtomic = &TAtomic::Mixed(TMixed::isset_from_loop());
 /// A static `TAtomic` representing the `never` type, which indicates an impossible state.
 pub const NEVER_ATOMIC: &TAtomic = &TAtomic::Never;
-/// A static `TAtomic` representing any value that is not `null`.
-pub const NON_NULL_ATOMIC: &TAtomic = &TAtomic::Mixed(TMixed::non_null());
-/// A static `TAtomic` representing any "falsy" value (e.g., `false`, `0`, `""`, `[]`).
-pub const FALSY_MIXED_ATOMIC: &TAtomic = &TAtomic::Mixed(TMixed::falsy());
 /// A static `TAtomic` representing any "truthy" value.
 pub const TRUTHY_MIXED_ATOMIC: &TAtomic = &TAtomic::Mixed(TMixed::truthy());
 /// A static `TAtomic` representing the `resource` type.

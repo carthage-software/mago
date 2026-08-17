@@ -80,10 +80,6 @@ impl TType for TIntMask {
         true
     }
 
-    fn is_complex(&self) -> bool {
-        false
-    }
-
     fn get_id(&self) -> Word {
         let mut id: Vec<u8> = b"int-mask<".to_vec();
         for (i, value) in self.values.iter().enumerate() {
@@ -94,9 +90,5 @@ impl TType for TIntMask {
         }
         id.push(b'>');
         word(&id)
-    }
-
-    fn get_pretty_id_with_indent(&self, _indent: usize) -> Word {
-        self.get_id()
     }
 }

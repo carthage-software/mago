@@ -175,7 +175,7 @@ fn is_contained_by_atomic(
 
             union_comparison_result
                 .type_variable_upper_bounds
-                .push((*name, TemplateBound::new(container_type.clone(), 0, None, None)));
+                .push((*name, TemplateBound::new(container_type.clone(), 0, None)));
 
             return true;
         }
@@ -294,7 +294,7 @@ fn is_contained_by_atomic(
         if let TAtomic::Variable(name) = &container_type_part {
             union_comparison_result
                 .type_variable_lower_bounds
-                .push((*name, TemplateBound::new(input_type.clone(), 0, None, None)));
+                .push((*name, TemplateBound::new(input_type.clone(), 0, None)));
 
             type_match_found = true;
 

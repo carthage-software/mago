@@ -43,28 +43,12 @@ impl TResource {
 }
 
 impl TType for TResource {
-    fn needs_population(&self) -> bool {
-        false
-    }
-
-    fn is_expandable(&self) -> bool {
-        false
-    }
-
-    fn is_complex(&self) -> bool {
-        false
-    }
-
     fn get_id(&self) -> Word {
         match self.closed {
             Some(true) => word("closed-resource"),
             Some(false) => word("open-resource"),
             None => word("resource"),
         }
-    }
-
-    fn get_pretty_id_with_indent(&self, _indent: usize) -> Word {
-        self.get_id()
     }
 }
 

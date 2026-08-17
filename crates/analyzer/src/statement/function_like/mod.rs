@@ -567,15 +567,11 @@ where
             } else {
                 StaticClassType::None
             },
-            evaluate_class_constants: true,
-            evaluate_conditional_types: true,
             function_is_final: if let Some(method_metadata) = &function_like_metadata.method_metadata {
                 method_metadata.is_final
             } else {
                 false
             },
-            expand_generic: true,
-            expand_templates: true,
             ..Default::default()
         },
     );
@@ -669,7 +665,6 @@ where
                 static_class_type: StaticClassType::Name(calling_class),
                 function_is_final: function_like_metadata
                     .is_some_and(|m| m.method_metadata.as_ref().is_some_and(|metadata| metadata.is_final)),
-                expand_generic: true,
                 ..Default::default()
             },
         );

@@ -194,11 +194,6 @@ impl TAtomic {
     }
 
     #[must_use]
-    pub fn is_enum_case(&self) -> bool {
-        matches!(self, TAtomic::Object(TObject::Enum(TEnum { case: Some(_), .. })))
-    }
-
-    #[must_use]
     pub fn is_object_type(&self) -> bool {
         match self {
             TAtomic::Object(_) => true,
@@ -247,13 +242,6 @@ impl TAtomic {
         }
 
         object_names
-    }
-
-    #[must_use]
-    pub fn is_stdclass(&self) -> bool {
-        matches!(&self, TAtomic::Object(object) if {
-            object.get_name().is_some_and(|name| name.as_bytes().eq_ignore_ascii_case(b"stdClass"))
-        })
     }
 
     #[must_use]
@@ -344,10 +332,6 @@ impl TAtomic {
         matches!(self, TAtomic::Array(array) if array.is_keyed())
     }
 
-    pub fn is_non_empty_keyed_array(&self) -> bool {
-        matches!(self, TAtomic::Array(array) if array.get_keyed().is_some_and(array::keyed::TKeyedArray::is_non_empty))
-    }
-
     #[inline]
     #[must_use]
     pub const fn is_array(&self) -> bool {
@@ -430,12 +414,6 @@ impl TAtomic {
 
     #[inline]
     #[must_use]
-    pub fn could_be_countable(&self, codebase: &CodebaseMetadata) -> bool {
-        self.is_mixed() || self.is_countable(codebase)
-    }
-
-    #[inline]
-    #[must_use]
     pub fn is_traversable(&self, codebase: &CodebaseMetadata) -> bool {
         self.extends_or_implements(codebase, b"Traversable")
             || self.extends_or_implements(codebase, b"Iterator")
@@ -477,22 +455,6 @@ impl TAtomic {
         }
     }
 
-    #[must_use]
-    pub fn get_array_key_type(&self) -> Option<TUnion> {
-        match self {
-            TAtomic::Array(array) => array.get_key_type(),
-            _ => None,
-        }
-    }
-
-    #[must_use]
-    pub fn get_array_value_type(&self) -> Option<TUnion> {
-        match self {
-            TAtomic::Array(array) => array.get_value_type(),
-            _ => None,
-        }
-    }
-
     #[inline]
     #[must_use]
     pub const fn is_generic_scalar(&self) -> bool {
@@ -503,15 +465,6 @@ impl TAtomic {
     #[must_use]
     pub const fn is_some_scalar(&self) -> bool {
         matches!(self, TAtomic::Scalar(_))
-    }
-
-    #[inline]
-    #[must_use]
-    pub const fn is_boring_scalar(&self) -> bool {
-        matches!(
-            self,
-            TAtomic::Scalar(scalar) if scalar.is_boring()
-        )
     }
 
     #[inline]
@@ -695,18 +648,6 @@ impl TAtomic {
 
     #[inline]
     #[must_use]
-    pub const fn is_closed_resource(&self) -> bool {
-        matches!(self, TAtomic::Resource(resource) if resource.is_closed())
-    }
-
-    #[inline]
-    #[must_use]
-    pub const fn is_open_resource(&self) -> bool {
-        matches!(self, TAtomic::Resource(resource) if resource.is_open())
-    }
-
-    #[inline]
-    #[must_use]
     pub const fn is_literal(&self) -> bool {
         match self {
             TAtomic::Scalar(scalar) => scalar.is_literal_value(),
@@ -792,33 +733,6 @@ impl TAtomic {
     #[must_use]
     pub fn is_derived(&self) -> bool {
         matches!(self, TAtomic::Derived(_))
-    }
-
-    #[must_use]
-    pub fn clone_without_intersection_types(&self) -> TAtomic {
-        let mut clone = self.clone();
-        match &mut clone {
-            TAtomic::Object(TObject::Named(named_object)) => {
-                named_object.intersection_types = None;
-            }
-            TAtomic::GenericParameter(parameter) => {
-                parameter.intersection_types = None;
-            }
-            TAtomic::Iterable(iterable) => {
-                iterable.intersection_types = None;
-            }
-            TAtomic::Reference(TReference::Symbol { intersection_types, .. }) => {
-                *intersection_types = None;
-            }
-            TAtomic::Derived(TDerived::Intersection(intersection)) => {
-                if let Some(intersection_types) = intersection.get_intersection_types_mut() {
-                    intersection_types.clear();
-                }
-            }
-            _ => {}
-        }
-
-        clone
     }
 
     pub fn remove_placeholders(&mut self) {

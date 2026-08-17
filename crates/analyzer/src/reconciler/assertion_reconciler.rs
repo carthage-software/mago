@@ -132,11 +132,7 @@ where
             }
         }
 
-        expander::expand_union(
-            codebase,
-            &mut refined_type,
-            &TypeExpansionOptions { expand_generic: true, ..Default::default() },
-        );
+        expander::expand_union(codebase, &mut refined_type, &TypeExpansionOptions::default());
 
         return refined_type;
     }

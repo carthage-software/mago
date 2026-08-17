@@ -155,12 +155,7 @@ pub enum StaticClassType {
 pub struct TypeExpansionOptions {
     pub self_class: Option<Word>,
     pub static_class_type: StaticClassType,
-    pub parent_class: Option<Word>,
-    pub evaluate_class_constants: bool,
-    pub evaluate_conditional_types: bool,
     pub function_is_final: bool,
-    pub expand_generic: bool,
-    pub expand_templates: bool,
     /// True when expanding the return type of a method resolved through `@mixin`:
     /// a pre-bound `static` that reaches the receiver through mixin tags rebinds
     /// to the receiver. Elsewhere the mixin relationship between two class names
@@ -173,12 +168,7 @@ impl Default for TypeExpansionOptions {
         Self {
             self_class: None,
             static_class_type: StaticClassType::default(),
-            parent_class: None,
-            evaluate_class_constants: true,
-            evaluate_conditional_types: false,
             function_is_final: false,
-            expand_generic: false,
-            expand_templates: true,
             allow_mixin_static_rebind: false,
         }
     }
@@ -949,46 +939,28 @@ fn get_signature_of_function_like_identifier_with_options(
     codebase: &CodebaseMetadata,
     preserve_parameter_dependencies: bool,
 ) -> Option<TCallableSignature> {
-    Some(match function_like_identifier {
+    let (function_like_metadata, options) = match function_like_identifier {
         FunctionLikeIdentifier::Function(name) => {
-            let function_like_metadata = codebase.get_function(name.as_bytes())?;
-
-            get_signature_of_function_like_metadata_with_options(
-                function_like_identifier,
-                function_like_metadata,
-                codebase,
-                &TypeExpansionOptions::default(),
-                preserve_parameter_dependencies,
-            )
+            (codebase.get_function(name.as_bytes())?, TypeExpansionOptions::default())
         }
-        FunctionLikeIdentifier::Closure(name) => {
-            let function_like_metadata = codebase.get_closure(name)?;
+        FunctionLikeIdentifier::Closure(name) => (codebase.get_closure(name)?, TypeExpansionOptions::default()),
+        FunctionLikeIdentifier::Method(classlike_name, method_name) => (
+            codebase.get_declaring_method(classlike_name.as_bytes(), method_name.as_bytes())?,
+            TypeExpansionOptions {
+                self_class: Some(*classlike_name),
+                static_class_type: StaticClassType::Name(*classlike_name),
+                ..Default::default()
+            },
+        ),
+    };
 
-            get_signature_of_function_like_metadata_with_options(
-                function_like_identifier,
-                function_like_metadata,
-                codebase,
-                &TypeExpansionOptions::default(),
-                preserve_parameter_dependencies,
-            )
-        }
-        FunctionLikeIdentifier::Method(classlike_name, method_name) => {
-            let function_like_metadata =
-                codebase.get_declaring_method(classlike_name.as_bytes(), method_name.as_bytes())?;
-
-            get_signature_of_function_like_metadata_with_options(
-                function_like_identifier,
-                function_like_metadata,
-                codebase,
-                &TypeExpansionOptions {
-                    self_class: Some(*classlike_name),
-                    static_class_type: StaticClassType::Name(*classlike_name),
-                    ..Default::default()
-                },
-                preserve_parameter_dependencies,
-            )
-        }
-    })
+    Some(get_signature_of_function_like_metadata_with_options(
+        function_like_identifier,
+        function_like_metadata,
+        codebase,
+        &options,
+        preserve_parameter_dependencies,
+    ))
 }
 
 #[must_use]
@@ -2547,12 +2519,7 @@ mod tests {
         let alias = TAlias::new(ascii_lowercase_word(b"foo"), word("SelfAlias"));
         let input = TUnion::from_atomic(TAtomic::Alias(alias));
 
-        let options = TypeExpansionOptions {
-            evaluate_conditional_types: true,
-            expand_generic: true,
-            expand_templates: true,
-            ..Default::default()
-        };
+        let options = TypeExpansionOptions { ..Default::default() };
         let mut actual = input;
         expand_union(&codebase, &mut actual, &options);
 
@@ -2913,12 +2880,7 @@ mod tests {
         let options = TypeExpansionOptions {
             self_class: None,
             static_class_type: StaticClassType::None,
-            parent_class: None,
-            evaluate_class_constants: false,
-            evaluate_conditional_types: false,
             function_is_final: false,
-            expand_generic: false,
-            expand_templates: false,
             allow_mixin_static_rebind: false,
         };
 

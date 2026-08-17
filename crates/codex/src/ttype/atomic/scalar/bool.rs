@@ -63,18 +63,7 @@ impl TBool {
 }
 
 impl TType for TBool {
-    fn needs_population(&self) -> bool {
-        false
-    }
-
     #[inline]
-    fn is_expandable(&self) -> bool {
-        false
-    }
-
-    fn is_complex(&self) -> bool {
-        false
-    }
 
     fn get_id(&self) -> Word {
         match self.value {
@@ -82,10 +71,6 @@ impl TType for TBool {
             Some(false) => word("false"),
             None => word("bool"),
         }
-    }
-
-    fn get_pretty_id_with_indent(&self, _indent: usize) -> Word {
-        self.get_id()
     }
 }
 

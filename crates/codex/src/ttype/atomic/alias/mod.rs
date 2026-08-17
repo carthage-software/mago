@@ -69,23 +69,11 @@ impl TType for TAlias {
         vec![]
     }
 
-    fn needs_population(&self) -> bool {
-        false
-    }
-
     fn is_expandable(&self) -> bool {
         true
     }
 
-    fn is_complex(&self) -> bool {
-        false
-    }
-
     fn get_id(&self) -> Word {
         concat_word!(b"!", self.class_name.as_bytes(), b"::", self.alias_name.as_bytes())
-    }
-
-    fn get_pretty_id_with_indent(&self, _indent: usize) -> Word {
-        self.get_id()
     }
 }

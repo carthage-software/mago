@@ -80,20 +80,8 @@ impl TKeyedArray {
 
     #[inline]
     #[must_use]
-    pub fn with_no_known_items(self) -> Self {
-        Self { known_items: None, ..self }
-    }
-
-    #[inline]
-    #[must_use]
     pub fn with_parameters(self, key_type: Arc<TUnion>, value_type: Arc<TUnion>) -> Self {
         Self { parameters: Some((key_type, value_type)), ..self }
-    }
-
-    #[inline]
-    #[must_use]
-    pub fn with_no_parameters(self) -> Self {
-        Self { parameters: None, ..self }
     }
 
     #[inline]
@@ -142,20 +130,6 @@ impl TKeyedArray {
     #[must_use]
     pub fn has_known_items(&self) -> bool {
         self.known_items.as_ref().is_some_and(|elements| !elements.is_empty())
-    }
-
-    /// Checks if the list contains any known indefinite elements.
-    #[inline]
-    #[must_use]
-    pub fn has_known_indefinite_items(&self) -> bool {
-        self.known_items.as_ref().is_some_and(|elements| elements.values().any(|(indefinite, _)| *indefinite))
-    }
-
-    /// Checks if generic key/value parameters are defined.
-    #[inline]
-    #[must_use]
-    pub fn has_generic_parameters(&self) -> bool {
-        self.parameters.is_some()
     }
 
     /// Returns a new `TKeyedArray` with the specified non-empty flag.

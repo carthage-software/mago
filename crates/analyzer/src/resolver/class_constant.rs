@@ -326,7 +326,6 @@ where
             &TypeExpansionOptions {
                 self_class: Some(metadata.name),
                 static_class_type: StaticClassType::Name(metadata.name),
-                parent_class: metadata.direct_parent_class,
                 function_is_final: metadata.flags.is_final(),
                 ..Default::default()
             },
@@ -373,7 +372,6 @@ where
                 &TypeExpansionOptions {
                     self_class: Some(required_metadata.name),
                     static_class_type: StaticClassType::Name(required_metadata.name),
-                    parent_class: required_metadata.direct_parent_class,
                     function_is_final: required_metadata.flags.is_final(),
                     ..Default::default()
                 },

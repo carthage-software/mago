@@ -1,5 +1,4 @@
 use mago_allocator::Arena;
-use std::borrow::Cow;
 
 use foldhash::fast::RandomState;
 use indexmap::IndexMap;
@@ -9,27 +8,18 @@ use mago_word::Word;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
 use mago_codex::misc::GenericParent;
-use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::object::TObject;
-use mago_codex::ttype::comparator::ComparisonResult;
-use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::get_specialized_template_type;
 use mago_codex::ttype::template::GenericTemplate;
-use mago_codex::ttype::template::TemplateBound;
 use mago_codex::ttype::template::TemplateResult;
 use mago_codex::ttype::template::bounds::get_most_specific_type_from_bounds;
-use mago_reporting::Annotation;
-use mago_reporting::Issue;
-use mago_span::Span;
 
-use crate::code::IssueCode;
 use crate::context::Context;
 use crate::invocation::Invocation;
 use crate::invocation::InvocationTarget;
 use crate::invocation::MethodTargetContext;
 use crate::invocation::template_inference::infer_templates_for_method_call;
-use crate::utils::misc::unique_vec;
 use crate::utils::template::get_template_types_for_class_member;
 
 /// Populates the `TemplateResult` with template types from the invocation target.
@@ -315,160 +305,4 @@ pub(super) fn refine_template_result_for_function_like<'ctx, A>(
             )
         })
         .collect::<IndexMap<_, _, RandomState>>();
-}
-
-/// Checks the consistency of inferred template parameter bounds.
-///
-/// This function analyzes the collected lower bounds (`T >: X`) and upper bounds (`T <: Y`, `T = Z`)
-/// for each template parameter (`T`) within a `TemplateResult`. It reports errors if conflicting
-/// bounds are found, such as:
-///
-/// - A lower bound that is not a subtype of an upper bound (`X` not assignable to `Y`).
-/// - Multiple incompatible equality bounds (`T = int` and `T = string`).
-/// - A lower bound that is not compatible with an equality bound (`T >: float` and `T = int`).
-///
-/// # Arguments
-///
-/// * `context` - The analysis context, providing access to the codebase metadata.
-/// * `template_result` - The result containing the bounds to check (will be mutated if bounds are added).
-/// * `span` - The span (location) to associate with any reported errors (e.g., the call site).
-pub(super) fn check_template_result<A>(
-    context: &mut Context<'_, '_, A>,
-    template_result: &mut TemplateResult,
-    span: Span,
-) where
-    A: Arena,
-{
-    if template_result.lower_bounds.is_empty() {
-        return;
-    }
-
-    let codebase = context.codebase;
-
-    for (template_name, defining_map) in &template_result.upper_bounds {
-        for (defining_entity, upper_bound) in defining_map {
-            let lower_bounds = template_result
-                .lower_bounds
-                .entry(*template_name)
-                .or_default()
-                .entry(*defining_entity)
-                .or_insert_with(|| vec![TemplateBound::of_type(upper_bound.bound_type.clone())]);
-
-            let (lower_bound_type, upper_bound_type) = if template_result.upper_bounds_unintersectable_types.len() > 1 {
-                (
-                    Cow::Borrowed(&template_result.upper_bounds_unintersectable_types[0]),
-                    Cow::Borrowed(&template_result.upper_bounds_unintersectable_types[1]),
-                )
-            } else {
-                (
-                    Cow::Owned(get_most_specific_type_from_bounds(lower_bounds, codebase)),
-                    Cow::Borrowed(&upper_bound.bound_type),
-                )
-            };
-
-            let mut comparison_result = ComparisonResult::new();
-            let is_contained = union_comparator::is_contained_by(
-                codebase,
-                &lower_bound_type,
-                &upper_bound_type,
-                false,
-                false,
-                false,
-                &mut comparison_result,
-            );
-
-            if !is_contained {
-                let issue_kind = if comparison_result.type_coerced.unwrap_or(false)
-                    && comparison_result.type_coerced_from_as_mixed.unwrap_or(false)
-                {
-                    IssueCode::MixedArgument
-                } else {
-                    IssueCode::InvalidArgument
-                };
-
-                context.collector.report_with_code(
-                    issue_kind,
-                    Issue::error(format!("Incompatible template bounds for `{template_name}`."))
-                        .with_annotation(Annotation::primary(span).with_message(format!(
-                            "Inferred type `{}` is not compatible with declared bound `{}`",
-                            lower_bound_type.get_id(),
-                            upper_bound_type.get_id(),
-                        )))
-                        .with_note(format!("Could not reconcile bounds for template parameter `{template_name}`."))
-                        .with_help(
-                            "Check the types used for arguments or properties related to this template parameter.",
-                        ),
-                );
-            }
-        }
-    }
-
-    for (template_name, lower_bounds_map) in &template_result.lower_bounds {
-        for lower_bounds in lower_bounds_map.values() {
-            if lower_bounds.len() <= 1 {
-                continue;
-            }
-
-            let bounds_with_equality: Vec<_> =
-                lower_bounds.iter().filter(|bound| bound.equality_bound_classlike.is_some()).collect();
-
-            if !bounds_with_equality.is_empty() {
-                let equality_types: Vec<String> =
-                    unique_vec(bounds_with_equality.iter().map(|bound| bound.bound_type.get_id().to_string()));
-
-                if equality_types.len() > 1 {
-                    context.collector.report_with_code(
-                        IssueCode::ConflictingTemplateEqualityBounds,
-                        Issue::error(format!(
-                            "Conflicting equality requirements found for template `{template_name}`.",
-                        ))
-                        .with_annotation(Annotation::primary(span).with_message(format!(
-                            "Template `{template_name}` cannot be equal to all of: `{}`.",
-                            equality_types.join("`, `"),
-                        )))
-                        .with_help(
-                            "Check the argument types provided for this template parameter; they must resolve to a single compatible type."
-                        ),
-                    );
-
-                    continue;
-                }
-            }
-
-            if let Some(first_equality_bound) = bounds_with_equality.first() {
-                for lower_bound in lower_bounds {
-                    if lower_bound.equality_bound_classlike.is_some() {
-                        continue;
-                    }
-
-                    let is_contained = union_comparator::is_contained_by(
-                        codebase,
-                        &lower_bound.bound_type,
-                        &first_equality_bound.bound_type,
-                        false,
-                        false,
-                        false,
-                        &mut ComparisonResult::new(),
-                    );
-
-                    if !is_contained {
-                        context.collector.report_with_code(
-                            IssueCode::IncompatibleTemplateLowerBound,
-                            Issue::error(format!(
-                                "Incompatible bounds found for template `{template_name}`.",
-                            ))
-                            .with_annotation(Annotation::primary(span).with_message(format!(
-                                "Type `{}` required by a lower bound is not compatible with the required equality type `{}`.",
-                                lower_bound.bound_type.get_id(),
-                                first_equality_bound.bound_type.get_id(),
-                            )))
-                            .with_help(
-                                "Check the argument types provided; they must satisfy all lower and equality bounds simultaneously."
-                            ),
-                        );
-                    }
-                }
-            }
-        }
-    }
 }

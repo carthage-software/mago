@@ -12,9 +12,6 @@ use crate::ttype::atomic::scalar::string::TString;
 use crate::ttype::get_arraykey;
 use crate::ttype::get_int;
 use crate::ttype::get_string;
-use crate::ttype::shared::ARRAYKEY_ATOMIC;
-use crate::ttype::shared::INT_ATOMIC;
-use crate::ttype::shared::STRING_ATOMIC;
 use crate::ttype::union::TUnion;
 
 /// Represents a key used in PHP arrays, which can be either an integer (`int`) or a string (`string`).
@@ -137,18 +134,6 @@ impl ArrayKey {
     #[must_use]
     pub fn to_union(&self) -> TUnion {
         TUnion::from_single(Cow::Owned(self.to_atomic()))
-    }
-
-    /// Converts the array key into a general atomic type representing the key *type* (`int` or `string`).
-    /// Does not preserve the specific literal value.
-    #[inline]
-    #[must_use]
-    pub const fn to_general_atomic(&self) -> &'static TAtomic {
-        match self {
-            ArrayKey::Integer(_) => INT_ATOMIC,
-            ArrayKey::String(_) => STRING_ATOMIC,
-            ArrayKey::ClassLikeConstant { .. } => ARRAYKEY_ATOMIC,
-        }
     }
 
     /// Converts the array key into a `TUnion` containing its general atomic type (`int` or `string`).

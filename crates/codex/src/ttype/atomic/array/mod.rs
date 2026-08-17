@@ -43,27 +43,6 @@ impl PartialEq for TArray {
 }
 
 impl TArray {
-    /// Creates a new `ArrayType::List` with the given element type.
-    #[inline]
-    #[must_use]
-    pub fn new_list(element_type: Arc<TUnion>) -> Self {
-        Self::List(TList::new(element_type))
-    }
-
-    /// Creates a new `ArrayType::Keyed` with default parameters (no known items or generics).
-    #[inline]
-    #[must_use]
-    pub fn new_keyed() -> Self {
-        Self::Keyed(TKeyedArray::new())
-    }
-
-    /// Creates a new `ArrayType::Keyed` with the specified generic key and value types.
-    #[inline]
-    #[must_use]
-    pub fn new_keyed_with_generics(key_type: Arc<TUnion>, value_type: Arc<TUnion>) -> Self {
-        Self::Keyed(TKeyedArray::new_with_parameters(key_type, value_type))
-    }
-
     /// Checks if this represents a list (`list<T>`).
     #[inline]
     #[must_use]
@@ -83,13 +62,6 @@ impl TArray {
     #[must_use]
     pub const fn get_list(&self) -> Option<&TList> {
         if let TArray::List(data) = self { Some(data) } else { None }
-    }
-
-    /// Returns a reference to the `KeyedArrayType` data if this is a `Keyed` variant.
-    #[inline]
-    #[must_use]
-    pub const fn get_keyed(&self) -> Option<&TKeyedArray> {
-        if let TArray::Keyed(data) = self { Some(data) } else { None }
     }
 
     #[inline]

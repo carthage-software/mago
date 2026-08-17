@@ -53,26 +53,10 @@ impl TEnum {
 }
 
 impl TType for TEnum {
-    fn needs_population(&self) -> bool {
-        false
-    }
-
-    fn is_expandable(&self) -> bool {
-        false
-    }
-
-    fn is_complex(&self) -> bool {
-        false
-    }
-
     fn get_id(&self) -> Word {
         match self.case {
             Some(case) => concat_word!(b"enum(", self.name, b"::", case, b")"),
             None => concat_word!(b"enum(", self.name, b")"),
         }
-    }
-
-    fn get_pretty_id_with_indent(&self, _indent: usize) -> Word {
-        self.get_id()
     }
 }

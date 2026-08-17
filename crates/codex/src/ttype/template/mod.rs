@@ -2,7 +2,6 @@ use foldhash::HashMap;
 use foldhash::fast::RandomState;
 use indexmap::IndexMap;
 
-use mago_span::Span;
 use mago_word::Word;
 
 use crate::misc::GenericParent;
@@ -33,9 +32,6 @@ pub struct GenericTemplate {
 pub struct TemplateResult {
     pub template_types: IndexMap<Word, Vec<GenericTemplate>, RandomState>,
     pub lower_bounds: HashMap<Word, HashMap<GenericParent, Vec<TemplateBound>>>,
-    pub upper_bounds: HashMap<Word, HashMap<GenericParent, TemplateBound>>,
-    pub readonly: bool,
-    pub upper_bounds_unintersectable_types: Vec<TUnion>,
     pub projections: HashMap<Word, crate::ttype::template::variance::Variance>,
 }
 
@@ -44,8 +40,6 @@ pub struct TemplateBound {
     pub bound_type: TUnion,
     pub appearance_depth: usize,
     pub argument_offset: Option<usize>,
-    pub equality_bound_classlike: Option<Word>,
-    pub span: Option<Span>,
 }
 
 impl GenericTemplate {
@@ -75,20 +69,13 @@ impl TemplateResult {
             let mut th = HashMap::default();
 
             for (vk, vv) in v {
-                th.insert(vk, vec![TemplateBound::new(vv, 0, None, None)]);
+                th.insert(vk, vec![TemplateBound::new(vv, 0, None)]);
             }
 
             new_lower_bounds.insert(k, th);
         }
 
-        TemplateResult {
-            template_types,
-            lower_bounds: new_lower_bounds,
-            upper_bounds: HashMap::default(),
-            readonly: false,
-            upper_bounds_unintersectable_types: Vec::new(),
-            projections: HashMap::default(),
-        }
+        TemplateResult { template_types, lower_bounds: new_lower_bounds, projections: HashMap::default() }
     }
 
     #[must_use]
@@ -101,7 +88,7 @@ impl TemplateResult {
             let mut th = HashMap::default();
 
             for (vk, vv) in v {
-                th.insert(vk, vec![TemplateBound::new(vv, 0, None, None)]);
+                th.insert(vk, vec![TemplateBound::new(vv, 0, None)]);
             }
 
             self.lower_bounds.insert(k, th);
@@ -111,21 +98,12 @@ impl TemplateResult {
     pub fn add_lower_bound(&mut self, parameter_name: Word, generic_parent: GenericParent, bound: TUnion) {
         let entry = self.lower_bounds.entry(parameter_name).or_default();
 
-        entry.entry(generic_parent).or_default().push(TemplateBound::new(bound, 0, None, None));
+        entry.entry(generic_parent).or_default().push(TemplateBound::new(bound, 0, None));
     }
 
     pub fn add_template_type(&mut self, parameter_name: Word, generic_parent: GenericParent, constraint: TUnion) {
         let entry = self.template_types.entry(parameter_name).or_default();
         entry.push(GenericTemplate::new(generic_parent, constraint));
-    }
-
-    pub fn add_upper_bound(&mut self, parameter_name: Word, generic_parent: GenericParent, bound: TemplateBound) {
-        let entry = self.upper_bounds.entry(parameter_name).or_default();
-        entry.insert(generic_parent, bound);
-    }
-
-    pub fn add_upper_bound_unintersectable_type(&mut self, bound: TUnion) {
-        self.upper_bounds_unintersectable_types.push(bound);
     }
 
     #[must_use]
@@ -134,11 +112,6 @@ impl TemplateResult {
             .get(&parameter_name)
             .and_then(|bounds| bounds.get(generic_parent))
             .is_some_and(|bounds| !bounds.is_empty())
-    }
-
-    #[must_use]
-    pub fn has_lower_bound_for_class_like(&self, parameter_name: Word, classlike_name: &Word) -> bool {
-        self.has_lower_bound(parameter_name, &GenericParent::ClassLike(*classlike_name))
     }
 
     #[must_use]
@@ -153,17 +126,7 @@ impl TemplateResult {
 
 impl TemplateBound {
     #[must_use]
-    pub fn new(
-        bound_type: TUnion,
-        appearance_depth: usize,
-        argument_offset: Option<usize>,
-        equality_bound_classlike: Option<Word>,
-    ) -> Self {
-        Self { bound_type, appearance_depth, argument_offset, equality_bound_classlike, span: None }
-    }
-
-    #[must_use]
-    pub fn of_type(bound_type: TUnion) -> Self {
-        Self { bound_type, appearance_depth: 0, argument_offset: None, equality_bound_classlike: None, span: None }
+    pub fn new(bound_type: TUnion, appearance_depth: usize, argument_offset: Option<usize>) -> Self {
+        Self { bound_type, appearance_depth, argument_offset }
     }
 }

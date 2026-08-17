@@ -99,71 +99,11 @@ pub enum TReference {
 }
 
 impl TReference {
-    /// Creates a simple symbol reference with no generic parameters.
-    #[inline]
-    #[must_use]
-    pub fn new_symbol(name: Word) -> Self {
-        TReference::Symbol { name, parameters: None, variances: None, intersection_types: None }
-    }
-
-    /// Creates a symbol reference with generic parameters.
-    #[inline]
-    #[must_use]
-    pub fn new_symbol_with_parameters(name: Word, parameters: Vec<TUnion>) -> Self {
-        TReference::Symbol { name, parameters: Some(parameters), variances: None, intersection_types: None }
-    }
-
     /// Creates a class-like member reference.
     #[inline]
     #[must_use]
     pub fn new_member(class_like_name: Word, member_selector: TReferenceMemberSelector) -> Self {
         TReference::Member { class_like_name, member_selector }
-    }
-
-    /// Creates a global-constant wildcard reference.
-    #[inline]
-    #[must_use]
-    pub fn new_global(selector: TGlobalReferenceSelector) -> Self {
-        TReference::Global { selector }
-    }
-
-    /// Checks if this is a reference to a symbol name.
-    #[inline]
-    #[must_use]
-    pub const fn is_symbol(&self) -> bool {
-        matches!(self, TReference::Symbol { .. })
-    }
-
-    /// Checks if this is a reference to a class-like member.
-    #[inline]
-    #[must_use]
-    pub const fn is_member(&self) -> bool {
-        matches!(self, TReference::Member { .. })
-    }
-
-    /// Returns the name and parameters if this is a Symbol reference.
-    #[inline]
-    #[allow(clippy::type_complexity)]
-    #[must_use]
-    pub const fn get_symbol_data(&self) -> Option<(Word, &Option<Vec<TUnion>>, &Option<Vec<TAtomic>>)> {
-        match self {
-            TReference::Symbol { name, parameters, intersection_types, .. } => {
-                Some((*name, parameters, intersection_types))
-            }
-            _ => None,
-        }
-    }
-
-    /// Returns the class-like name and member name if this is a Member reference.
-    #[inline]
-    #[must_use]
-    pub const fn get_member_data(&self) -> Option<(Word, &TReferenceMemberSelector)> {
-        match self {
-            TReference::Member { class_like_name: classlike_name, member_selector } => {
-                Some((*classlike_name, member_selector))
-            }
-            _ => None,
-        }
     }
 }
 
@@ -235,10 +175,6 @@ impl TType for TReference {
         true
     }
 
-    fn is_complex(&self) -> bool {
-        false
-    }
-
     fn get_id(&self) -> Word {
         match self {
             TReference::Symbol { name, .. } => {
@@ -267,9 +203,5 @@ impl TType for TReference {
                 }
             },
         }
-    }
-
-    fn get_pretty_id_with_indent(&self, _indent: usize) -> Word {
-        self.get_id()
     }
 }

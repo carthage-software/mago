@@ -104,13 +104,6 @@ impl TList {
         self.known_elements.as_ref()
     }
 
-    /// Returns the known count of elements, if determined.
-    #[inline]
-    #[must_use]
-    pub fn get_known_count(&self) -> Option<usize> {
-        self.known_count
-    }
-
     /// Create a non-empty clone of the list type.
     #[inline]
     #[must_use]
@@ -123,18 +116,6 @@ impl TList {
         }
     }
 
-    /// Create a non-empty clone of the list type.
-    #[inline]
-    #[must_use]
-    pub fn clone_non_empty_with_count(&self, count: Option<usize>) -> Self {
-        Self {
-            element_type: Arc::clone(&self.element_type),
-            known_elements: self.known_elements.clone(),
-            known_count: count,
-            non_empty: true,
-        }
-    }
-
     /// Checks if the list is known to be non-empty.
     #[inline]
     #[must_use]
@@ -142,25 +123,11 @@ impl TList {
         self.non_empty
     }
 
-    /// Checks if there are any known specific element types defined.
-    #[inline]
-    #[must_use]
-    pub fn has_known_elements(&self) -> bool {
-        self.known_elements.is_some()
-    }
-
     /// Checks if the list contains any known optional elements.
     #[inline]
     #[must_use]
     pub fn has_known_optional_elements(&self) -> bool {
         self.known_elements.as_ref().is_some_and(|elements| elements.values().any(|(optional, _)| *optional))
-    }
-
-    /// Checks if the exact count of elements is known.
-    #[inline]
-    #[must_use]
-    pub fn has_known_count(&self) -> bool {
-        self.known_count.is_some()
     }
 }
 

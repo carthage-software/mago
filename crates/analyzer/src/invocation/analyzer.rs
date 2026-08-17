@@ -54,7 +54,6 @@ use crate::invocation::arguments::verify_argument_type;
 use crate::invocation::resolver::resolve_invocation_type;
 use crate::invocation::template_inference::infer_parameter_templates_from_argument;
 use crate::invocation::template_inference::infer_parameter_templates_from_default;
-use crate::invocation::template_result::check_template_result;
 use crate::invocation::template_result::get_class_template_parameters_from_result;
 use crate::invocation::template_result::populate_template_result_from_invocation;
 use crate::invocation::template_result::refine_template_result_for_function_like;
@@ -1153,8 +1152,6 @@ where
         // argument count is within the parameter range; nothing to report
     }
 
-    check_template_result(context, template_result, invocation.span);
-
     Ok(())
 }
 
@@ -1390,7 +1387,6 @@ where
         &TypeExpansionOptions {
             self_class: base_class_metadata.map(|meta| meta.name),
             static_class_type,
-            parent_class: base_class_metadata.and_then(|meta| meta.direct_parent_class),
             function_is_final: calling_class_like_metadata.is_some_and(|meta| meta.flags.is_final()),
             ..Default::default()
         },

@@ -100,7 +100,7 @@ where
                         .lower_bounds
                         .entry(template_name)
                         .or_default()
-                        .insert(generic_parent, vec![TemplateBound::new(get_never(), 1, None, None)]);
+                        .insert(generic_parent, vec![TemplateBound::new(get_never(), 1, None)]);
 
                     template_result = Cow::Owned(owned_template_result);
                 }
@@ -136,15 +136,10 @@ where
         // Running expansion first would eagerly walk the abstract `T`'s constraint and lose the substitution site.
         resulting_union = inferred_type_replacer::replace(&resulting_union, template_result, context.codebase);
 
-        expander::expand_union(
-            context.codebase,
-            &mut resulting_union,
-            &TypeExpansionOptions { expand_templates: false, ..Default::default() },
-        );
+        expander::expand_union(context.codebase, &mut resulting_union, &TypeExpansionOptions::default());
     }
 
     let static_class_type;
-    let parent_class;
     let self_class;
     let function_is_final;
     let allow_mixin_static_rebind;
@@ -152,7 +147,6 @@ where
     if let Some(method_context) = invocation.target.get_method_context() {
         static_class_type = method_context.class_type.clone();
         allow_mixin_static_rebind = method_context.declaring_object_type.is_some();
-        parent_class = method_context.class_like_metadata.direct_parent_class;
         self_class = Some(method_context.class_like_metadata.name);
         function_is_final = invocation
             .target
@@ -185,7 +179,6 @@ where
         }
     } else {
         static_class_type = StaticClassType::default();
-        parent_class = None;
         self_class = None;
         function_is_final = false;
         allow_mixin_static_rebind = false;
@@ -200,11 +193,8 @@ where
             context.codebase,
             &mut resulting_union,
             &TypeExpansionOptions {
-                expand_templates: false,
-                expand_generic: true,
                 self_class,
                 static_class_type,
-                parent_class,
                 function_is_final,
                 allow_mixin_static_rebind,
                 ..Default::default()

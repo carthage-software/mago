@@ -241,19 +241,11 @@ impl TType for TPropertiesOf {
         true
     }
 
-    fn is_complex(&self) -> bool {
-        false
-    }
-
     fn get_id(&self) -> Word {
         if let Some(visibility) = &self.visibility {
             concat_word!(visibility.as_bytes(), b"-properties-of<", self.target_type.get_id(), b">")
         } else {
             concat_word!(b"properties-of<", self.target_type.get_id(), b">")
         }
-    }
-
-    fn get_pretty_id_with_indent(&self, _indent: usize) -> Word {
-        self.get_id()
     }
 }

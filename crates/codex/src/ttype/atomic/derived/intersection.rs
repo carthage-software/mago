@@ -83,8 +83,4 @@ impl TType for TDerivedIntersection {
         parts.extend(self.intersection_types.iter().map(TType::get_id));
         join_words(&parts, b"&")
     }
-
-    fn get_pretty_id_with_indent(&self, _indent: usize) -> Word {
-        self.get_id()
-    }
 }

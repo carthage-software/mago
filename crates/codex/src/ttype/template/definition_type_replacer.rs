@@ -1,10 +1,8 @@
 use std::sync::Arc;
 
-use foldhash::HashMap;
 use foldhash::fast::RandomState;
 use indexmap::IndexMap;
 
-use mago_span::Span;
 use mago_word::Word;
 use mago_word::WordMap;
 use mago_word::empty_word;
@@ -13,7 +11,6 @@ use crate::identifier::function_like::FunctionLikeIdentifier;
 use crate::metadata::CodebaseMetadata;
 use crate::misc::GenericParent;
 use crate::ttype::TType;
-use crate::ttype::add_union_type;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::array::TArray;
 use crate::ttype::atomic::callable::TCallable;
@@ -22,18 +19,14 @@ use crate::ttype::atomic::object::TObject;
 use crate::ttype::atomic::scalar::TScalar;
 use crate::ttype::atomic::scalar::class_like_string::TClassLikeString;
 use crate::ttype::combiner;
-use crate::ttype::combiner::CombinerOptions;
 use crate::ttype::expander;
 use crate::ttype::expander::StaticClassType;
 use crate::ttype::expander::TypeExpansionOptions;
-use crate::ttype::get_mixed;
 use crate::ttype::template::GenericTemplate;
 use crate::ttype::template::TemplateBound;
 use crate::ttype::template::TemplateResult;
-use crate::ttype::template::inferred_type_replacer;
 use crate::ttype::template::variance::Variance;
 use crate::ttype::union::TUnion;
-use crate::ttype::wrap_atomic;
 
 /// Knobs for [`replace`].
 ///
@@ -314,8 +307,6 @@ fn handle_template_param_substitution(
                     StaticClassType::None
                 },
 
-                expand_templates: false,
-
                 ..Default::default()
             },
         );
@@ -399,7 +390,6 @@ fn handle_template_param_substitution(
 /// * `bound_type` - The inferred type (`TUnion`) that acts as a lower bound.
 /// * `options` - Replacement options providing context like appearance depth.
 /// * `argument_offset` - Optional index of the argument from which this bound was inferred.
-/// * `argument_span` - Optional span of the argument expression.
 pub fn insert_bound_type(
     template_result: &mut TemplateResult,
     param_name: Word,
@@ -407,25 +397,13 @@ pub fn insert_bound_type(
     bound_type: TUnion,
     options: DefinitionReplacementOptions,
     argument_offset: Option<usize>,
-    argument_span: Option<Span>,
 ) {
     let bounds = template_result.lower_bounds.entry(param_name).or_default().entry(*defining_entity).or_default();
 
-    if bounds.iter().any(|existing_bound| {
-        existing_bound.bound_type == bound_type
-            && existing_bound.appearance_depth == options.appearance_depth
-            && existing_bound.argument_offset == argument_offset
-    }) {
-        return; // Exact duplicate found, do nothing.
+    let new_bound = TemplateBound { bound_type, appearance_depth: options.appearance_depth, argument_offset };
+    if !bounds.contains(&new_bound) {
+        bounds.push(new_bound);
     }
-
-    bounds.push(TemplateBound {
-        bound_type,
-        appearance_depth: options.appearance_depth,
-        argument_offset,
-        equality_bound_classlike: None,
-        span: argument_span,
-    });
 }
 
 fn handle_template_param_class_substitution(
@@ -503,136 +481,6 @@ fn template_types_contains<'tt>(
             .find(|template| &template.defining_entity == defining_entity)
             .map(|template| &template.constraint)
     })
-}
-
-#[must_use]
-pub fn get_mapped_generic_type_parameters(
-    codebase: &CodebaseMetadata,
-    input_type_part: &TAtomic,
-    container_name: Word,
-    container_remapped_parameters: bool,
-) -> Vec<(Option<usize>, TUnion)> {
-    let mut input_type_parameters = match input_type_part {
-        TAtomic::Object(TObject::Named(named_object)) => named_object
-            .get_type_parameters()
-            .unwrap_or_default()
-            .iter()
-            .enumerate()
-            .map(|(k, v)| (Some(k), v.clone()))
-            .collect::<Vec<_>>(),
-        _ => {
-            return vec![];
-        }
-    };
-
-    let input_name = match input_type_part {
-        TAtomic::Object(TObject::Named(o)) => o.name,
-        _ => {
-            return vec![];
-        }
-    };
-
-    let Some(input_class_metadata) = codebase.get_class_like(input_name.as_bytes()) else {
-        return vec![];
-    };
-
-    if input_name == container_name {
-        return input_type_parameters;
-    }
-
-    let input_template_types = &input_class_metadata.template_types;
-
-    let mut i = 0;
-    let mut replacement_templates: HashMap<Word, HashMap<GenericParent, TUnion>> = HashMap::default();
-    if matches!(input_type_part, TAtomic::Object(TObject::Named(o)) if !o.remapped_parameters)
-        && !container_remapped_parameters
-    {
-        for (template_name, _) in input_template_types {
-            if let Some(input_type) = input_type_parameters.get(i) {
-                replacement_templates
-                    .entry(*template_name)
-                    .or_default()
-                    .insert(GenericParent::ClassLike(input_name), input_type.clone().1);
-
-                i += 1;
-            } else {
-                break;
-            }
-        }
-    }
-
-    if let Some(parameters) = input_class_metadata.template_extended_parameters.get(&container_name) {
-        let mut new_input_parameters = Vec::new();
-
-        for (_, extended_input_parameter) in parameters {
-            let mut mapped_input_offset = None;
-            let mut new_input_parameter = None;
-
-            for extended_input_parameter_type in extended_input_parameter.types.as_ref() {
-                let extended_input_parameter_types = get_extended_templated_types(
-                    extended_input_parameter_type,
-                    &input_class_metadata.template_extended_parameters,
-                );
-
-                let mut candidate_parameter_type: Option<_> = None;
-
-                if let Some(TAtomic::GenericParameter(parameter)) = extended_input_parameter_types.first()
-                    && let Some((old_parameters_offset, GenericTemplate { defining_entity, .. })) =
-                        input_class_metadata.get_template_type_with_index(parameter.parameter_name)
-                    && parameter.defining_entity == *defining_entity
-                {
-                    let candidate_parameter_type_inner =
-                        input_type_parameters.get(old_parameters_offset).unwrap_or(&(None, get_mixed())).clone().1;
-
-                    mapped_input_offset = Some(old_parameters_offset);
-                    candidate_parameter_type = Some(candidate_parameter_type_inner);
-                }
-
-                let mut candidate_parameter_type =
-                    candidate_parameter_type.unwrap_or(wrap_atomic(extended_input_parameter_type.clone()));
-
-                candidate_parameter_type.set_from_template_default(true);
-
-                new_input_parameter = if let Some(new_input_param) = new_input_parameter {
-                    Some(add_union_type(
-                        new_input_param,
-                        &candidate_parameter_type,
-                        codebase,
-                        CombinerOptions::default().with_overwrite_empty_array(),
-                    ))
-                } else {
-                    Some(candidate_parameter_type.clone())
-                };
-            }
-
-            if let Some(new_input_parameter) = new_input_parameter {
-                new_input_parameters.push((
-                    mapped_input_offset,
-                    inferred_type_replacer::replace(
-                        &new_input_parameter,
-                        &TemplateResult::new(
-                            IndexMap::with_hasher(RandomState::default()),
-                            replacement_templates.clone(),
-                        ),
-                        codebase,
-                    ),
-                ));
-            } else {
-                new_input_parameters.push((mapped_input_offset, get_mixed()));
-            }
-        }
-
-        input_type_parameters = new_input_parameters
-            .into_iter()
-            .map(|mut v| {
-                expander::expand_union(codebase, &mut v.1, &TypeExpansionOptions::default());
-
-                v
-            })
-            .collect::<Vec<_>>();
-    }
-
-    input_type_parameters
 }
 
 #[must_use]

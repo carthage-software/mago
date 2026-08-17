@@ -72,18 +72,6 @@ impl TType for TObjectHasProperty {
         true
     }
 
-    fn needs_population(&self) -> bool {
-        false
-    }
-
-    fn is_expandable(&self) -> bool {
-        false
-    }
-
-    fn is_complex(&self) -> bool {
-        false
-    }
-
     fn get_id(&self) -> Word {
         let mut result = concat_word!(b"has-property<'", self.property, b"'>");
 

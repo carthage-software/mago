@@ -13,13 +13,6 @@ pub enum TMixedTruthiness {
 }
 
 impl TMixedTruthiness {
-    /// Returns true if the value is undetermined (could be truthy or falsy).
-    #[inline]
-    #[must_use]
-    pub const fn is_undetermined(&self) -> bool {
-        matches!(self, TMixedTruthiness::Undetermined)
-    }
-
     /// Returns true if the value is definitely truthy.
     #[inline]
     #[must_use]

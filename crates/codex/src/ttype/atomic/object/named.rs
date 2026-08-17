@@ -166,18 +166,6 @@ impl TNamedObject {
         }
         self
     }
-
-    /// Returns a new instance with the `$this` flag set.
-    #[inline]
-    #[must_use]
-    pub fn with_is_this(mut self, is_this: bool) -> Self {
-        self.is_this = is_this;
-        if is_this {
-            self.is_static = true;
-        }
-
-        self
-    }
 }
 
 impl TType for TNamedObject {

@@ -191,7 +191,6 @@ where
                     &TypeExpansionOptions {
                         self_class: Some(required_declaring_id),
                         static_class_type: StaticClassType::Name(class_id),
-                        parent_class: required_declaring_metadata.direct_parent_class,
                         ..Default::default()
                     },
                 );
@@ -260,7 +259,6 @@ where
         &TypeExpansionOptions {
             self_class: Some(declaring_class_id),
             static_class_type: StaticClassType::Name(class_id),
-            parent_class: declaring_class_metadata.direct_parent_class,
             ..Default::default()
         },
     );

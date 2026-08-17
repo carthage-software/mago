@@ -974,7 +974,6 @@ where
             &TypeExpansionOptions {
                 self_class: Some(declaring_class_id),
                 static_class_type: StaticClassType::Object(object.clone()),
-                parent_class: declaring_class_metadata.direct_parent_class,
                 ..Default::default()
             },
         );
@@ -1221,7 +1220,7 @@ fn update_template_types<A>(
                             expander::expand_union(
                                 context.codebase,
                                 &mut lhs_param_type,
-                                &TypeExpansionOptions { parent_class: None, ..Default::default() },
+                                &TypeExpansionOptions::default(),
                             );
 
                             lhs_param_type

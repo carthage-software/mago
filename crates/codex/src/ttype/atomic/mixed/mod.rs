@@ -31,54 +31,18 @@ impl TMixed {
         }
     }
 
-    /// Creates a `Mixed` type constrained to be non-null.
-    #[inline]
-    #[must_use]
-    pub const fn non_null() -> Self {
-        Self {
-            is_isset_from_loop: false,
-            is_non_null: true,
-            is_empty: false,
-            truthiness: TMixedTruthiness::Undetermined,
-        }
-    }
-
     /// Creates a `Mixed` type marked as originating from `isset()` in a loop.
     #[inline]
     #[must_use]
     pub const fn isset_from_loop() -> Self {
-        Self {
-            is_isset_from_loop: true, // Mark origin
-            is_non_null: false,
-            is_empty: false,
-            truthiness: TMixedTruthiness::Undetermined,
-        }
-    }
-
-    /// Creates a `Mixed` type that may be marked as originating from `isset()` in a loop.
-    #[inline]
-    #[must_use]
-    pub const fn maybe_isset_from_loop(from_loop: bool) -> Self {
-        Self {
-            is_isset_from_loop: from_loop,
-            is_non_null: false,
-            is_empty: false,
-            truthiness: TMixedTruthiness::Undetermined,
-        }
+        Self::new().with_is_isset_from_loop(true)
     }
 
     /// Creates a `Mixed` type constrained to be truthy. Automatically sets `is_non_null` to `true`.
     #[inline]
     #[must_use]
     pub const fn truthy() -> Self {
-        Self { is_isset_from_loop: false, is_non_null: true, is_empty: false, truthiness: TMixedTruthiness::Truthy }
-    }
-
-    /// Creates a `Mixed` type constrained to be falsy. May include null.
-    #[inline]
-    #[must_use]
-    pub const fn falsy() -> Self {
-        Self { is_isset_from_loop: false, is_non_null: false, is_empty: false, truthiness: TMixedTruthiness::Falsy }
+        Self::new().with_truthiness(TMixedTruthiness::Truthy)
     }
 
     /// Checks if this `mixed` type could be truthy or non-null.
@@ -137,13 +101,6 @@ impl TMixed {
         matches!(self.truthiness, TMixedTruthiness::Falsy)
     }
 
-    /// Checks if the truthiness constraint is undetermined.
-    #[inline]
-    #[must_use]
-    pub const fn is_truthiness_undetermined(&self) -> bool {
-        matches!(self.truthiness, TMixedTruthiness::Undetermined)
-    }
-
     /// Returns a new instance with the `is_isset_from_loop` flag set.
     #[inline]
     #[must_use]
@@ -192,18 +149,6 @@ impl TMixed {
 }
 
 impl TType for TMixed {
-    fn needs_population(&self) -> bool {
-        false
-    }
-
-    fn is_expandable(&self) -> bool {
-        false
-    }
-
-    fn is_complex(&self) -> bool {
-        false
-    }
-
     fn get_id(&self) -> Word {
         if self.is_empty {
             word(match self.truthiness {
@@ -221,19 +166,10 @@ impl TType for TMixed {
             })
         }
     }
-
-    fn get_pretty_id_with_indent(&self, _indent: usize) -> Word {
-        self.get_id()
-    }
 }
 
 impl Default for TMixed {
     fn default() -> Self {
-        Self {
-            is_isset_from_loop: false,
-            is_non_null: false,
-            is_empty: false,
-            truthiness: TMixedTruthiness::Undetermined,
-        }
+        Self::new()
     }
 }

@@ -180,10 +180,6 @@ impl TType for TTemplateType {
         true
     }
 
-    fn is_complex(&self) -> bool {
-        false
-    }
-
     fn get_id(&self) -> Word {
         concat_word!(
             "template-type<",
@@ -194,9 +190,5 @@ impl TType for TTemplateType {
             self.template_name.get_id(),
             ">"
         )
-    }
-
-    fn get_pretty_id_with_indent(&self, _indent: usize) -> Word {
-        self.get_id()
     }
 }

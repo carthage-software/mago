@@ -2,7 +2,6 @@ use mago_word::concat_word;
 use mago_word::word;
 
 use crate::metadata::CodebaseMetadata;
-use crate::metadata::class_like_constant::ClassLikeConstantMetadata;
 use crate::misc::GenericParent;
 use crate::ttype::TType;
 use crate::ttype::atomic::TAtomic;
@@ -11,7 +10,6 @@ use crate::ttype::atomic::array::keyed::TKeyedArray;
 use crate::ttype::atomic::callable::TCallable;
 use crate::ttype::atomic::generic::TGenericParameter;
 use crate::ttype::atomic::iterable::TIterable;
-use crate::ttype::atomic::mixed::TMixed;
 use crate::ttype::atomic::object::TObject;
 use crate::ttype::atomic::object::r#enum::TEnum;
 use crate::ttype::atomic::object::named::TNamedObject;
@@ -892,13 +890,6 @@ fn strings_can_be_identical(lhs: &TString, rhs: &TString) -> bool {
     }
 
     true
-}
-
-#[must_use]
-pub fn expand_constant_value(v: &ClassLikeConstantMetadata) -> TAtomic {
-    v.inferred_type.clone().unwrap_or(
-        v.type_metadata.as_ref().map(|t| t.type_union.get_single()).cloned().unwrap_or(TAtomic::Mixed(TMixed::new())),
-    )
 }
 
 fn keyed_arrays_can_be_identical(

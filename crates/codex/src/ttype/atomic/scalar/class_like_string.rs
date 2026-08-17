@@ -123,13 +123,6 @@ impl TClassLikeString {
         Self::Any { kind: TClassLikeStringKind::Interface }
     }
 
-    /// Creates a new `interface-string<T>` instance.
-    #[inline]
-    #[must_use]
-    pub fn interface_string_of_type(constraint: TAtomic) -> Self {
-        Self::OfType { kind: TClassLikeStringKind::Interface, constraint: Arc::new(constraint) }
-    }
-
     /// Creates a new `enum-string` instance.
     #[inline]
     #[must_use]
@@ -137,32 +130,11 @@ impl TClassLikeString {
         Self::Any { kind: TClassLikeStringKind::Enum }
     }
 
-    /// Creates a new `enum-string<T>` instance.
-    #[inline]
-    #[must_use]
-    pub fn enum_string_of_type(constraint: TAtomic) -> Self {
-        Self::OfType { kind: TClassLikeStringKind::Enum, constraint: Arc::new(constraint) }
-    }
-
     /// Creates a new `trait-string` instance.
     #[inline]
     #[must_use]
     pub const fn trait_string() -> Self {
         Self::Any { kind: TClassLikeStringKind::Trait }
-    }
-
-    /// Creates a new `trait-string<T>` instance.
-    #[inline]
-    #[must_use]
-    pub fn trait_string_of_type(constraint: TAtomic) -> Self {
-        Self::OfType { kind: TClassLikeStringKind::Trait, constraint: Arc::new(constraint) }
-    }
-
-    /// Checks if this represents a general class-like string (`Any` variant).
-    #[inline]
-    #[must_use]
-    pub const fn is_any(&self) -> bool {
-        matches!(self, Self::Any { .. })
     }
 
     /// Checks if this represents a class-like string derived from a generic parameter (`Generic` variant).
@@ -177,49 +149,6 @@ impl TClassLikeString {
     #[must_use]
     pub const fn is_literal(&self) -> bool {
         matches!(self, Self::Literal { .. })
-    }
-
-    /// Checks if this represents a class-like string with a specific constraint type `<T>` (`OfType` variant).
-    #[inline]
-    #[must_use]
-    pub const fn is_of_type(&self) -> bool {
-        matches!(self, Self::OfType { .. })
-    }
-
-    /// Checks if the *kind* is explicitly Class (for `Any`, `Generic`, `OfType`). Returns `false` for `Literal`.
-    #[inline]
-    #[must_use]
-    pub const fn is_class_kind(&self) -> bool {
-        matches!(
-            self,
-            Self::Any { kind: TClassLikeStringKind::Class }
-                | Self::Generic { kind: TClassLikeStringKind::Class, .. }
-                | Self::OfType { kind: TClassLikeStringKind::Class, .. }
-        )
-    }
-
-    /// Checks if the *kind* is explicitly Interface (for `Any`, `Generic`, `OfType`). Returns `false` for `Literal`.
-    #[inline]
-    #[must_use]
-    pub const fn is_interface_kind(&self) -> bool {
-        matches!(
-            self,
-            Self::Any { kind: TClassLikeStringKind::Interface }
-                | Self::Generic { kind: TClassLikeStringKind::Interface, .. }
-                | Self::OfType { kind: TClassLikeStringKind::Interface, .. }
-        )
-    }
-
-    /// Checks if the *kind* is explicitly Enum (for `Any`, `Generic`, `OfType`). Returns `false` for `Literal`.
-    #[inline]
-    #[must_use]
-    pub const fn is_enum_kind(&self) -> bool {
-        matches!(
-            self,
-            Self::Any { kind: TClassLikeStringKind::Enum }
-                | Self::Generic { kind: TClassLikeStringKind::Enum, .. }
-                | Self::OfType { kind: TClassLikeStringKind::Enum, .. }
-        )
     }
 
     /// Checks if this type has an explicit constraint `<T>` (`Generic` or `OfType` variants).
@@ -259,26 +188,6 @@ impl TClassLikeString {
         match self {
             Self::Generic { constraint, .. } => Some(constraint),
             Self::OfType { constraint, .. } => Some(constraint),
-            _ => None,
-        }
-    }
-
-    /// Returns the generic parameter name if this is a `Generic` variant.
-    #[inline]
-    #[must_use]
-    pub fn generic_parameter_name(&self) -> Option<Word> {
-        match self {
-            Self::Generic { parameter_name, .. } => Some(*parameter_name),
-            _ => None,
-        }
-    }
-
-    /// Returns the defining entity (scope) if this is a `Generic` variant.
-    #[inline]
-    #[must_use]
-    pub fn generic_defining_entity(&self) -> Option<&GenericParent> {
-        match self {
-            Self::Generic { defining_entity, .. } => Some(defining_entity),
             _ => None,
         }
     }
@@ -337,10 +246,6 @@ impl TType for TClassLikeString {
         }
     }
 
-    fn is_complex(&self) -> bool {
-        false
-    }
-
     fn get_id(&self) -> Word {
         match self {
             TClassLikeString::Any { kind } => word(kind.as_bytes()),
@@ -363,10 +268,6 @@ impl TType for TClassLikeString {
                 concat_word!(kind.as_bytes(), b"<", constraint.get_id(), b">")
             }
         }
-    }
-
-    fn get_pretty_id_with_indent(&self, _indent: usize) -> Word {
-        self.get_id()
     }
 }
 

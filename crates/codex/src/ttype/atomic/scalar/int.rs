@@ -153,27 +153,6 @@ impl TInteger {
         matches!(self, TInteger::Literal(_) | TInteger::UnspecifiedLiteral)
     }
 
-    /// Returns `true` if the type is a `Range`.
-    #[inline]
-    #[must_use]
-    pub const fn is_range(&self) -> bool {
-        matches!(self, TInteger::Range(_, _))
-    }
-
-    /// Returns `true` if the type is a `From` range.
-    #[inline]
-    #[must_use]
-    pub const fn is_from(&self) -> bool {
-        matches!(self, TInteger::From(_))
-    }
-
-    /// Returns `true` if the type is a `To` range.
-    #[inline]
-    #[must_use]
-    pub const fn is_to(&self) -> bool {
-        matches!(self, TInteger::To(_))
-    }
-
     /// Returns `true` if the type is exactly `Literal(0)`.
     #[inline]
     #[must_use]
@@ -185,11 +164,9 @@ impl TInteger {
     #[inline]
     #[must_use]
     pub const fn is_positive(&self) -> bool {
-        match *self {
-            TInteger::From(f) => f > 0,
-            TInteger::Range(f, _) => f > 0,
-            TInteger::Literal(l) => l > 0,
-            _ => false,
+        match self.get_minimum_value() {
+            Some(minimum) => minimum > 0,
+            None => false,
         }
     }
 
@@ -197,11 +174,9 @@ impl TInteger {
     #[inline]
     #[must_use]
     pub const fn is_negative(&self) -> bool {
-        match *self {
-            TInteger::To(t) => t < 0,
-            TInteger::Range(_, t) => t < 0,
-            TInteger::Literal(l) => l < 0,
-            _ => false,
+        match self.get_maximum_value() {
+            Some(maximum) => maximum < 0,
+            None => false,
         }
     }
 
@@ -209,11 +184,9 @@ impl TInteger {
     #[inline]
     #[must_use]
     pub const fn is_non_negative(&self) -> bool {
-        match *self {
-            TInteger::From(f) => f >= 0,
-            TInteger::Range(f, _) => f >= 0,
-            TInteger::Literal(l) => l >= 0,
-            _ => false,
+        match self.get_minimum_value() {
+            Some(minimum) => minimum >= 0,
+            None => false,
         }
     }
 
@@ -221,11 +194,9 @@ impl TInteger {
     #[inline]
     #[must_use]
     pub const fn is_non_positive(&self) -> bool {
-        match *self {
-            TInteger::To(t) => t <= 0,
-            TInteger::Range(_, t) => t <= 0,
-            TInteger::Literal(l) => l <= 0,
-            _ => false,
+        match self.get_maximum_value() {
+            Some(maximum) => maximum <= 0,
+            None => false,
         }
     }
 
@@ -720,14 +691,7 @@ impl TInteger {
     /// Returns a new `TInteger` that represents the negation of the current type.
     #[must_use]
     pub fn negated(&self) -> Self {
-        match *self {
-            TInteger::Literal(v) => TInteger::Literal(v.saturating_neg()),
-            TInteger::From(f) => TInteger::To(f.saturating_neg()),
-            TInteger::To(t) => TInteger::From(t.saturating_neg()),
-            TInteger::Range(f, t) => TInteger::Range(t.saturating_neg(), f.saturating_neg()),
-            TInteger::Unspecified => TInteger::Unspecified,
-            TInteger::UnspecifiedLiteral => TInteger::UnspecifiedLiteral,
-        }
+        -*self
     }
 
     /// Narrows the current integer type to be less than the given value (`< n`).
@@ -736,20 +700,7 @@ impl TInteger {
     /// resulting type would represent an impossible range (e.g., `int<10, max>` cannot be `< 5`).
     #[must_use]
     pub fn to_less_than(&self, n: i64) -> Option<Self> {
-        let new_upper_bound = n.saturating_sub(1);
-        let narrowed_upper = match self.get_maximum_value() {
-            Some(existing_upper) => min(existing_upper, new_upper_bound),
-            None => new_upper_bound,
-        };
-
-        let new_lower_bound = self.get_minimum_value();
-        if let Some(min_b) = new_lower_bound
-            && min_b > narrowed_upper
-        {
-            return None;
-        }
-
-        Some(TInteger::from_bounds(new_lower_bound, Some(narrowed_upper)))
+        self.to_less_than_or_equal(n.saturating_sub(1))
     }
 
     /// Narrows the current integer type to be less than or equal to the given value (`<= n`).
@@ -779,20 +730,7 @@ impl TInteger {
     /// resulting type would represent an impossible range.
     #[must_use]
     pub fn to_greater_than(&self, n: i64) -> Option<Self> {
-        let new_lower_bound = n.saturating_add(1);
-        let narrowed_lower = match self.get_minimum_value() {
-            Some(existing_lower) => max(existing_lower, new_lower_bound),
-            None => new_lower_bound,
-        };
-
-        let new_upper_bound = self.get_maximum_value();
-        if let Some(max_b) = new_upper_bound
-            && narrowed_lower > max_b
-        {
-            return None;
-        }
-
-        Some(TInteger::from_bounds(Some(narrowed_lower), new_upper_bound))
+        self.to_greater_than_or_equal(n.saturating_add(1))
     }
 
     /// Narrows the current integer type to be greater than or equal to the given value (`>= n`).
@@ -976,18 +914,7 @@ impl TInteger {
 }
 
 impl TType for TInteger {
-    fn needs_population(&self) -> bool {
-        false
-    }
-
     #[inline]
-    fn is_expandable(&self) -> bool {
-        false
-    }
-
-    fn is_complex(&self) -> bool {
-        false
-    }
 
     fn get_id(&self) -> Word {
         match self {
@@ -1016,10 +943,6 @@ impl TType for TInteger {
             TInteger::Unspecified => word("int"),
             TInteger::UnspecifiedLiteral => word("literal-int"),
         }
-    }
-
-    fn get_pretty_id_with_indent(&self, _indent: usize) -> Word {
-        self.get_id()
     }
 }
 

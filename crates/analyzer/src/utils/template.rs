@@ -157,9 +157,7 @@ where
                     } else {
                         StaticClassType::None
                     },
-                    parent_class: declaring_class_meta.and_then(|m| m.direct_parent_class),
                     function_is_final: calling_class_meta.is_some_and(|m| m.flags.is_final()),
-                    expand_templates: true,
                     ..Default::default()
                 },
             );

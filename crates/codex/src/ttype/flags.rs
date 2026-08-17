@@ -60,12 +60,6 @@ impl UnionFlags {
 
     #[inline]
     #[must_use]
-    pub const fn intersects(self, other: UnionFlags) -> bool {
-        (self.0 & other.0) != 0
-    }
-
-    #[inline]
-    #[must_use]
     pub const fn union(&self, other: UnionFlags) -> UnionFlags {
         UnionFlags(self.0 | other.0)
     }
@@ -77,35 +71,12 @@ impl UnionFlags {
     }
 }
 
-impl std::ops::BitOr for UnionFlags {
-    type Output = Self;
-
-    #[inline]
-    fn bitor(self, rhs: Self) -> Self::Output {
-        UnionFlags(self.0 | rhs.0)
-    }
-}
-
-impl std::ops::BitOrAssign for UnionFlags {
-    #[inline]
-    fn bitor_assign(&mut self, rhs: Self) {
-        self.0 |= rhs.0;
-    }
-}
-
 impl std::ops::BitAnd for UnionFlags {
     type Output = Self;
 
     #[inline]
     fn bitand(self, rhs: Self) -> Self::Output {
         UnionFlags(self.0 & rhs.0)
-    }
-}
-
-impl std::ops::BitAndAssign for UnionFlags {
-    #[inline]
-    fn bitand_assign(&mut self, rhs: Self) {
-        self.0 &= rhs.0;
     }
 }
 

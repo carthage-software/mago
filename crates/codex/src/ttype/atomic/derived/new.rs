@@ -102,10 +102,6 @@ impl TType for TNew {
         true
     }
 
-    fn is_complex(&self) -> bool {
-        false
-    }
-
     fn get_id(&self) -> Word {
         concat_word!(b"new<", self.0.get_id(), b">")
     }

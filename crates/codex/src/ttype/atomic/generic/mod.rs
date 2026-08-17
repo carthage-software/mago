@@ -53,18 +53,6 @@ impl TGenericParameter {
         &self.constraint
     }
 
-    /// Returns the defining entity (scope) of the template parameter.
-    #[inline]
-    #[must_use]
-    pub const fn get_defining_entity(&self) -> GenericParent {
-        self.defining_entity
-    }
-
-    #[must_use]
-    pub fn is_constrained_as_numeric(&self) -> bool {
-        self.constraint.is_numeric()
-    }
-
     #[must_use]
     pub fn is_constrained_as_mixed(&self) -> bool {
         self.constraint.is_mixed()
@@ -87,16 +75,6 @@ impl TGenericParameter {
             constraint: Arc::new(constraint),
             defining_entity: self.defining_entity,
             intersection_types: self.intersection_types.clone(),
-        }
-    }
-
-    #[must_use]
-    pub fn without_intersection_types(&self) -> Self {
-        Self {
-            parameter_name: self.parameter_name,
-            constraint: Arc::clone(&self.constraint),
-            defining_entity: self.defining_entity,
-            intersection_types: None,
         }
     }
 }
@@ -176,9 +154,5 @@ impl TType for TGenericParameter {
         }
 
         result
-    }
-
-    fn get_pretty_id_with_indent(&self, _indent: usize) -> Word {
-        self.get_id()
     }
 }
