@@ -19,6 +19,15 @@ mod framework;
 /// 2. Read the content from the file `cases/my_test.php`.
 /// 3. Create and run a `TestCase` with that content and the specified settings.
 macro_rules! test_case {
+    ($test_name:ident, references = [$(($class:literal, $member:literal, $count:literal)),+ $(,)?]) => {
+        #[test]
+        fn $test_name() {
+            let content = include_bytes!(concat!("cases/", stringify!($test_name), ".php"));
+            let test = $crate::framework::TestCase::new(stringify!($test_name), content);
+            $(let test = test.expect_symbol_reference_count($class, $member, $count);)+
+            test.run();
+        }
+    };
     ($test_name:ident, property_reads = [$(($class:literal, $property:literal, $count:literal)),+ $(,)?]) => {
         #[test]
         fn $test_name() {
@@ -2683,6 +2692,7 @@ test_case!(issue_2203);
 test_case!(issue_2206);
 test_case!(issue_2207);
 test_case!(issue_2212, property_reads = [("MissingInterface", "$config", 1)]);
+test_case!(issue_2213, references = [("MixedCaseHolder", "USED", 1), ("lowercaseholder", "USED", 1)]);
 
 #[test]
 #[cfg_attr(miri, ignore)]

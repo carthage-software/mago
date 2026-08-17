@@ -33,12 +33,19 @@ pub struct TestCase<'src> {
     content: &'src [u8],
     settings: Option<Settings>,
     expected_property_reads: Vec<(&'src str, &'src str, usize)>,
+    expected_symbol_references: Vec<(&'src str, &'src str, usize)>,
 }
 
 impl<'src> TestCase<'src> {
     #[must_use]
     pub fn new(name: &'src str, content: &'src [u8]) -> Self {
-        Self { name, content, settings: None, expected_property_reads: Vec::new() }
+        Self {
+            name,
+            content,
+            settings: None,
+            expected_property_reads: Vec::new(),
+            expected_symbol_references: Vec::new(),
+        }
     }
 
     #[must_use]
@@ -50,6 +57,12 @@ impl<'src> TestCase<'src> {
     #[must_use]
     pub fn expect_property_reads(mut self, class: &'src str, property: &'src str, count: usize) -> Self {
         self.expected_property_reads.push((class, property, count));
+        self
+    }
+
+    #[must_use]
+    pub fn expect_symbol_reference_count(mut self, class: &'src str, member: &'src str, count: usize) -> Self {
+        self.expected_symbol_references.push((class, member, count));
         self
     }
 
@@ -140,6 +153,17 @@ fn run_test_case_inner(config: TestCase) {
         assert_eq!(
             expected, actual,
             "Test '{}': expected {expected} read reference(s) to {class}::{property}, found {actual}",
+            config.name,
+        );
+    }
+
+    for (class, member, expected) in config.expected_symbol_references {
+        let symbol = (ascii_lowercase_word(class.as_bytes()), word(member.as_bytes()));
+        let actual = analysis_result.symbol_references.count_referencing_symbols(&symbol, false)
+            + analysis_result.symbol_references.count_referencing_symbols(&symbol, true);
+        assert_eq!(
+            expected, actual,
+            "Test '{}': expected {expected} reference(s) to {class}::{member}, found {actual}",
             config.name,
         );
     }

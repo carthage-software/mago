@@ -138,7 +138,7 @@ where
 
             artifacts.symbol_references.add_reference_to_class_member(
                 &block_context.scope,
-                (fq_class_id, const_name),
+                (metadata.name, const_name),
                 false,
             );
 
