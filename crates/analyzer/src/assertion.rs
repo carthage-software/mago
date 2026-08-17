@@ -71,12 +71,7 @@ where
 
     let mut if_types = WordMap::default();
 
-    if let Some(var_name) = get_expression_id(
-        expression,
-        assertion_context.this_class_name,
-        assertion_context.resolved_names,
-        Some(assertion_context.codebase),
-    ) {
+    if let Some(var_name) = assertion_context.get_expression_id(expression) {
         if_types.insert(var_name, vec![vec![Assertion::Truthy]]);
     }
 
@@ -115,12 +110,7 @@ where
             if let Call::Function(FunctionCall { function: _, argument_list }) = call
                 && 1 == argument_list.arguments.len()
                 && let Some(first_argument) = argument_list.arguments.first()
-                && let Some(first_argument_expression_id) = get_expression_id(
-                    first_argument.value(),
-                    assertion_context.this_class_name,
-                    assertion_context.resolved_names,
-                    Some(assertion_context.codebase),
-                )
+                && let Some(first_argument_expression_id) = assertion_context.get_expression_id(first_argument.value())
             {
                 if is_count_or_size_of_call(expression, assertion_context) {
                     if_types.insert(first_argument_expression_id, vec![vec![Assertion::NonEmptyCountable(true)]]);
@@ -164,12 +154,7 @@ where
         }
         Expression::Construct(construct) => match construct {
             Construct::Empty(empty_construct) => {
-                let Some(value_id) = get_expression_id(
-                    empty_construct.value,
-                    assertion_context.this_class_name,
-                    assertion_context.resolved_names,
-                    Some(assertion_context.codebase),
-                ) else {
+                let Some(value_id) = assertion_context.get_expression_id(empty_construct.value) else {
                     return vec![];
                 };
 
@@ -185,12 +170,7 @@ where
             }
             Construct::Isset(isset_construct) => {
                 for value in &isset_construct.values {
-                    if let Some(value_id) = get_expression_id(
-                        value,
-                        assertion_context.this_class_name,
-                        assertion_context.resolved_names,
-                        Some(assertion_context.codebase),
-                    ) {
+                    if let Some(value_id) = assertion_context.get_expression_id(value) {
                         if let Expression::Variable(variable) = value
                             && let Some(expression_type) = artifacts.get_expression_type(variable)
                             && !expression_type.is_mixed()
@@ -228,12 +208,7 @@ where
             BinaryOperator::NullCoalesce(_) => {
                 let rhs = unwrap_expression(binary.rhs);
                 if matches!(rhs, Expression::Literal(Literal::Null(_))) {
-                    let var_name = get_expression_id(
-                        binary.lhs,
-                        assertion_context.this_class_name,
-                        assertion_context.resolved_names,
-                        Some(assertion_context.codebase),
-                    );
+                    let var_name = assertion_context.get_expression_id(binary.lhs);
 
                     if let Some(var_name) = var_name {
                         if_types.insert(var_name, vec![vec![Assertion::IsIsset]]);
@@ -324,27 +299,20 @@ where
         if let (Some(key_argument), Some(array_argument)) = (key_argument, array_argument)
             && get_expression_array_key(artifacts, key_argument).is_none()
         {
-            if let Some(array_id) = get_expression_id(
-                array_argument,
-                assertion_context.this_class_name,
-                assertion_context.resolved_names,
-                Some(assertion_context.codebase),
-            ) && let Some(index_id) = get_index_id(
-                key_argument,
-                assertion_context.this_class_name,
-                assertion_context.resolved_names,
-                Some(assertion_context.codebase),
-            ) {
+            if let Some(array_id) = assertion_context.get_expression_id(array_argument)
+                && let Some(index_id) = get_index_id(
+                    key_argument,
+                    assertion_context.this_class_name,
+                    assertion_context.resolved_names,
+                    Some(assertion_context.codebase),
+                )
+            {
                 let access_id = concat_word!(array_id.as_bytes(), b"[", index_id.as_bytes(), b"]");
                 if_types.insert(access_id, vec![vec![Assertion::ArrayKeyExists]]);
             }
 
-            if let Some(key_id) = get_expression_id(
-                key_argument,
-                assertion_context.this_class_name,
-                assertion_context.resolved_names,
-                Some(assertion_context.codebase),
-            ) && let Some(array_type) = artifacts.get_expression_type(array_argument)
+            if let Some(key_id) = assertion_context.get_expression_id(key_argument)
+                && let Some(array_type) = artifacts.get_expression_type(array_argument)
                 && let Some(input_key_type) = artifacts.get_expression_type(key_argument)
                 && let Some(key_type) =
                     get_possible_array_key_argument_type(array_type, input_key_type, assertion_context.codebase)
@@ -593,24 +561,14 @@ where
     };
 
     let extract_expression_id = |argument_expression: &Expression| {
-        if let Some(id) = get_expression_id(
-            argument_expression,
-            assertion_context.this_class_name,
-            assertion_context.resolved_names,
-            Some(assertion_context.codebase),
-        ) {
+        if let Some(id) = assertion_context.get_expression_id(argument_expression) {
             return Some((id, false));
         }
 
         if let Expression::Binary(binary) = unwrap_expression(argument_expression)
             && matches!(binary.operator, BinaryOperator::NullCoalesce(_))
             && matches!(unwrap_expression(binary.rhs), Expression::Literal(Literal::Null(_)))
-            && let Some(lhs_id) = get_expression_id(
-                binary.lhs,
-                assertion_context.this_class_name,
-                assertion_context.resolved_names,
-                Some(assertion_context.codebase),
-            )
+            && let Some(lhs_id) = assertion_context.get_expression_id(binary.lhs)
         {
             return Some((lhs_id, true));
         }
@@ -976,12 +934,7 @@ where
         (None, None) => return None,
     };
 
-    let variable_id = get_expression_id(
-        variable_expr,
-        assertion_context.this_class_name,
-        assertion_context.resolved_names,
-        Some(assertion_context.codebase),
-    )?;
+    let variable_id = assertion_context.get_expression_id(variable_expr)?;
 
     let class_name_type = artifacts.get_expression_type(class_name_expr)?;
 
@@ -1054,12 +1007,7 @@ where
         OtherValuePosition::Right => left,
     };
 
-    let var_name = get_expression_id(
-        base_conditional,
-        assertion_context.this_class_name,
-        assertion_context.resolved_names,
-        Some(assertion_context.codebase),
-    );
+    let var_name = assertion_context.get_expression_id(base_conditional);
 
     if let Some(var_name) = var_name {
         if is_identity {
@@ -1088,12 +1036,7 @@ where
         OtherValuePosition::Right => left,
     };
 
-    let var_name = get_expression_id(
-        base_conditional,
-        assertion_context.this_class_name,
-        assertion_context.resolved_names,
-        Some(assertion_context.codebase),
-    );
+    let var_name = assertion_context.get_expression_id(base_conditional);
 
     if let Some(var_name) = var_name {
         if operator.is_identity() {
@@ -1125,12 +1068,7 @@ where
 
     let mut if_types = WordMap::default();
 
-    let var_name = get_expression_id(
-        variable_expression,
-        assertion_context.this_class_name,
-        assertion_context.resolved_names,
-        Some(assertion_context.codebase),
-    );
+    let var_name = assertion_context.get_expression_id(variable_expression);
 
     if let Some(var_name) = var_name {
         if_types.insert(var_name, vec![vec![Assertion::IsType(enum_case_type.get_single().clone())]]);
@@ -1158,12 +1096,7 @@ where
 
     let mut if_types = WordMap::default();
 
-    let var_name = get_expression_id(
-        variable_expression,
-        assertion_context.this_class_name,
-        assertion_context.resolved_names,
-        Some(assertion_context.codebase),
-    );
+    let var_name = assertion_context.get_expression_id(variable_expression);
 
     if let Some(var_name) = var_name {
         if_types.insert(var_name, vec![vec![Assertion::IsNotType(enum_case_type.get_single().clone())]]);
@@ -1193,21 +1126,11 @@ where
     {
         let coalesce_lhs = binary.lhs;
 
-        if let Some(var_name) = get_expression_id(
-            coalesce_lhs,
-            assertion_context.this_class_name,
-            assertion_context.resolved_names,
-            Some(assertion_context.codebase),
-        ) {
+        if let Some(var_name) = assertion_context.get_expression_id(coalesce_lhs) {
             if_types.insert(var_name, vec![vec![Assertion::IsNotIsset]]);
         }
     } else {
-        let var_name = get_expression_id(
-            base_conditional,
-            assertion_context.this_class_name,
-            assertion_context.resolved_names,
-            Some(assertion_context.codebase),
-        );
+        let var_name = assertion_context.get_expression_id(base_conditional);
 
         if let Some(var_name) = var_name {
             if_types.insert(var_name, vec![vec![Assertion::IsType(TAtomic::Null)]]);
@@ -1238,32 +1161,17 @@ where
     {
         let coalesce_lhs = binary.lhs;
 
-        if let Some(var_name) = get_expression_id(
-            coalesce_lhs,
-            assertion_context.this_class_name,
-            assertion_context.resolved_names,
-            Some(assertion_context.codebase),
-        ) {
+        if let Some(var_name) = assertion_context.get_expression_id(coalesce_lhs) {
             if_types.insert(var_name, vec![vec![Assertion::IsIsset]]);
         } else if let Expression::ArrayAccess(array_access) = coalesce_lhs
-            && let Some(root_array_id) = get_expression_id(
-                array_access.array,
-                assertion_context.this_class_name,
-                assertion_context.resolved_names,
-                Some(assertion_context.codebase),
-            )
+            && let Some(root_array_id) = assertion_context.get_expression_id(array_access.array)
         {
             if_types.insert(root_array_id, vec![vec![Assertion::IsEqualIsset], vec![Assertion::Truthy]]);
         } else {
             // coalesce LHS isn't a tracked variable or array access; no isset assertion to record
         }
     } else {
-        let var_name = get_expression_id(
-            base_conditional,
-            assertion_context.this_class_name,
-            assertion_context.resolved_names,
-            Some(assertion_context.codebase),
-        );
+        let var_name = assertion_context.get_expression_id(base_conditional);
 
         if let Some(var_name) = var_name {
             if_types.insert(var_name, vec![vec![Assertion::IsNotType(TAtomic::Null)]]);
@@ -1288,12 +1196,7 @@ where
         OtherValuePosition::Right => left,
     };
 
-    let var_name = get_expression_id(
-        base_conditional,
-        assertion_context.this_class_name,
-        assertion_context.resolved_names,
-        Some(assertion_context.codebase),
-    );
+    let var_name = assertion_context.get_expression_id(base_conditional);
 
     if let Some(var_name) = var_name {
         if_types.insert(var_name, vec![vec![Assertion::IsNotType(TAtomic::Scalar(TScalar::r#false()))]]);
@@ -1317,12 +1220,7 @@ where
         OtherValuePosition::Right => left,
     };
 
-    let var_name = get_expression_id(
-        base_conditional,
-        assertion_context.this_class_name,
-        assertion_context.resolved_names,
-        Some(assertion_context.codebase),
-    );
+    let var_name = assertion_context.get_expression_id(base_conditional);
 
     if let Some(var_name) = var_name {
         if_types.insert(var_name, vec![vec![Assertion::IsType(TAtomic::Scalar(TScalar::r#true()))]]);
@@ -1404,19 +1302,9 @@ where
 
     let mut if_types: WordMap<AssertionSet> = WordMap::default();
 
-    let left_id = get_expression_id(
-        left,
-        assertion_context.this_class_name,
-        assertion_context.resolved_names,
-        Some(assertion_context.codebase),
-    );
+    let left_id = assertion_context.get_expression_id(left);
 
-    let right_id = get_expression_id(
-        right,
-        assertion_context.this_class_name,
-        assertion_context.resolved_names,
-        Some(assertion_context.codebase),
-    );
+    let right_id = assertion_context.get_expression_id(right);
 
     if let (Some(left_var_id), Some(right_var_id)) = (left_id, right_id) {
         let relation = if matches!(operator, BinaryOperator::LessThanOrEqual(_)) {
@@ -1605,18 +1493,8 @@ where
 
     let mut if_types: WordMap<AssertionSet> = WordMap::default();
 
-    let left_id = get_expression_id(
-        left,
-        assertion_context.this_class_name,
-        assertion_context.resolved_names,
-        Some(assertion_context.codebase),
-    );
-    let right_id = get_expression_id(
-        right,
-        assertion_context.this_class_name,
-        assertion_context.resolved_names,
-        Some(assertion_context.codebase),
-    );
+    let left_id = assertion_context.get_expression_id(left);
+    let right_id = assertion_context.get_expression_id(right);
 
     if let (Some(left_var_id), Some(right_var_id)) = (left_id, right_id) {
         let relation = if matches!(operator, BinaryOperator::GreaterThanOrEqual(_)) {
@@ -1633,20 +1511,9 @@ where
     // A non-literal bound is only a one-way implication: the assertion narrows
     // the true branch but must not narrow the negated branch.
     if let Some(right_int) = &right_integer
-        && let Some(left_var_id) = get_expression_id(
-            left,
-            assertion_context.this_class_name,
-            assertion_context.resolved_names,
-            Some(assertion_context.codebase),
-        )
+        && let Some(left_var_id) = assertion_context.get_expression_id(left)
     {
-        let use_range_bounds = get_expression_id(
-            right,
-            assertion_context.this_class_name,
-            assertion_context.resolved_names,
-            Some(assertion_context.codebase),
-        )
-        .is_some();
+        let use_range_bounds = assertion_context.get_expression_id(right).is_some();
 
         let assertion_result = if matches!(operator, BinaryOperator::GreaterThanOrEqual(_)) {
             match *right_int {
@@ -1696,20 +1563,9 @@ where
     // As above, range-derived facts must not be treated as the negation of the
     // full comparison in the false branch.
     if let Some(left_int) = &left_integer
-        && let Some(right_var_id) = get_expression_id(
-            right,
-            assertion_context.this_class_name,
-            assertion_context.resolved_names,
-            Some(assertion_context.codebase),
-        )
+        && let Some(right_var_id) = assertion_context.get_expression_id(right)
     {
-        let use_range_bounds = get_expression_id(
-            left,
-            assertion_context.this_class_name,
-            assertion_context.resolved_names,
-            Some(assertion_context.codebase),
-        )
-        .is_some();
+        let use_range_bounds = assertion_context.get_expression_id(left).is_some();
 
         let assertion_result = if matches!(operator, BinaryOperator::GreaterThanOrEqual(_)) {
             match *left_int {
@@ -1973,12 +1829,7 @@ where
         OtherValuePosition::Right => left,
     };
 
-    let var_name = get_expression_id(
-        base_conditional,
-        assertion_context.this_class_name,
-        assertion_context.resolved_names,
-        Some(assertion_context.codebase),
-    );
+    let var_name = assertion_context.get_expression_id(base_conditional);
 
     if let Some(var_name) = var_name {
         if is_identity {
@@ -2003,19 +1854,9 @@ pub fn has_typed_value_comparison<A>(
 where
     A: Arena,
 {
-    let left_var_id = get_expression_id(
-        left,
-        assertion_context.this_class_name,
-        assertion_context.resolved_names,
-        Some(assertion_context.codebase),
-    );
+    let left_var_id = assertion_context.get_expression_id(left);
 
-    let right_var_id = get_expression_id(
-        right,
-        assertion_context.this_class_name,
-        assertion_context.resolved_names,
-        Some(assertion_context.codebase),
-    );
+    let right_var_id = assertion_context.get_expression_id(right);
 
     let left_is_class_constant =
         left_var_id.as_ref().is_some_and(|id| memchr::memmem::find(id.as_bytes(), b"::").is_some());
@@ -2064,12 +1905,7 @@ where
         OtherValuePosition::Right => left,
     };
 
-    let var_name = get_expression_id(
-        base_conditional,
-        assertion_context.this_class_name,
-        assertion_context.resolved_names,
-        Some(assertion_context.codebase),
-    );
+    let var_name = assertion_context.get_expression_id(base_conditional);
 
     if let Some(var_name) = var_name {
         if is_identity {
@@ -2099,34 +1935,14 @@ where
 
     let (var_name, other_value_var_name, var_type, other_value_type) = match typed_value_position {
         OtherValuePosition::Right => (
-            get_expression_id(
-                left,
-                assertion_context.this_class_name,
-                assertion_context.resolved_names,
-                Some(assertion_context.codebase),
-            ),
-            get_expression_id(
-                right,
-                assertion_context.this_class_name,
-                assertion_context.resolved_names,
-                Some(assertion_context.codebase),
-            ),
+            assertion_context.get_expression_id(left),
+            assertion_context.get_expression_id(right),
             artifacts.get_expression_type(&left.span()),
             artifacts.get_expression_type(&right.span()),
         ),
         OtherValuePosition::Left => (
-            get_expression_id(
-                right,
-                assertion_context.this_class_name,
-                assertion_context.resolved_names,
-                Some(assertion_context.codebase),
-            ),
-            get_expression_id(
-                left,
-                assertion_context.this_class_name,
-                assertion_context.resolved_names,
-                Some(assertion_context.codebase),
-            ),
+            assertion_context.get_expression_id(right),
+            assertion_context.get_expression_id(left),
             artifacts.get_expression_type(&right.span()),
             artifacts.get_expression_type(&left.span()),
         ),
@@ -2184,34 +2000,14 @@ where
 
     let (var_name, other_value_var_name, var_type, other_value_type) = match typed_value_position {
         OtherValuePosition::Right => (
-            get_expression_id(
-                left,
-                assertion_context.this_class_name,
-                assertion_context.resolved_names,
-                Some(assertion_context.codebase),
-            ),
-            get_expression_id(
-                right,
-                assertion_context.this_class_name,
-                assertion_context.resolved_names,
-                Some(assertion_context.codebase),
-            ),
+            assertion_context.get_expression_id(left),
+            assertion_context.get_expression_id(right),
             artifacts.get_expression_type(&left.span()),
             artifacts.get_expression_type(&right.span()),
         ),
         OtherValuePosition::Left => (
-            get_expression_id(
-                right,
-                assertion_context.this_class_name,
-                assertion_context.resolved_names,
-                Some(assertion_context.codebase),
-            ),
-            get_expression_id(
-                left,
-                assertion_context.this_class_name,
-                assertion_context.resolved_names,
-                Some(assertion_context.codebase),
-            ),
+            assertion_context.get_expression_id(right),
+            assertion_context.get_expression_id(left),
             artifacts.get_expression_type(&right.span()),
             artifacts.get_expression_type(&left.span()),
         ),
@@ -2297,33 +2093,39 @@ pub fn has_enum_case_comparison(
     None
 }
 
+fn has_literal_operand(
+    left: &Expression,
+    right: &Expression,
+    artifacts: &AnalysisArtifacts,
+    is_literal: fn(&Expression) -> bool,
+    is_type: fn(&TUnion) -> bool,
+) -> Option<OtherValuePosition> {
+    for (operand, position) in [(right, OtherValuePosition::Right), (left, OtherValuePosition::Left)] {
+        if is_literal(unwrap_expression(operand)) {
+            return Some(position);
+        }
+
+        if artifacts.get_expression_type(operand).is_some_and(is_type) {
+            return Some(position);
+        }
+    }
+
+    None
+}
+
 #[inline]
 pub fn has_null_variable(
     left: &Expression,
     right: &Expression,
     artifacts: &AnalysisArtifacts,
 ) -> Option<OtherValuePosition> {
-    if let Expression::Literal(Literal::Null(_)) = unwrap_expression(right) {
-        return Some(OtherValuePosition::Right);
-    }
-
-    if let Some(right_type) = artifacts.get_expression_type(right)
-        && right_type.is_null()
-    {
-        return Some(OtherValuePosition::Right);
-    }
-
-    if let Expression::Literal(Literal::Null(_)) = unwrap_expression(left) {
-        return Some(OtherValuePosition::Left);
-    }
-
-    if let Some(left_type) = artifacts.get_expression_type(left)
-        && left_type.is_null()
-    {
-        return Some(OtherValuePosition::Left);
-    }
-
-    None
+    has_literal_operand(
+        left,
+        right,
+        artifacts,
+        |expression| matches!(expression, Expression::Literal(Literal::Null(_))),
+        TUnion::is_null,
+    )
 }
 
 #[inline]
@@ -2332,27 +2134,13 @@ pub fn has_false_variable(
     right: &Expression,
     artifacts: &AnalysisArtifacts,
 ) -> Option<OtherValuePosition> {
-    if let Expression::Literal(Literal::False(_)) = unwrap_expression(right) {
-        return Some(OtherValuePosition::Right);
-    }
-
-    if let Some(right_type) = artifacts.get_expression_type(right)
-        && right_type.is_false()
-    {
-        return Some(OtherValuePosition::Right);
-    }
-
-    if let Expression::Literal(Literal::False(_)) = unwrap_expression(left) {
-        return Some(OtherValuePosition::Left);
-    }
-
-    if let Some(left_type) = artifacts.get_expression_type(left)
-        && left_type.is_false()
-    {
-        return Some(OtherValuePosition::Left);
-    }
-
-    None
+    has_literal_operand(
+        left,
+        right,
+        artifacts,
+        |expression| matches!(expression, Expression::Literal(Literal::False(_))),
+        TUnion::is_false,
+    )
 }
 
 #[inline]
@@ -2361,27 +2149,13 @@ pub fn has_true_variable(
     right: &Expression,
     artifacts: &AnalysisArtifacts,
 ) -> Option<OtherValuePosition> {
-    if let Expression::Literal(Literal::True(_)) = unwrap_expression(right) {
-        return Some(OtherValuePosition::Right);
-    }
-
-    if let Some(right_type) = artifacts.get_expression_type(right)
-        && right_type.is_true()
-    {
-        return Some(OtherValuePosition::Right);
-    }
-
-    if let Expression::Literal(Literal::True(_)) = unwrap_expression(left) {
-        return Some(OtherValuePosition::Left);
-    }
-
-    if let Some(left_type) = artifacts.get_expression_type(left)
-        && left_type.is_true()
-    {
-        return Some(OtherValuePosition::Left);
-    }
-
-    None
+    has_literal_operand(
+        left,
+        right,
+        artifacts,
+        |expression| matches!(expression, Expression::Literal(Literal::True(_))),
+        TUnion::is_true,
+    )
 }
 
 #[inline]

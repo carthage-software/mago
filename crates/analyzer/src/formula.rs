@@ -18,10 +18,8 @@ use mago_word::WordMap;
 
 use crate::artifacts::AnalysisArtifacts;
 use crate::assertion::scrape_assertions;
-use crate::assertion::scrape_equality_assertions;
 use crate::context::assertion::AssertionContext;
 use crate::context::scope::var_has_root;
-use crate::utils::expression::get_expression_id;
 use crate::utils::misc::unwrap_expression;
 
 /// Recursively traverses a conditional expression to generate a corresponding logical formula.
@@ -57,6 +55,56 @@ use crate::utils::misc::unwrap_expression;
 /// Returns `Some(Vec<Clause>)` representing the logical formula. Returns `None` if the
 /// formula's complexity exceeds the provided `formula_size_threshold` at
 /// any point during the recursive process.
+#[allow(clippy::too_many_arguments)]
+fn get_boolean_literal_comparison_formula<A>(
+    conditional_object_id: Span,
+    creating_object_id: Span,
+    other_side: &Expression,
+    literal_is_true: bool,
+    is_identical: bool,
+    assertion_context: AssertionContext<'_, '_, A>,
+    artifacts: &AnalysisArtifacts,
+    algebra_thresholds: &AlgebraThresholds,
+    formula_size_threshold: u16,
+) -> Option<Vec<Clause>>
+where
+    A: Arena,
+{
+    if let Some(var_name) = assertion_context.get_expression_id(other_side) {
+        let literal_atomic =
+            if literal_is_true { TAtomic::Scalar(TScalar::r#true()) } else { TAtomic::Scalar(TScalar::r#false()) };
+        let assertion =
+            if is_identical { Assertion::IsType(literal_atomic) } else { Assertion::IsNotType(literal_atomic) };
+
+        let mut clause_map = IndexMap::new();
+        let mut type_map = IndexMap::new();
+        type_map.insert(assertion.to_hash(), assertion);
+        clause_map.insert(var_name, type_map);
+
+        return Some(vec![Clause::new(
+            clause_map,
+            conditional_object_id,
+            creating_object_id,
+            Some(false),
+            Some(true),
+            Some(false),
+        )]);
+    }
+
+    let formula = get_formula(
+        conditional_object_id,
+        creating_object_id,
+        other_side,
+        assertion_context,
+        artifacts,
+        algebra_thresholds,
+        formula_size_threshold,
+    )?;
+
+    let should_negate = if is_identical { !literal_is_true } else { literal_is_true };
+    if should_negate { negate_formula(formula, algebra_thresholds) } else { Some(formula) }
+}
+
 pub fn get_formula<A>(
     conditional_object_id: Span,
     creating_object_id: Span,
@@ -123,106 +171,30 @@ where
 
             match (left_is_true || left_is_false, right_is_true || right_is_false) {
                 (true, _) => {
-                    if let Some(var_name) = get_expression_id(
-                        binary.rhs,
-                        assertion_context.this_class_name,
-                        assertion_context.resolved_names,
-                        Some(assertion_context.codebase),
-                    ) {
-                        let type_assertion = if left_is_true {
-                            Assertion::IsType(TAtomic::Scalar(TScalar::r#true()))
-                        } else {
-                            Assertion::IsType(TAtomic::Scalar(TScalar::r#false()))
-                        };
-
-                        let assertion = if is_identical {
-                            type_assertion
-                        } else {
-                            match type_assertion {
-                                Assertion::IsType(t) => Assertion::IsNotType(t),
-                                #[allow(clippy::unreachable)]
-                                _ => unreachable!(),
-                            }
-                        };
-
-                        let mut clause_map = IndexMap::new();
-                        let mut type_map = IndexMap::new();
-                        type_map.insert(assertion.to_hash(), assertion);
-                        clause_map.insert(var_name, type_map);
-
-                        return Some(vec![Clause::new(
-                            clause_map,
-                            conditional_object_id,
-                            creating_object_id,
-                            Some(false),
-                            Some(true),
-                            Some(false),
-                        )]);
-                    }
-
-                    let formula = get_formula(
+                    return get_boolean_literal_comparison_formula(
                         conditional_object_id,
                         creating_object_id,
                         binary.rhs,
+                        left_is_true,
+                        is_identical,
                         assertion_context,
                         artifacts,
                         algebra_thresholds,
                         formula_size_threshold,
-                    )?;
-
-                    let should_negate = if is_identical { left_is_false } else { left_is_true };
-                    return if should_negate { negate_formula(formula, algebra_thresholds) } else { Some(formula) };
+                    );
                 }
                 (_, true) => {
-                    if let Some(var_name) = get_expression_id(
-                        binary.lhs,
-                        assertion_context.this_class_name,
-                        assertion_context.resolved_names,
-                        Some(assertion_context.codebase),
-                    ) {
-                        let type_assertion = if right_is_true {
-                            Assertion::IsType(TAtomic::Scalar(TScalar::r#true()))
-                        } else {
-                            Assertion::IsType(TAtomic::Scalar(TScalar::r#false()))
-                        };
-
-                        let assertion = if is_identical {
-                            type_assertion
-                        } else {
-                            match type_assertion {
-                                Assertion::IsType(t) => Assertion::IsNotType(t),
-                                #[allow(clippy::unreachable)]
-                                _ => unreachable!(),
-                            }
-                        };
-
-                        let mut clause_map = IndexMap::new();
-                        let mut type_map = IndexMap::new();
-                        type_map.insert(assertion.to_hash(), assertion);
-                        clause_map.insert(var_name, type_map);
-
-                        return Some(vec![Clause::new(
-                            clause_map,
-                            conditional_object_id,
-                            creating_object_id,
-                            Some(false),
-                            Some(true),
-                            Some(false),
-                        )]);
-                    }
-
-                    let formula = get_formula(
+                    return get_boolean_literal_comparison_formula(
                         conditional_object_id,
                         creating_object_id,
                         binary.lhs,
+                        right_is_true,
+                        is_identical,
                         assertion_context,
                         artifacts,
                         algebra_thresholds,
                         formula_size_threshold,
-                    )?;
-
-                    let should_negate = if is_identical { right_is_false } else { right_is_true };
-                    return if should_negate { negate_formula(formula, algebra_thresholds) } else { Some(formula) };
+                    );
                 }
                 _ => {}
             }
@@ -415,12 +387,7 @@ fn push_not_null_clause<A>(
 ) where
     A: Arena,
 {
-    let Some(base_id) = get_expression_id(
-        base,
-        assertion_context.this_class_name,
-        assertion_context.resolved_names,
-        Some(assertion_context.codebase),
-    ) else {
+    let Some(base_id) = assertion_context.get_expression_id(base) else {
         return;
     };
 
@@ -450,75 +417,6 @@ fn push_not_null_clause<A>(
         Some(true),
         Some(false),
     ));
-}
-
-/// Creates a logical formula representing a disjunction of equality/identity comparisons.
-///
-/// This function generates clauses for a formula that is logically equivalent to the
-/// expression `subject === conditions[0] || subject === conditions[1] || ...`.
-///
-/// It iterates through each provided condition, generates clauses for the assertion
-/// `subject === condition`, and combines them into a single disjunctive formula. This is
-/// often used to model the behavior of `match` arms.
-///
-/// # Parameters
-///
-/// * `subject`: The expression on the left-hand side of the equal comparisons.
-/// * `conditions`: A vec of expressions to compare against the `subject`.
-/// * `assertion_context`: The context required for generating assertions.
-/// * `artifacts`: A mutable reference to the analysis artifacts.
-/// * `is_identity`: A boolean indicating whether the equality is an identity check (e.g., `===`).
-/// * `algebra_thresholds`: Thresholds for controlling algebra operations complexity.
-/// * `formula_size_threshold`: The maximum allowed formula size before returning `None`.
-///
-/// # Returns
-///
-/// Returns `Some(Vec<Clause>)` containing the resulting logical formula if successful.
-///
-/// Returns `None` if the formula's complexity exceeds the provided `formula_size_threshold`,
-/// to avoid performance degradation.
-#[allow(dead_code)]
-pub fn get_disjunctive_equality_formula<A>(
-    subject: &Expression,
-    conditions: Vec<&Expression>,
-    assertion_context: AssertionContext<'_, '_, A>,
-    artifacts: &AnalysisArtifacts,
-    is_identity: bool,
-    algebra_thresholds: &AlgebraThresholds,
-    formula_size_threshold: u16,
-) -> Option<Vec<Clause>>
-where
-    A: Arena,
-{
-    let subject = unwrap_expression(subject);
-    let subject_span = subject.span();
-
-    let mut clauses = vec![];
-    for condition in conditions {
-        let condition = unwrap_expression(condition);
-        let condition_span = condition.span();
-        let formula = if subject.is_true() && (!is_identity || condition.evaluates_to_boolean()) {
-            get_formula(
-                condition_span,
-                condition_span,
-                condition,
-                assertion_context,
-                artifacts,
-                algebra_thresholds,
-                formula_size_threshold,
-            )?
-        } else {
-            let assertions = scrape_equality_assertions(subject, is_identity, condition, artifacts, assertion_context);
-            get_formula_from_assertions(condition_span, subject_span, subject, assertions, formula_size_threshold)?
-        };
-
-        clauses = disjoin_clauses(clauses, formula, condition_span, algebra_thresholds);
-        if clauses.len() > usize::from(formula_size_threshold) {
-            return None;
-        }
-    }
-
-    Some(clauses)
 }
 
 fn get_formula_from_assertions(

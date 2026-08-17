@@ -1504,6 +1504,26 @@ impl ExternalAnalyzer<WorkerPool> {
 }
 
 impl<T> ExternalAnalyzer<T> {
+    fn record_error(&self) {
+        if self.trace_enabled {
+            self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    fn record_lifecycle_error(&self) {
+        if self.trace_enabled {
+            self.telemetry.lifecycle_errors.fetch_add(1, Ordering::Relaxed);
+            self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
+    fn record_issue_filter_error(&self) {
+        if self.trace_enabled {
+            self.telemetry.issue_filter_errors.fetch_add(1, Ordering::Relaxed);
+            self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
+        }
+    }
+
     #[must_use]
     pub fn extensions(&self) -> &[ExternalExtension] {
         &self.extensions
@@ -1624,12 +1644,7 @@ where
             let issue_count = candidates.len();
             let request =
                 protocol::encode_issue_filter_request(hooks, file, &candidates, session.generation(), session)
-                    .inspect_err(|_| {
-                        if self.trace_enabled {
-                            self.telemetry.issue_filter_errors.fetch_add(1, Ordering::Relaxed);
-                            self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
-                        }
-                    })?;
+                    .inspect_err(|_| self.record_issue_filter_error())?;
             if let Some(start) = encode_start {
                 self.telemetry.issue_filter_encode_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
                 self.telemetry.issue_filter_batches.fetch_add(1, Ordering::Relaxed);
@@ -1650,12 +1665,10 @@ where
             };
 
             let ipc_start = self.trace_enabled.then(Instant::now);
-            let response = backend.transport.request_with_handler(request, &mut handler).inspect_err(|_| {
-                if self.trace_enabled {
-                    self.telemetry.issue_filter_errors.fetch_add(1, Ordering::Relaxed);
-                    self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
-                }
-            })?;
+            let response = backend
+                .transport
+                .request_with_handler(request, &mut handler)
+                .inspect_err(|_| self.record_issue_filter_error())?;
 
             if let Some(start) = ipc_start {
                 self.telemetry.issue_filter_ipc_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
@@ -1663,12 +1676,8 @@ where
             }
 
             let decode_start = self.trace_enabled.then(Instant::now);
-            let removed = protocol::decode_issue_filter_response(&response, issue_count).inspect_err(|_| {
-                if self.trace_enabled {
-                    self.telemetry.issue_filter_errors.fetch_add(1, Ordering::Relaxed);
-                    self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
-                }
-            })?;
+            let removed = protocol::decode_issue_filter_response(&response, issue_count)
+                .inspect_err(|_| self.record_issue_filter_error())?;
             let removed = removed.into_iter().map(|index| candidate_indices[index]).collect::<Vec<_>>();
 
             if let Some(start) = decode_start {
@@ -1745,12 +1754,8 @@ where
         }
 
         let ipc_start = self.trace_enabled.then(Instant::now);
-        let response = backend.transport.request_with_handler(request, handler).inspect_err(|_| {
-            if self.trace_enabled {
-                self.telemetry.lifecycle_errors.fetch_add(1, Ordering::Relaxed);
-                self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
-            }
-        })?;
+        let response =
+            backend.transport.request_with_handler(request, handler).inspect_err(|_| self.record_lifecycle_error())?;
 
         if let Some(start) = ipc_start {
             self.telemetry.lifecycle_ipc_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
@@ -1767,12 +1772,7 @@ where
             default_file,
             codebase,
         )
-        .inspect_err(|_| {
-            if self.trace_enabled {
-                self.telemetry.lifecycle_errors.fetch_add(1, Ordering::Relaxed);
-                self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
-            }
-        })?;
+        .inspect_err(|_| self.record_lifecycle_error())?;
 
         if let Some(start) = decode_start {
             self.telemetry.lifecycle_decode_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
@@ -1828,13 +1828,8 @@ where
             }
             let lifecycle_start = self.trace_enabled.then(Instant::now);
             let encode_start = self.trace_enabled.then(Instant::now);
-            let request =
-                lifecycle::encode_before_analysis_request(session.generation(), plugins).inspect_err(|_| {
-                    if self.trace_enabled {
-                        self.telemetry.lifecycle_errors.fetch_add(1, Ordering::Relaxed);
-                        self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
-                    }
-                })?;
+            let request = lifecycle::encode_before_analysis_request(session.generation(), plugins)
+                .inspect_err(|_| self.record_lifecycle_error())?;
 
             if let Some(start) = encode_start {
                 self.telemetry.lifecycle_encode_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
@@ -1914,12 +1909,7 @@ where
                 u16::try_from(backend_index)
                     .map_err(|_| error::protocol("external analyzer backend exceeds u16::MAX"))?,
             )
-            .inspect_err(|_| {
-                if self.trace_enabled {
-                    self.telemetry.lifecycle_errors.fetch_add(1, Ordering::Relaxed);
-                    self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
-                }
-            })?;
+            .inspect_err(|_| self.record_lifecycle_error())?;
 
             if let Some(start) = encode_start {
                 self.telemetry.lifecycle_encode_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
@@ -2006,12 +1996,7 @@ where
                 u16::try_from(backend_index)
                     .map_err(|_| error::protocol("external analyzer backend exceeds u16::MAX"))?,
             )
-            .inspect_err(|_| {
-                if self.trace_enabled {
-                    self.telemetry.lifecycle_errors.fetch_add(1, Ordering::Relaxed);
-                    self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
-                }
-            })?;
+            .inspect_err(|_| self.record_lifecycle_error())?;
             if let Some(start) = encode_start {
                 self.telemetry.lifecycle_encode_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
                 self.telemetry.after_file_analysis_files.fetch_add(files.len() as u64, Ordering::Relaxed);
@@ -2074,12 +2059,7 @@ where
             let encode_start = self.trace_enabled.then(Instant::now);
             let request =
                 lifecycle::encode_after_analysis_request(session.generation(), plugins, analysis_result, files)
-                    .inspect_err(|_| {
-                        if self.trace_enabled {
-                            self.telemetry.lifecycle_errors.fetch_add(1, Ordering::Relaxed);
-                            self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
-                        }
-                    })?;
+                    .inspect_err(|_| self.record_lifecycle_error())?;
             if let Some(start) = encode_start {
                 self.telemetry.lifecycle_encode_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
             }
@@ -2181,11 +2161,7 @@ where
         decode: impl FnOnce() -> Result<R, ExternalAnalyzerError>,
     ) -> Result<R, ExternalAnalyzerError> {
         let start = self.trace_enabled.then(Instant::now);
-        let result = decode().inspect_err(|_| {
-            if self.trace_enabled {
-                self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
-            }
-        });
+        let result = decode().inspect_err(|_| self.record_error());
         if let Some(start) = start {
             self.telemetry.decode_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
         }
@@ -2217,12 +2193,10 @@ where
         if self.trace_enabled {
             self.telemetry.ipc_requests.fetch_add(1, Ordering::Relaxed);
         }
-        let response =
-            backend.transport.request_with_handler_affinity(request, affinity, &mut handler).inspect_err(|_| {
-                if self.trace_enabled {
-                    self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
-                }
-            })?;
+        let response = backend
+            .transport
+            .request_with_handler_affinity(request, affinity, &mut handler)
+            .inspect_err(|_| self.record_error())?;
         if let Some(start) = ipc_start {
             self.telemetry.ipc_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
             self.telemetry.response_bytes.fetch_add(response.len() as u64, Ordering::Relaxed);
@@ -2513,11 +2487,7 @@ where
                 memoize,
                 self.trace_enabled,
             )
-            .inspect_err(|_| {
-                if self.trace_enabled {
-                    self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
-                }
-            })?;
+            .inspect_err(|_| self.record_error())?;
 
             if let Some(start) = encode_start {
                 self.telemetry.encode_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
@@ -2649,11 +2619,7 @@ where
                 memoize,
                 self.trace_enabled,
             )
-            .inspect_err(|_| {
-                if self.trace_enabled {
-                    self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
-                }
-            })?;
+            .inspect_err(|_| self.record_error())?;
 
             if let Some(start) = encode_start {
                 self.telemetry.encode_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
@@ -2752,11 +2718,7 @@ where
                 session.generation(),
                 self.trace_enabled,
             )
-            .inspect_err(|_| {
-                if self.trace_enabled {
-                    self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
-                }
-            })?;
+            .inspect_err(|_| self.record_error())?;
             if let Some(start) = encode_start {
                 self.telemetry.encode_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
                 self.telemetry.snapshotted_types.fetch_add(request.snapshotted_types as u64, Ordering::Relaxed);
@@ -2775,11 +2737,7 @@ where
             let result = protocol::decode_property_type_response(&response, |handle| {
                 protocol::resolve_type_handle(&request.types, handle)
             })
-            .inspect_err(|_| {
-                if self.trace_enabled {
-                    self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
-                }
-            })?;
+            .inspect_err(|_| self.record_error())?;
             if let Some(start) = decode_start {
                 self.telemetry.decode_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
             }
@@ -2866,11 +2824,7 @@ where
                 session.generation(),
                 session,
             )
-            .inspect_err(|_| {
-                if self.trace_enabled {
-                    self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
-                }
-            })?;
+            .inspect_err(|_| self.record_error())?;
 
             if let Some(start) = encode_start {
                 self.telemetry.encode_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
@@ -2881,11 +2835,8 @@ where
                 self.exchange_provider_payload(backend, request, declaring_class, codebase, session, |_| None)?;
 
             let decode_start = self.trace_enabled.then(Instant::now);
-            let initialized = protocol::decode_property_initialization_response(&response).inspect_err(|_| {
-                if self.trace_enabled {
-                    self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
-                }
-            })?;
+            let initialized =
+                protocol::decode_property_initialization_response(&response).inspect_err(|_| self.record_error())?;
 
             if let Some(start) = decode_start {
                 self.telemetry.decode_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
@@ -2963,11 +2914,7 @@ where
             let encode_start = self.trace_enabled.then(Instant::now);
             let request =
                 protocol::encode_class_initializer_request(indices.as_slice(), class, session.generation(), session)
-                    .inspect_err(|_| {
-                        if self.trace_enabled {
-                            self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
-                        }
-                    })?;
+                    .inspect_err(|_| self.record_error())?;
             if let Some(start) = encode_start {
                 self.telemetry.encode_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
                 self.telemetry.request_bytes.fetch_add(request.len() as u64, Ordering::Relaxed);
@@ -2977,11 +2924,8 @@ where
                 self.exchange_provider_payload(backend, request, class.name.as_bytes(), codebase, session, |_| None)?;
 
             let decode_start = self.trace_enabled.then(Instant::now);
-            let provided = protocol::decode_class_initializer_response(&response).inspect_err(|_| {
-                if self.trace_enabled {
-                    self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
-                }
-            })?;
+            let provided =
+                protocol::decode_class_initializer_response(&response).inspect_err(|_| self.record_error())?;
             if let Some(start) = decode_start {
                 self.telemetry.decode_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
             }
@@ -3247,76 +3191,29 @@ where
         };
 
         if let Some(start) = started_at {
-            let function_providers =
-                analyzer.backends.iter().map(|backend| backend.registration.function_providers.len()).sum::<usize>();
-            let method_providers =
-                analyzer.backends.iter().map(|backend| backend.registration.method_providers.len()).sum::<usize>();
-            let property_providers =
-                analyzer.backends.iter().map(|backend| backend.registration.property_providers.len()).sum::<usize>();
-            let property_initialization_providers = analyzer
-                .backends
-                .iter()
-                .map(|backend| backend.registration.property_initialization_providers.len())
-                .sum::<usize>();
-            let class_initializer_providers = analyzer
-                .backends
-                .iter()
-                .map(|backend| backend.registration.class_initializer_providers.len())
-                .sum::<usize>();
-            let entry_points =
-                analyzer.backends.iter().map(|backend| backend.registration.entry_points.len()).sum::<usize>();
-            let attributed_entry_points = analyzer
-                .backends
-                .iter()
-                .map(|backend| backend.registration.attributed_entry_points.len())
-                .sum::<usize>();
-            let issue_filter_hooks =
-                analyzer.backends.iter().map(|backend| backend.registration.issue_filter_hooks.len()).sum::<usize>();
-            let node_analysis_hooks =
-                analyzer.backends.iter().map(|backend| backend.registration.node_analysis_hooks.len()).sum::<usize>();
-            let method_call_analysis_hooks = analyzer
-                .backends
-                .iter()
-                .map(|backend| backend.registration.method_call_analysis_hooks.len())
-                .sum::<usize>();
-            let class_like_analysis_hooks = analyzer
-                .backends
-                .iter()
-                .map(|backend| backend.registration.class_like_analysis_hooks.len())
-                .sum::<usize>();
-            let before_analysis_plugins = analyzer
-                .backends
-                .iter()
-                .map(|backend| backend.registration.before_analysis_plugins.len())
-                .sum::<usize>();
-            let after_file_analysis_plugins = analyzer
-                .backends
-                .iter()
-                .map(|backend| backend.registration.after_file_analysis_plugins.len())
-                .sum::<usize>();
-            let after_analysis_plugins = analyzer
-                .backends
-                .iter()
-                .map(|backend| backend.registration.after_analysis_plugins.len())
-                .sum::<usize>();
+            let total = |count: fn(&Registration) -> usize| {
+                analyzer.backends.iter().map(|backend| count(&backend.registration)).sum::<usize>()
+            };
+
             tracing::trace!(
                 backends = analyzer.backends.len(),
                 extensions = analyzer.extensions.len(),
                 plugins = analyzer.extensions.iter().map(|extension| extension.plugins.len()).sum::<usize>(),
-                function_providers,
-                method_providers,
-                property_providers,
-                property_initialization_providers,
-                class_initializer_providers,
-                entry_points,
-                attributed_entry_points,
-                issue_filter_hooks,
-                node_analysis_hooks,
-                method_call_analysis_hooks,
-                class_like_analysis_hooks,
-                before_analysis_plugins,
-                after_file_analysis_plugins,
-                after_analysis_plugins,
+                function_providers = total(|registration| registration.function_providers.len()),
+                method_providers = total(|registration| registration.method_providers.len()),
+                property_providers = total(|registration| registration.property_providers.len()),
+                property_initialization_providers =
+                    total(|registration| registration.property_initialization_providers.len()),
+                class_initializer_providers = total(|registration| registration.class_initializer_providers.len()),
+                entry_points = total(|registration| registration.entry_points.len()),
+                attributed_entry_points = total(|registration| registration.attributed_entry_points.len()),
+                issue_filter_hooks = total(|registration| registration.issue_filter_hooks.len()),
+                node_analysis_hooks = total(|registration| registration.node_analysis_hooks.len()),
+                method_call_analysis_hooks = total(|registration| registration.method_call_analysis_hooks.len()),
+                class_like_analysis_hooks = total(|registration| registration.class_like_analysis_hooks.len()),
+                before_analysis_plugins = total(|registration| registration.before_analysis_plugins.len()),
+                after_file_analysis_plugins = total(|registration| registration.after_file_analysis_plugins.len()),
+                after_analysis_plugins = total(|registration| registration.after_analysis_plugins.len()),
                 elapsed = ?start.elapsed(),
                 "External analyzer initialized."
             );

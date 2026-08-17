@@ -51,6 +51,17 @@ pub enum ArrayTarget<'ast, 'arena> {
     Append(&'ast ArrayAppend<'arena>),
 }
 
+fn accumulate_value_type(
+    value_type: &mut Option<TUnion>,
+    new_type: TUnion,
+    codebase: &mago_codex::metadata::CodebaseMetadata,
+) {
+    *value_type = Some(match value_type.take() {
+        Some(existing_type) => add_union_type(existing_type, &new_type, codebase, CombinerOptions::default()),
+        None => new_type,
+    });
+}
+
 impl<'ast, 'arena> ArrayTarget<'ast, 'arena> {
     #[inline]
     pub const fn get_array(&self) -> &'ast Expression<'arena> {
@@ -178,12 +189,7 @@ where
                     &mut expected_index_types,
                 );
 
-                if let Some(existing_type) = value_type {
-                    value_type =
-                        Some(add_union_type(existing_type, &new_type, context.codebase, CombinerOptions::default()));
-                } else {
-                    value_type = Some(new_type);
-                }
+                accumulate_value_type(&mut value_type, new_type, context.codebase);
             }
             TAtomic::Array(TArray::Keyed(_)) => {
                 let mut possibly_undefined = false;
@@ -210,12 +216,7 @@ where
                     has_union_key_mismatch = true;
                 }
 
-                if let Some(existing_type) = value_type {
-                    value_type =
-                        Some(add_union_type(existing_type, &new_type, context.codebase, CombinerOptions::default()));
-                } else {
-                    value_type = Some(new_type);
-                }
+                accumulate_value_type(&mut value_type, new_type, context.codebase);
             }
             TAtomic::Scalar(TScalar::String(_)) => {
                 let new_type = handle_array_access_on_string(
@@ -226,34 +227,19 @@ where
                     &mut expected_index_types,
                 );
 
-                if let Some(existing_type) = value_type {
-                    value_type =
-                        Some(add_union_type(existing_type, &new_type, context.codebase, CombinerOptions::default()));
-                } else {
-                    value_type = Some(new_type);
-                }
+                accumulate_value_type(&mut value_type, new_type, context.codebase);
             }
             TAtomic::Mixed(mixed) if mixed.could_be_truthy_or_non_null() => {
                 let new_type = handle_array_access_on_mixed(context, block_context, access_span, atomic_var_type);
 
-                if let Some(existing_type) = value_type {
-                    value_type =
-                        Some(add_union_type(existing_type, &new_type, context.codebase, CombinerOptions::default()));
-                } else {
-                    value_type = Some(new_type);
-                }
+                accumulate_value_type(&mut value_type, new_type, context.codebase);
 
                 has_valid_expected_index = true;
             }
             TAtomic::Never => {
                 let new_type = handle_array_access_on_mixed(context, block_context, access_span, atomic_var_type);
 
-                if let Some(existing_type) = value_type {
-                    value_type =
-                        Some(add_union_type(existing_type, &new_type, context.codebase, CombinerOptions::default()));
-                } else {
-                    value_type = Some(new_type);
-                }
+                accumulate_value_type(&mut value_type, new_type, context.codebase);
 
                 has_valid_expected_index = true;
             }

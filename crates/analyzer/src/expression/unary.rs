@@ -101,14 +101,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPrefix<'arena> {
 
                 artifacts.set_rc_expression_type(self, Rc::new(referenced_type));
             }
-            UnaryPrefixOperator::ErrorControl(_) | UnaryPrefixOperator::Plus(_) => {
-                if let Some(operand_type) = operand_type {
-                    artifacts.set_rc_expression_type(self, operand_type);
-                } else {
-                    artifacts.set_expression_type(self, get_mixed());
-                }
-            }
-            UnaryPrefixOperator::BitwiseNot(_) => {
+            UnaryPrefixOperator::ErrorControl(_)
+            | UnaryPrefixOperator::Plus(_)
+            | UnaryPrefixOperator::BitwiseNot(_) => {
                 if let Some(operand_type) = operand_type {
                     artifacts.set_rc_expression_type(self, operand_type);
                 } else {

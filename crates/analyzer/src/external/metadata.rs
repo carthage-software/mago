@@ -1036,12 +1036,7 @@ fn write_optional_location(
     span: Option<Span>,
     session: &ExternalAnalysisSession,
 ) -> Result<(), ExternalAnalyzerError> {
-    writer.write_bool(span.is_some());
-    if let Some(span) = span {
-        write_location(writer, span, session)?;
-    }
-
-    Ok(())
+    write_optional(writer, span.as_ref(), |writer, span| write_location(writer, *span, session))
 }
 
 fn write_type_metadata(
@@ -1061,12 +1056,7 @@ fn write_optional_type_metadata(
     metadata: Option<&TypeMetadata>,
     session: &ExternalAnalysisSession,
 ) -> Result<(), ExternalAnalyzerError> {
-    writer.write_bool(metadata.is_some());
-    if let Some(metadata) = metadata {
-        write_type_metadata(writer, metadata, session)?;
-    }
-
-    Ok(())
+    write_optional(writer, metadata, |writer, metadata| write_type_metadata(writer, metadata, session))
 }
 
 fn write_union(writer: &mut PayloadWriter, union: &TUnion) -> Result<(), ExternalAnalyzerError> {
@@ -1105,21 +1095,11 @@ where
 }
 
 fn write_optional_union(writer: &mut PayloadWriter, union: Option<&TUnion>) -> Result<(), ExternalAnalyzerError> {
-    writer.write_bool(union.is_some());
-    if let Some(union) = union {
-        write_union(writer, union)?;
-    }
-
-    Ok(())
+    write_optional(writer, union, write_union)
 }
 
 fn write_optional_atomic(writer: &mut PayloadWriter, atomic: Option<&TAtomic>) -> Result<(), ExternalAnalyzerError> {
-    writer.write_bool(atomic.is_some());
-    if let Some(atomic) = atomic {
-        write_union(writer, &TUnion::from_atomic(atomic.clone()))?;
-    }
-
-    Ok(())
+    write_optional(writer, atomic, |writer, atomic| write_union(writer, &TUnion::from_atomic(atomic.clone())))
 }
 
 fn write_attributes(
@@ -1204,12 +1184,7 @@ where
 }
 
 fn write_optional_word(writer: &mut PayloadWriter, word: Option<Word>) -> Result<(), ExternalAnalyzerError> {
-    writer.write_bool(word.is_some());
-    if let Some(word) = word {
-        writer.write_bytes(word.as_bytes())?;
-    }
-
-    Ok(())
+    write_optional(writer, word.as_ref(), |writer, word| Ok(writer.write_bytes(word.as_bytes())?))
 }
 
 fn write_version_constraint(writer: &mut PayloadWriter, constraint: &VersionConstraint) {

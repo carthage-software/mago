@@ -143,8 +143,8 @@ enum PropertyConflict {
     Visibility(Visibility, Visibility, Visibility, Visibility),
     Static(bool, bool),
     Readonly(bool, bool),
-    Type(Option<String>, Option<String>),
-    Default(Option<String>, Option<String>),
+    Type(Option<Word>, Option<Word>),
+    Default(Option<Word>, Option<Word>),
     HookedProperty,
 }
 
@@ -2390,9 +2390,9 @@ fn check_trait_property_conflicts<'ctx, 'ast, 'arena, A>(
                         continue;
                     };
 
-                    if properties_are_compatible(first_property, second_property) {
+                    let Err(conflict) = check_property_compatibility(first_property, second_property) else {
                         continue;
-                    }
+                    };
 
                     report_trait_property_conflict(
                         context,
@@ -2401,8 +2401,7 @@ fn check_trait_property_conflicts<'ctx, 'ast, 'arena, A>(
                         *first_trait_fqcn,
                         *second_trait_fqcn,
                         first_trait_use.span(),
-                        first_property,
-                        second_property,
+                        conflict,
                     );
                 }
             }
@@ -2427,9 +2426,9 @@ fn check_trait_property_conflicts<'ctx, 'ast, 'arena, A>(
                             continue;
                         };
 
-                        if properties_are_compatible(first_property, second_property) {
+                        let Err(conflict) = check_property_compatibility(first_property, second_property) else {
                             continue;
-                        }
+                        };
 
                         report_trait_property_conflict(
                             context,
@@ -2438,8 +2437,7 @@ fn check_trait_property_conflicts<'ctx, 'ast, 'arena, A>(
                             *first_trait_fqcn,
                             *second_trait_fqcn,
                             second_trait_use.span(),
-                            first_property,
-                            second_property,
+                            conflict,
                         );
                     }
                 }
@@ -2456,9 +2454,9 @@ fn check_trait_property_conflicts<'ctx, 'ast, 'arena, A>(
                     continue;
                 };
 
-                if properties_are_compatible(trait_property, class_property) {
+                let Err(conflict) = check_property_compatibility(trait_property, class_property) else {
                     continue;
-                }
+                };
 
                 let conflict_span = members
                     .iter()
@@ -2492,56 +2490,11 @@ fn check_trait_property_conflicts<'ctx, 'ast, 'arena, A>(
                     *first_trait_fqcn,
                     class_like_metadata.name,
                     conflict_span,
-                    trait_property,
-                    class_property,
+                    conflict,
                 );
             }
         }
     }
-}
-
-fn properties_are_compatible(prop1: &PropertyMetadata, prop2: &PropertyMetadata) -> bool {
-    // PHP 8.4: Conflict resolution between hooked properties is not supported
-    if !prop1.hooks.is_empty() || !prop2.hooks.is_empty() {
-        return false;
-    }
-
-    if prop1.read_visibility != prop2.read_visibility {
-        return false;
-    }
-    if prop1.write_visibility != prop2.write_visibility {
-        return false;
-    }
-
-    if prop1.flags.is_static() != prop2.flags.is_static() {
-        return false;
-    }
-
-    if prop1.flags.is_readonly() != prop2.flags.is_readonly() {
-        return false;
-    }
-
-    match (&prop1.type_declaration_metadata, &prop2.type_declaration_metadata) {
-        (Some(t1), Some(t2)) => {
-            if t1.type_union.get_id() != t2.type_union.get_id() {
-                return false;
-            }
-        }
-        (None, None) => {}
-        _ => return false,
-    }
-
-    match (&prop1.default_type_metadata, &prop2.default_type_metadata) {
-        (Some(d1), Some(d2)) => {
-            if d1.type_union.get_id() != d2.type_union.get_id() {
-                return false;
-            }
-        }
-        (None, None) => {}
-        _ => return false,
-    }
-
-    true
 }
 
 /// Check if two properties are compatible, returns Err with specific conflict type if not
@@ -2570,36 +2523,34 @@ fn check_property_compatibility(prop1: &PropertyMetadata, prop2: &PropertyMetada
 
     match (&prop1.type_declaration_metadata, &prop2.type_declaration_metadata) {
         (Some(t1), Some(t2)) => {
-            if t1.type_union.get_id() != t2.type_union.get_id() {
-                return Err(PropertyConflict::Type(
-                    Some(format!("{:?}", t1.type_union)),
-                    Some(format!("{:?}", t2.type_union)),
-                ));
+            let t1_id = t1.type_union.get_id();
+            let t2_id = t2.type_union.get_id();
+            if t1_id != t2_id {
+                return Err(PropertyConflict::Type(Some(t1_id), Some(t2_id)));
             }
         }
         (Some(t1), None) => {
-            return Err(PropertyConflict::Type(Some(format!("{:?}", t1.type_union)), None));
+            return Err(PropertyConflict::Type(Some(t1.type_union.get_id()), None));
         }
         (None, Some(t2)) => {
-            return Err(PropertyConflict::Type(None, Some(format!("{:?}", t2.type_union))));
+            return Err(PropertyConflict::Type(None, Some(t2.type_union.get_id())));
         }
         (None, None) => {}
     }
 
     match (&prop1.default_type_metadata, &prop2.default_type_metadata) {
         (Some(d1), Some(d2)) => {
-            if d1.type_union.get_id() != d2.type_union.get_id() {
-                return Err(PropertyConflict::Default(
-                    Some(format!("{:?}", d1.type_union)),
-                    Some(format!("{:?}", d2.type_union)),
-                ));
+            let d1_id = d1.type_union.get_id();
+            let d2_id = d2.type_union.get_id();
+            if d1_id != d2_id {
+                return Err(PropertyConflict::Default(Some(d1_id), Some(d2_id)));
             }
         }
         (Some(d1), None) => {
-            return Err(PropertyConflict::Default(Some(format!("{:?}", d1.type_union)), None));
+            return Err(PropertyConflict::Default(Some(d1.type_union.get_id()), None));
         }
         (None, Some(d2)) => {
-            return Err(PropertyConflict::Default(None, Some(format!("{:?}", d2.type_union))));
+            return Err(PropertyConflict::Default(None, Some(d2.type_union.get_id())));
         }
         (None, None) => {}
     }
@@ -2614,18 +2565,10 @@ fn report_trait_property_conflict<A>(
     trait1_name: Word,
     trait2_name: Word,
     conflict_span: Span,
-    prop1: &PropertyMetadata,
-    prop2: &PropertyMetadata,
+    conflict: PropertyConflict,
 ) where
     A: Arena,
 {
-    let conflict = match check_property_compatibility(prop1, prop2) {
-        Ok(()) => {
-            PropertyConflict::Type(None, None) // Dummy value
-        }
-        Err(conflict) => conflict,
-    };
-
     let conflict_description = conflict.describe();
     let issue_code = conflict.get_issue_code();
 
@@ -3267,12 +3210,6 @@ fn check_class_like_properties<'ctx, A>(
             }
 
             if property_metadata.read_visibility > parent_property.read_visibility {
-                let property_span = property_metadata.name_span.unwrap_or(class_like_metadata.span);
-                let parent_property_span = parent_property.name_span.unwrap_or(parent_metadata.span);
-
-                let declaring_class_name = class_like_metadata.original_name;
-                let parent_class_name = parent_metadata.original_name;
-
                 context.collector.report_with_code(
                         IssueCode::IncompatiblePropertyAccess,
                         Issue::error(format!(
@@ -3295,12 +3232,6 @@ fn check_class_like_properties<'ctx, A>(
                 || parent_property.write_visibility != parent_property.read_visibility)
                 && property_metadata.write_visibility > parent_property.write_visibility
             {
-                let property_span = property_metadata.name_span.unwrap_or(class_like_metadata.span);
-                let parent_property_span = parent_property.name_span.unwrap_or(parent_metadata.span);
-
-                let declaring_class_name = class_like_metadata.original_name;
-                let parent_class_name = parent_metadata.original_name;
-
                 context.collector.report_with_code(
                         IssueCode::IncompatiblePropertyAccess,
                         Issue::error(format!(
@@ -3321,11 +3252,6 @@ fn check_class_like_properties<'ctx, A>(
 
             // Check static modifier consistency
             if property_metadata.flags.is_static() != parent_property.flags.is_static() {
-                let property_span = property_metadata.name_span.unwrap_or(class_like_metadata.span);
-                let parent_property_span = parent_property.name_span.unwrap_or(parent_metadata.span);
-
-                let declaring_class_name = class_like_metadata.original_name;
-                let parent_class_name = parent_metadata.original_name;
                 let (child_modifier, parent_modifier) = if property_metadata.flags.is_static() {
                     ("static", "non-static")
                 } else {
@@ -3352,11 +3278,6 @@ fn check_class_like_properties<'ctx, A>(
 
             // Check readonly modifier consistency
             if property_metadata.flags.is_readonly() != parent_property.flags.is_readonly() {
-                let property_span = property_metadata.name_span.unwrap_or(class_like_metadata.span);
-                let parent_property_span = parent_property.name_span.unwrap_or(parent_metadata.span);
-
-                let declaring_class_name = class_like_metadata.original_name;
-                let parent_class_name = parent_metadata.original_name;
                 let (child_modifier, parent_modifier) = if property_metadata.flags.is_readonly() {
                     ("readonly", "non-readonly")
                 } else {

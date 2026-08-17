@@ -910,23 +910,8 @@ where
     let final_actions =
         ControlAction::from_statements(else_if_clause.1.iter().collect(), vec![], Some(artifacts), true);
 
-    let has_actions = !final_actions.is_empty();
-    let has_ending_statements;
-    let has_break_statement;
-    let has_continue_statement;
-    let has_leaving_statements;
-
-    if has_actions {
-        has_ending_statements = final_actions.len() == 1 && final_actions.contains(ControlAction::End);
-        has_break_statement = final_actions.len() == 1 && final_actions.contains(ControlAction::Break);
-        has_continue_statement = final_actions.len() == 1 && final_actions.contains(ControlAction::Continue);
-        has_leaving_statements = has_ending_statements || !final_actions.contains(ControlAction::None);
-    } else {
-        has_ending_statements = false;
-        has_break_statement = false;
-        has_continue_statement = false;
-        has_leaving_statements = false;
-    }
+    let (has_ending_statements, has_break_statement, has_continue_statement, has_leaving_statements) =
+        get_branch_control_flags(final_actions);
 
     if_scope.if_actions.extend(final_actions);
 
@@ -1169,23 +1154,8 @@ where
         None => ControlActionSet::from_single(ControlAction::None),
     };
 
-    let has_actions = !final_actions.is_empty();
-    let has_ending_statements;
-    let has_break_statement;
-    let has_continue_statement;
-    let has_leaving_statements;
-
-    if has_actions {
-        has_ending_statements = final_actions.len() == 1 && final_actions.contains(ControlAction::End);
-        has_break_statement = final_actions.len() == 1 && final_actions.contains(ControlAction::Break);
-        has_continue_statement = final_actions.len() == 1 && final_actions.contains(ControlAction::Continue);
-        has_leaving_statements = has_ending_statements || !final_actions.contains(ControlAction::None);
-    } else {
-        has_ending_statements = false;
-        has_break_statement = false;
-        has_continue_statement = false;
-        has_leaving_statements = false;
-    }
+    let (has_ending_statements, has_break_statement, has_continue_statement, has_leaving_statements) =
+        get_branch_control_flags(final_actions);
 
     if_scope.final_actions.extend(final_actions);
 
@@ -1552,6 +1522,19 @@ fn synthesize_branch_discriminator_clauses<'ctx>(
             }
         }
     }
+}
+
+fn get_branch_control_flags(final_actions: ControlActionSet) -> (bool, bool, bool, bool) {
+    if final_actions.is_empty() {
+        return (false, false, false, false);
+    }
+
+    let has_ending_statements = final_actions.len() == 1 && final_actions.contains(ControlAction::End);
+    let has_break_statement = final_actions.len() == 1 && final_actions.contains(ControlAction::Break);
+    let has_continue_statement = final_actions.len() == 1 && final_actions.contains(ControlAction::Continue);
+    let has_leaving_statements = has_ending_statements || !final_actions.contains(ControlAction::None);
+
+    (has_ending_statements, has_break_statement, has_continue_statement, has_leaving_statements)
 }
 
 #[cfg(test)]

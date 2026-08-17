@@ -740,6 +740,28 @@ pub(crate) fn resolve_declared_property<'ctx>(
 /// a class scope but is certainly outside the class (mixins, intersection members,
 /// `array_column()`): a real property governs when it is publicly visible, a magic
 /// `@property*` annotation otherwise.  Returns `None` when neither reaches a declaration.
+fn get_resolved_declared_property(
+    codebase: &CodebaseMetadata,
+    resolution: &DeclaredProperty<'_>,
+    prop_name: Word,
+    for_assignment: bool,
+) -> ResolvedProperty {
+    let property_metadata = resolution.property;
+
+    ResolvedProperty {
+        property_span: property_metadata.name_span.or(property_metadata.span),
+        property_name: prop_name,
+        declaring_class_id: Some(resolution.declaring_class.name),
+        property_type: resolution.declared_type_for(codebase, for_assignment),
+        is_magic: resolution.is_magic(),
+        read_type: if for_assignment && resolution.is_magic() {
+            Some(resolution.declared_type(codebase))
+        } else {
+            None
+        },
+    }
+}
+
 pub(crate) fn resolve_property_for_external_access<'ctx>(
     codebase: &'ctx CodebaseMetadata,
     class_metadata: &'ctx ClassLikeMetadata,
@@ -1720,20 +1742,8 @@ where
     // Mixin access is always external, so a non-public real property defers to a magic
     // `@property*` annotation when the mixin class documents one.
     let resolution = resolve_property_for_external_access(context.codebase, mixin_metadata, prop_name)?;
-    let property_metadata = resolution.property;
 
-    Some(ResolvedProperty {
-        property_span: property_metadata.name_span.or(property_metadata.span),
-        property_name: prop_name,
-        declaring_class_id: Some(resolution.declaring_class.name),
-        property_type: resolution.declared_type_for(context.codebase, for_assignment),
-        is_magic: resolution.is_magic(),
-        read_type: if for_assignment && resolution.is_magic() {
-            Some(resolution.declared_type(context.codebase))
-        } else {
-            None
-        },
-    })
+    Some(get_resolved_declared_property(context.codebase, &resolution, prop_name, for_assignment))
 }
 
 /// Searches for a property in intersection types of a named object.
@@ -1764,20 +1774,7 @@ where
                     continue;
                 };
 
-                let property_metadata = resolution.property;
-
-                return Some(ResolvedProperty {
-                    property_span: property_metadata.name_span.or(property_metadata.span),
-                    property_name: prop_name,
-                    declaring_class_id: Some(resolution.declaring_class.name),
-                    property_type: resolution.declared_type_for(context.codebase, for_assignment),
-                    is_magic: resolution.is_magic(),
-                    read_type: if for_assignment && resolution.is_magic() {
-                        Some(resolution.declared_type(context.codebase))
-                    } else {
-                        None
-                    },
-                });
+                return Some(get_resolved_declared_property(context.codebase, &resolution, prop_name, for_assignment));
             }
             TAtomic::Object(TObject::WithProperties(shaped)) => {
                 let key = mago_word::word(trim_start_byte(prop_name.as_bytes(), b'$'));

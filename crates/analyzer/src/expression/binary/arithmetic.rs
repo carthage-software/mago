@@ -35,7 +35,6 @@ use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
-use crate::utils::expression::get_expression_id;
 
 #[inline]
 pub fn analyze_arithmetic_operation<'ctx, 'arena, A>(
@@ -574,18 +573,8 @@ where
     }
 
     let assertion_context = context.get_assertion_context_from_block(block_context);
-    let left_id = get_expression_id(
-        binary.lhs,
-        assertion_context.this_class_name,
-        assertion_context.resolved_names,
-        Some(assertion_context.codebase),
-    )?;
-    let right_id = get_expression_id(
-        binary.rhs,
-        assertion_context.this_class_name,
-        assertion_context.resolved_names,
-        Some(assertion_context.codebase),
-    )?;
+    let left_id = assertion_context.get_expression_id(binary.lhs)?;
+    let right_id = assertion_context.get_expression_id(binary.rhs)?;
 
     for clause in &block_context.clauses {
         if clause.wedge || !clause.reconcilable || clause.possibilities.len() != 1 {

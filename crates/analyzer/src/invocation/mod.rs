@@ -26,7 +26,6 @@ use mago_syntax::cst::Pipe;
 use mago_syntax::cst::PlaceholderArgument;
 use mago_syntax::cst::PositionalArgument;
 use mago_syntax::cst::VariadicPlaceholderArgument;
-use mago_word::Word;
 
 use crate::context::Context;
 
@@ -282,38 +281,6 @@ impl<'ctx> InvocationTarget<'ctx> {
         }
     }
 
-    /// If this target is a method, returns the fully qualified name of the class it belongs to.
-    #[inline]
-    #[allow(dead_code)]
-    pub const fn get_method_class_like_name(&self) -> Option<Word> {
-        match self.get_function_like_identifier() {
-            Some(FunctionLikeIdentifier::Method(fq_class_like_name, _)) => Some(*fq_class_like_name),
-            _ => None,
-        }
-    }
-
-    /// If this target is a method, returns its `MethodIdentifier`.
-    #[inline]
-    #[allow(dead_code)]
-    pub const fn get_method_identifier(&self) -> Option<MethodIdentifier> {
-        match self {
-            InvocationTarget::FunctionLike { identifier, .. } | InvocationTarget::ExternalMethod { identifier, .. } => {
-                identifier.as_method_identifier()
-            }
-            InvocationTarget::Callable { .. } => None,
-        }
-    }
-
-    /// Checks if the target function/method is known to potentially throw exceptions (e.g., has `@throws` tags).
-    #[inline]
-    #[allow(dead_code)]
-    pub const fn has_throw(&self) -> bool {
-        match self {
-            InvocationTarget::FunctionLike { metadata, .. } => metadata.flags.has_throw(),
-            InvocationTarget::Callable { .. } | InvocationTarget::ExternalMethod { .. } => false,
-        }
-    }
-
     /// Returns the template type definitions if the target is a generic function or method.
     #[inline]
     pub fn get_template_types(&self) -> Option<&'ctx TemplateTypes> {
@@ -479,22 +446,20 @@ impl<'ctx> InvocationTargetParameter<'ctx> {
         }
     }
 
-    /// Checks if the parameter is passed by reference (`&`).
-    #[inline]
-    #[allow(dead_code)]
-    pub const fn is_by_reference(&self) -> bool {
-        match self {
-            InvocationTargetParameter::FunctionLike(metadata) => metadata.flags.is_by_reference(),
-            InvocationTargetParameter::Callable(parameter) => parameter.is_by_reference(),
-        }
-    }
-
     /// Checks if the parameter is variadic (`...`).
     #[inline]
     pub const fn is_variadic(&self) -> bool {
         match self {
             InvocationTargetParameter::FunctionLike(metadata) => metadata.flags.is_variadic(),
             InvocationTargetParameter::Callable(parameter) => parameter.is_variadic(),
+        }
+    }
+
+    #[inline]
+    pub const fn is_by_reference(&self) -> bool {
+        match self {
+            InvocationTargetParameter::FunctionLike(metadata) => metadata.flags.is_by_reference(),
+            InvocationTargetParameter::Callable(parameter) => parameter.is_by_reference(),
         }
     }
 

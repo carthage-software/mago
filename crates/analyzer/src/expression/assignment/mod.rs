@@ -1208,12 +1208,8 @@ fn handle_assignment_with_boolean_logic<'ctx, 'arena, A>(
     );
 }
 
-const fn is_closure_expression<'arena>(expression: &'arena Expression<'arena>) -> bool {
-    if let Expression::Parenthesized(parenthesized) = expression {
-        return is_closure_expression(parenthesized.expression);
-    }
-
-    matches!(expression, Expression::Closure(_))
+fn is_closure_expression<'arena>(expression: &'arena Expression<'arena>) -> bool {
+    get_closure_expression_span(expression).is_some()
 }
 
 fn get_closure_expression_span<'arena>(expression: &'arena Expression<'arena>) -> Option<Span> {

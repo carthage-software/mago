@@ -1659,13 +1659,7 @@ fn map_concrete_generic_constraint<F>(generic_parameter: &TGenericParameter, f: 
 where
     F: FnOnce(&TUnion) -> TUnion,
 {
-    let parameter = if generic_parameter.constraint.is_mixed() {
-        generic_parameter.clone()
-    } else {
-        generic_parameter.with_constraint(f(&generic_parameter.constraint))
-    };
-
-    if parameter.constraint.is_never() { None } else { Some(TAtomic::GenericParameter(parameter)) }
+    map_generic_constraint_or_else(generic_parameter, || (*generic_parameter.constraint).clone(), f)
 }
 
 pub(crate) fn map_generic_constraint_or_else<F, D>(generic_parameter: &TGenericParameter, d: D, f: F) -> Option<TAtomic>

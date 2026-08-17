@@ -73,24 +73,14 @@ where
 
     if let Some(assertion_type) = assertion.get_type() {
         if !is_equality {
-            if let Some(assertion_type) = assertion.get_type() {
-                let mut has_changes = false;
-                subtract_complex_type(context, assertion_type, &mut existing_var_type, &mut has_changes);
+            let mut has_changes = false;
+            subtract_complex_type(context, assertion_type, &mut existing_var_type, &mut has_changes);
 
-                if (!has_changes || existing_var_type.is_never())
-                    && let Some(key) = &key
-                    && let Some(pos) = span
-                {
-                    trigger_issue_for_impossible(
-                        context,
-                        old_var_type_atom,
-                        key,
-                        assertion,
-                        !has_changes,
-                        negated,
-                        pos,
-                    );
-                }
+            if (!has_changes || existing_var_type.is_never())
+                && let Some(key) = &key
+                && let Some(pos) = span
+            {
+                trigger_issue_for_impossible(context, old_var_type_atom, key, assertion, !has_changes, negated, pos);
             }
         } else if let Some(key) = &key
             && let Some(pos) = span

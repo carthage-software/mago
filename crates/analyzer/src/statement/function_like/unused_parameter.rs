@@ -324,24 +324,20 @@ pub mod utils {
             Unset(&'arena [u8]),
         }
 
+        pub(super) type VariableWalkerState<'local, 'ctx, 'arena, A> =
+            (Vec<VariableReference<'arena>>, &'local Context<'ctx, 'arena, A>, usize);
+
         #[derive(Debug)]
         pub(super) struct VariableWalker;
 
         #[derive(Debug)]
         pub(super) struct FunctionCallWalker(pub &'static [u8]);
 
-        impl<'ast, 'arena, A> Walker<'ast, 'arena, (Vec<VariableReference<'arena>>, &Context<'_, 'arena, A>, usize)>
-            for VariableWalker
+        impl<'ast, 'arena, A> Walker<'ast, 'arena, VariableWalkerState<'_, '_, 'arena, A>> for VariableWalker
         where
             A: Arena,
         {
-            fn walk_if(
-                &self,
-                r#if: &'ast If<'arena>,
-                context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena, A>, usize),
-            ) where
-                A: Arena,
-            {
+            fn walk_if(&self, r#if: &'ast If<'arena>, context: &mut VariableWalkerState<'_, '_, 'arena, A>) {
                 self.walk_expression(r#if.condition, context);
 
                 context.2 += 1;
@@ -349,13 +345,7 @@ pub mod utils {
                 context.2 -= 1;
             }
 
-            fn walk_for(
-                &self,
-                r#for: &'ast For<'arena>,
-                context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena, A>, usize),
-            ) where
-                A: Arena,
-            {
+            fn walk_for(&self, r#for: &'ast For<'arena>, context: &mut VariableWalkerState<'_, '_, 'arena, A>) {
                 for i in &r#for.initializations {
                     self.walk_expression(i, context);
                 }
@@ -373,13 +363,7 @@ pub mod utils {
                 context.2 -= 1;
             }
 
-            fn walk_while(
-                &self,
-                r#while: &'ast While<'arena>,
-                context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena, A>, usize),
-            ) where
-                A: Arena,
-            {
+            fn walk_while(&self, r#while: &'ast While<'arena>, context: &mut VariableWalkerState<'_, '_, 'arena, A>) {
                 self.walk_expression(r#while.condition, context);
                 context.2 += 1;
                 self.walk_while_body(&r#while.body, context);
@@ -389,10 +373,8 @@ pub mod utils {
             fn walk_do_while(
                 &self,
                 do_while: &'ast DoWhile<'arena>,
-                context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena, A>, usize),
-            ) where
-                A: Arena,
-            {
+                context: &mut VariableWalkerState<'_, '_, 'arena, A>,
+            ) {
                 context.2 += 1;
                 self.walk_statement(do_while.statement, context);
                 context.2 -= 1;
@@ -402,10 +384,8 @@ pub mod utils {
             fn walk_match_expression_arm(
                 &self,
                 match_expression_arm: &'ast MatchExpressionArm<'arena>,
-                context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena, A>, usize),
-            ) where
-                A: Arena,
-            {
+                context: &mut VariableWalkerState<'_, '_, 'arena, A>,
+            ) {
                 for c in &match_expression_arm.conditions {
                     self.walk_expression(c, context);
                 }
@@ -418,10 +398,8 @@ pub mod utils {
             fn walk_match_default_arm(
                 &self,
                 match_default_arm: &'ast MatchDefaultArm<'arena>,
-                context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena, A>, usize),
-            ) where
-                A: Arena,
-            {
+                context: &mut VariableWalkerState<'_, '_, 'arena, A>,
+            ) {
                 context.2 += 1;
                 self.walk_expression(match_default_arm.expression, context);
                 context.2 -= 1;
@@ -430,10 +408,8 @@ pub mod utils {
             fn walk_switch_expression_case(
                 &self,
                 switch_expression_case: &'ast SwitchExpressionCase<'arena>,
-                context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena, A>, usize),
-            ) where
-                A: Arena,
-            {
+                context: &mut VariableWalkerState<'_, '_, 'arena, A>,
+            ) {
                 self.walk_expression(switch_expression_case.expression, context);
                 context.2 += 1;
                 for statement in &switch_expression_case.statements {
@@ -445,10 +421,8 @@ pub mod utils {
             fn walk_switch_default_case(
                 &self,
                 switch_default_case: &'ast SwitchDefaultCase<'arena>,
-                context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena, A>, usize),
-            ) where
-                A: Arena,
-            {
+                context: &mut VariableWalkerState<'_, '_, 'arena, A>,
+            ) {
                 context.2 += 1;
                 for statement in &switch_default_case.statements {
                     self.walk_statement(statement, context);
@@ -459,10 +433,8 @@ pub mod utils {
             fn walk_in_try_catch_clause(
                 &self,
                 try_catch_clause: &'ast TryCatchClause<'arena>,
-                context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena, A>, usize),
-            ) where
-                A: Arena,
-            {
+                context: &mut VariableWalkerState<'_, '_, 'arena, A>,
+            ) {
                 if let Some(variable) = &try_catch_clause.variable {
                     context.0.push(VariableReference::Assign(variable.name, true));
                 }
@@ -473,30 +445,24 @@ pub mod utils {
             fn walk_out_try_catch_clause(
                 &self,
                 _try_catch_clause: &'ast TryCatchClause<'arena>,
-                context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena, A>, usize),
-            ) where
-                A: Arena,
-            {
+                context: &mut VariableWalkerState<'_, '_, 'arena, A>,
+            ) {
                 context.2 -= 1;
             }
 
             fn walk_in_foreach_value_target(
                 &self,
                 foreach_value_target: &'ast ForeachValueTarget<'arena>,
-                context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena, A>, usize),
-            ) where
-                A: Arena,
-            {
+                context: &mut VariableWalkerState<'_, '_, 'arena, A>,
+            ) {
                 scan_expression_for_assignment(foreach_value_target.value, &mut context.0, true);
             }
 
             fn walk_in_foreach_key_value_target(
                 &self,
                 foreach_key_value_target: &'ast ForeachKeyValueTarget<'arena>,
-                context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena, A>, usize),
-            ) where
-                A: Arena,
-            {
+                context: &mut VariableWalkerState<'_, '_, 'arena, A>,
+            ) {
                 scan_expression_for_assignment(foreach_key_value_target.key, &mut context.0, true);
                 scan_expression_for_assignment(foreach_key_value_target.value, &mut context.0, true);
             }
@@ -504,30 +470,24 @@ pub mod utils {
             fn walk_in_static_concrete_item(
                 &self,
                 static_concrete_item: &'ast StaticConcreteItem<'arena>,
-                context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena, A>, usize),
-            ) where
-                A: Arena,
-            {
+                context: &mut VariableWalkerState<'_, '_, 'arena, A>,
+            ) {
                 context.0.push(VariableReference::Assign(static_concrete_item.variable.name, context.2 > 0));
             }
 
             fn walk_in_static_abstract_item(
                 &self,
                 static_abstract_item: &'ast StaticAbstractItem<'arena>,
-                context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena, A>, usize),
-            ) where
-                A: Arena,
-            {
+                context: &mut VariableWalkerState<'_, '_, 'arena, A>,
+            ) {
                 context.0.push(VariableReference::Assign(static_abstract_item.variable.name, context.2 > 0));
             }
 
             fn walk_in_global(
                 &self,
                 global: &'ast Global<'arena>,
-                context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena, A>, usize),
-            ) where
-                A: Arena,
-            {
+                context: &mut VariableWalkerState<'_, '_, 'arena, A>,
+            ) {
                 for variable in &global.variables {
                     let Variable::Direct(variable) = variable else {
                         continue;
@@ -539,10 +499,8 @@ pub mod utils {
             fn walk_conditional(
                 &self,
                 conditional: &'ast Conditional<'arena>,
-                context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena, A>, usize),
-            ) where
-                A: Arena,
-            {
+                context: &mut VariableWalkerState<'_, '_, 'arena, A>,
+            ) {
                 self.walk_expression(conditional.condition, context);
 
                 context.2 += 1;
@@ -553,13 +511,7 @@ pub mod utils {
                 context.2 -= 1;
             }
 
-            fn walk_binary(
-                &self,
-                binary: &'ast Binary<'arena>,
-                context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena, A>, usize),
-            ) where
-                A: Arena,
-            {
+            fn walk_binary(&self, binary: &'ast Binary<'arena>, context: &mut VariableWalkerState<'_, '_, 'arena, A>) {
                 self.walk_expression(binary.lhs, context);
 
                 if !binary.operator.is_null_coalesce() && !binary.operator.is_logical() {
@@ -575,10 +527,8 @@ pub mod utils {
             fn walk_assignment(
                 &self,
                 assignment: &'ast Assignment<'arena>,
-                context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena, A>, usize),
-            ) where
-                A: Arena,
-            {
+                context: &mut VariableWalkerState<'_, '_, 'arena, A>,
+            ) {
                 self.walk_expression(assignment.rhs, context);
 
                 let is_conditional = context.2 > 0;
@@ -607,10 +557,8 @@ pub mod utils {
             fn walk_in_direct_variable(
                 &self,
                 direct_variable: &'ast DirectVariable<'arena>,
-                context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena, A>, usize),
-            ) where
-                A: Arena,
-            {
+                context: &mut VariableWalkerState<'_, '_, 'arena, A>,
+            ) {
                 if !is_predefined_variable(direct_variable.name) {
                     context.0.push(VariableReference::Use(direct_variable.name));
                 }
@@ -619,10 +567,8 @@ pub mod utils {
             fn walk_closure(
                 &self,
                 closure: &'ast Closure<'arena>,
-                context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena, A>, usize),
-            ) where
-                A: Arena,
-            {
+                context: &mut VariableWalkerState<'_, '_, 'arena, A>,
+            ) {
                 if let Some(use_clause) = &closure.use_clause {
                     for use_clause_variable in &use_clause.variables {
                         context.0.push(VariableReference::Use(use_clause_variable.variable.name));
@@ -633,10 +579,8 @@ pub mod utils {
             fn walk_in_arrow_function(
                 &self,
                 arrow_function: &'ast ArrowFunction<'arena>,
-                context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena, A>, usize),
-            ) where
-                A: Arena,
-            {
+                context: &mut VariableWalkerState<'_, '_, 'arena, A>,
+            ) {
                 for parameter in &arrow_function.parameter_list.parameters {
                     context.0.push(VariableReference::Assign(parameter.variable.name, false));
                 }
@@ -645,10 +589,8 @@ pub mod utils {
             fn walk_out_arrow_function(
                 &self,
                 arrow_function: &'ast ArrowFunction<'arena>,
-                context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena, A>, usize),
-            ) where
-                A: Arena,
-            {
+                context: &mut VariableWalkerState<'_, '_, 'arena, A>,
+            ) {
                 for parameter in &arrow_function.parameter_list.parameters {
                     context.0.push(VariableReference::Unset(parameter.variable.name));
                 }
@@ -658,71 +600,51 @@ pub mod utils {
             fn walk_anonymous_class(
                 &self,
                 anonymous_class: &'ast AnonymousClass<'arena>,
-                context: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena, A>, usize),
-            ) where
-                A: Arena,
-            {
+                context: &mut VariableWalkerState<'_, '_, 'arena, A>,
+            ) {
                 if let Some(argument_list) = anonymous_class.argument_list.as_ref() {
                     self.walk_partial_argument_list(argument_list, context);
                 }
             }
 
             #[inline]
-            fn walk_namespace(
-                &self,
-                _: &'ast Namespace<'arena>,
-                _: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena, A>, usize),
-            ) where
+            fn walk_namespace(&self, _: &'ast Namespace<'arena>, _: &mut VariableWalkerState<'_, '_, 'arena, A>)
+            where
                 A: Arena,
             {
             }
 
             #[inline]
-            fn walk_class(
-                &self,
-                _: &'ast Class<'arena>,
-                _: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena, A>, usize),
-            ) where
+            fn walk_class(&self, _: &'ast Class<'arena>, _: &mut VariableWalkerState<'_, '_, 'arena, A>)
+            where
                 A: Arena,
             {
             }
 
             #[inline]
-            fn walk_interface(
-                &self,
-                _: &'ast Interface<'arena>,
-                _: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena, A>, usize),
-            ) where
+            fn walk_interface(&self, _: &'ast Interface<'arena>, _: &mut VariableWalkerState<'_, '_, 'arena, A>)
+            where
                 A: Arena,
             {
             }
 
             #[inline]
-            fn walk_trait(
-                &self,
-                _: &'ast Trait<'arena>,
-                _: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena, A>, usize),
-            ) where
+            fn walk_trait(&self, _: &'ast Trait<'arena>, _: &mut VariableWalkerState<'_, '_, 'arena, A>)
+            where
                 A: Arena,
             {
             }
 
             #[inline]
-            fn walk_enum(
-                &self,
-                _: &'ast Enum<'arena>,
-                _: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena, A>, usize),
-            ) where
+            fn walk_enum(&self, _: &'ast Enum<'arena>, _: &mut VariableWalkerState<'_, '_, 'arena, A>)
+            where
                 A: Arena,
             {
             }
 
             #[inline]
-            fn walk_function(
-                &self,
-                _: &'ast Function<'arena>,
-                _: &mut (Vec<VariableReference<'arena>>, &Context<'_, 'arena, A>, usize),
-            ) where
+            fn walk_function(&self, _: &'ast Function<'arena>, _: &mut VariableWalkerState<'_, '_, 'arena, A>)
+            where
                 A: Arena,
             {
             }
