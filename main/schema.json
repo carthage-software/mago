@@ -72,6 +72,14 @@
         }
       }
     },
+    "extension-hosts": {
+      "description": "External extension host pools keyed by a stable local name.\n\nEach entry starts a pool of identical worker processes. Every process\nadvertises the same logical extensions to Mago.",
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/ExtensionHostConfiguration"
+      },
+      "default": {}
+    },
     "linter": {
       "description": "Linter service configuration.\n\nControls linting behavior, including enabled/disabled rules, rule-specific\nsettings, and reporting preferences. Defaults to an empty configuration\nif not specified in the config file.",
       "$ref": "#/$defs/LinterConfiguration",
@@ -1151,6 +1159,82 @@
           "description": "Whether an empty case in alternates is allowed.\n\nWhen enabled, `{,a}` matches both `\"\"` and `\"a\"`.\n\nDefault: `false`.",
           "type": "boolean",
           "default": false
+        }
+      },
+      "additionalProperties": false
+    },
+    "ExtensionHostConfiguration": {
+      "description": "Configuration for one external extension host pool.\n\nOne command is replicated into a pool of identical worker processes. Every\nworker in that pool advertises the same set of logical extensions, and each\nextension may expose both linter rules and analyzer capabilities.",
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "description": "Whether this extension host is active.",
+          "type": "boolean",
+          "default": true
+        },
+        "command": {
+          "description": "Program and arguments used to start each worker, without shell parsing.\n\nThe first element is the executable. Remaining elements are passed as\nliteral arguments. A bare executable name is resolved through `PATH`;\na relative path with a directory component is resolved from the\neffective configuration file's directory.",
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "workers": {
+          "description": "Number of worker processes.\n\nZero uses an adaptive pool that can grow to Mago's global thread count.\nA non-zero value starts exactly that many workers.",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0,
+          "default": 0
+        },
+        "working-directory": {
+          "description": "Working directory for workers.\n\nRelative paths resolve from the effective configuration file's\ndirectory. When omitted, that directory itself is used.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
+        "environment": {
+          "description": "Environment variables added to or replacing inherited values.",
+          "type": "object",
+          "additionalProperties": {
+            "type": "string"
+          },
+          "default": {}
+        },
+        "inherit-environment": {
+          "description": "Whether workers inherit Mago's process environment.",
+          "type": "boolean",
+          "default": true
+        },
+        "maximum-payload-size": {
+          "description": "Maximum bytes accepted in one extension protocol frame.",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0,
+          "default": 67108864
+        },
+        "request-timeout-ms": {
+          "description": "Maximum duration of one request, in milliseconds.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0,
+          "default": 30000
+        },
+        "shutdown-timeout-ms": {
+          "description": "Grace period for worker shutdown, in milliseconds.",
+          "type": "integer",
+          "format": "uint64",
+          "minimum": 0,
+          "default": 250
+        },
+        "stderr-tail-size": {
+          "description": "Number of trailing worker stderr bytes retained for diagnostics.",
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0,
+          "default": 65536
         }
       },
       "additionalProperties": false
