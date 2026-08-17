@@ -114,7 +114,7 @@ where
                 continue;
             };
             let initializers =
-                self.plugin_registry.get_class_initializers(self.codebase, metadata, self.external_analysis_session)?;
+                self.plugin_registry.get_class_initializers(self.codebase, metadata, self.external_analysis_session);
             self.class_initializers.insert(class, initializers);
         }
 

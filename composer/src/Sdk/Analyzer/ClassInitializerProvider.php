@@ -11,12 +11,10 @@ namespace Mago\Sdk\Analyzer;
  * definite-initialization rules as constructors.
  *
  * @api
+ * @extends TargetedProvider<ClassTarget>
  */
-interface ClassInitializerProvider
+interface ClassInitializerProvider extends TargetedProvider
 {
-    /** @return non-empty-list<ClassTarget> */
-    public function getTargets(): array;
-
     /** @return list<non-empty-string> */
     public function getClassInitializers(ClassInitializerProviderContext $context): array;
 }

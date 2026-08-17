@@ -7,23 +7,29 @@ namespace Mago\Sdk\Internal\Analyzer;
 use Mago\Sdk\Analyzer\Argument;
 use Mago\Sdk\Analyzer\CallableSignatureOverride;
 use Mago\Sdk\Analyzer\CallableSignatureProvider;
+use Mago\Sdk\Analyzer\ClassLikeTarget;
+use Mago\Sdk\Analyzer\ClassTarget;
 use Mago\Sdk\Analyzer\EffectiveCallableSignature;
 use Mago\Sdk\Analyzer\ExpressionType;
 use Mago\Sdk\Analyzer\FileAnalysis;
 use Mago\Sdk\Analyzer\FileAnalysisRequirement;
+use Mago\Sdk\Analyzer\FunctionTarget;
 use Mago\Sdk\Analyzer\Invocation;
 use Mago\Sdk\Analyzer\InvocationAssertions;
 use Mago\Sdk\Analyzer\InvocationKind;
 use Mago\Sdk\Analyzer\Metadata\MemberIdentifier;
+use Mago\Sdk\Analyzer\MethodTarget;
 use Mago\Sdk\Analyzer\ProjectAnalysis;
 use Mago\Sdk\Analyzer\PropertyAccess;
 use Mago\Sdk\Analyzer\PropertyAccessKind;
+use Mago\Sdk\Analyzer\PropertyTarget;
 use Mago\Sdk\Analyzer\PropertyType;
 use Mago\Sdk\Analyzer\ReferenceKind;
 use Mago\Sdk\Analyzer\ReferenceOrigin;
 use Mago\Sdk\Analyzer\ReferenceSummary;
 use Mago\Sdk\Analyzer\SymbolReference;
 use Mago\Sdk\Analyzer\SymbolReferences;
+use Mago\Sdk\Analyzer\TargetedAnalysisHook;
 use Mago\Sdk\Analyzer\Type;
 use Mago\Sdk\Analyzer\Type\FunctionLikeIdentifier;
 use Mago\Sdk\Analyzer\TypeComparison;
@@ -170,6 +176,8 @@ final class Protocol
     private const METHOD_SEARCH_ANY_CLASS = 0;
     private const METHOD_SEARCH_EXACT_CLASS = 1;
     private const METHOD_SEARCH_DESCENDANTS = 2;
+    private const REGISTRATION_CAPABILITIES = 1;
+    private const REGISTRATION_MEMOIZATION = 2;
 
     /** @return array{int<0, 65535>, PayloadReader} */
     public static function readRequest(string $payload): array
@@ -294,64 +302,21 @@ final class Protocol
                     $writer->writeString($alias);
                 }
 
-                $writer->writeCount($plugin->functionProviders);
-                foreach ($plugin->functionProviders as $provider) {
-                    $writer->writeU16($provider->index);
-                    $capabilities = (int) ($provider->provider instanceof CallableSignatureProvider);
-                    $capabilities |= (int) ($provider->provider instanceof CallableSignatureOverride) << 1;
-                    $capabilities |= (int) ($provider->provider instanceof UndeclaredReturnTypeProvider) << 2;
-                    $capabilities |= (int) $plugin->memoizeProviders << 3;
-                    $writer->writeU8($capabilities);
-                    $writer->writeCount($provider->targets);
-                    foreach ($provider->targets as $target) {
-                        $writer->writeU8($target->kind->value);
-                        $writer->writeBytes($target->value);
-                    }
-                }
-
-                $writer->writeCount($plugin->methodProviders);
-                foreach ($plugin->methodProviders as $provider) {
-                    $writer->writeU16($provider->index);
-                    $capabilities = (int) ($provider->provider instanceof CallableSignatureProvider);
-                    $capabilities |= (int) ($provider->provider instanceof CallableSignatureOverride) << 1;
-                    $capabilities |= (int) ($provider->provider instanceof UndeclaredReturnTypeProvider) << 2;
-                    $capabilities |= (int) $plugin->memoizeProviders << 3;
-                    $writer->writeU8($capabilities);
-                    $writer->writeCount($provider->targets);
-                    foreach ($provider->targets as $target) {
-                        $writer->writeBytes($target->class);
-                        $writer->writeBytes($target->method);
-                    }
-                }
-
-                $writer->writeCount($plugin->propertyProviders);
-                foreach ($plugin->propertyProviders as $provider) {
-                    $writer->writeU16($provider->index);
-                    $writer->writeCount($provider->targets);
-                    foreach ($provider->targets as $target) {
-                        $writer->writeBytes($target->class);
-                        $writer->writeBytes($target->property);
-                    }
-                }
-
-                $writer->writeCount($plugin->propertyInitializationProviders);
-                foreach ($plugin->propertyInitializationProviders as $provider) {
-                    $writer->writeU16($provider->index);
-                    $writer->writeCount($provider->targets);
-                    foreach ($provider->targets as $target) {
-                        $writer->writeBytes($target->class);
-                        $writer->writeBytes($target->property);
-                    }
-                }
-
-                $writer->writeCount($plugin->classInitializerProviders);
-                foreach ($plugin->classInitializerProviders as $provider) {
-                    $writer->writeU16($provider->index);
-                    $writer->writeCount($provider->targets);
-                    foreach ($provider->targets as $target) {
-                        $writer->writeBytes($target->class);
-                    }
-                }
+                self::writeTargetRegistrations(
+                    $writer,
+                    $plugin->functionProviders,
+                    self::REGISTRATION_CAPABILITIES,
+                    $plugin->memoizeProviders,
+                );
+                self::writeTargetRegistrations(
+                    $writer,
+                    $plugin->methodProviders,
+                    self::REGISTRATION_CAPABILITIES,
+                    $plugin->memoizeProviders,
+                );
+                self::writeTargetRegistrations($writer, $plugin->propertyProviders);
+                self::writeTargetRegistrations($writer, $plugin->propertyInitializationProviders);
+                self::writeTargetRegistrations($writer, $plugin->classInitializerProviders);
 
                 $writer->writeCount($plugin->entryPoints);
                 foreach ($plugin->entryPoints as $entryPoint) {
@@ -368,101 +333,134 @@ final class Protocol
                 $writer->writeCount($plugin->issueFilterHooks);
                 foreach ($plugin->issueFilterHooks as $hook) {
                     $writer->writeU16($hook->index);
-                    $writer->writeCount($hook->codes);
-                    foreach ($hook->codes as $code) {
+                    $writer->writeCount($hook->targets);
+                    foreach ($hook->targets as $code) {
                         $writer->writeString($code);
                     }
                 }
 
-                $writer->writeCount($plugin->nodeAnalysisHooks);
-                foreach ($plugin->nodeAnalysisHooks as $hook) {
-                    $writer->writeU16($hook->index);
-                    $requirements = 0;
-                    foreach ($hook->requirements as $requirement) {
-                        $requirements |= match ($requirement) {
-                            FileAnalysisRequirement::ExpressionTypes => 1,
-                            FileAnalysisRequirement::TargetExpressionTypes => 1 << 1,
-                            FileAnalysisRequirement::ReceiverType => 1 << 2,
-                            FileAnalysisRequirement::ArgumentTypes => 1 << 3,
-                            FileAnalysisRequirement::TargetSubtree => 1 << 4,
-                            FileAnalysisRequirement::SourceText => 1 << 5,
-                        };
-                    }
-                    $writer->writeU8($requirements);
-                    $writer->writeCount($hook->targets);
-                    foreach ($hook->targets as $target) {
-                        $writer->writeString($target->value);
-                    }
-                }
-
-                $writer->writeCount($plugin->methodCallAnalysisHooks);
-                foreach ($plugin->methodCallAnalysisHooks as $hook) {
-                    $writer->writeU16($hook->index);
-                    $requirements = 0;
-                    foreach ($hook->requirements as $requirement) {
-                        $requirements |= match ($requirement) {
-                            FileAnalysisRequirement::ExpressionTypes => 1,
-                            FileAnalysisRequirement::TargetExpressionTypes => 1 << 1,
-                            FileAnalysisRequirement::ReceiverType => 1 << 2,
-                            FileAnalysisRequirement::ArgumentTypes => 1 << 3,
-                            FileAnalysisRequirement::TargetSubtree => 1 << 4,
-                            FileAnalysisRequirement::SourceText => 1 << 5,
-                        };
-                    }
-                    $writer->writeU8($requirements);
-                    $writer->writeCount($hook->targets);
-                    foreach ($hook->targets as $target) {
-                        $writer->writeBytes($target->class);
-                        $writer->writeBytes($target->method);
-                    }
-                }
-
-                $writer->writeCount($plugin->classLikeAnalysisHooks);
-                foreach ($plugin->classLikeAnalysisHooks as $hook) {
-                    $writer->writeU16($hook->index);
-                    $requirements = 0;
-                    foreach ($hook->requirements as $requirement) {
-                        $requirements |= match ($requirement) {
-                            FileAnalysisRequirement::ExpressionTypes => 1,
-                            FileAnalysisRequirement::TargetExpressionTypes => 1 << 1,
-                            FileAnalysisRequirement::ReceiverType => 1 << 2,
-                            FileAnalysisRequirement::ArgumentTypes => 1 << 3,
-                            FileAnalysisRequirement::TargetSubtree => 1 << 4,
-                            FileAnalysisRequirement::SourceText => 1 << 5,
-                        };
-                    }
-                    $writer->writeU8($requirements);
-                    $writer->writeCount($hook->targets);
-                    foreach ($hook->targets as $target) {
-                        $writer->writeBytes($target->ancestor);
-                    }
-                }
-
-                $writer->writeCount($plugin->functionAssertionProviders);
-                foreach ($plugin->functionAssertionProviders as $provider) {
-                    $writer->writeU16($provider->index);
-                    $writer->writeBoolean($plugin->memoizeProviders);
-                    $writer->writeCount($provider->targets);
-                    foreach ($provider->targets as $target) {
-                        $writer->writeU8($target->kind->value);
-                        $writer->writeBytes($target->value);
-                    }
-                }
-
-                $writer->writeCount($plugin->methodAssertionProviders);
-                foreach ($plugin->methodAssertionProviders as $provider) {
-                    $writer->writeU16($provider->index);
-                    $writer->writeBoolean($plugin->memoizeProviders);
-                    $writer->writeCount($provider->targets);
-                    foreach ($provider->targets as $target) {
-                        $writer->writeBytes($target->class);
-                        $writer->writeBytes($target->method);
-                    }
-                }
+                self::writeTargetRegistrations($writer, $plugin->nodeAnalysisHooks);
+                self::writeTargetRegistrations($writer, $plugin->methodCallAnalysisHooks);
+                self::writeTargetRegistrations($writer, $plugin->classLikeAnalysisHooks);
+                self::writeTargetRegistrations(
+                    $writer,
+                    $plugin->functionAssertionProviders,
+                    self::REGISTRATION_MEMOIZATION,
+                    $plugin->memoizeProviders,
+                );
+                self::writeTargetRegistrations(
+                    $writer,
+                    $plugin->methodAssertionProviders,
+                    self::REGISTRATION_MEMOIZATION,
+                    $plugin->memoizeProviders,
+                );
             }
         }
 
         return $writer->finish();
+    }
+
+    /**
+     * @param list<RegisteredTargetedCallback> $registrations
+     */
+    private static function writeTargetRegistrations(
+        PayloadWriter $writer,
+        array $registrations,
+        int $header = 0,
+        bool $memoize = false,
+    ): void {
+        $writer->writeCount($registrations);
+        foreach ($registrations as $registration) {
+            $writer->writeU16($registration->index);
+            self::writeRegistrationHeader($writer, $registration, $header, $memoize);
+
+            /** @var non-empty-list<FunctionTarget|MethodTarget|PropertyTarget|ClassTarget|NodeKind|ClassLikeTarget> $targets */
+            $targets = $registration->targets;
+            $writer->writeCount($targets);
+            foreach ($targets as $target) {
+                self::writeRegistrationTarget($writer, $target);
+            }
+        }
+    }
+
+    private static function writeRegistrationHeader(
+        PayloadWriter $writer,
+        RegisteredTargetedCallback $registration,
+        int $header,
+        bool $memoize,
+    ): void {
+        if ($registration->callback instanceof TargetedAnalysisHook) {
+            $writer->writeU8(self::requirements($registration->requirements));
+
+            return;
+        }
+
+        if ($header === self::REGISTRATION_CAPABILITIES) {
+            $writer->writeU8(
+                (int) ($registration->callback instanceof CallableSignatureProvider)
+                | ((int) ($registration->callback instanceof CallableSignatureOverride) << 1)
+                | ((int) ($registration->callback instanceof UndeclaredReturnTypeProvider) << 2)
+                | ((int) $memoize << 3),
+            );
+
+            return;
+        }
+
+        if ($header === self::REGISTRATION_MEMOIZATION) {
+            $writer->writeBoolean($memoize);
+        }
+    }
+
+    /** @param list<FileAnalysisRequirement> $requirements */
+    private static function requirements(array $requirements): int
+    {
+        $flags = 0;
+        foreach ($requirements as $requirement) {
+            $flags |= 1
+            << match ($requirement) {
+                FileAnalysisRequirement::ExpressionTypes => 0,
+                FileAnalysisRequirement::TargetExpressionTypes => 1,
+                FileAnalysisRequirement::ReceiverType => 2,
+                FileAnalysisRequirement::ArgumentTypes => 3,
+                FileAnalysisRequirement::TargetSubtree => 4,
+                FileAnalysisRequirement::SourceText => 5,
+            };
+        }
+
+        return $flags;
+    }
+
+    /** @mago-expect lint:halstead */
+    private static function writeRegistrationTarget(
+        PayloadWriter $writer,
+        FunctionTarget|MethodTarget|PropertyTarget|ClassTarget|NodeKind|ClassLikeTarget $target,
+    ): void {
+        if ($target instanceof FunctionTarget) {
+            $writer->writeU8($target->kind->value);
+            $writer->writeBytes($target->value);
+
+            return;
+        }
+
+        if ($target instanceof MethodTarget) {
+            $writer->writeBytes($target->class);
+            $writer->writeBytes($target->method);
+
+            return;
+        }
+
+        if ($target instanceof PropertyTarget) {
+            $writer->writeBytes($target->class);
+            $writer->writeBytes($target->property);
+
+            return;
+        }
+
+        $writer->writeBytes(match (true) {
+            $target instanceof ClassTarget => $target->class,
+            $target instanceof NodeKind => $target->value,
+            $target instanceof ClassLikeTarget => $target->ancestor,
+        });
     }
 
     /** @param array<string, Span> $spans */

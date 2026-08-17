@@ -3,6 +3,8 @@ use mago_extension::WorkerError;
 
 #[derive(Debug)]
 pub enum ExternalAnalyzerError {
+    InitializationUnavailable,
+    InitializationPanicked,
     Worker(WorkerError),
     Protocol(String),
     InconsistentRegistration,
@@ -21,6 +23,10 @@ impl ExternalAnalyzerError {
 impl std::fmt::Display for ExternalAnalyzerError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            Self::InitializationUnavailable => {
+                formatter.write_str("external analyzer initialization thread is unavailable")
+            }
+            Self::InitializationPanicked => formatter.write_str("external analyzer initialization thread panicked"),
             Self::Worker(error) => write!(formatter, "external analyzer worker failed: {error}"),
             Self::Protocol(message) => write!(formatter, "external analyzer protocol error: {message}"),
             Self::InconsistentRegistration => {

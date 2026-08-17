@@ -11,14 +11,6 @@ namespace Mago\Sdk\Analyzer;
  * least one target cross the extension boundary; the ancestors do not.
  *
  * @api
+ * @extends TargetedAnalysisHook<ClassLikeTarget>
  */
-interface ClassLikeAnalysisHook
-{
-    /** @return non-empty-list<ClassLikeTarget> */
-    public function getTargets(): array;
-
-    /** @return list<FileAnalysisRequirement> */
-    public function getRequirements(): array;
-
-    public function analyze(NodeAnalysisContext $context): void;
-}
+interface ClassLikeAnalysisHook extends TargetedAnalysisHook {}

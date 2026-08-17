@@ -8,11 +8,9 @@ namespace Mago\Sdk\Analyzer;
  * Marks targeted declared properties as initialized by external framework behavior.
  *
  * @api
+ * @extends TargetedProvider<PropertyTarget>
  */
-interface PropertyInitializationProvider
+interface PropertyInitializationProvider extends TargetedProvider
 {
-    /** @return non-empty-list<PropertyTarget> */
-    public function getTargets(): array;
-
     public function isPropertyInitialized(PropertyInitializationProviderContext $context): bool;
 }

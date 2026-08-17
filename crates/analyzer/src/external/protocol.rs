@@ -99,6 +99,7 @@ use mago_word::ascii_lowercase_word;
 use mago_word::word;
 
 use crate::artifacts::AnalysisArtifacts;
+use crate::external::AnalysisHookRegistration;
 use crate::external::AttributedEntryPoint;
 use crate::external::ClassInitializerProvider;
 use crate::external::ClassLikeAnalysisHookRegistration;
@@ -107,9 +108,11 @@ use crate::external::EntryPoint;
 use crate::external::ExternalAnalysisSession;
 use crate::external::ExternalExtension;
 use crate::external::ExternalPlugin;
+use crate::external::FunctionAssertionProvider;
 use crate::external::FunctionProvider;
 use crate::external::FunctionTarget;
 use crate::external::IssueFilterHookRegistration;
+use crate::external::MethodAssertionProvider;
 use crate::external::MethodCallAnalysisHookRegistration;
 use crate::external::MethodProvider;
 use crate::external::MethodTarget;
@@ -118,6 +121,7 @@ use crate::external::NodeAnalysisHookRegistration;
 use crate::external::PropertyAccessKind;
 use crate::external::PropertyProvider;
 use crate::external::PropertyTarget;
+use crate::external::ProviderRegistration;
 use crate::external::error::ExternalAnalyzerError;
 use crate::external::error::protocol;
 use crate::external::metadata;
@@ -242,22 +246,6 @@ pub(super) struct Registration {
     pub after_file_analysis_plugins: Vec<u16>,
     pub node_analysis_plugins: Vec<u16>,
     pub after_analysis_plugins: Vec<u16>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct FunctionAssertionProvider {
-    pub plugin: String,
-    pub index: u16,
-    pub memoize: bool,
-    pub targets: Vec<FunctionTarget>,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(super) struct MethodAssertionProvider {
-    pub plugin: String,
-    pub index: u16,
-    pub memoize: bool,
-    pub targets: Vec<MethodTarget>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -430,159 +418,46 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
                 aliases.push(non_empty(reader.read_string("plugin alias")?, "plugin alias")?);
             }
 
-            let function_count = reader.read_count("function providers", MAXIMUM_PROVIDERS)?;
-            for _ in 0..function_count {
-                let index = reader.read_u16("function provider index")?;
-                let capabilities = reader.read_u8("function provider capabilities")?;
-                if capabilities & !15 != 0 {
-                    return Err(protocol(format!(
-                        "function provider {index} has unknown capabilities {capabilities:#04x}"
-                    )));
-                }
-
-                let target_count = reader.read_count("function targets", MAXIMUM_TARGETS)?;
-                if target_count == 0 {
-                    return Err(protocol(format!("function provider {index} has no targets")));
-                }
-
-                let mut targets = Vec::with_capacity(target_count);
-                for _ in 0..target_count {
-                    let kind = reader.read_u8("function target kind")?;
-                    let mut value = non_empty(reader.read_bytes("function target")?.to_vec(), "function target")?;
-                    targets.push(match kind {
-                        TARGET_EXACT => FunctionTarget::Exact(value),
-                        TARGET_PREFIX => FunctionTarget::Prefix(value),
-                        TARGET_NAMESPACE => {
-                            if value.last() != Some(&b'\\') {
-                                value.push(b'\\');
-                            }
-                            FunctionTarget::Namespace(value)
-                        }
-                        _ => return Err(protocol(format!("function provider {index} has unknown target kind {kind}"))),
-                    });
-                }
-
-                function_providers.push(FunctionProvider {
-                    plugin: identifier.clone(),
-                    index,
-                    callable_signature: capabilities & 1 != 0,
-                    overrides_declared_signature: capabilities & 2 != 0,
-                    undeclared_return_type_only: capabilities & 4 != 0,
-                    memoize: capabilities & 8 != 0,
-                    targets,
-                });
-            }
-
-            let method_count = reader.read_count("method providers", MAXIMUM_PROVIDERS)?;
-            for _ in 0..method_count {
-                let index = reader.read_u16("method provider index")?;
-                let capabilities = reader.read_u8("method provider capabilities")?;
-                if capabilities & !15 != 0 {
-                    return Err(protocol(format!(
-                        "method provider {index} has unknown capabilities {capabilities:#04x}"
-                    )));
-                }
-                let target_count = reader.read_count("method targets", MAXIMUM_TARGETS)?;
-                if target_count == 0 {
-                    return Err(protocol(format!("method provider {index} has no targets")));
-                }
-
-                let mut targets = Vec::with_capacity(target_count);
-                for _ in 0..target_count {
-                    let class = non_empty(reader.read_bytes("method target class")?.to_vec(), "method target class")?;
-                    let method =
-                        non_empty(reader.read_bytes("method target method")?.to_vec(), "method target method")?;
-                    validate_method_pattern(&class)?;
-                    validate_method_pattern(&method)?;
-                    targets.push(MethodTarget { class, method });
-                }
-
-                method_providers.push(MethodProvider {
-                    plugin: identifier.clone(),
-                    index,
-                    callable_signature: capabilities & 1 != 0,
-                    overrides_declared_signature: capabilities & 2 != 0,
-                    undeclared_return_type_only: capabilities & 4 != 0,
-                    memoize: capabilities & 8 != 0,
-                    targets,
-                });
-            }
-
-            let property_count = reader.read_count("property providers", MAXIMUM_PROVIDERS)?;
-            for _ in 0..property_count {
-                let index = reader.read_u16("property provider index")?;
-                let target_count = reader.read_count("property targets", MAXIMUM_TARGETS)?;
-                if target_count == 0 {
-                    return Err(protocol(format!("property provider {index} has no targets")));
-                }
-
-                let mut targets = Vec::with_capacity(target_count);
-                for _ in 0..target_count {
-                    let class =
-                        non_empty(reader.read_bytes("property target class")?.to_vec(), "property target class")?;
-                    let property =
-                        non_empty(reader.read_bytes("property target property")?.to_vec(), "property target property")?;
-                    validate_method_pattern(&class)?;
-                    validate_property_pattern(&property)?;
-                    targets.push(PropertyTarget { class, property });
-                }
-
-                property_providers.push(PropertyProvider { plugin: identifier.clone(), index, targets });
-            }
-
-            let property_initialization_count =
-                reader.read_count("property initialization providers", MAXIMUM_PROVIDERS)?;
-            for _ in 0..property_initialization_count {
-                let index = reader.read_u16("property initialization provider index")?;
-                let target_count = reader.read_count("property initialization targets", MAXIMUM_TARGETS)?;
-                if target_count == 0 {
-                    return Err(protocol(format!("property initialization provider {index} has no targets")));
-                }
-
-                let mut targets = Vec::with_capacity(target_count);
-                for _ in 0..target_count {
-                    let class = non_empty(
-                        reader.read_bytes("property initialization target class")?.to_vec(),
-                        "property initialization target class",
-                    )?;
-
-                    let property = non_empty(
-                        reader.read_bytes("property initialization target property")?.to_vec(),
-                        "property initialization target property",
-                    )?;
-
-                    validate_method_pattern(&class)?;
-                    validate_property_pattern(&property)?;
-                    targets.push(PropertyTarget { class, property });
-                }
-
-                property_initialization_providers.push(PropertyProvider { plugin: identifier.clone(), index, targets });
-            }
-
-            let class_initializer_count = reader.read_count("class initializer providers", MAXIMUM_PROVIDERS)?;
-            for _ in 0..class_initializer_count {
-                let index = reader.read_u16("class initializer provider index")?;
-                let target_count = reader.read_count("class initializer targets", MAXIMUM_TARGETS)?;
-                if target_count == 0 {
-                    return Err(protocol(format!("class initializer provider {index} has no targets")));
-                }
-
-                let mut targets = Vec::with_capacity(target_count);
-                for _ in 0..target_count {
-                    let target = non_empty(
-                        reader.read_bytes("class initializer target class")?.to_vec(),
-                        "class initializer target class",
-                    )?;
-                    validate_method_pattern(&target)?;
-                    targets.push(target);
-                }
-
-                class_initializer_providers.push(ClassInitializerProvider {
-                    plugin: identifier.clone(),
-                    index,
-                    targets,
-                });
-            }
+            function_providers.extend(read_providers(
+                &mut reader,
+                index,
+                "function providers",
+                "function provider",
+                read_capabilities,
+                read_function_target,
+            )?);
+            method_providers.extend(read_providers(
+                &mut reader,
+                index,
+                "method providers",
+                "method provider",
+                read_capabilities,
+                read_method_target,
+            )?);
+            property_providers.extend(read_providers(
+                &mut reader,
+                index,
+                "property providers",
+                "property provider",
+                no_capabilities,
+                read_property_target,
+            )?);
+            property_initialization_providers.extend(read_providers(
+                &mut reader,
+                index,
+                "property initialization providers",
+                "property initialization provider",
+                no_capabilities,
+                read_property_target,
+            )?);
+            class_initializer_providers.extend(read_providers(
+                &mut reader,
+                index,
+                "class initializer providers",
+                "class initializer provider",
+                no_capabilities,
+                read_class_target,
+            )?);
 
             let entry_point_count = reader.read_count("entry points", MAXIMUM_TARGETS)?;
             for _ in 0..entry_point_count {
@@ -591,7 +466,7 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
                 validate_method_pattern(&class)?;
                 validate_method_pattern(&method)?;
                 entry_points.push(EntryPoint {
-                    plugin: identifier.clone(),
+                    plugin: index,
                     source: ascii_lowercase_word(identifier.as_bytes()),
                     target: MethodTarget { class, method },
                 });
@@ -610,7 +485,7 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
                     return Err(protocol("entry point attribute must be a valid PHP class-like name"));
                 }
                 attributed_entry_points.push(AttributedEntryPoint {
-                    plugin: identifier.clone(),
+                    plugin: index,
                     source: ascii_lowercase_word(identifier.as_bytes()),
                     class,
                     attribute,
@@ -619,238 +494,74 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
 
             let issue_filter_count = reader.read_count("issue-filter hooks", MAXIMUM_PROVIDERS)?;
             for _ in 0..issue_filter_count {
-                let index = reader.read_u16("issue-filter hook index")?;
+                let hook_index = reader.read_u16("issue-filter hook index")?;
                 let code_count = reader.read_count("issue-filter hook target codes", MAXIMUM_TARGETS)?;
                 if code_count == 0 {
-                    return Err(protocol(format!("issue-filter hook {index} has no target codes")));
+                    return Err(protocol(format!("issue-filter hook {hook_index} has no target codes")));
                 }
 
                 let mut codes = Vec::with_capacity(code_count);
                 for _ in 0..code_count {
                     let code = reader.read_string("issue-filter hook target code")?;
                     if code.is_empty() {
-                        return Err(protocol(format!("issue-filter hook {index} targets an empty issue code")));
+                        return Err(protocol(format!("issue-filter hook {hook_index} targets an empty issue code")));
                     }
                     if codes.contains(&code) {
                         return Err(protocol(format!(
-                            "issue-filter hook {index} targets issue code `{code}` more than once"
+                            "issue-filter hook {hook_index} targets issue code `{code}` more than once"
                         )));
                     }
                     codes.push(code);
                 }
 
-                issue_filter_hooks.push(IssueFilterHookRegistration { plugin: identifier.clone(), index, codes });
-            }
-
-            let node_hook_count = reader.read_count("node-analysis hooks", MAXIMUM_PROVIDERS)?;
-            for _ in 0..node_hook_count {
-                let hook_index = reader.read_u16("node-analysis hook index")?;
-                let requirements = reader.read_u8("node-analysis hook requirements")?;
-                if requirements & !NODE_REQUIREMENTS_ALL != 0 {
-                    return Err(protocol(format!(
-                        "node-analysis hook {hook_index} has unknown requirements {requirements:#04x}"
-                    )));
-                }
-                let target_count = reader.read_count("node-analysis hook targets", MAXIMUM_TARGETS)?;
-                if target_count == 0 {
-                    return Err(protocol(format!("node-analysis hook {hook_index} has no targets")));
-                }
-
-                let mut targets = Vec::with_capacity(target_count);
-                let mut unique_targets = HashSet::with_capacity_and_hasher(target_count, RandomState::default());
-                for _ in 0..target_count {
-                    let target_name = reader.read_str("node-analysis hook target")?;
-                    let target = target_name.parse::<NodeKind>().map_err(|_| {
-                        protocol(format!("node-analysis hook {hook_index} targets unknown node kind `{target_name}`"))
-                    })?;
-                    if !unique_targets.insert(target) {
-                        return Err(protocol(format!(
-                            "node-analysis hook {hook_index} lists node kind `{target_name}` more than once"
-                        )));
-                    }
-                    targets.push(target);
-                }
-
-                node_analysis_hooks.push(NodeAnalysisHookRegistration {
-                    plugin: identifier.clone(),
-                    plugin_index: index,
+                issue_filter_hooks.push(IssueFilterHookRegistration {
+                    plugin: index,
                     index: hook_index,
-                    requirements,
-                    targets,
-                });
-                if !node_analysis_plugins.contains(&index) {
-                    node_analysis_plugins.push(index);
-                }
-            }
-
-            let method_call_hook_count = reader.read_count("method-call analysis hooks", MAXIMUM_PROVIDERS)?;
-            for _ in 0..method_call_hook_count {
-                let hook_index = reader.read_u16("method-call analysis hook index")?;
-                let requirements = reader.read_u8("method-call analysis hook requirements")?;
-                if requirements & !NODE_REQUIREMENTS_ALL != 0 {
-                    return Err(protocol(format!(
-                        "method-call analysis hook {hook_index} has unknown requirements {requirements:#04x}"
-                    )));
-                }
-                let target_count = reader.read_count("method-call analysis hook targets", MAXIMUM_TARGETS)?;
-                if target_count == 0 {
-                    return Err(protocol(format!("method-call analysis hook {hook_index} has no targets")));
-                }
-
-                let mut targets = Vec::with_capacity(target_count);
-                let mut unique_targets = HashSet::with_capacity_and_hasher(target_count, RandomState::default());
-                for _ in 0..target_count {
-                    let class = non_empty(
-                        reader.read_bytes("method-call analysis target class")?.to_vec(),
-                        "method-call analysis target class",
-                    )?;
-                    let method = non_empty(
-                        reader.read_bytes("method-call analysis target method")?.to_vec(),
-                        "method-call analysis target method",
-                    )?;
-                    validate_method_pattern(&class)?;
-                    validate_method_pattern(&method)?;
-                    if !unique_targets.insert((class.clone(), method.clone())) {
-                        return Err(protocol(format!(
-                            "method-call analysis hook {hook_index} targets the same method more than once"
-                        )));
-                    }
-                    targets.push(MethodTarget { class, method });
-                }
-
-                method_call_analysis_hooks.push(MethodCallAnalysisHookRegistration {
-                    plugin: identifier.clone(),
-                    plugin_index: index,
-                    index: hook_index,
-                    requirements,
-                    targets,
-                    route: 0,
-                });
-                if !node_analysis_plugins.contains(&index) {
-                    node_analysis_plugins.push(index);
-                }
-            }
-
-            let class_like_hook_count = reader.read_count("class-like analysis hooks", MAXIMUM_PROVIDERS)?;
-            for _ in 0..class_like_hook_count {
-                let hook_index = reader.read_u16("class-like analysis hook index")?;
-                let requirements = reader.read_u8("class-like analysis hook requirements")?;
-                if requirements & !NODE_REQUIREMENTS_ALL != 0 {
-                    return Err(protocol(format!(
-                        "class-like analysis hook {hook_index} has unknown requirements {requirements:#04x}"
-                    )));
-                }
-                let target_count = reader.read_count("class-like analysis hook targets", MAXIMUM_TARGETS)?;
-                if target_count == 0 {
-                    return Err(protocol(format!("class-like analysis hook {hook_index} has no targets")));
-                }
-
-                let mut ancestors = Vec::with_capacity(target_count);
-                let mut unique_ancestors = HashSet::with_capacity_and_hasher(target_count, RandomState::default());
-                for _ in 0..target_count {
-                    let ancestor = non_empty(
-                        reader.read_bytes("class-like analysis target ancestor")?.to_vec(),
-                        "class-like analysis target ancestor",
-                    )?;
-                    if !is_valid_symbol_name(&ancestor) {
-                        return Err(protocol(format!(
-                            "class-like analysis hook {hook_index} target must be a valid PHP class-like name"
-                        )));
-                    }
-                    let ancestor = ascii_lowercase_word(&ancestor);
-                    if !unique_ancestors.insert(ancestor) {
-                        return Err(protocol(format!(
-                            "class-like analysis hook {hook_index} targets descendants of the same ancestor more than once"
-                        )));
-                    }
-                    ancestors.push(ancestor);
-                }
-
-                class_like_analysis_hooks.push(ClassLikeAnalysisHookRegistration {
-                    plugin: identifier.clone(),
-                    plugin_index: index,
-                    index: hook_index,
-                    requirements,
-                    ancestors,
-                    route: 0,
-                });
-                if !node_analysis_plugins.contains(&index) {
-                    node_analysis_plugins.push(index);
-                }
-            }
-
-            let function_assertion_count = reader.read_count("function assertion providers", MAXIMUM_PROVIDERS)?;
-            for _ in 0..function_assertion_count {
-                let provider_index = reader.read_u16("function assertion provider index")?;
-                let memoize = reader.read_bool("function assertion provider memoization flag")?;
-                let target_count = reader.read_count("function assertion provider targets", MAXIMUM_TARGETS)?;
-                if target_count == 0 {
-                    return Err(protocol(format!("function assertion provider {provider_index} has no targets")));
-                }
-
-                let mut targets = Vec::with_capacity(target_count);
-                for _ in 0..target_count {
-                    let kind = reader.read_u8("function assertion target kind")?;
-                    let mut value = non_empty(
-                        reader.read_bytes("function assertion target")?.to_vec(),
-                        "function assertion target",
-                    )?;
-                    targets.push(match kind {
-                        TARGET_EXACT => FunctionTarget::Exact(value),
-                        TARGET_PREFIX => FunctionTarget::Prefix(value),
-                        TARGET_NAMESPACE => {
-                            if value.last() != Some(&b'\\') {
-                                value.push(b'\\');
-                            }
-                            FunctionTarget::Namespace(value)
-                        }
-                        _ => {
-                            return Err(protocol(format!(
-                                "function assertion provider {provider_index} has unknown target kind {kind}"
-                            )));
-                        }
-                    });
-                }
-
-                function_assertion_providers.push(FunctionAssertionProvider {
-                    plugin: identifier.clone(),
-                    index: provider_index,
-                    memoize,
-                    targets,
+                    capabilities: 0,
+                    targets: codes,
                 });
             }
 
-            let method_assertion_count = reader.read_count("method assertion providers", MAXIMUM_PROVIDERS)?;
-            for _ in 0..method_assertion_count {
-                let provider_index = reader.read_u16("method assertion provider index")?;
-                let memoize = reader.read_bool("method assertion provider memoization flag")?;
-                let target_count = reader.read_count("method assertion provider targets", MAXIMUM_TARGETS)?;
-                if target_count == 0 {
-                    return Err(protocol(format!("method assertion provider {provider_index} has no targets")));
-                }
-
-                let mut targets = Vec::with_capacity(target_count);
-                for _ in 0..target_count {
-                    let class = non_empty(
-                        reader.read_bytes("method assertion target class")?.to_vec(),
-                        "method assertion target class",
-                    )?;
-                    let method = non_empty(
-                        reader.read_bytes("method assertion target method")?.to_vec(),
-                        "method assertion target method",
-                    )?;
-                    validate_method_pattern(&class)?;
-                    validate_method_pattern(&method)?;
-                    targets.push(MethodTarget { class, method });
-                }
-
-                method_assertion_providers.push(MethodAssertionProvider {
-                    plugin: identifier.clone(),
-                    index: provider_index,
-                    memoize,
-                    targets,
-                });
+            let node_hooks =
+                read_analysis_hooks(&mut reader, index, "node-analysis hooks", "node-analysis hook", read_node_target)?;
+            let method_call_hooks = read_analysis_hooks(
+                &mut reader,
+                index,
+                "method-call analysis hooks",
+                "method-call analysis hook",
+                read_method_target,
+            )?;
+            let class_like_hooks = read_analysis_hooks(
+                &mut reader,
+                index,
+                "class-like analysis hooks",
+                "class-like analysis hook",
+                read_class_like_target,
+            )?;
+            let node_analysis = !node_hooks.is_empty() || !method_call_hooks.is_empty() || !class_like_hooks.is_empty();
+            if node_analysis {
+                node_analysis_plugins.push(index);
             }
+            node_analysis_hooks.extend(node_hooks);
+            method_call_analysis_hooks.extend(method_call_hooks);
+            class_like_analysis_hooks.extend(class_like_hooks);
+
+            function_assertion_providers.extend(read_providers(
+                &mut reader,
+                index,
+                "function assertion providers",
+                "function assertion provider",
+                read_memoization,
+                read_function_target,
+            )?);
+            method_assertion_providers.extend(read_providers(
+                &mut reader,
+                index,
+                "method assertion providers",
+                "method assertion provider",
+                read_memoization,
+                read_method_target,
+            )?);
 
             let plugin = ExternalPlugin {
                 index,
@@ -864,7 +575,7 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
                 before_analysis: lifecycle & 1 != 0,
                 after_file_analysis: lifecycle & 2 != 0,
                 after_file_expression_types: lifecycle & 16 != 0,
-                node_analysis: node_hook_count != 0 || method_call_hook_count != 0 || class_like_hook_count != 0,
+                node_analysis,
                 after_analysis: lifecycle & 4 != 0,
             };
 
@@ -933,36 +644,195 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
     })
 }
 
-pub(super) fn encode_function_return_type_request<'type_info>(
-    provider_indices: &[u16],
-    name: &[u8],
-    invocation: &Invocation<'_, '_, '_>,
-    artifacts: &'type_info AnalysisArtifacts,
-    source_file: &File,
-    generation: u64,
-    memoize: bool,
-    trace_enabled: bool,
-) -> Result<ReturnTypeRequest<'type_info>, ExternalAnalyzerError> {
-    encode_return_type_request(
-        RETURN_TYPE_REQUEST,
-        provider_indices,
-        INVOCATION_FUNCTION,
-        None,
-        None,
-        name,
-        invocation,
-        artifacts,
-        source_file,
-        generation,
-        memoize,
-        trace_enabled,
-    )
+fn read_providers<T>(
+    reader: &mut PayloadReader<'_>,
+    plugin: u16,
+    list: &'static str,
+    description: &'static str,
+    read_capabilities: fn(&mut PayloadReader<'_>, u16, &'static str) -> Result<u8, ExternalAnalyzerError>,
+    read_target: fn(&mut PayloadReader<'_>, u16, &'static str) -> Result<T, ExternalAnalyzerError>,
+) -> Result<Vec<ProviderRegistration<T>>, ExternalAnalyzerError> {
+    let count = reader.read_count(list, MAXIMUM_PROVIDERS)?;
+    let mut providers = Vec::with_capacity(count);
+    for _ in 0..count {
+        let index = reader.read_u16(description)?;
+        let capabilities = read_capabilities(reader, index, description)?;
+        let targets = read_targets(reader, description, index, read_target)?;
+        providers.push(ProviderRegistration { plugin, index, capabilities, targets });
+    }
+    Ok(providers)
 }
 
-pub(super) fn encode_method_return_type_request<'type_info>(
+fn read_capabilities(
+    reader: &mut PayloadReader<'_>,
+    index: u16,
+    description: &'static str,
+) -> Result<u8, ExternalAnalyzerError> {
+    let capabilities = reader.read_u8("provider capabilities")?;
+    if capabilities & !15 != 0 {
+        return Err(protocol(format!("{description} {index} has unknown capabilities {capabilities:#04x}")));
+    }
+    Ok(capabilities)
+}
+
+fn no_capabilities(
+    _reader: &mut PayloadReader<'_>,
+    _index: u16,
+    _description: &'static str,
+) -> Result<u8, ExternalAnalyzerError> {
+    Ok(0)
+}
+
+fn read_memoization(
+    reader: &mut PayloadReader<'_>,
+    _index: u16,
+    _description: &'static str,
+) -> Result<u8, ExternalAnalyzerError> {
+    Ok(u8::from(reader.read_bool("provider memoization flag")?) * super::PROVIDER_MEMOIZED)
+}
+
+fn read_targets<T>(
+    reader: &mut PayloadReader<'_>,
+    description: &'static str,
+    index: u16,
+    mut read: impl FnMut(&mut PayloadReader<'_>, u16, &'static str) -> Result<T, ExternalAnalyzerError>,
+) -> Result<Vec<T>, ExternalAnalyzerError> {
+    let count = reader.read_count(description, MAXIMUM_TARGETS)?;
+    if count == 0 {
+        return Err(protocol(format!("{description} {index} has no targets")));
+    }
+
+    let mut targets = Vec::with_capacity(count);
+    for _ in 0..count {
+        targets.push(read(reader, index, description)?);
+    }
+    Ok(targets)
+}
+
+fn read_analysis_hooks<T>(
+    reader: &mut PayloadReader<'_>,
+    plugin: u16,
+    list: &'static str,
+    description: &'static str,
+    read_target: fn(&mut PayloadReader<'_>, u16, &'static str) -> Result<T, ExternalAnalyzerError>,
+) -> Result<Vec<AnalysisHookRegistration<T>>, ExternalAnalyzerError>
+where
+    T: Eq + std::hash::Hash,
+{
+    let count = reader.read_count(list, MAXIMUM_PROVIDERS)?;
+    let mut hooks = Vec::with_capacity(count);
+    for _ in 0..count {
+        let index = reader.read_u16(description)?;
+        let requirements = reader.read_u8("analysis hook requirements")?;
+        if requirements & !NODE_REQUIREMENTS_ALL != 0 {
+            return Err(protocol(format!("{description} {index} has unknown requirements {requirements:#04x}")));
+        }
+        let targets = read_targets(reader, description, index, read_target)?;
+        let mut unique = HashSet::with_capacity_and_hasher(targets.len(), RandomState::default());
+        if targets.iter().any(|target| !unique.insert(target)) {
+            return Err(protocol(format!("{description} {index} contains a duplicate target")));
+        }
+        hooks.push(AnalysisHookRegistration { plugin, index, requirements, targets, route: 0 });
+    }
+    Ok(hooks)
+}
+
+fn read_node_target(
+    reader: &mut PayloadReader<'_>,
+    index: u16,
+    _description: &'static str,
+) -> Result<NodeKind, ExternalAnalyzerError> {
+    let target = reader.read_str("node-analysis hook target")?;
+    target.parse().map_err(|_| protocol(format!("node-analysis hook {index} targets unknown node kind `{target}`")))
+}
+
+fn read_class_like_target(
+    reader: &mut PayloadReader<'_>,
+    index: u16,
+    _description: &'static str,
+) -> Result<Word, ExternalAnalyzerError> {
+    let ancestor = non_empty(
+        reader.read_bytes("class-like analysis target ancestor")?.to_vec(),
+        "class-like analysis target ancestor",
+    )?;
+    if !is_valid_symbol_name(&ancestor) {
+        return Err(protocol(format!("class-like analysis hook {index} target must be a valid PHP class-like name")));
+    }
+    Ok(ascii_lowercase_word(&ancestor))
+}
+
+fn read_function_target(
+    reader: &mut PayloadReader<'_>,
+    index: u16,
+    description: &'static str,
+) -> Result<FunctionTarget, ExternalAnalyzerError> {
+    let kind = reader.read_u8("function target kind")?;
+    let mut value = non_empty(reader.read_bytes("function target")?.to_vec(), "function target")?;
+    Ok(match kind {
+        TARGET_EXACT => FunctionTarget::Exact(value),
+        TARGET_PREFIX => FunctionTarget::Prefix(value),
+        TARGET_NAMESPACE => {
+            if value.last() != Some(&b'\\') {
+                value.push(b'\\');
+            }
+            FunctionTarget::Namespace(value)
+        }
+        _ => return Err(protocol(format!("{description} {index} has unknown target kind {kind}"))),
+    })
+}
+
+fn read_method_target(
+    reader: &mut PayloadReader<'_>,
+    _index: u16,
+    _description: &'static str,
+) -> Result<MethodTarget, ExternalAnalyzerError> {
+    let class = non_empty(reader.read_bytes("method target class")?.to_vec(), "method target class")?;
+    let method = non_empty(reader.read_bytes("method target method")?.to_vec(), "method target method")?;
+    validate_method_pattern(&class)?;
+    validate_method_pattern(&method)?;
+    Ok(MethodTarget { class, method })
+}
+
+fn read_property_target(
+    reader: &mut PayloadReader<'_>,
+    _index: u16,
+    _description: &'static str,
+) -> Result<PropertyTarget, ExternalAnalyzerError> {
+    let class = non_empty(reader.read_bytes("property target class")?.to_vec(), "property target class")?;
+    let property = non_empty(reader.read_bytes("property target property")?.to_vec(), "property target property")?;
+    validate_method_pattern(&class)?;
+    validate_property_pattern(&property)?;
+    Ok(PropertyTarget { class, property })
+}
+
+fn read_class_target(
+    reader: &mut PayloadReader<'_>,
+    _index: u16,
+    _description: &'static str,
+) -> Result<Vec<u8>, ExternalAnalyzerError> {
+    let target = non_empty(reader.read_bytes("class target")?.to_vec(), "class target")?;
+    validate_method_pattern(&target)?;
+    Ok(target)
+}
+
+#[derive(Clone, Copy)]
+pub(super) enum ProviderRequestKind {
+    ReturnType,
+    CallableSignature,
+    Assertion,
+}
+
+#[derive(Clone, Copy)]
+pub(super) enum ProviderTarget<'target> {
+    Function(&'target [u8]),
+    Method { class: &'target [u8], method: &'target [u8] },
+}
+
+#[allow(clippy::too_many_arguments)]
+pub(super) fn encode_provider_request<'type_info>(
+    request_kind: ProviderRequestKind,
     provider_indices: &[u16],
-    class: &[u8],
-    method: &[u8],
+    target: ProviderTarget<'_>,
     invocation: &Invocation<'_, '_, '_>,
     artifacts: &'type_info AnalysisArtifacts,
     source_file: &File,
@@ -970,151 +840,35 @@ pub(super) fn encode_method_return_type_request<'type_info>(
     memoize: bool,
     trace_enabled: bool,
 ) -> Result<ReturnTypeRequest<'type_info>, ExternalAnalyzerError> {
-    let method_context = invocation
-        .target
-        .get_method_context()
-        .ok_or_else(|| protocol("external method return-type provider request is missing its method context"))?;
-    let invocation_kind = match method_context.invocation_kind {
-        MethodInvocationKind::Instance => INVOCATION_INSTANCE_METHOD,
-        MethodInvocationKind::Static => INVOCATION_STATIC_METHOD,
+    let message_kind = match request_kind {
+        ProviderRequestKind::ReturnType => RETURN_TYPE_REQUEST,
+        ProviderRequestKind::CallableSignature => CALLABLE_SIGNATURE_REQUEST,
+        ProviderRequestKind::Assertion => ASSERTION_REQUEST,
+    };
+    let mut receiver_type = None;
+    let (invocation_kind, class, name) = match target {
+        ProviderTarget::Function(name) => (INVOCATION_FUNCTION, None, name),
+        ProviderTarget::Method { class, method } => {
+            let context = invocation
+                .target
+                .get_method_context()
+                .ok_or_else(|| protocol("external method provider request is missing its method context"))?;
+            receiver_type = Some(get_method_receiver_type(context)?);
+            let kind = match context.invocation_kind {
+                MethodInvocationKind::Instance => INVOCATION_INSTANCE_METHOD,
+                MethodInvocationKind::Static => INVOCATION_STATIC_METHOD,
+            };
+            (kind, Some(class), method)
+        }
     };
 
-    let receiver_type = get_method_receiver_type(method_context)?;
-
     encode_return_type_request(
-        RETURN_TYPE_REQUEST,
+        message_kind,
         provider_indices,
         invocation_kind,
-        Some(class),
-        Some(&receiver_type),
-        method,
-        invocation,
-        artifacts,
-        source_file,
-        generation,
-        memoize,
-        trace_enabled,
-    )
-}
-
-pub(super) fn encode_function_callable_signature_request<'type_info>(
-    provider_indices: &[u16],
-    name: &[u8],
-    invocation: &Invocation<'_, '_, '_>,
-    artifacts: &'type_info AnalysisArtifacts,
-    source_file: &File,
-    generation: u64,
-    memoize: bool,
-    trace_enabled: bool,
-) -> Result<ReturnTypeRequest<'type_info>, ExternalAnalyzerError> {
-    encode_return_type_request(
-        CALLABLE_SIGNATURE_REQUEST,
-        provider_indices,
-        INVOCATION_FUNCTION,
-        None,
-        None,
+        class,
+        receiver_type.as_ref(),
         name,
-        invocation,
-        artifacts,
-        source_file,
-        generation,
-        memoize,
-        trace_enabled,
-    )
-}
-
-pub(super) fn encode_method_callable_signature_request<'type_info>(
-    provider_indices: &[u16],
-    class: &[u8],
-    method: &[u8],
-    invocation: &Invocation<'_, '_, '_>,
-    artifacts: &'type_info AnalysisArtifacts,
-    source_file: &File,
-    generation: u64,
-    memoize: bool,
-    trace_enabled: bool,
-) -> Result<ReturnTypeRequest<'type_info>, ExternalAnalyzerError> {
-    let method_context = invocation
-        .target
-        .get_method_context()
-        .ok_or_else(|| protocol("external method callable-signature provider request is missing its method context"))?;
-    let invocation_kind = match method_context.invocation_kind {
-        MethodInvocationKind::Instance => INVOCATION_INSTANCE_METHOD,
-        MethodInvocationKind::Static => INVOCATION_STATIC_METHOD,
-    };
-
-    let receiver_type = get_method_receiver_type(method_context)?;
-
-    encode_return_type_request(
-        CALLABLE_SIGNATURE_REQUEST,
-        provider_indices,
-        invocation_kind,
-        Some(class),
-        Some(&receiver_type),
-        method,
-        invocation,
-        artifacts,
-        source_file,
-        generation,
-        memoize,
-        trace_enabled,
-    )
-}
-
-pub(super) fn encode_function_assertion_request<'type_info>(
-    provider_indices: &[u16],
-    name: &[u8],
-    invocation: &Invocation<'_, '_, '_>,
-    artifacts: &'type_info AnalysisArtifacts,
-    source_file: &File,
-    generation: u64,
-    memoize: bool,
-    trace_enabled: bool,
-) -> Result<ReturnTypeRequest<'type_info>, ExternalAnalyzerError> {
-    encode_return_type_request(
-        ASSERTION_REQUEST,
-        provider_indices,
-        INVOCATION_FUNCTION,
-        None,
-        None,
-        name,
-        invocation,
-        artifacts,
-        source_file,
-        generation,
-        memoize,
-        trace_enabled,
-    )
-}
-
-pub(super) fn encode_method_assertion_request<'type_info>(
-    provider_indices: &[u16],
-    class: &[u8],
-    method: &[u8],
-    invocation: &Invocation<'_, '_, '_>,
-    artifacts: &'type_info AnalysisArtifacts,
-    source_file: &File,
-    generation: u64,
-    memoize: bool,
-    trace_enabled: bool,
-) -> Result<ReturnTypeRequest<'type_info>, ExternalAnalyzerError> {
-    let method_context = invocation
-        .target
-        .get_method_context()
-        .ok_or_else(|| protocol("external method assertion provider request is missing its method context"))?;
-    let invocation_kind = match method_context.invocation_kind {
-        MethodInvocationKind::Instance => INVOCATION_INSTANCE_METHOD,
-        MethodInvocationKind::Static => INVOCATION_STATIC_METHOD,
-    };
-    let receiver_type = get_method_receiver_type(method_context)?;
-
-    encode_return_type_request(
-        ASSERTION_REQUEST,
-        provider_indices,
-        invocation_kind,
-        Some(class),
-        Some(&receiver_type),
-        method,
         invocation,
         artifacts,
         source_file,
@@ -3609,12 +3363,12 @@ pub(super) mod testing {
 
         let registration = decode_registration(&writer.finish()).unwrap();
         assert_eq!(registration.entry_points.len(), 1);
-        assert_eq!(registration.entry_points[0].plugin, "demo/plugin");
+        assert_eq!(registration.entry_points[0].plugin, 0);
         assert_eq!(registration.entry_points[0].source, word(b"demo/plugin"));
         assert_eq!(registration.entry_points[0].target.class, b"FrameworkTestCase");
         assert_eq!(registration.entry_points[0].target.method, b"test*");
         assert_eq!(registration.attributed_entry_points.len(), 1);
-        assert_eq!(registration.attributed_entry_points[0].plugin, "demo/plugin");
+        assert_eq!(registration.attributed_entry_points[0].plugin, 0);
         assert_eq!(registration.attributed_entry_points[0].source, word(b"demo/plugin"));
         assert_eq!(registration.attributed_entry_points[0].class, b"FrameworkTestCase");
         assert_eq!(registration.attributed_entry_points[0].attribute, b"Framework\\Test");

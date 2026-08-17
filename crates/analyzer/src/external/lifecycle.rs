@@ -284,7 +284,7 @@ fn class_like_matches_hook(
         return false;
     };
 
-    hook.ancestors.iter().any(|ancestor| {
+    hook.targets.iter().any(|ancestor| {
         class_like != *ancestor
             && (metadata.all_parent_classes.contains(ancestor) || metadata.all_parent_interfaces.contains(ancestor))
     })
@@ -1638,11 +1638,10 @@ mod tests {
         codebase.class_likes.insert(child, child_metadata);
 
         let hook = ClassLikeAnalysisHookRegistration {
-            plugin: "demo".to_string(),
-            plugin_index: 0,
+            plugin: 0,
             index: 0,
             requirements: 0,
-            ancestors: vec![ancestor],
+            targets: vec![ancestor],
             route: 0,
         };
 

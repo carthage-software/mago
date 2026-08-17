@@ -438,8 +438,7 @@ where
         &receiver_type,
         span,
         context.external_analysis_session,
-    )?
-    else {
+    ) else {
         return Ok(None);
     };
 

@@ -4,25 +4,41 @@ declare(strict_types=1);
 
 namespace Mago\Sdk;
 
+use Closure;
 use Mago\Sdk\Analyzer\AfterAnalysisContext;
 use Mago\Sdk\Analyzer\AfterFileAnalysisContext;
 use Mago\Sdk\Analyzer\AssertionProviderContext;
 use Mago\Sdk\Analyzer\BeforeAnalysisContext;
 use Mago\Sdk\Analyzer\CallableSignatureProvider;
 use Mago\Sdk\Analyzer\CallableSignatureProviderContext;
+use Mago\Sdk\Analyzer\ClassInitializerProvider;
 use Mago\Sdk\Analyzer\ClassInitializerProviderContext;
+use Mago\Sdk\Analyzer\ClassLikeTarget;
+use Mago\Sdk\Analyzer\ClassTarget;
 use Mago\Sdk\Analyzer\Codebase;
 use Mago\Sdk\Analyzer\FileAnalysis;
+use Mago\Sdk\Analyzer\FunctionAssertionProvider;
+use Mago\Sdk\Analyzer\FunctionReturnTypeProvider;
+use Mago\Sdk\Analyzer\FunctionTarget;
 use Mago\Sdk\Analyzer\InitializationContext;
 use Mago\Sdk\Analyzer\InvocationKind;
 use Mago\Sdk\Analyzer\IssueFilterContext;
 use Mago\Sdk\Analyzer\IssueFilterDecision;
+use Mago\Sdk\Analyzer\IssueFilterHook;
+use Mago\Sdk\Analyzer\MethodAssertionProvider;
+use Mago\Sdk\Analyzer\MethodReturnTypeProvider;
+use Mago\Sdk\Analyzer\MethodTarget;
 use Mago\Sdk\Analyzer\NodeAnalysisContext;
 use Mago\Sdk\Analyzer\PluginRegistry as AnalyzerPluginRegistry;
 use Mago\Sdk\Analyzer\ProjectAnalysis;
+use Mago\Sdk\Analyzer\PropertyInitializationProvider;
 use Mago\Sdk\Analyzer\PropertyInitializationProviderContext;
+use Mago\Sdk\Analyzer\PropertyTarget;
+use Mago\Sdk\Analyzer\PropertyTypeProvider;
 use Mago\Sdk\Analyzer\PropertyTypeProviderContext;
 use Mago\Sdk\Analyzer\ReturnTypeProviderContext;
+use Mago\Sdk\Analyzer\TargetedAnalysisHook;
+use Mago\Sdk\Analyzer\TargetedProvider;
 use Mago\Sdk\Analyzer\TypeComparator;
 use Mago\Sdk\Exception\CancelledException;
 use Mago\Sdk\Exception\InvalidArgumentException;
@@ -30,18 +46,8 @@ use Mago\Sdk\Exception\ProtocolException;
 use Mago\Sdk\Internal\Analyzer\DefinitionName;
 use Mago\Sdk\Internal\Analyzer\MetadataCache;
 use Mago\Sdk\Internal\Analyzer\Protocol as AnalyzerProtocol;
-use Mago\Sdk\Internal\Analyzer\RegisteredClassInitializerProvider;
-use Mago\Sdk\Internal\Analyzer\RegisteredClassLikeAnalysisHook;
-use Mago\Sdk\Internal\Analyzer\RegisteredFunctionAssertionProvider;
-use Mago\Sdk\Internal\Analyzer\RegisteredFunctionReturnTypeProvider;
-use Mago\Sdk\Internal\Analyzer\RegisteredIssueFilterHook;
-use Mago\Sdk\Internal\Analyzer\RegisteredMethodAssertionProvider;
-use Mago\Sdk\Internal\Analyzer\RegisteredMethodCallAnalysisHook;
-use Mago\Sdk\Internal\Analyzer\RegisteredMethodReturnTypeProvider;
-use Mago\Sdk\Internal\Analyzer\RegisteredNodeAnalysisHook;
 use Mago\Sdk\Internal\Analyzer\RegisteredPlugin;
-use Mago\Sdk\Internal\Analyzer\RegisteredPropertyInitializationProvider;
-use Mago\Sdk\Internal\Analyzer\RegisteredPropertyTypeProvider;
+use Mago\Sdk\Internal\Analyzer\RegisteredTargetedCallback;
 use Mago\Sdk\Internal\Analyzer\ReportedIssue;
 use Mago\Sdk\Internal\HostClient;
 use Mago\Sdk\Internal\Io\InputTransport;
@@ -105,28 +111,28 @@ final class Worker
     /** @var list<int<0, max>> */
     private readonly array $workerReducerIndices;
 
-    /** @var list<RegisteredFunctionReturnTypeProvider> */
+    /** @var list<RegisteredTargetedCallback<FunctionReturnTypeProvider, FunctionTarget>> */
     private readonly array $functionReturnTypeProviders;
 
-    /** @var list<RegisteredMethodReturnTypeProvider> */
+    /** @var list<RegisteredTargetedCallback<MethodReturnTypeProvider, MethodTarget>> */
     private readonly array $methodReturnTypeProviders;
 
-    /** @var list<RegisteredFunctionAssertionProvider> */
+    /** @var list<RegisteredTargetedCallback<FunctionAssertionProvider, FunctionTarget>> */
     private readonly array $functionAssertionProviders;
 
-    /** @var list<RegisteredMethodAssertionProvider> */
+    /** @var list<RegisteredTargetedCallback<MethodAssertionProvider, MethodTarget>> */
     private readonly array $methodAssertionProviders;
 
-    /** @var list<RegisteredPropertyTypeProvider> */
+    /** @var list<RegisteredTargetedCallback<PropertyTypeProvider, PropertyTarget>> */
     private readonly array $propertyTypeProviders;
 
-    /** @var list<RegisteredPropertyInitializationProvider> */
+    /** @var list<RegisteredTargetedCallback<PropertyInitializationProvider, PropertyTarget>> */
     private readonly array $propertyInitializationProviders;
 
-    /** @var list<RegisteredClassInitializerProvider> */
+    /** @var list<RegisteredTargetedCallback<ClassInitializerProvider, ClassTarget>> */
     private readonly array $classInitializerProviders;
 
-    /** @var list<RegisteredIssueFilterHook> */
+    /** @var list<RegisteredTargetedCallback<IssueFilterHook, string>> */
     private readonly array $issueFilterHooks;
 
     /**
@@ -216,187 +222,48 @@ final class Worker
                 }
                 $registry = new AnalyzerPluginRegistry();
                 $plugin->register($registry);
-                $registeredFunctionProviders = [];
-                foreach ($registry->getFunctionReturnTypeProviders() as $provider) {
-                    $targets = $provider->getTargets();
-                    if ($targets === []) {
-                        throw new InvalidArgumentException(
-                            "A function return-type provider in `{$definition->identifier}` has no targets.",
-                        );
-                    }
-
-                    $providerIndex = count($functionProviders);
-                    if ($providerIndex > 65_535) {
-                        throw new InvalidArgumentException(
-                            'A worker cannot register more than 65,536 function return-type providers.',
-                        );
-                    }
-
-                    $registeredProvider = new RegisteredFunctionReturnTypeProvider(
-                        $providerIndex,
-                        $definition->identifier,
-                        $provider,
-                        $targets,
-                    );
-                    $functionProviders[] = $registeredProvider;
-                    $registeredFunctionProviders[] = $registeredProvider;
-                }
-
-                $registeredMethodProviders = [];
-                foreach ($registry->getMethodReturnTypeProviders() as $provider) {
-                    $targets = $provider->getTargets();
-                    if ($targets === []) {
-                        throw new InvalidArgumentException(
-                            "A method return-type provider in `{$definition->identifier}` has no targets.",
-                        );
-                    }
-
-                    $providerIndex = count($methodProviders);
-                    if ($providerIndex > 65_535) {
-                        throw new InvalidArgumentException(
-                            'A worker cannot register more than 65,536 method return-type providers.',
-                        );
-                    }
-
-                    $registeredProvider = new RegisteredMethodReturnTypeProvider(
-                        $providerIndex,
-                        $definition->identifier,
-                        $provider,
-                        $targets,
-                    );
-                    $methodProviders[] = $registeredProvider;
-                    $registeredMethodProviders[] = $registeredProvider;
-                }
-
-                $registeredFunctionAssertionProviders = [];
-                foreach ($registry->getFunctionAssertionProviders() as $provider) {
-                    $targets = $provider->getTargets();
-                    if ($targets === []) {
-                        throw new InvalidArgumentException(
-                            "A function assertion provider in `{$definition->identifier}` has no targets.",
-                        );
-                    }
-
-                    $providerIndex = count($functionAssertionProviders);
-                    if ($providerIndex > 65_535) {
-                        throw new InvalidArgumentException(
-                            'A worker cannot register more than 65,536 function assertion providers.',
-                        );
-                    }
-
-                    $registeredProvider = new RegisteredFunctionAssertionProvider(
-                        $providerIndex,
-                        $definition->identifier,
-                        $provider,
-                        $targets,
-                    );
-                    $functionAssertionProviders[] = $registeredProvider;
-                    $registeredFunctionAssertionProviders[] = $registeredProvider;
-                }
-
-                $registeredMethodAssertionProviders = [];
-                foreach ($registry->getMethodAssertionProviders() as $provider) {
-                    $targets = $provider->getTargets();
-                    if ($targets === []) {
-                        throw new InvalidArgumentException(
-                            "A method assertion provider in `{$definition->identifier}` has no targets.",
-                        );
-                    }
-
-                    $providerIndex = count($methodAssertionProviders);
-                    if ($providerIndex > 65_535) {
-                        throw new InvalidArgumentException(
-                            'A worker cannot register more than 65,536 method assertion providers.',
-                        );
-                    }
-
-                    $registeredProvider = new RegisteredMethodAssertionProvider(
-                        $providerIndex,
-                        $definition->identifier,
-                        $provider,
-                        $targets,
-                    );
-                    $methodAssertionProviders[] = $registeredProvider;
-                    $registeredMethodAssertionProviders[] = $registeredProvider;
-                }
-
-                $registeredPropertyProviders = [];
-                foreach ($registry->getPropertyTypeProviders() as $provider) {
-                    $targets = $provider->getTargets();
-                    if ($targets === []) {
-                        throw new InvalidArgumentException(
-                            "A property type provider in `{$definition->identifier}` has no targets.",
-                        );
-                    }
-
-                    $providerIndex = count($propertyProviders);
-                    if ($providerIndex > 65_535) {
-                        throw new InvalidArgumentException(
-                            'A worker cannot register more than 65,536 property type providers.',
-                        );
-                    }
-
-                    $registeredProvider = new RegisteredPropertyTypeProvider(
-                        $providerIndex,
-                        $definition->identifier,
-                        $provider,
-                        $targets,
-                    );
-                    $propertyProviders[] = $registeredProvider;
-                    $registeredPropertyProviders[] = $registeredProvider;
-                }
-
-                $registeredPropertyInitializationProviders = [];
-                foreach ($registry->getPropertyInitializationProviders() as $provider) {
-                    $targets = $provider->getTargets();
-                    if ($targets === []) {
-                        throw new InvalidArgumentException(
-                            "A property initialization provider in `{$definition->identifier}` has no targets.",
-                        );
-                    }
-
-                    $providerIndex = count($propertyInitializationProviders);
-                    if ($providerIndex > 65_535) {
-                        throw new InvalidArgumentException(
-                            'A worker cannot register more than 65,536 property initialization providers.',
-                        );
-                    }
-
-                    $registeredProvider = new RegisteredPropertyInitializationProvider(
-                        $providerIndex,
-                        $definition->identifier,
-                        $provider,
-                        $targets,
-                    );
-                    $propertyInitializationProviders[] = $registeredProvider;
-                    $registeredPropertyInitializationProviders[] = $registeredProvider;
-                }
-
-                $registeredClassInitializerProviders = [];
-                foreach ($registry->getClassInitializerProviders() as $provider) {
-                    $targets = $provider->getTargets();
-                    if ($targets === []) {
-                        throw new InvalidArgumentException(
-                            "A class initializer provider in `{$definition->identifier}` has no targets.",
-                        );
-                    }
-
-                    $providerIndex = count($classInitializerProviders);
-                    if ($providerIndex > 65_535) {
-                        throw new InvalidArgumentException(
-                            'A worker cannot register more than 65,536 class initializer providers.',
-                        );
-                    }
-
-                    $registeredProvider = new RegisteredClassInitializerProvider(
-                        $providerIndex,
-                        $definition->identifier,
-                        $provider,
-                        $targets,
-                    );
-                    $classInitializerProviders[] = $registeredProvider;
-                    $registeredClassInitializerProviders[] = $registeredProvider;
-                }
+                $registeredFunctionProviders = self::registerTargetedCallbacks(
+                    $registry->getFunctionReturnTypeProviders(),
+                    $functionProviders,
+                    $definition->identifier,
+                    'function return-type provider',
+                );
+                $registeredMethodProviders = self::registerTargetedCallbacks(
+                    $registry->getMethodReturnTypeProviders(),
+                    $methodProviders,
+                    $definition->identifier,
+                    'method return-type provider',
+                );
+                $registeredFunctionAssertionProviders = self::registerTargetedCallbacks(
+                    $registry->getFunctionAssertionProviders(),
+                    $functionAssertionProviders,
+                    $definition->identifier,
+                    'function assertion provider',
+                );
+                $registeredMethodAssertionProviders = self::registerTargetedCallbacks(
+                    $registry->getMethodAssertionProviders(),
+                    $methodAssertionProviders,
+                    $definition->identifier,
+                    'method assertion provider',
+                );
+                $registeredPropertyProviders = self::registerTargetedCallbacks(
+                    $registry->getPropertyTypeProviders(),
+                    $propertyProviders,
+                    $definition->identifier,
+                    'property type provider',
+                );
+                $registeredPropertyInitializationProviders = self::registerTargetedCallbacks(
+                    $registry->getPropertyInitializationProviders(),
+                    $propertyInitializationProviders,
+                    $definition->identifier,
+                    'property initialization provider',
+                );
+                $registeredClassInitializerProviders = self::registerTargetedCallbacks(
+                    $registry->getClassInitializerProviders(),
+                    $classInitializerProviders,
+                    $definition->identifier,
+                    'class initializer provider',
+                );
 
                 $registeredIssueFilterHooks = [];
                 foreach ($registry->getIssueFilterHooks() as $hook) {
@@ -423,163 +290,54 @@ final class Worker
                         );
                     }
 
-                    $registeredHook = new RegisteredIssueFilterHook($hookIndex, $definition->identifier, $hook, $codes);
+                    $registeredHook = new RegisteredTargetedCallback(
+                        $hookIndex,
+                        $definition->identifier,
+                        $hook,
+                        $codes,
+                    );
                     $issueFilterHooks[] = $registeredHook;
                     $registeredIssueFilterHooks[] = $registeredHook;
                 }
 
-                $registeredNodeAnalysisHooks = [];
+                $registeredNodeAnalysisHooks = self::registerTargetedCallbacks(
+                    $registry->getNodeAnalysisHooks(),
+                    $nodeAnalysisHooks,
+                    $definition->identifier,
+                    'analyzer node-analysis hook',
+                    static fn(NodeKind $target): string => $target->value,
+                );
                 $registeredNodeAnalysisHooksByNodeKind = [];
-                foreach ($registry->getNodeAnalysisHooks() as $hook) {
-                    $targets = $hook->getTargets();
-                    if ($targets === []) {
-                        throw new InvalidArgumentException(
-                            "A node-analysis hook in `{$definition->identifier}` has no targets.",
-                        );
-                    }
-
-                    $seenTargets = [];
-                    foreach ($targets as $target) {
-                        if (array_key_exists($target->value, $seenTargets)) {
-                            throw new InvalidArgumentException(
-                                "A node-analysis hook in `{$definition->identifier}` targets `{$target->value}` more than once.",
-                            );
-                        }
-                        $seenTargets[$target->value] = true;
-                    }
-
-                    $requirements = $hook->getRequirements();
-                    $seenRequirements = [];
-                    foreach ($requirements as $requirement) {
-                        if (array_key_exists($requirement->name, $seenRequirements)) {
-                            throw new InvalidArgumentException(
-                                "A node-analysis hook in `{$definition->identifier}` requests `{$requirement->name}` more than once.",
-                            );
-                        }
-                        $seenRequirements[$requirement->name] = true;
-                    }
-
-                    $hookIndex = count($nodeAnalysisHooks);
-                    if ($hookIndex > 65_535) {
-                        throw new InvalidArgumentException(
-                            'A worker cannot register more than 65,536 analyzer node-analysis hooks.',
-                        );
-                    }
-
-                    $registeredHook = new RegisteredNodeAnalysisHook(
-                        $hookIndex,
-                        $definition->identifier,
-                        $hook,
-                        $targets,
-                        $requirements,
-                    );
-                    $nodeAnalysisHooks[] = $registeredHook;
-                    $registeredNodeAnalysisHooks[] = $registeredHook;
-                    foreach ($targets as $target) {
+                foreach ($registeredNodeAnalysisHooks as $registeredHook) {
+                    foreach ($registeredHook->targets as $target) {
                         $registeredNodeAnalysisHooksByNodeKind[$target->value][] = $registeredHook;
                     }
                 }
 
-                $registeredMethodCallAnalysisHooks = [];
+                $registeredMethodCallAnalysisHooks = self::registerTargetedCallbacks(
+                    $registry->getMethodCallAnalysisHooks(),
+                    $methodCallAnalysisHooks,
+                    $definition->identifier,
+                    'analyzer method-call analysis hook',
+                    static fn(MethodTarget $target): string => (
+                        strtolower($target->class) . '::' . strtolower($target->method)
+                    ),
+                );
                 $registeredMethodCallAnalysisHooksByIndex = [];
-                foreach ($registry->getMethodCallAnalysisHooks() as $hook) {
-                    $targets = $hook->getTargets();
-                    if ($targets === []) {
-                        throw new InvalidArgumentException(
-                            "A method-call analysis hook in `{$definition->identifier}` has no targets.",
-                        );
-                    }
-
-                    $seenTargets = [];
-                    foreach ($targets as $target) {
-                        $key = strtolower($target->class) . '::' . strtolower($target->method);
-                        if (array_key_exists($key, $seenTargets)) {
-                            throw new InvalidArgumentException(
-                                "A method-call analysis hook in `{$definition->identifier}` targets `{$target->class}::{$target->method}` more than once.",
-                            );
-                        }
-                        $seenTargets[$key] = true;
-                    }
-
-                    $requirements = $hook->getRequirements();
-                    $seenRequirements = [];
-                    foreach ($requirements as $requirement) {
-                        if (array_key_exists($requirement->name, $seenRequirements)) {
-                            throw new InvalidArgumentException(
-                                "A method-call analysis hook in `{$definition->identifier}` requests `{$requirement->name}` more than once.",
-                            );
-                        }
-                        $seenRequirements[$requirement->name] = true;
-                    }
-
-                    $hookIndex = count($methodCallAnalysisHooks);
-                    if ($hookIndex > 65_535) {
-                        throw new InvalidArgumentException(
-                            'A worker cannot register more than 65,536 analyzer method-call analysis hooks.',
-                        );
-                    }
-
-                    $registeredHook = new RegisteredMethodCallAnalysisHook(
-                        $hookIndex,
-                        $definition->identifier,
-                        $hook,
-                        $targets,
-                        $requirements,
-                    );
-                    $methodCallAnalysisHooks[] = $registeredHook;
-                    $registeredMethodCallAnalysisHooks[] = $registeredHook;
-                    $registeredMethodCallAnalysisHooksByIndex[$hookIndex] = $registeredHook;
+                foreach ($registeredMethodCallAnalysisHooks as $registeredHook) {
+                    $registeredMethodCallAnalysisHooksByIndex[$registeredHook->index] = $registeredHook;
                 }
 
-                $registeredClassLikeAnalysisHooks = [];
+                $registeredClassLikeAnalysisHooks = self::registerTargetedCallbacks(
+                    $registry->getClassLikeAnalysisHooks(),
+                    $classLikeAnalysisHooks,
+                    $definition->identifier,
+                    'analyzer class-like analysis hook',
+                    static fn(ClassLikeTarget $target): string => strtolower($target->ancestor),
+                );
                 $registeredClassLikeAnalysisHooksByIndex = [];
-                foreach ($registry->getClassLikeAnalysisHooks() as $hook) {
-                    $targets = $hook->getTargets();
-                    if ($targets === []) {
-                        throw new InvalidArgumentException(
-                            "A class-like analysis hook in `{$definition->identifier}` has no targets.",
-                        );
-                    }
-
-                    $seenTargets = [];
-                    foreach ($targets as $target) {
-                        $key = strtolower($target->ancestor);
-                        if (array_key_exists($key, $seenTargets)) {
-                            throw new InvalidArgumentException(
-                                "A class-like analysis hook in `{$definition->identifier}` targets descendants of `{$target->ancestor}` more than once.",
-                            );
-                        }
-                        $seenTargets[$key] = true;
-                    }
-
-                    $requirements = $hook->getRequirements();
-                    $seenRequirements = [];
-                    foreach ($requirements as $requirement) {
-                        if (array_key_exists($requirement->name, $seenRequirements)) {
-                            throw new InvalidArgumentException(
-                                "A class-like analysis hook in `{$definition->identifier}` requests `{$requirement->name}` more than once.",
-                            );
-                        }
-                        $seenRequirements[$requirement->name] = true;
-                    }
-
-                    $hookIndex = count($classLikeAnalysisHooks);
-                    if ($hookIndex > 65_535) {
-                        throw new InvalidArgumentException(
-                            'A worker cannot register more than 65,536 analyzer class-like analysis hooks.',
-                        );
-                    }
-
-                    $registeredHook = new RegisteredClassLikeAnalysisHook(
-                        $hookIndex,
-                        $definition->identifier,
-                        $hook,
-                        $targets,
-                        $requirements,
-                    );
-                    $classLikeAnalysisHooks[] = $registeredHook;
-                    $registeredClassLikeAnalysisHooks[] = $registeredHook;
-                    $registeredClassLikeAnalysisHooksByIndex[$hookIndex] = $registeredHook;
+                foreach ($registeredClassLikeAnalysisHooks as $registeredHook) {
+                    $registeredClassLikeAnalysisHooksByIndex[$registeredHook->index] = $registeredHook;
                 }
 
                 $registeredPlugins[] = new RegisteredPlugin(
@@ -624,6 +382,72 @@ final class Worker
         $this->propertyInitializationProviders = $propertyInitializationProviders;
         $this->classInitializerProviders = $classInitializerProviders;
         $this->issueFilterHooks = $issueFilterHooks;
+    }
+
+    /**
+     * @template TTarget
+     * @template TCallback of TargetedProvider<TTarget>|TargetedAnalysisHook<TTarget>
+     *
+     * @param list<TCallback> $callbacks
+     * @param list<RegisteredTargetedCallback<TCallback, TTarget>> $all
+     * @param non-empty-string $plugin
+     * @param non-empty-string $kind
+     * @param null|Closure(TTarget): non-empty-string $targetKey
+     *
+     * @return list<RegisteredTargetedCallback<TCallback, TTarget>>
+     */
+    private static function registerTargetedCallbacks(
+        array $callbacks,
+        array &$all,
+        string $plugin,
+        string $kind,
+        ?Closure $targetKey = null,
+    ): array {
+        $registered = [];
+        foreach ($callbacks as $callback) {
+            $targets = $callback->getTargets();
+            if ($targets === []) {
+                throw new InvalidArgumentException("A {$kind} in `{$plugin}` has no targets.");
+            }
+
+            if ($targetKey !== null) {
+                $seen = [];
+                foreach ($targets as $target) {
+                    $key = $targetKey($target);
+                    if (array_key_exists($key, $seen)) {
+                        throw new InvalidArgumentException("A {$kind} in `{$plugin}` targets `{$key}` more than once.");
+                    }
+                    $seen[$key] = true;
+                }
+            }
+
+            $requirements = [];
+            if ($callback instanceof TargetedAnalysisHook) {
+                /** @var TargetedAnalysisHook<TTarget> $hook */
+                $hook = $callback;
+                $requirements = $hook->getRequirements();
+                $seen = [];
+                foreach ($requirements as $requirement) {
+                    if (array_key_exists($requirement->name, $seen)) {
+                        throw new InvalidArgumentException(
+                            "A {$kind} in `{$plugin}` requests `{$requirement->name}` more than once.",
+                        );
+                    }
+                    $seen[$requirement->name] = true;
+                }
+            }
+
+            $index = count($all);
+            if ($index > 65_535) {
+                throw new InvalidArgumentException("A worker cannot register more than 65,536 {$kind}s.");
+            }
+
+            $entry = new RegisteredTargetedCallback($index, $plugin, $callback, $targets, $requirements);
+            $all[] = $entry;
+            $registered[] = $entry;
+        }
+
+        return $registered;
     }
 
     /**
@@ -892,6 +716,7 @@ final class Worker
             }
 
             $codebase = new Codebase($host, $requestId, $cancellation, $this->metadataCache);
+            $types = new TypeComparator($host, $requestId, $cancellation, $this->metadataCache);
             foreach ($request->providerIndices as $providerIndex) {
                 $registered = $this->propertyTypeProviders[$providerIndex] ?? null;
                 if ($registered === null) {
@@ -902,12 +727,12 @@ final class Worker
 
                 $cancellation->throwIfCancelled();
                 try {
-                    $type = $registered->provider->getPropertyType(
+                    $type = $registered->callback->getPropertyType(
                         new PropertyTypeProviderContext(
                             $this->phpVersion,
                             $codebase,
                             $request->access,
-                            new TypeComparator($host, $requestId, $cancellation, $this->metadataCache),
+                            $types,
                             $cancellation,
                         ),
                     );
@@ -934,6 +759,7 @@ final class Worker
             }
 
             $codebase = new Codebase($host, $requestId, $cancellation, $this->metadataCache);
+            $types = new TypeComparator($host, $requestId, $cancellation, $this->metadataCache);
             foreach ($request->providerIndices as $providerIndex) {
                 $registered = $this->propertyInitializationProviders[$providerIndex] ?? null;
                 if ($registered === null) {
@@ -944,13 +770,13 @@ final class Worker
 
                 $cancellation->throwIfCancelled();
                 try {
-                    $initialized = $registered->provider->isPropertyInitialized(
+                    $initialized = $registered->callback->isPropertyInitialized(
                         new PropertyInitializationProviderContext(
                             $this->phpVersion,
                             $codebase,
                             $request->declaringClass,
                             $request->property,
-                            new TypeComparator($host, $requestId, $cancellation, $this->metadataCache),
+                            $types,
                             $cancellation,
                         ),
                     );
@@ -988,7 +814,7 @@ final class Worker
 
                 $cancellation->throwIfCancelled();
                 try {
-                    $provided = $registered->provider->getClassInitializers(
+                    $provided = $registered->callback->getClassInitializers(
                         new ClassInitializerProviderContext(
                             $this->phpVersion,
                             $codebase,
@@ -1040,13 +866,16 @@ final class Worker
                         );
                     }
 
-                    if ($context->issue->code === null || !in_array($context->issue->code, $registered->codes, true)) {
+                    if (
+                        $context->issue->code === null
+                        || !in_array($context->issue->code, $registered->targets, true)
+                    ) {
                         continue;
                     }
 
                     $cancellation->throwIfCancelled();
                     try {
-                        $decision = $registered->hook->filterIssue($context);
+                        $decision = $registered->callback->filterIssue($context);
                     } catch (Throwable $throwable) {
                         throw new ProtocolException(
                             "Analyzer issue-filter hook in `{$registered->plugin}` failed: {$throwable->getMessage()}",
@@ -1100,7 +929,7 @@ final class Worker
 
                 $cancellation->throwIfCancelled();
                 try {
-                    $assertions = $registered->provider->getAssertions($context);
+                    $assertions = $registered->callback->getAssertions($context);
                 } catch (Throwable $throwable) {
                     throw new ProtocolException(
                         "Analyzer assertion provider in `{$registered->plugin}` failed: {$throwable->getMessage()}",
@@ -1138,13 +967,13 @@ final class Worker
 
                 $cancellation->throwIfCancelled();
                 try {
-                    if (!$registered->provider instanceof CallableSignatureProvider) {
+                    if (!$registered->callback instanceof CallableSignatureProvider) {
                         throw new ProtocolException(
                             "Mago requested a callable signature from analyzer provider {$providerIndex}, but it does not advertise that capability.",
                         );
                     }
 
-                    $signature = $registered->provider->getCallableSignature($context);
+                    $signature = $registered->callback->getCallableSignature($context);
                     if ($signature !== null) {
                         return AnalyzerProtocol::writeCallableSignatureResponse($signature);
                     }
@@ -1175,7 +1004,7 @@ final class Worker
 
             $cancellation->throwIfCancelled();
             try {
-                $type = $registered->provider->getReturnType($context);
+                $type = $registered->callback->getReturnType($context);
             } catch (Throwable $throwable) {
                 throw new ProtocolException(
                     "Analyzer provider in `{$registered->plugin}` failed: {$throwable->getMessage()}",
@@ -1384,7 +1213,7 @@ final class Worker
 
             $nodeContext = new NodeAnalysisContext($context, $source, $node, $data);
             foreach ($hooks as $hook) {
-                $hook->hook->analyze($nodeContext);
+                $hook->callback->analyze($nodeContext);
                 foreach ($nodeContext->takeReportedIssues() as $issue) {
                     $reportedIssues[] = $pluginIndex;
                     $reportedIssues[] = $issue;
@@ -1410,7 +1239,7 @@ final class Worker
                     continue;
                 }
 
-                $hook->hook->analyze($nodeContext);
+                $hook->callback->analyze($nodeContext);
                 foreach ($nodeContext->takeReportedIssues() as $issue) {
                     $reportedIssues[] = $pluginIndex;
                     $reportedIssues[] = $issue;

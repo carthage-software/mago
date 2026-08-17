@@ -1476,8 +1476,7 @@ where
         identifier,
         invocation,
         context.external_analysis_session,
-    )?
-    else {
+    ) else {
         return Ok(());
     };
 

@@ -274,7 +274,7 @@ where
         declaring_class_metadata,
         property,
         context.external_analysis_session,
-    )? {
+    ) {
         return Ok(false);
     }
 

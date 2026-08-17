@@ -1,8 +1,9 @@
 use mago_span::Span;
 
+use crate::external::ExternalAnalyzerError;
 use crate::plugin::PluginError;
 
-#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone)]
 pub enum AnalysisError {
     Plugin(PluginError),
     UserError(String),
@@ -33,5 +34,11 @@ impl std::error::Error for AnalysisError {
 impl From<PluginError> for AnalysisError {
     fn from(err: PluginError) -> Self {
         AnalysisError::Plugin(err)
+    }
+}
+
+impl From<ExternalAnalyzerError> for AnalysisError {
+    fn from(error: ExternalAnalyzerError) -> Self {
+        Self::Plugin(PluginError::from(error))
     }
 }

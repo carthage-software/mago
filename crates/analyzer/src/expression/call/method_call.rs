@@ -456,7 +456,7 @@ where
         };
 
         let mut invocation = Invocation::new(target, arguments, span);
-        if apply_callable_signature(context, artifacts, &identifier, &mut invocation)? {
+        if apply_callable_signature(context, artifacts, &identifier, &mut invocation) {
             targets.push(invocation.target);
         } else {
             report_non_existent_method(
@@ -529,7 +529,7 @@ where
         let signature_handled = if context.external_analysis_session.is_some()
             && context.plugin_registry.may_have_callable_signature_provider(&requested_identifier)
         {
-            apply_callable_signature(context, artifacts, &requested_identifier, &mut invocation)?
+            apply_callable_signature(context, artifacts, &requested_identifier, &mut invocation)
         } else {
             false
         };
@@ -559,7 +559,7 @@ where
             artifacts,
             &requested_identifier,
             &invocation,
-        )? {
+        ) {
             Some(return_type) => return_type,
             None => {
                 if !signature_handled {

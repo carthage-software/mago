@@ -11,14 +11,6 @@ namespace Mago\Sdk\Analyzer;
  * matching at least one target cross the extension boundary.
  *
  * @api
+ * @extends TargetedAnalysisHook<MethodTarget>
  */
-interface MethodCallAnalysisHook
-{
-    /** @return non-empty-list<MethodTarget> */
-    public function getTargets(): array;
-
-    /** @return list<FileAnalysisRequirement> */
-    public function getRequirements(): array;
-
-    public function analyze(NodeAnalysisContext $context): void;
-}
+interface MethodCallAnalysisHook extends TargetedAnalysisHook {}

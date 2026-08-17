@@ -8,11 +8,9 @@ namespace Mago\Sdk\Analyzer;
  * Supplies flow-sensitive assertions for targeted function calls.
  *
  * @api
+ * @extends TargetedProvider<FunctionTarget>
  */
-interface FunctionAssertionProvider
+interface FunctionAssertionProvider extends TargetedProvider
 {
-    /** @return non-empty-list<FunctionTarget> */
-    public function getTargets(): array;
-
     public function getAssertions(AssertionProviderContext $context): ?InvocationAssertions;
 }

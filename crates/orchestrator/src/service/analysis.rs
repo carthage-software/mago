@@ -14,7 +14,6 @@ use mago_allocator::LocalArena;
 use mago_analyzer::Analyzer;
 use mago_analyzer::analysis_result::AnalysisResult;
 use mago_analyzer::analysis_result::LateSymbolReferenceIssueReconciler;
-use mago_analyzer::artifacts::AnalysisArtifacts;
 use mago_analyzer::error::AnalysisError;
 use mago_analyzer::external::AFTER_FILE_ANALYSIS_BATCH_SIZE;
 use mago_analyzer::external::FileAnalysisSnapshot;
@@ -100,12 +99,16 @@ impl AnalysisService {
     /// # Returns
     ///
     /// An `IssueCollection` containing all issues found in the file.
-    pub fn oneshot(mut self, file_id: FileId) -> IssueCollection {
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OrchestratorError`] when analysis or an external analyzer operation fails.
+    pub fn oneshot(mut self, file_id: FileId) -> Result<IssueCollection, OrchestratorError> {
         let external_session = self.plugin_registry.create_external_analysis_session(self.database.files());
         let Ok(file) = self.database.get_ref(&file_id) else {
             tracing::error!("File with ID {:?} not found in database", file_id);
 
-            return IssueCollection::default();
+            return Ok(IssueCollection::default());
         };
 
         let arena = LocalArena::new();
@@ -128,29 +131,22 @@ impl AnalysisService {
 
         populate_codebase(&mut self.codebase, &mut self.symbol_references, WordSet::default(), HashSet::default());
 
-        if let Err(err) = self.plugin_registry.prepare_external_analyzer() {
-            issues.push(Issue::error(format!("Analysis error: {err}")));
-            return issues;
-        }
+        self.plugin_registry.prepare_external_analyzer().map_err(AnalysisError::from)?;
 
-        let additional_symbol_references =
-            match self.plugin_registry.run_external_before_analysis_hooks(&self.codebase, external_session.as_ref()) {
-                Ok(reported) => {
-                    issues.extend(reported.issues);
-                    reported.references
-                }
-                Err(err) => {
-                    issues.push(Issue::error(format!("Analysis error: {err}")));
-                    return issues;
-                }
-            };
+        let before = self
+            .plugin_registry
+            .run_external_before_analysis_hooks(&self.codebase, external_session.as_ref())
+            .map_err(AnalysisError::from)?;
+        issues.extend(before.issues);
+        let additional_symbol_references = before.references;
         if !additional_symbol_references.is_empty() {
             self.symbol_references.extend(additional_symbol_references.clone());
         }
 
-        let after_file = self.plugin_registry.has_external_after_file_analysis_hooks().unwrap_or_default();
-        let after_analysis = self.plugin_registry.has_external_after_analysis_hooks().unwrap_or_default();
-        let node_analysis_requirements = self.plugin_registry.external_node_analysis_requirements().unwrap_or_default();
+        let after_file = self.plugin_registry.has_external_after_file_analysis_hooks().map_err(AnalysisError::from)?;
+        let after_analysis = self.plugin_registry.has_external_after_analysis_hooks().map_err(AnalysisError::from)?;
+        let node_analysis_requirements =
+            self.plugin_registry.external_node_analysis_requirements().map_err(AnalysisError::from)?;
 
         // Run the analyzer
         let mut analysis_result = AnalysisResult::new(self.symbol_references);
@@ -166,88 +162,58 @@ impl AnalysisService {
             analyzer = analyzer.with_additional_symbol_references(&additional_symbol_references);
         }
 
-        let artifacts = match analyzer.analyze_with_artifacts(program, &mut analysis_result) {
-            Ok(artifacts) => artifacts,
-            Err(err) => {
-                issues.push(Issue::error(format!("Analysis error: {err}")));
-                AnalysisArtifacts::new()
-            }
-        };
+        let artifacts = analyzer.analyze_with_artifacts(program, &mut analysis_result)?;
 
         if after_file {
-            match self.plugin_registry.run_external_after_file_analysis_hooks(
+            let reported = self.plugin_registry.run_external_after_file_analysis_hooks(
                 file,
                 program,
                 &resolved_names,
                 &artifacts,
                 &self.codebase,
                 external_session.as_ref(),
-            ) {
-                Ok(reported) => {
-                    analysis_result.issues.extend(reported.issues);
-                    let has_late_references = !reported.references_by_file.is_empty();
-                    for references in reported.references_by_file.into_values() {
-                        analysis_result.symbol_references.extend(references);
-                    }
+            )?;
+            analysis_result.issues.extend(reported.issues);
+            let has_late_references = !reported.references_by_file.is_empty();
+            for references in reported.references_by_file.into_values() {
+                analysis_result.symbol_references.extend(references);
+            }
 
-                    if has_late_references {
-                        analysis_result.issues =
-                            LateSymbolReferenceIssueReconciler::new(&self.codebase, &analysis_result.symbol_references)
-                                .reconcile(std::mem::take(&mut analysis_result.issues));
-                    }
-                }
-                Err(err) => issues.push(Issue::error(format!("Analysis error: {err}"))),
+            if has_late_references {
+                analysis_result.issues =
+                    LateSymbolReferenceIssueReconciler::new(&self.codebase, &analysis_result.symbol_references)
+                        .reconcile(std::mem::take(&mut analysis_result.issues));
             }
         }
 
         let mut pragma_reconciler =
             DeferredIssueReconciler::new(analysis_result.take_deferred_pragmas(), self.database.files());
-        analysis_result.issues = match pragma_reconciler.reconcile(std::mem::take(&mut analysis_result.issues)) {
-            Ok(issues) => issues,
-            Err(error) => {
-                issues.push(Issue::error(format!("Analysis error: {error}")));
-                return issues;
-            }
-        };
+        analysis_result.issues = pragma_reconciler.reconcile(std::mem::take(&mut analysis_result.issues))?;
         issues.extend(analysis_result.issues.iter().cloned());
         issues.extend(self.codebase.take_issues(true));
         if after_analysis {
-            let snapshot = match FileAnalysisSnapshot::new(
+            let snapshot = Arc::new(FileAnalysisSnapshot::new(
                 file,
                 program,
                 &resolved_names,
                 &artifacts,
                 &self.codebase,
                 node_analysis_requirements.as_ref(),
-            ) {
-                Ok(snapshot) => Arc::new(snapshot),
-                Err(err) => {
-                    issues.push(Issue::error(format!("Analysis error: {err}")));
-                    return issues;
-                }
-            };
+            )?);
             let mut project_result = AnalysisResult::new(analysis_result.symbol_references);
             project_result.issues = issues.clone();
-            match self.plugin_registry.run_external_after_analysis_hooks(
+            let reported = self.plugin_registry.run_external_after_analysis_hooks(
                 &project_result,
                 &[snapshot],
                 &self.codebase,
                 external_session.as_ref(),
-            ) {
-                Ok(reported) => match pragma_reconciler.reconcile(reported) {
-                    Ok(reported) => issues.extend(reported),
-                    Err(error) => issues.push(Issue::error(format!("Analysis error: {error}"))),
-                },
-                Err(err) => issues.push(Issue::error(format!("Analysis error: {err}"))),
-            }
+            )?;
+            issues.extend(pragma_reconciler.reconcile(reported)?);
         }
 
-        match pragma_reconciler.finish() {
-            Ok(reported) => issues.extend(reported),
-            Err(error) => issues.push(Issue::error(format!("Analysis error: {error}"))),
-        }
+        issues.extend(pragma_reconciler.finish()?);
 
-        issues
+        Ok(issues)
     }
 
     /// Runs the full analysis pipeline.

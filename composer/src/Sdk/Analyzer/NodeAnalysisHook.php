@@ -14,14 +14,6 @@ use Mago\Sdk\Syntax\NodeKind;
  * source file in PHP.
  *
  * @api
+ * @extends TargetedAnalysisHook<NodeKind>
  */
-interface NodeAnalysisHook
-{
-    /** @return non-empty-list<NodeKind> */
-    public function getTargets(): array;
-
-    /** @return list<FileAnalysisRequirement> */
-    public function getRequirements(): array;
-
-    public function analyze(NodeAnalysisContext $context): void;
-}
+interface NodeAnalysisHook extends TargetedAnalysisHook {}

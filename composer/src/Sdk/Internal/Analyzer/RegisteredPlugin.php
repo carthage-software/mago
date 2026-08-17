@@ -8,10 +8,26 @@ use Mago\Sdk\Analyzer\AfterAnalysisHook;
 use Mago\Sdk\Analyzer\AfterFileAnalysisHook;
 use Mago\Sdk\Analyzer\AttributedEntryPoint;
 use Mago\Sdk\Analyzer\BeforeAnalysisHook;
+use Mago\Sdk\Analyzer\ClassInitializerProvider;
+use Mago\Sdk\Analyzer\ClassLikeAnalysisHook;
+use Mago\Sdk\Analyzer\ClassLikeTarget;
+use Mago\Sdk\Analyzer\ClassTarget;
+use Mago\Sdk\Analyzer\FunctionAssertionProvider;
+use Mago\Sdk\Analyzer\FunctionReturnTypeProvider;
+use Mago\Sdk\Analyzer\FunctionTarget;
 use Mago\Sdk\Analyzer\InitializationHook;
+use Mago\Sdk\Analyzer\IssueFilterHook;
+use Mago\Sdk\Analyzer\MethodAssertionProvider;
+use Mago\Sdk\Analyzer\MethodCallAnalysisHook;
+use Mago\Sdk\Analyzer\MethodReturnTypeProvider;
 use Mago\Sdk\Analyzer\MethodTarget;
+use Mago\Sdk\Analyzer\NodeAnalysisHook;
 use Mago\Sdk\Analyzer\Plugin;
 use Mago\Sdk\Analyzer\PluginDefinition;
+use Mago\Sdk\Analyzer\PropertyInitializationProvider;
+use Mago\Sdk\Analyzer\PropertyTarget;
+use Mago\Sdk\Analyzer\PropertyTypeProvider;
+use Mago\Sdk\Syntax\NodeKind;
 
 /**
  * @internal
@@ -21,25 +37,25 @@ final class RegisteredPlugin
 {
     /**
      * @param non-empty-string $extension
-     * @param list<RegisteredFunctionReturnTypeProvider> $functionProviders
-     * @param list<RegisteredMethodReturnTypeProvider> $methodProviders
-     * @param list<RegisteredFunctionAssertionProvider> $functionAssertionProviders
-     * @param list<RegisteredMethodAssertionProvider> $methodAssertionProviders
-     * @param list<RegisteredPropertyTypeProvider> $propertyProviders
-     * @param list<RegisteredPropertyInitializationProvider> $propertyInitializationProviders
-     * @param list<RegisteredClassInitializerProvider> $classInitializerProviders
+     * @param list<RegisteredTargetedCallback<FunctionReturnTypeProvider, FunctionTarget>> $functionProviders
+     * @param list<RegisteredTargetedCallback<MethodReturnTypeProvider, MethodTarget>> $methodProviders
+     * @param list<RegisteredTargetedCallback<FunctionAssertionProvider, FunctionTarget>> $functionAssertionProviders
+     * @param list<RegisteredTargetedCallback<MethodAssertionProvider, MethodTarget>> $methodAssertionProviders
+     * @param list<RegisteredTargetedCallback<PropertyTypeProvider, PropertyTarget>> $propertyProviders
+     * @param list<RegisteredTargetedCallback<PropertyInitializationProvider, PropertyTarget>> $propertyInitializationProviders
+     * @param list<RegisteredTargetedCallback<ClassInitializerProvider, ClassTarget>> $classInitializerProviders
      * @param list<MethodTarget> $entryPoints
      * @param list<AttributedEntryPoint> $attributedEntryPoints
-     * @param list<RegisteredIssueFilterHook> $issueFilterHooks
+     * @param list<RegisteredTargetedCallback<IssueFilterHook, string>> $issueFilterHooks
      * @param list<InitializationHook> $initializationHooks
      * @param list<BeforeAnalysisHook> $beforeAnalysisHooks
      * @param list<AfterFileAnalysisHook> $afterFileAnalysisHooks
-     * @param list<RegisteredNodeAnalysisHook> $nodeAnalysisHooks
-     * @param array<string, non-empty-list<RegisteredNodeAnalysisHook>> $nodeAnalysisHooksByNodeKind
-     * @param list<RegisteredMethodCallAnalysisHook> $methodCallAnalysisHooks
-     * @param array<int<0, 65535>, RegisteredMethodCallAnalysisHook> $methodCallAnalysisHooksByIndex
-     * @param list<RegisteredClassLikeAnalysisHook> $classLikeAnalysisHooks
-     * @param array<int<0, 65535>, RegisteredClassLikeAnalysisHook> $classLikeAnalysisHooksByIndex
+     * @param list<RegisteredTargetedCallback<NodeAnalysisHook, NodeKind>> $nodeAnalysisHooks
+     * @param array<string, non-empty-list<RegisteredTargetedCallback<NodeAnalysisHook, NodeKind>>> $nodeAnalysisHooksByNodeKind
+     * @param list<RegisteredTargetedCallback<MethodCallAnalysisHook, MethodTarget>> $methodCallAnalysisHooks
+     * @param array<int<0, 65535>, RegisteredTargetedCallback<MethodCallAnalysisHook, MethodTarget>> $methodCallAnalysisHooksByIndex
+     * @param list<RegisteredTargetedCallback<ClassLikeAnalysisHook, ClassLikeTarget>> $classLikeAnalysisHooks
+     * @param array<int<0, 65535>, RegisteredTargetedCallback<ClassLikeAnalysisHook, ClassLikeTarget>> $classLikeAnalysisHooksByIndex
      * @param list<AfterAnalysisHook> $afterAnalysisHooks
      */
     public function __construct(

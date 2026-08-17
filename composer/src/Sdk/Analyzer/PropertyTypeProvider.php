@@ -8,11 +8,9 @@ namespace Mago\Sdk\Analyzer;
  * Establishes targeted magic properties and supplies their read and write types.
  *
  * @api
+ * @extends TargetedProvider<PropertyTarget>
  */
-interface PropertyTypeProvider
+interface PropertyTypeProvider extends TargetedProvider
 {
-    /** @return non-empty-list<PropertyTarget> */
-    public function getTargets(): array;
-
     public function getPropertyType(PropertyTypeProviderContext $context): ?PropertyType;
 }

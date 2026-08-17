@@ -1,6 +1,8 @@
 //! Error types for the orchestrator crate.
 
 use mago_analyzer::error::AnalysisError;
+use mago_analyzer::external::ExternalAnalyzerError;
+use mago_analyzer::plugin::PluginError;
 use mago_database::error::DatabaseError;
 use mago_linter::external::ExternalLintError;
 
@@ -48,6 +50,18 @@ impl From<DatabaseError> for OrchestratorError {
 impl From<AnalysisError> for OrchestratorError {
     fn from(error: AnalysisError) -> Self {
         Self::Analysis(error)
+    }
+}
+
+impl From<PluginError> for OrchestratorError {
+    fn from(error: PluginError) -> Self {
+        Self::Analysis(AnalysisError::from(error))
+    }
+}
+
+impl From<ExternalAnalyzerError> for OrchestratorError {
+    fn from(error: ExternalAnalyzerError) -> Self {
+        Self::Analysis(AnalysisError::from(error))
     }
 }
 
