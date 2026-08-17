@@ -1417,6 +1417,7 @@ impl IncrementalAnalysisService {
                 })
                 .collect::<Result<Vec<_>, _>>()
                 .map_err(mago_analyzer::error::AnalysisError::from)?;
+            #[cfg(not(target_arch = "wasm32"))]
             let issue_count = batches.iter().map(|batch| batch.issues.len()).sum::<usize>();
             for batch in batches {
                 for issue in batch.issues {

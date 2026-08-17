@@ -1,5 +1,7 @@
 use std::sync::Arc;
+#[cfg(not(target_arch = "wasm32"))]
 use std::sync::atomic::Ordering::Relaxed;
+#[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
 
 use mago_allocator::LocalArena;
@@ -21,6 +23,7 @@ use mago_syntax::settings::ParserSettings;
 use crate::OrchestratorError;
 use crate::service::pipeline::StatelessParallelPipeline;
 use crate::service::pipeline::StatelessReducer;
+#[cfg(not(target_arch = "wasm32"))]
 use crate::service::telemetry::LintPhaseTelemetry;
 
 /// Defines the different operational modes for the linter.
@@ -184,20 +187,28 @@ impl LintService {
             self.use_progress_bars,
         );
 
+        #[cfg(not(target_arch = "wasm32"))]
         let trace_enabled = tracing::enabled!(tracing::Level::TRACE);
+        #[cfg(not(target_arch = "wasm32"))]
         let telemetry = Arc::new(LintPhaseTelemetry::default());
+        #[cfg(not(target_arch = "wasm32"))]
         let telemetry_for_closure = Arc::clone(&telemetry);
 
         let result = pipeline.run(move |context, arena, file| {
+            #[cfg(not(target_arch = "wasm32"))]
             let per_file_start = trace_enabled.then(Instant::now);
+            #[cfg(not(target_arch = "wasm32"))]
             let parse_start = trace_enabled.then(Instant::now);
             let program = parse_file_with_settings(arena, &file, context.parser_settings);
+            #[cfg(not(target_arch = "wasm32"))]
             if let Some(start) = parse_start {
                 telemetry_for_closure.parse_ns.fetch_add(start.elapsed().as_nanos() as u64, Relaxed);
             }
 
+            #[cfg(not(target_arch = "wasm32"))]
             let resolve_start = trace_enabled.then(Instant::now);
             let resolved_names = NameResolver::new(arena).resolve(program);
+            #[cfg(not(target_arch = "wasm32"))]
             if let Some(start) = resolve_start {
                 telemetry_for_closure.resolve_ns.fetch_add(start.elapsed().as_nanos() as u64, Relaxed);
             }
@@ -209,13 +220,16 @@ impl LintService {
             }
 
             let semantics_checker = SemanticsChecker::new(context.php_version);
+            #[cfg(not(target_arch = "wasm32"))]
             let semantics_start = trace_enabled.then(Instant::now);
             issues.extend(semantics_checker.check(&file, program, &resolved_names));
+            #[cfg(not(target_arch = "wasm32"))]
             if let Some(start) = semantics_start {
                 telemetry_for_closure.semantics_ns.fetch_add(start.elapsed().as_nanos() as u64, Relaxed);
             }
 
             if context.mode == LintMode::Full {
+                #[cfg(not(target_arch = "wasm32"))]
                 let lint_start = trace_enabled.then(Instant::now);
                 let linter = Linter::from_registry(arena, context.registry, context.php_version);
                 if let Some(external_linter) = context.external_linter.as_deref() {
@@ -223,11 +237,13 @@ impl LintService {
                 } else {
                     issues.extend(linter.lint(&file, program, &resolved_names));
                 }
+                #[cfg(not(target_arch = "wasm32"))]
                 if let Some(start) = lint_start {
                     telemetry_for_closure.lint_ns.fetch_add(start.elapsed().as_nanos() as u64, Relaxed);
                 }
             }
 
+            #[cfg(not(target_arch = "wasm32"))]
             if let Some(start) = per_file_start {
                 telemetry_for_closure.per_file_total_ns.fetch_add(start.elapsed().as_nanos() as u64, Relaxed);
                 telemetry_for_closure.files.fetch_add(1, Relaxed);
@@ -236,6 +252,7 @@ impl LintService {
             Ok(issues)
         });
 
+        #[cfg(not(target_arch = "wasm32"))]
         if trace_enabled {
             telemetry.dump();
         }

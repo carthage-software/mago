@@ -485,6 +485,7 @@ impl Reducer<AnalysisTaskResult, AnalysisResult> for AnalysisResultReducer {
         aggregated_result.issues.extend(codebase.take_issues(true));
         let after_file = self.plugin_registry.has_external_after_file_analysis_hooks().map_err(AnalysisError::from)?;
         if after_file {
+            #[cfg(not(target_arch = "wasm32"))]
             let started_at = tracing::enabled!(tracing::Level::TRACE).then(Instant::now);
             let batches = snapshots
                 .par_chunks(AFTER_FILE_ANALYSIS_BATCH_SIZE)
@@ -497,6 +498,7 @@ impl Reducer<AnalysisTaskResult, AnalysisResult> for AnalysisResultReducer {
                 })
                 .collect::<Result<Vec<_>, _>>()
                 .map_err(AnalysisError::from)?;
+            #[cfg(not(target_arch = "wasm32"))]
             let issue_count = batches.iter().map(|batch| batch.issues.len()).sum::<usize>();
             let has_late_references = batches.iter().any(|batch| !batch.references_by_file.is_empty());
             for batch in batches {
@@ -512,6 +514,7 @@ impl Reducer<AnalysisTaskResult, AnalysisResult> for AnalysisResultReducer {
                         .reconcile(std::mem::take(&mut aggregated_result.issues));
             }
 
+            #[cfg(not(target_arch = "wasm32"))]
             if let Some(start) = started_at {
                 tracing::trace!(
                     files = snapshots.len(),
