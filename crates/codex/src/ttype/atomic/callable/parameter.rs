@@ -17,6 +17,8 @@ pub struct TCallableParameter {
     /// The type hint for the parameter, if specified within the callable signature.
     /// `None` if no specific type is given (equivalent to `mixed`).
     type_signature: Option<Arc<TUnion>>,
+    /// The type bound to `$this` while analyzing a closure passed to this parameter.
+    closure_this_type: Option<Arc<TUnion>>,
     /// `true` if the parameter expects an argument passed by reference (signified by `&`).
     is_by_reference: bool,
     /// `true` if this parameter is variadic (`...`).
@@ -31,6 +33,7 @@ pub struct TCallableParameter {
 impl PartialEq for TCallableParameter {
     fn eq(&self, other: &Self) -> bool {
         self.type_signature == other.type_signature
+            && self.closure_this_type == other.closure_this_type
             && self.is_by_reference == other.is_by_reference
             && self.is_variadic == other.is_variadic
             && self.has_default == other.has_default
@@ -45,6 +48,7 @@ impl Hash for TCallableParameter {
         H: Hasher,
     {
         self.type_signature.hash(state);
+        self.closure_this_type.hash(state);
         self.is_by_reference.hash(state);
         self.is_variadic.hash(state);
         self.has_default.hash(state);
@@ -61,6 +65,7 @@ impl Ord for TCallableParameter {
     fn cmp(&self, other: &Self) -> Ordering {
         self.type_signature
             .cmp(&other.type_signature)
+            .then_with(|| self.closure_this_type.cmp(&other.closure_this_type))
             .then_with(|| self.is_by_reference.cmp(&other.is_by_reference))
             .then_with(|| self.is_variadic.cmp(&other.is_variadic))
             .then_with(|| self.has_default.cmp(&other.has_default))
@@ -84,7 +89,7 @@ impl TCallableParameter {
         is_variadic: bool,
         has_default: bool,
     ) -> Self {
-        Self { name: None, type_signature, is_by_reference, is_variadic, has_default }
+        Self { name: None, type_signature, closure_this_type: None, is_by_reference, is_variadic, has_default }
     }
 
     /// Returns the parameter name, if the callable signature retained one.
@@ -120,6 +125,21 @@ impl TCallableParameter {
     /// Returns a mutable reference to the parameter's type signature (`TUnion`), if specified.
     pub fn get_type_signature_mut(&mut self) -> Option<&mut TUnion> {
         self.type_signature.as_mut().map(Arc::make_mut)
+    }
+
+    /// Returns the type bound to `$this` for a closure passed to this parameter.
+    #[inline]
+    #[must_use]
+    pub fn get_closure_this_type(&self) -> Option<&TUnion> {
+        self.closure_this_type.as_deref()
+    }
+
+    /// Returns a new parameter with the closure `$this` binding type.
+    #[inline]
+    #[must_use]
+    pub fn with_closure_this_type(mut self, closure_this_type: Option<Arc<TUnion>>) -> Self {
+        self.closure_this_type = closure_this_type;
+        self
     }
 
     /// Checks if the parameter expects an argument passed by reference (`&`).

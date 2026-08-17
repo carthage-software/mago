@@ -60,6 +60,7 @@ use mago_php_version::PHPVersion;
 use crate::commands::analyze::AnalyzeCommand;
 use crate::commands::config::ConfigCommand;
 use crate::commands::cst::CstCommand;
+use crate::commands::extension::ExtensionCommand;
 use crate::commands::format::FormatCommand;
 use crate::commands::generate_completions::GenerateCompletionsCommand;
 use crate::commands::guard::GuardCommand;
@@ -75,6 +76,7 @@ mod args;
 pub mod analyze;
 pub mod config;
 pub mod cst;
+pub mod extension;
 pub mod format;
 pub mod generate_completions;
 pub mod guard;
@@ -154,6 +156,12 @@ pub enum MagoCommand {
     /// **Usage**: `mago config`
     #[command(name = "config")]
     Config(ConfigCommand),
+
+    /// Inspect or validate configured external extensions.
+    ///
+    /// **Usage**: `mago extension list` or `mago extension validate`
+    #[command(name = "extension")]
+    Extension(ExtensionCommand),
 
     /// List all files that will be processed.
     ///
@@ -348,6 +356,13 @@ pub struct CliArguments {
     /// `no-version-check = true` in `mago.toml`.
     #[arg(long, default_value_t = false)]
     pub no_version_check: bool,
+
+    /// Disable all external extensions for this invocation.
+    ///
+    /// Useful for troubleshooting extension startup or behavior without
+    /// changing the project configuration.
+    #[arg(long, global = true, default_value_t = false)]
+    pub no_extensions: bool,
 
     /// When to use colored output. Can be "auto", "always", or "never".
     ///

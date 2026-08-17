@@ -24,6 +24,7 @@ use mago_word::concat_word;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
+use crate::artifacts::ResolvedMethodCall;
 use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
@@ -32,6 +33,7 @@ use crate::error::AnalysisError;
 use crate::invocation::Invocation;
 use crate::invocation::InvocationArgumentsSource;
 use crate::invocation::InvocationTarget;
+use crate::invocation::MethodInvocationKind;
 use crate::invocation::MethodTargetContext;
 use crate::invocation::analyzer::analyze_invocation;
 use crate::invocation::post_process::post_invocation_process;
@@ -43,6 +45,59 @@ pub mod function_call;
 pub mod method_call;
 pub mod pipe;
 pub mod static_method_call;
+
+fn record_external_method_call<A>(
+    context: &Context<'_, '_, A>,
+    artifacts: &mut AnalysisArtifacts,
+    targets: &[InvocationTarget<'_>],
+    span: Span,
+) where
+    A: Arena,
+{
+    record_external_method_call_targets(
+        context,
+        artifacts,
+        targets.iter().filter_map(|target| {
+            let FunctionLikeIdentifier::Method(class, method) = target.get_function_like_identifier()? else {
+                return None;
+            };
+            Some((
+                target
+                    .get_method_context()
+                    .map_or(*class, |method_context| method_context.class_like_metadata.original_name),
+                *method,
+            ))
+        }),
+        span,
+    );
+}
+
+pub(super) fn record_external_method_call_targets<A>(
+    context: &Context<'_, '_, A>,
+    artifacts: &mut AnalysisArtifacts,
+    targets: impl IntoIterator<Item = (Word, Word)>,
+    span: Span,
+) where
+    A: Arena,
+{
+    if !context.plugin_registry.has_external_method_call_analysis_hooks() {
+        return;
+    }
+
+    let span = (span.start.offset, span.end.offset);
+    for (class, method) in targets {
+        if artifacts
+            .resolved_method_calls
+            .iter()
+            .rev()
+            .take_while(|target| target.span == span)
+            .any(|target| target.class == class && target.method == method)
+        {
+            continue;
+        }
+        artifacts.resolved_method_calls.push(ResolvedMethodCall { span, class, method });
+    }
+}
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Call<'arena> {
     fn analyze<'ctx, A>(
@@ -76,7 +131,6 @@ fn analyze_invocation_targets<'ctx, 'ast, 'arena, A>(
     encountered_mixed_targets: bool,
     should_add_null: bool,
     object_has_nullsafe_null: bool,
-    all_targets_non_nullable_return: bool,
 ) -> Result<(), AnalysisError>
 where
     A: Arena,
@@ -108,6 +162,7 @@ where
         });
 
     let mut resulting_type = None;
+    let mut all_targets_non_nullable_return = !invocation_targets.is_empty();
     for target in invocation_targets {
         if let InvocationTarget::FunctionLike { metadata, .. } = &target {
             let name = metadata.name;
@@ -150,31 +205,30 @@ where
             }
         }
 
-        let invocation: Invocation<'ctx, 'ast, 'arena> = Invocation::new(target, invocation_arguments, call_span);
+        let mut invocation: Invocation<'ctx, 'ast, 'arena> = Invocation::new(target, invocation_arguments, call_span);
         let mut argument_types = WordMap::default();
 
         analyze_invocation(
             context,
             block_context,
             artifacts,
-            &invocation,
+            &mut invocation,
             None,
             &mut template_result,
             &mut argument_types,
         )?;
 
-        resulting_type = Some(add_optional_union_type(
-            fetch_invocation_return_type(
-                context,
-                block_context,
-                artifacts,
-                &invocation,
-                &template_result,
-                &argument_types,
-            ),
-            resulting_type.as_ref(),
-            context.codebase,
-        ));
+        let return_type = fetch_invocation_return_type(
+            context,
+            block_context,
+            artifacts,
+            &invocation,
+            &template_result,
+            &argument_types,
+        )?;
+
+        all_targets_non_nullable_return &= !return_type.is_nullable();
+        resulting_type = Some(add_optional_union_type(return_type, resulting_type.as_ref(), context.codebase));
 
         post_invocation_process(
             context,
@@ -458,6 +512,7 @@ where
             };
 
             Some(MethodTargetContext {
+                invocation_kind: MethodInvocationKind::Static,
                 declaring_method_id,
                 class_like_metadata,
                 class_type: StaticClassType::Name(original_class_name),
@@ -470,7 +525,14 @@ where
         None
     };
 
-    Some(InvocationTarget::FunctionLike { identifier, metadata, inferred_return_type, method_context, span })
+    Some(InvocationTarget::FunctionLike {
+        identifier,
+        metadata,
+        inferred_return_type,
+        effective_signature: None,
+        method_context,
+        span,
+    })
 }
 
 fn inspect_arguments<'ctx, 'arena, A>(

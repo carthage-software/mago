@@ -220,7 +220,7 @@ where
         template_result,
         parameters,
         range,
-    );
+    )?;
 
     Ok(())
 }
@@ -1464,7 +1464,8 @@ fn apply_plugin_assertions<'ctx, 'arena, A>(
     template_result: &TemplateResult,
     parameters: &WordMap<TUnion>,
     range: (u32, u32),
-) where
+) -> Result<(), AnalysisError>
+where
     A: Arena,
 {
     let Some(assertions) = context.plugin_registry.get_function_like_assertions(
@@ -1474,8 +1475,9 @@ fn apply_plugin_assertions<'ctx, 'arena, A>(
         artifacts,
         identifier,
         invocation,
+        context.external_analysis_session,
     ) else {
-        return;
+        return Ok(());
     };
 
     let resolved_if_true_assertions = resolve_invocation_assertion(
@@ -1520,4 +1522,6 @@ fn apply_plugin_assertions<'ctx, 'arena, A>(
         template_result,
         parameters,
     );
+
+    Ok(())
 }

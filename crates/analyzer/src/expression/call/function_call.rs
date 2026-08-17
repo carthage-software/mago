@@ -74,7 +74,6 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for FunctionCall<'arena> {
             false,
             false,
             false, // object_has_nullsafe_null - not applicable for function calls
-            false, // all_targets_non_nullable_return - not applicable for function calls
         )?;
 
         if context.plugin_registry.has_function_call_hooks() {
@@ -177,6 +176,7 @@ where
 
                     targets.push(InvocationTarget::Callable {
                         signature: callable_signature.clone(),
+                        effective_signature: None,
                         span: expression.span(),
                         source: callable_signature.get_source(),
                     });
@@ -192,6 +192,7 @@ where
         } else if atomic.can_be_callable() {
             targets.push(InvocationTarget::Callable {
                 signature: TCallableSignature::mixed(false),
+                effective_signature: None,
                 span: expression.span(),
                 source: None,
             });

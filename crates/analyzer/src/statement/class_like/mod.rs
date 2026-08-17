@@ -443,11 +443,13 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Class<'arena> {
         };
 
         if should_check_unused {
+            let additional_symbol_references = context.additional_symbol_references;
             let unused_members = unused_members::check_unused_members_with_transitivity(
                 class_like_metadata.name,
                 self.span(),
                 class_like_metadata,
                 &artifacts.symbol_references,
+                additional_symbol_references,
                 context,
             );
 
@@ -456,6 +458,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Class<'arena> {
                 self.span(),
                 class_like_metadata,
                 &artifacts.symbol_references,
+                additional_symbol_references,
                 &unused_members,
                 context,
             );
@@ -687,11 +690,13 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Enum<'arena> {
         }
 
         if context.settings.find_unused_definitions {
+            let additional_symbol_references = context.additional_symbol_references;
             unused_members::check_unused_members_with_transitivity(
                 class_like_metadata.name,
                 self.span(),
                 class_like_metadata,
                 &artifacts.symbol_references,
+                additional_symbol_references,
                 context,
             );
         }
@@ -807,6 +812,8 @@ where
     if class_like_metadata.flags.is_unchecked() {
         return Ok(());
     }
+
+    context.prepare_class_initializers(class_like_metadata)?;
 
     let name = &class_like_metadata.original_name;
 
@@ -1103,7 +1110,13 @@ where
     check_class_like_constants(context, class_like_metadata, members);
 
     crate::readonly::finalize_class_writes(context, artifacts, class_like_metadata);
-    initialization::check_property_initialization(context, artifacts, class_like_metadata, declaration_span, name_span);
+    initialization::check_property_initialization(
+        context,
+        artifacts,
+        class_like_metadata,
+        declaration_span,
+        name_span,
+    )?;
 
     Ok(())
 }

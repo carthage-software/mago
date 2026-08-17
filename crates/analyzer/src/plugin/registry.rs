@@ -1,5 +1,8 @@
 //! Plugin registry for managing and dispatching to providers and hooks.
 
+use std::sync::Arc;
+use std::sync::OnceLock;
+
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
@@ -7,6 +10,9 @@ use mago_codex::metadata::function_like::FunctionLikeMetadata;
 use mago_codex::metadata::property::PropertyMetadata;
 use mago_codex::ttype::union::TUnion;
 use mago_database::file::File;
+use mago_names::ResolvedNames;
+use mago_reporting::IssueCollection;
+use mago_span::Span;
 use mago_syntax::cst::Class;
 use mago_syntax::cst::Enum;
 use mago_syntax::cst::Expression;
@@ -27,7 +33,22 @@ use mago_word::concat_word;
 
 use crate::artifacts::AnalysisArtifacts;
 use crate::context::block::BlockContext;
+use crate::external::AfterFileAnalysisResult;
+use crate::external::BeforeAnalysisResult;
+use crate::external::CodebaseScanFile;
+use crate::external::CodebaseScanPlan;
+use crate::external::EffectivePropertyType;
+use crate::external::ExternalAnalysisSession;
+use crate::external::ExternalAnalyzer;
+use crate::external::ExternalAnalyzerCapabilities;
+use crate::external::ExternalAnalyzerError;
+use crate::external::ExternalAnalyzerHandle;
+use crate::external::FileAnalysisSnapshot;
+use crate::external::NodeAnalysisRequirements;
+use crate::external::PropertyAccessKind;
+use crate::invocation::EffectiveCallableSignature;
 use crate::invocation::Invocation;
+use crate::plugin::PluginError;
 use crate::plugin::context::HookContext;
 use crate::plugin::context::InvocationInfo;
 use crate::plugin::context::ProviderContext;
@@ -61,15 +82,28 @@ use crate::plugin::provider::throw::ExpressionThrowTypeProvider;
 use crate::plugin::provider::throw::FunctionThrowTypeProvider;
 use crate::plugin::provider::throw::MethodThrowTypeProvider;
 
-use mago_reporting::IssueCollection;
-
 pub struct ProviderResult {
     pub return_type: Option<TUnion>,
     pub issues: Vec<ReportedIssue>,
 }
 
+fn optional_external_hint<T>(operation: &'static str, result: Result<T, Arc<ExternalAnalyzerError>>) -> T
+where
+    T: Default,
+{
+    match result {
+        Ok(value) => value,
+        Err(error) => {
+            tracing::warn!(operation, error = %error, "External analyzer provider failed; using native analysis fallback.");
+            T::default()
+        }
+    }
+}
+
 #[derive(Default)]
 pub struct PluginRegistry {
+    external_analyzer: Option<Arc<ExternalAnalyzerHandle>>,
+    external_capabilities: OnceLock<ExternalAnalyzerCapabilities>,
     function_exact: WordMap<Vec<usize>>,
     function_prefix: Vec<(Word, usize)>,
     function_namespace: Vec<(Word, usize)>,
@@ -112,6 +146,8 @@ pub struct PluginRegistry {
 impl std::fmt::Debug for PluginRegistry {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_struct("PluginRegistry")
+            .field("external_analyzer", &self.external_analyzer.is_some())
+            .field("external_capabilities", &self.external_capabilities.get())
             .field("function_providers", &self.function_providers.len())
             .field("method_providers", &self.method_providers.len())
             .field("program_hooks", &self.program_hooks.len())
@@ -138,6 +174,225 @@ impl std::fmt::Debug for PluginRegistry {
 }
 
 impl PluginRegistry {
+    /// Attaches worker-backed analyzer plugins to this registry.
+    pub fn set_external_analyzer(&mut self, analyzer: Arc<ExternalAnalyzerHandle>) {
+        self.external_analyzer = Some(analyzer);
+    }
+
+    /// Completes concurrent external analyzer initialization before file analysis.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a worker fails to initialize or advertises invalid capabilities.
+    pub fn prepare_external_analyzer(&self) -> PluginResult<()> {
+        let Some(analyzer) = self.external_analyzer.as_deref() else {
+            return Ok(());
+        };
+
+        analyzer.prepare().map_err(PluginError::from)?;
+        let capabilities = analyzer.read(|analyzer| analyzer.capabilities()).map_err(PluginError::from)?;
+        let _capabilities = self.external_capabilities.set(capabilities);
+        Ok(())
+    }
+
+    #[inline]
+    fn has_external_capability(&self, capability: fn(&ExternalAnalyzerCapabilities) -> bool) -> bool {
+        self.external_analyzer.is_some() && self.external_capabilities.get().is_none_or(capability)
+    }
+
+    #[inline]
+    #[must_use]
+    pub(crate) fn has_external_method_call_analysis_hooks(&self) -> bool {
+        self.has_external_capability(|capabilities| capabilities.method_call_analysis)
+    }
+
+    /// Completes external initialization and returns its in-memory source stubs.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a worker fails to initialize or returns invalid initialization data.
+    pub fn external_initialization_files(&self) -> PluginResult<Vec<File>> {
+        self.prepare_external_analyzer()?;
+        self.external_analyzer
+            .as_deref()
+            .map(ExternalAnalyzerHandle::initialization_files)
+            .transpose()
+            .map(Option::unwrap_or_default)
+            .map_err(PluginError::from)
+    }
+
+    /// Returns compiled host-file selectors for enabled external codebase-scan hooks.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the external analyzer cannot initialize or a hook advertises an invalid path pattern.
+    pub fn external_codebase_scan_plan(&self) -> PluginResult<Option<CodebaseScanPlan>> {
+        self.prepare_external_analyzer()?;
+        self.external_analyzer
+            .as_deref()
+            .map(|analyzer| analyzer.with(ExternalAnalyzer::codebase_scan_plan))
+            .transpose()
+            .map(Option::flatten)
+            .map_err(PluginError::from)
+    }
+
+    /// Replaces each external worker's selected codebase-scan source state.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a worker cannot accept or validate the snapshot sequence.
+    pub fn run_external_codebase_scan(&self, files: Vec<CodebaseScanFile>) -> PluginResult<()> {
+        self.external_analyzer
+            .as_deref()
+            .map(|analyzer| analyzer.with(|analyzer| analyzer.run_codebase_scan(files)))
+            .transpose()
+            .map(|result| result.unwrap_or_default())
+            .map_err(PluginError::from)
+    }
+
+    /// Creates the immutable external-plugin context for one frozen codebase generation.
+    #[must_use]
+    pub fn create_external_analysis_session(
+        &self,
+        files: impl IntoIterator<Item = Arc<File>>,
+    ) -> Option<ExternalAnalysisSession> {
+        self.external_analyzer.as_ref()?;
+        Some(ExternalAnalysisSession::from_files(files))
+    }
+
+    /// Returns whether any enabled external plugin subscribed to per-file completion.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the external analyzer cannot be initialized.
+    pub fn has_external_after_file_analysis_hooks(&self) -> PluginResult<bool> {
+        self.external_analyzer
+            .as_deref()
+            .map(|analyzer| analyzer.read(|analyzer| analyzer.capabilities().after_file_analysis))
+            .transpose()
+            .map(Option::unwrap_or_default)
+            .map_err(PluginError::from)
+    }
+
+    /// Returns the syntax targets and embedded data requested by enabled external analyzer hooks.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the external analyzer cannot be initialized.
+    pub fn external_node_analysis_requirements(&self) -> PluginResult<Option<NodeAnalysisRequirements>> {
+        self.external_analyzer
+            .as_deref()
+            .map(|analyzer| analyzer.read(ExternalAnalyzer::node_analysis_requirements))
+            .transpose()
+            .map(Option::flatten)
+            .map_err(PluginError::from)
+    }
+
+    /// Returns whether any enabled external plugin subscribed to whole-project completion.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the external analyzer cannot be initialized.
+    pub fn has_external_after_analysis_hooks(&self) -> PluginResult<bool> {
+        self.external_analyzer
+            .as_deref()
+            .map(|analyzer| analyzer.read(|analyzer| analyzer.capabilities().after_analysis))
+            .transpose()
+            .map(Option::unwrap_or_default)
+            .map_err(PluginError::from)
+    }
+
+    /// Runs enabled external hooks after the codebase is frozen and before file analysis starts.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when an external hook cannot be dispatched or returns an invalid response.
+    pub fn run_external_before_analysis_hooks(
+        &self,
+        codebase: &CodebaseMetadata,
+        session: Option<&ExternalAnalysisSession>,
+    ) -> PluginResult<BeforeAnalysisResult> {
+        self.external_analyzer
+            .as_deref()
+            .zip(session)
+            .map(|(analyzer, session)| analyzer.with(|analyzer| analyzer.run_before_analysis_hooks(codebase, session)))
+            .transpose()
+            .map(Option::unwrap_or_default)
+            .map_err(PluginError::from)
+    }
+
+    /// Runs enabled external hooks for one completed file analysis.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when an external hook cannot be dispatched or returns an invalid response.
+    pub fn run_external_after_file_analysis_hooks(
+        &self,
+        file: &File,
+        program: &Program<'_>,
+        resolved_names: &ResolvedNames<'_>,
+        artifacts: &AnalysisArtifacts,
+        codebase: &CodebaseMetadata,
+        session: Option<&ExternalAnalysisSession>,
+    ) -> PluginResult<AfterFileAnalysisResult> {
+        self.external_analyzer
+            .as_deref()
+            .zip(session)
+            .map(|(analyzer, session)| {
+                analyzer.with(|analyzer| {
+                    analyzer.run_after_file_analysis_hooks(file, program, resolved_names, artifacts, codebase, session)
+                })
+            })
+            .transpose()
+            .map(Option::unwrap_or_default)
+            .map_err(PluginError::from)
+    }
+
+    /// Runs enabled external after-file hooks for a batch of completed analyses.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when an external hook cannot be dispatched or returns an invalid response.
+    pub fn run_external_after_file_analysis_batch_hooks(
+        &self,
+        files: &[Arc<FileAnalysisSnapshot>],
+        codebase: &CodebaseMetadata,
+        session: Option<&ExternalAnalysisSession>,
+    ) -> PluginResult<AfterFileAnalysisResult> {
+        self.external_analyzer
+            .as_deref()
+            .zip(session)
+            .map(|(analyzer, session)| {
+                analyzer.with(|analyzer| analyzer.run_after_file_analysis_batch_hooks(files, codebase, session))
+            })
+            .transpose()
+            .map(Option::unwrap_or_default)
+            .map_err(PluginError::from)
+    }
+
+    /// Runs enabled external hooks for the final merged analysis result.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when an external hook cannot be dispatched or returns an invalid response.
+    pub fn run_external_after_analysis_hooks(
+        &self,
+        result: &crate::analysis_result::AnalysisResult,
+        files: &[Arc<FileAnalysisSnapshot>],
+        codebase: &CodebaseMetadata,
+        session: Option<&ExternalAnalysisSession>,
+    ) -> PluginResult<IssueCollection> {
+        self.external_analyzer
+            .as_deref()
+            .zip(session)
+            .map(|(analyzer, session)| {
+                analyzer.with(|analyzer| analyzer.run_after_analysis_hooks(result, files, codebase, session))
+            })
+            .transpose()
+            .map(Option::unwrap_or_default)
+            .map_err(PluginError::from)
+    }
+
     #[inline]
     #[must_use]
     pub fn new() -> Self {
@@ -504,12 +759,13 @@ impl PluginRegistry {
     #[must_use]
     pub fn has_property_initialization_providers(&self) -> bool {
         !self.property_initialization_providers.is_empty()
+            || self.has_external_capability(|capabilities| capabilities.property_initialization)
     }
 
     #[inline]
     #[must_use]
     pub fn has_issue_filter_hooks(&self) -> bool {
-        !self.issue_filter_hooks.is_empty()
+        !self.issue_filter_hooks.is_empty() || self.has_external_capability(|capabilities| capabilities.issue_filters)
     }
 
     #[inline]
@@ -987,7 +1243,81 @@ impl PluginRegistry {
         indices
     }
 
+    #[inline]
     #[must_use]
+    pub(crate) fn may_have_callable_signature_provider(&self, function_like: &FunctionLikeIdentifier) -> bool {
+        if self.external_analyzer.is_none() {
+            return false;
+        }
+
+        match function_like {
+            FunctionLikeIdentifier::Function(_) => {
+                self.has_external_capability(|capabilities| capabilities.function_signatures)
+            }
+            FunctionLikeIdentifier::Method(_, _) => {
+                self.has_external_capability(|capabilities| capabilities.method_signatures)
+            }
+            FunctionLikeIdentifier::Closure(_) => false,
+        }
+    }
+
+    /// Requests an external provider's effective callable signature before argument analysis.
+    ///
+    /// Provider failures are logged and preserve the native callable signature.
+    pub fn get_function_like_callable_signature<'ctx>(
+        &self,
+        codebase: &'ctx CodebaseMetadata,
+        source_file: &'ctx File,
+        artifacts: &AnalysisArtifacts,
+        function_like: &FunctionLikeIdentifier,
+        invocation: &Invocation<'ctx, '_, '_>,
+        external_session: Option<&ExternalAnalysisSession>,
+    ) -> Option<EffectiveCallableSignature> {
+        let (analyzer, session) = self.external_analyzer.as_deref().zip(external_session)?;
+
+        match function_like {
+            FunctionLikeIdentifier::Function(name)
+                if self.has_external_capability(|capabilities| capabilities.function_signatures) =>
+            {
+                optional_external_hint(
+                    "function callable-signature provider",
+                    analyzer.with(|analyzer| {
+                        analyzer.get_function_callable_signature(
+                            name.as_bytes(),
+                            invocation,
+                            artifacts,
+                            source_file,
+                            codebase,
+                            session,
+                        )
+                    }),
+                )
+            }
+            FunctionLikeIdentifier::Method(class, method)
+                if self.has_external_capability(|capabilities| capabilities.method_signatures) =>
+            {
+                optional_external_hint(
+                    "method callable-signature provider",
+                    analyzer.with(|analyzer| {
+                        analyzer.get_method_callable_signature(
+                            class.as_bytes(),
+                            method.as_bytes(),
+                            invocation,
+                            artifacts,
+                            source_file,
+                            codebase,
+                            session,
+                        )
+                    }),
+                )
+            }
+            _ => None,
+        }
+    }
+
+    /// Returns a provider result for a function or method invocation.
+    ///
+    /// External provider failures are logged and preserve the native return type.
     pub fn get_function_like_return_type<'ctx>(
         &self,
         codebase: &'ctx CodebaseMetadata,
@@ -996,6 +1326,7 @@ impl PluginRegistry {
         artifacts: &AnalysisArtifacts,
         function_like: &FunctionLikeIdentifier,
         invocation: &Invocation<'ctx, '_, '_>,
+        external_session: Option<&ExternalAnalysisSession>,
     ) -> Option<ProviderResult> {
         match function_like {
             FunctionLikeIdentifier::Function(name) => Some(self.get_function_return_type(
@@ -1005,6 +1336,7 @@ impl PluginRegistry {
                 artifacts,
                 name.as_bytes(),
                 invocation,
+                external_session,
             )),
             FunctionLikeIdentifier::Method(class_name, method_name) => Some(self.get_method_return_type(
                 codebase,
@@ -1014,12 +1346,15 @@ impl PluginRegistry {
                 class_name.as_bytes(),
                 method_name.as_bytes(),
                 invocation,
+                external_session,
             )),
             _ => None,
         }
     }
 
-    #[must_use]
+    /// Returns the first applicable function return-type provider result.
+    ///
+    /// External provider failures are logged and preserve the native return type.
     pub fn get_function_return_type<'ctx>(
         &self,
         codebase: &'ctx CodebaseMetadata,
@@ -1028,6 +1363,7 @@ impl PluginRegistry {
         artifacts: &AnalysisArtifacts,
         function_name: &[u8],
         invocation: &Invocation<'ctx, '_, '_>,
+        external_session: Option<&ExternalAnalysisSession>,
     ) -> ProviderResult {
         let indices = self.get_function_provider_indices(function_name);
         let mut all_issues = Vec::new();
@@ -1044,10 +1380,32 @@ impl PluginRegistry {
             all_issues.extend(provider_context.take_issues());
         }
 
-        ProviderResult { return_type: None, issues: all_issues }
+        let return_type = if self.has_external_capability(|capabilities| capabilities.function_return_types) {
+            self.external_analyzer.as_deref().zip(external_session).and_then(|(analyzer, session)| {
+                optional_external_hint(
+                    "function return-type provider",
+                    analyzer.with(|analyzer| {
+                        analyzer.get_function_return_type(
+                            function_name,
+                            invocation,
+                            artifacts,
+                            source_file,
+                            codebase,
+                            session,
+                        )
+                    }),
+                )
+            })
+        } else {
+            None
+        };
+
+        ProviderResult { return_type, issues: all_issues }
     }
 
-    #[must_use]
+    /// Returns the first applicable method return-type provider result.
+    ///
+    /// External provider failures are logged and preserve the native return type.
     pub fn get_method_return_type<'ctx>(
         &self,
         codebase: &'ctx CodebaseMetadata,
@@ -1057,6 +1415,7 @@ impl PluginRegistry {
         class_name: &[u8],
         method_name: &[u8],
         invocation: &Invocation<'ctx, '_, '_>,
+        external_session: Option<&ExternalAnalysisSession>,
     ) -> ProviderResult {
         let indices = self.get_method_provider_indices(class_name, method_name);
         let mut all_issues = Vec::new();
@@ -1075,7 +1434,67 @@ impl PluginRegistry {
             all_issues.extend(provider_context.take_issues());
         }
 
-        ProviderResult { return_type: None, issues: all_issues }
+        let return_type = if self.has_external_capability(|capabilities| capabilities.method_return_types) {
+            self.external_analyzer.as_deref().zip(external_session).and_then(|(analyzer, session)| {
+                optional_external_hint(
+                    "method return-type provider",
+                    analyzer.with(|analyzer| {
+                        analyzer.get_method_return_type(
+                            class_name,
+                            method_name,
+                            invocation,
+                            artifacts,
+                            source_file,
+                            codebase,
+                            session,
+                        )
+                    }),
+                )
+            })
+        } else {
+            None
+        };
+
+        ProviderResult { return_type, issues: all_issues }
+    }
+
+    #[inline]
+    #[must_use]
+    pub(crate) fn may_have_property_type_provider(&self) -> bool {
+        self.has_external_capability(|capabilities| capabilities.property_types)
+    }
+
+    #[inline]
+    #[must_use]
+    pub(crate) fn may_have_class_initializer_provider(&self) -> bool {
+        self.has_external_capability(|capabilities| capabilities.class_initializers)
+    }
+
+    /// Requests an external provider's effective magic-property contract.
+    ///
+    /// Provider failures are logged and preserve native property resolution.
+    pub(crate) fn get_property_type(
+        &self,
+        codebase: &CodebaseMetadata,
+        class: &[u8],
+        property: &[u8],
+        access: PropertyAccessKind,
+        receiver_type: &TUnion,
+        span: Span,
+        external_session: Option<&ExternalAnalysisSession>,
+    ) -> Option<EffectivePropertyType> {
+        if !self.has_external_capability(|capabilities| capabilities.property_types) {
+            return None;
+        }
+
+        self.external_analyzer.as_deref().zip(external_session).and_then(|(analyzer, session)| {
+            optional_external_hint(
+                "property type provider",
+                analyzer.with(|analyzer| {
+                    analyzer.get_property_type(class, property, access, receiver_type, span, codebase, session)
+                }),
+            )
+        })
     }
 
     #[inline]
@@ -1090,14 +1509,15 @@ impl PluginRegistry {
         self.method_providers.len()
     }
 
-    /// Check if a property should be considered initialized by any registered provider.
+    /// Checks whether any registered provider considers a property initialized.
     ///
-    /// Returns `true` if any provider considers the property initialized.
-    #[must_use]
+    /// External provider failures are logged and preserve native initialization analysis.
     pub fn is_property_initialized(
         &self,
+        codebase: &CodebaseMetadata,
         class_metadata: &ClassLikeMetadata,
         property_metadata: &PropertyMetadata,
+        external_session: Option<&ExternalAnalysisSession>,
     ) -> bool {
         for provider in &self.property_initialization_providers {
             if provider.is_property_initialized(class_metadata, property_metadata) {
@@ -1105,7 +1525,52 @@ impl PluginRegistry {
             }
         }
 
-        false
+        if !self.has_external_capability(|capabilities| capabilities.property_initialization) {
+            return false;
+        }
+
+        self.external_analyzer
+            .as_deref()
+            .zip(external_session)
+            .map(|(analyzer, session)| {
+                optional_external_hint(
+                    "property initialization provider",
+                    analyzer.with(|analyzer| {
+                        analyzer.is_property_initialized(
+                            class_metadata.name.as_bytes(),
+                            property_metadata,
+                            codebase,
+                            session,
+                        )
+                    }),
+                )
+            })
+            .unwrap_or(false)
+    }
+
+    /// Returns framework lifecycle methods that initialize properties on `class_metadata`.
+    ///
+    /// External provider failures are logged and preserve native initialization analysis.
+    pub fn get_class_initializers(
+        &self,
+        codebase: &CodebaseMetadata,
+        class_metadata: &ClassLikeMetadata,
+        external_session: Option<&ExternalAnalysisSession>,
+    ) -> WordSet {
+        if !self.has_external_capability(|capabilities| capabilities.class_initializers) {
+            return WordSet::default();
+        }
+
+        self.external_analyzer
+            .as_deref()
+            .zip(external_session)
+            .map(|(analyzer, session)| {
+                optional_external_hint(
+                    "class initializer provider",
+                    analyzer.with(|analyzer| analyzer.get_class_initializers(class_metadata, codebase, session)),
+                )
+            })
+            .unwrap_or_default()
     }
 
     fn get_function_assertion_provider_indices(&self, name: &[u8]) -> Vec<usize> {
@@ -1165,7 +1630,9 @@ impl PluginRegistry {
         indices
     }
 
-    #[must_use]
+    /// Returns assertions for a function or method invocation.
+    ///
+    /// External provider failures are logged and preserve native assertion analysis.
     pub fn get_function_like_assertions<'ctx>(
         &self,
         codebase: &'ctx CodebaseMetadata,
@@ -1174,6 +1641,7 @@ impl PluginRegistry {
         artifacts: &AnalysisArtifacts,
         function_like: &FunctionLikeIdentifier,
         invocation: &Invocation<'ctx, '_, '_>,
+        external_session: Option<&ExternalAnalysisSession>,
     ) -> Option<InvocationAssertions> {
         match function_like {
             FunctionLikeIdentifier::Function(name) => self.get_function_assertions(
@@ -1183,6 +1651,7 @@ impl PluginRegistry {
                 artifacts,
                 name.as_bytes(),
                 invocation,
+                external_session,
             ),
             FunctionLikeIdentifier::Method(class_name, method_name) => self.get_method_assertions(
                 codebase,
@@ -1192,13 +1661,15 @@ impl PluginRegistry {
                 class_name.as_bytes(),
                 method_name.as_bytes(),
                 invocation,
+                external_session,
             ),
             _ => None,
         }
     }
 
     /// Get assertions for a function invocation from registered providers.
-    #[must_use]
+    ///
+    /// External provider failures are logged and preserve native assertion analysis.
     pub fn get_function_assertions<'ctx>(
         &self,
         codebase: &'ctx CodebaseMetadata,
@@ -1207,8 +1678,10 @@ impl PluginRegistry {
         artifacts: &AnalysisArtifacts,
         function_name: &[u8],
         invocation: &Invocation<'ctx, '_, '_>,
+        external_session: Option<&ExternalAnalysisSession>,
     ) -> Option<InvocationAssertions> {
-        if self.function_assertion_providers.is_empty() {
+        let may_have_external = self.has_external_capability(|capabilities| capabilities.function_assertions);
+        if self.function_assertion_providers.is_empty() && !may_have_external {
             return None;
         }
 
@@ -1226,11 +1699,30 @@ impl PluginRegistry {
             }
         }
 
-        None
+        if !may_have_external {
+            return None;
+        }
+
+        self.external_analyzer.as_deref().zip(external_session).and_then(|(analyzer, session)| {
+            optional_external_hint(
+                "function assertion provider",
+                analyzer.with(|analyzer| {
+                    analyzer.get_function_assertions(
+                        function_name,
+                        invocation,
+                        artifacts,
+                        source_file,
+                        codebase,
+                        session,
+                    )
+                }),
+            )
+        })
     }
 
     /// Get assertions for a method invocation from registered providers.
-    #[must_use]
+    ///
+    /// External provider failures are logged and preserve native assertion analysis.
     pub fn get_method_assertions<'ctx>(
         &self,
         codebase: &'ctx CodebaseMetadata,
@@ -1240,8 +1732,10 @@ impl PluginRegistry {
         class_name: &[u8],
         method_name: &[u8],
         invocation: &Invocation<'ctx, '_, '_>,
+        external_session: Option<&ExternalAnalysisSession>,
     ) -> Option<InvocationAssertions> {
-        if self.method_assertion_providers.is_empty() {
+        let may_have_external = self.has_external_capability(|capabilities| capabilities.method_assertions);
+        if self.method_assertion_providers.is_empty() && !may_have_external {
             return None;
         }
 
@@ -1262,7 +1756,26 @@ impl PluginRegistry {
             }
         }
 
-        None
+        if !may_have_external {
+            return None;
+        }
+
+        self.external_analyzer.as_deref().zip(external_session).and_then(|(analyzer, session)| {
+            optional_external_hint(
+                "method assertion provider",
+                analyzer.with(|analyzer| {
+                    analyzer.get_method_assertions(
+                        class_name,
+                        method_name,
+                        invocation,
+                        artifacts,
+                        source_file,
+                        codebase,
+                        session,
+                    )
+                }),
+            )
+        })
     }
 
     fn get_function_throw_provider_indices(&self, name: &[u8]) -> Vec<usize> {
@@ -1401,35 +1914,53 @@ impl PluginRegistry {
     /// Filter issues through all registered issue filter hooks.
     ///
     /// Returns a new `IssueCollection` with filtered issues.
-    #[must_use]
-    pub fn filter_issues(&self, file: &File, issues: IssueCollection) -> IssueCollection {
-        if self.issue_filter_hooks.is_empty() {
-            return issues;
-        }
-
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a native hook fails or an external issue batch cannot be filtered.
+    pub fn filter_issues(
+        &self,
+        file: &File,
+        issues: IssueCollection,
+        codebase: &CodebaseMetadata,
+        session: Option<&ExternalAnalysisSession>,
+    ) -> PluginResult<IssueCollection> {
         let mut filtered = IssueCollection::default();
+        if self.issue_filter_hooks.is_empty() {
+            filtered = issues;
+        } else {
+            filtered.reserve(issues.len());
+            for issue in issues {
+                let mut keep = true;
+                for hook in &self.issue_filter_hooks {
+                    if hook.filter_issue(file, &issue)? == IssueFilterDecision::Remove {
+                        keep = false;
+                        break;
+                    }
+                }
 
-        for issue in issues {
-            let mut keep = true;
-            for hook in &self.issue_filter_hooks {
-                if hook.filter_issue(file, &issue) == Ok(IssueFilterDecision::Remove) {
-                    keep = false;
-                    break;
+                if keep {
+                    filtered.push(issue);
                 }
             }
-
-            if keep {
-                filtered.push(issue);
-            }
         }
 
-        filtered
+        if filtered.is_empty() || !self.has_external_capability(|capabilities| capabilities.issue_filters) {
+            return Ok(filtered);
+        }
+
+        let Some((analyzer, session)) = self.external_analyzer.as_deref().zip(session) else {
+            return Ok(filtered);
+        };
+
+        analyzer.with(|analyzer| analyzer.filter_issues(file, filtered, codebase, session)).map_err(PluginError::from)
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::external::ExternalAnalyzerError;
     use crate::plugin::provider::Provider;
     use crate::plugin::provider::ProviderMeta;
 
@@ -1480,5 +2011,31 @@ mod tests {
 
         let indices = registry.get_function_provider_indices(b"other_func");
         assert!(indices.is_empty());
+    }
+
+    #[test]
+    fn external_analyzer_errors_remain_structured() {
+        let handle = ExternalAnalyzerHandle::pending(std::thread::spawn(|| {
+            Err(ExternalAnalyzerError::Protocol("broken response".to_string()))
+        }));
+        let mut registry = PluginRegistry::new();
+        registry.set_external_analyzer(Arc::new(handle));
+
+        let result = registry.prepare_external_analyzer();
+        assert!(matches!(
+            result,
+            Err(PluginError::External(source))
+                if matches!(source.as_ref(), ExternalAnalyzerError::Protocol(message) if message == "broken response")
+        ));
+    }
+
+    #[test]
+    fn optional_external_provider_failures_use_native_fallback() {
+        let result: Option<TUnion> = optional_external_hint(
+            "test provider",
+            Err(Arc::new(ExternalAnalyzerError::Protocol("broken response".to_string()))),
+        );
+
+        assert!(result.is_none());
     }
 }

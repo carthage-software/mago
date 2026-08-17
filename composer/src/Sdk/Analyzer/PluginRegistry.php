@@ -1,0 +1,396 @@
+<?php
+
+declare(strict_types=1);
+
+namespace Mago\Sdk\Analyzer;
+
+/**
+ * Collects the semantic providers contributed by one analyzer plugin.
+ *
+ * @api
+ * @mago-expect lint:too-many-methods
+ * @mago-expect lint:too-many-properties
+ */
+final class PluginRegistry
+{
+    private bool $memoizeProviders = false;
+
+    /**
+     * @var list<InitializationHook>
+     */
+    private array $initializationHooks = [];
+
+    /**
+     * @var list<CodebaseScanHook>
+     */
+    private array $codebaseScanHooks = [];
+
+    /**
+     * @var list<FunctionReturnTypeProvider>
+     */
+    private array $functionReturnTypeProviders = [];
+
+    /**
+     * @var list<MethodReturnTypeProvider>
+     */
+    private array $methodReturnTypeProviders = [];
+
+    /**
+     * @var list<FunctionAssertionProvider>
+     */
+    private array $functionAssertionProviders = [];
+
+    /**
+     * @var list<MethodAssertionProvider>
+     */
+    private array $methodAssertionProviders = [];
+
+    /**
+     * @var list<PropertyTypeProvider>
+     */
+    private array $propertyTypeProviders = [];
+
+    /**
+     * @var list<PropertyInitializationProvider>
+     */
+    private array $propertyInitializationProviders = [];
+
+    /**
+     * @var list<ClassInitializerProvider>
+     */
+    private array $classInitializerProviders = [];
+
+    /**
+     * @var list<MethodTarget>
+     */
+    private array $entryPoints = [];
+
+    /**
+     * @var list<AttributedEntryPoint>
+     */
+    private array $attributedEntryPoints = [];
+
+    /**
+     * @var list<IssueFilterHook>
+     */
+    private array $issueFilterHooks = [];
+
+    /**
+     * @var list<BeforeAnalysisHook>
+     */
+    private array $beforeAnalysisHooks = [];
+
+    /**
+     * @var list<AfterFileAnalysisHook>
+     */
+    private array $afterFileAnalysisHooks = [];
+
+    /**
+     * @var list<NodeAnalysisHook>
+     */
+    private array $nodeAnalysisHooks = [];
+
+    /**
+     * @var list<MethodCallAnalysisHook>
+     */
+    private array $methodCallAnalysisHooks = [];
+
+    /**
+     * @var list<ClassLikeAnalysisHook>
+     */
+    private array $classLikeAnalysisHooks = [];
+
+    /**
+     * @var list<AfterAnalysisHook>
+     */
+    private array $afterAnalysisHooks = [];
+
+    public function registerInitializationHook(InitializationHook $hook): void
+    {
+        $this->initializationHooks[] = $hook;
+    }
+
+    public function registerCodebaseScanHook(CodebaseScanHook $hook): void
+    {
+        $this->codebaseScanHooks[] = $hook;
+    }
+
+    public function registerFunctionReturnTypeProvider(FunctionReturnTypeProvider $provider): void
+    {
+        $this->functionReturnTypeProviders[] = $provider;
+    }
+
+    public function registerMethodReturnTypeProvider(MethodReturnTypeProvider $provider): void
+    {
+        $this->methodReturnTypeProviders[] = $provider;
+    }
+
+    public function registerFunctionAssertionProvider(FunctionAssertionProvider $provider): void
+    {
+        $this->functionAssertionProviders[] = $provider;
+    }
+
+    public function registerMethodAssertionProvider(MethodAssertionProvider $provider): void
+    {
+        $this->methodAssertionProviders[] = $provider;
+    }
+
+    public function registerPropertyTypeProvider(PropertyTypeProvider $provider): void
+    {
+        $this->propertyTypeProviders[] = $provider;
+    }
+
+    public function registerPropertyInitializationProvider(PropertyInitializationProvider $provider): void
+    {
+        $this->propertyInitializationProviders[] = $provider;
+    }
+
+    public function registerClassInitializerProvider(ClassInitializerProvider $provider): void
+    {
+        $this->classInitializerProviders[] = $provider;
+    }
+
+    /**
+     * Marks methods matching the target as framework entry points.
+     *
+     * Mago resolves the declaration and records the reference without invoking
+     * the extension during analysis.
+     */
+    public function registerEntryPoint(MethodTarget $target): void
+    {
+        $this->entryPoints[] = $target;
+    }
+
+    /**
+     * Marks methods carrying an attribute as framework entry points.
+     *
+     * The class target matches subclasses and implementations.
+     */
+    public function registerAttributedEntryPoint(string|ClassTarget $class, string $attribute): void
+    {
+        $this->attributedEntryPoints[] = new AttributedEntryPoint($class, $attribute);
+    }
+
+    public function registerIssueFilterHook(IssueFilterHook $hook): void
+    {
+        $this->issueFilterHooks[] = $hook;
+    }
+
+    public function registerBeforeAnalysisHook(BeforeAnalysisHook $hook): void
+    {
+        $this->beforeAnalysisHooks[] = $hook;
+    }
+
+    public function registerAfterFileAnalysisHook(AfterFileAnalysisHook $hook): void
+    {
+        $this->afterFileAnalysisHooks[] = $hook;
+    }
+
+    public function registerNodeAnalysisHook(NodeAnalysisHook $hook): void
+    {
+        $this->nodeAnalysisHooks[] = $hook;
+    }
+
+    public function registerMethodCallAnalysisHook(MethodCallAnalysisHook $hook): void
+    {
+        $this->methodCallAnalysisHooks[] = $hook;
+    }
+
+    public function registerClassLikeAnalysisHook(ClassLikeAnalysisHook $hook): void
+    {
+        $this->classLikeAnalysisHooks[] = $hook;
+    }
+
+    public function registerAfterAnalysisHook(AfterAnalysisHook $hook): void
+    {
+        $this->afterAnalysisHooks[] = $hook;
+    }
+
+    /**
+     * Memoize function and method provider results for identical invocations within one frozen analysis generation.
+     *
+     * This includes callable-signature results. Enable it only when every registered function and method provider is
+     * deterministic and does not depend on source locations, invocation order, or externally mutable state.
+     */
+    public function enableProviderMemoization(): void
+    {
+        $this->memoizeProviders = true;
+    }
+
+    /** @internal */
+    public function shouldMemoizeProviders(): bool
+    {
+        return $this->memoizeProviders;
+    }
+
+    /**
+     * @internal
+     * @return list<FunctionReturnTypeProvider>
+     */
+    public function getFunctionReturnTypeProviders(): array
+    {
+        return $this->functionReturnTypeProviders;
+    }
+
+    /**
+     * @internal
+     * @return list<MethodReturnTypeProvider>
+     */
+    public function getMethodReturnTypeProviders(): array
+    {
+        return $this->methodReturnTypeProviders;
+    }
+
+    /**
+     * @internal
+     * @return list<FunctionAssertionProvider>
+     */
+    public function getFunctionAssertionProviders(): array
+    {
+        return $this->functionAssertionProviders;
+    }
+
+    /**
+     * @internal
+     * @return list<MethodAssertionProvider>
+     */
+    public function getMethodAssertionProviders(): array
+    {
+        return $this->methodAssertionProviders;
+    }
+
+    /**
+     * @internal
+     * @return list<PropertyTypeProvider>
+     */
+    public function getPropertyTypeProviders(): array
+    {
+        return $this->propertyTypeProviders;
+    }
+
+    /**
+     * @internal
+     * @return list<PropertyInitializationProvider>
+     */
+    public function getPropertyInitializationProviders(): array
+    {
+        return $this->propertyInitializationProviders;
+    }
+
+    /**
+     * @internal
+     * @return list<ClassInitializerProvider>
+     */
+    public function getClassInitializerProviders(): array
+    {
+        return $this->classInitializerProviders;
+    }
+
+    /**
+     * @internal
+     * @return list<MethodTarget>
+     */
+    public function getEntryPoints(): array
+    {
+        return $this->entryPoints;
+    }
+
+    /**
+     * @internal
+     * @return list<AttributedEntryPoint>
+     */
+    public function getAttributedEntryPoints(): array
+    {
+        return $this->attributedEntryPoints;
+    }
+
+    /**
+     * @internal
+     *
+     * @return list<IssueFilterHook>
+     */
+    public function getIssueFilterHooks(): array
+    {
+        return $this->issueFilterHooks;
+    }
+
+    /**
+     * @internal
+     *
+     * @return list<InitializationHook>
+     */
+    public function getInitializationHooks(): array
+    {
+        return $this->initializationHooks;
+    }
+
+    /**
+     * @internal
+     *
+     * @return list<CodebaseScanHook>
+     */
+    public function getCodebaseScanHooks(): array
+    {
+        return $this->codebaseScanHooks;
+    }
+
+    /**
+     * @internal
+     *
+     * @return list<BeforeAnalysisHook>
+     */
+    public function getBeforeAnalysisHooks(): array
+    {
+        return $this->beforeAnalysisHooks;
+    }
+
+    /**
+     * @internal
+     *
+     * @return list<AfterFileAnalysisHook>
+     */
+    public function getAfterFileAnalysisHooks(): array
+    {
+        return $this->afterFileAnalysisHooks;
+    }
+
+    /**
+     * @internal
+     *
+     * @return list<NodeAnalysisHook>
+     */
+    public function getNodeAnalysisHooks(): array
+    {
+        return $this->nodeAnalysisHooks;
+    }
+
+    /**
+     * @internal
+     *
+     * @return list<MethodCallAnalysisHook>
+     */
+    public function getMethodCallAnalysisHooks(): array
+    {
+        return $this->methodCallAnalysisHooks;
+    }
+
+    /**
+     * @internal
+     *
+     * @return list<ClassLikeAnalysisHook>
+     */
+    public function getClassLikeAnalysisHooks(): array
+    {
+        return $this->classLikeAnalysisHooks;
+    }
+
+    /**
+     * @internal
+     *
+     * @return list<AfterAnalysisHook>
+     */
+    public function getAfterAnalysisHooks(): array
+    {
+        return $this->afterAnalysisHooks;
+    }
+}

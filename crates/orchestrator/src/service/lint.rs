@@ -1,10 +1,13 @@
 use std::sync::Arc;
+use std::sync::atomic::Ordering::Relaxed;
+use std::time::Instant;
 
 use mago_allocator::LocalArena;
 
 use mago_database::ReadDatabase;
 use mago_database::file::File;
 use mago_linter::Linter;
+use mago_linter::external::ExternalLinter;
 use mago_linter::registry::RuleRegistry;
 use mago_linter::settings::Settings;
 use mago_names::resolver::NameResolver;
@@ -18,6 +21,7 @@ use mago_syntax::settings::ParserSettings;
 use crate::OrchestratorError;
 use crate::service::pipeline::StatelessParallelPipeline;
 use crate::service::pipeline::StatelessReducer;
+use crate::service::telemetry::LintPhaseTelemetry;
 
 /// Defines the different operational modes for the linter.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -42,6 +46,9 @@ pub struct LintService {
 
     /// Whether to display progress bars during linting.
     use_progress_bars: bool,
+
+    /// Optional worker-backed custom linter rules.
+    external_linter: Option<Arc<ExternalLinter>>,
 }
 
 impl LintService {
@@ -64,7 +71,14 @@ impl LintService {
         parser_settings: ParserSettings,
         use_progress_bars: bool,
     ) -> Self {
-        Self { database, settings, parser_settings, use_progress_bars }
+        Self { database, settings, parser_settings, use_progress_bars, external_linter: None }
+    }
+
+    /// Adds worker-backed custom rules to parallel full lint runs.
+    #[must_use]
+    pub fn with_external_linter(mut self, external_linter: Arc<ExternalLinter>) -> Self {
+        self.external_linter = Some(external_linter);
+        self
     }
 
     /// Creates a `RuleRegistry` based on the current settings.
@@ -79,7 +93,18 @@ impl LintService {
     /// A configured `RuleRegistry` instance.
     #[must_use]
     pub fn create_registry(&self, only: Option<&[String]>, include_disabled: bool) -> RuleRegistry {
-        RuleRegistry::build(&self.settings, only, include_disabled)
+        let registry = RuleRegistry::build(&self.settings, only, include_disabled);
+        if let Some(only) = only
+            && registry.is_empty()
+            && !self
+                .external_linter
+                .as_ref()
+                .is_some_and(|external| only.iter().any(|code| external.contains_rule(code)))
+        {
+            tracing::warn!("No rules found for the specified 'only' filter: {:?}", only);
+        }
+
+        registry
     }
 
     /// Lints a single file synchronously without using parallel processing.
@@ -148,6 +173,7 @@ impl LintService {
             parser_settings: self.parser_settings,
             registry: Arc::new(self.create_registry(only, false)),
             mode,
+            external_linter: self.external_linter,
         };
 
         let pipeline = StatelessParallelPipeline::new(
@@ -158,9 +184,23 @@ impl LintService {
             self.use_progress_bars,
         );
 
-        pipeline.run(|context, arena, file| {
+        let trace_enabled = tracing::enabled!(tracing::Level::TRACE);
+        let telemetry = Arc::new(LintPhaseTelemetry::default());
+        let telemetry_for_closure = Arc::clone(&telemetry);
+
+        let result = pipeline.run(move |context, arena, file| {
+            let per_file_start = trace_enabled.then(Instant::now);
+            let parse_start = trace_enabled.then(Instant::now);
             let program = parse_file_with_settings(arena, &file, context.parser_settings);
+            if let Some(start) = parse_start {
+                telemetry_for_closure.parse_ns.fetch_add(start.elapsed().as_nanos() as u64, Relaxed);
+            }
+
+            let resolve_start = trace_enabled.then(Instant::now);
             let resolved_names = NameResolver::new(arena).resolve(program);
+            if let Some(start) = resolve_start {
+                telemetry_for_closure.resolve_ns.fetch_add(start.elapsed().as_nanos() as u64, Relaxed);
+            }
 
             let mut issues = IssueCollection::new();
 
@@ -169,16 +209,38 @@ impl LintService {
             }
 
             let semantics_checker = SemanticsChecker::new(context.php_version);
+            let semantics_start = trace_enabled.then(Instant::now);
             issues.extend(semantics_checker.check(&file, program, &resolved_names));
+            if let Some(start) = semantics_start {
+                telemetry_for_closure.semantics_ns.fetch_add(start.elapsed().as_nanos() as u64, Relaxed);
+            }
 
             if context.mode == LintMode::Full {
+                let lint_start = trace_enabled.then(Instant::now);
                 let linter = Linter::from_registry(arena, context.registry, context.php_version);
+                if let Some(external_linter) = context.external_linter.as_deref() {
+                    issues.extend(linter.lint_with_external(&file, program, &resolved_names, external_linter)?);
+                } else {
+                    issues.extend(linter.lint(&file, program, &resolved_names));
+                }
+                if let Some(start) = lint_start {
+                    telemetry_for_closure.lint_ns.fetch_add(start.elapsed().as_nanos() as u64, Relaxed);
+                }
+            }
 
-                issues.extend(linter.lint(&file, program, &resolved_names));
+            if let Some(start) = per_file_start {
+                telemetry_for_closure.per_file_total_ns.fetch_add(start.elapsed().as_nanos() as u64, Relaxed);
+                telemetry_for_closure.files.fetch_add(1, Relaxed);
             }
 
             Ok(issues)
-        })
+        });
+
+        if trace_enabled {
+            telemetry.dump();
+        }
+
+        result
     }
 }
 
@@ -193,6 +255,8 @@ struct LintContext {
     pub registry: Arc<RuleRegistry>,
     /// The operational mode, determining which checks to run.
     pub mode: LintMode,
+    /// Worker-backed custom rules, when configured by the host.
+    pub external_linter: Option<Arc<ExternalLinter>>,
 }
 
 /// The "reduce" step for the linting pipeline.

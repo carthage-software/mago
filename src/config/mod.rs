@@ -81,6 +81,7 @@
 //! - PHP version compatibility is validated against the supported range.
 //! - Source paths are resolved and validated.
 
+use std::collections::BTreeMap;
 use std::collections::HashSet;
 use std::env::home_dir;
 use std::fmt::Debug;
@@ -98,6 +99,7 @@ use serde::de::IgnoredAny;
 use serde_json::Value;
 
 use crate::config::analyzer::AnalyzerConfiguration;
+use crate::config::extension::ExtensionHostConfiguration;
 use crate::config::formatter::FormatterConfiguration;
 use crate::config::guard::GuardConfiguration;
 use crate::config::linter::LinterConfiguration;
@@ -108,6 +110,7 @@ use crate::error::Error;
 use crate::version_check::VersionDriftFailLevel;
 
 pub mod analyzer;
+pub mod extension;
 pub mod formatter;
 pub mod guard;
 pub mod linter;
@@ -265,6 +268,13 @@ pub struct Configuration {
     /// for analysis, linting, or formatting.
     #[serde(default = "default_source_configuration")]
     pub source: SourceConfiguration,
+
+    /// External extension host pools keyed by a stable local name.
+    ///
+    /// Each entry starts a pool of identical worker processes. Every process
+    /// advertises the same logical extensions to Mago.
+    #[serde(default)]
+    pub extension_hosts: BTreeMap<String, ExtensionHostConfiguration>,
 
     /// Linter service configuration.
     ///
@@ -595,6 +605,7 @@ impl Configuration {
             no_version_check: false,
             version_drift_fail_level: VersionDriftFailLevel::Major,
             source: SourceConfiguration::from_workspace(workspace),
+            extension_hosts: BTreeMap::new(),
             linter: LinterConfiguration::default(),
             parser: ParserConfiguration::default(),
             formatter: FormatterConfiguration::default(),
@@ -623,6 +634,7 @@ impl Configuration {
             "no-version-check": self.no_version_check,
             "version-drift-fail-level": self.version_drift_fail_level,
             "source": self.source,
+            "extension-hosts": self.extension_hosts,
             "linter": self.linter.to_filtered_value(self.php_version),
             "parser": self.parser,
             "formatter": self.formatter.to_value(),
@@ -709,6 +721,16 @@ impl Configuration {
 
         self.source.normalize()?;
 
+        let extension_host_base = self.config_file.as_deref().and_then(Path::parent).map_or_else(
+            || self.source.workspace.clone(),
+            |directory| {
+                if directory.is_relative() { CURRENT_DIR.join(directory) } else { directory.to_path_buf() }
+            },
+        );
+        for (name, host) in &mut self.extension_hosts {
+            host.normalize(name, &extension_host_base).map_err(Error::InvalidExtensionHostConfiguration)?;
+        }
+
         if let Some(b) = self.analyzer.baseline.take() {
             let resolved = if b.is_relative() { self.source.workspace.join(&b) } else { b };
             tracing::debug!("Analyzer baseline configuration from {}.", resolved.display());
@@ -761,6 +783,97 @@ mod tests {
         let config = load_config(Some(workspace_path));
 
         assert_eq!(config.threads, *LOGICAL_CPUS)
+    }
+
+    #[test]
+    fn extension_hosts_resolve_from_the_configuration_directory() {
+        let directory = temp_dir().join("extension-configuration");
+        let _ = fs::remove_dir_all(&directory);
+        fs::create_dir_all(&directory).unwrap();
+        let configuration_file = directory.join("mago.toml");
+        write_file(
+            &configuration_file,
+            r#"
+[extension-hosts.php]
+command = ["./vendor/bin/mago-extension", "--verbose"]
+workers = 2
+working-directory = "project"
+request-timeout-ms = 1234
+environment = { APP_ENV = "test" }
+"#,
+        );
+
+        let configuration = load_isolated(&configuration_file);
+        let host = &configuration.extension_hosts["php"];
+        let command = host.worker_command().unwrap();
+
+        assert_eq!(command.program(), directory.join("./vendor/bin/mago-extension"));
+        assert_eq!(command.arguments(), ["--verbose"]);
+        assert_eq!(command.current_directory(), Some(directory.join("project").as_path()));
+        assert_eq!(host.worker_count(configuration.threads).get(), 2);
+        assert_eq!(host.worker_pool_options().request_timeout, std::time::Duration::from_millis(1234));
+    }
+
+    #[test]
+    fn extension_hosts_are_adaptive_when_worker_count_is_omitted() {
+        let directory = temp_dir().join("adaptive-extension-configuration");
+        let _ = fs::remove_dir_all(&directory);
+        fs::create_dir_all(&directory).unwrap();
+        let configuration_file = directory.join("mago.toml");
+        write_file(&configuration_file, "[extension-hosts.php]\ncommand = [\"php\", \"worker.php\"]\n");
+
+        let configuration = load_isolated(&configuration_file);
+        let host = &configuration.extension_hosts["php"];
+
+        assert_eq!(host.workers, 0);
+        assert_eq!(host.worker_count(configuration.threads).get(), configuration.threads);
+    }
+
+    #[test]
+    fn enabled_extension_host_requires_a_command() {
+        let directory = temp_dir().join("extension-missing-command");
+        let _ = fs::remove_dir_all(&directory);
+        fs::create_dir_all(&directory).unwrap();
+        let configuration_file = directory.join("mago.toml");
+        write_file(&configuration_file, "[extension-hosts.php]\n");
+
+        let error = Configuration::load(None, Some(&configuration_file), None, None, false, false)
+            .expect_err("enabled extension without a command should fail");
+
+        assert!(matches!(error, Error::InvalidExtensionHostConfiguration(_)));
+        assert!(error.to_string().contains("extension host `php` must define a non-empty command"));
+    }
+
+    #[test]
+    fn disabled_extension_host_may_omit_its_command() {
+        let directory = temp_dir().join("disabled-extension");
+        let _ = fs::remove_dir_all(&directory);
+        fs::create_dir_all(&directory).unwrap();
+        let configuration_file = directory.join("mago.toml");
+        write_file(&configuration_file, "[extension-hosts.php]\nenabled = false\n");
+
+        let configuration = load_isolated(&configuration_file);
+
+        assert!(!configuration.extension_hosts["php"].enabled);
+    }
+
+    #[test]
+    fn extension_hosts_can_be_overridden_by_name_through_extends() {
+        let directory = temp_dir().join("extended-extension-configuration");
+        let _ = fs::remove_dir_all(&directory);
+        fs::create_dir_all(&directory).unwrap();
+        write_file(
+            &directory.join("base.toml"),
+            "[extension-hosts.php]\ncommand = [\"php\", \"worker.php\"]\nworkers = 2\n",
+        );
+        write_file(&directory.join("mago.toml"), "extends = \"base.toml\"\n[extension-hosts.php]\nenabled = false\n");
+
+        let configuration = load_isolated(&directory.join("mago.toml"));
+        let host = &configuration.extension_hosts["php"];
+
+        assert!(!host.enabled);
+        assert_eq!(host.command, ["php", "worker.php"]);
+        assert_eq!(host.workers, 2);
     }
 
     #[test]

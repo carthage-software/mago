@@ -4,6 +4,7 @@ use mago_php_version::PHPVersionRange;
 use mago_span::Span;
 use mago_word::WordMap;
 
+use crate::metadata::attribute::AttributeMetadata;
 use crate::metadata::flags::MetadataFlags;
 use crate::metadata::property_hook::PropertyHookMetadata;
 use crate::metadata::ttype::TypeMetadata;
@@ -74,6 +75,9 @@ pub struct PropertyMetadata {
     /// Flags indicating various properties of the property.
     pub flags: MetadataFlags,
 
+    /// Attributes attached to the property declaration.
+    pub attributes: Vec<AttributeMetadata>,
+
     /// Metadata for property hooks (get/set).
     ///
     /// Key is the hook name atom ("get" or "set").
@@ -103,6 +107,7 @@ impl PropertyMetadata {
             write_type_metadata: None,
             default_type_metadata: None,
             flags,
+            attributes: Vec::new(),
             hooks: WordMap::default(),
             version_constraint: VersionConstraint::unconstrained(),
         }

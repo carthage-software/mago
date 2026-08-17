@@ -26,6 +26,7 @@ mago-casing = { workspace = true }
 mago-names = { workspace = true }
 mago-php-version = { workspace = true }
 mago-collector = { workspace = true }
+mago-extension = { workspace = true }
 foldhash = { workspace = true }
 memchr = { workspace = true }
 ordered-float = { workspace = true }
@@ -36,6 +37,7 @@ indoc = { workspace = true }
 mago-allocator = { workspace = true }
 tracing = { workspace = true }
 schemars = { workspace = true }
+strum = { workspace = true }
 
 [features]
 default = []

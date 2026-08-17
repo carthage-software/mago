@@ -249,6 +249,16 @@ impl CodebaseMetadata {
             .is_some_and(|meta| meta.appearing_property_ids.contains_key(&property_name))
     }
 
+    /// Checks if a magic `@property*` exists on a class-like, including inherited tags.
+    /// Class name is case-insensitive, property name is case-sensitive.
+    #[inline]
+    #[must_use]
+    pub fn magic_property_exists(&self, class: &[u8], property: &[u8]) -> bool {
+        let lowercase_class = ascii_lowercase_word(class);
+        let property_name = word(property);
+        self.class_likes.get(&lowercase_class).is_some_and(|meta| meta.magic_property_ids.contains_key(&property_name))
+    }
+
     /// Checks if a class constant or enum case exists on a class-like.
     /// Class name is case-insensitive, constant/case name is case-sensitive.
     #[inline]
@@ -459,6 +469,16 @@ impl CodebaseMetadata {
         self.class_likes.get(&lowercase_class)?.properties.get(&property_name)
     }
 
+    /// Retrieves magic `@property*` metadata declared directly on a class-like.
+    /// Class name is case-insensitive, property name is case-sensitive.
+    #[inline]
+    #[must_use]
+    pub fn get_magic_property(&self, class: &[u8], property: &[u8]) -> Option<&PropertyMetadata> {
+        let lowercase_class = ascii_lowercase_word(class);
+        let property_name = word(property);
+        self.class_likes.get(&lowercase_class)?.magic_properties.get(&property_name)
+    }
+
     /// Retrieves the property metadata, potentially from a parent class if inherited.
     #[inline]
     #[must_use]
@@ -467,6 +487,17 @@ impl CodebaseMetadata {
         let property_name = word(property);
         let declaring_class = self.class_likes.get(&lowercase_class)?.declaring_property_ids.get(&property_name)?;
         self.class_likes.get(declaring_class)?.properties.get(&property_name)
+    }
+
+    /// Retrieves magic `@property*` metadata, potentially from an inherited tag.
+    /// Class name is case-insensitive, property name is case-sensitive.
+    #[inline]
+    #[must_use]
+    pub fn get_declaring_magic_property(&self, class: &[u8], property: &[u8]) -> Option<&PropertyMetadata> {
+        let lowercase_class = ascii_lowercase_word(class);
+        let property_name = word(property);
+        let declaring_class = self.class_likes.get(&lowercase_class)?.magic_property_ids.get(&property_name)?;
+        self.class_likes.get(declaring_class)?.magic_properties.get(&property_name)
     }
     // Type Resolution
 
@@ -1591,7 +1622,7 @@ fn orphan_patch_constant_diagnostic(meta: &ConstantMetadata) -> Issue {
 /// Determines which metadata value to keep when merging duplicates.
 ///
 /// Priority:
-///   1. user-defined > patch > built-in > other.
+///   1. user-defined > patch > external > built-in > other.
 ///   2. non-polyfill > polyfill — tools like rector/phpstan/psalm ship
 ///      skeleton stubs gated by `if (!class_exists('X'))` that should never
 ///      shadow a concrete definition.
@@ -1616,6 +1647,13 @@ fn should_replace_metadata(
 
     if new_is_patch != existing_is_patch {
         return new_is_patch;
+    }
+
+    let new_is_external = new_flags.is_external();
+    let existing_is_external = existing_flags.is_external();
+
+    if new_is_external != existing_is_external {
+        return new_is_external;
     }
 
     let new_is_built_in = new_flags.is_built_in();
@@ -1692,6 +1730,30 @@ mod should_replace_metadata_tests {
         let patch = MetadataFlags::PATCH;
         assert!(should_replace_metadata(builtin, Span::dummy(0, 100), patch, Span::dummy(0, 100)));
         assert!(!should_replace_metadata(patch, Span::dummy(0, 100), builtin, Span::dummy(0, 100)));
+    }
+
+    #[test]
+    fn external_beats_builtin_and_vendored() {
+        let external = MetadataFlags::EXTERNAL;
+        let builtin = MetadataFlags::BUILTIN;
+        let vendored = MetadataFlags::empty();
+
+        assert!(should_replace_metadata(builtin, Span::dummy(0, 100), external, Span::dummy(500, 600)));
+        assert!(!should_replace_metadata(external, Span::dummy(500, 600), builtin, Span::dummy(0, 100)));
+        assert!(should_replace_metadata(vendored, Span::dummy(0, 100), external, Span::dummy(500, 600)));
+        assert!(!should_replace_metadata(external, Span::dummy(500, 600), vendored, Span::dummy(0, 100)));
+    }
+
+    #[test]
+    fn patch_and_user_defined_beat_external() {
+        let external = MetadataFlags::EXTERNAL;
+        let patch = MetadataFlags::PATCH;
+        let user = MetadataFlags::USER_DEFINED;
+
+        assert!(should_replace_metadata(external, Span::dummy(0, 100), patch, Span::dummy(500, 600)));
+        assert!(!should_replace_metadata(patch, Span::dummy(500, 600), external, Span::dummy(0, 100)));
+        assert!(should_replace_metadata(external, Span::dummy(0, 100), user, Span::dummy(500, 600)));
+        assert!(!should_replace_metadata(user, Span::dummy(500, 600), external, Span::dummy(0, 100)));
     }
 
     #[test]

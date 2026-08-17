@@ -1,7 +1,7 @@
 use foldhash::HashMap;
 use indexmap::IndexMap;
 use mago_allocator::Arena;
-
+use mago_bytes::trim_start_byte;
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
@@ -44,6 +44,7 @@ use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
+use crate::external::PropertyAccessKind;
 use crate::resolver::class_name::report_non_existent_class_like;
 use crate::resolver::selector::resolve_member_selector;
 use crate::utils::names::display_class_like_name;
@@ -51,7 +52,6 @@ use crate::utils::template::get_template_types_for_class_member;
 use crate::visibility::check_resolved_property_read_visibility;
 use crate::visibility::check_resolved_property_write_visibility;
 use crate::visibility::is_visible_from_scope;
-use mago_bytes::trim_start_byte;
 
 /// Represents a successfully resolved instance property.
 #[derive(Debug)]
@@ -81,6 +81,8 @@ pub struct PropertyResolutionResult {
     pub encountered_null: bool,
     pub encountered_mixed: bool,
     pub has_possibly_defined_property: bool,
+    /// True when a successfully written extension property cannot subsequently be read.
+    pub has_unreadable_property: bool,
     /// True if all resolved properties are non-nullable.
     /// When combined with `encountered_null` and nullsafe access, indicates
     /// the null in the result type came ONLY from nullsafe short-circuit.
@@ -329,20 +331,32 @@ where
                 continue;
             }
 
-            let resolved_property = find_property_in_class(
+            let resolved_property = match resolve_external_property(
                 context,
-                block_context,
-                artifacts,
                 classname,
                 *prop_name,
-                property_selector,
-                object_expression,
+                property_selector.span(),
                 object,
-                operator_span,
                 for_assignment,
                 &mut result,
-                magic_method.is_some(),
-            );
+            )? {
+                Some(ExternalPropertyResolution::Resolved(property)) => Some(property),
+                Some(ExternalPropertyResolution::Invalid) => None,
+                None => find_property_in_class(
+                    context,
+                    block_context,
+                    artifacts,
+                    classname,
+                    *prop_name,
+                    property_selector,
+                    object_expression,
+                    object,
+                    operator_span,
+                    for_assignment,
+                    &mut result,
+                    magic_method.is_some(),
+                ),
+            };
 
             let Some(resolved_property) = resolved_property else {
                 result.has_invalid_path = true;
@@ -391,6 +405,97 @@ where
         !result.properties.is_empty() && result.properties.iter().all(|p| !p.property_type.is_nullable());
 
     Ok(result)
+}
+
+enum ExternalPropertyResolution {
+    Resolved(ResolvedProperty),
+    Invalid,
+}
+
+fn resolve_external_property<A>(
+    context: &mut Context<'_, '_, A>,
+    class: Word,
+    property: Word,
+    span: Span,
+    object: &TObject,
+    for_assignment: bool,
+    result: &mut PropertyResolutionResult,
+) -> Result<Option<ExternalPropertyResolution>, AnalysisError>
+where
+    A: Arena,
+{
+    if context.external_analysis_session.is_none() || !context.plugin_registry.may_have_property_type_provider() {
+        return Ok(None);
+    }
+
+    let property_without_dollar = trim_start_byte(property.as_bytes(), b'$');
+    let receiver_type = TUnion::from_atomic(TAtomic::Object(object.clone()));
+    let Some(effective) = context.plugin_registry.get_property_type(
+        context.codebase,
+        class.as_bytes(),
+        property_without_dollar,
+        if for_assignment { PropertyAccessKind::Write } else { PropertyAccessKind::Read },
+        &receiver_type,
+        span,
+        context.external_analysis_session,
+    ) else {
+        return Ok(None);
+    };
+
+    if for_assignment {
+        let Some(write_type) = effective.write_type else {
+            report_external_invalid_property_access(context, class, property, span, true);
+            result.has_error_path = true;
+            return Ok(Some(ExternalPropertyResolution::Invalid));
+        };
+
+        result.has_unreadable_property |= effective.read_type.is_none();
+        return Ok(Some(ExternalPropertyResolution::Resolved(ResolvedProperty {
+            property_name: property,
+            declaring_class_id: None,
+            property_span: None,
+            property_type: write_type,
+            is_magic: true,
+            read_type: effective.read_type,
+        })));
+    }
+
+    let Some(read_type) = effective.read_type else {
+        report_external_invalid_property_access(context, class, property, span, false);
+        result.has_error_path = true;
+        return Ok(Some(ExternalPropertyResolution::Invalid));
+    };
+
+    Ok(Some(ExternalPropertyResolution::Resolved(ResolvedProperty {
+        property_name: property,
+        declaring_class_id: None,
+        property_span: None,
+        property_type: read_type,
+        is_magic: true,
+        read_type: None,
+    })))
+}
+
+fn report_external_invalid_property_access<A>(
+    context: &mut Context<'_, '_, A>,
+    class: Word,
+    property: Word,
+    span: Span,
+    for_assignment: bool,
+) where
+    A: Arena,
+{
+    let class = context.codebase.get_class_like(class.as_bytes()).map_or(class, |metadata| metadata.original_name);
+    let (code, action, direction) = if for_assignment {
+        (IssueCode::InvalidPropertyWrite, "write to", "read-only")
+    } else {
+        (IssueCode::InvalidPropertyRead, "read from", "write-only")
+    };
+    context.collector.report_with_code(
+        code,
+        Issue::error(format!("Cannot {action} extension-provided {direction} property `{class}::{property}`."))
+            .with_annotation(Annotation::primary(span).with_message(format!("This property is {direction}"))),
+    );
 }
 
 /// Resolves built-in enum properties (`name` and `value`) with literal types.

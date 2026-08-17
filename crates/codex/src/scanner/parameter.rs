@@ -67,7 +67,7 @@ where
         parameter.variable.span,
         flags,
     )
-    .with_attributes(scan_attribute_lists(&parameter.attribute_lists, context));
+    .with_attributes(scan_attribute_lists(&parameter.attribute_lists, context, scope, classname));
 
     metadata.set_type_declaration_metadata(
         parameter.hint.as_ref().map(|hint| get_type_metadata_from_hint(hint, classname, context)),

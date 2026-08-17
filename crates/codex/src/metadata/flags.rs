@@ -5,6 +5,12 @@ use mago_database::file::FileType;
 pub struct MetadataFlags(u64);
 
 impl MetadataFlags {
+    #[inline]
+    #[must_use]
+    pub const fn bits(self) -> u64 {
+        self.0
+    }
+
     pub const ABSTRACT: MetadataFlags = MetadataFlags(1 << 0);
     pub const FINAL: MetadataFlags = MetadataFlags(1 << 1);
     pub const READONLY: MetadataFlags = MetadataFlags(1 << 3);
@@ -45,9 +51,16 @@ impl MetadataFlags {
     pub const EXPERIMENTAL: MetadataFlags = MetadataFlags(1 << 40);
     pub const POLYFILL: MetadataFlags = MetadataFlags(1 << 41);
     pub const PATCH: MetadataFlags = MetadataFlags(1 << 42);
+    pub const EXTERNAL: MetadataFlags = MetadataFlags(1 << 43);
 }
 
 impl MetadataFlags {
+    #[inline]
+    #[must_use]
+    pub const fn from_bits(bits: u64) -> Self {
+        Self(bits)
+    }
+
     #[inline]
     #[must_use]
     pub const fn empty() -> Self {
@@ -329,11 +342,18 @@ impl MetadataFlags {
 
     #[inline]
     #[must_use]
+    pub const fn is_external(self) -> bool {
+        self.contains(Self::EXTERNAL)
+    }
+
+    #[inline]
+    #[must_use]
     pub const fn origin_flags(file_type: FileType) -> Self {
         match file_type {
             FileType::Host => Self::USER_DEFINED,
             FileType::Builtin => Self::BUILTIN,
             FileType::Patch => Self::PATCH,
+            FileType::External => Self::EXTERNAL,
             FileType::Vendored => Self::empty(),
         }
     }

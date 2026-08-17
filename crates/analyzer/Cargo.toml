@@ -26,6 +26,7 @@ mago-algebra = { workspace = true }
 mago-php-version = { workspace = true }
 mago-phpdoc-syntax = { workspace = true }
 mago-collector = { workspace = true }
+mago-extension = { workspace = true }
 foldhash = { workspace = true }
 tracing = { workspace = true }
 regex = { workspace = true }

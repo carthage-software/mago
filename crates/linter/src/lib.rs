@@ -20,6 +20,9 @@ use mago_syntax::cst::NodeKind;
 use mago_syntax::cst::Program;
 
 use crate::context::LintContext;
+use crate::external::ExternalLintError;
+use crate::external::ExternalLinter;
+use crate::external::LinterTransport;
 use crate::registry::RuleRegistry;
 use crate::rule::AnyRule;
 use crate::scope::Scope;
@@ -27,6 +30,7 @@ use crate::settings::Settings;
 
 pub mod category;
 pub mod context;
+pub mod external;
 pub mod import_tracker;
 pub mod integration;
 pub mod registry;
@@ -92,6 +96,40 @@ where
         program: &'ast Program<'arena>,
         resolved_names: &'ast ResolvedNames<'arena>,
     ) -> IssueCollection {
+        match self.lint_internal::<mago_extension::WorkerPool>(source_file, program, resolved_names, None) {
+            Ok(issues) => issues,
+            Err(_) => unreachable!("linting without external rules cannot fail"),
+        }
+    }
+
+    /// Lints a file with both built-in rules and registered external rules.
+    ///
+    /// External issues pass through the same collector as built-in issues, so
+    /// `@mago-ignore` and `@mago-expect` pragmas behave identically for both.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a worker fails or sends an invalid linter response.
+    pub fn lint_with_external<'ctx, 'ast>(
+        &self,
+        source_file: &'ctx File,
+        program: &'ast Program<'arena>,
+        resolved_names: &'ast ResolvedNames<'arena>,
+        external: &ExternalLinter,
+    ) -> Result<IssueCollection, ExternalLintError> {
+        self.lint_internal(source_file, program, resolved_names, Some(external))
+    }
+
+    fn lint_internal<'ctx, 'ast, T>(
+        &self,
+        source_file: &'ctx File,
+        program: &'ast Program<'arena>,
+        resolved_names: &'ast ResolvedNames<'arena>,
+        external: Option<&ExternalLinter<T>>,
+    ) -> Result<IssueCollection, ExternalLintError>
+    where
+        T: LinterTransport,
+    {
         let mut collector = Collector::new(self.arena, source_file, program, COLLECTOR_CATEGORIES);
 
         // Set active codes if --only filter was used
@@ -114,7 +152,12 @@ where
 
         walk(Node::Program(program), &mut context, excluded_rules.as_slice());
 
-        context.collector.finish()
+        if let Some(external) = external {
+            let external_issues = external.lint(source_file, program, resolved_names, self.registry.only.as_deref())?;
+            context.collector.extend(external_issues);
+        }
+
+        Ok(context.collector.finish())
     }
 }
 

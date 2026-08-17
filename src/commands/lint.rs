@@ -29,6 +29,7 @@
 
 use std::path::PathBuf;
 use std::process::ExitCode;
+use std::sync::Arc;
 use std::time::Instant;
 
 use clap::ColorChoice;
@@ -47,6 +48,7 @@ use crate::commands::args::substitution::SubstitutionArgs;
 use crate::commands::stdin_input;
 use crate::config::Configuration;
 use crate::error::Error;
+use crate::extensions::initialize_external_linter;
 use crate::utils::create_orchestrator;
 use crate::utils::git;
 
@@ -263,10 +265,38 @@ impl LintCommand {
         let orchestrator_init_duration = orchestrator_init_start.map(|s| s.elapsed());
 
         let load_database_start = trace_enabled.then(Instant::now);
-        let mut database = orchestrator.load_database(&configuration.source.workspace, false, None, stdin_override)?;
+        let extension_hosts = &configuration.extension_hosts;
+        let extension_host_enabled = extension_hosts.values().any(|host| host.enabled);
+        let worker_count = configuration.threads;
+        let php_version = configuration.php_version;
+        let (mut database, external_linter) = std::thread::scope(|scope| -> Result<_, Error> {
+            let external_linter = extension_host_enabled.then(|| {
+                scope.spawn(move || {
+                    initialize_external_linter(extension_hosts, php_version, worker_count)
+                        .map_err(mago_orchestrator::OrchestratorError::from)
+                })
+            });
+
+            let database = orchestrator.load_database(&configuration.source.workspace, false, None, stdin_override);
+            let external_linter = external_linter
+                .map(|handle| {
+                    handle.join().map_err(|_| {
+                        mago_orchestrator::OrchestratorError::General(
+                            "External linter initialization thread panicked".to_string(),
+                        )
+                    })?
+                })
+                .transpose()?
+                .flatten();
+
+            Ok((database?, external_linter))
+        })?;
         let load_database_duration = load_database_start.map(|s| s.elapsed());
 
-        let service = orchestrator.get_lint_service(database.read_only());
+        let mut service = orchestrator.get_lint_service(database.read_only());
+        if let Some(external_linter) = external_linter {
+            service = service.with_external_linter(Arc::new(external_linter));
+        }
 
         if let Some(explain_code) = self.explain {
             let registry = service.create_registry(

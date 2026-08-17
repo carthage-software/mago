@@ -89,7 +89,8 @@ where
 
     let mut metadata = FunctionLikeMetadata::new(FunctionLikeKind::Method, lookup_name, display_name, span, flags);
     metadata.version_constraint = verdict.constraint;
-    metadata.attributes = scan_attribute_lists(&method.attribute_lists, context);
+    metadata.attributes =
+        scan_attribute_lists(&method.attribute_lists, context, scope, Some(class_like_metadata.original_name));
     metadata.type_resolution_context = type_resolution_context.filter(|c| !c.is_empty());
 
     metadata.name_span = Some(method.name.span);
@@ -212,7 +213,7 @@ where
         .filter_map(|p| scan_function_like_parameter_with_constants(p, classname, context, scope, constants))
         .collect();
 
-    metadata.attributes = scan_attribute_lists(&function.attribute_lists, context);
+    metadata.attributes = scan_attribute_lists(&function.attribute_lists, context, scope, classname);
     metadata.type_resolution_context =
         if type_resolution_context.is_empty() { None } else { Some(type_resolution_context) };
 
@@ -276,7 +277,7 @@ where
             );
     collect_globals_into(&closure.body, &mut metadata.globals_accessed);
 
-    metadata.attributes = scan_attribute_lists(&closure.attribute_lists, context);
+    metadata.attributes = scan_attribute_lists(&closure.attribute_lists, context, scope, classname);
     metadata.type_resolution_context =
         if type_resolution_context.is_empty() { None } else { Some(type_resolution_context) };
 
@@ -335,7 +336,7 @@ where
                     .filter_map(|p| scan_function_like_parameter(p, classname, context, scope)),
             );
 
-    metadata.attributes = scan_attribute_lists(&arrow_function.attribute_lists, context);
+    metadata.attributes = scan_attribute_lists(&arrow_function.attribute_lists, context, scope, classname);
     metadata.type_resolution_context =
         if type_resolution_context.is_empty() { None } else { Some(type_resolution_context) };
 

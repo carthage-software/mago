@@ -1,6 +1,7 @@
 use mago_allocator::Arena;
 use std::sync::Arc;
 
+use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_word::Word;
 use mago_word::ascii_lowercase_word;
 use mago_word::word;
@@ -34,8 +35,9 @@ use crate::resolver::class_name::ResolvedClassname;
 use crate::resolver::class_name::resolve_classnames_from_expression;
 use crate::resolver::method::MethodResolutionResult;
 use crate::resolver::method::ResolvedMethod;
+use crate::resolver::method::UndocumentedMethod;
+use crate::resolver::method::UnresolvedMethod;
 use crate::resolver::method::report_magic_call_without_call_method;
-use crate::resolver::method::report_non_documented_method;
 use crate::resolver::method::report_non_existent_method;
 use crate::resolver::method::report_possibly_missing_magic_call;
 use crate::resolver::selector::resolve_member_selector;
@@ -111,15 +113,6 @@ where
             result.resolved_methods.extend(resolved_methods);
         }
     }
-
-    result.all_methods_non_nullable_return = !result.resolved_methods.is_empty()
-        && result.resolved_methods.iter().all(|resolved_method| {
-            context
-                .codebase
-                .get_method_by_id(&resolved_method.method_identifier)
-                .and_then(|method| method.return_type_metadata.as_ref())
-                .is_some_and(|return_type| !return_type.type_union.is_nullable())
-        });
 
     Ok(result)
 }
@@ -210,7 +203,7 @@ where
     let mut resolved_methods = vec![];
     let mut could_method_ever_exist = false;
     let mut first_class_id = None;
-    let mut magic_call_could_exist = false;
+    let mut magic_call_methods = Vec::new();
 
     let magic_method_to_check = if classname.is_parent() { word("__call") } else { word("__callStatic") };
     if let Some(fq_class_id) = classname.fqcn {
@@ -224,7 +217,8 @@ where
             None,
         );
 
-        magic_call_could_exist |= resolved_magic_call_method.is_some();
+        let has_magic_static_call = resolved_magic_call_method.is_some();
+        magic_call_methods.extend(resolved_magic_call_method);
 
         let (could_method_exist, resolved_method) = resolve_method_from_class_id(
             fq_class_id,
@@ -232,7 +226,7 @@ where
             classname.is_object_instance(),
             classname.is_from_class_string(),
             method_name,
-            resolved_magic_call_method.is_some(),
+            has_magic_static_call,
             Some(result),
         );
 
@@ -259,7 +253,8 @@ where
             None,
         );
 
-        magic_call_could_exist |= resolved_magic_call_method.is_some();
+        let has_magic_static_call = resolved_magic_call_method.is_some();
+        magic_call_methods.extend(resolved_magic_call_method);
 
         let (could_method_exist, resolved_method) = resolve_method_from_class_id(
             fq_class_id,
@@ -267,7 +262,7 @@ where
             intersection.is_object_instance() || classname.is_object_instance(),
             intersection.is_from_class_string(),
             method_name,
-            resolved_magic_call_method.is_some(),
+            has_magic_static_call,
             Some(result),
         );
 
@@ -296,7 +291,7 @@ where
             access_span,
         )
     {
-        if magic_call_could_exist {
+        if !magic_call_methods.is_empty() {
             resolved_methods.push(resolved_method);
         } else {
             if class_metadata.flags.is_final() {
@@ -327,14 +322,43 @@ where
 
     if resolved_methods.is_empty() {
         if let Some(fq_class_id) = first_class_id {
-            result.has_invalid_target = true;
-
             if !could_method_ever_exist {
-                if magic_call_could_exist {
-                    report_non_documented_method(context, class_span, method_span, fq_class_id, method_name);
+                if magic_call_methods.is_empty() {
+                    let identifier = FunctionLikeIdentifier::Method(fq_class_id, method_name);
+                    if context.external_analysis_session.is_some()
+                        && context.plugin_registry.may_have_callable_signature_provider(&identifier)
+                        && let Some(class_metadata) = context.codebase.get_class_like(fq_class_id.as_bytes())
+                    {
+                        result.unresolved_methods.push(UnresolvedMethod {
+                            classname: class_metadata.original_name,
+                            method_name,
+                            target_span: class_span,
+                            selector_span: method_span,
+                            class_type: get_static_class_type(
+                                context,
+                                current_class_metadata,
+                                classname,
+                                fq_class_id,
+                                class_metadata,
+                            ),
+                        });
+                    } else {
+                        result.has_invalid_target = true;
+                        report_non_existent_method(context, class_span, method_span, fq_class_id, method_name);
+                    }
                 } else {
-                    report_non_existent_method(context, class_span, method_span, fq_class_id, method_name);
+                    result.undocumented_methods.extend(magic_call_methods.into_iter().map(|magic_method| {
+                        UndocumentedMethod {
+                            classname: magic_method.classname,
+                            method_name,
+                            target_span: class_span,
+                            selector_span: method_span,
+                            magic_method,
+                        }
+                    }));
                 }
+            } else {
+                result.has_invalid_target = true;
             }
         } else {
             result.has_ambiguous_target = true;
@@ -426,7 +450,35 @@ where
         }
     }
 
-    let static_class_type = if let Some(current_class_metadata) = current_class_metadata
+    let static_class_type =
+        get_static_class_type(context, current_class_metadata, classname, fq_class_id, defining_class_metadata);
+
+    // Get the class it was called on - need original name for callable creation
+    let called_on_class_metadata = context.codebase.get_class_like(fq_class_id.as_bytes())?;
+
+    Some(ResolvedMethod {
+        // Use the original name of the class it was called on
+        // This is important for first-class callables with static return types
+        classname: called_on_class_metadata.original_name,
+        method_identifier: declaring_method_id,
+        static_class_type,
+        declaring_object: None,
+        is_static: function_like.method_metadata.as_ref().is_some_and(|m| m.is_static),
+        mixin_without_magic_method: None,
+    })
+}
+
+fn get_static_class_type<A>(
+    context: &Context<'_, '_, A>,
+    current_class_metadata: Option<&ClassLikeMetadata>,
+    classname: &ResolvedClassname,
+    fq_class_id: Word,
+    defining_class_metadata: &ClassLikeMetadata,
+) -> StaticClassType
+where
+    A: Arena,
+{
+    if let Some(current_class_metadata) = current_class_metadata
         && classname.is_relative()
     {
         let object = get_metadata_object(context, current_class_metadata, current_class_metadata);
@@ -444,21 +496,7 @@ where
         StaticClassType::Exact(fq_class_id)
     } else {
         StaticClassType::Name(fq_class_id)
-    };
-
-    // Get the class it was called on - need original name for callable creation
-    let called_on_class_metadata = context.codebase.get_class_like(fq_class_id.as_bytes())?;
-
-    Some(ResolvedMethod {
-        // Use the original name of the class it was called on
-        // This is important for first-class callables with static return types
-        classname: called_on_class_metadata.original_name,
-        method_identifier: declaring_method_id,
-        static_class_type,
-        declaring_object: None,
-        is_static: function_like.method_metadata.as_ref().is_some_and(|m| m.is_static),
-        mixin_without_magic_method: None,
-    })
+    }
 }
 
 fn get_metadata_object<'ctx, A>(

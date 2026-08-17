@@ -28,6 +28,32 @@ pub enum ReferenceSource {
     ClassLikeMember(bool, Word, Word),
 }
 
+/// Identifies where a recorded symbol reference originates.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum ReferenceOrigin {
+    /// A top-level symbol or class-like member.
+    Symbol(SymbolIdentifier),
+    /// Top-level code in a source file.
+    File(Word),
+}
+
+/// Describes the semantic role of a recorded symbol reference.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum SymbolReferenceKind {
+    /// A reference from executable code.
+    Body,
+    /// A reference from a declaration signature.
+    Signature,
+    /// A reference to an overridden member.
+    OverriddenMember,
+    /// A use of another function-like's return value.
+    FunctionLikeReturn,
+    /// A property value read.
+    PropertyRead,
+    /// A property write.
+    PropertyWrite,
+}
+
 /// Holds sets of symbols and members identified as invalid during analysis,
 /// often due to changes detected in `CodebaseDiff`.
 #[derive(Debug, Clone, PartialEq, Eq, Default)]
@@ -106,6 +132,20 @@ impl SymbolReferences {
             property_write_references: HashMap::default(),
             property_read_references: HashMap::default(),
         }
+    }
+
+    /// Returns whether no references of any kind are recorded.
+    #[inline]
+    #[must_use]
+    pub fn is_empty(&self) -> bool {
+        self.symbol_references_to_symbols.is_empty()
+            && self.symbol_references_to_symbols_in_signature.is_empty()
+            && self.symbol_references_to_overridden_members.is_empty()
+            && self.functionlike_references_to_functionlike_returns.is_empty()
+            && self.file_references_to_symbols.is_empty()
+            && self.file_references_to_symbols_in_signature.is_empty()
+            && self.property_write_references.is_empty()
+            && self.property_read_references.is_empty()
     }
 
     /// Counts the total number of symbol-to-symbol body references.
@@ -243,6 +283,72 @@ impl SymbolReferences {
             }
             self.symbol_references_to_symbols.entry(referencing_key).or_default().insert(referenced_key);
         }
+    }
+
+    /// Records a reference between arbitrary top-level symbols or class-like members.
+    #[inline]
+    pub fn add_symbol_reference(
+        &mut self,
+        referencing: SymbolIdentifier,
+        referenced: SymbolIdentifier,
+        in_signature: bool,
+    ) {
+        match (referencing.1.is_empty(), referenced.1.is_empty()) {
+            (true, true) => self.add_symbol_reference_to_symbol(referencing.0, referenced.0, in_signature),
+            (true, false) => self.add_symbol_reference_to_class_member(referencing.0, referenced, in_signature),
+            (false, true) => self.add_class_member_reference_to_symbol(referencing, referenced.0, in_signature),
+            (false, false) => self.add_class_member_reference_to_class_member(referencing, referenced, in_signature),
+        }
+    }
+
+    /// Records a body or signature reference from a symbol/member or file origin.
+    #[inline]
+    pub fn add_reference(&mut self, referencing: ReferenceOrigin, referenced: SymbolIdentifier, in_signature: bool) {
+        match referencing {
+            ReferenceOrigin::Symbol(referencing) => {
+                self.add_symbol_reference(referencing, referenced, in_signature);
+            }
+            ReferenceOrigin::File(file) => {
+                self.add_file_reference_to_class_member(file, referenced, in_signature);
+            }
+        }
+    }
+
+    /// Records a property read from an explicit symbol or member source.
+    #[inline]
+    pub fn add_property_read_reference(&mut self, referencing: SymbolIdentifier, property: SymbolIdentifier) {
+        self.add_symbol_reference(referencing, property, false);
+        self.property_read_references.entry(referencing).or_default().insert(property);
+    }
+
+    /// Records a property write from an explicit symbol or member source.
+    #[inline]
+    pub fn add_property_write_reference(&mut self, referencing: SymbolIdentifier, property: SymbolIdentifier) {
+        self.add_symbol_reference(referencing, property, false);
+        self.property_write_references.entry(referencing).or_default().insert(property);
+    }
+
+    /// Records an explicit reference to an overridden class-like member.
+    #[inline]
+    pub fn add_overridden_member_reference(&mut self, referencing: SymbolIdentifier, overridden: SymbolIdentifier) {
+        self.symbol_references_to_overridden_members.entry(referencing).or_default().insert(overridden);
+    }
+
+    /// Records an explicit use of another function-like's return value.
+    #[inline]
+    pub fn add_functionlike_return_reference(&mut self, referencing: SymbolIdentifier, referenced: SymbolIdentifier) {
+        let referencing = if referencing.1.is_empty() {
+            FunctionLikeIdentifier::Function(referencing.0)
+        } else {
+            FunctionLikeIdentifier::Method(referencing.0, referencing.1)
+        };
+        let referenced = if referenced.1.is_empty() {
+            FunctionLikeIdentifier::Function(referenced.0)
+        } else {
+            FunctionLikeIdentifier::Method(referenced.0, referenced.1)
+        };
+
+        self.add_reference_to_functionlike_return(referencing, referenced);
     }
 
     /// Records that a class member references another class member.
@@ -556,6 +662,56 @@ impl SymbolReferences {
 
         for (k, v) in other.property_read_references {
             self.property_read_references.entry(k).or_default().extend(v);
+        }
+    }
+
+    /// Visits every recorded reference without materializing a copy of the graph.
+    #[inline]
+    pub fn for_each_reference(&self, mut visit: impl FnMut(ReferenceOrigin, SymbolIdentifier, SymbolReferenceKind)) {
+        for (source, targets) in &self.symbol_references_to_symbols {
+            for target in targets {
+                visit(ReferenceOrigin::Symbol(*source), *target, SymbolReferenceKind::Body);
+            }
+        }
+        for (source, targets) in &self.symbol_references_to_symbols_in_signature {
+            for target in targets {
+                visit(ReferenceOrigin::Symbol(*source), *target, SymbolReferenceKind::Signature);
+            }
+        }
+        for (source, targets) in &self.symbol_references_to_overridden_members {
+            for target in targets {
+                visit(ReferenceOrigin::Symbol(*source), *target, SymbolReferenceKind::OverriddenMember);
+            }
+        }
+        for (source, targets) in &self.functionlike_references_to_functionlike_returns {
+            let Some(source) = function_like_symbol_identifier(source) else {
+                continue;
+            };
+            for target in targets {
+                if let Some(target) = function_like_symbol_identifier(target) {
+                    visit(ReferenceOrigin::Symbol(source), target, SymbolReferenceKind::FunctionLikeReturn);
+                }
+            }
+        }
+        for (source, targets) in &self.file_references_to_symbols {
+            for target in targets {
+                visit(ReferenceOrigin::File(*source), *target, SymbolReferenceKind::Body);
+            }
+        }
+        for (source, targets) in &self.file_references_to_symbols_in_signature {
+            for target in targets {
+                visit(ReferenceOrigin::File(*source), *target, SymbolReferenceKind::Signature);
+            }
+        }
+        for (source, targets) in &self.property_read_references {
+            for target in targets {
+                visit(ReferenceOrigin::Symbol(*source), *target, SymbolReferenceKind::PropertyRead);
+            }
+        }
+        for (source, targets) in &self.property_write_references {
+            for target in targets {
+                visit(ReferenceOrigin::Symbol(*source), *target, SymbolReferenceKind::PropertyWrite);
+            }
         }
     }
 
@@ -1008,6 +1164,14 @@ impl SymbolReferences {
     }
 }
 
+fn function_like_symbol_identifier(identifier: &FunctionLikeIdentifier) -> Option<SymbolIdentifier> {
+    match identifier {
+        FunctionLikeIdentifier::Function(name) => Some((*name, empty_word())),
+        FunctionLikeIdentifier::Method(class, method) => Some((*class, *method)),
+        FunctionLikeIdentifier::Closure(_) => None,
+    }
+}
+
 #[cfg(test)]
 #[allow(clippy::unwrap_used, clippy::expect_used)]
 mod tests {
@@ -1022,6 +1186,60 @@ mod tests {
             refs.symbol_references_to_symbols.insert(key, set);
         }
         refs
+    }
+
+    #[test]
+    fn test_for_each_reference_visits_every_reference_kind_and_origin() {
+        let function = (word("consumer"), empty_word());
+        let signature_function = (word("signature_consumer"), empty_word());
+        let class = word("service");
+        let method = (class, word("method"));
+        let property = (class, word("$property"));
+        let override_source = (word("child"), word("method"));
+        let return_source = (word("return_consumer"), empty_word());
+        let file = word("src/file.php");
+
+        let mut references = SymbolReferences::new();
+        assert!(references.is_empty());
+        references.add_symbol_reference(function, (class, empty_word()), false);
+        references.add_symbol_reference(signature_function, (class, empty_word()), true);
+        references.add_property_read_reference(method, property);
+        references.add_property_write_reference(function, property);
+        references.add_overridden_member_reference(override_source, method);
+        references.add_functionlike_return_reference(return_source, method);
+        references.add_reference(ReferenceOrigin::File(file), method, false);
+        references.add_file_reference_to_class_member(file, property, true);
+        assert!(!references.is_empty());
+
+        let mut visited = HashSet::default();
+        references.for_each_reference(|source, target, kind| {
+            visited.insert((source, target, kind));
+        });
+
+        assert!(visited.contains(&(
+            ReferenceOrigin::Symbol(function),
+            (class, empty_word()),
+            SymbolReferenceKind::Body
+        )));
+        assert!(visited.contains(&(
+            ReferenceOrigin::Symbol(signature_function),
+            (class, empty_word()),
+            SymbolReferenceKind::Signature,
+        )));
+        assert!(visited.contains(&(ReferenceOrigin::Symbol(method), property, SymbolReferenceKind::PropertyRead)));
+        assert!(visited.contains(&(ReferenceOrigin::Symbol(function), property, SymbolReferenceKind::PropertyWrite)));
+        assert!(visited.contains(&(
+            ReferenceOrigin::Symbol(override_source),
+            method,
+            SymbolReferenceKind::OverriddenMember,
+        )));
+        assert!(visited.contains(&(
+            ReferenceOrigin::Symbol(return_source),
+            method,
+            SymbolReferenceKind::FunctionLikeReturn,
+        )));
+        assert!(visited.contains(&(ReferenceOrigin::File(file), method, SymbolReferenceKind::Body)));
+        assert!(visited.contains(&(ReferenceOrigin::File(file), property, SymbolReferenceKind::Signature)));
     }
 
     #[test]

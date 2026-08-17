@@ -27,11 +27,6 @@ impl RuleRegistry {
         let only = only.map(<[std::string::String]>::to_vec);
 
         let rules_with_excludes = AnyRule::get_all_for(settings, only.as_deref(), include_disabled || only.is_some());
-        if let Some(only) = &only
-            && rules_with_excludes.is_empty()
-        {
-            tracing::warn!("No rules found for the specified 'only' filter: {:?}", only);
-        }
 
         let (rules, rule_exclude_patterns): (Vec<AnyRule>, Vec<Vec<String>>) = rules_with_excludes.into_iter().unzip();
 

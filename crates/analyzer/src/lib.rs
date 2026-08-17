@@ -9,6 +9,7 @@ use mago_allocator::Arena;
 
 use mago_codex::context::ScopeContext;
 use mago_codex::metadata::CodebaseMetadata;
+use mago_codex::reference::SymbolReferences;
 use mago_collector::Collector;
 use mago_database::file::File;
 use mago_names::ResolvedNames;
@@ -20,6 +21,7 @@ use crate::artifacts::AnalysisArtifacts;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
+use crate::external::ExternalAnalysisSession;
 use crate::plugin::PluginRegistry;
 use crate::plugin::context::HookContext;
 use crate::plugin::hook::HookAction;
@@ -30,6 +32,7 @@ pub mod analysis_result;
 pub mod artifacts;
 pub mod code;
 pub mod error;
+pub mod external;
 pub mod plugin;
 pub mod settings;
 #[cfg(not(target_arch = "wasm32"))]
@@ -62,6 +65,9 @@ where
     pub codebase: &'ctx CodebaseMetadata,
     pub settings: Settings,
     pub plugin_registry: &'ctx PluginRegistry,
+    pub external_analysis_session: Option<&'ctx ExternalAnalysisSession>,
+    pub additional_symbol_references: Option<&'ctx SymbolReferences>,
+    defer_pragmas: bool,
 }
 
 impl<'ctx, 'ast, 'arena, A> Analyzer<'ctx, 'ast, 'arena, A>
@@ -76,7 +82,37 @@ where
         plugin_registry: &'ctx PluginRegistry,
         settings: Settings,
     ) -> Self {
-        Self { arena, source_file, resolved_names, codebase, settings, plugin_registry }
+        Self {
+            arena,
+            source_file,
+            resolved_names,
+            codebase,
+            settings,
+            plugin_registry,
+            external_analysis_session: None,
+            additional_symbol_references: None,
+            defer_pragmas: false,
+        }
+    }
+
+    #[must_use]
+    pub fn with_external_analysis_session(mut self, session: &'ctx ExternalAnalysisSession) -> Self {
+        self.external_analysis_session = Some(session);
+        self
+    }
+
+    #[must_use]
+    pub fn with_additional_symbol_references(mut self, references: &'ctx SymbolReferences) -> Self {
+        self.additional_symbol_references = Some(references);
+        self
+    }
+
+    /// Defers unused and unfulfilled pragma reporting until external lifecycle
+    /// diagnostics have been collected.
+    #[must_use]
+    pub fn with_deferred_pragmas(mut self) -> Self {
+        self.defer_pragmas = true;
+        self
     }
 
     /// Runs the analyzer over `program` and accumulates findings into `analysis_result`.
@@ -139,6 +175,8 @@ where
             program.trivia.as_slice(),
             collector,
             self.plugin_registry,
+            self.external_analysis_session,
+            self.additional_symbol_references,
         );
 
         let mut block_context = BlockContext::new(ScopeContext::new(), context.settings.register_super_globals);
@@ -158,7 +196,7 @@ where
                 }
 
                 analysis_result.symbol_references.extend(std::mem::take(&mut artifacts.symbol_references));
-                context.finish_collector(analysis_result);
+                context.finish_collector(analysis_result, self.defer_pragmas);
 
                 #[cfg(not(target_arch = "wasm32"))]
                 {
@@ -194,7 +232,7 @@ where
         #[cfg(not(target_arch = "wasm32"))]
         let finish_start = trace_enabled.then(std::time::Instant::now);
         analysis_result.symbol_references.extend(std::mem::take(&mut artifacts.symbol_references));
-        context.finish_collector(analysis_result);
+        context.finish_collector(analysis_result, self.defer_pragmas);
         #[cfg(not(target_arch = "wasm32"))]
         if let Some(start) = finish_start {
             telemetry::record_finish(start.elapsed());
@@ -202,8 +240,12 @@ where
 
         // Filter issues through registered issue filter hooks
         if self.plugin_registry.has_issue_filter_hooks() {
-            analysis_result.issues =
-                self.plugin_registry.filter_issues(self.source_file, std::mem::take(&mut analysis_result.issues));
+            analysis_result.issues = self.plugin_registry.filter_issues(
+                self.source_file,
+                std::mem::take(&mut analysis_result.issues),
+                self.codebase,
+                self.external_analysis_session,
+            )?;
         }
 
         #[cfg(not(target_arch = "wasm32"))]

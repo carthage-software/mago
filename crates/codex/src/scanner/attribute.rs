@@ -2,11 +2,13 @@ use mago_allocator::Arena;
 use mago_names::scope::NamespaceScope;
 use mago_span::HasSpan;
 use mago_syntax::cst::AttributeList;
+use mago_syntax::cst::PartialArgument;
 use mago_syntax::cst::Sequence;
 use mago_word::Word;
 use mago_word::word;
 
 use crate::flags::attribute::AttributeFlags;
+use crate::metadata::attribute::AttributeArgumentMetadata;
 use crate::metadata::attribute::AttributeMetadata;
 use crate::scanner::Context;
 use crate::scanner::inference::infer;
@@ -15,6 +17,8 @@ use crate::scanner::inference::infer;
 pub fn scan_attribute_lists<'arena, A>(
     attribute_lists: &'arena Sequence<'arena, AttributeList<'arena>>,
     context: &Context<'_, 'arena, A>,
+    scope: &NamespaceScope,
+    enclosing_class: Option<Word>,
 ) -> Vec<AttributeMetadata>
 where
     A: Arena,
@@ -23,9 +27,35 @@ where
 
     for attribute_list in attribute_lists {
         for attribute in &attribute_list.attributes {
+            let arguments = attribute
+                .argument_list
+                .iter()
+                .flat_map(|arguments| &arguments.arguments)
+                .map(|argument| {
+                    let (name, name_span, value) = match argument {
+                        PartialArgument::Positional(argument) => (None, None, Some(argument.value)),
+                        PartialArgument::Named(argument) => {
+                            (Some(word(argument.name.value)), Some(argument.name.span), Some(argument.value))
+                        }
+                        PartialArgument::NamedPlaceholder(argument) => {
+                            (Some(word(argument.name.value)), Some(argument.name.span), None)
+                        }
+                        PartialArgument::Placeholder(_) | PartialArgument::VariadicPlaceholder(_) => (None, None, None),
+                    };
+
+                    AttributeArgumentMetadata {
+                        name,
+                        span: argument.span(),
+                        name_span,
+                        value_span: value.map(HasSpan::span),
+                        value_type: value.and_then(|value| infer(context, scope, value, enclosing_class)),
+                    }
+                })
+                .collect();
             metadata.push(AttributeMetadata {
                 name: word(context.resolved_names.get(&attribute.name)),
                 span: attribute.span(),
+                arguments,
             });
         }
     }

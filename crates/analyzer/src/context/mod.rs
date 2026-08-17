@@ -1,7 +1,11 @@
 use mago_allocator::Arena;
 use mago_word::Word;
+use mago_word::WordMap;
+use mago_word::WordSet;
 
 use mago_codex::metadata::CodebaseMetadata;
+use mago_codex::metadata::class_like::ClassLikeMetadata;
+use mago_codex::reference::SymbolReferences;
 use mago_codex::ttype::resolution::TypeResolutionContext;
 use mago_collector::Collector;
 use mago_database::file::File;
@@ -23,6 +27,7 @@ use crate::artifacts::AnalysisArtifacts;
 use crate::code::IssueCode;
 use crate::context::assertion::AssertionContext;
 use crate::context::block::BlockContext;
+use crate::external::ExternalAnalysisSession;
 use crate::plugin::PluginRegistry;
 use crate::settings::Settings;
 
@@ -50,6 +55,9 @@ where
     pub(super) collector: Collector<'ctx, 'arena, A>,
     pub(super) statement_span: Span,
     pub(super) plugin_registry: &'ctx PluginRegistry,
+    pub(super) external_analysis_session: Option<&'ctx ExternalAnalysisSession>,
+    pub(super) additional_symbol_references: Option<&'ctx SymbolReferences>,
+    class_initializers: WordMap<WordSet>,
 }
 
 impl<'ctx, 'arena, A> Context<'ctx, 'arena, A>
@@ -66,6 +74,8 @@ where
         comments: &'arena [Trivia<'arena>],
         collector: Collector<'ctx, 'arena, A>,
         plugin_registry: &'ctx PluginRegistry,
+        external_analysis_session: Option<&'ctx ExternalAnalysisSession>,
+        additional_symbol_references: Option<&'ctx SymbolReferences>,
     ) -> Self {
         Self {
             arena,
@@ -79,7 +89,51 @@ where
             statement_span,
             collector,
             plugin_registry,
+            external_analysis_session,
+            additional_symbol_references,
+            class_initializers: WordMap::default(),
         }
+    }
+
+    pub(crate) fn prepare_class_initializers(
+        &mut self,
+        class_like: &ClassLikeMetadata,
+    ) -> Result<(), crate::error::AnalysisError> {
+        if self.external_analysis_session.is_none() || !self.plugin_registry.may_have_class_initializer_provider() {
+            return Ok(());
+        }
+
+        let classes =
+            std::iter::once(class_like.name).chain(class_like.all_parent_classes.iter().copied()).collect::<Vec<_>>();
+        for class in classes {
+            if self.class_initializers.contains_key(&class) {
+                continue;
+            }
+
+            let Some(metadata) = self.codebase.get_class_like(class.as_bytes()) else {
+                continue;
+            };
+            let initializers =
+                self.plugin_registry.get_class_initializers(self.codebase, metadata, self.external_analysis_session);
+            self.class_initializers.insert(class, initializers);
+        }
+
+        Ok(())
+    }
+
+    #[inline]
+    pub(crate) fn is_class_initializer_for(&self, metadata: &ClassLikeMetadata, method: Word) -> bool {
+        self.settings.is_class_initializer_for(metadata, method)
+            || self.class_initializers.get(&metadata.name).is_some_and(|methods| methods.contains(&method))
+    }
+
+    pub(crate) fn applicable_class_initializers<'meta>(
+        &'meta self,
+        metadata: &'meta ClassLikeMetadata,
+    ) -> impl Iterator<Item = Word> + 'meta {
+        self.settings
+            .applicable_class_initializers(metadata)
+            .chain(self.class_initializers.get(&metadata.name).into_iter().flat_map(|methods| methods.iter().copied()))
     }
 
     /// Resolves the correct function name based on PHP's dynamic name resolution rules.
@@ -200,7 +254,13 @@ where
     /// unreported issues. Used by [`crate::Analyzer::analyze_with_artifacts`]
     /// when the caller needs to retain ownership of [`AnalysisArtifacts`]
     /// after analysis completes.
-    pub fn finish_collector(self, analysis_result: &mut AnalysisResult) {
-        analysis_result.issues.extend(self.collector.finish());
+    pub fn finish_collector(self, analysis_result: &mut AnalysisResult, defer_pragmas: bool) {
+        if defer_pragmas {
+            let (issues, pragmas) = self.collector.defer();
+            analysis_result.issues.extend(issues);
+            analysis_result.add_deferred_pragmas(pragmas);
+        } else {
+            analysis_result.issues.extend(self.collector.finish());
+        }
     }
 }

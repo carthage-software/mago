@@ -15,6 +15,7 @@ use mago_word::word;
 use crate::artifacts::AnalysisArtifacts;
 use crate::code::IssueCode;
 use crate::context::Context;
+use crate::error::AnalysisError;
 
 /// Check property initialization for a class-like.
 pub fn check_property_initialization<'ctx, A>(
@@ -23,11 +24,12 @@ pub fn check_property_initialization<'ctx, A>(
     class_like_metadata: &'ctx ClassLikeMetadata,
     declaration_span: Span,
     name_span: Option<Span>,
-) where
+) -> Result<(), AnalysisError>
+where
     A: Arena,
 {
     if !context.settings.check_property_initialization {
-        return;
+        return Ok(());
     }
 
     if class_like_metadata.flags.is_abstract()
@@ -35,26 +37,26 @@ pub fn check_property_initialization<'ctx, A>(
         || class_like_metadata.kind.is_trait()
         || class_like_metadata.kind.is_enum()
     {
-        return;
+        return Ok(());
     }
 
-    let uninitialized_properties: Vec<_> = class_like_metadata
-        .declaring_property_ids
-        .iter()
-        .sorted_by_key(|(k, _)| *k)
-        .filter_map(|(&name, declaring_class)| {
-            let declaring_meta = context.codebase.get_class_like(declaring_class.as_bytes())?;
-            let prop = declaring_meta.properties.get(&name)?;
-            if property_requires_initialization(name, prop, class_like_metadata, declaring_meta, context) {
-                Some((name, prop))
-            } else {
-                None
-            }
-        })
-        .collect();
+    let mut uninitialized_properties = Vec::new();
+    for (&name, declaring_class) in class_like_metadata.declaring_property_ids.iter().sorted_by_key(|(k, _)| *k) {
+        let Some(declaring_meta) = context.codebase.get_class_like(declaring_class.as_bytes()) else {
+            continue;
+        };
+
+        let Some(property) = declaring_meta.properties.get(&name) else {
+            continue;
+        };
+
+        if property_requires_initialization(name, property, class_like_metadata, declaring_meta, context)? {
+            uninitialized_properties.push((name, property));
+        }
+    }
 
     if uninitialized_properties.is_empty() {
-        return;
+        return Ok(());
     }
 
     let constructor_method_id = class_like_metadata.declaring_method_ids.get(&word("__construct"));
@@ -63,7 +65,7 @@ pub fn check_property_initialization<'ctx, A>(
             check_parent_constructor_initializes(context, artifacts, class_like_metadata, &uninitialized_properties);
 
         if parent_initializes {
-            return;
+            return Ok(());
         }
 
         let initialized_by_initializers =
@@ -79,7 +81,7 @@ pub fn check_property_initialization<'ctx, A>(
             report_missing_constructor(context, class_like_metadata, declaration_span, name_span, &still_uninitialized);
         }
 
-        return;
+        return Ok(());
     };
 
     let constructor_declaring_class = constructor_method_id.get_class_name();
@@ -191,7 +193,7 @@ pub fn check_property_initialization<'ctx, A>(
             }
         }
 
-        return;
+        return Ok(());
     }
 
     // Get properties initialized by the class's own constructor (including transitive through method calls)
@@ -226,6 +228,8 @@ pub fn check_property_initialization<'ctx, A>(
             );
         }
     }
+
+    Ok(())
 }
 
 /// Determines if a property requires initialization in the constructor.
@@ -235,38 +239,43 @@ fn property_requires_initialization<A>(
     class_like_metadata: &ClassLikeMetadata,
     declaring_class_metadata: &ClassLikeMetadata,
     context: &Context<'_, '_, A>,
-) -> bool
+) -> Result<bool, AnalysisError>
 where
     A: Arena,
 {
     // Has default value - doesn't need initialization
     if property.flags.has_default() {
-        return false;
+        return Ok(false);
     }
 
     // Promoted property - initialized via constructor parameter
     if property.flags.is_promoted_property() {
-        return false;
+        return Ok(false);
     }
 
     // Static property - not initialized in constructor
     if property.flags.is_static() {
-        return false;
+        return Ok(false);
     }
 
     // Virtual/hooked property - may not need backing storage
     if property.flags.is_virtual_property() {
-        return false;
+        return Ok(false);
     }
 
     // No type declaration - PHP doesn't require initialization
     if property.type_declaration_metadata.is_none() {
-        return false;
+        return Ok(false);
     }
 
     // Check if any plugin considers this property initialized
-    if context.plugin_registry.is_property_initialized(declaring_class_metadata, property) {
-        return false;
+    if context.plugin_registry.is_property_initialized(
+        context.codebase,
+        declaring_class_metadata,
+        property,
+        context.external_analysis_session,
+    ) {
+        return Ok(false);
     }
 
     // NOTE: Nullable types (`?string`, `null|string`) and mixed types STILL require
@@ -277,7 +286,7 @@ where
     if declaring_class_metadata.name != class_like_metadata.name {
         // If declaring class is a concrete class (not abstract and not a trait), it handles initialization.
         if !declaring_class_metadata.flags.is_abstract() && !declaring_class_metadata.kind.is_trait() {
-            return false;
+            return Ok(false);
         }
 
         // If abstract parent has a constructor and the child class does NOT define its own constructor,
@@ -290,11 +299,11 @@ where
             && declaring_class_metadata.declaring_method_ids.contains_key(&word("__construct"))
             && !class_like_metadata.declaring_method_ids.contains_key(&word("__construct"))
         {
-            return false;
+            return Ok(false);
         }
     }
 
-    true
+    Ok(true)
 }
 
 /// Compute properties initialized transitively through method calls.
@@ -418,15 +427,10 @@ where
 {
     let mut all_initialized = WordSet::default();
 
-    // No class initializers configured
-    if context.settings.class_initializers.is_empty() {
-        return all_initialized;
-    }
-
     let class_name = class_like_metadata.name;
     let class_is_final = class_like_metadata.flags.is_final();
 
-    for initializer_name in context.settings.applicable_class_initializers(class_like_metadata) {
+    for initializer_name in context.applicable_class_initializers(class_like_metadata) {
         if let Some(method_id) = class_like_metadata.declaring_method_ids.get(&initializer_name) {
             let declaring_class_name = method_id.get_class_name();
 
@@ -449,7 +453,7 @@ where
             break;
         };
 
-        for initializer_name in context.settings.applicable_class_initializers(parent_meta) {
+        for initializer_name in context.applicable_class_initializers(parent_meta) {
             if let Some(method_id) = parent_meta.declaring_method_ids.get(&initializer_name) {
                 let declaring_class_name = method_id.get_class_name();
 
@@ -480,7 +484,6 @@ where
 
     let has_any_initializer = {
         let current_has = context
-            .settings
             .applicable_class_initializers(class_like_metadata)
             .any(|init_name| class_like_metadata.declaring_method_ids.contains_key(&init_name));
 
@@ -494,7 +497,6 @@ where
                     break;
                 };
                 if context
-                    .settings
                     .applicable_class_initializers(parent_meta)
                     .any(|init_name| parent_meta.declaring_method_ids.contains_key(&init_name))
                 {
@@ -515,7 +517,6 @@ where
             };
 
             let parent_has_initializer = context
-                .settings
                 .applicable_class_initializers(parent_meta)
                 .any(|init_name| parent_meta.declaring_method_ids.contains_key(&init_name));
 
@@ -550,7 +551,7 @@ where
     }
 
     if let Some(class_meta) = context.codebase.get_class_like(class_name.as_bytes())
-        && context.settings.is_class_initializer_for(class_meta, method_name)
+        && context.is_class_initializer_for(class_meta, method_name)
     {
         return true;
     }

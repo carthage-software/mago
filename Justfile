@@ -14,6 +14,10 @@ regen-analyzer-issue-codes:
     php scripts/regen-analyzer-issue-codes.php >> crates/analyzer/src/code.rs
     rustfmt crates/analyzer/src/code.rs
 
+# Regenerate the PHP SDK's stable syntax node names.
+regen-sdk-node-kinds:
+    php scripts/regen-sdk-node-kinds.php
+
 # Builds the library in release mode.
 build:
     cargo build --release
@@ -43,6 +47,10 @@ fix:
 # Runs all tests in the workspace.
 test:
     cargo test --workspace --locked --all-targets
+
+# Runs the PHP SDK test suite.
+test-sdk:
+    vendor/bin/phpunit --configuration composer/phpunit.xml
 
 # Fuzz the PHP lexer. Seeds are drawn from the syntax/analyzer/formatter PHP fixtures.
 fuzz-php-lexer:

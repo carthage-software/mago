@@ -69,6 +69,7 @@ mod commands;
 mod config;
 mod consts;
 mod error;
+mod extensions;
 mod macros;
 mod service;
 mod updater;
@@ -214,11 +215,19 @@ pub fn run(main_start: Instant) -> Result<ExitCode, Error> {
         if trace_enabled { main_start.elapsed() - clap_duration - logger_duration } else { Duration::ZERO };
 
     let php_version = arguments.get_php_version()?;
-    let CliArguments { workspace, config, threads, allow_unsupported_php_version, no_version_check, command, .. } =
-        arguments;
+    let CliArguments {
+        workspace,
+        config,
+        threads,
+        allow_unsupported_php_version,
+        no_version_check,
+        no_extensions,
+        command,
+        ..
+    } = arguments;
 
     let config_load_start = trace_enabled.then(Instant::now);
-    let configuration = Configuration::load(
+    let mut configuration = Configuration::load(
         workspace,
         config.as_deref(),
         php_version,
@@ -226,6 +235,10 @@ pub fn run(main_start: Instant) -> Result<ExitCode, Error> {
         allow_unsupported_php_version,
         no_version_check,
     )?;
+
+    if no_extensions {
+        configuration.extension_hosts.clear();
+    }
     let config_load_duration = config_load_start.map(|s| s.elapsed()).unwrap_or_default();
 
     if let MagoCommand::SelfUpdate(cmd) = command {
@@ -264,6 +277,7 @@ pub fn run(main_start: Instant) -> Result<ExitCode, Error> {
     let result = match command {
         MagoCommand::Init(cmd) => cmd.execute(configuration, None),
         MagoCommand::Config(cmd) => cmd.execute(configuration),
+        MagoCommand::Extension(cmd) => cmd.execute(configuration),
         MagoCommand::ListFiles(cmd) => cmd.execute(configuration, arguments.colors),
         MagoCommand::Lint(cmd) => cmd.execute(configuration, arguments.colors),
         MagoCommand::Format(cmd) => cmd.execute(configuration, arguments.colors),

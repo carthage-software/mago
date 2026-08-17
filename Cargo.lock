@@ -1410,6 +1410,7 @@ dependencies = [
  "mago-codex",
  "mago-composer",
  "mago-database",
+ "mago-extension",
  "mago-formatter",
  "mago-guard",
  "mago-linter",
@@ -1485,6 +1486,7 @@ dependencies = [
  "mago-codex",
  "mago-collector",
  "mago-database",
+ "mago-extension",
  "mago-names",
  "mago-php-version",
  "mago-phpdoc-syntax",
@@ -1595,6 +1597,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "mago-extension"
+version = "1.46.0"
+dependencies = [
+ "foldhash",
+ "mago-names",
+ "mago-span",
+ "mago-syntax",
+ "rand 0.9.4",
+ "strum 0.28.0",
+ "tracing",
+]
+
+[[package]]
 name = "mago-fingerprint"
 version = "1.46.0"
 dependencies = [
@@ -1690,6 +1705,7 @@ dependencies = [
  "mago-casing",
  "mago-collector",
  "mago-database",
+ "mago-extension",
  "mago-names",
  "mago-php-version",
  "mago-phpdoc-syntax",
@@ -1705,6 +1721,7 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
+ "strum 0.28.0",
  "tracing",
 ]
 
@@ -1732,6 +1749,7 @@ dependencies = [
  "mago-analyzer",
  "mago-bytes",
  "mago-codex",
+ "mago-collector",
  "mago-database",
  "mago-formatter",
  "mago-guard",

@@ -23,6 +23,7 @@ use crate::invocation::Invocation;
 use crate::invocation::InvocationArgumentsSource;
 use crate::invocation::InvocationTarget;
 use crate::invocation::InvocationTargetParameter;
+use crate::invocation::MethodInvocationKind;
 use crate::invocation::MethodTargetContext;
 use crate::invocation::analyzer::analyze_invocation;
 use crate::resolver::method::resolve_method_targets;
@@ -100,6 +101,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for MethodPartialApplication<'arena>
                     .expect("class-like metadata should exist for resolved method");
 
                 let method_target_context = MethodTargetContext {
+                    invocation_kind: MethodInvocationKind::Instance,
                     declaring_method_id: Some(resolved_method.method_identifier),
                     class_like_metadata: class_metadata,
                     class_type: resolved_method.static_class_type,
@@ -113,11 +115,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for MethodPartialApplication<'arena>
                     identifier,
                     metadata: method_metadata,
                     inferred_return_type: None,
+                    effective_signature: None,
                     method_context: Some(method_target_context),
                     span: self.method.span(),
                 };
 
-                let invocation = Invocation::new(
+                let mut invocation = Invocation::new(
                     invocation_target,
                     InvocationArgumentsSource::PartialArgumentList(&self.argument_list),
                     self.span(),
@@ -130,7 +133,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for MethodPartialApplication<'arena>
                     context,
                     block_context,
                     artifacts,
-                    &invocation,
+                    &mut invocation,
                     Some((resolved_method.classname, None)),
                     &mut template_result,
                     &mut parameter_types,

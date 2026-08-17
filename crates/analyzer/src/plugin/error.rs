@@ -1,13 +1,19 @@
 //! Error types for the plugin system.
 
 use std::fmt;
+use std::sync::Arc;
+
+use crate::external::ExternalAnalyzerError;
 
 /// Result type for plugin operations.
 pub type PluginResult<T> = Result<T, PluginError>;
 
 /// Errors that can occur during plugin operations.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone)]
 pub enum PluginError {
+    /// An external analyzer worker, transport, or protocol operation failed.
+    External(Arc<ExternalAnalyzerError>),
+
     /// Plugin initialization failed.
     InitializationFailed { name: String, reason: String },
 
@@ -24,6 +30,7 @@ pub enum PluginError {
 impl fmt::Display for PluginError {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
+            PluginError::External(error) => write!(f, "External plugin error: {error}"),
             PluginError::InitializationFailed { name, reason } => {
                 write!(f, "Plugin '{name}' failed to initialize: {reason}")
             }
@@ -40,4 +47,23 @@ impl fmt::Display for PluginError {
     }
 }
 
-impl std::error::Error for PluginError {}
+impl std::error::Error for PluginError {
+    fn source(&self) -> Option<&(dyn std::error::Error + 'static)> {
+        match self {
+            Self::External(error) => Some(error.as_ref()),
+            _ => None,
+        }
+    }
+}
+
+impl From<Arc<ExternalAnalyzerError>> for PluginError {
+    fn from(error: Arc<ExternalAnalyzerError>) -> Self {
+        Self::External(error)
+    }
+}
+
+impl From<ExternalAnalyzerError> for PluginError {
+    fn from(error: ExternalAnalyzerError) -> Self {
+        Self::External(Arc::new(error))
+    }
+}

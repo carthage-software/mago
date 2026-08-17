@@ -205,7 +205,7 @@ pub fn run(code: String, settings_js: JsValue) -> Result<JsValue, JsValue> {
         plugin_registry,
     );
 
-    let analyzer_issues = analysis_service.oneshot(file_id);
+    let analyzer_issues = analysis_service.oneshot(file_id).map_err(|error| JsValue::from_str(&error.to_string()))?;
 
     let file = prelude
         .database
@@ -324,7 +324,7 @@ pub fn analyze(code: String, php_version: &str) -> Result<JsValue, JsValue> {
         plugin_registry,
     );
 
-    let issues = service.oneshot(file_id);
+    let issues = service.oneshot(file_id).map_err(|error| JsValue::from_str(&error.to_string()))?;
 
     let file = prelude
         .database

@@ -23,6 +23,8 @@ use crate::invocation::Invocation;
 use crate::invocation::InvocationArgumentsSource;
 use crate::invocation::InvocationTarget;
 use crate::invocation::InvocationTargetParameter;
+use crate::invocation::MethodInvocationKind;
+use crate::invocation::MethodTargetContext;
 use crate::invocation::analyzer::analyze_invocation;
 use crate::resolver::static_method::resolve_static_method_targets;
 
@@ -91,6 +93,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodPartialApplication<'
                 let Some(metadata) = context.codebase.get_function_like(&identifier) else {
                     continue;
                 };
+                let Some(class_like_metadata) = context.codebase.get_class_like(resolved_method.classname.as_bytes())
+                else {
+                    continue;
+                };
 
                 let original_parameters: Vec<_> =
                     metadata.parameters.iter().map(InvocationTargetParameter::FunctionLike).collect();
@@ -99,11 +105,18 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodPartialApplication<'
                     identifier,
                     metadata,
                     inferred_return_type: None,
-                    method_context: None,
+                    effective_signature: None,
+                    method_context: Some(MethodTargetContext {
+                        invocation_kind: MethodInvocationKind::Static,
+                        declaring_method_id: Some(resolved_method.method_identifier),
+                        class_like_metadata,
+                        class_type: resolved_method.static_class_type,
+                        declaring_object_type: resolved_method.declaring_object,
+                    }),
                     span: self.method.span(),
                 };
 
-                let invocation = Invocation::new(
+                let mut invocation = Invocation::new(
                     invocation_target,
                     InvocationArgumentsSource::PartialArgumentList(&self.argument_list),
                     self.span(),
@@ -116,7 +129,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodPartialApplication<'
                     context,
                     block_context,
                     artifacts,
-                    &invocation,
+                    &mut invocation,
                     Some((resolved_method.classname, None)),
                     &mut template_result,
                     &mut parameter_types,

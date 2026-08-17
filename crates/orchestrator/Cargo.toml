@@ -25,6 +25,7 @@ mago-formatter = { workspace = true }
 mago-php-version = { workspace = true }
 mago-semantics = { workspace = true }
 mago-codex = { workspace = true }
+mago-collector = { workspace = true }
 mago-analyzer = { workspace = true }
 mago-guard = { workspace = true }
 foldhash = { workspace = true }

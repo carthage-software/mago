@@ -1,14 +1,26 @@
 use std::sync::Arc;
 #[cfg(not(target_arch = "wasm32"))]
+use std::sync::atomic::AtomicU64;
+#[cfg(not(target_arch = "wasm32"))]
+use std::sync::atomic::Ordering::Relaxed;
+#[cfg(not(target_arch = "wasm32"))]
 use std::time::Duration;
+#[cfg(not(target_arch = "wasm32"))]
+use std::time::Instant;
 
 use foldhash::HashMap;
 use foldhash::HashSet;
-use mago_allocator::LocalArena;
+use rayon::prelude::*;
 
+use mago_allocator::LocalArena;
 use mago_analyzer::Analyzer;
 use mago_analyzer::analysis_result::AnalysisResult;
+use mago_analyzer::analysis_result::LateSymbolReferenceIssueReconciler;
 use mago_analyzer::artifacts::AnalysisArtifacts;
+use mago_analyzer::external::AFTER_FILE_ANALYSIS_BATCH_SIZE;
+use mago_analyzer::external::CodebaseScanFile;
+use mago_analyzer::external::CodebaseScanPlan;
+use mago_analyzer::external::FileAnalysisSnapshot;
 use mago_analyzer::plugin::PluginRegistry;
 use mago_analyzer::settings::Settings;
 use mago_codex::diff::CodebaseDiff;
@@ -19,6 +31,7 @@ use mago_codex::populator::populate_codebase_targeted;
 use mago_codex::reference::SymbolReferences;
 use mago_codex::scanner::scan_program;
 use mago_codex::signature_builder;
+use mago_collector::DeferredPragmas;
 use mago_database::DatabaseReader;
 use mago_database::ReadDatabase;
 use mago_database::file::FileId;
@@ -30,16 +43,31 @@ use mago_semantics::SemanticsChecker;
 use mago_syntax::parser::parse_file_with_settings;
 use mago_syntax::settings::ParserSettings;
 use mago_word::WordSet;
-use rayon::prelude::*;
 
 use crate::error::OrchestratorError;
+use crate::service::issue_reconciliation::DeferredIssueReconciler;
 
 /// Per-file cached state for incremental analysis.
 #[derive(Debug, Clone)]
 struct FileState {
     content_hash: u64,
     entry_keys: CodebaseEntryKeys,
+    unreconciled_analysis_issues: IssueCollection,
     analysis_issues: IssueCollection,
+    codebase_issues: IssueCollection,
+    deferred_pragmas: Option<DeferredPragmas>,
+    late_symbol_references: SymbolReferences,
+}
+
+struct SelectiveAnalysisOutput {
+    result: AnalysisResult,
+    native_symbol_references: SymbolReferences,
+    external_symbol_references: SymbolReferences,
+    late_symbol_references: SymbolReferences,
+    late_symbol_references_by_file: HashMap<FileId, SymbolReferences>,
+    per_file_issues: HashMap<FileId, IssueCollection>,
+    per_file_pragmas: HashMap<FileId, DeferredPragmas>,
+    snapshots: Vec<Arc<FileAnalysisSnapshot>>,
     codebase_issues: IssueCollection,
 }
 
@@ -61,6 +89,9 @@ pub struct IncrementalAnalysisService {
     database: ReadDatabase,
     codebase: CodebaseMetadata,
     symbol_references: SymbolReferences,
+    native_symbol_references: SymbolReferences,
+    external_symbol_references: SymbolReferences,
+    late_symbol_references: SymbolReferences,
     base_codebase: Arc<CodebaseMetadata>,
     base_symbol_references: Arc<SymbolReferences>,
     settings: Settings,
@@ -69,6 +100,10 @@ pub struct IncrementalAnalysisService {
     plugin_registry: Arc<PluginRegistry>,
     initialized: bool,
     codebase_issues: IssueCollection,
+    lifecycle_issues: IssueCollection,
+    analysis_snapshots: HashMap<FileId, Arc<FileAnalysisSnapshot>>,
+    codebase_scan_plan: Option<Arc<CodebaseScanPlan>>,
+    codebase_scan_files: HashMap<FileId, CodebaseScanFile>,
 }
 
 impl std::fmt::Debug for IncrementalAnalysisService {
@@ -77,6 +112,9 @@ impl std::fmt::Debug for IncrementalAnalysisService {
             .field("database", &"<ReadDatabase>")
             .field("codebase", &"<CodebaseMetadata>")
             .field("symbol_references", &"<SymbolReferences>")
+            .field("native_symbol_references", &"<SymbolReferences>")
+            .field("external_symbol_references", &"<SymbolReferences>")
+            .field("late_symbol_references", &"<SymbolReferences>")
             .field("base_codebase", &"<Arc<CodebaseMetadata>>")
             .field("base_symbol_references", &"<Arc<SymbolReferences>>")
             .field("settings", &self.settings)
@@ -85,6 +123,10 @@ impl std::fmt::Debug for IncrementalAnalysisService {
             .field("plugin_registry", &"<Arc<PluginRegistry>>")
             .field("initialized", &self.initialized)
             .field("codebase_issues", &self.codebase_issues.len())
+            .field("lifecycle_issues", &self.lifecycle_issues.len())
+            .field("analysis_snapshots", &self.analysis_snapshots.len())
+            .field("codebase_scan_plan", &self.codebase_scan_plan.is_some())
+            .field("codebase_scan_files", &self.codebase_scan_files.len())
             .finish()
     }
 }
@@ -114,11 +156,15 @@ impl IncrementalAnalysisService {
     ) -> Self {
         let base_codebase = Arc::new(codebase.clone());
         let base_symbol_references = Arc::new(symbol_references.clone());
+        let native_symbol_references = symbol_references.clone();
 
         Self {
             database,
             codebase,
             symbol_references,
+            native_symbol_references,
+            external_symbol_references: SymbolReferences::new(),
+            late_symbol_references: SymbolReferences::new(),
             base_codebase,
             base_symbol_references,
             settings,
@@ -127,6 +173,10 @@ impl IncrementalAnalysisService {
             plugin_registry,
             initialized: false,
             codebase_issues: IssueCollection::default(),
+            lifecycle_issues: IssueCollection::default(),
+            analysis_snapshots: HashMap::default(),
+            codebase_scan_plan: None,
+            codebase_scan_files: HashMap::default(),
         }
     }
 
@@ -246,11 +296,13 @@ impl IncrementalAnalysisService {
     /// This avoids storing a separate snapshot by reconstructing on demand.
     fn collect_all_issues(&self) -> IssueCollection {
         let total: usize = self.codebase_issues.len()
+            + self.lifecycle_issues.len()
             + self.file_states.values().map(|s| s.analysis_issues.len() + s.codebase_issues.len()).sum::<usize>();
 
         let mut issues = IssueCollection::default();
         issues.reserve(total);
         issues.extend(self.codebase_issues.iter().cloned());
+        issues.extend(self.lifecycle_issues.iter().cloned());
         for state in self.file_states.values() {
             if !state.analysis_issues.is_empty() {
                 issues.extend(state.analysis_issues.iter().cloned());
@@ -264,6 +316,20 @@ impl IncrementalAnalysisService {
         issues
     }
 
+    fn refresh_late_reference_issues(&mut self) {
+        if self.late_symbol_references.is_empty() {
+            for state in self.file_states.values_mut() {
+                state.analysis_issues = state.unreconciled_analysis_issues.clone();
+            }
+            return;
+        }
+
+        let reconciler = LateSymbolReferenceIssueReconciler::new(&self.codebase, &self.symbol_references);
+        for state in self.file_states.values_mut() {
+            state.analysis_issues = reconciler.reconcile(state.unreconciled_analysis_issues.clone());
+        }
+    }
+
     /// Runs a full analysis from scratch.
     ///
     /// After this call, [`analyze_incremental()`](Self::analyze_incremental) can be used
@@ -274,17 +340,27 @@ impl IncrementalAnalysisService {
     /// Returns [`OrchestratorError`] when source scanning, codebase population, or per-file
     /// analysis fails.
     pub fn analyze(&mut self) -> Result<AnalysisResult, OrchestratorError> {
+        self.codebase_scan_plan = self
+            .plugin_registry
+            .external_codebase_scan_plan()
+            .map_err(mago_analyzer::error::AnalysisError::from)?
+            .map(Arc::new);
         let source_files: Vec<_> = self.database.files().filter(|f| f.file_type != FileType::Builtin).collect();
 
         if source_files.is_empty() {
             tracing::info!("No source files found for analysis.");
+            self.codebase_scan_files.clear();
+            self.plugin_registry
+                .run_external_codebase_scan(Vec::new())
+                .map_err(mago_analyzer::error::AnalysisError::from)?;
             self.initialized = true;
             return Ok(AnalysisResult::new(SymbolReferences::new()));
         }
 
         let parser_settings = self.parser_settings;
         let php_version = self.settings.version;
-        let per_file_results: Vec<(FileId, u64, CodebaseMetadata)> = source_files
+        let codebase_scan_plan = self.codebase_scan_plan.clone();
+        let per_file_results: Vec<(FileId, u64, CodebaseMetadata, Option<CodebaseScanFile>)> = source_files
             .into_par_iter()
             .map_init(LocalArena::new, |arena, file| {
                 let content_hash = xxhash_rust::xxh3::xxh3_64(file.contents.as_ref());
@@ -300,25 +376,33 @@ impl IncrementalAnalysisService {
 
                 let resolver = NameResolver::new(arena);
                 let resolved_names = resolver.resolve(program);
-
                 let file_signature = signature_builder::build_file_signature(&file, program, &resolved_names);
                 let mut metadata = scan_program(arena, &file, program, &resolved_names, php_version);
                 metadata.set_file_signature(file.id, file_signature);
                 if file.file_type.is_patch() {
                     metadata.convert_partial_to_patch();
                 }
+                let codebase_scan = codebase_scan_plan
+                    .as_deref()
+                    .map(|plan| plan.capture(&file, program, &resolved_names))
+                    .transpose()?
+                    .flatten();
 
                 arena.reset();
 
-                (file.id, content_hash, metadata)
+                Ok((file.id, content_hash, metadata, codebase_scan))
             })
-            .collect();
+            .collect::<Result<Vec<_>, mago_analyzer::external::ExternalAnalyzerError>>()?;
 
         let mut merged_codebase = (*self.base_codebase).clone();
 
+        self.codebase_scan_files.clear();
         let staged: Vec<(FileId, u64, CodebaseMetadata)> = per_file_results
             .into_iter()
-            .map(|(file_id, content_hash, metadata)| {
+            .map(|(file_id, content_hash, metadata, codebase_scan)| {
+                if let Some(codebase_scan) = codebase_scan {
+                    self.codebase_scan_files.insert(file_id, codebase_scan);
+                }
                 let clone_for_ownership = metadata.clone();
                 merged_codebase.extend(metadata);
                 (file_id, content_hash, clone_for_ownership)
@@ -328,7 +412,9 @@ impl IncrementalAnalysisService {
 
         let mut symbol_references = (*self.base_symbol_references).clone();
         populate_codebase(&mut merged_codebase, &mut symbol_references, WordSet::default(), HashSet::default());
-
+        self.plugin_registry
+            .run_external_codebase_scan(self.codebase_scan_files.values().cloned().collect())
+            .map_err(mago_analyzer::error::AnalysisError::from)?;
         let mut file_states: HashMap<FileId, FileState> = HashMap::default();
         for (file_id, content_hash, metadata) in staged {
             let entry_keys = metadata.extract_owned_keys(&merged_codebase);
@@ -337,17 +423,32 @@ impl IncrementalAnalysisService {
                 FileState {
                     content_hash,
                     entry_keys,
+                    unreconciled_analysis_issues: IssueCollection::default(),
                     analysis_issues: IssueCollection::default(),
                     codebase_issues: IssueCollection::default(),
+                    deferred_pragmas: None,
+                    late_symbol_references: SymbolReferences::new(),
                 },
             );
         }
 
-        let (mut analysis_result, per_file_issues) =
-            self.run_analyzer_selective(&merged_codebase, symbol_references, &self.settings, &HashSet::default())?;
-
-        let all_codebase_issues = merged_codebase.take_issues(true);
-        analysis_result.issues.extend(all_codebase_issues.iter().cloned());
+        let SelectiveAnalysisOutput {
+            result: mut analysis_result,
+            native_symbol_references,
+            external_symbol_references,
+            late_symbol_references,
+            late_symbol_references_by_file,
+            per_file_issues,
+            per_file_pragmas,
+            snapshots,
+            codebase_issues: all_codebase_issues,
+        } =
+            self.run_analyzer_selective(&mut merged_codebase, symbol_references, &self.settings, &HashSet::default())?;
+        self.external_symbol_references = external_symbol_references;
+        self.late_symbol_references = late_symbol_references;
+        self.native_symbol_references = native_symbol_references;
+        self.lifecycle_issues = analysis_result.issues.clone();
+        self.analysis_snapshots = snapshots.into_iter().map(|snapshot| (snapshot.file_id(), snapshot)).collect();
 
         // Distribute codebase issues to per-file caches.
         self.file_states = file_states;
@@ -355,20 +456,24 @@ impl IncrementalAnalysisService {
         self.distribute_codebase_issues(all_codebase_issues);
 
         for (file_id, issues) in per_file_issues {
-            analysis_result.issues.extend(issues.iter().cloned());
             if let Some(state) = self.file_states.get_mut(&file_id) {
+                state.unreconciled_analysis_issues = issues.clone();
                 state.analysis_issues = issues;
+                state.deferred_pragmas = per_file_pragmas.get(&file_id).cloned();
+                state.late_symbol_references =
+                    late_symbol_references_by_file.get(&file_id).cloned().unwrap_or_default();
             }
         }
 
+        self.codebase = merged_codebase;
+        self.symbol_references = std::mem::take(&mut analysis_result.symbol_references);
+        self.refresh_late_reference_issues();
+        analysis_result.issues = self.collect_all_issues();
         tracing::debug!(
             "Initial analysis: {} total issues ({} codebase-level)",
             analysis_result.issues.len(),
             self.codebase_issues.len(),
         );
-
-        self.codebase = merged_codebase;
-        self.symbol_references = std::mem::take(&mut analysis_result.symbol_references);
         self.initialized = true;
 
         Ok(analysis_result)
@@ -521,7 +626,8 @@ impl IncrementalAnalysisService {
 
         let parser_settings = self.parser_settings;
         let php_version = self.settings.version;
-        let new_file_scans: Vec<(FileId, CodebaseMetadata)> = changed_files
+        let codebase_scan_plan = self.codebase_scan_plan.clone();
+        let scanned_files: Vec<(FileId, CodebaseMetadata, Option<CodebaseScanFile>)> = changed_files
             .into_par_iter()
             .map_init(LocalArena::new, |arena, file| {
                 let program = parse_file_with_settings(arena, file, parser_settings);
@@ -535,7 +641,6 @@ impl IncrementalAnalysisService {
 
                 let resolver = NameResolver::new(arena);
                 let resolved_names = resolver.resolve(program);
-
                 let mut metadata = scan_program(arena, file, program, &resolved_names, php_version);
                 metadata.set_file_signature(
                     file.id,
@@ -544,23 +649,52 @@ impl IncrementalAnalysisService {
                 if file.file_type.is_patch() {
                     metadata.convert_partial_to_patch();
                 }
+                let codebase_scan = codebase_scan_plan
+                    .as_deref()
+                    .map(|plan| plan.capture(file, program, &resolved_names))
+                    .transpose()?
+                    .flatten();
 
                 arena.reset();
 
-                (file.id, metadata)
+                Ok((file.id, metadata, codebase_scan))
             })
-            .collect();
+            .collect::<Result<Vec<_>, mago_analyzer::external::ExternalAnalyzerError>>()
+            .map_err(mago_analyzer::error::AnalysisError::from)?;
 
         // A patch whose content actually changed requires rebuilding the merged codebase from
         // scratch. Patches that were force-rescanned due to a vendor change (same hash) go
         // through the normal incremental path: `apply_patches_pass` re-applies them to the
         // freshly-updated vendor entries and generates the correct diagnostics.
-        let any_patch_content_changed = new_file_scans.iter().any(|(fid, _)| {
+        let any_patch_content_changed = scanned_files.iter().any(|(fid, _, _)| {
             self.database.get(fid).is_ok_and(|f| f.file_type.is_patch())
                 && self.file_states.get(fid).is_none_or(|s| s.content_hash != file_hashes[fid])
         });
         if any_patch_content_changed {
             return self.analyze();
+        }
+
+        let scan_state_changed = self.codebase_scan_files.keys().any(|file_id| !current_file_ids.contains(file_id))
+            || scanned_files
+                .iter()
+                .any(|(file_id, _, snapshot)| snapshot.is_some() || self.codebase_scan_files.contains_key(file_id));
+        if scan_state_changed {
+            self.codebase_scan_files.retain(|file_id, _| current_file_ids.contains(file_id));
+        }
+        let mut new_file_scans = Vec::with_capacity(scanned_files.len());
+        for (file_id, metadata, snapshot) in scanned_files {
+            if scan_state_changed {
+                self.codebase_scan_files.remove(&file_id);
+                if let Some(snapshot) = snapshot {
+                    self.codebase_scan_files.insert(file_id, snapshot);
+                }
+            }
+            new_file_scans.push((file_id, metadata));
+        }
+        if scan_state_changed {
+            self.plugin_registry
+                .run_external_codebase_scan(self.codebase_scan_files.values().cloned().collect())
+                .map_err(mago_analyzer::error::AnalysisError::from)?;
         }
 
         let mut diff = {
@@ -618,7 +752,7 @@ impl IncrementalAnalysisService {
             self.apply_scan_results(&mut merged_codebase, &new_file_scans);
 
             let files_to_skip: HashSet<FileId> = unchanged_file_ids.iter().copied().collect();
-            let mut symbol_references = std::mem::take(&mut self.symbol_references);
+            let mut symbol_references = std::mem::take(&mut self.native_symbol_references);
 
             let mut changed_symbols: HashSet<(mago_word::Word, mago_word::Word)> = HashSet::default();
             let mut changed_file_names: Vec<mago_word::Word> = Vec::new();
@@ -670,18 +804,38 @@ impl IncrementalAnalysisService {
                 HashSet::default(),
                 changed_symbols,
             );
-
-            let (mut analysis_result, mut per_file_issues) =
-                self.run_analyzer_selective(&merged_codebase, symbol_references, &self.settings, &files_to_skip)?;
+            let SelectiveAnalysisOutput {
+                result: mut analysis_result,
+                native_symbol_references,
+                external_symbol_references,
+                late_symbol_references,
+                mut late_symbol_references_by_file,
+                mut per_file_issues,
+                per_file_pragmas,
+                snapshots,
+                codebase_issues: new_codebase_issues,
+            } = self.run_analyzer_selective(&mut merged_codebase, symbol_references, &self.settings, &files_to_skip)?;
+            self.external_symbol_references = external_symbol_references;
+            self.late_symbol_references = late_symbol_references;
+            self.native_symbol_references = native_symbol_references;
+            self.lifecycle_issues = std::mem::take(&mut analysis_result.issues);
+            self.analysis_snapshots.retain(|file_id, _| current_file_ids.contains(file_id));
+            for snapshot in snapshots {
+                self.analysis_snapshots.insert(snapshot.file_id(), snapshot);
+            }
 
             // Drain codebase issues from metadata and distribute to changed files only.
             // Unchanged files keep their cached codebase_issues from previous runs.
-            let new_codebase_issues = merged_codebase.take_issues(true);
             let changed_file_ids: HashSet<FileId> = new_file_scans.iter().map(|(fid, _)| *fid).collect();
+            let re_analyzed_unchanged: Vec<FileId> = per_file_issues
+                .keys()
+                .filter(|file_id| self.file_states.contains_key(file_id) && !changed_file_ids.contains(file_id))
+                .copied()
+                .collect();
 
-            // Clear codebase issues for changed files (they'll be re-distributed below).
+            // Clear codebase issues for every file analyzed in this generation.
             for (file_id, state) in self.file_states.iter_mut() {
-                if changed_file_ids.contains(file_id) {
+                if !files_to_skip.contains(file_id) {
                     state.codebase_issues = IssueCollection::default();
                 }
             }
@@ -689,6 +843,17 @@ impl IncrementalAnalysisService {
             // Keep orphan codebase issues; distribute file-attributable ones.
             self.codebase_issues = IssueCollection::default();
             self.distribute_codebase_issues(new_codebase_issues);
+
+            for file_id in re_analyzed_unchanged {
+                if let Some(issues) = per_file_issues.remove(&file_id)
+                    && let Some(state) = self.file_states.get_mut(&file_id)
+                {
+                    state.unreconciled_analysis_issues = issues.clone();
+                    state.analysis_issues = issues;
+                    state.deferred_pragmas = per_file_pragmas.get(&file_id).cloned();
+                    state.late_symbol_references = late_symbol_references_by_file.remove(&file_id).unwrap_or_default();
+                }
+            }
 
             for (file_id, metadata) in new_file_scans {
                 let content_hash = file_hashes[&file_id];
@@ -698,12 +863,25 @@ impl IncrementalAnalysisService {
                 let entry_keys = metadata.extract_owned_keys(&merged_codebase);
                 let codebase_issues =
                     self.file_states.get(&file_id).map(|s| s.codebase_issues.clone()).unwrap_or_default();
-                self.file_states
-                    .insert(file_id, FileState { content_hash, entry_keys, analysis_issues, codebase_issues });
+                let deferred_pragmas = per_file_pragmas.get(&file_id).cloned();
+                let late_symbol_references = late_symbol_references_by_file.remove(&file_id).unwrap_or_default();
+                self.file_states.insert(
+                    file_id,
+                    FileState {
+                        content_hash,
+                        entry_keys,
+                        unreconciled_analysis_issues: analysis_issues.clone(),
+                        analysis_issues,
+                        codebase_issues,
+                        deferred_pragmas,
+                        late_symbol_references,
+                    },
+                );
             }
 
             self.codebase = merged_codebase;
             self.symbol_references = std::mem::take(&mut analysis_result.symbol_references);
+            self.refresh_late_reference_issues();
             analysis_result.issues = self.collect_all_issues();
 
             return Ok(analysis_result);
@@ -731,7 +909,8 @@ impl IncrementalAnalysisService {
         merged_codebase.safe_symbols.clear();
         merged_codebase.safe_symbol_members.clear();
 
-        let Some(global_scope_invalid) = merged_codebase.mark_safe_symbols(&diff, &self.symbol_references) else {
+        let Some(global_scope_invalid) = merged_codebase.mark_safe_symbols(&diff, &self.native_symbol_references)
+        else {
             tracing::warn!("Invalidation cascade too expensive (>5000 steps), falling back to full analysis");
 
             return self.analyze();
@@ -786,7 +965,7 @@ impl IncrementalAnalysisService {
             }
         }
 
-        let mut symbol_references = std::mem::take(&mut self.symbol_references);
+        let mut symbol_references = std::mem::take(&mut self.native_symbol_references);
         symbol_references.remove_dirty_symbol_references(&dirty_symbols);
 
         populate_codebase_targeted(
@@ -796,7 +975,6 @@ impl IncrementalAnalysisService {
             safe_symbol_members,
             dirty_symbols,
         );
-
         let mut files_to_skip: HashSet<FileId> = HashSet::default();
         for &file_id in &unchanged_file_ids {
             if let Some(sig) = merged_codebase.get_file_signature(&file_id) {
@@ -873,10 +1051,26 @@ impl IncrementalAnalysisService {
             }
         }
 
-        let (mut analysis_result, mut per_file_issues) =
-            self.run_analyzer_selective(&merged_codebase, symbol_references, &self.settings, &files_to_skip)?;
+        let SelectiveAnalysisOutput {
+            result: mut analysis_result,
+            native_symbol_references,
+            external_symbol_references,
+            late_symbol_references,
+            mut late_symbol_references_by_file,
+            mut per_file_issues,
+            per_file_pragmas,
+            snapshots,
+            codebase_issues: new_codebase_issues,
+        } = self.run_analyzer_selective(&mut merged_codebase, symbol_references, &self.settings, &files_to_skip)?;
+        self.external_symbol_references = external_symbol_references;
+        self.late_symbol_references = late_symbol_references;
+        self.native_symbol_references = native_symbol_references;
+        self.lifecycle_issues = std::mem::take(&mut analysis_result.issues);
+        self.analysis_snapshots.retain(|file_id, _| current_file_ids.contains(file_id));
+        for snapshot in snapshots {
+            self.analysis_snapshots.insert(snapshot.file_id(), snapshot);
+        }
 
-        let new_codebase_issues = merged_codebase.take_issues(true);
         self.file_states.retain(|id, _| current_file_ids.contains(id));
 
         let changed_file_ids: HashSet<FileId> = new_file_scans.iter().map(|(fid, _)| *fid).collect();
@@ -902,7 +1096,10 @@ impl IncrementalAnalysisService {
             if let Some(issues) = per_file_issues.remove(&file_id)
                 && let Some(state) = self.file_states.get_mut(&file_id)
             {
+                state.unreconciled_analysis_issues = issues.clone();
                 state.analysis_issues = issues;
+                state.deferred_pragmas = per_file_pragmas.get(&file_id).cloned();
+                state.late_symbol_references = late_symbol_references_by_file.remove(&file_id).unwrap_or_default();
             }
         }
 
@@ -913,12 +1110,25 @@ impl IncrementalAnalysisService {
             // not clobber a rival file that won the tiebreak over this one.
             let entry_keys = metadata.extract_owned_keys(&merged_codebase);
             let codebase_issues = self.file_states.get(&file_id).map(|s| s.codebase_issues.clone()).unwrap_or_default();
-            self.file_states.insert(file_id, FileState { content_hash, entry_keys, analysis_issues, codebase_issues });
+            let deferred_pragmas = per_file_pragmas.get(&file_id).cloned();
+            let late_symbol_references = late_symbol_references_by_file.remove(&file_id).unwrap_or_default();
+            self.file_states.insert(
+                file_id,
+                FileState {
+                    content_hash,
+                    entry_keys,
+                    unreconciled_analysis_issues: analysis_issues.clone(),
+                    analysis_issues,
+                    codebase_issues,
+                    deferred_pragmas,
+                    late_symbol_references,
+                },
+            );
         }
 
         self.codebase = merged_codebase;
         self.symbol_references = std::mem::take(&mut analysis_result.symbol_references);
-
+        self.refresh_late_reference_issues();
         analysis_result.issues = self.collect_all_issues();
 
         Ok(analysis_result)
@@ -933,6 +1143,7 @@ impl IncrementalAnalysisService {
     /// this to answer "what's the type of `$obj` here?".
     #[must_use]
     pub fn analyze_file_with_artifacts(&self, file_id: FileId) -> Option<(IssueCollection, AnalysisArtifacts)> {
+        let external_session = self.plugin_registry.create_external_analysis_session(self.database.files());
         let file = self.database.get(&file_id).ok()?;
 
         let arena = LocalArena::new();
@@ -950,8 +1161,14 @@ impl IncrementalAnalysisService {
         issues.extend(semantics_checker.check(&file, program, &resolved_names));
 
         let mut analysis_result = AnalysisResult::new(SymbolReferences::new());
-        let analyzer =
+        let mut analyzer =
             Analyzer::new(&arena, &file, &resolved_names, &self.codebase, &self.plugin_registry, self.settings.clone());
+        if let Some(session) = external_session.as_ref() {
+            analyzer = analyzer.with_external_analysis_session(session);
+        }
+        if !self.external_symbol_references.is_empty() {
+            analyzer = analyzer.with_additional_symbol_references(&self.external_symbol_references);
+        }
 
         let artifacts = match analyzer.analyze_with_artifacts(program, &mut analysis_result) {
             Ok(artifacts) => artifacts,
@@ -961,7 +1178,14 @@ impl IncrementalAnalysisService {
             }
         };
 
-        issues.extend(analysis_result.issues);
+        if self.late_symbol_references.is_empty() {
+            issues.extend(analysis_result.issues);
+        } else {
+            issues.extend(
+                LateSymbolReferenceIssueReconciler::new(&self.codebase, &self.symbol_references)
+                    .reconcile(analysis_result.issues),
+            );
+        }
         Some((issues, artifacts))
     }
 
@@ -970,6 +1194,7 @@ impl IncrementalAnalysisService {
     /// This is useful for LSP single-file analysis. It uses the current codebase
     /// state for type resolution but only reports issues for the specified file.
     pub fn analyze_file(&self, file_id: FileId) -> IssueCollection {
+        let external_session = self.plugin_registry.create_external_analysis_session(self.database.files());
         let Ok(file) = self.database.get(&file_id) else {
             tracing::error!("File with ID {:?} not found in database", file_id);
             return IssueCollection::default();
@@ -990,14 +1215,27 @@ impl IncrementalAnalysisService {
         issues.extend(semantics_checker.check(&file, program, &resolved_names));
 
         let mut analysis_result = AnalysisResult::new(SymbolReferences::new());
-        let analyzer =
+        let mut analyzer =
             Analyzer::new(&arena, &file, &resolved_names, &self.codebase, &self.plugin_registry, self.settings.clone());
+        if let Some(session) = external_session.as_ref() {
+            analyzer = analyzer.with_external_analysis_session(session);
+        }
+        if !self.external_symbol_references.is_empty() {
+            analyzer = analyzer.with_additional_symbol_references(&self.external_symbol_references);
+        }
 
         if let Err(err) = analyzer.analyze(program, &mut analysis_result) {
             issues.push(Issue::error(format!("Analysis error: {err}")));
         }
 
-        issues.extend(analysis_result.issues);
+        if self.late_symbol_references.is_empty() {
+            issues.extend(analysis_result.issues);
+        } else {
+            issues.extend(
+                LateSymbolReferenceIssueReconciler::new(&self.codebase, &self.symbol_references)
+                    .reconcile(analysis_result.issues),
+            );
+        }
         issues
     }
 
@@ -1007,32 +1245,64 @@ impl IncrementalAnalysisService {
     /// only the files that were actually analyzed (not skipped).
     fn run_analyzer_selective(
         &self,
-        codebase: &CodebaseMetadata,
+        codebase: &mut CodebaseMetadata,
         current_symbol_references: SymbolReferences,
         settings: &Settings,
         skip_files: &HashSet<FileId>,
-    ) -> Result<(AnalysisResult, HashMap<FileId, IssueCollection>), OrchestratorError> {
+    ) -> Result<SelectiveAnalysisOutput, OrchestratorError> {
         #[cfg(not(target_arch = "wasm32"))]
         const ANALYSIS_DURATION_THRESHOLD: Duration = Duration::from_secs(5);
 
+        let plugin_registry = &self.plugin_registry;
+        #[cfg(not(target_arch = "wasm32"))]
+        let trace_enabled = tracing::enabled!(tracing::Level::TRACE);
+        #[cfg(not(target_arch = "wasm32"))]
+        let snapshot_ns = AtomicU64::new(0);
+        #[cfg(not(target_arch = "wasm32"))]
+        let snapshot_count = AtomicU64::new(0);
+        let external_session =
+            self.plugin_registry.create_external_analysis_session(self.database.files()).map(Arc::new);
+        plugin_registry.prepare_external_analyzer().map_err(mago_analyzer::error::AnalysisError::from)?;
+        let after_file = plugin_registry
+            .has_external_after_file_analysis_hooks()
+            .map_err(mago_analyzer::error::AnalysisError::from)?;
+        let after_analysis =
+            plugin_registry.has_external_after_analysis_hooks().map_err(mago_analyzer::error::AnalysisError::from)?;
+        let node_analysis_requirements =
+            plugin_registry.external_node_analysis_requirements().map_err(mago_analyzer::error::AnalysisError::from)?;
+        #[cfg(not(target_arch = "wasm32"))]
+        let before_start = trace_enabled.then(Instant::now);
+        let before = plugin_registry
+            .run_external_before_analysis_hooks(codebase, external_session.as_deref())
+            .map_err(mago_analyzer::error::AnalysisError::from)?;
+        let references_changed = before.references != self.external_symbol_references;
+        let external_symbol_references = before.references;
+        let effective_skip_files = if references_changed { HashSet::default() } else { skip_files.clone() };
         let host_files: Vec<_> = self
             .database
             .files()
-            .filter(|f| f.file_type == FileType::Host && !skip_files.contains(&f.id))
-            .map(|f| self.database.get(&f.id))
+            .filter(|file| file.file_type == FileType::Host && !effective_skip_files.contains(&file.id))
+            .map(|file| self.database.get(&file.id))
             .collect::<Result<Vec<_>, _>>()?;
-
-        if host_files.is_empty() && skip_files.is_empty() {
-            tracing::warn!("No host files found for analysis.");
-
-            return Ok((AnalysisResult::new(SymbolReferences::new()), HashMap::default()));
+        #[cfg(not(target_arch = "wasm32"))]
+        if let Some(start) = before_start {
+            tracing::trace!(
+                issues = before.issues.len(),
+                contributed_references = external_symbol_references.count_body_references()
+                    + external_symbol_references.count_signature_references(),
+                references_changed,
+                elapsed = ?start.elapsed(),
+                "Incremental external before-analysis hooks completed."
+            );
         }
 
-        let plugin_registry = &self.plugin_registry;
+        if host_files.is_empty() && effective_skip_files.is_empty() {
+            tracing::warn!("No host files found for analysis.");
+        }
         let settings = settings.clone();
         let parser_settings = self.parser_settings;
 
-        let results: Vec<(FileId, AnalysisResult)> = host_files
+        let results: Vec<(FileId, AnalysisResult, Option<Arc<FileAnalysisSnapshot>>)> = host_files
             .into_par_iter()
             .map_init(LocalArena::new, |arena, source_file| {
                 let file_id = source_file.id;
@@ -1046,11 +1316,44 @@ impl IncrementalAnalysisService {
                 }
 
                 let semantics_checker = SemanticsChecker::new(settings.version);
-                let analyzer =
+                let mut analyzer =
                     Analyzer::new(arena, &source_file, &resolved_names, codebase, plugin_registry, settings.clone());
+                if after_file || after_analysis {
+                    analyzer = analyzer.with_deferred_pragmas();
+                }
+                if let Some(session) = external_session.as_deref() {
+                    analyzer = analyzer.with_external_analysis_session(session);
+                }
+                if !external_symbol_references.is_empty() {
+                    analyzer = analyzer.with_additional_symbol_references(&external_symbol_references);
+                }
 
                 analysis_result.issues.extend(semantics_checker.check(&source_file, program, &resolved_names));
-                analyzer.analyze(program, &mut analysis_result)?;
+                let artifacts = analyzer.analyze_with_artifacts(program, &mut analysis_result)?;
+                #[cfg(not(target_arch = "wasm32"))]
+                let snapshot_start = (trace_enabled && (after_file || after_analysis)).then(Instant::now);
+                let snapshot = if after_file || after_analysis {
+                    Some(Arc::new(
+                        FileAnalysisSnapshot::new(
+                            &source_file,
+                            program,
+                            &resolved_names,
+                            &artifacts,
+                            codebase,
+                            node_analysis_requirements.as_ref(),
+                        )
+                        .map_err(|error| {
+                            OrchestratorError::General(format!("Failed to retain external analysis data: {error}"))
+                        })?,
+                    ))
+                } else {
+                    None
+                };
+                #[cfg(not(target_arch = "wasm32"))]
+                if let Some(start) = snapshot_start {
+                    snapshot_ns.fetch_add(start.elapsed().as_nanos() as u64, Relaxed);
+                    snapshot_count.fetch_add(1, Relaxed);
+                }
 
                 #[cfg(not(target_arch = "wasm32"))]
                 if analysis_result.time_in_analysis > ANALYSIS_DURATION_THRESHOLD {
@@ -1064,19 +1367,191 @@ impl IncrementalAnalysisService {
 
                 arena.reset();
 
-                Ok((file_id, analysis_result))
+                Ok((file_id, analysis_result, snapshot))
             })
             .collect::<Result<Vec<_>, OrchestratorError>>()?;
 
-        let mut aggregated_result = AnalysisResult::new(current_symbol_references);
-        let mut per_file_issues: HashMap<FileId, IssueCollection> = HashMap::default();
-
-        for (file_id, result) in results {
-            aggregated_result.symbol_references.extend(result.symbol_references);
-            per_file_issues.insert(file_id, result.issues);
+        #[cfg(not(target_arch = "wasm32"))]
+        if trace_enabled {
+            tracing::trace!(
+                analyzed_files = results.len(),
+                retained_snapshots = snapshot_count.load(Relaxed),
+                snapshot_worker_cpu = ?Duration::from_nanos(snapshot_ns.load(Relaxed)),
+                "Incremental external lifecycle parallel-phase summary."
+            );
         }
 
-        Ok((aggregated_result, per_file_issues))
+        let mut aggregated_result = AnalysisResult::new(current_symbol_references);
+        aggregated_result.issues = before.issues;
+        let mut per_file_issues: HashMap<FileId, IssueCollection> = HashMap::default();
+        let mut per_file_pragmas: HashMap<FileId, DeferredPragmas> = HashMap::default();
+        let mut snapshots = Vec::new();
+
+        for (file_id, mut result, snapshot) in results {
+            let mut deferred_pragmas = result.take_deferred_pragmas();
+            aggregated_result.symbol_references.extend(result.symbol_references);
+            per_file_issues.insert(file_id, result.issues);
+            if let Some(pragmas) = deferred_pragmas.pop() {
+                per_file_pragmas.insert(file_id, pragmas);
+            }
+            debug_assert!(
+                deferred_pragmas.is_empty(),
+                "one file analysis must produce at most one deferred pragma state",
+            );
+            snapshots.extend(snapshot);
+        }
+
+        let mut late_symbol_references_by_file = HashMap::<FileId, SymbolReferences>::default();
+
+        if after_file {
+            #[cfg(not(target_arch = "wasm32"))]
+            let after_file_start = trace_enabled.then(Instant::now);
+            let batches = snapshots
+                .par_chunks(AFTER_FILE_ANALYSIS_BATCH_SIZE)
+                .map(|files| {
+                    plugin_registry.run_external_after_file_analysis_batch_hooks(
+                        files,
+                        codebase,
+                        external_session.as_deref(),
+                    )
+                })
+                .collect::<Result<Vec<_>, _>>()
+                .map_err(mago_analyzer::error::AnalysisError::from)?;
+            let issue_count = batches.iter().map(|batch| batch.issues.len()).sum::<usize>();
+            for batch in batches {
+                for issue in batch.issues {
+                    let file_id = issue.annotations.first().map(|annotation| annotation.span.file_id);
+                    if let Some(issues) = file_id.and_then(|file_id| per_file_issues.get_mut(&file_id)) {
+                        issues.push(issue);
+                    } else {
+                        aggregated_result.issues.push(issue);
+                    }
+                }
+                for (file_id, references) in batch.references_by_file {
+                    late_symbol_references_by_file.entry(file_id).or_default().extend(references);
+                }
+            }
+            #[cfg(not(target_arch = "wasm32"))]
+            if let Some(start) = after_file_start {
+                tracing::trace!(
+                    files = snapshots.len(),
+                    batches = snapshots.len().div_ceil(AFTER_FILE_ANALYSIS_BATCH_SIZE),
+                    issues = issue_count,
+                    elapsed = ?start.elapsed(),
+                    "Incremental external after-file hook batches completed."
+                );
+            }
+        }
+
+        let mut late_symbol_references = SymbolReferences::new();
+        for file_id in &effective_skip_files {
+            if let Some(state) = self.file_states.get(file_id) {
+                late_symbol_references.extend(state.late_symbol_references.clone());
+            }
+        }
+        for references in late_symbol_references_by_file.values() {
+            late_symbol_references.extend(references.clone());
+        }
+
+        let cached_pragmas =
+            effective_skip_files.iter().filter_map(|file_id| self.file_states.get(file_id)?.deferred_pragmas.clone());
+        let mut pragma_reconciler = DeferredIssueReconciler::new(
+            cached_pragmas.chain(per_file_pragmas.values().cloned()),
+            self.database.files(),
+        );
+        aggregated_result.issues = pragma_reconciler.reconcile(std::mem::take(&mut aggregated_result.issues))?;
+        for issues in per_file_issues.values_mut() {
+            *issues = pragma_reconciler.reconcile(std::mem::take(issues))?;
+        }
+        for (file_id, pragmas) in &mut per_file_pragmas {
+            if let Some(reconciled) = pragma_reconciler.state(*file_id) {
+                *pragmas = reconciled.clone();
+            }
+        }
+
+        let native_symbol_references = aggregated_result.symbol_references.clone();
+        aggregated_result.symbol_references.extend(external_symbol_references.clone());
+        aggregated_result.symbol_references.extend(late_symbol_references.clone());
+
+        let codebase_issues = codebase.take_issues(true);
+        if after_analysis {
+            let analyzed = snapshots.iter().map(|snapshot| snapshot.file_id()).collect::<HashSet<_>>();
+            let current = self
+                .database
+                .files()
+                .filter(|file| file.file_type == FileType::Host)
+                .map(|file| file.id)
+                .collect::<HashSet<_>>();
+            let mut project_files = self
+                .analysis_snapshots
+                .iter()
+                .filter(|(file_id, _)| current.contains(file_id) && !analyzed.contains(file_id))
+                .map(|(_, snapshot)| Arc::clone(snapshot))
+                .collect::<Vec<_>>();
+            project_files.extend(snapshots.iter().cloned());
+            project_files.sort_unstable_by_key(|snapshot| snapshot.file_id());
+
+            let mut project_result = AnalysisResult::new(aggregated_result.symbol_references.clone());
+            project_result.issues.extend(aggregated_result.issues.iter().cloned());
+            let late_reconciler = (!late_symbol_references.is_empty())
+                .then(|| LateSymbolReferenceIssueReconciler::new(codebase, &aggregated_result.symbol_references));
+            for issues in per_file_issues.values().cloned() {
+                project_result.issues.extend(match late_reconciler.as_ref() {
+                    Some(reconciler) => reconciler.reconcile(issues),
+                    None => issues,
+                });
+            }
+            for (file_id, state) in &self.file_states {
+                if effective_skip_files.contains(file_id) {
+                    let issues = state.unreconciled_analysis_issues.clone();
+                    project_result.issues.extend(match late_reconciler.as_ref() {
+                        Some(reconciler) => reconciler.reconcile(issues),
+                        None => issues,
+                    });
+                    project_result.issues.extend(state.codebase_issues.iter().cloned());
+                }
+            }
+            project_result.issues.extend(codebase_issues.iter().cloned());
+
+            #[cfg(not(target_arch = "wasm32"))]
+            let after_start = trace_enabled.then(Instant::now);
+            let after_issues = plugin_registry
+                .run_external_after_analysis_hooks(
+                    &project_result,
+                    &project_files,
+                    codebase,
+                    external_session.as_deref(),
+                )
+                .map_err(mago_analyzer::error::AnalysisError::from)?;
+            #[cfg(not(target_arch = "wasm32"))]
+            if let Some(start) = after_start {
+                tracing::trace!(
+                    files = project_files.len(),
+                    issues = after_issues.len(),
+                    elapsed = ?start.elapsed(),
+                    "Incremental external after-analysis hooks completed."
+                );
+            }
+            aggregated_result.issues.extend(pragma_reconciler.reconcile(after_issues)?);
+        }
+
+        aggregated_result.issues.extend(pragma_reconciler.finish()?);
+
+        if !after_analysis {
+            snapshots.clear();
+        }
+
+        Ok(SelectiveAnalysisOutput {
+            result: aggregated_result,
+            native_symbol_references,
+            external_symbol_references,
+            late_symbol_references,
+            late_symbol_references_by_file,
+            per_file_issues,
+            per_file_pragmas,
+            snapshots,
+            codebase_issues,
+        })
     }
 }
 

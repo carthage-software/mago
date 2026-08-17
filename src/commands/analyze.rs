@@ -66,6 +66,8 @@ use crate::commands::stdin_input;
 use crate::config::Configuration;
 use crate::consts::PRELUDE_BYTES;
 use crate::error::Error;
+use crate::extensions::initialize_external_analyzer;
+use crate::extensions::start_external_analyzer;
 use crate::utils::create_orchestrator;
 use crate::utils::git;
 
@@ -281,11 +283,22 @@ impl AnalyzeCommand {
         } else if !self.stdin_input && !self.path.is_empty() {
             stdin_input::set_source_paths_from_paths(&mut orchestrator, &self.path);
         }
-        let orchestrator_init_duration = orchestrator_init_start.map(|s| s.elapsed());
 
+        let orchestrator_init_duration = orchestrator_init_start.map(|s| s.elapsed());
         let load_inputs_start = trace_enabled.then(Instant::now);
         let mut prelude_duration = None;
         let mut load_database_duration = None;
+        let external_analyzer = start_external_analyzer(
+            &configuration.extension_hosts,
+            configuration.php_version,
+            configuration.threads,
+            &configuration.analyzer.plugins,
+            configuration.analyzer.disable_default_plugins,
+        );
+        if let Some(external_analyzer) = external_analyzer {
+            orchestrator.set_external_analyzer_handle(external_analyzer);
+        }
+
         let (prelude, database) = rayon::join(
             || {
                 let start = trace_enabled.then(Instant::now);
@@ -304,6 +317,7 @@ impl AnalyzeCommand {
                 database
             },
         );
+
         let Prelude { database: prelude_database, metadata, symbol_references } = prelude;
         let mut database = database?;
         database.merge_base(prelude_database);
@@ -319,7 +333,6 @@ impl AnalyzeCommand {
         let service = orchestrator.get_analysis_service(database.read_only(), metadata, symbol_references);
         let analysis_result = service.run()?;
         let service_run_duration = service_run_start.map(|s| s.elapsed());
-
         let report_start = trace_enabled.then(Instant::now);
         let mut issues = analysis_result.issues;
         let ignore_set = self.compile_ignore_set(&configuration);
@@ -392,6 +405,18 @@ impl AnalyzeCommand {
 
             let mut orchestrator = create_orchestrator(&configuration, color_choice, false, false, true);
             orchestrator.add_exclude_patterns(configuration.analyzer.excludes.iter());
+
+            if let Some(external_analyzer) = initialize_external_analyzer(
+                &configuration.extension_hosts,
+                configuration.php_version,
+                configuration.threads,
+                &configuration.analyzer.plugins,
+                configuration.analyzer.disable_default_plugins,
+            )
+            .map_err(|error| mago_orchestrator::OrchestratorError::General(error.to_string()))?
+            {
+                orchestrator.set_external_analyzer(external_analyzer);
+            }
 
             if !self.path.is_empty() {
                 orchestrator.set_source_paths(self.path.iter().map(|p| p.to_string_lossy().to_string()));

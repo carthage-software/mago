@@ -11,8 +11,13 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::expression::call::analyze_invocation_targets;
+use crate::expression::call::method_call::analyze_undocumented_method_return_type;
+use crate::expression::call::method_call::prepare_unresolved_method_targets;
+use crate::expression::call::record_external_method_call;
+use crate::expression::call::record_external_method_call_targets;
 use crate::invocation::InvocationArgumentsSource;
 use crate::invocation::InvocationTarget;
+use crate::invocation::MethodInvocationKind;
 use crate::invocation::MethodTargetContext;
 use crate::plugin::ExpressionHookResult;
 use crate::plugin::context::HookContext;
@@ -63,15 +68,17 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodCall<'arena> {
                     .and_then(|m| m.direct_parent_class)
                     .and_then(|p| context.codebase.get_class_like(p.as_bytes()));
                 if let Some(parent_meta) = parent_meta
-                    && context.settings.is_class_initializer_for(parent_meta, method_name)
+                    && context.is_class_initializer_for(parent_meta, method_name)
                 {
                     block_context.calls_parent_initializer = Some(method_name);
                 }
             }
         }
 
-        let method_resolution =
+        let mut method_resolution =
             resolve_static_method_targets(context, block_context, artifacts, self.class, &self.method, self.span())?;
+        let undocumented_template_result =
+            (!method_resolution.undocumented_methods.is_empty()).then(|| method_resolution.template_result.clone());
 
         let mut invocation_targets = vec![];
         for resolved_method in method_resolution.resolved_methods {
@@ -98,6 +105,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodCall<'arena> {
             );
 
             let method_target_context = MethodTargetContext {
+                invocation_kind: MethodInvocationKind::Static,
                 declaring_method_id: Some(resolved_method.method_identifier),
                 class_like_metadata: metadata,
                 class_type: resolved_method.static_class_type,
@@ -111,28 +119,68 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodCall<'arena> {
                 ),
                 metadata: method_metadata,
                 inferred_return_type: None,
+                effective_signature: None,
                 method_context: Some(method_target_context),
                 span: self.span(),
             });
         }
 
+        if !method_resolution.unresolved_methods.is_empty() {
+            method_resolution.has_invalid_target |= prepare_unresolved_method_targets(
+                context,
+                artifacts,
+                std::mem::take(&mut method_resolution.unresolved_methods),
+                InvocationArgumentsSource::ArgumentList(&self.argument_list),
+                self.span(),
+                MethodInvocationKind::Static,
+                &mut invocation_targets,
+            )?;
+        }
+
+        let has_resolved_methods = !invocation_targets.is_empty();
+
+        record_external_method_call(context, artifacts, &invocation_targets, self.span());
+        if !method_resolution.undocumented_methods.is_empty() {
+            record_external_method_call_targets(
+                context,
+                artifacts,
+                method_resolution.undocumented_methods.iter().map(|method| (method.classname, method.method_name)),
+                self.span(),
+            );
+        }
+
         let class_has_nullsafe_null = artifacts.get_expression_type(self.class).is_some_and(|t| t.has_nullsafe_null());
 
-        analyze_invocation_targets(
-            context,
-            block_context,
-            artifacts,
-            method_resolution.template_result,
-            invocation_targets,
-            InvocationArgumentsSource::ArgumentList(&self.argument_list),
-            self.span(),
-            None,
-            method_resolution.has_invalid_target,
-            method_resolution.encountered_mixed,
-            expression_is_nullsafe(self.class) || method_resolution.encountered_null,
-            class_has_nullsafe_null,
-            method_resolution.all_methods_non_nullable_return,
-        )?;
+        if has_resolved_methods || method_resolution.undocumented_methods.is_empty() {
+            analyze_invocation_targets(
+                context,
+                block_context,
+                artifacts,
+                method_resolution.template_result,
+                invocation_targets,
+                InvocationArgumentsSource::ArgumentList(&self.argument_list),
+                self.span(),
+                None,
+                method_resolution.has_invalid_target,
+                method_resolution.encountered_mixed,
+                expression_is_nullsafe(self.class) || method_resolution.encountered_null,
+                class_has_nullsafe_null,
+            )?;
+        }
+
+        if !method_resolution.undocumented_methods.is_empty() {
+            analyze_undocumented_method_return_type(
+                context,
+                block_context,
+                artifacts,
+                method_resolution.undocumented_methods,
+                undocumented_template_result.as_ref().expect("undocumented calls have a template result"),
+                &self.argument_list,
+                self.span(),
+                MethodInvocationKind::Static,
+                !has_resolved_methods,
+            )?;
+        }
 
         if context.plugin_registry.has_static_method_call_hooks() {
             let mut hook_context = HookContext::new(context.codebase, context.source_file, block_context, artifacts);
