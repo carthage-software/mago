@@ -833,12 +833,14 @@ $classes = $context-&gt;codebase-&gt;getMultipleClasses([
 <li>normalized and source-cased names, kind, declaration locations, and flags;</li>
 <li>direct and transitive parents and interfaces;</li>
 <li>trait use, <code>require extends</code>, and <code>require implements</code> relationships;</li>
+<li>unresolved hierarchy dependencies and <code>hasIncompleteHierarchy()</code>;</li>
 <li>declared methods, pseudo-methods, properties, magic properties, constants, and enum cases;</li>
 <li>templates, attributes, type aliases, mixins, and enum backing type;</li>
 <li>optional children and permitted inheritors;</li>
 <li>sealed-method and sealed-property state and PHP version ranges.</li>
 </ul>
 <p>Ancestry helpers return direct descendants, all descendants, or ancestors. Plural variants query multiple roots in one request.</p>
+<p><code>hasIncompleteHierarchy()</code> is true when Mago could not resolve a direct or transitive hierarchy dependency. The normalized missing names are available through <code>unresolvedHierarchyDependencies</code>. Local declarations and references discovered while analyzing their bodies remain available, but an extension should avoid negative conclusions that require complete inherited metadata.</p>
 <h2 id="functions-and-methods">Functions and methods</h2>
 <p>Functions are queried by name. A <code>FunctionLikeIdentifier</code> can identify a function, method, or closure for generic function-like values.</p>
 <p>Methods use <code>MemberIdentifier</code> for batched operations. <code>getMethod()</code> resolves the visible method for a class, while <code>getDeclaringMethod()</code> returns the declaration that owns it.</p>
