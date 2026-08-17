@@ -120,12 +120,18 @@ final class PluginRegistryTest extends TestCase
         };
     }
 
+    /** @param non-empty-string $pattern */
     private static function codebaseScanHook(string $pattern): CodebaseScanHook
     {
         return new class($pattern) implements CodebaseScanHook {
-            public function __construct(
-                private readonly string $pattern,
-            ) {}
+            /** @var non-empty-string */
+            private readonly string $pattern;
+
+            /** @param non-empty-string $pattern */
+            public function __construct(string $pattern)
+            {
+                $this->pattern = $pattern;
+            }
 
             public function getTargets(): array
             {

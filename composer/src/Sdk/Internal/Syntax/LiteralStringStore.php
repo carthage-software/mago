@@ -26,7 +26,7 @@ final class LiteralStringStore
     ) {}
 
     /**
-     * @param int<0, 4294967295> $node
+     * @param non-negative-int $node
      */
     public function find(int $node): ?string
     {

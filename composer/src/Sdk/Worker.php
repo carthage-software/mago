@@ -138,7 +138,7 @@ final class Worker
     /** @var list<RegisteredTargetedCallback<IssueFilterHook, string>> */
     private readonly array $issueFilterHooks;
 
-    /** @var list<RegisteredTargetedCallback<CodebaseScanHook, non-empty-string>> */
+    /** @var list<RegisteredTargetedCallback<CodebaseScanHook, string>> */
     private readonly array $codebaseScanHooks;
 
     /**

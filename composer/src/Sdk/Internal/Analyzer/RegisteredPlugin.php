@@ -49,7 +49,7 @@ final class RegisteredPlugin
      * @param list<AttributedEntryPoint> $attributedEntryPoints
      * @param list<RegisteredTargetedCallback<IssueFilterHook, string>> $issueFilterHooks
      * @param list<InitializationHook> $initializationHooks
-     * @param list<RegisteredTargetedCallback<CodebaseScanHook, non-empty-string>> $codebaseScanHooks
+     * @param list<RegisteredTargetedCallback<CodebaseScanHook, string>> $codebaseScanHooks
      * @param list<BeforeAnalysisHook> $beforeAnalysisHooks
      * @param list<AfterFileAnalysisHook> $afterFileAnalysisHooks
      * @param list<RegisteredTargetedCallback<NodeAnalysisHook, NodeKind>> $nodeAnalysisHooks
