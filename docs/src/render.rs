@@ -140,6 +140,7 @@ pub fn build_site(root: &Path) -> Result<()> {
         context.insert("content", &rewritten_html);
         context.insert("is_homepage", &page.logical_path.is_empty());
         context.insert("is_playground", &(page.logical_path == "playground"));
+        context.insert("has_diagrams", &page.html.contains("language-mermaid"));
         context.insert("base_url", &config.base_url);
 
         let ui_strings = BTreeMap::from([

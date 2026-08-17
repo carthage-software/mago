@@ -14,6 +14,7 @@ nav-sections = [
   "Guide", "指南",
   "Fundamentals", "Fondamentaux", "基础",
   "Tools", "工具",
+  "Extensions",
   "Recipes", "Recettes", "实用方案",
   "Reference", "Référence", "参考",
 ]
@@ -21,6 +22,7 @@ nav-sections = [
 # Subsection order under specific parents. Anything missing falls to alpha.
 [nav-subsections]
 "Tools" = ["Linter", "Analyzer", "Formatter", "Guard"]
+"Extensions" = ["PHP SDK", "Linter", "Analyzer", "Development", "Reference"]
 
 [[languages]]
 code = "en"

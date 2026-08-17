@@ -35,6 +35,9 @@
   <link rel="stylesheet" href="{{ path_to_root }}{{ current_version }}/_assets/css/layout.css">
   <link rel="stylesheet" href="{{ path_to_root }}{{ current_version }}/_assets/css/components.css">
   <link rel="stylesheet" href="{{ path_to_root }}{{ current_version }}/_assets/css/code.css">
+  {% if has_diagrams %}
+  <link rel="stylesheet" href="{{ path_to_root }}{{ current_version }}/_assets/css/diagrams.css">
+  {% endif %}
   {% if is_playground %}
   <link rel="stylesheet" href="{{ path_to_root }}{{ current_version }}/_assets/css/playground.css">
   {% endif %}
@@ -79,6 +82,10 @@
   <script src="{{ path_to_root }}{{ current_version }}/_assets/js/anchors.js" defer></script>
   <script src="{{ path_to_root }}{{ current_version }}/_assets/js/versions.js" defer></script>
   <script src="{{ path_to_root }}{{ current_version }}/_assets/js/highlight.js" defer></script>
+  {% if has_diagrams %}
+  <script src="https://cdn.jsdelivr.net/npm/mermaid@11.16.1/dist/mermaid.min.js" integrity="sha384-aBQXj4hK6Jm05i7aQAsUV3bLdSUrHX1BGYfMB0166TtWt/RRaw+h0Eelme9OCOvy" crossorigin="anonymous" defer></script>
+  <script src="{{ path_to_root }}{{ current_version }}/_assets/js/diagrams.js" defer></script>
+  {% endif %}
   {% if is_homepage %}<script src="{{ path_to_root }}{{ current_version }}/_assets/js/sponsors.js" defer></script>{% endif %}
   {% block page_scripts %}{% endblock page_scripts %}
 </body>
