@@ -4,8 +4,10 @@ use std::cmp::Ordering;
 use mago_algebra::assertion_set::AssertionSet;
 use mago_algebra::assertion_set::negate_assertion_set;
 use mago_codex::assertion::Assertion;
+use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::object::named::TNamedObject;
@@ -15,7 +17,14 @@ use mago_codex::ttype::atomic::scalar::string::TString;
 use mago_codex::ttype::atomic::scalar::string::TStringCasing;
 use mago_codex::ttype::cast::cast_atomic_to_callable;
 use mago_codex::ttype::get_array_value_parameter;
+use mago_codex::ttype::get_arraykey;
+use mago_codex::ttype::get_bool;
+use mago_codex::ttype::get_false;
+use mago_codex::ttype::get_float;
 use mago_codex::ttype::get_iterable_value_parameter;
+use mago_codex::ttype::get_numeric_string;
+use mago_codex::ttype::get_true;
+use mago_codex::ttype::union::TUnion;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::cst::Access;
@@ -34,6 +43,7 @@ use mago_word::Word;
 use mago_word::WordMap;
 use mago_word::ascii_lowercase_word;
 use mago_word::concat_word;
+use mago_word::i64_word;
 use mago_word::word;
 
 use crate::artifacts::AnalysisArtifacts;
@@ -313,23 +323,41 @@ where
 
         if let (Some(key_argument), Some(array_argument)) = (key_argument, array_argument)
             && get_expression_array_key(artifacts, key_argument).is_none()
-            && let Some(array_id) = get_expression_id(
+        {
+            if let Some(array_id) = get_expression_id(
                 array_argument,
                 assertion_context.this_class_name,
                 assertion_context.resolved_names,
                 Some(assertion_context.codebase),
-            )
-            && let Some(index_id) = get_index_id(
+            ) && let Some(index_id) = get_index_id(
                 key_argument,
                 assertion_context.this_class_name,
                 assertion_context.resolved_names,
                 Some(assertion_context.codebase),
-            )
-        {
-            let access_id = concat_word!(array_id.as_bytes(), b"[", index_id.as_bytes(), b"]");
-            if_types.insert(access_id, vec![vec![Assertion::ArrayKeyExists]]);
+            ) {
+                let access_id = concat_word!(array_id.as_bytes(), b"[", index_id.as_bytes(), b"]");
+                if_types.insert(access_id, vec![vec![Assertion::ArrayKeyExists]]);
+            }
 
-            return if_types;
+            if let Some(key_id) = get_expression_id(
+                key_argument,
+                assertion_context.this_class_name,
+                assertion_context.resolved_names,
+                Some(assertion_context.codebase),
+            ) && let Some(array_type) = artifacts.get_expression_type(array_argument)
+                && let Some(input_key_type) = artifacts.get_expression_type(key_argument)
+                && let Some(key_type) =
+                    get_possible_array_key_argument_type(array_type, input_key_type, assertion_context.codebase)
+            {
+                let assertions = key_type.types.iter().cloned().map(Assertion::IsType).collect::<Vec<_>>();
+                if !assertions.is_empty() {
+                    if_types.insert(key_id, vec![assertions]);
+                }
+            }
+
+            if !if_types.is_empty() {
+                return if_types;
+            }
         }
     }
 
@@ -603,6 +631,130 @@ where
     }
 
     if_types
+}
+
+fn get_possible_array_key_argument_type(
+    array_type: &TUnion,
+    input_key_type: &TUnion,
+    codebase: &CodebaseMetadata,
+) -> Option<TUnion> {
+    let mut key_type = None;
+
+    for atomic in array_type.types.as_ref() {
+        let TAtomic::Array(array) = atomic else {
+            continue;
+        };
+
+        match array {
+            TArray::Keyed(keyed) => {
+                if let Some(known_items) = keyed.get_known_items() {
+                    for key in known_items.keys() {
+                        add_possible_key_argument_type(&key.to_atomic(), input_key_type, &mut key_type, codebase);
+                    }
+                }
+
+                if let Some((parameter, _)) = keyed.get_generic_parameters() {
+                    for atomic in parameter.types.as_ref() {
+                        add_possible_key_argument_type(atomic, input_key_type, &mut key_type, codebase);
+                    }
+                }
+            }
+            TArray::List(list) => {
+                if !list.get_element_type().is_never() {
+                    add_possible_key_argument_type(
+                        &TAtomic::Scalar(TScalar::Integer(TInteger::unspecified())),
+                        input_key_type,
+                        &mut key_type,
+                        codebase,
+                    );
+
+                    continue;
+                }
+
+                if let Some(known_elements) = list.get_known_elements() {
+                    for index in known_elements.keys() {
+                        let Ok(index) = i64::try_from(*index) else {
+                            add_possible_key_argument_type(
+                                &TAtomic::Scalar(TScalar::Integer(TInteger::unspecified())),
+                                input_key_type,
+                                &mut key_type,
+                                codebase,
+                            );
+
+                            break;
+                        };
+
+                        add_possible_key_argument_type(
+                            &ArrayKey::Integer(index).to_atomic(),
+                            input_key_type,
+                            &mut key_type,
+                            codebase,
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    key_type
+}
+
+fn add_possible_key_argument_type(
+    key: &TAtomic,
+    input_key_type: &TUnion,
+    possible_type: &mut Option<TUnion>,
+    codebase: &CodebaseMetadata,
+) {
+    let add = |candidate, possible_type: &mut Option<TUnion>| {
+        *possible_type = Some(add_optional_union_type(candidate, possible_type.as_ref(), codebase));
+    };
+
+    let accepts_all_scalars = input_key_type.is_mixed() || input_key_type.has_scalar();
+
+    match key {
+        TAtomic::Scalar(TScalar::Integer(integer)) => {
+            if accepts_all_scalars || input_key_type.has_int() {
+                add(TUnion::from_atomic(key.clone()), possible_type);
+            }
+
+            if accepts_all_scalars || input_key_type.has_float() {
+                add(get_float(), possible_type);
+            }
+
+            if let Some(value) = integer.get_literal_value() {
+                if accepts_all_scalars || input_key_type.has_string() {
+                    add(TUnion::from_atomic(TAtomic::Scalar(TScalar::literal_string(i64_word(value)))), possible_type);
+                }
+
+                if accepts_all_scalars || input_key_type.has_bool() {
+                    if value == 0 {
+                        add(get_false(), possible_type);
+                    } else if value == 1 {
+                        add(get_true(), possible_type);
+                    }
+                }
+            } else {
+                if accepts_all_scalars || input_key_type.has_string() {
+                    add(get_numeric_string(), possible_type);
+                }
+
+                if accepts_all_scalars || input_key_type.has_bool() {
+                    add(get_bool(), possible_type);
+                }
+            }
+        }
+        TAtomic::Scalar(TScalar::ArrayKey) => {
+            add(get_arraykey(), possible_type);
+            if accepts_all_scalars || input_key_type.has_float() {
+                add(get_float(), possible_type);
+            }
+
+            if accepts_all_scalars || input_key_type.has_bool() {
+                add(get_bool(), possible_type);
+            }
+        }
+        _ => add(TUnion::from_atomic(key.clone()), possible_type),
+    }
 }
 
 pub(super) fn scrape_equality_assertions<A>(
