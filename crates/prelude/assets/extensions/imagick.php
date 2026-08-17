@@ -1,6 +1,9 @@
 <?php
 
-class Imagick
+/**
+ * @implements Iterator<int, Imagick>
+ */
+class Imagick implements Iterator, Countable
 {
     public const COLOR_BLACK = 11;
     public const COLOR_BLUE = 12;
@@ -1988,6 +1991,135 @@ class ImagickDraw
     public function skewY(float $degrees): bool {}
 
     public function translate(float $x, float $y): bool {}
+}
+
+/**
+ * @implements Iterator<int, list<ImagickPixel>>
+ */
+class ImagickPixelIterator implements Iterator
+{
+    public function __construct(Imagick $imagick) {}
+
+    public function clear(): bool {}
+
+    public static function getPixelIterator(Imagick $imagick): ImagickPixelIterator {}
+
+    public static function getPixelRegionIterator(
+        Imagick $imagick,
+        int $x,
+        int $y,
+        int $columns,
+        int $rows,
+    ): ImagickPixelIterator {}
+
+    public function destroy(): bool {}
+
+    /** @return list<ImagickPixel>|null */
+    public function getCurrentIteratorRow(): ?array {}
+
+    public function getIteratorRow(): int {}
+
+    /** @return list<ImagickPixel>|null */
+    public function getNextIteratorRow(): ?array {}
+
+    /** @return list<ImagickPixel> */
+    public function getPreviousIteratorRow(): array {}
+
+    public function key(): int {}
+
+    public function next(): void {}
+
+    public function rewind(): void {}
+
+    /** @return list<ImagickPixel>|null */
+    public function current(): ?array {}
+
+    public function newPixelIterator(Imagick $imagick): bool {}
+
+    public function newPixelRegionIterator(Imagick $imagick, int $x, int $y, int $columns, int $rows): bool {}
+
+    public function resetIterator(): bool {}
+
+    public function setIteratorFirstRow(): bool {}
+
+    public function setIteratorLastRow(): bool {}
+
+    public function setIteratorRow(int $row): bool {}
+
+    public function syncIterator(): bool {}
+
+    public function valid(): bool {}
+}
+
+class ImagickPixel
+{
+    public function __construct(?string $color = null) {}
+
+    public function clear(): bool {}
+
+    public function destroy(): bool {}
+
+    /** @return array{r: int|float, g: int|float, b: int|float, a: int|float} */
+    public function getColor(int $normalized = 0): array {}
+
+    public function getColorAsString(): string {}
+
+    public function getColorCount(): int {}
+
+    /** @return array<string, int|float> */
+    public function getColorQuantum(): array {}
+
+    public function getColorValue(int $color): float {}
+
+    public function getColorValueQuantum(int $color): int|float {}
+
+    /** @return array{hue: float, saturation: float, luminosity: float} */
+    public function getHSL(): array {}
+
+    public function getIndex(): int {}
+
+    public function isPixelSimilar(ImagickPixel|string $color, float $fuzz): ?bool {}
+
+    public function isPixelSimilarQuantum(ImagickPixel|string $color, float $fuzz): ?bool {}
+
+    public function isSimilar(ImagickPixel|string $color, float $fuzz): ?bool {}
+
+    public function setColor(string $color): bool {}
+
+    public function setColorCount(int $color_count): bool {}
+
+    public function setColorValue(int $color, float $value): bool {}
+
+    public function setColorValueQuantum(int $color, int|float $value): bool {}
+
+    public function setHSL(float $hue, float $saturation, float $luminosity): bool {}
+
+    public function setIndex(int|float $index): bool {}
+
+    public function setColorFromPixel(ImagickPixel $pixel): bool {}
+}
+
+class ImagickKernel
+{
+    public function addKernel(ImagickKernel $kernel): void {}
+
+    public function addUnityKernel(float $scale): void {}
+
+    public static function fromBuiltin(int $kernel, string $shape): ImagickKernel {}
+
+    /**
+     * @param list<list<float|false>> $matrix
+     * @param array{0: int, 1: int}|null $origin
+     */
+    public static function fromMatrix(array $matrix, ?array $origin = null): ImagickKernel {}
+
+    /** @return list<list<float|false>> */
+    public function getMatrix(): array {}
+
+    public function scale(float $scale, ?int $normalize_kernel = null): void {}
+
+    /** @return list<ImagickKernel> */
+    public function separate(): array {}
 }
 
 class ImagickException extends Exception {}
