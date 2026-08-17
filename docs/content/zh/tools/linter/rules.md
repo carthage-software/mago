@@ -5,9 +5,9 @@ nav_order = 70
 nav_section = "Tools"
 nav_subsection = "Linter"
 +++
-Mago 的 linter 共提供 176 条规则,分布在 9 个类别中。点击任意规则可展开其描述、要求、默认配置和示例。
+Mago 的 linter 共提供 190 条规则,分布在 9 个类别中。点击任意规则可展开其描述、要求、默认配置和示例。
 
-<div class="rule-index" role="navigation" aria-label="规则类别"><a class="rule-index__item" href="#clarity"><span class="rule-index__name">清晰度</span><span class="rule-index__count">22 条规则</span><span class="rule-index__blurb">让意图更明确、减少阅读负担的规则。它们指出在技术上合法但会模糊代码意图的写法。</span></a><a class="rule-index__item" href="#bestpractices"><span class="rule-index__name">最佳实践</span><span class="rule-index__count">40 条规则</span><span class="rule-index__blurb">PHP 的惯用写法和被广泛接受的约定。这些规则推动代码靠近经验丰富的 PHP 开发者所采用的现代风格。</span></a><a class="rule-index__item" href="#consistency"><span class="rule-index__name">一致性</span><span class="rule-index__count">27 条规则</span><span class="rule-index__blurb">保持整套代码风格一致。选定一种写法,这些规则帮助所有人坚持下去。</span></a><a class="rule-index__item" href="#deprecation"><span class="rule-index__name">弃用</span><span class="rule-index__count">7 条规则</span><span class="rule-index__blurb">上游已弃用、未来会被移除的 PHP 特性与 API。请在它们彻底失效前迁移。</span></a><a class="rule-index__item" href="#maintainability"><span class="rule-index__name">可维护性</span><span class="rule-index__count">11 条规则</span><span class="rule-index__blurb">难以长期维护的代码,过于复杂、纠缠或脆弱。这些规则提前暴露成本。</span></a><a class="rule-index__item" href="#redundancy"><span class="rule-index__name">冗余</span><span class="rule-index__count">29 条规则</span><span class="rule-index__blurb">无用代码、无效值,以及没有可观察效果的写法。清理它们让代码更诚实。</span></a><a class="rule-index__item" href="#security"><span class="rule-index__name">安全</span><span class="rule-index__count">12 条规则</span><span class="rule-index__blurb">标记安全漏洞的规则,如注入向量、不安全的反序列化,以及不可信输入流入敏感位置。</span></a><a class="rule-index__item" href="#safety"><span class="rule-index__name">安全性</span><span class="rule-index__count">9 条规则</span><span class="rule-index__blurb">可以通过编译但运行时会出问题的写法。这些规则在用户遇到之前就揪出陷阱。</span></a><a class="rule-index__item" href="#correctness"><span class="rule-index__name">正确性</span><span class="rule-index__count">19 条规则</span><span class="rule-index__blurb">缺陷与逻辑错误。本类规则负责发现作者本意之外的行为。</span></a></div>
+<div class="rule-index" role="navigation" aria-label="规则类别"><a class="rule-index__item" href="#clarity"><span class="rule-index__name">清晰度</span><span class="rule-index__count">22 条规则</span><span class="rule-index__blurb">让意图更明确、减少阅读负担的规则。它们指出在技术上合法但会模糊代码意图的写法。</span></a><a class="rule-index__item" href="#bestpractices"><span class="rule-index__name">最佳实践</span><span class="rule-index__count">47 条规则</span><span class="rule-index__blurb">PHP 的惯用写法和被广泛接受的约定。这些规则推动代码靠近经验丰富的 PHP 开发者所采用的现代风格。</span></a><a class="rule-index__item" href="#consistency"><span class="rule-index__name">一致性</span><span class="rule-index__count">27 条规则</span><span class="rule-index__blurb">保持整套代码风格一致。选定一种写法,这些规则帮助所有人坚持下去。</span></a><a class="rule-index__item" href="#deprecation"><span class="rule-index__name">弃用</span><span class="rule-index__count">7 条规则</span><span class="rule-index__blurb">上游已弃用、未来会被移除的 PHP 特性与 API。请在它们彻底失效前迁移。</span></a><a class="rule-index__item" href="#maintainability"><span class="rule-index__name">可维护性</span><span class="rule-index__count">11 条规则</span><span class="rule-index__blurb">难以长期维护的代码,过于复杂、纠缠或脆弱。这些规则提前暴露成本。</span></a><a class="rule-index__item" href="#redundancy"><span class="rule-index__name">冗余</span><span class="rule-index__count">31 条规则</span><span class="rule-index__blurb">无用代码、无效值,以及没有可观察效果的写法。清理它们让代码更诚实。</span></a><a class="rule-index__item" href="#security"><span class="rule-index__name">安全</span><span class="rule-index__count">15 条规则</span><span class="rule-index__blurb">标记安全漏洞的规则,如注入向量、不安全的反序列化,以及不可信输入流入敏感位置。</span></a><a class="rule-index__item" href="#safety"><span class="rule-index__name">安全性</span><span class="rule-index__count">9 条规则</span><span class="rule-index__blurb">可以通过编译但运行时会出问题的写法。这些规则在用户遇到之前就揪出陷阱。</span></a><a class="rule-index__item" href="#correctness"><span class="rule-index__name">正确性</span><span class="rule-index__count">21 条规则</span><span class="rule-index__blurb">缺陷与逻辑错误。本类规则负责发现作者本意之外的行为。</span></a></div>
 
 <h2 id="integration-specific-rules">特定集成的规则</h2>
 
@@ -21,8 +21,13 @@ Mago 的 linter 共提供 176 条规则,分布在 9 个类别中。点击任意�
 
 - [`final-controller`](#final-controller)
 - [`middleware-in-routes`](#middleware-in-routes)
+- [`no-implicit-model-query`](#no-implicit-model-query)
 - [`no-request-all`](#no-request-all)
 - [`prefer-anonymous-migration`](#prefer-anonymous-migration)
+- [`prefer-array-validation-rules`](#prefer-array-validation-rules)
+- [`prefer-casts-method`](#prefer-casts-method)
+- [`prefer-dedicated-status-assertion`](#prefer-dedicated-status-assertion)
+- [`prefer-fake-helper`](#prefer-fake-helper)
 - [`prefer-view-array`](#prefer-view-array)
 
 <h3 id="integration-phpunit">PHPUnit</h3>
@@ -72,7 +77,10 @@ Mago 的 linter 共提供 176 条规则,分布在 9 个类别中。点击任意�
 - [`no-direct-db-query`](#no-direct-db-query)
 - [`no-roles-as-capabilities`](#no-roles-as-capabilities)
 - [`no-unescaped-output`](#no-unescaped-output)
+- [`nonce-verification`](#nonce-verification)
+- [`prepared-sql`](#prepared-sql)
 - [`use-wp-functions`](#use-wp-functions)
+- [`validated-sanitized-input`](#validated-sanitized-input)
 
 <h3 id="integration-yii">Yii</h3>
 
@@ -1229,6 +1237,7 @@ function foo() {}
 | `enabled` | `boolean` | `false` |
 | `enum-cases` | `boolean` | `true` |
 | `enums` | `boolean` | `false` |
+| `exclusions` | `object` | `{"functions":[],"classes":[],"interfaces":[],"traits":[],"enums":[],"enum-cases":[],"constants":[],"statics":[],"methods":[],"properties":[]}` |
 | `functions` | `boolean` | `true` |
 | `interfaces` | `boolean` | `false` |
 | `level` | `string` | `"help"` |
@@ -1914,8 +1923,9 @@ $className = \App\Models\User::class;
 
 <div class="rule__body">
 
-Detects when a function or method parameter is shadowed by a loop variable
-or catch variable, making the original parameter value inaccessible.
+Detects when a function or method parameter is shadowed by a loop variable,
+a catch variable, or a `global`/`static` declaration, making the original
+parameter value inaccessible.
 
 <hr class="rule__separator">
 
@@ -2996,6 +3006,296 @@ $wp_filesystem->put_contents( '/path/to/my-file.txt', 'data' );
 
 </details>
 
+<details class="rule" name="rule" id="no-implicit-model-query">
+<summary><code class="rule__code">no-implicit-model-query</code><a class="rule__anchor" href="#no-implicit-model-query" aria-label="no-implicit-model-query 的永久链接">¶</a><span class="rule__level rule__level--note">note</span></summary>
+
+<div class="rule__body">
+
+Detects query-builder methods (`where`, `orderBy`, `with`, ...) called statically on an
+Eloquent model. Such calls are forwarded to a new query through `__callStatic`. Starting
+the chain with an explicit `query()` makes the query obvious and improves IDE support.
+
+<blockquote class="rule-requirement">此规则需要启用 <a href="#integration-laravel"><code>Laravel</code></a> 集成。</blockquote>
+
+<hr class="rule__separator">
+
+<div class="rule-examples">
+
+<div class="rule-example rule-example--bad">
+<div class="rule-example__label">避免</div>
+
+```php
+<?php
+
+$users = User::where('is_active', true)->get();
+```
+
+</div>
+
+<div class="rule-example rule-example--good">
+<div class="rule-example__label">推荐</div>
+
+```php
+<?php
+
+$users = User::query()->where('is_active', true)->get();
+```
+
+</div>
+
+</div>
+
+<hr class="rule__separator">
+
+| 选项 | 类型 | 默认值 |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"note"` |
+
+</div>
+
+</details>
+
+<details class="rule" name="rule" id="prefer-array-validation-rules">
+<summary><code class="rule__code">prefer-array-validation-rules</code><a class="rule__anchor" href="#prefer-array-validation-rules" aria-label="prefer-array-validation-rules 的永久链接">¶</a><span class="rule__level rule__level--note">note</span></summary>
+
+<div class="rule__body">
+
+Detects `|`-delimited validation rule strings in a `rules()` method. Expressing the rules
+as an array keeps a consistent structure and avoids ambiguity when a rule value itself
+contains a `|`, such as a `regex` pattern.
+
+<blockquote class="rule-requirement">此规则需要启用 <a href="#integration-laravel"><code>Laravel</code></a> 集成。</blockquote>
+
+<hr class="rule__separator">
+
+<div class="rule-examples">
+
+<div class="rule-example rule-example--bad">
+<div class="rule-example__label">避免</div>
+
+```php
+<?php
+
+class StoreUserRequest
+{
+    public function rules(): array
+    {
+        return [
+            'name' => 'required|string|max:255',
+        ];
+    }
+}
+```
+
+</div>
+
+<div class="rule-example rule-example--good">
+<div class="rule-example__label">推荐</div>
+
+```php
+<?php
+
+class StoreUserRequest
+{
+    public function rules(): array
+    {
+        return [
+            'name' => ['required', 'string', 'max:255'],
+        ];
+    }
+}
+```
+
+</div>
+
+</div>
+
+<hr class="rule__separator">
+
+| 选项 | 类型 | 默认值 |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"note"` |
+
+</div>
+
+</details>
+
+<details class="rule" name="rule" id="prefer-casts-method">
+<summary><code class="rule__code">prefer-casts-method</code><a class="rule__anchor" href="#prefer-casts-method" aria-label="prefer-casts-method 的永久链接">¶</a><span class="rule__level rule__level--note">note</span></summary>
+
+<div class="rule__body">
+
+Detects the `$casts` property on an Eloquent model. Laravel 11 introduced the `casts()`
+method as the modern way to declare attribute casts, allowing the cast values to be
+expressed with code (such as enum or class references) rather than a static array.
+
+<blockquote class="rule-requirement">此规则需要启用 <a href="#integration-laravel"><code>Laravel</code></a> 集成。</blockquote>
+
+<hr class="rule__separator">
+
+<div class="rule-examples">
+
+<div class="rule-example rule-example--bad">
+<div class="rule-example__label">避免</div>
+
+```php
+<?php
+
+class User
+{
+    protected $casts = [
+        'is_admin' => 'boolean',
+    ];
+}
+```
+
+</div>
+
+<div class="rule-example rule-example--good">
+<div class="rule-example__label">推荐</div>
+
+```php
+<?php
+
+class User
+{
+    protected function casts(): array
+    {
+        return [
+            'is_admin' => 'boolean',
+        ];
+    }
+}
+```
+
+</div>
+
+</div>
+
+<hr class="rule__separator">
+
+| 选项 | 类型 | 默认值 |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"note"` |
+
+</div>
+
+</details>
+
+<details class="rule" name="rule" id="prefer-dedicated-status-assertion">
+<summary><code class="rule__code">prefer-dedicated-status-assertion</code><a class="rule__anchor" href="#prefer-dedicated-status-assertion" aria-label="prefer-dedicated-status-assertion 的永久链接">¶</a><span class="rule__level rule__level--note">note</span></summary>
+
+<div class="rule__body">
+
+Detects calls to `assertStatus()` with a status code that has a dedicated assertion
+method, such as `assertOk()` for `200` or `assertNotFound()` for `404`. The dedicated
+methods read better and state the expected outcome directly.
+
+<blockquote class="rule-requirement">此规则需要启用 <a href="#integration-laravel"><code>Laravel</code></a> 集成。</blockquote>
+
+<hr class="rule__separator">
+
+<div class="rule-examples">
+
+<div class="rule-example rule-example--bad">
+<div class="rule-example__label">避免</div>
+
+```php
+<?php
+
+$response->assertStatus(200);
+```
+
+</div>
+
+<div class="rule-example rule-example--good">
+<div class="rule-example__label">推荐</div>
+
+```php
+<?php
+
+$response->assertOk();
+```
+
+</div>
+
+</div>
+
+<hr class="rule__separator">
+
+| 选项 | 类型 | 默认值 |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"note"` |
+
+</div>
+
+</details>
+
+<details class="rule" name="rule" id="prefer-fake-helper">
+<summary><code class="rule__code">prefer-fake-helper</code><a class="rule__anchor" href="#prefer-fake-helper" aria-label="prefer-fake-helper 的永久链接">¶</a><span class="rule__level rule__level--note">note</span></summary>
+
+<div class="rule__body">
+
+Detects use of the `$this->faker` property inside a Laravel model factory. The global
+`fake()` helper is the modern equivalent and does not depend on the property being set.
+
+<blockquote class="rule-requirement">此规则需要启用 <a href="#integration-laravel"><code>Laravel</code></a> 集成。</blockquote>
+
+<hr class="rule__separator">
+
+<div class="rule-examples">
+
+<div class="rule-example rule-example--bad">
+<div class="rule-example__label">避免</div>
+
+```php
+<?php
+
+class UserFactory
+{
+    public function definition(): array
+    {
+        return ['name' => $this->faker->name()];
+    }
+}
+```
+
+</div>
+
+<div class="rule-example rule-example--good">
+<div class="rule-example__label">推荐</div>
+
+```php
+<?php
+
+class UserFactory
+{
+    public function definition(): array
+    {
+        return ['name' => fake()->name()];
+    }
+}
+```
+
+</div>
+
+</div>
+
+<hr class="rule__separator">
+
+| 选项 | 类型 | 默认值 |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"note"` |
+
+</div>
+
+</details>
+
 <details class="rule" name="rule" id="prefer-interface">
 <summary><code class="rule__code">prefer-interface</code><a class="rule__anchor" href="#prefer-interface" aria-label="prefer-interface 的永久链接">¶</a><span class="rule__level rule__level--note">note</span></summary>
 
@@ -3168,6 +3468,60 @@ $a = fn($x) => $x + 1;
 
 </details>
 
+<details class="rule" name="rule" id="prefer-datetimeimmutable-create-from-timestamp">
+<summary><code class="rule__code">prefer-datetimeimmutable-create-from-timestamp</code><a class="rule__anchor" href="#prefer-datetimeimmutable-create-from-timestamp" aria-label="prefer-datetimeimmutable-create-from-timestamp 的永久链接">¶</a><span class="rule__level rule__level--help">help</span></summary>
+
+<div class="rule__body">
+
+Suggests `DateTimeImmutable::createFromTimestamp()` when a Unix timestamp is converted
+to a string and parsed by the `DateTimeImmutable` constructor.
+
+The factory accepts an `int` or `float` timestamp directly, avoiding the intermediate
+string construction and date parsing step.
+
+<blockquote class="rule-requirement">此规则要求 PHP <code>8.4.0</code> 或更高版本。</blockquote>
+
+<hr class="rule__separator">
+
+<div class="rule-examples">
+
+<div class="rule-example rule-example--bad">
+<div class="rule-example__label">避免</div>
+
+```php
+<?php
+
+$timestamp = time();
+$date = new DateTimeImmutable('@' . $timestamp);
+```
+
+</div>
+
+<div class="rule-example rule-example--good">
+<div class="rule-example__label">推荐</div>
+
+```php
+<?php
+
+$timestamp = time();
+$date = DateTimeImmutable::createFromTimestamp($timestamp);
+```
+
+</div>
+
+</div>
+
+<hr class="rule__separator">
+
+| 选项 | 类型 | 默认值 |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"help"` |
+
+</div>
+
+</details>
+
 <details class="rule" name="rule" id="prefer-early-continue">
 <summary><code class="rule__code">prefer-early-continue</code><a class="rule__anchor" href="#prefer-early-continue" aria-label="prefer-early-continue 的永久链接">¶</a><span class="rule__level rule__level--help">help</span></summary>
 
@@ -3219,6 +3573,64 @@ for ($i = 0; $i < 10; $i++) {
 | 选项 | 类型 | 默认值 |
 | :--- | :--- | :--- |
 | `enabled` | `boolean` | `true` |
+| `level` | `string` | `"help"` |
+| `max_allowed_statements` | `number` | `0` |
+
+</div>
+
+</details>
+
+<details class="rule" name="rule" id="prefer-early-return">
+<summary><code class="rule__code">prefer-early-return</code><a class="rule__anchor" href="#prefer-early-return" aria-label="prefer-early-return 的永久链接">¶</a><span class="rule__level rule__level--help">help</span></summary>
+
+<div class="rule__body">
+
+Suggests using early return pattern when a function body contains only a single if statement.
+
+This improves code readability by reducing nesting and making the control flow more explicit.
+
+<hr class="rule__separator">
+
+<div class="rule-examples">
+
+<div class="rule-example rule-example--bad">
+<div class="rule-example__label">避免</div>
+
+```php
+<?php
+
+function process($condition) {
+    if ($condition) {
+        doSomething();
+    }
+}
+```
+
+</div>
+
+<div class="rule-example rule-example--good">
+<div class="rule-example__label">推荐</div>
+
+```php
+<?php
+
+function process($condition) {
+    if (!$condition) {
+        return;
+    }
+    doSomething();
+}
+```
+
+</div>
+
+</div>
+
+<hr class="rule__separator">
+
+| 选项 | 类型 | 默认值 |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
 | `level` | `string` | `"help"` |
 | `max_allowed_statements` | `number` | `0` |
 
@@ -4840,7 +5252,7 @@ class Foo
 
 <div class="rule__body">
 
-Disallows fully-qualified class-like references within a namespace.
+Disallows fully-qualified class-like references that could be imported instead.
 
 Instead of using the backslash prefix (e.g., `new \DateTime()` or `\Exception`
 in a type hint), prefer an explicit `use` import statement. This improves
@@ -4901,7 +5313,7 @@ function foo(DateTime $dt): Exception {}
 
 <div class="rule__body">
 
-Disallows fully-qualified references to global constants within a namespace.
+Disallows fully-qualified references to global constants that could be shortened or imported.
 
 Instead of using the backslash prefix (e.g., `\PHP_VERSION`),
 prefer an explicit `use const` import statement. This improves
@@ -4957,7 +5369,7 @@ $version = PHP_VERSION;
 
 <div class="rule__body">
 
-Disallows fully-qualified references to global functions within a namespace.
+Disallows fully-qualified references to global functions that could be shortened or imported.
 
 Instead of using the backslash prefix (e.g., `\strlen()`),
 prefer an explicit `use function` import statement. This improves
@@ -6410,10 +6822,15 @@ while ($i < 10) {
 
 <div class="rule__body">
 
-Flags function-like parameters that use a boolean type.
+Flags function-like parameters that use a boolean type and drive the function's behaviour.
 
-Boolean flag parameters can indicate a violation of the Single Responsibility Principle (SRP).
-Refactor by extracting the flag logic into its own class or method.
+A boolean parameter is only reported when it is used as a flag, that is, referenced in
+the condition of an `if`/`elseif` statement or a ternary (`?:`) expression. Such flag
+parameters can indicate a violation of the Single Responsibility Principle (SRP);
+refactor by extracting the flag logic into its own class or method.
+
+A boolean parameter that is merely stored (e.g. `$this->enabled = $enabled;`), passed on,
+or returned does not branch the function's behaviour and is not reported.
 
 <hr class="rule__separator">
 
@@ -6426,7 +6843,11 @@ Refactor by extracting the flag logic into its own class or method.
 <?php
 
 function get_difference(string $a, string $b, bool $ignore_case): string {
-    // ...
+    if ($ignore_case) {
+        return strtolower($a) === strtolower($b) ? '' : $a;
+    }
+
+    return $a === $b ? '' : $a;
 }
 ```
 
@@ -6444,6 +6865,17 @@ function get_difference(string $a, string $b): string {
 
 function get_difference_case_insensitive(string $a, string $b): string {
     // ...
+}
+
+final class Connection
+{
+    private bool $secure;
+
+    // The boolean is only stored, never used to branch behaviour.
+    public function configure(bool $secure): void
+    {
+        $this->secure = $secure;
+    }
 }
 ```
 
@@ -6842,6 +7274,64 @@ $foo->bar = $baz->bar;
 | :--- | :--- | :--- |
 | `enabled` | `boolean` | `true` |
 | `level` | `string` | `"warning"` |
+
+</div>
+
+</details>
+
+<details class="rule" name="rule" id="no-duplicate-match-arm">
+<summary><code class="rule__code">no-duplicate-match-arm</code><a class="rule__anchor" href="#no-duplicate-match-arm" aria-label="no-duplicate-match-arm 的永久链接">¶</a><span class="rule__level rule__level--note">note</span></summary>
+
+<div class="rule__body">
+
+Detects `match` arms that produce the same result as an earlier arm.
+
+Arms with an identical result can be merged into a single arm by
+combining their conditions, which removes the duplication. The result
+is compared by its constant value, so `1 + 2` and `-(-3)` are treated
+as the same result.
+
+<hr class="rule__separator">
+
+<div class="rule-examples">
+
+<div class="rule-example rule-example--bad">
+<div class="rule-example__label">避免</div>
+
+```php
+<?php
+
+$result = match ($value) {
+    1 => 'low',
+    2 => 'high',
+    3 => 'high',
+};
+```
+
+</div>
+
+<div class="rule-example rule-example--good">
+<div class="rule-example__label">推荐</div>
+
+```php
+<?php
+
+$result = match ($value) {
+    1 => 'low',
+    2, 3 => 'high',
+};
+```
+
+</div>
+
+</div>
+
+<hr class="rule__separator">
+
+| 选项 | 类型 | 默认值 |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"note"` |
 
 </div>
 
@@ -8134,6 +8624,67 @@ function gen(): Generator {
 
 </details>
 
+<details class="rule" name="rule" id="redundant-static">
+<summary><code class="rule__code">redundant-static</code><a class="rule__anchor" href="#redundant-static" aria-label="redundant-static 的永久链接">¶</a><span class="rule__level rule__level--help">help</span></summary>
+
+<div class="rule__body">
+
+Detects uses of `static` for late-static binding inside final classes.
+
+A final class cannot be extended, so `static` and `self` resolve to the same class.
+Using `self` states that intent directly and avoids unnecessary late-static binding.
+
+<hr class="rule__separator">
+
+<div class="rule-examples">
+
+<div class="rule-example rule-example--bad">
+<div class="rule-example__label">避免</div>
+
+```php
+<?php
+
+final class User
+{
+    public static function create(): static
+    {
+        return new static();
+    }
+}
+```
+
+</div>
+
+<div class="rule-example rule-example--good">
+<div class="rule-example__label">推荐</div>
+
+```php
+<?php
+
+final class User
+{
+    public static function create(): self
+    {
+        return new self();
+    }
+}
+```
+
+</div>
+
+</div>
+
+<hr class="rule__separator">
+
+| 选项 | 类型 | 默认值 |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"help"` |
+
+</div>
+
+</details>
+
 </div>
 
 <h2 id="security">安全</h2>
@@ -8355,6 +8906,59 @@ echo esc_html( $user_comment );
 
 </details>
 
+<details class="rule" name="rule" id="prepared-sql">
+<summary><code class="rule__code">prepared-sql</code><a class="rule__anchor" href="#prepared-sql" aria-label="prepared-sql 的永久链接">¶</a><span class="rule__level rule__level--error">error</span></summary>
+
+<div class="rule__body">
+
+Detects `$wpdb` query method calls where the SQL string contains variables
+not passed through `$wpdb->prepare()`.
+
+All dynamic values in SQL queries must use `$wpdb->prepare()` with placeholders
+to prevent SQL injection vulnerabilities. Only literal strings and `$wpdb` table
+properties (e.g. `$wpdb->posts`) are safe without preparation.
+
+<blockquote class="rule-requirement">此规则需要启用 <a href="#integration-wordpress"><code>WordPress</code></a> 集成。</blockquote>
+
+<hr class="rule__separator">
+
+<div class="rule-examples">
+
+<div class="rule-example rule-example--bad">
+<div class="rule-example__label">避免</div>
+
+```php
+<?php
+
+$wpdb->query("DELETE FROM {$wpdb->posts} WHERE ID = $post_id");
+```
+
+</div>
+
+<div class="rule-example rule-example--good">
+<div class="rule-example__label">推荐</div>
+
+```php
+<?php
+
+$wpdb->query($wpdb->prepare("DELETE FROM {$wpdb->posts} WHERE ID = %d", $post_id));
+```
+
+</div>
+
+</div>
+
+<hr class="rule__separator">
+
+| 选项 | 类型 | 默认值 |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"error"` |
+
+</div>
+
+</details>
+
 <details class="rule" name="rule" id="sensitive-parameter">
 <summary><code class="rule__code">sensitive-parameter</code><a class="rule__anchor" href="#sensitive-parameter" aria-label="sensitive-parameter 的永久链接">¶</a><span class="rule__level rule__level--error">error</span></summary>
 
@@ -8462,6 +9066,67 @@ echo htmlspecialchars($_GET['name'] ?? '', ENT_QUOTES, 'UTF-8');
 
 </details>
 
+<details class="rule" name="rule" id="validated-sanitized-input">
+<summary><code class="rule__code">validated-sanitized-input</code><a class="rule__anchor" href="#validated-sanitized-input" aria-label="validated-sanitized-input 的永久链接">¶</a><span class="rule__level rule__level--error">error</span></summary>
+
+<div class="rule__body">
+
+Detects use of superglobal variables (`$_GET`, `$_POST`, `$_REQUEST`,
+`$_COOKIE`, `$_SERVER`) that are not properly sanitized before use.
+
+All superglobal input must be sanitized with an appropriate sanitization
+function (e.g. `sanitize_text_field`) and unslashed with `wp_unslash()`
+before processing to prevent security vulnerabilities.
+
+<blockquote class="rule-requirement">此规则需要启用 <a href="#integration-wordpress"><code>WordPress</code></a> 集成。</blockquote>
+
+<hr class="rule__separator">
+
+<div class="rule-examples">
+
+<div class="rule-example rule-example--bad">
+<div class="rule-example__label">避免</div>
+
+```php
+<?php
+
+function handle_input() {
+    $name = $_POST['name'];
+}
+```
+
+</div>
+
+<div class="rule-example rule-example--good">
+<div class="rule-example__label">推荐</div>
+
+```php
+<?php
+
+function handle_input() {
+    if (isset($_POST['name'])) {
+        $name = sanitize_text_field(wp_unslash($_POST['name']));
+    }
+}
+```
+
+</div>
+
+</div>
+
+<hr class="rule__separator">
+
+| 选项 | 类型 | 默认值 |
+| :--- | :--- | :--- |
+| `custom-sanitization-functions` | `array` | `[]` |
+| `custom-unslash-sanitization-functions` | `array` | `[]` |
+| `enabled` | `boolean` | `false` |
+| `level` | `string` | `"error"` |
+
+</div>
+
+</details>
+
 <details class="rule" name="rule" id="disallowed-functions">
 <summary><code class="rule__code">disallowed-functions</code><a class="rule__anchor" href="#disallowed-functions" aria-label="disallowed-functions 的永久链接">¶</a><span class="rule__level rule__level--warning">warning</span></summary>
 
@@ -8473,12 +9138,15 @@ You can specify which functions or extensions should be disallowed through the
 `functions` or `extensions` options. This helps enforce coding standards,
 security restrictions, or the usage of preferred alternatives.
 
-Each entry can be a simple string or an object with `name` and optional `help`:
+Each entry can be a simple string or an object with `name`, an optional `help`,
+and an optional `level` that supersedes the top-level `level` for that entry:
 
 ```toml
 functions = [
     'eval',
     { name = 'error_log', help = 'Use MyLogger instead.' },
+    { name = 'var_dump', level = 'error' },
+    { name = 'var_dump', help = 'Do not commit debug code.', level = 'error' },
 ]
 ```
 
@@ -8538,7 +9206,8 @@ This rule helps enforce architectural patterns such as factory methods or provid
 by preventing direct instantiation of specific classes. This is useful for ensuring consistent
 configuration, centralizing object creation, and maintaining architectural boundaries.
 
-Each entry can be a simple string or an object with `name` and optional `help`:
+Each entry can be a simple string or an object with `name`, an optional `help`,
+and an optional `level` that supersedes the top-level `level` for that entry:
 
 ```toml
 [linter.rules]
@@ -8547,6 +9216,8 @@ disallowed-type-instantiation = {
     types = [
         'HttpService\\Client',
         { name = 'DatabaseConnection', help = 'Use DatabaseFactory::create() instead' },
+        { name = 'LegacyService', level = 'error' },
+        { name = 'LegacyService', help = 'Use ShinyNewService instead', level = 'error' },
     ]
 }
 ```
@@ -8693,6 +9364,69 @@ echo "Hello, World!";
 | 选项 | 类型 | 默认值 |
 | :--- | :--- | :--- |
 | `enabled` | `boolean` | `true` |
+| `level` | `string` | `"warning"` |
+
+</div>
+
+</details>
+
+<details class="rule" name="rule" id="nonce-verification">
+<summary><code class="rule__code">nonce-verification</code><a class="rule__anchor" href="#nonce-verification" aria-label="nonce-verification 的永久链接">¶</a><span class="rule__level rule__level--warning">warning</span></summary>
+
+<div class="rule__body">
+
+Detects access to `$_POST`, `$_GET`, `$_REQUEST`, or `$_FILES` superglobals
+inside a function or method that does not call a WordPress nonce verification
+function (`wp_verify_nonce`, `check_admin_referer`, or `check_ajax_referer`).
+
+Nonce verification is essential to protect against Cross-Site Request Forgery
+(CSRF) attacks. All form and request data processing should verify the nonce first.
+
+<blockquote class="rule-requirement">此规则需要启用 <a href="#integration-wordpress"><code>WordPress</code></a> 集成。</blockquote>
+
+<hr class="rule__separator">
+
+<div class="rule-examples">
+
+<div class="rule-example rule-example--bad">
+<div class="rule-example__label">避免</div>
+
+```php
+<?php
+
+function process_form() {
+    $name = $_POST['name'];
+    update_option('name', $name);
+}
+```
+
+</div>
+
+<div class="rule-example rule-example--good">
+<div class="rule-example__label">推荐</div>
+
+```php
+<?php
+
+function process_form() {
+    if (!wp_verify_nonce($_POST['_wpnonce'], 'my_action')) {
+        wp_die('Security check failed');
+    }
+    $name = sanitize_text_field(wp_unslash($_POST['name']));
+    update_option('name', $name);
+}
+```
+
+</div>
+
+</div>
+
+<hr class="rule__separator">
+
+| 选项 | 类型 | 默认值 |
+| :--- | :--- | :--- |
+| `custom-nonce-functions` | `array` | `[]` |
+| `enabled` | `boolean` | `false` |
 | `level` | `string` | `"warning"` |
 
 </div>
@@ -9352,6 +10086,60 @@ final class InvoiceService
 
 <div class="rule-list">
 
+<details class="rule" name="rule" id="no-missing-format-argument">
+<summary><code class="rule__code">no-missing-format-argument</code><a class="rule__anchor" href="#no-missing-format-argument" aria-label="no-missing-format-argument 的永久链接">¶</a><span class="rule__level rule__level--error">error</span></summary>
+
+<div class="rule__body">
+
+Detects `sprintf`-style format calls where the number of placeholders
+in the format string exceeds the number of provided values.
+
+When the format string is a literal, this rule parses the placeholders
+(regular `%s`/`%d` and positional `%1$s`) and compares the
+required argument count against the actual values given.
+
+This catches runtime `ArgumentCountError`-class errors at lint time.
+
+<hr class="rule__separator">
+
+<div class="rule-examples">
+
+<div class="rule-example rule-example--bad">
+<div class="rule-example__label">避免</div>
+
+```php
+<?php
+
+// Missing second value; will trigger a runtime error.
+$result = sprintf('Hello %s, you have %d messages', $name);
+```
+
+</div>
+
+<div class="rule-example rule-example--good">
+<div class="rule-example__label">推荐</div>
+
+```php
+<?php
+
+$result = sprintf('Hello %s, you have %d messages', $name, $count);
+```
+
+</div>
+
+</div>
+
+<hr class="rule__separator">
+
+| 选项 | 类型 | 默认值 |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"error"` |
+
+</div>
+
+</details>
+
 <details class="rule" name="rule" id="no-only">
 <summary><code class="rule__code">no-only</code><a class="rule__anchor" href="#no-only" aria-label="no-only 的永久链接">¶</a><span class="rule__level rule__level--error">error</span></summary>
 
@@ -9757,7 +10545,9 @@ with writes in sibling branches, so this rule produces no false positives for
 code like `if ($cond) { $x = 1; } else { $x = 2; } return $x;`.
 
 Variables whose name starts with an underscore (`$_`, `$_foo`) are ignored.
-Variables declared via `global` or `static` are also ignored.
+A `global` or `static` declaration counts as an overwrite, so a plain
+assignment whose value is discarded by a following `global`/`static` of the
+same name is reported; assignments to the bound variable afterwards are not.
 
 The rule analyses one function-like scope at a time. It bails out of any scope
 that uses variable variables (`$$x`, `${expr}`) or calls `extract()`.
@@ -10288,6 +11078,58 @@ echo "Hello, World!";
 | `allow-disabling` | `boolean` | `false` |
 | `enabled` | `boolean` | `true` |
 | `level` | `string` | `"warning"` |
+
+</div>
+
+</details>
+
+<details class="rule" name="rule" id="suspicious-explode-arguments">
+<summary><code class="rule__code">suspicious-explode-arguments</code><a class="rule__anchor" href="#suspicious-explode-arguments" aria-label="suspicious-explode-arguments 的永久链接">¶</a><span class="rule__level rule__level--warning">warning</span></summary>
+
+<div class="rule__body">
+
+Detects `explode` calls whose arguments appear to be swapped.
+
+The signature is `explode(string $separator, string $string)`: the separator comes first
+and the string being split comes second. When the second argument is a short string literal
+while the first is not a shorter literal, the arguments were most likely passed in the wrong
+order, which produces a silently incorrect result instead of an error.
+
+<hr class="rule__separator">
+
+<div class="rule-examples">
+
+<div class="rule-example rule-example--bad">
+<div class="rule-example__label">避免</div>
+
+```php
+<?php
+
+$parts = explode($sentence, ' ');
+```
+
+</div>
+
+<div class="rule-example rule-example--good">
+<div class="rule-example__label">推荐</div>
+
+```php
+<?php
+
+$parts = explode(' ', $sentence);
+```
+
+</div>
+
+</div>
+
+<hr class="rule__separator">
+
+| 选项 | 类型 | 默认值 |
+| :--- | :--- | :--- |
+| `enabled` | `boolean` | `true` |
+| `level` | `string` | `"warning"` |
+| `threshold` | `number` | `10` |
 
 </div>
 
