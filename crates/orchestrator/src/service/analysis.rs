@@ -105,7 +105,7 @@ impl AnalysisService {
     /// Returns [`OrchestratorError`] when analysis or an external analyzer operation fails.
     pub fn oneshot(mut self, file_id: FileId) -> Result<IssueCollection, OrchestratorError> {
         let external_session = self.plugin_registry.create_external_analysis_session(self.database.files());
-        let Ok(file) = self.database.get_ref(&file_id) else {
+        let Ok(file) = self.database.get(&file_id) else {
             tracing::error!("File with ID {:?} not found in database", file_id);
 
             return Ok(IssueCollection::default());
@@ -113,7 +113,7 @@ impl AnalysisService {
 
         let arena = LocalArena::new();
 
-        let program = parse_file_with_settings(&arena, file, self.parser_settings);
+        let program = parse_file_with_settings(&arena, &file, self.parser_settings);
         let resolved_names = NameResolver::new(&arena).resolve(program);
 
         let mut issues = IssueCollection::new();
@@ -124,14 +124,25 @@ impl AnalysisService {
         }
 
         let semantics_checker = SemanticsChecker::new(self.settings.version);
-        issues.extend(semantics_checker.check(file, program, &resolved_names));
+        issues.extend(semantics_checker.check(&file, program, &resolved_names));
 
-        let user_codebase = scan_program(&arena, file, program, &resolved_names, self.settings.version);
+        let user_codebase = scan_program(&arena, &file, program, &resolved_names, self.settings.version);
         self.codebase.extend(user_codebase);
+        let codebase_scan = self
+            .plugin_registry
+            .external_codebase_scan_plan()
+            .map_err(AnalysisError::from)?
+            .map(|plan| plan.capture(&file, program, &resolved_names))
+            .transpose()
+            .map_err(AnalysisError::from)?
+            .flatten();
 
         populate_codebase(&mut self.codebase, &mut self.symbol_references, WordSet::default(), HashSet::default());
 
         self.plugin_registry.prepare_external_analyzer().map_err(AnalysisError::from)?;
+        self.plugin_registry
+            .run_external_codebase_scan(codebase_scan.into_iter().collect())
+            .map_err(AnalysisError::from)?;
 
         let before = self
             .plugin_registry
@@ -151,7 +162,7 @@ impl AnalysisService {
         // Run the analyzer
         let mut analysis_result = AnalysisResult::new(self.symbol_references);
         let mut analyzer =
-            Analyzer::new(&arena, file, &resolved_names, &self.codebase, &self.plugin_registry, self.settings);
+            Analyzer::new(&arena, &file, &resolved_names, &self.codebase, &self.plugin_registry, self.settings);
         if after_file || after_analysis {
             analyzer = analyzer.with_deferred_pragmas();
         }
@@ -166,7 +177,7 @@ impl AnalysisService {
 
         if after_file {
             let reported = self.plugin_registry.run_external_after_file_analysis_hooks(
-                file,
+                &file,
                 program,
                 &resolved_names,
                 &artifacts,
@@ -193,7 +204,7 @@ impl AnalysisService {
         issues.extend(self.codebase.take_issues(true));
         if after_analysis {
             let snapshot = Arc::new(FileAnalysisSnapshot::new(
-                file,
+                &file,
                 program,
                 &resolved_names,
                 &artifacts,
@@ -230,6 +241,8 @@ impl AnalysisService {
 
         let external_session =
             self.plugin_registry.create_external_analysis_session(self.database.files()).map(Arc::new);
+        let codebase_scan_plan =
+            self.plugin_registry.external_codebase_scan_plan().map_err(AnalysisError::from)?.map(Arc::new);
         let lifecycle_capabilities = Arc::new(OnceLock::new());
         let additional_symbol_references = Arc::new(OnceLock::new());
         let reducer = AnalysisResultReducer {
@@ -270,8 +283,18 @@ impl AnalysisService {
         let telemetry_for_closure = Arc::clone(&telemetry);
 
         let result = pipeline.run(
-            move |codebase, symbol_references| {
+            move |file, program, resolved_names| {
+                codebase_scan_plan
+                    .as_deref()
+                    .map(|plan| plan.capture(file, program, resolved_names))
+                    .transpose()
+                    .map(Option::flatten)
+                    .map_err(AnalysisError::from)
+                    .map_err(OrchestratorError::from)
+            },
+            move |codebase, symbol_references, codebase_scan_files| {
                 before_plugin_registry.prepare_external_analyzer().map_err(AnalysisError::from)?;
+                before_plugin_registry.run_external_codebase_scan(codebase_scan_files).map_err(AnalysisError::from)?;
                 let capabilities = (
                     before_plugin_registry.has_external_after_file_analysis_hooks().map_err(AnalysisError::from)?,
                     before_plugin_registry.has_external_after_analysis_hooks().map_err(AnalysisError::from)?,

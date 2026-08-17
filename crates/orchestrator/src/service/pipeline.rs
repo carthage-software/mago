@@ -23,7 +23,9 @@ use mago_database::file::File;
 use mago_database::file::FileId;
 use mago_database::file::FileType;
 
+use mago_names::ResolvedNames;
 use mago_names::resolver::NameResolver;
+use mago_syntax::cst::Program;
 use mago_syntax::parser::parse_file_with_settings;
 use mago_syntax::settings::ParserSettings;
 
@@ -181,10 +183,12 @@ where
     /// - `result`: The aggregated result from the reducer
     /// - `codebase`: The final codebase metadata after all processing
     /// - `symbol_references`: The final symbol references
-    pub fn run<F, B>(self, before_map: B, map_function: F) -> Result<R, OrchestratorError>
+    pub fn run<F, B, C, S>(self, capture: C, before_map: B, map_function: F) -> Result<R, OrchestratorError>
     where
         F: Fn(T, &LocalArena, Arc<File>, Arc<CodebaseMetadata>) -> Result<I, OrchestratorError> + Send + Sync + 'static,
-        B: FnOnce(&mut CodebaseMetadata, &mut SymbolReferences) -> Result<Option<I>, OrchestratorError>,
+        B: FnOnce(&mut CodebaseMetadata, &mut SymbolReferences, Vec<S>) -> Result<Option<I>, OrchestratorError>,
+        C: Fn(&Arc<File>, &Program<'_>, &ResolvedNames<'_>) -> Result<Option<S>, OrchestratorError> + Send + Sync,
+        S: Send,
     {
         #[cfg(not(target_arch = "wasm32"))]
         let trace_enabled = tracing::enabled!(tracing::Level::TRACE);
@@ -220,12 +224,12 @@ where
         let source_count = source_files.len();
 
         let mut compile_parallel_duration = Duration::ZERO;
-        let partial_codebases: Vec<CodebaseMetadata> = measure!(
+        let compiled: Vec<(CodebaseMetadata, Option<S>)> = measure!(
             trace_enabled,
             compile_parallel_duration,
             source_files
                 .into_par_iter()
-                .map_init(LocalArena::new, |arena, file| -> Result<CodebaseMetadata, OrchestratorError> {
+                .map_init(LocalArena::new, |arena, file| -> Result<_, OrchestratorError> {
                     let program = parse_file_with_settings(arena, &file, parser_settings);
                     if program.has_errors() {
                         tracing::warn!(
@@ -245,24 +249,27 @@ where
                     if file.file_type.is_patch() {
                         metadata.convert_partial_to_patch();
                     }
+                    let captured = capture(&file, program, &resolved_names)?;
 
                     arena.reset();
                     if let Some(compiling_bar) = &compiling_bar {
                         compiling_bar.inc(1);
                     }
 
-                    Ok(metadata)
+                    Ok((metadata, captured))
                 })
                 .collect::<Result<Vec<_>, _>>()?
         );
 
         let mut merged_codex = self.codebase;
+        let mut captures = Vec::new();
         let mut safe_symbols = std::mem::take(&mut merged_codex.safe_symbols);
         let mut safe_symbol_members = std::mem::take(&mut merged_codex.safe_symbol_members);
         let mut replaced_classes = (!safe_symbol_members.is_empty()).then(WordSet::default);
         let mut merge_duration = Duration::ZERO;
         measure!(trace_enabled, merge_duration, {
-            for partial in partial_codebases {
+            for (partial, captured) in compiled {
+                captures.extend(captured);
                 for name in partial.class_likes.keys().chain(partial.patch_class_likes.keys()) {
                     safe_symbols.remove(name);
                     if let Some(replaced_classes) = &mut replaced_classes {
@@ -309,7 +316,7 @@ where
             self.database.files().filter(|f| f.file_type == FileType::Host).collect::<Vec<_>>()
         );
 
-        let before_map_result = before_map(&mut merged_codex, &mut symbol_references)?;
+        let before_map_result = before_map(&mut merged_codex, &mut symbol_references, captures)?;
 
         if host_files.is_empty() {
             tracing::warn!("No host files found for analysis after compilation.");

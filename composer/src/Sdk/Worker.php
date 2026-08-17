@@ -16,6 +16,8 @@ use Mago\Sdk\Analyzer\ClassInitializerProviderContext;
 use Mago\Sdk\Analyzer\ClassLikeTarget;
 use Mago\Sdk\Analyzer\ClassTarget;
 use Mago\Sdk\Analyzer\Codebase;
+use Mago\Sdk\Analyzer\CodebaseScanContext;
+use Mago\Sdk\Analyzer\CodebaseScanHook;
 use Mago\Sdk\Analyzer\FileAnalysis;
 use Mago\Sdk\Analyzer\FunctionAssertionProvider;
 use Mago\Sdk\Analyzer\FunctionReturnTypeProvider;
@@ -37,6 +39,7 @@ use Mago\Sdk\Analyzer\PropertyTarget;
 use Mago\Sdk\Analyzer\PropertyTypeProvider;
 use Mago\Sdk\Analyzer\PropertyTypeProviderContext;
 use Mago\Sdk\Analyzer\ReturnTypeProviderContext;
+use Mago\Sdk\Analyzer\SourceFileTarget;
 use Mago\Sdk\Analyzer\TargetedAnalysisHook;
 use Mago\Sdk\Analyzer\TargetedProvider;
 use Mago\Sdk\Analyzer\TypeComparator;
@@ -135,6 +138,9 @@ final class Worker
     /** @var list<RegisteredTargetedCallback<IssueFilterHook, string>> */
     private readonly array $issueFilterHooks;
 
+    /** @var list<RegisteredTargetedCallback<CodebaseScanHook, SourceFileTarget>> */
+    private readonly array $codebaseScanHooks;
+
     /**
      * @var list<int<0, 65535>>
      */
@@ -173,6 +179,7 @@ final class Worker
         $propertyInitializationProviders = [];
         $classInitializerProviders = [];
         $issueFilterHooks = [];
+        $codebaseScanHooks = [];
         $nodeAnalysisHooks = [];
         $methodCallAnalysisHooks = [];
         $classLikeAnalysisHooks = [];
@@ -300,6 +307,14 @@ final class Worker
                     $registeredIssueFilterHooks[] = $registeredHook;
                 }
 
+                $registeredCodebaseScanHooks = self::registerTargetedCallbacks(
+                    $registry->getCodebaseScanHooks(),
+                    $codebaseScanHooks,
+                    $definition->identifier,
+                    'codebase-scan hook',
+                    static fn(SourceFileTarget $target): string => $target->pattern,
+                );
+
                 $registeredNodeAnalysisHooks = self::registerTargetedCallbacks(
                     $registry->getNodeAnalysisHooks(),
                     $nodeAnalysisHooks,
@@ -356,6 +371,7 @@ final class Worker
                     $registry->getAttributedEntryPoints(),
                     $registeredIssueFilterHooks,
                     $registry->getInitializationHooks(),
+                    $registeredCodebaseScanHooks,
                     $registry->getBeforeAnalysisHooks(),
                     $registry->getAfterFileAnalysisHooks(),
                     $registeredNodeAnalysisHooks,
@@ -382,11 +398,12 @@ final class Worker
         $this->propertyInitializationProviders = $propertyInitializationProviders;
         $this->classInitializerProviders = $classInitializerProviders;
         $this->issueFilterHooks = $issueFilterHooks;
+        $this->codebaseScanHooks = $codebaseScanHooks;
     }
 
     /**
      * @template TTarget
-     * @template TCallback of TargetedProvider<TTarget>|TargetedAnalysisHook<TTarget>
+     * @template TCallback of CodebaseScanHook|TargetedProvider<TTarget>|TargetedAnalysisHook<TTarget>
      *
      * @param list<TCallback> $callbacks
      * @param list<RegisteredTargetedCallback<TCallback, TTarget>> $all
@@ -698,6 +715,10 @@ final class Worker
 
         if ($kind === AnalyzerProtocol::INITIALIZE_REQUEST) {
             return $this->handleAnalyzerInitialization($reader, $cancellation);
+        }
+
+        if ($kind === AnalyzerProtocol::CODEBASE_SCAN_REQUEST) {
+            return $this->handleCodebaseScanRequest($reader, $cancellation);
         }
 
         if (
@@ -1051,6 +1072,41 @@ final class Worker
         }
 
         return AnalyzerProtocol::writeInitializationResponse($stubs);
+    }
+
+    private function handleCodebaseScanRequest(PayloadReader $reader, CancellationTokenInterface $cancellation): string
+    {
+        [$firstBatch, $lastBatch, $activeHooks, $filesByHook] = AnalyzerProtocol::readCodebaseScanRequest(
+            $reader,
+            $this->phpVersion,
+            $this->nodeKinds,
+        );
+        foreach ($activeHooks as $hookIndex) {
+            $registered = $this->codebaseScanHooks[$hookIndex] ?? null;
+            if ($registered === null) {
+                throw new ProtocolException("Codebase-scan request targets unknown hook {$hookIndex}.");
+            }
+            $cancellation->throwIfCancelled();
+            try {
+                $registered->callback->scan(
+                    new CodebaseScanContext(
+                        $this->phpVersion,
+                        $cancellation,
+                        $filesByHook[$registered->index] ?? [],
+                        $firstBatch,
+                        $lastBatch,
+                    ),
+                );
+            } catch (Throwable $throwable) {
+                throw new ProtocolException(
+                    "Codebase-scan hook in `{$registered->plugin}` failed: {$throwable->getMessage()}",
+                    0,
+                    $throwable,
+                );
+            }
+        }
+
+        return AnalyzerProtocol::writeCodebaseScanResponse();
     }
 
     /**

@@ -35,6 +35,8 @@ use crate::artifacts::AnalysisArtifacts;
 use crate::context::block::BlockContext;
 use crate::external::AfterFileAnalysisResult;
 use crate::external::BeforeAnalysisResult;
+use crate::external::CodebaseScanFile;
+use crate::external::CodebaseScanPlan;
 use crate::external::EffectivePropertyType;
 use crate::external::ExternalAnalysisSession;
 use crate::external::ExternalAnalyzer;
@@ -216,6 +218,35 @@ impl PluginRegistry {
             .map(ExternalAnalyzerHandle::initialization_files)
             .transpose()
             .map(Option::unwrap_or_default)
+            .map_err(PluginError::from)
+    }
+
+    /// Returns compiled host-file selectors for enabled external codebase-scan hooks.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the external analyzer cannot initialize or a hook advertises an invalid path pattern.
+    pub fn external_codebase_scan_plan(&self) -> PluginResult<Option<CodebaseScanPlan>> {
+        self.prepare_external_analyzer()?;
+        self.external_analyzer
+            .as_deref()
+            .map(|analyzer| analyzer.with(ExternalAnalyzer::codebase_scan_plan))
+            .transpose()
+            .map(Option::flatten)
+            .map_err(PluginError::from)
+    }
+
+    /// Replaces each external worker's selected codebase-scan source state.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a worker cannot accept or validate the snapshot sequence.
+    pub fn run_external_codebase_scan(&self, files: Vec<CodebaseScanFile>) -> PluginResult<()> {
+        self.external_analyzer
+            .as_deref()
+            .map(|analyzer| analyzer.with(|analyzer| analyzer.run_codebase_scan(files)))
+            .transpose()
+            .map(|result| result.unwrap_or_default())
             .map_err(PluginError::from)
     }
 

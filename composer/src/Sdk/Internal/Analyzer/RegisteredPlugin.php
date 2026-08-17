@@ -12,6 +12,7 @@ use Mago\Sdk\Analyzer\ClassInitializerProvider;
 use Mago\Sdk\Analyzer\ClassLikeAnalysisHook;
 use Mago\Sdk\Analyzer\ClassLikeTarget;
 use Mago\Sdk\Analyzer\ClassTarget;
+use Mago\Sdk\Analyzer\CodebaseScanHook;
 use Mago\Sdk\Analyzer\FunctionAssertionProvider;
 use Mago\Sdk\Analyzer\FunctionReturnTypeProvider;
 use Mago\Sdk\Analyzer\FunctionTarget;
@@ -27,6 +28,7 @@ use Mago\Sdk\Analyzer\PluginDefinition;
 use Mago\Sdk\Analyzer\PropertyInitializationProvider;
 use Mago\Sdk\Analyzer\PropertyTarget;
 use Mago\Sdk\Analyzer\PropertyTypeProvider;
+use Mago\Sdk\Analyzer\SourceFileTarget;
 use Mago\Sdk\Syntax\NodeKind;
 
 /**
@@ -48,6 +50,7 @@ final class RegisteredPlugin
      * @param list<AttributedEntryPoint> $attributedEntryPoints
      * @param list<RegisteredTargetedCallback<IssueFilterHook, string>> $issueFilterHooks
      * @param list<InitializationHook> $initializationHooks
+     * @param list<RegisteredTargetedCallback<CodebaseScanHook, SourceFileTarget>> $codebaseScanHooks
      * @param list<BeforeAnalysisHook> $beforeAnalysisHooks
      * @param list<AfterFileAnalysisHook> $afterFileAnalysisHooks
      * @param list<RegisteredTargetedCallback<NodeAnalysisHook, NodeKind>> $nodeAnalysisHooks
@@ -74,6 +77,7 @@ final class RegisteredPlugin
         public readonly array $attributedEntryPoints,
         public readonly array $issueFilterHooks,
         public readonly array $initializationHooks,
+        public readonly array $codebaseScanHooks,
         public readonly array $beforeAnalysisHooks,
         public readonly array $afterFileAnalysisHooks,
         public readonly array $nodeAnalysisHooks,

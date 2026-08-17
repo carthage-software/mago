@@ -51,6 +51,10 @@ mod error;
 mod lifecycle;
 mod metadata;
 pub mod protocol;
+mod scan;
+
+pub use scan::CodebaseScanFile;
+pub use scan::CodebaseScanPlan;
 
 const SLOW_PROVIDER_THRESHOLD: Duration = Duration::from_millis(5);
 const SLOW_LIFECYCLE_THRESHOLD: Duration = Duration::from_millis(5);
@@ -473,6 +477,7 @@ type MethodAssertionProvider = ProviderRegistration<MethodTarget>;
 type PropertyProvider = ProviderRegistration<PropertyTarget>;
 type ClassInitializerProvider = ProviderRegistration<Vec<u8>>;
 type IssueFilterHookRegistration = ProviderRegistration<String>;
+type CodebaseScanHookRegistration = ProviderRegistration<String>;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 struct PropertyTarget {
@@ -631,6 +636,20 @@ pub trait AnalyzerTransport: std::fmt::Debug + Send + Sync {
     /// Returns an error if a worker cannot process the request.
     fn broadcast(&self, payload: &[u8]) -> Result<Vec<Vec<u8>>, WorkerError>;
 
+    /// Returns the largest payload accepted by this transport.
+    fn maximum_payload_size(&self) -> usize {
+        usize::MAX
+    }
+
+    /// Sends an ordered, replayable state-replacement sequence to every worker.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if a worker cannot process the complete sequence.
+    fn broadcast_sequence(&self, _group: u64, payloads: &[Vec<u8>]) -> Result<Vec<Vec<Vec<u8>>>, WorkerError> {
+        payloads.iter().map(|payload| self.broadcast(payload)).collect()
+    }
+
     /// Sends one provider request to an available worker.
     ///
     /// # Errors
@@ -675,6 +694,14 @@ impl AnalyzerTransport for WorkerPool {
 
     fn broadcast(&self, payload: &[u8]) -> Result<Vec<Vec<u8>>, WorkerError> {
         Self::broadcast(self, payload)
+    }
+
+    fn maximum_payload_size(&self) -> usize {
+        Self::maximum_payload_size(self)
+    }
+
+    fn broadcast_sequence(&self, group: u64, payloads: &[Vec<u8>]) -> Result<Vec<Vec<Vec<u8>>>, WorkerError> {
+        Self::broadcast_sequence(self, group, payloads)
     }
 
     fn request(&self, payload: Vec<u8>) -> Result<Vec<u8>, WorkerError> {
@@ -1559,6 +1586,14 @@ impl<T> ExternalAnalyzer<T>
 where
     T: AnalyzerTransport,
 {
+    pub(crate) fn codebase_scan_plan(&self) -> Result<Option<CodebaseScanPlan>, ExternalAnalyzerError> {
+        CodebaseScanPlan::compile(&self.backends)
+    }
+
+    pub(crate) fn run_codebase_scan(&self, files: Vec<CodebaseScanFile>) -> Result<(), ExternalAnalyzerError> {
+        scan::dispatch(&self.backends, files)
+    }
+
     pub(crate) fn filter_issues(
         &self,
         file: &File,
@@ -3081,6 +3116,7 @@ where
             let advertised_node_analysis_hooks = registration.node_analysis_hooks.len();
             let advertised_method_call_analysis_hooks = registration.method_call_analysis_hooks.len();
             let advertised_class_like_analysis_hooks = registration.class_like_analysis_hooks.len();
+            let advertised_codebase_scan_hooks = registration.codebase_scan_hooks.len();
             registration.function_providers.retain(|provider| enabled.contains(&provider.plugin));
             registration.method_providers.retain(|provider| enabled.contains(&provider.plugin));
             registration.function_assertion_providers.retain(|provider| enabled.contains(&provider.plugin));
@@ -3094,6 +3130,7 @@ where
             registration.node_analysis_hooks.retain(|hook| enabled.contains(&hook.plugin));
             registration.method_call_analysis_hooks.retain(|hook| enabled.contains(&hook.plugin));
             registration.class_like_analysis_hooks.retain(|hook| enabled.contains(&hook.plugin));
+            registration.codebase_scan_hooks.retain(|hook| enabled.contains(&hook.plugin));
             let backend_route = u16::try_from(backend_index)
                 .map_err(|_| error::protocol("more than 65,536 external analyzer backends were configured"))?;
             for hook in &mut registration.method_call_analysis_hooks {
@@ -3184,6 +3221,9 @@ where
                     class_like_analysis_hooks = registration.class_like_analysis_hooks.len(),
                     disabled_class_like_analysis_hooks = advertised_class_like_analysis_hooks
                         - registration.class_like_analysis_hooks.len(),
+                    codebase_scan_hooks = registration.codebase_scan_hooks.len(),
+                    disabled_codebase_scan_hooks = advertised_codebase_scan_hooks
+                        - registration.codebase_scan_hooks.len(),
                     before_analysis_plugins = registration.before_analysis_plugins.len(),
                     after_file_analysis_plugins = registration.after_file_analysis_plugins.len(),
                     after_analysis_plugins = registration.after_analysis_plugins.len(),

@@ -23,6 +23,9 @@ pub const NAME_RECORD_SIZE: usize = 13;
 /// Width of one packed comment-trivia record.
 pub const TRIVIA_RECORD_SIZE: usize = 9;
 
+/// Width of one packed decoded-literal-string record.
+pub const LITERAL_STRING_RECORD_SIZE: usize = 12;
+
 /// Writes the ordered node-kind table used to validate SDK compatibility.
 pub fn write_node_kind_table(writer: &mut PayloadWriter) {
     writer.write_u32(NodeKind::iter().count() as u32);
@@ -47,14 +50,15 @@ struct SnapshotNode {
 /// A flat syntax tree, resolved-name table, and comment table ready for a
 /// capability-specific extension protocol to encode.
 #[derive(Debug)]
-pub struct SourceSnapshot<'source> {
+pub struct SourceSnapshot<'arena> {
     nodes: Vec<SnapshotNode>,
     targets: Vec<u32>,
-    names: Vec<(u32, u32, &'source [u8], bool)>,
+    names: Vec<(u32, u32, &'arena [u8], bool)>,
     trivia: Vec<(u8, u32, u32)>,
+    literal_strings: Vec<(u32, &'arena [u8])>,
 }
 
-impl<'source> SourceSnapshot<'source> {
+impl<'arena> SourceSnapshot<'arena> {
     /// Builds a complete snapshot for semantic analyzer hooks.
     ///
     /// The target table is empty because analyzer hooks inspect the complete
@@ -64,11 +68,28 @@ impl<'source> SourceSnapshot<'source> {
     ///
     /// Returns an error when the syntax tree exceeds the protocol's `u32`
     /// address space.
-    pub fn complete<'ast, 'arena>(
+    pub fn complete<'ast>(
         program: &'ast Program<'arena>,
-        resolved_names: &'source ResolvedNames<'arena>,
+        resolved_names: &ResolvedNames<'arena>,
     ) -> Result<Self, PayloadError> {
         Self::complete_with_targets(program, resolved_names, None)
+    }
+
+    /// Builds a complete snapshot containing decoded literal-string values.
+    ///
+    /// This is intended for codebase-scan hooks that interpret source before
+    /// semantic analysis. Other protocols omit the table to avoid copying
+    /// literal values they do not consume.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when the syntax tree exceeds the protocol's `u32`
+    /// address space.
+    pub fn complete_with_literals<'ast>(
+        program: &'ast Program<'arena>,
+        resolved_names: &ResolvedNames<'arena>,
+    ) -> Result<Self, PayloadError> {
+        Self::complete_with_target_filter_and_literals(program, resolved_names, |_| false, true)
     }
 
     /// Builds a complete snapshot and records nodes matching analyzer-hook targets.
@@ -77,9 +98,9 @@ impl<'source> SourceSnapshot<'source> {
     ///
     /// Returns an error when the syntax tree exceeds the protocol's `u32`
     /// address space.
-    pub fn complete_with_targets<'ast, 'arena>(
+    pub fn complete_with_targets<'ast>(
         program: &'ast Program<'arena>,
-        resolved_names: &'source ResolvedNames<'arena>,
+        resolved_names: &ResolvedNames<'arena>,
         target_kinds: Option<&[bool; u8::MAX as usize + 1]>,
     ) -> Result<Self, PayloadError> {
         Self::complete_with_target_filter(program, resolved_names, |node| {
@@ -93,20 +114,38 @@ impl<'source> SourceSnapshot<'source> {
     ///
     /// Returns an error when the syntax tree exceeds the protocol's `u32`
     /// address space.
-    pub fn complete_with_target_filter<'ast, 'arena>(
+    pub fn complete_with_target_filter<'ast>(
         program: &'ast Program<'arena>,
-        resolved_names: &'source ResolvedNames<'arena>,
+        resolved_names: &ResolvedNames<'arena>,
+        is_target: impl FnMut(Node<'ast, 'arena>) -> bool,
+    ) -> Result<Self, PayloadError> {
+        Self::complete_with_target_filter_and_literals(program, resolved_names, is_target, false)
+    }
+
+    fn complete_with_target_filter_and_literals<'ast>(
+        program: &'ast Program<'arena>,
+        resolved_names: &ResolvedNames<'arena>,
         mut is_target: impl FnMut(Node<'ast, 'arena>) -> bool,
+        include_literal_strings: bool,
     ) -> Result<Self, PayloadError> {
         let mut nodes = Vec::new();
         let mut targets = Vec::new();
+        let mut literal_strings = Vec::new();
         let mut stack = Vec::with_capacity(64);
-        Self::append_subtree(Node::Program(program), &mut is_target, &mut nodes, &mut targets, &mut stack)?;
+        Self::append_subtree(
+            Node::Program(program),
+            &mut is_target,
+            &mut nodes,
+            &mut targets,
+            &mut literal_strings,
+            include_literal_strings,
+            &mut stack,
+        )?;
 
         let mut names = resolved_names.iter().collect::<Vec<_>>();
         names.sort_unstable_by_key(|(start, end, _, _)| (*start, *end));
 
-        Ok(Self { nodes, targets, names, trivia: collect_trivia(program) })
+        Ok(Self { nodes, targets, names, trivia: collect_trivia(program), literal_strings })
     }
 
     /// Builds only syntax subtrees needed by active external linter rules.
@@ -117,9 +156,9 @@ impl<'source> SourceSnapshot<'source> {
     ///
     /// Returns an error when the filtered syntax tree exceeds the protocol's
     /// `u32` address space.
-    pub fn filtered<'ast, 'arena>(
+    pub fn filtered<'ast>(
         program: &'ast Program<'arena>,
-        resolved_names: &'source ResolvedNames<'arena>,
+        resolved_names: &ResolvedNames<'arena>,
         target_kinds: &[bool; u8::MAX as usize + 1],
     ) -> Result<Option<Self>, PayloadError> {
         let mut nodes = Vec::new();
@@ -137,6 +176,8 @@ impl<'source> SourceSnapshot<'source> {
                     &mut |child| target_kinds[child.kind() as usize],
                     &mut nodes,
                     &mut targets,
+                    &mut Vec::new(),
+                    false,
                     &mut subtree_stack,
                 )?;
                 continue;
@@ -163,7 +204,7 @@ impl<'source> SourceSnapshot<'source> {
             .collect::<Vec<_>>();
         names.sort_unstable_by_key(|(start, end, _, _)| (*start, *end));
 
-        Ok(Some(Self { nodes, targets, names, trivia: collect_trivia(program) }))
+        Ok(Some(Self { nodes, targets, names, trivia: collect_trivia(program), literal_strings: Vec::new() }))
     }
 
     /// Builds the minimal syntax snapshot needed by targeted analyzer hooks.
@@ -177,9 +218,9 @@ impl<'source> SourceSnapshot<'source> {
     ///
     /// Returns an error when the filtered syntax tree exceeds the protocol's
     /// `u32` address space.
-    pub fn targeted<'ast, 'arena>(
+    pub fn targeted<'ast>(
         program: &'ast Program<'arena>,
-        resolved_names: &'source ResolvedNames<'arena>,
+        resolved_names: &ResolvedNames<'arena>,
         target_kinds: &[bool; u8::MAX as usize + 1],
         subtree_kinds: &[bool; u8::MAX as usize + 1],
         include_trivia: bool,
@@ -201,9 +242,9 @@ impl<'source> SourceSnapshot<'source> {
     ///
     /// Returns an error when the filtered syntax tree exceeds the protocol's
     /// `u32` address space.
-    pub fn targeted_with_filter<'ast, 'arena>(
+    pub fn targeted_with_filter<'ast>(
         program: &'ast Program<'arena>,
-        resolved_names: &'source ResolvedNames<'arena>,
+        resolved_names: &ResolvedNames<'arena>,
         mut target: impl FnMut(Node<'ast, 'arena>) -> Option<bool>,
         include_trivia: bool,
     ) -> Result<Option<Self>, PayloadError> {
@@ -223,6 +264,8 @@ impl<'source> SourceSnapshot<'source> {
                     &mut |child| target(child).is_some(),
                     &mut nodes,
                     &mut targets,
+                    &mut Vec::new(),
+                    false,
                     &mut subtree_stack,
                 )?;
                 continue;
@@ -271,14 +314,17 @@ impl<'source> SourceSnapshot<'source> {
             targets,
             names,
             trivia: if include_trivia { collect_trivia(program) } else { Vec::new() },
+            literal_strings: Vec::new(),
         }))
     }
 
-    fn append_subtree<'ast, 'arena>(
+    fn append_subtree<'ast>(
         root: Node<'ast, 'arena>,
         is_target: &mut impl FnMut(Node<'ast, 'arena>) -> bool,
         nodes: &mut Vec<SnapshotNode>,
         targets: &mut Vec<u32>,
+        literal_strings: &mut Vec<(u32, &'arena [u8])>,
+        include_literal_strings: bool,
         stack: &mut Vec<(Node<'ast, 'arena>, Option<u32>)>,
     ) -> Result<(), PayloadError> {
         stack.push((root, None));
@@ -295,6 +341,13 @@ impl<'source> SourceSnapshot<'source> {
                 next_sibling: None,
                 last_child: None,
             });
+
+            if include_literal_strings
+                && let Node::LiteralString(literal) = node
+                && let Some(value) = literal.value
+            {
+                literal_strings.push((identifier, value));
+            }
 
             if let Some(parent) = parent {
                 let previous_sibling = nodes[parent as usize].last_child.replace(identifier);
@@ -323,6 +376,34 @@ impl<'source> SourceSnapshot<'source> {
     ///
     /// Returns an error when a table or name buffer exceeds `u32::MAX` bytes.
     pub fn write_to(&self, writer: &mut PayloadWriter) -> Result<(), PayloadError> {
+        self.write_syntax_to(writer)
+    }
+
+    /// Writes the syntax snapshot followed by its decoded literal-string table.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a table or string buffer exceeds `u32::MAX` bytes.
+    pub fn write_to_with_literals(&self, writer: &mut PayloadWriter) -> Result<(), PayloadError> {
+        self.write_syntax_to(writer)?;
+        writer.write_length(self.literal_strings.len())?;
+        let mut literal_offset = 0usize;
+        for (node, value) in &self.literal_strings {
+            writer.write_u32(*node);
+            writer.write_length(literal_offset)?;
+            writer.write_length(value.len())?;
+            literal_offset =
+                literal_offset.checked_add(value.len()).ok_or(PayloadError::LengthOverflow { length: usize::MAX })?;
+        }
+        writer.write_length(literal_offset)?;
+        for (_, value) in &self.literal_strings {
+            writer.write_raw(value);
+        }
+
+        Ok(())
+    }
+
+    fn write_syntax_to(&self, writer: &mut PayloadWriter) -> Result<(), PayloadError> {
         writer.write_length(self.targets.len())?;
         for target in &self.targets {
             writer.write_u32(*target);
@@ -383,6 +464,15 @@ impl<'source> SourceSnapshot<'source> {
     }
 
     #[must_use]
+    pub fn encoded_len_with_literals(&self) -> usize {
+        self.encoded_len()
+            .saturating_add(4)
+            .saturating_add(self.literal_strings.len().saturating_mul(LITERAL_STRING_RECORD_SIZE))
+            .saturating_add(4)
+            .saturating_add(self.literal_strings.iter().map(|(_, value)| value.len()).sum::<usize>())
+    }
+
+    #[must_use]
     pub const fn target_count(&self) -> usize {
         self.targets.len()
     }
@@ -400,6 +490,11 @@ impl<'source> SourceSnapshot<'source> {
     #[must_use]
     pub const fn trivia_count(&self) -> usize {
         self.trivia.len()
+    }
+
+    #[must_use]
+    pub const fn literal_string_count(&self) -> usize {
+        self.literal_strings.len()
     }
 }
 

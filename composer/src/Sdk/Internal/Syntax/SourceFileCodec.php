@@ -51,6 +51,43 @@ final class SourceFileCodec
             $nodes,
             $names,
             new TriviaStore($triviaRecords, $triviaCount),
+            new LiteralStringStore('', '', 0),
+        );
+    }
+
+    /**
+     * @param list<NodeKind> $kinds
+     */
+    public static function readWithLiteralStrings(
+        PayloadReader $reader,
+        PHPVersion $phpVersion,
+        array $kinds,
+        string $path,
+        string $contents,
+    ): SourceFile {
+        $targetCount = $reader->readU32();
+        $targetIds = $reader->readU32List($targetCount);
+        $nodeCount = $reader->readU32();
+        $nodeRecords = $reader->readRaw($nodeCount * NodeStore::RECORD_SIZE);
+        $nodes = new NodeStore($kinds, $nodeRecords, $nodeCount);
+        $nameCount = $reader->readU32();
+        $nameStarts = $reader->readRaw($nameCount * ResolvedNameStore::START_SIZE);
+        $nameRecords = $reader->readRaw($nameCount * ResolvedNameStore::RECORD_SIZE);
+        $names = new ResolvedNameStore($nameStarts, $nameRecords, $reader->readBytes(), $nameCount);
+        $triviaCount = $reader->readU32();
+        $triviaRecords = $reader->readRaw($triviaCount * TriviaStore::RECORD_SIZE);
+        $literalStringCount = $reader->readU32();
+        $literalStringRecords = $reader->readRaw($literalStringCount * LiteralStringStore::RECORD_SIZE);
+
+        return new SourceFile(
+            $phpVersion,
+            $path,
+            $contents,
+            $targetIds,
+            $nodes,
+            $names,
+            new TriviaStore($triviaRecords, $triviaCount),
+            new LiteralStringStore($literalStringRecords, $reader->readBytes(), $literalStringCount),
         );
     }
 

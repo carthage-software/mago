@@ -21,6 +21,11 @@ final class PluginRegistry
     private array $initializationHooks = [];
 
     /**
+     * @var list<CodebaseScanHook>
+     */
+    private array $codebaseScanHooks = [];
+
+    /**
      * @var list<FunctionReturnTypeProvider>
      */
     private array $functionReturnTypeProviders = [];
@@ -103,6 +108,11 @@ final class PluginRegistry
     public function registerInitializationHook(InitializationHook $hook): void
     {
         $this->initializationHooks[] = $hook;
+    }
+
+    public function registerCodebaseScanHook(CodebaseScanHook $hook): void
+    {
+        $this->codebaseScanHooks[] = $hook;
     }
 
     public function registerFunctionReturnTypeProvider(FunctionReturnTypeProvider $provider): void
@@ -312,6 +322,16 @@ final class PluginRegistry
     public function getInitializationHooks(): array
     {
         return $this->initializationHooks;
+    }
+
+    /**
+     * @internal
+     *
+     * @return list<CodebaseScanHook>
+     */
+    public function getCodebaseScanHooks(): array
+    {
+        return $this->codebaseScanHooks;
     }
 
     /**

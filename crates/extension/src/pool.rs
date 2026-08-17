@@ -81,6 +81,7 @@ struct WorkerSlot {
 
 #[derive(Debug, Clone)]
 struct Bootstrap {
+    group: Option<u64>,
     request: Vec<u8>,
     response: Vec<u8>,
 }
@@ -506,7 +507,11 @@ impl WorkerPool {
         let responses = responses.into_iter().flatten().collect::<Vec<_>>();
         let response_bytes = responses.iter().map(Vec::len).sum::<usize>();
         if let Some(response) = responses.first() {
-            lock(&self.bootstraps).push(Bootstrap { request: payload.to_vec(), response: response.clone() });
+            lock(&self.bootstraps).push(Bootstrap {
+                group: None,
+                request: payload.to_vec(),
+                response: response.clone(),
+            });
         }
 
         if let Some(start) = trace_start {
@@ -520,6 +525,145 @@ impl WorkerPool {
                 response_bytes,
                 elapsed = ?elapsed,
                 "Extension initialization broadcast completed."
+            );
+        }
+
+        Ok(responses)
+    }
+
+    /// Returns the maximum payload accepted by a worker frame.
+    #[inline]
+    #[must_use]
+    pub const fn maximum_payload_size(&self) -> usize {
+        self.options.maximum_payload_size
+    }
+
+    /// Sends an ordered state replacement to every worker and records only the
+    /// latest successful sequence for replay by future workers.
+    ///
+    /// The growth lock keeps adaptive workers from appearing halfway through
+    /// the sequence. Requests for one worker remain serialized while different
+    /// workers process the sequence concurrently.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if any worker cannot process the complete sequence.
+    pub fn broadcast_sequence(&self, group: u64, payloads: &[Vec<u8>]) -> Result<Vec<Vec<Vec<u8>>>, WorkerError> {
+        let trace_start = self.trace_enabled.then(Instant::now);
+        if self.state.load(Ordering::Acquire) != STATE_RUNNING {
+            return Err(WorkerError::Unavailable);
+        }
+        if payloads.is_empty() {
+            return Ok(Vec::new());
+        }
+        if let Some(payload) = payloads.iter().find(|payload| payload.len() > self.options.maximum_payload_size) {
+            return Err(WorkerError::Protocol {
+                worker: 0,
+                source: crate::ProtocolError::FrameTooLarge {
+                    length: payload.len(),
+                    maximum: self.options.maximum_payload_size,
+                },
+            });
+        }
+
+        let _initialization = lock(&self.growth);
+        if self.state.load(Ordering::Acquire) != STATE_RUNNING {
+            return Err(WorkerError::Unavailable);
+        }
+        let active_workers = self.active_workers.load(Ordering::Acquire);
+        let workers = (0..active_workers)
+            .map(|index| self.ensure_running(index).map(|worker| (index, worker)))
+            .collect::<Result<Vec<_>, _>>()?;
+        let results = std::thread::scope(|scope| {
+            workers
+                .into_iter()
+                .map(|(index, worker)| {
+                    (
+                        index,
+                        scope.spawn(move || {
+                            let reservation = worker.reserve();
+                            let responses = payloads
+                                .iter()
+                                .map(|payload| reservation.worker().request(payload.clone()))
+                                .collect::<Result<Vec<_>, _>>();
+                            (reservation, responses)
+                        }),
+                    )
+                })
+                .collect::<Vec<_>>()
+                .into_iter()
+                .map(|(index, handle)| (index, handle.join()))
+                .collect::<Vec<_>>()
+        });
+
+        let mut responses = vec![vec![None; active_workers]; payloads.len()];
+        let mut first_error = None;
+        for (worker_index, result) in results {
+            let Ok((reservation, result)) = result else {
+                first_error.get_or_insert(WorkerError::CoordinatorPanic { worker: worker_index });
+                continue;
+            };
+
+            if result.is_err() && !reservation.worker().is_running() {
+                let failed = lock(&self.workers[worker_index].worker).as_ref().map(Arc::clone);
+                if let Some(failed) = failed
+                    && reservation.matches(&failed)
+                    && let Err(error) = self.restart(worker_index, &failed)
+                {
+                    first_error.get_or_insert(error);
+                }
+            }
+
+            match result {
+                Ok(worker_responses) => {
+                    for (request_index, response) in worker_responses.into_iter().enumerate() {
+                        responses[request_index][worker_index] = Some(response);
+                    }
+                }
+                Err(error) => {
+                    first_error.get_or_insert(error);
+                }
+            }
+        }
+
+        if let Some(error) = first_error {
+            return Err(error);
+        }
+
+        let responses = responses
+            .into_iter()
+            .map(|responses| responses.into_iter().flatten().collect::<Vec<_>>())
+            .collect::<Vec<_>>();
+        let replacements = payloads
+            .iter()
+            .zip(&responses)
+            .filter_map(|(request, responses)| {
+                responses.first().map(|response| Bootstrap {
+                    group: Some(group),
+                    request: request.clone(),
+                    response: response.clone(),
+                })
+            })
+            .collect::<Vec<_>>();
+        let mut bootstraps = lock(&self.bootstraps);
+        bootstraps.retain(|bootstrap| bootstrap.group != Some(group));
+        bootstraps.extend(replacements);
+        drop(bootstraps);
+
+        if let Some(start) = trace_start {
+            self.telemetry.broadcasts.fetch_add(payloads.len() as u64, Ordering::Relaxed);
+            self.telemetry
+                .broadcast_workers
+                .fetch_add(payloads.len().saturating_mul(active_workers) as u64, Ordering::Relaxed);
+            self.telemetry.broadcast_ns.fetch_add(duration_nanos(start.elapsed()), Ordering::Relaxed);
+            tracing::trace!(
+                group,
+                workers = active_workers,
+                requests = payloads.len(),
+                request_bytes = payloads.iter().map(Vec::len).sum::<usize>(),
+                response_bytes = responses.iter().flatten().map(Vec::len).sum::<usize>(),
+                elapsed = ?start.elapsed(),
+                "Extension state-replacement broadcast completed."
             );
         }
 
@@ -1106,8 +1250,11 @@ mod tests {
             WorkerPoolOptions::default(),
         )
         .expect("worker pool should start");
-        lock(&pool.bootstraps)
-            .push(Bootstrap { request: b"secret-request".to_vec(), response: b"secret-response".to_vec() });
+        lock(&pool.bootstraps).push(Bootstrap {
+            group: None,
+            request: b"secret-request".to_vec(),
+            response: b"secret-response".to_vec(),
+        });
 
         let debug = format!("{pool:?}");
         assert!(!debug.contains("secret-argument"));
@@ -1227,6 +1374,43 @@ mod tests {
         let worker = pool.spawn_initialized(3).expect("lazy worker should replay initialization");
         assert!(worker.is_running());
 
+        worker.shutdown();
+        pool.shutdown();
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn grouped_broadcast_replaces_lazy_worker_replay_state() {
+        const WORKER: &str = concat!(
+            "dd bs=1 count=33 of=/dev/null 2>/dev/null; ",
+            r"printf '\115\101\107\117\000\001\000\000\002\000\000\000",
+            r"\000\000\000\000\000\000\000\001\000\000\000\000\000\000\000\000\000\000\000\002\157\153'; ",
+            "dd bs=1 count=33 of=/dev/null 2>/dev/null; ",
+            r"printf '\115\101\107\117\000\001\000\000\002\000\000\000",
+            r"\000\000\000\000\000\000\000\002\000\000\000\000\000\000\000\000\000\000\000\002\157\153'; ",
+            "dd bs=1 count=33 of=/dev/null 2>/dev/null; ",
+            r"printf '\115\101\107\117\000\001\000\000\002\000\000\000",
+            r"\000\000\000\000\000\000\000\003\000\000\000\000\000\000\000\000\000\000\000\002\157\153'; ",
+            "dd bs=1 count=32 of=/dev/null 2>/dev/null",
+        );
+
+        let pool = WorkerPool::spawn_adaptive(
+            WorkerCommand::new("sh").with_arguments(["-c", WORKER]),
+            NonZeroUsize::new(4).expect("four is non-zero"),
+            WorkerPoolOptions::default(),
+        )
+        .expect("worker pool should start");
+
+        pool.broadcast_sequence(7, &[b"a".to_vec(), b"b".to_vec()]).expect("initial state sequence should succeed");
+        pool.broadcast_sequence(7, &[b"c".to_vec()]).expect("replacement state sequence should succeed");
+
+        let grouped =
+            lock(&pool.bootstraps).iter().filter(|bootstrap| bootstrap.group == Some(7)).cloned().collect::<Vec<_>>();
+        assert_eq!(grouped.len(), 1);
+        assert_eq!(grouped[0].request, b"c");
+
+        let worker = pool.spawn_initialized(3).expect("lazy worker should replay only the replacement sequence");
+        assert!(worker.is_running());
         worker.shutdown();
         pool.shutdown();
     }

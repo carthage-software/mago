@@ -18,6 +18,8 @@ use mago_analyzer::analysis_result::AnalysisResult;
 use mago_analyzer::analysis_result::LateSymbolReferenceIssueReconciler;
 use mago_analyzer::artifacts::AnalysisArtifacts;
 use mago_analyzer::external::AFTER_FILE_ANALYSIS_BATCH_SIZE;
+use mago_analyzer::external::CodebaseScanFile;
+use mago_analyzer::external::CodebaseScanPlan;
 use mago_analyzer::external::FileAnalysisSnapshot;
 use mago_analyzer::plugin::PluginRegistry;
 use mago_analyzer::settings::Settings;
@@ -100,6 +102,8 @@ pub struct IncrementalAnalysisService {
     codebase_issues: IssueCollection,
     lifecycle_issues: IssueCollection,
     analysis_snapshots: HashMap<FileId, Arc<FileAnalysisSnapshot>>,
+    codebase_scan_plan: Option<Arc<CodebaseScanPlan>>,
+    codebase_scan_files: HashMap<FileId, CodebaseScanFile>,
 }
 
 impl std::fmt::Debug for IncrementalAnalysisService {
@@ -121,6 +125,8 @@ impl std::fmt::Debug for IncrementalAnalysisService {
             .field("codebase_issues", &self.codebase_issues.len())
             .field("lifecycle_issues", &self.lifecycle_issues.len())
             .field("analysis_snapshots", &self.analysis_snapshots.len())
+            .field("codebase_scan_plan", &self.codebase_scan_plan.is_some())
+            .field("codebase_scan_files", &self.codebase_scan_files.len())
             .finish()
     }
 }
@@ -169,6 +175,8 @@ impl IncrementalAnalysisService {
             codebase_issues: IssueCollection::default(),
             lifecycle_issues: IssueCollection::default(),
             analysis_snapshots: HashMap::default(),
+            codebase_scan_plan: None,
+            codebase_scan_files: HashMap::default(),
         }
     }
 
@@ -332,17 +340,27 @@ impl IncrementalAnalysisService {
     /// Returns [`OrchestratorError`] when source scanning, codebase population, or per-file
     /// analysis fails.
     pub fn analyze(&mut self) -> Result<AnalysisResult, OrchestratorError> {
+        self.codebase_scan_plan = self
+            .plugin_registry
+            .external_codebase_scan_plan()
+            .map_err(mago_analyzer::error::AnalysisError::from)?
+            .map(Arc::new);
         let source_files: Vec<_> = self.database.files().filter(|f| f.file_type != FileType::Builtin).collect();
 
         if source_files.is_empty() {
             tracing::info!("No source files found for analysis.");
+            self.codebase_scan_files.clear();
+            self.plugin_registry
+                .run_external_codebase_scan(Vec::new())
+                .map_err(mago_analyzer::error::AnalysisError::from)?;
             self.initialized = true;
             return Ok(AnalysisResult::new(SymbolReferences::new()));
         }
 
         let parser_settings = self.parser_settings;
         let php_version = self.settings.version;
-        let per_file_results: Vec<(FileId, u64, CodebaseMetadata)> = source_files
+        let codebase_scan_plan = self.codebase_scan_plan.clone();
+        let per_file_results: Vec<(FileId, u64, CodebaseMetadata, Option<CodebaseScanFile>)> = source_files
             .into_par_iter()
             .map_init(LocalArena::new, |arena, file| {
                 let content_hash = xxhash_rust::xxh3::xxh3_64(file.contents.as_ref());
@@ -358,25 +376,33 @@ impl IncrementalAnalysisService {
 
                 let resolver = NameResolver::new(arena);
                 let resolved_names = resolver.resolve(program);
-
                 let file_signature = signature_builder::build_file_signature(&file, program, &resolved_names);
                 let mut metadata = scan_program(arena, &file, program, &resolved_names, php_version);
                 metadata.set_file_signature(file.id, file_signature);
                 if file.file_type.is_patch() {
                     metadata.convert_partial_to_patch();
                 }
+                let codebase_scan = codebase_scan_plan
+                    .as_deref()
+                    .map(|plan| plan.capture(&file, program, &resolved_names))
+                    .transpose()?
+                    .flatten();
 
                 arena.reset();
 
-                (file.id, content_hash, metadata)
+                Ok((file.id, content_hash, metadata, codebase_scan))
             })
-            .collect();
+            .collect::<Result<Vec<_>, mago_analyzer::external::ExternalAnalyzerError>>()?;
 
         let mut merged_codebase = (*self.base_codebase).clone();
 
+        self.codebase_scan_files.clear();
         let staged: Vec<(FileId, u64, CodebaseMetadata)> = per_file_results
             .into_iter()
-            .map(|(file_id, content_hash, metadata)| {
+            .map(|(file_id, content_hash, metadata, codebase_scan)| {
+                if let Some(codebase_scan) = codebase_scan {
+                    self.codebase_scan_files.insert(file_id, codebase_scan);
+                }
                 let clone_for_ownership = metadata.clone();
                 merged_codebase.extend(metadata);
                 (file_id, content_hash, clone_for_ownership)
@@ -386,6 +412,9 @@ impl IncrementalAnalysisService {
 
         let mut symbol_references = (*self.base_symbol_references).clone();
         populate_codebase(&mut merged_codebase, &mut symbol_references, WordSet::default(), HashSet::default());
+        self.plugin_registry
+            .run_external_codebase_scan(self.codebase_scan_files.values().cloned().collect())
+            .map_err(mago_analyzer::error::AnalysisError::from)?;
         let mut file_states: HashMap<FileId, FileState> = HashMap::default();
         for (file_id, content_hash, metadata) in staged {
             let entry_keys = metadata.extract_owned_keys(&merged_codebase);
@@ -597,7 +626,8 @@ impl IncrementalAnalysisService {
 
         let parser_settings = self.parser_settings;
         let php_version = self.settings.version;
-        let new_file_scans: Vec<(FileId, CodebaseMetadata)> = changed_files
+        let codebase_scan_plan = self.codebase_scan_plan.clone();
+        let scanned_files: Vec<(FileId, CodebaseMetadata, Option<CodebaseScanFile>)> = changed_files
             .into_par_iter()
             .map_init(LocalArena::new, |arena, file| {
                 let program = parse_file_with_settings(arena, file, parser_settings);
@@ -611,7 +641,6 @@ impl IncrementalAnalysisService {
 
                 let resolver = NameResolver::new(arena);
                 let resolved_names = resolver.resolve(program);
-
                 let mut metadata = scan_program(arena, file, program, &resolved_names, php_version);
                 metadata.set_file_signature(
                     file.id,
@@ -620,23 +649,52 @@ impl IncrementalAnalysisService {
                 if file.file_type.is_patch() {
                     metadata.convert_partial_to_patch();
                 }
+                let codebase_scan = codebase_scan_plan
+                    .as_deref()
+                    .map(|plan| plan.capture(file, program, &resolved_names))
+                    .transpose()?
+                    .flatten();
 
                 arena.reset();
 
-                (file.id, metadata)
+                Ok((file.id, metadata, codebase_scan))
             })
-            .collect();
+            .collect::<Result<Vec<_>, mago_analyzer::external::ExternalAnalyzerError>>()
+            .map_err(mago_analyzer::error::AnalysisError::from)?;
 
         // A patch whose content actually changed requires rebuilding the merged codebase from
         // scratch. Patches that were force-rescanned due to a vendor change (same hash) go
         // through the normal incremental path: `apply_patches_pass` re-applies them to the
         // freshly-updated vendor entries and generates the correct diagnostics.
-        let any_patch_content_changed = new_file_scans.iter().any(|(fid, _)| {
+        let any_patch_content_changed = scanned_files.iter().any(|(fid, _, _)| {
             self.database.get(fid).is_ok_and(|f| f.file_type.is_patch())
                 && self.file_states.get(fid).is_none_or(|s| s.content_hash != file_hashes[fid])
         });
         if any_patch_content_changed {
             return self.analyze();
+        }
+
+        let scan_state_changed = self.codebase_scan_files.keys().any(|file_id| !current_file_ids.contains(file_id))
+            || scanned_files
+                .iter()
+                .any(|(file_id, _, snapshot)| snapshot.is_some() || self.codebase_scan_files.contains_key(file_id));
+        if scan_state_changed {
+            self.codebase_scan_files.retain(|file_id, _| current_file_ids.contains(file_id));
+        }
+        let mut new_file_scans = Vec::with_capacity(scanned_files.len());
+        for (file_id, metadata, snapshot) in scanned_files {
+            if scan_state_changed {
+                self.codebase_scan_files.remove(&file_id);
+                if let Some(snapshot) = snapshot {
+                    self.codebase_scan_files.insert(file_id, snapshot);
+                }
+            }
+            new_file_scans.push((file_id, metadata));
+        }
+        if scan_state_changed {
+            self.plugin_registry
+                .run_external_codebase_scan(self.codebase_scan_files.values().cloned().collect())
+                .map_err(mago_analyzer::error::AnalysisError::from)?;
         }
 
         let mut diff = {

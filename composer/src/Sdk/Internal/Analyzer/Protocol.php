@@ -27,6 +27,7 @@ use Mago\Sdk\Analyzer\PropertyType;
 use Mago\Sdk\Analyzer\ReferenceKind;
 use Mago\Sdk\Analyzer\ReferenceOrigin;
 use Mago\Sdk\Analyzer\ReferenceSummary;
+use Mago\Sdk\Analyzer\SourceFileTarget;
 use Mago\Sdk\Analyzer\SymbolReference;
 use Mago\Sdk\Analyzer\SymbolReferences;
 use Mago\Sdk\Analyzer\TargetedAnalysisHook;
@@ -84,6 +85,7 @@ final class Protocol
     public const ISSUE_FILTER_REQUEST = 15;
     public const CLASS_INITIALIZER_REQUEST = 17;
     public const ASSERTION_REQUEST = 18;
+    public const CODEBASE_SCAN_REQUEST = 19;
     public const GET_EXPRESSION_TYPES = 1;
     public const GET_ALL_EXPRESSION_TYPES = 2;
     public const GET_INFERRED_RETURN_TYPES = 3;
@@ -160,6 +162,7 @@ final class Protocol
     private const TYPE_COMPARISON_BATCH_RESPONSE = 0x8010;
     private const CLASS_INITIALIZER_RESPONSE = 0x8011;
     private const ASSERTION_RESPONSE = 0x8012;
+    private const CODEBASE_SCAN_RESPONSE = 0x8013;
     private const MAXIMUM_ISSUES = 1_000_000;
     private const MAXIMUM_ISSUE_NOTES = 0x0001_0000;
     private const MAXIMUM_ISSUE_ANNOTATIONS = 0x0001_0000;
@@ -354,6 +357,7 @@ final class Protocol
                     self::REGISTRATION_MEMOIZATION,
                     $plugin->memoizeProviders,
                 );
+                self::writeTargetRegistrations($writer, $plugin->codebaseScanHooks);
             }
         }
 
@@ -374,7 +378,7 @@ final class Protocol
             $writer->writeU16($registration->index);
             self::writeRegistrationHeader($writer, $registration, $header, $memoize);
 
-            /** @var non-empty-list<FunctionTarget|MethodTarget|PropertyTarget|ClassTarget|NodeKind|ClassLikeTarget> $targets */
+            /** @var non-empty-list<FunctionTarget|MethodTarget|PropertyTarget|ClassTarget|NodeKind|ClassLikeTarget|SourceFileTarget> $targets */
             $targets = $registration->targets;
             $writer->writeCount($targets);
             foreach ($targets as $target) {
@@ -433,7 +437,7 @@ final class Protocol
     /** @mago-expect lint:halstead */
     private static function writeRegistrationTarget(
         PayloadWriter $writer,
-        FunctionTarget|MethodTarget|PropertyTarget|ClassTarget|NodeKind|ClassLikeTarget $target,
+        FunctionTarget|MethodTarget|PropertyTarget|ClassTarget|NodeKind|ClassLikeTarget|SourceFileTarget $target,
     ): void {
         if ($target instanceof FunctionTarget) {
             $writer->writeU8($target->kind->value);
@@ -456,11 +460,76 @@ final class Protocol
             return;
         }
 
+        if ($target instanceof SourceFileTarget) {
+            $writer->writeString($target->pattern);
+
+            return;
+        }
+
         $writer->writeBytes(match (true) {
             $target instanceof ClassTarget => $target->class,
             $target instanceof NodeKind => $target->value,
             $target instanceof ClassLikeTarget => $target->ancestor,
         });
+    }
+
+    /**
+     * @param list<NodeKind> $nodeKinds
+     *
+     * @return array{bool, bool, list<int<0, 65535>>, array<int<0, 65535>, list<SourceFile>>}
+     */
+    public static function readCodebaseScanRequest(
+        PayloadReader $reader,
+        PHPVersion $phpVersion,
+        array $nodeKinds,
+    ): array {
+        $firstBatch = $reader->readBoolean();
+        $lastBatch = $reader->readBoolean();
+        $activeHookCount = $reader->readCount(65_536);
+        if ($activeHookCount === 0) {
+            throw new ProtocolException('A codebase-scan request has no active hooks.');
+        }
+        $activeHooks = [];
+        for ($hookIndex = 0; $hookIndex < $activeHookCount; ++$hookIndex) {
+            $activeHooks[] = $reader->readU16();
+        }
+
+        $fileCount = $reader->readCount(1_000_000);
+        $filesByHook = [];
+        for ($fileIndex = 0; $fileIndex < $fileCount; ++$fileIndex) {
+            $hookCount = $reader->readCount(65_536);
+            if ($hookCount === 0) {
+                throw new ProtocolException('A codebase-scan file has no matching hooks.');
+            }
+
+            $hooks = [];
+            for ($hookIndex = 0; $hookIndex < $hookCount; ++$hookIndex) {
+                $hooks[] = $reader->readU16();
+            }
+
+            $path = $reader->readBytes();
+            if ($path === '') {
+                throw new ProtocolException('A codebase-scan file has an empty path.');
+            }
+            $source = SourceFileCodec::readWithLiteralStrings(
+                $reader,
+                $phpVersion,
+                $nodeKinds,
+                $path,
+                $reader->readBytes(),
+            );
+            foreach ($hooks as $hook) {
+                $filesByHook[$hook][] = $source;
+            }
+        }
+        $reader->finish();
+
+        return [$firstBatch, $lastBatch, $activeHooks, $filesByHook];
+    }
+
+    public static function writeCodebaseScanResponse(): string
+    {
+        return self::createMessage(self::CODEBASE_SCAN_RESPONSE)->finish();
     }
 
     /** @param array<string, Span> $spans */

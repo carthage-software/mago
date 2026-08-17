@@ -103,6 +103,7 @@ use crate::external::AnalysisHookRegistration;
 use crate::external::AttributedEntryPoint;
 use crate::external::ClassInitializerProvider;
 use crate::external::ClassLikeAnalysisHookRegistration;
+use crate::external::CodebaseScanHookRegistration;
 use crate::external::EffectivePropertyType;
 use crate::external::EntryPoint;
 use crate::external::ExternalAnalysisSession;
@@ -147,6 +148,7 @@ const ISSUE_FILTER_REQUEST: u16 = 15;
 const TYPE_COMPARISON_BATCH_REQUEST: u16 = 16;
 const CLASS_INITIALIZER_REQUEST: u16 = 17;
 const ASSERTION_REQUEST: u16 = 18;
+pub(super) const CODEBASE_SCAN_REQUEST: u16 = 19;
 const DESCRIBE_RESPONSE: u16 = 0x8001;
 const RETURN_TYPE_RESPONSE: u16 = 0x8002;
 const TYPE_COMPARISON_RESPONSE: u16 = 0x8003;
@@ -158,6 +160,7 @@ const ISSUE_FILTER_RESPONSE: u16 = 0x800F;
 const TYPE_COMPARISON_BATCH_RESPONSE: u16 = 0x8010;
 const CLASS_INITIALIZER_RESPONSE: u16 = 0x8011;
 const ASSERTION_RESPONSE: u16 = 0x8012;
+const CODEBASE_SCAN_RESPONSE: u16 = 0x8013;
 const MAXIMUM_EXTENSIONS: usize = 0x4000;
 const MAXIMUM_PLUGINS: usize = 0x4000;
 const MAXIMUM_PROVIDERS: usize = 0x0001_0000;
@@ -241,6 +244,7 @@ pub(super) struct Registration {
     pub node_analysis_hooks: Vec<NodeAnalysisHookRegistration>,
     pub method_call_analysis_hooks: Vec<MethodCallAnalysisHookRegistration>,
     pub class_like_analysis_hooks: Vec<ClassLikeAnalysisHookRegistration>,
+    pub codebase_scan_hooks: Vec<CodebaseScanHookRegistration>,
     pub initialization_plugins: Vec<u16>,
     pub before_analysis_plugins: Vec<u16>,
     pub after_file_analysis_plugins: Vec<u16>,
@@ -294,6 +298,11 @@ pub(super) fn encode_describe_request(php_version: PHPVersion) -> Vec<u8> {
     writer.write_u32(php_version.to_version_id());
     write_node_kind_table(&mut writer);
     writer.finish()
+}
+
+pub(super) fn decode_codebase_scan_response(payload: &[u8]) -> Result<(), ExternalAnalyzerError> {
+    message_reader(payload, CODEBASE_SCAN_RESPONSE)?.finish()?;
+    Ok(())
 }
 
 pub(super) fn encode_initialization_request(plugins: &[u16]) -> Result<Vec<u8>, ExternalAnalyzerError> {
@@ -374,6 +383,7 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
     let mut node_analysis_hooks = Vec::new();
     let mut method_call_analysis_hooks = Vec::new();
     let mut class_like_analysis_hooks = Vec::new();
+    let mut codebase_scan_hooks = Vec::new();
     let mut initialization_plugins = Vec::new();
     let mut before_analysis_plugins = Vec::new();
     let mut after_file_analysis_plugins = Vec::new();
@@ -562,6 +572,14 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
                 read_memoization,
                 read_method_target,
             )?);
+            codebase_scan_hooks.extend(read_providers(
+                &mut reader,
+                index,
+                "codebase-scan hooks",
+                "codebase-scan hook",
+                no_capabilities,
+                read_source_file_target,
+            )?);
 
             let plugin = ExternalPlugin {
                 index,
@@ -619,6 +637,7 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
         method_assertion_providers.iter().map(|provider| provider.index),
         "method assertion provider",
     )?;
+    validate_provider_indices(codebase_scan_hooks.iter().map(|hook| hook.index), "codebase-scan hook")?;
     Ok(Registration {
         extensions,
         plugins,
@@ -636,6 +655,7 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
         node_analysis_hooks,
         method_call_analysis_hooks,
         class_like_analysis_hooks,
+        codebase_scan_hooks,
         initialization_plugins,
         before_analysis_plugins,
         after_file_analysis_plugins,
@@ -812,6 +832,18 @@ fn read_class_target(
 ) -> Result<Vec<u8>, ExternalAnalyzerError> {
     let target = non_empty(reader.read_bytes("class target")?.to_vec(), "class target")?;
     validate_method_pattern(&target)?;
+    Ok(target)
+}
+
+fn read_source_file_target(
+    reader: &mut PayloadReader<'_>,
+    index: u16,
+    _description: &'static str,
+) -> Result<String, ExternalAnalyzerError> {
+    let target = non_empty(reader.read_string("source-file target")?, "source-file target")?;
+    if target.contains('\0') {
+        return Err(protocol(format!("codebase-scan hook {index} target contains NUL")));
+    }
     Ok(target)
 }
 
@@ -2994,6 +3026,16 @@ pub(super) fn message_writer(kind: u16) -> PayloadWriter {
     writer
 }
 
+pub(super) fn message_writer_with_capacity(kind: u16, capacity: usize) -> PayloadWriter {
+    let mut writer = PayloadWriter::with_capacity(capacity);
+    writer.write_raw(&ANALYZER_PROTOCOL_MAGIC);
+    writer.write_u16(ANALYZER_PROTOCOL_MAJOR);
+    writer.write_u16(ANALYZER_PROTOCOL_MINOR);
+    writer.write_u16(kind);
+    writer.write_u16(0);
+    writer
+}
+
 pub(super) fn message_reader(payload: &[u8], expected_kind: u16) -> Result<PayloadReader<'_>, ExternalAnalyzerError> {
     if payload.len() < HEADER_LENGTH {
         return Err(protocol("analyzer payload is shorter than its header"));
@@ -3354,12 +3396,13 @@ pub(super) mod testing {
         writer.write_u32(1);
         writer.write_bytes(b"FrameworkTestCase").unwrap();
         writer.write_bytes(b"Framework\\Test").unwrap();
-        writer.write_u32(0);
-        writer.write_u32(0);
-        writer.write_u32(0);
-        writer.write_u32(0);
-        writer.write_u32(0);
-        writer.write_u32(0);
+        for _ in 0..6 {
+            writer.write_u32(0);
+        }
+        writer.write_u32(1);
+        writer.write_u16(0);
+        writer.write_u32(1);
+        writer.write_string("database/migrations/**/*.php").unwrap();
 
         let registration = decode_registration(&writer.finish()).unwrap();
         assert_eq!(registration.entry_points.len(), 1);
@@ -3372,6 +3415,9 @@ pub(super) mod testing {
         assert_eq!(registration.attributed_entry_points[0].source, word(b"demo/plugin"));
         assert_eq!(registration.attributed_entry_points[0].class, b"FrameworkTestCase");
         assert_eq!(registration.attributed_entry_points[0].attribute, b"Framework\\Test");
+        assert_eq!(registration.codebase_scan_hooks.len(), 1);
+        assert_eq!(registration.codebase_scan_hooks[0].index, 0);
+        assert_eq!(registration.codebase_scan_hooks[0].targets, ["database/migrations/**/*.php"]);
     }
 
     #[test]
@@ -3425,6 +3471,7 @@ pub(super) mod testing {
         writer.write_u32(0);
         writer.write_u32(0);
         writer.write_u32(0);
+        writer.write_u32(0);
         writer.finish()
     }
 
@@ -3453,6 +3500,7 @@ pub(super) mod testing {
         writer.write_u32(1);
         writer.write_u8(TARGET_EXACT);
         writer.write_bytes(b"demo_service").unwrap();
+        writer.write_u32(0);
         writer.write_u32(0);
         writer.write_u32(0);
         writer.write_u32(0);

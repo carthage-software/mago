@@ -7,11 +7,14 @@ namespace Mago\Tests\Sdk\Unit\Analyzer;
 use Mago\Sdk\Analyzer\ClassLikeAnalysisHook;
 use Mago\Sdk\Analyzer\ClassLikeTarget;
 use Mago\Sdk\Analyzer\ClassTarget;
+use Mago\Sdk\Analyzer\CodebaseScanContext;
+use Mago\Sdk\Analyzer\CodebaseScanHook;
 use Mago\Sdk\Analyzer\MethodCallAnalysisHook;
 use Mago\Sdk\Analyzer\MethodTarget;
 use Mago\Sdk\Analyzer\NodeAnalysisContext;
 use Mago\Sdk\Analyzer\NodeAnalysisHook;
 use Mago\Sdk\Analyzer\PluginRegistry;
+use Mago\Sdk\Analyzer\SourceFileTarget;
 use Mago\Sdk\Syntax\NodeKind;
 use PHPUnit\Framework\TestCase;
 
@@ -38,6 +41,18 @@ final class PluginRegistryTest extends TestCase
         $registry->registerNodeAnalysisHook($second);
 
         self::assertSame([$first, $second], $registry->getNodeAnalysisHooks());
+    }
+
+    public function testCodebaseScanHooksPreserveRegistrationOrder(): void
+    {
+        $registry = new PluginRegistry();
+        $first = self::codebaseScanHook('database/migrations/**/*.php');
+        $second = self::codebaseScanHook('config/*.php');
+
+        $registry->registerCodebaseScanHook($first);
+        $registry->registerCodebaseScanHook($second);
+
+        self::assertSame([$first, $second], $registry->getCodebaseScanHooks());
     }
 
     public function testMethodCallAnalysisHooksPreserveRegistrationOrder(): void
@@ -103,6 +118,22 @@ final class PluginRegistryTest extends TestCase
             }
 
             public function analyze(NodeAnalysisContext $context): void {}
+        };
+    }
+
+    private static function codebaseScanHook(string $pattern): CodebaseScanHook
+    {
+        return new class($pattern) implements CodebaseScanHook {
+            public function __construct(
+                private readonly string $pattern,
+            ) {}
+
+            public function getTargets(): array
+            {
+                return [new SourceFileTarget($this->pattern)];
+            }
+
+            public function scan(CodebaseScanContext $context): void {}
         };
     }
 
