@@ -664,6 +664,7 @@ pub(super) fn write_class_like(
     write_words(writer, metadata.require_extends.iter().copied())?;
     write_words(writer, metadata.require_implements.iter().copied())?;
     write_words(writer, metadata.used_traits.iter().copied())?;
+    write_words(writer, metadata.incomplete_hierarchy_dependencies())?;
     write_words(writer, metadata.methods.iter().copied())?;
     write_words(writer, metadata.pseudo_methods.iter().copied())?;
     write_words(writer, metadata.static_pseudo_methods.iter().copied())?;

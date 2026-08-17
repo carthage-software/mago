@@ -72,6 +72,9 @@ function extension_consumer(LifecycleClass0 $provided): int {
     return $provided->answer() + $provided->unrelated() + extension_answer(0) + EXTENSION_ANSWER;
 }
 
+/** @mago-expect analysis:non-existent-class-like */
+final class IncompleteLifecycleClass implements Vendor\Unresolvable\LifecycleContract {}
+
 $lifecycleInstance = new LifecycleClass0();
 $lifecycleInstance->value();
 $lifecycleInstance->topLevelProperty = $lifecycleInstance->topLevelProperty + 1;

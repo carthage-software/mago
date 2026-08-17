@@ -83,6 +83,7 @@ final class MetadataCodec
             self::readStrings($reader),
             self::readStrings($reader),
             self::readStrings($reader),
+            self::readStrings($reader),
             self::readOptionalStrings($reader),
             self::readOptionalStrings($reader),
             self::readTemplates($reader),

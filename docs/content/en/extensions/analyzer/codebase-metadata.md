@@ -62,12 +62,15 @@ Use `getClass()`, `getInterface()`, `getTrait()`, `getEnum()`, or `getClassLike(
 - normalized and source-cased names, kind, declaration locations, and flags;
 - direct and transitive parents and interfaces;
 - trait use, `require extends`, and `require implements` relationships;
+- unresolved hierarchy dependencies and `hasIncompleteHierarchy()`;
 - declared methods, pseudo-methods, properties, magic properties, constants, and enum cases;
 - templates, attributes, type aliases, mixins, and enum backing type;
 - optional children and permitted inheritors;
 - sealed-method and sealed-property state and PHP version ranges.
 
 Ancestry helpers return direct descendants, all descendants, or ancestors. Plural variants query multiple roots in one request.
+
+`hasIncompleteHierarchy()` is true when Mago could not resolve a direct or transitive hierarchy dependency. The normalized missing names are available through `unresolvedHierarchyDependencies`. Local declarations and references discovered while analyzing their bodies remain available, but an extension should avoid negative conclusions that require complete inherited metadata.
 
 ## Functions and methods
 

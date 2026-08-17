@@ -22,6 +22,7 @@ final class ClassLikeMetadata
      * @param list<string> $requiredExtends
      * @param list<string> $requiredImplements
      * @param list<string> $usedTraits
+     * @param list<string> $unresolvedHierarchyDependencies
      * @param list<string> $methods
      * @param list<string> $pseudoMethods
      * @param list<string> $staticPseudoMethods
@@ -51,6 +52,7 @@ final class ClassLikeMetadata
         public readonly array $requiredExtends,
         public readonly array $requiredImplements,
         public readonly array $usedTraits,
+        public readonly array $unresolvedHierarchyDependencies,
         public readonly array $methods,
         public readonly array $pseudoMethods,
         public readonly array $staticPseudoMethods,
@@ -69,4 +71,12 @@ final class ClassLikeMetadata
         public readonly ?bool $sealedProperties,
         public readonly array $availableVersions,
     ) {}
+
+    /**
+     * Returns whether inherited metadata is incomplete because a hierarchy dependency could not be resolved.
+     */
+    public function hasIncompleteHierarchy(): bool
+    {
+        return $this->unresolvedHierarchyDependencies !== [];
+    }
 }

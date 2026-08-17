@@ -341,8 +341,18 @@ final class LifecycleProofPlugin implements
         $base = $this->verifySharedContext($context);
         $child = $context->codebase->getClass('LifecycleClass1');
         $external = $context->codebase->getClass('ExtensionProvided');
-        if ($child === null || $external === null) {
-            throw new RuntimeException('The final hook cannot query the child class.');
+        $incomplete = $context->codebase->getClass('IncompleteLifecycleClass');
+        if ($child === null || $external === null || $incomplete === null) {
+            throw new RuntimeException('The final hook cannot query project classes.');
+        }
+
+        if (
+            $child->hasIncompleteHierarchy()
+            || $child->unresolvedHierarchyDependencies !== []
+            || !$incomplete->hasIncompleteHierarchy()
+            || $incomplete->unresolvedHierarchyDependencies !== ['vendor\\unresolvable\\lifecyclecontract']
+        ) {
+            throw new RuntimeException('Class-like metadata lost hierarchy completeness information.');
         }
 
         $frameworkReferenceEnabled = $context->codebase->getConstant('ENABLE_FRAMEWORK_ACTION') !== null;

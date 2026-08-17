@@ -119,22 +119,26 @@ impl ClassLikeMetadata {
     #[inline]
     #[must_use]
     pub fn has_incomplete_hierarchy(&self) -> bool {
-        if self.invalid_dependencies.is_empty() {
-            return false;
-        }
+        self.incomplete_hierarchy_dependencies().next().is_some()
+    }
 
-        if !self.kind.is_enum() {
-            return true;
-        }
-
-        self.invalid_dependencies.iter().any(|dependency| {
-            !matches!(
-                dependency.as_bytes(),
-                b"unitenum"
-                    | b"backedenum"
-                    | b"__internal_do_not_use__intbackedenum"
-                    | b"__internal_do_not_use__stringbackedenum"
-            )
+    /// Returns the unresolved dependencies that make this class-like's
+    /// inherited metadata incomplete.
+    ///
+    /// Synthetic enum contracts are materialized by the scanner and are not
+    /// exposed as unresolved hierarchy dependencies.
+    #[inline]
+    pub fn incomplete_hierarchy_dependencies(&self) -> impl Iterator<Item = Word> + '_ {
+        let is_enum = self.kind.is_enum();
+        self.invalid_dependencies.iter().copied().filter(move |dependency| {
+            !is_enum
+                || !matches!(
+                    dependency.as_bytes(),
+                    b"unitenum"
+                        | b"backedenum"
+                        | b"__internal_do_not_use__intbackedenum"
+                        | b"__internal_do_not_use__stringbackedenum"
+                )
         })
     }
 
@@ -1038,6 +1042,26 @@ mod tests {
     fn make(name: &str) -> ClassLikeMetadata {
         let a = word(name);
         ClassLikeMetadata::new(a, a, Span::dummy(0, 10), None, MetadataFlags::empty())
+    }
+
+    #[test]
+    fn incomplete_hierarchy_dependencies_hide_synthetic_enum_contracts() {
+        let mut metadata = make("Example");
+        metadata.kind = SymbolKind::Enum;
+        metadata.invalid_dependencies.extend([
+            word("unitenum"),
+            word("backedenum"),
+            word("__internal_do_not_use__intbackedenum"),
+        ]);
+
+        assert!(!metadata.has_incomplete_hierarchy());
+        assert_eq!(metadata.incomplete_hierarchy_dependencies().collect::<Vec<_>>(), []);
+
+        let missing = word("vendor\\missing\\contract");
+        metadata.invalid_dependencies.insert(missing);
+
+        assert!(metadata.has_incomplete_hierarchy());
+        assert_eq!(metadata.incomplete_hierarchy_dependencies().collect::<Vec<_>>(), [missing]);
     }
 
     #[test]
