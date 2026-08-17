@@ -42,11 +42,22 @@ fn test_all_rule_examples() {
     assert!(failures.is_empty(), "\n\n{} rule example(s) failed:\n\n{}\n\n", failures.len(), failures.join("\n"));
 }
 
+/// The file name to lint a rule's examples under.
+///
+/// Some rules only apply to files with a particular extension, so their examples
+/// have to be linted under a matching name to be meaningful.
+fn example_file_name(rule_code: &str) -> &'static [u8] {
+    match rule_code {
+        "no-this-in-template" => b"test.phtml",
+        _ => b"test.php",
+    }
+}
+
 /// Test a code snippet and verify it produces (or doesn't produce) issues
 fn test_code_snippet(rule_code: &str, code: &str, should_have_issues: bool) -> Result<(), String> {
     let arena = LocalArena::new();
 
-    let file = File::ephemeral(Cow::Owned(b"test.php".to_vec()), Cow::Owned(code.as_bytes().to_vec()));
+    let file = File::ephemeral(Cow::Owned(example_file_name(rule_code).to_vec()), Cow::Owned(code.as_bytes().to_vec()));
 
     let program = parse_file(&arena, &file);
     if program.has_errors() {
