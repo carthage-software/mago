@@ -127,6 +127,13 @@ impl LintRule for AmbiguousFunctionCallRule {
             return;
         }
 
+        if identifier.value().eq_ignore_ascii_case(b"clone")
+            || identifier.value().eq_ignore_ascii_case(b"exit")
+            || identifier.value().eq_ignore_ascii_case(b"die")
+        {
+            return;
+        }
+
         if ctx.is_name_imported(identifier) {
             return;
         }
@@ -144,5 +151,70 @@ impl LintRule for AmbiguousFunctionCallRule {
                 .with_note("Making calls explicit improves code clarity and prevents bugs if a function with the same name is later added to the namespace.")
                 .with_help(format!("Make the call explicit: for global functions, use `\\{function_name}(...)` or add a `use function {function_name};` statement.")),
         );
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use indoc::indoc;
+
+    use super::AmbiguousFunctionCallRule;
+    use crate::test_lint_failure;
+    use crate::test_lint_success;
+
+    test_lint_success! {
+        name = language_constructs_are_not_ambiguous_function_calls,
+        rule = AmbiguousFunctionCallRule,
+        code = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            final readonly class Value
+            {
+                public function __construct(public string $value) {}
+
+                public function withValue(string $value): self
+                {
+                    return clone($this, ['value' => $value]);
+                }
+            }
+
+            $exit = exit('done');
+            $die = die('done');
+        "#}
+    }
+
+    test_lint_success! {
+        name = language_construct_names_are_case_insensitive,
+        rule = AmbiguousFunctionCallRule,
+        code = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            function copy(object $value): object
+            {
+                return ClOnE($value);
+            }
+
+            $exit = EXIT('done');
+            $die = DiE('done');
+        "#}
+    }
+
+    test_lint_failure! {
+        name = similarly_named_functions_remain_ambiguous,
+        rule = AmbiguousFunctionCallRule,
+        count = 3,
+        code = indoc! {r#"
+            <?php
+
+            namespace App;
+
+            clone_object($value);
+            exit_now();
+            die_hard();
+        "#}
     }
 }
