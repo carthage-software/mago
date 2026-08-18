@@ -312,6 +312,7 @@ const DRUPAL_PRESET: FormatSettings = FormatSettings {
     preserve_breaking_attribute_list: true,
     preserve_breaking_conditional_expression: true,
     preserve_breaking_condition_expression: true,
+    preserve_redundant_logical_binary_expression_parentheses: true,
     array_table_style_alignment: false,
     space_before_arrow_function_parameter_list_parenthesis: true,
     empty_line_after_class_like_open: true,
