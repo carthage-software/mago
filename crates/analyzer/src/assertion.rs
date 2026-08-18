@@ -315,10 +315,7 @@ where
                 && let Some(key_type) =
                     get_possible_array_key_argument_type(array_type, input_key_type, assertion_context.codebase)
             {
-                let assertions = key_type.types.iter().cloned().map(Assertion::IsType).collect::<Vec<_>>();
-                if !assertions.is_empty() {
-                    if_types.insert(key_id, vec![assertions]);
-                }
+                if_types.insert(key_id, vec![vec![Assertion::InArray(key_type)]]);
             }
 
             if !if_types.is_empty() {

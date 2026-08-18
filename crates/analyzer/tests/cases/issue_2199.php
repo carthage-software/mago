@@ -74,3 +74,28 @@ function coercedBooleanKey(bool $key): ?bool
 
     return null;
 }
+
+/**
+ * @template TKey of array-key
+ * @template TValue
+ * @param array<TKey, TValue> $first
+ * @param array<TKey, TValue> $second
+ */
+function arraysHaveSameKeys(array $first, array $second): bool
+{
+    if ($first === $second) {
+        return true;
+    }
+
+    if (count($first) !== count($second)) {
+        return false;
+    }
+
+    foreach ($first as $key => $value) {
+        if (!array_key_exists($key, $second) || $second[$key] !== $value) {
+            return false;
+        }
+    }
+
+    return true;
+}
