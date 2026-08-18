@@ -217,7 +217,7 @@ php-version = "{php_version}"
 workspace = "."
 paths = [{paths}]
 includes = [{includes}]
-excludes = [{excludes}]
+excludes = [{excludes}]{source_extensions}
 
 [source.glob]
 literal-separator = true
@@ -346,6 +346,7 @@ impl InitCommand {
             .replace("{paths}", &quote_format_strings(&paths))
             .replace("{includes}", &quote_format_strings(&includes))
             .replace("{excludes}", &quote_format_strings(&excludes))
+            .replace("{source_extensions}", &build_source_extensions_string(&integrations))
             .replace(
                 "{integrations}",
                 &quote_format_strings(&integrations.iter().map(|i| i.to_string().to_lowercase()).collect::<Vec<_>>()),
@@ -820,6 +821,10 @@ fn detect_integrations_from_composer(composer: &ComposerPackage) -> Vec<Integrat
         integrations.push(Integration::Laravel);
     }
 
+    if has_package_prefix(composer, "drupal/") {
+        integrations.push(Integration::Drupal);
+    }
+
     if has_package(composer, "phpunit/phpunit") {
         integrations.push(Integration::PHPUnit);
     }
@@ -947,6 +952,22 @@ fn quote_format_strings(items: &[String]) -> String {
     items.iter().map(|p| format!("\"{}\"", p)).collect::<Vec<_>>().join(", ")
 }
 
+/// Builds the `extensions` line for the `[source]` section, leading newline included, or an empty string
+/// when Drupal is not detected. The template appends it to the `excludes` line so nothing is left behind
+/// when the line is not needed.
+///
+/// Drupal classes live in `.php` files, but hooks, update functions, and other procedural code sit in
+/// legacy `.module`, `.install`, and `.theme` files that the default `php`-only list skips. The list matches the
+/// `extensions` argument in Drupal core's own `phpcs.xml.dist`, minus the non-PHP entries.
+fn build_source_extensions_string(integrations: &[Integration]) -> String {
+    if !integrations.contains(&Integration::Drupal) {
+        return String::new();
+    }
+
+    "\nextensions = [\"php\", \"engine\", \"inc\", \"install\", \"module\", \"profile\", \"test\", \"theme\"]"
+        .to_string()
+}
+
 fn build_analyzer_settings_string(settings: &InitializationAnalyzerSettings) -> String {
     let mut lines = Vec::new();
 
@@ -1012,6 +1033,7 @@ mod tests {
             .replace("{paths}", &quote_format_strings(paths))
             .replace("{includes}", &quote_format_strings(includes))
             .replace("{excludes}", &quote_format_strings(excludes))
+            .replace("{source_extensions}", &build_source_extensions_string(integrations))
             .replace(
                 "{integrations}",
                 &quote_format_strings(&integrations.iter().map(|i| i.to_string().to_lowercase()).collect::<Vec<_>>()),
@@ -1111,6 +1133,8 @@ mod tests {
             &create_default_analyzer_settings(),
         );
 
+        assert!(!content.contains("extensions ="), "Drupal extensions should not leak into other projects");
+
         let result: Result<Configuration, _> = toml::from_str(&content);
         assert!(result.is_ok(), "Generated config should parse. Error: {:?}\n\nConfig:\n{}", result.err(), content);
     }
@@ -1202,5 +1226,39 @@ mod tests {
 
         let result: Result<Configuration, _> = toml::from_str(&content);
         assert!(result.is_ok(), "Generated config should parse. Error: {:?}\n\nConfig:\n{}", result.err(), content);
+    }
+    #[test]
+    fn test_generated_config_adds_drupal_extensions() {
+        let content = generate_config_content(
+            "8.3",
+            &["web/modules/custom".to_string()],
+            &["vendor".to_string()],
+            &[],
+            &[Integration::Drupal],
+            "[formatter]\npreset = \"drupal\"",
+            &create_default_analyzer_settings(),
+        );
+
+        let configuration: Configuration = toml::from_str(&content).expect("generated config should parse");
+        for extension in ["php", "engine", "inc", "install", "module", "profile", "test", "theme"] {
+            assert!(configuration.source.extensions.iter().any(|e| e == extension), "missing `{extension}`");
+        }
+    }
+
+    #[test]
+    fn test_detect_integrations_from_composer_detects_drupal() {
+        let composer = ComposerPackage::from_str(
+            r#"{"require": {"drupal/core-recommended": "^11.0", "symfony/console": "^7.0"}}"#,
+        )
+        .expect("composer.json should parse");
+
+        let integrations = detect_integrations_from_composer(&composer);
+        assert!(integrations.contains(&Integration::Drupal));
+
+        let composer =
+            ComposerPackage::from_str(r#"{"require": {"laravel/framework": "^11.0"}}"#).expect("should parse");
+
+        let integrations = detect_integrations_from_composer(&composer);
+        assert!(!integrations.contains(&Integration::Drupal));
     }
 }
