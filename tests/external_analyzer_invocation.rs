@@ -405,6 +405,10 @@ retained_missing();
 
 #[test]
 fn external_providers_receive_complete_invocation_context() -> Result<(), Box<dyn std::error::Error>> {
+    if !php_sdk_is_available() {
+        return Ok(());
+    }
+
     let observation = analyze_with_fixture(SOURCE, false, false, false)?;
     assert!(
         observation.issues.is_empty(),
@@ -464,6 +468,10 @@ fn external_providers_receive_complete_invocation_context() -> Result<(), Box<dy
 
 #[test]
 fn analyzer_without_method_providers_sends_no_method_request() -> Result<(), Box<dyn std::error::Error>> {
+    if !php_sdk_is_available() {
+        return Ok(());
+    }
+
     let observation = analyze_with_fixture(NO_METHOD_PROVIDER_SOURCE, true, false, false)?;
     assert!(observation.issues.is_empty(), "native method analysis should remain unchanged: {:#?}", observation.issues);
     assert!(observation.invocations.is_empty(), "a host without method providers must not receive method requests");
@@ -473,6 +481,10 @@ fn analyzer_without_method_providers_sends_no_method_request() -> Result<(), Box
 
 #[test]
 fn declined_dynamic_methods_preserve_non_documented_method_diagnostics() -> Result<(), Box<dyn std::error::Error>> {
+    if !php_sdk_is_available() {
+        return Ok(());
+    }
+
     let observation = analyze_with_fixture(UNDOCUMENTED_METHOD_SOURCE, true, false, false)?;
     assert_eq!(
         observation.issues,
@@ -494,6 +506,10 @@ fn declined_dynamic_methods_preserve_non_documented_method_diagnostics() -> Resu
 
 #[test]
 fn declined_missing_methods_preserve_non_existent_method_diagnostics() -> Result<(), Box<dyn std::error::Error>> {
+    if !php_sdk_is_available() {
+        return Ok(());
+    }
+
     let observation = analyze_with_fixture(MISSING_METHOD_SOURCE, false, false, false)?;
     assert_eq!(
         observation.issues,
@@ -509,6 +525,10 @@ fn declined_missing_methods_preserve_non_existent_method_diagnostics() -> Result
 
 #[test]
 fn declined_property_initialization_preserves_uninitialized_diagnostic() -> Result<(), Box<dyn std::error::Error>> {
+    if !php_sdk_is_available() {
+        return Ok(());
+    }
+
     let observation = analyze_with_fixture(DECLINED_PROPERTY_INITIALIZATION_SOURCE, false, true, false)?;
     assert_eq!(observation.issues.len(), 1, "a declining provider must preserve the native diagnostic");
     assert_eq!(observation.issues[0].0.as_deref(), Some("uninitialized-property"));
@@ -519,6 +539,10 @@ fn declined_property_initialization_preserves_uninitialized_diagnostic() -> Resu
 
 #[test]
 fn external_issue_filters_batch_and_remove_selected_native_diagnostics() -> Result<(), Box<dyn std::error::Error>> {
+    if !php_sdk_is_available() {
+        return Ok(());
+    }
+
     let observation = analyze_with_fixture(ISSUE_FILTER_SOURCE, true, false, true)?;
     assert_eq!(observation.issues.len(), 1, "only the explicitly filtered native issue should be suppressed");
     assert_eq!(observation.issues[0].0.as_deref(), Some("non-existent-function"));
@@ -582,6 +606,10 @@ fn analyze_with_fixture(
     let invocations = std::fs::read_to_string(audit)?.lines().map(str::to_owned).collect::<Vec<_>>();
 
     Ok(AnalysisObservation { issues, invocations })
+}
+
+fn php_sdk_is_available() -> bool {
+    common::php_sdk_is_available(Path::new(env!("CARGO_MANIFEST_DIR")), "the external analyzer invocation tests")
 }
 
 struct AnalysisObservation {
