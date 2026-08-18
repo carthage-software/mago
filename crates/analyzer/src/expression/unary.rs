@@ -61,7 +61,7 @@ use crate::error::AnalysisError;
 use crate::expression::assignment::PropertyWriteKind;
 use crate::expression::assignment::assign_to_expression;
 use crate::expression::call::method_call::analyze_implicit_method_call;
-use crate::utils::expression::get_expression_id;
+use crate::utils::expression::get_block_expression_id;
 use crate::utils::php_emulation::str_increment_bytes;
 use crate::utils::php_emulation::str_is_numeric_bytes;
 
@@ -392,12 +392,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPrefix<'arena> {
                             report_redundant_type_cast(&self.operator, self, &t, context);
                         }
 
-                        let operand_expression_id = get_expression_id(
-                            self.operand,
-                            block_context.scope.get_class_like_name(),
-                            context.resolved_names,
-                            Some(context.codebase),
-                        );
+                        let operand_expression_id = get_block_expression_id(self.operand, context, block_context);
 
                         cast_type_to_string(
                             &t,
@@ -679,13 +674,7 @@ where
         TUnion::from_vec(combine(possibilities, context.codebase, context.settings.combiner_options()))
     });
 
-    let operand_id = get_expression_id(
-        operand,
-        block_context.scope.get_class_like_name(),
-        context.resolved_names,
-        Some(context.codebase),
-    );
-
+    let operand_id = get_block_expression_id(operand, context, block_context);
     let successful = assign_to_expression(
         context,
         block_context,
@@ -939,13 +928,7 @@ where
         TUnion::from_vec(combine(possibilities, context.codebase, context.settings.combiner_options()))
     });
 
-    let operand_id = get_expression_id(
-        operand,
-        block_context.scope.get_class_like_name(),
-        context.resolved_names,
-        Some(context.codebase),
-    );
-
+    let operand_id = get_block_expression_id(operand, context, block_context);
     let successful = assign_to_expression(
         context,
         block_context,

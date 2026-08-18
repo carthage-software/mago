@@ -381,8 +381,6 @@ pub fn insert_variable_from_docblock<'ctx, A>(
                     )))
                     .with_help("You can remove this redundant `@var` docblock tag."),
             );
-        } else {
-            // docblock narrows the previous type without contradiction or redundancy; accept silently
         }
     }
 

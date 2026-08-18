@@ -443,13 +443,17 @@ where
     fn link_gaps(&self) -> impl Iterator<Item = (Position, Position)> + '_ {
         let first = self.accesses.first().map(|access| (self.base.span().end, access.get_operator_span().start));
 
-        first.into_iter().chain(self.accesses.windows(2).map(|pair| {
-            let end = match pair[0].get_arguments_list() {
-                Some(arguments) => arguments.span().end,
-                None => pair[0].get_selector().span().end,
+        first.into_iter().chain(self.accesses.windows(2).filter_map(|pair| {
+            let [previous, current] = pair else {
+                return None;
             };
 
-            (end, pair[1].get_operator_span().start)
+            let end = match previous.get_arguments_list() {
+                Some(arguments) => arguments.span().end,
+                None => previous.get_selector().span().end,
+            };
+
+            Some((end, current.get_operator_span().start))
         }))
     }
 

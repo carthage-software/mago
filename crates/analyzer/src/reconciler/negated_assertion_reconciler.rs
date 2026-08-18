@@ -93,8 +93,6 @@ where
             )
         {
             trigger_issue_for_impossible(context, old_var_type_atom, key, assertion, false, negated, pos);
-        } else {
-            // equality assertion with no key/span or types still possibly identical; no impossibility to report
         }
     }
 
@@ -267,8 +265,6 @@ fn subtract_complex_type<A>(
         acceptable_types.push(TAtomic::Never);
     } else if acceptable_types.len() > 1 && *can_be_disjunct {
         acceptable_types = combiner::combine(acceptable_types, context.codebase, CombinerOptions::default());
-    } else {
-        // single acceptable type or no disjunction needed; keep the list as-is
     }
 
     existing_var_type.types = Cow::Owned(acceptable_types);

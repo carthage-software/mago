@@ -136,8 +136,6 @@ where
                     .or_default()
                     .push(GenericTemplate::new(template.defining_entity, resolved_type));
             }
-        } else {
-            // declaring class has no templates and no calling-side extension to thread through
         }
     }
 

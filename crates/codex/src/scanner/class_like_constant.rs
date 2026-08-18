@@ -22,6 +22,7 @@ use crate::scanner::inference::infer;
 use crate::scanner::ttype::get_type_metadata_from_hint;
 use crate::scanner::ttype::get_type_metadata_from_type;
 use crate::scanner::ttype::merge_type_preserving_nullability;
+use crate::scanner::typing_error_issue;
 use crate::scanner::version_claim::evaluate_version_attributes;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::reference::TReference;
@@ -119,15 +120,11 @@ where
 
                             meta.type_metadata = Some(type_metadata);
                         }
-                        Err(typing_error) => class_like_metadata.issues.push(
-                            Issue::error("Could not resolve the type for the @var tag.")
-                                .with_code(ScanningIssueKind::InvalidVarTag)
-                                .with_annotation(
-                                    Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
-                                )
-                                .with_note(typing_error.note())
-                                .with_help(typing_error.help()),
-                        ),
+                        Err(typing_error) => class_like_metadata.issues.push(typing_error_issue(
+                            "Could not resolve the type for the @var tag.",
+                            ScanningIssueKind::InvalidVarTag,
+                            &typing_error,
+                        )),
                     }
                 }
             }

@@ -194,8 +194,6 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
                 } else {
                     signature.return_type = Some(Arc::new(get_void()));
                 }
-            } else {
-                // generator-yielding closure; return type already set above
             }
         }
 

@@ -38,7 +38,7 @@ use super::format::call_arguments::should_expand_first_arg;
 use super::format::call_arguments::should_expand_last_arg;
 
 #[inline]
-pub fn spaces<'arena, A>(arena: &'arena A, count: usize) -> &'arena [u8]
+pub fn spaces<A>(arena: &A, count: usize) -> &[u8]
 where
     A: Arena,
 {

@@ -378,8 +378,6 @@ where
         );
 
         then_type = Some(Rc::new(if_return_type_reconciled));
-    } else {
-        // shorthand ternary with no inferred condition type; leave then_type as None
     }
 
     let mut is_condition_truthy = false;
@@ -487,8 +485,6 @@ where
                         .with_safety(Safety::PotentiallyUnsafe),
                 );
             });
-        } else {
-            // condition can resolve to either truthy or falsy; no redundant-condition diagnostic
         }
     }
 

@@ -26,7 +26,7 @@ use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
-use crate::utils::expression::get_expression_id;
+use crate::utils::expression::get_block_expression_id;
 use mago_word::concat_word;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
@@ -48,12 +48,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
             value.analyze(context, block_context, artifacts)?;
             block_context.flags.set_inside_general_use(was_inside_general_use);
 
-            let value_id = get_expression_id(
-                value,
-                block_context.scope.get_class_like_name(),
-                context.resolved_names,
-                Some(context.codebase),
-            );
+            let value_id = get_block_expression_id(value, context, block_context);
 
             if let Some(value_id) = &value_id {
                 block_context.remove_variable(value_id.as_bytes(), true, context);
@@ -67,12 +62,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
                     break 'array_access;
                 };
 
-                let Some(array_id) = get_expression_id(
-                    array_access.array,
-                    block_context.scope.get_class_like_name(),
-                    context.resolved_names,
-                    Some(context.codebase),
-                ) else {
+                let Some(array_id) = get_block_expression_id(array_access.array, context, block_context) else {
                     break 'array_access;
                 };
 

@@ -247,18 +247,6 @@ impl ClassLikeMetadata {
         self.template_types.get(&name)
     }
 
-    /// Returns type parameters for a specific generic parameter name with its index.
-    #[inline]
-    #[must_use]
-    pub fn get_template_type_with_index(&self, name: Word) -> Option<(usize, &GenericTemplate)> {
-        self.template_types.get_full(&name).map(|(index, _, types)| (index, types))
-    }
-
-    #[must_use]
-    pub fn get_template_for_index(&self, index: usize) -> Option<(Word, &GenericTemplate)> {
-        self.template_types.get_index(index).map(|(name, types)| (*name, types))
-    }
-
     #[must_use]
     pub fn get_template_name_for_index(&self, index: usize) -> Option<Word> {
         self.template_types.get_index(index).map(|(name, _)| *name)
@@ -274,13 +262,6 @@ impl ClassLikeMetadata {
     #[must_use]
     pub fn has_parent(&self, parent: Word) -> bool {
         self.all_parent_classes.contains(&parent) || self.all_parent_interfaces.contains(&parent)
-    }
-
-    /// Checks if a specific parent has template extended parameters.
-    #[inline]
-    #[must_use]
-    pub fn has_template_extended_parameter(&self, parent: Word) -> bool {
-        self.template_extended_parameters.contains_key(&parent)
     }
 
     /// Checks if a specific method appears in this class-like.
@@ -304,13 +285,6 @@ impl ClassLikeMetadata {
         self.appearing_property_ids.contains_key(&name)
     }
 
-    /// Checks if a specific property is declared in this class-like.
-    #[inline]
-    #[must_use]
-    pub fn has_declaring_property(&self, name: Word) -> bool {
-        self.declaring_property_ids.contains_key(&name)
-    }
-
     /// Takes ownership of the issues found for this class-like structure.
     #[inline]
     pub fn take_issues(&mut self) -> Vec<Issue> {
@@ -322,24 +296,6 @@ impl ClassLikeMetadata {
     pub fn add_direct_parent_interface(&mut self, interface: Word) {
         self.direct_parent_interfaces.insert(interface);
         self.all_parent_interfaces.insert(interface);
-    }
-
-    /// Adds a single interface to the list of all parent interfaces. Use with caution, normally derived.
-    #[inline]
-    pub fn add_all_parent_interface(&mut self, interface: Word) {
-        self.all_parent_interfaces.insert(interface);
-    }
-
-    /// Adds multiple interfaces to the list of all parent interfaces. Use with caution.
-    #[inline]
-    pub fn add_all_parent_interfaces(&mut self, interfaces: impl IntoIterator<Item = Word>) {
-        self.all_parent_interfaces.extend(interfaces);
-    }
-
-    /// Adds multiple ancestor classes. Use with caution.
-    #[inline]
-    pub fn add_all_parent_classes(&mut self, classes: impl IntoIterator<Item = Word>) {
-        self.all_parent_classes.extend(classes);
     }
 
     /// Adds a single used trait. Returns `true` if the trait was not already present.

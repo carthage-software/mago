@@ -332,8 +332,6 @@ where
                                 ));
                             }
                         }
-                    } else {
-                        // ambiguous
                     }
                 } else {
                     // Check if any resolved method was found in a mixin without magic method support
@@ -634,8 +632,6 @@ where
                         false,
                     );
                 }
-            } else {
-                // call is on an inherited or interface member with magic call available; no extra diagnostic needed
             }
         }
 
@@ -724,8 +720,6 @@ where
                 });
             }
         }
-    } else {
-        // method already resolved on the class itself, or no required-extends/mixins to search
     }
 
     if let Some(intersection_types) = object_type.get_intersection_types() {

@@ -456,8 +456,6 @@ pub fn verify_argument_type<'arena, A>(
         }
 
         context.collector.report_with_code(kind, issue);
-    } else {
-        // type was coerced from mixed/empty container; already reported above, nothing more to do
     }
 }
 

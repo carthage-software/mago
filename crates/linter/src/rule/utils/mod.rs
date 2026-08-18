@@ -1,6 +1,7 @@
 pub mod call;
 pub mod const_value;
 pub mod consts;
+pub mod early_exit;
 pub mod isset;
 pub mod laravel;
 pub mod misc;

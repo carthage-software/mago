@@ -921,8 +921,6 @@ where
             if !is_equality {
                 new_existing_var_type.remove_type(atomic);
             }
-        } else {
-            // atomic isn't an int/string/array-key family; arraykey subtraction doesn't apply
         }
     }
 
@@ -988,8 +986,6 @@ where
             if !is_equality {
                 new_existing_var_type.remove_type(atomic);
             }
-        } else {
-            // atomic isn't a bool; bool subtraction doesn't apply
         }
     }
 
@@ -1417,13 +1413,9 @@ where
                 }
             } else if !atomic.is_falsy() {
                 did_remove_type = true;
-            } else {
-                // list with no known count and possibly empty; no fixed-count contradiction to detect
             }
         } else if atomic.is_keyed_array() && !atomic.is_false() {
             did_remove_type = true;
-        } else {
-            // atomic isn't a list or non-false keyed array; count assertion doesn't apply
         }
 
         acceptable_types.push(atomic);
@@ -1496,8 +1488,6 @@ where
                         if known_item.0 {
                             known_items.remove(key_name);
                             did_remove_type = true;
-                        } else {
-                            // entry is non-optional and present; assertion can't remove it
                         }
                     } else if let Some((key_parameter, _)) = parameters
                         && union_comparator::can_expression_types_be_identical(
@@ -1509,8 +1499,6 @@ where
                         )
                     {
                         did_remove_type = true;
-                    } else {
-                        // key not in known items and parameters don't admit it; nothing to remove
                     }
                 } else if let Some((key_parameter, _)) = parameters
                     && union_comparator::can_expression_types_be_identical(
@@ -1522,8 +1510,6 @@ where
                     )
                 {
                     did_remove_type = true;
-                } else {
-                    // no known items and parameters don't admit this key; nothing to remove
                 }
 
                 acceptable_types.push(atomic);
@@ -1535,18 +1521,12 @@ where
                             if known_element.0 {
                                 known_elements.remove(&(*i as usize));
                                 did_remove_type = true;
-                            } else {
-                                // element is non-optional and present; assertion can't remove it
                             }
                         } else if !element_type.is_never() {
                             did_remove_type = true;
-                        } else {
-                            // index missing and no element type to fall back on; nothing to remove
                         }
                     } else if !element_type.is_never() {
                         did_remove_type = true;
-                    } else {
-                        // no known elements and the element type is never; nothing to remove
                     }
                 }
 
@@ -1559,8 +1539,6 @@ where
                     reconcile_no_array_key(context, assertion, constraint, None, None, key_name, negated)
                 }) {
                     acceptable_types.push(atomic);
-                } else {
-                    // constraint reconciles to nothing; drop the parameter entirely
                 }
 
                 did_remove_type = true;
@@ -1609,11 +1587,7 @@ fn reconcile_no_nonnull_entry_for_key(existing_var_type: &TUnion, key_name: &Arr
                     if known_items_inner.is_empty() {
                         all_known_items_removed = true;
                     }
-                } else {
-                    // todo emit issue
                 }
-            } else {
-                // do nothing
             }
 
             if all_known_items_removed {

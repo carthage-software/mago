@@ -561,6 +561,42 @@ where
     get_never()
 }
 
+fn finalize<A>(
+    context: &mut Context<'_, '_, A>,
+    acceptable_types: Vec<TAtomic>,
+    did_remove_type: bool,
+    key: Option<&[u8]>,
+    span: Option<&Span>,
+    existing_var_type: &TUnion,
+    assertion: &Assertion,
+    negated: bool,
+    is_equality: bool,
+) -> TUnion
+where
+    A: Arena,
+{
+    if (acceptable_types.is_empty() || (!did_remove_type && !is_equality))
+        && let Some(key) = key
+        && let Some(span) = span
+    {
+        trigger_issue_for_impossible(
+            context,
+            existing_var_type.get_id(),
+            key,
+            assertion,
+            !did_remove_type,
+            negated,
+            span,
+        );
+    }
+
+    if !acceptable_types.is_empty() {
+        return TUnion::from_vec(acceptable_types);
+    }
+
+    get_never()
+}
+
 fn intersect_iterable<A>(
     context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
@@ -609,26 +645,7 @@ where
         }
     }
 
-    if (acceptable_types.is_empty() || (!did_remove_type && !is_equality))
-        && let Some(key) = key
-        && let Some(span) = span
-    {
-        trigger_issue_for_impossible(
-            context,
-            existing_var_type.get_id(),
-            key,
-            assertion,
-            !did_remove_type,
-            negated,
-            span,
-        );
-    }
-
-    if !acceptable_types.is_empty() {
-        return TUnion::from_vec(acceptable_types);
-    }
-
-    get_never()
+    finalize(context, acceptable_types, did_remove_type, key, span, existing_var_type, assertion, negated, is_equality)
 }
 
 fn intersect_array_list<A>(
@@ -726,26 +743,7 @@ where
         }
     }
 
-    if (acceptable_types.is_empty() || (!did_remove_type && !is_equality))
-        && let Some(key) = key
-        && let Some(span) = span
-    {
-        trigger_issue_for_impossible(
-            context,
-            existing_var_type.get_id(),
-            key,
-            assertion,
-            !did_remove_type,
-            negated,
-            span,
-        );
-    }
-
-    if !acceptable_types.is_empty() {
-        return TUnion::from_vec(acceptable_types);
-    }
-
-    get_never()
+    finalize(context, acceptable_types, did_remove_type, key, span, existing_var_type, assertion, negated, is_equality)
 }
 
 fn intersect_keyed_array<A>(
@@ -829,26 +827,7 @@ where
         }
     }
 
-    if (acceptable_types.is_empty() || (!did_remove_type && !is_equality))
-        && let Some(key) = key
-        && let Some(span) = span
-    {
-        trigger_issue_for_impossible(
-            context,
-            existing_var_type.get_id(),
-            key,
-            assertion,
-            !did_remove_type,
-            negated,
-            span,
-        );
-    }
-
-    if !acceptable_types.is_empty() {
-        return TUnion::from_vec(acceptable_types);
-    }
-
-    get_never()
+    finalize(context, acceptable_types, did_remove_type, key, span, existing_var_type, assertion, negated, is_equality)
 }
 
 fn intersect_arraykey<A>(
@@ -912,26 +891,7 @@ where
         }
     }
 
-    if (acceptable_types.is_empty() || (!did_remove_type && !is_equality))
-        && let Some(key) = key
-        && let Some(span) = span
-    {
-        trigger_issue_for_impossible(
-            context,
-            existing_var_type.get_id(),
-            key,
-            assertion,
-            !did_remove_type,
-            negated,
-            span,
-        );
-    }
-
-    if !acceptable_types.is_empty() {
-        return TUnion::from_vec(acceptable_types);
-    }
-
-    get_never()
+    finalize(context, acceptable_types, did_remove_type, key, span, existing_var_type, assertion, negated, is_equality)
 }
 
 fn intersect_numeric<A>(
@@ -995,26 +955,7 @@ where
         }
     }
 
-    if (acceptable_types.is_empty() || (!did_remove_type && !is_equality))
-        && let Some(key) = key
-        && let Some(span) = span
-    {
-        trigger_issue_for_impossible(
-            context,
-            existing_var_type.get_id(),
-            key,
-            assertion,
-            !did_remove_type,
-            negated,
-            span,
-        );
-    }
-
-    if !acceptable_types.is_empty() {
-        return TUnion::from_vec(acceptable_types);
-    }
-
-    get_never()
+    finalize(context, acceptable_types, did_remove_type, key, span, existing_var_type, assertion, negated, is_equality)
 }
 
 fn intersect_string<A>(
@@ -1120,26 +1061,7 @@ where
         }
     }
 
-    if (acceptable_types.is_empty() || (!did_remove_type && !is_equality))
-        && let Some(key) = key
-        && let Some(span) = span
-    {
-        trigger_issue_for_impossible(
-            context,
-            existing_var_type.get_id(),
-            key,
-            assertion,
-            !did_remove_type,
-            negated,
-            span,
-        );
-    }
-
-    if !acceptable_types.is_empty() {
-        return TUnion::from_vec(acceptable_types);
-    }
-
-    get_never()
+    finalize(context, acceptable_types, did_remove_type, key, span, existing_var_type, assertion, negated, is_equality)
 }
 
 fn intersect_bool<A>(
@@ -1207,26 +1129,7 @@ where
         }
     }
 
-    if (acceptable_types.is_empty() || (!did_remove_type && !is_equality))
-        && let Some(key) = key
-        && let Some(span) = span
-    {
-        trigger_issue_for_impossible(
-            context,
-            existing_var_type.get_id(),
-            key,
-            assertion,
-            !did_remove_type,
-            negated,
-            span,
-        );
-    }
-
-    if !acceptable_types.is_empty() {
-        return TUnion::from_vec(acceptable_types);
-    }
-
-    get_never()
+    finalize(context, acceptable_types, did_remove_type, key, span, existing_var_type, assertion, negated, is_equality)
 }
 
 fn intersect_float<A>(
@@ -1282,26 +1185,7 @@ where
         }
     }
 
-    if (acceptable_types.is_empty() || (!did_remove_type && !is_equality))
-        && let Some(key) = key
-        && let Some(span) = span
-    {
-        trigger_issue_for_impossible(
-            context,
-            existing_var_type.get_id(),
-            key,
-            assertion,
-            !did_remove_type,
-            negated,
-            span,
-        );
-    }
-
-    if !acceptable_types.is_empty() {
-        return TUnion::from_vec(acceptable_types);
-    }
-
-    get_never()
+    finalize(context, acceptable_types, did_remove_type, key, span, existing_var_type, assertion, negated, is_equality)
 }
 
 fn intersect_int<A>(
@@ -1359,26 +1243,7 @@ where
         }
     }
 
-    if (acceptable_types.is_empty() || (!did_remove_type && !is_equality))
-        && let Some(key) = key
-        && let Some(span) = span
-    {
-        trigger_issue_for_impossible(
-            context,
-            existing_var_type.get_id(),
-            key,
-            assertion,
-            !did_remove_type,
-            negated,
-            span,
-        );
-    }
-
-    if !acceptable_types.is_empty() {
-        return TUnion::from_vec(acceptable_types);
-    }
-
-    get_never()
+    finalize(context, acceptable_types, did_remove_type, key, span, existing_var_type, assertion, negated, is_equality)
 }
 
 fn reconcile_truthy_or_non_empty<A>(
@@ -1666,8 +1531,6 @@ where
                     non_empty: true,
                 })));
             }
-        } else {
-            // atomic isn't a list or keyed array; countable assertion doesn't apply
         }
     }
 
@@ -1990,8 +1853,6 @@ where
                     } else if !element_type.is_never() {
                         *non_empty = true;
                         *known_elements = Some(BTreeMap::from([(*i as usize, (false, (**element_type).clone()))]));
-                    } else {
-                        // no known elements and element type is never; leave the list shape untouched
                     }
 
                     acceptable_types.push(atomic);
@@ -2084,8 +1945,6 @@ where
                             *known_item = (false, nonnull);
                         } else if known_item.1 != nonnull {
                             known_item.1 = nonnull;
-                        } else {
-                            // entry already non-optional and stripping null produced no change
                         }
                     } else if let Some((_, value_param)) = parameters {
                         let nonnull = subtract_null(context, assertion, value_param, None, negated, None);
@@ -2125,8 +1984,6 @@ where
                             *known_element = (false, nonnull);
                         } else if known_element.1 != nonnull {
                             known_element.1 = nonnull;
-                        } else {
-                            // entry already non-optional and stripping null produced no change
                         }
                     } else if !element_type.is_never() {
                         let nonnull = subtract_null(context, assertion, element_type, None, negated, None);
@@ -2137,8 +1994,6 @@ where
                 } else if !element_type.is_never() {
                     let nonnull = subtract_null(context, assertion, element_type, None, negated, None);
                     *known_elements = Some(BTreeMap::from([(*i as usize, (false, nonnull))]));
-                } else {
-                    // no known elements and the generic element type is never; leave the list shape untouched
                 }
 
                 acceptable_types.push(atomic);

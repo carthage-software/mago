@@ -13,7 +13,6 @@ use std::process::Child;
 use std::process::ChildStderr;
 #[cfg(not(windows))]
 use std::process::ChildStdin;
-use std::process::ChildStdout;
 use std::sync::Arc;
 use std::sync::Mutex;
 use std::sync::MutexGuard;
@@ -32,7 +31,6 @@ use foldhash::HashMapExt;
 
 use crate::command::WorkerCommand;
 use crate::error::WorkerError;
-use crate::error::WorkerFailure;
 use crate::pool::WorkerPoolOptions;
 use crate::protocol::Frame;
 use crate::protocol::FrameFlags;
@@ -97,14 +95,6 @@ where
     }
 }
 
-struct AbsentRequestHandler;
-
-impl WorkerRequestHandler for AbsentRequestHandler {
-    fn handle(&mut self, _request: &Frame) -> Result<Vec<u8>, Vec<u8>> {
-        unreachable!("an absent nested-request handler cannot be invoked")
-    }
-}
-
 enum WorkerStdin {
     #[cfg(not(windows))]
     Process(ChildStdin),
@@ -140,7 +130,7 @@ impl Write for WorkerStdin {
 
 enum PendingEvent {
     Frame(Frame),
-    Failure(WorkerFailure),
+    Failure(String),
 }
 
 struct StderrTail {
@@ -204,7 +194,7 @@ impl WorkerInner {
         };
 
         if let Err(source) = result {
-            let error = WorkerError::protocol(self.id, source);
+            let error = WorkerError::Protocol { worker: self.id, source };
             self.fail(error.to_string());
             return Err(error);
         }
@@ -279,8 +269,8 @@ impl WorkerInner {
             message.push_str(&stderr);
         }
 
-        let failure = WorkerFailure::new(message);
-        tracing::trace!(worker = self.id, reason = %failure.message, "Extension worker failed.");
+        let failure = message;
+        tracing::trace!(worker = self.id, reason = %failure, "Extension worker failed.");
         let pending = std::mem::take(&mut *lock(&self.pending));
         for sender in pending.into_values() {
             let _result = sender.send(PendingEvent::Failure(failure.clone()));
@@ -417,7 +407,7 @@ impl Worker {
         let reader_thread = std::thread::Builder::new()
             .name(format!("mago-extension-worker-{id}-stdout"))
             .stack_size(IO_THREAD_STACK_SIZE)
-            .spawn(move || read_worker_stdout(&reader_inner, stdout))
+            .spawn(move || read_worker_stream(&reader_inner, stdout))
             .map_err(|source| {
                 inner.fail("failed to start stdout reader thread");
                 reap_child(&inner);
@@ -466,7 +456,7 @@ impl Worker {
     }
 
     pub fn request(&self, payload: Vec<u8>) -> Result<Vec<u8>, WorkerError> {
-        self.request_inner::<AbsentRequestHandler>(payload, None)
+        self.request_inner::<fn(&Frame) -> Result<Vec<u8>, Vec<u8>>>(payload, None)
     }
 
     pub fn request_with_handler<H>(&self, payload: Vec<u8>, handler: &mut H) -> Result<Vec<u8>, WorkerError>
@@ -571,7 +561,7 @@ impl Worker {
                     }
                 },
                 Ok(PendingEvent::Failure(failure)) => {
-                    return Err(self.inner.disconnected(failure.message));
+                    return Err(self.inner.disconnected(failure));
                 }
                 Err(mpsc::RecvTimeoutError::Timeout) => {
                     self.timeout(request_id);
@@ -689,7 +679,7 @@ impl Worker {
         }
 
         self.inner.state.store(STATE_STOPPED, Ordering::Release);
-        let failure = WorkerFailure::new("worker shut down");
+        let failure = String::from("worker shut down");
         let pending = std::mem::take(&mut *lock(&self.inner.pending));
         for sender in pending.into_values() {
             let _result = sender.send(PendingEvent::Failure(failure.clone()));
@@ -859,10 +849,6 @@ fn take_pipe<T>(id: usize, name: &'static str, pipe: Option<T>, child: &mut Chil
     })
 }
 
-fn read_worker_stdout(inner: &WorkerInner, stdout: ChildStdout) {
-    read_worker_stream(inner, stdout);
-}
-
 fn read_worker_stream(inner: &WorkerInner, stream: impl Read) {
     tracing::trace!(worker = inner.id, "Extension worker stdout reader started.");
     let mut reader = BufReader::new(stream);
@@ -918,20 +904,20 @@ fn reap_child(inner: &WorkerInner) {
     }
 }
 
-fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
+pub(crate) fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
     mutex.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
 }
 
-fn duration_nanos(duration: Duration) -> u64 {
+pub(crate) fn duration_nanos(duration: Duration) -> u64 {
     u64::try_from(duration.as_nanos()).unwrap_or(u64::MAX)
 }
 
 #[allow(clippy::cast_precision_loss, clippy::float_arithmetic)]
-fn nanos_millis(nanos: u64) -> f64 {
+pub(crate) fn nanos_millis(nanos: u64) -> f64 {
     nanos as f64 / 1_000_000.0
 }
 
-fn average_micros(nanos: u64, count: u64) -> u64 {
+pub(crate) fn average_micros(nanos: u64, count: u64) -> u64 {
     nanos.checked_div(count).unwrap_or(0) / 1_000
 }
 

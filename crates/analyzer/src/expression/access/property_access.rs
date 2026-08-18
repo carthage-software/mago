@@ -26,7 +26,7 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::resolver::property::resolve_instance_properties;
-use crate::utils::expression::get_expression_id;
+use crate::utils::expression::get_block_expression_id;
 use crate::utils::expression::get_property_access_expression_id;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for PropertyAccess<'arena> {
@@ -161,14 +161,7 @@ where
         None
     };
 
-    if is_null_safe
-        && let Some(var_id) = get_expression_id(
-            object,
-            block_context.scope.get_class_like_name(),
-            context.resolved_names,
-            Some(context.codebase),
-        )
-    {
+    if is_null_safe && let Some(var_id) = get_block_expression_id(object, context, block_context) {
         artifacts
             .true_branch_only_assertions
             .entry((span.start.offset, span.end.offset))
@@ -258,8 +251,6 @@ where
                 }
             }
         }
-    } else {
-        // object expression has no inferred type; no property reference to record
     }
 
     // Add references (after releasing the immutable borrow)

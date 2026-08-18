@@ -606,8 +606,6 @@ where
                 &if_conditional_scope.assigned_in_conditional_variable_ids,
             )?;
         }
-    } else {
-        // branch ends with a `break`; reasonable clauses stay as-is
     }
 
     if !if_scope.negated_types.is_empty() {
@@ -644,8 +642,6 @@ where
             loop_scope.variables_possibly_in_scope.extend(variables_possibly_in_scope);
         } else if !has_leaving_statements {
             if_scope.new_variables_possibly_in_scope = variables_possibly_in_scope;
-        } else {
-            // outside any loop scope and the branch leaves; variables don't propagate further
         }
     }
 
@@ -984,8 +980,6 @@ where
         } else if !has_leaving_statements {
             if_scope.new_variables_possibly_in_scope.extend(variables_possibly_in_scope);
             if_scope.possibly_assigned_variable_ids.extend(possibly_assigned_variable_ids);
-        } else {
-            // outside any loop scope and the branch leaves; variables don't propagate further
         }
     }
 

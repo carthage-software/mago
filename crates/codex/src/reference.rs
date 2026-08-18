@@ -57,23 +57,6 @@ pub enum SymbolReferenceKind {
     PropertyWrite,
 }
 
-/// Holds sets of symbols and members identified as invalid during analysis,
-/// often due to changes detected in `CodebaseDiff`.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[allow(clippy::struct_field_names)]
-pub struct InvalidSymbols {
-    /// Set of (Symbol, Member) pairs whose *signatures* are considered invalid.
-    /// An empty member name usually indicates the symbol itself.
-    invalid_symbol_and_member_signatures: HashSet<SymbolIdentifier>,
-    /// Set of (Symbol, Member) pairs whose *bodies* are considered invalid.
-    /// An empty member name usually indicates the symbol itself.
-    invalid_symbol_and_member_bodies: HashSet<SymbolIdentifier>,
-    /// Set of top-level symbols (class FQCN, function FQN) that are partially invalid,
-    /// meaning at least one member's signature or body is invalid, but not necessarily the whole symbol.
-    partially_invalid_symbols: WordSet,
-}
-
 /// Stores various maps tracking references between symbols (classes, functions, etc.)
 /// and class-like members (methods, properties, constants, etc.) within the codebase.
 ///
@@ -131,18 +114,7 @@ impl SymbolReferences {
     #[inline]
     #[must_use]
     pub fn new() -> Self {
-        Self {
-            symbol_references_to_symbols: HashMap::default(),
-            symbol_references_to_symbols_in_signature: HashMap::default(),
-            symbol_references_to_overridden_members: HashMap::default(),
-            functionlike_references_to_functionlike_returns: HashMap::default(),
-            file_references_to_symbols: HashMap::default(),
-            file_references_to_symbols_in_signature: HashMap::default(),
-            property_write_references: HashMap::default(),
-            property_read_references: HashMap::default(),
-            file_property_write_references: HashMap::default(),
-            file_property_read_references: HashMap::default(),
-        }
+        Self::default()
     }
 
     /// Returns whether no references of any kind are recorded.
@@ -676,56 +648,6 @@ impl SymbolReferences {
         }
     }
 
-    /// Computes the set of all unique symbols and members that are referenced *by* any symbol/member
-    /// tracked in the body or signature reference maps.
-    ///
-    /// # Returns
-    ///
-    /// A `HashSet` containing `&(SymbolName, MemberName)` tuples of all referenced items.
-    #[inline]
-    #[must_use]
-    pub fn get_referenced_symbols_and_members(&self) -> HashSet<&SymbolIdentifier> {
-        let mut referenced_items = HashSet::default();
-        for refs in self.symbol_references_to_symbols.values() {
-            referenced_items.extend(refs.iter());
-        }
-        for refs in self.symbol_references_to_symbols_in_signature.values() {
-            referenced_items.extend(refs.iter());
-        }
-        for refs in self.file_references_to_symbols.values() {
-            referenced_items.extend(refs.iter());
-        }
-        for refs in self.file_references_to_symbols_in_signature.values() {
-            referenced_items.extend(refs.iter());
-        }
-
-        referenced_items
-    }
-
-    /// Computes the inverse of the body and signature reference maps.
-    ///
-    /// # Returns
-    ///
-    /// A `HashMap` where the key is the referenced symbol/member `(Symbol, Member)` and the value
-    /// is a `HashSet` of referencing symbols/members `(RefSymbol, RefMember)`.
-    #[inline]
-    #[must_use]
-    pub fn get_back_references(&self) -> HashMap<SymbolIdentifier, HashSet<SymbolIdentifier>> {
-        let mut back_refs: HashMap<SymbolIdentifier, HashSet<SymbolIdentifier>> = HashMap::default();
-
-        for (referencing_item, referenced_items) in &self.symbol_references_to_symbols {
-            for referenced_item in referenced_items {
-                back_refs.entry(*referenced_item).or_default().insert(*referencing_item);
-            }
-        }
-        for (referencing_item, referenced_items) in &self.symbol_references_to_symbols_in_signature {
-            for referenced_item in referenced_items {
-                back_refs.entry(*referenced_item).or_default().insert(*referencing_item);
-            }
-        }
-        back_refs
-    }
-
     /// Finds all symbols/members that reference a specific target symbol/member.
     /// Checks both body and signature references.
     ///
@@ -762,58 +684,6 @@ impl SymbolReferences {
                 .file_references_to_symbols_in_signature
                 .values()
                 .any(|references| references.contains(&target_symbol))
-    }
-
-    /// Computes the count of references for each unique symbol/member referenced in bodies or signatures.
-    ///
-    /// # Returns
-    ///
-    /// A `HashMap` where the key is the referenced symbol/member `(Symbol, Member)` and the value
-    /// is the total count (`u32`) of references to it.
-    #[inline]
-    #[must_use]
-    pub fn get_referenced_symbols_and_members_with_counts(&self) -> HashMap<SymbolIdentifier, u32> {
-        let mut counts = HashMap::default();
-        for referenced_items in self.symbol_references_to_symbols.values() {
-            for referenced_item in referenced_items {
-                *counts.entry(*referenced_item).or_insert(0) += 1;
-            }
-        }
-        for referenced_items in self.symbol_references_to_symbols_in_signature.values() {
-            for referenced_item in referenced_items {
-                *counts.entry(*referenced_item).or_insert(0) += 1;
-            }
-        }
-        for referenced_items in self.file_references_to_symbols.values() {
-            for referenced_item in referenced_items {
-                *counts.entry(*referenced_item).or_insert(0) += 1;
-            }
-        }
-        for referenced_items in self.file_references_to_symbols_in_signature.values() {
-            for referenced_item in referenced_items {
-                *counts.entry(*referenced_item).or_insert(0) += 1;
-            }
-        }
-        counts
-    }
-
-    /// Computes the inverse of the overridden member reference map.
-    ///
-    /// # Returns
-    ///
-    /// A `HashMap` where the key is the overridden member `(ParentSymbol, Member)` and the value
-    /// is a `HashSet` of referencing symbols/members `(RefSymbol, RefMember)` that call it via `parent::`.
-    #[inline]
-    #[must_use]
-    pub fn get_referenced_overridden_class_members(&self) -> HashMap<SymbolIdentifier, HashSet<SymbolIdentifier>> {
-        let mut back_refs: HashMap<SymbolIdentifier, HashSet<SymbolIdentifier>> = HashMap::default();
-
-        for (referencing_item, referenced_items) in &self.symbol_references_to_overridden_members {
-            for referenced_item in referenced_items {
-                back_refs.entry(*referenced_item).or_default().insert(*referencing_item);
-            }
-        }
-        back_refs
     }
 
     /// Calculates sets of invalid symbols and members based on detected code changes (`CodebaseDiff`).
@@ -1141,52 +1011,6 @@ impl SymbolReferences {
 
             self.functionlike_references_to_functionlike_returns.remove(&fl_key);
         }
-    }
-
-    /// Returns a reference to the map tracking references within symbol/member bodies.
-    #[inline]
-    #[must_use]
-    pub fn get_symbol_references_to_symbols(&self) -> &HashMap<SymbolIdentifier, HashSet<SymbolIdentifier>> {
-        &self.symbol_references_to_symbols
-    }
-
-    /// Returns a reference to the map tracking references within symbol/member signatures.
-    #[inline]
-    #[must_use]
-    pub fn get_symbol_references_to_symbols_in_signature(
-        &self,
-    ) -> &HashMap<SymbolIdentifier, HashSet<SymbolIdentifier>> {
-        &self.symbol_references_to_symbols_in_signature
-    }
-
-    /// Returns a reference to the map tracking references to overridden members.
-    #[inline]
-    #[must_use]
-    pub fn get_symbol_references_to_overridden_members(&self) -> &HashMap<SymbolIdentifier, HashSet<SymbolIdentifier>> {
-        &self.symbol_references_to_overridden_members
-    }
-
-    /// Returns a reference to the map tracking references to function-like return values.
-    #[inline]
-    #[must_use]
-    pub fn get_functionlike_references_to_functionlike_returns(
-        &self,
-    ) -> &HashMap<FunctionLikeIdentifier, HashSet<FunctionLikeIdentifier>> {
-        &self.functionlike_references_to_functionlike_returns
-    }
-
-    /// Returns a reference to the map tracking file-level references to symbols (body).
-    #[inline]
-    #[must_use]
-    pub fn get_file_references_to_symbols(&self) -> &HashMap<Word, HashSet<SymbolIdentifier>> {
-        &self.file_references_to_symbols
-    }
-
-    /// Returns a reference to the map tracking file-level references to symbols (signature).
-    #[inline]
-    #[must_use]
-    pub fn get_file_references_to_symbols_in_signature(&self) -> &HashMap<Word, HashSet<SymbolIdentifier>> {
-        &self.file_references_to_symbols_in_signature
     }
 }
 

@@ -22,7 +22,7 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::expression::unary::cast_type_to_string;
-use crate::utils::expression::get_expression_id;
+use crate::utils::expression::get_block_expression_id;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for CompositeString<'arena> {
     fn analyze<'ctx, A>(
@@ -63,12 +63,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for CompositeString<'arena> {
 
                     (
                         artifacts.get_rc_expression_type(expression).cloned(),
-                        get_expression_id(
-                            expression,
-                            block_context.scope.get_class_like_name(),
-                            context.resolved_names,
-                            Some(context.codebase),
-                        ),
+                        get_block_expression_id(expression, context, block_context),
                     )
                 }
                 StringPart::BracedExpression(braced_expression) => {
@@ -79,12 +74,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for CompositeString<'arena> {
 
                     (
                         artifacts.get_rc_expression_type(&braced_expression.expression).cloned(),
-                        get_expression_id(
-                            braced_expression.expression,
-                            block_context.scope.get_class_like_name(),
-                            context.resolved_names,
-                            Some(context.codebase),
-                        ),
+                        get_block_expression_id(braced_expression.expression, context, block_context),
                     )
                 }
             };
@@ -177,8 +167,6 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for CompositeString<'arena> {
                         *strings = new_strings;
                     }
                 }
-            } else {
-                // resulting_strings was already cleared by an earlier non-literal part; keep it as None
             }
 
             if resulting_strings

@@ -26,6 +26,7 @@ use mago_syntax::cst::EnumCase;
 use mago_syntax::cst::EnumCaseBackedItem;
 use mago_syntax::cst::EnumCaseItem;
 use mago_syntax::cst::EnumCaseUnitItem;
+use mago_syntax::cst::Expression;
 use mago_syntax::cst::ExpressionStatement;
 use mago_syntax::cst::Extends;
 use mago_syntax::cst::FullOpeningTag;
@@ -882,6 +883,34 @@ where
     }
 }
 
+fn clause_separator<'arena, A>(f: &FormatterState<'_, 'arena, A>, prev_block_span: Span) -> Document<'arena, A>
+where
+    A: Arena,
+{
+    if f.settings.following_clause_on_newline
+        || f.is_followed_by_comment_on_next_line(prev_block_span)
+        || f.has_same_line_trailing_comment(prev_block_span)
+    {
+        Document::Line(Line::hard())
+    } else {
+        Document::space()
+    }
+}
+
+fn print_eq_assignment<'arena, A>(
+    f: &mut FormatterState<'_, 'arena, A>,
+    node: AssignmentLikeNode<'arena>,
+    lhs: Document<'arena, A>,
+    value: &'arena Expression<'arena>,
+) -> Document<'arena, A>
+where
+    A: Arena,
+{
+    let alignment = f.alignment_context();
+
+    print_assignment_with_alignment(f, node, lhs, Document::String(b"="), value, alignment)
+}
+
 impl<'arena, A> Format<'arena, A> for ClassLikeConstant<'arena>
 where
     A: Arena,
@@ -922,14 +951,7 @@ where
         wrap!(f, self, ClassLikeConstantItem, {
             let lhs = self.name.format(f);
 
-            print_assignment_with_alignment(
-                f,
-                AssignmentLikeNode::ClassLikeConstantItem(self),
-                lhs,
-                Document::String(b"="),
-                self.value,
-                f.alignment_context(),
-            )
+            print_eq_assignment(f, AssignmentLikeNode::ClassLikeConstantItem(self), lhs, self.value)
         })
     }
 }
@@ -986,16 +1008,8 @@ where
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena, A>) -> Document<'arena, A> {
         wrap!(f, self, EnumCaseBackedItem, {
             let lhs = self.name.format(f);
-            let operator = Document::String(b"=");
 
-            print_assignment_with_alignment(
-                f,
-                AssignmentLikeNode::EnumCaseBackedItem(self),
-                lhs,
-                operator,
-                self.value,
-                f.alignment_context(),
-            )
+            print_eq_assignment(f, AssignmentLikeNode::EnumCaseBackedItem(self), lhs, self.value)
         })
     }
 }
@@ -1155,16 +1169,8 @@ where
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena, A>) -> Document<'arena, A> {
         wrap!(f, self, PropertyConcreteItem, {
             let lhs = self.variable.format(f);
-            let operator = Document::String(b"=");
 
-            print_assignment_with_alignment(
-                f,
-                AssignmentLikeNode::PropertyConcreteItem(self),
-                lhs,
-                operator,
-                self.value,
-                f.alignment_context(),
-            )
+            print_eq_assignment(f, AssignmentLikeNode::PropertyConcreteItem(self), lhs, self.value)
         })
     }
 }
@@ -1534,14 +1540,7 @@ where
         wrap!(f, self, ConstantItem, {
             let lhs = self.name.format(f);
 
-            print_assignment_with_alignment(
-                f,
-                AssignmentLikeNode::ConstantItem(self),
-                lhs,
-                Document::String(b"="),
-                self.value,
-                f.alignment_context(),
-            )
+            print_eq_assignment(f, AssignmentLikeNode::ConstantItem(self), lhs, self.value)
         })
     }
 }
@@ -2045,27 +2044,13 @@ where
 
             let mut prev_block_span = self.block.span();
             for clause in &self.catch_clauses {
-                if f.settings.following_clause_on_newline
-                    || f.is_followed_by_comment_on_next_line(prev_block_span)
-                    || f.has_same_line_trailing_comment(prev_block_span)
-                {
-                    parts.push(Document::Line(Line::hard()));
-                } else {
-                    parts.push(Document::space());
-                }
+                parts.push(clause_separator(f, prev_block_span));
                 parts.push(clause.format(f));
                 prev_block_span = clause.block.span();
             }
 
             if let Some(clause) = &self.finally_clause {
-                if f.settings.following_clause_on_newline
-                    || f.is_followed_by_comment_on_next_line(prev_block_span)
-                    || f.has_same_line_trailing_comment(prev_block_span)
-                {
-                    parts.push(Document::Line(Line::hard()));
-                } else {
-                    parts.push(Document::space());
-                }
+                parts.push(clause_separator(f, prev_block_span));
                 parts.push(clause.format(f));
             }
 

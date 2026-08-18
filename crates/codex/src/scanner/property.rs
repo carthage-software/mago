@@ -29,6 +29,7 @@ use crate::scanner::inference::infer;
 use crate::scanner::ttype::get_type_metadata_from_hint;
 use crate::scanner::ttype::get_type_metadata_from_type;
 use crate::scanner::ttype::merge_type_preserving_nullability;
+use crate::scanner::typing_error_issue;
 use crate::scanner::version_claim::TypeOverride;
 use crate::scanner::version_claim::evaluate_version_attributes;
 use crate::ttype::resolution::TypeResolutionContext;
@@ -435,15 +436,11 @@ where
                         param.set_type_metadata(Some(merged));
                     }
                     Err(typing_error) => {
-                        issues.push(
-                            Issue::error("Could not resolve the type for the @param tag.")
-                                .with_code(ScanningIssueKind::InvalidParamTag)
-                                .with_annotation(
-                                    Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
-                                )
-                                .with_note(typing_error.note())
-                                .with_help(typing_error.help()),
-                        );
+                        issues.push(typing_error_issue(
+                            "Could not resolve the type for the @param tag.",
+                            ScanningIssueKind::InvalidParamTag,
+                            &typing_error,
+                        ));
                     }
                 }
             }
@@ -463,29 +460,28 @@ where
                     return_type_metadata = Some(docblock_type);
                 }
                 Err(typing_error) => {
-                    issues.push(
-                        Issue::error("Could not resolve the type for the @return tag.")
-                            .with_code(ScanningIssueKind::InvalidReturnTag)
-                            .with_annotation(
-                                Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
-                            )
-                            .with_note(typing_error.note())
-                            .with_help(typing_error.help()),
-                    );
+                    issues.push(typing_error_issue(
+                        "Could not resolve the type for the @return tag.",
+                        ScanningIssueKind::InvalidReturnTag,
+                        &typing_error,
+                    ));
                 }
             }
         }
     }
 
-    PropertyHookMetadata::new(name, hook.span())
-        .with_flags(flags)
-        .with_parameter(parameter)
-        .with_returns_by_ref(hook.ampersand.is_some())
-        .with_is_abstract(is_abstract)
-        .with_attributes(attributes)
-        .with_return_type_metadata(return_type_metadata)
-        .with_has_docblock(has_docblock)
-        .with_issues(issues)
+    PropertyHookMetadata {
+        name,
+        span: hook.span(),
+        flags,
+        parameter,
+        returns_by_ref: hook.ampersand.is_some(),
+        is_abstract,
+        attributes,
+        return_type_metadata,
+        has_docblock,
+        issues,
+    }
 }
 
 fn scan_hook_parameter<'arena, A>(
@@ -607,13 +603,11 @@ fn update_property_metadata_from_docblock(
 
                 property_metadata.set_type_metadata(Some(property_type_metadata));
             }
-            Err(typing_error) => class_like_metadata.issues.push(
-                Issue::error("Could not resolve the property type from its docblock.")
-                    .with_code(ScanningIssueKind::InvalidVarTag)
-                    .with_annotation(Annotation::primary(typing_error.span()).with_message(typing_error.to_string()))
-                    .with_note(typing_error.note())
-                    .with_help(typing_error.help()),
-            ),
+            Err(typing_error) => class_like_metadata.issues.push(typing_error_issue(
+                "Could not resolve the property type from its docblock.",
+                ScanningIssueKind::InvalidVarTag,
+                &typing_error,
+            )),
         }
     }
 }

@@ -453,8 +453,6 @@ where
                 .map(|(_, _)| if is_spl_object_storage { get_never() } else { wrap_atomic(TAtomic::Placeholder) })
                 .collect(),
         );
-    } else {
-        // class has no constructor, no extra arguments, and no templates; no type parameters to record
     }
 
     let skip_constructor_warning =
@@ -627,8 +625,6 @@ where
         }
 
         argument_list.analyze(context, block_context, artifacts)?;
-    } else {
-        // anonymous class has no constructor and no arguments were provided; nothing to report
     }
 
     Ok(())

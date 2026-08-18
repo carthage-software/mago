@@ -127,8 +127,6 @@ where
                 }
             } else if refined_type.is_never() {
                 trigger_issue_for_impossible(context, existing_var_type.get_id(), key, assertion, false, negated, span);
-            } else {
-                // refinement narrowed the type without making it never; no impossibility to report
             }
         }
 
@@ -625,8 +623,6 @@ where
                     );
                 } else if !second_value.0 {
                     return None;
-                } else {
-                    // optional key not present in the first array and no fallback parameters; drop it from the intersection
                 }
             }
 
@@ -644,8 +640,6 @@ where
                     second_value.1 = intersect_union_with_union(context, &second_value.1, &first_parameters.1)?;
                 } else if second_keyed_array.parameters.is_none() && !second_value.0 {
                     return None;
-                } else {
-                    // first array has no fallback parameters and the entry is optional; leave the value type unchanged
                 }
             }
 
@@ -663,8 +657,6 @@ where
                     first_value.1 = intersect_union_with_union(context, &first_value.1, &second_params.1)?;
                 } else if first_keyed_array.parameters.is_none() && !first_value.0 {
                     return None;
-                } else {
-                    // second array has no fallback parameters and the entry is optional; leave the value type unchanged
                 }
             }
 

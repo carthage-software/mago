@@ -298,8 +298,6 @@ pub fn handle_return_value<'ctx, A>(
             }
 
             expected_return_type = return_type;
-        } else {
-            // ignore this, it will be handled by the `yield` analyzer
         }
     }
 
@@ -541,8 +539,6 @@ pub fn handle_return_value<'ctx, A>(
                 )
             ),
         );
-    } else {
-        // a return value isn't required, the function yields, or this is a constructor; nothing to report
     }
 }
 

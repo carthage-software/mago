@@ -410,8 +410,6 @@ impl ControlAction {
                         control_actions.extend(try_statement_actions);
 
                         return control_actions;
-                    } else {
-                        // try block falls through and there are no catches taking over; fall into finally handling
                     }
 
                     if let Some(finally_clause) = try_catch.finally_clause.as_ref()

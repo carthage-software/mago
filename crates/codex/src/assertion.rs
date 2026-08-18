@@ -183,18 +183,6 @@ impl Assertion {
     }
 
     #[must_use]
-    pub fn has_non_isset_equality(&self) -> bool {
-        matches!(
-            self,
-            Assertion::InArray(_)
-                | Assertion::HasIntOrStringArrayAccess
-                | Assertion::HasStringArrayAccess
-                | Assertion::IsIdentical(_)
-                | Assertion::IsEqual(_)
-        )
-    }
-
-    #[must_use]
     pub fn has_equality(&self) -> bool {
         matches!(
             self,
@@ -212,76 +200,12 @@ impl Assertion {
 
     #[must_use]
     pub fn has_literal_value(&self) -> bool {
-        match self {
-            Assertion::IsIdentical(atomic)
-            | Assertion::IsNotIdentical(atomic)
-            | Assertion::IsType(atomic)
-            | Assertion::IsNotType(atomic)
-            | Assertion::IsEqual(atomic)
-            | Assertion::IsNotEqual(atomic) => {
-                atomic.is_literal_int()
-                    || atomic.is_literal_float()
-                    || atomic.is_known_literal_string()
-                    || atomic.is_literal_class_string()
-            }
-
-            _ => false,
-        }
-    }
-
-    #[must_use]
-    pub fn has_integer(&self) -> bool {
-        match self {
-            Assertion::IsIdentical(atomic)
-            | Assertion::IsNotIdentical(atomic)
-            | Assertion::IsType(atomic)
-            | Assertion::IsNotType(atomic)
-            | Assertion::IsEqual(atomic)
-            | Assertion::IsNotEqual(atomic) => atomic.is_int(),
-            _ => false,
-        }
-    }
-
-    #[must_use]
-    pub fn has_literal_string(&self) -> bool {
-        match self {
-            Assertion::IsIdentical(atomic)
-            | Assertion::IsNotIdentical(atomic)
-            | Assertion::IsType(atomic)
-            | Assertion::IsNotType(atomic)
-            | Assertion::IsEqual(atomic)
-            | Assertion::IsNotEqual(atomic) => atomic.is_known_literal_string(),
-
-            _ => false,
-        }
-    }
-
-    #[must_use]
-    pub fn has_literal_int(&self) -> bool {
-        match self {
-            Assertion::IsIdentical(atomic)
-            | Assertion::IsNotIdentical(atomic)
-            | Assertion::IsType(atomic)
-            | Assertion::IsNotType(atomic)
-            | Assertion::IsEqual(atomic)
-            | Assertion::IsNotEqual(atomic) => atomic.is_literal_int(),
-
-            _ => false,
-        }
-    }
-
-    #[must_use]
-    pub fn has_literal_float(&self) -> bool {
-        match self {
-            Assertion::IsIdentical(atomic)
-            | Assertion::IsNotIdentical(atomic)
-            | Assertion::IsType(atomic)
-            | Assertion::IsNotType(atomic)
-            | Assertion::IsEqual(atomic)
-            | Assertion::IsNotEqual(atomic) => atomic.is_literal_float(),
-
-            _ => false,
-        }
+        self.get_type().is_some_and(|atomic| {
+            atomic.is_literal_int()
+                || atomic.is_literal_float()
+                || atomic.is_known_literal_string()
+                || atomic.is_literal_class_string()
+        })
     }
 
     #[must_use]

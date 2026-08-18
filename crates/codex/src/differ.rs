@@ -5,8 +5,6 @@ use mago_database::file::FileId;
 use mago_word::empty_word;
 
 use crate::diff::CodebaseDiff;
-use crate::diff::DeletionRange;
-use crate::diff::DiffHunk;
 use crate::signature::DefSignatureNode;
 use crate::signature::FileSignature;
 
@@ -18,7 +16,7 @@ use crate::signature::FileSignature;
 ///
 /// # Arguments
 ///
-/// * `file_id` - The identifier of the file being compared (used for `diff_map`)
+/// * `file_id` - The identifier of the file being compared
 /// * `old_signature` - The previous file signature (None if this is a new file)
 /// * `new_signature` - The current file signature
 ///
@@ -27,8 +25,6 @@ use crate::signature::FileSignature;
 /// A `CodebaseDiff` containing:
 /// - `keep`: Symbols that are unchanged
 /// - `changed`: Symbols that are new, deleted, or modified
-/// - `diff_map`: Position mappings for symbols that moved
-/// - `deletion_ranges_map`: Ranges of deleted code
 #[must_use]
 pub fn compute_file_diff(
     file_id: FileId,
@@ -73,7 +69,7 @@ fn mark_all_as_changed(signature: &FileSignature) -> CodebaseDiff {
 ///
 /// # Arguments
 ///
-/// * `file_id` - File being compared (for tracking position changes)
+/// * `file_id` - File being compared
 /// * `old_signature` - Previous file signature
 /// * `new_signature` - Current file signature
 ///
@@ -82,13 +78,9 @@ fn mark_all_as_changed(signature: &FileSignature) -> CodebaseDiff {
 /// A `CodebaseDiff` with:
 /// - `keep`: Symbols whose signatures are unchanged
 /// - `changed`: Added, removed, or signature-modified symbols
-/// - `diff_map`: Position changes for issue mapping
-/// - `deletion_ranges_map`: Deleted code ranges for issue filtering
 fn myers_diff(file_id: FileId, old_signature: &FileSignature, new_signature: &FileSignature) -> CodebaseDiff {
     let mut keep = HashSet::default();
     let mut changed = HashSet::default();
-    let mut file_diffs: Vec<DiffHunk> = vec![];
-    let mut deletion_ranges: Vec<DeletionRange> = vec![];
 
     let Ok((trace, x, y)) = calculate_trace(&old_signature.ast_nodes, &new_signature.ast_nodes) else {
         tracing::warn!("Myers diff algorithm failed to converge for file {file_id:?}, marking all symbols as changed");
@@ -129,22 +121,10 @@ fn myers_diff(file_id: FileId, old_signature: &FileSignature, new_signature: &Fi
                                 has_child_sig_change = true;
                                 changed.insert((a.name, a_child.name));
                             }
-
-                            // Track position changes for issue mapping
-                            if b_child.start_offset != a_child.start_offset || b_child.start_line != a_child.start_line
-                            {
-                                file_diffs.push((
-                                    a_child.start_offset as usize,
-                                    a_child.end_offset as usize,
-                                    b_child.start_offset as isize - a_child.start_offset as isize,
-                                    b_child.start_line as isize - a_child.start_line as isize,
-                                ));
-                            }
                         }
                         AstDiffElem::Remove(child_node) => {
                             has_child_sig_change = true;
                             changed.insert((a.name, child_node.name));
-                            deletion_ranges.push((child_node.start_offset as usize, child_node.end_offset as usize));
                         }
                         AstDiffElem::Add(child_node) => {
                             has_child_sig_change = true;
@@ -157,21 +137,10 @@ fn myers_diff(file_id: FileId, old_signature: &FileSignature, new_signature: &Fi
                     changed.insert((a.name, empty_word()));
                 } else {
                     keep.insert((a.name, empty_word()));
-
-                    // Track position changes for issue mapping
-                    if b.start_offset != a.start_offset || b.start_line != a.start_line {
-                        file_diffs.push((
-                            a.start_offset as usize,
-                            a.end_offset as usize,
-                            b.start_offset as isize - a.start_offset as isize,
-                            b.start_line as isize - a.start_line as isize,
-                        ));
-                    }
                 }
             }
             AstDiffElem::Remove(node) => {
                 changed.insert((node.name, empty_word()));
-                deletion_ranges.push((node.start_offset as usize, node.end_offset as usize));
 
                 // Also mark all children as removed
                 for child in &node.children {
@@ -189,17 +158,7 @@ fn myers_diff(file_id: FileId, old_signature: &FileSignature, new_signature: &Fi
         }
     }
 
-    let mut diff = CodebaseDiff::new().with_keep(keep).with_changed(changed);
-
-    if !file_diffs.is_empty() {
-        diff.add_diff_map_entry(file_id, file_diffs);
-    }
-
-    if !deletion_ranges.is_empty() {
-        diff.add_deletion_ranges_entry(file_id, deletion_ranges);
-    }
-
-    diff
+    CodebaseDiff::new().with_keep(keep).with_changed(changed)
 }
 
 /// Type alias for the Myers diff trace structure.

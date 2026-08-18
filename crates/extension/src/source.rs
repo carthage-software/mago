@@ -59,22 +59,6 @@ pub struct SourceSnapshot<'arena> {
 }
 
 impl<'arena> SourceSnapshot<'arena> {
-    /// Builds a complete snapshot for semantic analyzer hooks.
-    ///
-    /// The target table is empty because analyzer hooks inspect the complete
-    /// node table directly rather than receiving per-rule callbacks.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the syntax tree exceeds the protocol's `u32`
-    /// address space.
-    pub fn complete<'ast>(
-        program: &'ast Program<'arena>,
-        resolved_names: &ResolvedNames<'arena>,
-    ) -> Result<Self, PayloadError> {
-        Self::complete_with_targets(program, resolved_names, None)
-    }
-
     /// Builds a complete snapshot containing decoded literal-string values.
     ///
     /// This is intended for codebase-scan hooks that interpret source before
@@ -161,75 +145,11 @@ impl<'arena> SourceSnapshot<'arena> {
         resolved_names: &ResolvedNames<'arena>,
         target_kinds: &[bool; u8::MAX as usize + 1],
     ) -> Result<Option<Self>, PayloadError> {
-        let mut nodes = Vec::new();
-        let mut targets = Vec::new();
-        let mut target_ranges = Vec::new();
-        let mut stack = Vec::with_capacity(64);
-        let mut subtree_stack = Vec::with_capacity(64);
-        stack.push(Node::Program(program));
-        while let Some(node) = stack.pop() {
-            if target_kinds[node.kind() as usize] {
-                let span = node.span();
-                target_ranges.push((span.start.offset, span.end.offset));
-                Self::append_subtree(
-                    node,
-                    &mut |child| target_kinds[child.kind() as usize],
-                    &mut nodes,
-                    &mut targets,
-                    &mut Vec::new(),
-                    false,
-                    &mut subtree_stack,
-                )?;
-                continue;
-            }
-
-            let start = stack.len();
-            node.visit_children(|child| stack.push(child));
-            stack[start..].reverse();
-        }
-
-        if targets.is_empty() {
-            return Ok(None);
-        }
-
-        let target_ranges = merge_ranges(target_ranges);
-        let mut names = resolved_names
-            .iter()
-            .filter(|(start, end, _, _)| {
-                let range_index = target_ranges.partition_point(|(_, range_end)| range_end <= start);
-                target_ranges
-                    .get(range_index)
-                    .is_some_and(|(range_start, range_end)| range_start <= start && end <= range_end)
-            })
-            .collect::<Vec<_>>();
-        names.sort_unstable_by_key(|(start, end, _, _)| (*start, *end));
-
-        Ok(Some(Self { nodes, targets, names, trivia: collect_trivia(program), literal_strings: Vec::new() }))
-    }
-
-    /// Builds the minimal syntax snapshot needed by targeted analyzer hooks.
-    ///
-    /// Every matching target is included. A target's descendants are included
-    /// only when its kind is enabled in `subtree_kinds`.
-    ///
-    /// Returns `None` when the file has no matching target nodes.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when the filtered syntax tree exceeds the protocol's
-    /// `u32` address space.
-    pub fn targeted<'ast>(
-        program: &'ast Program<'arena>,
-        resolved_names: &ResolvedNames<'arena>,
-        target_kinds: &[bool; u8::MAX as usize + 1],
-        subtree_kinds: &[bool; u8::MAX as usize + 1],
-        include_trivia: bool,
-    ) -> Result<Option<Self>, PayloadError> {
         Self::targeted_with_filter(
             program,
             resolved_names,
-            |node| target_kinds[node.kind() as usize].then_some(subtree_kinds[node.kind() as usize]),
-            include_trivia,
+            |node| target_kinds[node.kind() as usize].then_some(true),
+            true,
         )
     }
 
@@ -370,22 +290,13 @@ impl<'arena> SourceSnapshot<'arena> {
         Ok(())
     }
 
-    /// Writes target identifiers and packed syntax, name, and trivia tables.
-    ///
-    /// # Errors
-    ///
-    /// Returns an error when a table or name buffer exceeds `u32::MAX` bytes.
-    pub fn write_to(&self, writer: &mut PayloadWriter) -> Result<(), PayloadError> {
-        self.write_syntax_to(writer)
-    }
-
     /// Writes the syntax snapshot followed by its decoded literal-string table.
     ///
     /// # Errors
     ///
     /// Returns an error when a table or string buffer exceeds `u32::MAX` bytes.
     pub fn write_to_with_literals(&self, writer: &mut PayloadWriter) -> Result<(), PayloadError> {
-        self.write_syntax_to(writer)?;
+        self.write_to(writer)?;
         writer.write_length(self.literal_strings.len())?;
         let mut literal_offset = 0usize;
         for (node, value) in &self.literal_strings {
@@ -403,7 +314,12 @@ impl<'arena> SourceSnapshot<'arena> {
         Ok(())
     }
 
-    fn write_syntax_to(&self, writer: &mut PayloadWriter) -> Result<(), PayloadError> {
+    /// Writes target identifiers and packed syntax, name, and trivia tables.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error when a table or name buffer exceeds `u32::MAX` bytes.
+    pub fn write_to(&self, writer: &mut PayloadWriter) -> Result<(), PayloadError> {
         writer.write_length(self.targets.len())?;
         for target in &self.targets {
             writer.write_u32(*target);
@@ -490,11 +406,6 @@ impl<'arena> SourceSnapshot<'arena> {
     #[must_use]
     pub const fn trivia_count(&self) -> usize {
         self.trivia.len()
-    }
-
-    #[must_use]
-    pub const fn literal_string_count(&self) -> usize {
-        self.literal_strings.len()
     }
 }
 

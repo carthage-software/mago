@@ -22,6 +22,7 @@ use crate::scanner::docblock::find_most_trusted_tag;
 use crate::scanner::docblock::parse_docblock;
 use crate::scanner::inference::infer;
 use crate::scanner::ttype::get_type_metadata_from_type;
+use crate::scanner::typing_error_issue;
 use crate::scanner::version_claim::evaluate_version_attributes;
 use crate::ttype::resolution::TypeResolutionContext;
 
@@ -140,13 +141,11 @@ fn process_constant_docblock(
             Ok(type_metadata) => {
                 metadata.type_metadata = Some(type_metadata);
             }
-            Err(typing_error) => metadata.issues.push(
-                Issue::error("Could not resolve the type for the @var tag.")
-                    .with_code(ScanningIssueKind::InvalidVarTag)
-                    .with_annotation(Annotation::primary(typing_error.span()).with_message(typing_error.to_string()))
-                    .with_note(typing_error.note())
-                    .with_help(typing_error.help()),
-            ),
+            Err(typing_error) => metadata.issues.push(typing_error_issue(
+                "Could not resolve the type for the @var tag.",
+                ScanningIssueKind::InvalidVarTag,
+                &typing_error,
+            )),
         }
     }
 }

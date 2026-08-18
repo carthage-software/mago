@@ -73,7 +73,7 @@ pub struct CodebaseEntryKeys {
 /// This acts as the central repository for metadata gathered during static analysis,
 /// including details about classes, interfaces, traits, enums, functions, constants,
 /// their members, inheritance, dependencies, and associated types.
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Debug, PartialEq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[non_exhaustive]
 #[allow(clippy::unsafe_derive_deserialize)]
@@ -271,34 +271,17 @@ impl CodebaseMetadata {
         })
     }
 
-    /// Checks if a method is declared directly in a class (not inherited).
-    #[inline]
-    #[must_use]
-    pub fn method_is_declared_in_class(&self, class: &[u8], method: &[u8]) -> bool {
-        let lowercase_class = ascii_lowercase_word(class);
-        let lowercase_method = ascii_lowercase_word(method);
-        self.class_likes
-            .get(&lowercase_class)
-            .and_then(|meta| meta.declaring_method_ids.get(&lowercase_method))
-            .is_some_and(|method_id| method_id.get_class_name() == lowercase_class)
-    }
-
-    /// Checks if a property is declared directly in a class (not inherited).
-    #[inline]
-    #[must_use]
-    pub fn property_is_declared_in_class(&self, class: &[u8], property: &[u8]) -> bool {
-        let lowercase_class = ascii_lowercase_word(class);
-        let property_name = word(property);
-        self.class_likes.get(&lowercase_class).is_some_and(|meta| meta.properties.contains_key(&property_name))
-    }
-
     /// Retrieves metadata for a class (case-insensitive).
     /// Returns `None` if the name doesn't correspond to a class.
     #[inline]
     #[must_use]
     pub fn get_class(&self, name: &[u8]) -> Option<&ClassLikeMetadata> {
         let lowercase_name = ascii_lowercase_word(name);
-        if self.symbols.contains_class(lowercase_name) { self.class_likes.get(&lowercase_name) } else { None }
+        if matches!(self.symbols.get_kind(lowercase_name), Some(SymbolKind::Class)) {
+            self.class_likes.get(&lowercase_name)
+        } else {
+            None
+        }
     }
 
     /// Retrieves metadata for an interface (case-insensitive).
@@ -306,7 +289,11 @@ impl CodebaseMetadata {
     #[must_use]
     pub fn get_interface(&self, name: &[u8]) -> Option<&ClassLikeMetadata> {
         let lowercase_name = ascii_lowercase_word(name);
-        if self.symbols.contains_interface(lowercase_name) { self.class_likes.get(&lowercase_name) } else { None }
+        if matches!(self.symbols.get_kind(lowercase_name), Some(SymbolKind::Interface)) {
+            self.class_likes.get(&lowercase_name)
+        } else {
+            None
+        }
     }
 
     /// Retrieves metadata for a trait (case-insensitive).
@@ -314,7 +301,11 @@ impl CodebaseMetadata {
     #[must_use]
     pub fn get_trait(&self, name: &[u8]) -> Option<&ClassLikeMetadata> {
         let lowercase_name = ascii_lowercase_word(name);
-        if self.symbols.contains_trait(lowercase_name) { self.class_likes.get(&lowercase_name) } else { None }
+        if matches!(self.symbols.get_kind(lowercase_name), Some(SymbolKind::Trait)) {
+            self.class_likes.get(&lowercase_name)
+        } else {
+            None
+        }
     }
 
     /// Retrieves metadata for an enum (case-insensitive).
@@ -536,18 +527,6 @@ impl CodebaseMetadata {
         // Fall back to inferred type
         constant_meta.inferred_type.as_ref().map(|atomic| Cow::Owned(TUnion::from_atomic(atomic.clone())))
     }
-
-    /// Gets the literal value of a class constant if it was inferred.
-    #[inline]
-    #[must_use]
-    pub fn get_class_constant_literal_value(&self, class: &[u8], constant: &[u8]) -> Option<&TAtomic> {
-        let lowercase_class = ascii_lowercase_word(class);
-        let constant_name = word(constant);
-        self.class_likes
-            .get(&lowercase_class)
-            .and_then(|meta| meta.constants.get(&constant_name))
-            .and_then(|constant_meta| constant_meta.inferred_type.as_ref())
-    }
     // Inheritance Queries
 
     /// Checks if a child class extends a parent class (case-insensitive).
@@ -557,17 +536,6 @@ impl CodebaseMetadata {
         let lowercase_child = ascii_lowercase_word(child);
         let lowercase_parent = ascii_lowercase_word(parent);
         self.class_likes.get(&lowercase_child).is_some_and(|meta| meta.all_parent_classes.contains(&lowercase_parent))
-    }
-
-    /// Checks if a class directly extends a parent class (case-insensitive).
-    #[inline]
-    #[must_use]
-    pub fn class_directly_extends(&self, child: &[u8], parent: &[u8]) -> bool {
-        let lowercase_child = ascii_lowercase_word(child);
-        let lowercase_parent = ascii_lowercase_word(parent);
-        self.class_likes
-            .get(&lowercase_child)
-            .is_some_and(|meta| meta.direct_parent_class.as_ref() == Some(&lowercase_parent))
     }
 
     /// Checks if a class implements an interface (case-insensitive).
@@ -581,17 +549,6 @@ impl CodebaseMetadata {
             .is_some_and(|meta| meta.all_parent_interfaces.contains(&lowercase_interface))
     }
 
-    /// Checks if a class directly implements an interface (case-insensitive).
-    #[inline]
-    #[must_use]
-    pub fn class_directly_implements(&self, class: &[u8], interface: &[u8]) -> bool {
-        let lowercase_class = ascii_lowercase_word(class);
-        let lowercase_interface = ascii_lowercase_word(interface);
-        self.class_likes
-            .get(&lowercase_class)
-            .is_some_and(|meta| meta.direct_parent_interfaces.contains(&lowercase_interface))
-    }
-
     /// Checks if a class uses a trait (case-insensitive).
     #[inline]
     #[must_use]
@@ -599,18 +556,6 @@ impl CodebaseMetadata {
         let lowercase_class = ascii_lowercase_word(class);
         let lowercase_trait = ascii_lowercase_word(trait_name);
         self.class_likes.get(&lowercase_class).is_some_and(|meta| meta.used_traits.contains(&lowercase_trait))
-    }
-
-    /// Checks if a trait has `@require-extends` for a class (case-insensitive).
-    /// Returns true if the trait requires extending the specified class or any of its parents.
-    #[inline]
-    #[must_use]
-    pub fn trait_requires_extends(&self, trait_name: &[u8], class_name: &[u8]) -> bool {
-        let lowercase_trait = ascii_lowercase_word(trait_name);
-
-        self.class_likes.get(&lowercase_trait).is_some_and(|meta| {
-            meta.require_extends.iter().any(|required| self.is_instance_of(class_name, required.as_bytes()))
-        })
     }
 
     /// Checks if child is an instance of parent (via extends or implements).
@@ -709,19 +654,6 @@ impl CodebaseMetadata {
             .map(|method_id| method_id.get_class_name())
     }
 
-    /// Gets the class where a method appears (could be the declaring class or child class).
-    #[inline]
-    #[must_use]
-    pub fn get_appearing_method_class(&self, class: &[u8], method: &[u8]) -> Option<Word> {
-        let lowercase_class = ascii_lowercase_word(class);
-        let lowercase_method = ascii_lowercase_word(method);
-        self.class_likes
-            .get(&lowercase_class)?
-            .appearing_method_ids
-            .get(&lowercase_method)
-            .map(|method_id| method_id.get_class_name())
-    }
-
     /// Gets the declaring method identifier for a method.
     #[must_use]
     pub fn get_declaring_method_identifier(&self, method_id: &MethodIdentifier) -> MethodIdentifier {
@@ -768,19 +700,6 @@ impl CodebaseMetadata {
             .get(&identifier)
             .and_then(|meta| meta.method_metadata.as_ref())
             .is_some_and(|method_meta| method_meta.is_abstract)
-    }
-
-    /// Checks if a method is static.
-    #[inline]
-    #[must_use]
-    pub fn method_is_static(&self, class: &[u8], method: &[u8]) -> bool {
-        let lowercase_class = ascii_lowercase_word(class);
-        let lowercase_method = ascii_lowercase_word(method);
-        let identifier = (lowercase_class, lowercase_method);
-        self.function_likes
-            .get(&identifier)
-            .and_then(|meta| meta.method_metadata.as_ref())
-            .is_some_and(|method_meta| method_meta.is_static)
     }
 
     /// Checks if a method is final.
@@ -879,15 +798,6 @@ impl CodebaseMetadata {
         self.class_likes.get(&lowercase_class)?.declaring_property_ids.get(&property_name).copied()
     }
 
-    /// Gets the class where a property appears.
-    #[inline]
-    #[must_use]
-    pub fn get_appearing_property_class(&self, class: &[u8], property: &[u8]) -> Option<Word> {
-        let lowercase_class = ascii_lowercase_word(class);
-        let property_name = word(property);
-        self.class_likes.get(&lowercase_class)?.appearing_property_ids.get(&property_name).copied()
-    }
-
     /// Gets all descendants of a class (recursive).
     #[must_use]
     pub fn get_all_descendants(&self, class: &[u8]) -> WordSet {
@@ -954,20 +864,6 @@ impl CodebaseMetadata {
     #[inline]
     pub fn set_file_signature(&mut self, file_id: FileId, signature: FileSignature) -> Option<FileSignature> {
         self.file_signatures.insert(file_id, signature)
-    }
-
-    /// Removes the file signature for a given file ID.
-    ///
-    /// # Arguments
-    ///
-    /// * `file_id` - The file identifier
-    ///
-    /// # Returns
-    ///
-    /// The removed `FileSignature` if it existed.
-    #[inline]
-    pub fn remove_file_signature(&mut self, file_id: &FileId) -> Option<FileSignature> {
-        self.file_signatures.remove(file_id)
     }
 
     /// Marks safe symbols based on diff and invalidation cascade.
@@ -1328,61 +1224,6 @@ impl CodebaseMetadata {
         }
     }
 
-    /// Removes all entries that were contributed by the given per-file scan metadata.
-    ///
-    /// This is the inverse of [`extend_ref()`]: it removes class_likes, function_likes,
-    /// constants, symbols, and file_signatures whose keys match those in `file_metadata`.
-    ///
-    /// Used by the incremental engine to patch the codebase in-place when files change,
-    /// avoiding a full rebuild from base + all files.
-    ///
-    /// Note: This does NOT remove descendant map entries — those are rebuilt from scratch
-    /// by `populate_codebase()` on every run.
-    pub fn remove_entries_of(&mut self, file_metadata: &CodebaseMetadata) {
-        for k in file_metadata.class_likes.keys() {
-            self.class_likes.remove(k);
-        }
-
-        for k in file_metadata.function_likes.keys() {
-            self.function_likes.remove(k);
-        }
-
-        for k in file_metadata.constants.keys() {
-            self.constants.remove(k);
-        }
-
-        // Remove symbols that were contributed by this file.
-        // We can only remove class-like symbols (not namespaces, since they may be shared).
-        for k in file_metadata.class_likes.keys() {
-            self.symbols.remove(*k);
-        }
-
-        for k in file_metadata.file_signatures.keys() {
-            self.file_signatures.remove(k);
-        }
-
-        // Drop any patch entry that originated from a file signature we just removed; a patch
-        // entry's originating file is recorded on its span.
-        let removed_files: HashSet<FileId> = file_metadata.file_signatures.keys().copied().collect();
-        self.patch_class_likes.retain(|_, m| !removed_files.contains(&m.span.file_id));
-        self.patch_function_likes.retain(|_, m| !removed_files.contains(&m.span.file_id));
-        self.patch_constants.retain(|_, m| !removed_files.contains(&m.span.file_id));
-    }
-
-    /// Extracts the set of keys from this metadata for use with [`remove_entries_by_keys()`].
-    ///
-    /// This is much cheaper than keeping a full `CodebaseMetadata` clone — it only stores
-    /// the keys needed to undo an `extend_ref()` operation.
-    #[must_use]
-    pub fn extract_keys(&self) -> CodebaseEntryKeys {
-        CodebaseEntryKeys {
-            class_like_names: self.class_likes.keys().copied().collect(),
-            function_like_keys: self.function_likes.keys().copied().collect(),
-            constant_names: self.constants.keys().copied().collect(),
-            file_ids: self.file_signatures.keys().copied().collect(),
-        }
-    }
-
     /// Extracts only the keys that this per-file metadata currently "owns" in the given
     /// merged codebase; i.e. keys whose span in `merged` matches this metadata's span.
     ///
@@ -1506,27 +1347,6 @@ impl CodebaseMetadata {
     #[must_use]
     pub fn get_all_file_ids(&self) -> Vec<FileId> {
         self.file_signatures.keys().copied().collect()
-    }
-}
-
-impl Default for CodebaseMetadata {
-    #[inline]
-    fn default() -> Self {
-        Self {
-            class_likes: WordMap::default(),
-            function_likes: HashMap::default(),
-            symbols: Symbols::new(),
-            infer_types_from_usage: false,
-            constants: WordMap::default(),
-            all_class_like_descendants: WordMap::default(),
-            direct_classlike_descendants: WordMap::default(),
-            safe_symbols: WordSet::default(),
-            safe_symbol_members: HashSet::default(),
-            file_signatures: HashMap::default(),
-            patch_class_likes: WordMap::default(),
-            patch_function_likes: HashMap::default(),
-            patch_constants: WordMap::default(),
-        }
     }
 }
 

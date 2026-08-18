@@ -47,7 +47,7 @@ use crate::expression::assignment::PropertyWriteKind;
 use crate::expression::assignment::property_assignment;
 use crate::utils::expression::array::ArrayTarget;
 use crate::utils::expression::array::get_array_target_type_given_index;
-use crate::utils::expression::get_expression_id;
+use crate::utils::expression::get_block_expression_id;
 use crate::utils::expression::get_index_id;
 
 pub(crate) fn analyze<'ctx, 'arena, A>(
@@ -93,13 +93,7 @@ where
 
     let mut current_type = root_array_type.clone();
 
-    let root_var_id = get_expression_id(
-        root_array_expression,
-        block_context.scope.get_class_like_name(),
-        context.resolved_names,
-        Some(context.codebase),
-    );
-
+    let root_var_id = get_block_expression_id(root_array_expression, context, block_context);
     let current_index = analyze_nested_array_assignment(
         context,
         block_context,
@@ -715,8 +709,6 @@ where
         {
             artifacts.set_rc_expression_type(array_target.get_array(), Rc::clone(&scoped_type));
             array_expression_type = scoped_type;
-        } else {
-            // expression already typed and no scoped parent type to override with; keep current type
         }
 
         let new_index_type = array_target_index_type.clone().unwrap_or(Rc::new(get_non_negative_int()));
@@ -804,20 +796,15 @@ where
         let key_values =
             if let Some(index_type) = index_type.as_ref() { get_index_literal_types(index_type) } else { vec![] };
 
-        let array_expr_id = get_expression_id(
-            array_target.get_array(),
-            block_context.scope.get_class_like_name(),
-            context.resolved_names,
-            Some(context.codebase),
-        )
-        .map(|var_var_id| {
-            let combined = format!("{}{}", var_var_id, unsafe {
-                // SAFETY: This is safe because we can guarantee `var_id_additions` is not empty,
-                // so `last()` will always return `Some`.
-                var_id_additions.last().unwrap_unchecked()
+        let array_expr_id =
+            get_block_expression_id(array_target.get_array(), context, block_context).map(|var_var_id| {
+                let combined = format!("{}{}", var_var_id, unsafe {
+                    // SAFETY: This is safe because we can guarantee `var_id_additions` is not empty,
+                    // so `last()` will always return `Some`.
+                    var_id_additions.last().unwrap_unchecked()
+                });
+                mago_word::word(&combined)
             });
-            mago_word::word(&combined)
-        });
 
         array_expr_type = update_type_with_key_values(
             context,

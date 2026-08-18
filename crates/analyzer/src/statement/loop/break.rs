@@ -3,7 +3,6 @@ use std::rc::Rc;
 
 use mago_word::WordSet;
 
-use mago_codex::ttype::TType;
 use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::combine_union_types;
 use mago_codex::ttype::combiner::CombinerOptions;
@@ -11,9 +10,6 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_syntax::cst::Break;
-use mago_syntax::cst::Expression;
-use mago_syntax::cst::Literal;
-use mago_syntax::cst::LiteralInteger;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -33,32 +29,14 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Break<'arena> {
     where
         A: Arena,
     {
-        let levels = match self.level.as_ref() {
-            Some(expression) => {
-                if let Expression::Literal(Literal::Integer(LiteralInteger { value: Some(integer_value), .. })) =
-                    expression
-                {
-                    *integer_value
-                } else {
-                    expression.analyze(context, block_context, artifacts)?;
-
-                    context.collector.report_with_code(
-                        IssueCode::InvalidBreak,
-                        Issue::error("Break level must be an integer literal.").with_annotation(
-                            Annotation::primary(expression.span()).with_message(format!(
-                                "Expected an integer literal here, found an expression of type `{}`.",
-                                artifacts
-                                    .get_expression_type(expression)
-                                    .map_or_else(|| "unknown".to_string(), |union| union.get_id().to_string())
-                            )),
-                        ),
-                    );
-
-                    1
-                }
-            }
-            None => 1,
-        };
+        let levels = super::parse_control_flow_level(
+            self.level,
+            context,
+            block_context,
+            artifacts,
+            IssueCode::InvalidBreak,
+            "Break level must be an integer literal.",
+        )?;
 
         let mut i = levels;
         let mut loop_scope_ref = artifacts.loop_scope.as_mut();
@@ -187,8 +165,6 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Break<'arena> {
                     Annotation::primary(self.span()).with_message("This break statement is not valid here."),
                 ),
             );
-        } else {
-            // break is leaving an enclosing loop; switch case scope handling above already covered
         }
 
         block_context.flags.set_has_returned(true);

@@ -104,8 +104,6 @@ where
             .with_note("PHP compares arrays as greater than other types (except other arrays and null), so the spaceship result depends on which variant of the union the array side resolves to at runtime.")
             .with_help("Narrow the array side to a non-array type before comparing, or handle the array case separately."),
         );
-    } else {
-        // both sides have array variants or neither does. no array/non-array mismatch
     }
 
     let result_type = if !block_context.flags.inside_loop_expressions() && is_always_greater_than(lhs_type, rhs_type) {
@@ -208,7 +206,5 @@ fn check_spaceship_operand<'arena, A>(
             .with_note("If this operand is `false` at runtime, PHP's specific comparison rules for `false` will apply.")
             .with_help("Ensure this operand is non-false or that comparison with `false` is intended."),
         );
-    } else {
-        // operand isn't null/mixed/false-bearing; no spaceship-operand diagnostic to emit
     }
 }

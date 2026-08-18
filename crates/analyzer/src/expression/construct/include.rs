@@ -126,7 +126,6 @@ where
     block_context.flags.set_inside_call(true);
     included_file.analyze(context, block_context, artifacts)?;
     block_context.flags.set_inside_call(was_inside_call);
-
     let construct_kind = if is_include {
         if is_once { "include_once" } else { "include" }
     } else if is_once {

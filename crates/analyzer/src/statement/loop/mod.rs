@@ -64,6 +64,8 @@ use crate::formula::get_formula;
 use crate::reconciler::reconcile_keyed_types;
 use crate::statement::r#loop::assignment_map_visitor::get_assignment_map;
 use crate::statement::r#loop::cleaner::clean_nodes;
+use mago_syntax::cst::Literal;
+use mago_syntax::cst::LiteralInteger;
 
 mod assignment_map_visitor;
 mod cleaner;
@@ -74,6 +76,42 @@ pub mod r#do;
 pub mod r#for;
 pub mod foreach;
 pub mod r#while;
+
+pub fn parse_control_flow_level<'ctx, 'arena, A>(
+    level: Option<&Expression<'arena>>,
+    context: &mut Context<'ctx, 'arena, A>,
+    block_context: &mut BlockContext<'ctx>,
+    artifacts: &mut AnalysisArtifacts,
+    code: IssueCode,
+    message: &str,
+) -> Result<u64, AnalysisError>
+where
+    A: Arena,
+{
+    let Some(expression) = level else {
+        return Ok(1);
+    };
+
+    if let Expression::Literal(Literal::Integer(LiteralInteger { value: Some(integer_value), .. })) = expression {
+        return Ok(*integer_value);
+    }
+
+    expression.analyze(context, block_context, artifacts)?;
+
+    context.collector.report_with_code(
+        code,
+        Issue::error(message.to_string()).with_annotation(Annotation::primary(expression.span()).with_message(
+            format!(
+                "Expected an integer literal here, found an expression of type `{}`.",
+                artifacts
+                    .get_expression_type(expression)
+                    .map_or_else(|| "unknown".to_string(), |union| union.get_id().to_string())
+            ),
+        )),
+    );
+
+    Ok(1)
+}
 
 fn analyze_for_or_while_loop<'ctx, 'ast, 'arena, A>(
     context: &mut Context<'ctx, 'arena, A>,
@@ -840,8 +878,6 @@ where
                 && loop_parent_context_type != loop_context_type
             {
                 *loop_parent_context_type = Rc::clone(loop_context_type);
-            } else {
-                // type already matches between loop and parent context; nothing to update
             }
         }
     }
@@ -868,8 +904,6 @@ where
                     loop_parent_context.remove_variable_from_conflicting_clauses(context, variable_id, None);
                 } else if let Some(loop_parent_context_type) = loop_parent_context.locals.get_mut(&variable_id) {
                     *loop_parent_context_type = Rc::clone(continue_context_type);
-                } else {
-                    // continue context matches the parent type; nothing to write back
                 }
             } else {
                 loop_parent_context.locals.remove(&variable_id);
@@ -956,8 +990,6 @@ where
                             },
                         )),
                     );
-                } else {
-                    // variable wasn't recorded as possibly-defined or possibly-redefined in the loop scope
                 }
             } else {
                 loop_parent_context.locals.insert(*variable_id, Rc::clone(variable_type));
@@ -1202,8 +1234,6 @@ where
             {
                 loop_scope.truthy_pre_conditions = false;
             }
-        } else {
-            // condition is always truthy; loop scope's truthy_pre_conditions stays true
         }
     }
 

@@ -24,7 +24,7 @@ use crate::error::AnalysisError;
 use crate::expression::assignment::PropertyWriteKind;
 use crate::expression::assignment::assign_to_expression;
 use crate::statement::r#loop;
-use crate::utils::expression::get_expression_id;
+use crate::utils::expression::get_block_expression_id;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Foreach<'arena> {
     fn analyze<'ctx, A>(
@@ -42,12 +42,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Foreach<'arena> {
             ForeachTarget::KeyValue(kv) => kv.value.is_reference(),
         };
 
-        let iterator_variable_id = get_expression_id(
-            iterator,
-            block_context.scope.get_class_like_name(),
-            context.resolved_names,
-            Some(context.codebase),
-        );
+        let iterator_variable_id = get_block_expression_id(iterator, context, block_context);
 
         let (always_enters_loop, mut key_type, mut value_type) =
             r#loop::analyze_iterator(context, block_context, artifacts, iterator, iterator_variable_id, self)?;
@@ -65,12 +60,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Foreach<'arena> {
         loop_block_context.break_types.push(BreakContext::Loop);
 
         if let Some(key_expression) = self.target.key() {
-            let key_expression_id = get_expression_id(
-                key_expression,
-                block_context.scope.get_class_like_name(),
-                context.resolved_names,
-                Some(context.codebase),
-            );
+            let key_expression_id = get_block_expression_id(key_expression, context, block_context);
 
             let assigned = assign_to_expression(
                 context,
@@ -105,12 +95,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Foreach<'arena> {
             value => value,
         };
 
-        let value_expression_id = get_expression_id(
-            value_expression,
-            block_context.scope.get_class_like_name(),
-            context.resolved_names,
-            Some(context.codebase),
-        );
+        let value_expression_id = get_block_expression_id(value_expression, context, block_context);
 
         value_type.set_by_reference(is_by_reference);
 

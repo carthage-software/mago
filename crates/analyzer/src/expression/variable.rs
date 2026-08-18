@@ -227,8 +227,6 @@ where
                     help_message = format!(
                         "Ensure `{variable_name}` is assigned before use, or check for typos and variable scope."
                     );
-                } else {
-                    // confusable-character note above already explains the likely cause; keep default help
                 }
 
                 context.collector.report_with_code(IssueCode::UndefinedVariable, issue.with_help(help_message));

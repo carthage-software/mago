@@ -278,29 +278,20 @@ fn populate_codebase_inner(
     }
 
     if !incremental || !class_likes_to_repopulate.is_empty() {
-        let mut direct_classlike_descendants = WordMap::default();
-        let mut all_classlike_descendants = WordMap::default();
+        let mut direct_classlike_descendants: WordMap<WordSet> = WordMap::default();
+        let mut all_classlike_descendants: WordMap<WordSet> = WordMap::default();
 
         for (class_like_name, class_like_metadata) in &codebase.class_likes {
             for parent_interface in &class_like_metadata.all_parent_interfaces {
-                all_classlike_descendants
-                    .entry(*parent_interface)
-                    .or_insert_with(WordSet::default)
-                    .insert(*class_like_name);
+                all_classlike_descendants.entry(*parent_interface).or_default().insert(*class_like_name);
             }
 
             for parent_interface in &class_like_metadata.direct_parent_interfaces {
-                direct_classlike_descendants
-                    .entry(*parent_interface)
-                    .or_insert_with(WordSet::default)
-                    .insert(*class_like_name);
+                direct_classlike_descendants.entry(*parent_interface).or_default().insert(*class_like_name);
             }
 
             for parent_class in &class_like_metadata.all_parent_classes {
-                all_classlike_descendants
-                    .entry(*parent_class)
-                    .or_insert_with(WordSet::default)
-                    .insert(*class_like_name);
+                all_classlike_descendants.entry(*parent_class).or_default().insert(*class_like_name);
             }
 
             for used_trait in &class_like_metadata.used_traits {
@@ -308,10 +299,7 @@ fn populate_codebase_inner(
             }
 
             if let Some(parent_class) = &class_like_metadata.direct_parent_class {
-                direct_classlike_descendants
-                    .entry(*parent_class)
-                    .or_insert_with(WordSet::default)
-                    .insert(*class_like_name);
+                direct_classlike_descendants.entry(*parent_class).or_default().insert(*class_like_name);
             }
         }
 

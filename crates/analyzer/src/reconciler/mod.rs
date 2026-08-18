@@ -331,8 +331,6 @@ pub fn reconcile_keyed_types<'ctx, A>(
                 }
             } else if memchr::memmem::find(key_str, b"->").is_some() && !is_equality {
                 adjust_object_property_type(key_parts.clone(), block_context, changed_var_ids, &result_type, context);
-            } else {
-                // plain variable assertion; no parent array or object property to propagate into
             }
 
             if key_str != b"$this" {
@@ -401,8 +399,6 @@ pub fn reconcile_keyed_types<'ctx, A>(
             }
         } else if !has_negation && !has_truthy_or_falsy_or_empty && !has_isset && !has_relational_comparison {
             changed_var_ids.insert(*key);
-        } else {
-            // type unchanged and the assertion is one that wouldn't mark the variable changed anyway
         }
 
         if !has_object_array_access {
@@ -1463,8 +1459,6 @@ pub(crate) fn trigger_issue_for_impossible<A>(
             } else if assertion_atom.as_bytes() == b"truthy" {
                 not_operator = false;
                 assertion_atom = word(b"falsy");
-            } else {
-                // other assertion atoms don't have a complementary truthy/falsy form to swap into
             }
         }
 

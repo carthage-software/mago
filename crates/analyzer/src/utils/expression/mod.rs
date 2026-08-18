@@ -2,6 +2,8 @@ use std::rc::Rc;
 
 use foldhash::HashMap;
 
+use mago_allocator::Arena;
+
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::ttype::atomic::TAtomic;
@@ -28,6 +30,8 @@ use mago_word::Word;
 use mago_word::concat_word;
 use mago_word::word;
 
+use crate::context::Context;
+use crate::context::block::BlockContext;
 use crate::utils::misc::unwrap_expression;
 
 pub mod array;
@@ -149,6 +153,22 @@ pub fn get_constant_selector_id<'ast, 'arena>(
         }
         ClassLikeConstantSelector::Missing(_) => None,
     }
+}
+
+pub fn get_block_expression_id<'arena, A>(
+    expression: &Expression<'arena>,
+    context: &Context<'_, 'arena, A>,
+    block_context: &BlockContext<'_>,
+) -> Option<Word>
+where
+    A: Arena,
+{
+    get_expression_id(
+        expression,
+        block_context.scope.get_class_like_name(),
+        context.resolved_names,
+        Some(context.codebase),
+    )
 }
 
 /** Gets the identifier for a simple variable */

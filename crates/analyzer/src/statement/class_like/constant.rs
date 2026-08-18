@@ -128,8 +128,6 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ClassLikeConstantItem<'arena> {
 
                     context.collector.report_with_code(IssueCode::InvalidConstantValue, issue);
                 }
-            } else {
-                // no declared type to check against, or value/declared type are too generic to compare
             }
         }
 

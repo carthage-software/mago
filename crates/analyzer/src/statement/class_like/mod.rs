@@ -1280,8 +1280,6 @@ fn check_class_like_extends<'ctx, 'arena, A>(
                         .with_note("A non-`readonly` class can only be extended by another non-`readonly` class.")
                         .with_help(format!("To resolve this, either make the `{using_name}` class non-`readonly`, or extend a different, readonly class.")),
                 );
-            } else {
-                // readonly status matches between parent and child; no inheritance error
             }
 
             if let Some(required_interface) =
@@ -1671,8 +1669,6 @@ fn check_template_parameters<'ctx, A>(
         .with_help(format!("Remove the extra arguments from the `{inheritance_tag}` tag for `{class_name}`."));
 
         context.collector.report_with_code(IssueCode::ExcessTemplateParameter, issue);
-    } else {
-        // template argument count matches expectation; nothing to report
     }
 
     let own_template_parameters_len = class_like_metadata.template_types.len();
@@ -1789,8 +1785,6 @@ fn check_template_parameters<'ctx, A>(
                                 .with_note(format!("Because `{parent_name}` is marked `@consistent-templates`, the constraints of its template parameters must be identical in child classes."))
                                 .with_help("Adjust the constraint on the child template parameter to match the parent's."),
                         );
-                    } else {
-                        // child template name resolves to a matching constraint; no inconsistency to report
                     }
                 }
             }

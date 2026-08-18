@@ -101,57 +101,33 @@ pub struct Frame {
 }
 
 impl Frame {
+    const fn new(kind: FrameKind, flags: FrameFlags, id: u64, parent_id: u64, payload: Vec<u8>) -> Self {
+        Self { version: PROTOCOL_VERSION, kind, flags, id, parent_id, payload }
+    }
+
     #[must_use]
     pub fn request(id: u64, payload: Vec<u8>) -> Self {
-        Self {
-            version: PROTOCOL_VERSION,
-            kind: FrameKind::Request,
-            flags: FrameFlags::empty(),
-            id,
-            parent_id: 0,
-            payload,
-        }
+        Self::new(FrameKind::Request, FrameFlags::empty(), id, 0, payload)
     }
 
     #[must_use]
     pub fn response(id: u64, parent_id: u64, payload: Vec<u8>) -> Self {
-        Self {
-            version: PROTOCOL_VERSION,
-            kind: FrameKind::Response,
-            flags: FrameFlags::empty(),
-            id,
-            parent_id,
-            payload,
-        }
+        Self::new(FrameKind::Response, FrameFlags::empty(), id, parent_id, payload)
     }
 
     #[must_use]
     pub fn error(id: u64, parent_id: u64, payload: Vec<u8>) -> Self {
-        Self { version: PROTOCOL_VERSION, kind: FrameKind::Response, flags: FrameFlags::ERROR, id, parent_id, payload }
+        Self::new(FrameKind::Response, FrameFlags::ERROR, id, parent_id, payload)
     }
 
     #[must_use]
     pub fn cancel(id: u64) -> Self {
-        Self {
-            version: PROTOCOL_VERSION,
-            kind: FrameKind::Cancel,
-            flags: FrameFlags::empty(),
-            id,
-            parent_id: 0,
-            payload: Vec::new(),
-        }
+        Self::new(FrameKind::Cancel, FrameFlags::empty(), id, 0, Vec::new())
     }
 
     #[must_use]
     pub fn shutdown() -> Self {
-        Self {
-            version: PROTOCOL_VERSION,
-            kind: FrameKind::Shutdown,
-            flags: FrameFlags::empty(),
-            id: 0,
-            parent_id: 0,
-            payload: Vec::new(),
-        }
+        Self::new(FrameKind::Shutdown, FrameFlags::empty(), 0, 0, Vec::new())
     }
 
     /// Writes this frame to `writer`.

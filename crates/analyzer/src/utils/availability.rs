@@ -16,6 +16,24 @@ use mago_span::Span;
 use crate::code::IssueCode;
 use crate::context::Context;
 
+pub fn check_availability<A>(
+    context: &mut Context<'_, '_, A>,
+    code: IssueCode,
+    kind: &str,
+    version_constraint: &VersionConstraint,
+    display_name: &(impl std::fmt::Display + ?Sized),
+    span: Span,
+) where
+    A: Arena,
+{
+    let version = context.settings.version;
+    if version_constraint.allows_version(version) {
+        return;
+    }
+
+    report_unavailable(context, code, kind, display_name, version_constraint, version, span);
+}
+
 /// Reports a "symbol unavailable in configured PHP version" issue when the
 /// configured version is outside the metadata's `Mago\AvailableSince` /
 /// `Mago\AvailableUntil` window.
@@ -25,16 +43,11 @@ use crate::context::Context;
 pub fn check_class_like_availability<A>(
     context: &mut Context<'_, '_, A>,
     metadata: &ClassLikeMetadata,
-    display_name: &dyn std::fmt::Display,
+    display_name: &(impl std::fmt::Display + ?Sized),
     span: Span,
 ) where
     A: Arena,
 {
-    let version = context.settings.version;
-    if metadata.is_available_in_version(version) {
-        return;
-    }
-
     let kind = match metadata.kind {
         SymbolKind::Class => "class",
         SymbolKind::Interface => "interface",
@@ -42,13 +55,12 @@ pub fn check_class_like_availability<A>(
         SymbolKind::Enum => "enum",
     };
 
-    report_unavailable(
+    check_availability(
         context,
         IssueCode::UnavailableClassLike,
         kind,
-        display_name,
         &metadata.version_constraint,
-        version,
+        display_name,
         span,
     );
 }
@@ -56,23 +68,17 @@ pub fn check_class_like_availability<A>(
 pub fn check_function_availability<A>(
     context: &mut Context<'_, '_, A>,
     metadata: &FunctionLikeMetadata,
-    display_name: &dyn std::fmt::Display,
+    display_name: &(impl std::fmt::Display + ?Sized),
     span: Span,
 ) where
     A: Arena,
 {
-    let version = context.settings.version;
-    if metadata.is_available_in_version(version) {
-        return;
-    }
-
-    report_unavailable(
+    check_availability(
         context,
         IssueCode::UnavailableFunction,
         "function",
-        display_name,
         &metadata.version_constraint,
-        version,
+        display_name,
         span,
     );
 }
@@ -80,23 +86,17 @@ pub fn check_function_availability<A>(
 pub fn check_method_availability<A>(
     context: &mut Context<'_, '_, A>,
     metadata: &FunctionLikeMetadata,
-    display_name: &dyn std::fmt::Display,
+    display_name: &(impl std::fmt::Display + ?Sized),
     span: Span,
 ) where
     A: Arena,
 {
-    let version = context.settings.version;
-    if metadata.is_available_in_version(version) {
-        return;
-    }
-
-    report_unavailable(
+    check_availability(
         context,
         IssueCode::UnavailableMethod,
         "method",
-        display_name,
         &metadata.version_constraint,
-        version,
+        display_name,
         span,
     );
 }
@@ -104,23 +104,17 @@ pub fn check_method_availability<A>(
 pub fn check_property_availability<A>(
     context: &mut Context<'_, '_, A>,
     metadata: &PropertyMetadata,
-    display_name: &dyn std::fmt::Display,
+    display_name: &(impl std::fmt::Display + ?Sized),
     span: Span,
 ) where
     A: Arena,
 {
-    let version = context.settings.version;
-    if metadata.is_available_in_version(version) {
-        return;
-    }
-
-    report_unavailable(
+    check_availability(
         context,
         IssueCode::UnavailableProperty,
         "property",
-        display_name,
         &metadata.version_constraint,
-        version,
+        display_name,
         span,
     );
 }
@@ -128,23 +122,17 @@ pub fn check_property_availability<A>(
 pub fn check_constant_availability<A>(
     context: &mut Context<'_, '_, A>,
     metadata: &ConstantMetadata,
-    display_name: &dyn std::fmt::Display,
+    display_name: &(impl std::fmt::Display + ?Sized),
     span: Span,
 ) where
     A: Arena,
 {
-    let version = context.settings.version;
-    if metadata.is_available_in_version(version) {
-        return;
-    }
-
-    report_unavailable(
+    check_availability(
         context,
         IssueCode::UnavailableConstant,
         "constant",
-        display_name,
         &metadata.version_constraint,
-        version,
+        display_name,
         span,
     );
 }
@@ -152,23 +140,17 @@ pub fn check_constant_availability<A>(
 pub fn check_class_constant_availability<A>(
     context: &mut Context<'_, '_, A>,
     metadata: &ClassLikeConstantMetadata,
-    display_name: &dyn std::fmt::Display,
+    display_name: &(impl std::fmt::Display + ?Sized),
     span: Span,
 ) where
     A: Arena,
 {
-    let version = context.settings.version;
-    if metadata.is_available_in_version(version) {
-        return;
-    }
-
-    report_unavailable(
+    check_availability(
         context,
         IssueCode::UnavailableClassConstant,
         "class constant",
-        display_name,
         &metadata.version_constraint,
-        version,
+        display_name,
         span,
     );
 }
@@ -176,23 +158,17 @@ pub fn check_class_constant_availability<A>(
 pub fn check_enum_case_availability<A>(
     context: &mut Context<'_, '_, A>,
     metadata: &EnumCaseMetadata,
-    display_name: &dyn std::fmt::Display,
+    display_name: &(impl std::fmt::Display + ?Sized),
     span: Span,
 ) where
     A: Arena,
 {
-    let version = context.settings.version;
-    if metadata.is_available_in_version(version) {
-        return;
-    }
-
-    report_unavailable(
+    check_availability(
         context,
         IssueCode::UnavailableEnumCase,
         "enum case",
-        display_name,
         &metadata.version_constraint,
-        version,
+        display_name,
         span,
     );
 }
@@ -202,7 +178,7 @@ fn report_unavailable<A>(
     context: &mut Context<'_, '_, A>,
     code: IssueCode,
     kind: &str,
-    display_name: &dyn std::fmt::Display,
+    display_name: &(impl std::fmt::Display + ?Sized),
     constraint: &VersionConstraint,
     configured: PHPVersion,
     span: Span,

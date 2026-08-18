@@ -195,8 +195,6 @@ where
             );
 
             reported_general_invalid_operand = true;
-        } else {
-            // both sides have array variants or neither does. no array/non-array mismatch
         }
     }
 
@@ -620,8 +618,6 @@ fn check_comparison_operand<'ast, 'arena, A>(
             .with_note(format!("If this operand is `false` at runtime, PHP's specific comparison rules for `false` with `{op_str}` will apply."))
             .with_help("Ensure this operand is non-false or that comparison with `false` is intended and handled safely."),
         );
-    } else {
-        // operand isn't null/mixed/false-bearing; no comparison-operand diagnostic to emit
     }
 }
 

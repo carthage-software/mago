@@ -949,8 +949,6 @@ where
                         *key_in_other_variant = true;
                         expression_type.set_possibly_undefined(true, None);
                     }
-                } else {
-                    // single-variant array with the key required and non-optional; no extra adjustment needed
                 }
 
                 return expression_type;

@@ -58,6 +58,7 @@ use crate::scanner::docblock::parse_docblock;
 use crate::scanner::enum_case::scan_enum_case;
 use crate::scanner::property::scan_properties;
 use crate::scanner::ttype::get_type_metadata_from_type;
+use crate::scanner::typing_error_issue;
 use crate::scanner::version_claim::evaluate_version_attributes;
 use crate::symbol::SymbolKind;
 use crate::ttype::TType;
@@ -111,23 +112,7 @@ where
         scope,
     )?;
 
-    let template_resolution_context = class_like_metadata
-        .template_types
-        .iter()
-        .map(|(name, definition)| (*name, definition.clone()))
-        .collect::<TemplateConstraintList>();
-
-    let name = class_like_metadata.name;
-    let type_aliases = class_like_metadata.type_aliases.keys().copied().collect::<WordSet>();
-    let imported_aliases = class_like_metadata
-        .imported_type_aliases
-        .iter()
-        .map(|(local_name, (source_class, original_name, _span))| (*local_name, (*source_class, *original_name)))
-        .collect::<WordMap<(Word, Word)>>();
-
-    codebase.class_likes.insert(name, class_like_metadata);
-
-    Some((name, template_resolution_context, type_aliases, imported_aliases))
+    finish_registration(codebase, class_like_metadata)
 }
 
 #[inline]
@@ -156,23 +141,7 @@ where
         scope,
     )?;
 
-    let template_resolution_context = class_like_metadata
-        .template_types
-        .iter()
-        .map(|(name, definition)| (*name, definition.clone()))
-        .collect::<TemplateConstraintList>();
-
-    let name = class_like_metadata.name;
-    let type_aliases = class_like_metadata.type_aliases.keys().copied().collect::<WordSet>();
-    let imported_aliases = class_like_metadata
-        .imported_type_aliases
-        .iter()
-        .map(|(local_name, (source_class, original_name, _span))| (*local_name, (*source_class, *original_name)))
-        .collect::<WordMap<(Word, Word)>>();
-
-    codebase.class_likes.insert(name, class_like_metadata);
-
-    Some((name, template_resolution_context, type_aliases, imported_aliases))
+    finish_registration(codebase, class_like_metadata)
 }
 
 #[inline]
@@ -201,23 +170,7 @@ where
         scope,
     )?;
 
-    let template_resolution_context = class_like_metadata
-        .template_types
-        .iter()
-        .map(|(name, definition)| (*name, definition.clone()))
-        .collect::<TemplateConstraintList>();
-
-    let name = class_like_metadata.name;
-    let type_aliases = class_like_metadata.type_aliases.keys().copied().collect::<WordSet>();
-    let imported_aliases = class_like_metadata
-        .imported_type_aliases
-        .iter()
-        .map(|(local_name, (source_class, original_name, _span))| (*local_name, (*source_class, *original_name)))
-        .collect::<WordMap<(Word, Word)>>();
-
-    codebase.class_likes.insert(name, class_like_metadata);
-
-    Some((name, template_resolution_context, type_aliases, imported_aliases))
+    finish_registration(codebase, class_like_metadata)
 }
 
 #[inline]
@@ -246,23 +199,7 @@ where
         scope,
     )?;
 
-    let template_resolution_context = class_like_metadata
-        .template_types
-        .iter()
-        .map(|(name, definition)| (*name, definition.clone()))
-        .collect::<TemplateConstraintList>();
-
-    let name = class_like_metadata.name;
-    let type_aliases = class_like_metadata.type_aliases.keys().copied().collect::<WordSet>();
-    let imported_aliases = class_like_metadata
-        .imported_type_aliases
-        .iter()
-        .map(|(local_name, (source_class, original_name, _span))| (*local_name, (*source_class, *original_name)))
-        .collect::<WordMap<(Word, Word)>>();
-
-    codebase.class_likes.insert(name, class_like_metadata);
-
-    Some((name, template_resolution_context, type_aliases, imported_aliases))
+    finish_registration(codebase, class_like_metadata)
 }
 
 #[inline]
@@ -291,6 +228,13 @@ where
         scope,
     )?;
 
+    finish_registration(codebase, class_like_metadata)
+}
+
+fn finish_registration(
+    codebase: &mut CodebaseMetadata,
+    class_like_metadata: ClassLikeMetadata,
+) -> ClassLikeRegistration {
     let template_resolution_context = class_like_metadata
         .template_types
         .iter()
@@ -372,7 +316,7 @@ where
                 class_like_metadata.flags |= MetadataFlags::READONLY;
             }
 
-            codebase.symbols.add_class_name(name);
+            codebase.symbols.add_symbol_name(name, SymbolKind::Class);
 
             if let Some(extended_class) = extends.and_then(|e| e.types.first()) {
                 let parent_name = context.resolved_names.get(extended_class);
@@ -401,17 +345,17 @@ where
                 }
             }
 
-            codebase.symbols.add_enum_name(name);
+            codebase.symbols.add_symbol_name(name, SymbolKind::Enum);
 
             create_enum_methods(codebase, &mut class_like_metadata, span);
         }
         SymbolKind::Trait => {
-            codebase.symbols.add_trait_name(name);
+            codebase.symbols.add_symbol_name(name, SymbolKind::Trait);
         }
         SymbolKind::Interface => {
             class_like_metadata.flags |= MetadataFlags::ABSTRACT;
 
-            codebase.symbols.add_interface_name(name);
+            codebase.symbols.add_symbol_name(name, SymbolKind::Interface);
 
             if let Some(extends) = extends {
                 for extended_interface in &extends.types {
@@ -527,15 +471,11 @@ where
                 match builder::get_union_from_type(bound.r#type, scope, &type_context, Some(original_name)) {
                     Ok(tunion) => tunion,
                     Err(typing_error) => {
-                        class_like_metadata.issues.push(
-                            Issue::error("Could not resolve the constraint type for the `@template` tag.")
-                                .with_code(ScanningIssueKind::InvalidTemplateTag)
-                                .with_annotation(
-                                    Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
-                                )
-                                .with_note(typing_error.note())
-                                .with_help(typing_error.help()),
-                        );
+                        class_like_metadata.issues.push(typing_error_issue(
+                            "Could not resolve the constraint type for the `@template` tag.",
+                            ScanningIssueKind::InvalidTemplateTag,
+                            &typing_error,
+                        ));
 
                         continue;
                     }
@@ -548,15 +488,11 @@ where
                 match builder::get_union_from_type(default.r#type, scope, &type_context, Some(original_name)) {
                     Ok(tunion) => Some(tunion),
                     Err(typing_error) => {
-                        class_like_metadata.issues.push(
-                            Issue::error("Could not resolve the default type for the `@template` tag.")
-                                .with_code(ScanningIssueKind::InvalidTemplateTag)
-                                .with_annotation(
-                                    Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
-                                )
-                                .with_note(typing_error.note())
-                                .with_help(typing_error.help()),
-                        );
+                        class_like_metadata.issues.push(typing_error_issue(
+                            "Could not resolve the default type for the `@template` tag.",
+                            ScanningIssueKind::InvalidTemplateTag,
+                            &typing_error,
+                        ));
 
                         None
                     }
@@ -621,15 +557,11 @@ where
                     class_like_metadata.type_aliases.insert(alias_name, type_metadata);
                 }
                 Err(typing_error) => {
-                    class_like_metadata.issues.push(
-                        Issue::error("Could not resolve the type in the `@type` tag.")
-                            .with_code(ScanningIssueKind::InvalidTypeTag)
-                            .with_annotation(
-                                Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
-                            )
-                            .with_note(typing_error.note())
-                            .with_help(typing_error.help()),
-                    );
+                    class_like_metadata.issues.push(typing_error_issue(
+                        "Could not resolve the type in the `@type` tag.",
+                        ScanningIssueKind::InvalidTypeTag,
+                        &typing_error,
+                    ));
                 }
             }
         }
@@ -643,15 +575,11 @@ where
                 match builder::get_union_from_type(extended_type.r#type, scope, &type_context, Some(original_name)) {
                     Ok(tunion) => tunion,
                     Err(typing_error) => {
-                        class_like_metadata.issues.push(
-                            Issue::error("Could not resolve the generic type in the `@extends` tag.")
-                                .with_code(ScanningIssueKind::InvalidExtendsTag)
-                                .with_annotation(
-                                    Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
-                                )
-                                .with_note(typing_error.note())
-                                .with_help(typing_error.help()),
-                        );
+                        class_like_metadata.issues.push(typing_error_issue(
+                            "Could not resolve the generic type in the `@extends` tag.",
+                            ScanningIssueKind::InvalidExtendsTag,
+                            &typing_error,
+                        ));
 
                         continue;
                     }
@@ -738,15 +666,11 @@ where
             ) {
                 Ok(tunion) => tunion,
                 Err(typing_error) => {
-                    class_like_metadata.issues.push(
-                        Issue::error("Could not resolve the interface name in the `@implements` tag.")
-                            .with_code(ScanningIssueKind::InvalidImplementsTag)
-                            .with_annotation(
-                                Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
-                            )
-                            .with_note(typing_error.note())
-                            .with_help(typing_error.help()),
-                    );
+                    class_like_metadata.issues.push(typing_error_issue(
+                        "Could not resolve the interface name in the `@implements` tag.",
+                        ScanningIssueKind::InvalidImplementsTag,
+                        &typing_error,
+                    ));
 
                     continue;
                 }
@@ -821,15 +745,11 @@ where
                 match builder::get_union_from_type(require_extend.r#type, scope, &type_context, Some(original_name)) {
                     Ok(tunion) => tunion,
                     Err(typing_error) => {
-                        class_like_metadata.issues.push(
-                            Issue::error("Could not resolve the class name in the `@require-extends` tag.")
-                                .with_code(ScanningIssueKind::InvalidRequireExtendsTag)
-                                .with_annotation(
-                                    Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
-                                )
-                                .with_note(typing_error.note())
-                                .with_help(typing_error.help()),
-                        );
+                        class_like_metadata.issues.push(typing_error_issue(
+                            "Could not resolve the class name in the `@require-extends` tag.",
+                            ScanningIssueKind::InvalidRequireExtendsTag,
+                            &typing_error,
+                        ));
 
                         continue;
                     }
@@ -907,15 +827,11 @@ where
             ) {
                 Ok(tunion) => tunion,
                 Err(typing_error) => {
-                    class_like_metadata.issues.push(
-                        Issue::error("Could not resolve the interface name in the `@require-implements` tag.")
-                            .with_code(ScanningIssueKind::InvalidRequireImplementsTag)
-                            .with_annotation(
-                                Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
-                            )
-                            .with_note(typing_error.note())
-                            .with_help(typing_error.help()),
-                    );
+                    class_like_metadata.issues.push(typing_error_issue(
+                        "Could not resolve the interface name in the `@require-implements` tag.",
+                        ScanningIssueKind::InvalidRequireImplementsTag,
+                        &typing_error,
+                    ));
 
                     continue;
                 }
@@ -1012,15 +928,11 @@ where
                     }
                 }
                 Err(typing_error) => {
-                    class_like_metadata.issues.push(
-                        Issue::error("Could not resolve the type in the `@inheritors` tag.")
-                            .with_code(ScanningIssueKind::InvalidInheritorsTag)
-                            .with_annotation(
-                                Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
-                            )
-                            .with_note(typing_error.note())
-                            .with_help(typing_error.help()),
-                    );
+                    class_like_metadata.issues.push(typing_error_issue(
+                        "Could not resolve the type in the `@inheritors` tag.",
+                        ScanningIssueKind::InvalidInheritorsTag,
+                        &typing_error,
+                    ));
                 }
             }
         }
@@ -1035,15 +947,11 @@ where
                     class_like_metadata.mixins.push(mixin_type);
                 }
                 Err(typing_error) => {
-                    class_like_metadata.issues.push(
-                        Issue::error("Could not resolve the type in the `@mixin` tag.")
-                            .with_code(ScanningIssueKind::InvalidMixinTag)
-                            .with_annotation(
-                                Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
-                            )
-                            .with_note(typing_error.note())
-                            .with_help(typing_error.help()),
-                    );
+                    class_like_metadata.issues.push(typing_error_issue(
+                        "Could not resolve the type in the `@mixin` tag.",
+                        ScanningIssueKind::InvalidMixinTag,
+                        &typing_error,
+                    ));
                 }
             }
         }
@@ -1133,15 +1041,11 @@ where
                 match get_type_metadata_from_type(property_type, Some(original_name), &type_context, scope) {
                     Ok(type_metadata) => Some(type_metadata),
                     Err(typing_error) => {
-                        class_like_metadata.issues.push(
-                            Issue::error("Could not resolve the property type in the `@property` tag.")
-                                .with_code(ScanningIssueKind::InvalidPropertyTag)
-                                .with_annotation(
-                                    Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
-                                )
-                                .with_note(typing_error.note())
-                                .with_help(typing_error.help()),
-                        );
+                        class_like_metadata.issues.push(typing_error_issue(
+                            "Could not resolve the property type in the `@property` tag.",
+                            ScanningIssueKind::InvalidPropertyTag,
+                            &typing_error,
+                        ));
 
                         None
                     }
@@ -1388,15 +1292,11 @@ where
                     ) {
                         Ok(template_use_type) => template_use_type,
                         Err(typing_error) => {
-                            class_like_metadata.issues.push(
-                                Issue::error("Could not resolve the trait type in the `@use` tag.")
-                                    .with_code(ScanningIssueKind::InvalidUseTag)
-                                    .with_annotation(
-                                        Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
-                                    )
-                                    .with_note(typing_error.note())
-                                    .with_help(typing_error.help()),
-                            );
+                            class_like_metadata.issues.push(typing_error_issue(
+                                "Could not resolve the trait type in the `@use` tag.",
+                                ScanningIssueKind::InvalidUseTag,
+                                &typing_error,
+                            ));
 
                             continue;
                         }
@@ -1555,112 +1455,73 @@ fn create_enum_methods(codebase: &mut CodebaseMetadata, class_like: &mut ClassLi
     let backing_type = class_like.enum_type.clone();
 
     if let Some(backing_type) = backing_type {
-        let from_method = create_enum_from_method(enum_name_word.as_bytes(), span, backing_type.clone());
+        let from_method = create_enum_method(
+            "from",
+            span,
+            vec![create_enum_value_parameter(backing_type.clone(), span)],
+            enum_instance_union(enum_name_word),
+            vec![TypeMetadata::new(get_named_object(word("ValueError"), None), span)],
+        );
         add_method(b"from", class_like, from_method);
 
-        let try_from_method = create_enum_try_from_method(enum_name_word.as_bytes(), span, backing_type);
+        let try_from_method = create_enum_method(
+            "tryFrom",
+            span,
+            vec![create_enum_value_parameter(backing_type, span)],
+            TUnion::from_vec(vec![
+                TAtomic::Object(TObject::Enum(TEnum { name: enum_name_word, case: None })),
+                TAtomic::Null,
+            ]),
+            vec![],
+        );
         add_method(b"tryFrom", class_like, try_from_method);
     }
 
-    let has_cases = !class_like.enum_cases.is_empty();
-    let cases_method = create_enum_cases_method(enum_name_word.as_bytes(), span, has_cases);
+    let case_list = enum_instance_union(enum_name_word);
+    let cases_return_type =
+        if class_like.enum_cases.is_empty() { get_list(case_list) } else { get_non_empty_list(case_list) };
+    let cases_method = create_enum_method("cases", span, vec![], cases_return_type, vec![]);
     add_method(b"cases", class_like, cases_method);
 }
 
-fn create_enum_from_method(enum_name: &[u8], enum_method_span: Span, backing_type: TAtomic) -> FunctionLikeMetadata {
-    FunctionLikeMetadata {
-        kind: FunctionLikeKind::Method,
-        span: enum_method_span,
-        name: word("from"),
-        original_name: word("from"),
-        name_span: Some(enum_method_span),
-        parameters: vec![FunctionLikeParameterMetadata {
-            attributes: vec![],
-            name: VariableIdentifier(word("$value")),
-            type_declaration_metadata: Some(TypeMetadata::new(
-                TUnion::from_vec(vec![backing_type.clone()]),
-                enum_method_span,
-            )),
-            type_metadata: Some(TypeMetadata::new(TUnion::from_vec(vec![backing_type]), enum_method_span)),
-            out_type: None,
-            closure_this_type: None,
-            default_type: None,
-            span: enum_method_span,
-            name_span: enum_method_span,
-            flags: MetadataFlags::empty(),
-        }],
-        return_type_declaration_metadata: Some(TypeMetadata::new(
-            TUnion::from_vec(vec![TAtomic::Object(TObject::Enum(TEnum { name: word(enum_name), case: None }))]),
-            enum_method_span,
-        )),
-        return_type_metadata: Some(TypeMetadata::new(
-            TUnion::from_vec(vec![TAtomic::Object(TObject::Enum(TEnum { name: word(enum_name), case: None }))]),
-            enum_method_span,
-        )),
-        template_types: TemplateTypes::default(),
+fn enum_instance_union(name: Word) -> TUnion {
+    TUnion::from_vec(vec![TAtomic::Object(TObject::Enum(TEnum { name, case: None }))])
+}
+
+fn create_enum_value_parameter(backing_type: TAtomic, enum_method_span: Span) -> FunctionLikeParameterMetadata {
+    FunctionLikeParameterMetadata {
         attributes: vec![],
-        method_metadata: Some(MethodMetadata {
-            is_final: true,
-            is_abstract: false,
-            is_static: true,
-            is_constructor: false,
-            visibility: Visibility::Public,
-            where_constraints: WordMap::default(),
-        }),
-        type_resolution_context: None,
-        thrown_types: vec![TypeMetadata::new(get_named_object(word("ValueError"), None), enum_method_span)],
-        issues: Vec::default(),
-        assertions: BTreeMap::default(),
-        if_true_assertions: BTreeMap::default(),
-        if_false_assertions: BTreeMap::default(),
-        assertions_inferred: false,
-        globals_accessed: WordSet::default(),
-        has_docblock: false,
-        flags: MetadataFlags::POPULATED,
-        version_constraint: crate::metadata::version_constraint::VersionConstraint::unconstrained(),
+        name: VariableIdentifier(word("$value")),
+        type_declaration_metadata: Some(TypeMetadata::new(
+            TUnion::from_vec(vec![backing_type.clone()]),
+            enum_method_span,
+        )),
+        type_metadata: Some(TypeMetadata::new(TUnion::from_vec(vec![backing_type]), enum_method_span)),
+        out_type: None,
+        closure_this_type: None,
+        default_type: None,
+        span: enum_method_span,
+        name_span: enum_method_span,
+        flags: MetadataFlags::empty(),
     }
 }
 
-fn create_enum_try_from_method(
-    enum_name: &[u8],
+fn create_enum_method(
+    name: &str,
     enum_method_span: Span,
-    backing_type: TAtomic,
+    parameters: Vec<FunctionLikeParameterMetadata>,
+    return_type: TUnion,
+    thrown_types: Vec<TypeMetadata>,
 ) -> FunctionLikeMetadata {
     FunctionLikeMetadata {
         kind: FunctionLikeKind::Method,
         span: enum_method_span,
-        name: word("tryFrom"),
-        original_name: word("tryFrom"),
+        name: word(name),
+        original_name: word(name),
         name_span: Some(enum_method_span),
-        parameters: vec![FunctionLikeParameterMetadata {
-            attributes: vec![],
-            name: VariableIdentifier(word("$value")),
-            type_declaration_metadata: Some(TypeMetadata::new(
-                TUnion::from_vec(vec![backing_type.clone()]),
-                enum_method_span,
-            )),
-            type_metadata: Some(TypeMetadata::new(TUnion::from_vec(vec![backing_type]), enum_method_span)),
-            out_type: None,
-            closure_this_type: None,
-            default_type: None,
-            span: enum_method_span,
-            name_span: enum_method_span,
-            flags: MetadataFlags::empty(),
-        }],
-        return_type_declaration_metadata: Some(TypeMetadata::new(
-            TUnion::from_vec(vec![
-                TAtomic::Object(TObject::Enum(TEnum { name: word(enum_name), case: None })),
-                TAtomic::Null,
-            ]),
-            enum_method_span,
-        )),
-        return_type_metadata: Some(TypeMetadata::new(
-            TUnion::from_vec(vec![
-                TAtomic::Object(TObject::Enum(TEnum { name: word(enum_name), case: None })),
-                TAtomic::Null,
-            ]),
-            enum_method_span,
-        )),
+        parameters,
+        return_type_declaration_metadata: Some(TypeMetadata::new(return_type.clone(), enum_method_span)),
+        return_type_metadata: Some(TypeMetadata::new(return_type, enum_method_span)),
         template_types: TemplateTypes::default(),
         attributes: vec![],
         method_metadata: Some(MethodMetadata {
@@ -1672,67 +1533,7 @@ fn create_enum_try_from_method(
             where_constraints: WordMap::default(),
         }),
         type_resolution_context: None,
-        thrown_types: vec![],
-        issues: Vec::default(),
-        assertions: BTreeMap::default(),
-        if_true_assertions: BTreeMap::default(),
-        if_false_assertions: BTreeMap::default(),
-        assertions_inferred: false,
-        globals_accessed: WordSet::default(),
-        has_docblock: false,
-        flags: MetadataFlags::POPULATED,
-        version_constraint: crate::metadata::version_constraint::VersionConstraint::unconstrained(),
-    }
-}
-
-fn create_enum_cases_method(enum_name: &[u8], enum_method_span: Span, has_cases: bool) -> FunctionLikeMetadata {
-    FunctionLikeMetadata {
-        kind: FunctionLikeKind::Method,
-        span: enum_method_span,
-        name: word("cases"),
-        original_name: word("cases"),
-        name_span: Some(enum_method_span),
-        parameters: vec![],
-        return_type_declaration_metadata: Some(TypeMetadata::new(
-            if has_cases {
-                get_non_empty_list(TUnion::from_vec(vec![TAtomic::Object(TObject::Enum(TEnum {
-                    name: word(enum_name),
-                    case: None,
-                }))]))
-            } else {
-                get_list(TUnion::from_vec(vec![TAtomic::Object(TObject::Enum(TEnum {
-                    name: word(enum_name),
-                    case: None,
-                }))]))
-            },
-            enum_method_span,
-        )),
-        return_type_metadata: Some(TypeMetadata::new(
-            if has_cases {
-                get_non_empty_list(TUnion::from_vec(vec![TAtomic::Object(TObject::Enum(TEnum {
-                    name: word(enum_name),
-                    case: None,
-                }))]))
-            } else {
-                get_list(TUnion::from_vec(vec![TAtomic::Object(TObject::Enum(TEnum {
-                    name: word(enum_name),
-                    case: None,
-                }))]))
-            },
-            enum_method_span,
-        )),
-        template_types: TemplateTypes::default(),
-        attributes: vec![],
-        method_metadata: Some(MethodMetadata {
-            is_final: true,
-            is_abstract: false,
-            is_static: true,
-            is_constructor: false,
-            visibility: Visibility::Public,
-            where_constraints: WordMap::default(),
-        }),
-        type_resolution_context: None,
-        thrown_types: vec![],
+        thrown_types,
         issues: Vec::default(),
         assertions: BTreeMap::default(),
         if_true_assertions: BTreeMap::default(),

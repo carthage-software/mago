@@ -332,16 +332,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                                 CombinerOptions::default(),
                             )),
                         );
-                    } else {
-                        // variable from catch isn't in the parent scope and try doesn't always end; drop it
                     }
                 }
 
                 block_context.variables_possibly_in_scope.extend(catch_block_context.variables_possibly_in_scope);
             } else if self.finally_clause.is_some() {
                 block_context.variables_possibly_in_scope.extend(catch_block_context.variables_possibly_in_scope);
-            } else {
-                // catch leaves the parent scope and there's no finally; nothing to merge back
             }
 
             if let Some(mut finally_scope) = try_block_context.finally_scope.as_ref().map(|s| s.borrow_mut()) {

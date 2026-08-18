@@ -51,7 +51,7 @@ use crate::resolver::method::UnresolvedMethod;
 use crate::resolver::method::report_non_documented_method;
 use crate::resolver::method::report_non_existent_method;
 use crate::resolver::method::resolve_method_targets;
-use crate::utils::expression::get_expression_id;
+use crate::utils::expression::get_block_expression_id;
 use crate::visibility::check_method_visibility;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for MethodCall<'arena> {
@@ -360,13 +360,7 @@ where
         );
     }
 
-    let this_variable = get_expression_id(
-        object,
-        block_context.scope.get_class_like_name(),
-        context.resolved_names,
-        Some(context.codebase),
-    );
-
+    let this_variable = get_block_expression_id(object, context, block_context);
     if is_null_safe && let Some(var_id) = this_variable.as_ref() {
         artifacts
             .true_branch_only_assertions

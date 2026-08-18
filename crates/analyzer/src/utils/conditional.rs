@@ -315,7 +315,5 @@ where
                 "Consider simplifying or removing the conditional check if the guarded code should always execute, or verify the expression's logic if a conditional check is truly needed.",
             ),
         );
-    } else {
-        // condition can be either truthy or falsy; no redundant-condition diagnostic to emit
     }
 }

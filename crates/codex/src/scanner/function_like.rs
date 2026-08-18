@@ -56,6 +56,7 @@ use crate::scanner::parameter::scan_function_like_parameter_with_constants;
 use crate::scanner::ttype::get_type_metadata_from_hint;
 use crate::scanner::ttype::get_type_metadata_from_type;
 use crate::scanner::ttype::merge_type_preserving_nullability;
+use crate::scanner::typing_error_issue;
 use crate::scanner::version_claim::evaluate_version_attributes;
 use crate::ttype::builder;
 use crate::ttype::get_mixed;
@@ -467,15 +468,11 @@ fn scan_function_like_docblock<A>(
             match builder::get_union_from_type(bound.r#type, scope, &type_context, classname) {
                 Ok(tunion) => tunion,
                 Err(typing_error) => {
-                    metadata.issues.push(
-                        Issue::error("Invalid `@template` type.")
-                            .with_code(ScanningIssueKind::InvalidTemplateTag)
-                            .with_annotation(
-                                Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
-                            )
-                            .with_note(typing_error.note())
-                            .with_help(typing_error.help()),
-                    );
+                    metadata.issues.push(typing_error_issue(
+                        "Invalid `@template` type.",
+                        ScanningIssueKind::InvalidTemplateTag,
+                        &typing_error,
+                    ));
 
                     continue;
                 }
@@ -488,15 +485,11 @@ fn scan_function_like_docblock<A>(
             match builder::get_union_from_type(default.r#type, scope, &type_context, classname) {
                 Ok(tunion) => Some(tunion),
                 Err(typing_error) => {
-                    metadata.issues.push(
-                        Issue::error("Invalid `@template` default type.")
-                            .with_code(ScanningIssueKind::InvalidTemplateTag)
-                            .with_annotation(
-                                Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
-                            )
-                            .with_note(typing_error.note())
-                            .with_help(typing_error.help()),
-                    );
+                    metadata.issues.push(typing_error_issue(
+                        "Invalid `@template` default type.",
+                        ScanningIssueKind::InvalidTemplateTag,
+                        &typing_error,
+                    ));
 
                     None
                 }
@@ -579,15 +572,11 @@ fn scan_function_like_docblock<A>(
                 parameter_metadata.set_type_metadata(Some(resulting_type));
             }
             Err(typing_error) => {
-                metadata.issues.push(
-                    Issue::error("Could not resolve the type for the @param tag.")
-                        .with_code(ScanningIssueKind::InvalidParamTag)
-                        .with_annotation(
-                            Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
-                        )
-                        .with_note(typing_error.note())
-                        .with_help(typing_error.help()),
-                );
+                metadata.issues.push(typing_error_issue(
+                    "Could not resolve the type for the @param tag.",
+                    ScanningIssueKind::InvalidParamTag,
+                    &typing_error,
+                ));
             }
         }
 
@@ -638,15 +627,11 @@ fn scan_function_like_docblock<A>(
                 parameter_metadata.out_type = Some(parameter_out_type);
             }
             Err(typing_error) => {
-                metadata.issues.push(
-                    Issue::error("Invalid `@param-out` type string.")
-                        .with_code(ScanningIssueKind::InvalidParamOutTag)
-                        .with_annotation(
-                            Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
-                        )
-                        .with_note(typing_error.note())
-                        .with_help(typing_error.help()),
-                );
+                metadata.issues.push(typing_error_issue(
+                    "Invalid `@param-out` type string.",
+                    ScanningIssueKind::InvalidParamOutTag,
+                    &typing_error,
+                ));
             }
         }
     }
@@ -678,15 +663,11 @@ fn scan_function_like_docblock<A>(
                 parameter_metadata.closure_this_type = Some(closure_this_type);
             }
             Err(typing_error) => {
-                metadata.issues.push(
-                    Issue::error("Invalid `@param-closure-this` type string.")
-                        .with_code(ScanningIssueKind::InvalidParamClosureThisTag)
-                        .with_annotation(
-                            Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
-                        )
-                        .with_note(typing_error.note())
-                        .with_help(typing_error.help()),
-                );
+                metadata.issues.push(typing_error_issue(
+                    "Invalid `@param-closure-this` type string.",
+                    ScanningIssueKind::InvalidParamClosureThisTag,
+                    &typing_error,
+                ));
             }
         }
     }
@@ -702,15 +683,11 @@ fn scan_function_like_docblock<A>(
                 metadata.set_return_type_metadata(Some(return_type_signature));
             }
             Err(typing_error) => {
-                metadata.issues.push(
-                    Issue::error("Failed to resolve `@return` type string.")
-                        .with_code(ScanningIssueKind::InvalidReturnTag)
-                        .with_annotation(
-                            Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
-                        )
-                        .with_note(typing_error.note())
-                        .with_help(typing_error.help()),
-                );
+                metadata.issues.push(typing_error_issue(
+                    "Failed to resolve `@return` type string.",
+                    ScanningIssueKind::InvalidReturnTag,
+                    &typing_error,
+                ));
             }
         }
     }
@@ -776,15 +753,11 @@ fn scan_function_like_docblock<A>(
                 metadata.thrown_types.push(thrown_type);
             }
             Err(typing_error) => {
-                metadata.issues.push(
-                    Issue::error("Invalid `@throws` type string.")
-                        .with_code(ScanningIssueKind::InvalidThrowsTag)
-                        .with_annotation(
-                            Annotation::primary(typing_error.span()).with_message(typing_error.to_string()),
-                        )
-                        .with_note(typing_error.note())
-                        .with_help(typing_error.help()),
-                );
+                metadata.issues.push(typing_error_issue(
+                    "Invalid `@throws` type string.",
+                    ScanningIssueKind::InvalidThrowsTag,
+                    &typing_error,
+                ));
             }
         }
     }
@@ -887,13 +860,11 @@ fn parse_assertions_from_tag(
             }
         },
         Err(typing_error) => {
-            function_like_metadata.issues.push(
-                Issue::error("Failed to resolve assertion type string.")
-                    .with_code(ScanningIssueKind::InvalidAssertionTag)
-                    .with_annotation(Annotation::primary(typing_error.span()).with_message(typing_error.to_string()))
-                    .with_note(typing_error.note())
-                    .with_help(typing_error.help()),
-            );
+            function_like_metadata.issues.push(typing_error_issue(
+                "Failed to resolve assertion type string.",
+                ScanningIssueKind::InvalidAssertionTag,
+                &typing_error,
+            ));
         }
     }
 

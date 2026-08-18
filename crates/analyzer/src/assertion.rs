@@ -147,8 +147,6 @@ where
                     if !callables.is_empty() {
                         if_types.insert(first_argument_expression_id, vec![callables]);
                     }
-                } else {
-                    // not a recognised intrinsic call; leave the assertion set untouched
                 }
             }
         }
@@ -1167,8 +1165,6 @@ where
             && let Some(root_array_id) = assertion_context.get_expression_id(array_access.array)
         {
             if_types.insert(root_array_id, vec![vec![Assertion::IsEqualIsset], vec![Assertion::Truthy]]);
-        } else {
-            // coalesce LHS isn't a tracked variable or array access; no isset assertion to record
         }
     } else {
         let var_name = assertion_context.get_expression_id(base_conditional);
@@ -1282,8 +1278,6 @@ where
                     if_types.insert(array_variable_id, vec![vec![Assertion::NonEmptyCountable(false)]]);
                 } else if minimum_count > 1 {
                     if_types.insert(array_variable_id, vec![vec![Assertion::HasAtLeastCount(minimum_count as usize)]]);
-                } else {
-                    // count >= 0 is always true; no assertion needed
                 }
             }
 
@@ -1445,8 +1439,6 @@ where
                     if_types.insert(array_variable_id, vec![vec![Assertion::NonEmptyCountable(false)]]);
                 } else if minimum_count > 1 {
                     if_types.insert(array_variable_id, vec![vec![Assertion::HasAtLeastCount(minimum_count as usize)]]);
-                } else {
-                    // count >= 0 is always true; no assertion needed
                 }
             }
 
@@ -1978,8 +1970,6 @@ where
         };
 
         if_types.insert(other_value_var_name, vec![orred_types]);
-    } else {
-        // multi-atomic other value with no known single var type; no assertion to record
     }
 
     if if_types.is_empty() { vec![] } else { vec![if_types] }

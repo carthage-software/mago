@@ -430,8 +430,6 @@ fn analyze_string_concat_operand<'arena, A>(
                 "Ensure the operand always has a compatible type using checks or assertions before concatenation.",
             ),
         );
-    } else {
-        // operand fully matches concatenation, or an invalid-operand issue was already reported
     }
 }
 

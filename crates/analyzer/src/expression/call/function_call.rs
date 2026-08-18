@@ -135,7 +135,6 @@ where
     block_context.flags.set_inside_call(true);
     expression.analyze(context, block_context, artifacts)?;
     block_context.flags.set_inside_call(was_inside_call);
-
     let Some(expression_type) = artifacts.get_expression_type(expression) else {
         return Ok((vec![], false));
     };

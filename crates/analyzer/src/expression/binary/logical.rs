@@ -352,8 +352,6 @@ where
                 );
             } else if left_block_context.assigned_variable_ids.contains_key(var_id) {
                 block_context.locals.insert(*var_id, Rc::clone(left_type));
-            } else {
-                // variable wasn't assigned in the left branch and isn't in the parent; drop it
             }
         }
 
@@ -605,8 +603,6 @@ where
                         context.settings.combiner_options(),
                     ),
                 );
-            } else {
-                // variable doesn't appear in the if body or left branch; nothing to merge in
             }
         }
 
@@ -752,8 +748,6 @@ fn check_logical_operand<'arena, A>(
                 .with_note("Resources generally coerce to `true`. This implicit conversion can be unclear.")
                 .with_help("Explicitly check the state of the resource or cast to `bool` if necessary."),
         );
-    } else {
-        // operand has a clean boolean coercion; no diagnostic needed
     }
 }
 

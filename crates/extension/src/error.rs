@@ -133,13 +133,6 @@ pub enum WorkerError {
     Restart { worker: usize, source: Box<Self> },
 }
 
-impl WorkerError {
-    #[must_use]
-    pub(crate) fn protocol(worker: usize, source: ProtocolError) -> Self {
-        Self::Protocol { worker, source }
-    }
-}
-
 impl std::fmt::Display for WorkerError {
     fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
@@ -202,17 +195,5 @@ impl std::error::Error for WorkerError {
             Self::Restart { source, .. } => Some(source),
             _ => None,
         }
-    }
-}
-
-/// A cloneable failure sent from a worker's reader thread to pending requests.
-#[derive(Debug, Clone)]
-pub(crate) struct WorkerFailure {
-    pub message: String,
-}
-
-impl WorkerFailure {
-    pub fn new(message: impl Into<String>) -> Self {
-        Self { message: message.into() }
     }
 }

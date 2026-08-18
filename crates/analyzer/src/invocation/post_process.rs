@@ -55,7 +55,7 @@ use crate::invocation::InvocationArgumentsSource;
 use crate::invocation::resolver::resolve_invocation_type;
 use crate::reconciler;
 use crate::reconciler::assertion_reconciler::intersect_union_with_union;
-use crate::utils::expression::get_expression_id;
+use crate::utils::expression::get_block_expression_id;
 use crate::utils::misc::unwrap_expression;
 
 pub fn post_invocation_process<'ctx, 'arena, A>(
@@ -683,12 +683,7 @@ fn clear_object_property_narrowings<'ctx, 'arena, A>(
             continue;
         };
 
-        let Some(argument_id) = get_expression_id(
-            expression,
-            block_context.scope.get_class_like_name(),
-            context.resolved_names,
-            Some(context.codebase),
-        ) else {
+        let Some(argument_id) = get_block_expression_id(expression, context, block_context) else {
             continue;
         };
 
@@ -1026,8 +1021,6 @@ where
                                 // ignore
                             }
                         }
-                    } else {
-                        // resolved type is never and there's no asserted type to compare against; nothing to report
                     }
                 }
 
@@ -1343,8 +1336,6 @@ where
             .target
             .iter_parameters()
             .position(|parameter| parameter.get_name().is_some_and(|name_variable| name_variable.0 == name));
-    } else {
-        // both name and offset already known; nothing to fill in
     }
 
     // After attempting to fill in missing info, if we still lack a name or an offset,
@@ -1388,13 +1379,7 @@ where
     };
 
     // If an argument was found, resolve its expression ID.
-    let argument_id = get_expression_id(
-        argument_expression,
-        block_context.scope.get_class_like_name(),
-        context.resolved_names,
-        Some(context.codebase),
-    );
-
+    let argument_id = get_block_expression_id(argument_expression, context, block_context);
     let argument_id = match argument_id {
         Some(id) => Some(id),
         None => {
@@ -1402,12 +1387,7 @@ where
                 && matches!(binary.operator, BinaryOperator::NullCoalesce(_))
                 && matches!(unwrap_expression(binary.rhs), Expression::Literal(Literal::Null(_)))
             {
-                get_expression_id(
-                    binary.lhs,
-                    block_context.scope.get_class_like_name(),
-                    context.resolved_names,
-                    Some(context.codebase),
-                )
+                get_block_expression_id(binary.lhs, context, block_context)
             } else {
                 None
             }

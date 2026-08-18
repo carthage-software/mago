@@ -4,6 +4,8 @@ use mago_database::file::File;
 use mago_names::ResolvedNames;
 use mago_names::scope::NamespaceScope;
 use mago_php_version::PHPVersion;
+use mago_reporting::Annotation;
+use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_syntax::comments::docblock::get_docblock_for_node;
 use mago_syntax::cst::AnonymousClass;
@@ -62,6 +64,8 @@ use crate::ttype::template::GenericTemplate;
 
 mod assertion_inference;
 mod attribute;
+use crate::issue::ScanningIssueKind;
+use crate::ttype::error::TypeError;
 mod class_like;
 mod class_like_constant;
 mod constant;
@@ -84,6 +88,14 @@ mod version_claim;
 /// so the resulting metadata is already version-correct and downstream
 /// consumers don't need a separate filter pass.
 #[inline]
+pub(super) fn typing_error_issue(message: &str, kind: ScanningIssueKind, typing_error: &TypeError) -> Issue {
+    Issue::error(message)
+        .with_code(kind)
+        .with_annotation(Annotation::primary(typing_error.span()).with_message(typing_error.to_string()))
+        .with_note(typing_error.note())
+        .with_help(typing_error.help())
+}
+
 pub fn scan_program<'arena, 'ctx, A>(
     arena: &'arena A,
     file: &'ctx File,
@@ -330,14 +342,8 @@ where
             return;
         };
 
-        self.template_constraints.push({
-            let mut constraints: TemplateConstraintList = vec![];
-            for (template_name, template_constraints) in &metadata.template_types {
-                constraints.push((*template_name, template_constraints.clone()));
-            }
-
-            constraints
-        });
+        self.template_constraints
+            .push(metadata.template_types.iter().map(|(name, constraints)| (*name, constraints.clone())).collect());
 
         if self.polyfill_depth > 0 {
             metadata.flags |= MetadataFlags::POLYFILL;
@@ -368,14 +374,8 @@ where
             type_resolution_context,
         );
 
-        self.template_constraints.push({
-            let mut constraints: TemplateConstraintList = vec![];
-            for (template_name, template_constraints) in &metadata.template_types {
-                constraints.push((*template_name, template_constraints.clone()));
-            }
-
-            constraints
-        });
+        self.template_constraints
+            .push(metadata.template_types.iter().map(|(name, constraints)| (*name, constraints.clone())).collect());
 
         self.codebase.function_likes.entry(identifier).or_insert(metadata);
     }
@@ -407,14 +407,8 @@ where
             type_resolution_context,
         );
 
-        self.template_constraints.push({
-            let mut constraints: TemplateConstraintList = vec![];
-            for (template_name, template_constraints) in &metadata.template_types {
-                constraints.push((*template_name, template_constraints.clone()));
-            }
-
-            constraints
-        });
+        self.template_constraints
+            .push(metadata.template_types.iter().map(|(name, constraints)| (*name, constraints.clone())).collect());
         self.codebase.function_likes.entry(identifier).or_insert(metadata);
     }
 
@@ -640,14 +634,13 @@ where
             class_like_metadata.flags |= MetadataFlags::CONSISTENT_CONSTRUCTOR;
         }
 
-        self.template_constraints.push({
-            let mut constraints: TemplateConstraintList = vec![];
-            for (template_name, template_constraints) in &function_like_metadata.template_types {
-                constraints.push((*template_name, template_constraints.clone()));
-            }
-
-            constraints
-        });
+        self.template_constraints.push(
+            function_like_metadata
+                .template_types
+                .iter()
+                .map(|(name, constraints)| (*name, constraints.clone()))
+                .collect(),
+        );
 
         self.codebase.class_likes.entry(current_class).or_insert(class_like_metadata);
         self.codebase.function_likes.entry(method_id).or_insert(function_like_metadata);

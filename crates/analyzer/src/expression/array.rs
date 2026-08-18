@@ -53,7 +53,7 @@ use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
-use crate::utils::expression::get_expression_id;
+use crate::utils::expression::get_block_expression_id;
 use crate::utils::misc::unwrap_expression;
 
 /// Analyzes array literals and their elements.
@@ -342,13 +342,7 @@ where
         if let Expression::UnaryPrefix(UnaryPrefix { operator: UnaryPrefixOperator::Reference(_), operand }) =
             unwrap_expression(value)
         {
-            let variable_id = get_expression_id(
-                operand,
-                block_context.scope.get_class_like_name(),
-                context.resolved_names,
-                Some(context.codebase),
-            );
-
+            let variable_id = get_block_expression_id(operand, context, block_context);
             if let Some(variable_id) = variable_id {
                 if let Some(existing_type) = block_context.locals.remove(&variable_id) {
                     block_context.remove_descendants(context, variable_id, &existing_type, None);

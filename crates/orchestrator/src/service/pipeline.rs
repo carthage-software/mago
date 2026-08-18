@@ -242,7 +242,7 @@ where
                     let resolver = NameResolver::new(arena);
                     let resolved_names = resolver.resolve(program);
 
-                    let file_signature = signature_builder::build_file_signature(&file, program, &resolved_names);
+                    let file_signature = signature_builder::build_file_signature(program, &resolved_names);
 
                     let mut metadata = scan_program(arena, &file, program, &resolved_names, php_version);
                     metadata.set_file_signature(file.id, file_signature);

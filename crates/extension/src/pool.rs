@@ -1,7 +1,6 @@
 use std::num::NonZeroUsize;
 use std::sync::Arc;
 use std::sync::Mutex;
-use std::sync::MutexGuard;
 use std::sync::atomic::AtomicBool;
 use std::sync::atomic::AtomicU8;
 use std::sync::atomic::AtomicU64;
@@ -15,6 +14,10 @@ use crate::error::WorkerError;
 use crate::reduction;
 use crate::worker::Worker;
 use crate::worker::WorkerRequestHandler;
+use crate::worker::average_micros;
+use crate::worker::duration_nanos;
+use crate::worker::lock;
+use crate::worker::nanos_millis;
 
 const INITIAL_WORKERS: usize = 3;
 const WARMUP_REQUESTS: usize = 8;
@@ -284,48 +287,7 @@ impl WorkerPool {
     /// Returns an error when no worker is available, communication fails, the
     /// deadline expires, or the worker returns an error response.
     pub fn request(&self, payload: Vec<u8>) -> Result<Vec<u8>, WorkerError> {
-        let start = Instant::now();
-        let trace_start = self.trace_enabled.then(Instant::now);
-        let request_bytes = payload.len();
-        let reserve_start = self.trace_enabled.then(Instant::now);
-        let (index, reservation) = match self.reserve_worker(None) {
-            Ok(reservation) => reservation,
-            Err(error) => {
-                self.record_trace_request(
-                    request_bytes,
-                    0,
-                    trace_start.map_or(Duration::ZERO, |start| start.elapsed()),
-                    reserve_start.map_or(Duration::ZERO, |start| start.elapsed()),
-                    Duration::ZERO,
-                    Duration::ZERO,
-                    true,
-                    false,
-                );
-                return Err(error);
-            }
-        };
-        let reserve_duration = reserve_start.map_or(Duration::ZERO, |start| start.elapsed());
-        let exchange_start = self.trace_enabled.then(Instant::now);
-        let result = reservation.worker().request(payload);
-        let exchange_duration = exchange_start.map_or(Duration::ZERO, |start| start.elapsed());
-        let recovery_start = self.trace_enabled.then(Instant::now);
-        let recovery = self.recover_if_needed(index, &reservation, &result);
-        let recovery_duration = recovery_start.map_or(Duration::ZERO, |start| start.elapsed());
-        let response_bytes = result.as_ref().map_or(0, Vec::len);
-        let failed = result.is_err() || recovery.is_err();
-        self.record_trace_request(
-            request_bytes,
-            response_bytes,
-            trace_start.map_or(Duration::ZERO, |start| start.elapsed()),
-            reserve_duration,
-            exchange_duration,
-            recovery_duration,
-            failed,
-            false,
-        );
-        recovery?;
-        self.record_request(start.elapsed());
-        result
+        self.request_inner(payload, None, |worker, payload| worker.request(payload), false)
     }
 
     /// Sends a request and services nested worker requests on the calling thread.
@@ -339,7 +301,7 @@ impl WorkerPool {
     where
         H: WorkerRequestHandler,
     {
-        self.request_with_handler_inner(payload, None, handler)
+        self.request_inner(payload, None, |worker, payload| worker.request_with_handler(payload, handler), true)
     }
 
     /// Sends a nested-request-capable request with a stable worker-affinity key.
@@ -359,18 +321,21 @@ impl WorkerPool {
     where
         H: WorkerRequestHandler,
     {
-        self.request_with_handler_inner(payload, Some(affinity), handler)
+        self.request_inner(
+            payload,
+            Some(affinity),
+            |worker, payload| worker.request_with_handler(payload, handler),
+            true,
+        )
     }
 
-    fn request_with_handler_inner<H>(
+    fn request_inner(
         &self,
         payload: Vec<u8>,
         affinity: Option<&[u8]>,
-        handler: &mut H,
-    ) -> Result<Vec<u8>, WorkerError>
-    where
-        H: WorkerRequestHandler,
-    {
+        exchange: impl FnOnce(&Worker, Vec<u8>) -> Result<Vec<u8>, WorkerError>,
+        nested_handler: bool,
+    ) -> Result<Vec<u8>, WorkerError> {
         let start = Instant::now();
         let trace_start = self.trace_enabled.then(Instant::now);
         let request_bytes = payload.len();
@@ -386,14 +351,14 @@ impl WorkerPool {
                     Duration::ZERO,
                     Duration::ZERO,
                     true,
-                    true,
+                    nested_handler,
                 );
                 return Err(error);
             }
         };
         let reserve_duration = reserve_start.map_or(Duration::ZERO, |start| start.elapsed());
         let exchange_start = self.trace_enabled.then(Instant::now);
-        let result = reservation.worker().request_with_handler(payload, handler);
+        let result = exchange(reservation.worker(), payload);
         let exchange_duration = exchange_start.map_or(Duration::ZERO, |start| start.elapsed());
         let recovery_start = self.trace_enabled.then(Instant::now);
         let recovery = self.recover_if_needed(index, &reservation, &result);
@@ -408,7 +373,7 @@ impl WorkerPool {
             exchange_duration,
             recovery_duration,
             failed,
-            true,
+            nested_handler,
         );
         recovery?;
         self.record_request(start.elapsed());
@@ -1108,26 +1073,9 @@ impl Drop for WorkerPool {
     }
 }
 
-fn lock<T>(mutex: &Mutex<T>) -> MutexGuard<'_, T> {
-    mutex.lock().unwrap_or_else(std::sync::PoisonError::into_inner)
-}
-
 #[inline]
 fn affinity_hash(bytes: &[u8]) -> usize {
     bytes.iter().fold(0x811c_9dc5usize, |hash, byte| (hash ^ usize::from(*byte)).wrapping_mul(0x0100_0193usize))
-}
-
-fn duration_nanos(duration: Duration) -> u64 {
-    u64::try_from(duration.as_nanos()).unwrap_or(u64::MAX)
-}
-
-#[allow(clippy::cast_precision_loss, clippy::float_arithmetic)]
-fn nanos_millis(nanos: u64) -> f64 {
-    nanos as f64 / 1_000_000.0
-}
-
-fn average_micros(nanos: u64, count: u64) -> u64 {
-    nanos.checked_div(count).unwrap_or(0) / 1_000
 }
 
 fn pool_state_name(state: u8) -> &'static str {

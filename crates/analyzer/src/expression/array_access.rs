@@ -15,7 +15,7 @@ use crate::error::AnalysisError;
 use crate::utils::expression::array::get_array_target_type_given_index;
 use crate::utils::expression::expression_is_nullsafe;
 use crate::utils::expression::get_array_access_id;
-use crate::utils::expression::get_expression_id;
+use crate::utils::expression::get_block_expression_id;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrayAccess<'arena> {
     fn analyze<'ctx, A>(
@@ -34,13 +34,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrayAccess<'arena> {
             Some(context.codebase),
         );
 
-        let extended_var_id = get_expression_id(
-            self.array,
-            block_context.scope.get_class_like_name(),
-            context.resolved_names,
-            Some(context.codebase),
-        );
-
+        let extended_var_id = get_block_expression_id(self.array, context, block_context);
         let saved_narrowed_type = if matches!(self.index, Expression::UnaryPostfix(_)) {
             keyed_array_var_id.as_ref().and_then(|k| block_context.locals.get(k).cloned())
         } else {

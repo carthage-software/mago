@@ -451,8 +451,6 @@ where
                                 "Remove this case or rearrange the switch cases to ensure that this case is last.",
                             ),
                     );
-                } else {
-                    // case condition can match without being unconditional; leave detection to runtime semantics
                 }
             }
 
@@ -472,8 +470,6 @@ where
             });
         } else if result.is_none() {
             result = Some(true);
-        } else {
-            // default case after a previously matching case; result already decided
         }
 
         if !has_leaving_statements && !is_last {

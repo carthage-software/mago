@@ -278,12 +278,6 @@ impl FunctionLikeMetadata {
         self.parameters.iter_mut().find(|parameter| parameter.get_name().0 == name)
     }
 
-    /// Returns a mutable reference to the template type parameters.
-    #[inline]
-    pub fn get_template_types_mut(&mut self) -> &mut TemplateTypes {
-        &mut self.template_types
-    }
-
     /// Returns a slice of the attributes.
     #[inline]
     #[must_use]

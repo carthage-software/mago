@@ -67,7 +67,7 @@ impl SymbolKind {
 
 /// Stores a map of all known class-like symbol names (FQCNs) to their corresponding `SymbolKind`.
 /// Provides basic methods for adding symbols and querying.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Debug, PartialEq, Eq, Default)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct Symbols {
     all: WordMap<SymbolKind>,
@@ -82,32 +82,11 @@ impl Symbols {
         Symbols { all: WordMap::default(), namespaces: WordSet::default() }
     }
 
-    /// Adds or updates a symbol name identified as a `Class`.
+    /// Adds or updates a symbol name identified as the given kind.
     #[inline]
-    pub fn add_class_name(&mut self, name: Word) {
+    pub fn add_symbol_name(&mut self, name: Word, kind: SymbolKind) {
         self.namespaces.extend(get_symbol_namespaces(name));
-        self.all.insert(name, SymbolKind::Class);
-    }
-
-    /// Adds or updates a symbol name identified as an `Interface`.
-    #[inline]
-    pub fn add_interface_name(&mut self, name: Word) {
-        self.namespaces.extend(get_symbol_namespaces(name));
-        self.all.insert(name, SymbolKind::Interface);
-    }
-
-    /// Adds or updates a symbol name identified as a `Trait`.
-    #[inline]
-    pub fn add_trait_name(&mut self, name: Word) {
-        self.namespaces.extend(get_symbol_namespaces(name));
-        self.all.insert(name, SymbolKind::Trait);
-    }
-
-    /// Adds or updates a symbol name identified as an `Enum`.
-    #[inline]
-    pub fn add_enum_name(&mut self, name: Word) {
-        self.namespaces.extend(get_symbol_namespaces(name));
-        self.all.insert(name, SymbolKind::Enum);
+        self.all.insert(name, kind);
     }
 
     /// Retrieves the `SymbolKind` for a given symbol name, if known.
@@ -154,51 +133,6 @@ impl Symbols {
         self.namespaces.contains(&namespace)
     }
 
-    /// Checks if a symbol with the given name is a `Class`.
-    ///
-    /// # Arguments
-    ///
-    /// * `name`: The `Word` (likely FQCN) of the symbol to check.
-    ///
-    /// # Returns
-    ///
-    /// `true` if the symbol is a `Class`, `false` otherwise.
-    #[inline]
-    #[must_use]
-    pub fn contains_class(&self, name: Word) -> bool {
-        matches!(self.get_kind(name), Some(SymbolKind::Class))
-    }
-
-    /// Checks if a symbol with the given name is an `Interface`.
-    ///
-    /// # Arguments
-    ///
-    /// * `name`: The `Word` (likely FQCN) of the symbol to check.
-    ///
-    /// # Returns
-    ///
-    /// `true` if the symbol is an `Interface`, `false` otherwise.
-    #[inline]
-    #[must_use]
-    pub fn contains_interface(&self, name: Word) -> bool {
-        matches!(self.get_kind(name), Some(SymbolKind::Interface))
-    }
-
-    /// Checks if a symbol with the given name is a `Trait`.
-    ///
-    /// # Arguments
-    ///
-    /// * `name`: The `Word` (likely FQCN) of the symbol to check.
-    ///
-    /// # Returns
-    ///
-    /// `true` if the symbol is a `Trait`, `false` otherwise.
-    #[inline]
-    #[must_use]
-    pub fn contains_trait(&self, name: Word) -> bool {
-        matches!(self.get_kind(name), Some(SymbolKind::Trait))
-    }
-
     /// Checks if a symbol with the given name is an `Enum`.
     ///
     /// # Arguments
@@ -212,13 +146,6 @@ impl Symbols {
     #[must_use]
     pub fn contains_enum(&self, name: Word) -> bool {
         matches!(self.get_kind(name), Some(SymbolKind::Enum))
-    }
-
-    /// Returns a reference to the underlying map of all symbols.
-    #[inline]
-    #[must_use]
-    pub fn get_all(&self) -> &WordMap<SymbolKind> {
-        &self.all
     }
 
     /// Extends the current `Symbols` map with another one.
@@ -249,13 +176,6 @@ impl Symbols {
     }
 }
 
-/// Provides a default, empty `Symbols` map.
-impl Default for Symbols {
-    #[inline]
-    fn default() -> Self {
-        Self::new()
-    }
-}
 /// Returns an iterator that yields all parent namespaces of a given symbol.
 ///
 /// For example, if the symbol is `Foo\Bar\Baz\Qux`, the iterator yields:

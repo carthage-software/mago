@@ -396,8 +396,6 @@ where
 
                         context.collector.report_with_code(IssueCode::DocblockParameterNarrowing, issue);
                     }
-                } else {
-                    // overriding method or template-bearing types; narrowing check would be unreliable
                 }
             }
 

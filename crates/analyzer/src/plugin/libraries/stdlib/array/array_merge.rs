@@ -151,8 +151,6 @@ impl FunctionReturnTypeProvider for ArrayMergeProvider {
                             }
                         } else if list.non_empty {
                             next_list_index += 1; // At least one element
-                        } else {
-                            // list has no known elements and may be empty; leave the running index untouched
                         }
 
                         let (_, list_value_type) = get_array_parameters(&TArray::List(list.clone()), codebase);

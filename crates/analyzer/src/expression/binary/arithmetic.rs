@@ -88,8 +88,6 @@ where
                 "Ensure the left operand is non-null before the operation, potentially using checks or assertions.",
             ),
         );
-    } else {
-        // left operand is not null and not possibly-null; no nullability diagnostic needed
     }
 
     if right_type.is_null() {
@@ -115,16 +113,12 @@ where
                 "Ensure the right operand is non-null before the operation, potentially using checks or assertions.",
             ),
         );
-    } else {
-        // right operand is not null and not possibly-null; no nullability diagnostic needed
     }
 
     if is_arithmetic_compatible_generic(context, &left_type, &right_type) {
         final_result_type = Some(left_type.as_ref().clone());
     } else if is_arithmetic_compatible_generic(context, &right_type, &left_type) {
         final_result_type = Some(right_type.as_ref().clone());
-    } else {
-        // neither operand is a compatible generic; fall through to per-atomic arithmetic resolution
     }
 
     if let Some(final_result_type) = final_result_type {
@@ -174,8 +168,6 @@ where
                 "Ensure the left operand is non-falsy before the operation, or explicitly cast if coercion is intended."
             ),
         );
-    } else {
-        // left operand is bitwise-safe or not falsable; no false-operand diagnostic needed
     }
 
     if right_type.is_false() && !is_bitwise {
@@ -213,8 +205,6 @@ where
                 "Ensure the right operand is non-falsy before the operation, or explicitly cast if coercion is intended."
             ),
         );
-    } else {
-        // right operand is bitwise-safe or not falsable; no false-operand diagnostic needed
     }
 
     let mut result_atomic_types: Vec<TAtomic> = Vec::new();

@@ -653,8 +653,6 @@ where
         } else if *argument_offset >= invocation.target.parameter_count() {
             has_too_many_arguments = true;
             continue;
-        } else {
-            // positional argument with no matching parameter and not over the limit; fall through to record offset
         }
 
         last_argument_offset = *argument_offset as isize;
@@ -997,8 +995,6 @@ where
                 )
                 .with_help("Remove the argument unpacking (`...`)."),
             );
-        } else {
-            // target accepts no parameters and no unpacking was attempted; nothing to validate
         }
     }
 
@@ -1148,8 +1144,6 @@ where
             .with_help("Remove the extra argument(s).");
 
         context.collector.report_with_code(IssueCode::TooManyArguments, issue);
-    } else {
-        // argument count is within the parameter range; nothing to report
     }
 
     Ok(())
@@ -1830,8 +1824,6 @@ fn validate_keyed_array_elements<'ctx, 'arena, A>(
                     }),
                 );
             }
-        } else {
-            // integer array key with no matching parameter; already handled via continue above
         }
     }
 }

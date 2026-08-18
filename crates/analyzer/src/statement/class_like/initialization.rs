@@ -362,8 +362,6 @@ where
                             all_initialized.insert(*prop_name);
                         }
                     }
-                } else {
-                    // origin class metadata is unavailable; can't tell which inherited props are initialized
                 }
             }
 
