@@ -1,0 +1,196 @@
+@layer components {
+  .doc-diagram {
+    position: relative;
+    inline-size: 100%;
+    margin-block: var(--s-6);
+    border: var(--rule-thick);
+    background: var(--bg);
+  }
+
+  .doc-diagram__header {
+    min-block-size: 48px;
+    display: flex;
+    align-items: center;
+    gap: var(--s-3);
+    padding: var(--s-2);
+    padding-inline-start: var(--s-3);
+    border-block-end: var(--hair);
+    background: var(--bg);
+  }
+
+  .doc-diagram__identity {
+    min-inline-size: 0;
+    display: flex;
+    align-items: baseline;
+    gap: var(--s-3);
+    margin-inline-end: auto;
+  }
+
+  .doc-diagram__kind {
+    flex: none;
+    font-family: var(--mono);
+    font-size: 0.64rem;
+    font-weight: 500;
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+    color: var(--accent-text);
+  }
+
+  .doc-diagram__title {
+    min-inline-size: 0;
+    overflow: hidden;
+    font-family: var(--sans);
+    font-size: 0.82rem;
+    font-weight: 500;
+    line-height: 1.2;
+    color: var(--ink);
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+
+  .doc-diagram__controls {
+    display: flex;
+    flex: none;
+    gap: var(--s-1);
+  }
+
+  .doc-diagram__control {
+    inline-size: 30px;
+    block-size: 30px;
+    display: inline-grid;
+    place-items: center;
+    padding: 0;
+    border: var(--hair);
+    background: var(--bg);
+    color: var(--ink);
+    cursor: pointer;
+  }
+
+  .doc-diagram__control:hover {
+    border-color: var(--rule);
+    background: var(--ink);
+    color: var(--bg);
+  }
+
+  .doc-diagram__control svg {
+    inline-size: 14px;
+    block-size: 14px;
+    fill: none;
+    stroke: currentColor;
+    stroke-linecap: square;
+    stroke-linejoin: miter;
+    stroke-width: 1.75;
+  }
+
+  .doc-diagram__viewport {
+    position: relative;
+    min-block-size: 260px;
+    overflow: hidden;
+    cursor: grab;
+    touch-action: none;
+    background-color: var(--bg-soft);
+    background-image:
+      linear-gradient(to right, var(--rule-faint) 1px, transparent 1px),
+      linear-gradient(to bottom, var(--rule-faint) 1px, transparent 1px);
+    background-size: 24px 24px;
+  }
+
+  .doc-diagram__viewport:active {
+    cursor: grabbing;
+  }
+
+  .doc-diagram__viewport:focus-visible {
+    outline: 2px solid var(--accent-text);
+    outline-offset: -3px;
+  }
+
+  .doc-diagram__canvas {
+    position: absolute;
+    inset: 0 auto auto 0;
+    transform-origin: 0 0;
+    will-change: transform;
+  }
+
+  .doc-diagram__canvas svg {
+    display: block;
+    max-inline-size: none;
+    block-size: auto;
+    font-family: var(--sans) !important;
+  }
+
+  .doc-diagram__footer {
+    display: flex;
+    justify-content: space-between;
+    gap: var(--s-4);
+    padding: var(--s-2) var(--s-3);
+    border-block-start: var(--hair);
+    background: var(--bg);
+    font-family: var(--mono);
+    font-size: 0.66rem;
+    line-height: 1.35;
+    color: var(--ink-quiet);
+  }
+
+  .doc-diagram__status {
+    flex: none;
+    color: var(--accent-text);
+    font-feature-settings: "tnum";
+  }
+
+  :root.has-focused-diagram {
+    overflow: hidden;
+  }
+
+  .doc-diagram--focused {
+    position: fixed;
+    inset: 0;
+    z-index: 100;
+    display: grid;
+    grid-template-rows: auto minmax(0, 1fr) auto;
+    inline-size: 100vw;
+    block-size: 100vh;
+    margin: 0;
+    border: 0;
+    background: var(--bg);
+  }
+
+  .doc-diagram--focused .doc-diagram__viewport {
+    block-size: auto !important;
+    min-block-size: 0;
+  }
+
+  @media (max-width: 560px) {
+    .doc-diagram__header {
+      align-items: flex-start;
+    }
+
+    .doc-diagram__identity {
+      display: grid;
+      gap: 2px;
+    }
+
+    .doc-diagram__kind {
+      font-size: 0.58rem;
+    }
+
+    .doc-diagram__title {
+      font-size: 0.74rem;
+    }
+
+    .doc-diagram__footer {
+      display: none;
+    }
+
+    .doc-diagram__control {
+      inline-size: 28px;
+      block-size: 28px;
+    }
+
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .doc-diagram__canvas {
+      will-change: auto;
+    }
+  }
+}
