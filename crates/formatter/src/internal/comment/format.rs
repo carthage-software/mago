@@ -453,7 +453,7 @@ where
     }
 
     #[must_use]
-    pub(crate) fn print_inner_comment(&mut self, range: Span, should_indent: bool) -> Option<Document<'arena, A>> {
+    pub(crate) fn print_inner_comment(&mut self, range: Span) -> Option<Document<'arena, A>> {
         let mut parts = vec_in![self.arena];
         let mut must_break = false;
         let mut consumed_count = 0;
@@ -469,14 +469,7 @@ where
                 }
 
                 must_break = must_break || !comment.is_block;
-                if !should_indent && self.is_next_line_empty(trivia.span) {
-                    parts.push(Document::Array(
-                        vec_in![self.arena; self.print_comment(comment), Document::Line(Line::hard())],
-                    ));
-                    must_break = true;
-                } else {
-                    parts.push(self.print_comment(comment));
-                }
+                parts.push(self.print_comment(comment));
                 self.placed_comments.mark_consumed(index);
                 consumed_count += 1;
             } else {
@@ -494,23 +487,13 @@ where
 
         let document = Document::Array(Document::join(self.arena, parts, Separator::HardLine));
 
-        Some(if should_indent {
-            Document::Group(
-                Group::new(vec_in![self.arena;
-                    Document::Indent(vec_in![self.arena; Document::Line(Line::default()), document]),
-                    Document::Line(Line::default()),
-                ])
-                .with_break_mode(if must_break { BreakMode::Force } else { BreakMode::Auto }),
-            )
-        } else {
-            Document::Group(
-                Group::new(vec_in![self.arena;
-                    Document::Array(vec_in![self.arena; Document::Line(Line::default()), document]),
-                    Document::Line(Line::default()),
-                ])
-                .with_break_mode(if must_break { BreakMode::Force } else { BreakMode::Auto }),
-            )
-        })
+        Some(Document::Group(
+            Group::new(vec_in![self.arena;
+                Document::Indent(vec_in![self.arena; Document::Line(Line::default()), document]),
+                Document::Line(Line::default()),
+            ])
+            .with_break_mode(if must_break { BreakMode::Force } else { BreakMode::Auto }),
+        ))
     }
 
     #[must_use]

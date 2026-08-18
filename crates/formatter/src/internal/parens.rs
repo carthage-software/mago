@@ -184,20 +184,14 @@ where
         };
 
         match self.nth_parent_kind(2) {
-            Some(Node::Binary(e)) => {
-                let precedence = e.operator.precedence();
-
-                if precedence >= Precedence::Pipe {
-                    return true;
-                }
-
-                false
-            }
-            Some(Node::Assignment(_)) => false,
-            Some(Node::UnaryPrefix(_) | Node::UnaryPostfix(_)) => true,
-            Some(Node::VariadicArrayElement(_)) => true,
-            Some(Node::ArrayAppend(_)) => true,
-            Some(Node::Conditional(_)) => true,
+            Some(Node::Binary(e)) => e.operator.precedence() >= Precedence::Pipe,
+            Some(
+                Node::UnaryPrefix(_)
+                | Node::UnaryPostfix(_)
+                | Node::VariadicArrayElement(_)
+                | Node::ArrayAppend(_)
+                | Node::Conditional(_),
+            ) => true,
             _ => false,
         }
     }
@@ -296,19 +290,8 @@ where
                 access.left_bracket.start > node.span().start
             }
             Some(Node::Assignment(_)) => precedence < Precedence::Assignment,
-            _ => {
-                if matches!(self.nth_parent_kind(2), Some(Node::PropertyAccess(_) | Node::NullSafePropertyAccess(_))) {
-                    return true;
-                }
-
-                let grand_parent_node = self.nth_parent_kind(3);
-
-                if let Some(Node::Access(_)) = grand_parent_node {
-                    return true;
-                }
-
-                false
-            }
+            Some(Node::PropertyAccess(_) | Node::NullSafePropertyAccess(_)) => true,
+            _ => matches!(self.nth_parent_kind(3), Some(Node::Access(_))),
         }
     }
 
@@ -612,24 +595,10 @@ where
     }
 
     const fn is_unary_or_binary_or_ternary(&self, node: Node<'arena, 'arena>) -> bool {
-        self.is_unary(node) || self.is_binaryish(node) || self.is_ternary_conditional(node)
-    }
-
-    const fn is_binaryish(&self, node: Node<'arena, 'arena>) -> bool {
-        match node {
-            Node::Binary(_) => true,
-            Node::Conditional(conditional) => conditional.then.is_none(),
-            Node::Pipe(_) => true,
-            _ => false,
-        }
-    }
-
-    const fn is_unary(&self, node: Node<'arena, 'arena>) -> bool {
-        matches!(node, Node::UnaryPrefix(_) | Node::UnaryPostfix(_))
-    }
-
-    const fn is_ternary_conditional(&self, node: Node<'arena, 'arena>) -> bool {
-        if let Node::Conditional(op) = node { op.then.is_some() } else { false }
+        matches!(
+            node,
+            Node::UnaryPrefix(_) | Node::UnaryPostfix(_) | Node::Binary(_) | Node::Conditional(_) | Node::Pipe(_)
+        )
     }
 }
 

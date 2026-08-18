@@ -15,8 +15,6 @@ impl CommentFlags {
     pub const DANGLING: CommentFlags = CommentFlags(1 << 2); // Check comment is a dangling comment
     pub const BLOCK: CommentFlags = CommentFlags(1 << 3); // Check comment is a block comment
     pub const LINE: CommentFlags = CommentFlags(1 << 4); // Check comment is a line comment
-    pub const FIRST: CommentFlags = CommentFlags(1 << 5); // Check comment is the first attached comment
-    pub const LAST: CommentFlags = CommentFlags(1 << 6); // Check comment is the last attached comment
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -34,15 +32,7 @@ impl CommentFlags {
     #[inline]
     #[must_use]
     pub const fn all() -> Self {
-        CommentFlags(
-            Self::LEADING.0
-                | Self::TRAILING.0
-                | Self::DANGLING.0
-                | Self::BLOCK.0
-                | Self::LINE.0
-                | Self::FIRST.0
-                | Self::LAST.0,
-        )
+        CommentFlags(Self::LEADING.0 | Self::TRAILING.0 | Self::DANGLING.0 | Self::BLOCK.0 | Self::LINE.0)
     }
 
     #[inline]
@@ -95,53 +85,5 @@ impl std::ops::BitOr for CommentFlags {
     #[inline]
     fn bitor(self, rhs: Self) -> Self {
         CommentFlags(self.0 | rhs.0)
-    }
-}
-
-impl std::ops::BitAnd for CommentFlags {
-    type Output = Self;
-
-    #[inline]
-    fn bitand(self, rhs: Self) -> Self {
-        CommentFlags(self.0 & rhs.0)
-    }
-}
-
-impl std::ops::BitXor for CommentFlags {
-    type Output = Self;
-
-    #[inline]
-    fn bitxor(self, rhs: Self) -> Self {
-        CommentFlags(self.0 ^ rhs.0)
-    }
-}
-
-impl std::ops::Not for CommentFlags {
-    type Output = Self;
-
-    #[inline]
-    fn not(self) -> Self {
-        CommentFlags(!self.0)
-    }
-}
-
-impl std::ops::BitOrAssign for CommentFlags {
-    #[inline]
-    fn bitor_assign(&mut self, rhs: Self) {
-        self.0 |= rhs.0;
-    }
-}
-
-impl std::ops::BitAndAssign for CommentFlags {
-    #[inline]
-    fn bitand_assign(&mut self, rhs: Self) {
-        self.0 &= rhs.0;
-    }
-}
-
-impl std::ops::BitXorAssign for CommentFlags {
-    #[inline]
-    fn bitxor_assign(&mut self, rhs: Self) {
-        self.0 ^= rhs.0;
     }
 }

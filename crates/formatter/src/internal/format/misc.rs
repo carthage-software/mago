@@ -501,37 +501,18 @@ pub(super) fn is_simple_call_argument<'arena>(node: &'arena Expression<'arena>, 
         Expression::LegacyArray(array) => array.elements.iter().all(is_simple_element),
         Expression::CompositeString(composite_string) => is_simple_composite_string_argument(composite_string, depth),
         Expression::Call(call) => {
-            let argument_list = match call {
-                Call::Function(function_call) => {
-                    if !is_simple_call_argument(function_call.function, depth) {
-                        return false;
-                    }
-
-                    &function_call.argument_list
-                }
-                Call::Method(method_call) => {
-                    if !is_simple_call_argument(method_call.object, depth) {
-                        return false;
-                    }
-
-                    &method_call.argument_list
-                }
-                Call::NullSafeMethod(null_safe_method_call) => {
-                    if !is_simple_call_argument(null_safe_method_call.object, depth) {
-                        return false;
-                    }
-
-                    &null_safe_method_call.argument_list
-                }
-                Call::StaticMethod(static_method_call) => {
-                    if !is_simple_call_argument(static_method_call.class, depth) {
-                        return false;
-                    }
-
-                    &static_method_call.argument_list
-                }
+            let callee = match call {
+                Call::Function(function_call) => function_call.function,
+                Call::Method(method_call) => method_call.object,
+                Call::NullSafeMethod(null_safe_method_call) => null_safe_method_call.object,
+                Call::StaticMethod(static_method_call) => static_method_call.class,
             };
 
+            if !is_simple_call_argument(callee, depth) {
+                return false;
+            }
+
+            let argument_list = call.get_argument_list();
             argument_list.arguments.len() <= depth
                 && argument_list.arguments.iter().map(Argument::value).all(is_child_simple)
         }
@@ -683,68 +664,38 @@ where
     }
 
     let mut lists = vec_in![f.arena;];
-    let mut has_new_line = false;
-    let mut has_potentially_long_attribute = false;
-
     if matches!(f.settings.attributes_order, SortOrder::Preserve) {
-        for attribute_list in attribute_lists {
-            collect_attribute_list(
-                f,
-                attribute_list,
-                &mut lists,
-                &mut has_new_line,
-                &mut has_potentially_long_attribute,
-            );
-        }
+        lists.extend(attribute_lists.iter().map(|attribute_list| attribute_list.format(f)));
     } else {
         let mut sorted: std::vec::Vec<&'arena AttributeList<'arena>> = attribute_lists.iter().collect();
         sort_attribute_list_refs(&mut sorted, f.settings.attributes_order);
-        for attribute_list in sorted {
-            collect_attribute_list(
-                f,
-                attribute_list,
-                &mut lists,
-                &mut has_new_line,
-                &mut has_potentially_long_attribute,
-            );
-        }
+        lists.extend(sorted.into_iter().map(|attribute_list| attribute_list.format(f)));
     }
 
-    let mut contents = vec_in![f.arena;];
-    let len = lists.len();
-    for (i, attribute_list) in lists.into_iter().enumerate() {
-        contents.push(attribute_list);
-
-        if i != len - 1 {
-            contents.push(Document::Line(Line::hard()));
-        }
-    }
-
-    Some(Document::Group(Group::new(contents)))
+    Some(Document::Group(Group::new(Document::join(f.arena, lists, Separator::HardLine))))
 }
 
 pub(super) fn print_clause<'arena, A>(
     f: &mut FormatterState<'_, 'arena, A>,
     node: &'arena Statement<'arena>,
-    force_space: bool,
 ) -> Document<'arena, A>
 where
     A: Arena,
 {
     let clause = node.format(f);
 
-    adjust_clause(f, node, clause, force_space)
+    adjust_clause(f, node, clause)
 }
 
 pub(super) fn adjust_clause<'arena, A>(
     f: &mut FormatterState<'_, 'arena, A>,
     node: &'arena Statement<'arena>,
     clause: Document<'arena, A>,
-    mut force_space: bool,
 ) -> Document<'arena, A>
 where
     A: Arena,
 {
+    let mut force_space = false;
     let mut is_block = false;
 
     let has_trailing_segment = match f.current_node() {
@@ -883,31 +834,6 @@ where
     condition
 }
 
-fn collect_attribute_list<'arena, A>(
-    f: &mut FormatterState<'_, 'arena, A>,
-    attribute_list: &'arena AttributeList<'arena>,
-    lists: &mut Vec<'arena, Document<'arena, A>, A>,
-    has_new_line: &mut bool,
-    has_potentially_long_attribute: &mut bool,
-) where
-    A: Arena,
-{
-    if !*has_potentially_long_attribute {
-        for attribute in &attribute_list.attributes {
-            *has_potentially_long_attribute =
-                !attribute.argument_list.as_ref().is_none_or(|args| args.arguments.is_empty());
-
-            if *has_potentially_long_attribute {
-                break;
-            }
-        }
-    }
-
-    lists.push(attribute_list.format(f));
-
-    *has_new_line = *has_new_line || f.is_next_line_empty(attribute_list.span());
-}
-
 fn attribute_list_sort_key<'arena>(list: &'arena AttributeList<'arena>) -> &'arena [u8] {
     list.attributes.iter().next().map(|a| a.name.value()).unwrap_or(b"")
 }
@@ -949,7 +875,7 @@ where
     }
 }
 
-fn compare_case_insensitive_bytes(a: &[u8], b: &[u8]) -> Ordering {
+pub(super) fn compare_case_insensitive_bytes(a: &[u8], b: &[u8]) -> Ordering {
     let mut a_iter = a.iter().map(u8::to_ascii_lowercase);
     let mut b_iter = b.iter().map(u8::to_ascii_lowercase);
 

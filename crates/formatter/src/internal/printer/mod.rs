@@ -6,7 +6,6 @@ use mago_allocator::vec_in;
 use crate::document::Align;
 use crate::document::BreakMode;
 use crate::document::Document;
-use crate::document::Fill;
 use crate::document::IfBreak;
 use crate::document::IndentIfBreak;
 use crate::document::Line;
@@ -95,9 +94,9 @@ where
             match document {
                 Document::String(s) => self.handle_bytes(s),
                 Document::Space(space) => self.handle_space(space),
-                Document::Array(docs) => self.handle_array(&indentation, mode, docs),
-                Document::Indent(docs) => self.handle_indent(&indentation, mode, docs),
-                Document::Align(align) => self.handle_align(align, mode),
+                Document::Array(docs) => self.push_docs(indentation, mode, docs),
+                Document::Indent(docs) => self.push_docs(indentation.indented(), mode, docs),
+                Document::Align(align) => self.push_docs(Indentation::aligned(align.alignment), mode, align.contents),
                 Document::Group(_) => {
                     should_remeasure = self.handle_group(&indentation, mode, document, should_remeasure);
                 }
@@ -110,7 +109,6 @@ where
                     should_remeasure = self.handle_line_suffix_boundary(indentation, mode, should_remeasure);
                 }
                 Document::IfBreak(if_break) => self.handle_if_break(if_break, indentation, mode),
-                Document::Fill(fill) => self.handle_fill(indentation, mode, fill),
                 Document::BreakParent => { /* No op */ }
                 Document::Trim(trim) => self.handle_trim(trim),
                 Document::DoNotTrim => {
@@ -147,13 +145,8 @@ where
         self.position += 1;
     }
 
-    fn handle_array(
-        &mut self,
-        indentation: &Indentation<'arena>,
-        mode: Mode,
-        docs: Vec<'arena, Document<'arena, A>, A>,
-    ) {
-        self.commands.extend(docs.into_iter().rev().map(|doc| Command::new(*indentation, mode, doc)));
+    fn push_docs(&mut self, indentation: Indentation<'arena>, mode: Mode, docs: Vec<'arena, Document<'arena, A>, A>) {
+        self.commands.extend(docs.into_iter().rev().map(|doc| Command::new(indentation, mode, doc)));
     }
 
     #[inline]
@@ -184,21 +177,6 @@ where
                 }
             }
         }
-    }
-
-    fn handle_indent(
-        &mut self,
-        indentation: &Indentation<'arena>,
-        mode: Mode,
-        docs: Vec<'arena, Document<'arena, A>, A>,
-    ) {
-        let new_indentation = indentation.indented();
-        self.commands.extend(docs.into_iter().rev().map(|doc| Command::new(new_indentation, mode, doc)));
-    }
-
-    fn handle_align(&mut self, align: Align<'arena, A>, mode: Mode) {
-        let new_indent = Indentation::aligned(align.alignment);
-        self.commands.extend(align.contents.into_iter().rev().map(|doc| Command::new(new_indent, mode, doc)));
     }
 
     fn handle_group(
@@ -274,15 +252,12 @@ where
         let IndentIfBreak { contents, group_id } = doc;
         let group_mode = self.group_mode_map.get(&group_id).copied().unwrap_or(mode);
 
-        match group_mode {
-            Mode::Flat => {
-                self.commands.extend(contents.into_iter().rev().map(|doc| Command::new(*indentation, mode, doc)));
-            }
-            Mode::Break => {
-                self.commands
-                    .extend(contents.into_iter().rev().map(|doc| Command::new(indentation.indented(), mode, doc)));
-            }
-        }
+        let new_indentation = match group_mode {
+            Mode::Flat => *indentation,
+            Mode::Break => indentation.indented(),
+        };
+
+        self.push_docs(new_indentation, mode, contents);
     }
 
     fn handle_line(
@@ -371,93 +346,6 @@ where
 
                 self.commands.push(Command::new(indentation, Mode::Break, break_contents));
             }
-        }
-    }
-
-    fn handle_fill(&mut self, indentation: Indentation<'arena>, mode: Mode, mut fill: Fill<'arena, A>) {
-        let remaining_width = self.remaining_width();
-        let original_parts_len = fill.parts().len();
-        let (content, whitespace) = fill.drain_out_pair();
-
-        let Some(content) = content else {
-            return;
-        };
-
-        let content_flat_cmd = Command::new(indentation, Mode::Flat, content);
-        let content_fits = self.fits(&content_flat_cmd, remaining_width);
-
-        if original_parts_len == 1 {
-            if content_fits {
-                self.commands.push(content_flat_cmd);
-            } else {
-                self.commands.push(content_flat_cmd.with_mode(Mode::Break));
-            }
-
-            return;
-        }
-
-        let Some(whitespace) = whitespace else {
-            return;
-        };
-
-        let whitespace_flat_cmd = Command::new(indentation, Mode::Flat, whitespace);
-        if original_parts_len == 2 {
-            if content_fits {
-                self.commands.push(whitespace_flat_cmd);
-                self.commands.push(content_flat_cmd);
-            } else {
-                let content_break_cmd = content_flat_cmd.with_mode(Mode::Break);
-                let whitespace_break_cmd = whitespace_flat_cmd.with_mode(Mode::Break);
-                self.commands.push(whitespace_break_cmd);
-                self.commands.push(content_break_cmd);
-            }
-
-            return;
-        }
-
-        let Some(second_content) = fill.dequeue() else {
-            return;
-        };
-
-        let mut docs = vec_in![self.arena; ];
-        let content = content_flat_cmd.document;
-        docs.push(content);
-        docs.push(whitespace_flat_cmd.document);
-        docs.push(second_content);
-
-        let first_and_second_content_fit_cmd = Command::new(indentation, Mode::Flat, Document::Array(docs));
-        let first_and_second_content_fits = self.fits(&first_and_second_content_fit_cmd, remaining_width);
-        let Document::Array(mut doc) = first_and_second_content_fit_cmd.document else {
-            return;
-        };
-
-        if let Some(second_content) = doc.pop() {
-            fill.enqueue(second_content);
-        }
-
-        let Some(whitespace) = doc.pop() else {
-            return;
-        };
-        let Some(content) = doc.pop() else {
-            return;
-        };
-
-        let remaining_cmd = Command::new(indentation, mode, Document::Fill(fill));
-        let whitespace_flat_cmd = Command::new(indentation, Mode::Flat, whitespace);
-        let content_flat_cmd = Command::new(indentation, Mode::Flat, content);
-
-        if first_and_second_content_fits {
-            self.commands.extend(vec_in![self.arena; remaining_cmd, whitespace_flat_cmd, content_flat_cmd]);
-        } else if content_fits {
-            self.commands.extend(
-                vec_in![self.arena; remaining_cmd, whitespace_flat_cmd.with_mode(Mode::Break), content_flat_cmd],
-            );
-        } else {
-            self.commands.extend(vec_in![self.arena;
-                remaining_cmd,
-                whitespace_flat_cmd.with_mode(Mode::Break),
-                content_flat_cmd.with_mode(Mode::Break),
-            ]);
         }
     }
 
@@ -557,11 +445,6 @@ where
                     }
                     if !line.soft {
                         remaining_width -= 1;
-                    }
-                }
-                Document::Fill(fill) => {
-                    for part in fill.parts.iter().rev() {
-                        stack.push((mode, part));
                     }
                 }
                 Document::LineSuffix(_) => {

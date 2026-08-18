@@ -12,12 +12,6 @@ pub struct GroupIdentifierBuilder {
     id: GroupIdentifier,
 }
 
-impl Default for GroupIdentifierBuilder {
-    fn default() -> Self {
-        Self::new()
-    }
-}
-
 impl GroupIdentifierBuilder {
     #[must_use]
     pub fn new() -> Self {

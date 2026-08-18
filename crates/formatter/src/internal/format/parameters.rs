@@ -29,7 +29,7 @@ where
 {
     if parameter_list.parameters.is_empty() {
         let mut contents = vec_in![f.arena; Document::String(b"(")];
-        if let Some(comments) = f.print_inner_comment(parameter_list.span(), true) {
+        if let Some(comments) = f.print_inner_comment(parameter_list.span()) {
             contents.push(comments);
         }
 

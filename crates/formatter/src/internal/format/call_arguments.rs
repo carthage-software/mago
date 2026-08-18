@@ -68,7 +68,7 @@ where
                     && !instantiation_needs_inline_new_parens(f, expression))
                     || (expression.is_exit_or_die_construct() && !f.settings.parentheses_in_exit_and_die))
             {
-                if let Some(inner_comments) = f.print_inner_comment(argument_list.span(), true) {
+                if let Some(inner_comments) = f.print_inner_comment(argument_list.span()) {
                     Document::Array(vec_in![f.arena;
                         Document::String(b"("),
                         inner_comments,
@@ -85,7 +85,7 @@ where
             if partial_argument_list.arguments.is_empty()
                 && (expression.is_attribute() && !f.settings.parentheses_in_attribute)
             {
-                if let Some(inner_comments) = f.print_inner_comment(partial_argument_list.span(), true) {
+                if let Some(inner_comments) = f.print_inner_comment(partial_argument_list.span()) {
                     Document::Array(vec_in![f.arena;
                         Document::String(b"("),
                         inner_comments,
@@ -886,16 +886,7 @@ fn is_hopefully_short_call_argument(mut node: &Expression) -> bool {
     }
 
     match node {
-        Expression::Call(call) => {
-            let argument_list = match call {
-                Call::Function(function_call) => &function_call.argument_list,
-                Call::Method(method_call) => &method_call.argument_list,
-                Call::NullSafeMethod(null_safe_method_call) => &null_safe_method_call.argument_list,
-                Call::StaticMethod(static_method_call) => &static_method_call.argument_list,
-            };
-
-            argument_list.arguments.len() < 2
-        }
+        Expression::Call(call) => call.get_argument_list().arguments.len() < 2,
         Expression::Instantiation(instantiation) => {
             instantiation.argument_list.as_ref().is_none_or(|argument_list| argument_list.arguments.len() < 2)
         }

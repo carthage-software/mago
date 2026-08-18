@@ -171,10 +171,51 @@ fn calculate_modifier_signature(modifiers: &Sequence<'_, Modifier<'_>>) -> u32 {
     sig
 }
 
-/// Detect alignment runs in a slice of class-like members.
-///
-/// Returns a list of runs where consecutive members of the same type can be aligned.
-/// Different member types (properties vs constants) break alignment runs.
+pub fn get_alignment(runs: &[AlignmentRun], index: usize) -> Option<AlignmentWidths> {
+    runs.iter().find(|run| run.contains(index)).map(|run| run.widths)
+}
+
+pub fn detect_alignment_runs<K>(
+    item_count: usize,
+    kind_of: impl Fn(usize) -> Option<K>,
+    extra_break: impl Fn(usize) -> bool,
+    widths_of: impl Fn(usize, usize, K) -> Option<AlignmentWidths>,
+) -> Vec<AlignmentRun>
+where
+    K: PartialEq + Copy,
+{
+    let mut runs = Vec::new();
+    let mut run_start: Option<(usize, K)> = None;
+
+    let flush = |runs: &mut Vec<AlignmentRun>, run_start: &mut Option<(usize, K)>, end: usize| {
+        if let Some((start, kind)) = run_start.take()
+            && end - start >= 2
+            && let Some(widths) = widths_of(start, end, kind)
+        {
+            runs.push(AlignmentRun::new(start, end, widths));
+        }
+    };
+
+    for i in 0..item_count {
+        let kind = kind_of(i);
+
+        let should_break_run = run_start.is_some_and(|(_, start_kind)| kind != Some(start_kind) || extra_break(i));
+        if should_break_run || kind.is_none() {
+            flush(&mut runs, &mut run_start, i);
+        }
+
+        if let Some(kind) = kind
+            && run_start.is_none()
+        {
+            run_start = Some((i, kind));
+        }
+    }
+
+    flush(&mut runs, &mut run_start, item_count);
+
+    runs
+}
+
 pub fn detect_class_member_alignment_runs<'arena, A>(
     f: &FormatterState<'_, 'arena, A>,
     members: &'arena [ClassLikeMember<'arena>],
@@ -186,34 +227,20 @@ where
         return Vec::new();
     }
 
-    let mut runs = Vec::new();
-    let mut run_start: Option<(usize, AlignableKind)> = None;
-
-    for (i, member) in members.iter().enumerate() {
-        let kind = match member {
-            ClassLikeMember::Property(prop) => {
-                if is_plain_property_with_default(prop) {
-                    Some(AlignableKind::PropertyWithDefault)
-                } else {
-                    None
-                }
+    detect_alignment_runs(
+        members.len(),
+        |i| match &members[i] {
+            ClassLikeMember::Property(prop) if is_plain_property_with_default(prop) => {
+                Some(AlignableKind::PropertyWithDefault)
             }
             ClassLikeMember::Constant(_) => Some(AlignableKind::ClassConstant),
-            ClassLikeMember::EnumCase(case) => {
-                if matches!(case.item, EnumCaseItem::Backed(_)) {
-                    Some(AlignableKind::EnumBackedCase)
-                } else {
-                    None
-                }
+            ClassLikeMember::EnumCase(case) if matches!(case.item, EnumCaseItem::Backed(_)) => {
+                Some(AlignableKind::EnumBackedCase)
             }
             _ => None,
-        };
-
-        let should_break_run = run_start.is_some_and(|(_start_idx, start_kind)| {
-            if kind != Some(start_kind) {
-                return true;
-            }
-
+        },
+        |i| {
+            let member = &members[i];
             if i > 0 {
                 let prev_span = members[i - 1].span();
                 let curr_span = member.span();
@@ -229,53 +256,10 @@ where
                 _ => false,
             };
 
-            if has_attributes {
-                return true;
-            }
-
-            if i > 0 && !have_compatible_modifiers(&members[i - 1], member) {
-                return true;
-            }
-
-            false
-        });
-
-        if should_break_run {
-            if let Some((start_idx, start_kind)) = run_start
-                && i - start_idx >= 2
-            {
-                let widths = calculate_class_member_widths(&members[start_idx..i], start_kind);
-                runs.push(AlignmentRun::new(start_idx, i, widths));
-            }
-            run_start = None;
-        }
-
-        if let Some(k) = kind {
-            if run_start.is_none() {
-                run_start = Some((i, k));
-            }
-        } else {
-            // Non-alignable member breaks any run
-            if let Some((start_idx, start_kind)) = run_start
-                && i - start_idx >= 2
-            {
-                let widths = calculate_class_member_widths(&members[start_idx..i], start_kind);
-                runs.push(AlignmentRun::new(start_idx, i, widths));
-            }
-            run_start = None;
-        }
-    }
-
-    // Flush any remaining run
-    if let Some((start_idx, start_kind)) = run_start {
-        let len = members.len();
-        if len - start_idx >= 2 {
-            let widths = calculate_class_member_widths(&members[start_idx..], start_kind);
-            runs.push(AlignmentRun::new(start_idx, len, widths));
-        }
-    }
-
-    runs
+            has_attributes || (i > 0 && !have_compatible_modifiers(&members[i - 1], member))
+        },
+        |start, end, kind| Some(calculate_class_member_widths(&members[start..end], kind)),
+    )
 }
 
 /// Calculate alignment widths for a slice of class-like members.
@@ -325,20 +309,6 @@ fn calculate_plain_property_widths(prop: &Property<'_>) -> (usize, usize) {
     }
 }
 
-/// Get alignment widths for a specific class member index.
-pub fn get_member_alignment(runs: &[AlignmentRun], index: usize) -> Option<AlignmentWidths> {
-    runs.iter().find(|run| run.contains(index)).map(|run| run.widths)
-}
-
-/// Get alignment widths for a specific statement index.
-pub fn get_statement_alignment(runs: &[AlignmentRun], index: usize) -> Option<AlignmentWidths> {
-    runs.iter().find(|run| run.contains(index)).map(|run| run.widths)
-}
-
-/// Detect alignment runs in a slice of statement references.
-///
-/// This is a variant of `detect_statement_alignment_runs` that works with
-/// `&[&Statement]` instead of `&[Statement]`.
 pub fn detect_statement_ref_alignment_runs<'arena, A>(
     f: &FormatterState<'_, 'arena, A>,
     statements: &[&'arena Statement<'arena>],
@@ -350,86 +320,40 @@ where
         return Vec::new();
     }
 
-    let mut runs = Vec::new();
-    let mut run_start: Option<(usize, AlignableKind)> = None;
-
-    for (i, stmt) in statements.iter().enumerate() {
-        let kind = match stmt {
-            Statement::Expression(expr_stmt) => {
-                if let Expression::Assignment(assign) = &expr_stmt.expression {
+    detect_alignment_runs(
+        statements.len(),
+        |i| match statements[i] {
+            Statement::Expression(expr_stmt) => match &expr_stmt.expression {
+                Expression::Assignment(assign)
                     if matches!(
                         assign.lhs,
                         Expression::Variable(_)
                             | Expression::Access(_)
                             | Expression::ArrayAccess(_)
                             | Expression::ArrayAppend(_)
-                    ) {
-                        Some(AlignableKind::VariableAssignment)
-                    } else {
-                        None
-                    }
-                } else {
-                    None
+                    ) =>
+                {
+                    Some(AlignableKind::VariableAssignment)
                 }
-            }
+                _ => None,
+            },
             Statement::Constant(_) => Some(AlignableKind::GlobalConstant),
             _ => None,
-        };
-
-        let should_break_run = run_start.is_some_and(|(_start_idx, start_kind)| {
-            if kind != Some(start_kind) {
-                return true;
+        },
+        |i| {
+            if i == 0 {
+                return false;
             }
 
-            if i > 0 {
-                let prev_span = statements[i - 1].span();
-                let curr_span = stmt.span();
-                if has_blank_line_between(f, prev_span, curr_span) || has_comment_between(f, prev_span, curr_span) {
-                    return true;
-                }
+            let prev_span = statements[i - 1].span();
+            let curr_span = statements[i].span();
 
-                if statement_breaks_alignment_run_after(f, statements[i - 1]) {
-                    return true;
-                }
-            }
-
-            false
-        });
-
-        if should_break_run {
-            if let Some((start_idx, start_kind)) = run_start
-                && i - start_idx >= 2
-            {
-                let widths = calculate_statement_ref_widths(f, &statements[start_idx..i], start_kind);
-                runs.push(AlignmentRun::new(start_idx, i, widths));
-            }
-            run_start = None;
-        }
-
-        if let Some(k) = kind {
-            if run_start.is_none() {
-                run_start = Some((i, k));
-            }
-        } else {
-            if let Some((start_idx, start_kind)) = run_start
-                && i - start_idx >= 2
-            {
-                let widths = calculate_statement_ref_widths(f, &statements[start_idx..i], start_kind);
-                runs.push(AlignmentRun::new(start_idx, i, widths));
-            }
-            run_start = None;
-        }
-    }
-
-    if let Some((start_idx, start_kind)) = run_start {
-        let len = statements.len();
-        if len - start_idx >= 2 {
-            let widths = calculate_statement_ref_widths(f, &statements[start_idx..], start_kind);
-            runs.push(AlignmentRun::new(start_idx, len, widths));
-        }
-    }
-
-    runs
+            has_blank_line_between(f, prev_span, curr_span)
+                || has_comment_between(f, prev_span, curr_span)
+                || statement_breaks_alignment_run_after(f, statements[i - 1])
+        },
+        |start, end, kind| Some(calculate_statement_ref_widths(f, &statements[start..end], kind)),
+    )
 }
 
 /// Calculate alignment widths for a slice of statement references.

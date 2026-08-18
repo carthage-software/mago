@@ -22,6 +22,8 @@ use crate::internal::FormatterState;
 use crate::internal::format::Format;
 use crate::internal::format::alignment::AlignmentRun;
 use crate::internal::format::alignment::AlignmentWidths;
+use crate::internal::format::alignment::detect_alignment_runs;
+use crate::internal::format::alignment::get_alignment;
 use crate::internal::format::alignment::has_blank_line_between;
 use crate::internal::format::alignment::has_comment_between;
 use crate::internal::format::assignment::AssignmentAlignment;
@@ -203,7 +205,7 @@ where
                 let element_span = element.span();
 
                 // Set alignment context if this element is in an alignment run
-                if let Some(widths) = get_array_element_alignment(&kv_alignment_runs, i) {
+                if let Some(widths) = get_alignment(&kv_alignment_runs, i) {
                     let alignment = calculate_array_element_alignment(element, &widths, group_id);
                     f.set_alignment_context(Some(alignment));
                 }
@@ -311,20 +313,8 @@ where
                 value,
             ])))
         }
-        ArrayElement::Value(element) => {
-            if is_expandable_expression(element.value, true) {
-                Some(element.format(f))
-            } else {
-                None
-            }
-        }
-        ArrayElement::Variadic(element) => {
-            if is_expandable_expression(element.value, true) {
-                Some(element.format(f))
-            } else {
-                None
-            }
-        }
+        ArrayElement::Value(element) => is_expandable_expression(element.value, true).then(|| element.format(f)),
+        ArrayElement::Variadic(element) => is_expandable_expression(element.value, true).then(|| element.format(f)),
         ArrayElement::Missing(_) => None,
     }
 }
@@ -670,63 +660,21 @@ where
         return std::vec::Vec::new();
     }
 
-    let mut runs = std::vec::Vec::new();
-    let mut run_start: Option<usize> = None;
-
-    for (i, element) in elements.iter().enumerate() {
-        let is_key_value = matches!(element, ArrayElement::KeyValue(_));
-
-        let should_break_run = run_start.is_some_and(|_start_idx| {
-            if !is_key_value {
-                return true;
+    detect_alignment_runs(
+        elements.len(),
+        |i| matches!(elements[i], ArrayElement::KeyValue(_)).then_some(()),
+        |i| {
+            if i == 0 {
+                return false;
             }
 
-            if i > 0 {
-                let prev_span = elements[i - 1].span();
-                let curr_span = element.span();
-                if has_blank_line_between(f, prev_span, curr_span) || has_comment_between(f, prev_span, curr_span) {
-                    return true;
-                }
-            }
+            let prev_span = elements[i - 1].span();
+            let curr_span = elements[i].span();
 
-            false
-        });
-
-        if should_break_run {
-            if let Some(start_idx) = run_start
-                && i - start_idx >= 2
-                && let Some(widths) = calculate_array_element_widths(f, &elements[start_idx..i])
-            {
-                runs.push(AlignmentRun::new(start_idx, i, widths));
-            }
-            run_start = None;
-        }
-
-        if is_key_value {
-            if run_start.is_none() {
-                run_start = Some(i);
-            }
-        } else {
-            if let Some(start_idx) = run_start
-                && i - start_idx >= 2
-                && let Some(widths) = calculate_array_element_widths(f, &elements[start_idx..i])
-            {
-                runs.push(AlignmentRun::new(start_idx, i, widths));
-            }
-            run_start = None;
-        }
-    }
-
-    if let Some(start_idx) = run_start {
-        let len = elements.len();
-        if len - start_idx >= 2
-            && let Some(widths) = calculate_array_element_widths(f, &elements[start_idx..])
-        {
-            runs.push(AlignmentRun::new(start_idx, len, widths));
-        }
-    }
-
-    runs
+            has_blank_line_between(f, prev_span, curr_span) || has_comment_between(f, prev_span, curr_span)
+        },
+        |start, end, ()| calculate_array_element_widths(f, &elements[start..end]),
+    )
 }
 
 fn calculate_array_element_widths<A>(
@@ -783,10 +731,6 @@ where
 
 fn get_expression_span_width(expr: &Expression<'_>) -> usize {
     (expr.end_offset() - expr.start_offset()) as usize
-}
-
-fn get_array_element_alignment(runs: &[AlignmentRun], index: usize) -> Option<AlignmentWidths> {
-    runs.iter().find(|run| run.contains(index)).map(|run| run.widths)
 }
 
 fn calculate_array_element_alignment(

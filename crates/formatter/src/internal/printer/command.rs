@@ -73,9 +73,4 @@ where
     pub fn new(indent: Indentation<'arena>, mode: Mode, document: Document<'arena, A>) -> Self {
         Self { indentation: indent, mode, document }
     }
-
-    pub fn with_mode(mut self, mode: Mode) -> Self {
-        self.mode = mode;
-        self
-    }
 }

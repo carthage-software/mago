@@ -38,7 +38,6 @@ where
     /// This is an alternative type of group which behaves like text layout:
     /// it's going to add a break whenever the next element doesn't fit in the line anymore.
     /// The difference with `group` is that it's not going to break all the separators, just the ones that are at the end of lines.
-    Fill(Fill<'arena, A>),
     /// Include this anywhere to force all parent groups to break.
     BreakParent,
     Align(Align<'arena, A>),
@@ -112,14 +111,6 @@ where
     pub contents: Vec<'arena, Document<'arena, A>, A>,
 }
 
-#[derive(Debug, Eq, PartialEq, PartialOrd, Ord)]
-pub struct Fill<'arena, A>
-where
-    A: Arena,
-{
-    pub parts: Vec<'arena, Document<'arena, A>, A>,
-}
-
 #[derive(Debug, Eq, PartialEq, PartialOrd, Ord, Copy, Clone)]
 pub struct IfBreak<'arena, A>
 where
@@ -132,8 +123,6 @@ where
 
 #[derive(Clone, Copy)]
 pub enum Separator {
-    #[allow(unused)]
-    SoftLine,
     HardLine,
     LiteralLine,
     CommaLine,     // [",", line]
@@ -169,12 +158,6 @@ impl Space {
     #[must_use]
     pub fn soft() -> Self {
         Self { soft: true }
-    }
-
-    /// Specify a space that is "hard" and will always be printed.
-    #[must_use]
-    pub fn hard() -> Self {
-        Self { soft: false }
     }
 }
 
@@ -215,31 +198,6 @@ where
     #[must_use]
     pub fn new(group_id: GroupIdentifier, contents: Vec<'arena, Document<'arena, A>, A>) -> Self {
         Self { group_id, contents }
-    }
-}
-
-impl<'arena, A> Fill<'arena, A>
-where
-    A: Arena,
-{
-    pub fn drain_out_pair(&mut self) -> (Option<Document<'arena, A>>, Option<Document<'arena, A>>) {
-        let content = if self.parts.is_empty() { None } else { Some(self.parts.remove(0)) };
-        let whitespace = if self.parts.is_empty() { None } else { Some(self.parts.remove(0)) };
-
-        (content, whitespace)
-    }
-
-    pub fn dequeue(&mut self) -> Option<Document<'arena, A>> {
-        if self.parts.is_empty() { None } else { Some(self.parts.remove(0)) }
-    }
-
-    pub fn enqueue(&mut self, doc: Document<'arena, A>) {
-        self.parts.insert(0, doc);
-    }
-
-    #[must_use]
-    pub fn parts(&self) -> &[Document<'arena, A>] {
-        &self.parts
     }
 }
 
@@ -308,7 +266,6 @@ where
             Document::IfBreak(IfBreak { break_contents, flat_content, .. }) => {
                 predicate(break_contents) || predicate(flat_content)
             }
-            Document::Fill(fill) => fill.parts.iter().any(predicate),
             _ => false,
         }
     }
@@ -323,7 +280,6 @@ where
             if i != 0 {
                 parts.push(match separator {
                     Separator::Space => Document::String(b" "),
-                    Separator::SoftLine => Document::Line(Line::soft()),
                     Separator::HardLine => Document::Line(Line::hard()),
                     Separator::CommaSpace => Document::String(b", "),
                     Separator::LiteralLine => {
@@ -393,7 +349,6 @@ where
             expanded_states: g.expanded_states.as_ref().map(|v| clone_vec_in_arena(arena, v)),
             id: g.id,
         }),
-        Document::Fill(f) => Document::Fill(Fill { parts: clone_vec_in_arena(arena, &f.parts) }),
         Document::Align(a) => {
             Document::Align(Align { alignment: a.alignment, contents: clone_vec_in_arena(arena, &a.contents) })
         }
@@ -541,11 +496,6 @@ where
                 buffer.push('}');
             }
 
-            buffer.push(')');
-        }
-        Document::Fill(Fill { parts }) => {
-            buffer.push_str("fill(");
-            write_documents_vec_to_buffer(&mut buffer, arena, parts);
             buffer.push(')');
         }
         Document::BreakParent => buffer.push_str("breakParent"),

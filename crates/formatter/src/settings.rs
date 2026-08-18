@@ -1,5 +1,4 @@
 use std::ops::Deref;
-use std::str::FromStr;
 
 use crate::presets::FormatterPreset;
 use schemars::JsonSchema;
@@ -1376,12 +1375,6 @@ impl BraceStyle {
     pub fn is_next_line(&self) -> bool {
         *self == Self::NextLine
     }
-
-    #[inline]
-    #[must_use]
-    pub fn is_always_next_line(&self) -> bool {
-        *self == Self::AlwaysNextLine
-    }
 }
 
 impl MethodChainBreakingStyle {
@@ -1401,20 +1394,6 @@ impl EndOfLine {
             Self::Cr => "\r",
             Self::Lf | Self::Auto => "\n",
         }
-    }
-}
-
-impl FromStr for EndOfLine {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        Ok(match s {
-            "crlf" => Self::Crlf,
-            "cr" => Self::Cr,
-            "auto" => Self::Auto,
-            "lf" => Self::Lf,
-            _ => Self::default(),
-        })
     }
 }
 

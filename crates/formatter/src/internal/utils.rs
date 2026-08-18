@@ -163,7 +163,6 @@ where
         | Document::LineSuffix(contents)
         | Document::IndentIfBreak(IndentIfBreak { contents, .. })
         | Document::Align(Align { contents, .. }) => check_array(contents),
-        Document::Fill(doc) => check_array(&doc.parts),
         _ => false,
     }
 }

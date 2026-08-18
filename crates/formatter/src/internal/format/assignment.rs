@@ -283,13 +283,6 @@ where
         }
     }
 
-    if let Expression::Binary(Binary { lhs, rhs, .. }) = rhs_expression
-        && is_member_chain_or_single_arg_call(f, lhs)
-        && is_simple_expression(rhs)
-    {
-        return Layout::NeverBreakAfterOperator;
-    }
-
     let can_break_left_doc = lhs.can_break();
     if is_complex_destructuring(assignment_like_node)
         || (is_arrow_function_variable_declarator(assignment_like_node) && can_break_left_doc)
@@ -488,16 +481,6 @@ where
 
     if has_short_key {
         return false;
-    }
-
-    let mut current_expression = rhs_expression;
-    loop {
-        current_expression = match current_expression {
-            Expression::UnaryPrefix(operation) => operation.operand,
-            _ => {
-                break;
-            }
-        };
     }
 
     if is_poorly_breakable_member_or_call_chain(f, rhs_expression) {

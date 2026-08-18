@@ -1,5 +1,4 @@
 use mago_allocator::vec_in;
-use std::cmp::Ordering;
 
 use mago_allocator::Arena;
 use mago_allocator::CollectIn;
@@ -11,16 +10,10 @@ use mago_syntax::cst::ClosingTag;
 use mago_syntax::cst::Constant;
 use mago_syntax::cst::Declare;
 use mago_syntax::cst::DeclareBody;
-use mago_syntax::cst::Echo;
-use mago_syntax::cst::ExpressionStatement;
-use mago_syntax::cst::Global;
-use mago_syntax::cst::Goto;
 use mago_syntax::cst::MaybeTypedUseItem;
 use mago_syntax::cst::Sequence;
 use mago_syntax::cst::Statement;
-use mago_syntax::cst::Static;
 use mago_syntax::cst::Terminator;
-use mago_syntax::cst::Unset;
 use mago_syntax::cst::Use;
 use mago_syntax::cst::UseItem;
 use mago_syntax::cst::UseItems;
@@ -39,9 +32,10 @@ use crate::internal::comment::CommentFlags;
 use crate::internal::format::Format;
 use crate::internal::format::alignment::AlignmentWidths;
 use crate::internal::format::alignment::detect_statement_ref_alignment_runs;
-use crate::internal::format::alignment::get_statement_alignment;
+use crate::internal::format::alignment::get_alignment;
 use crate::internal::format::alignment::has_comment_between;
 use crate::internal::format::assignment::AssignmentAlignment;
+use crate::internal::format::misc::compare_case_insensitive_bytes;
 use crate::internal::format::misc::has_new_line_in_range;
 use crate::settings::SortOrder;
 
@@ -160,7 +154,7 @@ where
             }
         }
 
-        if let Some(widths) = get_statement_alignment(&alignment_runs, i) {
+        if let Some(widths) = get_alignment(&alignment_runs, i) {
             let alignment = calculate_statement_alignment(f, stmt, &widths);
             f.set_alignment_context(Some(alignment));
         }
@@ -410,13 +404,7 @@ where
 
     let mut should_add_space = false;
     let should_add_line = match stmt {
-        Statement::HaltCompiler(_) | Statement::ClosingTag(_) | Statement::Inline(_) => false,
-        Statement::Expression(ExpressionStatement { terminator: Terminator::ClosingTag(_), .. }) => false,
-        Statement::Echo(Echo { terminator: Terminator::ClosingTag(_), .. }) => false,
-        Statement::Global(Global { terminator: Terminator::ClosingTag(_), .. }) => false,
-        Statement::Static(Static { terminator: Terminator::ClosingTag(_), .. }) => false,
-        Statement::Unset(Unset { terminator: Terminator::ClosingTag(_), .. }) => false,
-        Statement::Goto(Goto { terminator: Terminator::ClosingTag(_), .. }) => false,
+        Statement::Inline(_) => false,
         Statement::Constant(Constant { terminator: Terminator::ClosingTag(_), .. }) => false,
         Statement::Declare(Declare { body, .. }) => match body {
             DeclareBody::Statement(statement) => {
@@ -582,25 +570,6 @@ where
         bytes.extend_from_slice(name);
 
         bytes.leak()
-    }
-
-    fn compare_case_insensitive_bytes(a: &[u8], b: &[u8]) -> Ordering {
-        let mut a_iter = a.iter().map(u8::to_ascii_lowercase);
-        let mut b_iter = b.iter().map(u8::to_ascii_lowercase);
-
-        loop {
-            match (a_iter.next(), b_iter.next()) {
-                (Some(ac), Some(bc)) => {
-                    let ord = ac.cmp(&bc);
-                    if ord != Ordering::Equal {
-                        return ord;
-                    }
-                }
-                (Some(_), None) => return Ordering::Greater,
-                (None, Some(_)) => return Ordering::Less,
-                (None, None) => return Ordering::Equal,
-            }
-        }
     }
 
     let sort_uses = *f.settings.sort_uses;

@@ -1,4 +1,5 @@
 use mago_allocator::Arena;
+use mago_allocator::vec::Vec;
 use mago_allocator::vec_in;
 use mago_span::HasSpan;
 use mago_syntax::cst::Break;
@@ -22,6 +23,7 @@ use mago_syntax::cst::IfColonDelimitedBodyElseIfClause;
 use mago_syntax::cst::IfStatementBody;
 use mago_syntax::cst::IfStatementBodyElseClause;
 use mago_syntax::cst::IfStatementBodyElseIfClause;
+use mago_syntax::cst::Sequence;
 use mago_syntax::cst::Statement;
 use mago_syntax::cst::Switch;
 use mago_syntax::cst::SwitchBody;
@@ -31,6 +33,7 @@ use mago_syntax::cst::SwitchCaseSeparator;
 use mago_syntax::cst::SwitchColonDelimitedBody;
 use mago_syntax::cst::SwitchDefaultCase;
 use mago_syntax::cst::SwitchExpressionCase;
+use mago_syntax::cst::Terminator;
 use mago_syntax::cst::While;
 use mago_syntax::cst::WhileBody;
 use mago_syntax::cst::WhileColonDelimitedBody;
@@ -88,7 +91,7 @@ where
 {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena, A>) -> Document<'arena, A> {
         wrap!(f, self, IfStatementBody, {
-            let mut parts = vec_in![f.arena; misc::print_clause(f, self.statement, false)];
+            let mut parts = vec_in![f.arena; misc::print_clause(f, self.statement)];
 
             for else_if_clause in &self.else_if_clauses {
                 parts.push(else_if_clause.format(f));
@@ -109,9 +112,7 @@ where
 {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena, A>) -> Document<'arena, A> {
         wrap!(f, self, IfStatementBodyElseClause, {
-            Document::Group(Group::new(
-                vec_in![f.arena; self.r#else.format(f), misc::print_clause(f, self.statement, false)],
-            ))
+            Document::Group(Group::new(vec_in![f.arena; self.r#else.format(f), misc::print_clause(f, self.statement)]))
         })
     }
 }
@@ -130,7 +131,7 @@ where
                     self.condition,
                     self.right_parenthesis,
                 ),
-                misc::print_clause(f, self.statement, false),
+                misc::print_clause(f, self.statement),
             ]))
         })
     }
@@ -261,7 +262,7 @@ where
         wrap!(f, self, DoWhile, {
             Document::Group(Group::new(vec_in![f.arena;
                 self.r#do.format(f),
-                misc::print_clause(f, self.statement, false),
+                misc::print_clause(f, self.statement),
                 self.r#while.format(f),
                 misc::print_condition(
                     f,
@@ -299,7 +300,7 @@ where
                 };
 
                 let first = first.format(f);
-                let rest = exprs[1..].iter().map(|expression| expression.format(f)).collect::<Vec<_>>();
+                let rest = exprs[1..].iter().map(|expression| expression.format(f)).collect::<std::vec::Vec<_>>();
 
                 if rest.is_empty() {
                     first
@@ -360,7 +361,7 @@ where
                 ForBody::Statement(s) => {
                     let stmt = s.format(f);
 
-                    misc::adjust_clause(f, s, stmt, false)
+                    misc::adjust_clause(f, s, stmt)
                 }
                 ForBody::ColonDelimited(b) => b.format(f),
             }
@@ -470,6 +471,21 @@ where
     }
 }
 
+fn push_indented_case_statements<'arena, A>(
+    f: &mut FormatterState<'_, 'arena, A>,
+    parts: &mut Vec<'arena, Document<'arena, A>, A>,
+    statements: &'arena Sequence<'arena, Statement<'arena>>,
+) where
+    A: Arena,
+{
+    let mut printed = print_statement_sequence(f, statements);
+    if !printed.is_empty() {
+        printed.insert(0, Document::Line(Line::hard()));
+
+        parts.push(Document::Indent(printed));
+    }
+}
+
 impl<'arena, A> Format<'arena, A> for SwitchExpressionCase<'arena>
 where
     A: Arena,
@@ -478,12 +494,7 @@ where
         wrap!(f, self, SwitchExpressionCase, {
             let mut parts = vec_in![f.arena; self.case.format(f), Document::space(), self.expression.format(f), self.separator.format(f)];
 
-            let mut statements = print_statement_sequence(f, &self.statements);
-            if !statements.is_empty() {
-                statements.insert(0, Document::Line(Line::hard()));
-
-                parts.push(Document::Indent(statements));
-            }
+            push_indented_case_statements(f, &mut parts, &self.statements);
 
             Document::Group(Group::new(parts))
         })
@@ -497,12 +508,7 @@ where
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena, A>) -> Document<'arena, A> {
         wrap!(f, self, SwitchDefaultCase, {
             let mut parts = vec_in![f.arena; self.default.format(f), self.separator.format(f)];
-            let mut statements = print_statement_sequence(f, &self.statements);
-            if !statements.is_empty() {
-                statements.insert(0, Document::Line(Line::hard()));
-
-                parts.push(Document::Indent(statements));
-            }
+            push_indented_case_statements(f, &mut parts, &self.statements);
 
             Document::Group(Group::new(parts))
         })
@@ -550,7 +556,7 @@ where
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena, A>) -> Document<'arena, A> {
         wrap!(f, self, WhileBody, {
             match self {
-                WhileBody::Statement(s) => misc::print_clause(f, s, false),
+                WhileBody::Statement(s) => misc::print_clause(f, s),
                 WhileBody::ColonDelimited(b) => b.format(f),
             }
         })
@@ -637,7 +643,7 @@ where
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena, A>) -> Document<'arena, A> {
         wrap!(f, self, ForeachBody, {
             match self {
-                ForeachBody::Statement(s) => misc::print_clause(f, s, false),
+                ForeachBody::Statement(s) => misc::print_clause(f, s),
                 ForeachBody::ColonDelimited(b) => b.format(f),
             }
         })
@@ -655,21 +661,35 @@ where
     }
 }
 
+fn print_jump_statement<'arena, A>(
+    f: &mut FormatterState<'_, 'arena, A>,
+    keyword: Document<'arena, A>,
+    level: Option<&'arena Expression<'arena>>,
+    terminator: &'arena Terminator<'arena>,
+) -> Document<'arena, A>
+where
+    A: Arena,
+{
+    Document::Group(Group::new(vec_in![f.arena;
+        keyword,
+        if let Some(level) = level {
+            Document::Array(vec_in![f.arena; Document::space(), level.format(f)])
+        } else {
+            Document::empty()
+        },
+        terminator.format(f),
+    ]))
+}
+
 impl<'arena, A> Format<'arena, A> for Continue<'arena>
 where
     A: Arena,
 {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena, A>) -> Document<'arena, A> {
         wrap!(f, self, Continue, {
-            Document::Group(Group::new(vec_in![f.arena;
-                self.r#continue.format(f),
-                if let Some(level) = &self.level {
-                    Document::Array(vec_in![f.arena; Document::space(), level.format(f)])
-                } else {
-                    Document::empty()
-                },
-                self.terminator.format(f),
-            ]))
+            let keyword = self.r#continue.format(f);
+
+            print_jump_statement(f, keyword, self.level, &self.terminator)
         })
     }
 }
@@ -680,15 +700,9 @@ where
 {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena, A>) -> Document<'arena, A> {
         wrap!(f, self, Break, {
-            Document::Group(Group::new(vec_in![f.arena;
-                self.r#break.format(f),
-                if let Some(level) = &self.level {
-                    Document::Array(vec_in![f.arena; Document::space(), level.format(f)])
-                } else {
-                    Document::empty()
-                },
-                self.terminator.format(f),
-            ]))
+            let keyword = self.r#break.format(f);
+
+            print_jump_statement(f, keyword, self.level, &self.terminator)
         })
     }
 }

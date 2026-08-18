@@ -26,7 +26,7 @@ use crate::internal::FormatterState;
 use crate::internal::format::Format;
 use crate::internal::format::alignment::AlignmentWidths;
 use crate::internal::format::alignment::detect_class_member_alignment_runs;
-use crate::internal::format::alignment::get_member_alignment;
+use crate::internal::format::alignment::get_alignment;
 use crate::internal::format::assignment::AssignmentAlignment;
 use crate::internal::format::block::block_is_empty;
 use crate::settings::BraceStyle;
@@ -177,7 +177,7 @@ where
                     members.push(Document::Line(Line::hard()));
                 }
 
-                if let Some(widths) = get_member_alignment(&alignment_runs, i) {
+                if let Some(widths) = get_alignment(&alignment_runs, i) {
                     let alignment = calculate_member_alignment(item, &widths);
                     f.set_alignment_context(Some(alignment));
                 }
@@ -278,21 +278,15 @@ where
 
 #[inline]
 fn should_add_empty_line_before<A>(
-    f: &mut FormatterState<'_, '_, A>,
+    f: &FormatterState<'_, '_, A>,
     class_like_member_kind: ClassLikeMemberKind,
     last_class_like_member_kind: Option<ClassLikeMemberKind>,
 ) -> bool
 where
     A: Arena,
 {
-    if let Some(last_member_kind) = last_class_like_member_kind
-        && last_member_kind != class_like_member_kind
-        && f.settings.separate_class_like_members
-    {
-        true
-    } else {
-        false
-    }
+    f.settings.separate_class_like_members
+        && last_class_like_member_kind.is_some_and(|last_member_kind| last_member_kind != class_like_member_kind)
 }
 
 #[inline]
