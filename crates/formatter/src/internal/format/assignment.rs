@@ -1,5 +1,4 @@
 use mago_allocator::Arena;
-use mago_allocator::vec::Vec;
 use mago_allocator::vec_in;
 
 use mago_span::HasSpan;
@@ -36,6 +35,7 @@ use crate::internal::format::binaryish::should_inline_binary_expression;
 use crate::internal::format::member_access::collect_member_access_chain;
 use crate::internal::format::misc::is_breaking_expression;
 use crate::internal::format::misc::is_simple_expression;
+use crate::internal::utils;
 use crate::internal::utils::string_width;
 use crate::internal::utils::unwrap_parenthesized;
 
@@ -100,19 +100,6 @@ enum Layout {
     Fluid,
 }
 
-pub(super) fn print_assignment<'arena, A>(
-    f: &mut FormatterState<'_, 'arena, A>,
-    assignment_node: AssignmentLikeNode<'arena>,
-    lhs: Document<'arena, A>,
-    operator: Document<'arena, A>,
-    rhs_expression: &'arena Expression<'arena>,
-) -> Document<'arena, A>
-where
-    A: Arena,
-{
-    print_assignment_with_alignment(f, assignment_node, lhs, operator, rhs_expression, None)
-}
-
 pub(super) fn print_assignment_with_alignment<'arena, A>(
     f: &mut FormatterState<'_, 'arena, A>,
     assignment_node: AssignmentLikeNode<'arena>,
@@ -134,9 +121,7 @@ where
         f.set_alignment_context(outer_alignment);
 
         let padding = if align.name_padding > 0 {
-            let mut spaces = Vec::with_capacity_in(align.name_padding, f.arena);
-            spaces.resize(align.name_padding, b' ');
-            let spaces = Document::String(spaces.leak());
+            let spaces = Document::String(utils::spaces(f.arena, align.name_padding));
 
             if let Some(group_id) = align.break_group_id {
                 Document::IfBreak(IfBreak::new(f.arena, spaces, Document::empty()).with_id(group_id))

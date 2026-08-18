@@ -1048,7 +1048,7 @@ where
                 if let Some(alignment) = f.alignment_context()
                     && alignment.type_padding > 0
                 {
-                    contents.push(Document::String(f.as_str(" ".repeat(alignment.type_padding))));
+                    contents.push(Document::String(utils::spaces(f.arena, alignment.type_padding)));
                 }
 
                 should_add_space = true;
@@ -1991,9 +1991,7 @@ where
                 (f.parameter_state.variable_padding, f.parameter_state.list_group_id)
                 && padding > 0
             {
-                let mut spaces = Vec::with_capacity_in(padding, f.arena);
-                spaces.resize(padding, b' ');
-                let spaces = Document::String(spaces.leak());
+                let spaces = Document::String(utils::spaces(f.arena, padding));
                 contents.push(Document::IfBreak(IfBreak::new(f.arena, spaces, Document::empty()).with_id(list_id)));
             }
 

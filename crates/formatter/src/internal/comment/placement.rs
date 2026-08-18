@@ -92,10 +92,6 @@ impl Comments {
         self.placed.get(index).copied().flatten() == Some(Placement::Leading)
     }
 
-    pub fn is_placed_trailing(&self, index: usize) -> bool {
-        self.placed.get(index).copied().flatten() == Some(Placement::Trailing)
-    }
-
     fn mark_placed(&mut self, index: usize, placement: Placement) {
         if let Some(v) = self.placed.get_mut(index) {
             *v = Some(placement);

@@ -236,11 +236,6 @@ where
     }
 
     #[inline]
-    fn as_str(&self, string: impl AsRef<str>) -> &'arena [u8] {
-        self.arena.alloc_str(string.as_ref()).as_bytes()
-    }
-
-    #[inline]
     fn enter_node(&mut self, node: Node<'arena, 'arena>) {
         self.stack.push(node);
     }
@@ -493,36 +488,9 @@ where
 
     #[inline]
     fn split_lines(&self, slice: &'arena [u8]) -> BumpVec<'arena, &'arena [u8], A> {
-        let mut lines = BumpVec::new_in(self.arena);
-        let mut remaining = slice;
-
-        while !remaining.is_empty() {
-            // find the earliest line terminator: \r\n, \n, or bare \r
-            let next_break = remaining.iter().enumerate().find_map(|(i, &b)| {
-                if b == b'\r' {
-                    // check for \r\n (CRLF) — consume both bytes
-                    if remaining.get(i + 1) == Some(&b'\n') {
-                        Some((i, 2))
-                    } else {
-                        // bare \r — still a line terminator
-                        Some((i, 1))
-                    }
-                } else if b == b'\n' {
-                    Some((i, 1))
-                } else {
-                    None
-                }
-            });
-
-            if let Some((pos, skip)) = next_break {
-                lines.push(&remaining[..pos]);
-                remaining = &remaining[pos + skip..];
-            } else {
-                if !remaining.is_empty() {
-                    lines.push(remaining);
-                }
-                break;
-            }
+        let mut lines = utils::split_any_newline(slice).collect_in::<BumpVec<'arena, _, A>>(self.arena);
+        if lines.last().is_some_and(|line| line.is_empty()) {
+            lines.pop();
         }
 
         lines

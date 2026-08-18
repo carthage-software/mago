@@ -3,6 +3,7 @@ use mago_allocator::vec::Vec;
 use mago_allocator::vec_in;
 use mago_database::file::HasFileId;
 use mago_span::HasSpan;
+use mago_span::Position;
 use mago_span::Span;
 use mago_syntax::cst::Access;
 use mago_syntax::cst::Argument;
@@ -418,34 +419,10 @@ where
             accesses_len -= 1; // First access is inline, so we don't count it for broken links
         }
 
-        let mut broken_links = 0;
-        if let Some(first_access) = self.accesses.first() {
-            let base_end = self.base.span().end;
-            let first_op_start = first_access.get_operator_span().start;
-
-            if misc::has_new_line_in_range(f.source_text, base_end.offset, first_op_start.offset) {
-                broken_links += 1;
-            }
-        }
-
-        for (i, access) in self.accesses.iter().enumerate() {
-            if i == 0 {
-                continue; // Skip the first access since we need previous selector
-            }
-
-            let prev_access = &self.accesses[i - 1];
-            let prev_selector = prev_access.get_selector();
-            let prev_selector_end = match prev_access.get_arguments_list() {
-                Some(args) => args.span().end,
-                None => prev_selector.span().end,
-            };
-
-            let current_op_span = access.get_operator_span();
-
-            if misc::has_new_line_in_range(f.source_text, prev_selector_end.offset, current_op_span.start_offset()) {
-                broken_links += 1;
-            }
-        }
+        let broken_links = self
+            .link_gaps()
+            .filter(|(start, end)| misc::has_new_line_in_range(f.source_text, start.offset, end.offset))
+            .count();
 
         if broken_links == 0 {
             return false;
@@ -463,50 +440,32 @@ where
         true
     }
 
-    #[inline]
-    fn has_comments_in_chain(&self, f: &FormatterState<'_, '_, A>) -> bool {
-        // Check if there are comments after the base expression
-        if let Some(first_access) = self.accesses.first() {
-            let base_end = self.base.span().end;
-            let first_op_start = first_access.get_operator_span().start;
+    fn link_gaps(&self) -> impl Iterator<Item = (Position, Position)> + '_ {
+        let first = self.accesses.first().map(|access| (self.base.span().end, access.get_operator_span().start));
 
-            // Check for comments between base and first operator
-            if f.has_inner_comment(Span::new(f.file_id(), base_end, first_op_start)) {
-                return true;
-            }
-        }
-
-        // Check for comments between chain elements
-        for (i, access) in self.accesses.iter().enumerate() {
-            if i == 0 {
-                continue; // Skip the first access as we already checked between base and it
-            }
-
-            let prev_access = &self.accesses[i - 1];
-            let prev_selector = prev_access.get_selector();
-            let prev_span = match prev_access.get_arguments_list() {
-                Some(args) => args.span(),
-                None => prev_selector.span(),
+        first.into_iter().chain(self.accesses.windows(2).map(|pair| {
+            let end = match pair[0].get_arguments_list() {
+                Some(arguments) => arguments.span().end,
+                None => pair[0].get_selector().span().end,
             };
 
-            let current_op_start = access.get_operator_span().start;
+            (end, pair[1].get_operator_span().start)
+        }))
+    }
 
-            // Check for comments between previous selector/args and current operator
-            if f.has_inner_comment(Span::new(prev_span.file_id, prev_span.end, current_op_start)) {
-                return true;
-            }
+    #[inline]
+    fn has_comments_in_chain(&self, f: &FormatterState<'_, '_, A>) -> bool {
+        if self.link_gaps().any(|(start, end)| f.has_inner_comment(Span::new(f.file_id(), start, end))) {
+            return true;
+        }
 
-            // Check for comments between operator and selector
-            if f.has_inner_comment(Span::new(
+        self.accesses.iter().skip(1).any(|access| {
+            f.has_inner_comment(Span::new(
                 access.get_operator_span().file_id,
                 access.get_operator_span().end_position(),
                 access.get_selector().span().start_position(),
-            )) {
-                return true;
-            }
-        }
-
-        false
+            ))
+        })
     }
 
     /// Checks if any method call in the chain has arguments that will force the chain to break.
@@ -1035,21 +994,9 @@ where
 
     if f.settings.preserve_breaking_member_access_chain
         && member_access_chain.is_first_link_object_method_call()
-        && member_access_chain.is_first_link_already_broken(f)
-    {
-        return false;
-    }
-
-    if f.settings.preserve_breaking_member_access_chain
-        && member_access_chain.is_first_link_object_method_call()
-        && member_access_chain.has_break_after_first_access(f)
-    {
-        return false;
-    }
-
-    if f.settings.preserve_breaking_member_access_chain
-        && member_access_chain.is_first_link_object_method_call()
-        && member_access_chain.exceeds_print_width(f)
+        && (member_access_chain.is_first_link_already_broken(f)
+            || member_access_chain.has_break_after_first_access(f)
+            || member_access_chain.exceeds_print_width(f))
     {
         return false;
     }

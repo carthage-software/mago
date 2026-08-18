@@ -583,27 +583,8 @@ where
 
     if sort_uses != SortOrder::Preserve {
         all_expanded_items.sort_by(|a, b| {
-            let a_type_order = match a.use_type {
-                None => 0,
-                Some(ty) => {
-                    if ty.is_function() {
-                        1
-                    } else {
-                        2
-                    }
-                }
-            };
-
-            let b_type_order = match b.use_type {
-                None => 0,
-                Some(ty) => {
-                    if ty.is_function() {
-                        1
-                    } else {
-                        2
-                    }
-                }
-            };
+            let a_type_order = use_type_order(a.use_type);
+            let b_type_order = use_type_order(b.use_type);
 
             if a_type_order != b_type_order {
                 return a_type_order.cmp(&b_type_order);
@@ -630,19 +611,11 @@ where
 
     let mut grouped_items: Vec<Vec<ExpandedUseItem<'arena>>> = Vec::new();
     if should_separate {
-        #[derive(PartialEq, Eq)]
-        enum UseTypeDiscriminant {
-            Function,
-            Const,
-        }
-
         let mut current_group: Vec<ExpandedUseItem<'arena>> = Vec::new();
-        let mut current_type: Option<UseTypeDiscriminant> = None;
+        let mut current_type: Option<u8> = None;
 
         for item in all_expanded_items {
-            let item_type = item
-                .use_type
-                .map(|ty| if ty.is_function() { UseTypeDiscriminant::Function } else { UseTypeDiscriminant::Const });
+            let item_type = Some(use_type_order(item.use_type));
 
             if current_type != item_type {
                 if !current_group.is_empty() {
@@ -706,6 +679,14 @@ where
     result_docs
 }
 
+fn use_type_order(use_type: Option<&UseType<'_>>) -> u8 {
+    match use_type {
+        None => 0,
+        Some(ty) if ty.is_function() => 1,
+        Some(_) => 2,
+    }
+}
+
 #[derive(Debug, Clone, Eq, PartialEq, Ord, PartialOrd)]
 struct ExpandedUseItem<'arena> {
     use_type: Option<&'arena UseType<'arena>>,
@@ -742,20 +723,72 @@ where
         (namespace, name)
     }
 
-    /// Extract namespace and name from a grouped list (`TypedList` or `MixedList`).
-    /// The namespace is the list's namespace appended to the current namespace,
-    /// and the name is extracted from the first item.
-    fn extract_namespace_and_name_from_grouped_list<'arena, A>(
-        list_namespace: &'arena [u8],
-        first_item_name: Option<&'arena [u8]>,
-        mut namespace: Vec<'arena, &'arena [u8], A>,
-    ) -> (Vec<'arena, &'arena [u8], A>, &'arena [u8])
-    where
+    #[allow(clippy::too_many_arguments)]
+    fn expand_sequence<'arena, A>(
+        f: &mut FormatterState<'_, 'arena, A>,
+        items: impl Iterator<Item = &'arena UseItem<'arena>>,
+        current_namespace: Vec<'arena, &'arena [u8], A>,
+        use_type: Option<&'arena UseType<'arena>>,
+        expanded_items: &mut std::vec::Vec<ExpandedUseItem<'arena>>,
+        original_node: &'arena Use<'arena>,
+        should_expand: bool,
+    ) where
         A: Arena,
     {
-        namespace.push(list_namespace);
-        let name = first_item_name.unwrap_or(b"");
-        (namespace, name)
+        let mut items = items.peekable();
+        if should_expand {
+            for item in items {
+                expand_single_item(f, item, current_namespace.clone(), use_type, expanded_items, original_node);
+            }
+        } else {
+            let (namespace, name) = match items.peek() {
+                Some(item) => extract_namespace_and_name_from_item(f, item, current_namespace),
+                None => (current_namespace, b"".as_slice()),
+            };
+
+            expanded_items.push(ExpandedUseItem {
+                use_type,
+                namespace: namespace.leak(),
+                name,
+                alias: None,
+                original_node,
+            });
+        }
+    }
+
+    #[allow(clippy::too_many_arguments)]
+    fn expand_grouped<'arena, A>(
+        f: &mut FormatterState<'_, 'arena, A>,
+        list_namespace: &'arena [u8],
+        pairs: impl Iterator<Item = (&'arena UseItem<'arena>, Option<&'arena UseType<'arena>>)>,
+        current_namespace: Vec<'arena, &'arena [u8], A>,
+        else_use_type: Option<&'arena UseType<'arena>>,
+        expanded_items: &mut std::vec::Vec<ExpandedUseItem<'arena>>,
+        original_node: &'arena Use<'arena>,
+        should_expand: bool,
+    ) where
+        A: Arena,
+    {
+        let mut pairs = pairs.peekable();
+        if should_expand {
+            let mut new_namespace = current_namespace;
+            new_namespace.push(list_namespace);
+            for (item, use_type) in pairs {
+                expand_single_item(f, item, new_namespace.clone(), use_type, expanded_items, original_node);
+            }
+        } else {
+            let name = pairs.peek().map_or(b"".as_slice(), |(item, _)| item.name.value());
+            let mut namespace = current_namespace;
+            namespace.push(list_namespace);
+
+            expanded_items.push(ExpandedUseItem {
+                use_type: else_use_type,
+                namespace: namespace.leak(),
+                name,
+                alias: None,
+                original_node,
+            });
+        }
     }
 
     fn expand_items<'arena, A>(
@@ -770,139 +803,62 @@ where
         A: Arena,
     {
         match items {
-            UseItems::Sequence(seq) => {
-                if should_expand {
-                    for item in &seq.items {
-                        expand_single_item(f, item, current_namespace.clone(), use_type, expanded_items, original_node);
-                    }
-                } else {
-                    // Extract namespace and name from first item for sorting
-                    let (namespace, name) = seq
-                        .items
-                        .first()
-                        .map(|item| extract_namespace_and_name_from_item(f, item, current_namespace.clone()))
-                        .unwrap_or((current_namespace, b""));
-                    expanded_items.push(ExpandedUseItem {
-                        use_type,
-                        namespace: namespace.leak(),
-                        name,
-                        alias: None,
-                        original_node,
-                    });
-                }
-            }
-            UseItems::TypedSequence(seq) => {
-                if should_expand {
-                    for item in &seq.items {
-                        expand_single_item(
-                            f,
-                            item,
-                            current_namespace.clone(),
-                            Some(&seq.r#type),
-                            expanded_items,
-                            original_node,
-                        );
-                    }
-                } else {
-                    // Extract namespace and name from first item for sorting
-                    let (namespace, name) = seq
-                        .items
-                        .first()
-                        .map(|item| extract_namespace_and_name_from_item(f, item, current_namespace.clone()))
-                        .unwrap_or((current_namespace, b""));
-                    expanded_items.push(ExpandedUseItem {
-                        use_type: Some(&seq.r#type),
-                        namespace: namespace.leak(),
-                        name,
-                        alias: None,
-                        original_node,
-                    });
-                }
-            }
-            UseItems::TypedList(list) => {
-                if should_expand {
-                    let mut new_namespace = current_namespace.clone();
-                    new_namespace.push(list.namespace.value());
-                    for item in &list.items {
-                        expand_single_item(
-                            f,
-                            item,
-                            new_namespace.clone(),
-                            Some(&list.r#type),
-                            expanded_items,
-                            original_node,
-                        );
-                    }
-                } else {
-                    // Extract namespace and name from first item for sorting
-                    // For grouped items, the name should be just the item name (not a full path)
-                    let (namespace, name) = extract_namespace_and_name_from_grouped_list(
-                        list.namespace.value(),
-                        list.items.first().map(|item| item.name.value()),
-                        current_namespace,
-                    );
-                    expanded_items.push(ExpandedUseItem {
-                        use_type: Some(&list.r#type),
-                        namespace: namespace.leak(),
-                        name,
-                        alias: None,
-                        original_node,
-                    });
-                }
-            }
-            UseItems::MixedList(list) => {
-                if should_expand {
-                    let mut new_namespace = current_namespace.clone();
-                    new_namespace.push(list.namespace.value());
-                    for maybe_typed_item in &list.items {
-                        expand_single_item(
-                            f,
-                            &maybe_typed_item.item,
-                            new_namespace.clone(),
-                            maybe_typed_item.r#type.as_ref(),
-                            expanded_items,
-                            original_node,
-                        );
-                    }
-                } else {
-                    // Extract namespace and name from first item for sorting
-                    // For grouped items, the name should be just the item name (not a full path)
-                    let (namespace, name) = extract_namespace_and_name_from_grouped_list(
-                        list.namespace.value(),
-                        list.items.first().map(|item| item.item.name.value()),
-                        current_namespace,
-                    );
-                    expanded_items.push(ExpandedUseItem {
-                        use_type: list.items.first().and_then(|item| item.r#type.as_ref()),
-                        namespace: namespace.leak(),
-                        name,
-                        alias: None,
-                        original_node,
-                    });
-                }
-            }
+            UseItems::Sequence(seq) => expand_sequence(
+                f,
+                seq.items.iter(),
+                current_namespace,
+                use_type,
+                expanded_items,
+                original_node,
+                should_expand,
+            ),
+            UseItems::TypedSequence(seq) => expand_sequence(
+                f,
+                seq.items.iter(),
+                current_namespace,
+                Some(&seq.r#type),
+                expanded_items,
+                original_node,
+                should_expand,
+            ),
+            UseItems::TypedList(list) => expand_grouped(
+                f,
+                list.namespace.value(),
+                list.items.iter().map(|item| (item, Some(&list.r#type))),
+                current_namespace,
+                Some(&list.r#type),
+                expanded_items,
+                original_node,
+                should_expand,
+            ),
+            UseItems::MixedList(list) => expand_grouped(
+                f,
+                list.namespace.value(),
+                list.items.iter().map(|maybe_typed_item| (&maybe_typed_item.item, maybe_typed_item.r#type.as_ref())),
+                current_namespace,
+                list.items.first().and_then(|item| item.r#type.as_ref()),
+                expanded_items,
+                original_node,
+                should_expand,
+            ),
         }
     }
 
     fn expand_single_item<'arena, A>(
         f: &mut FormatterState<'_, 'arena, A>,
         item: &'arena UseItem<'arena>,
-        mut current_namespace: Vec<'arena, &'arena [u8], A>,
+        current_namespace: Vec<'arena, &'arena [u8], A>,
         use_type: Option<&'arena UseType<'arena>>,
         expanded_items: &mut std::vec::Vec<ExpandedUseItem<'arena>>,
         original_node: &'arena Use<'arena>,
     ) where
         A: Arena,
     {
-        let mut parts: Vec<'arena, &'arena [u8], A> =
-            item.name.value().split(|&b| b == b'\\').collect_in::<Vec<'arena, _, A>>(f.arena);
-        // SAFETY: split always returns at least one element
-        let name = unsafe { parts.pop().unwrap_unchecked() };
-        current_namespace.extend(parts);
+        let (namespace, name) = extract_namespace_and_name_from_item(f, item, current_namespace);
 
         expanded_items.push(ExpandedUseItem {
             use_type,
-            namespace: current_namespace.leak(),
+            namespace: namespace.leak(),
             name,
             alias: item.alias.as_ref().map(|a| a.identifier.value),
             original_node,
@@ -926,20 +882,8 @@ pub fn sort_maybe_typed_use_items<'arena>(
     items: impl Iterator<Item = &'arena MaybeTypedUseItem<'arena>>,
 ) -> std::vec::Vec<&'arena MaybeTypedUseItem<'arena>> {
     let mut items = items.collect::<std::vec::Vec<_>>();
-    items.sort_by_cached_key(|item| {
-        let type_order = match &item.r#type {
-            None => 0u8,
-            Some(ty) => {
-                if ty.is_function() {
-                    1
-                } else {
-                    2
-                }
-            }
-        };
-
-        (type_order, item.item.name.value().to_ascii_lowercase())
-    });
+    items
+        .sort_by_cached_key(|item| (use_type_order(item.r#type.as_ref()), item.item.name.value().to_ascii_lowercase()));
 
     items
 }

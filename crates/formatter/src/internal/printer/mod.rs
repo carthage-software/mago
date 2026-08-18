@@ -104,7 +104,9 @@ where
                 Document::Line(line) => {
                     should_remeasure = self.handle_line(line, &indentation, mode, document, should_remeasure);
                 }
-                Document::LineSuffix(docs) => self.handle_line_suffix(indentation, mode, docs),
+                Document::LineSuffix(docs) => {
+                    self.line_suffix.push(Command { indentation, mode, document: Document::Array(docs) });
+                }
                 Document::LineSuffixBoundary => {
                     should_remeasure = self.handle_line_suffix_boundary(indentation, mode, should_remeasure);
                 }
@@ -157,25 +159,17 @@ where
             return;
         }
 
-        match trim {
-            Trim::Whitespace => {
-                while let Some(&last) = self.out.last() {
-                    if is_space(last) {
-                        self.out.pop();
-                    } else {
-                        break;
-                    }
-                }
+        let should_pop: fn(u8) -> bool = match trim {
+            Trim::Whitespace => is_space,
+            Trim::Newlines => is_line_terminator_or_space,
+        };
+
+        while let Some(&last) = self.out.last() {
+            if !should_pop(last) {
+                break;
             }
-            Trim::Newlines => {
-                while let Some(&last) = self.out.last() {
-                    if is_line_terminator_or_space(last) {
-                        self.out.pop();
-                    } else {
-                        break;
-                    }
-                }
-            }
+
+            self.out.pop();
         }
     }
 
@@ -304,15 +298,6 @@ where
         self.position = self.add_indentation(indentation);
 
         should_remeasure
-    }
-
-    fn handle_line_suffix(
-        &mut self,
-        indentation: Indentation<'arena>,
-        mode: Mode,
-        docs: Vec<'arena, Document<'arena, A>, A>,
-    ) {
-        self.line_suffix.push(Command { indentation, mode, document: Document::Array(docs) });
     }
 
     fn handle_line_suffix_boundary(

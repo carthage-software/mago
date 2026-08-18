@@ -38,6 +38,16 @@ use super::format::call_arguments::should_expand_first_arg;
 use super::format::call_arguments::should_expand_last_arg;
 
 #[inline]
+pub fn spaces<'arena, A>(arena: &'arena A, count: usize) -> &'arena [u8]
+where
+    A: Arena,
+{
+    let mut spaces = Vec::with_capacity_in(count, arena);
+    spaces.resize(count, b' ');
+    spaces.leak()
+}
+
+#[inline]
 pub const fn has_naked_left_side(expression: &Expression) -> bool {
     matches!(
         expression,
@@ -171,7 +181,7 @@ where
 ///
 /// behaves like `str::split('\n')` — a trailing line terminator produces a
 /// trailing empty slice.
-fn split_any_newline(text: &[u8]) -> impl Iterator<Item = &[u8]> {
+pub(crate) fn split_any_newline(text: &[u8]) -> impl Iterator<Item = &[u8]> {
     let mut remaining: Option<&[u8]> = Some(text);
     std::iter::from_fn(move || {
         let text = remaining?;
@@ -339,7 +349,7 @@ pub fn get_expression_width(element: &Expression<'_>) -> Option<usize> {
             },
             Argument::Named(arg) => get_expression_width(arg.value).map(|mut width| {
                 width += 2;
-                width += bytes_width(arg.name.value);
+                width += string_width(arg.name.value);
                 width
             }),
         }
@@ -360,18 +370,18 @@ pub fn get_expression_width(element: &Expression<'_>) -> Option<usize> {
 
     Some(match element {
         Expression::Literal(literal) => match literal {
-            Literal::String(literal_string) => bytes_width(literal_string.raw),
-            Literal::Integer(literal_integer) => bytes_width(literal_integer.raw),
-            Literal::Float(literal_float) => bytes_width(literal_float.raw),
+            Literal::String(literal_string) => string_width(literal_string.raw),
+            Literal::Integer(literal_integer) => string_width(literal_integer.raw),
+            Literal::Float(literal_float) => string_width(literal_float.raw),
             Literal::True(_) => 4,
             Literal::False(_) => 5,
             Literal::Null(_) => 4,
         },
         Expression::CompositeString(composite_string) => get_composite_string_width(composite_string)?,
-        Expression::MagicConstant(magic_constant) => bytes_width(magic_constant.value().value),
+        Expression::MagicConstant(magic_constant) => string_width(magic_constant.value().value),
         Expression::ConstantAccess(ConstantAccess { name: Identifier::Local(local) })
-        | Expression::Identifier(Identifier::Local(local)) => bytes_width(local.value),
-        Expression::Variable(Variable::Direct(variable)) => bytes_width(variable.name),
+        | Expression::Identifier(Identifier::Local(local)) => string_width(local.value),
+        Expression::Variable(Variable::Direct(variable)) => string_width(variable.name),
         Expression::Call(Call::Function(FunctionCall { function, argument_list })) => {
             let function_width = get_expression_width(function)?;
             let args_width = get_argument_list_width(argument_list)?;
@@ -385,7 +395,7 @@ pub fn get_expression_width(element: &Expression<'_>) -> Option<usize> {
             ..
         })) => {
             let class_width = get_expression_width(class)?;
-            let method_width = bytes_width(method.value);
+            let method_width = string_width(method.value);
             let args_width = get_argument_list_width(argument_list)?;
 
             class_width + 2 + method_width + args_width
@@ -395,7 +405,7 @@ pub fn get_expression_width(element: &Expression<'_>) -> Option<usize> {
             constant: ClassLikeConstantSelector::Identifier(constant),
             ..
         })) => {
-            return get_expression_width(class).map(|class| class + 2 + bytes_width(constant.value));
+            return get_expression_width(class).map(|class| class + 2 + string_width(constant.value));
         }
         _ => {
             return None;
@@ -406,7 +416,7 @@ pub fn get_expression_width(element: &Expression<'_>) -> Option<usize> {
 fn get_composite_string_width(composite_string: &CompositeString<'_>) -> Option<usize> {
     let mut width = match composite_string {
         CompositeString::Interpolated(interpolated) => {
-            interpolated.prefix.map_or(0, |prefix| bytes_width(prefix.value)) + 2
+            interpolated.prefix.map_or(0, |prefix| string_width(prefix.value)) + 2
         }
         CompositeString::ShellExecute(_) => 2,
         CompositeString::Document(_) => return None,
@@ -419,7 +429,7 @@ fn get_composite_string_width(composite_string: &CompositeString<'_>) -> Option<
                     return None;
                 }
 
-                bytes_width(literal.raw)
+                string_width(literal.raw)
             }
             StringPart::Expression(expression) => get_expression_width(expression)?,
             StringPart::BracedExpression(braced) => get_expression_width(braced.expression)? + 2,
@@ -431,11 +441,6 @@ fn get_composite_string_width(composite_string: &CompositeString<'_>) -> Option<
 
 #[inline]
 pub fn string_width(s: &[u8]) -> usize {
-    bytes_width(s)
-}
-
-#[inline]
-pub fn bytes_width(s: &[u8]) -> usize {
     let line = split_any_newline(s).last().unwrap_or(b"");
     let line_str = String::from_utf8_lossy(line);
 

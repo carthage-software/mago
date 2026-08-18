@@ -31,6 +31,7 @@ use crate::internal::format::misc;
 use crate::internal::format::misc::get_document_width;
 use crate::internal::format::misc::is_expandable_expression;
 use crate::internal::format::misc::is_string_word_type;
+use crate::internal::utils;
 use crate::internal::utils::get_expression_width;
 
 #[derive(Debug, Clone, Copy)]
@@ -170,8 +171,9 @@ where
     }
 
     // Check if we should use table-style formatting
-    let use_table_style = f.settings.array_table_style_alignment && is_table_style(f, &array_like);
-    let column_widths = if use_table_style { calculate_column_widths(f, &array_like) } else { None };
+    let column_widths =
+        if f.settings.array_table_style_alignment { get_table_style_column_widths(f, &array_like) } else { None };
+    let use_table_style = column_widths.is_some();
 
     let outer_alignment = f.alignment_context();
     f.set_alignment_context(None);
@@ -499,11 +501,7 @@ where
                 Document::Array(vec_in![f.arena;
                     element,
                     Document::String(b","),
-                    Document::String({
-                        let mut spaces = Vec::with_capacity_in(padding + 1, f.arena);
-                        spaces.resize(padding + 1, b' ');
-                        spaces.leak()
-                    })
+                    Document::String(utils::spaces(f.arena, padding + 1))
                 ])
             } else {
                 // No padding needed
@@ -520,7 +518,10 @@ where
     formatted_elements
 }
 
-fn is_table_style<'arena, A>(f: &mut FormatterState<'_, 'arena, A>, array_like: &ArrayLike<'arena>) -> bool
+fn get_table_style_column_widths<'arena, A>(
+    f: &mut FormatterState<'_, 'arena, A>,
+    array_like: &ArrayLike<'arena>,
+) -> Option<Vec<'arena, usize, A>>
 where
     A: Arena,
 {
@@ -529,123 +530,70 @@ where
 
     let elements = array_like.elements(f.arena);
     if elements.len() < 2 {
-        return false; // Need at least two rows for table style to make sense
+        return None; // Need at least two rows for table style to make sense
     }
 
     let mut row_size = 0;
     let mut sizes = vec_in![f.arena;];
     let mut maximum_width = 0;
+    let mut column_maximum_widths: Vec<'arena, usize, A> = vec_in![f.arena;];
 
     // Check if all elements are nested arrays with consistent row sizes
     for element in elements {
         if f.has_inner_comment(element.span()) {
-            return false; // Do not format if there are inner comments
+            return None; // Do not format if there are inner comments
         }
 
-        match element {
-            ArrayElement::Value(element) => {
-                if let Expression::Array(Array { elements, .. })
-                | Expression::LegacyArray(LegacyArray { elements, .. }) = element.value
-                {
-                    let size = elements.len();
-                    if 0 == size {
-                        return false; // Empty row
-                    }
+        let ArrayElement::Value(element) = element else {
+            return None; // Only support Value elements
+        };
 
-                    // Check if row size is consistent
-                    row_size = row_size.max(size);
-                    sizes.push(size);
+        let (Expression::Array(Array { elements, .. }) | Expression::LegacyArray(LegacyArray { elements, .. })) =
+            element.value
+        else {
+            return None; // Not a nested array
+        };
 
-                    // Check if all inner elements are simple (strings, numbers, etc.)
-                    let mut elements_width = 0;
-                    for inner_element in elements {
-                        match inner_element {
-                            ArrayElement::Value(inner_value) => {
-                                match get_expression_width(inner_value.value) {
-                                    Some(width) => elements_width += width,
-                                    None => {
-                                        return false; // Only support simple elements
-                                    }
-                                }
-                            }
-                            _ => {
-                                return false; // Only support Value elements
-                            }
-                        }
-                    }
-
-                    let total_width = elements_width + ((size - 1) * 2);
-                    if total_width > (f.settings.print_width - WIGGLE_ROOM) {
-                        return false; // Exceeds column width limit
-                    }
-
-                    maximum_width = maximum_width.max(total_width);
-                } else {
-                    return false; // Not a nested array
-                }
-            }
-            _ => return false, // Only support Value elements
+        let size = elements.len();
+        if 0 == size {
+            return None; // Empty row
         }
+
+        // Check if row size is consistent
+        row_size = row_size.max(size);
+        sizes.push(size);
+        if column_maximum_widths.len() < size {
+            column_maximum_widths.resize(size, 0);
+        }
+
+        // Check if all inner elements are simple (strings, numbers, etc.)
+        let mut elements_width = 0;
+        for (column, inner_element) in elements.iter().enumerate() {
+            let ArrayElement::Value(inner_value) = inner_element else {
+                return None; // Only support Value elements
+            };
+
+            let width = get_expression_width(inner_value.value)?;
+            elements_width += width;
+            column_maximum_widths[column] = column_maximum_widths[column].max(width);
+        }
+
+        let total_width = elements_width + ((size - 1) * 2);
+        if total_width > (f.settings.print_width - WIGGLE_ROOM) {
+            return None; // Exceeds column width limit
+        }
+
+        maximum_width = maximum_width.max(total_width);
     }
 
     if maximum_width < WIGGLE_ROOM {
-        return false; // Too narrow to be a table
+        return None; // Too narrow to be a table
     }
 
     // At least 60% of the rows should have the same size
-    (sizes.iter().filter(|size| **size == row_size).count() as f64) / (sizes.len() as f64) >= 0.6
-}
+    let consistent = (sizes.iter().filter(|size| **size == row_size).count() as f64) / (sizes.len() as f64) >= 0.6;
 
-fn calculate_column_widths<'arena, A>(
-    f: &mut FormatterState<'_, 'arena, A>,
-    array_like: &ArrayLike<'arena>,
-) -> Option<Vec<'arena, usize, A>>
-where
-    A: Arena,
-{
-    let mut row_size = 0;
-    let elements = array_like.elements(f.arena);
-
-    // First pass: determine consistent row size and initialize column widths
-    for element in &elements {
-        match element {
-            ArrayElement::Value(element) => {
-                if let Expression::Array(Array { elements, .. })
-                | Expression::LegacyArray(LegacyArray { elements, .. }) = element.value
-                {
-                    let size = elements.len();
-
-                    row_size = row_size.max(size);
-                } else {
-                    return None; // Not a nested array
-                }
-            }
-            _ => return None, // Only support Value elements
-        }
-    }
-
-    let mut column_maximum_widths = vec_in![f.arena; 0; row_size];
-
-    // Second pass: calculate maximum width for each column
-    for element in elements {
-        if let ArrayElement::Value(element) = element
-            && let Expression::Array(Array { elements, .. }) | Expression::LegacyArray(LegacyArray { elements, .. }) =
-                element.value
-        {
-            for (col_idx, col_element) in elements.iter().enumerate() {
-                if let ArrayElement::Value(value_element) = col_element
-                    && let Some(width) = get_expression_width(value_element.value)
-                {
-                    column_maximum_widths[col_idx] = column_maximum_widths[col_idx].max(width);
-                } else {
-                    // Either the element is not a value element, or we cannot determine element width
-                    return None;
-                }
-            }
-        }
-    }
-
-    Some(column_maximum_widths)
+    consistent.then_some(column_maximum_widths)
 }
 
 /// Detect alignment runs in array elements for key-value pairs.
