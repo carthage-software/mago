@@ -8,7 +8,9 @@ use mago_word::Word;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
 use mago_codex::misc::GenericParent;
+use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::object::TObject;
+use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::get_specialized_template_type;
 use mago_codex::ttype::template::GenericTemplate;
@@ -96,7 +98,7 @@ pub fn populate_template_result_from_invocation<'ctx, 'arena, A>(
             }
         }
 
-        if let StaticClassType::Object(TObject::Named(instance_type)) = &method_context.class_type
+        if let Some(instance_type) = get_named_static_class_type(&method_context.class_type)
             && !instance_type.name.as_bytes().eq_ignore_ascii_case(declaring_class_metadata.original_name.as_bytes())
             && let Some(calling_class_metadata) = context.codebase.get_class_like(instance_type.name.as_bytes())
         {
@@ -203,6 +205,17 @@ pub fn populate_template_result_from_invocation<'ctx, 'arena, A>(
     };
 
     infer_templates_for_method_call(context, instance_type, method_context, method_metadata, metadata, template_result);
+}
+
+fn get_named_static_class_type(class_type: &StaticClassType) -> Option<&TNamedObject> {
+    match class_type {
+        StaticClassType::Object(TObject::Named(instance_type)) => Some(instance_type),
+        StaticClassType::Generic(parameter) => parameter.constraint.types.iter().find_map(|atomic| match atomic {
+            TAtomic::Object(TObject::Named(instance_type)) => Some(instance_type),
+            _ => None,
+        }),
+        _ => None,
+    }
 }
 
 /// Extracts and resolves concrete types for class-level template parameters based on inferred lower bounds.

@@ -493,6 +493,12 @@ where
         let object = get_metadata_object(context, current_class_metadata, current_class_metadata);
 
         StaticClassType::Object(object)
+    } else if let ResolutionOrigin::SpecificClassLikeString(class_string) = &classname.origin {
+        match class_string.get_object_type(context.codebase) {
+            TAtomic::GenericParameter(parameter) => StaticClassType::Generic(parameter),
+            TAtomic::Object(object) => StaticClassType::Object(object),
+            _ => StaticClassType::Name(fq_class_id),
+        }
     } else if defining_class_metadata.kind.is_enum() {
         StaticClassType::Object(TObject::Enum(TEnum { name: defining_class_metadata.original_name, case: None }))
     } else if !classname.intersections.is_empty() {

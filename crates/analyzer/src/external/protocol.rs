@@ -1335,14 +1335,15 @@ fn encode_return_type_arguments<'type_info>(
 }
 
 fn get_method_receiver_type(method_context: &MethodTargetContext<'_>) -> Result<TUnion, ExternalAnalyzerError> {
-    let object = match &method_context.class_type {
+    let atomic = match &method_context.class_type {
         StaticClassType::None => return Err(protocol("external method return-type provider has no receiver type")),
-        StaticClassType::Exact(name) => TObject::Named(TNamedObject::new(*name)),
-        StaticClassType::Name(name) => TObject::Named(TNamedObject::new_static(*name)),
-        StaticClassType::Object(object) => object.clone(),
+        StaticClassType::Exact(name) => TAtomic::Object(TObject::Named(TNamedObject::new(*name))),
+        StaticClassType::Name(name) => TAtomic::Object(TObject::Named(TNamedObject::new_static(*name))),
+        StaticClassType::Object(object) => TAtomic::Object(object.clone()),
+        StaticClassType::Generic(parameter) => TAtomic::GenericParameter(parameter.clone()),
     };
 
-    Ok(TUnion::from_atomic(TAtomic::Object(object)))
+    Ok(TUnion::from_atomic(atomic))
 }
 
 pub(super) fn encode_union_snapshot<'type_info>(

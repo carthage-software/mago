@@ -149,6 +149,7 @@ pub enum StaticClassType {
     Name(Word),
     /// The late-static type is bound to a potentially specialized object.
     Object(TObject),
+    Generic(TGenericParameter),
 }
 
 #[derive(Debug, Default)]
@@ -253,7 +254,12 @@ pub(crate) fn expand_atomic(
             }
         },
         TAtomic::Object(object) => {
-            expand_object(object, codebase, options);
+            if let Some(parameter) = resolve_generic_static_type(object, codebase, options) {
+                *skip_key = true;
+                new_return_type_parts.push(TAtomic::GenericParameter(parameter));
+            } else {
+                expand_object(object, codebase, options);
+            }
         }
         TAtomic::Callable(TCallable::Signature(signature)) => {
             if let Some(return_type) = signature.get_return_type_mut() {
@@ -573,6 +579,56 @@ fn expand_object(object: &mut TObject, codebase: &CodebaseMetadata, options: &Ty
     }
 
     expand_or_fill_type_parameters(named, codebase, options);
+}
+
+fn resolve_generic_static_type(
+    object: &TObject,
+    codebase: &CodebaseMetadata,
+    options: &TypeExpansionOptions,
+) -> Option<TGenericParameter> {
+    let StaticClassType::Generic(parameter) = &options.static_class_type else {
+        return None;
+    };
+    let TObject::Named(named) = object else {
+        return None;
+    };
+
+    let special = classify_special_class_name(named.name.as_bytes());
+    if matches!(special, SpecialClassName::None) && !named.is_static && !named.is_this {
+        return None;
+    }
+
+    if matches!(special, SpecialClassName::None)
+        && !generic_parameter_can_resolve_static(parameter, named.name, codebase)
+    {
+        return None;
+    }
+
+    let mut parameter = parameter.clone();
+    for intersection in named.intersection_types.iter().flatten() {
+        parameter.add_intersection_type(intersection.clone());
+    }
+
+    Some(parameter)
+}
+
+fn generic_parameter_can_resolve_static(
+    parameter: &TGenericParameter,
+    expected_class: Word,
+    codebase: &CodebaseMetadata,
+) -> bool {
+    parameter.constraint.types.iter().any(|atomic| match atomic {
+        TAtomic::Object(TObject::Named(object)) => {
+            codebase.is_instance_of(object.name.as_bytes(), expected_class.as_bytes())
+        }
+        TAtomic::Object(TObject::Enum(object)) => {
+            codebase.is_instance_of(object.name.as_bytes(), expected_class.as_bytes())
+        }
+        TAtomic::GenericParameter(parameter) => {
+            generic_parameter_can_resolve_static(parameter, expected_class, codebase)
+        }
+        _ => false,
+    })
 }
 
 /// Classifies a class-like name as one of the PHP "special" tokens that require
@@ -1749,6 +1805,30 @@ mod tests {
                 false
             }
         }));
+    }
+
+    #[test]
+    fn test_expand_static_to_generic_receiver() {
+        let codebase = create_test_codebase("<?php class Base {}");
+        let base = ascii_lowercase_word(b"base");
+        let parameter = TGenericParameter::new(
+            word("T"),
+            Arc::new(TUnion::from_atomic(TAtomic::Object(TObject::Named(TNamedObject::new(base))))),
+            GenericParent::ClassLike(word("Consumer")),
+        );
+        let mut actual = TUnion::from_atomic(TAtomic::Object(TObject::Named(TNamedObject::new_static(base))));
+
+        expand_union(
+            &codebase,
+            &mut actual,
+            &TypeExpansionOptions {
+                self_class: Some(base),
+                static_class_type: StaticClassType::Generic(parameter.clone()),
+                ..Default::default()
+            },
+        );
+
+        assert_eq!(actual, TUnion::from_atomic(TAtomic::GenericParameter(parameter)));
     }
 
     #[test]
