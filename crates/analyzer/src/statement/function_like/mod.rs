@@ -65,6 +65,7 @@ use crate::resolver::property::resolve_declared_property;
 use crate::statement::analyze_statements;
 use crate::statement::attributes::AttributeTarget;
 use crate::statement::attributes::analyze_attributes;
+use crate::statement::class_like::property::analyze_property_hook;
 use crate::statement::r#return::handle_return_value;
 use crate::utils::expression::get_variable_id;
 
@@ -587,6 +588,15 @@ where
         };
 
         block_context.locals.insert(parameter_variable_str, Rc::new(final_parameter_type));
+
+        if parameter_node.is_promoted_property()
+            && let Some(hook_list) = &parameter_node.hooks
+        {
+            let property_name = word(parameter_node.variable.name);
+            for hook in &hook_list.hooks {
+                analyze_property_hook(hook, property_name, context, block_context, artifacts)?;
+            }
+        }
     }
 
     Ok(())

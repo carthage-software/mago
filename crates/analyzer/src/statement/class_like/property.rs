@@ -211,7 +211,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for PropertyHook<'arena> {
     }
 }
 
-fn analyze_property_hook<'ctx, 'arena, A>(
+pub(crate) fn analyze_property_hook<'ctx, 'arena, A>(
     hook: &PropertyHook<'arena>,
     property_name: mago_word::Word,
     context: &mut Context<'ctx, 'arena, A>,
