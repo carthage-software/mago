@@ -5,6 +5,10 @@ A heartfelt thank you to the generous individuals and organizations listed below
 To become a sponsor, please visit [the sponsorship page](https://github.com/sponsors/azjezz).
 
 ---
+<a href="https://opensource.check24.de/project/mago/" title="Check24"><kbd><img src="https://opensource.check24.de/brand/check24.svg" width="80" height="80" alt="Check24" /></kbd></a>
+
+---
+
 <a href="https://www.jetbrains.com/" title="JetBrains"><kbd><img src="https://avatars.githubusercontent.com/u/60931315?u=f9b545e50cace9e9028f77eaf1e83104d18d4d48&v=4&s=160" width="80" height="80" alt="JetBrains" /></kbd></a>
 
 ---

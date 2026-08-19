@@ -8,6 +8,8 @@ namespace Mago\Scripts;
 use RuntimeException;
 
 use function array_slice;
+use function array_unshift;
+use function date;
 use function explode;
 use function file_get_contents;
 use function file_put_contents;
@@ -25,6 +27,25 @@ use const JSON_THROW_ON_ERROR;
 use const JSON_UNESCAPED_SLASHES;
 
 const SPONSORS_URL = 'https://raw.githubusercontent.com/azjezz/azjezz/develop/sponsors.json';
+
+/**
+ * @var list<array{
+ *  name: non-empty-string,
+ *  websiteUrl: non-empty-string,
+ *  avatarUrl: non-empty-string,
+ *  tier: 'large'|'medium'|'small'|'supporter',
+ *  until?: non-empty-string,
+ * }>
+ */
+const MANUAL_SPONSORS = [
+    [
+        'name' => 'Check24',
+        'websiteUrl' => 'https://opensource.check24.de/project/mago/',
+        'avatarUrl' => 'https://opensource.check24.de/brand/check24.svg',
+        'tier' => 'large',
+        'until' => '2028-09-19',
+    ],
+];
 
 const README_PATH = __DIR__ . '/../README.md';
 
@@ -57,6 +78,13 @@ final class SponsorsData
     private const LARGE_SPONSOR_THRESHOLD = 100;
     private const MEDIUM_SPONSOR_THRESHOLD = 50;
     private const SMALL_SPONSOR_THRESHOLD = 25;
+
+    private const MANUAL_TIER_SORT_AMOUNTS = [
+        'large' => 500,
+        'medium' => 99,
+        'small' => 49,
+        'supporter' => 24,
+    ];
 
     /**
      * @var array<non-negative-int, list<Sponsor>>
@@ -109,6 +137,28 @@ final class SponsorsData
             $sponsorsByAmount[$monthlyDollar] = $amountSponsors;
         }
 
+        foreach (MANUAL_SPONSORS as $manual_sponsor) {
+            $shown_until = $manual_sponsor['until'] ?? null;
+            if (null !== $shown_until && $shown_until <= date('Y-m-d')) {
+                continue;
+            }
+
+            $sort_amount = self::MANUAL_TIER_SORT_AMOUNTS[$manual_sponsor['tier']];
+            $sponsor = new Sponsor(
+                login: $manual_sponsor['name'],
+                name: $manual_sponsor['name'],
+                avatarUrl: $manual_sponsor['avatarUrl'],
+                websiteUrl: $manual_sponsor['websiteUrl'],
+                monthlyPriceInDollars: $sort_amount,
+                isCustomAmount: false,
+                isOneTime: false,
+            );
+
+            $amountSponsors = $sponsorsByAmount[$sort_amount] ?? [];
+            array_unshift($amountSponsors, $sponsor);
+            $sponsorsByAmount[$sort_amount] = $amountSponsors;
+        }
+
         return new static(sponsorsByAmount: $sponsorsByAmount);
     }
 
@@ -131,10 +181,10 @@ final class SponsorsData
 
                 if ($amount >= self::LARGE_SPONSOR_THRESHOLD) {
                     $large_sponsors_html .= sprintf(
-                        '<a href="%s" title="%s"><kbd><img src="%s&s=240" width="120" height="120" alt="%s" /></kbd></a>',
+                        '<a href="%s" title="%s"><kbd><img src="%s" width="120" height="120" alt="%s" /></kbd></a>',
                         $url,
                         $sponsor->name,
-                        $sponsor->avatarUrl,
+                        namespace\sized_avatar_url($sponsor->avatarUrl, 240),
                         $sponsor->name,
                     );
 
@@ -143,10 +193,10 @@ final class SponsorsData
 
                 if ($amount >= self::MEDIUM_SPONSOR_THRESHOLD) {
                     $medium_sponsors_html .= sprintf(
-                        '<a href="%s" title="%s"><kbd><img src="%s&s=160" width="80" height="80" alt="%s" /></kbd></a>',
+                        '<a href="%s" title="%s"><kbd><img src="%s" width="80" height="80" alt="%s" /></kbd></a>',
                         $url,
                         $sponsor->name,
-                        $sponsor->avatarUrl,
+                        namespace\sized_avatar_url($sponsor->avatarUrl, 160),
                         $sponsor->name,
                     );
 
@@ -154,10 +204,10 @@ final class SponsorsData
                 }
 
                 $small_sponsors_html .= sprintf(
-                    '<a href="%s" title="%s"><kbd><img src="%s&s=96" width="48" height="48" alt="%s" /></kbd></a>',
+                    '<a href="%s" title="%s"><kbd><img src="%s" width="48" height="48" alt="%s" /></kbd></a>',
                     $url,
                     $sponsor->name,
-                    $sponsor->avatarUrl,
+                    namespace\sized_avatar_url($sponsor->avatarUrl, 96),
                     $sponsor->name,
                 );
             }
@@ -194,10 +244,10 @@ final class SponsorsData
                 }
 
                 $tier_html .= sprintf(
-                    '<a href="%s" title="%s"><kbd><img src="%s&s=160" width="80" height="80" alt="%s" /></kbd></a>',
+                    '<a href="%s" title="%s"><kbd><img src="%s" width="80" height="80" alt="%s" /></kbd></a>',
                     $url,
                     $sponsor->name,
-                    $sponsor->avatarUrl,
+                    namespace\sized_avatar_url($sponsor->avatarUrl, 160),
                     $sponsor->name,
                 );
             }
@@ -258,6 +308,15 @@ final class SponsorsData
 
         return json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES | JSON_THROW_ON_ERROR) . "\n";
     }
+}
+
+function sized_avatar_url(string $avatar_url, int $size): string
+{
+    if (!str_contains($avatar_url, '?')) {
+        return $avatar_url;
+    }
+
+    return sprintf('%s&s=%d', $avatar_url, $size);
 }
 
 function overwrite_sponsors_file(string $new_content): void
