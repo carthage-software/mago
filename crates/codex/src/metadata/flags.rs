@@ -91,24 +91,6 @@ impl MetadataFlags {
     pub const fn remove(&mut self, other: MetadataFlags) {
         self.0 &= !other.0;
     }
-
-    #[inline]
-    #[must_use]
-    pub const fn intersects(self, other: MetadataFlags) -> bool {
-        (self.0 & other.0) != 0
-    }
-
-    #[inline]
-    #[must_use]
-    pub const fn union(&self, other: MetadataFlags) -> MetadataFlags {
-        MetadataFlags(self.0 | other.0)
-    }
-
-    #[inline]
-    #[must_use]
-    pub const fn intersection(&self, other: MetadataFlags) -> MetadataFlags {
-        MetadataFlags(self.0 & other.0)
-    }
 }
 
 impl MetadataFlags {

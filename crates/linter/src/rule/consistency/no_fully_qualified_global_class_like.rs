@@ -79,11 +79,7 @@ impl NoFullyQualifiedGlobalClassLikeRule {
                 "Fully-qualified class-like reference is already in scope.",
                 format!("`{class_name}` is already reachable as `{}`; drop the leading `\\`.", res.local_name),
             ),
-            Some(_) => (
-                "Fully-qualified class-like reference detected.",
-                format!("Add `use {class_name};` and reference `{short_name_display}` directly."),
-            ),
-            None => (
+            Some(_) | None => (
                 "Fully-qualified class-like reference detected.",
                 format!("Add `use {class_name};` and reference `{short_name_display}` directly."),
             ),
@@ -197,45 +193,6 @@ impl LintRule for NoFullyQualifiedGlobalClassLikeRule {
                     self.report_if_fq(ctx, *identifier);
                 }
             }
-            Node::Instantiation(instantiation) => {
-                let Expression::Identifier(identifier) = instantiation.class else {
-                    return;
-                };
-                self.report_if_fq(ctx, *identifier);
-            }
-            Node::StaticMethodCall(call) => {
-                let Expression::Identifier(identifier) = call.class else {
-                    return;
-                };
-                self.report_if_fq(ctx, *identifier);
-            }
-            Node::StaticMethodPartialApplication(application) => {
-                let Expression::Identifier(identifier) = application.class else {
-                    return;
-                };
-                self.report_if_fq(ctx, *identifier);
-            }
-            Node::StaticPropertyAccess(access) => {
-                let Expression::Identifier(identifier) = access.class else {
-                    return;
-                };
-                self.report_if_fq(ctx, *identifier);
-            }
-            Node::ClassConstantAccess(access) => {
-                let Expression::Identifier(identifier) = access.class else {
-                    return;
-                };
-                self.report_if_fq(ctx, *identifier);
-            }
-            Node::Binary(binary) => {
-                if !matches!(binary.operator, BinaryOperator::Instanceof(_)) {
-                    return;
-                }
-                let Expression::Identifier(identifier) = binary.rhs else {
-                    return;
-                };
-                self.report_if_fq(ctx, *identifier);
-            }
             Node::Hint(Hint::Identifier(identifier)) => {
                 self.report_if_fq(ctx, *identifier);
             }
@@ -244,7 +201,23 @@ impl LintRule for NoFullyQualifiedGlobalClassLikeRule {
                     self.report_if_fq(ctx, *identifier);
                 }
             }
-            _ => {}
+            _ => {
+                let class_expression = match node {
+                    Node::Instantiation(instantiation) => instantiation.class,
+                    Node::StaticMethodCall(call) => call.class,
+                    Node::StaticMethodPartialApplication(application) => application.class,
+                    Node::StaticPropertyAccess(access) => access.class,
+                    Node::ClassConstantAccess(access) => access.class,
+                    Node::Binary(binary) if matches!(binary.operator, BinaryOperator::Instanceof(_)) => binary.rhs,
+                    _ => return,
+                };
+
+                let Expression::Identifier(identifier) = class_expression else {
+                    return;
+                };
+
+                self.report_if_fq(ctx, *identifier);
+            }
         }
     }
 }

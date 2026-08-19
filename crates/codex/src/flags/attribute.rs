@@ -84,24 +84,6 @@ impl AttributeFlags {
 
     #[inline]
     #[must_use]
-    pub const fn intersects(self, other: AttributeFlags) -> bool {
-        (self.0 & other.0) != 0
-    }
-
-    #[inline]
-    #[must_use]
-    pub const fn union(&self, other: AttributeFlags) -> AttributeFlags {
-        AttributeFlags(self.0 | other.0)
-    }
-
-    #[inline]
-    #[must_use]
-    pub const fn intersection(&self, other: AttributeFlags) -> AttributeFlags {
-        AttributeFlags(self.0 & other.0)
-    }
-
-    #[inline]
-    #[must_use]
     pub const fn bits(self) -> u8 {
         self.0
     }

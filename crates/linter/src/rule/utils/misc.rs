@@ -6,6 +6,7 @@ use mago_syntax::cst::Expression;
 use mago_syntax::cst::Method;
 use mago_syntax::cst::MethodBody;
 use mago_syntax::cst::Node;
+use mago_syntax::cst::NodeKind;
 use mago_syntax::cst::Return;
 use mago_syntax::cst::Statement;
 use mago_syntax::cst::Variable;
@@ -116,4 +117,37 @@ fn is_variable_named(expression: &Expression<'_>, name: &[u8]) -> bool {
     };
 
     direct_variable.name == name
+}
+
+pub const STATEMENT_LIST_TARGETS: &[NodeKind] = &[
+    NodeKind::Program,
+    NodeKind::Block,
+    NodeKind::Namespace,
+    NodeKind::DeclareColonDelimitedBody,
+    NodeKind::SwitchExpressionCase,
+    NodeKind::SwitchDefaultCase,
+    NodeKind::ForeachColonDelimitedBody,
+    NodeKind::WhileColonDelimitedBody,
+    NodeKind::ForColonDelimitedBody,
+    NodeKind::IfColonDelimitedBody,
+    NodeKind::IfColonDelimitedBodyElseIfClause,
+    NodeKind::IfColonDelimitedBodyElseClause,
+];
+
+pub fn statement_list_of<'ast, 'arena>(node: Node<'ast, 'arena>) -> Option<&'ast [Statement<'arena>]> {
+    Some(match node {
+        Node::Program(node) => node.statements.as_slice(),
+        Node::Block(node) => node.statements.as_slice(),
+        Node::Namespace(node) => node.statements().as_slice(),
+        Node::DeclareColonDelimitedBody(node) => node.statements.as_slice(),
+        Node::SwitchExpressionCase(node) => node.statements.as_slice(),
+        Node::SwitchDefaultCase(node) => node.statements.as_slice(),
+        Node::ForeachColonDelimitedBody(node) => node.statements.as_slice(),
+        Node::WhileColonDelimitedBody(node) => node.statements.as_slice(),
+        Node::ForColonDelimitedBody(node) => node.statements.as_slice(),
+        Node::IfColonDelimitedBody(node) => node.statements.as_slice(),
+        Node::IfColonDelimitedBodyElseIfClause(node) => node.statements.as_slice(),
+        Node::IfColonDelimitedBodyElseClause(node) => node.statements.as_slice(),
+        _ => return None,
+    })
 }

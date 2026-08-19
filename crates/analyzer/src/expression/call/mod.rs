@@ -262,21 +262,7 @@ where
             resulting_type
         }
     } else {
-        match invocation_arguments {
-            InvocationArgumentsSource::ArgumentList(argument_list) => {
-                argument_list.analyze(context, block_context, artifacts)?;
-            }
-            InvocationArgumentsSource::PipeInput(pipe) => {
-                let was_inside_call = block_context.flags.inside_call();
-                let was_inside_general_use = block_context.flags.inside_general_use();
-                block_context.flags.set_inside_call(true);
-                block_context.flags.set_inside_general_use(true);
-                pipe.input.analyze(context, block_context, artifacts)?;
-                block_context.flags.set_inside_call(was_inside_call);
-                block_context.flags.set_inside_general_use(was_inside_general_use);
-            }
-            _ => {}
-        }
+        analyze_invocation_arguments_source(context, block_context, artifacts, &invocation_arguments)?;
 
         if encountered_mixed_targets {
             get_mixed()
@@ -545,21 +531,7 @@ fn inspect_arguments<'ctx, 'arena, A>(
 where
     A: Arena,
 {
-    match invocation_arguments {
-        InvocationArgumentsSource::ArgumentList(argument_list) => {
-            argument_list.analyze(context, block_context, artifacts)?;
-        }
-        InvocationArgumentsSource::PipeInput(pipe) => {
-            let was_inside_call = block_context.flags.inside_call();
-            let was_inside_general_use = block_context.flags.inside_general_use();
-            block_context.flags.set_inside_call(true);
-            block_context.flags.set_inside_general_use(true);
-            pipe.input.analyze(context, block_context, artifacts)?;
-            block_context.flags.set_inside_call(was_inside_call);
-            block_context.flags.set_inside_general_use(was_inside_general_use);
-        }
-        _ => {}
-    }
+    analyze_invocation_arguments_source(context, block_context, artifacts, invocation_arguments)?;
 
     let mut argument_annotations = vec![];
     for (idx, argument) in invocation_arguments.iter_arguments().enumerate() {
@@ -607,21 +579,7 @@ fn confirm_argument_type<'ctx, 'arena, A>(
 where
     A: Arena,
 {
-    match invocation_arguments {
-        InvocationArgumentsSource::ArgumentList(argument_list) => {
-            argument_list.analyze(context, block_context, artifacts)?;
-        }
-        InvocationArgumentsSource::PipeInput(pipe) => {
-            let was_inside_call = block_context.flags.inside_call();
-            let was_inside_general_use = block_context.flags.inside_general_use();
-            block_context.flags.set_inside_call(true);
-            block_context.flags.set_inside_general_use(true);
-            pipe.input.analyze(context, block_context, artifacts)?;
-            block_context.flags.set_inside_call(was_inside_call);
-            block_context.flags.set_inside_general_use(was_inside_general_use);
-        }
-        _ => {}
-    }
+    analyze_invocation_arguments_source(context, block_context, artifacts, invocation_arguments)?;
 
     let argument_count = invocation_arguments.argument_count();
 
@@ -755,6 +713,34 @@ where
             .with_note("`Mago\\confirm()` failed to confirm the type of the expression.")
             .with_help("This debugging utility (`Mago\\confirm()`) should be removed before committing code."),
         );
+    }
+
+    Ok(())
+}
+
+fn analyze_invocation_arguments_source<'ctx, 'ast, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
+    block_context: &mut BlockContext<'ctx>,
+    artifacts: &mut AnalysisArtifacts,
+    invocation_arguments: &InvocationArgumentsSource<'ast, 'arena>,
+) -> Result<(), AnalysisError>
+where
+    A: Arena,
+{
+    match invocation_arguments {
+        InvocationArgumentsSource::ArgumentList(argument_list) => {
+            argument_list.analyze(context, block_context, artifacts)?;
+        }
+        InvocationArgumentsSource::PipeInput(pipe) => {
+            let was_inside_call = block_context.flags.inside_call();
+            let was_inside_general_use = block_context.flags.inside_general_use();
+            block_context.flags.set_inside_call(true);
+            block_context.flags.set_inside_general_use(true);
+            pipe.input.analyze(context, block_context, artifacts)?;
+            block_context.flags.set_inside_call(was_inside_call);
+            block_context.flags.set_inside_general_use(was_inside_general_use);
+        }
+        _ => {}
     }
 
     Ok(())

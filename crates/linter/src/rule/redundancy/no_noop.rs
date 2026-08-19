@@ -1,20 +1,21 @@
 use indoc::indoc;
-use mago_allocator::Arena;
-use mago_text_edit::TextEdit;
 use schemars::JsonSchema;
 
+use mago_allocator::Arena;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_syntax::cst::Node;
 use mago_syntax::cst::NodeKind;
 use mago_syntax::cst::Statement;
+use mago_text_edit::TextEdit;
 
 use crate::category::Category;
 use crate::context::LintContext;
 use crate::requirements::RuleRequirements;
 use crate::rule::Config;
 use crate::rule::LintRule;
+use crate::rule::utils::misc::STATEMENT_LIST_TARGETS;
 use crate::rule_meta::RuleMeta;
 use crate::settings::RuleSettings;
 
@@ -71,22 +72,7 @@ impl LintRule for NoNoopRule {
     }
 
     fn targets() -> &'static [NodeKind] {
-        const TARGETS: &[NodeKind] = &[
-            NodeKind::Program,
-            NodeKind::Block,
-            NodeKind::Namespace,
-            NodeKind::DeclareColonDelimitedBody,
-            NodeKind::SwitchExpressionCase,
-            NodeKind::SwitchDefaultCase,
-            NodeKind::ForeachColonDelimitedBody,
-            NodeKind::WhileColonDelimitedBody,
-            NodeKind::ForColonDelimitedBody,
-            NodeKind::IfColonDelimitedBody,
-            NodeKind::IfColonDelimitedBodyElseIfClause,
-            NodeKind::IfColonDelimitedBodyElseClause,
-        ];
-
-        TARGETS
+        STATEMENT_LIST_TARGETS
     }
 
     fn build(settings: &RuleSettings<Self::Config>) -> Self {
@@ -97,20 +83,8 @@ impl LintRule for NoNoopRule {
     where
         A: Arena,
     {
-        let statements = match node {
-            Node::Program(node) => node.statements.as_slice(),
-            Node::Block(node) => node.statements.as_slice(),
-            Node::Namespace(node) => node.statements().as_slice(),
-            Node::DeclareColonDelimitedBody(node) => node.statements.as_slice(),
-            Node::SwitchExpressionCase(node) => node.statements.as_slice(),
-            Node::SwitchDefaultCase(node) => node.statements.as_slice(),
-            Node::ForeachColonDelimitedBody(node) => node.statements.as_slice(),
-            Node::WhileColonDelimitedBody(node) => node.statements.as_slice(),
-            Node::ForColonDelimitedBody(node) => node.statements.as_slice(),
-            Node::IfColonDelimitedBody(node) => node.statements.as_slice(),
-            Node::IfColonDelimitedBodyElseIfClause(node) => node.statements.as_slice(),
-            Node::IfColonDelimitedBodyElseClause(node) => node.statements.as_slice(),
-            _ => return,
+        let Some(statements) = crate::rule::utils::misc::statement_list_of(node) else {
+            return;
         };
 
         for statement in statements {

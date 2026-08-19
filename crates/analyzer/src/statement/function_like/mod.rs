@@ -16,6 +16,7 @@ use mago_codex::metadata::ttype::TypeMetadata;
 use mago_codex::misc::GenericParent;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::TypeRef;
+use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::callable::TCallable;
 use mago_codex::ttype::atomic::generic::TGenericParameter;
@@ -31,10 +32,13 @@ use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::expander;
 use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::expander::TypeExpansionOptions;
+use mago_codex::ttype::expander::get_signature_of_function_like_metadata;
 use mago_codex::ttype::get_arraykey;
 use mago_codex::ttype::get_keyed_array;
 use mago_codex::ttype::get_list;
 use mago_codex::ttype::get_mixed;
+use mago_codex::ttype::get_never;
+use mago_codex::ttype::get_void;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;
 use mago_php_version::feature::Feature;
@@ -80,6 +84,76 @@ impl HasSpan for FunctionLikeBody<'_, '_> {
             FunctionLikeBody::Expression(expr) => expr.span(),
         }
     }
+}
+
+pub fn resolve_closure_like_type<A>(
+    context: &Context<'_, '_, A>,
+    closure_span: Span,
+    function_metadata: &FunctionLikeMetadata,
+    inner_has_returned: bool,
+    inner_artifacts: AnalysisArtifacts,
+) -> TUnion
+where
+    A: Arena,
+{
+    let function_identifier = FunctionLikeIdentifier::for_closure(context.source_file, closure_span);
+
+    let mut signature = get_signature_of_function_like_metadata(
+        &function_identifier,
+        function_metadata,
+        context.codebase,
+        &TypeExpansionOptions::default(),
+    );
+
+    if function_metadata.template_types.is_empty() {
+        if function_metadata.flags.has_yield() && function_metadata.return_type_metadata.is_none() {
+            let mut key_type = None;
+            for k in inner_artifacts.inferred_yield_key_types {
+                key_type = Some(add_optional_union_type(k, key_type.as_ref(), context.codebase));
+            }
+
+            let mut value_type = None;
+            for v in inner_artifacts.inferred_yield_value_types {
+                value_type = Some(add_optional_union_type(v, value_type.as_ref(), context.codebase));
+            }
+
+            let mut return_type = None;
+            for r in inner_artifacts.inferred_return_types {
+                return_type = Some(add_optional_union_type((*r).clone(), return_type.as_ref(), context.codebase));
+            }
+
+            let generator = TNamedObject::new_with_type_parameters(
+                word("Generator"),
+                Some(vec![
+                    key_type.unwrap_or_else(get_mixed),
+                    value_type.unwrap_or_else(get_mixed),
+                    get_mixed(),
+                    return_type.unwrap_or_else(get_void),
+                ]),
+            );
+
+            signature.return_type = Some(Arc::new(TUnion::from_atomic(TAtomic::Object(TObject::Named(generator)))));
+        } else if !function_metadata.flags.has_yield() {
+            let mut inferred_return_type = None;
+            for inferred_return in inner_artifacts.inferred_return_types {
+                inferred_return_type = Some(add_optional_union_type(
+                    (*inferred_return).clone(),
+                    inferred_return_type.as_ref(),
+                    context.codebase,
+                ));
+            }
+
+            if let Some(inferred_return_type) = inferred_return_type {
+                signature.return_type = Some(Arc::new(inferred_return_type));
+            } else if inner_has_returned {
+                signature.return_type = Some(Arc::new(get_never()));
+            } else {
+                signature.return_type = Some(Arc::new(get_void()));
+            }
+        }
+    }
+
+    TUnion::from_atomic(TAtomic::Callable(TCallable::Signature(signature)))
 }
 
 pub fn analyze_function_like<'ctx, 'ast, 'arena, A>(

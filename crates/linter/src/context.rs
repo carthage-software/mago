@@ -93,15 +93,6 @@ where
         self.imports.import(fqn, ImportKind::Constant)
     }
 
-    /// Returns the span of `use function <fqn>;` when `<fqn>` is bound to
-    /// `local` and that `use` statement holds only this one item. Used by
-    /// rules that migrate a `use function` import to a different shape and
-    /// want to remove the now-orphaned line in the same fix pass.
-    #[must_use]
-    pub fn sole_function_import_use_span(&self, local: &[u8]) -> Option<mago_span::Span> {
-        self.imports.sole_function_import_use_span(local)
-    }
-
     /// Like [`sole_function_import_use_span`] but removes the entry after returning it.
     pub fn take_sole_function_import_use_span(&mut self, local: &[u8]) -> Option<mago_span::Span> {
         self.imports.take_sole_function_import_use_span(local)
@@ -154,14 +145,6 @@ where
         self.get_nth_parent(0)
     }
 
-    /// Returns the `NodeKind` of the immediate parent.
-    ///
-    /// Shorthand for `get_parent().map(|n| n.kind())`.
-    #[must_use]
-    pub fn get_parent_kind(&self) -> Option<NodeKind> {
-        self.get_parent().map(|n| n.kind())
-    }
-
     /// Returns the `n`-th ancestor node of the current node.
     ///
     /// `n = 0` is the immediate parent, `n = 1` is the grandparent, etc.
@@ -173,14 +156,6 @@ where
         let len = self.ancestors.len();
         let index = n + 2; // skip current (len-1) + 1 for the offset
         if len >= index { Some(self.ancestors[len - index]) } else { None }
-    }
-
-    /// Returns the `NodeKind` of the `n`-th ancestor.
-    ///
-    /// Shorthand for `get_nth_parent(n).map(|n| n.kind())`.
-    #[must_use]
-    pub fn get_nth_parent_kind(&self, n: usize) -> Option<NodeKind> {
-        self.get_nth_parent(n).map(|n| n.kind())
     }
 
     /// Returns `true` if any ancestor of the current node has the given kind.
