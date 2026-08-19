@@ -39,9 +39,9 @@ const SPONSORS_URL = 'https://raw.githubusercontent.com/azjezz/azjezz/develop/sp
  */
 const MANUAL_SPONSORS = [
     [
-        'name' => 'Check24',
+        'name' => 'CHECK24',
         'websiteUrl' => 'https://opensource.check24.de/project/mago/',
-        'avatarUrl' => 'https://www.check24.de/assets/images/web/misc/check24_200x200.png',
+        'avatarUrl' => 'https://carthage.software/media/01a01a1f-9b15-5cd1-1205-96a7452e17cb',
         'tier' => 'large',
         'until' => '2028-09-19',
     ],
