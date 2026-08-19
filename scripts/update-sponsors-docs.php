@@ -41,7 +41,7 @@ const MANUAL_SPONSORS = [
     [
         'name' => 'Check24',
         'websiteUrl' => 'https://opensource.check24.de/project/mago/',
-        'avatarUrl' => 'https://opensource.check24.de/brand/check24.svg',
+        'avatarUrl' => 'https://www.check24.de/assets/images/web/misc/check24_200x200.png',
         'tier' => 'large',
         'until' => '2028-09-19',
     ],

@@ -5,7 +5,7 @@ A heartfelt thank you to the generous individuals and organizations listed below
 To become a sponsor, please visit [the sponsorship page](https://github.com/sponsors/azjezz).
 
 ---
-<a href="https://opensource.check24.de/project/mago/" title="Check24"><kbd><img src="https://opensource.check24.de/brand/check24.svg" width="80" height="80" alt="Check24" /></kbd></a>
+<a href="https://opensource.check24.de/project/mago/" title="Check24"><kbd><img src="https://www.check24.de/assets/images/web/misc/check24_200x200.png" width="80" height="80" alt="Check24" /></kbd></a>
 
 ---
 
