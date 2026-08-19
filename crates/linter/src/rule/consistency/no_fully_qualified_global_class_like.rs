@@ -66,20 +66,31 @@ impl NoFullyQualifiedGlobalClassLikeRule {
         let fqn_span = identifier.span();
 
         let resolution = ctx.import_name(class_name_bytes);
+        let suggested_alias =
+            if resolution.is_none() { ctx.suggest_name_alias_for_conflict(class_name_bytes) } else { None };
 
         let class_name = mago_bytes::BytesDisplay(class_name_bytes);
         let short_name_display = mago_bytes::BytesDisplay(short_name);
 
-        let (title, help) = match &resolution {
-            Some(res) if res.is_already_available() && res.local_name.as_bytes() != short_name => (
+        let (title, help) = match (&resolution, suggested_alias.as_deref()) {
+            (Some(res), _) if res.is_already_available() && res.local_name.as_bytes() != short_name => (
                 "Fully-qualified class-like reference can be replaced with an existing alias.",
                 format!("`{class_name}` is already imported as `{}`; replace the reference with it.", res.local_name),
             ),
-            Some(res) if res.is_already_available() => (
+            (Some(res), _) if res.is_already_available() => (
                 "Fully-qualified class-like reference is already in scope.",
                 format!("`{class_name}` is already reachable as `{}`; drop the leading `\\`.", res.local_name),
             ),
-            Some(_) | None => (
+            (None, Some(alias)) => {
+                let alias = mago_bytes::BytesDisplay(alias);
+                (
+                    "Fully-qualified class-like reference conflicts with a name in scope.",
+                    format!(
+                        "Import with a non-conflicting alias: `use {class_name} as {alias};`, then reference `{alias}` directly."
+                    ),
+                )
+            }
+            (Some(_), _) | (None, None) => (
                 "Fully-qualified class-like reference detected.",
                 format!("Add `use {class_name};` and reference `{short_name_display}` directly."),
             ),

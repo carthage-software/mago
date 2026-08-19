@@ -3,6 +3,7 @@ use mago_allocator::prelude::*;
 use mago_collector::Collector;
 use mago_database::file::File;
 use mago_names::ResolvedNames;
+use mago_names::kind::NameKind;
 use mago_php_version::PHPVersion;
 use mago_span::HasPosition;
 use mago_syntax::cst::Node;
@@ -79,7 +80,119 @@ where
     /// in a single pass. When the whitespace run is exhausted later imports
     /// fall back to the base offset and conflict with the first.
     pub fn import_name(&mut self, fqn: &[u8]) -> Option<ImportResolution> {
+        if self.has_implicit_name_conflict(fqn) {
+            return None;
+        }
+
         self.imports.import(fqn, ImportKind::Name)
+    }
+
+    /// Returns whether importing `fqn` by its short name would shadow a
+    /// different class-like reference in the same import scope.
+    ///
+    /// Name resolution knows that an unqualified `SomeInterface` in namespace
+    /// `A` means `A\SomeInterface` even when its declaration is in another
+    /// file. The import tracker cannot discover that relationship from the
+    /// current AST alone.
+    fn has_implicit_name_conflict(&self, fqn: &[u8]) -> bool {
+        let fqn = fqn.strip_prefix(b"\\").unwrap_or(fqn);
+        let short_name = fqn.rsplit(|byte| *byte == b'\\').next().unwrap_or(fqn);
+        let import_scope = self.current_import_scope();
+
+        self.resolved_names.iter().any(|(start, _, resolved, imported)| {
+            let Some(metadata) = self.resolved_names.metadata_at_offset(start) else {
+                return false;
+            };
+
+            if metadata.kind() != NameKind::Default || metadata.import_scope() != import_scope || imported {
+                return false;
+            }
+
+            let original = metadata.original();
+            if original.starts_with(b"\\") {
+                return false;
+            }
+
+            let root = metadata.root();
+            if !root.eq_ignore_ascii_case(short_name) {
+                return false;
+            }
+
+            let suffix = &original[root.len()..];
+            !resolution_matches_import(resolved, fqn, suffix)
+        })
+    }
+
+    /// Suggests a non-conflicting alias when importing `fqn` by its short name
+    /// would collide with another class-like name in the current import scope.
+    #[must_use]
+    pub fn suggest_name_alias_for_conflict(&self, fqn: &[u8]) -> Option<std::vec::Vec<u8>> {
+        let fqn = fqn.strip_prefix(b"\\").unwrap_or(fqn);
+        let short_name = fqn.rsplit(|byte| *byte == b'\\').next().unwrap_or(fqn);
+        if !self.has_implicit_name_conflict(fqn) && !self.imports.is_name_bound(short_name) {
+            return None;
+        }
+
+        let parts = fqn.split(|byte| *byte == b'\\').collect::<std::vec::Vec<_>>();
+        let mut base = std::vec::Vec::new();
+
+        if parts.len() > 1 {
+            for start in (0..parts.len() - 1).rev() {
+                base.clear();
+                for part in &parts[start..] {
+                    base.extend_from_slice(part);
+                }
+
+                if self.is_name_alias_available(&base) {
+                    return Some(base);
+                }
+            }
+        } else {
+            base.extend_from_slice(short_name);
+            base.extend_from_slice(b"Alias");
+            if self.is_name_alias_available(&base) {
+                return Some(base);
+            }
+        }
+
+        for suffix in 2u32.. {
+            let mut candidate = base.clone();
+            candidate.extend_from_slice(suffix.to_string().as_bytes());
+            if self.is_name_alias_available(&candidate) {
+                return Some(candidate);
+            }
+        }
+
+        unreachable!("an unused numeric alias suffix must eventually exist")
+    }
+
+    fn is_name_alias_available(&self, alias: &[u8]) -> bool {
+        if self.imports.is_name_bound(alias) {
+            return false;
+        }
+
+        let import_scope = self.current_import_scope();
+        !self.resolved_names.iter().any(|(start, _, _, _)| {
+            let Some(metadata) = self.resolved_names.metadata_at_offset(start) else {
+                return false;
+            };
+
+            metadata.kind() == NameKind::Default
+                && metadata.import_scope() == import_scope
+                && !metadata.original().starts_with(b"\\")
+                && metadata.root().eq_ignore_ascii_case(alias)
+        })
+    }
+
+    /// Returns the namespace declaration that owns the current import table.
+    ///
+    /// The declaration offset distinguishes repeated blocks with the same
+    /// namespace name, including multiple `namespace { ... }` blocks.
+    fn current_import_scope(&self) -> Option<u32> {
+        self.ancestors.iter().rev().find_map(|node| match node {
+            Node::Namespace(namespace) => Some(namespace.namespace.span.start.offset),
+            _ => None,
+        })
     }
 
     /// Same as [`import_name`](Self::import_name) but emits `use function ...;`.
@@ -168,4 +281,10 @@ where
 
         self.ancestors[..len - 1].iter().any(|n| n.kind() == kind)
     }
+}
+
+fn resolution_matches_import(resolved: &[u8], fqn: &[u8], suffix: &[u8]) -> bool {
+    resolved.len() == fqn.len() + suffix.len()
+        && resolved[..fqn.len()].eq_ignore_ascii_case(fqn)
+        && resolved[fqn.len()..].eq_ignore_ascii_case(suffix)
 }

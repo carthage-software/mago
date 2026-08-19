@@ -327,6 +327,13 @@ impl ImportTracker {
         self.scope.sole_function_import_use_span.remove(&lookup)
     }
 
+    /// Returns whether a class-like local name is already bound in this import scope.
+    #[must_use]
+    pub fn is_name_bound(&self, local: &[u8]) -> bool {
+        let lookup = ascii_lowercase_word(local);
+        self.scope.class_imports.contains_key(&lookup) || self.scope.local_classes.contains(&lookup)
+    }
+
     pub fn import(&mut self, fqn: &[u8], kind: ImportKind) -> Option<ImportResolution> {
         let (namespace_part, short_part) = split_fqn(fqn)?;
         if is_reserved_type_name(short_part, kind) {
