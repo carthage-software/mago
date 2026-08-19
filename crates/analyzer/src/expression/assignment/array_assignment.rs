@@ -74,22 +74,14 @@ where
         array_target_expressions.last().unwrap_unchecked().get_array()
     };
 
-    let was_inside_general_use = block_context.flags.inside_general_use();
-    block_context.flags.set_inside_general_use(true);
-    root_array_expression.analyze(context, block_context, artifacts)?;
-    block_context.flags.set_inside_general_use(was_inside_general_use);
-
-    let mut root_array_type = artifacts.get_expression_type(root_array_expression).cloned().unwrap_or_else(get_mixed);
-
-    if root_array_type.is_mixed() {
+    if artifacts.get_expression_type(root_array_expression).is_none() {
         let was_inside_general_use = block_context.flags.inside_general_use();
         block_context.flags.set_inside_general_use(true);
-        array_target.get_array().analyze(context, block_context, artifacts)?;
-        if let Some(index) = array_target.get_index() {
-            index.analyze(context, block_context, artifacts)?;
-        }
+        root_array_expression.analyze(context, block_context, artifacts)?;
         block_context.flags.set_inside_general_use(was_inside_general_use);
     }
+
+    let mut root_array_type = artifacts.get_expression_type(root_array_expression).cloned().unwrap_or_else(get_mixed);
 
     let mut current_type = root_array_type.clone();
 
