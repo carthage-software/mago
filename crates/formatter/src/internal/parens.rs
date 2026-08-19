@@ -569,6 +569,10 @@ where
     }
 
     const fn function_callee_expression_need_parenthesis(&self, expression: &'arena Expression<'arena>) -> bool {
+        if let Expression::Construct(construct) = expression {
+            return !construct.has_bounds();
+        }
+
         !matches!(
             expression,
             Expression::Literal(_)
@@ -577,7 +581,6 @@ where
                 | Expression::ArrayAccess(_)
                 | Expression::Variable(_)
                 | Expression::Identifier(_)
-                | Expression::Construct(_)
                 | Expression::Call(_)
                 | Expression::PartialApplication(_)
                 | Expression::Static(_)

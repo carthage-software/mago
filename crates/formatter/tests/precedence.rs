@@ -147,6 +147,11 @@ mod precedence {
     test_expression_format!(complex_10_messy, b"$a = ($b . ($b << $c) . $d)", b"$a = $b . ($b << $c) . $d");
     test_expression_format!(complex_11_messy, b"($a = (- ($b ** $c)))", b"$a = -$b ** $c");
     test_expression_format!(error_control_include, b"$a = (@include $b) === $c", b"$a = (@include $b) === $c");
+    test_expression_format!(invoke_include_result, b"(include $path)($arg)", b"(include $path)($arg)");
+    test_expression_format!(invoke_include_once_result, b"(include_once $path)($arg)", b"(include_once $path)($arg)");
+    test_expression_format!(invoke_require_result, b"(require $path)($arg)", b"(require $path)($arg)");
+    test_expression_format!(invoke_require_once_result, b"(require_once $path)($arg)", b"(require_once $path)($arg)");
+    test_expression_format!(invoke_print_result, b"(print $value)($arg)", b"(print $value)($arg)");
     test_expression_format!(error_control_new, b"$a = (@(new Foo($x))) === $c", b"$a = @new Foo($x) === $c");
     test_expression_format!(nonassoc_identical_parens_left, b"($a === 'b') === $c", b"($a === 'b') === $c");
     test_expression_format!(nonassoc_less_than_parens_left, b"($a < $b) < $c", b"($a < $b) < $c");
