@@ -31,6 +31,7 @@ use crate::error::ReportingError;
 use crate::formatter::Formatter;
 use crate::formatter::FormatterConfig;
 use crate::formatter::utils::osc8_hyperlink;
+use crate::formatter::utils::utf8_preserving_byte_offsets;
 
 /// Formatter that outputs issues in rich diagnostic format with full context.
 pub(crate) struct RichFormatter;
@@ -164,7 +165,7 @@ impl<'db> DatabaseFiles<'db> {
         let mut sources: HashMap<FileId, String> = HashMap::default();
         for file_id in referenced_ids {
             if let Ok(file) = database.get_ref(&file_id) {
-                sources.insert(file_id, String::from_utf8_lossy(file.contents.as_ref()).into_owned());
+                sources.insert(file_id, utf8_preserving_byte_offsets(file.contents.as_ref()).into_owned());
             }
         }
 

@@ -304,6 +304,29 @@ mod tests {
         buffer
     }
 
+    fn report_invalid_utf8_source(format: ReportingFormat) -> Vec<u8> {
+        let source = b"<?php\nclass \xa9 {}\n";
+        let file = File::ephemeral(Cow::Borrowed(b"test.php"), Cow::Borrowed(source));
+        let file_id = file.id;
+        let reporter = reporter_for_file(format, file);
+        let Some(invalid_offset) = source.iter().position(|byte| *byte == 0xa9) else {
+            panic!("test source should contain invalid UTF-8");
+        };
+        let invalid_offset = invalid_offset as u32;
+        let issue = Issue::error("invalid class name").with_annotation(Annotation::primary(Span::new(
+            file_id,
+            invalid_offset.into(),
+            (invalid_offset + 1).into(),
+        )));
+        let mut buffer = Vec::new();
+
+        let Ok(_) = reporter.report_to(IssueCollection::from([issue]), None, &mut buffer) else {
+            panic!("reporting invalid UTF-8 source should succeed");
+        };
+
+        buffer
+    }
+
     fn report_empty(format: ReportingFormat) -> Vec<u8> {
         let reporter = reporter_for(format);
         let mut buffer = Vec::new();
@@ -322,6 +345,18 @@ mod tests {
         assert!(report_empty(ReportingFormat::Rich).is_empty());
         assert!(report_empty(ReportingFormat::Medium).is_empty());
         assert!(report_empty(ReportingFormat::Short).is_empty());
+    }
+
+    #[test]
+    fn source_rendering_handles_invalid_utf8() {
+        for format in [ReportingFormat::Rich, ReportingFormat::Medium, ReportingFormat::Short, ReportingFormat::Ariadne]
+        {
+            let Ok(output) = String::from_utf8(report_invalid_utf8_source(format)) else {
+                panic!("human-readable report should be UTF-8");
+            };
+
+            assert!(output.contains("invalid class name"));
+        }
     }
 
     #[test]

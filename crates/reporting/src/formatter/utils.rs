@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::cmp::Ordering;
 
 use crate::Issue;
@@ -81,6 +82,37 @@ pub fn filter_issues<'issues>(
     } else {
         FilteredIssues::Lazy(lazy)
     }
+}
+
+pub(crate) fn utf8_preserving_byte_offsets(bytes: &[u8]) -> Cow<'_, str> {
+    if let Ok(source) = std::str::from_utf8(bytes) {
+        return Cow::Borrowed(source);
+    }
+
+    let mut source = String::with_capacity(bytes.len());
+    let mut offset = 0;
+
+    while offset < bytes.len() {
+        match std::str::from_utf8(&bytes[offset..]) {
+            Ok(suffix) => {
+                source.push_str(suffix);
+                break;
+            }
+            Err(error) => {
+                let valid_end = offset + error.valid_up_to();
+                source.push_str(String::from_utf8_lossy(&bytes[offset..valid_end]).as_ref());
+
+                let invalid_length = error.error_len().unwrap_or(bytes.len() - valid_end);
+                for _ in 0..invalid_length {
+                    source.push('?');
+                }
+
+                offset = valid_end + invalid_length;
+            }
+        }
+    }
+
+    Cow::Owned(source)
 }
 
 #[inline]
@@ -213,7 +245,17 @@ fn strip_windows_verbatim_prefix(path: &str) -> std::borrow::Cow<'_, str> {
 #[cfg(test)]
 mod tests {
     use super::strip_windows_verbatim_prefix;
+    use super::utf8_preserving_byte_offsets;
     use super::xml_encode;
+
+    #[test]
+    fn preserves_byte_offsets_when_replacing_invalid_utf8() {
+        let bytes = b"valid \xc2\xa9 invalid \xa9 truncated \xf0\x9f\nnext";
+        let source = utf8_preserving_byte_offsets(bytes);
+
+        assert_eq!(source.len(), bytes.len());
+        assert_eq!(source.as_bytes(), b"valid \xc2\xa9 invalid ? truncated ??\nnext");
+    }
 
     #[test]
     fn xml_encoding_escapes_markup_and_line_boundaries() {

@@ -17,6 +17,7 @@ use crate::Level;
 use crate::error::ReportingError;
 use crate::formatter::Formatter;
 use crate::formatter::FormatterConfig;
+use crate::formatter::utils::utf8_preserving_byte_offsets;
 
 /// Formatter that outputs issues using the Ariadne diagnostic library.
 pub(crate) struct AriadneFormatter;
@@ -92,7 +93,7 @@ impl Formatter for AriadneFormatter {
 
                 relevant_sources.push((
                     String::from_utf8_lossy(&file.name).into_owned(),
-                    String::from_utf8_lossy(&file.contents).into_owned(),
+                    utf8_preserving_byte_offsets(&file.contents).into_owned(),
                 ));
             }
 
