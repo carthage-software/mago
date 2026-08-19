@@ -80,7 +80,7 @@ final class SponsorsData
     private const SMALL_SPONSOR_THRESHOLD = 25;
 
     private const MANUAL_TIER_SORT_AMOUNTS = [
-        'large' => 500,
+        'large' => 400,
         'medium' => 99,
         'small' => 49,
         'supporter' => 24,
