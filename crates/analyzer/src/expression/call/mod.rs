@@ -718,11 +718,11 @@ where
     Ok(())
 }
 
-fn analyze_invocation_arguments_source<'ctx, 'ast, 'arena, A>(
+fn analyze_invocation_arguments_source<'ctx, 'arena, A>(
     context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
-    invocation_arguments: &InvocationArgumentsSource<'ast, 'arena>,
+    invocation_arguments: &InvocationArgumentsSource<'_, 'arena>,
 ) -> Result<(), AnalysisError>
 where
     A: Arena,
