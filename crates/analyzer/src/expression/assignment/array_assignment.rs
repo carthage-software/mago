@@ -82,6 +82,8 @@ where
     }
 
     let mut root_array_type = artifacts.get_expression_type(root_array_expression).cloned().unwrap_or_else(get_mixed);
+    let root_is_array_access_object =
+        root_array_type.types.iter().all(|atomic| atomic.extends_or_implements(context.codebase, b"ArrayAccess"));
 
     let mut current_type = root_array_type.clone();
 
@@ -136,7 +138,11 @@ where
             property_access,
             &root_array_type,
             Some(root_array_expression.span()),
-            PropertyWriteKind::Mutation,
+            if root_is_array_access_object {
+                PropertyWriteKind::ArrayAccessMutation
+            } else {
+                PropertyWriteKind::Mutation
+            },
         )?;
     }
 

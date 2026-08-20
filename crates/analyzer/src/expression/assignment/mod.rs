@@ -67,6 +67,7 @@ pub(crate) enum PropertyWriteKind {
     Direct,
     Coalesce,
     Mutation,
+    ArrayAccessMutation,
 }
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Assignment<'arena> {

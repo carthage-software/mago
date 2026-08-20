@@ -144,6 +144,7 @@ pub(crate) fn check_property_write<A>(
     });
 
     let certainty = match write_kind {
+        PropertyWriteKind::ArrayAccessMutation => return,
         PropertyWriteKind::Mutation => PendingCertainty::Invalid(InvalidWriteReason::Mutation),
         PropertyWriteKind::Coalesce if !property_can_be_null || current_value_is_non_null => return,
         PropertyWriteKind::Coalesce => match local_state {
