@@ -2697,6 +2697,7 @@ test_case!(issue_2213, references = [("MixedCaseHolder", "USED", 1), ("lowercase
 test_case!(issue_2218);
 test_case!(issue_2219);
 test_case!(issue_2220);
+test_case!(issue_2226);
 
 #[test]
 #[cfg_attr(miri, ignore)]
