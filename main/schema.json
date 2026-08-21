@@ -8200,6 +8200,11 @@
           "type": "boolean",
           "default": false
         },
+        "preserve-breaking-pipe-expression": {
+          "description": "Whether to preserve line breaks in pipe expressions.\n\nDefault: false",
+          "type": "boolean",
+          "default": false
+        },
         "break-promoted-properties-list": {
           "description": "Whether to break a parameter list with one or more promoted properties into multiple lines.\n\nWhen enabled, parameter lists with promoted properties are always multi-line:\n```php\nclass User {\n    public function __construct(\n        public string $name,\n        public string $email,\n    ) {}\n}\n```\n\nWhen disabled, they may be kept on a single line if space allows:\n```php\nclass User {\n    public function __construct(public string $name, public string $email) {}\n}\n```\n\nDefault: true",
           "type": "boolean",
