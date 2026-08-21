@@ -31,6 +31,7 @@ use mago_codex::ttype::get_bool;
 use mago_codex::ttype::get_false;
 use mago_codex::ttype::get_float;
 use mago_codex::ttype::get_int;
+use mago_codex::ttype::get_int_or_float;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_named_object;
 use mago_codex::ttype::get_never;
@@ -40,6 +41,7 @@ use mago_codex::ttype::get_true;
 use mago_codex::ttype::get_void;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;
+use mago_php_version::PHPVersion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -101,11 +103,20 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPrefix<'arena> {
 
                 artifacts.set_rc_expression_type(self, Rc::new(referenced_type));
             }
-            UnaryPrefixOperator::ErrorControl(_)
-            | UnaryPrefixOperator::Plus(_)
-            | UnaryPrefixOperator::BitwiseNot(_) => {
+            UnaryPrefixOperator::ErrorControl(_) | UnaryPrefixOperator::BitwiseNot(_) => {
                 if let Some(operand_type) = operand_type {
                     artifacts.set_rc_expression_type(self, operand_type);
+                } else {
+                    artifacts.set_expression_type(self, get_mixed());
+                }
+            }
+            UnaryPrefixOperator::Plus(_) => {
+                if let Some(operand_type) = operand_type {
+                    if operand_type.is_numeric() && !operand_type.is_int_or_float() {
+                        artifacts.set_expression_type(self, get_int_or_float());
+                    } else {
+                        artifacts.set_rc_expression_type(self, operand_type);
+                    }
                 } else {
                     artifacts.set_expression_type(self, get_mixed());
                 }
@@ -452,6 +463,90 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPostfix<'arena> {
     }
 }
 
+fn adjust_numeric_string(value: Option<&[u8]>, adjustment: i64) -> Vec<TAtomic> {
+    if let Some(value) = value
+        && let Ok(value) = std::str::from_utf8(value)
+    {
+        let value = value.trim();
+        if let Ok(value) = value.parse::<i64>() {
+            return vec![TAtomic::Scalar(match value.checked_add(adjustment) {
+                Some(value) => TScalar::literal_int(value),
+                None => TScalar::literal_float(value as f64 + adjustment as f64),
+            })];
+        }
+
+        if let Ok(value) = value.parse::<f64>() {
+            return vec![TAtomic::Scalar(TScalar::literal_float(value + adjustment as f64))];
+        }
+    }
+
+    vec![TAtomic::Scalar(TScalar::int()), TAtomic::Scalar(TScalar::float())]
+}
+
+fn report_deprecated_string_increment<A>(context: &mut Context<'_, '_, A>, operand_span: Span, value: &[u8])
+where
+    A: Arena,
+{
+    if context.settings.version < PHPVersion::PHP83 || str_is_numeric_bytes(value) {
+        return;
+    }
+
+    let is_alphanumeric = !value.is_empty() && value.iter().all(u8::is_ascii_alphanumeric);
+    if context.settings.version < PHPVersion::PHP85 && is_alphanumeric {
+        return;
+    }
+
+    context.collector.report_with_code(
+        IssueCode::DeprecatedFeature,
+        Issue::warning("Incrementing a non-numeric string is deprecated.")
+            .with_annotation(Annotation::primary(operand_span).with_message("Deprecated string increment"))
+            .with_note(if is_alphanumeric {
+                "Incrementing non-numeric strings is deprecated as of PHP 8.5."
+            } else {
+                "Incrementing empty or non-alphanumeric strings is deprecated as of PHP 8.3."
+            })
+            .with_help("Use `str_increment()` for alphanumeric string increments."),
+    );
+}
+
+fn report_deprecated_string_decrement<A>(context: &mut Context<'_, '_, A>, operand_span: Span, value: &[u8])
+where
+    A: Arena,
+{
+    if context.settings.version < PHPVersion::PHP83 || str_is_numeric_bytes(value) {
+        return;
+    }
+
+    context.collector.report_with_code(
+        IssueCode::DeprecatedFeature,
+        Issue::warning("Decrementing a non-numeric string is deprecated.")
+            .with_annotation(Annotation::primary(operand_span).with_message("Deprecated string decrement"))
+            .with_note("Decrementing empty or non-numeric strings is deprecated as of PHP 8.3.")
+            .with_help("Handle the string explicitly or ensure it is numeric before decrementing it."),
+    );
+}
+
+fn report_ineffective_increment_or_decrement<A>(
+    context: &mut Context<'_, '_, A>,
+    operand_span: Span,
+    operation: &str,
+    operand_type: &str,
+) where
+    A: Arena,
+{
+    if context.settings.version < PHPVersion::PHP83 {
+        return;
+    }
+
+    context.collector.report_with_code(
+        IssueCode::InvalidOperand,
+        Issue::warning(format!("{operation} a value of type `{operand_type}` has no effect."))
+            .with_annotation(Annotation::primary(operand_span).with_message("This operation has no effect"))
+            .with_note("PHP emits an `E_WARNING` for this operation as of PHP 8.3.")
+            .with_help("Remove the operation or convert the value to an integer first."),
+    );
+}
+
 /// Increments the given operand and returns its type after incrementing.
 ///
 /// If the operand is a variable-like entity, the function attempts to assign the incremented value back to it.
@@ -511,55 +606,45 @@ where
                     }
                 }
                 TScalar::Numeric => {
-                    possibilities.push(TAtomic::Scalar(TScalar::numeric()));
+                    possibilities.push(TAtomic::Scalar(TScalar::int()));
+                    possibilities.push(TAtomic::Scalar(TScalar::float()));
                 }
                 TScalar::String(string_scalar) => {
-                    if block_context.flags.inside_loop() {
-                        possibilities.push(TAtomic::Scalar(TScalar::String(string_scalar.without_literal())));
-                    } else if let Some(TStringLiteral::Value(string_val)) = &string_scalar.literal {
-                        let string_bytes = string_val.as_bytes();
-                        if string_bytes.is_empty() {
-                            possibilities.push(TAtomic::Scalar(TScalar::literal_string(word(b"1"))));
-                        } else if str_is_numeric_bytes(string_bytes) {
-                            let mut negative = false;
-                            let value: &[u8] = if let Some(value) = string_bytes.strip_prefix(b"+") {
-                                value
-                            } else if let Some(value) = string_bytes.strip_prefix(b"-") {
-                                negative = true;
-                                value
-                            } else {
-                                string_bytes
-                            };
+                    if let Some(TStringLiteral::Value(string_val)) = &string_scalar.literal {
+                        report_deprecated_string_increment(context, operand.span(), string_val.as_bytes());
+                    }
 
-                            let value = mago_bytes::trim_start_byte(value, b'0');
-                            if value.is_empty() {
-                                possibilities.push(TAtomic::Scalar(TScalar::literal_int(1)));
-                            } else if let Some(value) =
-                                std::str::from_utf8(value).ok().and_then(|s| s.parse::<i64>().ok())
-                            {
-                                let signed_value = if negative { -value } else { value };
-                                possibilities.push(TAtomic::Scalar(TScalar::literal_int(signed_value.wrapping_add(1))));
-                            } else if let Some(value) =
-                                std::str::from_utf8(value).ok().and_then(|s| s.parse::<f64>().ok())
-                            {
-                                let signed_value = if negative { -value } else { value };
-                                possibilities.push(TAtomic::Scalar(TScalar::literal_float(signed_value + 1.0)));
-                            } else {
-                                possibilities.push(TAtomic::Scalar(TScalar::int()));
-                                possibilities.push(TAtomic::Scalar(TScalar::float()));
+                    if string_scalar.is_numeric {
+                        let value = if block_context.flags.inside_loop() {
+                            None
+                        } else {
+                            match &string_scalar.literal {
+                                Some(TStringLiteral::Value(value)) => Some(value.as_bytes()),
+                                _ => None,
                             }
-                        } else if let Some(incremented) = str_increment_bytes(string_bytes) {
+                        };
+
+                        possibilities.extend(adjust_numeric_string(value, 1));
+                    } else if !block_context.flags.inside_loop()
+                        && let Some(TStringLiteral::Value(string_val)) = &string_scalar.literal
+                    {
+                        if string_val.is_empty() {
+                            possibilities.push(TAtomic::Scalar(TScalar::literal_string(word(b"1"))));
+                        } else if let Some(incremented) = str_increment_bytes(string_val.as_bytes()) {
                             possibilities.push(TAtomic::Scalar(TScalar::literal_string(word(incremented.as_bytes()))));
                         } else {
                             possibilities
                                 .push(TAtomic::Scalar(TScalar::String(string_scalar.with_unspecified_literal())));
                         }
                     } else {
-                        // Non-literal string: result is string, but value unknown.
-                        possibilities.push(TAtomic::Scalar(TScalar::String(*string_scalar)));
+                        possibilities.push(TAtomic::Scalar(TScalar::int()));
+                        possibilities.push(TAtomic::Scalar(TScalar::float()));
+                        possibilities.push(TAtomic::Scalar(TScalar::string()));
                     }
                 }
                 TScalar::Bool(boolean_scalar) => {
+                    report_ineffective_increment_or_decrement(context, operand.span(), "Incrementing", "bool");
+
                     // PHP: ++true remains true, ++false remains false. The type remains bool.
                     possibilities.push(TAtomic::Scalar(TScalar::Bool(*boolean_scalar)));
                 }
@@ -759,64 +844,42 @@ where
                         }
                     }
                     TScalar::Numeric => {
-                        possibilities.push(TAtomic::Scalar(TScalar::numeric()));
+                        possibilities.push(TAtomic::Scalar(TScalar::int()));
+                        possibilities.push(TAtomic::Scalar(TScalar::float()));
                     }
                     TScalar::String(string_scalar) => {
-                        if block_context.flags.inside_loop() {
-                            possibilities.push(TAtomic::Scalar(TScalar::String(string_scalar.without_literal())));
-                        } else if !string_scalar.is_numeric {
-                            context.collector.report_with_code(
-                                IssueCode::InvalidOperand,
-                                Issue::error("Cannot decrement a non-numeric string.")
-                                    .with_annotation(
-                                        Annotation::primary(operand.span())
-                                            .with_message("Invalid string for decrement."),
-                                    )
-                                    .with_note("String decrement supports numeric strings only.")
-                                    .with_help("Decrementing a non-numeric string has no effects on the string value."),
-                            );
+                        if let Some(TStringLiteral::Value(string_val)) = &string_scalar.literal {
+                            report_deprecated_string_decrement(context, operand.span(), string_val.as_bytes());
+                        }
 
-                            possibilities.push(TAtomic::Scalar(TScalar::String(*string_scalar)));
-                        } else if let Some(TStringLiteral::Value(string_val)) = &string_scalar.literal {
-                            let string_bytes = string_val.as_bytes();
-                            if string_bytes.is_empty() {
+                        if string_scalar.is_numeric {
+                            let value = if block_context.flags.inside_loop() {
+                                None
+                            } else {
+                                match &string_scalar.literal {
+                                    Some(TStringLiteral::Value(value)) => Some(value.as_bytes()),
+                                    _ => None,
+                                }
+                            };
+
+                            possibilities.extend(adjust_numeric_string(value, -1));
+                        } else if !block_context.flags.inside_loop()
+                            && let Some(TStringLiteral::Value(string_val)) = &string_scalar.literal
+                        {
+                            if string_val.is_empty() {
                                 possibilities.push(TAtomic::Scalar(TScalar::literal_int(-1)));
                             } else {
-                                let mut negative = false;
-                                let value: &[u8] = if let Some(value) = string_bytes.strip_prefix(b"+") {
-                                    value
-                                } else if let Some(value) = string_bytes.strip_prefix(b"-") {
-                                    negative = true;
-                                    value
-                                } else {
-                                    string_bytes
-                                };
-
-                                let value = mago_bytes::trim_start_byte(value, b'0');
-                                if value.is_empty() {
-                                    possibilities.push(TAtomic::Scalar(TScalar::literal_int(-1)));
-                                } else if let Some(value) =
-                                    std::str::from_utf8(value).ok().and_then(|s| s.parse::<i64>().ok())
-                                {
-                                    let signed_value = if negative { -value } else { value };
-                                    possibilities
-                                        .push(TAtomic::Scalar(TScalar::literal_int(signed_value.wrapping_sub(1))));
-                                } else if let Some(value) =
-                                    std::str::from_utf8(value).ok().and_then(|s| s.parse::<f64>().ok())
-                                {
-                                    let signed_value = if negative { -value } else { value };
-                                    possibilities.push(TAtomic::Scalar(TScalar::literal_float(signed_value - 1.0)));
-                                } else {
-                                    possibilities.push(TAtomic::Scalar(TScalar::int()));
-                                    possibilities.push(TAtomic::Scalar(TScalar::float()));
-                                }
+                                possibilities.push(TAtomic::Scalar(TScalar::String(*string_scalar)));
                             }
                         } else {
-                            // Non-literal string: result is string, but value unknown.
-                            possibilities.push(TAtomic::Scalar(TScalar::String(*string_scalar)));
+                            possibilities.push(TAtomic::Scalar(TScalar::int()));
+                            possibilities.push(TAtomic::Scalar(TScalar::float()));
+                            possibilities.push(TAtomic::Scalar(TScalar::string()));
                         }
                     }
                     TScalar::Bool(boolean_scalar) => {
+                        report_ineffective_increment_or_decrement(context, operand.span(), "Decrementing", "bool");
+
                         possibilities.push(TAtomic::Scalar(TScalar::Bool(*boolean_scalar)));
                     }
                     TScalar::ClassLikeString(_) => {
@@ -850,6 +913,8 @@ where
                 }
             }
             TAtomic::Null | TAtomic::Void => {
+                report_ineffective_increment_or_decrement(context, operand.span(), "Decrementing", "null");
+
                 // --null results in `null`
                 possibilities.push(TAtomic::Null);
             }
@@ -1840,11 +1905,15 @@ where
 #[cfg(test)]
 mod tests {
     use indoc::indoc;
+    use mago_php_version::PHPVersion;
 
+    use crate::code::IssueCode;
+    use crate::settings::Settings;
     use crate::test_analysis;
 
     test_analysis! {
         name = unary_increment_decrement_operators,
+        settings = Settings::new(PHPVersion::PHP82),
         code = indoc! {"
             <?php
 
@@ -2006,5 +2075,113 @@ mod tests {
             $b--;
             check($a, $b);
         "}
+    }
+
+    test_analysis! {
+        name = increment_decrement_runtime_types,
+        settings = Settings::new(PHPVersion::PHP82),
+        code = indoc! {"
+            <?php
+
+            function increment_string(string $value): int|float|string
+            {
+                return ++$value;
+            }
+
+            function decrement_string(string $value): int|float|string
+            {
+                return --$value;
+            }
+
+            /** @return 'fop' */
+            function increment_literal(): string
+            {
+                $value = 'foo';
+                return ++$value;
+            }
+
+            /** @return 'foo' */
+            function decrement_literal(): string
+            {
+                $value = 'foo';
+                return --$value;
+            }
+
+            /** @return -1 */
+            function decrement_empty_string(): int
+            {
+                $value = '';
+                return --$value;
+            }
+
+            function increment_bool(bool $value): bool
+            {
+                return ++$value;
+            }
+
+            function decrement_bool(bool $value): bool
+            {
+                return --$value;
+            }
+
+            function decrement_null(): null
+            {
+                $value = null;
+                return --$value;
+            }
+        "}
+    }
+
+    test_analysis! {
+        name = increment_decrement_diagnostics_php83,
+        settings = Settings::new(PHPVersion::PHP83),
+        code = indoc! {"
+            <?php
+
+            $increment_empty = '';
+            ++$increment_empty;
+
+            $increment_non_alphanumeric = '-cc';
+            ++$increment_non_alphanumeric;
+
+            $increment_alphanumeric = 'foo';
+            ++$increment_alphanumeric;
+
+            $decrement_empty = '';
+            --$decrement_empty;
+
+            $decrement_string = 'foo';
+            --$decrement_string;
+
+            $bool = true;
+            ++$bool;
+            --$bool;
+
+            $null = null;
+            --$null;
+        "},
+        issues = [
+            IssueCode::DeprecatedFeature,
+            IssueCode::DeprecatedFeature,
+            IssueCode::DeprecatedFeature,
+            IssueCode::DeprecatedFeature,
+            IssueCode::InvalidOperand,
+            IssueCode::InvalidOperand,
+            IssueCode::InvalidOperand,
+        ]
+    }
+
+    test_analysis! {
+        name = non_numeric_string_increment_deprecated_php85,
+        settings = Settings::new(PHPVersion::PHP85),
+        code = indoc! {"
+            <?php
+
+            $value = 'foo';
+            ++$value;
+        "},
+        issues = [
+            IssueCode::DeprecatedFeature,
+        ]
     }
 }

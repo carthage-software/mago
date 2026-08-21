@@ -339,6 +339,8 @@ where
                         get_literal_int(operand_value)
                     } else if let Some(operand_value) = operand_type.get_single_literal_float_value() {
                         TUnion::from_single(Cow::Owned(TAtomic::Scalar(TScalar::Float(TFloat::literal(operand_value)))))
+                    } else if operand_type.is_numeric() {
+                        get_int_or_float()
                     } else {
                         operand_type
                     })
@@ -350,6 +352,8 @@ where
                         TUnion::from_single(Cow::Owned(TAtomic::Scalar(TScalar::Float(TFloat::literal(
                             -operand_value,
                         )))))
+                    } else if operand_type.is_numeric() {
+                        get_int_or_float()
                     } else {
                         operand_type
                     })

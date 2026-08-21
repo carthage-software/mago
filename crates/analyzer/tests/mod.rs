@@ -1167,7 +1167,11 @@ test_case!(scalars_strict_arith_string_rejected);
 test_case!(scalars_strict_equality_int_string);
 test_case!(scalars_strict_inequality_int_float);
 test_case!(scalars_string_default_for_int_param);
-test_case!(scalars_string_increment_ok);
+test_case!(scalars_string_increment_ok, {
+    let mut settings = default_test_settings();
+    settings.version = mago_php_version::PHPVersion::PHP82;
+    settings
+});
 test_case!(scalars_string_to_int_param_strict);
 test_case!(scalars_subtraction_literals);
 test_case!(scalars_sum_in_loop_keeps_int);
@@ -2700,6 +2704,7 @@ test_case!(issue_2219);
 test_case!(issue_2220);
 test_case!(issue_2226);
 test_case!(issue_2227);
+test_case!(issue_2229);
 
 #[test]
 #[cfg_attr(miri, ignore)]
