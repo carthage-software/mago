@@ -9,6 +9,7 @@ use mago_codex::ttype::atomic::callable::TCallableConstraint;
 use mago_codex::ttype::atomic::callable::TCallableSignature;
 use mago_codex::ttype::atomic::callable::parameter::TCallableParameter;
 use mago_codex::ttype::template::TemplateResult;
+use mago_codex::ttype::template::inferred_type_replacer;
 use mago_codex::ttype::union::TUnion;
 use mago_syntax::cst::PartialApplication;
 use mago_syntax::cst::PartialArgument;
@@ -29,6 +30,48 @@ use crate::invocation::resolve_invocation_type;
 pub mod function_partial_application;
 pub mod method_partial_application;
 pub mod static_method_partial_application;
+
+fn create_closure_from_first_class_callable<A>(
+    context: &Context<'_, '_, A>,
+    mut signature: TCallableSignature,
+    template_result: &TemplateResult,
+) -> TAtomic
+where
+    A: Arena,
+{
+    for parameter in signature.get_parameters_mut() {
+        if let Some(parameter_type) = parameter.get_type_signature() {
+            *parameter = parameter.clone().with_type_signature(Some(Arc::new(inferred_type_replacer::replace(
+                parameter_type,
+                template_result,
+                context.codebase,
+            ))));
+        }
+
+        if let Some(closure_this_type) = parameter.get_closure_this_type() {
+            *parameter = parameter.clone().with_closure_this_type(Some(Arc::new(inferred_type_replacer::replace(
+                closure_this_type,
+                template_result,
+                context.codebase,
+            ))));
+        }
+    }
+
+    if let Some(return_type) = signature.get_return_type_mut() {
+        *return_type = inferred_type_replacer::replace(return_type, template_result, context.codebase);
+    }
+
+    for constraint in &mut signature.constraints {
+        constraint.input_type =
+            Arc::new(inferred_type_replacer::replace(&constraint.input_type, template_result, context.codebase));
+        constraint.parameter_type =
+            Arc::new(inferred_type_replacer::replace(&constraint.parameter_type, template_result, context.codebase));
+    }
+
+    signature.is_closure = true;
+
+    TAtomic::Callable(TCallable::Signature(signature))
+}
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for PartialApplication<'arena> {
     fn analyze<'ctx, A>(

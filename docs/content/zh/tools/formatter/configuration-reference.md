@@ -151,6 +151,7 @@ public function bar(
 | `preserve-breaking-attribute-list` | 布尔值 | `false` | 保留 attribute 列表中已有的换行。 |
 | `preserve-breaking-conditional-expression` | 布尔值 | `false` | 保留三元表达式中已有的换行。 |
 | `preserve-breaking-condition-expression` | 布尔值 | `false` | 保留控制结构条件中已有的换行。启用时,每个布尔运算符放在独立的一行。 |
+| `preserve-breaking-pipe-expression` | 布尔值 | `false` | 保留管道表达式中已有的换行。 |
 | `break-promoted-properties-list` | 布尔值 | `true` | 始终对包含构造器属性提升的形参列表进行换行。 |
 | `parameter-attribute-on-new-line` | 布尔值 | `true` | 形参列表换行时,把形参 attribute 放到独立的一行(PER-CS 12.2)。 |
 | `line-before-binary-operator` | 布尔值 | `true` | 二元表达式换行时,把运算符放到下一行。 |

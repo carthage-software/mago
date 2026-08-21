@@ -230,13 +230,26 @@ where
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena, A>) -> Document<'arena, A> {
         wrap!(f, self, Pipe, {
             let has_trailing_comments = f.has_comment(self.span(), CommentFlags::TRAILING);
-            let mut should_break = has_trailing_comments;
+            let mut should_break = has_trailing_comments
+                || (f.settings.preserve_breaking_pipe_expression
+                    && misc::has_new_line_in_range(
+                        f.source_text,
+                        self.input.end_offset(),
+                        self.callable.start_offset(),
+                    ));
 
             let mut callables: Vec<'arena, &'arena Expression<'arena>, A> = vec_in![f.arena];
             let mut input: &'arena Expression<'arena> = self.input;
 
             callables.push(self.callable);
             while let Expression::Pipe(inner_pipe) = unwrap_parenthesized(input) {
+                should_break |= f.settings.preserve_breaking_pipe_expression
+                    && misc::has_new_line_in_range(
+                        f.source_text,
+                        inner_pipe.input.end_offset(),
+                        inner_pipe.callable.start_offset(),
+                    );
+
                 callables.push(inner_pipe.callable);
                 input = inner_pipe.input;
             }

@@ -214,6 +214,8 @@ test_case!(preserve_breaking_condition_expression);
 test_case!(preserve_breaking_condition_expression_disabled);
 test_case!(preserve_breaking_binary_expression);
 test_case!(preserve_breaking_binary_expression_disabled);
+test_case!(preserve_breaking_pipe_expression);
+test_case!(preserve_breaking_pipe_expression_disabled);
 test_case!(indent_binary_expression_continuation);
 test_case!(preserve_breaking_parameter_list_promoted_properties);
 test_case!(hooks_always_break);

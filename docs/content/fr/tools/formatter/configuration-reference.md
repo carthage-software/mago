@@ -151,6 +151,7 @@ public function bar(
 | `preserve-breaking-attribute-list` | booléen | `false` | Préserver les sauts de ligne existants dans les listes d'attributs. |
 | `preserve-breaking-conditional-expression` | booléen | `false` | Préserver les sauts de ligne existants dans les ternaires. |
 | `preserve-breaking-condition-expression` | booléen | `false` | Préserver les sauts de ligne existants dans les conditions de structure de contrôle. Lorsque activé, chaque opérateur booléen va sur sa propre ligne. |
+| `preserve-breaking-pipe-expression` | booléen | `false` | Préserver les sauts de ligne existants dans les expressions pipe. |
 | `break-promoted-properties-list` | booléen | `true` | Toujours casser les listes de paramètres avec des propriétés promues. |
 | `parameter-attribute-on-new-line` | booléen | `true` | Mettre les attributs de paramètre sur leur propre ligne lorsque la liste de paramètres se casse (PER-CS 12.2). |
 | `line-before-binary-operator` | booléen | `true` | Lorsqu'une expression binaire se casse, placer l'opérateur sur la ligne suivante. |

@@ -512,6 +512,11 @@ generate_formatter_settings! {
     /// Default: false
     preserve_breaking_binary_expression: bool => "default_false",
 
+    /// Whether to preserve line breaks in pipe expressions.
+    ///
+    /// Default: false
+    preserve_breaking_pipe_expression: bool => "default_false",
+
     /// Whether to break a parameter list with one or more promoted properties into multiple lines.
     ///
     /// When enabled, parameter lists with promoted properties are always multi-line:
