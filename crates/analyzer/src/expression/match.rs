@@ -25,6 +25,8 @@ use mago_syntax::cst::MatchDefaultArm;
 use mago_syntax::cst::MatchExpressionArm;
 use mago_word::Word;
 use mago_word::WordSet;
+use mago_word::concat_word;
+use mago_word::u32_word;
 use mago_word::word;
 
 use crate::analyzable::Analyzable;
@@ -77,7 +79,7 @@ impl<'anlyz, 'ctx, 'ast, 'arena, A> MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena, A>
 where
     A: Arena,
 {
-    const SYNTHETIC_MATCH_VAR_PREFIX: &'static str = "$-tmp-match-";
+    const SYNTHETIC_MATCH_VAR_PREFIX: &'static [u8] = b"$-tmp-match-";
 
     fn new(
         stmt: &'ast Match<'arena>,
@@ -284,12 +286,11 @@ where
 
             (inserted, id, self.stmt.expression.clone())
         } else {
-            let subject_id_str =
-                format!("{}{}", Self::SYNTHETIC_MATCH_VAR_PREFIX, self.stmt.expression.span().start.offset);
-            let subject_id = mago_word::word(&subject_id_str);
+            let subject_id =
+                concat_word!(Self::SYNTHETIC_MATCH_VAR_PREFIX, u32_word(self.stmt.expression.start_offset()));
             self.block_context.locals.insert(subject_id, Rc::clone(subject_type));
             let subject_for_conditions =
-                new_synthetic_variable(self.context.arena, subject_id_str.as_bytes(), self.stmt.expression.span());
+                new_synthetic_variable(self.context.arena, subject_id.as_bytes(), self.stmt.expression.span());
 
             (true, subject_id, subject_for_conditions)
         }
