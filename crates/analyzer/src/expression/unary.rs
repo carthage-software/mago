@@ -46,6 +46,7 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
+use mago_syntax::cst::BinaryOperator;
 use mago_syntax::cst::Expression;
 use mago_syntax::cst::UnaryPostfix;
 use mago_syntax::cst::UnaryPostfixOperator;
@@ -331,7 +332,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPrefix<'arena> {
                         // if t.is_int() {
                         //     report_redundant_type_cast(&self.operator, self, &t, context);
                         // }
-                        cast_type_to_int(&t, context)
+                        cast_type_to_int(&t, self.operand, artifacts, context)
                     }
                     None => get_int(),
                 };
@@ -1398,10 +1399,136 @@ where
     TUnion::from_vec(combine(resulting_float_atomics, context.codebase, context.settings.combiner_options()))
 }
 
-fn cast_type_to_int<A>(operand_type: &TUnion, context: &Context<'_, '_, A>) -> TUnion
+#[derive(Clone, Copy)]
+struct NumericInterval {
+    minimum: f64,
+    maximum: f64,
+}
+
+impl NumericInterval {
+    fn new(minimum: f64, maximum: f64) -> Option<Self> {
+        (minimum.is_finite() && maximum.is_finite() && minimum <= maximum).then_some(Self { minimum, maximum })
+    }
+
+    fn from_expression(expression: &Expression<'_>, artifacts: &AnalysisArtifacts) -> Option<Self> {
+        match expression {
+            Expression::Parenthesized(parenthesized) => Self::from_expression(parenthesized.expression, artifacts),
+            Expression::UnaryPrefix(unary) => match unary.operator {
+                UnaryPrefixOperator::Plus(_)
+                | UnaryPrefixOperator::DoubleCast(_, _)
+                | UnaryPrefixOperator::RealCast(_, _)
+                | UnaryPrefixOperator::FloatCast(_, _) => Self::from_expression(unary.operand, artifacts),
+                UnaryPrefixOperator::Negation(_) => {
+                    let interval = Self::from_expression(unary.operand, artifacts)?;
+                    Self::new(-interval.maximum, -interval.minimum)
+                }
+                _ => Self::from_type(artifacts.get_expression_type(expression)?),
+            },
+            Expression::Binary(binary) => {
+                let expression_type = artifacts.get_expression_type(expression)?;
+                if !expression_type.has_float() {
+                    return Self::from_type(expression_type);
+                }
+
+                let left = Self::from_expression(binary.lhs, artifacts)?;
+                let right = Self::from_expression(binary.rhs, artifacts)?;
+
+                match binary.operator {
+                    BinaryOperator::Addition(_) => {
+                        Self::new(left.minimum + right.minimum, left.maximum + right.maximum)
+                    }
+                    BinaryOperator::Subtraction(_) => {
+                        Self::new(left.minimum - right.maximum, left.maximum - right.minimum)
+                    }
+                    BinaryOperator::Multiplication(_) => Self::from_candidates([
+                        left.minimum * right.minimum,
+                        left.minimum * right.maximum,
+                        left.maximum * right.minimum,
+                        left.maximum * right.maximum,
+                    ]),
+                    BinaryOperator::Division(_) if right.minimum > 0.0 || right.maximum < 0.0 => {
+                        Self::from_candidates([
+                            left.minimum / right.minimum,
+                            left.minimum / right.maximum,
+                            left.maximum / right.minimum,
+                            left.maximum / right.maximum,
+                        ])
+                    }
+                    _ => None,
+                }
+            }
+            _ => Self::from_type(artifacts.get_expression_type(expression)?),
+        }
+    }
+
+    fn from_type(operand_type: &TUnion) -> Option<Self> {
+        const MAX_EXACT_INTEGER: i64 = 1i64 << 53;
+
+        let mut minimum = f64::INFINITY;
+        let mut maximum = f64::NEG_INFINITY;
+
+        for atomic in operand_type.types.as_ref() {
+            let interval = match atomic {
+                TAtomic::Scalar(TScalar::Integer(integer)) => {
+                    let (Some(minimum), Some(maximum)) = integer.get_bounds() else { return None };
+                    if minimum < -MAX_EXACT_INTEGER || maximum > MAX_EXACT_INTEGER {
+                        return None;
+                    }
+
+                    Self { minimum: minimum as f64, maximum: maximum as f64 }
+                }
+                TAtomic::Scalar(TScalar::Float(TFloat::Literal(value))) => Self::new(value.0, value.0)?,
+                TAtomic::GenericParameter(parameter) => Self::from_type(&parameter.constraint)?,
+                _ => return None,
+            };
+
+            minimum = minimum.min(interval.minimum);
+            maximum = maximum.max(interval.maximum);
+        }
+
+        Self::new(minimum, maximum)
+    }
+
+    fn from_candidates(candidates: [f64; 4]) -> Option<Self> {
+        let mut minimum = f64::INFINITY;
+        let mut maximum = f64::NEG_INFINITY;
+
+        for candidate in candidates {
+            minimum = minimum.min(candidate);
+            maximum = maximum.max(candidate);
+        }
+
+        Self::new(minimum, maximum)
+    }
+
+    fn into_integer(self) -> Option<TInteger> {
+        let minimum = self.minimum.trunc();
+        let maximum = self.maximum.trunc();
+        let upper_limit = -(i64::MIN as f64);
+        if minimum < i64::MIN as f64 || maximum >= upper_limit {
+            return None;
+        }
+
+        Some(TInteger::from_bounds(Some(minimum as i64), Some(maximum as i64)))
+    }
+}
+
+fn cast_type_to_int<A>(
+    operand_type: &TUnion,
+    operand: &Expression<'_>,
+    artifacts: &AnalysisArtifacts,
+    context: &Context<'_, '_, A>,
+) -> TUnion
 where
     A: Arena,
 {
+    if operand_type.has_float()
+        && let Some(integer) =
+            NumericInterval::from_expression(operand, artifacts).and_then(NumericInterval::into_integer)
+    {
+        return TUnion::from_atomic(TAtomic::Scalar(TScalar::Integer(integer)));
+    }
+
     let mut possibilities = vec![];
     for t in operand_type.types.as_ref() {
         let possible = match t {
