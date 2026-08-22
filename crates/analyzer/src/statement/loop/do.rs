@@ -1,15 +1,15 @@
 use indexmap::IndexMap;
-use mago_allocator::Arena;
-use mago_word::WordSet;
 
 use mago_algebra::clause::Clause;
 use mago_algebra::find_satisfying_assignments;
 use mago_algebra::negate_formula;
 use mago_algebra::saturate_clauses;
+use mago_allocator::Arena;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_syntax::cst::DoWhile;
+use mago_word::WordSet;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -35,11 +35,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for DoWhile<'arena> {
         A: Arena,
     {
         let mut loop_block_context = block_context.clone();
-        loop_block_context.break_types.push(BreakContext::Loop);
+        loop_block_context.break_types.push(BreakContext::Loop(self.span()));
         loop_block_context.flags.set_inside_loop(true);
 
         let loop_scope = LoopScope::new(self.span(), block_context.locals.clone(), None);
-
         let mut mixed_variable_ids = vec![];
         for (variable_id, variable_type) in &loop_scope.parent_context_variables {
             if variable_type.is_mixed() {

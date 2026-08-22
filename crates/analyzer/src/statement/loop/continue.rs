@@ -1,8 +1,6 @@
-use mago_allocator::Arena;
 use std::rc::Rc;
 
-use mago_word::WordSet;
-
+use mago_allocator::Arena;
 use mago_codex::ttype::add_optional_union_type_rc;
 use mago_codex::ttype::combine_union_types;
 use mago_codex::ttype::combiner::CombinerOptions;
@@ -10,6 +8,7 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_syntax::cst::Continue;
+use mago_word::WordSet;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -38,51 +37,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Continue<'arena> {
             "Continue level must be an integer literal.",
         )?;
 
-        let mut i = levels;
-        let mut loop_scope_ref = artifacts.loop_scope.as_mut();
-        let mut loop_spans = vec![];
-        while let Some(loop_scope) = loop_scope_ref.take() {
-            loop_spans.push(loop_scope.span);
-
-            if i > 1 && loop_scope.parent_loop.is_some() {
-                i -= 1;
-                loop_scope_ref = loop_scope.parent_loop.as_deref_mut();
-            } else if i > 1 && loop_scope.parent_loop.is_none() {
-                let actual_levels_available = levels - i + 1;
-                let error_message = format!(
-                    "Cannot continue {} levels - only {} enclosing loop{} available.",
-                    levels,
-                    actual_levels_available,
-                    if actual_levels_available == 1 { "" } else { "s" }
-                );
-
-                let mut issue = Issue::error(error_message);
-                if let Some(level) = &self.level {
-                    issue = issue.with_annotation(Annotation::primary(level.span()).with_message(format!(
-                        "Continue level must be less than or equal to {actual_levels_available}."
-                    )));
-                }
-
-                for (i, loop_span) in loop_spans.into_iter().enumerate() {
-                    issue = issue.with_annotation(
-                        Annotation::secondary(loop_span)
-                            .with_message(format!("This is the {} enclosing loop.", get_ordinal_string(i + 1))),
-                    );
-                }
-
-                context.collector.report_with_code(IssueCode::InvalidContinue, issue);
-
-                block_context.flags.set_has_returned(true);
-
-                return Ok(());
-            } else {
-                loop_scope_ref = Some(loop_scope);
-
-                break;
-            }
-        }
-
-        let Some(loop_scope) = loop_scope_ref else {
+        let available_levels = block_context.break_types.len() as u64;
+        if available_levels == 0 {
             context.collector.report_with_code(
                 IssueCode::InvalidContinue,
                 Issue::error("Continue statement used outside of loop.").with_annotation(
@@ -94,61 +50,157 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Continue<'arena> {
             block_context.flags.set_has_returned(true);
 
             return Ok(());
-        };
-
-        if block_context.break_types.last().is_some_and(crate::context::block::BreakContext::is_switch) && levels < 2 {
-            loop_scope.final_actions.insert(ControlAction::LeaveSwitch);
-        } else {
-            loop_scope.final_actions.insert(ControlAction::Continue);
         }
 
-        let mut removed_var_ids = WordSet::default();
-        let redefined_vars =
-            block_context.get_redefined_locals(&loop_scope.parent_context_variables, false, &mut removed_var_ids);
+        if levels == 0 {
+            context.collector.report_with_code(
+                IssueCode::InvalidContinue,
+                Issue::error("Continue level must be greater than zero.").with_annotation(
+                    Annotation::primary(self.level.as_ref().map_or_else(|| self.span(), |level| level.span()))
+                        .with_message("Specify a positive continue level."),
+                ),
+            );
 
-        loop_scope.redefined_loop_variables.retain(|redefined_var, current_redefined_type| {
-            match redefined_vars.get(redefined_var) {
-                Some(outer_redefined_type) => {
-                    *current_redefined_type = Rc::new(combine_union_types(
-                        outer_redefined_type,
-                        current_redefined_type,
-                        context.codebase,
-                        CombinerOptions::default(),
-                    ));
+            block_context.flags.set_has_returned(true);
 
-                    true
-                }
-                None => false,
+            return Ok(());
+        }
+
+        if levels > available_levels {
+            let error_message = format!(
+                "Cannot continue {} levels - only {} enclosing loop{} or switch{} available.",
+                levels,
+                available_levels,
+                if available_levels == 1 { "" } else { "s" },
+                if available_levels == 1 { "" } else { "es" }
+            );
+
+            let mut issue = Issue::error(error_message);
+            if let Some(level) = &self.level {
+                issue = issue.with_annotation(
+                    Annotation::primary(level.span())
+                        .with_message(format!("Continue level must be less than or equal to {available_levels}.")),
+                );
             }
-        });
 
-        for var_id in loop_scope.parent_context_variables.keys() {
-            if !redefined_vars.contains_key(var_id)
-                && let Some(current_type) = block_context.locals.get(var_id)
+            for (index, break_context) in block_context.break_types.iter().rev().enumerate() {
+                let kind = if break_context.is_switch() { "switch" } else { "loop" };
+                issue =
+                    issue.with_annotation(Annotation::secondary(break_context.span()).with_message(format!(
+                        "This is the {} enclosing {kind}.",
+                        super::get_ordinal_string(index + 1)
+                    )));
+            }
+
+            context.collector.report_with_code(IssueCode::InvalidContinue, issue);
+            block_context.flags.set_has_returned(true);
+
+            return Ok(());
+        }
+
+        let target_index = block_context.break_types.len() - levels as usize;
+        let target_is_switch = block_context.break_types[target_index].is_switch();
+        let loops_inside_target = block_context.break_types[(target_index + 1)..]
+            .iter()
+            .filter(|break_context| !break_context.is_switch())
+            .count();
+        if target_is_switch {
+            let mut loop_scope_ref = artifacts.loop_scope.as_mut();
+            for _ in 0..loops_inside_target.saturating_sub(1) {
+                loop_scope_ref = loop_scope_ref.and_then(|loop_scope| loop_scope.parent_loop.as_deref_mut());
+            }
+
+            if loops_inside_target > 0 {
+                loop_scope_ref = loop_scope_ref.and_then(|loop_scope| {
+                    loop_scope.final_actions.insert(ControlAction::Break);
+
+                    loop_scope.parent_loop.as_deref_mut()
+                });
+            }
+
+            if let Some(loop_scope) = loop_scope_ref {
+                loop_scope.final_actions.insert(ControlAction::LeaveSwitch);
+            }
+
+            let switches_to_target = block_context.break_types[target_index..]
+                .iter()
+                .filter(|break_context| break_context.is_switch())
+                .count();
+            if let Some(case_scope_index) = artifacts.case_scopes.len().checked_sub(switches_to_target)
+                && let Some(case_scope) = artifacts.case_scopes.get_mut(case_scope_index)
             {
-                let combined = add_optional_union_type_rc(
-                    current_type,
-                    loop_scope.possibly_redefined_loop_variables.get(var_id).map(std::convert::AsRef::as_ref),
-                    context.codebase,
+                case_scope.record_break(&block_context.locals, context.codebase);
+            }
+        } else {
+            let mut loop_scope_ref = artifacts.loop_scope.as_mut();
+            for _ in 0..loops_inside_target {
+                loop_scope_ref = loop_scope_ref.and_then(|loop_scope| loop_scope.parent_loop.as_deref_mut());
+            }
+
+            let Some(loop_scope) = loop_scope_ref else {
+                context.collector.report_with_code(
+                    IssueCode::InvalidContinue,
+                    Issue::error("Continue statement used outside of loop.").with_annotation(
+                        Annotation::primary(self.span())
+                            .with_message("Continue statement must be inside a loop.".to_string()),
+                    ),
                 );
 
-                loop_scope.possibly_redefined_loop_variables.insert(*var_id, combined);
-            }
-        }
+                block_context.flags.set_has_returned(true);
 
-        for (var_id, var_type) in redefined_vars {
-            loop_scope.possibly_redefined_loop_variables.insert(
-                var_id,
-                match loop_scope.possibly_redefined_loop_variables.get(&var_id) {
-                    Some(existing_type) => Rc::new(combine_union_types(
-                        existing_type,
-                        &var_type,
+                return Ok(());
+            };
+
+            loop_scope.final_actions.insert(ControlAction::Continue);
+
+            let mut removed_var_ids = WordSet::default();
+            let redefined_vars =
+                block_context.get_redefined_locals(&loop_scope.parent_context_variables, false, &mut removed_var_ids);
+
+            loop_scope.redefined_loop_variables.retain(|redefined_var, current_redefined_type| {
+                match redefined_vars.get(redefined_var) {
+                    Some(outer_redefined_type) => {
+                        *current_redefined_type = Rc::new(combine_union_types(
+                            outer_redefined_type,
+                            current_redefined_type,
+                            context.codebase,
+                            CombinerOptions::default(),
+                        ));
+
+                        true
+                    }
+                    None => false,
+                }
+            });
+
+            for var_id in loop_scope.parent_context_variables.keys() {
+                if !redefined_vars.contains_key(var_id)
+                    && let Some(current_type) = block_context.locals.get(var_id)
+                {
+                    let combined = add_optional_union_type_rc(
+                        current_type,
+                        loop_scope.possibly_redefined_loop_variables.get(var_id).map(std::convert::AsRef::as_ref),
                         context.codebase,
-                        CombinerOptions::default(),
-                    )),
-                    None => Rc::clone(&var_type),
-                },
-            );
+                    );
+
+                    loop_scope.possibly_redefined_loop_variables.insert(*var_id, combined);
+                }
+            }
+
+            for (var_id, var_type) in redefined_vars {
+                loop_scope.possibly_redefined_loop_variables.insert(
+                    var_id,
+                    match loop_scope.possibly_redefined_loop_variables.get(&var_id) {
+                        Some(existing_type) => Rc::new(combine_union_types(
+                            existing_type,
+                            &var_type,
+                            context.codebase,
+                            CombinerOptions::default(),
+                        )),
+                        None => Rc::clone(&var_type),
+                    },
+                );
+            }
         }
 
         if let Some(finally_scope) = block_context.finally_scope.clone() {
@@ -170,26 +222,5 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Continue<'arena> {
         block_context.flags.set_has_returned(true);
 
         Ok(())
-    }
-}
-
-fn get_ordinal_string(n: usize) -> String {
-    match n {
-        1 => "first".to_string(),
-        2 => "second".to_string(),
-        3 => "third".to_string(),
-        4 => "fourth".to_string(),
-        5 => "fifth".to_string(),
-        _ => {
-            // Handle general cases with suffixes
-            let suffix = match n % 10 {
-                1 if n % 100 != 11 => "st",
-                2 if n % 100 != 12 => "nd",
-                3 if n % 100 != 13 => "rd",
-                _ => "th",
-            };
-
-            format!("{n}{suffix}")
-        }
     }
 }

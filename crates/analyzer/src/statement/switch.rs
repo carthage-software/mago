@@ -1,10 +1,10 @@
-use mago_allocator::Arena;
 use std::rc::Rc;
 
 use foldhash::HashMap;
 use indexmap::IndexMap;
 
 use mago_algebra::clause::Clause;
+use mago_allocator::Arena;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::combine_union_types;
 use mago_codex::ttype::combiner::CombinerOptions;
@@ -499,7 +499,7 @@ where
             ));
         }
 
-        case_block_context.break_types.push(BreakContext::Switch);
+        case_block_context.break_types.push(BreakContext::Switch(switch.span()));
         if !self.has_fallthrough {
             self.leftover_statement_groups.clear();
         }

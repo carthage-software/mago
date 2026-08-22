@@ -1,6 +1,6 @@
-use mago_allocator::Arena;
 use std::rc::Rc;
 
+use mago_allocator::Arena;
 use mago_codex::ttype::get_mixed;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -57,8 +57,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Foreach<'arena> {
 
         let mut loop_block_context = block_context.clone();
         loop_block_context.flags.set_inside_loop(true);
-        loop_block_context.break_types.push(BreakContext::Loop);
-
+        loop_block_context.break_types.push(BreakContext::Loop(self.span()));
         if let Some(key_expression) = self.target.key() {
             let key_expression_id = get_block_expression_id(key_expression, context, block_context);
 

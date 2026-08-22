@@ -33,8 +33,8 @@ use mago_bytes::BytesDisplay;
 
 #[derive(Clone, PartialEq, Eq, Debug)]
 pub enum BreakContext {
-    Switch,
-    Loop,
+    Switch(Span),
+    Loop(Span),
 }
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -145,7 +145,14 @@ pub struct BlockContext<'ctx> {
 impl BreakContext {
     #[inline]
     pub const fn is_switch(&self) -> bool {
-        matches!(self, BreakContext::Switch)
+        matches!(self, BreakContext::Switch(_))
+    }
+
+    #[inline]
+    pub const fn span(&self) -> Span {
+        match self {
+            BreakContext::Switch(span) | BreakContext::Loop(span) => *span,
+        }
     }
 }
 

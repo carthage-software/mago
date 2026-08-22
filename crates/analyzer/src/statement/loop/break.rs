@@ -1,8 +1,6 @@
-use mago_allocator::Arena;
 use std::rc::Rc;
 
-use mago_word::WordSet;
-
+use mago_allocator::Arena;
 use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::combine_union_types;
 use mago_codex::ttype::combiner::CombinerOptions;
@@ -10,6 +8,7 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_syntax::cst::Break;
+use mago_word::WordSet;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -38,29 +37,91 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Break<'arena> {
             "Break level must be an integer literal.",
         )?;
 
-        let mut i = levels;
-        let mut loop_scope_ref = artifacts.loop_scope.as_mut();
-        while let Some(loop_scope) = loop_scope_ref.take() {
-            if i > 1 && loop_scope.parent_loop.is_some() {
-                i -= 1;
-                loop_scope_ref = loop_scope.parent_loop.as_deref_mut();
-            } else {
-                loop_scope_ref = Some(loop_scope);
+        let available_levels = block_context.break_types.len() as u64;
+        if available_levels == 0 {
+            context.collector.report_with_code(
+                IssueCode::InvalidBreak,
+                Issue::error("Break statement outside of a loop or switch.").with_annotation(
+                    Annotation::primary(self.span()).with_message("This break statement is not valid here."),
+                ),
+            );
 
-                break;
-            }
+            block_context.flags.set_has_returned(true);
+
+            return Ok(());
         }
 
-        let mut leaving_switch = true;
-        let mut leaving_loop = false;
+        if levels == 0 {
+            context.collector.report_with_code(
+                IssueCode::InvalidBreak,
+                Issue::error("Break level must be greater than zero.").with_annotation(
+                    Annotation::primary(self.level.as_ref().map_or_else(|| self.span(), |level| level.span()))
+                        .with_message("Specify a positive break level."),
+                ),
+            );
+
+            block_context.flags.set_has_returned(true);
+
+            return Ok(());
+        }
+
+        if levels > available_levels {
+            let error_message = format!(
+                "Cannot break {} levels - only {} enclosing loop{} or switch{} available.",
+                levels,
+                available_levels,
+                if available_levels == 1 { "" } else { "s" },
+                if available_levels == 1 { "" } else { "es" }
+            );
+
+            let mut issue = Issue::error(error_message);
+            if let Some(level) = &self.level {
+                issue = issue.with_annotation(
+                    Annotation::primary(level.span())
+                        .with_message(format!("Break level must be less than or equal to {available_levels}.")),
+                );
+            }
+
+            for (index, break_context) in block_context.break_types.iter().rev().enumerate() {
+                let kind = if break_context.is_switch() { "switch" } else { "loop" };
+                issue =
+                    issue.with_annotation(Annotation::secondary(break_context.span()).with_message(format!(
+                        "This is the {} enclosing {kind}.",
+                        super::get_ordinal_string(index + 1)
+                    )));
+            }
+
+            context.collector.report_with_code(IssueCode::InvalidBreak, issue);
+
+            block_context.flags.set_has_returned(true);
+
+            return Ok(());
+        }
+
+        let target_index = block_context.break_types.len() - levels as usize;
+        let target_is_switch = block_context.break_types[target_index].is_switch();
+        let loops_inside_target = block_context.break_types[(target_index + 1)..]
+            .iter()
+            .filter(|break_context| !break_context.is_switch())
+            .count();
+        let mut loop_scope_ref = artifacts.loop_scope.as_mut();
+        for _ in 0..loops_inside_target.saturating_sub(usize::from(target_is_switch)) {
+            loop_scope_ref = loop_scope_ref.and_then(|loop_scope| loop_scope.parent_loop.as_deref_mut());
+        }
+
+        if target_is_switch && loops_inside_target > 0 {
+            loop_scope_ref = loop_scope_ref.and_then(|loop_scope| {
+                loop_scope.final_actions.insert(ControlAction::Break);
+
+                loop_scope.parent_loop.as_deref_mut()
+            });
+        }
+
+        let has_loop_scope = loop_scope_ref.is_some();
         if let Some(loop_scope) = loop_scope_ref {
-            if block_context.break_types.last().is_some_and(crate::context::block::BreakContext::is_switch)
-                && levels < 2
-            {
+            if target_is_switch {
                 loop_scope.final_actions.insert(ControlAction::LeaveSwitch);
             } else {
-                leaving_switch = false;
-                leaving_loop = true;
                 loop_scope.final_actions.insert(ControlAction::Break);
             }
 
@@ -137,28 +198,17 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Break<'arena> {
             }
         }
 
-        if let Some(case_scope) = artifacts.case_scopes.last_mut() {
-            if leaving_switch {
-                let mut break_vars = case_scope.break_vars.take().unwrap_or_default();
-
-                for (var_id, var_type) in &block_context.locals {
-                    let resulting_type = match break_vars.get(var_id) {
-                        Some(break_var_type) => Rc::new(combine_union_types(
-                            var_type,
-                            break_var_type,
-                            context.codebase,
-                            CombinerOptions::default(),
-                        )),
-                        None => Rc::clone(var_type),
-                    };
-
-                    break_vars.insert(*var_id, resulting_type);
-                }
-
-                case_scope.break_vars = Some(break_vars);
+        if target_is_switch {
+            let switches_to_target = block_context.break_types[target_index..]
+                .iter()
+                .filter(|break_context| break_context.is_switch())
+                .count();
+            if let Some(case_scope_index) = artifacts.case_scopes.len().checked_sub(switches_to_target)
+                && let Some(case_scope) = artifacts.case_scopes.get_mut(case_scope_index)
+            {
+                case_scope.record_break(&block_context.locals, context.codebase);
             }
-        } else if !leaving_loop {
-            // `break` outside of a loop or switch
+        } else if !has_loop_scope {
             context.collector.report_with_code(
                 IssueCode::InvalidBreak,
                 Issue::error("Break statement outside of a loop or switch.").with_annotation(

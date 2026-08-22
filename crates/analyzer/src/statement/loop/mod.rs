@@ -1,5 +1,3 @@
-use mago_allocator::Arena;
-use mago_reporting::IssueCollection;
 use std::cell::Cell;
 use std::collections::BTreeMap;
 use std::collections::BTreeSet;
@@ -13,6 +11,9 @@ use indexmap::IndexMap;
 use mago_algebra::clause::Clause;
 use mago_algebra::find_satisfying_assignments;
 use mago_algebra::negate_formula;
+use mago_allocator::Arena;
+use mago_reporting::IssueCollection;
+
 use mago_algebra::saturate_clauses;
 use mago_codex::ttype;
 use mago_codex::ttype::TType;
@@ -44,6 +45,8 @@ use mago_span::Span;
 use mago_syntax::cst::BinaryOperator;
 use mago_syntax::cst::Expression;
 use mago_syntax::cst::Foreach;
+use mago_syntax::cst::Literal;
+use mago_syntax::cst::LiteralInteger;
 use mago_syntax::cst::Statement;
 use mago_word::Word;
 use mago_word::WordSet;
@@ -64,8 +67,6 @@ use crate::formula::get_formula;
 use crate::reconciler::reconcile_keyed_types;
 use crate::statement::r#loop::assignment_map_visitor::get_assignment_map;
 use crate::statement::r#loop::cleaner::clean_nodes;
-use mago_syntax::cst::Literal;
-use mago_syntax::cst::LiteralInteger;
 
 mod assignment_map_visitor;
 mod cleaner;
@@ -113,6 +114,26 @@ where
     Ok(1)
 }
 
+fn get_ordinal_string(n: usize) -> String {
+    match n {
+        1 => "first".to_string(),
+        2 => "second".to_string(),
+        3 => "third".to_string(),
+        4 => "fourth".to_string(),
+        5 => "fifth".to_string(),
+        _ => {
+            let suffix = match n % 10 {
+                1 if n % 100 != 11 => "st",
+                2 if n % 100 != 12 => "nd",
+                3 if n % 100 != 13 => "rd",
+                _ => "th",
+            };
+
+            format!("{n}{suffix}")
+        }
+    }
+}
+
 fn analyze_for_or_while_loop<'ctx, 'ast, 'arena, A>(
     context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
@@ -137,7 +158,7 @@ where
 
     let mut loop_block_context = block_context.clone();
     loop_block_context.flags.set_inside_loop(true);
-    loop_block_context.break_types.push(BreakContext::Loop);
+    loop_block_context.break_types.push(BreakContext::Loop(span));
     let previous_loop_bounds = loop_block_context.loop_bounds;
     loop_block_context.loop_bounds = span.to_offset_tuple();
 
