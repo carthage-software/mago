@@ -6,11 +6,59 @@ use mago_span::Span;
 use mago_span::HasPosition;
 use mago_span::Position;
 
+use crate::kind::NameKind;
+
 pub mod kind;
 pub mod resolver;
 pub mod scope;
 
 mod internal;
+
+/// Information about how a source-level name participates in PHP name resolution.
+#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+pub struct NameResolutionMetadata<'arena> {
+    kind: NameKind,
+    original: &'arena [u8],
+    root: &'arena [u8],
+    import_scope: Option<u32>,
+}
+
+impl<'arena> NameResolutionMetadata<'arena> {
+    /// Creates metadata for a resolved source-level name.
+    #[must_use]
+    pub const fn new(kind: NameKind, original: &'arena [u8], root: &'arena [u8], import_scope: Option<u32>) -> Self {
+        Self { kind, original, root, import_scope }
+    }
+
+    /// Returns the PHP name kind used to resolve this name.
+    #[must_use]
+    pub const fn kind(&self) -> NameKind {
+        self.kind
+    }
+
+    /// Returns the name exactly as it appeared in source code.
+    #[must_use]
+    pub const fn original(&self) -> &'arena [u8] {
+        self.original
+    }
+
+    /// Returns the local root name whose meaning can be changed by an import.
+    ///
+    /// For example, this is `Foo` for `Foo\Bar` and `Alias` for
+    /// `use Vendor\Package as Alias`.
+    #[must_use]
+    pub const fn root(&self) -> &'arena [u8] {
+        self.root
+    }
+
+    /// Returns the namespace declaration offset defining this import scope.
+    ///
+    /// `None` represents the file's top-level global namespace scope.
+    #[must_use]
+    pub const fn import_scope(&self) -> Option<u32> {
+        self.import_scope
+    }
+}
 
 /// Stores the results of a name resolution pass over a PHP program.
 ///
@@ -27,6 +75,9 @@ pub struct ResolvedNames<'arena> {
     /// can return `&(&'arena [u8], bool)` references — preserving the original signature
     /// for backward compatibility.
     names: HashMap<u32, (u32, (&'arena [u8], bool))>,
+    /// Resolution metadata keyed by the same source start offset as `names`.
+    #[cfg_attr(feature = "serde", serde(skip))]
+    metadata: HashMap<u32, NameResolutionMetadata<'arena>>,
 }
 
 impl<'arena> ResolvedNames<'arena> {
@@ -84,6 +135,12 @@ impl<'arena> ResolvedNames<'arena> {
         self.names.get(&position.offset()).is_some_and(|(_, (_, imported))| *imported)
     }
 
+    /// Returns resolution metadata for the name starting at `offset`.
+    #[must_use]
+    pub fn metadata_at_offset(&self, offset: u32) -> Option<NameResolutionMetadata<'arena>> {
+        self.metadata.get(&offset).copied()
+    }
+
     /// Returns the resolved entry whose source range covers the given byte offset.
     ///
     /// Identifier ranges in `ResolvedNames` never overlap, so at most one entry can
@@ -124,6 +181,18 @@ impl<'arena> ResolvedNames<'arena> {
     /// and other range-based lookups work without re-scanning the source.
     pub(crate) fn insert_at(&mut self, span: Span, name: &'arena [u8], imported: bool) {
         self.names.insert(span.start.offset, (span.end.offset, (name, imported)));
+    }
+
+    /// Inserts a resolution result and its source-level metadata.
+    pub(crate) fn insert_with_metadata(
+        &mut self,
+        span: Span,
+        name: &'arena [u8],
+        imported: bool,
+        metadata: NameResolutionMetadata<'arena>,
+    ) {
+        self.metadata.insert(span.start.offset, metadata);
+        self.insert_at(span, name, imported);
     }
 
     /// Returns a `HashSet` containing every resolution result as `(&start, (fqn, imported))`.

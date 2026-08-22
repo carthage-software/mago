@@ -66,20 +66,31 @@ impl NoFullyQualifiedGlobalClassLikeRule {
         let fqn_span = identifier.span();
 
         let resolution = ctx.import_name(class_name_bytes);
+        let suggested_alias =
+            if resolution.is_none() { ctx.suggest_name_alias_for_conflict(class_name_bytes) } else { None };
 
         let class_name = mago_bytes::BytesDisplay(class_name_bytes);
         let short_name_display = mago_bytes::BytesDisplay(short_name);
 
-        let (title, help) = match &resolution {
-            Some(res) if res.is_already_available() && res.local_name.as_bytes() != short_name => (
+        let (title, help) = match (&resolution, suggested_alias.as_deref()) {
+            (Some(res), _) if res.is_already_available() && res.local_name.as_bytes() != short_name => (
                 "Fully-qualified class-like reference can be replaced with an existing alias.",
                 format!("`{class_name}` is already imported as `{}`; replace the reference with it.", res.local_name),
             ),
-            Some(res) if res.is_already_available() => (
+            (Some(res), _) if res.is_already_available() => (
                 "Fully-qualified class-like reference is already in scope.",
                 format!("`{class_name}` is already reachable as `{}`; drop the leading `\\`.", res.local_name),
             ),
-            Some(_) | None => (
+            (None, Some(alias)) => {
+                let alias = mago_bytes::BytesDisplay(alias);
+                (
+                    "Fully-qualified class-like reference conflicts with a name in scope.",
+                    format!(
+                        "Import with a non-conflicting alias: `use {class_name} as {alias};`, then reference `{alias}` directly."
+                    ),
+                )
+            }
+            (Some(_), _) | (None, None) => (
                 "Fully-qualified class-like reference detected.",
                 format!("Add `use {class_name};` and reference `{short_name_display}` directly."),
             ),
@@ -872,6 +883,239 @@ mod tests {
             <?php
 
             function at(DateTimeImmutable $when): void {}
+        "#}
+    }
+
+    test_lint_failure! {
+        name = fix_declined_when_namespace_interface_is_in_another_file,
+        rule = NoFullyQualifiedGlobalClassLikeRule,
+        code = indoc! {r#"
+            <?php
+
+            namespace A;
+
+            class X implements SomeInterface
+            {
+                public function __construct(private \B\SomeInterface $some) {}
+
+                public function foo(): void
+                {
+                    echo 'Hello';
+                }
+            }
+        "#}
+    }
+
+    test_lint_failure! {
+        name = fix_declined_when_namespace_interface_shadows_import_in_constructor,
+        rule = NoFullyQualifiedGlobalClassLikeRule,
+        code = indoc! {r#"
+            <?php
+
+            namespace A;
+
+            interface SomeInterface
+            {
+                public function foo(): void;
+            }
+
+            class X implements SomeInterface
+            {
+                public function __construct(private \B\SomeInterface $some) {}
+
+                public function foo(): void
+                {
+                    echo 'Hello';
+                }
+            }
+        "#}
+    }
+
+    test_lint_fix! {
+        name = same_named_function_does_not_block_class_like_import,
+        rule = NoFullyQualifiedGlobalClassLikeRule,
+        code = indoc! {r#"
+            <?php
+
+            namespace A;
+
+            function SomeInterface(): void {}
+
+            class X
+            {
+                public function __construct(private \B\SomeInterface $some) {}
+            }
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            namespace A;
+
+            use B\SomeInterface;
+
+            function SomeInterface(): void {}
+
+            class X
+            {
+                public function __construct(private SomeInterface $some) {}
+            }
+        "#}
+    }
+
+    test_lint_fix! {
+        name = reference_in_separate_named_namespace_block_does_not_block_import,
+        rule = NoFullyQualifiedGlobalClassLikeRule,
+        code = indoc! {r#"
+            <?php
+
+            namespace A {
+                class X
+                {
+                    public function __construct(private \B\Foo $foo) {}
+                }
+            }
+
+            namespace A {
+                function handle(Foo $foo): void {}
+            }
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            namespace A {
+
+            use B\Foo;
+                class X
+                {
+                    public function __construct(private Foo $foo) {}
+                }
+            }
+
+            namespace A {
+                function handle(Foo $foo): void {}
+            }
+        "#}
+    }
+
+    test_lint_fix! {
+        name = reference_in_separate_global_namespace_block_does_not_block_import,
+        rule = NoFullyQualifiedGlobalClassLikeRule,
+        code = indoc! {r#"
+            <?php
+
+            namespace {
+                class X
+                {
+                    public function __construct(private \B\Foo $foo) {}
+                }
+            }
+
+            namespace {
+                function handle(Foo $foo): void {}
+            }
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            namespace {
+
+            use B\Foo;
+                class X
+                {
+                    public function __construct(private Foo $foo) {}
+                }
+            }
+
+            namespace {
+                function handle(Foo $foo): void {}
+            }
+        "#}
+    }
+
+    test_lint_failure! {
+        name = qualified_reference_in_same_scope_blocks_import_of_its_first_segment,
+        rule = NoFullyQualifiedGlobalClassLikeRule,
+        code = indoc! {r#"
+            <?php
+
+            namespace A;
+
+            function handle(Foo\Bar $foo): void {}
+
+            class X
+            {
+                public function __construct(private \B\Foo $foo) {}
+            }
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fully_qualified_reference_in_same_scope_does_not_block_import,
+        rule = NoFullyQualifiedGlobalClassLikeRule,
+        code = indoc! {r#"
+            <?php
+
+            namespace A;
+
+            class X
+            {
+                public function __construct(private \B\Foo $foo) {}
+            }
+
+            function handle(\A\Foo $foo): void {}
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            namespace A;
+
+            use B\Foo;
+
+            class X
+            {
+                public function __construct(private Foo $foo) {}
+            }
+
+            function handle(\A\Foo $foo): void {}
+        "#}
+    }
+
+    test_lint_failure! {
+        name = conflicting_import_warning_suggests_safe_alias,
+        rule = NoFullyQualifiedGlobalClassLikeRule,
+        code = indoc! {r#"
+            <?php
+
+            namespace A;
+
+            class X implements SomeInterface
+            {
+                public function __construct(private \B\SomeInterface $some) {}
+
+                public function foo(): void
+                {
+                    echo 'Hello';
+                }
+            }
+        "#}
+    }
+
+    test_lint_failure! {
+        name = conflicting_import_warning_avoids_alias_already_in_use,
+        rule = NoFullyQualifiedGlobalClassLikeRule,
+        count = 1,
+        code = indoc! {r#"
+            <?php
+
+            namespace A;
+
+            class X implements SomeInterface
+            {
+                public function __construct(
+                    private \B\SomeInterface $some,
+                    private BSomeInterface $other,
+                ) {}
+            }
         "#}
     }
 }
