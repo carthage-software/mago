@@ -27,7 +27,7 @@ Mago 从单一文件读取配置,通常是项目根目录下的 `mago.toml`。�
 
 Schema 托管在:
 
-- `https://mago.carthage.software/<version>/schema.json`,对应某个具体版本(如 `1.47.2`)。
+- `https://mago.carthage.software/<version>/schema.json`,对应某个具体版本(如 `1.47.3`)。
 - `https://mago.carthage.software/latest/schema.json`,最新的稳定版本。
 - `https://mago.carthage.software/main/schema.json`,来自 `main` 分支的开发构建。
 
@@ -36,20 +36,20 @@ Schema 托管在:
 引用方式因格式而异:
 
 ```toml
-#:schema https://mago.carthage.software/1.47.2/schema.json
+#:schema https://mago.carthage.software/1.47.3/schema.json
 version = "1"
 php-version = "8.3"
 ```
 
 ```yaml
-# yaml-language-server: $schema=https://mago.carthage.software/1.47.2/schema.json
+# yaml-language-server: $schema=https://mago.carthage.software/1.47.3/schema.json
 version: "1"
 php-version: "8.3"
 ```
 
 ```json
 {
-  "$schema": "https://mago.carthage.software/1.47.2/schema.json",
+  "$schema": "https://mago.carthage.software/1.47.3/schema.json",
   "version": "1",
   "php-version": "8.3"
 }
@@ -135,7 +135,7 @@ editor-url = "phpstorm://open?file=%file%&line=%line%&column=%column%"
 
 | 选项 | 类型 | 默认值 | 说明 |
 | :--- | :--- | :--- | :--- |
-| `version` | string | 无 | 锁定本项目所基于的 Mago 版本。接受主版本(`"1"`)、次版本(`"1.47"`)或精确版本(`"1.47.2"`)的锁定。参见 [版本锁定](#version-pinning)。 |
+| `version` | string | 无 | 锁定本项目所基于的 Mago 版本。接受主版本(`"1"`)、次版本(`"1.47"`)或精确版本(`"1.47.3"`)的锁定。参见 [版本锁定](#version-pinning)。 |
 | `php-version` | string | 最新稳定版 | Mago 在解析与分析时应针对的 PHP 版本。`mago init` 会尽可能从 `composer.json` 自动检测。 |
 | `allow-unsupported-php-version` | boolean | `false` | 允许 Mago 运行在它官方不支持的 PHP 版本上。不建议使用。 |
 | `no-version-check` | boolean | `false` | 在已安装二进制与锁定版本不一致时关闭警告。主版本不一致始终是致命错误。 |
@@ -151,7 +151,7 @@ editor-url = "phpstorm://open?file=%file%&line=%line%&column=%column%"
 
 - **主版本锁定**(`version = "1"`):任何 `1.x.y` 都满足。升级到 `2.x` 会硬性报错,因为新主版本可能带来不兼容的默认值、schema 变化或规则行为。这是 `mago init` 默认写入的级别。
 - **次版本锁定**(`version = "1.47"`):任何 `1.47.y` 都满足。漂移到不同的次版本会发出警告;跨主版本仍然是致命错误。
-- **精确锁定**(`version = "1.47.2"`):任何漂移都会发出警告;跨主版本仍然是致命错误。
+- **精确锁定**(`version = "1.47.3"`):任何漂移都会发出警告;跨主版本仍然是致命错误。
 
 警告可通过 `--no-version-check`、`MAGO_NO_VERSION_CHECK` 环境变量,或配置中的 `no-version-check = true` 关闭。这些都不会影响主版本漂移,而后者正是版本锁定的全部意义所在。
 
