@@ -237,32 +237,47 @@ impl LintRule for NoRedundantMathRule {
                 issue
             }
             BinaryOperator::Subtraction(_) => {
-                let zero = if get_expression_value(binary.lhs) == Some(0) {
-                    &binary.lhs
-                } else if get_expression_value(binary.rhs) == Some(0) {
-                    &binary.rhs
+                if get_expression_value(binary.rhs) == Some(0) {
+                    let mut issue = Issue::new(
+                        self.cfg.level(),
+                        "Redundant subtraction of `0`: subtracting 0 does not change the value.",
+                    )
+                    .with_code(self.meta.code)
+                    .with_annotation(
+                        Annotation::primary(binary.operator.span()).with_message("`$x - 0` is equivalent to `$x`"),
+                    )
+                    .with_note("Subtracting 0 has no effect.")
+                    .with_help("Remove the `- 0` operation.");
+
+                    if !binary.rhs.is_literal() {
+                        issue = issue.with_annotation(
+                            Annotation::secondary(binary.rhs.span()).with_message("This expression evaluates to `0`"),
+                        );
+                    }
+
+                    issue
+                } else if get_expression_value(binary.lhs) == Some(0) {
+                    let mut issue = Issue::new(
+                        self.cfg.level(),
+                        "Redundant subtraction from `0`: subtracting from 0 is equivalent to negation.",
+                    )
+                    .with_code(self.meta.code)
+                    .with_annotation(
+                        Annotation::primary(binary.operator.span()).with_message("`0 - $x` is equivalent to `-$x`"),
+                    )
+                    .with_note("Subtracting a value from 0 negates the value.")
+                    .with_help("Replace `0 - $x` with unary negation.");
+
+                    if !binary.lhs.is_literal() {
+                        issue = issue.with_annotation(
+                            Annotation::secondary(binary.lhs.span()).with_message("This expression evaluates to `0`"),
+                        );
+                    }
+
+                    issue
                 } else {
                     return;
-                };
-
-                let mut issue = Issue::new(
-                    self.cfg.level(),
-                    "Redundant subtraction of `0`: subtracting 0 does not change the value.",
-                )
-                .with_code(self.meta.code)
-                .with_annotation(
-                    Annotation::primary(binary.operator.span()).with_message("`$x - 0` is equivalent to `$x`"),
-                )
-                .with_note("Subtracting 0 has no effect.")
-                .with_help("Remove the `- 0` operation.");
-
-                if !zero.is_literal() {
-                    issue = issue.with_annotation(
-                        Annotation::secondary(zero.span()).with_message("This expression evaluates to `0`"),
-                    );
                 }
-
-                issue
             }
             BinaryOperator::Modulo(_) => match get_expression_value(binary.rhs) {
                 Some(1) => {
@@ -459,6 +474,8 @@ mod tests {
     use indoc::indoc;
 
     use super::NoRedundantMathRule;
+    use crate::rule::tests::collect_issues;
+    use crate::settings::Settings;
     use crate::test_lint_failure;
     use crate::test_lint_success;
 
@@ -540,6 +557,41 @@ mod tests {
 
             $a = $x - 0;
         "}
+    }
+
+    #[test]
+    fn subtraction_from_zero_suggests_negation() {
+        let issues = collect_issues::<NoRedundantMathRule, fn(&mut Settings)>(
+            indoc! {r#"
+                <?php
+
+                declare(strict_types=1);
+
+                namespace Foo;
+
+                function baz(): string
+                {
+                    $string = \uniqid('some-unique-string-');
+
+                    return \mb_substr($string, 0 - \mb_strlen("foo"));
+                }
+            "#},
+            None,
+            None,
+        );
+
+        assert_eq!(issues.len(), 1);
+
+        let Some(issue) = issues.iter().next() else {
+            panic!("expected a no-redundant-math issue");
+        };
+
+        assert_eq!(issue.message, "Redundant subtraction from `0`: subtracting from 0 is equivalent to negation.");
+        assert_eq!(
+            issue.annotations.first().and_then(|annotation| annotation.message.as_deref()),
+            Some("`0 - $x` is equivalent to `-$x`")
+        );
+        assert_eq!(issue.help.as_deref(), Some("Replace `0 - $x` with unary negation."));
     }
 
     test_lint_failure! {

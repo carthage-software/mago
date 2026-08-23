@@ -13,7 +13,7 @@ use crate::registry::RuleRegistry;
 use crate::rule::LintRule;
 use crate::settings::Settings;
 
-fn collect_issues<R, F>(
+pub(super) fn collect_issues<R, F>(
     code: &str,
     filename: Option<&'static str>,
     settings_fn: Option<F>,
