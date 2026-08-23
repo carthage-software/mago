@@ -3,7 +3,9 @@ use mago_word::Word;
 use mago_word::word;
 
 use mago_codex::metadata::CodebaseMetadata;
+use mago_codex::metadata::property::PropertyMetadata;
 use mago_codex::visibility::Visibility;
+use mago_php_version::PHPVersion;
 use mago_php_version::feature::Feature;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -312,18 +314,7 @@ where
         return false;
     }
 
-    let visibility = if property_metadata.flags.is_readonly() {
-        if context.settings.version.is_supported(Feature::AsymmetricVisibility) {
-            match property_metadata.write_visibility {
-                Visibility::Public => Visibility::Protected,
-                visibility => visibility,
-            }
-        } else {
-            Visibility::Private
-        }
-    } else {
-        property_metadata.write_visibility
-    };
+    let visibility = effective_write_visibility(property_metadata, context.settings.version);
 
     let is_visible = is_visible_from_scope(
         context.codebase,
@@ -355,6 +346,23 @@ where
     }
 
     is_visible
+}
+
+/// The visibility that governs writes to `property`, which is narrower than the
+/// declared write visibility for `readonly` properties.
+pub(crate) fn effective_write_visibility(property: &PropertyMetadata, version: PHPVersion) -> Visibility {
+    if !property.flags.is_readonly() {
+        return property.write_visibility;
+    }
+
+    if !version.is_supported(Feature::AsymmetricVisibility) {
+        return Visibility::Private;
+    }
+
+    match property.write_visibility {
+        Visibility::Public => Visibility::Protected,
+        visibility => visibility,
+    }
 }
 
 pub(crate) fn is_visible_from_scope(
