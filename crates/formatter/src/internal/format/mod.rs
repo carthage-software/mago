@@ -1212,11 +1212,10 @@ where
         wrap!(f, self, ExpressionStatement, {
             let expression = self.expression.format(f);
             let terminator = self.terminator.format(f);
-
             if let Some(chain_group_id) = f.take_member_access_chain_group_id()
                 && f.settings.method_chain_semicolon_on_next_line
             {
-                return Document::Array(vec_in![f.arena;
+                Document::Array(vec_in![f.arena;
                     expression,
                     Document::IfBreak(
                         IfBreak::new(
@@ -1226,10 +1225,10 @@ where
                         )
                         .with_id(chain_group_id),
                     ),
-                ]);
+                ])
+            } else {
+                Document::Array(vec_in![f.arena; expression, terminator])
             }
-
-            Document::Array(vec_in![f.arena; expression, terminator])
         })
     }
 }
@@ -1449,12 +1448,12 @@ where
                     .with_id(chain_group_id),
                 ));
 
-                return Document::Group(Group::new(contents).with_id(chain_group_id));
+                Document::Group(Group::new(contents).with_id(chain_group_id))
+            } else {
+                contents.push(terminator);
+
+                Document::Group(Group::new(contents))
             }
-
-            contents.push(terminator);
-
-            Document::Group(Group::new(contents))
         })
     }
 }
