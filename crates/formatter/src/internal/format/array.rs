@@ -533,6 +533,10 @@ where
         return None; // Need at least two rows for table style to make sense
     }
 
+    if f.settings.print_width <= WIGGLE_ROOM {
+        return None; // Not enough width for a table
+    }
+
     let mut row_size = 0;
     let mut sizes = vec_in![f.arena;];
     let mut maximum_width = 0;
