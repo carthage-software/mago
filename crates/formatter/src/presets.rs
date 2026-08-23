@@ -174,6 +174,7 @@ const DEFAULT_PRESET: FormatSettings = FormatSettings {
     parentheses_in_new_expression: true,
     parentheses_in_exit_and_die: true,
     parentheses_in_attribute: false,
+    parentheses_in_return_statement: true,
     space_before_arrow_function_parameter_list_parenthesis: false,
     space_before_closure_parameter_list_parenthesis: true,
     space_before_hook_parameter_list_parenthesis: false,

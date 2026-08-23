@@ -942,7 +942,7 @@ where
             }
 
             contents.push(Document::String(b" => "));
-            contents.push(format_return_value(f, self.expression));
+            contents.push(format_return_value(f, self.expression, true));
 
             Document::Group(Group::new(contents))
         })

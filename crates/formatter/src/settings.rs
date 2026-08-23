@@ -936,6 +936,32 @@ generate_formatter_settings! {
     ///
     /// Default: false
     parentheses_in_attribute: bool => "default_false",
+    /// Whether to add parentheses around multi-line return values.
+    ///
+    /// When a `return` value breaks across multiple lines (for example, a conditional
+    /// expression), parentheses are added around it for clarity:
+    ///
+    /// ```php
+    /// return (
+    ///     $condition
+    ///         ? $value
+    ///         : $other
+    /// );
+    /// ```
+    ///
+    /// When disabled, the value is left unparenthesized:
+    ///
+    /// ```php
+    /// return $condition
+    ///     ? $value
+    ///     : $other;
+    /// ```
+    ///
+    /// This setting only applies to `return` statements. Arrow function bodies are
+    /// still wrapped in parentheses when they break across multiple lines.
+    ///
+    /// Default: true
+    parentheses_in_return_statement: bool => "default_true",
 
     /// Whether to add a space before the opening parameters in arrow functions.
     ///

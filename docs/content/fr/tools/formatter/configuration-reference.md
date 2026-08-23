@@ -189,6 +189,7 @@ public function bar(
 | `parentheses-in-new-expression` | booléen | `true` | Ajouter `()` à `new` sans arguments : `new Foo()`. |
 | `parentheses-in-exit-and-die` | booléen | `true` | Ajouter `()` à `exit` et `die`. |
 | `parentheses-in-attribute` | booléen | `false` | Ajouter `()` aux attributs sans arguments. |
+| `parentheses-in-return-statement` | booléen | `true` | Envelopper les valeurs `return` multilignes entre parenthèses. Ne s'applique qu'aux instructions `return`, pas aux corps de fonctions fléchées. |
 
 ## Espaces autour des opérateurs
 

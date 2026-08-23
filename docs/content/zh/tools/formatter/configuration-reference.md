@@ -189,6 +189,7 @@ public function bar(
 | `parentheses-in-new-expression` | 布尔值 | `true` | 为没有实参的 `new` 添加 `()`:`new Foo()`。 |
 | `parentheses-in-exit-and-die` | 布尔值 | `true` | 为 `exit` 和 `die` 添加 `()`。 |
 | `parentheses-in-attribute` | 布尔值 | `false` | 为没有实参的 attribute 添加 `()`。 |
+| `parentheses-in-return-statement` | 布尔值 | `true` | 为多行 `return` 值添加括号。仅适用于 `return` 语句，不适用于箭头函数体。 |
 
 ## 运算符周围的空白
 

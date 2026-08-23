@@ -22,6 +22,7 @@ use crate::internal::utils::unwrap_parenthesized;
 pub fn format_return_value<'arena, A>(
     f: &mut FormatterState<'_, 'arena, A>,
     value: &'arena Expression<'arena>,
+    allow_wrap: bool,
 ) -> Document<'arena, A>
 where
     A: Arena,
@@ -42,7 +43,7 @@ where
         ]);
     }
 
-    if should_wrap_return_value(f, value) {
+    if allow_wrap && should_wrap_return_value(f, value) {
         let was_inside_parens = f.is_wrapped_in_parens;
         f.is_wrapped_in_parens = true;
         let value_doc = value.format(f);

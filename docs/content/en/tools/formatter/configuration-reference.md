@@ -190,6 +190,7 @@ public function bar(
 | `parentheses-in-new-expression` | boolean | `true` | Add `()` to `new` without arguments: `new Foo()`. |
 | `parentheses-in-exit-and-die` | boolean | `true` | Add `()` to `exit` and `die`. |
 | `parentheses-in-attribute` | boolean | `false` | Add `()` to attributes without arguments. |
+| `parentheses-in-return-statement` | boolean | `true` | Wrap multi-line `return` values in parentheses. Only applies to `return` statements, not arrow function bodies. |
 
 ## Whitespace around operators
 

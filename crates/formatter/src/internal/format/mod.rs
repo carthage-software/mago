@@ -1432,7 +1432,7 @@ where
 
             if let Some(value) = &self.value {
                 contents.push(Document::space());
-                contents.push(format_return_value(f, value));
+                contents.push(format_return_value(f, value, f.settings.parentheses_in_return_statement));
             }
 
             let terminator = self.terminator.format(f);
