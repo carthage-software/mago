@@ -29,7 +29,7 @@ class B extends A
 }
 
 /**
- * @mago-expect analysis:invalid-property-write - Cannot write to protected property `$foo` on class `A`.
+ * @mago-expect analysis:invalid-property-write - Cannot initialize readonly property `A::$foo` from the global scope.
  */
 function example(): void
 {
