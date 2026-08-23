@@ -24,8 +24,6 @@ use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::template::TemplateResult;
 use mago_codex::ttype::template::inferred_type_replacer;
 use mago_codex::ttype::union::TUnion;
-use mago_codex::visibility::Visibility;
-use mago_php_version::feature::Feature;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -51,6 +49,7 @@ use crate::utils::names::display_class_like_name;
 use crate::utils::template::get_template_types_for_class_member;
 use crate::visibility::check_resolved_property_read_visibility;
 use crate::visibility::check_resolved_property_write_visibility;
+use crate::visibility::effective_write_visibility;
 use crate::visibility::is_visible_from_scope;
 
 /// Represents a successfully resolved instance property.
@@ -1147,18 +1146,7 @@ where
             return false;
         }
 
-        let visibility = if property.flags.is_readonly() {
-            if context.settings.version.is_supported(Feature::AsymmetricVisibility) {
-                match property.write_visibility {
-                    Visibility::Public => Visibility::Protected,
-                    visibility => visibility,
-                }
-            } else {
-                Visibility::Private
-            }
-        } else {
-            property.write_visibility
-        };
+        let visibility = effective_write_visibility(property, context.settings.version);
 
         return is_visible_from_scope(
             context.codebase,
