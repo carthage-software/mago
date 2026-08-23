@@ -343,6 +343,34 @@ mod tests {
         "#}
     }
 
+    test_lint_success! {
+        name = anonymous_class_constructor_argument_counts_as_use,
+        rule = NoRedundantVariableRule,
+        code = indoc! {r#"
+            <?php
+
+            declare(strict_types=1);
+
+            namespace Foo;
+
+            function baz(array $options = []): object
+            {
+                $name = \uniqid("name-");
+
+                return new class($name) {
+                    public function __construct(private string $name)
+                    {
+                    }
+
+                    public function getName(): string
+                    {
+                        return \sprintf("Hello %s!", $this->name);
+                    }
+                };
+            }
+        "#}
+    }
+
     test_lint_failure! {
         name = catch_variable_unused,
         rule = NoRedundantVariableRule,

@@ -430,6 +430,19 @@ impl<'arena, R: Recorder<'arena>> UsageWalker<'arena, R> {
         f(self);
         self.ctx = saved;
     }
+
+    fn walk_call_argument_value<'ast>(&mut self, value: &'ast Expression<'arena>, ctx: &mut ())
+    where
+        R: Sync + Send,
+    {
+        if let Expression::Variable(Variable::Direct(d)) = value
+            && !self.excluded.contains(&d.name)
+        {
+            self.rec.record_call_argument(d.name, d.span);
+        } else {
+            self.walk_expression(value, ctx);
+        }
+    }
 }
 
 impl<'ast, 'arena, R: Recorder<'arena> + Sync + Send> MutWalker<'ast, 'arena, ()> for UsageWalker<'arena, R> {
@@ -862,14 +875,7 @@ impl<'ast, 'arena, R: Recorder<'arena> + Sync + Send> MutWalker<'ast, 'arena, ()
                 Argument::Named(n) => n.value,
             };
 
-            if let Expression::Variable(Variable::Direct(d)) = value
-                && !self.excluded.contains(&d.name)
-            {
-                self.rec.record_call_argument(d.name, d.span);
-                continue;
-            }
-
-            self.walk_expression(value, ctx);
+            self.walk_call_argument_value(value, ctx);
         }
     }
 
@@ -930,13 +936,30 @@ impl<'ast, 'arena, R: Recorder<'arena> + Sync + Send> MutWalker<'ast, 'arena, ()
         self.excluded.truncate(saved_len);
     }
 
+    fn walk_anonymous_class(&mut self, anonymous_class: &'ast AnonymousClass<'arena>, ctx: &mut ()) {
+        let Some(argument_list) = &anonymous_class.argument_list else {
+            return;
+        };
+
+        for argument in argument_list.arguments.iter() {
+            let value = match argument {
+                PartialArgument::Positional(positional) => positional.value,
+                PartialArgument::Named(named) => named.value,
+                PartialArgument::NamedPlaceholder(_)
+                | PartialArgument::Placeholder(_)
+                | PartialArgument::VariadicPlaceholder(_) => continue,
+            };
+
+            self.walk_call_argument_value(value, ctx);
+        }
+    }
+
     fn walk_function(&mut self, _: &'ast Function<'arena>, _: &mut ()) {}
     fn walk_method(&mut self, _: &'ast Method<'arena>, _: &mut ()) {}
     fn walk_class(&mut self, _: &'ast Class<'arena>, _: &mut ()) {}
     fn walk_interface(&mut self, _: &'ast Interface<'arena>, _: &mut ()) {}
     fn walk_trait(&mut self, _: &'ast Trait<'arena>, _: &mut ()) {}
     fn walk_enum(&mut self, _: &'ast Enum<'arena>, _: &mut ()) {}
-    fn walk_anonymous_class(&mut self, _: &'ast AnonymousClass<'arena>, _: &mut ()) {}
 }
 
 fn simple_function_name<'arena>(expr: &Expression<'arena>) -> Option<&'arena [u8]> {
