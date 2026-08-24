@@ -38,6 +38,68 @@ pub fn str_is_numeric(input: &str) -> bool {
     maybe_numeric.parse::<f64>().is_ok()
 }
 
+pub fn string_to_int(input: &[u8]) -> i64 {
+    let input = input.trim_ascii_start();
+    let mut offset = 0;
+
+    if matches!(input.first(), Some(b'+' | b'-')) {
+        offset += 1;
+    }
+
+    let mut has_digits = false;
+    while input.get(offset).is_some_and(u8::is_ascii_digit) {
+        has_digits = true;
+        offset += 1;
+    }
+
+    if input.get(offset) == Some(&b'.') {
+        offset += 1;
+        while input.get(offset).is_some_and(u8::is_ascii_digit) {
+            has_digits = true;
+            offset += 1;
+        }
+    }
+
+    if !has_digits {
+        return 0;
+    }
+
+    if matches!(input.get(offset), Some(b'e' | b'E')) {
+        let exponent_start = offset;
+        offset += 1;
+
+        if matches!(input.get(offset), Some(b'+' | b'-')) {
+            offset += 1;
+        }
+
+        let digits_start = offset;
+        while input.get(offset).is_some_and(u8::is_ascii_digit) {
+            offset += 1;
+        }
+
+        if offset == digits_start {
+            offset = exponent_start;
+        }
+    }
+
+    let Ok(number) = std::str::from_utf8(&input[..offset]) else {
+        return 0;
+    };
+
+    number.parse::<i64>().unwrap_or_else(|_| number.parse::<f64>().map_or(0, |number| number as i64))
+}
+
+pub fn numeric_string_equals_int(input: &[u8], expected: i64) -> bool {
+    let Ok(input) = std::str::from_utf8(input.trim_ascii()) else {
+        return false;
+    };
+
+    input.parse::<i64>().map_or_else(
+        |_| input.parse::<f64>().is_ok_and(|number| number == expected as f64),
+        |number| number == expected,
+    )
+}
+
 /// Increments an alphanumeric string.
 ///
 /// Rust implementation based on PHP's `str_increment` function from php-src:
@@ -139,6 +201,33 @@ mod tests {
         assert!(str_is_numeric("12e3"));
         assert!(!str_is_numeric(""));
         assert!(!str_is_numeric("  "));
+    }
+
+    #[test]
+    fn test_string_to_int() {
+        assert_eq!(string_to_int(b"abc"), 0);
+        assert_eq!(string_to_int(b""), 0);
+        assert_eq!(string_to_int(b"42"), 42);
+        assert_eq!(string_to_int(b"042"), 42);
+        assert_eq!(string_to_int(b"42.9"), 42);
+        assert_eq!(string_to_int(b"4.2e1"), 42);
+        assert_eq!(string_to_int(b"  +42.9foo"), 42);
+        assert_eq!(string_to_int(b"-.5x"), 0);
+        assert_eq!(string_to_int(b"1_000"), 1);
+        assert_eq!(string_to_int(b"9223372036854775808"), i64::MAX);
+        assert_eq!(string_to_int(b"-9223372036854775809"), i64::MIN);
+    }
+
+    #[test]
+    fn test_numeric_string_equals_int() {
+        assert!(numeric_string_equals_int(b"42", 42));
+        assert!(numeric_string_equals_int(b"042", 42));
+        assert!(numeric_string_equals_int(b"42.0", 42));
+        assert!(numeric_string_equals_int(b"4.2e1", 42));
+        assert!(numeric_string_equals_int(b" 42 ", 42));
+        assert!(!numeric_string_equals_int(b"42.5", 42));
+        assert!(!numeric_string_equals_int(b"abc", 0));
+        assert!(!numeric_string_equals_int("\u{a0}42".as_bytes(), 42));
     }
 
     #[test]

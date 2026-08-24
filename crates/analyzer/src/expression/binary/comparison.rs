@@ -29,6 +29,7 @@ use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
+use crate::expression::binary::utils::are_definitely_loosely_equal;
 use crate::expression::binary::utils::are_definitely_not_identical;
 use crate::expression::binary::utils::are_definitely_not_loosely_equal;
 use crate::expression::binary::utils::is_always_greater_than;
@@ -300,13 +301,20 @@ where
 
                 if !should_be_specific {
                     get_bool()
-                } else if are_expressions_always_identical(binary.lhs, binary.rhs, lhs_type, rhs_type, artifacts) {
+                } else if are_expressions_always_identical(binary.lhs, binary.rhs, lhs_type, rhs_type, artifacts)
+                    || are_definitely_loosely_equal(context.settings.version, lhs_type, rhs_type)
+                {
                     if !block_context.flags.inside_loop_expressions() {
                         report_redundant_comparison(context, artifacts, binary, "always equal to", "`true`");
                     }
 
                     get_true()
-                } else if are_definitely_not_loosely_equal(context.codebase, lhs_type, rhs_type) {
+                } else if are_definitely_not_loosely_equal(
+                    context.codebase,
+                    context.settings.version,
+                    lhs_type,
+                    rhs_type,
+                ) {
                     if !block_context.flags.inside_loop_expressions() {
                         report_redundant_comparison(context, artifacts, binary, "never equal to", "`false`");
                     }
@@ -322,7 +330,9 @@ where
 
                 if !should_be_specific {
                     get_bool()
-                } else if are_expressions_always_identical(binary.lhs, binary.rhs, lhs_type, rhs_type, artifacts) {
+                } else if are_expressions_always_identical(binary.lhs, binary.rhs, lhs_type, rhs_type, artifacts)
+                    || are_definitely_loosely_equal(context.settings.version, lhs_type, rhs_type)
+                {
                     if !block_context.flags.inside_loop_expressions() {
                         report_redundant_comparison(
                             context,
@@ -334,7 +344,12 @@ where
                     }
 
                     get_false()
-                } else if are_definitely_not_loosely_equal(context.codebase, lhs_type, rhs_type) {
+                } else if are_definitely_not_loosely_equal(
+                    context.codebase,
+                    context.settings.version,
+                    lhs_type,
+                    rhs_type,
+                ) {
                     if !block_context.flags.inside_loop_expressions() {
                         report_redundant_comparison(
                             context,

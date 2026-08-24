@@ -50,6 +50,7 @@ use mago_codex::ttype::intersect_union_types;
 use mago_codex::ttype::shared::MIXED_KEYED_ARRAY_ATOMIC;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;
+use mago_php_version::PHPVersion;
 use mago_span::Span;
 use mago_word::Word;
 use mago_word::word;
@@ -1208,6 +1209,18 @@ where
         match atomic {
             TAtomic::Scalar(TScalar::Integer(_)) => {
                 acceptable_types.push(TAtomic::Scalar(TScalar::Integer(*integer)));
+            }
+            TAtomic::Scalar(TScalar::String(string)) if is_equality => {
+                if context.settings.version < PHPVersion::PHP80 {
+                    acceptable_types.push(TAtomic::Scalar(TScalar::String(*string)));
+                    continue;
+                }
+
+                did_remove_type |= !string.is_numeric;
+
+                if !string.is_known_literal() || string.is_numeric {
+                    acceptable_types.push(TAtomic::Scalar(TScalar::String(string.as_numeric(true))));
+                }
             }
             TAtomic::Mixed(_) | TAtomic::Scalar(TScalar::Generic | TScalar::ArrayKey | TScalar::Numeric) => {
                 return get_union_from_integer(integer);

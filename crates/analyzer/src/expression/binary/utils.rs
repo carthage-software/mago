@@ -5,6 +5,9 @@ use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::float::TFloat;
 use mago_codex::ttype::comparator::union_comparator::can_expression_types_be_identical;
 use mago_codex::ttype::union::TUnion;
+use mago_php_version::PHPVersion;
+
+use crate::utils::php_emulation::numeric_string_equals_int;
 
 #[inline]
 pub fn is_always_less_than_or_equal(lhs: &TUnion, rhs: &TUnion) -> bool {
@@ -204,10 +207,17 @@ fn are_sealed_arrays_always_identical(lhs: &TArray, rhs: &TArray) -> bool {
 ///
 /// Loose equality performs type juggling that can make values of different types compare
 /// equal (e.g. `0 == "0"`, `0 == false`, `5 == 5.0`, `"10" == "1e1"`). This function is
-/// a safe approximation: it only returns `true` when both operands fall within a single
-/// primitive category where `==` is equivalent to `===`, and the strict-identity check
-/// rules out equality for all possible values.
-pub fn are_definitely_not_loosely_equal(codebase: &CodebaseMetadata, lhs: &TUnion, rhs: &TUnion) -> bool {
+/// a safe approximation that handles primitive categories and literal integer-string pairs.
+pub fn are_definitely_not_loosely_equal(
+    codebase: &CodebaseMetadata,
+    php_version: PHPVersion,
+    lhs: &TUnion,
+    rhs: &TUnion,
+) -> bool {
+    if let Some(loosely_equal) = compare_literal_int_and_string(php_version, lhs, rhs) {
+        return !loosely_equal;
+    }
+
     if (lhs.is_int() && rhs.is_int())
         || (lhs.is_bool() && rhs.is_bool())
         || (lhs.is_float() && rhs.is_float())
@@ -217,6 +227,26 @@ pub fn are_definitely_not_loosely_equal(codebase: &CodebaseMetadata, lhs: &TUnio
     } else {
         false
     }
+}
+
+pub fn are_definitely_loosely_equal(php_version: PHPVersion, lhs: &TUnion, rhs: &TUnion) -> bool {
+    compare_literal_int_and_string(php_version, lhs, rhs) == Some(true)
+}
+
+fn compare_literal_int_and_string(php_version: PHPVersion, lhs: &TUnion, rhs: &TUnion) -> Option<bool> {
+    if php_version < PHPVersion::PHP80 {
+        return None;
+    }
+
+    if let (Some(integer), Some(string)) = (lhs.get_single_literal_int_value(), rhs.get_single_literal_string_value()) {
+        return Some(numeric_string_equals_int(string, integer));
+    }
+
+    if let (Some(string), Some(integer)) = (lhs.get_single_literal_string_value(), rhs.get_single_literal_int_value()) {
+        return Some(numeric_string_equals_int(string, integer));
+    }
+
+    None
 }
 
 pub fn are_definitely_not_identical(

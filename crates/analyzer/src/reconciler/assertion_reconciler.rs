@@ -36,6 +36,7 @@ use mago_codex::ttype::get_undefined_null;
 use mago_codex::ttype::intersect_union_types;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;
+use mago_php_version::PHPVersion;
 use mago_span::Span;
 use mago_word::Word;
 use mago_word::word;
@@ -45,6 +46,7 @@ use crate::reconciler::map_generic_constraint_or_else;
 use crate::reconciler::negated_assertion_reconciler;
 use crate::reconciler::simple_assertion_reconciler;
 use crate::reconciler::trigger_issue_for_impossible;
+use crate::utils::php_emulation::numeric_string_equals_int;
 
 pub fn reconcile<A>(
     context: &mut Context<'_, '_, A>,
@@ -957,7 +959,8 @@ where
             TAtomic::Scalar(TScalar::String(TString {
                 literal: Some(TStringLiteral::Value(string_value)), ..
             })) if is_loose_equality
-                && string_value.as_bytes() == IntegerBuffer::new().format(assertion_integer).as_bytes() =>
+                && (context.settings.version < PHPVersion::PHP80
+                    || numeric_string_equals_int(string_value.as_bytes(), assertion_integer)) =>
             {
                 acceptable_types.push(existing_var_atomic_type.clone());
             }

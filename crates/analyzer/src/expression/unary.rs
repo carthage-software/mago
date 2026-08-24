@@ -67,6 +67,7 @@ use crate::expression::call::method_call::analyze_implicit_method_call;
 use crate::utils::expression::get_block_expression_id;
 use crate::utils::php_emulation::str_increment_bytes;
 use crate::utils::php_emulation::str_is_numeric_bytes;
+use crate::utils::php_emulation::string_to_int;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPrefix<'arena> {
     fn analyze<'ctx, A>(
@@ -1582,13 +1583,7 @@ where
                 },
                 TScalar::String(string_scalar) => match &string_scalar.literal {
                     Some(TStringLiteral::Value(string_literal)) => {
-                        if let Some(value) =
-                            std::str::from_utf8(string_literal.as_bytes()).ok().and_then(|s| s.parse::<i64>().ok())
-                        {
-                            TAtomic::Scalar(TScalar::literal_int(value))
-                        } else {
-                            return get_int();
-                        }
+                        TAtomic::Scalar(TScalar::literal_int(string_to_int(string_literal.as_bytes())))
                     }
                     _ => {
                         return get_int();
