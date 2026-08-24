@@ -104,6 +104,16 @@ where
     (regions.leak(), next_markers.leak())
 }
 
+/// Context about a formatted member access chain that terminates an expression statement,
+/// an assignment or a return statement.
+#[derive(Debug, Clone, Copy)]
+pub struct MemberAccessChainContext {
+    /// The identifier of the group wrapping the chain, for `IfBreak` resolution.
+    pub(crate) group_id: GroupIdentifier,
+    /// Whether the chain is guaranteed to be printed across multiple lines.
+    pub(crate) must_break: bool,
+}
+
 #[derive(Debug)]
 pub struct FormatterState<'ctx, 'arena, A>
 where
@@ -133,7 +143,7 @@ where
     is_in_aligned_assignment_rhs: bool,
     halted_compilation: bool,
     alignment_context: Option<AssignmentAlignment>,
-    member_access_chain_group_id: Option<GroupIdentifier>,
+    member_access_chain_context: Option<MemberAccessChainContext>,
 }
 
 impl<'ctx, 'arena, A> FormatterState<'ctx, 'arena, A>
@@ -185,7 +195,7 @@ where
             halted_compilation: false,
             in_script_terminating_statement: false,
             alignment_context: None,
-            member_access_chain_group_id: None,
+            member_access_chain_context: None,
         }
     }
 
@@ -219,16 +229,16 @@ where
         self.all_comments
     }
 
-    /// Take the member access chain group ID, resetting it to None.
+    /// Take the member access chain context, resetting it to `None`.
     #[inline]
-    pub(crate) fn take_member_access_chain_group_id(&mut self) -> Option<GroupIdentifier> {
-        self.member_access_chain_group_id.take()
+    pub(crate) fn take_member_access_chain_context(&mut self) -> Option<MemberAccessChainContext> {
+        self.member_access_chain_context.take()
     }
 
-    /// Set the member access chain group ID.
+    /// Set the member access chain context.
     #[inline]
-    pub(crate) fn set_member_access_chain_group_id(&mut self, id: GroupIdentifier) {
-        self.member_access_chain_group_id = Some(id);
+    pub(crate) fn set_member_access_chain_context(&mut self, context: MemberAccessChainContext) {
+        self.member_access_chain_context = Some(context);
     }
 
     fn next_id(&mut self) -> GroupIdentifier {
@@ -274,6 +284,29 @@ where
         let len = self.stack.len();
 
         (len > n).then(|| self.stack[len - n - 1])
+    }
+
+    /// Walks up from the immediate parent through expression nodes that never own a
+    /// statement terminator (parentheses, unary operators/casts, binary operations) to
+    /// determine whether this node terminates an expression statement, an assignment
+    /// or a return statement.
+    ///
+    /// For example, in `return $this->foo()->bar() > 0;` the member access chain does
+    /// not have the return statement as its direct parent, but this still returns
+    /// `true`.
+    #[inline]
+    pub(crate) fn terminates_statement_from_parent(&self) -> bool {
+        let len = self.stack.len();
+
+        for i in (0..len.saturating_sub(1)).rev() {
+            match &self.stack[i] {
+                Node::ExpressionStatement(_) | Node::Assignment(_) | Node::Return(_) => return true,
+                Node::Expression(_) | Node::Binary(_) | Node::Parenthesized(_) | Node::UnaryPrefix(_) => {}
+                _ => return false,
+            }
+        }
+
+        false
     }
 
     #[inline]

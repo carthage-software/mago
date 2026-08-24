@@ -193,6 +193,7 @@ test_case!(binary_alignment_before_op);
 test_case!(chain_comments);
 test_case!(literal_concat_parens);
 test_case!(method_chain_semicolon_group_scope);
+test_case!(method_chain_semicolon_embedded_expression);
 test_case!(method_chain_semicolon_group_scope_same_line_first_break);
 test_case!(preserve_breaking_member_access_chain);
 test_case!(preserve_breaking_member_access_chain_same_line_first_break);
