@@ -181,6 +181,7 @@ test_case!(next_line_chain_property_receiver_unchanged);
 test_case!(return_wrapping);
 test_case!(shebang);
 test_case!(arrow_return);
+test_case!(arrow_function_binary_array_body);
 test_case!(match_breaking);
 test_case!(array_alignment);
 test_case!(align_parameters);
