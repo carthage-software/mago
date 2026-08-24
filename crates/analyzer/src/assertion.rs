@@ -1613,7 +1613,19 @@ where
 {
     let mut if_types = WordMap::default();
 
-    let variable_id = get_expression_id(left, context.this_class_name, context.resolved_names, Some(context.codebase));
+    let left = unwrap_expression(left);
+    let assertion_target = match left {
+        Expression::Binary(binary)
+            if matches!(binary.operator, BinaryOperator::NullCoalesce(_))
+                && matches!(unwrap_expression(binary.rhs), Expression::Literal(Literal::Null(_))) =>
+        {
+            binary.lhs
+        }
+        _ => left,
+    };
+
+    let variable_id =
+        get_expression_id(assertion_target, context.this_class_name, context.resolved_names, Some(context.codebase));
 
     if let Some(counter_variable_id) = variable_id {
         match right {
