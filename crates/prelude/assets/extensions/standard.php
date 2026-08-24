@@ -3822,9 +3822,9 @@ function array_diff_key(array $array, array ...$arrays): array {}
 function array_diff_assoc(array $array, array ...$arrays): array {}
 
 /**
- * @param array<int|float> $array
+ * @param array<numeric> $array
  *
- * @return ($array is array<int> ? int : float)
+ * @return ($array is array<int> ? int : ($array is array<float> ? float : int|float))
  *
  * @pure
  */
