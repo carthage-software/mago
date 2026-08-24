@@ -340,7 +340,7 @@ where
         for key_value in key_values {
             if let TAtomic::Array(array) = &mut atomic_type {
                 let array_key = if let Some(str) = key_value.get_literal_string_value() {
-                    ArrayKey::String(word(str))
+                    ArrayKey::from_string(word(str))
                 } else if let Some(int) = key_value.get_literal_int_value() {
                     ArrayKey::Integer(int)
                 } else {

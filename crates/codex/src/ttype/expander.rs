@@ -421,7 +421,7 @@ fn resolve_array_key(key: ArrayKey, codebase: &CodebaseMetadata, options: &TypeE
                 return ArrayKey::Integer(*i);
             }
             TAtomic::Scalar(TScalar::String(TString { literal: Some(TStringLiteral::Value(s)), .. })) => {
-                return ArrayKey::String(*s);
+                return ArrayKey::from_string(*s);
             }
             _ => {}
         }
@@ -436,7 +436,7 @@ fn resolve_array_key(key: ArrayKey, codebase: &CodebaseMetadata, options: &TypeE
                 return ArrayKey::Integer(*i);
             }
             TAtomic::Scalar(TScalar::String(TString { literal: Some(TStringLiteral::Value(s)), .. })) => {
-                return ArrayKey::String(*s);
+                return ArrayKey::from_string(*s);
             }
             _ => {}
         }

@@ -513,26 +513,10 @@ fn get_literal_array_key(expression: &Expression<'_>, artifacts: &AnalysisArtifa
     } else if let Some(value) = key_type.get_single_literal_int_value() {
         ArrayKey::Integer(value)
     } else if let Some(value) = key_type.get_single_literal_string_value() {
-        match get_numeric_array_key(value) {
-            Some(value) => ArrayKey::Integer(value),
-            None => ArrayKey::String(word(value)),
-        }
+        ArrayKey::from_string(word(value))
     } else {
         return key_type.get_single_class_string_value().map(ArrayKey::String);
     })
-}
-
-fn get_numeric_array_key(key: &[u8]) -> Option<i64> {
-    if key.starts_with(b"0") || key.starts_with(b"+") {
-        return None;
-    }
-
-    let key = std::str::from_utf8(key).ok()?;
-    if key.trim() != key {
-        return None;
-    }
-
-    key.parse().ok()
 }
 
 fn should_use_specific_equality_inference(

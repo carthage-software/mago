@@ -447,7 +447,7 @@ impl TAtomic {
         match self {
             TAtomic::Scalar(TScalar::Integer(int)) => int.get_literal_value().map(ArrayKey::Integer),
             TAtomic::Scalar(TScalar::String(TString { literal: Some(TStringLiteral::Value(value)), .. })) => {
-                Some(ArrayKey::String(*value))
+                Some(ArrayKey::from_string(*value))
             }
             TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Literal { value })) => {
                 Some(ArrayKey::String(*value))

@@ -35,6 +35,22 @@ pub enum ArrayKey {
 }
 
 impl ArrayKey {
+    #[inline]
+    #[must_use]
+    pub fn from_string(value: Word) -> Self {
+        let raw = value.as_bytes();
+        let digits = raw.strip_prefix(b"-").unwrap_or(raw);
+
+        if digits.is_empty() || !digits.iter().all(u8::is_ascii_digit) || (digits[0] == b'0' && raw != b"0") {
+            return Self::String(value);
+        }
+
+        std::str::from_utf8(raw)
+            .ok()
+            .and_then(|value| value.parse::<i64>().ok())
+            .map_or(Self::String(value), Self::Integer)
+    }
+
     /// If this key is an `Integer`, returns `Some(i64)`, otherwise `None`.
     #[inline]
     #[must_use]
@@ -175,5 +191,30 @@ where
     #[inline]
     fn from(s: T) -> Self {
         ArrayKey::String(Word::from(s.as_ref()))
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use mago_word::word;
+
+    use super::ArrayKey;
+
+    #[test]
+    fn converts_canonical_integer_strings() {
+        for (value, expected) in
+            [("0", 0), ("22", 22), ("-22", -22), ("9223372036854775807", i64::MAX), ("-9223372036854775808", i64::MIN)]
+        {
+            assert_eq!(ArrayKey::from_string(word(value)), ArrayKey::Integer(expected));
+        }
+    }
+
+    #[test]
+    fn preserves_noncanonical_integer_strings() {
+        for value in ["00", "01", "-0", "+22", " 22", "22 ", "9223372036854775808", "-9223372036854775809"] {
+            let value = word(value);
+
+            assert_eq!(ArrayKey::from_string(value), ArrayKey::String(value));
+        }
     }
 }

@@ -203,12 +203,7 @@ where
 
                         let item_key_value =
                             if let Some(item_key_literal_type) = key_type.get_single_literal_string_value() {
-                                let string_to_int = get_numeric_key_from_string(item_key_literal_type);
-
-                                Some(match string_to_int {
-                                    Some(integer) => ArrayKey::Integer(integer),
-                                    None => ArrayKey::String(word(item_key_literal_type)),
-                                })
+                                Some(ArrayKey::from_string(word(item_key_literal_type)))
                             } else if let Some(literal_integer) = key_type.get_single_literal_int_value() {
                                 // The most recent integer key becomes the next available integer key
                                 array_creation_info.int_offset = literal_integer;
@@ -503,19 +498,6 @@ where
     artifacts.set_expression_type(&expression_span, array_type);
 
     Ok(())
-}
-
-fn get_numeric_key_from_string(key: &[u8]) -> Option<i64> {
-    if key.starts_with(b"0") || key.starts_with(b"+") {
-        return None;
-    }
-
-    let key_str = std::str::from_utf8(key).ok()?;
-    if key_str.trim() != key_str {
-        return None;
-    }
-
-    key_str.parse::<i64>().ok()
 }
 
 fn handle_variadic_array_element<'arena, A>(
