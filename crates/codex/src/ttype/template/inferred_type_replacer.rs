@@ -39,6 +39,34 @@ pub fn replace_with_polarity(
     codebase: &CodebaseMetadata,
     polarity: Variance,
 ) -> TUnion {
+    if let [
+        TAtomic::GenericParameter(TGenericParameter {
+            parameter_name,
+            defining_entity,
+            constraint,
+            intersection_types,
+        }),
+    ] = union.types.as_ref()
+    {
+        if let Some(projection) = template_result.projections.get(parameter_name).copied() {
+            match projection.project(polarity) {
+                Some(true) => {}
+                Some(false) => return union.clone_with_types(get_mixed().types.into_owned()),
+                None => return union.clone_with_types(get_never().types.into_owned()),
+            }
+        }
+
+        return replace_template_parameter(
+            *parameter_name,
+            defining_entity,
+            codebase,
+            constraint,
+            intersection_types.as_ref(),
+            template_result,
+        )
+        .map_or_else(|| union.clone(), |replacement| union.clone_with_types(replacement.types.into_owned()));
+    }
+
     let mut new_types = Vec::new();
 
     for atomic_type in union.types.as_ref() {
@@ -142,6 +170,32 @@ pub fn replace_with_polarity(
 
     if new_types.is_empty() {
         return get_never();
+    }
+
+    if new_types.iter().filter(|atomic| atomic.is_array()).count() > 1 {
+        let (mut array_types, other_types): (Vec<_>, Vec<_>) = new_types.into_iter().partition(TAtomic::is_array);
+        let mut combined_types = if other_types.is_empty() {
+            Vec::new()
+        } else {
+            combiner::combine(other_types, codebase, combiner::CombinerOptions::default())
+        };
+
+        if combined_types.iter().any(|atomic| matches!(atomic, TAtomic::Mixed(mixed) if mixed.is_vanilla())) {
+            return union.clone_with_types(combined_types);
+        }
+
+        combined_types.retain(|atomic| !atomic.is_never());
+        for atomic in &mut combined_types {
+            if matches!(atomic, TAtomic::Void) {
+                *atomic = TAtomic::Null;
+            }
+        }
+
+        combined_types.append(&mut array_types);
+        combined_types.sort_unstable();
+        combined_types.dedup();
+
+        return union.clone_with_types(combined_types);
     }
 
     union.clone_with_types(combiner::combine(new_types, codebase, combiner::CombinerOptions::default()))
