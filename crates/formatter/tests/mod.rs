@@ -472,6 +472,7 @@ test_case!(issue_2063);
 test_case!(issue_2093);
 test_case!(issue_2094);
 test_case!(issue_2221);
+test_case!(issue_2255);
 test_case!(issue_2032);
 test_case!(issue_2032_nested_function_argument);
 test_case!(member_access_chain_keeps_breaks_with_comments);

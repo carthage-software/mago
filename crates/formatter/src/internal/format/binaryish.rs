@@ -125,21 +125,21 @@ where
 
     let grandparent = f.grandparent_node();
 
+    let is_control_structure_condition = matches!(
+        grandparent,
+        Some(
+            Node::If(_)
+                | Node::IfStatementBodyElseIfClause(_)
+                | Node::IfColonDelimitedBodyElseIfClause(_)
+                | Node::While(_)
+                | Node::Switch(_)
+                | Node::DoWhile(_)
+                | Node::Match(_)
+        )
+    );
     let is_inside_parenthesis = f.is_wrapped_in_parens
-        || matches!(
-            grandparent,
-            Some(
-                Node::If(_)
-                    | Node::IfStatementBodyElseIfClause(_)
-                    | Node::IfColonDelimitedBodyElseIfClause(_)
-                    | Node::While(_)
-                    | Node::Switch(_)
-                    | Node::DoWhile(_)
-                    | Node::Match(_)
-                    | Node::PositionalArgument(_)
-                    | Node::NamedArgument(_)
-            )
-        );
+        || is_control_structure_condition
+        || matches!(grandparent, Some(Node::PositionalArgument(_) | Node::NamedArgument(_)));
 
     let is_breaking_concat_in_arg = operator.is_concatenation()
         && matches!(grandparent, Some(Node::PositionalArgument(_) | Node::NamedArgument(_)))
@@ -193,7 +193,7 @@ where
             return Document::Group(Group::new(parts));
         }
 
-        if !preserves_breaking_layout {
+        if !preserves_breaking_layout || is_control_structure_condition {
             return Document::Array(parts);
         }
     }
