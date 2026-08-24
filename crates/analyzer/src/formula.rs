@@ -354,6 +354,15 @@ fn add_nullsafe_condition_clauses<A>(
     A: Arena,
 {
     match unwrap_expression(expression) {
+        Expression::Binary(binary) if matches!(binary.operator, BinaryOperator::Instanceof(_)) => {
+            add_nullsafe_base_clauses(
+                binary.lhs,
+                formula,
+                conditional_object_id,
+                creating_object_id,
+                assertion_context,
+            );
+        }
         Expression::Binary(binary)
             if matches!(
                 binary.operator,
