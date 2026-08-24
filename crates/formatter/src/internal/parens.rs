@@ -106,7 +106,9 @@ where
             return false;
         };
 
-        if let Some(Node::Binary(binary)) = self.nth_parent_kind(2)
+        // Without spaces, parentheses keep the concatenation operator from becoming part of a numeric literal.
+        if !self.settings.space_around_concatenation_binary_operator
+            && let Some(Node::Binary(binary)) = self.nth_parent_kind(2)
             && let BinaryOperator::StringConcat(_) = binary.operator
         {
             return true;
