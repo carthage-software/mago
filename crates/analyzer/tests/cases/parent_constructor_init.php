@@ -250,3 +250,55 @@ class Level3 extends Level2
         $this->l3 = 'level3';
     }
 }
+
+abstract class ParentDeclaringConstructor
+{
+    public string $declared;
+
+    public function __construct()
+    {
+        $this->declared = 'declared';
+    }
+}
+
+// Declares no constructor, so `parent::__construct()` in subclasses resolves past it
+class MiddleWithoutConstructor extends ParentDeclaringConstructor
+{
+}
+
+class ChildCallsConstructorFromAncestor extends MiddleWithoutConstructor
+{
+    public function __construct()
+    {
+        parent::__construct();
+    }
+}
+
+trait TraitDeclaringProperty
+{
+    public string $fromTrait;
+}
+
+// Concrete, but the property comes from a trait so it still needs initializing here
+class ParentUsingTrait
+{
+    use TraitDeclaringProperty;
+
+    public function __construct()
+    {
+        $this->fromTrait = 'trait';
+    }
+}
+
+// Declares no constructor, so `parent::__construct()` in subclasses resolves past it
+class TraitMiddleWithoutConstructor extends ParentUsingTrait
+{
+}
+
+class ChildCallsConstructorFromTraitAncestor extends TraitMiddleWithoutConstructor
+{
+    public function __construct()
+    {
+        parent::__construct();
+    }
+}
