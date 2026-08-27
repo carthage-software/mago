@@ -11,6 +11,8 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::Span;
 use mago_syntax::cst::Expression;
+use mago_syntax::cst::UnaryPrefix;
+use mago_syntax::cst::UnaryPrefixOperator;
 
 use crate::code::IssueCode;
 
@@ -148,6 +150,10 @@ fn report_paradoxical_condition<A>(
 pub const fn unwrap_expression<'ast, 'arena>(expression: &'ast Expression<'arena>) -> &'ast Expression<'arena> {
     match expression {
         Expression::Parenthesized(parenthesized) => unwrap_expression(parenthesized.expression),
+        // `@` only suppresses diagnostics; it yields the operand's value unchanged.
+        Expression::UnaryPrefix(UnaryPrefix { operator: UnaryPrefixOperator::ErrorControl(_), operand }) => {
+            unwrap_expression(operand)
+        }
         _ => expression,
     }
 }
