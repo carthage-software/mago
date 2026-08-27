@@ -577,6 +577,7 @@ test_case!(conditional_with_assignment);
 test_case!(conditional_nested);
 test_case!(elvis_operator_with_null);
 test_case!(elvis_operator_with_falsy_string);
+test_case!(error_suppressed_condition_narrowing);
 test_case!(short_ternary_with_truthy);
 test_case!(short_ternary_with_falsy);
 test_case!(conditional_type_narrowing);
