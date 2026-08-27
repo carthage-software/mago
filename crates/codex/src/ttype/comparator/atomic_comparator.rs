@@ -784,18 +784,14 @@ pub(crate) fn can_be_identical(
         };
     }
 
-    if matches!(
+    matches!(
         (first_part, second_part),
         (TAtomic::Object(_), TAtomic::Reference(TReference::Symbol { .. }))
             | (
                 TAtomic::Reference(TReference::Symbol { .. }),
                 TAtomic::Object(_) | TAtomic::Reference(TReference::Symbol { .. })
             )
-    ) {
-        return true;
-    }
-
-    false
+    )
 }
 
 /// Checks whether two string types can share at least one concrete value.

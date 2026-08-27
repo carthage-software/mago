@@ -183,8 +183,8 @@ pub(crate) fn is_array_contained_by_array(
         return false;
     }
 
-    if !input_value_type.is_never()
-        && !union_comparator::is_contained_by(
+    input_value_type.is_never()
+        || union_comparator::is_contained_by(
             codebase,
             &input_value_type,
             &container_value_type,
@@ -193,11 +193,6 @@ pub(crate) fn is_array_contained_by_array(
             inside_assertion,
             atomic_comparison_result,
         )
-    {
-        return false;
-    }
-
-    true
 }
 
 #[cfg(test)]

@@ -196,14 +196,9 @@ pub fn is_password(mut str: &[u8]) -> bool {
 
     let lower = str.to_ascii_lowercase();
 
-    if lower.ends_with(b"password")
+    lower.ends_with(b"password")
         || lower.ends_with(b"token")
         || lower.ends_with(b"secret")
         || lower.ends_with(b"apikey")
         || lower.ends_with(b"api_key")
-    {
-        return true;
-    }
-
-    false
 }

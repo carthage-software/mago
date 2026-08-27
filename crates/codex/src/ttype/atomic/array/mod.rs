@@ -256,13 +256,7 @@ impl TArray {
 
                 !keyed_array.non_empty
             }
-            Self::List(list) => {
-                if list.known_elements.is_none() && list.element_type.is_never() && !list.non_empty {
-                    return true;
-                }
-
-                false
-            }
+            Self::List(list) => list.known_elements.is_none() && list.element_type.is_never() && !list.non_empty,
         }
     }
 
