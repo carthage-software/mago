@@ -72,6 +72,7 @@ test_case!(array_append_overflow_conditionally_assigned_max_key);
 test_case!(array_append_overflow_explicit_max_key);
 test_case!(array_append_overflow_optional_max_key);
 test_case!(array_list_reconciliation);
+test_case!(bare_class_string_containment);
 test_case!(boundary_widen_generic_never_to_int);
 test_case!(boundary_widen_generic_property_assignment);
 test_case!(boundary_widen_generic_static_property);
