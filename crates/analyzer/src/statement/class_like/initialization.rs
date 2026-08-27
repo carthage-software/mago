@@ -560,11 +560,7 @@ where
         return true;
     }
 
-    if context.codebase.method_is_final(class_name.as_bytes(), method_name.as_bytes()) {
-        return true;
-    }
-
-    false
+    context.codebase.method_is_final(class_name.as_bytes(), method_name.as_bytes())
 }
 
 /// Check if parent class constructor initializes the required properties.

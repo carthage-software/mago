@@ -639,11 +639,7 @@ where
                 return true;
             }
         }
-        if cursor < inner.len() && check_non_pragma_line(&inner[cursor..]) {
-            return true;
-        }
-
-        false
+        cursor < inner.len() && check_non_pragma_line(&inner[cursor..])
     }
 
     /// Computes a `TextEdit` to delete a single pragma directive line from within a multi-line comment.
