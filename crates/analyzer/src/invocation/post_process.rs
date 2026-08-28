@@ -56,6 +56,8 @@ use crate::invocation::resolver::resolve_invocation_type;
 use crate::reconciler;
 use crate::reconciler::assertion_reconciler::intersect_union_with_union;
 use crate::utils::expression::get_block_expression_id;
+use crate::utils::expression::get_non_nullsafe_expression_id;
+use crate::utils::expression::get_nullsafe_base_expressions;
 use crate::utils::misc::unwrap_expression;
 
 pub fn post_invocation_process<'ctx, 'arena, A>(
@@ -870,16 +872,25 @@ where
         return type_assertions;
     }
 
+    let mut pending_redundant_issues = Vec::new();
+    let mut has_non_redundant_assertion = false;
+
     for (parameter_id, variable_assertions) in assertions {
         let (assertion_expression, assertion_variable) =
             resolve_argument_or_special_target(context, block_context, invocation, *parameter_id, this_variable);
 
         match assertion_variable {
             Some(assertion_variable) => {
+                let non_nullsafe_assertion_variable = get_non_nullsafe_expression_id(assertion_variable);
+                let assertion_variable = non_nullsafe_assertion_variable.unwrap_or(assertion_variable);
                 let mut new_variable_possibilities: AssertionSet = vec![];
                 let mut resolved_or_clause: Disjunction<Assertion> = Vec::new();
 
-                let asserted_type = block_context.locals.get(&assertion_variable);
+                let asserted_type = block_context.locals.get(&assertion_variable).map(Rc::as_ref).or_else(|| {
+                    non_nullsafe_assertion_variable
+                        .and(assertion_expression)
+                        .and_then(|expression| artifacts.get_expression_type(expression))
+                });
                 let mut any_possible = false;
                 let mut has_resolved_types = false;
                 let mut all_negated = true;
@@ -1041,8 +1052,7 @@ where
 
                     if all_negated {
                         if !any_possible && !suppress_redundant {
-                            context.collector.report_with_code(
-                                IssueCode::RedundantTypeComparison,
+                            pending_redundant_issues.push(
                                 Issue::warning(format!(
                                     "Redundant type assertion: `{assertion_variable}` of type `{asserted_type_id}` is always not `{expected_type_id}`."
                                 ))
@@ -1061,8 +1071,7 @@ where
                             // Side effects or a meaningful return value mean removing the call
                             // would lose behavior. Skip the redundant warning.
                         } else {
-                            context.collector.report_with_code(
-                                IssueCode::RedundantTypeComparison,
+                            pending_redundant_issues.push(
                                 Issue::warning(format!(
                                     "Redundant type assertion: `{assertion_variable}` is already `{asserted_type_id}`."
                                 ))
@@ -1094,7 +1103,29 @@ where
                     }
                 }
 
+                let assertion_is_redundant =
+                    has_resolved_types && if all_negated { !any_possible } else { always_redundant };
+                if !assertion_is_redundant {
+                    has_non_redundant_assertion = true;
+                }
+
                 if !resolved_or_clause.is_empty() {
+                    if resolved_or_clause.iter().all(assertion_excludes_null)
+                        && let Some(assertion_expression) = assertion_expression
+                    {
+                        for base in get_nullsafe_base_expressions(assertion_expression) {
+                            let Some(base_id) = get_block_expression_id(base, context, block_context) else {
+                                continue;
+                            };
+
+                            let base_id = get_non_nullsafe_expression_id(base_id).unwrap_or(base_id);
+                            add_and_assertion(
+                                type_assertions.entry(base_id).or_default(),
+                                Assertion::IsNotType(TAtomic::Null),
+                            );
+                        }
+                    }
+
                     add_and_clause(&mut new_variable_possibilities, &resolved_or_clause);
                 }
 
@@ -1152,6 +1183,9 @@ where
                     };
 
                     let new_clauses = clauses.unwrap_or_default();
+                    if !new_clauses.is_empty() {
+                        has_non_redundant_assertion = true;
+                    }
 
                     for clause in &new_clauses {
                         block_context.clauses.push(Rc::new(clause.clone()));
@@ -1171,7 +1205,24 @@ where
         }
     }
 
+    if !has_non_redundant_assertion {
+        for issue in pending_redundant_issues {
+            context.collector.report_with_code(IssueCode::RedundantTypeComparison, issue);
+        }
+    }
+
     type_assertions
+}
+
+fn assertion_excludes_null(assertion: &Assertion) -> bool {
+    match assertion {
+        Assertion::IsType(atomic) | Assertion::IsIdentical(atomic) => !atomic.is_null(),
+        Assertion::IsNotType(atomic) | Assertion::IsNotIdentical(atomic) | Assertion::IsNotEqual(atomic) => {
+            atomic.is_null()
+        }
+        Assertion::Truthy | Assertion::IsIsset | Assertion::IsEqualIsset | Assertion::NonEmpty => true,
+        _ => false,
+    }
 }
 
 fn generic_keyed_array_can_be_list(asserted_type: &TUnion, assertion_type: &TUnion) -> bool {

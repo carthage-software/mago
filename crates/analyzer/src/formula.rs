@@ -484,7 +484,7 @@ fn add_conditional_assertion_clauses(
                 possibilities,
                 conditional_object_id,
                 creating_object_id,
-                Some(true),
+                Some(false),
                 Some(true),
                 Some(generated),
             ));
