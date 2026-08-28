@@ -116,11 +116,7 @@ fn mixed_triples_dominate() {
 
 #[test]
 fn array_triples() {
-    check(
-        "array{},list,int",
-        vec![t_empty_array(), t_list(u(t_int()), false), t_int()],
-        &["array{}", "int", "list<int>"],
-    );
+    check("array{},list,int", vec![t_empty_array(), t_list(u(t_int()), false), t_int()], &["int", "list<int>"]);
     check(
         "list,list,int",
         vec![t_list(u(t_int()), false), t_list(u(t_string()), false), t_int()],

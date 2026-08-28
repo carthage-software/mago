@@ -618,6 +618,16 @@ fn scrape_type_properties(
         for array in std::iter::once(array).chain(sealed_arrays) {
             match array {
                 TArray::List(TList { element_type, known_elements, non_empty, known_count: _ }) => {
+                    if combination.flags.contains(CombinationFlags::HAS_KEYED_ARRAY)
+                        && !combination.flags.contains(CombinationFlags::KEYED_ARRAY_SOMETIMES_FILLED)
+                        && combination.keyed_array_parameters.is_none()
+                        && combination.keyed_array_entries.is_empty()
+                    {
+                        combination.flags.remove(CombinationFlags::HAS_KEYED_ARRAY);
+                        combination.flags.remove(CombinationFlags::KEYED_ARRAY_ALWAYS_FILLED);
+                        combination.flags.remove(CombinationFlags::LIST_ARRAY_ALWAYS_FILLED);
+                    }
+
                     if !non_empty {
                         combination.flags.remove(CombinationFlags::LIST_ARRAY_ALWAYS_FILLED);
                     }

@@ -232,7 +232,7 @@ fn primitive_pairs_array() {
         vec![t_list(u(t_int()), false), t_list(u(t_string()), false)],
         &["list<int|string>"],
     );
-    check("array{} ∨ list", vec![t_empty_array(), t_list(u(t_int()), false)], &["array{}", "list<int>"]);
+    check("array{} ∨ list", vec![t_empty_array(), t_list(u(t_int()), false)], &["list<int>"]);
     check("list ∨ array{}", vec![t_list(u(t_int()), false), t_empty_array()], &["list<int>"]);
     check("list ∨ int", vec![t_list(u(t_int()), false), t_int()], &["int", "list<int>"]);
     check("list ∨ object", vec![t_list(u(t_int()), false), t_object_any()], &["list<int>", "object"]);

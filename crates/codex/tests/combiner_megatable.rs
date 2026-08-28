@@ -197,9 +197,9 @@ fn array_megatable() {
     expect("ne-list∨list", vec![t_list(u(t_int()), true), t_list(u(t_int()), false)], &["list<int>"]);
     expect("list∨ne-list", vec![t_list(u(t_int()), false), t_list(u(t_int()), true)], &["list<int>"]);
 
-    expect("empty∨list", vec![t_empty_array(), t_list(u(t_int()), false)], &["array{}", "list<int>"]);
-    expect("list∨empty", vec![t_list(u(t_int()), false), t_empty_array()], &["list<int>"]);
-    expect("empty∨ne-list", vec![t_empty_array(), t_list(u(t_int()), true)], &["array{}", "non-empty-list<int>"]);
+    expect("empty ∨ list", vec![t_empty_array(), t_list(u(t_int()), false)], &["list<int>"]);
+    expect("list ∨ empty", vec![t_list(u(t_int()), false), t_empty_array()], &["list<int>"]);
+    expect("empty ∨ ne-list", vec![t_empty_array(), t_list(u(t_int()), true)], &["list<int>"]);
 
     expect("keyed<string,int>", vec![t_keyed_unsealed(u(t_string()), u(t_int()), false)], &["array<string, int>"]);
     expect(

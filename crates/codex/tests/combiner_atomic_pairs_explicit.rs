@@ -870,7 +870,7 @@ fn p_arr_ne_with_e() {
 
 #[test]
 fn p_arr_empty_with_list() {
-    check(vec![t_empty_array(), t_list(u(t_int()), false)], &["array{}", "list<int>"]);
+    check(vec![t_empty_array(), t_list(u(t_int()), false)], &["list<int>"]);
 }
 
 #[test]

@@ -239,7 +239,7 @@ fn array_cases() {
             vec![t_list(u(t_int()), true), t_list(u(t_int()), true)],
             vec!["non-empty-list<int>"],
         ),
-        ("array{} ∨ list<int>", vec![t_empty_array(), t_list(u(t_int()), false)], vec!["array{}", "list<int>"]),
+        ("array{} ∨ list<int>", vec![t_empty_array(), t_list(u(t_int()), false)], vec!["list<int>"]),
         ("list<int> ∨ array{}", vec![t_list(u(t_int()), false), t_empty_array()], vec!["list<int>"]),
         ("list ∨ int", vec![t_list(u(t_int()), false), t_int()], vec!["int", "list<int>"]),
         (

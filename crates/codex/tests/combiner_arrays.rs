@@ -67,25 +67,18 @@ fn two_non_empty_lists_stay_non_empty() {
 }
 
 #[test]
-fn empty_array_or_list_kept_separate() {
-    let r = combine_default(vec![t_empty_array(), t_list(u(t_int()), false)]);
-    let mut ids: Vec<String> = r.iter().map(atomic_id_string).collect();
-    ids.sort();
-    assert_eq!(ids.len(), 2);
-}
+fn empty_array_and_list_combine_order_independently() {
+    for non_empty in [false, true] {
+        let empty = t_empty_array();
+        let list = t_list(u(t_int()), non_empty);
 
-#[test]
-fn empty_array_or_non_empty_list_kept_separate() {
-    let r = combine_default(vec![t_empty_array(), t_list(u(t_int()), true)]);
-    assert_eq!(r.len(), 2);
-}
+        for types in [vec![empty.clone(), list.clone()], vec![list, empty]] {
+            let result = combine_default(types);
 
-#[test]
-fn list_then_empty_yields_just_list() {
-    let r = combine_default(vec![t_list(u(t_int()), false), t_empty_array()]);
-    assert_eq!(r.len(), 1);
-    let id = atomic_id_string(&r[0]);
-    assert!(id.starts_with("list<"));
+            assert_eq!(result.len(), 1);
+            assert_eq!(atomic_id_string(&result[0]), "list<int>");
+        }
+    }
 }
 
 #[test]
