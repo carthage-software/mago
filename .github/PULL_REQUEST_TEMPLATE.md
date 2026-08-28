@@ -17,6 +17,7 @@
 
 - [ ] Linter
 - [ ] Formatter
+- [ ] Analyzer
 - [ ] CLI
 - [ ] Dependencies
 - [ ] Documentation
