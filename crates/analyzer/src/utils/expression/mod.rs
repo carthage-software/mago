@@ -93,6 +93,60 @@ pub(crate) const fn expression_is_nullsafe(expr: &'_ Expression<'_>) -> bool {
     }
 }
 
+pub(crate) fn get_nullsafe_base_expressions<'ast, 'arena>(
+    expression: &'ast Expression<'arena>,
+) -> Vec<&'ast Expression<'arena>> {
+    let mut bases = vec![];
+    let mut current = Some(unwrap_expression(expression));
+    while let Some(expression) = current {
+        match expression {
+            Expression::Access(Access::NullSafeProperty(access)) => {
+                bases.push(access.object);
+                current = Some(unwrap_expression(access.object));
+            }
+            Expression::Access(Access::Property(access)) => {
+                current = Some(unwrap_expression(access.object));
+            }
+            Expression::Call(Call::NullSafeMethod(call)) => {
+                bases.push(call.object);
+                current = Some(unwrap_expression(call.object));
+            }
+            Expression::Call(Call::Method(call)) => {
+                current = Some(unwrap_expression(call.object));
+            }
+            Expression::ArrayAccess(access) => {
+                current = Some(unwrap_expression(access.array));
+            }
+            _ => {
+                current = None;
+            }
+        }
+    }
+
+    bases
+}
+
+pub(crate) fn get_non_nullsafe_expression_id(id: Word) -> Option<Word> {
+    let bytes = id.as_bytes();
+    if !bytes.windows(3).any(|window| window == b"?->") {
+        return None;
+    }
+
+    let mut result = Vec::with_capacity(bytes.len());
+    let mut offset = 0;
+    while offset < bytes.len() {
+        if bytes.get(offset..offset + 3) == Some(b"?->") {
+            result.extend_from_slice(b"->");
+            offset += 3;
+        } else {
+            result.push(bytes[offset]);
+            offset += 1;
+        }
+    }
+
+    Some(word(result))
+}
+
 pub const fn expression_has_logic(expression: &Expression<'_>) -> bool {
     match unwrap_expression(expression) {
         Expression::Binary(binary) => {

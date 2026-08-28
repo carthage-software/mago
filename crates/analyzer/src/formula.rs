@@ -15,7 +15,6 @@ use mago_span::Span;
 use mago_syntax::cst::*;
 use mago_word::Word;
 use mago_word::WordMap;
-use mago_word::word;
 
 use crate::artifacts::AnalysisArtifacts;
 use crate::assertion::OtherValuePosition;
@@ -23,6 +22,9 @@ use crate::assertion::has_null_variable;
 use crate::assertion::scrape_assertions;
 use crate::context::assertion::AssertionContext;
 use crate::context::scope::var_has_root;
+use crate::utils::expression::expression_is_nullsafe;
+use crate::utils::expression::get_non_nullsafe_expression_id;
+use crate::utils::expression::get_nullsafe_base_expressions;
 use crate::utils::misc::unwrap_expression;
 
 /// Recursively traverses a conditional expression to generate a corresponding logical formula.
@@ -376,6 +378,42 @@ fn add_nullsafe_condition_clauses<A>(
 
             add_nullsafe_base_clauses(operand, formula, conditional_object_id, creating_object_id, assertion_context);
         }
+        Expression::Binary(binary)
+            if matches!(binary.operator, BinaryOperator::Equal(_) | BinaryOperator::Identical(_))
+                && let Some(position) = has_null_variable(binary.lhs, binary.rhs, artifacts) =>
+        {
+            let operand = match position {
+                OtherValuePosition::Left => binary.rhs,
+                OtherValuePosition::Right => binary.lhs,
+            };
+
+            add_nullsafe_null_equality_clauses(operand, formula, assertion_context);
+        }
+        Expression::Binary(binary) if matches!(binary.operator, BinaryOperator::Identical(_)) => {
+            let nullsafe_operand = if expression_is_nullsafe(binary.lhs)
+                && !expression_is_nullsafe(binary.rhs)
+                && artifacts.get_expression_type(binary.rhs).is_some_and(|ty| !ty.can_be_null())
+            {
+                Some(binary.lhs)
+            } else if expression_is_nullsafe(binary.rhs)
+                && !expression_is_nullsafe(binary.lhs)
+                && artifacts.get_expression_type(binary.lhs).is_some_and(|ty| !ty.can_be_null())
+            {
+                Some(binary.rhs)
+            } else {
+                None
+            };
+
+            if let Some(operand) = nullsafe_operand {
+                add_nullsafe_base_clauses(
+                    operand,
+                    formula,
+                    conditional_object_id,
+                    creating_object_id,
+                    assertion_context,
+                );
+            }
+        }
         Expression::Construct(Construct::Isset(isset)) => {
             for value in isset.values.iter() {
                 add_nullsafe_base_clauses(value, formula, conditional_object_id, creating_object_id, assertion_context);
@@ -387,7 +425,7 @@ fn add_nullsafe_condition_clauses<A>(
     }
 }
 
-fn add_nullsafe_base_clauses<A>(
+pub(crate) fn add_nullsafe_base_clauses<A>(
     expression: &Expression,
     formula: &mut Vec<Clause>,
     conditional_object_id: Span,
@@ -396,34 +434,7 @@ fn add_nullsafe_base_clauses<A>(
 ) where
     A: Arena,
 {
-    let mut bases = vec![];
-    let mut current = Some(unwrap_expression(expression));
-    while let Some(expr) = current {
-        match expr {
-            Expression::Access(Access::NullSafeProperty(access)) => {
-                bases.push(access.object);
-                current = Some(unwrap_expression(access.object));
-            }
-            Expression::Access(Access::Property(access)) => {
-                current = Some(unwrap_expression(access.object));
-            }
-            Expression::Call(Call::NullSafeMethod(call)) => {
-                bases.push(call.object);
-                current = Some(unwrap_expression(call.object));
-            }
-            Expression::Call(Call::Method(call)) => {
-                current = Some(unwrap_expression(call.object));
-            }
-            Expression::ArrayAccess(access) => {
-                current = Some(unwrap_expression(access.array));
-            }
-            _ => {
-                current = None;
-            }
-        }
-    }
-
-    for base in bases.into_iter().rev() {
+    for base in get_nullsafe_base_expressions(expression).into_iter().rev() {
         push_not_null_clause(base, formula, conditional_object_id, creating_object_id, assertion_context);
     }
 
@@ -434,6 +445,75 @@ fn add_nullsafe_base_clauses<A>(
         creating_object_id,
         assertion_context,
     );
+}
+
+fn add_nullsafe_null_equality_clauses<A>(
+    expression: &Expression,
+    formula: &mut Vec<Clause>,
+    assertion_context: AssertionContext<'_, '_, A>,
+) where
+    A: Arena,
+{
+    let base_ids = get_nullsafe_base_expressions(expression)
+        .into_iter()
+        .filter_map(|base| assertion_context.get_expression_id(base))
+        .map(|id| get_non_nullsafe_expression_id(id).unwrap_or(id))
+        .collect::<Vec<_>>();
+
+    if base_ids.is_empty() {
+        return;
+    }
+
+    let mut modified = false;
+    if let Some(expression_id) = assertion_context.get_expression_id(expression)
+        && let Some(non_nullsafe_id) = get_non_nullsafe_expression_id(expression_id)
+    {
+        for clause in formula.iter_mut() {
+            let Some(expression_assertions) = clause.possibilities.get(&expression_id).cloned() else {
+                continue;
+            };
+
+            let mut possibilities = clause.possibilities.clone();
+            possibilities.shift_remove(&expression_id);
+            possibilities.entry(non_nullsafe_id).or_default().extend(expression_assertions);
+            for base_id in &base_ids {
+                let assertion = Assertion::IsType(TAtomic::Null);
+                possibilities.entry(*base_id).or_default().insert(assertion.to_hash(), assertion);
+            }
+
+            *clause = Clause::new(
+                possibilities,
+                clause.condition_span,
+                clause.span,
+                Some(clause.wedge),
+                Some(clause.reconcilable),
+                Some(clause.generated),
+            );
+            modified = true;
+        }
+    }
+
+    if modified {
+        return;
+    }
+
+    let Some(template) = formula.first() else {
+        return;
+    };
+
+    let condition_span = template.condition_span;
+    let span = template.span;
+    let placeholder =
+        Word::from(format!("*nullsafe-{}-{}", expression.start_offset(), expression.end_offset()).as_str());
+    let null = Assertion::IsType(TAtomic::Null);
+    let mut possibilities = IndexMap::from([(placeholder, IndexMap::from([(null.to_hash(), null)]))]);
+    for base_id in base_ids {
+        let null = Assertion::IsType(TAtomic::Null);
+        possibilities.entry(base_id).or_default().insert(null.to_hash(), null);
+    }
+
+    formula.clear();
+    formula.push(Clause::new(possibilities, condition_span, span, Some(false), Some(true), Some(true)));
 }
 
 fn push_not_null_clause<A>(
@@ -449,7 +529,7 @@ fn push_not_null_clause<A>(
         return;
     };
 
-    if let Some(non_nullsafe_id) = get_non_nullsafe_id(base_id) {
+    if let Some(non_nullsafe_id) = get_non_nullsafe_expression_id(base_id) {
         push_not_null_clause_for_id(non_nullsafe_id, formula, conditional_object_id, creating_object_id);
     } else {
         push_not_null_clause_for_id(base_id, formula, conditional_object_id, creating_object_id);
@@ -469,32 +549,11 @@ fn push_non_nullsafe_not_null_clause<A>(
         return;
     };
 
-    let Some(non_nullsafe_id) = get_non_nullsafe_id(expression_id) else {
+    let Some(non_nullsafe_id) = get_non_nullsafe_expression_id(expression_id) else {
         return;
     };
 
     push_not_null_clause_for_id(non_nullsafe_id, formula, conditional_object_id, creating_object_id);
-}
-
-fn get_non_nullsafe_id(id: Word) -> Option<Word> {
-    let bytes = id.as_bytes();
-    if !bytes.windows(3).any(|window| window == b"?->") {
-        return None;
-    }
-
-    let mut result = Vec::with_capacity(bytes.len());
-    let mut offset = 0;
-    while offset < bytes.len() {
-        if bytes.get(offset..offset + 3) == Some(b"?->") {
-            result.extend_from_slice(b"->");
-            offset += 3;
-        } else {
-            result.push(bytes[offset]);
-            offset += 1;
-        }
-    }
-
-    Some(word(result))
 }
 
 fn push_not_null_clause_for_id(

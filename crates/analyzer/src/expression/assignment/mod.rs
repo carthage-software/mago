@@ -46,6 +46,7 @@ use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::context::block::ReferenceConstraintSource;
+use crate::context::scope::var_has_root;
 use crate::context::scope::var_references_dynamic;
 use crate::error::AnalysisError;
 use crate::expression::find_expression_logic_issues;
@@ -55,6 +56,8 @@ use crate::utils::docblock::get_type_from_var_docblock;
 use crate::utils::expression::array::get_array_target_type_given_index;
 use crate::utils::expression::expression_has_logic;
 use crate::utils::expression::get_block_expression_id;
+use crate::utils::expression::get_non_nullsafe_expression_id;
+use crate::utils::expression::get_nullsafe_base_expressions;
 use crate::utils::expression::get_root_expression_id;
 use crate::utils::misc::unwrap_expression;
 
@@ -295,11 +298,55 @@ where
         }
     }
 
+    if successful
+        && assignment_operator.is_none()
+        && let (Some(target_variable_id), Some(source_expression)) = (target_variable_id, source_expression)
+        && matches!(target_expression, Expression::Variable(_))
+    {
+        add_nullsafe_assignment_clauses(target_variable_id, source_expression, context, block_context);
+    }
+
     if let Some(assignment_span) = assignment_span {
         artifacts.set_rc_expression_type(&assignment_span, source_type);
     }
 
     Ok(())
+}
+
+fn add_nullsafe_assignment_clauses<'ctx, 'arena, A>(
+    target_variable_id: Word,
+    source_expression: &Expression<'arena>,
+    context: &Context<'ctx, 'arena, A>,
+    block_context: &mut BlockContext<'ctx>,
+) where
+    A: Arena,
+{
+    for base in get_nullsafe_base_expressions(source_expression) {
+        let Some(base_id) = get_block_expression_id(base, context, block_context) else {
+            continue;
+        };
+
+        let base_id = get_non_nullsafe_expression_id(base_id).unwrap_or(base_id);
+        if var_has_root(base_id, target_variable_id) {
+            continue;
+        }
+
+        let target_null = Assertion::IsType(TAtomic::Null);
+        let base_not_null = Assertion::IsNotType(TAtomic::Null);
+        let possibilities = IndexMap::from([
+            (target_variable_id, IndexMap::from([(target_null.to_hash(), target_null)])),
+            (base_id, IndexMap::from([(base_not_null.to_hash(), base_not_null)])),
+        ]);
+
+        block_context.clauses.push(Rc::new(Clause::new(
+            possibilities,
+            source_expression.span(),
+            source_expression.span(),
+            Some(false),
+            Some(true),
+            Some(true),
+        )));
+    }
 }
 
 pub(crate) fn assign_to_expression<'ctx, 'ast, 'arena, A>(

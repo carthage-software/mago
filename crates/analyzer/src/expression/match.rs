@@ -38,6 +38,7 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::context::utils::inherit_branch_context_properties;
 use crate::error::AnalysisError;
+use crate::formula::add_nullsafe_base_clauses;
 use crate::formula::get_formula;
 use crate::formula::negate_or_synthesize;
 use crate::reconciler::reconcile_keyed_types;
@@ -390,10 +391,26 @@ where
             })
             .unwrap_or_default();
 
+        let mut nullsafe_subject_clauses = vec![];
+        if expression_arm
+            .conditions
+            .iter()
+            .all(|condition| self.artifacts.get_expression_type(condition).is_some_and(|ty| !ty.can_be_null()))
+        {
+            add_nullsafe_base_clauses(
+                self.stmt.expression,
+                &mut nullsafe_subject_clauses,
+                expression_arm.span(),
+                expression_arm.span(),
+                assertion_context,
+            );
+        }
+
         let combined_clauses: Vec<_> = saturate_clauses(
             arm_clauses
                 .iter()
                 .chain(original_arm_clauses.iter())
+                .chain(nullsafe_subject_clauses.iter())
                 .chain(arm_body_context.clauses.iter().map(Deref::deref)),
             &self.context.settings.algebra_thresholds(),
         )
