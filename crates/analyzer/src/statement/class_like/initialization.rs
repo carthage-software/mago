@@ -385,9 +385,16 @@ where
             && let Some(class_meta) = context.codebase.get_class_like(current_class.as_bytes())
             && let Some(parent_name) = &class_meta.direct_parent_class
             && let Some(parent_meta) = context.codebase.get_class_like(parent_name.as_bytes())
-            && parent_meta.declaring_method_ids.contains_key(&word("__construct"))
+            && let Some(method_id) = parent_meta.declaring_method_ids.get(&word("__construct"))
         {
-            work_queue.push((*parent_name, word("__construct"), parent_meta.flags.is_final(), false, origin_class));
+            // Find closest constructor-declaring ancestor
+            let declaring_class_name = method_id.get_class_name();
+            let declaring_class_is_final = context
+                .codebase
+                .get_class_like(declaring_class_name.as_bytes())
+                .is_some_and(|declaring_meta| declaring_meta.flags.is_final());
+
+            work_queue.push((declaring_class_name, word("__construct"), declaring_class_is_final, false, origin_class));
         }
 
         if let Some(parent_initializer_name) = artifacts.method_calls_parent_initializer.get(&method_key)
