@@ -745,7 +745,9 @@ where
     for mut clause in if_conditional_scope.entry_clauses {
         'set_clause: for key in clause.possibilities.keys() {
             for conditional_assigned_variable_id in assigned_in_conditional_variable_ids.keys() {
-                if !is_derived_access_path(*key, *conditional_assigned_variable_id) {
+                if key != conditional_assigned_variable_id
+                    && !is_derived_access_path(*key, *conditional_assigned_variable_id)
+                {
                     continue;
                 }
 
