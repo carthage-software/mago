@@ -96,7 +96,7 @@ where
         )]);
     }
 
-    let formula = get_formula(
+    let formula = get_base_formula(
         conditional_object_id,
         creating_object_id,
         other_side,
@@ -111,6 +111,40 @@ where
 }
 
 pub fn get_formula<A>(
+    conditional_object_id: Span,
+    creating_object_id: Span,
+    conditional: &Expression,
+    assertion_context: AssertionContext<'_, '_, A>,
+    artifacts: &AnalysisArtifacts,
+    algebra_thresholds: &AlgebraThresholds,
+    formula_size_threshold: u16,
+) -> Option<Vec<Clause>>
+where
+    A: Arena,
+{
+    let mut formula = get_base_formula(
+        conditional_object_id,
+        creating_object_id,
+        conditional,
+        assertion_context,
+        artifacts,
+        algebra_thresholds,
+        formula_size_threshold,
+    )?;
+
+    add_conditional_assertion_clauses(
+        conditional,
+        true,
+        &mut formula,
+        conditional_object_id,
+        creating_object_id,
+        artifacts,
+    );
+
+    if formula.len() > usize::from(formula_size_threshold) { None } else { Some(formula) }
+}
+
+fn get_base_formula<A>(
     conditional_object_id: Span,
     creating_object_id: Span,
     conditional: &Expression,
@@ -295,7 +329,7 @@ where
 
         let unary_operand_span = unary_prefix.operand.span();
         let negated = negate_formula(
-            get_formula(
+            get_base_formula(
                 conditional_object_id,
                 unary_operand_span,
                 unary_prefix.operand,
@@ -422,6 +456,120 @@ fn add_nullsafe_condition_clauses<A>(
         _ => {
             add_nullsafe_base_clauses(expression, formula, conditional_object_id, creating_object_id, assertion_context)
         }
+    }
+}
+
+fn add_conditional_assertion_clauses(
+    expression: &Expression,
+    when_true: bool,
+    formula: &mut Vec<Clause>,
+    conditional_object_id: Span,
+    creating_object_id: Span,
+    artifacts: &AnalysisArtifacts,
+) {
+    let assertions = collect_conditional_assertions(expression, when_true, artifacts);
+    for (variable, assertion_set) in assertions {
+        for assertions in assertion_set {
+            let Some(first_assertion) = assertions.first() else {
+                continue;
+            };
+
+            let generated = first_assertion.has_equality();
+            let possibilities = IndexMap::from([(
+                variable,
+                assertions.into_iter().map(|assertion| (assertion.to_hash(), assertion)).collect(),
+            )]);
+
+            formula.push(Clause::new(
+                possibilities,
+                conditional_object_id,
+                creating_object_id,
+                Some(true),
+                Some(true),
+                Some(generated),
+            ));
+        }
+    }
+}
+
+fn collect_conditional_assertions(
+    expression: &Expression,
+    when_true: bool,
+    artifacts: &AnalysisArtifacts,
+) -> WordMap<AssertionSet> {
+    let expression = unwrap_expression(expression);
+    match expression {
+        Expression::Call(call) => {
+            let range = (call.span().start.offset, call.span().end.offset);
+            if when_true {
+                let mut assertions = artifacts.if_true_assertions.get(&range).cloned().unwrap_or_default();
+                assertions.retain(|_, assertion_set| {
+                    assertion_set.retain(|assertions| assertions.iter().any(Assertion::has_equality));
+                    !assertion_set.is_empty()
+                });
+
+                assertions
+            } else {
+                artifacts.if_false_assertions.get(&range).cloned().unwrap_or_default()
+            }
+        }
+        Expression::UnaryPrefix(unary) if unary.operator.is_not() => {
+            collect_conditional_assertions(unary.operand, !when_true, artifacts)
+        }
+        Expression::Assignment(assignment) if matches!(assignment.operator, AssignmentOperator::Assign(_)) => {
+            collect_conditional_assertions(assignment.rhs, when_true, artifacts)
+        }
+        Expression::Binary(binary) if matches!(binary.operator, BinaryOperator::And(_) | BinaryOperator::LowAnd(_)) => {
+            if !when_true {
+                return WordMap::default();
+            }
+
+            let mut assertions = collect_conditional_assertions(binary.lhs, true, artifacts);
+            extend_conditional_assertions(&mut assertions, collect_conditional_assertions(binary.rhs, true, artifacts));
+            assertions
+        }
+        Expression::Binary(binary) if matches!(binary.operator, BinaryOperator::Or(_) | BinaryOperator::LowOr(_)) => {
+            if when_true {
+                return WordMap::default();
+            }
+
+            let mut assertions = collect_conditional_assertions(binary.lhs, false, artifacts);
+            extend_conditional_assertions(
+                &mut assertions,
+                collect_conditional_assertions(binary.rhs, false, artifacts),
+            );
+            assertions
+        }
+        Expression::Binary(binary)
+            if matches!(binary.operator, BinaryOperator::Identical(_) | BinaryOperator::NotIdentical(_)) =>
+        {
+            let (other, literal) = if binary.lhs.is_true() {
+                (binary.rhs, true)
+            } else if binary.lhs.is_false() {
+                (binary.rhs, false)
+            } else if binary.rhs.is_true() {
+                (binary.lhs, true)
+            } else if binary.rhs.is_false() {
+                (binary.lhs, false)
+            } else {
+                return WordMap::default();
+            };
+
+            let other_when_true = if matches!(binary.operator, BinaryOperator::Identical(_)) {
+                when_true == literal
+            } else {
+                when_true != literal
+            };
+
+            collect_conditional_assertions(other, other_when_true, artifacts)
+        }
+        _ => WordMap::default(),
+    }
+}
+
+fn extend_conditional_assertions(target: &mut WordMap<AssertionSet>, assertions: WordMap<AssertionSet>) {
+    for (variable, assertion_set) in assertions {
+        target.entry(variable).or_default().extend(assertion_set);
     }
 }
 
@@ -658,8 +806,34 @@ pub fn negate_or_synthesize<A>(
 where
     A: Arena,
 {
-    match negate_formula(clauses, algebra_thresholds) {
-        Some(negated_clauses) => negated_clauses,
+    let negated_clauses = if collect_conditional_assertions(conditional, true, artifacts).is_empty() {
+        negate_formula(clauses, algebra_thresholds)
+    } else {
+        get_base_formula(
+            conditional.span(),
+            conditional.span(),
+            conditional,
+            assertion_context,
+            artifacts,
+            algebra_thresholds,
+            formula_size_threshold,
+        )
+        .and_then(|formula| negate_formula(formula, algebra_thresholds))
+    };
+
+    match negated_clauses {
+        Some(mut negated_clauses) => {
+            add_conditional_assertion_clauses(
+                conditional,
+                false,
+                &mut negated_clauses,
+                conditional.span(),
+                conditional.span(),
+                artifacts,
+            );
+
+            negated_clauses
+        }
         None => match get_formula(
             conditional.span(),
             conditional.span(),
@@ -695,7 +869,7 @@ fn handle_binary_or_operation<A>(
 where
     A: Arena,
 {
-    let left_clauses = get_formula(
+    let left_clauses = get_base_formula(
         conditional_object_id,
         left.span(),
         left,
@@ -704,7 +878,7 @@ where
         algebra_thresholds,
         formula_size_threshold,
     )?;
-    let right_clauses = get_formula(
+    let right_clauses = get_base_formula(
         conditional_object_id,
         right.span(),
         right,
@@ -731,7 +905,7 @@ fn handle_binary_and_operation<A>(
 where
     A: Arena,
 {
-    let mut clauses = get_formula(
+    let mut clauses = get_base_formula(
         conditional_object_id,
         left.span(),
         left,
@@ -740,7 +914,7 @@ where
         algebra_thresholds,
         formula_size_threshold,
     )?;
-    clauses.extend(get_formula(
+    clauses.extend(get_base_formula(
         conditional_object_id,
         right.span(),
         right,

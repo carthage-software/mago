@@ -2,7 +2,6 @@ use indexmap::IndexMap;
 
 use mago_algebra::clause::Clause;
 use mago_algebra::find_satisfying_assignments;
-use mago_algebra::negate_formula;
 use mago_algebra::saturate_clauses;
 use mago_allocator::Arena;
 use mago_reporting::Annotation;
@@ -20,6 +19,7 @@ use crate::context::block::BreakContext;
 use crate::context::scope::loop_scope::LoopScope;
 use crate::error::AnalysisError;
 use crate::formula::get_formula;
+use crate::formula::negate_or_synthesize;
 use crate::formula::remove_clauses_with_mixed_variables;
 use crate::reconciler::reconcile_keyed_types;
 use crate::statement::r#loop;
@@ -115,7 +115,14 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for DoWhile<'arena> {
 
         let clauses_to_simplify = {
             let mut c = block_context.clauses.iter().map(|v| (**v).clone()).collect::<Vec<_>>();
-            c.extend(negate_formula(while_clauses, &context.settings.algebra_thresholds()).unwrap_or_default());
+            c.extend(negate_or_synthesize(
+                while_clauses,
+                self.condition,
+                context.get_assertion_context_from_block(&inner_loop_block_context),
+                artifacts,
+                &context.settings.algebra_thresholds(),
+                context.settings.formula_size_threshold,
+            ));
             c
         };
 

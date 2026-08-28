@@ -243,30 +243,27 @@ where
 }
 
 fn process_custom_assertions(expression_span: Span, artifacts: &AnalysisArtifacts) -> WordMap<AssertionSet> {
-    let mut if_true_assertions = artifacts
-        .if_true_assertions
-        .get(&(expression_span.start.offset, expression_span.end.offset))
-        .cloned()
-        .unwrap_or(WordMap::default());
+    let range = (expression_span.start.offset, expression_span.end.offset);
+    let mut assertions = artifacts.if_true_assertions.get(&range).cloned().unwrap_or_default();
 
-    let if_false_assertions = artifacts
-        .if_false_assertions
-        .get(&(expression_span.start.offset, expression_span.end.offset))
-        .cloned()
-        .unwrap_or(WordMap::default());
+    assertions.retain(|_, assertion_set| {
+        assertion_set.retain(|assertions| !assertions.iter().any(Assertion::has_equality));
+        !assertion_set.is_empty()
+    });
 
-    if if_true_assertions.is_empty() && if_false_assertions.is_empty() {
-        return WordMap::default();
+    if let Some(if_false_assertions) = artifacts.if_false_assertions.get(&range) {
+        for (variable, assertion_set) in if_false_assertions {
+            for assertion_group in assertion_set {
+                if assertion_group.iter().any(Assertion::has_equality) {
+                    continue;
+                }
+
+                assertions.entry(*variable).or_default().extend(negate_assertion_set(vec![assertion_group.clone()]));
+            }
+        }
     }
 
-    for if_false_assertion in if_false_assertions {
-        if_true_assertions
-            .entry(if_false_assertion.0)
-            .or_insert_with(Vec::new)
-            .extend(negate_assertion_set(if_false_assertion.1));
-    }
-
-    if_true_assertions
+    assertions
 }
 
 fn scrape_special_function_call_assertions<A>(

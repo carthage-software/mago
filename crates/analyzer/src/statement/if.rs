@@ -12,7 +12,6 @@ use mago_word::WordSet;
 use mago_algebra::clause::Clause;
 use mago_algebra::disjoin_clauses;
 use mago_algebra::find_satisfying_assignments;
-use mago_algebra::negate_formula;
 use mago_algebra::saturate_clauses;
 use mago_codex::assertion::Assertion;
 use mago_codex::ttype::atomic::TAtomic;
@@ -985,13 +984,19 @@ where
         }
     }
 
-    if_scope.negated_clauses = match negate_formula(else_if_clauses, &context.settings.algebra_thresholds()) {
-        Some(negated_formula) => saturate_clauses(
-            if_scope.negated_clauses.iter().chain(negated_formula.iter()),
-            &context.settings.algebra_thresholds(),
-        ),
-        None => vec![],
-    };
+    let negated_formula = negate_or_synthesize(
+        else_if_clauses,
+        else_if_clause.0,
+        context.get_assertion_context_from_block(&else_if_block_context),
+        artifacts,
+        &context.settings.algebra_thresholds(),
+        context.settings.formula_size_threshold,
+    );
+
+    if_scope.negated_clauses = saturate_clauses(
+        if_scope.negated_clauses.iter().chain(negated_formula.iter()),
+        &context.settings.algebra_thresholds(),
+    );
 
     outer_block_context.update_references_possibly_from_confusing_scope(&else_if_block_context);
 
