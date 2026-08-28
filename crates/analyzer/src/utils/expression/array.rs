@@ -824,6 +824,75 @@ where
         return get_never();
     };
 
+    let has_value_parameter = keyed_array.get_generic_parameters().is_some();
+    if let Some(known_items) = keyed_array.get_known_items()
+        && let Some(array_key) = index_type.get_single_array_key()
+        && let Some((actual_possibly_undefined, actual_value)) = known_items.get(&array_key).cloned()
+    {
+        *has_valid_expected_index = true;
+        *has_matching_array_key = true;
+
+        let mut expression_type = actual_value;
+        if actual_possibly_undefined {
+            *has_possibly_undefined = true;
+            expression_type.set_possibly_undefined(true, None);
+            let suppress_for_generic = context.settings.allow_possibly_undefined_array_keys && has_value_parameter;
+            if !in_assignment
+                && !block_context.flags.inside_isset()
+                && !block_context.flags.inside_unset()
+                && !suppress_for_generic
+            {
+                context.collector.report_with_code(
+                    match &array_key {
+                        ArrayKey::Integer(_) => IssueCode::PossiblyUndefinedIntArrayIndex,
+                        _ => IssueCode::PossiblyUndefinedStringArrayIndex,
+                    },
+                    Issue::warning(format!(
+                        "Possibly undefined array key {} accessed on `{}`.",
+                        array_key,
+                        keyed_array.get_id()
+                    ))
+                    .with_annotation(
+                        Annotation::primary(span).with_message(format!("Key {array_key} might not exist.")),
+                    )
+                    .with_note("The analysis indicates this specific key might not be set when this access occurs.")
+                    .with_help(format!(
+                        "Ensure the key {array_key} is always set before accessing it, or use `isset()` or the null coalesce operator (`??`) to handle potential missing keys."
+                    )),
+                );
+
+                expression_type = expression_type.as_nullable();
+            }
+        } else if array_like_type.types.len() > 1 {
+            let sibling_list_may_lack_key = array_like_type.types.iter().any(|atomic_type| {
+                if let TAtomic::Array(TArray::List(other_list)) = atomic_type
+                    && let ArrayKey::Integer(k) = &array_key
+                    && *k >= 0
+                {
+                    let idx = *k as usize;
+                    let known_has_required = other_list
+                        .known_elements
+                        .as_ref()
+                        .and_then(|elems| elems.get(&idx))
+                        .is_some_and(|(optional, _)| !*optional);
+                    let is_index_zero_on_non_empty = idx == 0 && other_list.non_empty;
+
+                    !(known_has_required || is_index_zero_on_non_empty)
+                } else {
+                    false
+                }
+            });
+
+            if sibling_list_may_lack_key {
+                *has_possibly_undefined = true;
+                *key_in_other_variant = true;
+                expression_type.set_possibly_undefined(true, None);
+            }
+        }
+
+        return expression_type;
+    }
+
     let key_parameter = if in_assignment || block_context.flags.inside_isset() {
         Cow::Owned(get_arraykey())
     } else {
@@ -843,10 +912,7 @@ where
         Cow::Owned(key_union.unwrap_or(get_never()))
     };
 
-    let mut has_value_parameter = false;
     let mut value_parameter = if let Some(parameters) = keyed_array.get_generic_parameters() {
-        has_value_parameter = true;
-
         Cow::Borrowed(parameters.1)
     } else {
         Cow::Owned(get_never())
@@ -883,77 +949,6 @@ where
 
     if let Some(known_items) = keyed_array.get_known_items() {
         if let Some(array_key) = index_type.get_single_array_key() {
-            if let Some((actual_possibly_undefined, actual_value)) = known_items.get(&array_key).cloned() {
-                *has_valid_expected_index = true;
-                *has_matching_array_key = true;
-
-                let mut expression_type = actual_value;
-                if actual_possibly_undefined {
-                    *has_possibly_undefined = true;
-                    expression_type.set_possibly_undefined(true, None);
-                    let suppress_for_generic =
-                        context.settings.allow_possibly_undefined_array_keys && has_value_parameter;
-                    if !in_assignment
-                        && !block_context.flags.inside_isset()
-                        && !block_context.flags.inside_unset()
-                        && !suppress_for_generic
-                    {
-                        context.collector.report_with_code(
-                            match &array_key {
-                                ArrayKey::Integer(_) => IssueCode::PossiblyUndefinedIntArrayIndex,
-                                _ => IssueCode::PossiblyUndefinedStringArrayIndex,
-                            },
-                            Issue::warning(format!(
-                                "Possibly undefined array key {} accessed on `{}`.",
-                                array_key,
-                                keyed_array.get_id()
-                            ))
-                            .with_annotation(
-                                Annotation::primary(span)
-                                    .with_message(format!("Key {array_key} might not exist."))
-                            )
-                            .with_note(
-                                "The analysis indicates this specific key might not be set when this access occurs."
-                            )
-                            .with_help(
-                                format!(
-                                    "Ensure the key {array_key} is always set before accessing it, or use `isset()` or the null coalesce operator (`??`) to handle potential missing keys."
-                                )
-                            ),
-                        );
-
-                        expression_type = expression_type.as_nullable();
-                    }
-                } else if array_like_type.types.len() > 1 {
-                    let sibling_list_may_lack_key = array_like_type.types.iter().any(|atomic_type| {
-                        if let TAtomic::Array(TArray::List(other_list)) = atomic_type
-                            && let ArrayKey::Integer(k) = &array_key
-                            && *k >= 0
-                        {
-                            let idx = *k as usize;
-                            let known_has_required = other_list
-                                .known_elements
-                                .as_ref()
-                                .and_then(|elems| elems.get(&idx))
-                                .is_some_and(|(optional, _)| !*optional);
-                            let is_index_zero_on_non_empty = idx == 0 && other_list.non_empty;
-
-                            !(known_has_required || is_index_zero_on_non_empty)
-                        } else {
-                            false
-                        }
-                    });
-
-                    if sibling_list_may_lack_key {
-                        *has_possibly_undefined = true;
-                        *key_in_other_variant = true;
-                        expression_type.set_possibly_undefined(true, None);
-                    }
-                }
-
-                return expression_type;
-            }
-
             if in_assignment && !has_value_parameter {
                 // In an assignment to a non-existent key, the value before assignment is effectively null.
                 // This allows upstream logic to promote it to an array.
