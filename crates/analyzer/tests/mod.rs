@@ -956,6 +956,7 @@ test_case!(parent_static_call_template_resolution);
 test_case!(bitwise_shift_bounds);
 test_case!(isset_after_loop_break);
 test_case!(callable_string);
+test_case!(callable_string_leading_backslash);
 test_case!(session_set_save_handler);
 test_case!(session_set_cookie_params);
 test_case!(psl_math);

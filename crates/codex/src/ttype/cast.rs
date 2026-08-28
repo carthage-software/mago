@@ -47,6 +47,8 @@ pub fn cast_atomic_to_callable<'atomic>(
     }
 
     if let Some(literal_string) = atomic.get_literal_string_value() {
+        let literal_string = strip_root_separator(literal_string);
+
         // Check if this is a static method callable in the format "ClassName::methodName"
         if let Some(idx) = memchr::memmem::find(literal_string, b"::") {
             let (class_part, rest) = literal_string.split_at(idx);
@@ -111,6 +113,12 @@ pub fn cast_atomic_to_callable<'atomic>(
     None
 }
 
+/// Strips the leading root namespace separator PHP allows in callable strings,
+/// which always name a fully qualified function-like or class.
+fn strip_root_separator(name: &[u8]) -> &[u8] {
+    name.strip_prefix(b"\\").unwrap_or(name)
+}
+
 fn handle_array_callable(
     known_elements: &BTreeMap<usize, (bool, TUnion)>,
     codebase: &CodebaseMetadata,
@@ -131,7 +139,10 @@ fn handle_array_callable(
 
     // Check if the first element is a literal string (e.g., 'ClassName')
     if let Some(class_name) = class_or_object.get_literal_string_value() {
-        return Some(Cow::Owned(TCallable::Alias(FunctionLikeIdentifier::Method(word(class_name), method_name))));
+        return Some(Cow::Owned(TCallable::Alias(FunctionLikeIdentifier::Method(
+            word(strip_root_separator(class_name)),
+            method_name,
+        ))));
     }
 
     // Check if the first element is a class-string literal (e.g., ClassName::class)
