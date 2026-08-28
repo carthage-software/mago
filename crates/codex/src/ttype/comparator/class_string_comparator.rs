@@ -23,9 +23,7 @@ pub fn is_contained_by(
     atomic_comparison_result: &mut ComparisonResult,
 ) -> bool {
     let fake_container_type = match container_class_string {
-        TClassLikeString::Any { .. } => {
-            return true;
-        }
+        TClassLikeString::Any { .. } => Cow::Owned(TAtomic::Object(TObject::Any)),
         TClassLikeString::Literal { value } => {
             if let Some(str_value) = input_scalar.get_known_literal_string_value()
                 && is_valid_class_string(str_value)
