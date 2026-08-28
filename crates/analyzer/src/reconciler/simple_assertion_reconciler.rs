@@ -734,9 +734,11 @@ where
             TAtomic::Object(TObject::Named(_)) => {
                 did_remove_type = true;
             }
-            TAtomic::Callable(_) => {
+            TAtomic::Callable(callable) => {
                 did_remove_type = true;
-                acceptable_types.push(get_callable_array_shape());
+                if !callable.is_closure() {
+                    acceptable_types.push(get_callable_array_shape());
+                }
             }
             _ => {
                 did_remove_type = true;
@@ -818,9 +820,11 @@ where
             TAtomic::Object(TObject::Named(_)) => {
                 did_remove_type = true;
             }
-            TAtomic::Callable(_) => {
+            TAtomic::Callable(callable) => {
                 did_remove_type = true;
-                acceptable_types.push(get_callable_array_shape());
+                if !callable.is_closure() {
+                    acceptable_types.push(get_callable_array_shape());
+                }
             }
             _ => {
                 did_remove_type = true;
