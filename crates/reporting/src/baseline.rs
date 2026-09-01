@@ -158,6 +158,83 @@ fn normalize_path(path: &[u8]) -> String {
     String::from_utf8_lossy(path).replace('\\', "/")
 }
 
+/// The synthetic-name prefixes emitted for anonymous constructs, including the
+/// trailing `:` that separates the prefix from the file path.
+///
+/// See `mago_codex::build_synthetic_name`, which renders these as
+/// `{<prefix>:<path>:<line>:<column>}`.
+const SYNTHETIC_NAME_PREFIXES: [&str; 2] = ["{closure:", "{anonymous-class:"];
+
+/// Strips the `:<line>:<column>` suffix from every synthetic anonymous-construct
+/// name in an issue message, turning `{closure:src/foo.php:12:5}` into
+/// `{closure:src/foo.php}`.
+///
+/// Loose baselines key issues on `(file, code, message)`, so a message that
+/// embeds a closure's position changes whenever unrelated edits shift that
+/// closure — making the entry impossible to keep baselined. Strict baselines
+/// keep the position, since several closures can share a line and only the
+/// column tells them apart.
+///
+/// Baselines written before this normalization store the unnormalized message and
+/// no longer match; they surface as unbaselined issues alongside the usual
+/// "entries for issues that no longer exist" warning, and are fixed by
+/// regenerating with `--generate-baseline`.
+fn normalize_message(message: &str) -> Cow<'_, str> {
+    let mut normalized: Option<String> = None;
+    let mut rest = message;
+
+    while let Some((prefix, offset)) = next_synthetic_name(rest) {
+        let name_start = offset + prefix.len();
+        let Some(name_length) = rest[name_start..].find('}') else {
+            break;
+        };
+
+        let name_end = name_start + name_length;
+        let stripped = strip_position_suffix(&rest[name_start..name_end]);
+
+        let output = normalized.get_or_insert_with(String::new);
+        output.push_str(&rest[..name_start]);
+        output.push_str(stripped);
+        output.push('}');
+
+        rest = &rest[name_end + 1..];
+    }
+
+    match normalized {
+        Some(mut output) => {
+            output.push_str(rest);
+
+            Cow::Owned(output)
+        }
+        None => Cow::Borrowed(message),
+    }
+}
+
+/// Finds the earliest synthetic-name prefix in `haystack`, returning it along
+/// with the byte offset it starts at.
+fn next_synthetic_name(haystack: &str) -> Option<(&'static str, usize)> {
+    SYNTHETIC_NAME_PREFIXES
+        .iter()
+        .filter_map(|prefix| haystack.find(prefix).map(|offset| (*prefix, offset)))
+        .min_by_key(|(_, offset)| *offset)
+}
+
+/// Drops a trailing `:<line>:<column>` from a synthetic name's body, leaving the
+/// file path. Returns the body untouched if it doesn't end in two numeric segments.
+fn strip_position_suffix(name: &str) -> &str {
+    let is_number = |segment: &str| !segment.is_empty() && segment.bytes().all(|byte| byte.is_ascii_digit());
+
+    let Some((without_column, column)) = name.rsplit_once(':') else {
+        return name;
+    };
+
+    let Some((path, line)) = without_column.rsplit_once(':') else {
+        return name;
+    };
+
+    if is_number(column) && is_number(line) { path } else { name }
+}
+
 impl StrictBaseline {
     /// Creates a new empty strict baseline.
     #[must_use]
@@ -383,7 +460,9 @@ impl LooseBaseline {
     /// Generates a loose baseline from a collection of issues.
     ///
     /// Issues are grouped by (file, code, message) tuple and stored with a count.
-    /// File paths are normalized to ensure cross-platform compatibility.
+    /// File paths are normalized to ensure cross-platform compatibility, and messages
+    /// are stripped of the `:<line>:<column>` inside synthetic names such as
+    /// `{closure:src/foo.php:12:5}` so line shifts don't invalidate the entry.
     #[must_use]
     pub fn generate_from_issues(issues: &IssueCollection, read_database: &ReadDatabase) -> Self {
         let mut issue_counts: HashMap<(String, String, String), u32> = HashMap::default();
@@ -399,7 +478,7 @@ impl LooseBaseline {
 
             let normalized_path = normalize_path(&file.name);
             let code = issue.code.as_ref().unwrap_or(&String::from("unknown")).clone();
-            let message = issue.message.clone();
+            let message = normalize_message(&issue.message).into_owned();
 
             let key = (normalized_path, code, message);
             *issue_counts.entry(key).or_insert(0) += 1;
@@ -439,7 +518,7 @@ impl LooseBaseline {
 
             let normalized_path = normalize_path(&file.name);
             let code = issue.code.as_ref().unwrap_or(&String::from("unknown")).clone();
-            let key = (normalized_path, code, issue.message.clone());
+            let key = (normalized_path, code, normalize_message(&issue.message).into_owned());
 
             if let Some(count) = remaining_counts.get_mut(&key)
                 && *count > 0
@@ -758,6 +837,44 @@ mod tests {
 
         let e002 = baseline.issues.iter().find(|i| i.code == "E002").unwrap();
         assert_eq!(e002.count, 1);
+    }
+
+    #[test]
+    fn test_normalize_message_strips_synthetic_name_positions() {
+        assert_eq!(
+            normalize_message("Potentially unhandled exception `ValueError` in `{closure:test.php:9:9}`."),
+            "Potentially unhandled exception `ValueError` in `{closure:test.php}`."
+        );
+
+        assert_eq!(
+            normalize_message("`{closure:a/b.php:1:2}` calls `{anonymous-class:a/b.php:30:12}`"),
+            "`{closure:a/b.php}` calls `{anonymous-class:a/b.php}`"
+        );
+
+        // Windows-style paths keep their drive letter colon.
+        assert_eq!(normalize_message("{closure:C:/a/b.php:3:4}"), "{closure:C:/a/b.php}");
+
+        // Messages without a position suffix, or without a synthetic name, are untouched.
+        assert_eq!(normalize_message("{closure:test.php}"), "{closure:test.php}");
+        assert_eq!(normalize_message("a plain message"), "a plain message");
+    }
+
+    #[test]
+    fn test_loose_baseline_matches_moved_closure() {
+        let (db, file_id) = create_test_database();
+        let read_db = db.read_only();
+
+        let mut original = IssueCollection::new();
+        original.push(create_test_issue_with_message(file_id, "E001", "in `{closure:test.php:9:9}`", 0, 5));
+
+        let baseline = LooseBaseline::generate_from_issues(&original, &read_db);
+        assert_eq!(baseline.issues[0].message, "in `{closure:test.php}`");
+
+        // The same closure, shifted down the file by an unrelated edit.
+        let mut moved = IssueCollection::new();
+        moved.push(create_test_issue_with_message(file_id, "E001", "in `{closure:test.php:42:9}`", 10, 15));
+
+        assert_eq!(baseline.filter_issues(moved, &read_db).len(), 0);
     }
 
     #[test]
