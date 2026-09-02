@@ -171,7 +171,8 @@ fn collect_node_comments<'ast, 'arena>(
     let can_reattribute = !is_binary_like(node);
     let mut prev_child: Option<Node<'ast, 'arena>> = None;
     for child in children.iter() {
-        let child = unwrap_parenthesized_node(*child);
+        let parenthesized_child = *child;
+        let child = unwrap_parenthesized_node(parenthesized_child);
         let child_start = child.span().start.offset;
 
         while *cursor < total {
@@ -181,7 +182,10 @@ fn collect_node_comments<'ast, 'arena>(
                 break;
             }
 
-            let enclosing = if can_reattribute
+            let enclosing = if comment_start > parenthesized_child.span().start.offset {
+                // The comment is within the child's parentheses, so belongs to it.
+                parenthesized_child
+            } else if can_reattribute
                 && let Some(prev) = prev_child.filter(|p| comment_start >= p.span().end.offset && is_binary_like(*p))
             {
                 prev
@@ -274,6 +278,13 @@ fn unwrap_parenthesized_node<'ast, 'arena>(node: Node<'ast, 'arena>) -> Node<'as
 
 fn place_comment<'ast, 'arena>(comment: DecoratedComment<'ast, 'arena>) -> CommentPlacement<'ast, 'arena> {
     let enclosing = match comment.enclosing {
+        // A comment inside parentheses belongs to the whole expression, so this is checked first.
+        Node::Parenthesized(parenthesized) | Node::Expression(Expression::Parenthesized(parenthesized)) => {
+            return CommentPlacement::Leading {
+                node: Node::Expression(unwrap_parenthesized(parenthesized.expression)),
+                comment_index: comment.comment_index,
+            };
+        }
         Node::Expression(expr) => match unwrap_parenthesized(expr) {
             Expression::Binary(binary) => Node::Binary(binary),
             Expression::Conditional(cond) => Node::Conditional(cond),

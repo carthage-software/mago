@@ -287,8 +287,7 @@ where
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena, A>) -> Document<'arena, A> {
         wrap!(f, self, UnaryPrefix, {
             // Prevent block comments between operator and operand running straight into the operand.
-            let operand = unwrap_parenthesized(self.operand);
-            let separator = if f.has_comment(operand.span(), CommentFlags::LEADING | CommentFlags::BLOCK) {
+            let separator = if f.has_comment(self.operand.span(), CommentFlags::LEADING | CommentFlags::BLOCK) {
                 Document::soft_space()
             } else {
                 Document::empty()
