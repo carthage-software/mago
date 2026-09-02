@@ -127,7 +127,12 @@ where
         );
 
         result_type = (**lhs_type).clone();
-        binary.rhs.analyze(context, block_context, artifacts)?;
+
+        // Analyze the unreachable right-hand side in a separate disposable context
+        // Prevents its terminating control flow and recorded thrown exceptions from affecting the remainder of the block
+        let mut dead_rhs_context = block_context.clone();
+        dead_rhs_context.flags.set_has_returned(true);
+        binary.rhs.analyze(context, &mut dead_rhs_context, artifacts)?;
     } else {
         let non_null_lhs_type = lhs_type.to_non_nullable();
         let has_returned = block_context.flags.has_returned();

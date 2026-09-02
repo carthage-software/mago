@@ -1507,6 +1507,7 @@ test_case!(flow_try_multi_catch_pipe);
 test_case!(flow_try_finally_no_catch);
 test_case!(flow_throw_in_ternary);
 test_case!(flow_throw_in_coalesce);
+test_case!(flow_throw_in_redundant_coalesce);
 test_case!(flow_assert_narrow);
 test_case!(flow_assert_false_unreachable);
 test_case!(flow_eq_literal_string);
