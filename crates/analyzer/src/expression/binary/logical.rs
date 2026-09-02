@@ -159,6 +159,12 @@ where
         right_block_context.known_functions.extend(left_block_context.known_functions.iter().copied());
         right_block_context.known_constants.extend(left_block_context.known_constants.iter().copied());
 
+        for variable_id in left_assertions.keys() {
+            if let Some(variable_type) = left_block_context.locals.get(variable_id) {
+                right_block_context.locals.entry(*variable_id).or_insert_with(|| Rc::clone(variable_type));
+            }
+        }
+
         let empty_referenced_vars = WordSet::default();
 
         reconciler::reconcile_keyed_types(
