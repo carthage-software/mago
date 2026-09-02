@@ -286,6 +286,14 @@ where
 {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena, A>) -> Document<'arena, A> {
         wrap!(f, self, UnaryPrefix, {
+            // Prevent block comments between operator and operand running straight into the operand.
+            let operand = unwrap_parenthesized(self.operand);
+            let separator = if f.has_comment(operand.span(), CommentFlags::LEADING | CommentFlags::BLOCK) {
+                Document::soft_space()
+            } else {
+                Document::empty()
+            };
+
             let operator = self.operator.format(f);
             let operand_trailing_comments = if let Expression::Parenthesized(p) = self.operand {
                 f.print_trailing_comments_between_nodes(p.left_parenthesis, p.expression.span())
@@ -295,9 +303,9 @@ where
 
             match operand_trailing_comments {
                 Some(operand_trailing_comments) => Document::Group(Group::new(
-                    vec_in![f.arena; operator, operand_trailing_comments, self.operand.format(f)],
+                    vec_in![f.arena; operator, operand_trailing_comments, separator, self.operand.format(f)],
                 )),
-                None => Document::Group(Group::new(vec_in![f.arena; operator, self.operand.format(f)])),
+                None => Document::Group(Group::new(vec_in![f.arena; operator, separator, self.operand.format(f)])),
             }
         })
     }
