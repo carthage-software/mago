@@ -11,7 +11,6 @@ function test_isset_suppresses_possibly_undefined(bool $cond): void
     }
 
     if (isset($x)) {
-        /** @mago-expect analysis:mixed-argument */
         echo $x;
     }
 }
@@ -24,7 +23,6 @@ function test_empty_suppresses_possibly_undefined(bool $cond): void
     }
 
     if (!empty($y)) {
-        /** @mago-expect analysis:mixed-argument */
         echo $y;
     }
 }

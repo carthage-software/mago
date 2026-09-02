@@ -61,6 +61,8 @@ pub struct BlockContext<'ctx> {
     pub conditionally_referenced_variable_ids: WordSet,
     pub assigned_variable_ids: WordMap<u32>,
     pub possibly_assigned_variable_ids: WordSet,
+    pub derived_local_sources: WordMap<Word>,
+    pub possibly_undefined_variable_ids: WordSet,
 
     /// Maps variable names to the number of times they have been referenced in the current scope.
     ///
@@ -202,6 +204,8 @@ impl<'ctx> BlockContext<'ctx> {
             conditionally_referenced_variable_ids: WordSet::default(),
             assigned_variable_ids: WordMap::default(),
             possibly_assigned_variable_ids: WordSet::default(),
+            derived_local_sources: WordMap::default(),
+            possibly_undefined_variable_ids: WordSet::default(),
             referenced_counts: WordMap::default(),
             references_in_scope: WordMap::default(),
             references_to_external_scope: WordSet::default(),
@@ -540,6 +544,8 @@ impl<'ctx> BlockContext<'ctx> {
         self.assigned_variable_ids.remove(&var_atom);
         self.possibly_assigned_variable_ids.remove(&var_atom);
         self.conditionally_referenced_variable_ids.remove(&var_atom);
+        self.derived_local_sources.remove(&var_atom);
+        self.possibly_undefined_variable_ids.remove(&var_atom);
     }
 
     pub fn remove_possible_reference(&mut self, remove_var_id: &[u8]) {
@@ -597,6 +603,8 @@ impl<'ctx> BlockContext<'ctx> {
         self.assigned_variable_ids.remove(&remove_var_atom);
         self.possibly_assigned_variable_ids.remove(&remove_var_atom);
         self.conditionally_referenced_variable_ids.remove(&remove_var_atom);
+        self.derived_local_sources.remove(&remove_var_atom);
+        self.possibly_undefined_variable_ids.remove(&remove_var_atom);
     }
 
     pub fn update<A>(

@@ -1397,6 +1397,7 @@ where
     }
 
     new_var_type.set_possibly_undefined_from_try(false);
+    new_var_type.set_possibly_undefined(false, None);
     new_var_type.types = Cow::Owned(acceptable_types);
 
     if new_var_type.is_never() {

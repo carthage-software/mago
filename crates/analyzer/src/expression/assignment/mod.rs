@@ -363,6 +363,10 @@ pub(crate) fn assign_to_expression<'ctx, 'ast, 'arena, A>(
 where
     A: Arena,
 {
+    if let Some(target_expression_id) = target_expression_id {
+        artifacts.record_loop_assignment_target(target_expression_id);
+    }
+
     if let Some(source_expression) = source_expression {
         if source_expression.is_reference() != source_type.by_reference() {
             Rc::make_mut(&mut source_type).set_by_reference(source_expression.is_reference());
@@ -712,6 +716,8 @@ pub fn analyze_assignment_to_variable<'ctx, 'arena, A>(
     }
 
     block_context.locals.retain(|var_id, _| !var_references_dynamic(*var_id, variable_id));
+    block_context.derived_local_sources.remove(&variable_id);
+    block_context.possibly_undefined_variable_ids.remove(&variable_id);
 
     block_context.locals.insert(variable_id, assigned_type);
     block_context.variables_possibly_in_scope.insert(variable_id);
