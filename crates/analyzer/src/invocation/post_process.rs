@@ -1110,9 +1110,14 @@ where
                 }
 
                 if !resolved_or_clause.is_empty() {
-                    if resolved_or_clause.iter().all(assertion_excludes_null)
-                        && let Some(assertion_expression) = assertion_expression
-                    {
+                    let resolved_clause_is_conjunction = resolved_or_clause.iter().all(Assertion::is_negation);
+                    let excludes_null = if resolved_clause_is_conjunction {
+                        resolved_or_clause.iter().any(assertion_excludes_null)
+                    } else {
+                        resolved_or_clause.iter().all(assertion_excludes_null)
+                    };
+
+                    if excludes_null && let Some(assertion_expression) = assertion_expression {
                         for base in get_nullsafe_base_expressions(assertion_expression) {
                             let Some(base_id) = get_block_expression_id(base, context, block_context) else {
                                 continue;
@@ -1126,7 +1131,13 @@ where
                         }
                     }
 
-                    add_and_clause(&mut new_variable_possibilities, &resolved_or_clause);
+                    if resolved_clause_is_conjunction {
+                        for assertion in resolved_or_clause {
+                            add_and_assertion(&mut new_variable_possibilities, assertion);
+                        }
+                    } else {
+                        add_and_clause(&mut new_variable_possibilities, &resolved_or_clause);
+                    }
                 }
 
                 if !new_variable_possibilities.is_empty() {
