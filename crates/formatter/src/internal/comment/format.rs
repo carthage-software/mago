@@ -526,6 +526,11 @@ where
                 continue;
             }
 
+            // Block comments already placed as leading are left for the node they were placed on.
+            if comment.is_block && self.placed_comments.is_placed_leading(self.next_comment_index) {
+                break;
+            }
+
             let is_between = comment.start >= after.end_offset() && comment.end <= before.start_offset();
             let gap_is_ok =
                 after.end_offset() == comment.start || self.is_insignificant(after.end_offset(), comment.start);
@@ -749,11 +754,16 @@ where
 
             parts.push(self.print_comment(comment));
 
-            if !trivia.kind.is_block_comment() {
+            if !comment.is_block || !comment.is_single_line {
+                // Line comments and multi-line block comments always end the line.
                 parts.push(Document::BreakParent);
                 parts.push(Document::Line(Line::hard()));
-            } else {
+            } else if self.has_newline(comment.end, /* backwards */ false) {
+                // A line break followed the comment in the source, so allow one here.
                 parts.push(Document::Line(Line::default()));
+            } else {
+                // The comment shared a line with what followed it, so keep them together.
+                parts.push(Document::Space(Space::soft()));
             }
         }
 
@@ -821,7 +831,17 @@ where
         span: Span,
         document: Document<'arena, A>,
     ) -> Document<'arena, A> {
+        // Wrapper nodes such as `Expression` share a span with the node they hold.
+        // Leave the comments to the outer node, so any parentheses added to it enclose them too.
+        if self.nth_parent_kind(1).is_some_and(|parent| parent.span() == span) {
+            return document;
+        }
+
         match self.take_placed_leading(span) {
+            // Separate comments from preceding prefix operators.
+            Some(placed) if matches!(self.nth_parent_kind(1), Some(Node::UnaryPrefix(_))) => {
+                Document::Array(vec_in![self.arena; Document::Space(Space::soft()), placed, document])
+            }
             Some(placed) => Document::Array(vec_in![self.arena; placed, document]),
             None => document,
         }

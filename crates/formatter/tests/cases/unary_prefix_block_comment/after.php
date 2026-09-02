@@ -10,7 +10,7 @@ $b = (int) /* c */ $s;
 $c = (bool) /* c */ ($x && $y);
 
 // Comment inside parentheses that are kept
-$d = ! /* c */ ($x && $y);
+$d = !(/* c */ $x && $y);
 
 // Every spacing possibility around the comment
 $e = - /* c */ $n;
