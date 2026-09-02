@@ -1,0 +1,13 @@
+extends = "../defaults.toml"
+
+php-version = "8.4"
+
+[source]
+paths = ["src"]
+includes = []
+
+[analyzer]
+check-property-initialization = true
+
+[linter.rules]
+file-name = { enabled = false }

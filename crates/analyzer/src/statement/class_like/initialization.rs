@@ -363,6 +363,25 @@ where
                         }
                     }
                 }
+            } else if method == word("__construct")
+                && current_class != origin_class
+                && !context.codebase.method_is_abstract(current_class.as_bytes(), b"__construct")
+            {
+                // The constructor's body is in another file, so nothing was recorded for it here.
+                // Defer responsibility for initializing its class's properties to that constructor.
+                // A class that only inherits a constructor initializes nothing itself.
+                if let Some(current_meta) = context.codebase.get_class_like(current_class.as_bytes())
+                    && current_meta
+                        .declaring_method_ids
+                        .get(&word("__construct"))
+                        .is_some_and(|method_id| method_id.get_class_name() == current_class)
+                {
+                    for (prop_name, declaring_class) in &current_meta.declaring_property_ids {
+                        if *declaring_class == current_class {
+                            all_initialized.insert(*prop_name);
+                        }
+                    }
+                }
             }
 
             if let Some(called_methods) = artifacts.method_calls_this_methods.get(&method_key) {
