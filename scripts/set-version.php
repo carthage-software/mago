@@ -43,17 +43,19 @@ const VERSIONED_DOCUMENTATION_FILES = [
     'docs/content/zh/recipes/docker.md',
 ];
 
-function main(mixed $newVersion, int $argumentCount): int
+const MANIFEST_VERSION_DECLARATIONS = [
+    'package' => ['package', '/^version = "[^"]+"$/'],
+    'workspace' => ['workspace', '/^package\.version = "[^"]+"$/'],
+    'workspace.dependencies' => [
+        'dependency',
+        '/^mago-[a-z0-9-]+ = \{[^}]*path = "[^"]+"[^}]*version = "[^"]+"[^}]*}$/',
+    ],
+];
+
+function set_version(mixed $newVersion, int $argumentCount): int
 {
-    if (1 !== $argumentCount || !is_string($newVersion)) {
-        fwrite(STDERR, "Usage: php scripts/set-version.php <version>\n");
-
-        return 64;
-    }
-
-    if (1 !== preg_match('/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/D', $newVersion)) {
-        fwrite(STDERR, sprintf("Invalid release version: %s\n", $newVersion));
-
+    $newVersion = namespace\validate_new_version($newVersion, $argumentCount);
+    if (null === $newVersion) {
         return 64;
     }
 
@@ -62,10 +64,7 @@ function main(mixed $newVersion, int $argumentCount): int
     $manifest = namespace\read_file($manifestPath);
     $currentVersion = namespace\read_package_version($manifest);
 
-    [$currentMajor, $currentMinor] = explode('.', $currentVersion);
-    [$newMajor, $newMinor] = explode('.', $newVersion);
-
-    if ($currentMajor !== $newMajor) {
+    if (!namespace\versions_share_major($currentVersion, $newVersion)) {
         fwrite(STDERR, sprintf(
             "Major version bumps are not supported by this script: %s to %s.\n",
             $currentVersion,
@@ -81,41 +80,107 @@ function main(mixed $newVersion, int $argumentCount): int
         return 0;
     }
 
-    $updates = [];
-    $updates[$manifestPath] = namespace\update_manifest($manifest, $newVersion);
+    $updates = namespace\prepare_updates($root, $manifest, $currentVersion, $newVersion);
+    namespace\write_updates($updates);
 
+    fwrite(STDOUT, sprintf("Updated Mago from %s to %s in %d files.\n", $currentVersion, $newVersion, count($updates)));
+
+    return 0;
+}
+
+function validate_new_version(mixed $newVersion, int $argumentCount): ?string
+{
+    if (1 !== $argumentCount || !is_string($newVersion)) {
+        fwrite(STDERR, "Usage: php scripts/set-version.php <version>\n");
+
+        return null;
+    }
+
+    if (1 !== preg_match('/^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$/D', $newVersion)) {
+        fwrite(STDERR, sprintf("Invalid release version: %s\n", $newVersion));
+
+        return null;
+    }
+
+    return $newVersion;
+}
+
+function versions_share_major(string $currentVersion, string $newVersion): bool
+{
+    [$currentMajor] = explode('.', $currentVersion);
+    [$newMajor] = explode('.', $newVersion);
+
+    return $currentMajor === $newMajor;
+}
+
+function minor_version(string $version): string
+{
+    [$major, $minor] = explode('.', $version);
+
+    return $major . '.' . $minor;
+}
+
+/** @return array<string, string> */
+function prepare_updates(string $root, string $manifest, string $currentVersion, string $newVersion): array
+{
+    $manifestPath = $root . '/Cargo.toml';
     $lockPath = $root . '/Cargo.lock';
-    $updates[$lockPath] = namespace\update_lock(namespace\read_file($lockPath), $newVersion);
+
+    return (
+        [
+            $manifestPath => namespace\update_manifest($manifest, $newVersion),
+            $lockPath => namespace\update_lock(namespace\read_file($lockPath), $newVersion),
+        ] + namespace\prepare_documentation_updates($root, $currentVersion, $newVersion)
+    );
+}
+
+/** @return array<string, string> */
+function prepare_documentation_updates(string $root, string $currentVersion, string $newVersion): array
+{
+    $updates = [];
 
     foreach (VERSIONED_DOCUMENTATION_FILES as $relativePath) {
         $path = $root . '/' . $relativePath;
         $contents = namespace\read_file($path);
-        $updated = str_replace($currentVersion, $newVersion, $contents);
+        $updated = namespace\update_documentation($path, $contents, $currentVersion, $newVersion);
 
-        if ($currentMinor !== $newMinor) {
-            $currentMinorVersion = $currentMajor . '.' . $currentMinor;
-            $newMinorVersion = $newMajor . '.' . $newMinor;
-            $pattern = sprintf('/(?<![0-9.])%s(?![0-9]|\.[0-9])/', preg_quote($currentMinorVersion, '/'));
-            $updated = preg_replace($pattern, $newMinorVersion, $updated);
-            if (null === $updated) {
-                throw new RuntimeException(sprintf('Unable to update minor versions in %s.', $path));
-            }
+        if ($updated === $contents) {
+            continue;
         }
 
-        if ($updated !== $contents) {
-            $updates[$path] = $updated;
-        }
+        $updates[$path] = $updated;
     }
 
+    return $updates;
+}
+
+function update_documentation(string $path, string $contents, string $currentVersion, string $newVersion): string
+{
+    $updated = str_replace($currentVersion, $newVersion, $contents);
+    $currentMinorVersion = namespace\minor_version($currentVersion);
+    $newMinorVersion = namespace\minor_version($newVersion);
+
+    if ($currentMinorVersion === $newMinorVersion) {
+        return $updated;
+    }
+
+    $pattern = sprintf('/(?<![0-9.])%s(?![0-9]|\.[0-9])/', preg_quote($currentMinorVersion, '/'));
+    $updated = preg_replace($pattern, $newMinorVersion, $updated);
+    if (null === $updated) {
+        throw new RuntimeException(sprintf('Unable to update minor versions in %s.', $path));
+    }
+
+    return $updated;
+}
+
+/** @param array<string, string> $updates */
+function write_updates(array $updates): void
+{
     foreach ($updates as $path => $contents) {
         if (false === file_put_contents($path, $contents)) {
             throw new RuntimeException(sprintf('Unable to write %s.', $path));
         }
     }
-
-    fwrite(STDOUT, sprintf("Updated Mago from %s to %s in %d files.\n", $currentVersion, $newVersion, count($updates)));
-
-    return 0;
 }
 
 function read_file(string $path): string
@@ -163,44 +228,93 @@ function update_manifest(string $manifest, string $newVersion): string
 
     foreach ($lines as &$line) {
         $normalized = rtrim($line, "\r");
-        $matches = [];
-        if (1 === preg_match('/^\[([^]]+)]$/', trim($normalized), $matches)) {
-            $section = $matches[1] ?? throw new RuntimeException('Unable to read a Cargo.toml section name.');
+        $nextSection = namespace\read_manifest_section($normalized);
+        if (null !== $nextSection) {
+            $section = $nextSection;
 
             continue;
         }
 
-        $shouldUpdate =
-            'package' === $section && 1 === preg_match('/^version = "[^"]+"$/', $normalized)
-            || 'workspace' === $section && 1 === preg_match('/^package\.version = "[^"]+"$/', $normalized)
-            || 'workspace.dependencies' === $section
-            && 1 === preg_match('/^mago-[a-z0-9-]+ = \{[^}]*path = "[^"]+"[^}]*version = "[^"]+"[^}]*}$/', $normalized);
-
-        if (!$shouldUpdate) {
+        $updateKind = namespace\get_manifest_update_kind($section, $normalized);
+        if (null === $updateKind) {
             continue;
         }
 
-        $updated = preg_replace('/version = "[^"]+"/', sprintf('version = "%s"', $newVersion), $line, 1);
-        if (null === $updated) {
-            throw new RuntimeException('Unable to update a version in Cargo.toml.');
-        }
+        $line = namespace\update_manifest_line($line, $newVersion);
 
-        $line = $updated;
-        if ('package' === $section) {
+        if ('package' === $updateKind) {
             ++$packageUpdates;
-        } elseif ('workspace' === $section) {
-            ++$workspaceUpdates;
-        } else {
-            ++$dependencyUpdates;
+
+            continue;
         }
+
+        if ('workspace' === $updateKind) {
+            ++$workspaceUpdates;
+
+            continue;
+        }
+
+        ++$dependencyUpdates;
     }
     unset($line);
 
-    if (1 !== $packageUpdates || 1 !== $workspaceUpdates || 0 === $dependencyUpdates) {
+    namespace\validate_manifest_updates($packageUpdates, $workspaceUpdates, $dependencyUpdates);
+
+    return implode("\n", $lines);
+}
+
+function read_manifest_section(string $line): ?string
+{
+    $matches = [];
+    if (1 !== preg_match('/^\[([^]]+)]$/', trim($line), $matches)) {
+        return null;
+    }
+
+    return $matches[1] ?? throw new RuntimeException('Unable to read a Cargo.toml section name.');
+}
+
+function get_manifest_update_kind(?string $section, string $line): ?string
+{
+    if (null === $section) {
+        return null;
+    }
+
+    $declaration = MANIFEST_VERSION_DECLARATIONS[$section] ?? null;
+    if (null === $declaration) {
+        return null;
+    }
+
+    [$kind, $pattern] = $declaration;
+    if (1 !== preg_match($pattern, $line)) {
+        return null;
+    }
+
+    return $kind;
+}
+
+function update_manifest_line(string $line, string $newVersion): string
+{
+    $updated = preg_replace('/version = "[^"]+"/', sprintf('version = "%s"', $newVersion), $line, 1);
+    if (null === $updated) {
+        throw new RuntimeException('Unable to update a version in Cargo.toml.');
+    }
+
+    return $updated;
+}
+
+function validate_manifest_updates(int $packageUpdates, int $workspaceUpdates, int $dependencyUpdates): void
+{
+    if (1 !== $packageUpdates) {
         throw new RuntimeException('Cargo.toml does not contain the expected Mago version declarations.');
     }
 
-    return implode("\n", $lines);
+    if (1 !== $workspaceUpdates) {
+        throw new RuntimeException('Cargo.toml does not contain the expected Mago version declarations.');
+    }
+
+    if (0 === $dependencyUpdates) {
+        throw new RuntimeException('Cargo.toml does not contain the expected Mago version declarations.');
+    }
 }
 
 function update_lock(string $lock, string $newVersion): string
@@ -241,7 +355,7 @@ function update_lock(string $lock, string $newVersion): string
 }
 
 try {
-    exit(namespace\main($argv[1] ?? null, count($argv) - 1));
+    exit(namespace\set_version($argv[1] ?? null, count($argv) - 1));
 } catch (RuntimeException $exception) {
     fwrite(STDERR, $exception->getMessage() . "\n");
 
