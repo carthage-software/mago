@@ -497,16 +497,27 @@ fn collect_conditional_assertions(
     when_true: bool,
     artifacts: &AnalysisArtifacts,
 ) -> WordMap<AssertionSet> {
+    collect_conditional_assertions_inner(expression, when_true, artifacts, false)
+}
+
+fn collect_conditional_assertions_inner(
+    expression: &Expression,
+    when_true: bool,
+    artifacts: &AnalysisArtifacts,
+    include_non_equality: bool,
+) -> WordMap<AssertionSet> {
     let expression = unwrap_expression(expression);
     match expression {
         Expression::Call(call) => {
             let range = (call.span().start.offset, call.span().end.offset);
             if when_true {
                 let mut assertions = artifacts.if_true_assertions.get(&range).cloned().unwrap_or_default();
-                assertions.retain(|_, assertion_set| {
-                    assertion_set.retain(|assertions| assertions.iter().any(Assertion::has_equality));
-                    !assertion_set.is_empty()
-                });
+                if !include_non_equality {
+                    assertions.retain(|_, assertion_set| {
+                        assertion_set.retain(|assertions| assertions.iter().any(Assertion::has_equality));
+                        !assertion_set.is_empty()
+                    });
+                }
 
                 assertions
             } else {
@@ -514,18 +525,22 @@ fn collect_conditional_assertions(
             }
         }
         Expression::UnaryPrefix(unary) if unary.operator.is_not() => {
-            collect_conditional_assertions(unary.operand, !when_true, artifacts)
+            collect_conditional_assertions_inner(unary.operand, !when_true, artifacts, include_non_equality)
         }
         Expression::Assignment(assignment) if matches!(assignment.operator, AssignmentOperator::Assign(_)) => {
-            collect_conditional_assertions(assignment.rhs, when_true, artifacts)
+            collect_conditional_assertions_inner(assignment.rhs, when_true, artifacts, include_non_equality)
         }
         Expression::Binary(binary) if matches!(binary.operator, BinaryOperator::And(_) | BinaryOperator::LowAnd(_)) => {
             if !when_true {
                 return WordMap::default();
             }
 
-            let mut assertions = collect_conditional_assertions(binary.lhs, true, artifacts);
-            extend_conditional_assertions(&mut assertions, collect_conditional_assertions(binary.rhs, true, artifacts));
+            let mut assertions =
+                collect_conditional_assertions_inner(binary.lhs, true, artifacts, include_non_equality);
+            extend_conditional_assertions(
+                &mut assertions,
+                collect_conditional_assertions_inner(binary.rhs, true, artifacts, include_non_equality),
+            );
             assertions
         }
         Expression::Binary(binary) if matches!(binary.operator, BinaryOperator::Or(_) | BinaryOperator::LowOr(_)) => {
@@ -533,10 +548,11 @@ fn collect_conditional_assertions(
                 return WordMap::default();
             }
 
-            let mut assertions = collect_conditional_assertions(binary.lhs, false, artifacts);
+            let mut assertions =
+                collect_conditional_assertions_inner(binary.lhs, false, artifacts, include_non_equality);
             extend_conditional_assertions(
                 &mut assertions,
-                collect_conditional_assertions(binary.rhs, false, artifacts),
+                collect_conditional_assertions_inner(binary.rhs, false, artifacts, include_non_equality),
             );
             assertions
         }
@@ -561,7 +577,10 @@ fn collect_conditional_assertions(
                 when_true != literal
             };
 
-            collect_conditional_assertions(other, other_when_true, artifacts)
+            let include_non_equality = matches!(binary.operator, BinaryOperator::Identical(_)) == when_true
+                || artifacts.get_expression_type(other).is_some_and(|ty| ty.is_bool());
+
+            collect_conditional_assertions_inner(other, other_when_true, artifacts, include_non_equality)
         }
         _ => WordMap::default(),
     }
