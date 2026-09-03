@@ -2,6 +2,7 @@ use mago_allocator::Arena;
 use mago_allocator::vec_in;
 use mago_span::HasSpan;
 use mago_syntax::cst::Expression;
+use mago_syntax::cst::Node;
 
 use crate::document::Document;
 use crate::document::Group;
@@ -102,6 +103,13 @@ where
 {
     match value {
         Expression::Binary(binary) => {
+            if matches!(f.current_node(), Node::ArrowFunction(_))
+                && is_expandable_expression(binary.lhs, false)
+                && is_expandable_expression(binary.rhs, true)
+            {
+                return false;
+            }
+
             if is_simple_expression_or_binary(f, binary.lhs) && is_expandable_expression(binary.rhs, true) {
                 return false;
             }
