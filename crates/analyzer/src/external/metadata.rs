@@ -839,6 +839,8 @@ fn write_assertion(writer: &mut PayloadWriter, assertion: &Assertion) -> Result<
         Assertion::IsGreaterThanOrEqualVariable(_) => 42,
         Assertion::Countable => 43,
         Assertion::NotCountable(_) => 44,
+        Assertion::StringLengthLessThan(_) => 45,
+        Assertion::StringLengthGreaterThanOrEqual(_) => 46,
     };
     writer.write_u8(kind);
 
@@ -868,7 +870,9 @@ fn write_assertion(writer: &mut PayloadWriter, assertion: &Assertion) -> Result<
         | Assertion::IsLessThanFromBound(value)
         | Assertion::IsLessThanOrEqualFromBound(value)
         | Assertion::IsGreaterThanFromBound(value)
-        | Assertion::IsGreaterThanOrEqualFromBound(value) => writer.write_u64(*value as u64),
+        | Assertion::IsGreaterThanOrEqualFromBound(value)
+        | Assertion::StringLengthLessThan(value)
+        | Assertion::StringLengthGreaterThanOrEqual(value) => writer.write_u64(*value as u64),
         Assertion::IsLessThanVariable(variable)
         | Assertion::IsLessThanOrEqualVariable(variable)
         | Assertion::IsGreaterThanVariable(variable)

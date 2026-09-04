@@ -5,7 +5,7 @@ declare(strict_types=1);
 namespace Mago\Sdk\Analyzer\Assertion;
 
 /**
- * The relationship between an asserted value and an integer bound or count.
+ * The relationship between an asserted value and an integer bound, string-length bound, or count.
  *
  * @api
  */
@@ -23,6 +23,8 @@ enum IntegerAssertionKind
     case IsLessThanOrEqualFromBound;
     case IsGreaterThanFromBound;
     case IsGreaterThanOrEqualFromBound;
+    case StringLengthLessThan;
+    case StringLengthGreaterThanOrEqual;
 
     public function isCount(): bool
     {

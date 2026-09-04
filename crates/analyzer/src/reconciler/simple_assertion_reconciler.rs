@@ -272,6 +272,10 @@ where
         | Assertion::IsLessThanOrEqualVariable(_)
         | Assertion::IsGreaterThanVariable(_)
         | Assertion::IsGreaterThanOrEqualVariable(_) => Some(existing_var_type.clone()),
+        Assertion::StringLengthLessThan(_) => Some(existing_var_type.clone()),
+        Assertion::StringLengthGreaterThanOrEqual(length) => {
+            Some(reconcile_string_length_greater_than_or_equal(existing_var_type, *length))
+        }
         Assertion::Truthy | Assertion::NonEmpty => {
             Some(reconcile_truthy_or_non_empty(context, assertion, existing_var_type, key, negated, span))
         }
@@ -374,6 +378,39 @@ where
         Assertion::Countable => Some(reconcile_countable(context, assertion, existing_var_type, key, negated, span)),
         _ => None,
     }
+}
+
+fn reconcile_string_length_greater_than_or_equal(existing_var_type: &TUnion, length: i64) -> TUnion {
+    if length <= 0 {
+        return existing_var_type.clone();
+    }
+
+    let mut new_var_type = existing_var_type.clone();
+    let mut acceptable_types = Vec::new();
+
+    for atomic in std::mem::take(new_var_type.types.to_mut()) {
+        match atomic {
+            TAtomic::Scalar(TScalar::String(mut string)) => {
+                if string.is_empty() {
+                    continue;
+                }
+
+                string.is_non_empty = true;
+                acceptable_types.push(TAtomic::Scalar(TScalar::String(string)));
+            }
+            TAtomic::GenericParameter(generic_parameter) => {
+                if let Some(atomic) = map_concrete_generic_constraint(&generic_parameter, |constraint| {
+                    reconcile_string_length_greater_than_or_equal(constraint, length)
+                }) {
+                    acceptable_types.push(atomic);
+                }
+            }
+            atomic => acceptable_types.push(atomic),
+        }
+    }
+
+    new_var_type.types = Cow::Owned(acceptable_types);
+    new_var_type
 }
 
 pub(crate) fn intersect_null<A>(

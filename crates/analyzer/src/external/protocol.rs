@@ -2244,6 +2244,10 @@ where
         42 => Assertion::IsGreaterThanOrEqualVariable(word(reader.read_bytes("greater-than-or-equal variable")?)),
         43 => Assertion::Countable,
         44 => Assertion::NotCountable(reader.read_bool("not-countable negatable flag")?),
+        45 => Assertion::StringLengthLessThan(reader.read_u64("string length less-than bound")? as i64),
+        46 => Assertion::StringLengthGreaterThanOrEqual(
+            reader.read_u64("string length greater-than-or-equal bound")? as i64
+        ),
         unknown => return Err(protocol(format!("unknown invocation assertion kind {unknown}"))),
     })
 }

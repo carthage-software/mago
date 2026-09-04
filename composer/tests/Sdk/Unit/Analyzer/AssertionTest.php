@@ -34,6 +34,7 @@ final class AssertionTest extends TestCase
             new ArrayKey(ArrayKeyKind::String, 'name'),
         );
         $integer = new IntegerAssertion(IntegerAssertionKind::IsGreaterThan, -1);
+        $length = new IntegerAssertion(IntegerAssertionKind::StringLengthGreaterThanOrEqual, 1);
         $variable = new VariableAssertion(VariableAssertionKind::IsLessThan, '$limit');
         $countability = new CountabilityAssertion(CountabilityAssertionKind::NonEmpty, false);
 
@@ -41,6 +42,7 @@ final class AssertionTest extends TestCase
         self::assertSame('string', (string) $type->type);
         self::assertSame('name', $key->key->value);
         self::assertSame(-1, $integer->value);
+        self::assertSame(1, $length->value);
         self::assertSame('$limit', $variable->variable);
         self::assertFalse($countability->negatable);
     }

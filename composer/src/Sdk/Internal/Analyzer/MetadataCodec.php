@@ -376,6 +376,8 @@ final class MetadataCodec
             42 => new VariableAssertion(VariableAssertionKind::IsGreaterThanOrEqual, $reader->readBytes()),
             43 => new SimpleAssertion(SimpleAssertionKind::Countable),
             44 => new CountabilityAssertion(CountabilityAssertionKind::NotCountable, $reader->readBoolean()),
+            45 => new IntegerAssertion(IntegerAssertionKind::StringLengthLessThan, $reader->readI64()),
+            46 => new IntegerAssertion(IntegerAssertionKind::StringLengthGreaterThanOrEqual, $reader->readI64()),
             default => throw new ProtocolException("Unknown function-like assertion kind {$kind}."),
         };
     }

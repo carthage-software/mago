@@ -95,7 +95,7 @@ The SDK represents Mago's assertion vocabulary without flattening it into string
 
 ### Integer and count assertions
 
-`IntegerAssertion` supports exact and minimum collection counts, their negations, direct less/greater comparisons, and comparisons derived from a bound. Count values must be non-negative.
+`IntegerAssertion` supports collection counts, integer comparisons, derived bounds, and string-length bounds. Count values must be non-negative.
 
 ### Array-key assertions
 

@@ -106,6 +106,8 @@ final class AssertionCodec
                 IntegerAssertionKind::IsLessThanOrEqualFromBound => 36,
                 IntegerAssertionKind::IsGreaterThanFromBound => 37,
                 IntegerAssertionKind::IsGreaterThanOrEqualFromBound => 38,
+                IntegerAssertionKind::StringLengthLessThan => 45,
+                IntegerAssertionKind::StringLengthGreaterThanOrEqual => 46,
             },
             $assertion instanceof VariableAssertion => match ($assertion->kind) {
                 VariableAssertionKind::IsLessThan => 39,

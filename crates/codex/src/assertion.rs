@@ -73,6 +73,8 @@ pub enum Assertion {
     IsLessThanOrEqualVariable(Word),
     IsGreaterThanVariable(Word),
     IsGreaterThanOrEqualVariable(Word),
+    StringLengthLessThan(i64),
+    StringLengthGreaterThanOrEqual(i64),
     Countable,
     NotCountable(bool),
 }
@@ -137,6 +139,12 @@ impl Assertion {
             }
             Assertion::IsGreaterThanOrEqualVariable(variable) => {
                 concat_word!(b"is-greater-than-or-equal-variable-", variable)
+            }
+            Assertion::StringLengthLessThan(number) => {
+                concat_word!(b"string-length-is-less-than-", i64_word(*number))
+            }
+            Assertion::StringLengthGreaterThanOrEqual(number) => {
+                concat_word!(b"string-length-is-greater-than-or-equal-", i64_word(*number))
             }
             Assertion::NonEmptyCountable(negatable) => {
                 if *negatable {
@@ -418,6 +426,14 @@ impl Assertion {
                 Assertion::IsLessThanVariable(other_variable) => other_variable == variable,
                 _ => false,
             },
+            Assertion::StringLengthLessThan(number) => match other {
+                Assertion::StringLengthGreaterThanOrEqual(other_number) => other_number == number,
+                _ => false,
+            },
+            Assertion::StringLengthGreaterThanOrEqual(number) => match other {
+                Assertion::StringLengthLessThan(other_number) => other_number == number,
+                _ => false,
+            },
             Assertion::Countable => matches!(other, Assertion::NotCountable(negatable) if *negatable),
             Assertion::NotCountable(_) => matches!(other, Assertion::Countable),
         }
@@ -474,6 +490,8 @@ impl Assertion {
             Assertion::IsLessThanOrEqualVariable(variable) => Assertion::IsGreaterThanVariable(*variable),
             Assertion::IsGreaterThanVariable(variable) => Assertion::IsLessThanOrEqualVariable(*variable),
             Assertion::IsGreaterThanOrEqualVariable(variable) => Assertion::IsLessThanVariable(*variable),
+            Assertion::StringLengthLessThan(number) => Assertion::StringLengthGreaterThanOrEqual(*number),
+            Assertion::StringLengthGreaterThanOrEqual(number) => Assertion::StringLengthLessThan(*number),
             Assertion::Countable => Assertion::NotCountable(true),
             Assertion::NotCountable(_) => Assertion::Countable,
         }

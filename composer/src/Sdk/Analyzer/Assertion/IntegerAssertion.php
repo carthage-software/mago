@@ -7,7 +7,7 @@ namespace Mago\Sdk\Analyzer\Assertion;
 use Mago\Sdk\Exception\InvalidArgumentException;
 
 /**
- * An assertion carrying an integer bound or collection count.
+ * An assertion carrying an integer bound, string-length bound, or collection count.
  *
  * @api
  */
