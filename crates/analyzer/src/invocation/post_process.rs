@@ -782,22 +782,35 @@ where
     A: Arena,
 {
     let bytes = var_id.as_bytes();
-    let Some(arrow) = memchr::memmem::find(bytes, b"->") else {
+    let Some(mut arrow) = memchr::memmem::find(bytes, b"->") else {
         return false;
     };
 
-    let root = &bytes[..arrow];
-    let property = &bytes[arrow + 2..];
-    if memchr::memmem::find(property, b"->").is_some() || property.contains(&b'[') {
-        return false;
+    loop {
+        let property_start = arrow + 2;
+        let next_arrow = memchr::memmem::find(&bytes[property_start..], b"->").map(|offset| property_start + offset);
+        let property_end = next_arrow.unwrap_or(bytes.len());
+        let property = &bytes[property_start..property_end];
+        if property.contains(&b'[') {
+            return false;
+        }
+
+        let Some(root_type) = block_context.locals.get(&Word::new(&bytes[..arrow])) else {
+            return false;
+        };
+
+        if root_type.types.is_empty()
+            || !root_type.types.iter().all(|atom| atom_property_is_immutable(context, atom, property))
+        {
+            return false;
+        }
+
+        let Some(next_arrow) = next_arrow else {
+            return true;
+        };
+
+        arrow = next_arrow;
     }
-
-    let Some(root_type) = block_context.locals.get(&Word::new(root)) else {
-        return false;
-    };
-
-    !root_type.types.is_empty()
-        && root_type.types.iter().all(|atom| atom_property_is_immutable(context, atom, property))
 }
 
 fn atom_property_is_immutable<A>(context: &Context<'_, '_, A>, atom: &TAtomic, property: &[u8]) -> bool
