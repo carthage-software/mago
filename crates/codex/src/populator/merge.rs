@@ -151,7 +151,26 @@ pub fn merge_metadata_from_trait(
     metadata.add_used_traits(trait_metadata.used_traits.iter().copied());
 
     extend_template_parameters(metadata, trait_metadata);
+    remove_trait_requirement_template_parameters(metadata, trait_metadata, codebase);
 
     inherit_methods_from_parent(metadata, trait_metadata, codebase);
     inherit_properties_from_parent(metadata, trait_metadata);
+}
+
+fn remove_trait_requirement_template_parameters(
+    metadata: &mut ClassLikeMetadata,
+    trait_metadata: &ClassLikeMetadata,
+    codebase: &CodebaseMetadata,
+) {
+    for required_interface in &trait_metadata.require_implements {
+        metadata.template_extended_parameters.remove(required_interface);
+        metadata.template_extended_parameter_paths.remove(required_interface);
+
+        if let Some(required_metadata) = codebase.class_likes.get(required_interface) {
+            for parent_interface in &required_metadata.all_parent_interfaces {
+                metadata.template_extended_parameters.remove(parent_interface);
+                metadata.template_extended_parameter_paths.remove(parent_interface);
+            }
+        }
+    }
 }
