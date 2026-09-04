@@ -482,6 +482,7 @@ test_case!(issue_1562);
 test_case!(bare_cr_line_endings);
 test_case!(table_style_tiny_print_width);
 test_case!(issue_2150);
+test_case!(issue_2316);
 
 // PHP identifiers may contain non-UTF-8 bytes; the formatter must round-trip
 // `before.php`/`after.php` byte-for-byte without lossy decoding.

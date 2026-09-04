@@ -84,7 +84,9 @@ fn get_preferred_quote(raw: &[u8], enclosing_quote: u8, prefer_single_quote: boo
     let mut i = 0;
     while i < raw.len() {
         let byte = raw[i];
-        if byte == preferred_quote_char {
+        if byte == b'$' && enclosing_quote == b'\'' {
+            return enclosing_quote;
+        } else if byte == preferred_quote_char {
             preferred_quote_count += 1;
         } else if byte == alternate_quote_char {
             alternate_quote_count += 1;
