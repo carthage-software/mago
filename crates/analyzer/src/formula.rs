@@ -208,34 +208,35 @@ where
             let (left_is_true, left_is_false) = check_boolean(binary.lhs);
             let (right_is_true, right_is_false) = check_boolean(binary.rhs);
 
-            match (left_is_true || left_is_false, right_is_true || right_is_false) {
-                (true, _) => {
-                    return get_boolean_literal_comparison_formula(
-                        conditional_object_id,
-                        creating_object_id,
-                        binary.rhs,
-                        left_is_true,
-                        is_identical,
-                        assertion_context,
-                        artifacts,
-                        algebra_thresholds,
-                        formula_size_threshold,
-                    );
-                }
-                (_, true) => {
-                    return get_boolean_literal_comparison_formula(
-                        conditional_object_id,
-                        creating_object_id,
-                        binary.lhs,
-                        right_is_true,
-                        is_identical,
-                        assertion_context,
-                        artifacts,
-                        algebra_thresholds,
-                        formula_size_threshold,
-                    );
-                }
-                _ => {}
+            let boolean_comparison = match (left_is_true || left_is_false, right_is_true || right_is_false) {
+                (true, _) => Some((binary.rhs, left_is_true)),
+                (_, true) => Some((binary.lhs, right_is_true)),
+                _ => None,
+            };
+
+            if let Some((other_side, literal_is_true)) = boolean_comparison {
+                let mut formula = get_boolean_literal_comparison_formula(
+                    conditional_object_id,
+                    creating_object_id,
+                    other_side,
+                    literal_is_true,
+                    is_identical,
+                    assertion_context,
+                    artifacts,
+                    algebra_thresholds,
+                    formula_size_threshold,
+                )?;
+
+                add_nullsafe_condition_clauses(
+                    expression,
+                    &mut formula,
+                    conditional_object_id,
+                    creating_object_id,
+                    assertion_context,
+                    artifacts,
+                );
+
+                return Some(formula);
             }
         }
     }
