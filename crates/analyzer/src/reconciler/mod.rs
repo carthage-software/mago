@@ -887,6 +887,8 @@ fn add_nested_assertions(
             let base_key_atom = word(&base_key);
             let base_key_set = if let Some(base_key_type) = context.locals.get(&base_key_atom) {
                 !base_key_type.is_nullable()
+                    && !base_key_type.possibly_undefined()
+                    && !base_key_type.possibly_undefined_from_try()
             } else {
                 false
             };
