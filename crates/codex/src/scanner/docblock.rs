@@ -106,7 +106,11 @@ pub fn for_each_tag_by_ascending_trust<'arena>(
 pub fn assertion_subject_word(subject: &AssertSubject<'_>) -> Word {
     match subject {
         AssertSubject::Parameter { variable } => word(variable.value),
-        AssertSubject::Method { parameter, method, .. } => concat_word!(parameter.value, b"->", method.value, b"()"),
-        AssertSubject::Property { parameter, property, .. } => concat_word!(parameter.value, b"->", property.value),
+        AssertSubject::Method { object, method, .. } => {
+            concat_word!(assertion_subject_word(object).as_bytes(), b"->", method.value, b"()")
+        }
+        AssertSubject::Property { object, property, .. } => {
+            concat_word!(assertion_subject_word(object).as_bytes(), b"->", property.value)
+        }
     }
 }

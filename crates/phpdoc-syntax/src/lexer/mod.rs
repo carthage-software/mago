@@ -225,7 +225,7 @@ impl<'arena> DocblockLexer<'arena> {
             }
 
             let mut consumed_hyphen = false;
-            while length < total && remaining[length] == b'-' {
+            while length < total && remaining[length] == b'-' && remaining.get(length + 1) != Some(&b'>') {
                 length += 1;
                 consumed_hyphen = true;
             }
@@ -472,6 +472,22 @@ mod tests {
             TokenKind::Identifier,
             TokenKind::Backtick,
             TokenKind::Whitespace,
+            TokenKind::Identifier,
+        ]
+    );
+
+    test!(
+        lexes_nested_assertion_subject,
+        b"$value->inner->getProp()->value",
+        vec![
+            TokenKind::Variable,
+            TokenKind::Arrow,
+            TokenKind::Identifier,
+            TokenKind::Arrow,
+            TokenKind::Identifier,
+            TokenKind::LeftParenthesis,
+            TokenKind::RightParenthesis,
+            TokenKind::Arrow,
             TokenKind::Identifier,
         ]
     );

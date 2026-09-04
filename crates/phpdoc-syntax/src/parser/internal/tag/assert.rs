@@ -5,6 +5,7 @@ use crate::cst::tag::AssertSubject;
 use crate::cst::tag::AssertTagValue;
 use crate::error::ParseError;
 use crate::parser::PHPDocParser;
+use crate::parser::internal::stream::MAX_RECURSION_DEPTH;
 use crate::token::TokenKind;
 
 impl<'arena, A> PHPDocParser<'arena, A>
@@ -17,21 +18,28 @@ where
         let pattern = self.parse_assert_pattern()?;
         let parameter = self.parse_variable()?;
 
-        let subject = if self.stream.is_at(TokenKind::Arrow) {
-            let arrow = self.stream.consume_span()?;
-            let member = self.parse_identifier()?;
+        let mut subject = AssertSubject::Parameter { variable: parameter };
+        let mut depth = 0;
 
-            if self.stream.is_at(TokenKind::LeftParenthesis) {
+        while self.stream.is_at(TokenKind::Arrow) {
+            let arrow = self.stream.consume_span()?;
+            if depth == MAX_RECURSION_DEPTH {
+                return Err(ParseError::RecursionLimitExceeded(arrow));
+            }
+            depth += 1;
+
+            let member = self.parse_identifier()?;
+            let object = self.alloc(subject);
+
+            subject = if self.stream.is_at(TokenKind::LeftParenthesis) {
                 let left_parenthesis = self.stream.consume_span()?;
                 let right_parenthesis = self.stream.eat_span(TokenKind::RightParenthesis)?;
 
-                AssertSubject::Method { parameter, arrow, method: member, left_parenthesis, right_parenthesis }
+                AssertSubject::Method { object, arrow, method: member, left_parenthesis, right_parenthesis }
             } else {
-                AssertSubject::Property { parameter, arrow, property: member }
-            }
-        } else {
-            AssertSubject::Parameter { variable: parameter }
-        };
+                AssertSubject::Property { object, arrow, property: member }
+            };
+        }
 
         let description = self.parse_optional_description(false)?;
 
