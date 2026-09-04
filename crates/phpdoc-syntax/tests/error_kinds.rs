@@ -93,6 +93,20 @@ fn malformed_tag_with_unclosed_string_surfaces_inner_error() {
 }
 
 #[test]
+fn malformed_assert_nested_property_surfaces_inner_error() {
+    assert_reports(b"/** @phpstan-assert !null $value->inner-> */", |error| {
+        matches!(error, ParseError::UnexpectedEndOfInput(_))
+    });
+}
+
+#[test]
+fn assert_subject_recursion_limit_exceeded_is_reported() {
+    let source = format!("/** @phpstan-assert !null $value{} */", "->prop".repeat(5000));
+
+    assert_reports(source.as_bytes(), |error| matches!(error, ParseError::RecursionLimitExceeded(_)));
+}
+
+#[test]
 fn recursion_limit_exceeded_is_reported() {
     let spawned = std::thread::Builder::new().stack_size(64 * 1024 * 1024).spawn(|| {
         let nested = vec![b'('; 5000];
