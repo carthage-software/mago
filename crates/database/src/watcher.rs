@@ -355,7 +355,7 @@ impl<'config> DatabaseWatcher<'config> {
 
             let file_id = FileId::new(&logical_name);
 
-            changed_files.push(ChangedFile { id: file_id, path: path.clone() });
+            changed_files.push(ChangedFile { id: file_id, path });
         }
 
         if changed_files.is_empty() { None } else { Some(changed_files) }
