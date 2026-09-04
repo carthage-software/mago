@@ -51,6 +51,7 @@ use crate::context::assertion::AssertionContext;
 use crate::resolver::class_name::get_class_name_from_atomic;
 use crate::utils::expression::get_expression_id;
 use crate::utils::expression::get_index_id;
+use crate::utils::expression::get_non_nullsafe_expression_id;
 use crate::utils::misc::unwrap_expression;
 
 #[derive(Debug, Clone, Copy)]
@@ -1622,7 +1623,8 @@ where
     };
 
     let variable_id =
-        get_expression_id(assertion_target, context.this_class_name, context.resolved_names, Some(context.codebase));
+        get_expression_id(assertion_target, context.this_class_name, context.resolved_names, Some(context.codebase))
+            .map(|id| get_non_nullsafe_expression_id(id).unwrap_or(id));
 
     if let Some(counter_variable_id) = variable_id {
         match right {
