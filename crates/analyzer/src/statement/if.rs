@@ -788,17 +788,16 @@ where
     );
 
     let else_if_clauses = saturate_clauses(else_if_clauses.iter(), &context.settings.algebra_thresholds());
-    else_if_block_context.clauses = if entry_clauses.is_empty() {
-        else_if_clauses.clone().into_iter().map(Rc::new).collect()
-    } else {
-        saturate_clauses(
-            else_if_clauses.iter().chain(entry_clauses.iter().map(Rc::deref)),
-            &context.settings.algebra_thresholds(),
-        )
-        .into_iter()
-        .map(Rc::new)
-        .collect()
-    };
+    else_if_block_context.clauses = saturate_clauses(
+        else_if_clauses
+            .iter()
+            .chain(entry_clauses.iter().map(Rc::deref))
+            .chain(else_if_block_context.clauses.iter().map(Rc::deref)),
+        &context.settings.algebra_thresholds(),
+    )
+    .into_iter()
+    .map(Rc::new)
+    .collect();
 
     if !else_if_block_context.reconciled_expression_clauses.is_empty() {
         let reconciled_expression_clauses = else_if_block_context

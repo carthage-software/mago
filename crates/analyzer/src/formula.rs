@@ -76,10 +76,15 @@ where
     A: Arena,
 {
     if let Some(var_name) = assertion_context.get_expression_id(other_side) {
-        let literal_atomic =
-            if literal_is_true { TAtomic::Scalar(TScalar::r#true()) } else { TAtomic::Scalar(TScalar::r#false()) };
-        let assertion =
-            if is_identical { Assertion::IsType(literal_atomic) } else { Assertion::IsNotType(literal_atomic) };
+        let matches_literal = is_identical == literal_is_true;
+        let assertion = if artifacts.get_expression_type(other_side).is_some_and(|ty| ty.is_bool()) {
+            if matches_literal { Assertion::Truthy } else { Assertion::Falsy }
+        } else {
+            let literal_atomic =
+                if literal_is_true { TAtomic::Scalar(TScalar::r#true()) } else { TAtomic::Scalar(TScalar::r#false()) };
+
+            if is_identical { Assertion::IsType(literal_atomic) } else { Assertion::IsNotType(literal_atomic) }
+        };
 
         let mut clause_map = IndexMap::new();
         let mut type_map = IndexMap::new();
