@@ -38,6 +38,7 @@ use mago_syntax::cst::Literal;
 use mago_word::Word;
 use mago_word::WordMap;
 use mago_word::WordSet;
+use mago_word::concat_word;
 
 use crate::artifacts::AnalysisArtifacts;
 use crate::code::IssueCode;
@@ -1315,6 +1316,15 @@ where
     // First, check if the name refers to a special assertion target like `$this->...`
     if let Some(resolved_id) = resolve_special_assertion_target(block_context, parameter_name, this_variable) {
         return (None, Some(resolved_id));
+    }
+
+    if let Some(offset) = memchr::memmem::find(parameter_name.as_bytes(), b"->") {
+        let parameter = Word::new(&parameter_name.as_bytes()[..offset]);
+        let suffix = &parameter_name.as_bytes()[offset..];
+        let (expression, argument) =
+            get_argument_for_parameter(context, block_context, invocation, None, Some(parameter));
+
+        return (expression, argument.map(|argument| concat_word!(argument.as_bytes(), suffix)));
     }
 
     // If not a special target, treat it as a regular parameter and find its argument.
