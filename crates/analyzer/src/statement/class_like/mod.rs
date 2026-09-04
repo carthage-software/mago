@@ -137,6 +137,34 @@ fn is_property_type_variance_invalid(
     incomparable || (declaring_is_wider && !parent_only_set) || (declaring_is_narrower && !parent_only_get)
 }
 
+/// Rewrites a type declared by `parent_class_name` in terms of the child's own templates,
+/// substituting the arguments the child supplies through `@extends`.
+///
+/// Inherited property types are already localized this way, so the parent's type has to be
+/// localized too before the two can be compared.
+#[inline]
+fn localize_parent_type(
+    codebase: &CodebaseMetadata,
+    class_like_metadata: &ClassLikeMetadata,
+    parent_class_name: Word,
+    parent_type: &TUnion,
+) -> TUnion {
+    let Some(mapping) = class_like_metadata.template_extended_parameters.get(&parent_class_name) else {
+        return parent_type.clone();
+    };
+
+    let mut template_result = TemplateResult::default();
+    for (template_name, concrete_type) in mapping {
+        template_result.add_lower_bound(
+            *template_name,
+            GenericParent::ClassLike(parent_class_name),
+            concrete_type.clone(),
+        );
+    }
+
+    inferred_type_replacer::replace(parent_type, &template_result, codebase)
+}
+
 /// Represents different types of property conflicts between traits
 #[derive(Debug)]
 enum PropertyConflict {
@@ -3402,20 +3430,30 @@ fn check_class_like_properties<'ctx, A>(
                 }
             }
 
+            let localized_parent_type = parent_property.type_metadata.as_ref().map(|parent_type| {
+                localize_parent_type(
+                    context.codebase,
+                    class_like_metadata,
+                    parent_metadata.name,
+                    &parent_type.type_union,
+                )
+            });
+
             if !has_type_incompatibility
                 && let Some(declaring_type) = &property_metadata.type_metadata
                 && declaring_type.from_docblock
                 && let Some(parent_type) = &parent_property.type_metadata
+                && let Some(localized_parent_type) = &localized_parent_type
                 && is_property_type_variance_invalid(
                     context.codebase,
                     &declaring_type.type_union,
-                    &parent_type.type_union,
+                    localized_parent_type,
                     parent_only_get,
                     parent_only_set,
                 )
             {
                 let declaring_type_id = declaring_type.type_union.get_id();
-                let parent_type_id = parent_type.type_union.get_id();
+                let parent_type_id = localized_parent_type.get_id();
                 let property_name = property_metadata.name.0;
                 let class_name = class_like_metadata.original_name;
 
