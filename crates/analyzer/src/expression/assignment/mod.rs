@@ -41,7 +41,6 @@ use mago_word::WordSet;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
-use crate::artifacts::get_expression_range;
 use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
@@ -133,6 +132,7 @@ where
         block_context.locals.insert(*target_variable_id, Rc::new(preliminary_type));
     }
 
+    let mut assignment_operation_type = None;
     if let Some(source_expression) = source_expression {
         let was_inside_general_use = block_context.flags.inside_general_use();
         block_context.flags.set_inside_general_use(true);
@@ -170,7 +170,7 @@ where
 
                 binary_expression.analyze(context, block_context, artifacts)?;
                 block_context.flags.set_inside_assignment_operation(false);
-                let assignment_type = if let Some(assignment_span) = assignment_span {
+                assignment_operation_type = if let Some(assignment_span) = assignment_span {
                     artifacts.get_rc_expression_type(&assignment_span).cloned()
                 } else {
                     None
@@ -179,9 +179,6 @@ where
                 let new_expression_types =
                     std::mem::replace(&mut artifacts.expression_types, previous_expression_types);
                 artifacts.expression_types.extend(new_expression_types);
-                if let Some(expression_type) = assignment_type {
-                    artifacts.expression_types.insert(get_expression_range(source_expression), expression_type);
-                }
             }
         }
 
@@ -194,6 +191,8 @@ where
 
     let source_type: Rc<TUnion> = if let Some(source_type) = source_type {
         Rc::new(source_type)
+    } else if let Some(assignment_operation_type) = assignment_operation_type {
+        assignment_operation_type
     } else if let Some(source_expression) = source_expression {
         if let Some(source_type) = artifacts.get_rc_expression_type(&source_expression) {
             Rc::clone(source_type)

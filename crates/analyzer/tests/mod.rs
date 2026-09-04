@@ -2737,6 +2737,7 @@ test_case!(issue_2305);
 test_case!(issue_2307);
 test_case!(issue_2308);
 test_case!(issue_2309);
+test_case!(issue_2311);
 test_case!(issue_2312);
 test_case!(issue_2315);
 
