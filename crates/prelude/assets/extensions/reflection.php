@@ -1177,6 +1177,8 @@ class ReflectionClass implements Reflector
 
     /**
      * @pure
+     *
+     * @return class-string<T>
      */
     public function getName(): string {}
 
