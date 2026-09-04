@@ -1,8 +1,9 @@
-use mago_allocator::Arena;
 use std::collections::BTreeMap;
 use std::rc::Rc;
 use std::sync::Arc;
 
+use mago_allocator::Arena;
+use mago_codex::ttype::TType;
 use mago_codex::ttype::add_union_type;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
@@ -15,6 +16,8 @@ use mago_codex::ttype::atomic::scalar::string::TString;
 use mago_codex::ttype::combine_union_types;
 use mago_codex::ttype::combiner;
 use mago_codex::ttype::combiner::CombinerOptions;
+use mago_codex::ttype::comparator::ComparisonResult;
+use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::get_arraykey;
 use mago_codex::ttype::get_int;
 use mago_codex::ttype::get_iterable_parameters;
@@ -23,18 +26,14 @@ use mago_codex::ttype::get_never;
 use mago_codex::ttype::get_non_negative_int;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;
+use mago_reporting::Annotation;
+use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_syntax::cst::Access;
 use mago_syntax::cst::Expression;
 use mago_word::Word;
 use mago_word::empty_word;
 use mago_word::word;
-
-use mago_codex::ttype::TType;
-use mago_codex::ttype::comparator::ComparisonResult;
-use mago_codex::ttype::comparator::union_comparator;
-use mago_reporting::Annotation;
-use mago_reporting::Issue;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -711,7 +710,7 @@ where
             array_expression_type = scoped_type;
         }
 
-        let new_index_type = array_target_index_type.clone().unwrap_or(Rc::new(get_non_negative_int()));
+        let new_index_type = array_target_index_type.unwrap_or(Rc::new(get_non_negative_int()));
 
         let is_last = i == array_target_expressions.len() - 1;
 
@@ -749,13 +748,13 @@ where
 
             if let Some(parent_var_id) = &parent_var_id {
                 if full_var_id && memchr::memmem::find(parent_var_id.as_bytes(), b"[$").is_some() {
-                    block_context.locals.insert(*parent_var_id, Rc::new(array_expression_type_inner.clone()));
+                    block_context.locals.insert(*parent_var_id, Rc::new(array_expression_type_inner));
                     block_context.possibly_assigned_variable_ids.insert(*parent_var_id);
                 }
             } else {
                 *root_type = array_expression_type_inner.clone();
 
-                block_context.locals.insert(*root_var_id, Rc::new(array_expression_type_inner.clone()));
+                block_context.locals.insert(*root_var_id, Rc::new(array_expression_type_inner));
                 block_context.possibly_assigned_variable_ids.insert(*root_var_id);
             }
         }
@@ -820,7 +819,7 @@ where
         if let Some(array_expr_id) = &array_expr_id
             && memchr::memmem::find(array_expr_id.as_bytes(), b"[$").is_some()
         {
-            block_context.locals.insert(*array_expr_id, Rc::new(array_expr_type.clone()));
+            block_context.locals.insert(*array_expr_id, Rc::new(array_expr_type));
             block_context.possibly_assigned_variable_ids.insert(*array_expr_id);
         }
 

@@ -713,7 +713,7 @@ where
                 candidates.push(MethodCandidate {
                     metadata: mixin_metadata,
                     method_identifier: mixin_method_id,
-                    object: mixin_object.clone(),
+                    object: mixin_object,
                     classname: mixin_class_name,
                     mixin_without_magic_method: mixin_info,
                     receiver_object: Some(outer_object.clone()),

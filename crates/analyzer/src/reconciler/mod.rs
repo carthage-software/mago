@@ -1,4 +1,3 @@
-use mago_allocator::Arena;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::rc::Rc;
@@ -10,6 +9,8 @@ use indexmap::IndexMap;
 use regex::Regex;
 
 use mago_algebra::assertion_set::AssertionSet;
+use mago_allocator::Arena;
+use mago_bytes::BytesDisplay;
 use mago_codex::assertion::Assertion;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::ttype::add_optional_union_type;
@@ -50,7 +51,6 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::context::scope::var_has_root;
 use crate::resolver::property::resolve_declared_property;
-use mago_bytes::BytesDisplay;
 
 pub mod assertion_reconciler;
 pub mod negated_assertion_reconciler;
@@ -296,7 +296,7 @@ pub fn reconcile_keyed_types<'ctx, A>(
             // Even when the type doesn't exist and result is never, we still need to
             // update parent array types for negated isset/key_exists to remove the key
             if key_str.ends_with(b"]") && (has_inverted_isset || has_inverted_key_exists) {
-                adjust_array_type_remove_key(key_parts.clone(), block_context, changed_var_ids, context.codebase);
+                adjust_array_type_remove_key(key_parts, block_context, changed_var_ids, context.codebase);
             }
 
             continue;
@@ -422,7 +422,7 @@ pub fn reconcile_keyed_types<'ctx, A>(
             && reference_graph.contains_key(&key_parts_0_atom)
         {
             // If key is new, create references for other variables that reference the root variable.
-            let mut reference_key_parts = key_parts.clone();
+            let mut reference_key_parts = key_parts;
             for reference in &reference_graph[&key_parts_0_atom] {
                 reference_key_parts[0] = reference.as_bytes().to_vec();
                 let joined: Vec<u8> = reference_key_parts.iter().flatten().copied().collect();
