@@ -125,6 +125,7 @@ where
             &current_type,
             root_array_type,
             array_target.span(),
+            root_var_id.is_none_or(|id| !block_context.references_in_scope.contains_key(&id)),
         )
     } else {
         root_array_type
@@ -426,6 +427,7 @@ fn update_array_assignment_child_type<'ctx, A>(
     value_type: &TUnion,
     mut root_type: TUnion,
     target_span: mago_span::Span,
+    mark_non_empty: bool,
 ) -> TUnion
 where
     A: Arena,
@@ -616,7 +618,7 @@ where
         context.settings.combiner_options().with_overwrite_empty_array(),
     );
 
-    if key_type.is_none() {
+    if key_type.is_none() || mark_non_empty {
         for atomic in result.types.to_mut().iter_mut() {
             match atomic {
                 TAtomic::Array(TArray::List(list)) => list.non_empty = true,

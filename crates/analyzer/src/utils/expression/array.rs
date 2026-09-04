@@ -1194,21 +1194,20 @@ where
 
         // }
         if has_value_parameter {
-            // For non-empty arrays where the key type is fully contained by the access key type,
-            // the entry is guaranteed to exist.
-            let key_is_definitely_defined = keyed_array.non_empty && {
-                let array_key = get_arraykey();
+            let key_is_definitely_defined =
+                keyed_array.non_empty && key_parameter.get_single_array_key().is_some() && {
+                    let array_key = get_arraykey();
 
-                is_contained_by(
-                    context.codebase,
-                    &key_parameter,
-                    if index_type.is_mixed() { &array_key } else { index_type },
-                    false,
-                    false,
-                    false,
-                    &mut ComparisonResult::new(),
-                )
-            };
+                    is_contained_by(
+                        context.codebase,
+                        &key_parameter,
+                        if index_type.is_mixed() { &array_key } else { index_type },
+                        false,
+                        false,
+                        false,
+                        &mut ComparisonResult::new(),
+                    )
+                };
 
             if !in_assignment && !key_is_definitely_defined {
                 *has_possibly_undefined = true;
