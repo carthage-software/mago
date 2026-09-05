@@ -190,6 +190,7 @@ where
     let class_string = match class_resolution.fqcn {
         Some(fq_class_id) => {
             if matches!(class_resolution.origin, ResolutionOrigin::Named { is_self: false, is_parent: false })
+                && !block_context.flags.inside_class_alias_destination()
                 && context.codebase.get_class_like(fq_class_id.as_bytes()).is_none()
             {
                 report_non_existent_class(context, fq_class_id, class_expr.span());

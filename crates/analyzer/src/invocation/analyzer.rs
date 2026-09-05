@@ -32,6 +32,8 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
+use mago_syntax::cst::Access;
+use mago_syntax::cst::ClassLikeConstantSelector;
 use mago_syntax::cst::Expression;
 use mago_word::Word;
 use mago_word::WordMap;
@@ -182,7 +184,23 @@ where
 
         let parameter = get_parameter_of_argument(&invocation.target, argument, *argument_offset);
 
-        analyze_and_store_argument_type(
+        // Restrict the exemption to a literal `Name::class` so it cannot hide errors in nested expressions.
+        let is_class_alias_destination = if parameter.is_some_and(|(offset, _)| offset == 1)
+            && let Expression::Access(Access::ClassConstant(access)) = argument_expression.unparenthesized()
+            && matches!(access.class, Expression::Identifier(_))
+            && let ClassLikeConstantSelector::Identifier(constant) = &access.constant
+            && constant.value.eq_ignore_ascii_case(b"class")
+            && let Some(FunctionLikeIdentifier::Function(name)) = invocation.target.get_function_like_identifier()
+            && name.as_bytes().eq_ignore_ascii_case(b"class_alias")
+        {
+            true
+        } else {
+            false
+        };
+        let was_inside_class_alias_destination = block_context.flags.inside_class_alias_destination();
+        block_context.flags.set_inside_class_alias_destination(is_class_alias_destination);
+
+        let analysis_result = analyze_and_store_argument_type(
             context,
             block_context,
             artifacts,
@@ -192,7 +210,10 @@ where
             &mut analyzed_argument_types,
             parameter.is_some_and(|p| p.1.is_by_reference()),
             None,
-        )?;
+        );
+
+        block_context.flags.set_inside_class_alias_destination(was_inside_class_alias_destination);
+        analysis_result?;
 
         if let Some(argument_type) = analyzed_argument_types.get(argument_offset)
             && let Some((_, parameter_ref)) = parameter
