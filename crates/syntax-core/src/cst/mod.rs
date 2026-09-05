@@ -1,4 +1,4 @@
-//! Shared AST primitives used across every syntax crate.
+//! Shared CST primitives used across every syntax crate.
 
 use std::slice::Iter;
 
@@ -8,7 +8,7 @@ use mago_span::HasPosition;
 use mago_span::HasSpan;
 use mago_span::Span;
 
-/// A sequence of AST nodes allocated in an arena.
+/// A sequence of CST nodes allocated in an arena.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[repr(transparent)]
@@ -141,7 +141,7 @@ impl<'seq, T> IntoIterator for &'seq Sequence<'_, T> {
     }
 }
 
-/// A sequence of AST nodes separated by infix tokens.
+/// A sequence of CST nodes separated by infix tokens.
 ///
 /// The token type is generic so every syntax crate can plug in its own
 /// token definition. Methods that depend on spatial relationships between

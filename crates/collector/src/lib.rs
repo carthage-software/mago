@@ -117,14 +117,14 @@ where
     /// Creates a new `Collector` from a slice of trivia.
     ///
     /// This is the primary constructor. It pre-parses the given trivia to find pragmas
-    /// relevant to the specified category. This is useful when the full program AST is not
+    /// relevant to the specified category. This is useful when the full program CST is not
     /// needed or available.
     ///
     /// # Parameters
     ///
     /// - `arena`: The memory arena for allocations.
     /// - `file`: The source file associated with this collector.
-    /// - `program`: The AST of the entire program, used to attach pragma scopes.
+    /// - `program`: The CST of the entire program, used to attach pragma scopes.
     /// - `categories`: The categories of pragmas to extract (e.g., "lint", "analysis").
     #[inline]
     pub fn new<'ast>(

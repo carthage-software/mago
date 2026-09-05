@@ -11,7 +11,7 @@ use crate::plugin::provider::Provider;
 /// Hook trait for intercepting program-level analysis.
 ///
 /// This hook is called before and after analyzing a complete program (file).
-/// It receives the source file, full AST, and mutable context, allowing hooks to:
+/// It receives the source file, full CST, and mutable context, allowing hooks to:
 /// - Access file information (id, path, content)
 /// - Inspect the entire program structure
 /// - Report issues at the program level

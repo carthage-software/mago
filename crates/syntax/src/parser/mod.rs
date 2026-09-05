@@ -82,7 +82,7 @@ where
         Self::new(arena, file.file_id(), file.contents.as_ref(), settings)
     }
 
-    /// Parses and returns the program AST.
+    /// Parses and returns the program CST.
     fn parse(mut self, source_text: &'arena [u8], file_id: FileId) -> &'arena Program<'arena> {
         let mut statements = Vec::new_in(self.arena);
 
@@ -129,7 +129,7 @@ where
     }
 }
 
-/// Parses the given file and returns the program AST.
+/// Parses the given file and returns the program CST.
 ///
 /// # Parameters
 ///
@@ -138,7 +138,7 @@ where
 ///
 /// # Returns
 ///
-/// The parsed `Program` AST.
+/// The parsed `Program` CST.
 #[inline]
 pub fn parse_file<'arena, A>(arena: &'arena A, file: &File) -> &'arena Program<'arena>
 where
@@ -147,7 +147,7 @@ where
     parse_file_content(arena, file.file_id(), file.contents.as_ref())
 }
 
-/// Parses the given file with custom settings and returns the program AST.
+/// Parses the given file with custom settings and returns the program CST.
 ///
 /// # Parameters
 ///
@@ -157,7 +157,7 @@ where
 ///
 /// # Returns
 ///
-/// The parsed `Program` AST.
+/// The parsed `Program` CST.
 #[inline]
 pub fn parse_file_with_settings<'arena, A>(
     arena: &'arena A,
@@ -170,7 +170,7 @@ where
     parse_file_content_with_settings(arena, file.file_id(), file.contents.as_ref(), settings)
 }
 
-/// Parses the given file content and returns the program AST.
+/// Parses the given file content and returns the program CST.
 ///
 /// # Parameters
 ///
@@ -180,7 +180,7 @@ where
 ///
 /// # Returns
 ///
-/// The parsed `Program` AST.
+/// The parsed `Program` CST.
 pub fn parse_file_content<'arena, A>(arena: &'arena A, file_id: FileId, content: &[u8]) -> &'arena Program<'arena>
 where
     A: Arena,
@@ -189,7 +189,7 @@ where
     Parser::new(arena, file_id, source_text, ParserSettings::default()).parse(source_text, file_id)
 }
 
-/// Parses the given file content with custom settings and returns the program AST.
+/// Parses the given file content with custom settings and returns the program CST.
 ///
 /// # Parameters
 ///
@@ -200,7 +200,7 @@ where
 ///
 /// # Returns
 ///
-/// The parsed `Program` AST.
+/// The parsed `Program` CST.
 pub fn parse_file_content_with_settings<'arena, A>(
     arena: &'arena A,
     file_id: FileId,

@@ -11,7 +11,7 @@ use crate::signature::FileSignature;
 /// Computes the difference between an old file signature and a new file signature.
 ///
 /// This function uses the Myers diff algorithm to efficiently identify changes between
-/// two versions of a file's AST. Unlike Hakana which differentiates between signature
+/// two versions of a file's CST. Unlike Hakana which differentiates between signature
 /// and body changes, we use a single hash approach: any change triggers re-analysis.
 ///
 /// # Arguments
@@ -284,7 +284,7 @@ fn extract_diff<'nodes>(
     result
 }
 
-/// Represents a single element in the AST diff.
+/// Represents a single element in the CST diff.
 #[derive(Debug)]
 enum AstDiffElem<'nodes> {
     /// Node unchanged in both old and new versions

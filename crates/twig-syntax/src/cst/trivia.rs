@@ -9,7 +9,7 @@ use crate::cst::Sequence;
 ///
 /// Trivia are tokens that carry no syntactic meaning for the parse tree
 /// proper but are retained so that the template source can be recovered
-/// from the AST.
+/// from the CST.
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord, Display)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize))]
 #[cfg_attr(feature = "serde", serde(tag = "type", content = "value"))]

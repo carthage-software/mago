@@ -1,4 +1,4 @@
-//! AST types for Twig templates.
+//! CST types for Twig templates.
 //!
 //! * [`Template`] is the root. It carries the source slice, a trivia channel,
 //!   a statement sequence, and any deferred parse errors.

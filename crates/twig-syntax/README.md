@@ -1,6 +1,6 @@
 # mago-twig-syntax
 
-A lossless lexer, AST, and parser for [Twig 3](https://twig.symfony.com/) templates.
+A lossless lexer, CST, and parser for [Twig 3](https://twig.symfony.com/) templates.
 
 The crate is purely syntactic. It does not resolve filters, functions, or
 tests, it does not load templates, and unknown tag names are accepted as
@@ -12,8 +12,8 @@ formatters, language servers, static analysers - rather than a runtime.
 - **Lossless.** Every byte of the input appears in the value of exactly one
   emitted token. Trivia (whitespace, `{# … #}` comments, inline `# …`
   comments) is collected on a side channel and attached to the [`Template`]
-  so the source can be reconstructed byte-for-byte from the AST.
-- **Arena-allocated AST.** Every node lives in a caller-supplied
+  so the source can be reconstructed byte-for-byte from the CST.
+- **Arena-allocated CST.** Every node lives in a caller-supplied
   [`bumpalo::Bump`]. No reference counting, no per-node `Drop`.
 - **Recursive-descent parser.** Precedence-climbing for expressions,
   with a shared `parse_comma_separated_sequence` helper for delimited lists.
@@ -70,11 +70,11 @@ On Apple Silicon (release profile) the crate sustains roughly:
 
 Run `cargo bench -p mago-twig-syntax` to reproduce.
 
-## AST traversal
+## CST traversal
 
 A macro-generated [`MutWalker`] / [`Walker`] trait pair is provided in
 [`walker`], with `walk_in_*` / `walk_out_*` hooks per node type. For one-off
-inspection, [`ast::Node`] is a non-exhaustive enum covering every node kind.
+inspection, [`cst::Node`] is a non-exhaustive enum covering every node kind.
 
 ## License
 

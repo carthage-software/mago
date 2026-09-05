@@ -16,7 +16,7 @@
 //! - [`FunctionDeclarationHook`]: Function declaration analysis
 //! - [`IssueFilterHook`]: Filter issues at the end of analysis
 //!
-//! All hooks receive real AST references and a [`HookContext`](crate::plugin::context::HookContext)
+//! All hooks receive real CST references and a [`HookContext`](crate::plugin::context::HookContext)
 //! that provides mutable access to the analysis state.
 
 mod action;

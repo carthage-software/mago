@@ -40,7 +40,7 @@ const FORMAT_IGNORE_MARKERS: [&[u8]; 2] = [b"@mago-format-ignore", b"@mago-forma
 /// The main entry point for formatting PHP code.
 ///
 /// The `Formatter` orchestrates the entire formatting process, from parsing
-/// the source code into an Abstract Syntax Tree (AST) to printing a well-formatted
+/// the source code into an Concrete Syntax Tree (CST) to printing a well-formatted
 /// string representation. It is configured with a specific PHP version, formatting
 /// settings, and a string interner.
 #[derive(Debug)]
@@ -96,7 +96,7 @@ where
 
     /// Formats the contents of a [`File`].
     ///
-    /// This method will first parse the file's content into an AST and then format it.
+    /// This method will first parse the file's content into an CST and then format it.
     /// It should be used when you already have a `File` instance, for example, from
     /// a `mago_database::Database`.
     ///
@@ -112,9 +112,9 @@ where
         Ok(self.format(file, program))
     }
 
-    /// Formats a pre-parsed [`Program`] (AST).
+    /// Formats a pre-parsed [`Program`] (CST).
     ///
-    /// This is the lowest-level formatting method that operates directly on the AST.
+    /// This is the lowest-level formatting method that operates directly on the CST.
     /// It first builds an intermediate [`Document`] representation and then prints it.
     /// This is useful if you have already parsed the code and want to avoid re-parsing.
     #[must_use]
@@ -124,7 +124,7 @@ where
         self.print(document, Some(file.size as usize))
     }
 
-    /// Converts a program's AST into a structured [`Document`] model.
+    /// Converts a program's CST into a structured [`Document`] model.
     ///
     /// The document model is an intermediate representation that describes the
     /// layout of the code with elements like groups, indentation, and line breaks.

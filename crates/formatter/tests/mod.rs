@@ -529,7 +529,7 @@ test_case!(idempotency_corpus_symfony_json_streamer);
 fn preserves_non_utf8_identifiers() {
     // Latin-1 `É` (0xC9), `é` (0xE9), and a stray 0xFF that is invalid in any
     // UTF-8 sequence. Bundled into class / method / function / constant names
-    // and a property name so the formatter sees them across multiple AST
+    // and a property name so the formatter sees them across multiple CST
     // positions.
     let bad: &[u8] = &[0xC9, 0xE9, 0xFF];
 
