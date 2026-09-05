@@ -32,7 +32,7 @@
 //! - **`format`** ([`FormatCommand`]): Format PHP code
 //! - **`guard`** ([`GuardCommand`]): Enforce architectural rules
 //! - **`inspect-baseline`** ([`InspectBaselineCommand`]): Visualize a baseline file
-//! - **`cst`** ([`CstCommand`]): Display the abstract syntax tree
+//! - **`cst`** ([`CstCommand`]): Display the concrete syntax tree
 //! - **`self-update`** ([`SelfUpdateCommand`]): Update Mago to the latest version
 //! - **`generate-completions`** ([`GenerateCompletionsCommand`]): Generate shell completions
 //!
@@ -173,7 +173,7 @@ pub enum MagoCommand {
     #[command(name = "list-files")]
     ListFiles(ListFilesCommand),
 
-    /// Display the abstract syntax tree (CST) of PHP code.
+    /// Display the concrete syntax tree (CST) of PHP code.
     ///
     /// Parses PHP code and displays its CST structure, useful for understanding how
     /// Mago interprets code structure and for debugging parser issues.

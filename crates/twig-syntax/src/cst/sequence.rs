@@ -10,6 +10,6 @@ use crate::token::TwigToken;
 
 pub use mago_syntax_core::cst::Sequence;
 
-/// A Twig AST sequence whose separators are [`TwigToken`]s.
+/// A Twig CST sequence whose separators are [`TwigToken`]s.
 pub type TokenSeparatedSequence<'arena, T> =
     mago_syntax_core::cst::TokenSeparatedSequence<'arena, T, TwigToken<'arena>>;

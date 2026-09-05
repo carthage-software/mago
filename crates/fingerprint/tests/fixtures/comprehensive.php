@@ -1,6 +1,6 @@
 <?php
 /**
- * Comprehensive PHP file with ALL AST nodes
+ * Comprehensive PHP file with ALL CST nodes
  *
  * @package TestPackage
  * @author Test Author

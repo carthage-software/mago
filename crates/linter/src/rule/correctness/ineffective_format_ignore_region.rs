@@ -124,7 +124,7 @@ impl LintRule for IneffectiveFormatIgnoreRegionRule {
             return;
         }
 
-        // Walk the AST to mark regions as used when they contain statement starts
+        // Walk the CST to mark regions as used when they contain statement starts
         let mut checker = IgnoreRegionChecker { regions: &mut regions };
         mago_syntax::walker::walk_program_mut(&mut checker, program, &mut ());
 
