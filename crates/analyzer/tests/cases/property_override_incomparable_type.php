@@ -52,3 +52,34 @@ class VirtualIncomparable extends VirtualBase
         get => null;
     }
 }
+
+/**
+ * @template TValue of int|string
+ */
+abstract class GenericBase
+{
+    /** @var array<TValue, string> */
+    protected array $choices = [];
+}
+
+/**
+ * @extends GenericBase<string>
+ */
+final class GenericChild extends GenericBase
+{
+    /** @var array<string, string> */
+    protected array $choices = ['a' => 'A'];
+}
+
+/**
+ * The parent's type is localized before comparison, so an override that does
+ * not match the substituted type is still reported.
+ *
+ * @extends GenericBase<int>
+ */
+// @mago-expect analysis:incompatible-property-type
+final class GenericChildIncomparable extends GenericBase
+{
+    /** @var array<string, string> */
+    protected array $choices = ['a' => 'A'];
+}
