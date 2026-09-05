@@ -25,6 +25,8 @@ impl BlockContextFlags {
     /// class-like is in scope for name resolution, but the arguments are evaluated outside
     /// its body.
     pub const INSIDE_CLASS_LIKE_ATTRIBUTE: u32 = 1 << 18;
+    /// Set only while analyzing a literal `Name::class` used as a `class_alias()` destination.
+    pub const INSIDE_CLASS_ALIAS_DESTINATION: u32 = 1 << 19;
 
     #[inline]
     pub const fn new() -> Self {
@@ -149,6 +151,11 @@ impl BlockContextFlags {
     }
 
     #[inline(always)]
+    pub const fn inside_class_alias_destination(&self) -> bool {
+        self.contains(Self::INSIDE_CLASS_ALIAS_DESTINATION)
+    }
+
+    #[inline(always)]
     pub fn set_inside_conditional(&mut self, value: bool) {
         self.set(Self::INSIDE_CONDITIONAL, value);
     }
@@ -241,5 +248,10 @@ impl BlockContextFlags {
     #[inline(always)]
     pub fn set_inside_class_like_attribute(&mut self, value: bool) {
         self.set(Self::INSIDE_CLASS_LIKE_ATTRIBUTE, value);
+    }
+
+    #[inline(always)]
+    pub fn set_inside_class_alias_destination(&mut self, value: bool) {
+        self.set(Self::INSIDE_CLASS_ALIAS_DESTINATION, value);
     }
 }
