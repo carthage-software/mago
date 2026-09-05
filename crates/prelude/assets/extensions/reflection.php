@@ -264,6 +264,8 @@ class ReflectionAttribute implements Reflector
 
     /**
      * @pure
+     *
+     * @return class-string<T>
      */
     public function getName(): string {}
 
@@ -305,7 +307,7 @@ class ReflectionClassConstant implements Reflector
     public string $name;
 
     /**
-     * @var class-name<T>
+     * @var class-string<T>
      *
      * @readonly
      */
@@ -456,7 +458,7 @@ class ReflectionProperty implements Reflector
     public string $name;
 
     /**
-     * @var class-name<T>
+     * @var class-string<T>
      *
      * @readonly
      */
@@ -464,7 +466,6 @@ class ReflectionProperty implements Reflector
 
     /**
      * @param class-string<T>|T $class
-     * @param string $property
      *
      * @throws ReflectionException
      */
@@ -1400,16 +1401,16 @@ class ReflectionClass implements Reflector
     public function newInstanceArgs(array $args = []): ?object {}
 
     /**
-     * @return ReflectionClass|false
-     *
      * @pure
+     *
+     * @return ReflectionClass|false
      */
     public function getParentClass(): ReflectionClass|false {}
 
     /**
-     * @param string|ReflectionClass $class
-     *
      * @pure
+     *
+     * @param ReflectionClass|class-string $class
      */
     public function isSubclassOf(ReflectionClass|string $class): bool {}
 
@@ -1442,6 +1443,8 @@ class ReflectionClass implements Reflector
 
     /**
      * @pure
+     *
+     * @param ReflectionClass|interface-string $interface
      */
     public function implementsInterface(ReflectionClass|string $interface): bool {}
 
@@ -1471,13 +1474,13 @@ class ReflectionClass implements Reflector
     public function getShortName(): string {}
 
     /**
+     * @pure
+     *
      * @template A
      *
      * @param class-string<A>|null $name
      *
      * @return list<ReflectionAttribute<A>>
-     *
-     * @pure
      */
     public function getAttributes(?string $name = null, int $flags = 0): array {}
 
@@ -1546,6 +1549,9 @@ class ReflectionObject extends ReflectionClass
 }
 
 #[Mago\AvailableSince(80100)]
+/**
+ * @extends ReflectionClass<UnitEnum|BackedEnum>
+ */
 class ReflectionEnum extends ReflectionClass
 {
     public function __construct(object|string $objectOrClass) {}
@@ -1553,7 +1559,7 @@ class ReflectionEnum extends ReflectionClass
     public function hasCase(string $name): bool {}
 
     /**
-     * @return list<ReflectionEnumUnitCase|ReflectionEnumBackedCase>
+     * @return list<T>
      */
     public function getCases(): array {}
 
@@ -1574,6 +1580,9 @@ class ReflectionEnum extends ReflectionClass
 }
 
 #[Mago\AvailableSince(80100)]
+/**
+ * @extends ReflectionClassConstant<UnitEnum>
+ */
 class ReflectionEnumUnitCase extends ReflectionClassConstant
 {
     public function __construct(object|string $class, string $constant) {}
@@ -1590,6 +1599,9 @@ class ReflectionEnumUnitCase extends ReflectionClassConstant
 }
 
 #[Mago\AvailableSince(80100)]
+/**
+ * @extends ReflectionEnumUnitCase<BackedEnum>
+ */
 class ReflectionEnumBackedCase extends ReflectionEnumUnitCase
 {
     public function __construct(object|string $class, string $constant) {}
