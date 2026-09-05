@@ -64,7 +64,7 @@ where
 
     /// Parse the Elvis conditional form `a ?: c`. The lexer fuses `?:`
     /// into a single `QuestionColon` token; we split its span into the
-    /// question-mark half and the colon half so the AST still reports
+    /// question-mark half and the colon half so the CST still reports
     /// both positions.
     pub(crate) fn parse_elvis(
         &mut self,

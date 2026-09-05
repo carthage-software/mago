@@ -205,7 +205,7 @@ impl ResolvedClassname {
     }
 }
 
-/// Resolves an AST `Expression` to one or more `ResolvedClassname` instances.
+/// Resolves a CST `Expression` to one or more `ResolvedClassname` instances.
 ///
 /// This function analyzes various forms of expressions that can represent a class name
 /// in PHP. For expressions that can resolve to a union of types (e.g., a variable

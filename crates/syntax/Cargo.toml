@@ -1,6 +1,6 @@
 [package]
 name = "mago-syntax"
-description = "A correct, fast, and memory-efficient PHP syntax implementation, including Lexer, Parser, AST, and utilities for Mago."
+description = "A correct, fast, and memory-efficient PHP syntax implementation, including Lexer, Parser, AST/CST, and utilities for Mago."
 version.workspace = true
 edition.workspace = true
 authors.workspace = true

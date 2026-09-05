@@ -1392,7 +1392,7 @@ fn resolve_special_assertion_target(
 ///
 /// # Returns
 /// A tuple containing:
-/// * `Option<&'a Expression>`: The argument's expression AST node, if found.
+/// * `Option<&'a Expression>`: The argument's expression CST node, if found.
 /// * `Option<Word>`: The unique ID of the argument expression (e.g., a variable name), if it can be determined.
 fn get_argument_for_parameter<'ctx, 'ast, 'arena, A>(
     context: &Context<'ctx, 'arena, A>,
