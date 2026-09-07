@@ -827,6 +827,7 @@
 <li>source text copies file bytes;</li>
 <li>target subtrees retain and encode more syntax;</li>
 <li>receiver and argument types serialize complete type information;</li>
+<li>variable definedness serializes the local scope at each target;</li>
 <li>all expression types can dominate large files.</li>
 </ul>
 <p>Request only values the hook reads. Use lazy <code>FileAnalysis</code> methods for uncommon branches rather than embedding expensive data for every matching file.</p>

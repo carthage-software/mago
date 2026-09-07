@@ -832,6 +832,7 @@
         FileAnalysisRequirement::ReceiverType,
         FileAnalysisRequirement::ArgumentTypes,
         FileAnalysisRequirement::TargetSubtree,
+        FileAnalysisRequirement::VariableDefinedness,
     ];
 }
 </code></pre>
@@ -841,6 +842,7 @@
 <tr><td style="text-align: left"><code>ArgumentTypes</code></td><td style="text-align: left">Populates <code>argumentTypes</code> in source order; individual entries may be <code>null</code></td></tr>
 <tr><td style="text-align: left"><code>TargetSubtree</code></td><td style="text-align: left">Retains the target's concrete-syntax descendants in <code>source</code></td></tr>
 <tr><td style="text-align: left"><code>SourceText</code></td><td style="text-align: left">Retains exact in-memory file bytes and all comment trivia in <code>source</code></td></tr>
+<tr><td style="text-align: left"><code>VariableDefinedness</code></td><td style="text-align: left">Enables <code>getVariableDefinedness()</code> for locals immediately before the target executes</td></tr>
 <tr><td style="text-align: left"><code>ExpressionTypes</code></td><td style="text-align: left">Embeds every file expression type in <code>analysis</code>; generally an after-file concern</td></tr>
 </tbody></table>
 <p>Without <code>TargetSubtree</code>, each selected target is retained as a standalone node without its ancestors or descendants. With <code>TargetSubtree</code>, that target's descendants are retained too. Without <code>SourceText</code>, <code>SourceFile::$contents</code> is an empty string and comment trivia is omitted. Resolved names are limited to the retained target ranges. If a hook only needs the node kind, span, and semantic type, request neither.</p>
@@ -854,8 +856,10 @@
 <tr><td style="text-align: left"><code>targetType</code></td><td style="text-align: left">Requested target expression type, or <code>null</code></td></tr>
 <tr><td style="text-align: left"><code>receiverType</code></td><td style="text-align: left">Requested direct receiver type, or <code>null</code></td></tr>
 <tr><td style="text-align: left"><code>argumentTypes</code></td><td style="text-align: left">Requested direct argument types, otherwise an empty list</td></tr>
+<tr><td style="text-align: left"><code>getVariableDefinedness()</code></td><td style="text-align: left">Returns <code>Defined</code>, <code>PossiblyDefined</code>, or <code>Undefined</code>; <code>null</code> when unavailable</td></tr>
 <tr><td style="text-align: left">lifecycle members</td><td style="text-align: left">PHP version, codebase, type comparator, cancellation, and <code>report()</code></td></tr>
 </tbody></table>
+<p>Variable names passed to <code>getVariableDefinedness()</code> may include or omit the leading <code>$</code>. Request <code>VariableDefinedness</code> before relying on the result; skipped, unanalyzed targets return <code>null</code>.</p>
 <p>Within one plugin callback, the plugin's after-file hooks run first and its targeted hooks then share that same file-scoped reference registry. Different plugins receive separate registries; Mago merges every plugin's contributions with the file result and replaces them if that file is reanalyzed.</p>
 <h2 id="example">Example</h2>
 <pre><code class="language-php">&lt;?php
