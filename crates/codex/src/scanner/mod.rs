@@ -48,6 +48,7 @@ use crate::metadata::CodebaseMetadata;
 use crate::metadata::flags::MetadataFlags;
 use crate::metadata::function_like::FunctionLikeKind;
 use crate::metadata::function_like::FunctionLikeMetadata;
+use crate::scanner::class_alias::scan_class_like_alias;
 use crate::scanner::class_like::register_anonymous_class;
 use crate::scanner::class_like::register_class;
 use crate::scanner::class_like::register_enum;
@@ -67,6 +68,7 @@ mod assertion_inference;
 mod attribute;
 use crate::issue::ScanningIssueKind;
 use crate::ttype::error::TypeError;
+mod class_alias;
 mod class_like;
 mod class_like_constant;
 mod constant;
@@ -465,6 +467,40 @@ where
         function_call: &'arena FunctionCall<'arena>,
         context: &mut Context<'ctx, 'arena, A>,
     ) {
+        let Expression::Identifier(identifier) = function_call.function.unparenthesized() else {
+            return;
+        };
+
+        let function_name = identifier.value();
+        let is_class_alias = matches!(function_name.len(), 11 | 12)
+            && (function_name.eq_ignore_ascii_case(b"class_alias")
+                || function_name.eq_ignore_ascii_case(b"\\class_alias"));
+
+        if is_class_alias {
+            let current_class = self.stack.last().copied();
+            let parent_class = current_class
+                .and_then(|class| self.codebase.class_likes.get(&class))
+                .and_then(|metadata| metadata.direct_parent_class);
+            let Some((alias, target, span)) =
+                scan_class_like_alias(function_call, context, &self.scope, current_class, parent_class)
+            else {
+                return;
+            };
+
+            let mut flags = MetadataFlags::origin_flags(context.file.file_type);
+            if self.polyfill_depth > 0 {
+                flags |= MetadataFlags::POLYFILL;
+            }
+
+            self.codebase.add_class_like_alias(alias, target, span, flags);
+
+            return;
+        }
+
+        if function_name != b"define" {
+            return;
+        }
+
         let Some(mut constant_metadata) =
             scan_defined_constant(function_call, context, &self.get_current_type_resolution_context(), &self.scope)
         else {
@@ -1185,5 +1221,44 @@ mod tests {
             tc.direct_parent_class.map(|p| p.to_string()),
             Some("PHPUnit\\Framework\\Assert".to_ascii_lowercase()),
         );
+    }
+
+    #[test]
+    fn scans_class_like_aliases() {
+        let mut codebase = scan(
+            r#"<?php
+            namespace App;
+
+            class Original {}
+            class Existing {}
+
+            class_alias(Original::class, Alias::class);
+            class_alias(Alias::class, 'App\Chain');
+            class_alias(Original::class, Existing::class);
+            class_alias('App\Missing', 'App\MissingAlias');
+            class_alias('App\CycleB', 'App\CycleA');
+            class_alias('App\CycleA', 'App\CycleB');
+        "#,
+        );
+
+        assert!(codebase.populate_class_like_aliases());
+
+        let original = ascii_lowercase_word(b"App\\Original");
+        let alias = ascii_lowercase_word(b"App\\Alias");
+        let chain = ascii_lowercase_word(b"App\\Chain");
+        let existing = ascii_lowercase_word(b"App\\Existing");
+        let missing = ascii_lowercase_word(b"App\\MissingAlias");
+        let cycle_a = ascii_lowercase_word(b"App\\CycleA");
+        let cycle_b = ascii_lowercase_word(b"App\\CycleB");
+
+        assert_eq!(codebase.class_like_aliases.get(&alias), Some(&original));
+        assert_eq!(codebase.class_like_aliases.get(&chain), Some(&original));
+        assert!(!codebase.class_like_aliases.contains_key(&existing));
+        assert!(!codebase.class_like_aliases.contains_key(&missing));
+        assert!(!codebase.class_like_aliases.contains_key(&cycle_a));
+        assert!(!codebase.class_like_aliases.contains_key(&cycle_b));
+        assert!(codebase.class_likes[&original].aliases.contains(&alias));
+        assert!(codebase.class_likes[&original].aliases.contains(&chain));
+        assert_eq!(codebase.symbols.get_kind(alias), Some(crate::symbol::SymbolKind::Class));
     }
 }

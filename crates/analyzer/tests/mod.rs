@@ -2743,6 +2743,7 @@ test_case!(issue_2312);
 test_case!(issue_2315);
 test_case!(issue_2317);
 test_case!(issue_2318);
+test_case!(issue_2323);
 test_case!(issue_2331);
 test_case!(issue_2333);
 
