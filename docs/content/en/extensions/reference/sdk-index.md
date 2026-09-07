@@ -146,6 +146,8 @@ Targets are `PropertyTarget` and `ClassTarget`. See [Properties and initializati
 
 All receive `NodeAnalysisContext`. See [Targeted analysis hooks](/extensions/analyzer/targeted-analysis-hooks/).
 
+`VariableDefinedness` reports whether a local is defined, possibly defined, or undefined before a targeted node.
+
 ## Entry points and filters
 
 `AttributedEntryPoint`, `ClassTarget`, and `MethodTarget` describe native framework entry points. `IssueFilterHook`, `IssueFilterContext`, and `IssueFilterDecision` implement targeted last-resort filtering. See [Entry points and issue filtering](/extensions/analyzer/entry-points-and-issue-filtering/).

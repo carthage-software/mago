@@ -10,6 +10,7 @@ use mago_syntax::cst::Call;
 use mago_syntax::cst::Expression;
 use mago_syntax::cst::ExpressionStatement;
 use mago_syntax::cst::FunctionCall;
+use mago_syntax::cst::Node;
 use mago_syntax::cst::Statement;
 use mago_word::Word;
 
@@ -54,6 +55,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Statement<'arena> {
     {
         let last_statement_span = context.statement_span;
         context.statement_span = self.span();
+        artifacts.record_variable_definedness(Node::Statement(self), block_context);
 
         // Call plugin before_statement hooks
         if context.plugin_registry.has_statement_hooks() {

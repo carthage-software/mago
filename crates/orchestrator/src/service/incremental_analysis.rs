@@ -1349,6 +1349,9 @@ impl IncrementalAnalysisService {
                 let semantics_checker = SemanticsChecker::new(settings.version);
                 let mut analyzer =
                     Analyzer::new(arena, &source_file, &resolved_names, codebase, plugin_registry, settings.clone());
+                if let Some(requirements) = node_analysis_requirements.as_ref() {
+                    analyzer = analyzer.with_node_analysis_requirements(requirements);
+                }
                 if after_file || after_analysis {
                     analyzer = analyzer.with_deferred_pragmas();
                 }

@@ -28,4 +28,7 @@ enum FileAnalysisRequirement
 
     /** Embed the exact source text of files containing targeted nodes. */
     case SourceText;
+
+    /** Embed local-variable definedness immediately before each targeted node executes. */
+    case VariableDefinedness;
 }

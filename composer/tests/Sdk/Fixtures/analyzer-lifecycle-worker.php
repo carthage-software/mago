@@ -35,6 +35,7 @@ use Mago\Sdk\Analyzer\Type\CallableType;
 use Mago\Sdk\Analyzer\Type\FunctionLikeIdentifier;
 use Mago\Sdk\Analyzer\Type\FunctionLikeKind as IdentifierKind;
 use Mago\Sdk\Analyzer\TypeComparison;
+use Mago\Sdk\Analyzer\VariableDefinedness;
 use Mago\Sdk\Extension;
 use Mago\Sdk\Reporting\Issue;
 use Mago\Sdk\Reporting\Level;
@@ -109,16 +110,32 @@ final class LifecycleProofPlugin implements
             FileAnalysisRequirement::ArgumentTypes,
             FileAnalysisRequirement::TargetSubtree,
             FileAnalysisRequirement::SourceText,
+            FileAnalysisRequirement::VariableDefinedness,
         ];
     }
 
     public function getTargets(): array
     {
-        return [NodeKind::FunctionCall, NodeKind::MethodCall];
+        return [NodeKind::FunctionCall, NodeKind::MethodCall, NodeKind::For, NodeKind::Foreach];
     }
 
     public function analyze(NodeAnalysisContext $context): void
     {
+        if ($context->node->kind === NodeKind::For || $context->node->kind === NodeKind::Foreach) {
+            if (
+                $context->getVariableDefinedness('definedBeforeLoop') !== VariableDefinedness::Defined
+                || $context->getVariableDefinedness('$possiblyDefinedBeforeLoop')
+                    !== VariableDefinedness::PossiblyDefined
+                || $context->getVariableDefinedness('undefinedBeforeLoop') !== VariableDefinedness::Undefined
+            ) {
+                throw new RuntimeException('A targeted loop hook received inconsistent variable definedness.');
+            }
+
+            $this->record('node', $context->analysis->file);
+
+            return;
+        }
+
         if (
             $context->node->kind !== NodeKind::FunctionCall && $context->node->kind !== NodeKind::MethodCall
             || $context->source->path !== $context->analysis->file
@@ -704,6 +721,7 @@ final class LifecycleClassLikeHook implements ClassLikeAnalysisHook
         if (
             $context->node->kind !== NodeKind::Class_
             || !str_contains($context->source->getText($context->node->span), 'class LifecycleClass0')
+            || $context->getVariableDefinedness('unrequested') !== null
         ) {
             throw new RuntimeException('A descendant class-like hook received an unrelated declaration.');
         }

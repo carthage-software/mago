@@ -1,4 +1,5 @@
 use std::rc::Rc;
+use std::sync::Arc;
 
 use foldhash::HashMap;
 use foldhash::HashSet;
@@ -10,10 +11,20 @@ use mago_algebra::assertion_set::AssertionSet;
 use mago_codex::reference::SymbolReferences;
 use mago_codex::ttype::union::TUnion;
 use mago_span::HasSpan;
+use mago_span::Span;
+use mago_syntax::cst::Node;
 
+use crate::context::block::BlockContext;
 use crate::context::scope::case_scope::CaseScope;
 use crate::context::scope::loop_scope::LoopScope;
 use crate::readonly::PendingReadonlyPropertyWrite;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+#[repr(u8)]
+pub(crate) enum VariableDefinedness {
+    Defined = 1,
+    PossiblyDefined = 2,
+}
 
 /// Represents scope information extracted from a `Closure::bind()` or `Closure::bindTo()` call.
 /// This is used to pass the bound class scope to closure/arrow function analysis.
@@ -53,6 +64,8 @@ pub struct AnalysisArtifacts {
     pub method_calls_parent_initializer: HashMap<(Word, Word), Word>,
     pub closure_bind_scope: Option<ClosureBindScope>,
     pub resolved_method_calls: Vec<ResolvedMethodCall>,
+    pub(crate) variable_definedness: HashMap<(u32, u32), WordMap<VariableDefinedness>>,
+    variable_definedness_targets: Option<Arc<[bool; u8::MAX as usize + 1]>>,
     pub(crate) pending_readonly_property_writes: Vec<PendingReadonlyPropertyWrite>,
 }
 
@@ -84,8 +97,59 @@ impl AnalysisArtifacts {
             method_calls_parent_initializer: HashMap::default(),
             closure_bind_scope: None,
             resolved_method_calls: Vec::new(),
+            variable_definedness: HashMap::default(),
+            variable_definedness_targets: None,
             pending_readonly_property_writes: Vec::new(),
         }
+    }
+
+    pub(crate) fn with_variable_definedness_targets(
+        mut self,
+        targets: Option<Arc<[bool; u8::MAX as usize + 1]>>,
+    ) -> Self {
+        self.variable_definedness_targets = targets;
+        self
+    }
+
+    pub(crate) fn variable_definedness_targets(&self) -> Option<Arc<[bool; u8::MAX as usize + 1]>> {
+        self.variable_definedness_targets.clone()
+    }
+
+    #[inline]
+    pub(crate) fn record_variable_definedness(&mut self, node: Node<'_, '_>, block_context: &BlockContext<'_>) {
+        let Some(targets) = self.variable_definedness_targets.as_deref() else {
+            return;
+        };
+
+        let span = node.span();
+        if !node_or_same_span_descendant_is_targeted(node, span, targets) {
+            return;
+        }
+
+        let mut variables = WordMap::default();
+        for (variable, variable_type) in &block_context.locals {
+            if !is_plain_variable(*variable) {
+                continue;
+            }
+
+            let definedness = if variable_type.possibly_undefined_from_try()
+                || variable_type.possibly_undefined()
+                    && block_context.possibly_undefined_variable_ids.contains(variable)
+            {
+                VariableDefinedness::PossiblyDefined
+            } else {
+                VariableDefinedness::Defined
+            };
+            variables.insert(*variable, definedness);
+        }
+
+        for variable in &block_context.variables_possibly_in_scope {
+            if is_plain_variable(*variable) {
+                variables.entry(*variable).or_insert(VariableDefinedness::PossiblyDefined);
+            }
+        }
+
+        self.variable_definedness.insert((span.start.offset, span.end.offset), variables);
     }
 
     pub(crate) fn set_loop_scope(&mut self, loop_scope: LoopScope) {
@@ -164,6 +228,33 @@ impl AnalysisArtifacts {
     {
         self.expression_types.get(&get_expression_range(expression))
     }
+}
+
+fn node_or_same_span_descendant_is_targeted(
+    node: Node<'_, '_>,
+    span: Span,
+    targets: &[bool; u8::MAX as usize + 1],
+) -> bool {
+    if targets[node.kind() as usize] {
+        return true;
+    }
+
+    let mut targeted = false;
+    node.visit_children(|child| {
+        if !targeted && child.span() == span {
+            targeted = node_or_same_span_descendant_is_targeted(child, span, targets);
+        }
+    });
+
+    targeted
+}
+
+fn is_plain_variable(variable: Word) -> bool {
+    let bytes = variable.as_bytes();
+
+    bytes.starts_with(b"$")
+        && !bytes.contains(&b'[')
+        && !bytes.windows(2).any(|window| window == b"->" || window == b"::")
 }
 
 #[inline]

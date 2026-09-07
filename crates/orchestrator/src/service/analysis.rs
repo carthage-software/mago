@@ -163,6 +163,9 @@ impl AnalysisService {
         let mut analysis_result = AnalysisResult::new(self.symbol_references);
         let mut analyzer =
             Analyzer::new(&arena, &file, &resolved_names, &self.codebase, &self.plugin_registry, self.settings);
+        if let Some(requirements) = node_analysis_requirements.as_ref() {
+            analyzer = analyzer.with_node_analysis_requirements(requirements);
+        }
         if after_file || after_analysis {
             analyzer = analyzer.with_deferred_pragmas();
         }
@@ -364,6 +367,9 @@ impl AnalysisService {
                 let analyzer_new_start = trace_enabled.then(Instant::now);
                 let mut analyzer =
                     Analyzer::new(arena, &source_file, &resolved_names, &codebase, &plugin_registry, settings);
+                if let Some(requirements) = node_analysis_requirements.as_ref() {
+                    analyzer = analyzer.with_node_analysis_requirements(requirements);
+                }
                 if after_file || after_analysis {
                     analyzer = analyzer.with_deferred_pragmas();
                 }
