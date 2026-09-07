@@ -41,7 +41,7 @@ final class FrameCodecTest extends TestCase
         fclose($input);
 
         self::assertNotNull($frame);
-        self::assertSame(42, $frame->id);
-        self::assertSame("payload\0", $frame->payload);
+        self::assertSame(42, $frame?->id);
+        self::assertSame("payload\0", $frame?->payload);
     }
 }

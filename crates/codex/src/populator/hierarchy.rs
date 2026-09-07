@@ -162,7 +162,7 @@ pub fn populate_class_like_metadata_iterative(
 
     let pending_imports = std::mem::take(&mut metadata.imported_type_aliases);
     for (local_name, (source_class_name, imported_type, import_span)) in pending_imports {
-        if let Some(source_class) = codebase.class_likes.get(&source_class_name) {
+        if let Some(source_class) = codebase.get_class_like_by_word(source_class_name) {
             if source_class.type_aliases.contains_key(&imported_type) {
                 let alias_metadata = TypeMetadata {
                     span: import_span,
