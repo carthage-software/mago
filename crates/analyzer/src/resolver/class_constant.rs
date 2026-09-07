@@ -187,6 +187,37 @@ where
         return None;
     }
 
+    let generic_class_string = if class_resolution.is_object_instance() || class_resolution.is_from_any_object() {
+        artifacts.get_expression_type(class_expr).and_then(|expression_type| {
+            if !expression_type.is_single() {
+                return None;
+            }
+
+            let TAtomic::GenericParameter(TGenericParameter { parameter_name, defining_entity, constraint, .. }) =
+                expression_type.get_single()
+            else {
+                return None;
+            };
+
+            Some(TUnion::from_vec(
+                constraint
+                    .types
+                    .iter()
+                    .map(|constraint| {
+                        TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::generic(
+                            TClassLikeStringKind::Class,
+                            *parameter_name,
+                            *defining_entity,
+                            constraint.clone(),
+                        )))
+                    })
+                    .collect(),
+            ))
+        })
+    } else {
+        None
+    };
+
     let class_string = match class_resolution.fqcn {
         Some(fq_class_id) => {
             if matches!(class_resolution.origin, ResolutionOrigin::Named { is_self: false, is_parent: false })
@@ -196,6 +227,10 @@ where
             }
 
             artifacts.symbol_references.add_reference_to_symbol(&block_context.scope, fq_class_id, false);
+
+            if let Some(generic_class_string) = generic_class_string {
+                return Some(generic_class_string);
+            }
 
             if class_resolution.is_final
                 || class_resolution.is_from_literal_class_string()
@@ -210,25 +245,8 @@ where
             }
         }
         None => {
-            if let Some(expr_type) = artifacts.get_expression_type(class_expr) {
-                for atomic in expr_type.types.as_ref() {
-                    if let TAtomic::GenericParameter(TGenericParameter {
-                        parameter_name,
-                        defining_entity,
-                        constraint,
-                        ..
-                    }) = atomic
-                    {
-                        return Some(wrap_atomic(TAtomic::Scalar(TScalar::ClassLikeString(
-                            TClassLikeString::generic(
-                                TClassLikeStringKind::Class,
-                                *parameter_name,
-                                *defining_entity,
-                                constraint.get_single().clone(),
-                            ),
-                        ))));
-                    }
-                }
+            if let Some(generic_class_string) = generic_class_string {
+                return Some(generic_class_string);
             }
 
             return Some(get_class_string());
