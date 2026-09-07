@@ -41,6 +41,8 @@ pub type TemplateTypes = IndexMap<Word, GenericTemplate, RandomState>;
 pub struct ClassLikeMetadata {
     pub name: Word,
     pub original_name: Word,
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub aliases: Vec<Word>,
     pub span: Span,
     pub direct_parent_interfaces: WordSet,
     pub all_parent_interfaces: WordSet,
@@ -196,6 +198,7 @@ impl ClassLikeMetadata {
             trait_final_map: WordSet::default(),
             name,
             original_name,
+            aliases: Vec::new(),
             child_class_likes: None,
             template_readonly: WordSet::default(),
             has_sealed_methods: None,
@@ -907,6 +910,7 @@ impl ClassLikeMetadata {
 
     #[inline]
     pub fn shrink_to_fit(&mut self) {
+        self.aliases.shrink_to_fit();
         self.properties.shrink_to_fit();
         self.magic_properties.shrink_to_fit();
         self.magic_property_ids.shrink_to_fit();
