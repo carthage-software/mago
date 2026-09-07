@@ -15,6 +15,7 @@ use mago_allocator::Arena;
 use mago_reporting::IssueCollection;
 
 use mago_algebra::saturate_clauses;
+use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::ttype;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::add_optional_union_type;
@@ -27,6 +28,7 @@ use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::bool::TBool;
 use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::combine_union_types;
+use mago_codex::ttype::combine_union_types_preserving_array_shapes;
 use mago_codex::ttype::combine_union_types_rc;
 use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::get_array_parameters;
@@ -61,6 +63,7 @@ use crate::context::block::BlockContext;
 use crate::context::block::BreakContext;
 use crate::context::scope::control_action::ControlAction;
 use crate::context::scope::loop_scope::LoopScope;
+use crate::context::scope::var_has_root;
 use crate::context::utils::inherit_branch_context_properties;
 use crate::error::AnalysisError;
 use crate::formula::get_formula;
@@ -604,6 +607,11 @@ where
             let mut different_from_pre_loop_types = HashSet::default();
 
             for (variable_id, continue_context_type) in continue_context.locals.clone() {
+                let has_self_descending_reference = continue_context
+                    .references_in_scope
+                    .get(&variable_id)
+                    .is_some_and(|referenced| *referenced != variable_id && var_has_root(*referenced, variable_id));
+
                 if always_assigned_before_loop_body_variables.contains(&variable_id) {
                     // set the variables to whatever the while/foreach loop expects them to be
                     if let Some(pre_loop_context_type) = pre_loop_context.locals.get(&variable_id) {
@@ -616,15 +624,18 @@ where
                     }
                 } else if let Some(parent_context_type) = original_parent_context.locals.get(&variable_id) {
                     if continue_context_type != *parent_context_type {
-                        has_changes = true;
+                        if !has_self_descending_reference {
+                            has_changes = true;
+                        }
 
                         continue_context.locals.insert(
                             variable_id,
-                            Rc::new(simplify_generic_subset_arrays(combine_union_types(
+                            Rc::new(simplify_generic_subset_arrays(combine_loop_types(
                                 &continue_context_type,
                                 parent_context_type,
                                 context.codebase,
                                 CombinerOptions::default(),
+                                has_self_descending_reference,
                             ))),
                         );
 
@@ -636,13 +647,16 @@ where
                     if let Some(loop_context_type) = loop_context.locals.get(&variable_id)
                         && continue_context_type != *loop_context_type
                     {
-                        has_changes = true;
+                        if !has_self_descending_reference {
+                            has_changes = true;
+                        }
 
-                        let combined = combine_union_types(
+                        let combined = combine_loop_types(
                             &continue_context_type,
                             loop_context_type,
                             codebase,
                             CombinerOptions::default(),
+                            has_self_descending_reference,
                         );
 
                         let combined = simplify_generic_subset_arrays(combined);
@@ -661,12 +675,15 @@ where
                         let existing = continue_context.locals.get(&variable_id).cloned();
                         let combined = match existing {
                             Some(existing_type) if existing_type.as_ref() != byref_type.as_ref() => {
-                                has_changes = true;
-                                simplify_generic_subset_arrays(combine_union_types(
+                                if !has_self_descending_reference {
+                                    has_changes = true;
+                                }
+                                simplify_generic_subset_arrays(combine_loop_types(
                                     &existing_type,
                                     byref_type,
                                     codebase,
                                     CombinerOptions::default(),
+                                    has_self_descending_reference,
                                 ))
                             }
                             Some(existing_type) => (*existing_type).clone(),
@@ -834,6 +851,13 @@ where
     let does_sometimes_break = loop_scope.final_actions.contains(ControlAction::Break);
     let does_sometimes_continue = loop_scope.final_actions.contains(ControlAction::Continue);
     let does_always_break = does_sometimes_break && loop_scope.final_actions.len() == 1;
+    let preserve_array_shapes_for = continue_context
+        .references_in_scope
+        .iter()
+        .filter_map(|(reference, referenced)| {
+            (*reference != *referenced && var_has_root(*referenced, *reference)).then_some(*reference)
+        })
+        .collect::<WordSet>();
 
     let can_overwrite_empty_array = always_enters_loop.get() && !does_sometimes_break && !does_sometimes_continue;
     if does_sometimes_break {
@@ -844,7 +868,7 @@ where
                     *do_context_type = if do_context_type == possibly_redefined_variable_type {
                         Rc::clone(possibly_redefined_variable_type)
                     } else {
-                        Rc::new(combine_union_types(
+                        Rc::new(combine_loop_types(
                             possibly_redefined_variable_type,
                             do_context_type,
                             codebase,
@@ -852,6 +876,7 @@ where
                                 overwrite_empty_array: can_overwrite_empty_array,
                                 ..CombinerOptions::default()
                             },
+                            preserve_array_shapes_for.contains(variable_id),
                         ))
                     };
                 }
@@ -863,7 +888,7 @@ where
         } else {
             for (variable_id, variable_type) in &loop_scope.possibly_redefined_loop_parent_variables {
                 if let Some(loop_parent_context_type) = loop_parent_context.locals.get_mut(variable_id) {
-                    *loop_parent_context_type = combine_union_types_rc(
+                    *loop_parent_context_type = Rc::new(combine_loop_types(
                         variable_type,
                         loop_parent_context_type,
                         codebase,
@@ -871,7 +896,8 @@ where
                             overwrite_empty_array: can_overwrite_empty_array,
                             ..CombinerOptions::default()
                         },
-                    );
+                        preserve_array_shapes_for.contains(variable_id),
+                    ));
                 }
 
                 loop_parent_context.possibly_assigned_variable_ids.insert(*variable_id);
@@ -884,7 +910,7 @@ where
             if loop_context_type != variable_type {
                 loop_parent_context.locals.insert(
                     *variable_id,
-                    combine_union_types_rc(
+                    Rc::new(combine_loop_types(
                         variable_type,
                         loop_context_type,
                         codebase,
@@ -892,7 +918,8 @@ where
                             overwrite_empty_array: can_overwrite_empty_array,
                             ..CombinerOptions::default()
                         },
-                    ),
+                        preserve_array_shapes_for.contains(variable_id),
+                    )),
                 );
 
                 loop_parent_context.remove_variable_from_conflicting_clauses(context, *variable_id, None);
@@ -913,7 +940,7 @@ where
                 } else if continue_context_type != &variable_type {
                     loop_parent_context.locals.insert(
                         variable_id,
-                        Rc::new(combine_union_types(
+                        Rc::new(combine_loop_types(
                             &variable_type,
                             continue_context_type,
                             codebase,
@@ -921,6 +948,7 @@ where
                                 overwrite_empty_array: can_overwrite_empty_array,
                                 ..CombinerOptions::default()
                             },
+                            preserve_array_shapes_for.contains(&variable_id),
                         )),
                     );
                     loop_parent_context.remove_variable_from_conflicting_clauses(context, variable_id, None);
@@ -995,7 +1023,7 @@ where
                 {
                     loop_parent_context.locals.insert(
                         *variable_id,
-                        Rc::new(combine_union_types(
+                        Rc::new(combine_loop_types(
                             variable_type,
                             possibly_defined_type,
                             codebase,
@@ -1003,6 +1031,7 @@ where
                                 overwrite_empty_array: can_overwrite_empty_array,
                                 ..CombinerOptions::default()
                             },
+                            preserve_array_shapes_for.contains(variable_id),
                         )),
                     );
                 } else if let Some(possibly_redefined_type) =
@@ -1010,7 +1039,7 @@ where
                 {
                     loop_parent_context.locals.insert(
                         *variable_id,
-                        Rc::new(combine_union_types(
+                        Rc::new(combine_loop_types(
                             variable_type,
                             possibly_redefined_type,
                             codebase,
@@ -1018,6 +1047,7 @@ where
                                 overwrite_empty_array: can_overwrite_empty_array,
                                 ..CombinerOptions::default()
                             },
+                            preserve_array_shapes_for.contains(variable_id),
                         )),
                     );
                 }
@@ -1680,6 +1710,20 @@ where
     // every atomic in the iterator type is iterable; no diagnostic needed
 
     Ok((always_enters_loop, key_type.unwrap_or_else(get_mixed), value_type.unwrap_or_else(get_mixed)))
+}
+
+fn combine_loop_types(
+    left: &TUnion,
+    right: &TUnion,
+    codebase: &CodebaseMetadata,
+    options: CombinerOptions,
+    preserve_array_shapes: bool,
+) -> TUnion {
+    if preserve_array_shapes {
+        return combine_union_types_preserving_array_shapes(left, right, codebase, options);
+    }
+
+    combine_union_types(left, right, codebase, options)
 }
 
 /// Removes generic keyed arrays from a union when their value parameter shape is a

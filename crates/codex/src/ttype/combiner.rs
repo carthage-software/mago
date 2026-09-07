@@ -132,6 +132,36 @@ impl CombinerOptions {
     }
 }
 
+pub fn combine_preserving_array_shapes(
+    types: Vec<TAtomic>,
+    codebase: &CodebaseMetadata,
+    options: CombinerOptions,
+) -> Vec<TAtomic> {
+    if types.iter().filter(|atomic| atomic.is_array()).count() < 2 {
+        return combine(types, codebase, options);
+    }
+
+    let (mut array_types, other_types): (Vec<_>, Vec<_>) = types.into_iter().partition(TAtomic::is_array);
+    let mut combined_types = if other_types.is_empty() { Vec::new() } else { combine(other_types, codebase, options) };
+
+    if combined_types.iter().any(|atomic| matches!(atomic, TAtomic::Mixed(mixed) if mixed.is_vanilla())) {
+        return combined_types;
+    }
+
+    combined_types.retain(|atomic| !atomic.is_never());
+    for atomic in &mut combined_types {
+        if matches!(atomic, TAtomic::Void) {
+            *atomic = TAtomic::Null;
+        }
+    }
+
+    combined_types.append(&mut array_types);
+    combined_types.sort_unstable();
+    combined_types.dedup();
+
+    combined_types
+}
+
 pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, options: CombinerOptions) -> Vec<TAtomic> {
     if types.is_empty() {
         debug_assert!(false, "combine() received an empty Vec; this is a caller bug");
