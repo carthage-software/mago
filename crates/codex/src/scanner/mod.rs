@@ -7,7 +7,7 @@ use mago_php_version::PHPVersion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
-use mago_syntax::comments::docblock::get_docblock_for_node;
+use mago_syntax::comments::docblock::get_docblock_before_position;
 use mago_syntax::cst::AnonymousClass;
 use mago_syntax::cst::ArrowFunction;
 use mago_syntax::cst::Call;
@@ -24,6 +24,7 @@ use mago_syntax::cst::Interface;
 use mago_syntax::cst::Method;
 use mago_syntax::cst::Namespace;
 use mago_syntax::cst::Program;
+use mago_syntax::cst::Return;
 use mago_syntax::cst::Trait;
 use mago_syntax::cst::Trivia;
 use mago_syntax::cst::UnaryPrefix;
@@ -140,7 +141,22 @@ where
     }
 
     pub fn get_docblock(&self, node: impl HasSpan) -> Option<&'arena Trivia<'arena>> {
-        get_docblock_for_node(self.program, node)
+        self.get_docblock_before(node.span().start.offset)
+    }
+
+    pub fn get_docblock_before(&self, start_offset: u32) -> Option<&'arena Trivia<'arena>> {
+        get_docblock_before_position(self.program.trivia.as_slice(), start_offset)
+    }
+
+    pub fn get_docblock_in_range(&self, start_offset: u32, end_offset: u32) -> Option<&'arena Trivia<'arena>> {
+        let trivia = self.program.trivia.as_slice();
+        let end = trivia.partition_point(|trivia| trivia.span.start.offset < end_offset);
+
+        trivia[..end]
+            .iter()
+            .rev()
+            .take_while(|trivia| trivia.span.start.offset >= start_offset)
+            .find(|trivia| trivia.kind.is_docblock())
     }
 }
 
@@ -157,6 +173,7 @@ struct Scanner {
     file_type_aliases: WordSet,
     file_imported_aliases: WordMap<(Word, Word)>,
     polyfill_depth: u32,
+    return_docblock_starts: Vec<Option<u32>>,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -359,6 +376,10 @@ where
 
     #[inline]
     fn walk_in_closure(&mut self, closure: &'arena Closure<'arena>, context: &mut Context<'ctx, 'arena, A>) {
+        if let Some(docblock_start) = self.return_docblock_starts.last_mut() {
+            docblock_start.take();
+        }
+
         let span = closure.span();
 
         let synthetic = crate::build_synthetic_name("closure", context.file, span);
@@ -391,6 +412,10 @@ where
         arrow_function: &'arena ArrowFunction<'arena>,
         context: &mut Context<'ctx, 'arena, A>,
     ) {
+        if let Some(docblock_start) = self.return_docblock_starts.last_mut() {
+            docblock_start.take();
+        }
+
         let span = arrow_function.span();
 
         let synthetic = crate::build_synthetic_name("closure", context.file, span);
@@ -459,8 +484,14 @@ where
         anonymous_class: &'arena AnonymousClass<'arena>,
         context: &mut Context<'ctx, 'arena, A>,
     ) {
+        let docblock_start = self
+            .return_docblock_starts
+            .last_mut()
+            .and_then(Option::take)
+            .unwrap_or_else(|| anonymous_class.span().start.offset);
+
         if let Some((id, template_definition, type_aliases, imported_aliases)) =
-            register_anonymous_class(&mut self.codebase, anonymous_class, context, &mut self.scope)
+            register_anonymous_class(&mut self.codebase, anonymous_class, docblock_start, context, &mut self.scope)
         {
             self.apply_polyfill_flag_to_class_like(id);
             self.file_type_aliases.extend(type_aliases);
@@ -470,6 +501,16 @@ where
 
             walk_anonymous_class_mut(self, anonymous_class, context);
         }
+    }
+
+    #[inline]
+    fn walk_in_return(&mut self, r#return: &'arena Return<'arena>, _context: &mut Context<'ctx, 'arena, A>) {
+        self.return_docblock_starts.push(Some(r#return.span().start.offset));
+    }
+
+    #[inline]
+    fn walk_out_return(&mut self, _return: &'arena Return<'arena>, _context: &mut Context<'ctx, 'arena, A>) {
+        self.return_docblock_starts.pop().expect("Expected return stack to be non-empty");
     }
 
     #[inline]

@@ -55,6 +55,7 @@ use crate::scanner::attribute::scan_attribute_lists;
 use crate::scanner::class_like_constant::scan_class_like_constants;
 use crate::scanner::docblock::apply_common_metadata_flag;
 use crate::scanner::docblock::parse_docblock;
+use crate::scanner::docblock::parse_docblock_trivia;
 use crate::scanner::enum_case::scan_enum_case;
 use crate::scanner::property::scan_properties;
 use crate::scanner::ttype::get_type_metadata_from_type;
@@ -87,6 +88,7 @@ type ClassLikeRegistration = Option<(Word, TemplateConstraintList, WordSet, Word
 pub fn register_anonymous_class<'arena, A>(
     codebase: &mut CodebaseMetadata,
     class: &'arena AnonymousClass<'arena>,
+    docblock_start: u32,
     context: &mut Context<'_, 'arena, A>,
     scope: &mut NamespaceScope,
 ) -> ClassLikeRegistration
@@ -102,6 +104,8 @@ where
         SymbolKind::Class,
         None,
         span,
+        docblock_start,
+        class.left_brace.start.offset,
         &class.attribute_lists,
         Some(&class.modifiers),
         &class.members,
@@ -125,12 +129,15 @@ pub fn register_class<'arena, A>(
 where
     A: Arena,
 {
+    let span = class.span();
     let class_like_metadata = scan_class_like(
         codebase,
         word(context.resolved_names.get(&class.name)),
         SymbolKind::Class,
         Some(class.name.span),
-        class.span(),
+        span,
+        span.start.offset,
+        class.left_brace.start.offset,
         &class.attribute_lists,
         Some(&class.modifiers),
         &class.members,
@@ -154,12 +161,15 @@ pub fn register_interface<'arena, A>(
 where
     A: Arena,
 {
+    let span = interface.span();
     let class_like_metadata = scan_class_like(
         codebase,
         word(context.resolved_names.get(&interface.name)),
         SymbolKind::Interface,
         Some(interface.name.span),
-        interface.span(),
+        span,
+        span.start.offset,
+        interface.left_brace.start.offset,
         &interface.attribute_lists,
         None,
         &interface.members,
@@ -183,12 +193,15 @@ pub fn register_trait<'arena, A>(
 where
     A: Arena,
 {
+    let span = r#trait.span();
     let class_like_metadata = scan_class_like(
         codebase,
         word(context.resolved_names.get(&r#trait.name)),
         SymbolKind::Trait,
         Some(r#trait.name.span),
-        r#trait.span(),
+        span,
+        span.start.offset,
+        r#trait.left_brace.start.offset,
         &r#trait.attribute_lists,
         None,
         &r#trait.members,
@@ -212,12 +225,15 @@ pub fn register_enum<'arena, A>(
 where
     A: Arena,
 {
+    let span = r#enum.span();
     let class_like_metadata = scan_class_like(
         codebase,
         word(context.resolved_names.get(&r#enum.name)),
         SymbolKind::Enum,
         Some(r#enum.name.span),
-        r#enum.span(),
+        span,
+        span.start.offset,
+        r#enum.left_brace.start.offset,
         &r#enum.attribute_lists,
         None,
         &r#enum.members,
@@ -262,6 +278,8 @@ fn scan_class_like<'arena, A>(
     kind: SymbolKind,
     name_span: Option<Span>,
     span: Span,
+    docblock_start: u32,
+    docblock_end: u32,
     attribute_lists: &'arena Sequence<'arena, AttributeList<'arena>>,
     modifiers: Option<&'arena Sequence<Modifier<'arena>>>,
     members: &'arena Sequence<ClassLikeMember<'arena>>,
@@ -380,7 +398,10 @@ where
     }
 
     let mut type_context = TypeResolutionContext::new();
-    let document = parse_docblock(context, span);
+    let document = context
+        .get_docblock_in_range(docblock_start, docblock_end)
+        .or_else(|| context.get_docblock_before(docblock_start))
+        .map(|docblock| parse_docblock_trivia(context, docblock));
 
     if let Some(document) = document {
         for parse_error in document.errors {
