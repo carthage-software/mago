@@ -22,6 +22,8 @@ use mago_codex::ttype::atomic::scalar::float::TFloat;
 use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::atomic::scalar::string::TString;
 use mago_codex::ttype::atomic::scalar::string::TStringLiteral;
+use mago_codex::ttype::cast::can_atomic_be_callable;
+use mago_codex::ttype::cast::cast_atomic_to_callable;
 use mago_codex::ttype::combiner;
 use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::comparator::ComparisonResult;
@@ -30,6 +32,7 @@ use mago_codex::ttype::comparator::atomic_comparator::is_contained_by;
 use mago_codex::ttype::expander;
 use mago_codex::ttype::expander::TypeExpansionOptions;
 use mago_codex::ttype::get_mixed;
+use mago_codex::ttype::get_mixed_callable;
 use mago_codex::ttype::get_mixed_maybe_from_loop;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::get_undefined_null;
@@ -371,20 +374,12 @@ where
         return Some(second_type.clone());
     }
 
-    if matches!(second_type, TAtomic::Callable(_)) && first_type.can_be_callable() {
-        if let TAtomic::Scalar(TScalar::String(string)) = first_type {
-            return Some(TAtomic::Scalar(TScalar::String(string.as_callable())));
-        }
-
-        return Some(first_type.clone());
+    if matches!(second_type, TAtomic::Callable(_)) {
+        return intersect_atomic_with_callable(context, first_type);
     }
 
-    if matches!(first_type, TAtomic::Callable(_)) && second_type.can_be_callable() {
-        if let TAtomic::Scalar(TScalar::String(string)) = second_type {
-            return Some(TAtomic::Scalar(TScalar::String(string.as_callable())));
-        }
-
-        return Some(second_type.clone());
+    if matches!(first_type, TAtomic::Callable(_)) {
+        return intersect_atomic_with_callable(context, second_type);
     }
 
     match (first_type, second_type) {
@@ -491,6 +486,30 @@ where
     }
 
     None
+}
+
+fn intersect_atomic_with_callable<A>(context: &Context<'_, '_, A>, atomic: &TAtomic) -> Option<TAtomic>
+where
+    A: Arena,
+{
+    if let TAtomic::Scalar(TScalar::String(string)) = atomic {
+        return Some(TAtomic::Scalar(TScalar::String(string.as_callable())));
+    }
+
+    if cast_atomic_to_callable(atomic, context.codebase, None).is_some() {
+        return Some(atomic.clone());
+    }
+
+    if !can_atomic_be_callable(atomic, context.codebase) {
+        return None;
+    }
+
+    let mut intersected = atomic.clone();
+    if intersected.add_intersection_type(get_mixed_callable().get_single().clone()) {
+        return Some(intersected);
+    }
+
+    Some(atomic.clone())
 }
 
 fn intersect_list_arrays<A>(

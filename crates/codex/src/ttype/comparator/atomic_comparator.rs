@@ -20,6 +20,7 @@ use crate::ttype::atomic::scalar::class_like_string::TClassLikeString;
 use crate::ttype::atomic::scalar::string::TString;
 use crate::ttype::atomic::scalar::string::TStringCasing;
 use crate::ttype::atomic::scalar::string::TStringLiteral;
+use crate::ttype::cast::can_atomic_be_callable;
 use crate::ttype::comparator::ComparisonResult;
 use crate::ttype::comparator::array_comparator;
 use crate::ttype::comparator::callable_comparator;
@@ -246,7 +247,7 @@ pub fn is_contained_by(
     }
 
     if let TAtomic::Callable(TCallable::Signature(_)) = container_type_part {
-        if input_type_part.can_be_callable() {
+        if can_atomic_be_callable(input_type_part, codebase) {
             return callable_comparator::is_contained_by(
                 codebase,
                 input_type_part,
@@ -584,8 +585,8 @@ pub(crate) fn can_be_identical(
     }
 
     if matches!(first_part, TAtomic::Callable(_)) != matches!(second_part, TAtomic::Callable(_))
-        && first_part.can_be_callable()
-        && second_part.can_be_callable()
+        && can_atomic_be_callable(first_part, codebase)
+        && can_atomic_be_callable(second_part, codebase)
     {
         return true;
     }
