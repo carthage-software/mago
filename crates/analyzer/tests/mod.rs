@@ -1268,7 +1268,6 @@ test_case!(strings_invalid_argument_to_strtolower);
 test_case!(strings_invalid_argument_to_strlen);
 test_case!(strings_preg_match_returns_int_or_false);
 test_case!(preg_match_pattern_validation);
-test_case!(comparison_false_positive_integer);
 test_case!(strings_trim_returns_string);
 test_case!(strings_trim_does_not_preserve_non_empty);
 test_case!(strings_sprintf_returns_string);

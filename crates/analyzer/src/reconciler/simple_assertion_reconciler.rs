@@ -1731,25 +1731,10 @@ where
     let mut redundant = true;
 
     for atomic in existing_var_types {
-        if atomic.is_false() {
-            // PHP converts the integer to bool when comparing it with false. Only exact
-            // bounds can determine the result; numeric range bounds are not sufficient.
-            let excludes_false = match assertion {
-                Assertion::IsLessThan(bound) => *bound == 0,
-                Assertion::IsGreaterThan(_) => true,
-                Assertion::IsGreaterThanOrEqual(bound) => *bound != 0,
-                _ => false,
-            };
-
-            if excludes_false {
-                existing_var_type.remove_type(atomic);
-            }
-
-            redundant = false;
-            continue;
-        }
-
-        if is_less_than && value == 0 && atomic.is_null() {
+        if is_less_than
+            && value == 0
+            && let TAtomic::Null | TAtomic::Scalar(TScalar::Bool(TBool { value: Some(false) })) = &atomic
+        {
             existing_var_type.remove_type(atomic);
         }
 
