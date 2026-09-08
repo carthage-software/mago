@@ -8,6 +8,7 @@ pub mod filter;
 pub mod json;
 pub mod math;
 pub mod object;
+pub mod pcre;
 pub mod random;
 pub mod reflection;
 pub mod session;
@@ -60,6 +61,7 @@ impl Plugin for StdlibPlugin {
         registry.register_function_provider(math::MaxProvider);
         registry.register_function_provider(math::AbsProvider);
         registry.register_function_provider(array::RangeProvider);
+        registry.register_function_provider(pcre::PregMatchPatternProvider);
 
         registry.register_function_assertion_provider(array::ArrayAllAssertionProvider);
 
