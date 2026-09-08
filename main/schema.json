@@ -1038,7 +1038,7 @@
       }
     },
     "editor-url": {
-      "description": "Editor URL template for OSC 8 terminal hyperlinks on file paths in diagnostics.\n\nWhen set, file paths in diagnostic output become clickable links in terminals\nthat support OSC 8 hyperlinks (e.g., iTerm2, Wezterm, Kitty, Windows Terminal).\n\nSupported placeholders:\n- `%file%` — absolute file path\n- `%line%` — line number\n- `%column%` — column number\n\nCan be set via `MAGO_EDITOR_URL` environment variable or `editor-url` in `mago.toml`.",
+      "description": "Editor URL template for OSC 8 terminal hyperlinks on file paths in diagnostics.\n\nWhen set, file paths in diagnostic output become clickable links in terminals\nthat support OSC 8 hyperlinks (e.g., iTerm2, Wezterm, Kitty, Windows Terminal).\n\nSupported placeholders:\n- `%file%` — absolute file path\n- `%rel_file%` — workspace-relative file path\n- `%line%` — line number\n- `%column%` — column number\n\nCan be set via `MAGO_EDITOR_URL` environment variable or `editor-url` in `mago.toml`.",
       "type": [
         "string",
         "null"

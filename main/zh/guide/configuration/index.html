@@ -802,9 +802,13 @@ enable-short-tags = false
 </code></pre>
 <table><thead><tr><th style="text-align: left">占位符</th><th style="text-align: left">含义</th></tr></thead><tbody>
 <tr><td style="text-align: left"><code>%file%</code></td><td style="text-align: left">文件的绝对路径。</td></tr>
+<tr><td style="text-align: left"><code>%rel_file%</code></td><td style="text-align: left">相对于工作区的文件路径。</td></tr>
 <tr><td style="text-align: left"><code>%line%</code></td><td style="text-align: left">行号,从 1 开始。</td></tr>
 <tr><td style="text-align: left"><code>%column%</code></td><td style="text-align: left">列号,从 1 开始。</td></tr>
 </tbody></table>
+<p>当编辑器相对于当前打开的工作区解析文件路径时，请使用 <code>%rel_file%</code>：</p>
+<pre><code class="language-sh">export MAGO_EDITOR_URL="vscode://file/%rel_file%:%line%:%column%"
+</code></pre>
 <p>常用模板:</p>
 <table><thead><tr><th style="text-align: left">编辑器</th><th style="text-align: left">模板</th></tr></thead><tbody>
 <tr><td style="text-align: left">VS Code</td><td style="text-align: left"><code>vscode://file/%file%:%line%:%column%</code></td></tr>

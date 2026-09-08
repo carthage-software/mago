@@ -1039,9 +1039,13 @@ enable-short-tags = false
 </code></pre>
 <table><thead><tr><th style="text-align: left">Placeholder</th><th style="text-align: left">Meaning</th></tr></thead><tbody>
 <tr><td style="text-align: left"><code>%file%</code></td><td style="text-align: left">Absolute path to the file.</td></tr>
+<tr><td style="text-align: left"><code>%rel_file%</code></td><td style="text-align: left">File path relative to the workspace.</td></tr>
 <tr><td style="text-align: left"><code>%line%</code></td><td style="text-align: left">Line number, 1-based.</td></tr>
 <tr><td style="text-align: left"><code>%column%</code></td><td style="text-align: left">Column number, 1-based.</td></tr>
 </tbody></table>
+<p>Use <code>%rel_file%</code> when the editor resolves file paths relative to the open workspace:</p>
+<pre><code class="language-sh">export MAGO_EDITOR_URL="vscode://file/%rel_file%:%line%:%column%"
+</code></pre>
 <p>Common templates:</p>
 <table><thead><tr><th style="text-align: left">Editor</th><th style="text-align: left">Template</th></tr></thead><tbody>
 <tr><td style="text-align: left">VS Code</td><td style="text-align: left"><code>vscode://file/%file%:%line%:%column%</code></td></tr>

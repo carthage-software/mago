@@ -775,9 +775,13 @@ enable-short-tags = false
 </code></pre>
 <table><thead><tr><th style="text-align: left">Variable</th><th style="text-align: left">Signification</th></tr></thead><tbody>
 <tr><td style="text-align: left"><code>%file%</code></td><td style="text-align: left">Chemin absolu vers le fichier.</td></tr>
+<tr><td style="text-align: left"><code>%rel_file%</code></td><td style="text-align: left">Chemin du fichier relatif à l'espace de travail.</td></tr>
 <tr><td style="text-align: left"><code>%line%</code></td><td style="text-align: left">Numéro de ligne, base 1.</td></tr>
 <tr><td style="text-align: left"><code>%column%</code></td><td style="text-align: left">Numéro de colonne, base 1.</td></tr>
 </tbody></table>
+<p>Utilisez <code>%rel_file%</code> lorsque l'éditeur résout les chemins relativement à l'espace de travail ouvert :</p>
+<pre><code class="language-sh">export MAGO_EDITOR_URL="vscode://file/%rel_file%:%line%:%column%"
+</code></pre>
 <p>Modèles courants :</p>
 <table><thead><tr><th style="text-align: left">Éditeur</th><th style="text-align: left">Modèle</th></tr></thead><tbody>
 <tr><td style="text-align: left">VS Code</td><td style="text-align: left"><code>vscode://file/%file%:%line%:%column%</code></td></tr>
