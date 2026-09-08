@@ -867,7 +867,7 @@
 </tbody></table>
 <p>Targets are <code>FunctionTarget</code> with <code>FunctionTargetKind</code>, or <code>MethodTarget</code>. See <a href="../../../../../main/en/extensions/analyzer/return-types-and-callable-signatures">Return types and callable signatures</a>.</p>
 <h2 id="assertions">Assertions</h2>
-<p><code>FunctionAssertionProvider</code>, <code>MethodAssertionProvider</code>, and <code>AssertionProviderContext</code> produce <code>InvocationAssertions</code>.</p>
+<p><code>FunctionAssertionProvider</code>, <code>MethodAssertionProvider</code>, and <code>AssertionProviderContext</code> produce <code>InvocationAssertions</code>. Method providers can use <code>InvocationAssertions::RECEIVER</code> to assert facts about the called object.</p>
 <p>The assertion value families are:</p>
 <ul>
 <li><code>Assertion\TypeAssertion</code> and <code>TypeAssertionKind</code>;</li>

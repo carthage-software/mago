@@ -831,6 +831,17 @@ final class IsUserAssertion implements FunctionAssertionProvider
 }
 </code></pre>
 <p>Map keys are callable parameter names such as <code>$value</code>, not local variable names at the call site. Mago resolves the parameter to its actual argument expression. Every mapped fact list must be non-empty.</p>
+<h2 id="receiver-assertions">Receiver assertions</h2>
+<p>A method assertion provider can target the called object with <code>InvocationAssertions::RECEIVER</code>. An unconditional receiver assertion updates the object in the caller's scope even when the method's return value is discarded.</p>
+<pre><code class="language-php">return new InvocationAssertions(
+    assertions: [
+        InvocationAssertions::RECEIVER =&gt; [
+            new TypeAssertion(TypeAssertionKind::IsType, $updatedReceiverType),
+        ],
+    ],
+);
+</code></pre>
+<p>Use receiver assertions only for instance methods. Other SDK implementations should encode the reserved target as <code>$this</code>.</p>
 <p>Return <code>null</code> to delegate to the next matching provider. An empty <code>InvocationAssertions</code> contributes no facts.</p>
 <h2 id="when-assertions-apply">When assertions apply</h2>
 <p><code>InvocationAssertions</code> has three maps:</p>
@@ -889,6 +900,10 @@ final class IsUserAssertion implements FunctionAssertionProvider
     
     <li class="doc-toc__item doc-toc__item--lvl2">
       <a class="doc-toc__link" href="#basic-type-guard">Basic type guard</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#receiver-assertions">Receiver assertions</a>
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl2">
