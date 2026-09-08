@@ -322,6 +322,26 @@ fn is_contained_by_atomic(
         return true;
     }
 
+    // An enum's cases can collectively cover its native type even when no single case does.
+    if let TAtomic::Object(TObject::Enum(input_enum)) = input_type_part
+        && input_enum.case.is_none()
+        && let Some(enum_metadata) = codebase.get_enum(input_enum.name.as_bytes())
+        && !enum_metadata.enum_cases.is_empty()
+        && enum_metadata.enum_cases.len() <= container_atomic_types.len()
+        && enum_metadata.enum_cases.keys().all(|case| {
+            container_atomic_types.iter().any(|container_atomic| {
+                matches!(
+                    container_atomic,
+                    TAtomic::Object(TObject::Enum(container_enum))
+                        if container_enum.case == Some(*case)
+                            && codebase.is_instance_of(input_enum.name.as_bytes(), container_enum.name.as_bytes())
+                )
+            })
+        })
+    {
+        return true;
+    }
+
     if some_type_coerced {
         union_comparison_result.type_coerced = Some(true);
     }
