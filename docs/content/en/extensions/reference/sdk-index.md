@@ -111,7 +111,7 @@ Targets are `FunctionTarget` with `FunctionTargetKind`, or `MethodTarget`. See [
 
 ## Assertions
 
-`FunctionAssertionProvider`, `MethodAssertionProvider`, and `AssertionProviderContext` produce `InvocationAssertions`.
+`FunctionAssertionProvider`, `MethodAssertionProvider`, and `AssertionProviderContext` produce `InvocationAssertions`. Method providers can use `InvocationAssertions::RECEIVER` to assert facts about the called object.
 
 The assertion value families are:
 

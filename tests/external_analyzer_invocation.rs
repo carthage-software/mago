@@ -124,6 +124,19 @@ final class ExternalAssertions
     }
 }
 
+interface ReceiverMarker
+{
+    public function marked(): string;
+}
+
+final class ReceiverWidening
+{
+    public function willImplement(string $interface): self
+    {
+        return $this;
+    }
+}
+
 final class Attribute
 {
     public const int TARGET_METHOD = 4;
@@ -239,6 +252,8 @@ function take_external_result(ExternalResult $_result): void {}
 
 function take_intersection(BaseModel&Marker $_model): void {}
 
+function take_widened_receiver(ReceiverWidening&ReceiverMarker $_receiver): void {}
+
 /** @param array<int, string> $_values */
 function take_string_map(array $_values): void {}
 
@@ -255,6 +270,10 @@ $conditional = 'conditional';
 if (ExternalAssertions::isString($conditional)) {
     take_string($conditional);
 }
+$receiver = new ReceiverWidening();
+$receiver->willImplement(ReceiverMarker::class);
+take_widened_receiver($receiver);
+take_string($receiver->marked());
 take_string(collect('function'));
 Artisan::command('inspire', function (): void {
     $this->comment('Be inspired!');
@@ -458,6 +477,7 @@ fn external_providers_receive_complete_invocation_context() -> Result<(), Box<dy
             "property-secret-read",
             "property-secret-write",
             "property-self-read",
+            "receiver-assertion",
             "relation-subclass",
             "static"
         ]
