@@ -6,10 +6,12 @@ use std::borrow::Cow;
 use mago_word::Word;
 use mago_word::word;
 
+use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::add_union_type;
+use mago_codex::ttype::add_union_type_preserving_array_shapes;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::key::ArrayKey;
@@ -44,6 +46,7 @@ use mago_syntax::cst::Expression;
 use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
+use crate::context::scope::var_has_root;
 
 #[derive(Debug, Clone, Copy)]
 pub enum ArrayTarget<'ast, 'arena> {
@@ -54,12 +57,26 @@ pub enum ArrayTarget<'ast, 'arena> {
 fn accumulate_value_type(
     value_type: &mut Option<TUnion>,
     new_type: TUnion,
-    codebase: &mago_codex::metadata::CodebaseMetadata,
+    codebase: &CodebaseMetadata,
+    preserve_array_shapes: bool,
 ) {
     *value_type = Some(match value_type.take() {
-        Some(existing_type) => add_union_type(existing_type, &new_type, codebase, CombinerOptions::default()),
+        Some(existing_type) => add_array_access_union_type(existing_type, &new_type, codebase, preserve_array_shapes),
         None => new_type,
     });
+}
+
+fn add_array_access_union_type(
+    existing_type: TUnion,
+    new_type: &TUnion,
+    codebase: &CodebaseMetadata,
+    preserve_array_shapes: bool,
+) -> TUnion {
+    if preserve_array_shapes {
+        add_union_type_preserving_array_shapes(existing_type, new_type, codebase, CombinerOptions::default())
+    } else {
+        add_union_type(existing_type, new_type, codebase, CombinerOptions::default())
+    }
 }
 
 impl<'ast, 'arena> ArrayTarget<'ast, 'arena> {
@@ -166,6 +183,15 @@ where
     let mut array_atomic_types = array_like_type.types.iter().collect::<Vec<_>>();
 
     let mut value_type = None;
+    let preserve_array_shapes = block_context.flags.inside_reference()
+        || block_context.flags.inside_variable_reference()
+        || (block_context.flags.inside_loop()
+            && extended_var_id.is_some_and(|variable_id| {
+                block_context
+                    .references_in_scope
+                    .get(&variable_id)
+                    .is_some_and(|referenced| *referenced != variable_id && var_has_root(*referenced, variable_id))
+            }));
     let mut expected_index_types = vec![];
     let mut has_union_key_mismatch = false; // Track if we're in a union where key exists in some but not all variants
     let mut reported_undefined_key = false;
@@ -189,7 +215,7 @@ where
                     &mut expected_index_types,
                 );
 
-                accumulate_value_type(&mut value_type, new_type, context.codebase);
+                accumulate_value_type(&mut value_type, new_type, context.codebase, preserve_array_shapes);
             }
             TAtomic::Array(TArray::Keyed(_)) => {
                 let mut possibly_undefined = false;
@@ -208,6 +234,7 @@ where
                     array_like_type,
                     &mut has_key_in_other_variant,
                     &mut reported_undefined_key,
+                    preserve_array_shapes,
                 );
 
                 new_type.set_possibly_undefined(possibly_undefined, None);
@@ -216,7 +243,7 @@ where
                     has_union_key_mismatch = true;
                 }
 
-                accumulate_value_type(&mut value_type, new_type, context.codebase);
+                accumulate_value_type(&mut value_type, new_type, context.codebase, preserve_array_shapes);
             }
             TAtomic::Scalar(TScalar::String(_)) => {
                 let new_type = handle_array_access_on_string(
@@ -227,19 +254,19 @@ where
                     &mut expected_index_types,
                 );
 
-                accumulate_value_type(&mut value_type, new_type, context.codebase);
+                accumulate_value_type(&mut value_type, new_type, context.codebase, preserve_array_shapes);
             }
             TAtomic::Mixed(mixed) if mixed.could_be_truthy_or_non_null() => {
                 let new_type = handle_array_access_on_mixed(context, block_context, access_span, atomic_var_type);
 
-                accumulate_value_type(&mut value_type, new_type, context.codebase);
+                accumulate_value_type(&mut value_type, new_type, context.codebase, preserve_array_shapes);
 
                 has_valid_expected_index = true;
             }
             TAtomic::Never => {
                 let new_type = handle_array_access_on_mixed(context, block_context, access_span, atomic_var_type);
 
-                accumulate_value_type(&mut value_type, new_type, context.codebase);
+                accumulate_value_type(&mut value_type, new_type, context.codebase, preserve_array_shapes);
 
                 has_valid_expected_index = true;
             }
@@ -816,6 +843,7 @@ pub(crate) fn handle_array_access_on_keyed_array<'ctx, A>(
     array_like_type: &TUnion,
     key_in_other_variant: &mut bool,
     reported_undefined_key: &mut bool,
+    preserve_array_shapes: bool,
 ) -> TUnion
 where
     A: Arena,
@@ -1111,21 +1139,21 @@ where
         if !possible_keys.is_empty() && possible_keys.len() == index_type.types.len() {
             for key in &possible_keys {
                 if let Some((_, known_item)) = known_items.get(key) {
-                    value_parameter = Cow::Owned(add_union_type(
+                    value_parameter = Cow::Owned(add_array_access_union_type(
                         value_parameter.into_owned(),
                         known_item,
                         context.codebase,
-                        CombinerOptions::default(),
+                        preserve_array_shapes,
                     ));
                 }
             }
         } else {
             for (_, known_item) in known_items.values() {
-                value_parameter = Cow::Owned(add_union_type(
+                value_parameter = Cow::Owned(add_array_access_union_type(
                     value_parameter.into_owned(),
                     known_item,
                     context.codebase,
-                    CombinerOptions::default(),
+                    preserve_array_shapes,
                 ));
             }
         }

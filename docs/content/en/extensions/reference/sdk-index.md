@@ -111,7 +111,7 @@ Targets are `FunctionTarget` with `FunctionTargetKind`, or `MethodTarget`. See [
 
 ## Assertions
 
-`FunctionAssertionProvider`, `MethodAssertionProvider`, and `AssertionProviderContext` produce `InvocationAssertions`.
+`FunctionAssertionProvider`, `MethodAssertionProvider`, and `AssertionProviderContext` produce `InvocationAssertions`. Method providers can use `InvocationAssertions::RECEIVER` to assert facts about the called object.
 
 The assertion value families are:
 
@@ -145,6 +145,8 @@ Targets are `PropertyTarget` and `ClassTarget`. See [Properties and initializati
 | `ClassLikeAnalysisHook` | `ClassLikeTarget` descendant declarations |
 
 All receive `NodeAnalysisContext`. See [Targeted analysis hooks](/extensions/analyzer/targeted-analysis-hooks/).
+
+`VariableDefinedness` reports whether a local is defined, possibly defined, or undefined before a targeted node.
 
 ## Entry points and filters
 

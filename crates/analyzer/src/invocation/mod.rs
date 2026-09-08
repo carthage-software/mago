@@ -26,6 +26,7 @@ use mago_syntax::cst::Pipe;
 use mago_syntax::cst::PlaceholderArgument;
 use mago_syntax::cst::PositionalArgument;
 use mago_syntax::cst::VariadicPlaceholderArgument;
+use mago_word::Word;
 
 use crate::context::Context;
 
@@ -57,6 +58,7 @@ pub struct Invocation<'ctx, 'ast, 'arena> {
 pub struct EffectiveCallableSignature {
     pub parameters: Vec<TCallableParameter>,
     pub allows_named_arguments: bool,
+    pub display_name: Option<Word>,
 }
 
 /// Context information for method call resolution.
@@ -208,6 +210,16 @@ impl<'ctx> InvocationTarget<'ctx> {
     where
         A: Arena,
     {
+        if let Some(display_name) = match self {
+            InvocationTarget::Callable { effective_signature, .. }
+            | InvocationTarget::FunctionLike { effective_signature, .. }
+            | InvocationTarget::ExternalMethod { effective_signature, .. } => {
+                effective_signature.as_ref().and_then(|signature| signature.display_name)
+            }
+        } {
+            return display_name.to_string();
+        }
+
         self.get_function_like_identifier()
             .map(|identifier| crate::utils::names::display_function_like_identifier(context, identifier))
             .unwrap_or_else(
@@ -319,6 +331,17 @@ impl<'ctx> InvocationTarget<'ctx> {
             InvocationTarget::Callable { effective_signature, .. }
             | InvocationTarget::FunctionLike { effective_signature, .. }
             | InvocationTarget::ExternalMethod { effective_signature, .. } => effective_signature.is_some(),
+        }
+    }
+
+    #[inline]
+    pub(crate) fn get_effective_parameter_name(&self, index: usize) -> Option<Word> {
+        match self {
+            InvocationTarget::Callable { effective_signature, .. }
+            | InvocationTarget::FunctionLike { effective_signature, .. }
+            | InvocationTarget::ExternalMethod { effective_signature, .. } => {
+                effective_signature.as_ref()?.parameters.get(index)?.get_name().map(|name| name.0)
+            }
         }
     }
 

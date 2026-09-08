@@ -5,6 +5,8 @@
 #![allow(clippy::pub_use)]
 #![allow(clippy::match_wildcard_for_single_variants)]
 
+use std::sync::Arc;
+
 use mago_allocator::Arena;
 
 use mago_codex::context::ScopeContext;
@@ -15,6 +17,7 @@ use mago_collector::Collector;
 use mago_database::file::File;
 use mago_names::ResolvedNames;
 use mago_span::HasSpan;
+use mago_syntax::cst::Node;
 use mago_syntax::cst::Program;
 use mago_word::word;
 
@@ -24,6 +27,7 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::external::ExternalAnalysisSession;
+use crate::external::NodeAnalysisRequirements;
 use crate::plugin::PluginRegistry;
 use crate::plugin::context::HookContext;
 use crate::plugin::hook::HookAction;
@@ -69,6 +73,7 @@ where
     pub plugin_registry: &'ctx PluginRegistry,
     pub external_analysis_session: Option<&'ctx ExternalAnalysisSession>,
     pub additional_symbol_references: Option<&'ctx SymbolReferences>,
+    variable_definedness_targets: Option<Arc<[bool; u8::MAX as usize + 1]>>,
     defer_pragmas: bool,
 }
 
@@ -93,6 +98,7 @@ where
             plugin_registry,
             external_analysis_session: None,
             additional_symbol_references: None,
+            variable_definedness_targets: None,
             defer_pragmas: false,
         }
     }
@@ -106,6 +112,12 @@ where
     #[must_use]
     pub fn with_additional_symbol_references(mut self, references: &'ctx SymbolReferences) -> Self {
         self.additional_symbol_references = Some(references);
+        self
+    }
+
+    #[must_use]
+    pub fn with_node_analysis_requirements(mut self, requirements: &NodeAnalysisRequirements) -> Self {
+        self.variable_definedness_targets = requirements.variable_definedness_targets();
         self
     }
 
@@ -152,7 +164,9 @@ where
                 analysis_result.time_in_analysis = start_time.elapsed();
             }
 
-            return Ok(AnalysisArtifacts::new());
+            return Ok(
+                AnalysisArtifacts::new().with_variable_definedness_targets(self.variable_definedness_targets.clone())
+            );
         }
 
         #[cfg(not(target_arch = "wasm32"))]
@@ -185,7 +199,9 @@ where
             ScopeContext::new(ReferenceOrigin::File(word(context.source_file.name.as_ref()))),
             context.settings.register_super_globals,
         );
-        let mut artifacts = AnalysisArtifacts::new();
+        let mut artifacts =
+            AnalysisArtifacts::new().with_variable_definedness_targets(self.variable_definedness_targets.clone());
+        artifacts.record_variable_definedness(Node::Program(program), &block_context);
         #[cfg(not(target_arch = "wasm32"))]
         if let Some(start) = setup_start {
             telemetry::record_setup(start.elapsed());

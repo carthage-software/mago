@@ -80,19 +80,22 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPrefix<'arena> {
         A: Arena,
     {
         let is_negation = matches!(self.operator, UnaryPrefixOperator::Not(_));
-        let is_variable_reference = matches!(self.operator, UnaryPrefixOperator::Reference(_))
-            && matches!(self.operand, Expression::Variable(Variable::Direct(_)));
+        let is_reference = matches!(self.operator, UnaryPrefixOperator::Reference(_));
+        let is_variable_reference = is_reference && matches!(self.operand, Expression::Variable(Variable::Direct(_)));
 
         let was_in_negation = block_context.flags.inside_negation();
+        let was_in_reference = block_context.flags.inside_reference();
         let was_in_variable_reference = block_context.flags.inside_variable_reference();
         let was_in_general_use = block_context.flags.inside_general_use();
         block_context.flags.set_inside_general_use(true);
+        block_context.flags.set_inside_reference(is_reference);
         block_context.flags.set_inside_variable_reference(is_variable_reference);
         block_context.flags.set_inside_negation(if is_negation { !was_in_negation } else { was_in_negation });
 
         self.operand.analyze(context, block_context, artifacts)?;
 
         block_context.flags.set_inside_negation(was_in_negation);
+        block_context.flags.set_inside_reference(was_in_reference);
         block_context.flags.set_inside_general_use(was_in_general_use);
         block_context.flags.set_inside_variable_reference(was_in_variable_reference);
 

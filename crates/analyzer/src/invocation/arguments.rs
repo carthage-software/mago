@@ -3,6 +3,7 @@ use std::collections::hash_map::Entry;
 
 use foldhash::HashMap;
 
+use mago_bytes::BytesDisplay;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::add_union_type;
 use mago_codex::ttype::atomic::TAtomic;
@@ -128,14 +129,14 @@ where
     if referenced_parameter && !is_argument_referenceable(argument_expression, &argument_type) {
         let target_kind_str = invocation_target.guess_kind();
         let target_name_str = invocation_target.guess_name(context);
+        let parameter_label = invocation_target
+            .get_effective_parameter_name(argument_offset)
+            .map_or_else(|| format!("#{}", argument_offset + 1), |name| format!("`{}`", BytesDisplay(name.as_bytes())));
 
         context.collector.report_with_code(
             IssueCode::InvalidPassByReference,
             Issue::error(format!(
-                "Invalid argument for by-reference parameter #{} in call to {} `{}`.",
-                argument_offset + 1,
-                target_kind_str,
-                target_name_str,
+                "Invalid argument for by-reference parameter {parameter_label} in call to {target_kind_str} `{target_name_str}`.",
             ))
             .with_annotation(
                 Annotation::primary(argument_expression.span())
@@ -167,16 +168,22 @@ pub fn verify_argument_type<'arena, A>(
     A: Arena,
 {
     let target_kind_str = invocation_target.guess_kind();
+    let effective_parameter_name = invocation_target.get_effective_parameter_name(argument_offset);
+    let argument_label = effective_parameter_name.map_or_else(
+        || format!("argument #{}", argument_offset + 1),
+        |name| format!("`{}`", BytesDisplay(name.as_bytes())),
+    );
+    let argument_subject = effective_parameter_name.map_or_else(
+        || format!("Argument #{}", argument_offset + 1),
+        |name| format!("Argument `{}`", BytesDisplay(name.as_bytes())),
+    );
 
     if input_type.is_never() {
         let target_name_str = invocation_target.guess_name(context);
         context.collector.report_with_code(
             IssueCode::NoValue,
             Issue::error(format!(
-                "Argument #{} passed to {} `{}` has type `never`, meaning it cannot produce a value.",
-                argument_offset + 1,
-                target_kind_str,
-                target_name_str
+                "{argument_subject} passed to {target_kind_str} `{target_name_str}` has type `never`, meaning it cannot produce a value.",
             ))
             .with_annotation(
                 Annotation::primary(input_expression.span())
@@ -205,11 +212,7 @@ pub fn verify_argument_type<'arena, A>(
             context.collector.report_with_code(
                 IssueCode::NullArgument,
                 Issue::error(format!(
-                    "Argument #{} of {} `{}` is `null`, but parameter type `{}` does not accept it.",
-                    argument_offset + 1,
-                    target_kind_str,
-                    target_name_str,
-                    parameter_type_str
+                    "{argument_subject} of {target_kind_str} `{target_name_str}` is `null`, but parameter type `{parameter_type_str}` does not accept it.",
                 ))
                 .with_annotation(Annotation::primary(input_expression.span()).with_message("This argument is `null`"))
                 .with_annotation(call_site)
@@ -230,11 +233,7 @@ pub fn verify_argument_type<'arena, A>(
             context.collector.report_with_code(
                 IssueCode::PossiblyNullArgument,
                 Issue::error(format!(
-                    "Argument #{} of {} `{}` is possibly `null`, but parameter type `{}` does not accept it.",
-                    argument_offset + 1,
-                    target_kind_str,
-                    target_name_str,
-                    parameter_type_str
+                    "{argument_subject} of {target_kind_str} `{target_name_str}` is possibly `null`, but parameter type `{parameter_type_str}` does not accept it.",
                 ))
                 .with_annotation(
                     Annotation::primary(input_expression.span())
@@ -255,11 +254,7 @@ pub fn verify_argument_type<'arena, A>(
             context.collector.report_with_code(
                 IssueCode::FalseArgument,
                 Issue::error(format!(
-                    "Argument #{} of {} `{}` is `false`, but parameter type `{}` does not accept it.",
-                    argument_offset + 1,
-                    target_kind_str,
-                    target_name_str,
-                    parameter_type_str
+                    "{argument_subject} of {target_kind_str} `{target_name_str}` is `false`, but parameter type `{parameter_type_str}` does not accept it.",
                 ))
                 .with_annotation(Annotation::primary(input_expression.span()).with_message("This argument is `false`"))
                 .with_annotation(call_site)
@@ -280,11 +275,7 @@ pub fn verify_argument_type<'arena, A>(
             context.collector.report_with_code(
                 IssueCode::PossiblyFalseArgument,
                 Issue::error(format!(
-                    "Argument #{} of {} `{}` is possibly `false`, but parameter type `{}` does not accept it.",
-                    argument_offset + 1,
-                    target_kind_str,
-                    target_name_str,
-                    parameter_type_str
+                    "{argument_subject} of {target_kind_str} `{target_name_str}` is possibly `false`, but parameter type `{parameter_type_str}` does not accept it.",
                 ))
                 .with_annotation(
                     Annotation::primary(input_expression.span())
@@ -314,8 +305,8 @@ pub fn verify_argument_type<'arena, A>(
         context.collector.report_with_code(
             IssueCode::MixedArgument,
             Issue::error(format!(
-                "Invalid argument type for argument #{} of `{}`: expected `{}`, but found `{}`.",
-                argument_offset + 1,
+                "Invalid argument type for {} of `{}`: expected `{}`, but found `{}`.",
+                argument_label,
                 target_name_str,
                 parameter_type_str,
                 input_type_str
@@ -356,11 +347,8 @@ pub fn verify_argument_type<'arena, A>(
         };
 
         let mut issue = Issue::error(format!(
-            "Argument type mismatch for argument #{} of `{}`: expected `{}`, but provided type `{}` is less specific.",
-            argument_offset + 1,
-            target_name_str,
-            parameter_type_str,
-            input_type_str
+            "Argument type mismatch for {} of `{}`: expected `{}`, but provided type `{}` is less specific.",
+            argument_label, target_name_str, parameter_type_str, input_type_str
         ))
         .with_annotation(Annotation::primary(input_expression.span()).with_message(annotation_msg))
         .with_annotation(call_site)
@@ -415,11 +403,8 @@ pub fn verify_argument_type<'arena, A>(
             kind = IssueCode::PossiblyInvalidArgument;
 
             issue = Issue::error(format!(
-                "Possible argument type mismatch for argument #{} of `{}`: expected `{}`, but possibly received `{}`.",
-                argument_offset + 1,
-                target_name_str,
-                parameter_type_str,
-                input_type_str
+                "Possible argument type mismatch for {} of `{}`: expected `{}`, but possibly received `{}`.",
+                argument_label, target_name_str, parameter_type_str, input_type_str
             ))
             .with_annotation(
                 Annotation::primary(input_expression.span())
@@ -433,11 +418,8 @@ pub fn verify_argument_type<'arena, A>(
         } else {
             kind = IssueCode::InvalidArgument;
             issue = Issue::error(format!(
-                "Invalid argument type for argument #{} of `{}`: expected `{}`, but found `{}`.",
-                argument_offset + 1,
-                target_name_str,
-                parameter_type_str,
-                input_type_str
+                "Invalid argument type for {} of `{}`: expected `{}`, but found `{}`.",
+                argument_label, target_name_str, parameter_type_str, input_type_str
             ))
             .with_annotation(
                 Annotation::primary(input_expression.span()).with_message(format!("This has type `{input_type_str}`")),

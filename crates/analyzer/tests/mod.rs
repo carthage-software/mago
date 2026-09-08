@@ -863,6 +863,7 @@ test_case!(finally_inherits_call_invalidations);
 test_case!(post_narrowing_check);
 test_case!(data_transformer_type);
 test_case!(symbol_existence_assertions);
+test_case!(conditional_exact_assertions_disjunction);
 test_case!(symbol_existence_edge_cases);
 test_case!(type_assert);
 test_case!(string_callable_template_inference);
@@ -1241,6 +1242,7 @@ test_case!(strings_concat_with_null_implicit);
 test_case!(strings_concat_with_bool_invalid);
 test_case!(strings_interpolation_of_non_stringable_object);
 test_case!(strings_class_exists_narrows_to_class_string);
+test_case!(strings_class_or_interface_exists_narrows);
 test_case!(strings_interface_exists_narrows);
 test_case!(strings_enum_exists_narrows);
 test_case!(strings_trait_exists_narrows);
@@ -2744,9 +2746,17 @@ test_case!(issue_2315);
 test_case!(issue_2317);
 test_case!(issue_2318);
 test_case!(issue_2319);
+test_case!(issue_2320, {
+    let mut settings = default_test_settings();
+    settings.version = mago_php_version::PHPVersion::PHP84;
+    settings
+});
 test_case!(issue_2323);
+test_case!(issue_2330);
 test_case!(issue_2331);
 test_case!(issue_2333);
+test_case!(issue_2336);
+test_case!(issue_2341);
 
 #[test]
 #[cfg_attr(miri, ignore)]

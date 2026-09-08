@@ -54,6 +54,7 @@ use crate::formula::negate_or_synthesize;
 use crate::invocation::Invocation;
 use crate::invocation::InvocationArgumentsSource;
 use crate::invocation::resolver::resolve_invocation_type;
+use crate::plugin::provider::assertion::InvocationAssertions;
 use crate::reconciler;
 use crate::reconciler::assertion_reconciler::intersect_union_with_union;
 use crate::utils::expression::get_block_expression_id;
@@ -1354,7 +1355,7 @@ fn resolve_special_assertion_target(
 ) -> Option<Word> {
     let target_bytes = target_name.as_bytes();
     if let Some(this_variable) = this_variable
-        && target_bytes.starts_with(b"$this")
+        && (target_bytes == InvocationAssertions::RECEIVER || target_bytes.starts_with(b"$this->"))
     {
         let mut out: Vec<u8> = Vec::with_capacity(target_bytes.len() - 5 + this_variable.len());
         out.extend_from_slice(this_variable);

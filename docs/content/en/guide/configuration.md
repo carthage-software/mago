@@ -339,8 +339,15 @@ editor-url = "phpstorm://open?file=%file%&line=%line%&column=%column%"
 | Placeholder | Meaning |
 | :--- | :--- |
 | `%file%` | Absolute path to the file. |
+| `%rel_file%` | File path relative to the workspace. |
 | `%line%` | Line number, 1-based. |
 | `%column%` | Column number, 1-based. |
+
+Use `%rel_file%` when the editor resolves file paths relative to the open workspace:
+
+```sh
+export MAGO_EDITOR_URL="vscode://file/%rel_file%:%line%:%column%"
+```
 
 Common templates:
 

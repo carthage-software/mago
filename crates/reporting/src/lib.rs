@@ -41,6 +41,7 @@ pub mod reporter;
 
 pub use color::ColorChoice;
 pub use formatter::ReportingFormat;
+pub use formatter::utils::osc8_file_hyperlink;
 pub use formatter::utils::osc8_hyperlink;
 pub use output::ReportingTarget;
 

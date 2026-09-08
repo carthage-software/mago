@@ -56,6 +56,22 @@ final class IsUserAssertion implements FunctionAssertionProvider
 
 Map keys are callable parameter names such as `$value`, not local variable names at the call site. Mago resolves the parameter to its actual argument expression. Every mapped fact list must be non-empty.
 
+## Receiver assertions
+
+A method assertion provider can target the called object with `InvocationAssertions::RECEIVER`. An unconditional receiver assertion updates the object in the caller's scope even when the method's return value is discarded.
+
+```php
+return new InvocationAssertions(
+    assertions: [
+        InvocationAssertions::RECEIVER => [
+            new TypeAssertion(TypeAssertionKind::IsType, $updatedReceiverType),
+        ],
+    ],
+);
+```
+
+Use receiver assertions only for instance methods. Other SDK implementations should encode the reserved target as `$this`.
+
 Return `null` to delegate to the next matching provider. An empty `InvocationAssertions` contributes no facts.
 
 ## When assertions apply

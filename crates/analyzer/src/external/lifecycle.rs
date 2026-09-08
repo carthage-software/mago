@@ -43,6 +43,7 @@ use super::ExternalPlugin;
 use super::NODE_REQUIREMENT_ARGUMENT_TYPES;
 use super::NODE_REQUIREMENT_RECEIVER_TYPE;
 use super::NODE_REQUIREMENT_TARGET_EXPRESSION_TYPES;
+use super::NODE_REQUIREMENT_VARIABLE_DEFINEDNESS;
 use super::NodeAnalysisRequirements;
 use super::error::ExternalAnalyzerError;
 use super::error::protocol;
@@ -502,6 +503,9 @@ fn write_target_analysis(
         if requested & NODE_REQUIREMENT_ARGUMENT_TYPES != 0 {
             write_argument_types(writer, artifacts, target.node)?;
         }
+        if requested & NODE_REQUIREMENT_VARIABLE_DEFINEDNESS != 0 {
+            write_variable_definedness(writer, artifacts, target.node.span())?;
+        }
         writer.write_u32(
             u32::try_from(target.targeted_hook_routes.len())
                 .map_err(|_| protocol("too many targeted analysis hook routes matched one node"))?,
@@ -509,6 +513,28 @@ fn write_target_analysis(
         for route in &target.targeted_hook_routes {
             writer.write_u32(*route);
         }
+    }
+
+    Ok(())
+}
+
+fn write_variable_definedness(
+    writer: &mut PayloadWriter,
+    artifacts: &AnalysisArtifacts,
+    span: Span,
+) -> Result<(), ExternalAnalyzerError> {
+    let variables = artifacts.variable_definedness.get(&(span.start.offset, span.end.offset));
+    writer.write_bool(variables.is_some());
+    let Some(variables) = variables else {
+        return Ok(());
+    };
+
+    writer.write_u32(u32::try_from(variables.len()).map_err(|_| protocol("too many variables in scope"))?);
+    let mut variables = variables.iter().collect::<Vec<_>>();
+    variables.sort_unstable_by_key(|(variable, _)| variable.as_bytes());
+    for (variable, definedness) in variables {
+        writer.write_bytes(variable.as_bytes())?;
+        writer.write_u8(*definedness as u8);
     }
 
     Ok(())

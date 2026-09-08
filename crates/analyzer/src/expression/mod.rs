@@ -11,6 +11,7 @@ use mago_reporting::Issue;
 use mago_span::HasPosition;
 use mago_span::HasSpan;
 use mago_syntax::cst::Expression;
+use mago_syntax::cst::Node;
 use mago_syntax::cst::Parenthesized;
 use mago_word::WordSet;
 use mago_word::word;
@@ -66,6 +67,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Expression<'arena> {
     where
         A: Arena,
     {
+        artifacts.record_variable_definedness(Node::Expression(self), block_context);
+
         if context.plugin_registry.has_expression_hooks() {
             let mut hook_context = HookContext::new(context.codebase, context.source_file, block_context, artifacts);
             let expression_hook_result = context.plugin_registry.before_expression(self, &mut hook_context)?;

@@ -155,16 +155,55 @@ final class InvocationFunctionAssertionProvider implements FunctionAssertionProv
     }
 }
 
-/** @mago-expect lint:single-class-per-file */
+/**
+ * @mago-expect lint:cyclomatic-complexity
+ * @mago-expect lint:single-class-per-file
+ */
 final class InvocationMethodAssertionProvider implements MethodAssertionProvider
 {
     public function getTargets(): array
     {
-        return [MethodTarget::exact('ExternalAssertions', 'isString')];
+        return [
+            MethodTarget::exact('ExternalAssertions', 'isString'),
+            MethodTarget::exact('ReceiverWidening', 'willImplement'),
+        ];
     }
 
     public function getAssertions(AssertionProviderContext $context): ?InvocationAssertions
     {
+        if (strtolower($context->invocation->name) === 'willimplement') {
+            $receiver = $context->invocation->receiverType;
+            $receiverAtomic = $receiver?->atomicTypes[0] ?? null;
+            if (
+                $context->invocation->kind !== InvocationKind::InstanceMethod
+                || $receiver === null
+                || !$receiverAtomic instanceof NamedObjectType
+                || $receiverAtomic->name !== 'ReceiverWidening'
+            ) {
+                throw new RuntimeException('The receiver assertion proof received incorrect invocation context.');
+            }
+
+            $marker = Type::namedObject('ReceiverMarker')->atomicTypes[0];
+            $widened = Type::fromAtomic(
+                new NamedObjectType(
+                    $receiverAtomic->name,
+                    $receiverAtomic->parameters,
+                    $receiverAtomic->variances,
+                    $receiverAtomic->static,
+                    $receiverAtomic->isThis,
+                    [...($receiverAtomic->intersections ?? []), $marker],
+                    $receiverAtomic->remappedParameters,
+                ),
+                $receiver->flags,
+            );
+
+            InvocationAudit::record('receiver-assertion');
+
+            return new InvocationAssertions(assertions: [
+                InvocationAssertions::RECEIVER => [new TypeAssertion(TypeAssertionKind::IsType, $widened)],
+            ]);
+        }
+
         $argument = $context->invocation->getArgument(0, 'value') ?? throw new RuntimeException(
             'The method assertion proof received no argument.',
         );
@@ -205,6 +244,7 @@ final class InvocationMethodProvider implements MethodReturnTypeProvider, Callab
             MethodTarget::exact('Builder', 'first'),
             MethodTarget::exact('DynamicProxy', 'dynamic'),
             MethodTarget::exact('DynamicProxy', 'acceptString'),
+            MethodTarget::exact('DynamicProxy', 'knownMethod'),
             MethodTarget::exact('DynamicFacade', 'dynamic'),
             MethodTarget::exact('Artisan', 'command'),
             MethodTarget::allMethods('Relation'),
@@ -276,6 +316,15 @@ final class InvocationMethodProvider implements MethodReturnTypeProvider, Callab
             InvocationAudit::record($static ? 'missing-static-signature' : 'missing-class-signature');
 
             return new EffectiveCallableSignature([new CallableParameter('$value', Type::string())]);
+        }
+
+        if ($invocation->declaringClass === 'DynamicProxy' && $invocation->name === 'knownmethod') {
+            InvocationAudit::record('diagnostic-signature');
+
+            return new EffectiveCallableSignature([new CallableParameter(
+                '$a',
+                Type::int(),
+            )], displayName: 'Subject::knownMethod');
         }
 
         if ($invocation->name !== 'acceptstring') {
@@ -532,6 +581,12 @@ final class InvocationMethodProvider implements MethodReturnTypeProvider, Callab
             InvocationAudit::record('dynamic-signature-return');
 
             return $argumentType;
+        }
+
+        if ($invocation->declaringClass === 'DynamicProxy' && $invocation->name === 'knownmethod') {
+            InvocationAudit::record('diagnostic-return');
+
+            return Type::mixed();
         }
 
         if ($invocation->declaringClass === 'DynamicFacade' && $invocation->name === 'dynamic') {

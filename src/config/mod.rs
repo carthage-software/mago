@@ -323,6 +323,7 @@ pub struct Configuration {
     ///
     /// Supported placeholders:
     /// - `%file%` — absolute file path
+    /// - `%rel_file%` — workspace-relative file path
     /// - `%line%` — line number
     /// - `%column%` — column number
     ///
