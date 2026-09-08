@@ -69,8 +69,15 @@ where
     let lhs_type = artifacts.get_rc_expression_type(&binary.lhs).unwrap_or(&fallback_type);
     let rhs_type = artifacts.get_rc_expression_type(&binary.rhs).unwrap_or(&fallback_type);
 
-    check_comparison_operand(context, binary.lhs, lhs_type, "Left", &binary.operator);
-    check_comparison_operand(context, binary.rhs, rhs_type, "Right", &binary.operator);
+    // Comparing an integer-or-false result with `> 0` explicitly excludes the failure value.
+    let allows_false = match binary.operator {
+        BinaryOperator::GreaterThan(_) => is_positive_integer_check(lhs_type, rhs_type),
+        BinaryOperator::LessThan(_) => is_positive_integer_check(rhs_type, lhs_type),
+        _ => false,
+    };
+
+    check_comparison_operand(context, binary.lhs, lhs_type, "Left", &binary.operator, allows_false);
+    check_comparison_operand(context, binary.rhs, rhs_type, "Right", &binary.operator, allows_false);
 
     if context.settings.no_boolean_literal_comparison
         // Only consider equality/inequality operators.
@@ -549,6 +556,13 @@ fn involves_external_reference(expr: &Expression<'_>, block_context: &BlockConte
     matches!(unwrap_expression(expr), Expression::Variable(Variable::Direct(var)) if block_context.references_to_external_scope.contains(&word(var.name)))
 }
 
+/// Whether a comparison with zero tests an integer-or-false result for a positive value.
+fn is_positive_integer_check(value_type: &TUnion, zero_type: &TUnion) -> bool {
+    zero_type.get_single_int().is_some_and(|integer| integer.is_zero())
+        && value_type.is_falsable()
+        && value_type.types.iter().all(|atomic| atomic.is_int() || atomic.is_false())
+}
+
 /// Checks a single operand of a comparison operation for problematic types.
 fn check_comparison_operand<'ast, 'arena, A>(
     context: &mut Context<'_, 'arena, A>,
@@ -556,6 +570,7 @@ fn check_comparison_operand<'ast, 'arena, A>(
     operand_type: &TUnion,
     side: &'static str,
     operator: &'ast BinaryOperator<'arena>,
+    allows_false: bool,
 ) where
     A: Arena,
 {
@@ -606,7 +621,7 @@ fn check_comparison_operand<'ast, 'arena, A>(
             .with_note(format!("PHP compares `false` with other types according to specific rules (e.g., `false == 0` is true using `{op_str}`). This can hide bugs."))
             .with_help("Ensure this operand is not `false` or explicitly handle the `false` case if it represents a distinct state (e.g., an error from a function)."),
         );
-    } else if operand_type.is_falsable() && !operand_type.ignore_falsable_issues() {
+    } else if operand_type.is_falsable() && !operand_type.ignore_falsable_issues() && !allows_false {
         context.collector.report_with_code(
             IssueCode::PossiblyFalseOperand,
             Issue::warning(format!(
