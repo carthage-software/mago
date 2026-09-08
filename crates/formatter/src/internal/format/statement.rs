@@ -11,6 +11,7 @@ use mago_syntax::cst::Constant;
 use mago_syntax::cst::Declare;
 use mago_syntax::cst::DeclareBody;
 use mago_syntax::cst::MaybeTypedUseItem;
+use mago_syntax::cst::Node;
 use mago_syntax::cst::Sequence;
 use mago_syntax::cst::Statement;
 use mago_syntax::cst::Terminator;
@@ -65,13 +66,32 @@ where
     let alignment_runs = detect_statement_ref_alignment_runs(f, stmts);
 
     let last_statement_index = if stmts.is_empty() { None } else { stmts.len().checked_sub(1) };
+    let sequence_span = f.current_node().span();
+    let sequence_end = match f.current_node() {
+        Node::Program(program) => program.source_text.len() as u32,
+        _ => sequence_span.end.offset,
+    };
     let mut i = 0;
     while i < stmts.len() {
         let stmt = stmts[i];
         let stmt_start = stmt.span().start.offset;
 
         // Check if this statement falls within an ignore region
-        if let Some(region) = f.get_ignore_region_for(stmt_start).copied() {
+        if let Some(region) = f
+            .get_ignore_region_for(stmt_start)
+            .filter(|region| {
+                region.start >= sequence_span.start.offset
+                    && region.end <= sequence_end
+                    && stmt.span().end.offset <= region.end
+                    && stmts.iter().all(|statement| {
+                        let span = statement.span();
+
+                        !(span.start.offset < region.start && region.start < span.end.offset
+                            || span.start.offset < region.end && region.end < span.end.offset)
+                    })
+            })
+            .copied()
+        {
             // First, flush any pending use statements that came before the ignore region
             if !use_statements.is_empty() {
                 parts.extend(print_use_statements(f, use_statements.as_slice()));
