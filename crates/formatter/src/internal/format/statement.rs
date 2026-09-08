@@ -97,6 +97,9 @@ where
                 parts.extend(print_use_statements(f, use_statements.as_slice()));
                 use_statements.clear();
                 parts.push(Document::Line(Line::hard()));
+                if f.settings.empty_line_after_use {
+                    parts.push(Document::Line(Line::hard()));
+                }
             }
 
             // Output the preserved source for this region
@@ -129,6 +132,9 @@ where
                 parts.extend(print_use_statements(f, use_statements.as_slice()));
                 use_statements.clear();
                 parts.push(Document::Line(Line::hard()));
+                if f.settings.empty_line_after_use {
+                    parts.push(Document::Line(Line::hard()));
+                }
             }
 
             // Preserve the marker comment and statement as-is

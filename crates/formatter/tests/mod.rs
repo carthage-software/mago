@@ -269,6 +269,7 @@ test_case!(format_ignore_range_multiple);
 test_case!(format_ignore_range_block_comment);
 test_case!(format_ignore_range_multi_statements);
 test_case!(issue_2346);
+test_case!(issue_2348);
 test_case!(format_ignore_next_basic);
 test_case!(format_ignore_next_multiple);
 test_case!(class_member_format_ignore_next);
