@@ -112,6 +112,7 @@ Per top-level key:
 
 - Tables and objects are deep-merged. A child can override a single key inside a nested table without redefining the whole table.
 - Arrays such as `source.excludes` and per-rule `exclude` lists are concatenated, parent first. If a base config excludes `vendor/`, you keep that exclude and add your own.
+- `extension-hosts.<name>.command` is the exception: it is an argv, where each element's meaning comes from its position, so a layer that redeclares it **replaces** it. Concatenating two commands would start the parent's program with the child's path as a stray argument. Every other key inside the host table still merges normally, so a layer can change `workers` or `enabled` and keep the inherited command.
 - Scalars (strings, numbers, booleans) are overwritten by the child.
 
 ```toml

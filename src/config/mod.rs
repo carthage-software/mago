@@ -43,6 +43,9 @@
 //! Layers are merged later-wins. For each top-level key:
 //! - **Tables / objects**: deep-merged recursively.
 //! - **Arrays** (e.g. `source.excludes`): concatenated, parent first.
+//! - **Positional arrays** (`extension-hosts.<name>.command`): child replaces parent. An argv
+//!   derives each element's meaning from its position, so concatenating two of them produces a
+//!   command that runs the parent's program with the child's path as a stray argument.
 //! - **Scalars**: child overwrites parent.
 //!
 //! All layers parse into a generic `serde_json::Value` tree. The merged tree is deserialized
@@ -1133,6 +1136,41 @@ environment = { APP_ENV = "test" }
     }
 
     #[test]
+    fn test_extends_replaces_an_extension_host_command() {
+        let dir = temp_dir().join("extends-host-command");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+
+        write_file(&dir.join("base.toml"), "[extension-hosts.acme]\ncommand = [\"php\", \"vendor/acme/worker.php\"]\n");
+        write_file(
+            &dir.join("mago.toml"),
+            "extends = \"base.toml\"\n[extension-hosts.acme]\ncommand = [\"php\", \".mago/worker.php\"]\n",
+        );
+
+        let config = load_isolated(&dir.join("mago.toml"));
+
+        // Concatenating would give ["php", "vendor/acme/worker.php", "php", ".mago/worker.php"],
+        // which silently starts the base layer's worker and drops the project's own.
+        assert_eq!(config.extension_hosts["acme"].command, vec!["php", ".mago/worker.php"]);
+    }
+
+    #[test]
+    fn test_extends_keeps_an_extension_host_command_it_does_not_redeclare() {
+        let dir = temp_dir().join("extends-host-command-inherited");
+        let _ = fs::remove_dir_all(&dir);
+        fs::create_dir_all(&dir).unwrap();
+
+        write_file(&dir.join("base.toml"), "[extension-hosts.acme]\ncommand = [\"php\", \"vendor/acme/worker.php\"]\n");
+        write_file(&dir.join("mago.toml"), "extends = \"base.toml\"\n[extension-hosts.acme]\nworkers = 3\n");
+
+        let config = load_isolated(&dir.join("mago.toml"));
+        let host = &config.extension_hosts["acme"];
+
+        assert_eq!(host.command, vec!["php", "vendor/acme/worker.php"]);
+        assert_eq!(host.workers, 3);
+    }
+
+    #[test]
     fn test_extends_cycle_is_detected() {
         let dir = temp_dir().join("extends-cycle");
         let _ = fs::remove_dir_all(&dir);
@@ -1442,17 +1480,43 @@ fn resolve_extends_entry(entry: &str, base_dir: &Path) -> Result<Option<(PathBuf
 /// `target`'s. Arrays are concatenated (target first, source second). Scalars in `source`
 /// replace scalars in `target`.
 fn merge_into(target: &mut Value, source: Value) {
+    let mut path = Vec::new();
+    merge_value_into(target, source, &mut path);
+}
+
+/// Whether the array at `path` is positional rather than additive.
+///
+/// Concatenation is the right default for a set of independent entries —
+/// `source.excludes`, `analyzer.plugins`, a rule's `exclude` list — because a
+/// base layer adding one is exactly what inheritance is for. It is wrong for an
+/// argv, where every element's meaning comes from its position: appending one
+/// command to another yields `php a.php php b.php`, which runs the base layer's
+/// worker with the child's path as a stray argument and gives the child no way
+/// to say otherwise. Those arrays are replaced by the later layer, like scalars.
+fn is_positional_array(path: &[String]) -> bool {
+    // `extension-hosts.<name>.command`
+    path.len() == 3 && path[0] == "extension-hosts" && path[2] == "command"
+}
+
+fn merge_value_into(target: &mut Value, source: Value, path: &mut Vec<String>) {
     use serde_json::Value;
     match (target, source) {
         (Value::Object(t), Value::Object(s)) => {
             for (k, v) in s {
                 match t.get_mut(&k) {
-                    Some(existing) => merge_into(existing, v),
+                    Some(existing) => {
+                        path.push(k);
+                        merge_value_into(existing, v, path);
+                        path.pop();
+                    }
                     None => {
                         t.insert(k, v);
                     }
                 }
             }
+        }
+        (target @ Value::Array(_), source @ Value::Array(_)) if is_positional_array(path) => {
+            *target = source;
         }
         (Value::Array(t), Value::Array(s)) => {
             t.extend(s);
