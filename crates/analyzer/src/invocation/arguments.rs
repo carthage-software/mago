@@ -1,9 +1,10 @@
-use mago_allocator::Arena;
 use std::collections::hash_map::Entry;
 
 use foldhash::HashMap;
 
+use mago_allocator::Arena;
 use mago_bytes::BytesDisplay;
+use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::add_union_type;
 use mago_codex::ttype::atomic::TAtomic;
@@ -34,9 +35,33 @@ use crate::invocation::InvocationTarget;
 use crate::utils::get_type_diff;
 
 /// Checks if an argument can be passed by reference.
-fn is_argument_referenceable(argument_expression: &Expression, argument_type: &TUnion) -> bool {
+pub(super) fn is_argument_referenceable(argument_expression: &Expression, argument_type: &TUnion) -> bool {
     argument_expression.is_referenceable(false)
         || (argument_expression.is_referenceable(true) && argument_type.by_reference())
+}
+
+pub(super) fn is_argument_mutated_by_reference(
+    invocation_target: &InvocationTarget<'_>,
+    argument_offset: usize,
+    argument_type: &TUnion,
+    declared_by_reference: bool,
+) -> bool {
+    if declared_by_reference && argument_offset > 0 && is_array_multisort(invocation_target) {
+        return !argument_type.is_int();
+    }
+
+    declared_by_reference
+}
+
+fn requires_referenceable_argument(invocation_target: &InvocationTarget<'_>, declared_by_reference: bool) -> bool {
+    declared_by_reference && !is_array_multisort(invocation_target)
+}
+
+pub(super) fn is_array_multisort(invocation_target: &InvocationTarget<'_>) -> bool {
+    matches!(
+        invocation_target.get_function_like_identifier(),
+        Some(FunctionLikeIdentifier::Function(name)) if name.as_bytes().eq_ignore_ascii_case(b"array_multisort")
+    )
 }
 
 fn is_empty_container_construction(expression: &Expression) -> bool {
@@ -126,7 +151,9 @@ where
 
     let argument_type = artifacts.get_expression_type(argument_expression).cloned().unwrap_or_else(get_mixed);
 
-    if referenced_parameter && !is_argument_referenceable(argument_expression, &argument_type) {
+    if requires_referenceable_argument(invocation_target, referenced_parameter)
+        && !is_argument_referenceable(argument_expression, &argument_type)
+    {
         let target_kind_str = invocation_target.guess_kind();
         let target_name_str = invocation_target.guess_name(context);
         let parameter_label = invocation_target

@@ -2994,7 +2994,13 @@ function dns_get_record(
  *
  * @return false|int<0, max>
  */
-function stream_select(?array &$read, ?array &$write, ?array &$except, ?int $seconds, ?int $microseconds = null): int|false {}
+function stream_select(
+    ?array &$read,
+    ?array &$write,
+    ?array &$except,
+    ?int $seconds,
+    ?int $microseconds = null,
+): int|false {}
 
 /**
  * @return resource
@@ -4593,7 +4599,7 @@ function range(string|int|float $start, string|int|float $end, int|float $step =
 /**
  * @pure
  */
-function array_multisort(&$array, $sort_order = SORT_ASC, $sort_flags = SORT_REGULAR, &...$rest): bool {}
+function array_multisort(array &$array, array|int &...$rest): bool {}
 
 /**
  * @template K of array-key

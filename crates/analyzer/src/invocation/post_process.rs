@@ -53,6 +53,9 @@ use crate::formula::get_formula;
 use crate::formula::negate_or_synthesize;
 use crate::invocation::Invocation;
 use crate::invocation::InvocationArgumentsSource;
+use crate::invocation::arguments::is_argument_mutated_by_reference;
+use crate::invocation::arguments::is_argument_referenceable;
+use crate::invocation::arguments::is_array_multisort;
 use crate::invocation::resolver::resolve_invocation_type;
 use crate::plugin::provider::assertion::InvocationAssertions;
 use crate::reconciler;
@@ -324,18 +327,36 @@ where
         );
 
         if let Some(argument) = argument {
+            let argument_type = artifacts.get_expression_type(argument).cloned().unwrap_or_else(get_mixed);
+            if !is_argument_mutated_by_reference(
+                &invocation.target,
+                parameter_offset,
+                &argument_type,
+                parameter_ref.is_by_reference(),
+            ) {
+                continue;
+            }
+
+            if is_array_multisort(&invocation.target) && !is_argument_referenceable(argument, &argument_type) {
+                continue;
+            }
+
             let declared_had_templates = parameter_ref
                 .get_out_type()
                 .or_else(|| parameter_ref.get_type())
                 .is_some_and(|declared| declared.has_template_types());
 
-            let mut new_type = parameter_ref
-                .get_out_type()
-                .or_else(|| parameter_ref.get_type())
-                .cloned()
-                .map_or_else(get_mixed, |new_type| {
-                    resolve_invocation_type(context, invocation, template_result, parameters, new_type)
-                });
+            let mut new_type = if parameter_offset > 0 && is_array_multisort(&invocation.target) {
+                argument_type
+            } else {
+                parameter_ref
+                    .get_out_type()
+                    .or_else(|| parameter_ref.get_type())
+                    .cloned()
+                    .map_or_else(get_mixed, |new_type| {
+                        resolve_invocation_type(context, invocation, template_result, parameters, new_type)
+                    })
+            };
 
             // If the argument's current type is `never`, this call is unreachable
             // its by-reference effect cannot happen, so the variable's type must
