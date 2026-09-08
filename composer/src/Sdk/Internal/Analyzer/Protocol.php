@@ -1105,6 +1105,7 @@ final class Protocol
 
         $writer = self::createMessage(self::CALLABLE_SIGNATURE_RESPONSE);
         $writer->writeBoolean(true);
+        $writer->writeOptionalString($signature->displayName);
         $writer->writeBoolean($signature->allowsNamedArguments);
         $writer->writeCount($signature->parameters);
         foreach ($signature->parameters as $parameter) {

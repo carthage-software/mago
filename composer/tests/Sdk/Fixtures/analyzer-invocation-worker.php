@@ -244,6 +244,7 @@ final class InvocationMethodProvider implements MethodReturnTypeProvider, Callab
             MethodTarget::exact('Builder', 'first'),
             MethodTarget::exact('DynamicProxy', 'dynamic'),
             MethodTarget::exact('DynamicProxy', 'acceptString'),
+            MethodTarget::exact('DynamicProxy', 'knownMethod'),
             MethodTarget::exact('DynamicFacade', 'dynamic'),
             MethodTarget::exact('Artisan', 'command'),
             MethodTarget::allMethods('Relation'),
@@ -315,6 +316,15 @@ final class InvocationMethodProvider implements MethodReturnTypeProvider, Callab
             InvocationAudit::record($static ? 'missing-static-signature' : 'missing-class-signature');
 
             return new EffectiveCallableSignature([new CallableParameter('$value', Type::string())]);
+        }
+
+        if ($invocation->declaringClass === 'DynamicProxy' && $invocation->name === 'knownmethod') {
+            InvocationAudit::record('diagnostic-signature');
+
+            return new EffectiveCallableSignature([new CallableParameter(
+                '$a',
+                Type::int(),
+            )], displayName: 'Subject::knownMethod');
         }
 
         if ($invocation->name !== 'acceptstring') {
@@ -571,6 +581,12 @@ final class InvocationMethodProvider implements MethodReturnTypeProvider, Callab
             InvocationAudit::record('dynamic-signature-return');
 
             return $argumentType;
+        }
+
+        if ($invocation->declaringClass === 'DynamicProxy' && $invocation->name === 'knownmethod') {
+            InvocationAudit::record('diagnostic-return');
+
+            return Type::mixed();
         }
 
         if ($invocation->declaringClass === 'DynamicFacade' && $invocation->name === 'dynamic') {

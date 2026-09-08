@@ -21,11 +21,17 @@ final class EffectiveCallableSignature
 {
     /**
      * @param list<CallableParameter> $parameters
+     * @param string|null $displayName
      */
     public function __construct(
         public readonly array $parameters,
         public readonly bool $allowsNamedArguments = true,
+        public readonly ?string $displayName = null,
     ) {
+        if ($displayName === '') {
+            throw new InvalidArgumentException('An effective callable display name cannot be empty.');
+        }
+
         $names = [];
         $optional = false;
         $lastIndex = array_key_last($parameters);

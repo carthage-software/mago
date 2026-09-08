@@ -422,6 +422,22 @@ filtered_missing();
 retained_missing();
 ";
 
+const EFFECTIVE_SIGNATURE_DIAGNOSTIC_SOURCE: &str = r"<?php
+
+declare(strict_types=1);
+
+final class DynamicProxy
+{
+    public function __call(string $name, array $arguments): mixed
+    {
+        return null;
+    }
+}
+
+(new DynamicProxy())->knownMethod('not-an-int');
+(new DynamicProxy())->knownMethod(null);
+";
+
 #[test]
 fn external_providers_receive_complete_invocation_context() -> Result<(), Box<dyn std::error::Error>> {
     if !php_sdk_is_available() {
@@ -569,6 +585,34 @@ fn external_issue_filters_batch_and_remove_selected_native_diagnostics() -> Resu
     assert!(observation.issues[0].1.contains("`retained_missing`"));
     assert_eq!(observation.invocations.len(), 2, "both issues from the file should reach the worker batch");
     assert!(observation.invocations.iter().all(|entry| entry.starts_with("issue-filter-")));
+
+    Ok(())
+}
+
+#[test]
+fn effective_signatures_name_the_logical_callable_and_parameter_in_diagnostics()
+-> Result<(), Box<dyn std::error::Error>> {
+    if !php_sdk_is_available() {
+        return Ok(());
+    }
+
+    let observation = analyze_with_fixture(EFFECTIVE_SIGNATURE_DIAGNOSTIC_SOURCE, false, false, false)?;
+    assert_eq!(
+        observation.issues,
+        [(
+            Some("invalid-argument".to_owned()),
+            "Invalid argument type for `$a` of `Subject::knownMethod`: expected `int`, but found `string('not-an-int')`."
+                .to_owned(),
+        ), (
+            Some("null-argument".to_owned()),
+            "Argument `$a` of method `Subject::knownMethod` is `null`, but parameter type `int` does not accept it."
+                .to_owned(),
+        )]
+    );
+    assert_eq!(
+        observation.invocations,
+        ["diagnostic-signature", "diagnostic-return", "diagnostic-signature", "diagnostic-return"]
+    );
 
     Ok(())
 }
