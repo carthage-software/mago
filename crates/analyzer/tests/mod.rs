@@ -2745,6 +2745,7 @@ test_case!(issue_2312);
 test_case!(issue_2315);
 test_case!(issue_2317);
 test_case!(issue_2318);
+test_case!(issue_2319);
 test_case!(issue_2320, {
     let mut settings = default_test_settings();
     settings.version = mago_php_version::PHPVersion::PHP84;

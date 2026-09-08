@@ -14,6 +14,7 @@ use mago_phpdoc_syntax::cst::Text;
 use mago_phpdoc_syntax::cst::TextSegment;
 use mago_phpdoc_syntax::cst::WhereTagValueModifier;
 use mago_phpdoc_syntax::cst::r#type::Type;
+use mago_span::HasSpan;
 
 fn parse<'arena>(arena: &'arena LocalArena, source: &'arena [u8]) -> Document<'arena> {
     PHPDocParser::parse(arena, FileId::zero(), source)
@@ -284,11 +285,56 @@ fn parses_assert_property() {
     assert_eq!(tag.vendor, Some(TagVendor::PhpStan));
     let TagValue::Assert(assert) = &tag.value else { panic!("got {:?}", tag.value) };
     assert!(assert.bang.is_some());
-    let AssertSubject::Property { parameter, property, .. } = &assert.subject else {
-        panic!("got {:?}", assert.subject)
-    };
-    assert_eq!(parameter.value, b"$this");
+    let AssertSubject::Property { object, property, .. } = &assert.subject else { panic!("got {:?}", assert.subject) };
+    let AssertSubject::Parameter { variable } = object else { panic!("got {object:?}") };
+    assert_eq!(variable.value, b"$this");
     assert_eq!(property.value, b"value");
+}
+
+#[test]
+fn parses_assert_nested_property_with_description() {
+    let arena = LocalArena::new();
+    let source = b"/** @phpstan-assert !null $value->inner->prop validated property */";
+    let document = parse(&arena, source);
+    let tag = first_tag(&document);
+
+    assert!(!document.has_errors(), "got {:?}", document.errors);
+    let TagValue::Assert(assert) = &tag.value else { panic!("got {:?}", tag.value) };
+    let AssertSubject::Property { object, property, .. } = &assert.subject else { panic!("got {:?}", assert.subject) };
+    assert_eq!(property.value, b"prop");
+    let AssertSubject::Property { object, property, .. } = object else { panic!("got {object:?}") };
+    assert_eq!(property.value, b"inner");
+    let AssertSubject::Parameter { variable } = object else { panic!("got {object:?}") };
+    assert_eq!(variable.value, b"$value");
+
+    let span = assert.subject.span();
+    assert_eq!(&source[span.start.offset as usize..span.end.offset as usize], b"$value->inner->prop");
+    let Some(description) = &assert.description else { panic!("expected a description") };
+    assert_eq!(plain(description), b"validated property");
+}
+
+#[test]
+fn parses_assert_nested_method_and_property() {
+    let arena = LocalArena::new();
+    let source = b"/** @psalm-assert-if-true !null $this->getInner()->prop->getValue() validated value */";
+    let document = parse(&arena, source);
+    let tag = first_tag(&document);
+
+    assert!(!document.has_errors(), "got {:?}", document.errors);
+    let TagValue::AssertIfTrue(assert) = &tag.value else { panic!("got {:?}", tag.value) };
+    let AssertSubject::Method { object, method, .. } = &assert.subject else { panic!("got {:?}", assert.subject) };
+    assert_eq!(method.value, b"getValue");
+    let AssertSubject::Property { object, property, .. } = object else { panic!("got {object:?}") };
+    assert_eq!(property.value, b"prop");
+    let AssertSubject::Method { object, method, .. } = object else { panic!("got {object:?}") };
+    assert_eq!(method.value, b"getInner");
+    let AssertSubject::Parameter { variable } = object else { panic!("got {object:?}") };
+    assert_eq!(variable.value, b"$this");
+
+    let span = assert.subject.span();
+    assert_eq!(&source[span.start.offset as usize..span.end.offset as usize], b"$this->getInner()->prop->getValue()");
+    let Some(description) = &assert.description else { panic!("expected a description") };
+    assert_eq!(plain(description), b"validated value");
 }
 
 #[test]

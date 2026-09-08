@@ -31,28 +31,33 @@ where
         &mut self,
         assert: &'scratch AssertTagValue<'scratch>,
     ) -> AssertAnnotation<'arena> {
-        let target = match &assert.subject {
-            AssertSubject::Parameter { variable } => AssertAnnotationTarget {
-                span: variable.span,
-                kind: AssertAnnotationTargetKind::Variable(self.phpdoc_variable(variable)),
-            },
-            AssertSubject::Method { parameter, method, .. } => AssertAnnotationTarget {
-                span: parameter.span,
-                kind: AssertAnnotationTargetKind::Method(self.phpdoc_variable(parameter), self.phpdoc_name(method)),
-            },
-            AssertSubject::Property { parameter, property, .. } => AssertAnnotationTarget {
-                span: parameter.span,
-                kind: AssertAnnotationTargetKind::Property(self.phpdoc_variable(parameter), self.phpdoc_name(property)),
-            },
-        };
-
         AssertAnnotation {
             span: assert.span(),
             negated: assert.is_negated(),
             equality: assert.is_equality(),
             pattern: self.lower_assert_pattern_annotation(&assert.pattern),
-            target,
+            target: self.lower_assert_target_annotation(&assert.subject),
         }
+    }
+
+    fn lower_assert_target_annotation(&mut self, subject: &AssertSubject<'scratch>) -> AssertAnnotationTarget<'arena> {
+        let kind = match subject {
+            AssertSubject::Parameter { variable } => {
+                AssertAnnotationTargetKind::Variable(self.phpdoc_variable(variable))
+            }
+            AssertSubject::Method { object, method, .. } => {
+                let object = self.lower_assert_target_annotation(object);
+
+                AssertAnnotationTargetKind::Method(self.arena.alloc(object), self.phpdoc_name(method))
+            }
+            AssertSubject::Property { object, property, .. } => {
+                let object = self.lower_assert_target_annotation(object);
+
+                AssertAnnotationTargetKind::Property(self.arena.alloc(object), self.phpdoc_name(property))
+            }
+        };
+
+        AssertAnnotationTarget { span: subject.span(), kind }
     }
 
     fn lower_assert_pattern_annotation(

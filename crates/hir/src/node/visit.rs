@@ -1145,9 +1145,9 @@ impl<'ir, 'arena, I, S, E> Node<'ir, 'arena, I, S, E> {
             }
             Self::AssertAnnotationTarget(node) => match &node.kind {
                 AssertAnnotationTargetKind::Variable(variable) => f(Node::DirectVariable(variable)),
-                AssertAnnotationTargetKind::Method(variable, name)
-                | AssertAnnotationTargetKind::Property(variable, name) => {
-                    f(Node::DirectVariable(variable));
+                AssertAnnotationTargetKind::Method(object, name)
+                | AssertAnnotationTargetKind::Property(object, name) => {
+                    f(Node::AssertAnnotationTarget(object));
                     f(Node::Name(name));
                 }
             },

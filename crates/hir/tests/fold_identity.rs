@@ -7,6 +7,8 @@ use mago_hir::fold::Fold;
 use mago_hir::ir::IR;
 use mago_hir::ir::expression::ExpressionKind;
 use mago_hir::ir::item::annotation::ItemAnnotation;
+use mago_hir::ir::item::annotation::effect::AssertAnnotationTarget;
+use mago_hir::ir::item::annotation::effect::AssertAnnotationTargetKind;
 use mago_hir::ir::item::annotation::generics::Variance;
 use mago_hir::ir::item::annotation::member::PropertyAnnotationKind;
 use mago_hir::ir::item::expression::ItemExpressionKind;
@@ -15,6 +17,7 @@ use mago_hir::ir::item::statement::ItemStatementKind;
 use mago_hir::ir::statement::StatementKind;
 use mago_hir::lower::LowerSettings;
 use mago_hir::lower::Lowering;
+use mago_hir::node::Node;
 use mago_hir::walker::MutWalker;
 use mago_span::Span;
 use mago_syntax::parser::parse_file;
@@ -314,6 +317,73 @@ fn fold_deep_copies_the_ir_onto_a_different_arena() {
     assert_eq!(coverage.read_properties, 1, "the folded IR must keep `@property-read`");
     assert_eq!(coverage.asserts, 1, "the folded IR must keep `@assert`");
     assert_eq!(coverage.sealings, 1, "the folded IR must keep `@sealed`");
+}
+
+#[test]
+fn nested_assertion_targets_preserve_structure_spans_and_traversal_after_folding() {
+    const CODE: &str = "<?php
+/** @assert int $value->inner->getValue()->number */
+function check(object $value): void {}
+";
+
+    struct TargetCollector;
+
+    impl<'arena> MutWalker<'arena, (), (), (), Vec<(&'static str, Span)>> for TargetCollector {
+        fn walk_in_assert_annotation_target(
+            &mut self,
+            target: &AssertAnnotationTarget<'arena>,
+            targets: &mut Vec<(&'static str, Span)>,
+        ) {
+            let kind = match target.kind {
+                AssertAnnotationTargetKind::Variable(_) => "variable",
+                AssertAnnotationTargetKind::Method(..) => "method",
+                AssertAnnotationTargetKind::Property(..) => "property",
+            };
+
+            targets.push((kind, target.span));
+        }
+    }
+
+    fn collect_node_targets(node: Node<'_, '_, (), (), ()>, spans: &mut Vec<Span>) {
+        if let Node::AssertAnnotationTarget(target) = node {
+            spans.push(target.span);
+        }
+
+        node.visit_children(|child| collect_node_targets(child, spans));
+    }
+
+    let source_arena = LocalArena::new();
+    let target_arena = LocalArena::new();
+    let scratch = LocalArena::new();
+    let file = File::ephemeral(Cow::Borrowed(b"assert.php"), Cow::Borrowed(CODE.as_bytes()));
+    let program = parse_file(&scratch, &file);
+    let ir = Lowering::new(&source_arena, &scratch, &file, program, LowerSettings::default()).lower();
+    drop(scratch);
+
+    let folded = Identity { arena: &target_arena }.fold_ir(&ir);
+    assert_eq!(folded, ir);
+    drop(source_arena);
+
+    let mut targets = Vec::new();
+    TargetCollector.walk_ir(&folded, &mut targets);
+
+    let target_texts = targets
+        .iter()
+        .map(|(kind, span)| (*kind, &CODE[span.start.offset as usize..span.end.offset as usize]))
+        .collect::<Vec<_>>();
+    assert_eq!(
+        target_texts,
+        vec![
+            ("property", "$value->inner->getValue()->number"),
+            ("method", "$value->inner->getValue()"),
+            ("property", "$value->inner"),
+            ("variable", "$value"),
+        ],
+    );
+
+    let mut node_spans = Vec::new();
+    collect_node_targets(Node::Ir(&folded), &mut node_spans);
+    assert_eq!(node_spans, targets.iter().map(|(_, span)| *span).collect::<Vec<_>>());
 }
 
 #[test]
