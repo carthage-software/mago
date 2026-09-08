@@ -5,6 +5,7 @@ use mago_database::file::File;
 use mago_database::file::FileId;
 use mago_database::file::HasFileId;
 use mago_php_version::PHPVersion;
+use mago_php_version::feature::Feature;
 use mago_span::Span;
 use mago_syntax::cst::Node;
 use mago_syntax::cst::Program;
@@ -199,6 +200,15 @@ where
     #[inline]
     pub fn set_alignment_context(&mut self, context: Option<AssignmentAlignment>) {
         self.alignment_context = context;
+    }
+
+    /// Whether a trailing comma may be printed for a construct whose trailing-comma support
+    /// arrived with `feature`: the `trailing_comma` setting has to be on, and the target PHP
+    /// version has to accept the syntax. Constructs that always allowed a trailing comma
+    /// (array literals, `match` arms, attribute lists) do not go through here.
+    #[inline]
+    pub(crate) fn trailing_comma_for(&self, feature: Feature) -> bool {
+        self.settings.trailing_comma && self.php_version.is_supported(feature)
     }
 
     /// Get the current next comment index.

@@ -347,7 +347,11 @@ where
         parts.push(Document::Indent(vec_in![f.arena;
             Document::Line(Line::hard()),
             Document::Group(Group::new(get_printed_arguments(f, true, 0))),
-            if f.settings.trailing_comma { Document::String(b",") } else { Document::empty() },
+            if f.trailing_comma_for(Feature::TrailingCommaInFunctionCalls) {
+                Document::String(b",")
+            } else {
+                Document::empty()
+            },
         ]));
 
         parts.push(print_right_parenthesis(f, dangling_comments.as_ref(), &right_parenthesis, Some(true)));
@@ -374,7 +378,7 @@ where
                         Document::Line(Line::soft()),
                         Document::Group(Group::new(vec_in![f.arena; clone_in_arena(f.arena, &single_argument)])),
                     ])),
-                    if f.settings.trailing_comma {
+                    if f.trailing_comma_for(Feature::TrailingCommaInFunctionCalls) {
                         Document::IfBreak(IfBreak::new(f.arena, Document::String(b","), Document::empty()))
                     } else {
                         Document::empty()
@@ -478,7 +482,7 @@ where
     let group_id = f.next_id();
     printed_arguments.insert(0, Document::Line(Line::soft()));
     contents.push(Document::IndentIfBreak(IndentIfBreak::new(group_id, printed_arguments)));
-    if f.settings.trailing_comma {
+    if f.trailing_comma_for(Feature::TrailingCommaInFunctionCalls) {
         contents.push(Document::IfBreak(IfBreak::then(f.arena, Document::String(b","))));
     }
     contents.push(print_right_parenthesis(f, dangling_comments.as_ref(), &right_parenthesis, None));
