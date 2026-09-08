@@ -43,9 +43,8 @@
 //! Layers are merged later-wins. For each top-level key:
 //! - **Tables / objects**: deep-merged recursively.
 //! - **Arrays** (e.g. `source.excludes`): concatenated, parent first.
-//! - **Positional arrays** (`extension-hosts.<name>.command`): child replaces parent. An argv
-//!   derives each element's meaning from its position, so concatenating two of them produces a
-//!   command that runs the parent's program with the child's path as a stray argument.
+//! - **Positional arrays** (`extension-hosts.<name>.command`): child replaces parent, since
+//!   appending to an argv produces a different command rather than a merged one.
 //! - **Scalars**: child overwrites parent.
 //!
 //! All layers parse into a generic `serde_json::Value` tree. The merged tree is deserialized
@@ -157,6 +156,16 @@ const _: () = {
     assert!(bytes.len() == 4 && bytes[0] == b'M' && bytes[1] == b'A' && bytes[2] == b'G' && bytes[3] == b'O');
 };
 
+/// Shape of the top-level `extends` directive, for the published JSON schema only.
+///
+/// Either one parent layer or a list of them, applied left to right.
+#[derive(Debug, Clone, Serialize, Deserialize, JsonSchema)]
+#[serde(untagged)]
+enum ExtendsDirective {
+    One(String),
+    Many(Vec<String>),
+}
+
 /// The main configuration structure for Mago CLI.
 ///
 /// Aggregates all settings: top-level scalars (`php-version`, `threads`, …) plus
@@ -172,6 +181,14 @@ pub struct Configuration {
     #[serde(rename = "$schema", skip_serializing)]
     #[schemars(rename = "$schema", with = "Option<String>", !skip_serializing)]
     _schema: Option<IgnoredAny>,
+    /// Configuration layers this file inherits from.
+    ///
+    /// Declared for the published JSON schema only, which is
+    /// `additionalProperties: false`. [`extract_extends`] strips the directive
+    /// from every layer, so this field is never populated.
+    #[serde(default, rename = "extends", skip_serializing)]
+    #[schemars(rename = "extends", with = "Option<ExtendsDirective>", !skip_serializing)]
+    _extends: Option<IgnoredAny>,
     /// The mago version this project is pinned to.
     ///
     /// Accepts three pin levels:
@@ -601,6 +618,7 @@ impl Configuration {
     pub fn from_workspace(workspace: PathBuf) -> Self {
         Self {
             _schema: None,
+            _extends: None,
             version: None,
             threads: *LOGICAL_CPUS,
             stack_size: DEFAULT_STACK_SIZE,
@@ -1171,6 +1189,22 @@ environment = { APP_ENV = "test" }
     }
 
     #[test]
+    fn test_schema_accepts_the_extends_directive() {
+        let schema = serde_json::to_value(schemars::schema_for!(Configuration)).unwrap();
+
+        // A directive missing from an `additionalProperties: false` schema is an error.
+        assert_eq!(schema["additionalProperties"], serde_json::json!(false));
+
+        let extends = &schema["properties"]["extends"];
+        assert!(!extends.is_null(), "`extends` must be part of the published schema");
+
+        let definition = &schema["$defs"]["ExtendsDirective"]["anyOf"];
+        assert_eq!(definition[0]["type"], "string");
+        assert_eq!(definition[1]["type"], "array");
+        assert_eq!(definition[1]["items"]["type"], "string");
+    }
+
+    #[test]
     fn test_extends_cycle_is_detected() {
         let dir = temp_dir().join("extends-cycle");
         let _ = fs::remove_dir_all(&dir);
@@ -1477,22 +1511,18 @@ fn resolve_extends_entry(entry: &str, base_dir: &Path) -> Result<Option<(PathBuf
 }
 
 /// Recursively merge `source` into `target`. Object keys from `source` override / merge with
-/// `target`'s. Arrays are concatenated (target first, source second). Scalars in `source`
-/// replace scalars in `target`.
+/// `target`'s. Arrays are concatenated (target first, source second), except the positional ones
+/// named by [`is_positional_array`], which `source` replaces. Scalars in `source` replace scalars
+/// in `target`.
 fn merge_into(target: &mut Value, source: Value) {
     let mut path = Vec::new();
     merge_value_into(target, source, &mut path);
 }
 
-/// Whether the array at `path` is positional rather than additive.
+/// Whether the array at `path` is an argv, whose elements derive their meaning
+/// from their position, rather than an additive set like `source.excludes`.
 ///
-/// Concatenation is the right default for a set of independent entries —
-/// `source.excludes`, `analyzer.plugins`, a rule's `exclude` list — because a
-/// base layer adding one is exactly what inheritance is for. It is wrong for an
-/// argv, where every element's meaning comes from its position: appending one
-/// command to another yields `php a.php php b.php`, which runs the base layer's
-/// worker with the child's path as a stray argument and gives the child no way
-/// to say otherwise. Those arrays are replaced by the later layer, like scalars.
+/// Positional arrays are replaced by the later layer, like scalars.
 fn is_positional_array(path: &[String]) -> bool {
     // `extension-hosts.<name>.command`
     path.len() == 3 && path[0] == "extension-hosts" && path[2] == "command"

@@ -130,6 +130,8 @@ threads = 8
 excludes = ["build"]   # appended -> ["vendor", "node_modules", "build"]
 ```
 
+`extends` is part of the published JSON schema, so a file using it still validates against `vendor/carthage-software/mago/schema.json`.
+
 Cycles are detected via canonical-path tracking and surface a clear error rather than recursing forever. Diamond inheritance (A extends B and C, both extend D) processes D once and is fine. Layers can mix formats freely; each is parsed by its own driver and merged at a generic value level before the final document is validated against the schema.
 
 ## Global options
