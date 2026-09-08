@@ -216,10 +216,55 @@ pub fn long_message(issue: &Issue, include_annotations: bool) -> String {
 /// in `template` with the provided values.
 #[must_use]
 pub fn osc8_hyperlink(template: &str, abs_path: &str, line: u32, column: u32, display_text: &str) -> String {
-    let url = template
-        .replace("%file%", &strip_windows_verbatim_prefix(abs_path))
-        .replace("%line%", &line.to_string())
-        .replace("%column%", &column.to_string());
+    osc8_file_hyperlink(template, abs_path, abs_path, line, column, display_text)
+}
+
+/// Build an OSC 8 hyperlink wrapping `display_text` with absolute and relative file paths.
+///
+/// The URL is constructed by replacing `%file%`, `%rel_file%`, `%line%`, and `%column%`
+/// placeholders in `template` with the provided values.
+#[must_use]
+pub fn osc8_file_hyperlink(
+    template: &str,
+    abs_path: &str,
+    relative_path: &str,
+    line: u32,
+    column: u32,
+    display_text: &str,
+) -> String {
+    let absolute_path = strip_windows_verbatim_prefix(abs_path);
+    let line = line.to_string();
+    let column = column.to_string();
+    let replacements = [
+        ("%file%", absolute_path.as_ref()),
+        ("%rel_file%", relative_path),
+        ("%line%", line.as_str()),
+        ("%column%", column.as_str()),
+    ];
+    let mut url = String::with_capacity(template.len());
+    let mut remaining = template;
+
+    while let Some(position) = remaining.find('%') {
+        url.push_str(&remaining[..position]);
+        remaining = &remaining[position..];
+
+        let mut replaced = false;
+        for &(placeholder, value) in &replacements {
+            if let Some(rest) = remaining.strip_prefix(placeholder) {
+                url.push_str(value);
+                remaining = rest;
+                replaced = true;
+                break;
+            }
+        }
+
+        if !replaced {
+            url.push('%');
+            remaining = &remaining[1..];
+        }
+    }
+
+    url.push_str(remaining);
 
     format!("\x1b]8;;{url}\x1b\\{display_text}\x1b]8;;\x1b\\")
 }
@@ -244,6 +289,7 @@ fn strip_windows_verbatim_prefix(path: &str) -> std::borrow::Cow<'_, str> {
 
 #[cfg(test)]
 mod tests {
+    use super::osc8_file_hyperlink;
     use super::strip_windows_verbatim_prefix;
     use super::utf8_preserving_byte_offsets;
     use super::xml_encode;
@@ -290,5 +336,35 @@ mod tests {
     #[test]
     fn leaves_unc_without_verbatim_unchanged() {
         assert_eq!(strip_windows_verbatim_prefix(r"\\server\share\file.php"), r"\\server\share\file.php");
+    }
+
+    #[test]
+    fn editor_url_replaces_absolute_and_relative_file_placeholders() {
+        assert_eq!(
+            osc8_file_hyperlink(
+                "editor://%file%?relative=%rel_file%&line=%line%&column=%column%",
+                "/workspace/src/Foo.php",
+                "src/Foo.php",
+                12,
+                34,
+                "src/Foo.php",
+            ),
+            "\x1b]8;;editor:///workspace/src/Foo.php?relative=src/Foo.php&line=12&column=34\x1b\\src/Foo.php\x1b]8;;\x1b\\",
+        );
+    }
+
+    #[test]
+    fn editor_url_does_not_expand_placeholders_inside_file_paths() {
+        assert_eq!(
+            osc8_file_hyperlink(
+                "editor://%file%?relative=%rel_file%",
+                "/workspace/%line%/Foo.php",
+                "src/%column%/Foo.php",
+                12,
+                34,
+                "src/Foo.php",
+            ),
+            "\x1b]8;;editor:///workspace/%line%/Foo.php?relative=src/%column%/Foo.php\x1b\\src/Foo.php\x1b]8;;\x1b\\",
+        );
     }
 }

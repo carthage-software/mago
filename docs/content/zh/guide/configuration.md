@@ -300,8 +300,15 @@ editor-url = "phpstorm://open?file=%file%&line=%line%&column=%column%"
 | 占位符 | 含义 |
 | :--- | :--- |
 | `%file%` | 文件的绝对路径。 |
+| `%rel_file%` | 相对于工作区的文件路径。 |
 | `%line%` | 行号,从 1 开始。 |
 | `%column%` | 列号,从 1 开始。 |
+
+当编辑器相对于当前打开的工作区解析文件路径时，请使用 `%rel_file%`：
+
+```sh
+export MAGO_EDITOR_URL="vscode://file/%rel_file%:%line%:%column%"
+```
 
 常用模板:
 
