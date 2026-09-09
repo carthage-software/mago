@@ -1,10 +1,9 @@
-use std::sync::Arc;
-
-use mago_codex::metadata::CodebaseMetadata;
+use mago_codex::scanner::scan_program;
 use mago_database::ReadDatabase;
 use mago_guard::ArchitecturalGuard;
 use mago_guard::settings::Settings;
 use mago_names::resolver::NameResolver;
+use mago_php_version::PHPVersion;
 use mago_reporting::Issue;
 use mago_reporting::IssueCollection;
 use mago_syntax::parser::parse_file_with_settings;
@@ -31,9 +30,6 @@ pub struct GuardService {
     /// The read-only database containing source files to guard.
     database: ReadDatabase,
 
-    /// A codebase metadata of builtin symbols.
-    codebase: CodebaseMetadata,
-
     /// The guard settings to configure the guarding process.
     settings: Settings,
 
@@ -42,6 +38,7 @@ pub struct GuardService {
 
     /// Whether to display progress bars during guarding.
     use_progress_bars: bool,
+    php_version: PHPVersion,
 }
 
 impl GuardService {
@@ -61,12 +58,12 @@ impl GuardService {
     #[must_use]
     pub fn new(
         database: ReadDatabase,
-        codebase: CodebaseMetadata,
         settings: Settings,
         parser_settings: ParserSettings,
         use_progress_bars: bool,
+        php_version: PHPVersion,
     ) -> Self {
-        Self { database, codebase, settings, parser_settings, use_progress_bars }
+        Self { database, settings, parser_settings, use_progress_bars, php_version }
     }
 
     /// Runs the guard pipeline on the codebase.
@@ -89,12 +86,12 @@ impl GuardService {
         let pipeline = StatelessParallelPipeline::new(
             GUARD_PROGRESS_PREFIX,
             self.database,
-            (Arc::new(self.codebase), self.settings, self.parser_settings),
+            (self.settings, self.parser_settings, self.php_version),
             Box::new(GuardResultReducer),
             self.use_progress_bars,
         );
 
-        let issues = pipeline.run(|(codebase, guard_settings, parser_settings), arena, source_file| {
+        let issues = pipeline.run(|(guard_settings, parser_settings, php_version), arena, source_file| {
             let mut issues = IssueCollection::new();
 
             let program = parse_file_with_settings(arena, &source_file, parser_settings);
@@ -103,8 +100,9 @@ impl GuardService {
             }
 
             let resolved_names = NameResolver::new(arena).resolve(program);
+            let user_codebase = scan_program(&arena, &source_file, program, &resolved_names, php_version);
             let guard = ArchitecturalGuard::new(guard_settings);
-            let report = guard.check(&codebase, program, &resolved_names);
+            let report = guard.check(&user_codebase, program, &resolved_names);
 
             issues.extend(
                 // Report as issues
