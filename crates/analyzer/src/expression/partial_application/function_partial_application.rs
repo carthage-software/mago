@@ -135,6 +135,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for FunctionPartialApplication<'aren
                     artifacts,
                     &mut invocation,
                     None,
+                    None,
                     &mut template_result,
                     &mut parameter_types,
                 )?;

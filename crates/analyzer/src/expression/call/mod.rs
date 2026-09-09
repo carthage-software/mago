@@ -126,7 +126,7 @@ fn analyze_invocation_targets<'ctx, 'ast, 'arena, A>(
     invocation_targets: Vec<InvocationTarget<'ctx>>,
     invocation_arguments: InvocationArgumentsSource<'ast, 'arena>,
     call_span: Span,
-    this_variable: Option<&[u8]>,
+    this_variable: Option<Word>,
     encountered_invalid_targets: bool,
     encountered_mixed_targets: bool,
     should_add_null: bool,
@@ -160,6 +160,10 @@ where
 
             (metadata.flags.is_pure() || metadata.flags.is_mutation_free()) && !metadata.flags.suspends_fiber()
         });
+
+    let class_related_argument_variables = this_variable
+        .map(|receiver| block_context.get_class_type_relation_sources(receiver))
+        .filter(|variables| !variables.is_empty());
 
     let mut resulting_type = None;
     let mut all_targets_non_nullable_return = !invocation_targets.is_empty();
@@ -214,6 +218,7 @@ where
             artifacts,
             &mut invocation,
             None,
+            class_related_argument_variables.as_ref(),
             &mut template_result,
             &mut argument_types,
         )?;
@@ -235,7 +240,7 @@ where
             block_context,
             artifacts,
             &invocation,
-            this_variable,
+            this_variable.as_ref().map(Word::as_bytes),
             &template_result,
             &argument_types,
             true,
@@ -280,7 +285,7 @@ where
     let resulting_type = apply_method_call_assertions(
         context,
         block_context,
-        this_variable,
+        this_variable.as_ref().map(Word::as_bytes),
         method_name_for_assertions,
         method_call_is_stable,
         resulting_type,

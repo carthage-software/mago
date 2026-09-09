@@ -351,6 +351,7 @@ where
             artifacts,
             &mut constructor_call,
             Some((metadata.name, None)),
+            None,
             &mut template_result,
             &mut argument_types,
         )?;
@@ -598,6 +599,7 @@ where
             artifacts,
             &mut constructor_call,
             Some((class_like_metadata.name, None)),
+            None,
             &mut template_result,
             &mut argument_types,
         )?;

@@ -4,6 +4,8 @@ use std::borrow::Cow;
 use foldhash::HashMap;
 use foldhash::HashSet;
 
+use mago_bytes::BytesDisplay;
+use mago_bytes::trim_start_byte;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::ttype::TType;
@@ -25,6 +27,7 @@ use mago_codex::ttype::expander;
 use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::expander::TypeExpansionOptions;
 use mago_codex::ttype::get_mixed;
+use mago_codex::ttype::intersect_union_types;
 use mago_codex::ttype::template::TemplateResult;
 use mago_codex::ttype::template::inferred_type_replacer;
 use mago_codex::ttype::union::TUnion;
@@ -35,6 +38,7 @@ use mago_span::Span;
 use mago_syntax::cst::Expression;
 use mago_word::Word;
 use mago_word::WordMap;
+use mago_word::WordSet;
 use mago_word::concat_word;
 
 use crate::artifacts::AnalysisArtifacts;
@@ -57,8 +61,36 @@ use crate::invocation::template_inference::infer_parameter_templates_from_defaul
 use crate::invocation::template_result::get_class_template_parameters_from_result;
 use crate::invocation::template_result::populate_template_result_from_invocation;
 use crate::invocation::template_result::refine_template_result_for_function_like;
-use mago_bytes::BytesDisplay;
-use mago_bytes::trim_start_byte;
+use crate::utils::expression::get_block_expression_id;
+
+fn narrow_class_related_argument<A>(
+    context: &Context<'_, '_, A>,
+    block_context: &BlockContext<'_>,
+    target: &InvocationTarget<'_>,
+    class_related_argument_variables: Option<&WordSet>,
+    expression: &Expression<'_>,
+    argument_type: &TUnion,
+) -> Option<TUnion>
+where
+    A: Arena,
+{
+    let argument_variable = get_block_expression_id(expression, context, block_context)?;
+    if !class_related_argument_variables?.contains(&argument_variable) {
+        return None;
+    }
+
+    let class_type = &target.get_method_context()?.class_type;
+    let receiver_type = match class_type {
+        StaticClassType::Object(object) => TUnion::from_atomic(TAtomic::Object(object.clone())),
+        StaticClassType::Exact(name) | StaticClassType::Name(name) => {
+            TUnion::from_atomic(TAtomic::Object(TObject::new_named(*name)))
+        }
+        StaticClassType::Generic(parameter) => parameter.constraint.as_ref().clone(),
+        StaticClassType::None => return None,
+    };
+
+    intersect_union_types(argument_type, &receiver_type, context.codebase)
+}
 
 /// Finds the parameter that corresponds to a given argument.
 fn get_parameter_of_argument<'target, 'ctx>(
@@ -112,6 +144,7 @@ pub fn analyze_invocation<'ctx, 'arena, A>(
     artifacts: &mut AnalysisArtifacts,
     invocation: &mut Invocation<'ctx, '_, 'arena>,
     calling_class_like: Option<(Word, Option<&TAtomic>)>,
+    class_related_argument_variables: Option<&WordSet>,
     template_result: &mut TemplateResult,
     parameter_types: &mut WordMap<TUnion>,
 ) -> Result<(), AnalysisError>
@@ -193,6 +226,19 @@ where
             parameter.is_some_and(|p| p.1.is_by_reference()),
             None,
         )?;
+
+        if let Some((argument_type, span)) = analyzed_argument_types.get(argument_offset).cloned()
+            && let Some(narrowed_type) = narrow_class_related_argument(
+                context,
+                block_context,
+                &invocation.target,
+                class_related_argument_variables,
+                argument_expression,
+                &argument_type,
+            )
+        {
+            analyzed_argument_types.insert(*argument_offset, (narrowed_type, span));
+        }
 
         if let Some(argument_type) = analyzed_argument_types.get(argument_offset)
             && let Some((_, parameter_ref)) = parameter
