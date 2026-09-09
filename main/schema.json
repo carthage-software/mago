@@ -8061,7 +8061,7 @@
           "default": true
         },
         "trailing-comma": {
-          "description": "Whether to add a trailing comma to the last element in multi-line syntactic structures.\n\nWhen enabled, trailing commas are added to lists, arrays, parameter lists,\nargument lists, and other similar structures when they span multiple lines.\n\nDefault: true",
+          "description": "Whether to add a trailing comma to the last element in multi-line syntactic structures.\n\nWhen enabled, trailing commas are added to lists, arrays, parameter lists,\nargument lists, and other similar structures when they span multiple lines.\n\nConstructs whose trailing comma the target PHP version does not accept never get\none: `list()` before 7.2, function calls, `isset()` and `unset()` before 7.3,\nparameter lists and closure `use` lists before 8.0.\n\nDefault: true",
           "type": "boolean",
           "default": true
         },
