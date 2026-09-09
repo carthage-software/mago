@@ -96,3 +96,40 @@ fn empty_enum_does_not_make_unrelated_containment_vacuously_true() {
     assert!(!is_contained(&u(t_enum("EmptyEnum")), &container, &codebase));
     assert!(!is_contained(&u(t_enum("EmptyEnum")), &u(t_enum_case("EmptyEnum", "Unknown")), &codebase));
 }
+
+#[test]
+fn exhaustive_enum_case_unions_resolve_aliases_on_both_sides() {
+    let codebase = codebase_from_php(
+        "<?php
+        enum Suit { case Hearts; case Spades; }
+        enum OtherSuit { case Hearts; case Spades; }
+        class_alias(Suit::class, SuitAlias::class);
+        class_alias(OtherSuit::class, OtherSuitAlias::class);
+        ",
+    );
+
+    for (input_name, hearts_enum, spades_enum) in
+        [("SuitAlias", "Suit", "Suit"), ("Suit", "SuitAlias", "SuitAlias"), ("sUiTaLiAs", "SUIT", "suitalias")]
+    {
+        let input = u(t_enum(input_name));
+        let container = u_many(vec![t_enum_case(hearts_enum, "Hearts"), t_enum_case(spades_enum, "Spades")]);
+        let (is_subtype, result) = is_contained_capturing(&input, &container, &codebase);
+
+        assert!(is_subtype);
+        assert_eq!(result.type_coerced, None);
+        assert_eq!(result.type_coerced_from_nested_mixed, None);
+        assert_eq!(result.type_coerced_from_as_mixed, None);
+    }
+
+    let incomplete = u_many(vec![t_enum_case("SuitAlias", "Hearts"), t_enum_case("OtherSuitAlias", "Spades")]);
+    assert!(!is_contained(&u(t_enum("SuitAlias")), &incomplete, &codebase));
+}
+
+#[test]
+fn enum_cases_are_not_contained_by_other_cases_with_matching_enum_or_case_names() {
+    let codebase = codebase_from_php(ENUMS);
+    let input = u(t_enum_case("Suit", "Hearts"));
+    let container = u_many(vec![t_enum_case("Suit", "Spades"), t_enum_case("OtherSuit", "Hearts")]);
+
+    assert!(!is_contained(&input, &container, &codebase));
+}

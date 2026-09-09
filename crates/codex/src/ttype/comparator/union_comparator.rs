@@ -2,6 +2,7 @@ use crate::metadata::CodebaseMetadata;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::generic::TGenericParameter;
 use crate::ttype::atomic::object::TObject;
+use crate::ttype::atomic::object::r#enum::TEnum;
 use crate::ttype::atomic::scalar::TScalar;
 use crate::ttype::comparator::ComparisonResult;
 use crate::ttype::comparator::atomic_comparator;
@@ -325,19 +326,7 @@ fn is_contained_by_atomic(
     // An enum's cases can collectively cover its native type even when no single case does.
     if let TAtomic::Object(TObject::Enum(input_enum)) = input_type_part
         && input_enum.case.is_none()
-        && let Some(enum_metadata) = codebase.get_enum(input_enum.name.as_bytes())
-        && !enum_metadata.enum_cases.is_empty()
-        && enum_metadata.enum_cases.len() <= container_atomic_types.len()
-        && enum_metadata.enum_cases.keys().all(|case| {
-            container_atomic_types.iter().any(|container_atomic| {
-                matches!(
-                    container_atomic,
-                    TAtomic::Object(TObject::Enum(container_enum))
-                        if container_enum.case == Some(*case)
-                            && codebase.is_instance_of(input_enum.name.as_bytes(), container_enum.name.as_bytes())
-                )
-            })
-        })
+        && is_enum_contained_by_cases(codebase, input_enum, container_atomic_types)
     {
         return true;
     }
@@ -355,6 +344,31 @@ fn is_contained_by_atomic(
     }
 
     false
+}
+
+// Keep the enum case scan out of the hot, inlined containment comparator.
+#[inline(never)]
+fn is_enum_contained_by_cases(
+    codebase: &CodebaseMetadata,
+    input_enum: &TEnum,
+    container_atomic_types: &[TAtomic],
+) -> bool {
+    let Some(enum_metadata) = codebase.get_enum(input_enum.name.as_bytes()) else {
+        return false;
+    };
+
+    !enum_metadata.enum_cases.is_empty()
+        && enum_metadata.enum_cases.len() <= container_atomic_types.len()
+        && enum_metadata.enum_cases.keys().all(|case| {
+            container_atomic_types.iter().any(|container_atomic| {
+                matches!(
+                    container_atomic,
+                    TAtomic::Object(TObject::Enum(container_enum))
+                        if container_enum.case == Some(*case)
+                            && codebase.is_instance_of(input_enum.name.as_bytes(), container_enum.name.as_bytes())
+                )
+            })
+        })
 }
 
 #[must_use]
