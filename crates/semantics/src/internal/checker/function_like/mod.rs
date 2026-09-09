@@ -198,6 +198,7 @@ fn contains_this_in_statement(statement: &Statement<'_>) -> Option<Span> {
 
 #[inline]
 pub fn check_function<'arena>(function: &Function<'arena>, context: &mut Context<'_, '_, 'arena>) {
+    check_parameter_list_trailing_comma(&function.parameter_list, context);
     check_for_promoted_properties_outside_constructor(&function.parameter_list, context);
     let Some(return_hint) = &function.return_type_hint else {
         return;
@@ -270,6 +271,7 @@ pub fn check_arrow_function(arrow_function: &ArrowFunction, context: &mut Contex
         context.report(issue);
     }
 
+    check_parameter_list_trailing_comma(&arrow_function.parameter_list, context);
     check_for_promoted_properties_outside_constructor(&arrow_function.parameter_list, context);
 
     // Check for $this usage in static arrow functions
@@ -329,6 +331,7 @@ pub fn check_arrow_function(arrow_function: &ArrowFunction, context: &mut Contex
 
 #[inline]
 pub fn check_closure<'arena>(closure: &Closure<'arena>, context: &mut Context<'_, '_, 'arena>) {
+    check_parameter_list_trailing_comma(&closure.parameter_list, context);
     check_for_promoted_properties_outside_constructor(&closure.parameter_list, context);
 
     // Check for $this usage in static closures
@@ -448,6 +451,27 @@ pub fn check_return_type_hint(
             );
         }
         _ => {}
+    }
+}
+
+#[inline]
+pub fn check_parameter_list_trailing_comma(
+    parameter_list: &FunctionLikeParameterList,
+    context: &mut Context<'_, '_, '_>,
+) {
+    if !context.version.is_supported(Feature::TrailingCommaInParameterList)
+        && let Some(trailing_comma) = parameter_list.parameters.get_trailing_token()
+    {
+        context.report(
+            Issue::error("Trailing comma in parameter list is only available in PHP 8.0 and later.")
+                .with_annotation(
+                    Annotation::primary(trailing_comma.span_for(context.source_file.file_id()))
+                        .with_message("Trailing comma found here."),
+                )
+                .with_help(
+                    "Remove the trailing comma to make the code compatible with PHP 7.4 and earlier versions, or upgrade to PHP 8.0 or later.",
+                ),
+        );
     }
 }
 

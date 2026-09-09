@@ -1,5 +1,6 @@
 use mago_allocator::Arena;
 use mago_allocator::vec_in;
+use mago_php_version::feature::Feature;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::cst::AttributeList;
@@ -419,7 +420,7 @@ where
 
             let mut inner_content = Document::join(f.arena, variables, Separator::CommaLine);
             inner_content.insert(0, Document::Line(Line::soft()));
-            if f.settings.trailing_comma {
+            if f.trailing_comma_for(Feature::TrailingCommaInClosureUseList) {
                 inner_content.push(Document::IfBreak(IfBreak::then(f.arena, Document::String(b","))));
             }
 
