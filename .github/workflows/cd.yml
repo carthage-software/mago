@@ -536,3 +536,17 @@ jobs:
             --tag ghcr.io/carthage-software/mago:latest \
             ghcr.io/carthage-software/mago:${VERSION}-amd64 \
             ghcr.io/carthage-software/mago:${VERSION}-arm64
+
+  winget:
+    name: Publish to WinGet
+    runs-on: ubuntu-slim
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    steps:
+      - name: Submit package to WinGet Community Repository
+        uses: vedantmgoyal9/winget-releaser@v2
+        with:
+          identifier: CarthageSoftware.Mago
+          installers-regex: '-windows-msvc\.zip$'
+          token: ${{ secrets.WINGET_TOKEN }}
+          fork-user: ${{ vars.WINGET_USER }}
