@@ -5,6 +5,15 @@ namespace {
     {
         public ?array $errorInfo;
         protected $code;
+
+        /**
+         * Models the inherited final method's PDO-specific return type.
+         *
+         * @return int|string
+         *
+         * @mutation-free
+         */
+        final public function getCode() {}
     }
 
     class PDO

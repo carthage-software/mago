@@ -7,18 +7,16 @@ function chainCaughtThrowable(): void
 {
     try {
     } catch (Throwable $exception) {
-        // PDOException can supply a string code, so this can throw a TypeError at runtime.
-        // @mago-expect analysis:possibly-invalid-argument
         throw new LogicException('Encountered unexpected exception', $exception->getCode(), $exception);
     }
 }
 
-function throwableCode(Throwable $exception): int|string
+function throwableCode(Throwable $exception): int
 {
     return $exception->getCode();
 }
 
-function exceptionCode(Exception $exception): int|string
+function exceptionCode(Exception $exception): int
 {
     return $exception->getCode();
 }
@@ -30,7 +28,6 @@ function pdoExceptionCode(PDOException $exception): int|string
 
 function chainException(Exception $exception): LogicException
 {
-    // @mago-expect analysis:possibly-invalid-argument
     return new LogicException($exception->getMessage(), $exception->getCode(), $exception);
 }
 
@@ -57,7 +54,7 @@ function chainTypeError(TypeError $error): LogicException
     return new LogicException($error->getMessage(), $error->getCode(), $error);
 }
 
-function chainWithIntegerCode(Throwable $exception): LogicException
+function chainWithIntegerCode(PDOException $exception): LogicException
 {
     $code = $exception->getCode();
     if (is_int($code)) {
@@ -67,7 +64,7 @@ function chainWithIntegerCode(Throwable $exception): LogicException
     return new LogicException($exception->getMessage() . ' (' . $code . ')', 0, $exception);
 }
 
-function chainWithCastCode(Throwable $exception): LogicException
+function chainWithCastCode(PDOException $exception): LogicException
 {
     return new LogicException($exception->getMessage(), (int) $exception->getCode(), $exception);
 }
@@ -75,4 +72,87 @@ function chainWithCastCode(Throwable $exception): LogicException
 function chainWithDefaultCode(Throwable $exception): LogicException
 {
     return new LogicException($exception->getMessage(), previous: $exception);
+}
+
+function runtimeExceptionCode(RuntimeException $exception): int
+{
+    return $exception->getCode();
+}
+
+final class CustomException extends Exception {}
+
+function customExceptionCode(CustomException $exception): int
+{
+    return $exception->getCode();
+}
+
+final class CustomPdoException extends PDOException {}
+
+function chainCustomPdoException(CustomPdoException $exception): LogicException
+{
+    // @mago-expect analysis:possibly-invalid-argument
+    return new LogicException($exception->getMessage(), $exception->getCode(), $exception);
+}
+
+function nullableThrowableCode(?Throwable $exception): ?int
+{
+    return $exception?->getCode();
+}
+
+function nullablePdoExceptionCode(?PDOException $exception): int|string|null
+{
+    return $exception?->getCode();
+}
+
+/** @return Closure(): int */
+function throwableCodeCallable(Throwable $exception): Closure
+{
+    return $exception->getCode(...);
+}
+
+/** @return Closure(): int */
+function exceptionCodeCallable(Exception $exception): Closure
+{
+    return $exception->getCode(...);
+}
+
+/** @return Closure(): (int|string) */
+function pdoExceptionCodeCallable(PDOException $exception): Closure
+{
+    return $exception->getCode(...);
+}
+
+/** @return Closure(): int */
+function pdoExceptionIntegerCodeCallable(PDOException $exception): Closure
+{
+    // @mago-expect analysis:invalid-return-statement
+    return $exception->getCode(...);
+}
+
+function pdoExceptionHasCode(PDOException $exception): bool
+{
+    if ($exception->getCode() === 42) {
+        return true;
+    }
+
+    return false;
+}
+
+final class InvalidPdoExceptionOverride extends PDOException
+{
+    // @mago-expect analysis:override-final-method
+    public function getCode(): int|string
+    {
+        return 0;
+    }
+}
+
+function narrowPdoException(Throwable $exception): LogicException
+{
+    if ($exception instanceof PDOException) {
+        // @mago-expect analysis:possibly-invalid-argument
+        return new LogicException($exception->getMessage(), $exception->getCode(), $exception);
+    }
+
+    return new LogicException($exception->getMessage(), $exception->getCode(), $exception);
 }

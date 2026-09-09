@@ -121,9 +121,7 @@ interface Throwable extends Stringable
     public function getMessage(): string;
 
     /**
-     * Exception descendants such as PDOException can return string codes.
-     *
-     * @return int|string
+     * @return int
      */
     public function getCode();
 
@@ -164,9 +162,7 @@ class Exception implements Throwable
     final public function getMessage(): string {}
 
     /**
-     * Descendants such as PDOException can return string codes through this final method.
-     *
-     * @return int|string
+     * @return int
      *
      * @mutation-free
      */
