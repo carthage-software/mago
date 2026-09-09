@@ -276,6 +276,7 @@ impl PHPVersion {
             | Feature::MatchExpression
             | Feature::NullSafeOperator
             | Feature::TrailingCommaInClosureUseList
+            | Feature::TrailingCommaInParameterList
             | Feature::FalseCompoundTypeHint
             | Feature::NullCompoundTypeHint
             | Feature::CatchOptionalVariable => self.0 >= 0x08_00_00,

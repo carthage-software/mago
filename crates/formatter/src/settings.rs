@@ -104,6 +104,10 @@ generate_formatter_settings! {
     /// When enabled, trailing commas are added to lists, arrays, parameter lists,
     /// argument lists, and other similar structures when they span multiple lines.
     ///
+    /// Constructs whose trailing comma the target PHP version does not accept never get
+    /// one: `list()` before 7.2, function calls, `isset()` and `unset()` before 7.3,
+    /// parameter lists and closure `use` lists before 8.0.
+    ///
     /// Default: true
     trailing_comma: bool => "default_true",
 

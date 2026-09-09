@@ -481,6 +481,7 @@ fn clear_object_property_narrowings<'ctx, 'arena, A>(
         block_context.locals.retain(|key, _| !references_method_call_key(*key));
         block_context.clauses.retain(|clause| !references_method_call(clause));
         block_context.reconciled_expression_clauses.retain(|clause| !references_method_call(clause));
+        block_context.retain_valid_class_type_relations();
     }
 
     if let Some(metadata) = metadata
@@ -733,6 +734,8 @@ fn clear_object_property_narrowings<'ctx, 'arena, A>(
     }
 
     if !has_object_argument {
+        block_context.retain_valid_class_type_relations();
+
         return;
     }
 
@@ -776,6 +779,7 @@ fn clear_object_property_narrowings<'ctx, 'arena, A>(
     block_context
         .reconciled_expression_clauses
         .retain(|clause| clause.wedge || !clause.possibilities.keys().copied().any(should_wipe));
+    block_context.retain_valid_class_type_relations();
 }
 
 fn is_property_or_index_key(var_id: Word) -> bool {
