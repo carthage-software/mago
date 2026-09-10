@@ -307,8 +307,7 @@ pub fn reconcile_keyed_types<'ctx, A>(
 
         if type_changed {
             changed_var_ids.insert(*key);
-            if key_str.ends_with(b"]") && !has_inverted_isset && !has_inverted_key_exists && !has_empty && !is_equality
-            {
+            if key_str.ends_with(b"]") && !has_inverted_isset && !has_inverted_key_exists && !has_empty {
                 adjust_array_type(
                     key_parts.clone(),
                     block_context,

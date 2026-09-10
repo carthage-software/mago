@@ -99,6 +99,7 @@ test_case!(do_while_iteration_dependent_conditions);
 test_case!(array_map_non_empty_array);
 test_case!(array_map_non_empty_list);
 test_case!(array_shape_fields);
+test_case!(array_shape_discriminant_match);
 test_case!(array_type_combination_threshold);
 test_case!(array_unique_non_empty);
 test_case!(arrays_simple_list_literal);
