@@ -5,17 +5,43 @@ on:
     types: [opened]
 
 jobs:
-  label:
+  triage:
     runs-on: ubuntu-latest
     permissions:
       contents: read
       issues: write
     steps:
-      - name: Add needs-triage label
-        if: ${{ !contains(github.event.issue.labels.*.name, 'needs-triage') }}
+      - name: Triage issue
         uses: actions/github-script@v7
         with:
           script: |
+            const issue = context.payload.issue;
+            const isAiAgent = issue.user.type === 'Bot'
+              || /claude|anthropic|gemini|codex|openai|cursor|copilot|devin|jules/i.test(issue.user.login);
+
+            if (isAiAgent) {
+              await github.rest.issues.createComment({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                body: 'Mago does not accept issues opened by AI agents. A person may open a new issue after checking the report and agreeing to take part in the discussion.'
+              });
+
+              await github.rest.issues.update({
+                owner: context.repo.owner,
+                repo: context.repo.repo,
+                issue_number: context.issue.number,
+                state: 'closed',
+                state_reason: 'not_planned'
+              });
+
+              return;
+            }
+
+            if (issue.labels.some(({ name }) => name === 'needs-triage')) {
+              return;
+            }
+
             await github.rest.issues.addLabels({
               owner: context.repo.owner,
               repo: context.repo.repo,
