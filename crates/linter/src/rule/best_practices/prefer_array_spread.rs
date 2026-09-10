@@ -11,6 +11,7 @@ use mago_span::HasSpan;
 use mago_syntax::cst::Argument;
 use mago_syntax::cst::ArrayElement;
 use mago_syntax::cst::Expression;
+use mago_syntax::cst::Literal;
 use mago_syntax::cst::Node;
 use mago_syntax::cst::NodeKind;
 use mago_text_edit::TextEdit;
@@ -203,7 +204,11 @@ fn try_inline_array_literal(edits: &mut Vec<TextEdit>, value: &Expression<'_>) -
         _ => return false,
     };
 
-    if elements.iter().any(|e| matches!(e, ArrayElement::Missing(_))) {
+    if elements.iter().any(|element| match element {
+        ArrayElement::KeyValue(element) => !is_string_array_key(element.key),
+        ArrayElement::Missing(_) => true,
+        _ => false,
+    }) {
         return false;
     }
 
@@ -217,6 +222,23 @@ fn try_inline_array_literal(edits: &mut Vec<TextEdit>, value: &Expression<'_>) -
     edits.push(TextEdit::delete(last.end_offset()..value.end_offset()));
 
     true
+}
+
+fn is_string_array_key(key: &Expression<'_>) -> bool {
+    let value = match key {
+        Expression::Literal(Literal::String(literal)) => literal.value,
+        Expression::Parenthesized(parenthesized) => return is_string_array_key(parenthesized.expression),
+        _ => return false,
+    };
+
+    value.is_some_and(|value| {
+        let digits = value.strip_prefix(b"-").unwrap_or(value);
+
+        digits.is_empty()
+            || !digits.iter().all(u8::is_ascii_digit)
+            || (digits[0] == b'0' && value != b"0")
+            || std::str::from_utf8(value).is_ok_and(|value| value.parse::<i64>().is_err())
+    })
 }
 
 #[cfg(test)]
@@ -365,6 +387,71 @@ mod tests {
             <?php
 
             $merged = [...$a, 'x' => 1, 'y' => 2];
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_array_literals_with_integer_keys_are_spread,
+        rule = PreferArraySpreadRule,
+        code = indoc! {r#"
+            <?php
+
+            $y = [7 => 'y'];
+
+            $single = array_merge([5 => 'x']);
+            $twoLiterals = array_merge([5 => 'x'], [7 => 'y']);
+            $duplicateKeys = array_merge([5 => 'x'], [5 => 'y']);
+            $literalThenVariable = array_merge([5 => 'x'], $y);
+            $variableThenLiteral = array_merge($y, [5 => 'x']);
+            $mixedKeys = array_merge(['k' => 'v', 5 => 'x'], [5 => 'y']);
+            $legacy = array_merge(array(5 => 'x'));
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            $y = [7 => 'y'];
+
+            $single = [...[5 => 'x']];
+            $twoLiterals = [...[5 => 'x'], ...[7 => 'y']];
+            $duplicateKeys = [...[5 => 'x'], ...[5 => 'y']];
+            $literalThenVariable = [...[5 => 'x'], ...$y];
+            $variableThenLiteral = [...$y, ...[5 => 'x']];
+            $mixedKeys = [...['k' => 'v', 5 => 'x'], ...[5 => 'y']];
+            $legacy = [...array(5 => 'x')];
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_array_literals_with_non_string_keys_are_spread,
+        rule = PreferArraySpreadRule,
+        code = indoc! {r#"
+            <?php
+
+            const KEY = 'key';
+            $key = 'key';
+            $merged = array_merge(['5' => 1], [KEY => 2], [$key => 3], [1.5 => 4], [true => 5], [null => 6]);
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            const KEY = 'key';
+            $key = 'key';
+            $merged = [...['5' => 1], ...[KEY => 2], ...[$key => 3], ...[1.5 => 4], ...[true => 5], ...[null => 6]];
+        "#}
+    }
+
+    test_lint_fix! {
+        name = fix_array_literal_with_non_integer_string_keys_is_inlined,
+        rule = PreferArraySpreadRule,
+        code = indoc! {r#"
+            <?php
+
+            $merged = array_merge(['' => 0, '01' => 1, '-0' => 2, '+5' => 3, ' 5' => 4, '9223372036854775808' => 5]);
+        "#},
+        fixed = indoc! {r#"
+            <?php
+
+            $merged = ['' => 0, '01' => 1, '-0' => 2, '+5' => 3, ' 5' => 4, '9223372036854775808' => 5];
         "#}
     }
 
