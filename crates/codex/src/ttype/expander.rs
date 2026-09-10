@@ -493,11 +493,16 @@ fn expand_member_reference(
         }
     }
 
-    for enum_case_name in class_like.enum_cases.keys() {
-        if !member_selector.matches(*enum_case_name) {
-            continue;
+    if matches!(member_selector, TReferenceMemberSelector::Wildcard) && !class_like.enum_cases.is_empty() {
+        new_return_type_parts.push(TAtomic::Object(TObject::new_enum(class_like.original_name)));
+    } else {
+        for enum_case_name in class_like.enum_cases.keys() {
+            if !member_selector.matches(*enum_case_name) {
+                continue;
+            }
+            new_return_type_parts
+                .push(TAtomic::Object(TObject::new_enum_case(class_like.original_name, *enum_case_name)));
         }
-        new_return_type_parts.push(TAtomic::Object(TObject::new_enum_case(class_like.original_name, *enum_case_name)));
     }
 
     if let TReferenceMemberSelector::Identifier(member_name) = member_selector
@@ -2261,8 +2266,36 @@ mod tests {
         let mut actual = input;
         expand_union(&codebase, &mut actual, &TypeExpansionOptions::default());
 
+        assert_eq!(actual.types.len(), 1);
+        assert!(matches!(
+            &actual.types[0],
+            TAtomic::Object(TObject::Enum(TEnum { name, case: None })) if name.as_bytes().eq_ignore_ascii_case(b"Status")
+        ));
+    }
+
+    #[test]
+    fn test_expand_member_reference_wildcard_enum_cases_and_constants() {
+        let code = "<?php
+            enum Status {
+                case Active;
+                case Inactive;
+                public const VALUE = 1;
+            }
+        ";
+        let codebase = create_test_codebase(code);
+
+        let reference = TReference::new_member(ascii_lowercase_word(b"status"), TReferenceMemberSelector::Wildcard);
+        let input = TUnion::from_atomic(TAtomic::Reference(reference));
+
+        let mut actual = input;
+        expand_union(&codebase, &mut actual, &TypeExpansionOptions::default());
+
         assert_eq!(actual.types.len(), 2);
-        assert!(actual.types.iter().all(|t| matches!(t, TAtomic::Object(TObject::Enum(_)))));
+        assert!(actual.types.iter().any(|t| matches!(
+            t,
+            TAtomic::Object(TObject::Enum(TEnum { name, case: None })) if name.as_bytes().eq_ignore_ascii_case(b"Status")
+        )));
+        assert!(actual.types.iter().any(|t| t.get_literal_int_value() == Some(1)));
     }
 
     #[test]

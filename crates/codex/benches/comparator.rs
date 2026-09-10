@@ -6,7 +6,11 @@ use criterion::criterion_group;
 use criterion::criterion_main;
 
 use mago_codex::metadata::CodebaseMetadata;
+use mago_codex::metadata::class_like::ClassLikeMetadata;
+use mago_codex::metadata::enum_case::EnumCaseMetadata;
+use mago_codex::metadata::flags::MetadataFlags;
 use mago_codex::misc::GenericParent;
+use mago_codex::symbol::SymbolKind;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::key::ArrayKey;
@@ -15,15 +19,21 @@ use mago_codex::ttype::atomic::array::list::TList;
 use mago_codex::ttype::atomic::generic::TGenericParameter;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::object::named::TNamedObject;
+use mago_codex::ttype::atomic::reference::TReference;
+use mago_codex::ttype::atomic::reference::TReferenceMemberSelector;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator;
+use mago_codex::ttype::expander::TypeExpansionOptions;
+use mago_codex::ttype::expander::expand_union;
 use mago_codex::ttype::get_int;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_string;
 use mago_codex::ttype::union::TUnion;
+use mago_span::Span;
 use mago_word::ascii_lowercase_word;
+use mago_word::word;
 
 /// Benchmark union comparisons with simple types
 fn bench_union_simple_comparison(c: &mut Criterion) {
@@ -375,6 +385,109 @@ fn bench_object_comparison(c: &mut Criterion) {
     });
 }
 
+fn bench_enum_comparison(c: &mut Criterion) {
+    let enum_name = word(b"Suit");
+    let hearts = word(b"Hearts");
+    let spades = word(b"Spades");
+    let mut metadata = ClassLikeMetadata::new(
+        ascii_lowercase_word(enum_name.as_bytes()),
+        enum_name,
+        Span::dummy(0, 0),
+        None,
+        MetadataFlags::empty(),
+    );
+    metadata.kind = SymbolKind::Enum;
+    metadata
+        .enum_cases
+        .insert(hearts, EnumCaseMetadata::new(hearts, Span::dummy(0, 0), Span::dummy(0, 0), MetadataFlags::empty()));
+    metadata
+        .enum_cases
+        .insert(spades, EnumCaseMetadata::new(spades, Span::dummy(0, 0), Span::dummy(0, 0), MetadataFlags::empty()));
+
+    let mut codebase = CodebaseMetadata::new();
+    codebase.symbols.add_symbol_name(metadata.name, SymbolKind::Enum);
+    codebase.class_likes.insert(metadata.name, metadata);
+
+    let enum_type = TUnion::from_atomic(TAtomic::Object(TObject::new_enum(enum_name)));
+    let enum_case = TUnion::from_atomic(TAtomic::Object(TObject::new_enum_case(enum_name, hearts)));
+    let enum_cases = TUnion::from_vec(vec![
+        TAtomic::Object(TObject::new_enum_case(enum_name, hearts)),
+        TAtomic::Object(TObject::new_enum_case(enum_name, spades)),
+    ]);
+    let enum_wildcard =
+        TUnion::from_atomic(TAtomic::Reference(TReference::new_member(enum_name, TReferenceMemberSelector::Wildcard)));
+    let mut expanded_enum_wildcard = enum_wildcard.clone();
+    expand_union(&codebase, &mut expanded_enum_wildcard, &TypeExpansionOptions::default());
+
+    c.bench_function("is_contained_by_enum_same", |b| {
+        b.iter(|| {
+            let mut result = ComparisonResult::new();
+            std::hint::black_box(union_comparator::is_contained_by(
+                &codebase,
+                &enum_type,
+                &enum_type,
+                false,
+                false,
+                false,
+                &mut result,
+            ))
+        });
+    });
+
+    c.bench_function("is_contained_by_enum_case", |b| {
+        b.iter(|| {
+            let mut result = ComparisonResult::new();
+            std::hint::black_box(union_comparator::is_contained_by(
+                &codebase,
+                &enum_case,
+                &enum_type,
+                false,
+                false,
+                false,
+                &mut result,
+            ))
+        });
+    });
+
+    c.bench_function("is_contained_by_enum_case_union", |b| {
+        b.iter(|| {
+            let mut result = ComparisonResult::new();
+            std::hint::black_box(union_comparator::is_contained_by(
+                &codebase,
+                &enum_type,
+                &enum_cases,
+                false,
+                false,
+                false,
+                &mut result,
+            ))
+        });
+    });
+
+    c.bench_function("is_contained_by_enum_wildcard", |b| {
+        b.iter(|| {
+            let mut result = ComparisonResult::new();
+            std::hint::black_box(union_comparator::is_contained_by(
+                &codebase,
+                &enum_type,
+                &expanded_enum_wildcard,
+                false,
+                false,
+                false,
+                &mut result,
+            ))
+        });
+    });
+
+    c.bench_function("expand_enum_wildcard", |b| {
+        b.iter(|| {
+            let mut expanded = enum_wildcard.clone();
+            expand_union(&codebase, &mut expanded, &TypeExpansionOptions::default());
+            std::hint::black_box(expanded)
+        });
+    });
+}
+
 /// Benchmark `can_expression_types_be_identical`
 fn bench_can_be_identical(c: &mut Criterion) {
     let codebase = CodebaseMetadata::new();
@@ -429,6 +542,7 @@ criterion_group!(
     bench_integer_comparison,
     bench_array_comparison,
     bench_object_comparison,
+    bench_enum_comparison,
     bench_can_be_identical,
 );
 
