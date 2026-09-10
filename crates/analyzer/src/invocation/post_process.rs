@@ -280,6 +280,10 @@ fn apply_assertion_to_call_context<'ctx, 'arena, A>(
         return;
     }
 
+    block_context
+        .stable_method_calls
+        .extend(type_assertions.keys().filter(|variable| variable.as_bytes().ends_with(b"()")).copied());
+
     let referenced_variable_ids: WordSet = type_assertions.keys().copied().collect();
     let mut changed_variable_ids: WordSet = WordSet::default();
     let mut active_type_assertions = IndexMap::new();
