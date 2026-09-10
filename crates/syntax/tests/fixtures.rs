@@ -38,6 +38,8 @@ macro_rules! test_parsing {
 }
 
 test_parsing!(hello_world, 0);
+test_parsing!(issue_2228_class_constant_in_braced_string_interpolation, 1);
+test_parsing!(issue_2228_valid_scope_resolution_in_braced_string_interpolation, 0);
 
 // Fixtures lifted from nikic/PHP-Parser's test/code/parser/. Each one is
 // invalid PHP at the syntax level (verified with `php -l`); the assertion is
