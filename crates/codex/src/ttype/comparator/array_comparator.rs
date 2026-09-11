@@ -73,7 +73,10 @@ pub(crate) fn is_array_contained_by_array(
     }
 
     if container_array.is_list()
-        && matches!(input_array, TArray::Keyed(keyed_array) if keyed_array.parameters.is_some())
+        && matches!(
+            input_array,
+            TArray::Keyed(keyed_array) if keyed_array.parameters.is_some() || keyed_array.known_non_list
+        )
     {
         return false;
     }

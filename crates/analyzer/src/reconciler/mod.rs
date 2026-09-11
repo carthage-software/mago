@@ -613,6 +613,7 @@ fn adjust_array_type(
                     known_items: Some(BTreeMap::from([(key, (optional, result_type.clone()))])),
                     parameters: Some((Arc::new(get_arraykey()), Arc::new(get_mixed()))),
                     non_empty: !optional,
+                    known_non_list: false,
                 }));
             }
             _ => {

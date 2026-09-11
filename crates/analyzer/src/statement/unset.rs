@@ -130,6 +130,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
                                     } else {
                                         false
                                     },
+                                    known_non_list: true,
                                 })));
 
                                 continue;
@@ -243,11 +244,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
                                         Some((Arc::new(get_int()), element_type))
                                     },
                                     non_empty,
+                                    known_non_list: true,
                                 })));
                             }
                         }
                         TArray::Keyed(array) => {
-                            let TKeyedArray { known_items, parameters, non_empty } = array;
+                            let TKeyedArray { known_items, parameters, non_empty, known_non_list } = array;
                             let Some(mut known_items) = known_items else {
                                 atomics.push(TAtomic::Array(TArray::Keyed(TKeyedArray {
                                     known_items: None,
@@ -255,6 +257,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
                                     // We don't have any known items, so we can't unset anything.
                                     // Mark the keyed array as potentially empty.
                                     non_empty: false,
+                                    known_non_list,
                                 })));
 
                                 continue;
@@ -277,6 +280,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
                                     ),
                                     parameters,
                                     non_empty,
+                                    known_non_list,
                                 })));
 
                                 continue;
@@ -287,6 +291,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
                                     known_items: Some(known_items),
                                     parameters,
                                     non_empty,
+                                    known_non_list,
                                 })));
 
                                 continue;
@@ -303,6 +308,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
                                 known_items,
                                 parameters,
                                 non_empty,
+                                known_non_list,
                             })));
                         }
                     }

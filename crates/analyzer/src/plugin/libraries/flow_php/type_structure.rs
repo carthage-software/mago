@@ -126,6 +126,7 @@ impl FunctionReturnTypeProvider for TypeStructureProvider {
                 },
                 non_empty: !known_items.is_empty(),
                 known_items: Some(known_items),
+                known_non_list: false,
             })))]),
         )))))
     }

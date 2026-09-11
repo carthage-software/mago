@@ -10,6 +10,7 @@ use std::time::Instant;
 
 use foldhash::HashSet;
 use foldhash::fast::RandomState;
+
 use mago_algebra::assertion_set::Conjunction;
 use mago_codex::assertion::Assertion;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
@@ -2846,7 +2847,7 @@ fn decode_complete_array(reader: &mut PayloadReader<'_>, depth: usize) -> Result
             };
 
             let non_empty = reader.read_bool("array non-empty flag")?;
-            TArray::Keyed(TKeyedArray { known_items, parameters, non_empty })
+            TArray::Keyed(TKeyedArray { known_items, parameters, non_empty, known_non_list: false })
         }
         unknown => return Err(protocol(format!("unknown complete array kind {unknown}"))),
     })

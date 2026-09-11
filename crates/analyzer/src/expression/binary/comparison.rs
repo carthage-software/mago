@@ -1,8 +1,8 @@
-use mago_allocator::Arena;
 use std::rc::Rc;
 
+use mago_allocator::Arena;
+use mago_bytes::BytesDisplay;
 use mago_codex::ttype::TType;
-use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::get_bool;
 use mago_codex::ttype::get_false;
 use mago_codex::ttype::get_mixed;
@@ -19,7 +19,6 @@ use mago_syntax::cst::Literal;
 use mago_syntax::cst::Parenthesized;
 use mago_syntax::cst::Variable;
 use mago_text_edit::TextEdit;
-use mago_word::empty_word;
 use mago_word::word;
 
 use crate::analyzable::Analyzable;
@@ -37,8 +36,8 @@ use crate::expression::binary::utils::is_always_greater_than_or_equal;
 use crate::expression::binary::utils::is_always_identical_to;
 use crate::expression::binary::utils::is_always_less_than;
 use crate::expression::binary::utils::is_always_less_than_or_equal;
+use crate::utils::expression::get_literal_array_key;
 use crate::utils::misc::unwrap_expression;
-use mago_bytes::BytesDisplay;
 
 /// Analyzes standard comparison operations (e.g., `==`, `===`, `<`, `<=`, `>`, `>=`).
 ///
@@ -496,26 +495,6 @@ fn are_expressions_always_identical(
             lhs_key == rhs_key && are_expressions_always_identical(lhs.value, rhs.value, lhs_type, rhs_type, artifacts)
         }
         _ => false,
-    })
-}
-
-fn get_literal_array_key(expression: &Expression<'_>, artifacts: &AnalysisArtifacts) -> Option<ArrayKey> {
-    let key_type = artifacts.get_expression_type(expression)?;
-
-    Some(if key_type.is_null() {
-        ArrayKey::String(empty_word())
-    } else if key_type.is_true() {
-        ArrayKey::Integer(1)
-    } else if key_type.is_false() {
-        ArrayKey::Integer(0)
-    } else if let Some(value) = key_type.get_single_literal_float_value() {
-        ArrayKey::Integer(value.trunc() as i64)
-    } else if let Some(value) = key_type.get_single_literal_int_value() {
-        ArrayKey::Integer(value)
-    } else if let Some(value) = key_type.get_single_literal_string_value() {
-        ArrayKey::from_string(word(value))
-    } else {
-        return key_type.get_single_class_string_value().map(ArrayKey::String);
     })
 }
 

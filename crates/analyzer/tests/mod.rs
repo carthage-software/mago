@@ -437,6 +437,7 @@ test_case!(reconcile_properties);
 test_case!(reconciling_generic_parameter);
 test_case!(invariant_generic_unsound);
 test_case!(recursive_templates);
+test_case!(reversed_literal_list_parameter);
 test_case!(resource_reconciliation);
 test_case!(scalar_types_reconciliation);
 test_case!(string_reconciliation);
@@ -2765,6 +2766,7 @@ test_case!(issue_2336);
 test_case!(issue_2341);
 test_case!(issue_2343);
 test_case!(issue_2352);
+test_case!(issue_2360);
 
 #[test]
 #[cfg_attr(miri, ignore)]

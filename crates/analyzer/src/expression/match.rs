@@ -8,7 +8,14 @@ use indexmap::IndexMap;
 use mago_algebra::clause::Clause;
 use mago_algebra::saturate_clauses;
 use mago_allocator::Arena;
+use mago_codex::consts::MAX_ENUM_CASES_FOR_ANALYSIS;
+use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::ttype::TType;
+use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::atomic::array::key::ArrayKey;
+use mago_codex::ttype::atomic::object::TObject;
+use mago_codex::ttype::atomic::object::r#enum::TEnum;
+use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::combine_optional_union_types;
 use mago_codex::ttype::combine_union_types;
 use mago_codex::ttype::get_mixed;
@@ -18,6 +25,7 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
+use mago_syntax::cst::ArrayElement;
 use mago_syntax::cst::Expression;
 use mago_syntax::cst::Match;
 use mago_syntax::cst::MatchArm;
@@ -43,6 +51,8 @@ use crate::formula::get_formula;
 use crate::formula::negate_or_synthesize;
 use crate::reconciler::reconcile_keyed_types;
 use crate::utils::expression::get_expression_id;
+use crate::utils::expression::get_literal_array_key;
+use crate::utils::misc::unwrap_expression;
 use crate::utils::symbol_existence::extract_function_constant_existence;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Match<'arena> {
@@ -64,6 +74,141 @@ enum ArmExecutionStatus {
     Always,
     Never,
     Conditional,
+}
+
+struct FiniteArrayMatchCoverage {
+    keys: Vec<ArrayKey>,
+    dimensions: Vec<Vec<TAtomic>>,
+    covered: Vec<bool>,
+    remaining: usize,
+}
+
+impl FiniteArrayMatchCoverage {
+    fn new(
+        expression: &Expression<'_>,
+        artifacts: &AnalysisArtifacts,
+        codebase: &CodebaseMetadata,
+        limit: usize,
+    ) -> Option<Self> {
+        let (keys, values) = get_array_product_parts(expression, artifacts)?;
+        let mut dimensions = Vec::with_capacity(values.len());
+        let mut combination_count = 1usize;
+
+        for value in values {
+            let alternatives = expand_finite_match_type(artifacts.get_expression_type(value)?, codebase)?;
+            combination_count = combination_count.checked_mul(alternatives.len())?;
+            if combination_count > limit {
+                return None;
+            }
+
+            dimensions.push(alternatives);
+        }
+
+        Some(Self { keys, dimensions, covered: vec![false; combination_count], remaining: combination_count })
+    }
+
+    fn subtract(&mut self, expression: &Expression<'_>, artifacts: &AnalysisArtifacts) {
+        let Some((keys, values)) = get_array_product_parts(expression, artifacts) else {
+            return;
+        };
+
+        if keys != self.keys {
+            return;
+        }
+
+        let mut index = 0;
+        for (value, dimension) in values.into_iter().zip(&self.dimensions) {
+            let Some(atomic) = artifacts.get_expression_type(value).and_then(get_finite_singleton) else {
+                return;
+            };
+            let Some(position) = dimension.iter().position(|candidate| candidate == atomic) else {
+                return;
+            };
+
+            index = index * dimension.len() + position;
+        }
+
+        if !self.covered[index] {
+            self.covered[index] = true;
+            self.remaining -= 1;
+        }
+    }
+
+    fn is_exhaustive(&self) -> bool {
+        self.remaining == 0
+    }
+}
+
+fn get_array_product_parts<'expression, 'arena>(
+    expression: &'expression Expression<'arena>,
+    artifacts: &AnalysisArtifacts,
+) -> Option<(Vec<ArrayKey>, Vec<&'expression Expression<'arena>>)> {
+    let elements = match unwrap_expression(expression) {
+        Expression::Array(array) => array.elements.as_slice(),
+        Expression::LegacyArray(array) => array.elements.as_slice(),
+        _ => return None,
+    };
+
+    let keyed = matches!(elements.first()?, ArrayElement::KeyValue(_));
+    let mut keys = Vec::with_capacity(elements.len());
+    let mut values = Vec::with_capacity(elements.len());
+
+    for (index, element) in elements.iter().enumerate() {
+        let (key, value) = match element {
+            ArrayElement::Value(element) if !keyed => (ArrayKey::Integer(i64::try_from(index).ok()?), element.value),
+            ArrayElement::KeyValue(element) if keyed => (get_literal_array_key(element.key, artifacts)?, element.value),
+            _ => return None,
+        };
+
+        if keys.contains(&key) {
+            return None;
+        }
+
+        keys.push(key);
+        values.push(value);
+    }
+
+    Some((keys, values))
+}
+
+fn expand_finite_match_type(r#type: &TUnion, codebase: &CodebaseMetadata) -> Option<Vec<TAtomic>> {
+    let mut alternatives = Vec::new();
+
+    for atomic in r#type.types.as_ref() {
+        match atomic {
+            TAtomic::Scalar(TScalar::Bool(boolean)) if boolean.is_general() => {
+                alternatives.push(TAtomic::Scalar(TScalar::r#true()));
+                alternatives.push(TAtomic::Scalar(TScalar::r#false()));
+            }
+            TAtomic::Object(TObject::Enum(r#enum)) if r#enum.case.is_none() => {
+                let metadata = codebase.get_enum(r#enum.name.as_bytes())?;
+                if metadata.enum_cases.is_empty() || metadata.enum_cases.len() > MAX_ENUM_CASES_FOR_ANALYSIS {
+                    return None;
+                }
+
+                let mut cases = metadata.enum_cases.keys().copied().collect::<Vec<_>>();
+                cases.sort_unstable();
+                alternatives.extend(
+                    cases.into_iter().map(|case| TAtomic::Object(TObject::Enum(TEnum::new_case(r#enum.name, case)))),
+                );
+            }
+            _ if atomic.is_literal()
+                || matches!(atomic, TAtomic::Object(TObject::Enum(r#enum)) if r#enum.case.is_some()) =>
+            {
+                alternatives.push(atomic.clone());
+            }
+            _ => return None,
+        }
+    }
+
+    (!alternatives.is_empty()).then_some(alternatives)
+}
+
+fn get_finite_singleton(r#type: &TUnion) -> Option<&TAtomic> {
+    let atomic = r#type.is_single().then(|| r#type.get_single())?;
+
+    (atomic.is_literal() || matches!(atomic, TAtomic::Object(TObject::Enum(r#enum)) if r#enum.case.is_some()))
+        .then_some(atomic)
 }
 
 struct MatchAnalyzer<'anlyz, 'ctx, 'ast, 'arena, A>
@@ -142,6 +287,13 @@ where
             return Ok(());
         }
 
+        let mut finite_array_coverage = FiniteArrayMatchCoverage::new(
+            self.stmt.expression,
+            self.artifacts,
+            self.context.codebase,
+            usize::from(self.context.settings.formula_size_threshold),
+        );
+
         let (is_synthetic, subject_id, subject_for_conditions) = self.get_subject_info(&subject_type);
 
         let mut arm_body_types: Vec<Rc<TUnion>> = Vec::new();
@@ -174,6 +326,14 @@ where
                 is_exhaustive,
                 can_apply_original_subject_assertions && has_boolean_literal_conditions,
             )?;
+
+            if let Some(coverage) = &mut finite_array_coverage {
+                for condition in &expression_arm.conditions {
+                    coverage.subtract(condition, self.artifacts);
+                }
+
+                is_exhaustive |= coverage.is_exhaustive();
+            }
 
             can_apply_original_subject_assertions &= has_boolean_literal_conditions;
             if arm_status != ArmExecutionStatus::Never {
@@ -246,7 +406,9 @@ where
             }
 
             arm_body_types.push(Rc::new(get_never()));
-            arm_exit_contexts.push(running_else_context);
+            if !finite_array_coverage.as_ref().is_some_and(FiniteArrayMatchCoverage::is_exhaustive) {
+                arm_exit_contexts.push(running_else_context);
+            }
         }
 
         self.merge_match_contexts(&arm_exit_contexts);
