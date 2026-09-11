@@ -1,3 +1,5 @@
+use std::collections::HashSet;
+
 use mago_allocator::prelude::*;
 
 use mago_collector::Collector;
@@ -30,6 +32,9 @@ where
     pub constant_expression_depth: usize,
     imports: ImportTracker,
     ancestors: Vec<'arena, Node<'ctx, 'arena>, A>,
+    /// Resolved names of the functions this file declares, filled as the walk
+    /// reaches each declaration.
+    declared_functions: HashSet<&'arena [u8]>,
 }
 
 impl<'ctx, 'arena, A> LintContext<'ctx, 'arena, A>
@@ -55,6 +60,7 @@ where
             constant_expression_depth: 0,
             imports: ImportTracker::new(),
             ancestors: Vec::with_capacity_in(32, arena),
+            declared_functions: HashSet::new(),
         }
     }
 
@@ -112,6 +118,20 @@ where
         self.resolved_names.is_imported(&position.position())
     }
 
+    /// Whether this file declares the function the name at `position` resolves to.
+    ///
+    /// An unqualified call inside a namespace resolves to the namespaced
+    /// candidate, so comparing resolved names answers the question without
+    /// reassembling any name by hand.
+    ///
+    /// Only declarations the walk has already passed are known, so a call that
+    /// precedes the declaration it resolves to answers `false` even though PHP
+    /// hoists top-level declarations. Conditional declarations are recorded too,
+    /// which errs toward staying quiet.
+    pub fn declares_function(&self, position: &impl HasPosition) -> bool {
+        self.declared_functions.contains(self.resolved_names.get(&position.position()))
+    }
+
     /// Retrieves the name associated with a given position in the code.
     ///
     /// # Panics
@@ -126,6 +146,10 @@ where
     pub(crate) fn push_ancestor(&mut self, node: Node<'ctx, 'arena>) {
         self.ancestors.push(node);
         self.imports.enter_node(node);
+
+        if let Node::Function(function) = node {
+            self.declared_functions.insert(self.resolved_names.get(&function.name.position()));
+        }
     }
 
     /// Called by the walker on node exit. Rules must not call this.
