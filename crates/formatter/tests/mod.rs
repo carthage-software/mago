@@ -119,6 +119,7 @@ test_case!(inline_php);
 test_case!(inline_html_alignment);
 test_case!(inline_echo);
 test_case!(inline_php_closing_tag_idempotency);
+test_case!(statement_terminator_stays_on_last_line);
 test_case!(parameter_attributes);
 test_case!(parameter_attribute_on_new_line);
 test_case!(parameter_attribute_on_new_line_disabled);

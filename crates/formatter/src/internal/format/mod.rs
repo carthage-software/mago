@@ -563,7 +563,6 @@ where
                         statement::sort_use_items(self.items.iter()).into_iter().map(|i| i.format(f)),
                         Separator::CommaLine,
                     )),
-                    Document::Line(Line::soft()),
                 ]))
             } else {
                 Document::Group(Group::new(vec_in![f.arena;
@@ -572,7 +571,6 @@ where
                         self.items.iter().map(|i| i.format(f)),
                         Separator::CommaLine,
                     )),
-                    Document::Line(Line::soft()),
                 ]))
             }
         })
@@ -1482,15 +1480,23 @@ where
                     .with_id(values_group_id),
             );
 
-            Document::Group(Group::new(vec_in![f.arena;
+            let mut contents = vec_in![f.arena;
                 echo_keyword,
                 Document::IndentIfBreak(IndentIfBreak::new(values_group_id, vec_in![f.arena;
                     Document::Line(Line::default()),
                     values_group
                 ])),
-                Document::Line(Line::soft()),
-                self.terminator.format(f),
-            ]))
+            ];
+
+            // A closing tag terminates the statement *and* leaves PHP mode, so it reads as the end
+            // of the block and gets its own line; a semicolon belongs to the last value.
+            if !matches!(self.terminator, Terminator::Semicolon(_)) {
+                contents.push(Document::Line(Line::soft()));
+            }
+
+            contents.push(self.terminator.format(f));
+
+            Document::Group(Group::new(contents))
         })
     }
 }
