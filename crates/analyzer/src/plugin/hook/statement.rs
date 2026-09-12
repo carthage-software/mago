@@ -9,7 +9,7 @@ use crate::plugin::provider::Provider;
 
 /// Hook trait for intercepting statement analysis.
 ///
-/// This hook receives the real AST statement and full mutable context,
+/// This hook receives the real CST statement and full mutable context,
 /// allowing hooks to inspect statements, report issues, and modify analysis state.
 pub trait StatementHook: Provider {
     /// Called before a statement is analyzed.

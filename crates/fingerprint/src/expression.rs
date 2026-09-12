@@ -53,7 +53,7 @@ impl Fingerprintable for Expression<'_> {
             }
             _ => {
                 // Defensive fallback: an unhandled variant still produces a stable hash so the
-                // fingerprint stays deterministic if the AST gains a new shape we haven't covered.
+                // fingerprint stays deterministic if the CST gains a new shape we haven't covered.
                 hasher.write(b"__unhandled_expression__");
             }
         }

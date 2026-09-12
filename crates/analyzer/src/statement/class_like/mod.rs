@@ -3006,7 +3006,7 @@ fn report_signature_compatibility_issue<'ctx, A>(
 /// Reports undefined type references in the `@method`, `@property` and `@mixin`
 /// tags of a class-like docblock.
 ///
-/// The members these tags declare have no AST of their own, so they are never
+/// The members these tags declare have no CST of their own, so they are never
 /// visited by the analyzers that perform this check for real methods and
 /// properties.
 fn check_docblock_declared_members<A>(

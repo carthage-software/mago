@@ -21,7 +21,7 @@
 //! - `mago analyze`: Perform static analysis
 //! - `mago format`: Format PHP code
 //! - `mago guard`: Enforce architectural rules
-//! - `mago ast`: Display the abstract syntax tree
+//! - `mago cst`: Display the concrete syntax tree
 //! - `mago list-files`: List all files that would be processed
 //! - `mago self-update`: Update Mago to the latest version
 //! - `mago generate-completions`: Generate shell completion scripts

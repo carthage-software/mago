@@ -50,7 +50,7 @@ pub struct AssignmentAlignment {
     pub break_group_id: Option<GroupIdentifier>,
 }
 
-/// Represents nodes in the Abstract Syntax Tree (AST) that involve assignment-like operations.
+/// Represents nodes in the Concrete Syntax Tree (CST) that involve assignment-like operations.
 #[derive(Debug, Clone, Copy)]
 pub(super) enum AssignmentLikeNode<'arena> {
     /// Represents a standard assignment operation, such as `$a = $b`.

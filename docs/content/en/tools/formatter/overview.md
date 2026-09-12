@@ -13,11 +13,11 @@ A deterministic formatter for PHP. Run it on a file and you get the same output 
 
 Mago borrows the parse-and-reprint approach used by Prettier, `rustfmt`, and Black:
 
-1. Parse the source into an AST.
+1. Parse the source into an CST (Concrete Syntax Tree).
 2. Discard the original formatting (whitespace, line breaks, indentation, all of it).
-3. Reprint the AST from scratch according to a fixed set of rules, [PER-CS](https://www.php-fig.org/per/coding-style/) by default.
+3. Reprint the CST from scratch according to a fixed set of rules, [PER-CS](https://www.php-fig.org/per/coding-style/) by default.
 
-The output is identical for a given AST regardless of the input style. The runtime behaviour of the code is preserved exactly: the AST round-trips, only the surface representation changes.
+The output is identical for a given CST regardless of the input style. The runtime behaviour of the code is preserved exactly: the CST round-trips, only the surface representation changes.
 
 ## What you get
 

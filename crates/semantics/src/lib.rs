@@ -10,9 +10,9 @@ use crate::internal::context::Context;
 
 mod internal;
 
-/// The main entry point for performing semantic analysis on a PHP program's AST.
+/// The main entry point for performing semantic analysis on a PHP program's CST.
 ///
-/// This checker is responsible for traversing the Abstract Syntax Tree (AST)
+/// This checker is responsible for traversing the Concrete Syntax Tree (CST)
 /// and validating the code against a set of semantic rules, such as type correctness,
 /// variable usage, and adherence to language features for a specific PHP version.
 #[derive(Debug, Clone, Copy)]
@@ -32,15 +32,15 @@ impl SemanticsChecker {
         Self { version: php_version }
     }
 
-    /// Analyzes the given program AST for semantic issues.
+    /// Analyzes the given program CST for semantic issues.
     ///
-    /// This method walks the entire AST, applying semantic rules and collecting any
+    /// This method walks the entire CST, applying semantic rules and collecting any
     /// violations it finds.
     ///
     /// # Arguments
     ///
     /// - `source`: The source file being analyzed.
-    /// - `program`: The root of the AST for the program.
+    /// - `program`: The root of the CST for the program.
     /// - `names`: The resolved names (e.g., fully qualified class names) from the name resolution pass.
     ///
     /// # Returns

@@ -33,12 +33,12 @@ use crate::kind::NameKind;
 use crate::scope::concat_with_sep;
 use crate::scope::trim_start_byte;
 
-/// An AST visitor (`MutWalker`) that traverses a PHP Abstract Syntax Tree
+/// A CST visitor (`MutWalker`) that traverses a PHP Concrete Syntax Tree
 /// to resolve names (classes, functions, constants, etc.) according to
 /// PHP's scoping and aliasing rules.
 #[derive(Debug, Clone, Default)]
 pub struct NameWalker<'arena> {
-    /// Accumulates the resolved names found during the AST walk.
+    /// Accumulates the resolved names found during the CST walk.
     pub resolved_names: ResolvedNames<'arena>,
 }
 

@@ -61,7 +61,7 @@ To get started with Mago and learn how to configure your project, please visit o
 - 🛠️ Automated Fixes: Apply fixes for many lint issues automatically.
 - 📜 Formatting: Automatically format your code to adhere to best practices and style guides.
 - 🧠 Semantic Checks: Ensure code correctness with robust semantic analysis.
-- 🌳 AST Visualization: Explore your code’s structure with Abstract Syntax Tree (AST) parsing.
+- 🌳 CST Visualization: Explore your code’s structure with Concrete Syntax Tree (CST) parsing.
 
 ## Our Sponsors
 

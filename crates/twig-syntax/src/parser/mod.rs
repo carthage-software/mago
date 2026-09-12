@@ -142,7 +142,7 @@ where
     }
 }
 
-/// Parse a Twig template file into an AST, with default settings.
+/// Parse a Twig template file into a CST, with default settings.
 #[inline]
 pub fn parse_file<'arena, A>(arena: &'arena A, file: &File) -> &'arena Template<'arena>
 where
@@ -151,7 +151,7 @@ where
     parse_file_content(arena, file.file_id(), file.contents.as_ref())
 }
 
-/// Parse a Twig template file into an AST with the supplied settings.
+/// Parse a Twig template file into a CST with the supplied settings.
 #[inline]
 pub fn parse_file_with_settings<'arena, A>(
     arena: &'arena A,
@@ -164,7 +164,7 @@ where
     parse_file_content_with_settings(arena, file.file_id(), file.contents.as_ref(), settings)
 }
 
-/// Parse Twig source into an AST, associating every produced [`Span`] with
+/// Parse Twig source into a CST, associating every produced [`Span`] with
 /// the supplied [`FileId`].  Uses default parser settings.
 pub fn parse_file_content<'arena, A>(arena: &'arena A, file_id: FileId, content: &[u8]) -> &'arena Template<'arena>
 where
@@ -173,7 +173,7 @@ where
     parse_file_content_with_settings(arena, file_id, content, ParserSettings::default())
 }
 
-/// Parse Twig source into an AST with the supplied [`FileId`] and
+/// Parse Twig source into a CST with the supplied [`FileId`] and
 /// [`ParserSettings`].  The `content` is copied into the arena so that the
 /// resulting [`Template`] owns its `source_text` slice.
 pub fn parse_file_content_with_settings<'arena, A>(

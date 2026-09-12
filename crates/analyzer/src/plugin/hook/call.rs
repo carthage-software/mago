@@ -12,7 +12,7 @@ use crate::plugin::provider::Provider;
 
 /// Hook trait for intercepting function call analysis.
 ///
-/// This hook receives the real AST function call node and full mutable context,
+/// This hook receives the real CST function call node and full mutable context,
 /// allowing hooks to inspect calls, report issues, modify analysis state,
 /// and optionally skip analysis with a custom return type.
 pub trait FunctionCallHook: Provider {
@@ -45,7 +45,7 @@ pub trait FunctionCallHook: Provider {
 
 /// Hook trait for intercepting method call analysis.
 ///
-/// This hook receives the real AST method call node and full mutable context,
+/// This hook receives the real CST method call node and full mutable context,
 /// allowing hooks to inspect calls, report issues, modify analysis state,
 /// and optionally skip analysis with a custom return type.
 pub trait MethodCallHook: Provider {

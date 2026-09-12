@@ -339,7 +339,7 @@ macro_rules! gen_standalone_funcs {
     };
 }
 
-/// Macro for generating a walker trait and associated functions for traversing an AST.
+/// Macro for generating a walker trait and associated functions for traversing a CST.
 macro_rules! generate_ast_walker {
     (
         using($walker:ident, $context:ident, $ast:lifetime, $arena:lifetime):
@@ -347,14 +347,14 @@ macro_rules! generate_ast_walker {
             $prefix:tt $node_type:ty as $var_name:ident => $code:block
         )*
     ) => {
-        /// A trait that defines a mutable walker to traverse AST nodes.
+        /// A trait that defines a mutable walker to traverse CST nodes.
         pub trait MutWalker<$ast, $arena, C>: Sync + Send {
             $(
                 gen_mut_trait_methods!($prefix, $node_type, $var_name, $walker, $context, $ast, $arena, $code);
             )*
         }
 
-        /// A trait that defines an immutable walker to traverse AST nodes.
+        /// A trait that defines an immutable walker to traverse CST nodes.
         pub trait Walker<$ast, $arena, C>: Sync + Send {
             $(
                 gen_const_trait_methods!($prefix, $node_type, $var_name, $walker, $context, $ast, $arena, $code);

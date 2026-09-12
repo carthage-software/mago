@@ -57,7 +57,7 @@ impl std::fmt::Display for Visibility {
     }
 }
 
-/// Attempts to convert an AST `Modifier` node into a `Visibility` level.
+/// Attempts to convert an CST `Modifier` node into a `Visibility` level.
 impl TryFrom<&Modifier<'_>> for Visibility {
     type Error = ();
 
