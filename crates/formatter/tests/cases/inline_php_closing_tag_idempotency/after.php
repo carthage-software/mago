@@ -8,5 +8,4 @@ echo
         'key4' => 'value4',
         'key5' => 'value5',
         'key6' => 'value6',
-    ])
-;
+    ]);
