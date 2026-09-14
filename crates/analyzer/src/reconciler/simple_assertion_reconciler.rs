@@ -1024,10 +1024,27 @@ where
 {
     let mut acceptable_types = Vec::new();
     let mut did_remove_type = false;
+    let asserted_type = get_string_with_props(is_numeric, is_truthy, is_non_empty, is_callable, casing);
 
     for atomic in existing_var_type.types.as_ref() {
         match atomic {
             TAtomic::Scalar(TScalar::String(existing_string)) => {
+                if existing_string.is_known_literal() {
+                    if atomic_comparator::is_contained_by(
+                        context.codebase,
+                        atomic,
+                        asserted_type.get_single(),
+                        false,
+                        &mut ComparisonResult::new(),
+                    ) {
+                        acceptable_types.push(atomic.clone());
+                    } else {
+                        did_remove_type = true;
+                    }
+
+                    continue;
+                }
+
                 if (is_numeric && !existing_string.is_numeric)
                     || (is_truthy && !existing_string.is_truthy)
                     || (is_non_empty && !existing_string.is_non_empty)
@@ -1055,7 +1072,7 @@ where
                 acceptable_types.push(atomic.clone());
             }
             TAtomic::Mixed(_) | TAtomic::Scalar(TScalar::Generic | TScalar::ArrayKey) => {
-                return get_string_with_props(is_numeric, is_truthy, is_non_empty, is_callable, casing);
+                return asserted_type;
             }
             TAtomic::GenericParameter(generic_parameter) => {
                 did_remove_type = true;
@@ -1095,7 +1112,7 @@ where
                     || atomic_comparator::is_contained_by(
                         context.codebase,
                         atomic,
-                        get_string_with_props(is_numeric, is_truthy, is_non_empty, is_callable, casing).get_single(),
+                        asserted_type.get_single(),
                         false,
                         &mut ComparisonResult::new(),
                     )
