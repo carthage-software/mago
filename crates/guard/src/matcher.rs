@@ -211,7 +211,7 @@ fn find_ignore_ascii_case(haystack: &[u8], needle: &[u8]) -> Option<usize> {
 /// - `App\Infrastructure\*`
 ///
 /// Supports nested and multiple brace groups.
-fn expand_braces(pattern: &[u8]) -> Vec<Vec<u8>> {
+pub(crate) fn expand_braces(pattern: &[u8]) -> Vec<Vec<u8>> {
     let Some(open) = pattern.iter().position(|&b| b == b'{') else {
         return vec![pattern.to_vec()];
     };
