@@ -1,8 +1,14 @@
+use std::sync::Arc;
+
 use crate::metadata::CodebaseMetadata;
 use crate::ttype::atomic::TAtomic;
+use crate::ttype::atomic::array::TArray;
+use crate::ttype::atomic::array::keyed::TKeyedArray;
 use crate::ttype::atomic::generic::TGenericParameter;
 use crate::ttype::atomic::object::TObject;
 use crate::ttype::atomic::scalar::TScalar;
+use crate::ttype::combine_union_types;
+use crate::ttype::combiner::CombinerOptions;
 use crate::ttype::comparator::ComparisonResult;
 use crate::ttype::comparator::atomic_comparator;
 use crate::ttype::comparator::iterable_comparator;
@@ -322,6 +328,40 @@ fn is_contained_by_atomic(
         return true;
     }
 
+    if !container_has_template
+        && let Some(combined_container_type) =
+            get_combined_keyed_array_union_container(codebase, input_type_part, container_atomic_types)
+    {
+        let mut atomic_comparison_result = ComparisonResult::new();
+        if atomic_comparator::is_contained_by(
+            codebase,
+            input_type_part,
+            &combined_container_type,
+            inside_assertion,
+            &mut atomic_comparison_result,
+        ) {
+            if let Some(replacement_atomic_type) = atomic_comparison_result.replacement_atomic_type {
+                if let Some(replacement_union_type) = &mut union_comparison_result.replacement_union_type {
+                    replacement_union_type.replace_type(input_type_part, replacement_atomic_type);
+                } else {
+                    union_comparison_result.replacement_union_type = Some(wrap_atomic(replacement_atomic_type));
+                }
+            }
+
+            union_comparison_result
+                .type_variable_lower_bounds
+                .extend(atomic_comparison_result.type_variable_lower_bounds);
+            union_comparison_result
+                .type_variable_upper_bounds
+                .extend(atomic_comparison_result.type_variable_upper_bounds);
+
+            return true;
+        }
+
+        some_type_coerced |= atomic_comparison_result.type_coerced.unwrap_or(false);
+        some_type_coerced_from_nested_mixed |= atomic_comparison_result.type_coerced_from_nested_mixed.unwrap_or(false);
+    }
+
     if some_type_coerced {
         union_comparison_result.type_coerced = Some(true);
     }
@@ -335,6 +375,51 @@ fn is_contained_by_atomic(
     }
 
     false
+}
+
+#[inline]
+fn get_combined_keyed_array_union_container(
+    codebase: &CodebaseMetadata,
+    input_type_part: &TAtomic,
+    container_atomic_types: &[TAtomic],
+) -> Option<TAtomic> {
+    let TAtomic::Array(TArray::Keyed(input)) = input_type_part else {
+        return None;
+    };
+
+    if input.known_items.is_some() {
+        return None;
+    }
+
+    let (input_key, _) = input.parameters.as_ref()?;
+    let mut matching = container_atomic_types.iter().filter_map(|atomic| {
+        let TAtomic::Array(TArray::Keyed(array)) = atomic else {
+            return None;
+        };
+
+        let (key, value) = array.parameters.as_ref()?;
+        (array.known_items.is_none() && (Arc::ptr_eq(input_key, key) || input_key.as_ref() == key.as_ref()))
+            .then_some((array, value.as_ref()))
+    });
+
+    let (first, first_value) = matching.next()?;
+    let (second, second_value) = matching.next()?;
+    let mut value = combine_union_types(first_value, second_value, codebase, CombinerOptions::default());
+    let mut non_empty = first.non_empty && second.non_empty;
+    let mut known_non_list = first.known_non_list && second.known_non_list;
+
+    for (array, next_value) in matching {
+        value = combine_union_types(&value, next_value, codebase, CombinerOptions::default());
+        non_empty &= array.non_empty;
+        known_non_list &= array.known_non_list;
+    }
+
+    Some(TAtomic::Array(TArray::Keyed(TKeyedArray {
+        known_items: None,
+        parameters: Some((Arc::clone(input_key), Arc::new(value))),
+        non_empty,
+        known_non_list,
+    })))
 }
 
 #[must_use]
