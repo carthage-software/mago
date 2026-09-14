@@ -157,7 +157,7 @@ impl GuardCommand {
         let command_start = trace_enabled.then(Instant::now);
 
         let prelude_start = trace_enabled.then(Instant::now);
-        let Prelude { database, metadata, .. } = if self.no_stubs {
+        let Prelude { database, .. } = if self.no_stubs {
             Prelude::default()
         } else {
             Prelude::decode(PRELUDE_BYTES).expect("Failed to decode embedded prelude")
@@ -230,7 +230,7 @@ impl GuardCommand {
         }
 
         let guard_run_start = trace_enabled.then(Instant::now);
-        let service = orchestrator.get_guard_service(database.read_only(), metadata);
+        let service = orchestrator.get_guard_service(database.read_only());
         let result = service.run()?;
         let guard_run_duration = guard_run_start.map(|s| s.elapsed());
 
