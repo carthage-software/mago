@@ -4604,12 +4604,11 @@ function array_multisort(array &$array, array|int &...$rest): bool {}
 /**
  * @template K of array-key
  * @template V
- * @template T
  *
  * @param array<K, V> $array
- * @param T ...$values
+ * @param V ...$values
  *
- * @param-out ($array is list<V> ? non-empty-list<V|T> : non-empty-array<K, V|T>) $array
+ * @param-out ($array is list<V> ? non-empty-list<V> : non-empty-array<K, V>) $array
  *
  * @return int<1, max>
  *
@@ -4620,8 +4619,8 @@ function array_unshift(array &$array, mixed ...$values): int {}
 /**
  * @template InputKey of array-key
  * @template InputValue
- * @template ReplacementKey
- * @template ReplacementValue
+ * @template ReplacementKey = never
+ * @template ReplacementValue = never
  * @template ReplacementScalar
  *
  * @param list<InputValue>|array<InputKey, InputValue> $array

@@ -375,7 +375,9 @@ where
                 continue;
             }
 
-            if declared_had_templates {
+            if declared_had_templates
+                && !invocation.target.get_function_like_metadata().is_some_and(|metadata| metadata.flags.is_built_in())
+            {
                 new_type.widen_literals();
             }
 
