@@ -34,7 +34,7 @@ pub enum FunctionLikeScope<'arena> {
     Closure(Span, bool),
 }
 
-/// Represents a single level of lexical scope within the AST.
+/// Represents a single level of lexical scope within the CST.
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
 pub enum Scope<'arena> {
     /// A `namespace` scope.
@@ -45,7 +45,7 @@ pub enum Scope<'arena> {
     FunctionLike(FunctionLikeScope<'arena>),
 }
 
-/// A stack that tracks the current nesting of lexical scopes during AST traversal.
+/// A stack that tracks the current nesting of lexical scopes during CST traversal.
 ///
 /// As the node walker descends into scope-defining nodes (like classes or functions),
 /// it pushes a new `Scope` onto this stack. When it exits that node, it pops the
@@ -71,7 +71,7 @@ impl FunctionLikeScope<'_> {
 }
 
 impl<'arena> Scope<'arena> {
-    /// Creates a `Scope` from an AST `Node` if that node defines a new scope.
+    /// Creates a `Scope` from a CST `Node` if that node defines a new scope.
     ///
     /// Returns `None` if the node does not define a scope.
     pub fn for_node<'ast, A>(ctx: &LintContext<'_, 'arena, A>, node: Node<'ast, 'arena>) -> Option<Self>

@@ -1,6 +1,6 @@
 [package]
 name = "mago-twig-syntax"
-description = "A lossless lexer, AST, and parser for Twig templates, targeting Twig 3 syntactic compatibility."
+description = "A lossless lexer, CST, and parser for Twig templates, targeting Twig 3 syntactic compatibility."
 version.workspace = true
 edition.workspace = true
 authors.workspace = true
