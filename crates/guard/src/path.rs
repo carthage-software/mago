@@ -12,6 +12,8 @@ use serde::de::Deserializer;
 use mago_syntax_core::part_of_identifier;
 use mago_syntax_core::start_of_identifier;
 
+use crate::matcher;
+
 const INVALID_PATH_ERROR: &str = "Invalid path: must be '*', '@all', '@self', '@this', '@native', '@php', '@builtin', a layer (e.g., '@layer:name'), a valid namespace (ending with '\\'), a valid symbol name, or a pattern containing wildcards ('*').";
 const INVALID_SELECTOR_ERROR: &str = "Invalid symbol selector: must be a valid namespace (ending with '\\'), a valid symbol name, or a pattern containing wildcards ('*').";
 const INVALID_NAMESPACE_ERROR: &str = "Invalid namespace: must be '@global' or a valid namespace ending with '\\'.";
@@ -72,6 +74,32 @@ fn is_valid_pattern_part(part: &str) -> bool {
         .all(|&byte| matches!(byte, b'0'..=b'9' | b'a'..=b'z' | b'A'..=b'Z' | b'_' | b'\x80'..=b'\xff' | b'*'))
 }
 
+/// Validates a selector that contains a brace expression.
+///
+/// `matcher::matches` expands braces at match time, so the selector is stored verbatim and only
+/// its expansions are validated here. Validating the expansions rather than widening the accepted
+/// byte set keeps an unbalanced expression such as `App\\{Foo` a configuration error instead of a
+/// pattern that silently never matches anything.
+fn validate_brace_expansions(s: &str) -> Result<(), &'static str> {
+    let expansions = matcher::expand_braces(s.as_bytes());
+    if expansions.is_empty() {
+        return Err(INVALID_SELECTOR_ERROR);
+    }
+
+    for expansion in expansions {
+        let expansion = str::from_utf8(&expansion).map_err(|_| INVALID_SELECTOR_ERROR)?;
+
+        // `expand_braces` returns the input untouched when the braces are unbalanced.
+        if expansion.contains('{') || expansion.contains('}') {
+            return Err(INVALID_SELECTOR_ERROR);
+        }
+
+        expansion.parse::<SymbolSelector>()?;
+    }
+
+    Ok(())
+}
+
 impl FromStr for NamespacePath {
     type Err = &'static str;
 
@@ -93,6 +121,10 @@ impl FromStr for SymbolSelector {
     type Err = &'static str;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
+        if s.contains('{') || s.contains('}') {
+            return validate_brace_expansions(s).map(|()| SymbolSelector::Pattern(s.to_string()));
+        }
+
         if s.contains('*') {
             if s.split('\\').all(is_valid_pattern_part) {
                 Ok(SymbolSelector::Pattern(s.to_string()))
@@ -262,6 +294,53 @@ mod tests {
         "App\\*Something".parse::<Path>().unwrap();
         "App\\*Something*".parse::<Path>().unwrap();
         "App\\*Some*thing".parse::<Path>().unwrap();
+    }
+
+    #[test]
+    fn test_brace_patterns_parse_correctly() {
+        // The matcher expands braces, so the selector is kept verbatim as a pattern.
+        assert_eq!(
+            "App\\{Foo,Bar}\\Thing".parse::<Path>().unwrap(),
+            Path::Selector(SymbolSelector::Pattern("App\\{Foo,Bar}\\Thing".to_string()))
+        );
+        assert_eq!(
+            "App\\{Foo,Bar}\\**".parse::<Path>().unwrap(),
+            Path::Selector(SymbolSelector::Pattern("App\\{Foo,Bar}\\**".to_string()))
+        );
+
+        // A trailing separator keeps namespace-prefix semantics, which `matcher::matches` honours.
+        assert_eq!(
+            "App\\{Foo,Bar}\\".parse::<Path>().unwrap(),
+            Path::Selector(SymbolSelector::Pattern("App\\{Foo,Bar}\\".to_string()))
+        );
+
+        "{Foo,Bar}".parse::<Path>().unwrap();
+        "App\\{Foo,Bar}\\{Baz,Qux}".parse::<Path>().unwrap();
+        "App\\{Foo,Bar{Baz,Qux}}\\**".parse::<Path>().unwrap();
+        "*{Repository,Builder}".parse::<Path>().unwrap();
+    }
+
+    #[test]
+    fn test_brace_patterns_match_the_same_names_as_their_expansions() {
+        let Path::Selector(SymbolSelector::Pattern(pattern)) = "App\\{Foo,Bar}\\Thing".parse::<Path>().unwrap() else {
+            panic!("expected a pattern selector");
+        };
+
+        assert!(matcher::matches(b"App\\Foo\\Thing", pattern.as_bytes(), false, false));
+        assert!(matcher::matches(b"App\\Bar\\Thing", pattern.as_bytes(), false, false));
+        assert!(!matcher::matches(b"App\\Baz\\Thing", pattern.as_bytes(), false, false));
+    }
+
+    #[test]
+    fn test_malformed_brace_patterns_fail_to_parse() {
+        // Unbalanced braces would expand to themselves and never match anything.
+        "App\\{Foo".parse::<Path>().unwrap_err();
+        "App\\Foo}".parse::<Path>().unwrap_err();
+        "App\\{Foo,Bar".parse::<Path>().unwrap_err();
+
+        // Every alternative still has to be a valid selector on its own.
+        "App\\{Foo,Invalid-Bar}\\Thing".parse::<Path>().unwrap_err();
+        "App\\{Foo,1Leading}\\Thing".parse::<Path>().unwrap_err();
     }
 
     #[test]
