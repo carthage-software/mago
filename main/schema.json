@@ -8833,25 +8833,6 @@
           "type": "string"
         },
         {
-          "description": "Ignore a code in specific paths or glob patterns:\n`{ code = \"code2\", in = [\"tests/\", \"src/**/*.php\"] }`",
-          "type": "object",
-          "properties": {
-            "code": {
-              "type": "string"
-            },
-            "in": {
-              "type": "array",
-              "items": {
-                "type": "string"
-              }
-            }
-          },
-          "required": [
-            "code",
-            "in"
-          ]
-        },
-        {
           "description": "Ignore by regex against issue text, with optional code and path scoping:\n`{ pattern = \"Symfony\", code = \"mixed-assignment\", in = [\"src/Bridge/\"] }`.",
           "type": "object",
           "properties": {
@@ -8879,6 +8860,25 @@
           },
           "required": [
             "pattern"
+          ]
+        },
+        {
+          "description": "Ignore a code in specific paths or glob patterns:\n`{ code = \"code2\", in = [\"tests/\", \"src/**/*.php\"] }`",
+          "type": "object",
+          "properties": {
+            "code": {
+              "type": "string"
+            },
+            "in": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "required": [
+            "code",
+            "in"
           ]
         }
       ]
