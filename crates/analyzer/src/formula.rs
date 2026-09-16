@@ -581,28 +581,51 @@ fn collect_conditional_assertions_inner(
             assertions
         }
         Expression::Binary(binary)
-            if matches!(binary.operator, BinaryOperator::Identical(_) | BinaryOperator::NotIdentical(_)) =>
+            if matches!(binary.operator, BinaryOperator::Identical(_) | BinaryOperator::NotIdentical(_))
+                || matches!(
+                    binary.operator,
+                    BinaryOperator::Equal(_) | BinaryOperator::NotEqual(_) | BinaryOperator::AngledNotEqual(_)
+                ) && (binary.lhs.is_true()
+                    || binary.lhs.is_false()
+                    || binary.rhs.is_true()
+                    || binary.rhs.is_false()) =>
         {
-            let (other, literal) = if binary.lhs.is_true() {
-                (binary.rhs, true)
-            } else if binary.lhs.is_false() {
-                (binary.rhs, false)
-            } else if binary.rhs.is_true() {
-                (binary.lhs, true)
-            } else if binary.rhs.is_false() {
-                (binary.lhs, false)
+            let boolean_literal = |expression: &Expression| {
+                if expression.is_true() {
+                    Some(true)
+                } else if expression.is_false() {
+                    Some(false)
+                } else {
+                    artifacts.get_expression_type(expression).and_then(|ty| {
+                        if ty.is_true() {
+                            Some(true)
+                        } else if ty.is_false() {
+                            Some(false)
+                        } else {
+                            None
+                        }
+                    })
+                }
+            };
+
+            let (other, literal) = if let Some(literal) = boolean_literal(binary.lhs) {
+                (binary.rhs, literal)
+            } else if let Some(literal) = boolean_literal(binary.rhs) {
+                (binary.lhs, literal)
             } else {
                 return WordMap::default();
             };
 
-            let other_when_true = if matches!(binary.operator, BinaryOperator::Identical(_)) {
-                when_true == literal
-            } else {
-                when_true != literal
-            };
+            let is_equality = matches!(binary.operator, BinaryOperator::Equal(_) | BinaryOperator::Identical(_));
+            let is_strict = matches!(binary.operator, BinaryOperator::Identical(_) | BinaryOperator::NotIdentical(_));
+            let other_is_bool = artifacts.get_expression_type(other).is_some_and(|ty| ty.is_bool());
+            if !is_strict && !other_is_bool {
+                return WordMap::default();
+            }
 
-            let include_non_equality = matches!(binary.operator, BinaryOperator::Identical(_)) == when_true
-                || artifacts.get_expression_type(other).is_some_and(|ty| ty.is_bool());
+            let other_when_true = if is_equality { when_true == literal } else { when_true != literal };
+
+            let include_non_equality = is_equality == when_true || other_is_bool;
 
             collect_conditional_assertions_inner(
                 other,

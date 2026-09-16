@@ -269,6 +269,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
             post_if_block_context
         };
         else_block_context
+            .stable_method_call_assertions
+            .clone_from(&temporary_else_context.stable_method_call_assertions);
+        else_block_context
             .definitely_uninitialized_property_ids
             .clone_from(&temporary_else_context.definitely_uninitialized_property_ids);
 
@@ -313,6 +316,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
             && !self.body.has_else_if_clauses()
         {
             block_context.clauses = else_block_context.clauses;
+            block_context.stable_method_call_assertions.clone_from(&else_block_context.stable_method_call_assertions);
             for (variable_id, variable_type) in else_block_context.locals {
                 block_context.locals.insert(variable_id, variable_type);
             }
