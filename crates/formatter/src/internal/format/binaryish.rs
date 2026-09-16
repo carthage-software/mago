@@ -40,6 +40,30 @@ pub(super) enum BinaryishOperator<'arena> {
     Elvis(Span),
 }
 
+struct BinaryishOperation<'arena, A>
+where
+    A: Arena,
+{
+    left: &'arena Expression<'arena>,
+    operator: BinaryishOperator<'arena>,
+    right: &'arena Expression<'arena>,
+    is_inside_parenthesis: bool,
+    is_nested: bool,
+    should_break: bool,
+    should_inline: bool,
+    rhs_is_parenthesized_lassoc_subchain: bool,
+    right_prefix: Option<Document<'arena, A>>,
+}
+
+enum NullCoalescePart<'arena, A>
+where
+    A: Arena,
+{
+    Expression(&'arena Expression<'arena>),
+    Operator(BinaryishOperator<'arena>),
+    Leading(Document<'arena, A>),
+}
+
 impl<'arena> BinaryishOperator<'arena> {
     fn precedence(self) -> Precedence {
         match self {
@@ -177,14 +201,21 @@ where
             ) && (operator.is_logical() || operator.is_comparison())
     );
 
-    let parts = print_binaryish_expression_parts(
-        f,
-        left,
-        operator,
-        original_right,
-        is_inside_parenthesis,
-        is_nested_same_precedence_subchain,
-    );
+    let parts = if operator.is_null_coalesce()
+        && (matches!(left, Expression::Binary(binary) if binary.operator.is_null_coalesce())
+            || matches!(right, Expression::Binary(binary) if binary.operator.is_null_coalesce()))
+    {
+        print_null_coalesce_chain_parts(f, left, operator, original_right, is_inside_parenthesis)
+    } else {
+        print_binaryish_expression_parts(
+            f,
+            left,
+            operator,
+            original_right,
+            is_inside_parenthesis,
+            is_nested_same_precedence_subchain,
+        )
+    };
 
     if is_inside_parenthesis {
         let lhs_is_binary = left.is_binary();
@@ -403,30 +434,149 @@ where
         _ => vec_in![f.arena; left.format(f)],
     };
 
-    if let Some(trailing) = f.take_placed_trailing(left.span()) {
-        parts.push(trailing);
+    f.is_in_inlined_binary_chain = old_inlined_chain_state;
+
+    push_binaryish_operation(
+        f,
+        &mut parts,
+        BinaryishOperation {
+            left,
+            operator,
+            right,
+            is_inside_parenthesis,
+            is_nested,
+            should_break,
+            should_inline: should_inline_this_level,
+            rhs_is_parenthesized_lassoc_subchain,
+            right_prefix: None,
+        },
+    );
+
+    parts
+}
+
+fn print_null_coalesce_chain_parts<'arena, A>(
+    f: &mut FormatterState<'_, 'arena, A>,
+    left: &'arena Expression<'arena>,
+    operator: BinaryishOperator<'arena>,
+    right: &'arena Expression<'arena>,
+    is_inside_parenthesis: bool,
+) -> Vec<'arena, Document<'arena, A>, A>
+where
+    A: Arena,
+{
+    let mut pending = vec_in![f.arena;
+        NullCoalescePart::Expression(right),
+        NullCoalescePart::Operator(operator),
+        NullCoalescePart::Expression(left),
+    ];
+    let mut flattened = vec_in![f.arena];
+
+    while let Some(part) = pending.pop() {
+        match part {
+            NullCoalescePart::Expression(expression) => {
+                let expression = unwrap_parenthesized(expression);
+                if let Expression::Binary(binary) = expression
+                    && binary.operator.is_null_coalesce()
+                {
+                    pending.push(NullCoalescePart::Expression(binary.rhs));
+                    pending.push(NullCoalescePart::Operator(BinaryishOperator::Binary(&binary.operator)));
+                    pending.push(NullCoalescePart::Expression(binary.lhs));
+                    if let Some(leading) = f.take_placed_leading(expression.span()) {
+                        pending.push(NullCoalescePart::Leading(leading));
+                    }
+                } else {
+                    flattened.push(NullCoalescePart::Expression(expression));
+                }
+            }
+            NullCoalescePart::Operator(operator) => flattened.push(NullCoalescePart::Operator(operator)),
+            NullCoalescePart::Leading(leading) => flattened.push(NullCoalescePart::Leading(leading)),
+        }
+    }
+
+    let mut flattened = flattened.into_iter();
+    let mut first_prefix = vec_in![f.arena];
+    let first = loop {
+        match flattened.next() {
+            Some(NullCoalescePart::Expression(first)) => break first,
+            Some(NullCoalescePart::Leading(leading)) => first_prefix.push(leading),
+            _ => unreachable!(),
+        }
+    };
+    let mut operations = vec_in![f.arena];
+    let mut current_left = first;
+
+    while let Some(NullCoalescePart::Operator(operator)) = flattened.next() {
+        let mut right_prefix = vec_in![f.arena];
+        let right = loop {
+            match flattened.next() {
+                Some(NullCoalescePart::Expression(right)) => break right,
+                Some(NullCoalescePart::Leading(leading)) => right_prefix.push(leading),
+                _ => unreachable!(),
+            }
+        };
+        let should_break = f.has_placed_trailing_line_comment(current_left.span())
+            || f.has_placed_trailing_line_comment(right.span())
+            || f.has_placed_leading_own_line_comment(right.span())
+            || has_own_line_comment_in_left_chain(f, current_left)
+            || (f.settings.preserve_breaking_binary_expression
+                && misc::has_new_line_in_range(f.source_text, current_left.end_offset(), right.start_offset()));
+
+        operations.push(BinaryishOperation {
+            left: current_left,
+            operator,
+            right,
+            is_inside_parenthesis,
+            is_nested: true,
+            should_break,
+            should_inline: false,
+            rhs_is_parenthesized_lassoc_subchain: false,
+            right_prefix: if right_prefix.is_empty() { None } else { Some(Document::Array(right_prefix)) },
+        });
+        current_left = right;
+    }
+
+    let old_inlined_chain_state = f.is_in_inlined_binary_chain;
+    f.is_in_inlined_binary_chain = false;
+
+    let mut parts = first_prefix;
+    parts.push(first.format(f));
+    for operation in operations {
+        push_binaryish_operation(f, &mut parts, operation);
     }
 
     f.is_in_inlined_binary_chain = old_inlined_chain_state;
 
-    let has_space_around = match operator {
+    parts
+}
+
+fn push_binaryish_operation<'arena, A>(
+    f: &mut FormatterState<'_, 'arena, A>,
+    parts: &mut Vec<'arena, Document<'arena, A>, A>,
+    operation: BinaryishOperation<'arena, A>,
+) where
+    A: Arena,
+{
+    if let Some(trailing) = f.take_placed_trailing(operation.left.span()) {
+        parts.push(trailing);
+    }
+
+    let has_space_around = match operation.operator {
         BinaryishOperator::Binary(BinaryOperator::StringConcat(_)) => {
             f.settings.space_around_concatenation_binary_operator
         }
         _ => true,
     };
 
-    let has_leading_comment_on_right =
-        f.has_leading_own_line_comment(right.span()) || has_placed_leading_comment_in_leftmost(f, right);
+    let has_leading_comment_on_right = f.has_leading_own_line_comment(operation.right.span())
+        || has_placed_leading_comment_in_leftmost(f, operation.right);
     let line_before_operator = f.settings.line_before_binary_operator && !has_leading_comment_on_right;
-    let operator_has_leading_comments = f.has_comment(operator.span(), CommentFlags::LEADING);
-
-    let force_break = f.must_break_condition && line_before_operator && operator.is_logical();
-
+    let operator_has_leading_comments = f.has_comment(operation.operator.span(), CommentFlags::LEADING);
+    let force_break = f.must_break_condition && line_before_operator && operation.operator.is_logical();
     let mut right_document = vec_in![f.arena];
 
     right_document.push(
-        if force_break || operator_has_leading_comments || (line_before_operator && !should_inline_this_level) {
+        if force_break || operator_has_leading_comments || (line_before_operator && !operation.should_inline) {
             Document::Line(if force_break {
                 Line::hard()
             } else if has_space_around {
@@ -439,44 +589,46 @@ where
         },
     );
 
-    right_document.push(format_token(f, operator.span(), operator.as_bytes()));
-
-    right_document.push(if operator_has_leading_comments || line_before_operator || should_inline_this_level {
+    right_document.push(format_token(f, operation.operator.span(), operation.operator.as_bytes()));
+    right_document.push(if operator_has_leading_comments || line_before_operator || operation.should_inline {
         Document::String(if has_space_around { b" " } else { b"" })
     } else {
         Document::Line(if has_space_around { Line::default() } else { Line::soft() })
     });
 
-    right_document.push(if should_inline_this_level && !rhs_is_parenthesized_lassoc_subchain {
-        Document::Group(Group::new(vec_in![f.arena; right.format(f)]))
+    let right = if let Some(prefix) = operation.right_prefix {
+        Document::Array(vec_in![f.arena; prefix, operation.right.format(f)])
     } else {
-        right.format(f)
+        operation.right.format(f)
+    };
+
+    right_document.push(if operation.should_inline && !operation.rhs_is_parenthesized_lassoc_subchain {
+        Document::Group(Group::new(vec_in![f.arena; right]))
+    } else {
+        right
     });
 
     let parent = f.parent_node();
-
     let should_group = !operator_has_leading_comments
-        && !is_nested
-        && (should_break
-            || (!(is_inside_parenthesis && operator.is_logical())
+        && !operation.is_nested
+        && (operation.should_break
+            || (!(operation.is_inside_parenthesis && operation.operator.is_logical())
                 && parent.kind() != NodeKind::Binary
-                && left.node_kind() != NodeKind::Binary
-                && right.node_kind() != NodeKind::Binary));
+                && operation.left.node_kind() != NodeKind::Binary
+                && operation.right.node_kind() != NodeKind::Binary));
 
     if should_group {
-        parts.push(Document::Group(Group::new(right_document).with_break_mode(if should_break {
+        parts.push(Document::Group(Group::new(right_document).with_break_mode(if operation.should_break {
             BreakMode::Force
         } else {
             BreakMode::Auto
         })));
     } else {
         parts.extend(right_document);
-        if is_nested && should_break {
+        if operation.is_nested && operation.should_break {
             parts.push(Document::BreakParent);
         }
     }
-
-    parts
 }
 
 pub(super) fn should_inline_binary_expression<A>(f: &FormatterState<'_, '_, A>, expression: &Expression) -> bool
