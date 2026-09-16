@@ -22,11 +22,11 @@ use mago_word::word;
 use crate::signature::DefSignatureNode;
 use crate::signature::FileSignature;
 
-/// Builds a `FileSignature` from a Program AST using the walker pattern.
+/// Builds a `FileSignature` from a Program CST using the walker pattern.
 ///
 /// # Arguments
 ///
-/// * `program` - The parsed program AST
+/// * `program` - The parsed program CST
 /// * `resolved_names` - The resolved names for the program (needed for fingerprinting)
 ///
 /// # Returns
@@ -45,7 +45,7 @@ pub fn build_file_signature<'arena>(
     FileSignature { hash, ast_nodes: builder.ast_nodes }
 }
 
-/// Context for building file signatures while walking the AST.
+/// Context for building file signatures while walking the CST.
 struct SignatureBuilder<'arena> {
     resolved_names: &'arena ResolvedNames<'arena>,
     fingerprint_options: FingerprintOptions<'arena>,

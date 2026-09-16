@@ -9,7 +9,7 @@ use crate::plugin::provider::Provider;
 
 /// Hook trait for intercepting expression analysis.
 ///
-/// This hook receives the real AST expression and full mutable context,
+/// This hook receives the real CST expression and full mutable context,
 /// allowing hooks to inspect expressions, report issues, modify analysis state,
 /// and optionally skip analysis with a custom type.
 pub trait ExpressionHook: Provider {

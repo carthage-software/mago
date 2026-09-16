@@ -39,7 +39,7 @@ impl ArchitecturalGuard {
     /// # Arguments
     ///
     /// * `codebase` - The codebase metadata for symbol lookups
-    /// * `program` - The AST of the program
+    /// * `program` - The CST of the program
     /// * `resolved_names` - The resolved names for the program
     ///
     /// # Returns

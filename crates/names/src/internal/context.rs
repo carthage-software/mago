@@ -5,13 +5,13 @@ use mago_syntax::cst::Use;
 use crate::kind::NameKind;
 use crate::scope::NamespaceScope;
 
-/// Maintains the current name resolution state during an AST walk.
+/// Maintains the current name resolution state during a CST walk.
 ///
 /// This struct acts as a stateful manager for the name resolution process, primarily
 /// by holding the current `NamespaceScope` (which contains the active namespace name
 /// and relevant `use` aliases).
 ///
-/// It serves as a bridge between the AST walker and the `NamespaceScope`.
+/// It serves as a bridge between the CST walker and the `NamespaceScope`.
 #[derive(Debug)]
 pub struct NameResolutionContext<'arena, A>
 where
@@ -66,14 +66,14 @@ where
         self.scope = NamespaceScope::global();
     }
 
-    /// Processes a `use` statement AST node, adding its aliases to the current scope.
+    /// Processes a `use` statement CST node, adding its aliases to the current scope.
     ///
     /// Delegates directly to the underlying `NamespaceScope`'s `populate_from_use` method,
     /// passing the required interner reference along with the `Use` node.
     ///
     /// # Arguments
     ///
-    /// * `r#use` - The `Use` AST node to process.
+    /// * `r#use` - The `Use` CST node to process.
     pub fn populate_from_use(&mut self, r#use: &Use) {
         self.scope.populate_from_use(r#use);
     }
