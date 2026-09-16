@@ -190,7 +190,7 @@ pub(super) fn bare_items(
                     detail: Some(render_signature(meta, local)),
                     insert_text: Some(format!("{local_str}($1)")),
                     snippet: true,
-                    ..CompletionEntry::new(local_str.clone(), CompletionKind::Function)
+                    ..CompletionEntry::new(local_str, CompletionKind::Function)
                 },
             ));
         }
@@ -347,7 +347,7 @@ fn collect_class_members(
                 detail: Some(render_signature(method, display)),
                 insert_text: Some(format!("{display_str}($1)")),
                 snippet: true,
-                ..CompletionEntry::new(display_str.clone(), CompletionKind::Method)
+                ..CompletionEntry::new(display_str, CompletionKind::Method)
             },
         ));
     }
