@@ -16,7 +16,18 @@ impl Server {
             .codebase()
             .file_signatures
             .get(&file_id)
-            .map(|signature| signature.ast_nodes.iter().map(|node| node.start_offset).collect())
+            .map(|signature| {
+                signature
+                    .ast_nodes
+                    .iter()
+                    .filter_map(|node| {
+                        self.codebase()
+                            .span_of(node.name.as_bytes())
+                            .filter(|span| span.file_id == file_id)
+                            .map(|span| span.start.offset)
+                    })
+                    .collect()
+            })
             .unwrap_or_default();
 
         offsets
