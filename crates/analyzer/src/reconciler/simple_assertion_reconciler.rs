@@ -1,8 +1,8 @@
-use mago_allocator::Arena;
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
+use mago_allocator::Arena;
 use mago_codex::assertion::Assertion;
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::ttype::TType;
@@ -712,7 +712,12 @@ where
 
     'outer: for atomic in existing_var_type.types.as_ref() {
         match atomic {
-            TAtomic::Array(TArray::Keyed(TKeyedArray { known_items, parameters, non_empty })) => {
+            TAtomic::Array(TArray::Keyed(TKeyedArray { known_items, parameters, non_empty, known_non_list })) => {
+                if *known_non_list {
+                    did_remove_type = true;
+                    continue;
+                }
+
                 if let Some(known_items) = known_items {
                     for (k, (optional, _)) in known_items.iter() {
                         if *optional {
@@ -1019,10 +1024,27 @@ where
 {
     let mut acceptable_types = Vec::new();
     let mut did_remove_type = false;
+    let asserted_type = get_string_with_props(is_numeric, is_truthy, is_non_empty, is_callable, casing);
 
     for atomic in existing_var_type.types.as_ref() {
         match atomic {
             TAtomic::Scalar(TScalar::String(existing_string)) => {
+                if existing_string.is_known_literal() {
+                    if atomic_comparator::is_contained_by(
+                        context.codebase,
+                        atomic,
+                        asserted_type.get_single(),
+                        false,
+                        &mut ComparisonResult::new(),
+                    ) {
+                        acceptable_types.push(atomic.clone());
+                    } else {
+                        did_remove_type = true;
+                    }
+
+                    continue;
+                }
+
                 if (is_numeric && !existing_string.is_numeric)
                     || (is_truthy && !existing_string.is_truthy)
                     || (is_non_empty && !existing_string.is_non_empty)
@@ -1050,7 +1072,7 @@ where
                 acceptable_types.push(atomic.clone());
             }
             TAtomic::Mixed(_) | TAtomic::Scalar(TScalar::Generic | TScalar::ArrayKey) => {
-                return get_string_with_props(is_numeric, is_truthy, is_non_empty, is_callable, casing);
+                return asserted_type;
             }
             TAtomic::GenericParameter(generic_parameter) => {
                 did_remove_type = true;
@@ -1090,7 +1112,7 @@ where
                     || atomic_comparator::is_contained_by(
                         context.codebase,
                         atomic,
-                        get_string_with_props(is_numeric, is_truthy, is_non_empty, is_callable, casing).get_single(),
+                        asserted_type.get_single(),
                         false,
                         &mut ComparisonResult::new(),
                     )
@@ -1518,7 +1540,7 @@ where
                     known_count,
                 })));
             }
-            TAtomic::Array(TArray::Keyed(TKeyedArray { non_empty, parameters, known_items })) => {
+            TAtomic::Array(TArray::Keyed(TKeyedArray { non_empty, parameters, known_items, known_non_list })) => {
                 if !non_empty {
                     did_remove_type = true;
                     if parameters.is_none() && known_items.as_ref().is_none_or(|items| items.is_empty()) {
@@ -1530,6 +1552,7 @@ where
                     non_empty: true,
                     parameters,
                     known_items,
+                    known_non_list,
                 })));
             }
             TAtomic::Mixed(_) => {
@@ -1603,7 +1626,13 @@ where
 
                 did_remove_type = true;
             }
-        } else if let TAtomic::Array(TArray::Keyed(TKeyedArray { non_empty, parameters, known_items })) = atomic {
+        } else if let TAtomic::Array(TArray::Keyed(TKeyedArray {
+            non_empty,
+            parameters,
+            known_items,
+            known_non_list,
+        })) = atomic
+        {
             did_remove_type = true;
 
             if !non_empty {
@@ -1617,6 +1646,7 @@ where
                     known_items: known_items.clone(),
                     parameters: parameters.clone(),
                     non_empty: true,
+                    known_non_list: *known_non_list,
                 })));
             }
         }
@@ -1890,7 +1920,7 @@ where
 
     for mut atomic in existing_var_types {
         match &mut atomic {
-            TAtomic::Array(TArray::Keyed(TKeyedArray { known_items, parameters, non_empty })) => {
+            TAtomic::Array(TArray::Keyed(TKeyedArray { known_items, parameters, non_empty, .. })) => {
                 did_remove_type = true;
                 if let Some(known_items) = known_items {
                     if let Some(known_item) = known_items.get_mut(key_name) {
@@ -2106,6 +2136,7 @@ where
                     )])),
                     parameters: Some((Arc::new(get_arraykey()), Arc::new(get_mixed()))),
                     non_empty: false,
+                    known_non_list: false,
                 }));
                 acceptable_types.extend(keyed_array.types.into_owned());
             }

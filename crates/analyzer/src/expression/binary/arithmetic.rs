@@ -932,6 +932,11 @@ fn compose_keyed_plus(left: &TKeyedArray, right: &TKeyedArray) -> TKeyedArray {
         known_items: Some(composed_known).filter(|m| !m.is_empty()),
         parameters: composed_parameters,
         non_empty,
+        known_non_list: left.known_non_list
+            || (!left.non_empty
+                && left.parameters.is_none()
+                && left.known_items.as_ref().is_none_or(BTreeMap::is_empty)
+                && right.known_non_list),
     }
 }
 

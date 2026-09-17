@@ -1,22 +1,14 @@
-use mago_allocator::Arena;
-use mago_codex::metadata::class_like::ClassLikeMetadata;
-use mago_syntax::cst::PartialArgumentList;
-use std::borrow::Cow;
-use std::sync::Arc;
-
 use foldhash::HashMap;
 use foldhash::fast::RandomState;
 use indexmap::IndexMap;
 
-use mago_word::WordMap;
-use mago_word::word;
-
+use mago_allocator::Arena;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::identifier::method::MethodIdentifier;
+use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::atomic::TAtomic;
-use mago_codex::ttype::atomic::generic::TGenericParameter;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::atomic::scalar::class_like_string::TClassLikeString;
@@ -35,6 +27,9 @@ use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::cst::ArgumentList;
 use mago_syntax::cst::Instantiation;
+use mago_syntax::cst::PartialArgumentList;
+use mago_word::WordMap;
+use mago_word::word;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -521,20 +516,14 @@ where
 
     // `new $className()` where `$className: class-string<T>` produces a `T`, not the constraint.
     // Preserve the template parameter so the function's `@return T` keeps narrowing on the call site.
-    let result_atomic = if let ResolutionOrigin::SpecificClassLikeString(TClassLikeString::Generic {
-        parameter_name,
-        defining_entity,
-        ..
-    }) = &classname.origin
-    {
-        TAtomic::GenericParameter(TGenericParameter::new(
-            *parameter_name,
-            Arc::new(TUnion::from_single(Cow::Owned(constraint_object))),
-            *defining_entity,
-        ))
-    } else {
-        constraint_object
-    };
+    let result_atomic =
+        if let ResolutionOrigin::SpecificClassLikeString(class_string @ TClassLikeString::Generic { .. }) =
+            &classname.origin
+        {
+            class_string.get_object_type(context.codebase)
+        } else {
+            constraint_object
+        };
 
     Ok(wrap_atomic(result_atomic))
 }

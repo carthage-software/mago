@@ -151,6 +151,7 @@ fn arb_atomic() -> impl Strategy<Value = TAtomic> {
                     known_items: None,
                     parameters: Some((Arc::new(k), Arc::new(v))),
                     non_empty,
+                    known_non_list: false,
                 }))
             }),
             (element_union.clone(), element_union.clone())

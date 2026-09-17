@@ -206,6 +206,7 @@ where
                 known_items: Some(new_known_items),
                 parameters: existing_keyed_array.parameters.clone(),
                 non_empty: has_non_optional || existing_keyed_array.non_empty || *new_type_non_empty,
+                known_non_list: existing_keyed_array.known_non_list,
             })));
         }
 
@@ -610,6 +611,7 @@ fn intersect_keyed_arrays<A>(
 where
     A: Arena,
 {
+    let known_non_list = first_keyed_array.known_non_list || second_keyed_array.known_non_list;
     let parameters = match (&first_keyed_array.parameters, &second_keyed_array.parameters) {
         (Some(first_parameters), Some(second_parameters)) => {
             let key = intersect_union_with_union(context, &first_parameters.0, &second_parameters.0);
@@ -651,6 +653,7 @@ where
                 known_items: Some(intersected_items),
                 parameters,
                 non_empty: true,
+                known_non_list,
             })))
         }
         (None, Some(second_known_items)) => {
@@ -668,6 +671,7 @@ where
                 known_items: Some(second_known_items),
                 parameters,
                 non_empty: true,
+                known_non_list,
             })))
         }
         (Some(first_known_items), None) => {
@@ -685,9 +689,15 @@ where
                 known_items: Some(first_known_items),
                 parameters,
                 non_empty: true,
+                known_non_list,
             })))
         }
-        _ => Some(TAtomic::Array(TArray::Keyed(TKeyedArray { known_items: None, parameters, non_empty: true }))),
+        _ => Some(TAtomic::Array(TArray::Keyed(TKeyedArray {
+            known_items: None,
+            parameters,
+            non_empty: true,
+            known_non_list,
+        }))),
     }
 }
 

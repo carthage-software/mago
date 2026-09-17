@@ -66,6 +66,7 @@ std::thread_local! {
                 known_items: Some(known_items),
                 parameters: Some((Arc::new(get_non_empty_string()), Arc::new(get_mixed()))),
                 non_empty: true,
+                known_non_list: false,
             })))
         }));
 
@@ -218,6 +219,7 @@ std::thread_local! {
                 known_items: Some(known_items),
                 parameters: Some((Arc::new(get_non_empty_string()), Arc::new(get_string()))),
                 non_empty: true,
+                known_non_list: false,
             })))
         }));
 
@@ -253,6 +255,7 @@ std::thread_local! {
                 known_items: Some(known_items),
                 parameters: Some((Arc::new(get_non_empty_string()), Arc::new(get_string()))),
                 non_empty: true,
+                known_non_list: false,
             })))
         }));
 
@@ -337,9 +340,11 @@ std::thread_local! {
                     ])),
                     parameters: None,
                     non_empty: true,
+                    known_non_list: false,
                 })))),
             )),
             non_empty: false,
+            known_non_list: false,
         })))));
 
         map.insert("$_SESSION", Rc::new({

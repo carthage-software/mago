@@ -106,6 +106,7 @@ impl FunctionReturnTypeProvider for CaptureGroupsProvider {
                 parameters: if has_extra { Some((Arc::new(get_arraykey()), Arc::new(get_string()))) } else { None },
                 non_empty: true,
                 known_items: Some(known_items),
+                known_non_list: false,
             })))]),
         )))))
     }

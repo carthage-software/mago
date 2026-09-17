@@ -186,6 +186,10 @@ where
         false,
     );
 
+    block_context
+        .stable_method_calls
+        .extend(resolved_if_true_assertions.keys().filter(|variable| variable.as_bytes().ends_with(b"()")).copied());
+
     for (variable, assertions) in resolved_if_true_assertions {
         artifacts.if_true_assertions.entry(range).or_default().entry(variable).or_default().extend(assertions);
     }
@@ -201,6 +205,10 @@ where
         parameters,
         false,
     );
+
+    block_context
+        .stable_method_calls
+        .extend(resolved_if_false_assertions.keys().filter(|variable| variable.as_bytes().ends_with(b"()")).copied());
 
     for (variable, assertions) in resolved_if_false_assertions {
         artifacts.if_false_assertions.entry(range).or_default().entry(variable).or_default().extend(assertions);
@@ -375,7 +383,9 @@ where
                 continue;
             }
 
-            if declared_had_templates {
+            if declared_had_templates
+                && !invocation.target.get_function_like_metadata().is_some_and(|metadata| metadata.flags.is_built_in())
+            {
                 new_type.widen_literals();
             }
 

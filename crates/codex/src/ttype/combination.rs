@@ -39,6 +39,7 @@ impl CombinationFlags {
     const NONNULL_MIXED_VALUE: CombinationFlags = CombinationFlags(1 << 17);
     const MIXED_FROM_LOOP_ISSET_SET: CombinationFlags = CombinationFlags(1 << 18);
     const MIXED_FROM_LOOP_ISSET_VALUE: CombinationFlags = CombinationFlags(1 << 19);
+    pub const KEYED_ARRAY_KNOWN_NON_LIST: CombinationFlags = CombinationFlags(1 << 20);
 }
 
 impl CombinationFlags {

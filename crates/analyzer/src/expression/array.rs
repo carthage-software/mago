@@ -111,6 +111,7 @@ struct ArrayCreationInfo {
     array_keys: HashSet<ArrayKey>,
     int_offset: i64,
     is_list: bool,
+    known_non_list: bool,
     can_be_empty: bool,
     known_int_offset: bool,
 }
@@ -154,6 +155,7 @@ where
         array_keys: HashSet::default(),
         int_offset: -1,
         is_list: true,
+        known_non_list: false,
         can_be_empty: true,
         known_int_offset: true,
     };
@@ -312,7 +314,18 @@ where
         array_creation_info.is_list &= item_is_list_item;
 
         if let Some(item_key_value) = item_key_value {
-            if array_creation_info.array_keys.contains(&item_key_value) {
+            let is_duplicate = array_creation_info.array_keys.contains(&item_key_value);
+            if !is_duplicate
+                && !matches!(
+                    item_key_value,
+                    ArrayKey::Integer(index)
+                        if usize::try_from(index).is_ok_and(|index| index == array_creation_info.array_keys.len())
+                )
+            {
+                array_creation_info.known_non_list = true;
+            }
+
+            if is_duplicate {
                 context.collector.report_with_code(
                     IssueCode::DuplicateArrayKey,
                     Issue::error(format!(
@@ -471,6 +484,7 @@ where
                     }
                 },
                 non_empty: true,
+                known_non_list: array_creation_info.known_non_list,
             }))])
         }
     } else if item_key_type.is_none() && item_value_type.is_none() {
@@ -492,6 +506,7 @@ where
                 _ => Some((Arc::new(get_arraykey()), Arc::new(get_mixed()))),
             },
             non_empty: !array_creation_info.can_be_empty,
+            known_non_list: array_creation_info.known_non_list,
         }))])
     };
 
@@ -550,6 +565,12 @@ fn handle_variadic_array_element<'arena, A>(
                             };
 
                             array_creation_info.property_types.insert(new_offset_key, (false, value_type.clone()));
+
+                            if new_offset_key.is_integer() {
+                                array_creation_info.array_keys.insert(new_offset_key);
+                            } else {
+                                array_creation_info.known_non_list = true;
+                            }
                         }
                     }
 

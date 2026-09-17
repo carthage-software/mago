@@ -339,7 +339,12 @@ pub fn t_enum_case(name: &str, case: &str) -> TAtomic {
 
 #[must_use]
 pub fn t_empty_array() -> TAtomic {
-    TAtomic::Array(TArray::Keyed(TKeyedArray { known_items: None, parameters: None, non_empty: false }))
+    TAtomic::Array(TArray::Keyed(TKeyedArray {
+        known_items: None,
+        parameters: None,
+        non_empty: false,
+        known_non_list: false,
+    }))
 }
 #[must_use]
 pub fn t_keyed_unsealed(key: TUnion, value: TUnion, non_empty: bool) -> TAtomic {
@@ -347,11 +352,17 @@ pub fn t_keyed_unsealed(key: TUnion, value: TUnion, non_empty: bool) -> TAtomic 
         known_items: None,
         parameters: Some((Arc::new(key), Arc::new(value))),
         non_empty,
+        known_non_list: false,
     }))
 }
 #[must_use]
 pub fn t_keyed_sealed(items: BTreeMap<ArrayKey, (bool, TUnion)>, non_empty: bool) -> TAtomic {
-    TAtomic::Array(TArray::Keyed(TKeyedArray { known_items: Some(items), parameters: None, non_empty }))
+    TAtomic::Array(TArray::Keyed(TKeyedArray {
+        known_items: Some(items),
+        parameters: None,
+        non_empty,
+        known_non_list: false,
+    }))
 }
 #[must_use]
 pub fn t_keyed_with_both(
@@ -364,6 +375,7 @@ pub fn t_keyed_with_both(
         known_items: Some(items),
         parameters: Some((Arc::new(key), Arc::new(value))),
         non_empty,
+        known_non_list: false,
     }))
 }
 #[must_use]

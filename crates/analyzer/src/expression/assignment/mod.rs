@@ -702,7 +702,16 @@ pub fn analyze_assignment_to_variable<'ctx, 'arena, A>(
     if !from_docblock
         && assigned_type.is_bool()
         && let Some(source_expression) = source_expression
-        && matches!(unwrap_expression(source_expression), Expression::Binary(_))
+        && match unwrap_expression(source_expression) {
+            Expression::Binary(_) => true,
+            Expression::Call(call) => {
+                let span = call.span();
+                let range = (span.start.offset, span.end.offset);
+
+                artifacts.if_true_assertions.contains_key(&range) || artifacts.if_false_assertions.contains_key(&range)
+            }
+            _ => false,
+        }
     {
         handle_assignment_with_boolean_logic(
             context,
