@@ -142,21 +142,22 @@ impl CstCommand {
         }
 
         let program = parse_file_with_settings(&arena, &file, configuration.parser.to_settings());
-        if program.has_errors() {
+        let exit_code = if program.has_errors() {
             let issues = IssueCollection::from(program.errors.iter().map(Issue::from).collect::<Vec<_>>());
             let config = DatabaseConfiguration::new(Path::new("/"), vec![], vec![], vec![], vec![]).into_static();
             let mut database = Database::single(file, config);
             let editor_url = configuration.editor_url.take();
             let orchestrator = create_orchestrator(&configuration, color_choice, false, true, false);
 
-            self.reporting.get_processor(color_choice, editor_url, Level::Error, false).process_issues(
-                &orchestrator,
-                &mut database,
-                issues,
-                None,
-                false,
-            )?;
-        }
+            let (exit_code, _) = self
+                .reporting
+                .get_processor(color_choice, editor_url, Level::Error, false)
+                .process_issues(&orchestrator, &mut database, issues, None, false)?;
+
+            exit_code
+        } else {
+            ExitCode::SUCCESS
+        };
 
         if self.json {
             print_cst_json(program)?;
@@ -166,7 +167,7 @@ impl CstCommand {
             print_cst_tree(program);
         }
 
-        Ok(ExitCode::SUCCESS)
+        Ok(exit_code)
     }
 
     /// Prints the list of tokens from a file, either as a table or as JSON.

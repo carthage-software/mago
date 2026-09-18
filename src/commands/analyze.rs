@@ -516,9 +516,7 @@ impl AnalyzeCommand {
             self.staged || !self.path.is_empty() || self.stdin_input,
         );
 
-        watcher.with_database_mut(|database| {
-            processor.process_issues(&orchestrator, database, issues).map(|(code, _)| code)
-        })?;
+        watcher.with_database_mut(|database| processor.process_issues(&orchestrator, database, issues).map(|_| ()))?;
 
         tracing::info!("Initial analysis complete. Watching for changes...");
 
@@ -545,9 +543,8 @@ impl AnalyzeCommand {
                 read_db.get_ref(&file_id).ok().map(|f| String::from_utf8_lossy(&f.name).into_owned())
             });
 
-            watcher.with_database_mut(|database| {
-                processor.process_issues(&orchestrator, database, issues).map(|(code, _)| code)
-            })?;
+            watcher
+                .with_database_mut(|database| processor.process_issues(&orchestrator, database, issues).map(|_| ()))?;
 
             tracing::info!("Analysis complete. Watching for changes...");
         }
