@@ -159,7 +159,9 @@ fn run_until_stable(
     } else {
         tracing::error!("Fixes did not settle after {max_passes} passes. Increase --max-passes (up to 256).");
         if max_passes > 16 {
-            tracing::warn!("Running this many passes may indicate a bug in Mago or a conflicting rule. Please report a bug in Mago.");
+            tracing::warn!(
+                "Running this many passes may indicate a bug in Mago or a conflicting rule. Please report a bug in Mago."
+            );
         }
     }
 
