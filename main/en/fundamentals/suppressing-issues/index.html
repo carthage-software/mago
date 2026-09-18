@@ -797,6 +797,7 @@
 <li><code>guard</code> for architectural guard issues.</li>
 </ul>
 <p>Multiple codes can be suppressed at once with a comma-separated list, and a <code>(N)</code> count shorthand handles the case where the same code fires N times on one line.</p>
+<p>Spaces and tabs around commas are allowed. You can repeat the same category before each code: <code>@mago-expect analysis:mixed-operand(2), analysis:unused-variable</code>.</p>
 <h2 id="mago-expect"><code>@mago-expect</code></h2>
 <p>Asserts that a specific issue is expected on the line that follows. The strictest of the two pragmas, and the one we recommend by default.</p>
 <pre><code class="language-php">// @mago-expect lint:no-shorthand-ternary

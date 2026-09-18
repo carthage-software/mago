@@ -564,6 +564,7 @@
 <li><code>guard</code> pour les problèmes du guard architectural.</li>
 </ul>
 <p>Plusieurs codes peuvent être supprimés à la fois avec une liste séparée par des virgules, et un raccourci de comptage <code>(N)</code> traite le cas où le même code se déclenche N fois sur une ligne.</p>
+<p>Les espaces et tabulations autour des virgules sont autorisés. Vous pouvez répéter la même catégorie devant chaque code : <code>@mago-expect analysis:mixed-operand(2), analysis:unused-variable</code>.</p>
 <h2 id="mago-expect"><code>@mago-expect</code></h2>
 <p>Affirme qu'un problème spécifique est attendu sur la ligne qui suit. Le plus strict des deux pragmas, et celui que nous recommandons par défaut.</p>
 <pre><code class="language-php">// @mago-expect lint:no-shorthand-ternary

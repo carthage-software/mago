@@ -591,6 +591,7 @@
 <li><code>guard</code> 用于架构 guard 问题。</li>
 </ul>
 <p>可以用逗号分隔的列表一次抑制多个 code,<code>(N)</code> 计数简写用于处理同一个 code 在一行内出现 N 次的情况。</p>
+<p>逗号前后可以有空格或制表符。也可以在每个 code 前重复同一类别：<code>@mago-expect analysis:mixed-operand(2), analysis:unused-variable</code>。</p>
 <h2 id="mago-expect"><code>@mago-expect</code></h2>
 <p>声明在下一行上预期出现某个具体问题。两条指令中较严格的一条,也是我们默认推荐的。</p>
 <pre><code class="language-php">// @mago-expect lint:no-shorthand-ternary
