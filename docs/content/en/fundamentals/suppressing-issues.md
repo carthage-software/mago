@@ -16,6 +16,8 @@ Both take the form `category:code`, with three categories available:
 
 Multiple codes can be suppressed at once with a comma-separated list, and a `(N)` count shorthand handles the case where the same code fires N times on one line.
 
+Spaces and tabs around commas are allowed. You can repeat the same category before each code: `@mago-expect analysis:mixed-operand(2), analysis:unused-variable`.
+
 ## `@mago-expect`
 
 Asserts that a specific issue is expected on the line that follows. The strictest of the two pragmas, and the one we recommend by default.
