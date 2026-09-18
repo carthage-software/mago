@@ -15,6 +15,7 @@ use mago_bytes::trim_start_byte;
 use mago_syntax::cst::Constant;
 use mago_syntax::cst::Declare;
 use mago_syntax::cst::EchoTag;
+use mago_syntax::cst::Expression;
 use mago_syntax::cst::Namespace;
 use mago_syntax::cst::NamespaceBody;
 use mago_syntax::cst::Node;
@@ -115,6 +116,7 @@ struct ScopeState {
     local_classes: HashSet<Word>,
     local_functions: HashSet<Word>,
     local_constants: HashSet<Word>,
+    class_references: Option<HashSet<Word>>,
     sole_function_import_use_span: HashMap<Word, Span>,
 }
 
@@ -327,6 +329,52 @@ impl ImportTracker {
         self.scope.sole_function_import_use_span.remove(&lookup)
     }
 
+    pub fn collect_class_references(&mut self, root: Node<'_, '_>) {
+        if self.scope.class_references.is_some() {
+            return;
+        }
+
+        let mut references = HashSet::default();
+        let mut stack = Vec::new();
+        match root {
+            Node::Namespace(namespace) => stack.push(Node::NamespaceBody(&namespace.body)),
+            _ => stack.push(root),
+        }
+
+        while let Some(node) = stack.pop() {
+            let name = match node {
+                Node::Namespace(_) | Node::Use(_) => continue,
+                Node::FunctionCall(call) if matches!(call.function, Expression::Identifier(identifier) if identifier.is_local()) =>
+                {
+                    stack.push(Node::ArgumentList(&call.argument_list));
+                    continue;
+                }
+                Node::FunctionPartialApplication(application) if matches!(application.function, Expression::Identifier(identifier) if identifier.is_local()) =>
+                {
+                    stack.push(Node::PartialArgumentList(&application.argument_list));
+                    continue;
+                }
+                Node::ConstantAccess(access) if access.name.is_local() => continue,
+                Node::Identifier(identifier) if !identifier.is_fully_qualified() => Some(identifier.value()),
+                Node::Class(class) => Some(class.name.value),
+                Node::Interface(interface) => Some(interface.name.value),
+                Node::Trait(r#trait) => Some(r#trait.name.value),
+                Node::Enum(r#enum) => Some(r#enum.name.value),
+                _ => None,
+            };
+
+            if let Some(name) = name.and_then(|name| name.split(|&b| b == b'\\').next())
+                && !name.eq_ignore_ascii_case(b"namespace")
+            {
+                references.insert(ascii_lowercase_word(name));
+            }
+
+            node.visit_children(|child| stack.push(child));
+        }
+
+        self.scope.class_references = Some(references);
+    }
+
     pub fn import(&mut self, fqn: &[u8], kind: ImportKind) -> Option<ImportResolution> {
         let (namespace_part, short_part) = split_fqn(fqn)?;
         if is_reserved_type_name(short_part, kind) {
@@ -381,6 +429,12 @@ impl ImportTracker {
 
         if namespace_part.is_none() && self.scope.namespace.is_none() {
             return Some(ImportResolution { local_name: short_word, use_statement_edit: None });
+        }
+
+        if kind == ImportKind::Name
+            && self.scope.class_references.as_ref().is_some_and(|references| references.contains(&short_lookup))
+        {
+            return None;
         }
 
         let anchor = self.scope.anchor?;

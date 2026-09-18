@@ -79,9 +79,13 @@ impl NoFullyQualifiedGlobalClassLikeRule {
                 "Fully-qualified class-like reference is already in scope.",
                 format!("`{class_name}` is already reachable as `{}`; drop the leading `\\`.", res.local_name),
             ),
-            Some(_) | None => (
+            Some(_) => (
                 "Fully-qualified class-like reference detected.",
                 format!("Add `use {class_name};` and reference `{short_name_display}` directly."),
+            ),
+            None => (
+                "Fully-qualified class-like reference detected.",
+                format!("Import `{class_name}` manually with an alias to avoid conflicts with existing names."),
             ),
         };
 
@@ -227,9 +231,34 @@ mod tests {
     use indoc::indoc;
 
     use super::NoFullyQualifiedGlobalClassLikeRule;
+    use crate::rule::tests::collect_issues;
+    use crate::settings::Settings;
     use crate::test_lint_failure;
     use crate::test_lint_fix;
     use crate::test_lint_success;
+
+    #[test]
+    fn issue_2136_does_not_shadow_implicit_imports() {
+        for (code, expected) in [
+            (include_str!("../../../tests/cases/issue_2136/implicit_import.php"), 1),
+            (include_str!("../../../tests/cases/issue_2136/later_references.php"), 20),
+        ] {
+            let issues = collect_issues::<NoFullyQualifiedGlobalClassLikeRule, fn(&mut Settings)>(code, None, None);
+
+            assert_eq!(issues.len(), expected);
+            for issue in issues {
+                assert!(issue.edits.is_empty(), "The fix would shadow an existing class-like reference: {issue:?}");
+                assert!(issue.help.is_some_and(|help| help.contains("manually") && help.contains("alias")));
+            }
+        }
+    }
+
+    test_lint_fix! {
+        name = issue_2136_preserves_safe_imports,
+        rule = NoFullyQualifiedGlobalClassLikeRule,
+        code = include_str!("../../../tests/cases/issue_2136/safe_imports.before.php"),
+        fixed = include_str!("../../../tests/cases/issue_2136/safe_imports.after.php"),
+    }
 
     test_lint_success! {
         name = imported_class_is_not_flagged,
