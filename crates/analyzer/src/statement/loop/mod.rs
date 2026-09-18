@@ -23,6 +23,7 @@ use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
 use mago_codex::ttype::atomic::array::list::TList;
+use mago_codex::ttype::atomic::derived::TDerived;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::bool::TBool;
@@ -1517,7 +1518,10 @@ where
     let mut has_valid_iterable_type = false;
     let mut invalid_atomic_ids = Vec::with_capacity(iterator_type.types.len());
 
-    for iterator_atomic_original in iterator_type.types.as_ref() {
+    for iterator_atomic_original in iterator_type.types.iter().flat_map(|atomic| match atomic {
+        TAtomic::Derived(TDerived::Intersection(intersection)) => intersection.get_base_type().types.as_ref(),
+        _ => std::slice::from_ref(atomic),
+    }) {
         let iterator_atomic = if let TAtomic::GenericParameter(generic_parameter) = iterator_atomic_original {
             generic_parameter.get_constraint().get_single()
         } else {

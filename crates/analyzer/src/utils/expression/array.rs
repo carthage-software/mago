@@ -16,6 +16,7 @@ use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::atomic::array::list::TList;
+use mago_codex::ttype::atomic::derived::TDerived;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::int::TInteger;
@@ -196,6 +197,12 @@ where
     let mut has_union_key_mismatch = false; // Track if we're in a union where key exists in some but not all variants
     let mut reported_undefined_key = false;
     while let Some(atomic_var_type) = array_atomic_types.pop() {
+        if let TAtomic::Derived(TDerived::Intersection(intersection)) = atomic_var_type {
+            array_atomic_types.extend(intersection.get_base_type().types.iter());
+
+            continue;
+        }
+
         if let TAtomic::GenericParameter(parameter) = atomic_var_type {
             array_atomic_types.extend(parameter.constraint.types.as_ref());
 

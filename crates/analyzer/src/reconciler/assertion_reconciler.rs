@@ -11,6 +11,8 @@ use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
 use mago_codex::ttype::atomic::array::list::TList;
+use mago_codex::ttype::atomic::derived::TDerived;
+use mago_codex::ttype::atomic::derived::intersection::TDerivedIntersection;
 use mago_codex::ttype::atomic::generic::TGenericParameter;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::object::r#enum::TEnum;
@@ -505,12 +507,18 @@ where
         return None;
     }
 
+    let callable = get_mixed_callable().get_single().clone();
     let mut intersected = atomic.clone();
-    if intersected.add_intersection_type(get_mixed_callable().get_single().clone()) {
+    if intersected.can_be_intersected() {
+        let _ = intersected.add_intersection_type(callable);
+
         return Some(intersected);
     }
 
-    Some(atomic.clone())
+    let mut intersection = TDerivedIntersection::new(TUnion::from_atomic(intersected));
+    intersection.add_intersection_type(callable);
+
+    Some(TAtomic::Derived(TDerived::Intersection(intersection)))
 }
 
 fn intersect_list_arrays<A>(
