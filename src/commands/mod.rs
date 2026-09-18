@@ -61,6 +61,7 @@ use crate::commands::analyze::AnalyzeCommand;
 use crate::commands::config::ConfigCommand;
 use crate::commands::cst::CstCommand;
 use crate::commands::extension::ExtensionCommand;
+use crate::commands::fix::FixCommand;
 use crate::commands::format::FormatCommand;
 use crate::commands::generate_completions::GenerateCompletionsCommand;
 use crate::commands::guard::GuardCommand;
@@ -77,6 +78,7 @@ pub mod analyze;
 pub mod config;
 pub mod cst;
 pub mod extension;
+pub mod fix;
 pub mod format;
 pub mod generate_completions;
 pub mod guard;
@@ -84,6 +86,7 @@ pub mod init;
 pub mod inspect_baseline;
 pub mod lint;
 pub mod list_files;
+mod outcome;
 pub mod self_update;
 pub mod stdin_input;
 
@@ -191,6 +194,10 @@ pub enum MagoCommand {
     /// **Usage**: `mago lint [OPTIONS]`
     #[command(name = "lint")]
     Lint(LintCommand),
+
+    /// Apply fixes until guard, analyzer, linter, and formatter make no more changes.
+    #[command(name = "fix")]
+    Fix(FixCommand),
 
     /// Perform static analysis on PHP code.
     ///

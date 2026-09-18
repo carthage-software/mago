@@ -46,6 +46,7 @@ The core tools:
 | :--- | :--- |
 | [`mago analyze`](/tools/analyzer/command-reference/) | Static analysis: type errors, logic bugs. |
 | [`mago cst`](/guide/inspecting-the-cst/) | Print the CST of a PHP file. |
+| [`mago fix`](#mago-fix) | Apply fixes from all four tools until no more changes are possible. |
 | [`mago format`](/tools/formatter/command-reference/) | Format PHP files. |
 | [`mago guard`](/tools/guard/command-reference/) | Enforce architectural rules and boundaries. |
 | [`mago lint`](/tools/linter/command-reference/) | Lint for style, correctness, and best practices. |
@@ -62,10 +63,40 @@ Utility commands:
 | [`mago self-update`](/guide/upgrading/) | Replace the installed binary with a newer release. |
 | `mago version` | Print Mago's version. Same as `--version`. |
 
+## mago fix
+
+`mago fix [PATHS...]` runs **guard → analyzer → linter → formatter**, then repeats that order until a full pass changes no files. Each tool reads the changes from the previous tool. Without paths, the command uses the configured source paths.
+
+```sh
+mago fix
+mago fix src/ tests/ --potentially-unsafe
+mago fix --no-analyze --no-guard
+```
+
+Only safe fixes run by default. The command respects each tool's configuration, excludes, inline suppressions, and baseline. Issues without an allowed fix do not stop the other tools or cause an endless loop.
+
+| Flag | Description |
+| :--- | :--- |
+| `--potentially-unsafe` | Allow safe and potentially unsafe fixes. |
+| `--unsafe` | Allow all fixes. Review the changes carefully. |
+| `--no-guard` | Skip the guard. |
+| `--no-analyze` | Skip the analyzer. |
+| `--no-lint` | Skip the linter. |
+| `--no-fmt` | Skip the formatter. |
+| `--ignore-baseline` | Apply fixes to issues hidden by each tool's baseline too. |
+| `--fail-on-remaining` | Exit with code `1` if issues remain after fixes settle. |
+| `--max-passes <NUMBER>` | Limit full passes; defaults to `10` and accepts `1` to `256`. |
+
+By default, the command succeeds when no more fixes are available at the selected safety level, even if issues remain. Disabling all four tools does nothing and succeeds.
+
+If fixes keep returning to an earlier file state, or reach the pass limit, the command stops with code `1` and reports the problem. It keeps the edits already made; review the rules and settings before trying again. File access and other tool errors stop the command too.
+
+You can raise `--max-passes` up to `256`. If fixes still do not settle after `256` passes, report a bug in Mago.
+
 ## Exit codes
 
 | Code | Meaning |
 | :--- | :--- |
-| `0` | Success. No issues found. |
-| `1` | Issues found that need attention. |
-| `2` | Tool error: configuration, I/O, parse failure, etc. |
+| `0` | Success. `mago fix` found no more allowed fixes. |
+| `1` | Issues need attention, or fixes did not settle. |
+| `2` | Tool error: configuration, I/O, etc. |

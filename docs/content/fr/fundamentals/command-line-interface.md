@@ -46,6 +46,7 @@ Les outils principaux :
 | :--- | :--- |
 | [`mago analyze`](/tools/analyzer/command-reference/) | Analyse statique : erreurs de type, bugs de logique. |
 | [`mago cst`](/guide/inspecting-the-cst/) | Affiche l'CST d'un fichier PHP. |
+| [`mago fix`](#mago-fix) | Applique les corrections des quatre outils jusqu'à ce qu'aucun changement ne reste possible. |
 | [`mago format`](/tools/formatter/command-reference/) | Formate les fichiers PHP. |
 | [`mago guard`](/tools/guard/command-reference/) | Applique les règles et frontières architecturales. |
 | [`mago lint`](/tools/linter/command-reference/) | Linte pour le style, la justesse et les bonnes pratiques. |
@@ -61,10 +62,40 @@ Commandes utilitaires :
 | [`mago self-update`](/guide/upgrading/) | Remplace le binaire installé par une release plus récente. |
 | `mago version` | Affiche la version de Mago. Identique à `--version`. |
 
+## mago fix
+
+`mago fix [PATHS...]` lance **guard → analyzer → linter → formatter**, puis répète cet ordre jusqu'à ce qu'un passage complet ne modifie aucun fichier. Chaque outil lit les changements de l'outil précédent. Sans chemins explicites, la commande utilise ceux de la configuration.
+
+```sh
+mago fix
+mago fix src/ tests/ --potentially-unsafe
+mago fix --no-analyze --no-guard
+```
+
+Par défaut, seules les corrections sûres s'appliquent. La commande respecte la configuration, les exclusions, les suppressions dans le code et la baseline de chaque outil. Les problèmes sans correction autorisée ne bloquent ni les autres outils ni la fin de la commande.
+
+| Option | Description |
+| :--- | :--- |
+| `--potentially-unsafe` | Autorise les corrections sûres et potentiellement risquées. |
+| `--unsafe` | Autorise toutes les corrections. Vérifiez les changements avec soin. |
+| `--no-guard` | Ignore le guard. |
+| `--no-analyze` | Ignore l'analyzer. |
+| `--no-lint` | Ignore le linter. |
+| `--no-fmt` | Ignore le formatter. |
+| `--ignore-baseline` | Corrige aussi les problèmes masqués par les baselines. |
+| `--fail-on-remaining` | Renvoie le code `1` s'il reste des problèmes après les corrections. |
+| `--max-passes <NUMBER>` | Limite le nombre de passages complets : `10` par défaut, de `1` à `256`. |
+
+Par défaut, la commande réussit quand il ne reste aucune correction autorisée par le niveau de sûreté choisi, même s'il reste des problèmes. Désactiver les quatre outils ne fait rien et réussit.
+
+Si les corrections ramènent les fichiers à un état déjà rencontré ou atteignent la limite de passages, la commande s'arrête avec le code `1` et signale le problème. Elle conserve les changements déjà faits ; vérifiez les règles et les réglages avant de relancer. Les erreurs d'accès aux fichiers et les autres erreurs des outils arrêtent aussi la commande.
+
+Vous pouvez augmenter `--max-passes` jusqu'à `256`. Si les corrections ne se stabilisent toujours pas après `256` passages, signalez un bug dans Mago.
+
 ## Codes de sortie
 
 | Code | Signification |
 | :--- | :--- |
-| `0` | Succès. Aucun problème trouvé. |
-| `1` | Problèmes trouvés nécessitant attention. |
-| `2` | Erreur d'outil : configuration, I/O, échec d'analyse, etc. |
+| `0` | Succès. `mago fix` n'a plus de correction autorisée à appliquer. |
+| `1` | Des problèmes demandent votre attention, ou les corrections ne se stabilisent pas. |
+| `2` | Erreur d'outil : configuration, I/O, etc. |

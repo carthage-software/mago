@@ -62,6 +62,7 @@ use mago_reporting::CompiledIgnoreSet;
 
 use crate::commands::args::baseline_reporting::BaselineReportingArgs;
 use crate::commands::args::substitution::SubstitutionArgs;
+use crate::commands::outcome::CommandOutcome;
 use crate::commands::stdin_input;
 use crate::config::Configuration;
 use crate::consts::PRELUDE_BYTES;
@@ -99,7 +100,7 @@ enum WatchOutcome {
 /// By default, the analyzer loads embedded stubs for PHP built-ins and popular
 /// libraries, providing accurate type information for external symbols. This can
 /// be disabled with `--no-stubs` for testing or debugging.
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Default)]
 #[command(
     name = "analyze",
     // Alias for the British
@@ -216,7 +217,7 @@ impl AnalyzeCommand {
     ///
     /// Only host files are analyzed for issues; external files only contribute to
     /// the symbol table and type graph.
-    pub fn execute(self, configuration: Configuration, color_choice: ColorChoice) -> Result<ExitCode, Error> {
+    pub fn execute(self, configuration: Configuration, color_choice: ColorChoice) -> Result<CommandOutcome, Error> {
         if !self.only.is_empty() {
             eprintln!("error: the `--only` flag is not available for the analyzer.");
             eprintln!();
@@ -230,7 +231,7 @@ impl AnalyzeCommand {
             eprintln!("  This runs the full analysis but only reports issues matching the given codes.");
             eprintln!("  Use `mago analyze --list-codes` to see all available codes.");
 
-            return Ok(ExitCode::FAILURE);
+            return Ok(ExitCode::FAILURE.into());
         }
 
         if self.list_codes {
@@ -238,12 +239,12 @@ impl AnalyzeCommand {
 
             println!("{}", serde_json::to_string_pretty(&codes)?);
 
-            return Ok(ExitCode::SUCCESS);
+            return Ok(ExitCode::SUCCESS.into());
         }
 
         // Check if watch mode is enabled early, since it needs a restart loop
         if self.watch {
-            return self.run_watch_loop(configuration, color_choice);
+            return self.run_watch_loop(configuration, color_choice).map(CommandOutcome::from);
         }
 
         let trace_enabled = tracing::enabled!(tracing::Level::TRACE);
@@ -272,7 +273,7 @@ impl AnalyzeCommand {
             let staged_paths = git::get_staged_file_paths(&configuration.source.workspace)?;
             if staged_paths.is_empty() {
                 tracing::info!("No staged files to analyze.");
-                return Ok(ExitCode::SUCCESS);
+                return Ok(ExitCode::SUCCESS.into());
             }
 
             if self.baseline_reporting.reporting.fix {
@@ -326,7 +327,7 @@ impl AnalyzeCommand {
         if !database.files().any(|f| f.file_type == FileType::Host) {
             tracing::warn!("No files found to analyze.");
 
-            return Ok(ExitCode::SUCCESS);
+            return Ok(ExitCode::SUCCESS.into());
         }
 
         let service_run_start = trace_enabled.then(Instant::now);
@@ -353,6 +354,7 @@ impl AnalyzeCommand {
         );
 
         let (exit_code, changed_file_ids) = processor.process_issues(&orchestrator, &mut database, issues)?;
+        let outcome = CommandOutcome::with_changes(exit_code, &database, changed_file_ids.iter().copied())?;
         let report_duration = report_start.map(|s| s.elapsed());
 
         if self.staged && !changed_file_ids.is_empty() {
@@ -379,7 +381,7 @@ impl AnalyzeCommand {
             tracing::trace!("Analyze command finished in {:?}.", start.elapsed());
         }
 
-        Ok(exit_code)
+        Ok(outcome)
     }
 
     /// Compiles the configured ignore entries, or an empty set with `--skip-ignores`.

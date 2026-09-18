@@ -54,6 +54,7 @@ use mago_orchestrator::service::format::FileFormatStatus;
 use mago_orchestrator::service::format::FormatResult;
 
 use crate::EXIT_CODE_ERROR;
+use crate::commands::outcome::CommandOutcome;
 use crate::config::Configuration;
 use crate::error::Error;
 use crate::utils;
@@ -67,7 +68,7 @@ use crate::utils::git::update_staged_file;
 /// This command applies consistent formatting to PHP code based on the configured
 /// style preferences. It supports multiple modes including in-place formatting,
 /// check mode for CI, and dry-run mode for previewing changes.
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Default)]
 #[command(
     name = "format",
     aliases = ["fmt"],
@@ -169,9 +170,9 @@ impl FormatCommand {
     /// - **Dry run** (`--dry-run`): Prints diffs without modifying files
     /// - **STDIN** (`--stdin-input`): Formats input from stdin to stdout
     /// - **Staged** (`--staged`): Formats staged files and re-stages them
-    pub fn execute(self, configuration: Configuration, color_choice: ColorChoice) -> Result<ExitCode, Error> {
+    pub fn execute(self, configuration: Configuration, color_choice: ColorChoice) -> Result<CommandOutcome, Error> {
         if self.staged {
-            return self.execute_staged(configuration, color_choice);
+            return self.execute_staged(configuration, color_choice).map(CommandOutcome::from);
         }
 
         let mut orchestrator = create_orchestrator(&configuration, color_choice, false, true, false);
@@ -181,7 +182,7 @@ impl FormatCommand {
         }
 
         if self.stdin_input {
-            return self.execute_stdin(orchestrator, &configuration);
+            return self.execute_stdin(orchestrator, &configuration).map(CommandOutcome::from);
         }
 
         let mut database = orchestrator.load_database(&configuration.source.workspace, false, None, None)?;
@@ -198,9 +199,13 @@ impl FormatCommand {
         let changed_files_count = result.changed_files_count();
 
         if changed_files_count == 0 {
+            if result.is_failed() {
+                return Ok(ExitCode::FAILURE.into());
+            }
+
             tracing::info!("All files are already formatted.");
 
-            return Ok(ExitCode::SUCCESS);
+            return Ok(ExitCode::SUCCESS.into());
         }
 
         if self.check {
@@ -208,10 +213,11 @@ impl FormatCommand {
                 "Found {changed_files_count} file(s) need formatting. Run the command without '--check' to format them.",
             );
 
-            return Ok(ExitCode::FAILURE);
+            return Ok(ExitCode::FAILURE.into());
         }
 
         let change_log = to_change_log(&database, &result, self.dry_run, color_choice)?;
+        let changed_file_ids = change_log.changed_file_ids()?;
         database.commit(change_log, true)?;
 
         let exit_code = if self.dry_run {
@@ -224,7 +230,11 @@ impl FormatCommand {
             ExitCode::SUCCESS
         };
 
-        Ok(exit_code)
+        CommandOutcome::with_changes(
+            if result.is_failed() { ExitCode::FAILURE } else { exit_code },
+            &database,
+            changed_file_ids,
+        )
     }
 
     /// Executes the STDIN formatting flow.

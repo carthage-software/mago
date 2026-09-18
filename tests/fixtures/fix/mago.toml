@@ -1,0 +1,12 @@
+php-version = "8.4"
+
+[source]
+paths = ["src"]
+
+[analyzer]
+no-boolean-literal-comparison = true
+
+[linter.rules]
+no-is-null = { enabled = true }
+yoda-conditions = { enabled = true, mode = "deny" }
+missing-docs = { enabled = false }

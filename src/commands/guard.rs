@@ -52,6 +52,7 @@ use mago_prelude::Prelude;
 
 use crate::commands::args::baseline_reporting::BaselineReportingArgs;
 use crate::commands::args::substitution::SubstitutionArgs;
+use crate::commands::outcome::CommandOutcome;
 use crate::commands::stdin_input;
 use crate::config::Configuration;
 use crate::consts::PRELUDE_BYTES;
@@ -73,7 +74,7 @@ use crate::utils::create_orchestrator;
 ///
 /// You can define rules in your `mago.toml` file to specify which namespaces can
 /// depend on others and what types of symbols are allowed.
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Default)]
 #[command(name = "guard")]
 pub struct GuardCommand {
     /// Specific files or directories to check instead of using configuration.
@@ -152,7 +153,7 @@ impl GuardCommand {
     /// Rules are read from `configuration.guard.rules` and define which dependencies
     /// are allowed between different namespaces or layers. Violations are reported
     /// as issues with details about the forbidden dependency.
-    pub fn execute(self, mut configuration: Configuration, color_choice: ColorChoice) -> Result<ExitCode, Error> {
+    pub fn execute(self, mut configuration: Configuration, color_choice: ColorChoice) -> Result<CommandOutcome, Error> {
         let trace_enabled = tracing::enabled!(tracing::Level::TRACE);
         let command_start = trace_enabled.then(Instant::now);
 
@@ -226,7 +227,7 @@ impl GuardCommand {
         if !database.files().any(|f| f.file_type == FileType::Host) {
             tracing::warn!("No files found to check with guard.");
 
-            return Ok(ExitCode::SUCCESS);
+            return Ok(ExitCode::SUCCESS.into());
         }
 
         let guard_run_start = trace_enabled.then(Instant::now);
@@ -257,7 +258,8 @@ impl GuardCommand {
             !self.path.is_empty() || self.stdin_input,
         );
 
-        let (exit_code, _) = processor.process_issues(&orchestrator, &mut database, result.issues)?;
+        let (exit_code, changed_file_ids) = processor.process_issues(&orchestrator, &mut database, result.issues)?;
+        let outcome = CommandOutcome::with_changes(exit_code, &database, changed_file_ids)?;
         let report_duration = report_start.map(|s| s.elapsed());
 
         let drop_database_start = trace_enabled.then(Instant::now);
@@ -279,6 +281,6 @@ impl GuardCommand {
             tracing::trace!("Guard command finished in {:?}.", start.elapsed());
         }
 
-        Ok(exit_code)
+        Ok(outcome)
     }
 }
