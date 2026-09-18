@@ -12,8 +12,8 @@ use serde::de::Deserializer;
 use mago_syntax_core::part_of_identifier;
 use mago_syntax_core::start_of_identifier;
 
-const INVALID_PATH_ERROR: &str = "Invalid path: must be '*', '@all', '@self', '@this', '@native', '@php', '@builtin', a layer (e.g., '@layer:name'), a valid namespace (ending with '\\'), a valid symbol name, or a pattern containing wildcards ('*').";
-const INVALID_SELECTOR_ERROR: &str = "Invalid symbol selector: must be a valid namespace (ending with '\\'), a valid symbol name, or a pattern containing wildcards ('*').";
+const INVALID_PATH_ERROR: &str = "Invalid path: must be '*', '@all', '@self', '@this', '@native', '@php', '@builtin', a layer (e.g., '@layer:name'), a valid namespace (ending with '\\'), a valid symbol name, or a pattern with wildcards ('*') or brace alternatives ('{a,b}').";
+const INVALID_SELECTOR_ERROR: &str = "Invalid symbol selector: must be a valid namespace (ending with '\\'), a valid symbol name, or a pattern with wildcards ('*') or brace alternatives ('{a,b}').";
 const INVALID_NAMESPACE_ERROR: &str = "Invalid namespace: must be '@global' or a valid namespace ending with '\\'.";
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, JsonSchema)]
@@ -62,14 +62,20 @@ pub(crate) fn is_valid_identifier_part(part: &str) -> bool {
     matches!(bytes[0], start_of_identifier!()) && bytes[1..].iter().all(|byte| matches!(byte, part_of_identifier!()))
 }
 
-fn is_valid_pattern_part(part: &str) -> bool {
-    if part == "*" || part == "**" {
-        return true;
+fn is_valid_pattern(pattern: &str) -> bool {
+    let mut depth = 0usize;
+
+    for byte in pattern.bytes() {
+        match byte {
+            b'{' => depth += 1,
+            b'}' if depth > 0 => depth -= 1,
+            b',' if depth > 0 => {}
+            part_of_identifier!() | b'*' | b'\\' => {}
+            _ => return false,
+        }
     }
 
-    part.as_bytes()
-        .iter()
-        .all(|&byte| matches!(byte, b'0'..=b'9' | b'a'..=b'z' | b'A'..=b'Z' | b'_' | b'\x80'..=b'\xff' | b'*'))
+    depth == 0
 }
 
 impl FromStr for NamespacePath {
@@ -93,12 +99,8 @@ impl FromStr for SymbolSelector {
     type Err = &'static str;
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
-        if s.contains('*') {
-            if s.split('\\').all(is_valid_pattern_part) {
-                Ok(SymbolSelector::Pattern(s.to_string()))
-            } else {
-                Err(INVALID_SELECTOR_ERROR)
-            }
+        if s.contains(['*', '{']) {
+            if is_valid_pattern(s) { Ok(SymbolSelector::Pattern(s.to_string())) } else { Err(INVALID_SELECTOR_ERROR) }
         } else if s.ends_with('\\') || s.eq_ignore_ascii_case("@global") {
             s.parse().map(SymbolSelector::Namespace)
         } else if s.split('\\').all(is_valid_identifier_part) {
@@ -262,6 +264,46 @@ mod tests {
         "App\\*Something".parse::<Path>().unwrap();
         "App\\*Something*".parse::<Path>().unwrap();
         "App\\*Some*thing".parse::<Path>().unwrap();
+    }
+
+    #[test]
+    fn test_brace_patterns_parse_correctly() {
+        for pattern in [
+            r"App\{Foo,Bar}\Thing",
+            r"App\{Foo,Bar}\**",
+            r"App\{Foo,Bar}\",
+            r"App\{Foo,{Bar,Baz}}\Thing",
+            r"App\{Foo,Bar}\{Thing,Other}",
+            r"App\{Foo\Nested,Bar}\Thing",
+            r"App\{Foo}Thing",
+            r"App\{,Abstract}Thing",
+            r"App\{Foo,Bar}*",
+            r"App\{École,学校}\Thing",
+        ] {
+            let selector = SymbolSelector::Pattern(pattern.to_string());
+            assert_eq!(pattern.parse::<SymbolSelector>().unwrap(), selector);
+            assert_eq!(pattern.parse::<Path>().unwrap(), Path::Selector(selector));
+            assert_eq!(pattern.parse::<Path>().unwrap().to_string(), pattern);
+        }
+    }
+
+    #[test]
+    fn test_invalid_brace_patterns_fail_to_parse() {
+        for pattern in [
+            r"App\{Foo,Bar",
+            r"App\{Foo,Bar\*",
+            r"App\Foo,Bar}\Thing",
+            r"App\{Foo,Bar}}\Thing",
+            r"App\{{Foo,Bar}\Thing",
+            r"App\{Foo,{Bar,Baz}\Thing",
+            r"App\{Foo,Bar},Baz\Thing",
+            r"App\{Foo,Invalid-Class}\Thing",
+            r"App\{Foo,Bar/Baz}\Thing",
+            r"App\{Foo,Bar?}\Thing",
+        ] {
+            assert!(pattern.parse::<SymbolSelector>().is_err(), "{pattern}");
+            assert!(pattern.parse::<Path>().is_err(), "{pattern}");
+        }
     }
 
     #[test]

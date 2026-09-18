@@ -693,6 +693,29 @@ pub fn test_dependency_restriction_allows_only_configured_source_namespaces() {
     );
 }
 
+#[cfg(feature = "serde")]
+#[test]
+pub fn test_issue_2372_brace_patterns_in_perimeter_configuration() {
+    let settings = toml::from_str(include_str!("cases/issue_2372/settings.toml")).unwrap();
+    let result = test_guard("issue_2372", include_str!("cases/issue_2372/repro.php"), settings);
+    let breaches: Vec<_> = result
+        .boundary_breaches
+        .iter()
+        .map(|breach| (breach.source_namespace.as_slice(), breach.dependency_fqn.as_slice()))
+        .collect();
+
+    assert_eq!(
+        breaches,
+        [
+            (b"App\\LayerConsumer".as_slice(), b"App\\Baz\\Thing".as_slice()),
+            (b"App\\PermitConsumer".as_slice(), b"App\\Baz\\Thing".as_slice()),
+            (b"App\\TypedPermitConsumer".as_slice(), b"App\\Baz\\Thing".as_slice()),
+            (b"App\\RestrictedConsumer".as_slice(), b"App\\Foo\\Thing".as_slice()),
+            (b"App\\RestrictedConsumer".as_slice(), b"App\\Bar\\Thing".as_slice()),
+        ]
+    );
+}
+
 #[test]
 pub fn test_dependency_restriction_takes_precedence_over_permits() {
     let code = indoc! {r"
