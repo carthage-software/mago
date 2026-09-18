@@ -817,6 +817,7 @@ mago lint --colors=never        # wrong, --colors is a global option
 <table><thead><tr><th style="text-align: left">Command</th><th style="text-align: left">Description</th></tr></thead><tbody>
 <tr><td style="text-align: left"><a href="../../../../main/en/tools/analyzer/command-reference"><code>mago analyze</code></a></td><td style="text-align: left">Static analysis: type errors, logic bugs.</td></tr>
 <tr><td style="text-align: left"><a href="../../../../main/en/guide/inspecting-the-cst"><code>mago cst</code></a></td><td style="text-align: left">Print the CST of a PHP file.</td></tr>
+<tr><td style="text-align: left"><a href="#mago-fix"><code>mago fix</code></a></td><td style="text-align: left">Apply fixes from all four tools until no more changes are possible.</td></tr>
 <tr><td style="text-align: left"><a href="../../../../main/en/tools/formatter/command-reference"><code>mago format</code></a></td><td style="text-align: left">Format PHP files.</td></tr>
 <tr><td style="text-align: left"><a href="../../../../main/en/tools/guard/command-reference"><code>mago guard</code></a></td><td style="text-align: left">Enforce architectural rules and boundaries.</td></tr>
 <tr><td style="text-align: left"><a href="../../../../main/en/tools/linter/command-reference"><code>mago lint</code></a></td><td style="text-align: left">Lint for style, correctness, and best practices.</td></tr>
@@ -831,11 +832,32 @@ mago lint --colors=never        # wrong, --colors is a global option
 <tr><td style="text-align: left"><a href="../../../../main/en/guide/upgrading"><code>mago self-update</code></a></td><td style="text-align: left">Replace the installed binary with a newer release.</td></tr>
 <tr><td style="text-align: left"><code>mago version</code></td><td style="text-align: left">Print Mago's version. Same as <code>--version</code>.</td></tr>
 </tbody></table>
+<h2 id="mago-fix">mago fix</h2>
+<p><code>mago fix [PATHS...]</code> runs <strong>guard → analyzer → linter → formatter</strong>, then repeats that order until a full pass changes no files. Each tool reads the changes from the previous tool. Without paths, the command uses the configured source paths.</p>
+<pre><code class="language-sh">mago fix
+mago fix src/ tests/ --potentially-unsafe
+mago fix --no-analyze --no-guard
+</code></pre>
+<p>Only safe fixes run by default. The command respects each tool's configuration, excludes, inline suppressions, and baseline. Issues without an allowed fix do not stop the other tools or cause an endless loop.</p>
+<table><thead><tr><th style="text-align: left">Flag</th><th style="text-align: left">Description</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>--potentially-unsafe</code></td><td style="text-align: left">Allow safe and potentially unsafe fixes.</td></tr>
+<tr><td style="text-align: left"><code>--unsafe</code></td><td style="text-align: left">Allow all fixes. Review the changes carefully.</td></tr>
+<tr><td style="text-align: left"><code>--no-guard</code></td><td style="text-align: left">Skip the guard.</td></tr>
+<tr><td style="text-align: left"><code>--no-analyze</code></td><td style="text-align: left">Skip the analyzer.</td></tr>
+<tr><td style="text-align: left"><code>--no-lint</code></td><td style="text-align: left">Skip the linter.</td></tr>
+<tr><td style="text-align: left"><code>--no-fmt</code></td><td style="text-align: left">Skip the formatter.</td></tr>
+<tr><td style="text-align: left"><code>--ignore-baseline</code></td><td style="text-align: left">Apply fixes to issues hidden by each tool's baseline too.</td></tr>
+<tr><td style="text-align: left"><code>--fail-on-remaining</code></td><td style="text-align: left">Exit with code <code>1</code> if issues remain after fixes settle.</td></tr>
+<tr><td style="text-align: left"><code>--max-passes &lt;NUMBER&gt;</code></td><td style="text-align: left">Limit full passes; defaults to <code>10</code> and accepts <code>1</code> to <code>256</code>.</td></tr>
+</tbody></table>
+<p>By default, the command succeeds when no more fixes are available at the selected safety level, even if issues remain. Disabling all four tools does nothing and succeeds.</p>
+<p>If fixes keep returning to an earlier file state, or reach the pass limit, the command stops with code <code>1</code> and reports the problem. It keeps the edits already made; review the rules and settings before trying again. File access and other tool errors stop the command too.</p>
+<p>You can raise <code>--max-passes</code> up to <code>256</code>. If fixes still do not settle after <code>256</code> passes, report a bug in Mago.</p>
 <h2 id="exit-codes">Exit codes</h2>
 <table><thead><tr><th style="text-align: left">Code</th><th style="text-align: left">Meaning</th></tr></thead><tbody>
-<tr><td style="text-align: left"><code>0</code></td><td style="text-align: left">Success. No issues found.</td></tr>
-<tr><td style="text-align: left"><code>1</code></td><td style="text-align: left">Issues found that need attention.</td></tr>
-<tr><td style="text-align: left"><code>2</code></td><td style="text-align: left">Tool error: configuration, I/O, parse failure, etc.</td></tr>
+<tr><td style="text-align: left"><code>0</code></td><td style="text-align: left">Success. <code>mago fix</code> found no more allowed fixes.</td></tr>
+<tr><td style="text-align: left"><code>1</code></td><td style="text-align: left">Issues need attention, or fixes did not settle.</td></tr>
+<tr><td style="text-align: left"><code>2</code></td><td style="text-align: left">Tool error: configuration, I/O, etc.</td></tr>
 </tbody></table>
 
     </article>
@@ -858,6 +880,10 @@ mago lint --colors=never        # wrong, --colors is a global option
     
     <li class="doc-toc__item doc-toc__item--lvl2">
       <a class="doc-toc__link" href="#subcommands">Subcommands</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#mago-fix">mago fix</a>
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl2">

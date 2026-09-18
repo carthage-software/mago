@@ -611,6 +611,7 @@ mago lint --colors=never        # 错误, --colors 是全局选项
 <table><thead><tr><th style="text-align: left">命令</th><th style="text-align: left">说明</th></tr></thead><tbody>
 <tr><td style="text-align: left"><a href="../../../../main/zh/tools/analyzer/command-reference"><code>mago analyze</code></a></td><td style="text-align: left">静态分析:类型错误、逻辑 bug。</td></tr>
 <tr><td style="text-align: left"><a href="../../../../main/zh/guide/inspecting-the-ast"><code>mago cst</code></a></td><td style="text-align: left">打印 PHP 文件的 CST。</td></tr>
+<tr><td style="text-align: left"><a href="#mago-fix"><code>mago fix</code></a></td><td style="text-align: left">运行四个工具并应用修复，直到不再产生更改。</td></tr>
 <tr><td style="text-align: left"><a href="../../../../main/zh/tools/formatter/command-reference"><code>mago format</code></a></td><td style="text-align: left">格式化 PHP 文件。</td></tr>
 <tr><td style="text-align: left"><a href="../../../../main/zh/tools/guard/command-reference"><code>mago guard</code></a></td><td style="text-align: left">强制执行架构规则与边界。</td></tr>
 <tr><td style="text-align: left"><a href="../../../../main/zh/tools/linter/command-reference"><code>mago lint</code></a></td><td style="text-align: left">针对风格、正确性和最佳实践进行 lint。</td></tr>
@@ -624,11 +625,32 @@ mago lint --colors=never        # 错误, --colors 是全局选项
 <tr><td style="text-align: left"><a href="../../../../main/zh/guide/upgrading"><code>mago self-update</code></a></td><td style="text-align: left">用更新的发行版替换已安装的二进制。</td></tr>
 <tr><td style="text-align: left"><code>mago version</code></td><td style="text-align: left">打印 Mago 的版本,与 <code>--version</code> 相同。</td></tr>
 </tbody></table>
+<h2 id="mago-fix">mago fix</h2>
+<p><code>mago fix [PATHS...]</code> 按 <strong>guard → analyzer → linter → formatter</strong> 的顺序运行，然后重复此顺序，直到完整一轮不再修改任何文件。每个工具都会读取前一个工具的更改。不指定路径时，命令使用配置中的源码路径。</p>
+<pre><code class="language-sh">mago fix
+mago fix src/ tests/ --potentially-unsafe
+mago fix --no-analyze --no-guard
+</code></pre>
+<p>默认只应用安全修复。命令遵循每个工具的配置、排除规则、代码中的忽略标记和基线。没有可用修复或超出所选安全级别的问题，不会阻止其他工具运行，也不会导致无限循环。</p>
+<table><thead><tr><th style="text-align: left">参数</th><th style="text-align: left">说明</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>--potentially-unsafe</code></td><td style="text-align: left">允许安全和可能不安全的修复。</td></tr>
+<tr><td style="text-align: left"><code>--unsafe</code></td><td style="text-align: left">允许所有修复。请仔细检查更改。</td></tr>
+<tr><td style="text-align: left"><code>--no-guard</code></td><td style="text-align: left">跳过 guard。</td></tr>
+<tr><td style="text-align: left"><code>--no-analyze</code></td><td style="text-align: left">跳过 analyzer。</td></tr>
+<tr><td style="text-align: left"><code>--no-lint</code></td><td style="text-align: left">跳过 linter。</td></tr>
+<tr><td style="text-align: left"><code>--no-fmt</code></td><td style="text-align: left">跳过 formatter。</td></tr>
+<tr><td style="text-align: left"><code>--ignore-baseline</code></td><td style="text-align: left">同时修复各工具基线中已忽略的问题。</td></tr>
+<tr><td style="text-align: left"><code>--fail-on-remaining</code></td><td style="text-align: left">修复稳定后仍有问题时，以退出码 <code>1</code> 结束。</td></tr>
+<tr><td style="text-align: left"><code>--max-passes &lt;NUMBER&gt;</code></td><td style="text-align: left">完整执行轮数上限，默认 <code>10</code>，取值范围为 <code>1</code> 到 <code>256</code>。</td></tr>
+</tbody></table>
+<p>默认情况下，只要所选安全级别下没有更多可用修复，命令就会成功，即使仍有问题。禁用全部四个工具时，命令不做任何更改并成功退出。</p>
+<p>如果修复使文件反复回到先前的状态，或达到轮数上限，命令会报告问题并以退出码 <code>1</code> 停止。已应用的更改会保留；再次运行前，请检查规则和设置。文件访问错误及其他工具错误也会终止命令。</p>
+<p>您可以将 <code>--max-passes</code> 提高到 <code>256</code>。如果执行 <code>256</code> 轮后修复仍未稳定，请向 Mago 报告此缺陷。</p>
 <h2 id="exit-codes">退出码</h2>
 <table><thead><tr><th style="text-align: left">码</th><th style="text-align: left">含义</th></tr></thead><tbody>
-<tr><td style="text-align: left"><code>0</code></td><td style="text-align: left">成功。未发现问题。</td></tr>
-<tr><td style="text-align: left"><code>1</code></td><td style="text-align: left">发现需要关注的问题。</td></tr>
-<tr><td style="text-align: left"><code>2</code></td><td style="text-align: left">工具错误:配置、I/O、解析失败等。</td></tr>
+<tr><td style="text-align: left"><code>0</code></td><td style="text-align: left">成功。<code>mago fix</code> 没有找到更多允许应用的修复。</td></tr>
+<tr><td style="text-align: left"><code>1</code></td><td style="text-align: left">有问题需要处理，或修复未能稳定。</td></tr>
+<tr><td style="text-align: left"><code>2</code></td><td style="text-align: left">工具错误:配置、I/O 等。</td></tr>
 </tbody></table>
 
     </article>
@@ -651,6 +673,10 @@ mago lint --colors=never        # 错误, --colors 是全局选项
     
     <li class="doc-toc__item doc-toc__item--lvl2">
       <a class="doc-toc__link" href="#subcommands">子命令</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#mago-fix">mago fix</a>
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl2">
