@@ -17,6 +17,9 @@ use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
+use crate::expression::unary::cast_type_to_string;
+use crate::utils::expression::get_block_expression_id;
+use crate::utils::expression::get_variable_id;
 
 /// Represents the result of resolving a member or constant selector.
 ///
@@ -76,21 +79,23 @@ pub fn resolve_member_selector<'ctx, 'arena, A>(
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     selector: &ClassLikeMemberSelector<'arena>,
+    coerce_to_string: bool,
 ) -> Result<Vec<ResolvedSelector>, AnalysisError>
 where
     A: Arena,
 {
-    match selector {
-        ClassLikeMemberSelector::Identifier(ident) => Ok(vec![ResolvedSelector::Identifier(word(ident.value))]),
+    let (selector_type, selector_id) = match selector {
+        ClassLikeMemberSelector::Identifier(ident) => return Ok(vec![ResolvedSelector::Identifier(word(ident.value))]),
         ClassLikeMemberSelector::Expression(expr) => {
             let was_inside_general_use = block_context.flags.inside_general_use();
             block_context.flags.set_inside_general_use(true);
             expr.expression.analyze(context, block_context, artifacts)?;
             block_context.flags.set_inside_general_use(was_inside_general_use);
 
-            let selector_type = artifacts.get_expression_type(&expr.expression);
-
-            Ok(resolve_selector_from_type(context, selector_type, expr.span(), SelectorKind::Member))
+            (
+                artifacts.get_rc_expression_type(&expr.expression).cloned(),
+                get_block_expression_id(expr.expression, context, block_context),
+            )
         }
         ClassLikeMemberSelector::Variable(var) => {
             let was_inside_general_use = block_context.flags.inside_general_use();
@@ -98,12 +103,35 @@ where
             var.analyze(context, block_context, artifacts)?;
             block_context.flags.set_inside_general_use(was_inside_general_use);
 
-            let selector_type = artifacts.get_expression_type(&var);
-
-            Ok(resolve_selector_from_type(context, selector_type, var.span(), SelectorKind::Member))
+            (artifacts.get_rc_expression_type(&var).cloned(), get_variable_id(var).map(word))
         }
-        ClassLikeMemberSelector::Missing(_) => Ok(vec![]),
-    }
+        ClassLikeMemberSelector::Missing(_) => return Ok(vec![]),
+    };
+
+    let coerced_type = if coerce_to_string
+        && let Some(selector_type) = &selector_type
+        && !selector_type.is_any_string()
+        && !selector_type.is_mixed()
+        && !selector_type.is_never()
+    {
+        Some(cast_type_to_string(
+            selector_type,
+            selector_id.as_ref().map(|id| id.as_bytes()),
+            context,
+            block_context,
+            artifacts,
+            selector.span(),
+        )?)
+    } else {
+        None
+    };
+
+    Ok(resolve_selector_from_type(
+        context,
+        coerced_type.as_ref().or(selector_type.as_deref()),
+        selector.span(),
+        SelectorKind::Member,
+    ))
 }
 
 /// Resolves the selector part of a class constant access.

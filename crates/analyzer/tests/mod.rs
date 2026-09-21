@@ -1320,6 +1320,7 @@ test_case!(strings_redundant_string_eq_literal);
 test_case!(strings_redundant_strlen_of_literal);
 test_case!(strings_string_intersected_with_stringable);
 test_case!(strings_stringable_to_string_implicit);
+test_case!(stringable_names);
 test_case!(strings_ucfirst_with_int);
 test_case!(strings_ucwords_with_array);
 test_case!(strings_bin2hex_with_array);

@@ -621,7 +621,7 @@ mod tests {
     }
 
     test_analysis! {
-        name = property_access_dynamic_name_invalid_type,
+        name = property_access_dynamic_numeric_name,
         code = indoc! {r#"
             <?php
 
@@ -634,8 +634,8 @@ mod tests {
             }
         "#},
         issues = [
-            IssueCode::InvalidMemberSelector,
-            IssueCode::InvalidReturnStatement,
+            IssueCode::NonExistentProperty,
+            IssueCode::MixedReturnStatement,
         ]
     }
 

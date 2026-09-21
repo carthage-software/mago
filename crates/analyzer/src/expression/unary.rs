@@ -1953,6 +1953,19 @@ where
                     expression_span,
                 ) {
                     possibilities.extend(result?.types.to_vec());
+                } else if let TAtomic::GenericParameter(parameter) = t {
+                    possibilities.extend(
+                        cast_type_to_string(
+                            parameter.get_constraint(),
+                            operand_expression_id,
+                            context,
+                            block_context,
+                            artifacts,
+                            expression_span,
+                        )?
+                        .types
+                        .into_owned(),
+                    );
                 } else {
                     possibilities.push(TAtomic::Scalar(TScalar::string()));
                 }
