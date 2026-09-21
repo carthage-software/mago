@@ -15,6 +15,7 @@ use mago_syntax::cst::NodeKind;
 
 use crate::category::Category;
 use crate::context::LintContext;
+use crate::integration::Integration;
 use crate::requirements::RuleRequirements;
 use crate::rule::Config;
 use crate::rule::LintRule;
@@ -99,6 +100,23 @@ impl LintRule for FunctionNameRule {
         let Node::Function(function) = node else { return };
 
         let Some(name) = std::str::from_utf8(function.name.value).ok() else { return };
+
+        // Drupal documents its hooks in `*.api.php` files, where the name carries an uppercase
+        // placeholder for whatever the hook fires on, as in `hook_ENTITY_TYPE_insert()`. Coder's
+        // own `Drupal.NamingConventions.ValidFunctionName` sniff skips these on the same two
+        // conditions, the file suffix and the `hook_` prefix.
+        if name.starts_with("hook_") && ctx.registry.is_integration_enabled(Integration::Drupal) {
+            let path_str = ctx.source_file.path.as_ref().and_then(|p| p.to_str());
+            let ends_with_api = match path_str {
+                Some(p) => p.ends_with(".api.php"),
+                None => ctx.source_file.name.as_ref().ends_with(b".api.php"),
+            };
+
+            if ends_with_api {
+                return;
+            }
+        }
+
         let fqfn = BytesDisplay(ctx.lookup_name(&function.name));
 
         if self.cfg.either {
@@ -182,5 +200,74 @@ impl LintRule for FunctionNameRule {
                     )),
             );
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use indoc::indoc;
+
+    use super::FunctionNameRule;
+    use crate::integration::Integration;
+    use crate::settings::Settings;
+    use crate::test_lint_failure;
+    use crate::test_lint_success;
+
+    fn drupal(s: &mut Settings) {
+        s.integrations.insert(Integration::Drupal);
+    }
+
+    test_lint_success! {
+        name = drupal_hook_documentation_allowed,
+        rule = FunctionNameRule,
+        filename = "modules/example/example.api.php",
+        settings = drupal,
+        code = indoc! {r#"
+            <?php
+
+            function hook_ENTITY_TYPE_insert($entity) {
+            }
+        "#}
+    }
+
+    test_lint_failure! {
+        name = drupal_hook_documentation_flagged_outside_api_files,
+        rule = FunctionNameRule,
+        filename = "modules/example/example.module",
+        count = 1,
+        settings = drupal,
+        code = indoc! {r#"
+            <?php
+
+            function hook_ENTITY_TYPE_insert($entity) {
+            }
+        "#}
+    }
+
+    test_lint_failure! {
+        name = other_api_file_names_still_flagged,
+        rule = FunctionNameRule,
+        filename = "modules/example/example.api.php",
+        count = 1,
+        settings = drupal,
+        code = indoc! {r#"
+            <?php
+
+            function Example_HELPER() {
+            }
+        "#}
+    }
+
+    test_lint_failure! {
+        name = drupal_hook_documentation_flagged_without_the_integration,
+        rule = FunctionNameRule,
+        filename = "modules/example/example.api.php",
+        count = 1,
+        code = indoc! {r#"
+            <?php
+
+            function hook_ENTITY_TYPE_insert($entity) {
+            }
+        "#}
     }
 }
