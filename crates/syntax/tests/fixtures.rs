@@ -1,17 +1,14 @@
 //! Fixture-based parser tests.
 
 mod runner {
-    use std::borrow::Cow;
-
     use mago_allocator::LocalArena;
 
-    use mago_database::file::File;
-    use mago_syntax::parser::parse_file;
+    use mago_database::file::FileId;
+    use mago_syntax::parser::parse_file_content;
 
-    pub fn parse_file_test(name: &'static str, code: &'static str, expected_errors: usize) {
+    pub fn parse_file_test(name: &'static str, code: &str, expected_errors: usize) {
         let arena = LocalArena::new();
-        let file = File::ephemeral(Cow::Borrowed(name.as_bytes()), Cow::Borrowed(code.as_bytes()));
-        let program = parse_file(&arena, &file);
+        let program = parse_file_content(&arena, FileId::new(name.as_bytes()), code.as_bytes());
         let actual = program.errors.len();
         if actual != expected_errors {
             panic!(
@@ -38,6 +35,7 @@ macro_rules! test_parsing {
 }
 
 test_parsing!(hello_world, 0);
+test_parsing!(nested_braced_string_interpolation, 0);
 test_parsing!(issue_2228_class_constant_in_braced_string_interpolation, 1);
 test_parsing!(issue_2228_valid_scope_resolution_in_braced_string_interpolation, 0);
 
@@ -62,3 +60,9 @@ test_parsing!(stmt_class_short_echo_as_identifier, 8);
 test_parsing!(stmt_halt_compiler_invalid_syntax, 1);
 test_parsing!(stmt_halt_compiler_outermost_scope, 1);
 test_parsing!(stmt_namespace_group_use_errors, 1);
+
+#[test]
+fn repeated_unclosed_braced_string_interpolation() {
+    let code = include_str!("fixtures/unclosed_braced_string_interpolation.php").repeat(1000);
+    runner::parse_file_test("repeated_unclosed_braced_string_interpolation", &code, 4028);
+}
