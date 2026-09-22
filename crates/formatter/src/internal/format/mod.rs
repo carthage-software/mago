@@ -1211,19 +1211,22 @@ where
         wrap!(f, self, ExpressionStatement, {
             let expression = self.expression.format(f);
             let terminator = self.terminator.format(f);
-            if let Some(chain_group_id) = f.take_member_access_chain_group_id()
+
+            if let Some(chain) = f.take_member_access_chain_context()
                 && f.settings.method_chain_semicolon_on_next_line
             {
+                let semicolon = Document::Array(vec_in![f.arena;
+                    Document::Line(Line::hard()),
+                    Document::String(b";"),
+                ]);
+
                 Document::Array(vec_in![f.arena;
                     expression,
-                    Document::IfBreak(
-                        IfBreak::new(
-                            f.arena,
-                            Document::Array(vec_in![f.arena; Document::Line(Line::hard()), Document::String(b";")]),
-                            terminator,
-                        )
-                        .with_id(chain_group_id),
-                    ),
+                    if chain.must_break {
+                        semicolon
+                    } else {
+                        Document::IfBreak(IfBreak::new(f.arena, semicolon, terminator).with_id(chain.group_id))
+                    },
                 ])
             } else {
                 Document::Array(vec_in![f.arena; expression, terminator])
@@ -1435,19 +1438,21 @@ where
 
             let terminator = self.terminator.format(f);
 
-            if let Some(chain_group_id) = f.take_member_access_chain_group_id()
+            if let Some(chain) = f.take_member_access_chain_context()
                 && f.settings.method_chain_semicolon_on_next_line
             {
-                contents.push(Document::IfBreak(
-                    IfBreak::new(
-                        f.arena,
-                        Document::Array(vec_in![f.arena; Document::Line(Line::hard()), Document::String(b";")]),
-                        terminator,
-                    )
-                    .with_id(chain_group_id),
-                ));
+                let semicolon = Document::Array(vec_in![f.arena;
+                    Document::Line(Line::hard()),
+                    Document::String(b";"),
+                ]);
 
-                Document::Group(Group::new(contents).with_id(chain_group_id))
+                contents.push(if chain.must_break {
+                    semicolon
+                } else {
+                    Document::IfBreak(IfBreak::new(f.arena, semicolon, terminator).with_id(chain.group_id))
+                });
+
+                Document::Group(Group::new(contents).with_id(chain.group_id))
             } else {
                 contents.push(terminator);
 
