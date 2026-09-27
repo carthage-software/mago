@@ -14,6 +14,7 @@ use std::path::Path;
 
 use anyhow::Context;
 use anyhow::Result;
+use schemars::schema_for;
 use serde_json::Value;
 
 use mago_linter::category::Category;
@@ -21,6 +22,7 @@ use mago_linter::integration::IntegrationSet;
 use mago_linter::registry::RuleRegistry;
 use mago_linter::requirements::RuleRequirements;
 use mago_linter::rule::AnyRule;
+use mago_linter::settings::RulesSettings;
 use mago_linter::settings::Settings as LinterSettings;
 use mago_php_version::PHPVersionRange;
 use mago_reporting::Level;
@@ -66,6 +68,7 @@ pub fn generate(documentation_root: &Path) -> Result<()> {
 
     let rules_default_config: Value =
         serde_json::to_value(&settings.rules).context("failed to serialise default linter settings")?;
+    let rules_schema = serde_json::to_value(schema_for!(RulesSettings))?;
 
     tracing::info!(
         "Regenerating linter rules ({} rules across {} categories).",
@@ -95,7 +98,7 @@ pub fn generate(documentation_root: &Path) -> Result<()> {
 
         let strings = i18n.get(*language).with_context(|| format!("missing i18n strings for {language}"))?;
 
-        let body = render_all_rules(strings, &rules, &rules_default_config);
+        let body = render_all_rules(strings, &rules, &rules_default_config, &rules_schema);
         let markdown = wrap_with_front_matter(strings, &body);
         if let Some(parent) = new_page.parent() {
             fs::create_dir_all(parent).with_context(|| format!("failed to create {}", parent.display()))?;
@@ -153,7 +156,12 @@ fn wrap_with_front_matter(strings: &I18nMap, body: &str) -> String {
     out
 }
 
-fn render_all_rules(strings: &I18nMap, rules: &[RuleEntry], rules_default_config: &Value) -> String {
+fn render_all_rules(
+    strings: &I18nMap,
+    rules: &[RuleEntry],
+    rules_default_config: &Value,
+    rules_schema: &Value,
+) -> String {
     let mut out = String::new();
 
     let intro = t_format(
@@ -201,7 +209,7 @@ fn render_all_rules(strings: &I18nMap, rules: &[RuleEntry], rules_default_config
         out.push_str("\n\n");
         out.push_str("<div class=\"rule-list\">\n\n");
         for rule in rules_in_category {
-            out.push_str(&render_rule(strings, rule, rules_default_config));
+            out.push_str(&render_rule(strings, rule, rules_default_config, rules_schema));
             out.push('\n');
         }
 
@@ -321,7 +329,7 @@ fn strip_em_dashes(input: &str) -> String {
     input.replace(" \u{2014} ", ", ").replace('\u{2014}', ",")
 }
 
-fn render_rule(strings: &I18nMap, rule: &RuleEntry, rules_default_config: &Value) -> String {
+fn render_rule(strings: &I18nMap, rule: &RuleEntry, rules_default_config: &Value, rules_schema: &Value) -> String {
     let mut out = String::new();
     let level = level_label(rule.level);
 
@@ -381,7 +389,7 @@ fn render_rule(strings: &I18nMap, rule: &RuleEntry, rules_default_config: &Value
         out.push_str("</div>\n\n");
     }
 
-    if let Some(table) = render_config_table(strings, &rule.code, rules_default_config) {
+    if let Some(table) = render_config_table(strings, &rule.code, rules_default_config, rules_schema) {
         if has_top || has_examples {
             out.push_str("<hr class=\"rule__separator\">\n\n");
         }
@@ -530,7 +538,12 @@ fn join_with_and(strings: &I18nMap, items: &[String]) -> String {
     }
 }
 
-fn render_config_table(strings: &I18nMap, rule_code: &str, rules_default_config: &Value) -> Option<String> {
+fn render_config_table(
+    strings: &I18nMap,
+    rule_code: &str,
+    rules_default_config: &Value,
+    rules_schema: &Value,
+) -> Option<String> {
     let entry = rules_default_config.pointer(&format!("/{rule_code}"))?.as_object()?;
     if entry.is_empty() {
         return None;
@@ -546,12 +559,36 @@ fn render_config_table(strings: &I18nMap, rule_code: &str, rules_default_config:
     keys.sort();
     for key in keys {
         let value = &entry[key];
-        let type_label = json_type_label(value);
+        let type_label = schema_property(rules_schema, rules_schema, rule_code)
+            .and_then(|rule| schema_property(rules_schema, rule, key))
+            .and_then(schema_type_label)
+            .unwrap_or_else(|| json_type_label(value).to_string());
         let value_label = json_value_label(value);
         out.push_str(&format!("| `{key}` | `{type_label}` | `{value_label}` |\n"));
     }
     out.push('\n');
     Some(out)
+}
+
+fn schema_property<'a>(root: &'a Value, schema: &'a Value, name: &str) -> Option<&'a Value> {
+    if let Some(reference) = schema.get("$ref").and_then(Value::as_str) {
+        return schema_property(root, root.pointer(reference.strip_prefix('#')?)?, name);
+    }
+    if let Some(property) = schema.get("properties").and_then(|properties| properties.get(name)) {
+        return Some(property);
+    }
+    schema.get("allOf")?.as_array()?.iter().find_map(|part| schema_property(root, part, name))
+}
+
+fn schema_type_label(schema: &Value) -> Option<String> {
+    let type_name = |kind: &str| if kind == "integer" { "number".to_string() } else { kind.to_string() };
+    match schema.get("type")? {
+        Value::String(kind) => Some(type_name(kind)),
+        Value::Array(kinds) => {
+            Some(kinds.iter().filter_map(Value::as_str).map(type_name).collect::<Vec<_>>().join(" or "))
+        }
+        _ => None,
+    }
 }
 
 fn json_type_label(value: &Value) -> &'static str {
@@ -570,5 +607,53 @@ fn json_value_label(value: &Value) -> String {
         Value::String(s) => format!("\"{}\"", s.to_lowercase()),
         Value::Array(_) | Value::Object(_) => serde_json::to_string(value).unwrap_or_else(|_| String::from("…")),
         _ => value.to_string(),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn schema_types_match_non_null_defaults() {
+        let defaults = serde_json::to_value(RulesSettings::default()).unwrap();
+        let schema = serde_json::to_value(schema_for!(RulesSettings)).unwrap();
+        for (rule, options) in defaults.as_object().unwrap() {
+            for (option, value) in options.as_object().unwrap() {
+                if value.is_null() {
+                    continue;
+                }
+                let rule_schema = schema_property(&schema, &schema, rule).unwrap();
+                let option_schema = schema_property(&schema, rule_schema, option).unwrap();
+                let kind = schema_type_label(option_schema).unwrap_or_else(|| json_type_label(value).to_string());
+                assert_eq!(kind, json_type_label(value), "{rule}.{option}");
+            }
+        }
+    }
+
+    #[test]
+    fn referenced_level_uses_default_value_type() {
+        let schema = serde_json::to_value(schema_for!(RulesSettings)).unwrap();
+        let rule = schema_property(&schema, &schema, "cyclomatic-complexity").unwrap();
+        let level = schema_property(&schema, rule, "level").unwrap();
+        assert!(schema_type_label(level).is_none());
+        assert_eq!(
+            json_type_label(&serde_json::to_value(RulesSettings::default()).unwrap()["cyclomatic-complexity"]["level"]),
+            "string"
+        );
+    }
+
+    #[test]
+    fn nullable_threshold_types_come_from_schema() {
+        let schema = serde_json::to_value(schema_for!(RulesSettings)).unwrap();
+        for (rule, option) in [
+            ("cyclomatic-complexity", "method-threshold"),
+            ("excessive-parameter-list", "constructor-threshold"),
+            ("excessive-nesting", "function-like-threshold"),
+        ] {
+            let rule_schema = schema_property(&schema, &schema, rule).unwrap();
+            let option_schema = schema_property(&schema, rule_schema, option).unwrap();
+            assert_eq!(schema_type_label(option_schema).as_deref(), Some("number or null"));
+        }
     }
 }

@@ -1576,6 +1576,7 @@ dependencies = [
  "mago-reporting",
  "pulldown-cmark",
  "regex",
+ "schemars",
  "serde",
  "serde_json",
  "tera",
