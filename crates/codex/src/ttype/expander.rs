@@ -358,6 +358,11 @@ fn expand_derived_intersection(
         let mut next_results = Vec::with_capacity(results.len() * expanded_intersection.types.len());
         for base in results {
             for additional in expanded_intersection.types.as_ref() {
+                if let Some(string) = base.intersect_strings(additional) {
+                    next_results.push(string);
+                    continue;
+                }
+
                 let mut result = base.clone();
                 if !result.add_intersection_type(additional.clone()) {
                     return vec![TAtomic::Derived(TDerived::Intersection(intersection.clone()))];
