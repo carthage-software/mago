@@ -105,7 +105,7 @@ impl LintRule for FunctionNameRule {
         // placeholder for whatever the hook fires on, as in `hook_ENTITY_TYPE_insert()`. Coder's
         // own `Drupal.NamingConventions.ValidFunctionName` sniff skips these on the same two
         // conditions, the file suffix and the `hook_` prefix.
-        if name.starts_with("hook_") && ctx.registry.is_integration_enabled(Integration::Drupal) {
+        if ctx.registry.is_integration_enabled(Integration::Drupal) && name.starts_with("hook_") {
             let path_str = ctx.source_file.path.as_ref().and_then(|p| p.to_str());
             let ends_with_api = match path_str {
                 Some(p) => p.ends_with(".api.php"),
