@@ -64,15 +64,6 @@ fn get_nullable_union_from_type(
     })
 }
 
-fn get_non_empty_string_intersection(other: &Type<'_>) -> Option<TUnion> {
-    match other {
-        Type::String(_) | Type::NonEmptyString(_) => Some(get_non_empty_string()),
-        Type::LowercaseString(_) | Type::NonEmptyLowercaseString(_) => Some(get_non_empty_lowercase_string()),
-        Type::UppercaseString(_) | Type::NonEmptyUppercaseString(_) => Some(get_non_empty_uppercase_string()),
-        _ => None,
-    }
-}
-
 /// Converts a parsed `PHPDoc` type node into a semantic `TUnion` type representation,
 /// resolving names, templates, and keywords into their semantic counterparts.
 ///
@@ -125,18 +116,6 @@ pub fn get_union_from_type(
             TUnion::from_vec(combined_types)
         }
         Type::Intersection(intersection) => {
-            if matches!(intersection.left, Type::NonEmptyString(_))
-                && let Some(string_union) = get_non_empty_string_intersection(intersection.right)
-            {
-                return Ok(string_union);
-            }
-
-            if matches!(intersection.right, Type::NonEmptyString(_))
-                && let Some(string_union) = get_non_empty_string_intersection(intersection.left)
-            {
-                return Ok(string_union);
-            }
-
             let object_and_callable = (matches!(intersection.left, Type::Object(_))
                 && matches!(intersection.right, Type::Callable(_)))
                 || (matches!(intersection.left, Type::Callable(_)) && matches!(intersection.right, Type::Object(_)));
@@ -153,6 +132,11 @@ pub fn get_union_from_type(
             let mut intersection_types = vec![];
             for left_type in left_types {
                 for right_type in &right_types {
+                    if let Some(string) = left_type.intersect_strings(right_type) {
+                        intersection_types.push(string);
+                        continue;
+                    }
+
                     let (mut intersection, intersected_type) = if left_type.can_be_intersected() {
                         if !right_type.can_be_intersected()
                             && let Some(deferred) = create_deferred_intersection(right_type.clone())
@@ -163,6 +147,8 @@ pub fn get_union_from_type(
                         }
                     } else if let Some(deferred) = create_deferred_intersection(left_type.clone()) {
                         (deferred, right_type.clone())
+                    } else if let Some(deferred) = create_deferred_intersection(right_type.clone()) {
+                        (deferred, left_type.clone())
                     } else {
                         return Err(TypeError::InvalidType(
                             ttype.to_string(),

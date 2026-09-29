@@ -117,6 +117,16 @@ impl TAtomic {
         }
     }
 
+    /// Intersects two string atomics, returning `None` if either is not a string or no string satisfies both.
+    #[must_use]
+    pub fn intersect_strings(&self, other: &TAtomic) -> Option<TAtomic> {
+        let (TAtomic::Scalar(TScalar::String(left)), TAtomic::Scalar(TScalar::String(right))) = (self, other) else {
+            return None;
+        };
+
+        left.intersect(right).map(|string| TAtomic::Scalar(TScalar::String(string)))
+    }
+
     #[must_use]
     pub fn is_numeric(&self) -> bool {
         match self {
