@@ -9,6 +9,8 @@ DateFilter::make('affects_flights_from')
 $x = some_function_with_a_long_name_yes(12345678901234567890);
 $x = some_function_with_a_long_name_yes($a_long_variable_name_that_overflows_the_print_width);
 $x = some_function_with_a_long_name_yes(SomeClass::SOME_VERY_LONG_CONSTANT_NAME_HERE_XXX);
+$x = some_function_with_a_long_name_yes(SomeClass::SOME_VERY_LONG_CONSTANT_NAME_HERE_XXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXXX);
+$x = some_function_with_a_long_name_yes(SomeClass::$some_very_long_static_property_name_here_xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx);
 
 // Single complex arg (call): still breaks because the inner call is not a value.
 $x = wrapper(inner_call_that_returns_a_long_value_with_a_long_method_name_here_111());
