@@ -838,6 +838,7 @@ test_case!(class_string_of_generic_object_inference);
 test_case!(static_var_lazy_init);
 test_case!(static_var_coalesce);
 test_case!(issue_2403);
+test_case!(issue_2400);
 test_case!(array_coalesce_assign_check);
 test_case!(factory_null_params);
 test_case!(clone_dynamic_class);
