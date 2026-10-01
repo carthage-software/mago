@@ -42,6 +42,8 @@ use crate::context::scope::conditional_scope::IfConditionalScope;
 use crate::context::scope::control_action::ControlAction;
 use crate::context::scope::control_action::ControlActionSet;
 use crate::context::scope::if_scope::IfScope;
+use crate::context::scope::var_has_root;
+use crate::context::scope::var_references_dynamic;
 use crate::context::utils::inherit_branch_context_properties;
 use crate::error::AnalysisError;
 use crate::formula;
@@ -297,11 +299,11 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
             self.span(),
         )?;
 
-        synthesize_branch_discriminator_clauses(
-            block_context,
+        let branch_discriminator_clauses = synthesize_branch_discriminator_clauses(
             &if_body_redefined_snapshot,
             &else_block_context,
             &else_block_context.assigned_variable_ids,
+            &if_scope.possibly_assigned_variable_ids,
             &saved_if_clauses,
             &if_scope.negated_clauses,
             self.condition.span(),
@@ -423,6 +425,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
 
             block_context.locals.insert(variable_id, Rc::new(new_type));
         }
+
+        // Merging a discriminator's branch types can invalidate clauses about its old value.
+        // Add the new branch implications only after that invalidation has finished.
+        block_context.clauses.extend(branch_discriminator_clauses.into_iter().map(Rc::new));
 
         if has_returned {
             block_context.flags.set_has_returned(true);
@@ -1479,24 +1485,44 @@ fn get_definitely_evaluated_ored_expressions<'ast, 'arena>(
     vec![expression]
 }
 
-fn synthesize_branch_discriminator_clauses<'ctx>(
-    outer_block_context: &mut BlockContext<'ctx>,
+fn synthesize_branch_discriminator_clauses(
     if_body_redefined: &WordMap<Rc<TUnion>>,
-    else_block_context: &BlockContext<'ctx>,
+    else_block_context: &BlockContext<'_>,
     else_assigned_ids: &WordMap<u32>,
+    possibly_assigned_ids: &WordSet,
     if_clauses: &[mago_algebra::clause::Clause],
     negated_clauses: &[mago_algebra::clause::Clause],
     condition_span: Span,
     algebra_thresholds: &mago_algebra::AlgebraThresholds,
     formula_size_threshold: u16,
-) {
+) -> Vec<Clause> {
     if if_body_redefined.is_empty() {
-        return;
+        return vec![];
     }
 
     if if_clauses.is_empty() && negated_clauses.is_empty() {
-        return;
+        return vec![];
     }
+
+    // The original condition cannot describe a value that a branch may have overwritten.
+    if if_clauses.iter().chain(negated_clauses).any(|clause| {
+        clause.possibilities.iter().any(|(variable_id, assertions)| {
+            possibly_assigned_ids.iter().any(|assigned_id| {
+                var_has_root(*variable_id, *assigned_id)
+                    || var_references_dynamic(*variable_id, *assigned_id)
+                    || assertions.values().any(|assertion| {
+                        assertion.referenced_variable().is_some_and(|referenced_id| {
+                            var_has_root(referenced_id, *assigned_id)
+                                || var_references_dynamic(referenced_id, *assigned_id)
+                        })
+                    })
+            })
+        })
+    }) {
+        return vec![];
+    }
+
+    let mut clauses = vec![];
 
     for (variable_id, if_type) in if_body_redefined {
         if !else_assigned_ids.contains_key(variable_id) {
@@ -1539,7 +1565,7 @@ fn synthesize_branch_discriminator_clauses<'ctx>(
 
             let combined = disjoin_clauses(head, truthy_side_clauses.to_vec(), condition_span, algebra_thresholds);
             if combined.len() <= usize::from(formula_size_threshold) {
-                outer_block_context.clauses.extend(combined.into_iter().map(Rc::new));
+                clauses.extend(combined);
             }
         }
 
@@ -1558,10 +1584,12 @@ fn synthesize_branch_discriminator_clauses<'ctx>(
 
             let combined = disjoin_clauses(head, falsy_side_clauses.to_vec(), condition_span, algebra_thresholds);
             if combined.len() <= usize::from(formula_size_threshold) {
-                outer_block_context.clauses.extend(combined.into_iter().map(Rc::new));
+                clauses.extend(combined);
             }
         }
     }
+
+    clauses
 }
 
 fn get_branch_control_flags(final_actions: ControlActionSet) -> (bool, bool, bool, bool) {
