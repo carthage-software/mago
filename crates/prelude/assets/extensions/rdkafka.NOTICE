@@ -1,0 +1,9 @@
+rdkafka.php
+
+SPDX-License-Identifier: Apache-2.0
+Copyright 2010-2023 JetBrains s.r.o.
+
+Modified and consolidated from JetBrains/phpstorm-stubs:
+https://github.com/JetBrains/phpstorm-stubs/tree/e4f5f6c3de39f3bab3e9f3fca4b8cdb8b061e681/rdkafka
+
+The Apache-2.0 license is provided in the repository's LICENSE-APACHE.
