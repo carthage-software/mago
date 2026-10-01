@@ -8,7 +8,6 @@ use mago_reporting::Level;
 use mago_span::HasSpan;
 use mago_syntax::cst::Call;
 use mago_syntax::cst::Expression;
-use mago_syntax::cst::FunctionCall;
 use mago_syntax::cst::Literal;
 use mago_syntax::cst::Node;
 use mago_syntax::cst::NodeKind;
@@ -20,6 +19,7 @@ use crate::requirements::RuleRequirements;
 use crate::rule::Config;
 use crate::rule::LintRule;
 use crate::rule::utils::call::function_call_matches;
+use crate::rule::utils::call::function_call_matches_any;
 use crate::rule_meta::RuleMeta;
 use crate::settings::RuleSettings;
 
@@ -81,7 +81,8 @@ impl LintRule for NoUnescapedOutputRule {
     }
 
     fn targets() -> &'static [NodeKind] {
-        const TARGETS: &[NodeKind] = &[NodeKind::Echo, NodeKind::PrintConstruct, NodeKind::FunctionCall];
+        const TARGETS: &[NodeKind] =
+            &[NodeKind::Echo, NodeKind::EchoTag, NodeKind::PrintConstruct, NodeKind::FunctionCall];
 
         TARGETS
     }
@@ -98,7 +99,7 @@ impl LintRule for NoUnescapedOutputRule {
             Node::Echo(echo) => {
                 // Check each expression in the echo statement
                 for expression in &echo.values {
-                    if needs_escaping_with_context(expression, Some(ctx)) {
+                    if needs_escaping_with_context(expression, ctx) {
                         self.report_unescaped_output(ctx, expression.span(), "echo statement");
                     }
                 }
@@ -106,13 +107,13 @@ impl LintRule for NoUnescapedOutputRule {
             Node::EchoTag(echo_tag) => {
                 // Check each expression in the echo statement
                 for expression in &echo_tag.values {
-                    if needs_escaping_with_context(expression, Some(ctx)) {
+                    if needs_escaping_with_context(expression, ctx) {
                         self.report_unescaped_output(ctx, expression.span(), "echo tag");
                     }
                 }
             }
             // Check the print construct expression
-            Node::PrintConstruct(print_construct) if needs_escaping_with_context(print_construct.value, Some(ctx)) => {
+            Node::PrintConstruct(print_construct) if needs_escaping_with_context(print_construct.value, ctx) => {
                 self.report_unescaped_output(ctx, print_construct.value.span(), "print statement");
             }
             Node::FunctionCall(function_call) => {
@@ -121,7 +122,7 @@ impl LintRule for NoUnescapedOutputRule {
                     && function_call_matches(ctx, function_call, "printf")
                     && let Some(first_arg) =
                         function_call.argument_list.arguments.first().map(mago_syntax::cst::Argument::value)
-                    && needs_escaping_with_context(first_arg, Some(ctx))
+                    && needs_escaping_with_context(first_arg, ctx)
                 {
                     self.report_unescaped_output(ctx, first_arg.span(), "printf function");
                 }
@@ -147,7 +148,7 @@ impl NoUnescapedOutputRule {
 }
 
 /// Check if an expression needs escaping before output (with context)
-fn needs_escaping_with_context<A>(expr: &Expression, ctx: Option<&LintContext<'_, '_, A>>) -> bool
+fn needs_escaping_with_context<A>(expr: &Expression, ctx: &LintContext<'_, '_, A>) -> bool
 where
     A: Arena,
 {
@@ -162,16 +163,7 @@ where
         Expression::ArrayAccess(_) => true,
         // Function calls - check if it's already an escaping function
         Expression::Call(Call::Function(function_call)) => {
-            if let Some(context) = ctx {
-                !is_escaping_function_call(context, function_call)
-            } else {
-                // Fallback: if no context, check by identifier value
-                if let Expression::Identifier(function_name) = function_call.function {
-                    !is_escaping_function(function_name.value())
-                } else {
-                    true
-                }
-            }
+            function_call_matches_any(ctx, function_call, SAFE_OUTPUT_FUNCTIONS).is_none()
         }
         // Method calls and property access are potentially unsafe
         Expression::Call(_) => true,
@@ -190,48 +182,103 @@ where
     }
 }
 
-/// Check if a function call is a `WordPress` escaping function
-fn is_escaping_function_call<A>(ctx: &LintContext<'_, '_, A>, function_call: &FunctionCall) -> bool
-where
-    A: Arena,
-{
-    let escaping_functions = [
-        "esc_html",
-        "esc_attr",
-        "esc_url",
-        "esc_js",
-        "esc_textarea",
-        "esc_xml",
-        "sanitize_text_field",
-        "sanitize_email",
-        "sanitize_url",
-        "wp_kses",
-        "wp_kses_post",
-    ];
+/// `WordPress` functions whose return value is escaped or sanitized for HTML output.
+///
+/// Mirrors the `escapingFunctions` list of WPCS `EscapingFunctionsTrait`, minus functions that
+/// escape for a non-HTML context (`esc_sql`, `like_escape`, `esc_url_raw`) or only read input
+/// (`filter_input`, `filter_var`).
+const SAFE_OUTPUT_FUNCTIONS: &[&str] = &[
+    "absint",
+    "esc_attr",
+    "esc_attr__",
+    "esc_attr_e",
+    "esc_attr_x",
+    "esc_html",
+    "esc_html__",
+    "esc_html_e",
+    "esc_html_x",
+    "esc_js",
+    "esc_textarea",
+    "esc_url",
+    "esc_xml",
+    "floatval",
+    "highlight_string",
+    "intval",
+    "json_encode",
+    "number_format",
+    "rawurlencode",
+    "sanitize_email",
+    "sanitize_hex_color",
+    "sanitize_hex_color_no_hash",
+    "sanitize_html_class",
+    "sanitize_key",
+    "sanitize_locale_name",
+    "sanitize_text_field",
+    "sanitize_url",
+    "sanitize_user_field",
+    "tag_escape",
+    "urlencode",
+    "urlencode_deep",
+    "wp_json_encode",
+    "wp_kses",
+    "wp_kses_data",
+    "wp_kses_one_attr",
+    "wp_kses_post",
+];
 
-    for func_name in escaping_functions {
-        if function_call_matches(ctx, function_call, func_name) {
-            return true;
-        }
+#[cfg(test)]
+mod tests {
+    use indoc::indoc;
+
+    use super::NoUnescapedOutputRule;
+    use crate::test_lint_failure;
+    use crate::test_lint_success;
+
+    test_lint_success! {
+        name = translated_and_escaped_output_is_safe,
+        rule = NoUnescapedOutputRule,
+        code = indoc! {r#"
+            <?php
+
+            echo esc_html__( 'Hello', 'my-plugin' );
+            echo wp_json_encode( $data );
+            echo absint( $count );
+            ?>
+            <span><?= esc_attr( $title ) ?></span>
+        "#}
     }
 
-    false
-}
+    test_lint_success! {
+        name = namespaced_escaping_call_is_safe,
+        rule = NoUnescapedOutputRule,
+        code = indoc! {r"
+            <?php
 
-/// Check if a function name is a `WordPress` escaping function (fallback without context)
-fn is_escaping_function(name: &[u8]) -> bool {
-    matches!(
-        name,
-        b"esc_html"
-            | b"esc_attr"
-            | b"esc_url"
-            | b"esc_js"
-            | b"esc_textarea"
-            | b"esc_xml"
-            | b"sanitize_text_field"
-            | b"sanitize_email"
-            | b"sanitize_url"
-            | b"wp_kses"
-            | b"wp_kses_post"
-    )
+            namespace App;
+
+            echo Esc_Html( $title );
+        "}
+    }
+
+    test_lint_failure! {
+        name = echo_tag_output_is_checked,
+        rule = NoUnescapedOutputRule,
+        code = indoc! {r"
+            <?php $title = $_GET['title']; ?>
+            <h1><?= $title ?></h1>
+        "}
+    }
+
+    test_lint_failure! {
+        name = non_html_escaping_is_not_safe,
+        rule = NoUnescapedOutputRule,
+        count = 3,
+        code = indoc! {r"
+            <?php
+
+            echo esc_sql( $_GET['q'] );
+            echo esc_url_raw( $url );
+            echo filter_input( INPUT_GET, 'q' );
+        "}
+    }
 }
