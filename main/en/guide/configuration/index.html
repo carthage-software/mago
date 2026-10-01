@@ -867,6 +867,7 @@ php-version = "8.3"
 <ul>
 <li>Tables and objects are deep-merged. A child can override a single key inside a nested table without redefining the whole table.</li>
 <li>Arrays such as <code>source.excludes</code> and per-rule <code>exclude</code> lists are concatenated, parent first. If a base config excludes <code>vendor/</code>, you keep that exclude and add your own.</li>
+<li><code>extension-hosts.&lt;name&gt;.command</code> is the exception: it is an argv, where each element's meaning comes from its position, so a layer that redeclares it <strong>replaces</strong> it. Concatenating two commands would start the parent's program with the child's path as a stray argument. Every other key inside the host table still merges normally, so a layer can change <code>workers</code> or <code>enabled</code> and keep the inherited command.</li>
 <li>Scalars (strings, numbers, booleans) are overwritten by the child.</li>
 </ul>
 <pre><code class="language-toml"># base.toml
@@ -880,6 +881,7 @@ threads = 8
 [source]
 excludes = ["build"]   # appended -&gt; ["vendor", "node_modules", "build"]
 </code></pre>
+<p><code>extends</code> is part of the published JSON schema, so a file using it still validates against <code>vendor/carthage-software/mago/schema.json</code>.</p>
 <p>Cycles are detected via canonical-path tracking and surface a clear error rather than recursing forever. Diamond inheritance (A extends B and C, both extend D) processes D once and is fine. Layers can mix formats freely; each is parsed by its own driver and merged at a generic value level before the final document is validated against the schema.</p>
 <h2 id="global-options">Global options</h2>
 <p>These keys live at the root of <code>mago.toml</code>.</p>
