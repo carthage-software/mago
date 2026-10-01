@@ -1184,6 +1184,26 @@ mod tests {
         pool.shutdown();
     }
 
+    /// Blocks until the pool has started at least `expected` workers.
+    ///
+    /// A deadline, not a yield count: what a yield budget is worth in wall time
+    /// is unrelated to how long a worker takes to start.
+    #[cfg(unix)]
+    fn wait_for_workers(pool: &WorkerPool, expected: usize) {
+        const TIMEOUT: Duration = Duration::from_secs(10);
+
+        let deadline = Instant::now() + TIMEOUT;
+        while pool.len() < expected {
+            assert!(
+                Instant::now() < deadline,
+                "the pool started {} of {expected} workers within {TIMEOUT:?}",
+                pool.len(),
+            );
+
+            std::thread::sleep(Duration::from_millis(1));
+        }
+    }
+
     #[cfg(unix)]
     #[test]
     fn prepares_half_of_adaptive_capacity_in_the_background() {
@@ -1197,14 +1217,9 @@ mod tests {
         );
 
         pool.prepare_capacity();
-        for _ in 0..10_000 {
-            if pool.len() == 4 {
-                break;
-            }
-            std::thread::yield_now();
-        }
+        wait_for_workers(&pool, 4);
 
-        assert_eq!(pool.len(), 4);
+        assert_eq!(pool.len(), 4, "half of the configured capacity, and no more");
         pool.shutdown();
     }
 
