@@ -80,6 +80,11 @@ impl LintRule for AmbiguousFunctionCallRule {
 
                 // OK: Explicitly namespaced
                 $value = namespace\my_function();
+
+                function shout(string $value): string { return $value; }
+
+                // OK: declared in this file, in this namespace
+                $shouted = shout("hello");
             "#},
             bad_example: indoc! {r#"
                 <?php
@@ -135,6 +140,12 @@ impl LintRule for AmbiguousFunctionCallRule {
         }
 
         if ctx.is_name_imported(identifier) {
+            return;
+        }
+
+        // A function this file declares in this namespace is resolved at compile
+        // time, so neither reason in the notes below applies to it.
+        if ctx.declares_function(identifier) {
             return;
         }
 
