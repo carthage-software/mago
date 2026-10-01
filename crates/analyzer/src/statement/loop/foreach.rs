@@ -178,7 +178,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Foreach<'arena> {
             always_enters_loop,
         )?;
 
-        if let Some((iterator_id, key_id, value_id, entry_id, _)) = foreach_entry
+        let refined_entry = if let Some((iterator_id, key_id, value_id, entry_id, _)) = foreach_entry
             && !loop_scope.final_actions.contains(ControlAction::Break)
             && assignments_only_target_current_entry(
                 iterator_id,
@@ -189,11 +189,11 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Foreach<'arena> {
             )
             && let Some(entry_type) = inner_loop_block_context.locals.get(&entry_id)
             && !entry_type.is_mixed()
-            && let Some(iterator_type) = block_context.locals.get(&iterator_id)
-            && let Some(refined) = refine_foreach_array_values(iterator_type, entry_type)
         {
-            block_context.locals.insert(iterator_id, Rc::new(refined));
-        }
+            Some((iterator_id, Rc::clone(entry_type)))
+        } else {
+            None
+        };
 
         r#loop::inherit_loop_block_context(
             context,
@@ -204,6 +204,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Foreach<'arena> {
             always_enters_loop,
             /* infinite_loop = */ false,
         );
+
+        // Refine after inheriting the loop context so a non-empty iterator's
+        // widened type does not overwrite the fully transformed value type.
+        if let Some((iterator_id, entry_type)) = refined_entry
+            && let Some(iterator_type) = block_context.locals.get(&iterator_id)
+            && let Some(refined) = refine_foreach_array_values(iterator_type, &entry_type)
+        {
+            block_context.locals.insert(iterator_id, Rc::new(refined));
+        }
 
         Ok(())
     }
