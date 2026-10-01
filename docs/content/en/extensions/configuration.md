@@ -113,4 +113,6 @@ extends = "../mago.base.toml"
 enabled = false
 ```
 
+`command` is replaced rather than appended to, because it is an argv: a layer that declares its own command gets exactly that command, and a layer that does not keeps the inherited one. Every other key in the host table merges as usual.
+
 See [Configuration](/guide/configuration/) for path resolution and merge precedence.
