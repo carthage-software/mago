@@ -14,14 +14,14 @@ pub enum AssertSubject<'arena> {
         variable: Variable<'arena>,
     },
     Method {
-        parameter: Variable<'arena>,
+        object: &'arena AssertSubject<'arena>,
         arrow: Span,
         method: Identifier<'arena>,
         left_parenthesis: Span,
         right_parenthesis: Span,
     },
     Property {
-        parameter: Variable<'arena>,
+        object: &'arena AssertSubject<'arena>,
         arrow: Span,
         property: Identifier<'arena>,
     },
@@ -83,8 +83,8 @@ impl HasSpan for AssertSubject<'_> {
     fn span(&self) -> Span {
         match self {
             AssertSubject::Parameter { variable } => variable.span(),
-            AssertSubject::Method { parameter, right_parenthesis, .. } => parameter.span().join(*right_parenthesis),
-            AssertSubject::Property { parameter, property, .. } => parameter.span().join(property.span()),
+            AssertSubject::Method { object, right_parenthesis, .. } => object.span().join(*right_parenthesis),
+            AssertSubject::Property { object, property, .. } => object.span().join(property.span()),
         }
     }
 }

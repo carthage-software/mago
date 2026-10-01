@@ -224,8 +224,8 @@ fn get_kan_defect_of_node(node: Node<'_, '_>) -> f64 {
 }
 
 #[inline]
-const fn calculate_kan_defect(select: usize, r#while: usize, r#if: usize) -> f64 {
-    0.15 + 0.23 * (r#while as f64) + 0.22 * (select as f64) + 0.07 * (r#if as f64)
+fn calculate_kan_defect(select: usize, r#while: usize, r#if: usize) -> f64 {
+    0.07f64.mul_add(r#if as f64, 0.22f64.mul_add(select as f64, 0.23f64.mul_add(r#while as f64, 0.15)))
 }
 
 #[inline]

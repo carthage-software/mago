@@ -2,6 +2,7 @@ use mago_allocator::Arena;
 use mago_allocator::vec::Vec;
 use mago_allocator::vec_in;
 
+use mago_php_version::feature::Feature;
 use mago_span::HasSpan;
 use mago_syntax::cst::FunctionLikeParameter;
 use mago_syntax::cst::FunctionLikeParameterList;
@@ -125,7 +126,7 @@ where
         contents.extend(printed);
         parts.push(Document::Indent(contents));
 
-        if f.settings.trailing_comma {
+        if f.trailing_comma_for(Feature::TrailingCommaInParameterList) {
             parts.push(Document::IfBreak(IfBreak::then(f.arena, Document::String(b","))));
         }
     }

@@ -172,33 +172,11 @@ pub fn replace_with_polarity(
         return get_never();
     }
 
-    if new_types.iter().filter(|atomic| atomic.is_array()).count() > 1 {
-        let (mut array_types, other_types): (Vec<_>, Vec<_>) = new_types.into_iter().partition(TAtomic::is_array);
-        let mut combined_types = if other_types.is_empty() {
-            Vec::new()
-        } else {
-            combiner::combine(other_types, codebase, combiner::CombinerOptions::default())
-        };
-
-        if combined_types.iter().any(|atomic| matches!(atomic, TAtomic::Mixed(mixed) if mixed.is_vanilla())) {
-            return union.clone_with_types(combined_types);
-        }
-
-        combined_types.retain(|atomic| !atomic.is_never());
-        for atomic in &mut combined_types {
-            if matches!(atomic, TAtomic::Void) {
-                *atomic = TAtomic::Null;
-            }
-        }
-
-        combined_types.append(&mut array_types);
-        combined_types.sort_unstable();
-        combined_types.dedup();
-
-        return union.clone_with_types(combined_types);
-    }
-
-    union.clone_with_types(combiner::combine(new_types, codebase, combiner::CombinerOptions::default()))
+    union.clone_with_types(combiner::combine_preserving_array_shapes(
+        new_types,
+        codebase,
+        combiner::CombinerOptions::default(),
+    ))
 }
 
 fn replace_template_parameter(

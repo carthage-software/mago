@@ -37,7 +37,7 @@ pub struct FormatterConfig {
     pub filter_fixable: bool,
     /// Optional editor URL template for OSC 8 terminal hyperlinks.
     ///
-    /// Supported placeholders: `%file%` (absolute path), `%line%`, `%column%`.
+    /// Supported placeholders: `%file%` (absolute path), `%rel_file%` (workspace-relative path), `%line%`, `%column%`.
     /// Example: `"phpstorm://open?file=%file%&line=%line%"`
     pub editor_url: Option<String>,
 }

@@ -11,7 +11,7 @@ use crate::Level;
 use crate::error::ReportingError;
 use crate::formatter::Formatter;
 use crate::formatter::FormatterConfig;
-use crate::formatter::utils::osc8_hyperlink;
+use crate::formatter::utils::osc8_file_hyperlink;
 
 /// Formatter that outputs issues in Emacs compilation mode format.
 pub(crate) struct EmacsFormatter;
@@ -53,7 +53,7 @@ impl Formatter for EmacsFormatter {
 
                     let name = String::from_utf8_lossy(&file.name);
                     let display = if let (Some(template), Some(path)) = (editor_url, file.path.as_ref()) {
-                        osc8_hyperlink(template, &path.display().to_string(), line, column, &name)
+                        osc8_file_hyperlink(template, &path.display().to_string(), &name, line, column, &name)
                     } else {
                         name.into_owned()
                     };

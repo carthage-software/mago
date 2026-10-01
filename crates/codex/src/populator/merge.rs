@@ -8,6 +8,28 @@ use crate::populator::properties::inherit_properties_from_parent;
 use crate::populator::templates::extend_template_parameters;
 use crate::reference::SymbolReferences;
 
+fn canonicalize_template_relationship(metadata: &mut ClassLikeMetadata, source: Word, actual: Word) {
+    if source == actual {
+        return;
+    }
+
+    if let Some(offsets) = metadata.template_extended_offsets.remove(&source) {
+        metadata.template_extended_offsets.entry(actual).or_insert(offsets);
+    }
+
+    if let Some(count) = metadata.template_type_extends_count.remove(&source) {
+        metadata.template_type_extends_count.entry(actual).or_insert(count);
+    }
+
+    if let Some(count) = metadata.template_type_implements_count.remove(&source) {
+        metadata.template_type_implements_count.entry(actual).or_insert(count);
+    }
+
+    if let Some(count) = metadata.template_type_uses_count.remove(&source) {
+        metadata.template_type_uses_count.entry(actual).or_insert(count);
+    }
+}
+
 /// Merges interface data inherited from a parent interface into the current metadata.
 /// Assumes the parent is already populated.
 pub fn merge_interface_metadata_from_parent_interface(
@@ -37,10 +59,21 @@ fn merge_interface_metadata(
 ) {
     symbol_references.add_symbol_reference_to_symbol(metadata.name, interface, true);
 
-    let Some(parent_interface_metadata) = codebase.class_likes.get(&interface) else {
+    let Some(parent_interface_metadata) = codebase.get_class_like_by_word(interface) else {
         metadata.invalid_dependencies.insert(interface);
         return;
     };
+
+    canonicalize_template_relationship(metadata, interface, parent_interface_metadata.name);
+    if inherit_constants {
+        metadata.direct_parent_interfaces.remove(&interface);
+        metadata.all_parent_interfaces.remove(&interface);
+        metadata.direct_parent_interfaces.insert(parent_interface_metadata.name);
+        metadata.all_parent_interfaces.insert(parent_interface_metadata.name);
+    } else {
+        metadata.require_implements.remove(&interface);
+        metadata.require_implements.insert(parent_interface_metadata.name);
+    }
 
     if inherit_constants {
         for (interface_constant_name, interface_constant_metadata) in &parent_interface_metadata.constants {
@@ -72,10 +105,15 @@ pub fn merge_metadata_from_parent_class_like(
 ) {
     symbol_references.add_symbol_reference_to_symbol(metadata.name, parent_class, true);
 
-    let Some(parent_metadata) = codebase.class_likes.get(&parent_class) else {
+    let Some(parent_metadata) = codebase.get_class_like_by_word(parent_class) else {
         metadata.invalid_dependencies.insert(parent_class);
         return;
     };
+
+    canonicalize_template_relationship(metadata, parent_class, parent_metadata.name);
+    metadata.direct_parent_class = Some(parent_metadata.name);
+    metadata.all_parent_classes.remove(&parent_class);
+    metadata.all_parent_classes.insert(parent_metadata.name);
 
     metadata.all_parent_classes.extend(parent_metadata.all_parent_classes.iter().copied());
     metadata.all_parent_interfaces.extend(parent_metadata.all_parent_interfaces.iter().copied());
@@ -113,10 +151,14 @@ pub fn merge_metadata_from_required_class_like(
 ) {
     symbol_references.add_symbol_reference_to_symbol(metadata.name, parent_class, true);
 
-    let Some(parent_metadata) = codebase.class_likes.get(&parent_class) else {
+    let Some(parent_metadata) = codebase.get_class_like_by_word(parent_class) else {
         metadata.invalid_dependencies.insert(parent_class);
         return;
     };
+
+    canonicalize_template_relationship(metadata, parent_class, parent_metadata.name);
+    metadata.require_extends.remove(&parent_class);
+    metadata.require_extends.insert(parent_metadata.name);
 
     metadata.require_extends.extend(parent_metadata.all_parent_classes.iter().copied());
     metadata.require_implements.extend(parent_metadata.all_parent_interfaces.iter().copied());
@@ -132,13 +174,17 @@ pub fn merge_metadata_from_trait(
 ) {
     symbol_references.add_symbol_reference_to_symbol(metadata.name, trait_name, true);
 
-    let Some(trait_metadata) = codebase.class_likes.get(&trait_name) else {
+    let Some(trait_metadata) = codebase.get_class_like_by_word(trait_name) else {
         metadata.invalid_dependencies.insert(trait_name);
         return;
     };
 
+    canonicalize_template_relationship(metadata, trait_name, trait_metadata.name);
+    metadata.used_traits.remove(&trait_name);
+    metadata.used_traits.insert(trait_metadata.name);
+
     for (trait_constant_name, trait_constant_metadata) in &trait_metadata.constants {
-        metadata.trait_constant_ids.insert(*trait_constant_name, trait_name);
+        metadata.trait_constant_ids.insert(*trait_constant_name, trait_metadata.name);
 
         if !metadata.constants.contains_key(trait_constant_name) {
             metadata.constants.insert(*trait_constant_name, trait_constant_metadata.clone());
@@ -166,7 +212,7 @@ fn remove_trait_requirement_template_parameters(
         metadata.template_extended_parameters.remove(required_interface);
         metadata.template_extended_parameter_paths.remove(required_interface);
 
-        if let Some(required_metadata) = codebase.class_likes.get(required_interface) {
+        if let Some(required_metadata) = codebase.get_class_like_by_word(*required_interface) {
             for parent_interface in &required_metadata.all_parent_interfaces {
                 metadata.template_extended_parameters.remove(parent_interface);
                 metadata.template_extended_parameter_paths.remove(parent_interface);

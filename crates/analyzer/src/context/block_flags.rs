@@ -25,6 +25,7 @@ impl BlockContextFlags {
     /// class-like is in scope for name resolution, but the arguments are evaluated outside
     /// its body.
     pub const INSIDE_CLASS_LIKE_ATTRIBUTE: u32 = 1 << 18;
+    pub const INSIDE_REFERENCE: u32 = 1 << 19;
 
     #[inline]
     pub const fn new() -> Self {
@@ -149,6 +150,11 @@ impl BlockContextFlags {
     }
 
     #[inline(always)]
+    pub const fn inside_reference(&self) -> bool {
+        self.contains(Self::INSIDE_REFERENCE)
+    }
+
+    #[inline(always)]
     pub fn set_inside_conditional(&mut self, value: bool) {
         self.set(Self::INSIDE_CONDITIONAL, value);
     }
@@ -241,5 +247,10 @@ impl BlockContextFlags {
     #[inline(always)]
     pub fn set_inside_class_like_attribute(&mut self, value: bool) {
         self.set(Self::INSIDE_CLASS_LIKE_ATTRIBUTE, value);
+    }
+
+    #[inline(always)]
+    pub fn set_inside_reference(&mut self, value: bool) {
+        self.set(Self::INSIDE_REFERENCE, value);
     }
 }

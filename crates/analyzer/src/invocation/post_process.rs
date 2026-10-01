@@ -53,7 +53,11 @@ use crate::formula::get_formula;
 use crate::formula::negate_or_synthesize;
 use crate::invocation::Invocation;
 use crate::invocation::InvocationArgumentsSource;
+use crate::invocation::arguments::is_argument_mutated_by_reference;
+use crate::invocation::arguments::is_argument_referenceable;
+use crate::invocation::arguments::is_array_multisort;
 use crate::invocation::resolver::resolve_invocation_type;
+use crate::plugin::provider::assertion::InvocationAssertions;
 use crate::reconciler;
 use crate::reconciler::assertion_reconciler::intersect_union_with_union;
 use crate::utils::expression::get_block_expression_id;
@@ -182,6 +186,10 @@ where
         false,
     );
 
+    block_context
+        .stable_method_calls
+        .extend(resolved_if_true_assertions.keys().filter(|variable| variable.as_bytes().ends_with(b"()")).copied());
+
     for (variable, assertions) in resolved_if_true_assertions {
         artifacts.if_true_assertions.entry(range).or_default().entry(variable).or_default().extend(assertions);
     }
@@ -197,6 +205,10 @@ where
         parameters,
         false,
     );
+
+    block_context
+        .stable_method_calls
+        .extend(resolved_if_false_assertions.keys().filter(|variable| variable.as_bytes().ends_with(b"()")).copied());
 
     for (variable, assertions) in resolved_if_false_assertions {
         artifacts.if_false_assertions.entry(range).or_default().entry(variable).or_default().extend(assertions);
@@ -276,6 +288,10 @@ fn apply_assertion_to_call_context<'ctx, 'arena, A>(
         return;
     }
 
+    block_context
+        .stable_method_calls
+        .extend(type_assertions.keys().filter(|variable| variable.as_bytes().ends_with(b"()")).copied());
+
     let referenced_variable_ids: WordSet = type_assertions.keys().copied().collect();
     let mut changed_variable_ids: WordSet = WordSet::default();
     let mut active_type_assertions = IndexMap::new();
@@ -323,18 +339,36 @@ where
         );
 
         if let Some(argument) = argument {
+            let argument_type = artifacts.get_expression_type(argument).cloned().unwrap_or_else(get_mixed);
+            if !is_argument_mutated_by_reference(
+                &invocation.target,
+                parameter_offset,
+                &argument_type,
+                parameter_ref.is_by_reference(),
+            ) {
+                continue;
+            }
+
+            if is_array_multisort(&invocation.target) && !is_argument_referenceable(argument, &argument_type) {
+                continue;
+            }
+
             let declared_had_templates = parameter_ref
                 .get_out_type()
                 .or_else(|| parameter_ref.get_type())
                 .is_some_and(|declared| declared.has_template_types());
 
-            let mut new_type = parameter_ref
-                .get_out_type()
-                .or_else(|| parameter_ref.get_type())
-                .cloned()
-                .map_or_else(get_mixed, |new_type| {
-                    resolve_invocation_type(context, invocation, template_result, parameters, new_type)
-                });
+            let mut new_type = if parameter_offset > 0 && is_array_multisort(&invocation.target) {
+                argument_type
+            } else {
+                parameter_ref
+                    .get_out_type()
+                    .or_else(|| parameter_ref.get_type())
+                    .cloned()
+                    .map_or_else(get_mixed, |new_type| {
+                        resolve_invocation_type(context, invocation, template_result, parameters, new_type)
+                    })
+            };
 
             // If the argument's current type is `never`, this call is unreachable
             // its by-reference effect cannot happen, so the variable's type must
@@ -349,7 +383,9 @@ where
                 continue;
             }
 
-            if declared_had_templates {
+            if declared_had_templates
+                && !invocation.target.get_function_like_metadata().is_some_and(|metadata| metadata.flags.is_built_in())
+            {
                 new_type.widen_literals();
             }
 
@@ -459,6 +495,7 @@ fn clear_object_property_narrowings<'ctx, 'arena, A>(
         block_context.locals.retain(|key, _| !references_method_call_key(*key));
         block_context.clauses.retain(|clause| !references_method_call(clause));
         block_context.reconciled_expression_clauses.retain(|clause| !references_method_call(clause));
+        block_context.retain_valid_class_type_relations();
     }
 
     if let Some(metadata) = metadata
@@ -711,6 +748,8 @@ fn clear_object_property_narrowings<'ctx, 'arena, A>(
     }
 
     if !has_object_argument {
+        block_context.retain_valid_class_type_relations();
+
         return;
     }
 
@@ -754,6 +793,7 @@ fn clear_object_property_narrowings<'ctx, 'arena, A>(
     block_context
         .reconciled_expression_clauses
         .retain(|clause| clause.wedge || !clause.possibilities.keys().copied().any(should_wipe));
+    block_context.retain_valid_class_type_relations();
 }
 
 fn is_property_or_index_key(var_id: Word) -> bool {
@@ -1354,7 +1394,7 @@ fn resolve_special_assertion_target(
 ) -> Option<Word> {
     let target_bytes = target_name.as_bytes();
     if let Some(this_variable) = this_variable
-        && target_bytes.starts_with(b"$this")
+        && (target_bytes == InvocationAssertions::RECEIVER || target_bytes.starts_with(b"$this->"))
     {
         let mut out: Vec<u8> = Vec::with_capacity(target_bytes.len() - 5 + this_variable.len());
         out.extend_from_slice(this_variable);

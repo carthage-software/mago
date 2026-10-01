@@ -10,6 +10,7 @@ use std::time::Instant;
 
 use foldhash::HashSet;
 use foldhash::fast::RandomState;
+
 use mago_algebra::assertion_set::Conjunction;
 use mago_codex::assertion::Assertion;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
@@ -131,7 +132,7 @@ use crate::invocation::MethodTargetContext;
 
 pub const ANALYZER_PROTOCOL_MAGIC: [u8; 4] = *b"MANA";
 pub const ANALYZER_PROTOCOL_MAJOR: u16 = 1;
-pub const ANALYZER_PROTOCOL_MINOR: u16 = 0;
+pub const ANALYZER_PROTOCOL_MINOR: u16 = 1;
 
 const HEADER_LENGTH: usize = 12;
 const INITIAL_MESSAGE_CAPACITY: usize = 256;
@@ -2065,6 +2066,11 @@ where
         return Ok(None);
     }
 
+    let display_name = if reader.read_bool("effective callable display name presence")? {
+        Some(word(non_empty(reader.read_bytes("effective callable display name")?, "effective callable display name")?))
+    } else {
+        None
+    };
     let allows_named_arguments = reader.read_bool("allows named arguments flag")?;
     let count = reader.read_count("effective callable parameters", MAXIMUM_TYPE_MEMBERS)?;
     let mut parameters = Vec::with_capacity(count);
@@ -2130,7 +2136,7 @@ where
     }
 
     reader.finish()?;
-    Ok(Some(EffectiveCallableSignature { parameters, allows_named_arguments }))
+    Ok(Some(EffectiveCallableSignature { parameters, allows_named_arguments, display_name }))
 }
 
 pub(super) fn decode_assertion_response<'type_info, F>(
@@ -2841,7 +2847,7 @@ fn decode_complete_array(reader: &mut PayloadReader<'_>, depth: usize) -> Result
             };
 
             let non_empty = reader.read_bool("array non-empty flag")?;
-            TArray::Keyed(TKeyedArray { known_items, parameters, non_empty })
+            TArray::Keyed(TKeyedArray { known_items, parameters, non_empty, known_non_list: false })
         }
         unknown => return Err(protocol(format!("unknown complete array kind {unknown}"))),
     })
@@ -3238,6 +3244,8 @@ pub(super) mod testing {
         let request_type = get_literal_string(word(b"value"));
         let mut writer = message_writer(CALLABLE_SIGNATURE_RESPONSE);
         writer.write_bool(true);
+        writer.write_bool(true);
+        writer.write_bytes(b"Demo::run").unwrap();
         writer.write_bool(false);
         writer.write_u32(1);
         writer.write_bool(true);
@@ -3254,6 +3262,7 @@ pub(super) mod testing {
             decode_callable_signature_response(&writer.finish(), |handle| (handle == 0).then_some(&request_type))
                 .unwrap()
                 .unwrap();
+        assert_eq!(signature.display_name.as_ref().map(|name| name.as_bytes()), Some(b"Demo::run".as_slice()));
         assert!(!signature.allows_named_arguments);
         assert_eq!(signature.parameters.len(), 1);
         let parameter = &signature.parameters[0];
@@ -3269,6 +3278,7 @@ pub(super) mod testing {
     fn callable_signature_response_rejects_invalid_parameter_names() {
         let mut writer = message_writer(CALLABLE_SIGNATURE_RESPONSE);
         writer.write_bool(true);
+        writer.write_bool(false);
         writer.write_bool(true);
         writer.write_u32(1);
         writer.write_bool(true);

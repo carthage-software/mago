@@ -142,6 +142,8 @@ pub struct BlockContext<'ctx> {
     /// Zero-argument method calls known to be stable since the last potentially
     /// mutating invocation.
     pub stable_method_calls: WordSet,
+
+    class_type_relations: WordMap<WordSet>,
 }
 
 impl BreakContext {
@@ -232,6 +234,7 @@ impl<'ctx> BlockContext<'ctx> {
             active_method_call_assertions: WordMap::default(),
             stable_method_call_assertions: WordMap::default(),
             stable_method_calls: WordSet::default(),
+            class_type_relations: WordMap::default(),
         };
 
         if register_super_globals {
@@ -458,7 +461,40 @@ impl<'ctx> BlockContext<'ctx> {
     {
         self.clauses = BlockContext::filter_clauses(context, remove_var_id, self.clauses.clone(), new_type);
 
+        self.class_type_relations.retain(|source, targets| {
+            if var_has_root(*source, remove_var_id) {
+                return false;
+            }
+
+            targets.retain(|target| !var_has_root(*target, remove_var_id));
+            !targets.is_empty()
+        });
+
         self.parent_conflicting_clause_variables.insert(remove_var_id);
+    }
+
+    pub(crate) fn add_class_type_relation(&mut self, source: Word, target: Word) {
+        if source != target {
+            self.class_type_relations.entry(source).or_default().insert(target);
+        }
+    }
+
+    pub(crate) fn get_class_type_relation_sources(&self, target: Word) -> WordSet {
+        self.class_type_relations
+            .iter()
+            .filter_map(|(source, targets)| targets.contains(&target).then_some(*source))
+            .collect()
+    }
+
+    pub(crate) fn retain_valid_class_type_relations(&mut self) {
+        self.class_type_relations.retain(|source, targets| {
+            if !self.locals.contains_key(source) {
+                return false;
+            }
+
+            targets.retain(|target| self.locals.contains_key(target));
+            !targets.is_empty()
+        });
     }
 
     pub(crate) fn remove_descendants<'arena, A>(

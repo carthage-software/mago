@@ -1,6 +1,7 @@
 use mago_allocator::Arena;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
-use mago_codex::identifier::method::MethodIdentifier;
+use mago_codex::ttype::atomic::callable::TCallable;
+use mago_codex::ttype::cast::cast_atomic_to_callable;
 use mago_names::kind::NameKind;
 use mago_names::scope::NamespaceScope;
 use mago_reporting::Annotation;
@@ -10,6 +11,7 @@ use mago_syntax::cst::Call;
 use mago_syntax::cst::Expression;
 use mago_syntax::cst::ExpressionStatement;
 use mago_syntax::cst::FunctionCall;
+use mago_syntax::cst::Node;
 use mago_syntax::cst::Statement;
 use mago_word::Word;
 
@@ -26,6 +28,7 @@ use crate::utils::docblock::populate_docblock_variables_excluding;
 use crate::utils::expression::expression_has_observable_side_effect;
 use crate::utils::expression::get_block_expression_id;
 use crate::utils::expression::get_function_like_id_from_call;
+use crate::utils::misc::unwrap_expression;
 
 pub mod attributes;
 pub mod class_like;
@@ -54,6 +57,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Statement<'arena> {
     {
         let last_statement_span = context.statement_span;
         context.statement_span = self.span();
+        artifacts.record_variable_definedness(Node::Statement(self), block_context);
 
         // Call plugin before_statement hooks
         if context.plugin_registry.has_statement_hooks() {
@@ -214,6 +218,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Statement<'arena> {
 
         context.statement_span = last_statement_span;
         block_context.conditionally_referenced_variable_ids.clear();
+
+        artifacts.record_static_local_types(block_context, context.codebase, context.settings.combiner_options());
 
         Ok(())
     }
@@ -412,37 +418,42 @@ fn has_unused_must_use<'arena, A>(
 where
     A: Arena,
 {
-    let Expression::Call(call_expression) = expression else {
+    let Expression::Call(call_expression) = unwrap_expression(expression) else {
         return None;
     };
 
-    let functionlike_id_from_call =
-        get_function_like_id_from_call(call_expression, context.resolved_names, &artifacts.expression_types)?;
+    let check_target = |identifier| {
+        let (code, name) = match identifier {
+            FunctionLikeIdentifier::Function(name) | FunctionLikeIdentifier::Closure(name) => {
+                (IssueCode::UnusedFunctionCall, name)
+            }
+            FunctionLikeIdentifier::Method(_, name) => (IssueCode::UnusedMethodCall, name),
+        };
 
-    match functionlike_id_from_call {
-        FunctionLikeIdentifier::Function(function_id) => {
-            let function_metadata = context.codebase.get_function(function_id.as_bytes())?;
+        let metadata = context.codebase.get_function_like(&identifier)?;
+        let must_use = metadata.flags.must_use()
+            || metadata.attributes.iter().any(|attr| attr.name.as_bytes().eq_ignore_ascii_case(b"NoDiscard"));
 
-            let must_use = function_metadata.flags.must_use()
-                || function_metadata
-                    .attributes
-                    .iter()
-                    .any(|attr| attr.name.as_bytes().eq_ignore_ascii_case(b"NoDiscard"));
+        must_use.then_some((code, name))
+    };
 
-            if must_use { Some((IssueCode::UnusedFunctionCall, function_id)) } else { None }
-        }
-        FunctionLikeIdentifier::Method(method_class, method_name) => {
-            let method_metadata =
-                context.codebase.get_method_by_id(&MethodIdentifier::new(method_class, method_name))?;
-
-            let must_use = method_metadata.flags.must_use()
-                || method_metadata
-                    .attributes
-                    .iter()
-                    .any(|attr| attr.name.as_bytes().eq_ignore_ascii_case(b"NoDiscard"));
-
-            if must_use { Some((IssueCode::UnusedMethodCall, method_name)) } else { None }
-        }
-        FunctionLikeIdentifier::Closure(_) => None,
+    if let Some(identifier) =
+        get_function_like_id_from_call(call_expression, context.resolved_names, &artifacts.expression_types)
+    {
+        return check_target(identifier);
     }
+
+    let Call::Function(FunctionCall { function, .. }) = call_expression else {
+        return None;
+    };
+
+    artifacts.get_expression_type(function)?.types.iter().find_map(|atomic| {
+        let callable = cast_atomic_to_callable(atomic, context.codebase, None)?;
+        let identifier = match callable.as_ref() {
+            TCallable::Alias(identifier) => *identifier,
+            TCallable::Signature(signature) => signature.get_source()?,
+        };
+
+        check_target(identifier)
+    })
 }

@@ -42,23 +42,27 @@ const PCRE_JIT_SUPPORT = 1;
 /**
  * @param-out array<string> $matches
  *
- * @return int|false
+ * @return 0|1|false
  */
 function preg_match(string $pattern, string $subject, &$matches = [], int $flags = 0, int $offset = 0): int|false {}
 
 /**
  * @param-out list<array<string>> $matches
+ *
+ * @return non-negative-int|false
  */
 function preg_match_all(string $pattern, string $subject, &$matches = null, int $flags = 0, int $offset = 0): int|false {}
 
 /**
+ * @template K of array-key
+ *
  * @param string|array<string> $pattern
  * @param string|array<string> $replacement
- * @param string|array<string> $subject
+ * @param string|array<K, string> $subject
  *
- * @param-out int $count
+ * @param-out non-negative-int $count
  *
- * @return ($subject is string ? string|null : array<string>|null)
+ * @return ($subject is string ? string|null : array<K, string>|null)
  *
  * @pure
  */

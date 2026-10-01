@@ -3,6 +3,7 @@ use mago_allocator::CollectIn;
 use mago_allocator::vec::Vec;
 use mago_allocator::vec_in;
 
+use mago_php_version::feature::Feature;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::cst::Array;
@@ -234,7 +235,12 @@ where
 
     f.set_alignment_context(outer_alignment);
 
-    if f.settings.trailing_comma {
+    let trailing_comma = match &array_like {
+        ArrayLike::Array(_) | ArrayLike::LegacyArray(_) => f.settings.trailing_comma,
+        ArrayLike::List(_) => f.trailing_comma_for(Feature::TrailingCommaInListSyntax),
+    };
+
+    if trailing_comma {
         parts.push(Document::IfBreak(IfBreak::then(f.arena, Document::String(b","))));
     }
 

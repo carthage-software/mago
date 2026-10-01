@@ -45,6 +45,7 @@ use mago_reporting::Level;
 
 use crate::commands::args::baseline_reporting::BaselineReportingArgs;
 use crate::commands::args::substitution::SubstitutionArgs;
+use crate::commands::outcome::CommandOutcome;
 use crate::commands::stdin_input;
 use crate::config::Configuration;
 use crate::error::Error;
@@ -84,7 +85,7 @@ use crate::utils::git;
 /// ```text
 /// mago lint --stats
 /// ```
-#[derive(Parser, Debug)]
+#[derive(Parser, Debug, Default)]
 #[command(
     name = "lint",
     about = "Lints PHP source code for style, consistency, and structural errors.",
@@ -222,7 +223,7 @@ impl LintCommand {
     /// - **Explain Mode** (`--explain`): Displays detailed rule documentation and exits
     /// - **List Mode** (`--list-rules`): Shows all enabled rules and exits
     /// - **Empty Database**: Logs a message and exits successfully if no files found
-    pub fn execute(self, mut configuration: Configuration, color_choice: ColorChoice) -> Result<ExitCode, Error> {
+    pub fn execute(self, mut configuration: Configuration, color_choice: ColorChoice) -> Result<CommandOutcome, Error> {
         let trace_enabled = tracing::enabled!(tracing::Level::TRACE);
         let command_start = trace_enabled.then(Instant::now);
 
@@ -251,7 +252,7 @@ impl LintCommand {
             let staged_paths = git::get_staged_file_paths(&configuration.source.workspace)?;
             if staged_paths.is_empty() {
                 tracing::info!("No staged files to lint.");
-                return Ok(ExitCode::SUCCESS);
+                return Ok(ExitCode::SUCCESS.into());
             }
 
             if self.baseline_reporting.reporting.fix {
@@ -304,7 +305,7 @@ impl LintCommand {
                 self.pedantic, // Enable all rules if pedantic is set
             );
 
-            return explain_rule(&registry, &explain_code);
+            return explain_rule(&registry, &explain_code).map(CommandOutcome::from);
         }
 
         if self.list_rules {
@@ -313,13 +314,13 @@ impl LintCommand {
                 self.pedantic, // Enable all rules if pedantic is set
             );
 
-            return list_rules(registry.rules(), self.json);
+            return list_rules(registry.rules(), self.json).map(CommandOutcome::from);
         }
 
         if database.is_empty() {
             tracing::info!("No files found to lint.");
 
-            return Ok(ExitCode::SUCCESS);
+            return Ok(ExitCode::SUCCESS.into());
         }
 
         let lint_run_start = trace_enabled.then(Instant::now);
@@ -342,6 +343,7 @@ impl LintCommand {
         );
 
         let (exit_code, changed_file_ids) = processor.process_issues(&orchestrator, &mut database, issues)?;
+        let outcome = CommandOutcome::with_changes(exit_code, &database, changed_file_ids.iter().copied())?;
         let report_duration = report_start.map(|s| s.elapsed());
 
         if self.staged && !changed_file_ids.is_empty() {
@@ -366,7 +368,7 @@ impl LintCommand {
             tracing::trace!("Lint command finished in {:?}.", start.elapsed());
         }
 
-        Ok(exit_code)
+        Ok(outcome)
     }
 }
 

@@ -1,0 +1,3 @@
+<?php
+
+$message = "{$test::class}";

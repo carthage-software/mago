@@ -722,6 +722,26 @@ impl IncrementalAnalysisService {
             diff
         };
 
+        let aliases_changed = new_file_scans.iter().any(|(file_id, metadata)| {
+            let current: HashSet<_> =
+                metadata.class_like_alias_declarations().map(|(alias, target, _)| (alias, target)).collect();
+            let previous: HashSet<_> = self
+                .file_states
+                .get(file_id)
+                .map(|state| {
+                    state.entry_keys.class_like_aliases.iter().map(|(alias, target, _)| (*alias, *target)).collect()
+                })
+                .unwrap_or_default();
+
+            current != previous
+        }) || self.file_states.iter().any(|(file_id, state)| {
+            !current_file_ids.contains(file_id) && !state.entry_keys.class_like_aliases.is_empty()
+        });
+
+        if aliases_changed {
+            return self.analyze();
+        }
+
         let body_only = diff.get_changed().is_empty() && deleted_count == 0;
 
         if !body_only {
@@ -1329,6 +1349,9 @@ impl IncrementalAnalysisService {
                 let semantics_checker = SemanticsChecker::new(settings.version);
                 let mut analyzer =
                     Analyzer::new(arena, &source_file, &resolved_names, codebase, plugin_registry, settings.clone());
+                if let Some(requirements) = node_analysis_requirements.as_ref() {
+                    analyzer = analyzer.with_node_analysis_requirements(requirements);
+                }
                 if after_file || after_analysis {
                     analyzer = analyzer.with_deferred_pragmas();
                 }
@@ -2651,6 +2674,40 @@ mod tests {
             only_incr.is_empty() && only_full.is_empty(),
             "[{context}] incremental != full.\n  Only in incremental: {only_incr:?}\n  Only in full: {only_full:?}"
         );
+    }
+
+    #[test]
+    fn test_watch_class_alias_target_changes() {
+        let real = concat!(
+            "<?php\n",
+            "class First { public function value(): int { return 1; } }\n",
+            "class Second { public function value(): string { return ''; } }\n",
+        );
+        let alias = "<?php\nclass_alias(First::class, Alias::class);\n";
+        let consumer = concat!(
+            "<?php\n",
+            "function consume(Alias $value): int { return $value->value(); }\n",
+            "consume(new First());\n",
+        );
+
+        let mut db =
+            make_database(vec![("src/Real.php", real), ("src/Alias.php", alias), ("src/Consumer.php", consumer)]);
+        let mut service = make_watch_service(&db);
+        service.analyze().expect("Initial analysis failed.");
+        assert_matches_full(&service, &db, "initial class alias");
+
+        db.update(
+            FileId::new(b"src/Alias.php"),
+            Cow::Owned(b"<?php\nclass_alias(Second::class, Alias::class);\n".to_vec()),
+        );
+        service.update_database(db.read_only());
+        service.analyze_incremental(None).expect("Incremental failed.");
+        assert_matches_full(&service, &db, "changed class alias target");
+
+        db.update(FileId::new(b"src/Alias.php"), Cow::Owned(b"<?php\n".to_vec()));
+        service.update_database(db.read_only());
+        service.analyze_incremental(None).expect("Incremental failed.");
+        assert_matches_full(&service, &db, "removed class alias");
     }
 
     /// Parent changes return type making child's override incompatible.

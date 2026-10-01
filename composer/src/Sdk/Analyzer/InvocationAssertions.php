@@ -11,13 +11,15 @@ use Mago\Sdk\Internal\Analyzer\DefinitionName;
 /**
  * Assertions established by one invocation.
  *
- * Map keys are callable parameter names such as `$actual`. Mago resolves each
- * name to the corresponding argument expression before applying the facts.
+ * Map keys are callable parameter names such as `$actual`. Method providers
+ * may use `InvocationAssertions::RECEIVER` to target the called object.
  *
  * @api
  */
 final class InvocationAssertions
 {
+    public const RECEIVER = '$this';
+
     /**
      * @param array<string, list<Assertion>> $assertions
      * @param array<string, list<Assertion>> $ifTrueAssertions
@@ -42,8 +44,8 @@ final class InvocationAssertions
     /** @param array<string, list<Assertion>> $assertions */
     private static function validate(array $assertions): void
     {
-        foreach ($assertions as $parameter => $facts) {
-            DefinitionName::assertVariable($parameter, 'An invocation assertion parameter name');
+        foreach ($assertions as $target => $facts) {
+            DefinitionName::assertVariable($target, 'An invocation assertion target');
 
             if ($facts === []) {
                 throw new InvalidArgumentException('Invocation assertion facts must be a non-empty list.');

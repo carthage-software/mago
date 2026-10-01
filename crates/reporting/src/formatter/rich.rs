@@ -30,7 +30,7 @@ use crate::Level;
 use crate::error::ReportingError;
 use crate::formatter::Formatter;
 use crate::formatter::FormatterConfig;
-use crate::formatter::utils::osc8_hyperlink;
+use crate::formatter::utils::osc8_file_hyperlink;
 use crate::formatter::utils::utf8_preserving_byte_offsets;
 
 /// Formatter that outputs issues in rich diagnostic format with full context.
@@ -187,7 +187,7 @@ impl<'files> Files<'files> for DatabaseFiles<'_> {
             let line = self.line_hint.get().unwrap_or(1);
             let column = self.column_hint.get().unwrap_or(1);
 
-            Ok(Cow::Owned(osc8_hyperlink(template, &abs_path, line, column, &name)))
+            Ok(Cow::Owned(osc8_file_hyperlink(template, &abs_path, &name, line, column, &name)))
         } else {
             Ok(Cow::Owned(name))
         }
@@ -327,5 +327,43 @@ impl From<&Issue> for Diagnostic<FileId> {
         }
 
         diagnostic
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::borrow::Cow;
+    use std::path::Path;
+    use std::path::PathBuf;
+
+    use codespan_reporting::files::Files;
+    use mago_database::Database;
+    use mago_database::DatabaseConfiguration;
+    use mago_database::file::File;
+    use mago_database::file::FileType;
+
+    use crate::IssueCollection;
+
+    use super::DatabaseFiles;
+
+    #[test]
+    fn editor_url_uses_the_logical_name_for_the_relative_file_placeholder() {
+        let file = File::new(
+            Cow::Borrowed(b"src/Foo.php"),
+            FileType::Host,
+            Some(PathBuf::from("/workspace/src/Foo.php")),
+            Cow::Borrowed(b"<?php\n"),
+        );
+        let file_id = file.id;
+        let configuration =
+            DatabaseConfiguration::new(Path::new("/workspace"), vec![], vec![], vec![], vec![]).into_static();
+        let database = Database::single(file, configuration).read_only();
+        let issues = IssueCollection::new();
+        let files = DatabaseFiles::new(&database, Some("editor://%rel_file%:%line%:%column%"), &issues);
+        let Ok(name) = Files::name(&files, file_id) else {
+            panic!("file should exist");
+        };
+
+        assert_eq!(name, "\x1b]8;;editor://src/Foo.php:1:1\x1b\\src/Foo.php\x1b]8;;\x1b\\",);
     }
 }

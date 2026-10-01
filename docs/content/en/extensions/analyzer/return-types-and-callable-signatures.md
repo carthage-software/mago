@@ -125,13 +125,13 @@ public function getCallableSignature(
     return new EffectiveCallableSignature([
         new CallableParameter(name: '$column', type: Type::string()),
         new CallableParameter(name: '$value', type: Type::mixed()),
-    ]);
+    ], displayName: 'Builder::where');
 }
 ```
 
 At this stage argument expression types are intentionally `null`: template inference, closure typing, argument counting, and validation have not happened yet. Argument source text, names, flags, and spans are available.
 
-`EffectiveCallableSignature` accepts an ordered list of `CallableParameter` values and an `allowsNamedArguments` flag. A parameter can define:
+`EffectiveCallableSignature` accepts an ordered list of `CallableParameter` values, an `allowsNamedArguments` flag, and an optional `displayName`. The display name identifies the logical callable in diagnostics for dynamic APIs backed by magic methods. A parameter can define:
 
 - an optional `$name`;
 - an optional input `type`;

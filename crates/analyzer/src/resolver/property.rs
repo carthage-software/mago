@@ -109,7 +109,7 @@ where
     object_expression.analyze(context, block_context, artifacts)?;
     block_context.flags.set_inside_general_use(was_inside_general_use);
 
-    let selectors = resolve_member_selector(context, block_context, artifacts, property_selector)?;
+    let selectors = resolve_member_selector(context, block_context, artifacts, property_selector, true)?;
 
     let Some(object_type) = artifacts.get_rc_expression_type(object_expression).cloned() else {
         return Ok(result);

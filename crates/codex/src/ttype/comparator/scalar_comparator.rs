@@ -97,6 +97,16 @@ pub fn is_contained_by(
 
             return true;
         }
+        (TAtomic::Scalar(TScalar::String(c)), TAtomic::Scalar(TScalar::ClassLikeString(i))) if c.is_callable => {
+            return i.literal_value().is_some_and(|value| {
+                codebase.function_exists(value.as_bytes())
+                    && match c.casing {
+                        TStringCasing::Lowercase => value.as_bytes().iter().all(|byte| !byte.is_ascii_uppercase()),
+                        TStringCasing::Uppercase => value.as_bytes().iter().all(|byte| !byte.is_ascii_lowercase()),
+                        TStringCasing::Unspecified => true,
+                    }
+            });
+        }
         (TAtomic::Scalar(TScalar::String(c)), TAtomic::Scalar(TScalar::ClassLikeString(_)))
             if !c.is_literal_origin() && !c.is_numeric =>
         {
@@ -190,5 +200,25 @@ mod tests {
         let mut result = ComparisonResult::new();
 
         assert!(!is_contained_by(&codebase, &input, &container, false, &mut result));
+    }
+
+    #[test]
+    fn class_string_is_not_contained_by_callable_string() {
+        let codebase = create_test_codebase("<?php class Foo {}");
+        let input = class_string_literal("Foo");
+        let container = TAtomic::Scalar(TScalar::String(TString::callable()));
+        let mut result = ComparisonResult::new();
+
+        assert!(!is_contained_by(&codebase, &input, &container, false, &mut result));
+    }
+
+    #[test]
+    fn class_string_is_contained_by_callable_string_when_same_named_function_exists() {
+        let codebase = create_test_codebase("<?php class Foo {} function Foo(): void {}");
+        let input = class_string_literal("Foo");
+        let container = TAtomic::Scalar(TScalar::String(TString::callable()));
+        let mut result = ComparisonResult::new();
+
+        assert!(is_contained_by(&codebase, &input, &container, false, &mut result));
     }
 }

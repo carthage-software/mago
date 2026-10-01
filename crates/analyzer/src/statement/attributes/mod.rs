@@ -337,6 +337,7 @@ where
         artifacts,
         &mut invocation,
         Some((metadata.name, None)),
+        None,
         &mut template_result,
         &mut argument_types,
     )?;

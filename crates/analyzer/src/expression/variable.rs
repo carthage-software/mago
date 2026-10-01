@@ -24,6 +24,9 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::expression::assignment;
+use crate::expression::unary::cast_type_to_string;
+use crate::utils::expression::get_block_expression_id;
+use crate::utils::expression::get_variable_id;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Variable<'arena> {
     fn analyze<'ctx, A>(
@@ -73,9 +76,19 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for IndirectVariable<'arena> {
     {
         self.expression.analyze(context, block_context, artifacts)?;
 
-        let resulting_type = match artifacts.get_expression_type(&self.expression) {
-            Some(expression_type) if expression_type.is_single() => {
-                match expression_type.get_single_literal_string_value() {
+        let resulting_type = match artifacts.get_rc_expression_type(&self.expression).cloned() {
+            Some(expression_type) => {
+                let expression_id = get_block_expression_id(self.expression, context, block_context);
+                let name_type = cast_type_to_string(
+                    &expression_type,
+                    expression_id.as_ref().map(|id| id.as_bytes()),
+                    context,
+                    block_context,
+                    artifacts,
+                    self.expression.span(),
+                )?;
+
+                match name_type.get_single_literal_string_value() {
                     Some(value) => {
                         let variable_name = format!("${}", BytesDisplay(value));
 
@@ -105,9 +118,18 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for NestedVariable<'arena> {
     {
         self.variable.analyze(context, block_context, artifacts)?;
 
-        let resulting_type = match artifacts.get_expression_type(&self.variable) {
-            Some(expression_type) if expression_type.is_single() => {
-                match expression_type.get_single_literal_string_value() {
+        let resulting_type = match artifacts.get_rc_expression_type(&self.variable).cloned() {
+            Some(expression_type) => {
+                let name_type = cast_type_to_string(
+                    &expression_type,
+                    get_variable_id(self.variable),
+                    context,
+                    block_context,
+                    artifacts,
+                    self.variable.span(),
+                )?;
+
+                match name_type.get_single_literal_string_value() {
                     Some(value) => {
                         let variable_name = format!("${}", BytesDisplay(value));
 

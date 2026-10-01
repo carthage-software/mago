@@ -57,8 +57,8 @@ pub struct AssertAnnotationTarget<'arena> {
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
 pub enum AssertAnnotationTargetKind<'arena> {
     Variable(DirectVariable<'arena>),
-    Method(DirectVariable<'arena>, Name<'arena>),
-    Property(DirectVariable<'arena>, Name<'arena>),
+    Method(&'arena AssertAnnotationTarget<'arena>, Name<'arena>),
+    Property(&'arena AssertAnnotationTarget<'arena>, Name<'arena>),
 }
 
 #[cfg_attr(feature = "serde", derive(Serialize))]
@@ -147,11 +147,11 @@ impl CopyInto for AssertAnnotationTargetKind<'_> {
             AssertAnnotationTargetKind::Variable(variable) => {
                 AssertAnnotationTargetKind::Variable(variable.copy_into(arena))
             }
-            AssertAnnotationTargetKind::Method(variable, name) => {
-                AssertAnnotationTargetKind::Method(variable.copy_into(arena), name.copy_into(arena))
+            AssertAnnotationTargetKind::Method(object, name) => {
+                AssertAnnotationTargetKind::Method(copy_ref_into(object, arena), name.copy_into(arena))
             }
-            AssertAnnotationTargetKind::Property(variable, name) => {
-                AssertAnnotationTargetKind::Property(variable.copy_into(arena), name.copy_into(arena))
+            AssertAnnotationTargetKind::Property(object, name) => {
+                AssertAnnotationTargetKind::Property(copy_ref_into(object, arena), name.copy_into(arena))
             }
         }
     }

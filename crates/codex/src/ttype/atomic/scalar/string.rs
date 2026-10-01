@@ -359,6 +359,51 @@ impl TString {
         Self { literal: Some(TStringLiteral::Unspecified), ..*self }
     }
 
+    /// Intersects two string types, combining their guaranteed properties.
+    /// Returns `None` if no string can satisfy both, e.g. `lowercase-string & uppercase-string`.
+    #[must_use]
+    pub fn intersect(&self, other: &Self) -> Option<Self> {
+        match (self.get_known_literal_atom(), other.get_known_literal_atom()) {
+            (Some(left), Some(right)) => return (left == right).then_some(*self),
+            (Some(_), None) => return self.satisfies_guarantees_of(other).then_some(*self),
+            (None, Some(_)) => return other.satisfies_guarantees_of(self).then_some(*other),
+            (None, None) => {}
+        }
+
+        let casing = match (self.casing, other.casing) {
+            (TStringCasing::Unspecified, casing) | (casing, TStringCasing::Unspecified) => casing,
+            (left, right) if left == right => left,
+            _ => return None,
+        };
+
+        let literal = if self.is_literal_origin() || other.is_literal_origin() {
+            Some(TStringLiteral::Unspecified)
+        } else {
+            None
+        };
+
+        Some(Self::new(
+            literal,
+            self.is_numeric || other.is_numeric,
+            self.is_truthy || other.is_truthy,
+            self.is_non_empty || other.is_non_empty,
+            self.is_callable || other.is_callable,
+            casing,
+        ))
+    }
+
+    fn satisfies_guarantees_of(&self, other: &Self) -> bool {
+        (!other.is_numeric || self.is_numeric)
+            && (!other.is_truthy || self.is_truthy)
+            && (!other.is_non_empty || self.is_non_empty)
+            && (!other.is_callable || self.is_callable)
+            && match other.casing {
+                TStringCasing::Unspecified => true,
+                TStringCasing::Lowercase => self.is_lowercase(),
+                TStringCasing::Uppercase => self.is_uppercase(),
+            }
+    }
+
     #[must_use]
     pub fn as_numeric(&self, retain_literal: bool) -> Self {
         Self {

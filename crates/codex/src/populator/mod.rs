@@ -59,10 +59,16 @@ pub fn populate_codebase_targeted(
 fn populate_codebase_inner(
     codebase: &mut CodebaseMetadata,
     symbol_references: &mut SymbolReferences,
-    safe_symbols: WordSet,
-    safe_symbol_members: HashSet<SymbolIdentifier>,
-    dirty_symbols: Option<HashSet<SymbolIdentifier>>,
+    mut safe_symbols: WordSet,
+    mut safe_symbol_members: HashSet<SymbolIdentifier>,
+    mut dirty_symbols: Option<HashSet<SymbolIdentifier>>,
 ) {
+    if codebase.populate_class_like_aliases() {
+        safe_symbols.clear();
+        safe_symbol_members.clear();
+        dirty_symbols = None;
+    }
+
     let mut class_likes_to_repopulate = WordSet::default();
     if let Some(dirty) = &dirty_symbols {
         let mut dirty_class_names = WordSet::default();

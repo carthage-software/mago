@@ -2,6 +2,7 @@ use mago_allocator::Arena;
 use mago_allocator::vec::Vec;
 use mago_allocator::vec_in;
 
+use mago_php_version::feature::Feature;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::cst::Attribute;
@@ -562,7 +563,6 @@ where
                         statement::sort_use_items(self.items.iter()).into_iter().map(|i| i.format(f)),
                         Separator::CommaLine,
                     )),
-                    Document::Line(Line::soft()),
                 ]))
             } else {
                 Document::Group(Group::new(vec_in![f.arena;
@@ -571,7 +571,6 @@ where
                         self.items.iter().map(|i| i.format(f)),
                         Separator::CommaLine,
                     )),
-                    Document::Line(Line::soft()),
                 ]))
             }
         })
@@ -1204,6 +1203,32 @@ where
     }
 }
 
+/// Returns the document that terminates a statement whose member access chain received
+/// the dangling-semicolon treatment (`method_chain_semicolon_on_next_line`).
+///
+/// A closing-tag terminator must survive the replacement: dropping it would turn any
+/// inline HTML following the statement into PHP code.
+fn member_chain_dangling_semicolon<'arena, A>(
+    f: &mut FormatterState<'_, 'arena, A>,
+    terminator: &'arena Terminator<'arena>,
+) -> Document<'arena, A>
+where
+    A: Arena,
+{
+    match terminator {
+        Terminator::ClosingTag(closing_tag) => Document::Array(vec_in![f.arena;
+            Document::Line(Line::hard()),
+            Document::String(b";"),
+            Document::Line(Line::hard()),
+            closing_tag.format(f),
+        ]),
+        _ => Document::Array(vec_in![f.arena;
+            Document::Line(Line::hard()),
+            Document::String(b";"),
+        ]),
+    }
+}
+
 impl<'arena, A> Format<'arena, A> for ExpressionStatement<'arena>
 where
     A: Arena,
@@ -1215,12 +1240,14 @@ where
             if let Some(chain_group_id) = f.take_member_access_chain_group_id()
                 && f.settings.method_chain_semicolon_on_next_line
             {
+                let semicolon = member_chain_dangling_semicolon(f, &self.terminator);
+
                 Document::Array(vec_in![f.arena;
                     expression,
                     Document::IfBreak(
                         IfBreak::new(
                             f.arena,
-                            Document::Array(vec_in![f.arena; Document::Line(Line::hard()), Document::String(b";")]),
+                            semicolon,
                             terminator,
                         )
                         .with_id(chain_group_id),
@@ -1439,14 +1466,8 @@ where
             if let Some(chain_group_id) = f.take_member_access_chain_group_id()
                 && f.settings.method_chain_semicolon_on_next_line
             {
-                contents.push(Document::IfBreak(
-                    IfBreak::new(
-                        f.arena,
-                        Document::Array(vec_in![f.arena; Document::Line(Line::hard()), Document::String(b";")]),
-                        terminator,
-                    )
-                    .with_id(chain_group_id),
-                ));
+                let semicolon = member_chain_dangling_semicolon(f, &self.terminator);
+                contents.push(Document::IfBreak(IfBreak::new(f.arena, semicolon, terminator).with_id(chain_group_id)));
 
                 Document::Group(Group::new(contents).with_id(chain_group_id))
             } else {
@@ -1481,15 +1502,23 @@ where
                     .with_id(values_group_id),
             );
 
-            Document::Group(Group::new(vec_in![f.arena;
+            let mut contents = vec_in![f.arena;
                 echo_keyword,
                 Document::IndentIfBreak(IndentIfBreak::new(values_group_id, vec_in![f.arena;
                     Document::Line(Line::default()),
                     values_group
                 ])),
-                Document::Line(Line::soft()),
-                self.terminator.format(f),
-            ]))
+            ];
+
+            // A closing tag terminates the statement *and* leaves PHP mode, so it reads as the end
+            // of the block and gets its own line; a semicolon belongs to the last value.
+            if !matches!(self.terminator, Terminator::Semicolon(_)) {
+                contents.push(Document::Line(Line::soft()));
+            }
+
+            contents.push(self.terminator.format(f));
+
+            Document::Group(Group::new(contents))
         })
     }
 }
@@ -2190,7 +2219,8 @@ where
             if !self.values.is_empty() {
                 let mut values = Document::join(f.arena, self.values.iter().map(|v| v.format(f)), Separator::CommaLine);
 
-                if f.settings.trailing_comma {
+                // `unset()` accepts a trailing comma since the same version as function calls (7.3)
+                if f.trailing_comma_for(Feature::TrailingCommaInFunctionCalls) {
                     values.push(Document::IfBreak(IfBreak::then(f.arena, Document::String(b","))));
                 }
 

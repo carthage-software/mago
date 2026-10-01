@@ -117,7 +117,7 @@ impl LintRule for ArrayStyleRule {
                     }
                 });
             }
-            Node::Array(arr) if ArrayStyleOption::Long == self.cfg.style => {
+            Node::Array(arr) if ArrayStyleOption::Long == self.cfg.style && !is_destructuring_target(ctx) => {
                 let issue = Issue::new(self.cfg.level(), "Long array style `array(..)` is preferred over `[..]`.")
                     .with_code(self.meta.code)
                     .with_annotation(
@@ -132,5 +132,84 @@ impl LintRule for ArrayStyleRule {
             }
             _ => {}
         }
+    }
+}
+
+/// Whether the current `[..]` is the target of a destructuring assignment or a `foreach` value,
+/// directly or nested inside another one: `[$a, [$b]] = $c;`, `list([$a]) = $c;`, `foreach ($x as [$a, $b])`.
+///
+/// There, `[..]` is a short list, not an array, and `array(..)` would not parse; the long
+/// form is `list(..)`, which this rule does not enforce.
+fn is_destructuring_target<A>(ctx: &LintContext<'_, '_, A>) -> bool
+where
+    A: Arena,
+{
+    let mut child_span = None;
+    let mut depth = 0;
+    while let Some(parent) = ctx.get_nth_parent(depth) {
+        match parent {
+            Node::Expression(_)
+            | Node::Array(_)
+            | Node::ArrayElement(_)
+            | Node::ValueArrayElement(_)
+            | Node::KeyValueArrayElement(_) => {
+                child_span = Some(parent.span());
+                depth += 1;
+            }
+            Node::Assignment(assignment) => {
+                return child_span.is_some_and(|span| assignment.lhs.span() == span);
+            }
+            Node::List(_) | Node::ForeachValueTarget(_) | Node::ForeachKeyValueTarget(_) => return true,
+            _ => return false,
+        }
+    }
+
+    false
+}
+
+#[cfg(test)]
+mod tests {
+    use indoc::indoc;
+
+    use super::ArrayStyleOption;
+    use super::ArrayStyleRule;
+    use crate::test_lint_failure;
+    use crate::test_lint_success;
+
+    test_lint_success! {
+        name = long_style_skips_destructuring_targets,
+        rule = ArrayStyleRule,
+        settings = |s: &mut crate::settings::Settings| {
+            s.rules.array_style.config.style = ArrayStyleOption::Long;
+        },
+        code = indoc! {r"
+            <?php
+
+            [$a, $b] = $pair;
+            [$c, [$d, $e]] = $nested;
+            ['x' => $f, 'y' => $g] = $point;
+            foreach ($pairs as [$h, $i]) {}
+            foreach ($pairs as $key => [$j, $k]) {}
+            list([$m, $n]) = $nested;
+            foreach ($pairs as list([$o])) {}
+            $l = array(1, 2);
+        "}
+    }
+
+    test_lint_failure! {
+        name = long_style_flags_arrays_next_to_destructuring,
+        rule = ArrayStyleRule,
+        count = 5,
+        settings = |s: &mut crate::settings::Settings| {
+            s.rules.array_style.config.style = ArrayStyleOption::Long;
+        },
+        code = indoc! {r"
+            <?php
+
+            $a = [1, 2];
+            [$b, $c] = [3, 4];
+            [$d] = [[5]];
+            $e[[6][0]] = 7;
+        "}
     }
 }

@@ -30,6 +30,22 @@ fn splitn_whitespace_2(s: &[u8]) -> (&[u8], &[u8]) {
     }
 }
 
+fn split_codes_and_description(s: &[u8]) -> (&[u8], &[u8]) {
+    let mut cursor = 0;
+    while let Some(offset) = s[cursor..].iter().position(|byte| byte.is_ascii_whitespace()) {
+        let end = cursor + offset;
+        let rest = s[end..].trim_ascii_start();
+        if matches!(s[..end].last(), Some(b',' | b':')) || rest.starts_with(b",") {
+            cursor = s.len() - rest.len();
+            continue;
+        }
+
+        return (&s[..end], rest);
+    }
+
+    (s, &[])
+}
+
 #[inline]
 fn contains_ascii_whitespace(s: &[u8]) -> bool {
     s.iter().any(|b| b.is_ascii_whitespace())
@@ -67,7 +83,7 @@ pub struct Pragma<'arena> {
     pub category: &'arena str,
     /// The code specification.
     pub code: &'arena str,
-    /// The span of the code (including any `(N)` count suffix) within the pragma.
+    /// The span of the code, including any category prefix and `(N)` count suffix.
     pub code_span: Span,
     /// The span of the parenthesized count suffix, if present (e.g., `(3)`).
     pub count_span: Option<Span>,
@@ -259,7 +275,7 @@ where
 
         let rest = rest.trim_ascii_start();
 
-        let (codes_part, after_codes) = splitn_whitespace_2(rest);
+        let (codes_part, after_codes) = split_codes_and_description(rest);
         if codes_part.is_empty() {
             continue; // Malformed pragma, no code.
         }
@@ -301,14 +317,24 @@ where
             // Trimmed code's start offset inside codes_part = chunk start + leading whitespace count.
             let code_start_in_codes_part = chunk_start + (raw_chunk.len() - raw_chunk.trim_ascii_start().len());
             let code_start_offset = codes_start_offset + code_start_in_codes_part as u32;
-            let code_span = Span::new(file.id, code_start_offset, code_start_offset + code.len() as u32);
+            let entry_start_offset = if chunk_start == 0 {
+                absolute_line_start + (category_bytes.as_ptr() as usize - line.as_ptr() as usize) as u32
+            } else {
+                code_start_offset
+            };
+
+            let code_span = Span::new(file.id, entry_start_offset, code_start_offset + code.len() as u32);
+            let code = code
+                .split_once(':')
+                .filter(|(category, _)| categories.contains(category))
+                .map_or(code, |(_, code)| code.trim_ascii_start());
 
             // Parse an optional `(N)` count suffix. `code(3)` means "suppress up to 3 issues".
             // A missing or malformed suffix defaults to 1.
             let (base_code, expected_matches, count_span) = match parse_count_suffix(code) {
                 Some((base, count, count_start_in_code)) => {
-                    let count_start = code_start_offset + count_start_in_code as u32;
-                    let count_end = code_start_offset + code.len() as u32;
+                    let count_start = code_span.end - (code.len() - count_start_in_code) as u32;
+                    let count_end = code_span.end;
                     (base, count, Some(Span::new(file.id, count_start, count_end)))
                 }
                 None => (code, 1u16, None),

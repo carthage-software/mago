@@ -12,6 +12,7 @@ use mago_syntax::cst::Modifier;
 
 use crate::internal::checker::MAGIC_METHOD_SEMANTICS;
 use crate::internal::checker::function_like::check_for_promoted_properties_outside_constructor;
+use crate::internal::checker::function_like::check_parameter_list_trailing_comma;
 use crate::internal::checker::returns_generator;
 use crate::internal::context::Context;
 
@@ -26,6 +27,8 @@ pub fn check_method<'ast, 'arena>(
     class_like_is_interface: bool,
     context: &mut Context<'_, 'ast, 'arena>,
 ) {
+    check_parameter_list_trailing_comma(&method.parameter_list, context);
+
     let method_name_bytes = method_name;
     let method_name = BytesDisplay(method_name);
     let class_like_name = BytesDisplay(class_like_name);

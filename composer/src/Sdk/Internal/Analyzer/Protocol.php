@@ -34,6 +34,7 @@ use Mago\Sdk\Analyzer\Type;
 use Mago\Sdk\Analyzer\Type\FunctionLikeIdentifier;
 use Mago\Sdk\Analyzer\TypeComparison;
 use Mago\Sdk\Analyzer\UndeclaredReturnTypeProvider;
+use Mago\Sdk\Analyzer\VariableDefinedness;
 use Mago\Sdk\CancellationTokenInterface;
 use Mago\Sdk\Exception\ProtocolException;
 use Mago\Sdk\Extension;
@@ -52,6 +53,7 @@ use Mago\Sdk\Span;
 use Mago\Sdk\Syntax\NodeKind;
 use Mago\Sdk\Syntax\SourceFile;
 
+use function array_key_exists;
 use function count;
 use function intdiv;
 use function is_string;
@@ -142,7 +144,7 @@ final class Protocol
     private const TYPE_COMPARISON_BATCH_REQUEST = 16;
     private const MAGIC_U32 = 0x4D41_4E41;
     private const MAJOR = 1;
-    private const MINOR = 0;
+    private const MINOR = 1;
     private const VERSION_U32 = (self::MAJOR << 16) | self::MINOR;
     private const DESCRIBE_RESPONSE = 0x8001;
     private const RETURN_TYPE_RESPONSE = 0x8002;
@@ -428,6 +430,7 @@ final class Protocol
                 FileAnalysisRequirement::ArgumentTypes => 3,
                 FileAnalysisRequirement::TargetSubtree => 4,
                 FileAnalysisRequirement::SourceText => 5,
+                FileAnalysisRequirement::VariableDefinedness => 6,
             };
         }
 
@@ -918,6 +921,30 @@ final class Protocol
                         $argumentTypes[] = self::readOptionalType($reader);
                     }
                 }
+                $variableDefinedness = null;
+                if (($requirements & (1 << 6)) !== 0 && $reader->readBoolean()) {
+                    $variableDefinedness = [];
+                    $variableCount = $reader->readCount(1_000_000);
+                    for ($variableIndex = 0; $variableIndex < $variableCount; ++$variableIndex) {
+                        $variable = $reader->readBytes();
+                        if ($variable === '' || $variable[0] !== '$') {
+                            throw new ProtocolException(
+                                'A variable-definedness record contains an invalid variable name.',
+                            );
+                        }
+                        if (array_key_exists($variable, $variableDefinedness)) {
+                            throw new ProtocolException("A variable-definedness snapshot repeats `{$variable}`.");
+                        }
+
+                        $variableDefinedness[$variable] = match ($reader->readU8()) {
+                            1 => VariableDefinedness::Defined,
+                            2 => VariableDefinedness::PossiblyDefined,
+                            default => throw new ProtocolException(
+                                'A variable-definedness record has an unknown state.',
+                            ),
+                        };
+                    }
+                }
                 $targetedHookIndices = [];
                 $routeCount = $reader->readCount(1_000_000);
                 for ($routeIndex = 0; $routeIndex < $routeCount; ++$routeIndex) {
@@ -930,6 +957,7 @@ final class Protocol
                     $targetType,
                     $receiverType,
                     $argumentTypes,
+                    $variableDefinedness,
                     $targetedHookIndices,
                 );
             }
@@ -1077,6 +1105,7 @@ final class Protocol
 
         $writer = self::createMessage(self::CALLABLE_SIGNATURE_RESPONSE);
         $writer->writeBoolean(true);
+        $writer->writeOptionalString($signature->displayName);
         $writer->writeBoolean($signature->allowsNamedArguments);
         $writer->writeCount($signature->parameters);
         foreach ($signature->parameters as $parameter) {

@@ -37,7 +37,7 @@ use serde::Deserialize;
 mod common;
 
 const FILE_COUNT: usize = AFTER_FILE_ANALYSIS_BATCH_SIZE + 1;
-const NODE_CALL_COUNT: usize = 10;
+const NODE_TARGET_COUNT: usize = 12;
 const PLUGINS: [&str; 2] = ["lifecycle-one", "lifecycle-two"];
 
 #[derive(Debug, Deserialize)]
@@ -68,7 +68,18 @@ fn make_database(
  */
 function lifecycle_assertions(mixed $value, mixed $text, mixed $fallback): bool { return true; }
 
-function extension_consumer(LifecycleClass0 $provided): int {
+function extension_consumer(
+    LifecycleClass0 $provided,
+    bool $condition,
+    mixed $definedBeforeLoop,
+): int {
+    if ($condition) {
+        $possiblyDefinedBeforeLoop = null;
+    }
+
+    foreach ([1] as $definedBeforeLoop) {}
+    for ($undefinedBeforeLoop = 0; $undefinedBeforeLoop < 1; ++$undefinedBeforeLoop) {}
+
     return $provided->answer() + $provided->unrelated() + extension_answer(0) + EXTENSION_ANSWER;
 }
 
@@ -178,7 +189,7 @@ fn assert_initial_audit(entries: &[AuditEntry]) {
     assert_eq!(entries.iter().filter(|entry| entry.1 == "initialize").count(), PLUGINS.len() * 3);
     assert_eq!(entries.iter().filter(|entry| entry.1 == "before").count(), PLUGINS.len());
     assert_eq!(entries.iter().filter(|entry| entry.1 == "after-file").count(), FILE_COUNT * PLUGINS.len());
-    assert_eq!(entries.iter().filter(|entry| entry.1 == "node").count(), PLUGINS.len() * NODE_CALL_COUNT);
+    assert_eq!(entries.iter().filter(|entry| entry.1 == "node").count(), PLUGINS.len() * NODE_TARGET_COUNT);
     assert_eq!(entries.iter().filter(|entry| entry.1 == "method-call").count(), PLUGINS.len());
     assert_eq!(entries.iter().filter(|entry| entry.1 == "class-like").count(), PLUGINS.len());
     assert_eq!(entries.iter().filter(|entry| entry.1 == "after").count(), PLUGINS.len());
@@ -276,7 +287,7 @@ fn external_analyzer_lifecycle_is_exact_across_workers_and_incremental_runs() {
     );
 
     let initial_audit = read_audit(&audit_log);
-    assert_eq!(initial_audit.len(), PLUGINS.len() * (7 + NODE_CALL_COUNT + FILE_COUNT));
+    assert_eq!(initial_audit.len(), PLUGINS.len() * (7 + NODE_TARGET_COUNT + FILE_COUNT));
     assert_initial_audit(&initial_audit);
 
     let (updated_database, changed_file) = make_database(Some(5), true, true, &initialization_sources);

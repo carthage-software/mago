@@ -47,15 +47,18 @@ function d()
         Iter\search(
             $infos,
             static fn(ProductCommercialPropertyInfo $existing): bool => (
-                $existing->getSubLocation()->getLocation()->getUuid()->equals($location->getUuid()) && $existing->getSubLocation()->getNumber() === $subLocationNumber
+                $existing->getSubLocation()->getLocation()->getUuid()->equals($location->getUuid())
+                && $existing->getSubLocation()->getNumber() === $subLocationNumber
             ),
-        ) ?? Iter\search(
+        )
+        ?? Iter\search(
             $infos,
             static fn(ProductCommercialPropertyInfo $existing): bool => (
                 $existing->getSubLocation()->getLocation()->getNumber() === $location->getNumber()
                 && $existing->getSubLocation()->getNumber() === $subLocationNumber
             ),
-        ) ?? null
+        )
+        ?? null
     );
 }
 

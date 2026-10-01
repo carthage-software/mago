@@ -137,7 +137,12 @@ where
         return true;
     }
 
-    if let Expression::Access(_) = expression {
+    if let Expression::Access(access) = expression {
+        // A class constant cannot break, so hugging it would keep the argument list from ever breaking.
+        if let Access::ClassConstant(_) = access {
+            return false;
+        }
+
         return collect_member_access_chain(f.arena, expression).is_none_or(|chain| !chain.is_eligible_for_chaining(f));
     }
 

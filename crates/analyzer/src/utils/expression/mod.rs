@@ -7,6 +7,7 @@ use mago_allocator::Arena;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::union::TUnion;
 use mago_names::ResolvedNames;
@@ -28,14 +29,36 @@ use mago_syntax::cst::UnaryPrefixOperator;
 use mago_syntax::cst::Variable;
 use mago_word::Word;
 use mago_word::concat_word;
+use mago_word::empty_word;
 use mago_word::word;
 
+use crate::artifacts::AnalysisArtifacts;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::utils::misc::unwrap_expression;
 
 pub mod array;
 pub mod variable;
+
+pub(crate) fn get_literal_array_key(expression: &Expression<'_>, artifacts: &AnalysisArtifacts) -> Option<ArrayKey> {
+    let key_type = artifacts.get_expression_type(expression)?;
+
+    Some(if key_type.is_null() {
+        ArrayKey::String(empty_word())
+    } else if key_type.is_true() {
+        ArrayKey::Integer(1)
+    } else if key_type.is_false() {
+        ArrayKey::Integer(0)
+    } else if let Some(value) = key_type.get_single_literal_float_value() {
+        ArrayKey::Integer(value.trunc() as i64)
+    } else if let Some(value) = key_type.get_single_literal_int_value() {
+        ArrayKey::Integer(value)
+    } else if let Some(value) = key_type.get_single_literal_string_value() {
+        ArrayKey::from_string(word(value))
+    } else {
+        return key_type.get_single_class_string_value().map(ArrayKey::String);
+    })
+}
 
 /// Checks if an expression has observable side effects.
 ///

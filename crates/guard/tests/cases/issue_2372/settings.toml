@@ -1,0 +1,22 @@
+[perimeter.layers]
+inner = ['App\{Foo,Bar}\**']
+
+[[perimeter.rules]]
+namespace = 'App\LayerConsumer\'
+permit = ['@layer:inner']
+
+[[perimeter.rules]]
+namespace = 'App\PermitConsumer\'
+permit = ['App\{Foo,Bar}\Thing']
+
+[[perimeter.rules]]
+namespace = 'App\TypedPermitConsumer\'
+permit = [{ path = 'App\{Foo,Bar}\', kinds = ['class-like'] }]
+
+[[perimeter.rules]]
+namespace = 'App\RestrictedConsumer\'
+permit = ['@all']
+
+[[perimeter.restrictions]]
+dependency = 'App\{Foo,Bar}\Thing'
+deny-from = ['App\RestrictedConsumer\']

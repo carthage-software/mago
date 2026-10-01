@@ -179,7 +179,7 @@ where
     object.analyze(context, block_context, artifacts)?;
     block_context.flags.set_inside_general_use(was_inside_general_use);
 
-    let resolved_selectors = resolve_member_selector(context, block_context, artifacts, selector)?;
+    let resolved_selectors = resolve_member_selector(context, block_context, artifacts, selector, false)?;
     let mut method_names = Vec::new();
 
     for resolved_selector in resolved_selectors {

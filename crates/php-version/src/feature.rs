@@ -90,6 +90,7 @@ pub enum Feature {
     TrailingCommaInListSyntax,
     TrailingCommaInFunctionCalls,
     TrailingCommaInClosureUseList,
+    TrailingCommaInParameterList,
     NewInInitializers,
     ConstantAttributes,
     CallStaticMethodOnTrait,

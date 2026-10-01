@@ -96,6 +96,7 @@ fn unwrap_closure_return_array(array: &TArray, context: &ProviderContext<'_, '_,
                     }),
                     non_empty: keyed.non_empty,
                     known_items: Some(new_items),
+                    known_non_list: keyed.known_non_list,
                 }))));
             }
 
@@ -106,6 +107,7 @@ fn unwrap_closure_return_array(array: &TArray, context: &ProviderContext<'_, '_,
                 parameters: Some((Arc::new(key_type), Arc::new(inner))),
                 non_empty: keyed.non_empty,
                 known_items: None,
+                known_non_list: keyed.known_non_list,
             }))))
         }
     }

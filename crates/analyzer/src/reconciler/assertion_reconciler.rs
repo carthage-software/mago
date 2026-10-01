@@ -11,6 +11,8 @@ use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
 use mago_codex::ttype::atomic::array::list::TList;
+use mago_codex::ttype::atomic::derived::TDerived;
+use mago_codex::ttype::atomic::derived::intersection::TDerivedIntersection;
 use mago_codex::ttype::atomic::generic::TGenericParameter;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::object::r#enum::TEnum;
@@ -22,6 +24,8 @@ use mago_codex::ttype::atomic::scalar::float::TFloat;
 use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::atomic::scalar::string::TString;
 use mago_codex::ttype::atomic::scalar::string::TStringLiteral;
+use mago_codex::ttype::cast::can_atomic_be_callable;
+use mago_codex::ttype::cast::cast_atomic_to_callable;
 use mago_codex::ttype::combiner;
 use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::comparator::ComparisonResult;
@@ -30,6 +34,7 @@ use mago_codex::ttype::comparator::atomic_comparator::is_contained_by;
 use mago_codex::ttype::expander;
 use mago_codex::ttype::expander::TypeExpansionOptions;
 use mago_codex::ttype::get_mixed;
+use mago_codex::ttype::get_mixed_callable;
 use mago_codex::ttype::get_mixed_maybe_from_loop;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::get_undefined_null;
@@ -203,6 +208,7 @@ where
                 known_items: Some(new_known_items),
                 parameters: existing_keyed_array.parameters.clone(),
                 non_empty: has_non_optional || existing_keyed_array.non_empty || *new_type_non_empty,
+                known_non_list: existing_keyed_array.known_non_list,
             })));
         }
 
@@ -371,20 +377,12 @@ where
         return Some(second_type.clone());
     }
 
-    if matches!(second_type, TAtomic::Callable(_)) && first_type.can_be_callable() {
-        if let TAtomic::Scalar(TScalar::String(string)) = first_type {
-            return Some(TAtomic::Scalar(TScalar::String(string.as_callable())));
-        }
-
-        return Some(first_type.clone());
+    if matches!(second_type, TAtomic::Callable(_)) {
+        return intersect_atomic_with_callable(context, first_type);
     }
 
-    if matches!(first_type, TAtomic::Callable(_)) && second_type.can_be_callable() {
-        if let TAtomic::Scalar(TScalar::String(string)) = second_type {
-            return Some(TAtomic::Scalar(TScalar::String(string.as_callable())));
-        }
-
-        return Some(second_type.clone());
+    if matches!(first_type, TAtomic::Callable(_)) {
+        return intersect_atomic_with_callable(context, second_type);
     }
 
     match (first_type, second_type) {
@@ -493,6 +491,36 @@ where
     None
 }
 
+fn intersect_atomic_with_callable<A>(context: &Context<'_, '_, A>, atomic: &TAtomic) -> Option<TAtomic>
+where
+    A: Arena,
+{
+    if let TAtomic::Scalar(TScalar::String(string)) = atomic {
+        return Some(TAtomic::Scalar(TScalar::String(string.as_callable())));
+    }
+
+    if cast_atomic_to_callable(atomic, context.codebase, None).is_some() {
+        return Some(atomic.clone());
+    }
+
+    if !can_atomic_be_callable(atomic, context.codebase) {
+        return None;
+    }
+
+    let callable = get_mixed_callable().get_single().clone();
+    let mut intersected = atomic.clone();
+    if intersected.can_be_intersected() {
+        let _ = intersected.add_intersection_type(callable);
+
+        return Some(intersected);
+    }
+
+    let mut intersection = TDerivedIntersection::new(TUnion::from_atomic(intersected));
+    intersection.add_intersection_type(callable);
+
+    Some(TAtomic::Derived(TDerived::Intersection(intersection)))
+}
+
 fn intersect_list_arrays<A>(
     context: &mut Context<'_, '_, A>,
     first_list: &TList,
@@ -591,6 +619,7 @@ fn intersect_keyed_arrays<A>(
 where
     A: Arena,
 {
+    let known_non_list = first_keyed_array.known_non_list || second_keyed_array.known_non_list;
     let parameters = match (&first_keyed_array.parameters, &second_keyed_array.parameters) {
         (Some(first_parameters), Some(second_parameters)) => {
             let key = intersect_union_with_union(context, &first_parameters.0, &second_parameters.0);
@@ -632,6 +661,7 @@ where
                 known_items: Some(intersected_items),
                 parameters,
                 non_empty: true,
+                known_non_list,
             })))
         }
         (None, Some(second_known_items)) => {
@@ -649,6 +679,7 @@ where
                 known_items: Some(second_known_items),
                 parameters,
                 non_empty: true,
+                known_non_list,
             })))
         }
         (Some(first_known_items), None) => {
@@ -666,9 +697,15 @@ where
                 known_items: Some(first_known_items),
                 parameters,
                 non_empty: true,
+                known_non_list,
             })))
         }
-        _ => Some(TAtomic::Array(TArray::Keyed(TKeyedArray { known_items: None, parameters, non_empty: true }))),
+        _ => Some(TAtomic::Array(TArray::Keyed(TKeyedArray {
+            known_items: None,
+            parameters,
+            non_empty: true,
+            known_non_list,
+        }))),
     }
 }
 

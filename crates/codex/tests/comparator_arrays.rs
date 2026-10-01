@@ -117,6 +117,51 @@ fn keyed_disjoint_values() {
 }
 
 #[test]
+fn keyed_array_with_union_value_in_union_of_arrays() {
+    assert_subtype(
+        &u(t_keyed_unsealed(u(t_array_key()), u_many(vec![t_int(), t_string()]), false)),
+        &u_many(vec![
+            t_keyed_unsealed(u(t_array_key()), u(t_int()), false),
+            t_keyed_unsealed(u(t_array_key()), u(t_string()), false),
+        ]),
+    );
+}
+
+#[test]
+fn keyed_array_union_keeps_key_value_pairs() {
+    assert_not_subtype(
+        &u(t_keyed_unsealed(u(t_array_key()), u_many(vec![t_int(), t_string()]), false)),
+        &u_many(vec![
+            t_keyed_unsealed(u(t_int()), u(t_int()), false),
+            t_keyed_unsealed(u(t_string()), u(t_string()), false),
+        ]),
+    );
+}
+
+#[test]
+fn keyed_array_union_keeps_sealed_shape_pairs() {
+    assert_not_subtype(
+        &u(t_keyed_sealed(
+            BTreeMap::from([
+                (ak_str("kind"), (false, u_many(vec![t_lit_string("a"), t_lit_string("b")]))),
+                (ak_str("value"), (false, u_many(vec![t_int(), t_string()]))),
+            ]),
+            false,
+        )),
+        &u_many(vec![
+            t_keyed_sealed(
+                BTreeMap::from([(ak_str("kind"), (false, us("a"))), (ak_str("value"), (false, u(t_int())))]),
+                false,
+            ),
+            t_keyed_sealed(
+                BTreeMap::from([(ak_str("kind"), (false, us("b"))), (ak_str("value"), (false, u(t_string())))]),
+                false,
+            ),
+        ]),
+    );
+}
+
+#[test]
 fn list_in_array_with_int_keys() {
     assert_atomic_subtype(&t_list(u(t_int()), false), &t_keyed_unsealed(u(t_int()), u(t_int()), false));
 }

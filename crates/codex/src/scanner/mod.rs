@@ -7,7 +7,7 @@ use mago_php_version::PHPVersion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
-use mago_syntax::comments::docblock::get_docblock_for_node;
+use mago_syntax::comments::docblock::get_docblock_before_position;
 use mago_syntax::cst::AnonymousClass;
 use mago_syntax::cst::ArrowFunction;
 use mago_syntax::cst::Call;
@@ -24,6 +24,7 @@ use mago_syntax::cst::Interface;
 use mago_syntax::cst::Method;
 use mago_syntax::cst::Namespace;
 use mago_syntax::cst::Program;
+use mago_syntax::cst::Return;
 use mago_syntax::cst::Trait;
 use mago_syntax::cst::Trivia;
 use mago_syntax::cst::UnaryPrefix;
@@ -47,6 +48,7 @@ use crate::metadata::CodebaseMetadata;
 use crate::metadata::flags::MetadataFlags;
 use crate::metadata::function_like::FunctionLikeKind;
 use crate::metadata::function_like::FunctionLikeMetadata;
+use crate::scanner::class_alias::scan_class_like_alias;
 use crate::scanner::class_like::register_anonymous_class;
 use crate::scanner::class_like::register_class;
 use crate::scanner::class_like::register_enum;
@@ -66,6 +68,7 @@ mod assertion_inference;
 mod attribute;
 use crate::issue::ScanningIssueKind;
 use crate::ttype::error::TypeError;
+mod class_alias;
 mod class_like;
 mod class_like_constant;
 mod constant;
@@ -140,7 +143,22 @@ where
     }
 
     pub fn get_docblock(&self, node: impl HasSpan) -> Option<&'arena Trivia<'arena>> {
-        get_docblock_for_node(self.program, node)
+        self.get_docblock_before(node.span().start.offset)
+    }
+
+    pub fn get_docblock_before(&self, start_offset: u32) -> Option<&'arena Trivia<'arena>> {
+        get_docblock_before_position(self.program.trivia.as_slice(), start_offset)
+    }
+
+    pub fn get_docblock_in_range(&self, start_offset: u32, end_offset: u32) -> Option<&'arena Trivia<'arena>> {
+        let trivia = self.program.trivia.as_slice();
+        let end = trivia.partition_point(|trivia| trivia.span.start.offset < end_offset);
+
+        trivia[..end]
+            .iter()
+            .rev()
+            .take_while(|trivia| trivia.span.start.offset >= start_offset)
+            .find(|trivia| trivia.kind.is_docblock())
     }
 }
 
@@ -157,6 +175,7 @@ struct Scanner {
     file_type_aliases: WordSet,
     file_imported_aliases: WordMap<(Word, Word)>,
     polyfill_depth: u32,
+    return_docblock_starts: Vec<Option<u32>>,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -359,6 +378,10 @@ where
 
     #[inline]
     fn walk_in_closure(&mut self, closure: &'arena Closure<'arena>, context: &mut Context<'ctx, 'arena, A>) {
+        if let Some(docblock_start) = self.return_docblock_starts.last_mut() {
+            docblock_start.take();
+        }
+
         let span = closure.span();
 
         let synthetic = crate::build_synthetic_name("closure", context.file, span);
@@ -391,6 +414,10 @@ where
         arrow_function: &'arena ArrowFunction<'arena>,
         context: &mut Context<'ctx, 'arena, A>,
     ) {
+        if let Some(docblock_start) = self.return_docblock_starts.last_mut() {
+            docblock_start.take();
+        }
+
         let span = arrow_function.span();
 
         let synthetic = crate::build_synthetic_name("closure", context.file, span);
@@ -440,6 +467,40 @@ where
         function_call: &'arena FunctionCall<'arena>,
         context: &mut Context<'ctx, 'arena, A>,
     ) {
+        let Expression::Identifier(identifier) = function_call.function.unparenthesized() else {
+            return;
+        };
+
+        let function_name = identifier.value();
+        let is_class_alias = matches!(function_name.len(), 11 | 12)
+            && (function_name.eq_ignore_ascii_case(b"class_alias")
+                || function_name.eq_ignore_ascii_case(b"\\class_alias"));
+
+        if is_class_alias {
+            let current_class = self.stack.last().copied();
+            let parent_class = current_class
+                .and_then(|class| self.codebase.class_likes.get(&class))
+                .and_then(|metadata| metadata.direct_parent_class);
+            let Some((alias, target, span)) =
+                scan_class_like_alias(function_call, context, &self.scope, current_class, parent_class)
+            else {
+                return;
+            };
+
+            let mut flags = MetadataFlags::origin_flags(context.file.file_type);
+            if self.polyfill_depth > 0 {
+                flags |= MetadataFlags::POLYFILL;
+            }
+
+            self.codebase.add_class_like_alias(alias, target, span, flags);
+
+            return;
+        }
+
+        if function_name != b"define" {
+            return;
+        }
+
         let Some(mut constant_metadata) =
             scan_defined_constant(function_call, context, &self.get_current_type_resolution_context(), &self.scope)
         else {
@@ -459,8 +520,14 @@ where
         anonymous_class: &'arena AnonymousClass<'arena>,
         context: &mut Context<'ctx, 'arena, A>,
     ) {
+        let docblock_start = self
+            .return_docblock_starts
+            .last_mut()
+            .and_then(Option::take)
+            .unwrap_or_else(|| anonymous_class.span().start.offset);
+
         if let Some((id, template_definition, type_aliases, imported_aliases)) =
-            register_anonymous_class(&mut self.codebase, anonymous_class, context, &mut self.scope)
+            register_anonymous_class(&mut self.codebase, anonymous_class, docblock_start, context, &mut self.scope)
         {
             self.apply_polyfill_flag_to_class_like(id);
             self.file_type_aliases.extend(type_aliases);
@@ -470,6 +537,16 @@ where
 
             walk_anonymous_class_mut(self, anonymous_class, context);
         }
+    }
+
+    #[inline]
+    fn walk_in_return(&mut self, r#return: &'arena Return<'arena>, _context: &mut Context<'ctx, 'arena, A>) {
+        self.return_docblock_starts.push(Some(r#return.span().start.offset));
+    }
+
+    #[inline]
+    fn walk_out_return(&mut self, _return: &'arena Return<'arena>, _context: &mut Context<'ctx, 'arena, A>) {
+        self.return_docblock_starts.pop().expect("Expected return stack to be non-empty");
     }
 
     #[inline]
@@ -1144,5 +1221,44 @@ mod tests {
             tc.direct_parent_class.map(|p| p.to_string()),
             Some("PHPUnit\\Framework\\Assert".to_ascii_lowercase()),
         );
+    }
+
+    #[test]
+    fn scans_class_like_aliases() {
+        let mut codebase = scan(
+            r#"<?php
+            namespace App;
+
+            class Original {}
+            class Existing {}
+
+            class_alias(Original::class, Alias::class);
+            class_alias(Alias::class, 'App\Chain');
+            class_alias(Original::class, Existing::class);
+            class_alias('App\Missing', 'App\MissingAlias');
+            class_alias('App\CycleB', 'App\CycleA');
+            class_alias('App\CycleA', 'App\CycleB');
+        "#,
+        );
+
+        assert!(codebase.populate_class_like_aliases());
+
+        let original = ascii_lowercase_word(b"App\\Original");
+        let alias = ascii_lowercase_word(b"App\\Alias");
+        let chain = ascii_lowercase_word(b"App\\Chain");
+        let existing = ascii_lowercase_word(b"App\\Existing");
+        let missing = ascii_lowercase_word(b"App\\MissingAlias");
+        let cycle_a = ascii_lowercase_word(b"App\\CycleA");
+        let cycle_b = ascii_lowercase_word(b"App\\CycleB");
+
+        assert_eq!(codebase.class_like_aliases.get(&alias), Some(&original));
+        assert_eq!(codebase.class_like_aliases.get(&chain), Some(&original));
+        assert!(!codebase.class_like_aliases.contains_key(&existing));
+        assert!(!codebase.class_like_aliases.contains_key(&missing));
+        assert!(!codebase.class_like_aliases.contains_key(&cycle_a));
+        assert!(!codebase.class_like_aliases.contains_key(&cycle_b));
+        assert!(codebase.class_likes[&original].aliases.contains(&alias));
+        assert!(codebase.class_likes[&original].aliases.contains(&chain));
+        assert_eq!(codebase.symbols.get_kind(alias), Some(crate::symbol::SymbolKind::Class));
     }
 }

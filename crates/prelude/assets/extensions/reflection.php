@@ -4,10 +4,6 @@ class ReflectionException extends Exception {}
 
 interface Reflector extends Stringable
 {
-    /**
-     * @return string
-     */
-    public function __toString();
 }
 
 class Reflection
@@ -18,19 +14,44 @@ class Reflection
     public static function getModifierNames(int $modifiers): array {}
 }
 
+/**
+ * @template T of Fiber
+ */
 #[Mago\AvailableSince(80100)]
 final class ReflectionFiber
 {
+    /**
+     * @param T $fiber
+     */
     public function __construct(Fiber $fiber) {}
 
+    /**
+     * @return T
+     *
+     * @pure
+     */
     public function getFiber(): Fiber {}
 
+    /**
+     * @pure
+     */
     public function getExecutingFile(): ?string {}
 
+    /**
+     * @pure
+     */
     public function getExecutingLine(): ?int {}
 
+    /**
+     * @pure
+     */
     public function getCallable(): callable {}
 
+    /**
+     * @return list<array<string, mixed>>
+     *
+     * @pure
+     */
     public function getTrace(int $options = DEBUG_BACKTRACE_PROVIDE_OBJECT): array {}
 }
 
@@ -49,6 +70,8 @@ final class ReflectionGenerator
     public function getExecutingFile(): string {}
 
     /**
+     * @return list<array<string, mixed>>
+     *
      * @pure
      */
     public function getTrace(int $options = DEBUG_BACKTRACE_PROVIDE_OBJECT): array {}
@@ -213,14 +236,6 @@ class ReflectionZendExtension implements Reflector
      */
     public function __construct(string $name) {}
 
-    /**
-     * @param string $name
-     * @param bool $return
-     *
-     * @return ($return is true ? string : null)
-     */
-    public static function export($name, $return = false) {}
-
     public function __toString(): string {}
 
     /**
@@ -256,13 +271,22 @@ class ReflectionZendExtension implements Reflector
  */
 class ReflectionAttribute implements Reflector
 {
+    /**
+     * @var class-string<T>
+     *
+     * @readonly
+     */
     public string $name;
 
     public const IS_INSTANCEOF = 2;
 
     private function __construct() {}
 
+    public function __toString(): string {}
+
     /**
+     * @return class-string<T>
+     *
      * @pure
      */
     public function getName(): string {}
@@ -289,9 +313,6 @@ class ReflectionAttribute implements Reflector
 
     private function __clone(): void {}
 
-    public function __toString(): string {}
-
-    public static function export() {}
 }
 
 /**
@@ -305,7 +326,7 @@ class ReflectionClassConstant implements Reflector
     public string $name;
 
     /**
-     * @var class-name<T>
+     * @var class-string<T>
      *
      * @readonly
      */
@@ -326,7 +347,6 @@ class ReflectionClassConstant implements Reflector
 
     /**
      * @param class-string<T>|T $class
-     * @param string $constant
      *
      * @throws ReflectionException
      */
@@ -391,6 +411,7 @@ class ReflectionClassConstant implements Reflector
     /**
      * @pure
      */
+    #[Mago\AvailableSince(80100)]
     public function isEnumCase(): bool {}
 
     /**
@@ -456,7 +477,7 @@ class ReflectionProperty implements Reflector
     public string $name;
 
     /**
-     * @var class-name<T>
+     * @var class-string<T>
      *
      * @readonly
      */
@@ -464,7 +485,6 @@ class ReflectionProperty implements Reflector
 
     /**
      * @param class-string<T>|T $class
-     * @param string $property
      *
      * @throws ReflectionException
      */
@@ -543,7 +563,7 @@ class ReflectionProperty implements Reflector
     public function hasType(): bool {}
 
     /**
-     * @param T
+     * @param ?T $object
      *
      * @pure
      */
@@ -662,6 +682,9 @@ final class ReflectionReference
 #[Mago\AvailableSince(80500)]
 final class ReflectionConstant implements Reflector
 {
+    /**
+     * @readonly
+     */
     public string $name;
 
     public function __construct(string $name) {}
@@ -687,9 +710,11 @@ class ReflectionParameter implements Reflector
     public string $name;
 
     /**
+     * @param string|array{0: class-string, 1: string}|object $function
+     *
      * @throws ReflectionException
      */
-    public function __construct($function, string|int $param) {}
+    public function __construct(string|array|object $function, string|int $param) {}
 
     public function __toString(): string {}
 
@@ -703,6 +728,9 @@ class ReflectionParameter implements Reflector
      */
     public function isPassedByReference(): bool {}
 
+    /**
+     * @pure
+     */
     public function canBePassedByValue(): bool {}
 
     /**
@@ -715,12 +743,18 @@ class ReflectionParameter implements Reflector
      */
     public function getDeclaringClass(): ?ReflectionClass {}
 
+    /**
+     * @pure
+     */
     #[Deprecated(
         since: '8.0',
         reason: 'Use ReflectionParameter::getType() and the ReflectionType APIs should be used instead.',
     )]
     public function getClass(): ?ReflectionClass {}
 
+    /**
+     * @pure
+     */
     public function hasType(): bool {}
 
     /**
@@ -728,18 +762,27 @@ class ReflectionParameter implements Reflector
      */
     public function getType(): ReflectionNamedType|ReflectionUnionType|ReflectionIntersectionType|null {}
 
+    /**
+     * @pure
+     */
     #[Deprecated(
         since: '8.0',
         reason: 'Use ReflectionParameter::getType() and the ReflectionType APIs should be used instead.',
     )]
     public function isArray(): bool {}
 
+    /**
+     * @pure
+     */
     #[Deprecated(
         since: '8.0',
         reason: 'Use ReflectionParameter::getType() and the ReflectionType APIs should be used instead.',
     )]
     public function isCallable(): bool {}
 
+    /**
+     * @pure
+     */
     public function allowsNull(): bool {}
 
     /**
@@ -974,16 +1017,15 @@ abstract class ReflectionFunctionAbstract implements Reflector
      */
     public function isStatic(): bool {}
 
-    public function __toString() {}
+    public function __toString(): string {}
 }
 
 class ReflectionFunction extends ReflectionFunctionAbstract
 {
     /**
      * @readonly
-     * @var string
      */
-    public $name;
+    public string $name;
 
     public const IS_DEPRECATED = 2048;
 
@@ -995,9 +1037,9 @@ class ReflectionFunction extends ReflectionFunctionAbstract
     public function __toString(): string {}
 
     /**
-     * @deprecated
      * @pure
      */
+    #[\Deprecated(since: '8.0', reason: 'ReflectionFunction can no longer be constructed for disabled functions.')]
     public function isDisabled(): bool {}
 
     public function invoke(mixed ...$args): mixed {}
@@ -1011,6 +1053,9 @@ class ReflectionFunction extends ReflectionFunctionAbstract
      */
     public function getClosure(): Closure {}
 
+    /**
+     * @pure
+     */
     public function isAnonymous(): bool {}
 }
 
@@ -1137,6 +1182,9 @@ class ReflectionMethod extends ReflectionFunctionAbstract
     #[Deprecated(since: '8.5', message: 'as it has no effect')]
     public function setAccessible(bool $accessible): void {}
 
+    /**
+     * @pure
+     */
     #[Mago\AvailableSince(80100)]
     public function hasPrototype(): bool {}
 
@@ -1235,9 +1283,9 @@ class ReflectionClass implements Reflector
     /**
      * @throws ReflectionException
      *
-     * @pure
-     *
      * @return ReflectionMethod<T>
+     *
+     * @pure
      */
     public function getMethod(string $name): ReflectionMethod {}
 
@@ -1391,8 +1439,6 @@ class ReflectionClass implements Reflector
     public function newInstanceWithoutConstructor(): object {}
 
     /**
-     * @param array $args
-     *
      * @return T|null
      *
      * @throws ReflectionException
@@ -1400,15 +1446,11 @@ class ReflectionClass implements Reflector
     public function newInstanceArgs(array $args = []): ?object {}
 
     /**
-     * @return ReflectionClass|false
-     *
      * @pure
      */
     public function getParentClass(): ReflectionClass|false {}
 
     /**
-     * @param string|ReflectionClass $class
-     *
      * @pure
      */
     public function isSubclassOf(ReflectionClass|string $class): bool {}
@@ -1483,6 +1525,9 @@ class ReflectionClass implements Reflector
 
     private function __clone(): void {}
 
+    /**
+     * @pure
+     */
     #[Mago\AvailableSince(80100)]
     public function isEnum(): bool {}
 
@@ -1515,6 +1560,8 @@ class ReflectionClass implements Reflector
 
     /**
      * @param T $object
+     *
+     * @pure
      */
     #[Mago\AvailableSince(80400)]
     public function isUninitializedLazyObject(object $object): bool {}
@@ -1545,11 +1592,12 @@ class ReflectionObject extends ReflectionClass
     public function __construct(object $object) {}
 }
 
+/**
+ * @extends ReflectionClass<UnitEnum|BackedEnum>
+ */
 #[Mago\AvailableSince(80100)]
 class ReflectionEnum extends ReflectionClass
 {
-    public function __construct(object|string $objectOrClass) {}
-
     public function hasCase(string $name): bool {}
 
     /**
@@ -1560,24 +1608,25 @@ class ReflectionEnum extends ReflectionClass
     /**
      * @throws ReflectionException
      */
-    public function getCase(string $name): ReflectionEnumUnitCase {}
+    public function getCase(string $name): static {}
 
     /**
-     * @return bool
+     * @pure
      */
     public function isBacked(): bool {}
 
     /**
-     * @return ReflectionNamedType|null
+     * @pure
      */
-    public function getBackingType() {}
+    public function getBackingType(): ?ReflectionNamedType {}
 }
 
+/**
+ * @extends ReflectionClassConstant<UnitEnum>
+ */
 #[Mago\AvailableSince(80100)]
 class ReflectionEnumUnitCase extends ReflectionClassConstant
 {
-    public function __construct(object|string $class, string $constant) {}
-
     /**
      * @pure
      */
@@ -1589,11 +1638,12 @@ class ReflectionEnumUnitCase extends ReflectionClassConstant
     public function getEnum(): ReflectionEnum {}
 }
 
+/**
+ * @extends ReflectionEnumUnitCase<BackedEnum>
+ */
 #[Mago\AvailableSince(80100)]
 class ReflectionEnumBackedCase extends ReflectionEnumUnitCase
 {
-    public function __construct(object|string $class, string $constant) {}
-
     /**
      * @pure
      */

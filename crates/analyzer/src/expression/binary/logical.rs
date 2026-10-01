@@ -27,6 +27,7 @@ use mago_word::WordSet;
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
 use crate::artifacts::get_expression_range;
+use crate::assertion::get_class_type_relations;
 use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
@@ -189,6 +190,12 @@ where
         &changed_var_ids,
     );
     right_block_context.clauses = partitioned_clauses.0;
+
+    for (source, target) in
+        get_class_type_relations(binary.lhs, context.get_assertion_context_from_block(&right_block_context))
+    {
+        right_block_context.add_class_type_relation(source, target);
+    }
 
     let result_type: TUnion;
     if lhs_type.is_always_falsy() {

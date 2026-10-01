@@ -397,7 +397,7 @@ impl Registration {
             Arc::from(self.class_like_analysis_hooks.clone().into_boxed_slice());
         any |= !class_like_hooks.is_empty();
 
-        any.then_some(NodeAnalysisRequirements { targets, requirements, method_call_hooks, class_like_hooks })
+        any.then(|| NodeAnalysisRequirements::new(targets, requirements, method_call_hooks, class_like_hooks))
     }
 }
 
@@ -515,12 +515,14 @@ pub(super) const NODE_REQUIREMENT_RECEIVER_TYPE: u8 = 1 << 2;
 pub(super) const NODE_REQUIREMENT_ARGUMENT_TYPES: u8 = 1 << 3;
 pub(super) const NODE_REQUIREMENT_TARGET_SUBTREE: u8 = 1 << 4;
 pub(super) const NODE_REQUIREMENT_SOURCE_TEXT: u8 = 1 << 5;
+pub(super) const NODE_REQUIREMENT_VARIABLE_DEFINEDNESS: u8 = 1 << 6;
 pub(super) const NODE_REQUIREMENTS_ALL: u8 = NODE_REQUIREMENT_EXPRESSION_TYPES
     | NODE_REQUIREMENT_TARGET_EXPRESSION_TYPES
     | NODE_REQUIREMENT_RECEIVER_TYPE
     | NODE_REQUIREMENT_ARGUMENT_TYPES
     | NODE_REQUIREMENT_TARGET_SUBTREE
-    | NODE_REQUIREMENT_SOURCE_TEXT;
+    | NODE_REQUIREMENT_SOURCE_TEXT
+    | NODE_REQUIREMENT_VARIABLE_DEFINEDNESS;
 
 /// Syntax targets and embedded data requested by external node-analysis hooks.
 #[derive(Debug, Clone)]
@@ -529,9 +531,22 @@ pub struct NodeAnalysisRequirements {
     requirements: [u8; u8::MAX as usize + 1],
     method_call_hooks: Arc<[MethodCallAnalysisHookRegistration]>,
     class_like_hooks: Arc<[ClassLikeAnalysisHookRegistration]>,
+    variable_definedness_targets: Option<Arc<[bool; u8::MAX as usize + 1]>>,
 }
 
 impl NodeAnalysisRequirements {
+    fn new(
+        targets: [bool; u8::MAX as usize + 1],
+        requirements: [u8; u8::MAX as usize + 1],
+        method_call_hooks: Arc<[MethodCallAnalysisHookRegistration]>,
+        class_like_hooks: Arc<[ClassLikeAnalysisHookRegistration]>,
+    ) -> Self {
+        let variable_definedness_targets =
+            Self::create_variable_definedness_targets(&requirements, &method_call_hooks, &class_like_hooks);
+
+        Self { targets, requirements, method_call_hooks, class_like_hooks, variable_definedness_targets }
+    }
+
     #[inline]
     #[must_use]
     pub(crate) const fn targets(&self) -> &[bool; u8::MAX as usize + 1] {
@@ -550,6 +565,42 @@ impl NodeAnalysisRequirements {
         self.requirements.iter().any(|requirements| requirements & NODE_REQUIREMENT_SOURCE_TEXT != 0)
             || self.method_call_hooks.iter().any(|hook| hook.requirements & NODE_REQUIREMENT_SOURCE_TEXT != 0)
             || self.class_like_hooks.iter().any(|hook| hook.requirements & NODE_REQUIREMENT_SOURCE_TEXT != 0)
+    }
+
+    pub(crate) fn variable_definedness_targets(&self) -> Option<Arc<[bool; u8::MAX as usize + 1]>> {
+        self.variable_definedness_targets.clone()
+    }
+
+    fn create_variable_definedness_targets(
+        requirements: &[u8; u8::MAX as usize + 1],
+        method_call_hooks: &[MethodCallAnalysisHookRegistration],
+        class_like_hooks: &[ClassLikeAnalysisHookRegistration],
+    ) -> Option<Arc<[bool; u8::MAX as usize + 1]>> {
+        let mut targets = [false; u8::MAX as usize + 1];
+        let mut any = false;
+        for (target, requirements) in targets.iter_mut().zip(requirements) {
+            if requirements & NODE_REQUIREMENT_VARIABLE_DEFINEDNESS != 0 {
+                *target = true;
+                any = true;
+            }
+        }
+
+        if method_call_hooks.iter().any(|hook| hook.requirements & NODE_REQUIREMENT_VARIABLE_DEFINEDNESS != 0) {
+            targets[NodeKind::MethodCall as usize] = true;
+            targets[NodeKind::NullSafeMethodCall as usize] = true;
+            targets[NodeKind::StaticMethodCall as usize] = true;
+            any = true;
+        }
+
+        if class_like_hooks.iter().any(|hook| hook.requirements & NODE_REQUIREMENT_VARIABLE_DEFINEDNESS != 0) {
+            targets[NodeKind::Class as usize] = true;
+            targets[NodeKind::Enum as usize] = true;
+            targets[NodeKind::Interface as usize] = true;
+            targets[NodeKind::Trait as usize] = true;
+            any = true;
+        }
+
+        any.then(|| Arc::new(targets))
     }
 }
 
@@ -1598,7 +1649,7 @@ impl<T> ExternalAnalyzer<T> {
             .into();
         any |= !class_like_hooks.is_empty();
 
-        any.then_some(NodeAnalysisRequirements { targets, requirements, method_call_hooks, class_like_hooks })
+        any.then(|| NodeAnalysisRequirements::new(targets, requirements, method_call_hooks, class_like_hooks))
     }
 }
 

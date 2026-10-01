@@ -64,11 +64,6 @@
                     "avatar": "https://avatars.githubusercontent.com/u/1174337?v=4"
                 },
                 {
-                    "name": "Rasmus Bertell",
-                    "url": "https://bertell.fi",
-                    "avatar": "https://avatars.githubusercontent.com/u/57398362?u=f9bb382310c9552de2a7a82193c86fb94750e971&v=4"
-                },
-                {
                     "name": "Julian Schramm",
                     "url": "http://julian.center",
                     "avatar": "https://avatars.githubusercontent.com/u/79840527?u=2e15d0ec9e6d0bf6554ef69af6b1dba32a051417&v=4"
@@ -77,11 +72,6 @@
                     "name": "Anna Filina",
                     "url": "https://afilina.com",
                     "avatar": "https://avatars.githubusercontent.com/u/199835?u=d133afc4e19961b7da45b6bb485ed9ac9232e4bb&v=4"
-                },
-                {
-                    "name": "Joseph Kerkhof",
-                    "url": "https://kerkhof.dev",
-                    "avatar": "https://avatars.githubusercontent.com/u/5824820?u=d3439ac38ac78e5bb6255ef434b38f441dd27959&v=4"
                 },
                 {
                     "name": "Woody Gilk",
@@ -97,11 +87,6 @@
                     "name": "still-dreaming-1",
                     "url": "https://github.com/still-dreaming-1",
                     "avatar": "https://avatars.githubusercontent.com/u/354296?u=6e36d88516d121e132ec49cac38ac16df8471b17&v=4"
-                },
-                {
-                    "name": "Jacer OMRI",
-                    "url": "https://github.com/JacerOmri",
-                    "avatar": "https://avatars.githubusercontent.com/u/537996?u=6d425f3166884ff0c0da4ffc252d6388c9940714&v=4"
                 },
                 {
                     "name": "Matheus Martins",
@@ -152,6 +137,11 @@
                     "name": "Yigit Cukuren",
                     "url": "http://yigit.dev",
                     "avatar": "https://avatars.githubusercontent.com/u/42731194?u=bb0fb4e3635f7fcab7ff91ff4b311fd5a99cb009&v=4"
+                },
+                {
+                    "name": "Timoth\u00e9e Sterle",
+                    "url": "https://github.com/nanotee",
+                    "avatar": "https://avatars.githubusercontent.com/u/56110730?u=d27787e0853d748cb07355e7daedc267be38b0d4&v=4"
                 },
                 {
                     "name": "Zuruh",

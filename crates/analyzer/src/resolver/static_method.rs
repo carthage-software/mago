@@ -72,7 +72,7 @@ where
     {
         result.encountered_null = true;
     }
-    let selector_resolutions = resolve_member_selector(context, block_context, artifacts, method_selector)?;
+    let selector_resolutions = resolve_member_selector(context, block_context, artifacts, method_selector, false)?;
 
     let mut method_names = vec![];
     for selector in &selector_resolutions {
@@ -579,13 +579,15 @@ where
                     .template_types
                     .iter()
                     .map(|(&parameter_name, template)| {
-                        if let Some(parameter) = get_specialized_template_type(
-                            context.codebase,
-                            parameter_name,
-                            class_like_metadata.name,
-                            current_class_metadata,
-                            None,
-                        ) {
+                        if class_like_metadata.name != current_class_metadata.name
+                            && let Some(parameter) = get_specialized_template_type(
+                                context.codebase,
+                                parameter_name,
+                                class_like_metadata.name,
+                                current_class_metadata,
+                                None,
+                            )
+                        {
                             parameter
                         } else {
                             let defining_entity = &template.defining_entity;

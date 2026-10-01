@@ -80,7 +80,7 @@ impl GuardService {
     ///
     /// Returns [`OrchestratorError`] when guard pipelines fail or scanning encounters IO errors.
     pub fn run(self) -> Result<GuardResult, OrchestratorError> {
-        const GUARD_PROGRESS_PREFIX: &str = "🛡️  Guarding";
+        const GUARD_PROGRESS_PREFIX: &str = "🔒 Guarding";
 
         // Determine upfront which guards will be skipped due to missing config
         let skipped_perimeter = matches!(self.settings.should_run_perimeter(), Some(false));

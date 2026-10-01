@@ -162,6 +162,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for MethodPartialApplication<'arena>
                     artifacts,
                     &mut invocation,
                     Some((resolved_method.classname, None)),
+                    None,
                     &mut template_result,
                     &mut parameter_types,
                 )?;

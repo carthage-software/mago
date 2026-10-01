@@ -16,6 +16,8 @@ Les deux prennent la forme `category:code`, avec trois catégories disponibles :
 
 Plusieurs codes peuvent être supprimés à la fois avec une liste séparée par des virgules, et un raccourci de comptage `(N)` traite le cas où le même code se déclenche N fois sur une ligne.
 
+Les espaces et tabulations autour des virgules sont autorisés. Vous pouvez répéter la même catégorie devant chaque code : `@mago-expect analysis:mixed-operand(2), analysis:unused-variable`.
+
 ## `@mago-expect`
 
 Affirme qu'un problème spécifique est attendu sur la ligne qui suit. Le plus strict des deux pragmas, et celui que nous recommandons par défaut.

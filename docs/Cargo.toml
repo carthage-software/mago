@@ -25,6 +25,7 @@ mago-php-version = { workspace = true }
 mago-reporting = { workspace = true }
 pulldown-cmark = { workspace = true }
 regex = { workspace = true }
+schemars = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
 tera = { workspace = true }

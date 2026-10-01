@@ -4,6 +4,7 @@ use std::collections::VecDeque;
 
 use mago_allocator::vec::Vec;
 
+use mago_php_version::feature::Feature;
 use mago_span::HasPosition;
 use mago_span::HasSpan;
 use mago_syntax::cst::Access;
@@ -605,7 +606,8 @@ where
             if !self.values.is_empty() {
                 let mut values = Document::join(f.arena, self.values.iter().map(|v| v.format(f)), Separator::CommaLine);
 
-                if f.settings.trailing_comma {
+                // `isset()` accepts a trailing comma since the same version as function calls (7.3)
+                if f.trailing_comma_for(Feature::TrailingCommaInFunctionCalls) {
                     values.push(Document::IfBreak(IfBreak::then(f.arena, Document::String(b","))));
                 }
 

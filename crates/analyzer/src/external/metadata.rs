@@ -274,7 +274,7 @@ fn find_methods(
 
     match (class_filter, class) {
         (METHOD_SEARCH_EXACT_CLASS, Some(class)) => {
-            if let Some(class_like) = codebase.class_likes.get(&class) {
+            if let Some(class_like) = codebase.get_class_like(class.as_bytes()) {
                 collect(class_like);
             }
         }

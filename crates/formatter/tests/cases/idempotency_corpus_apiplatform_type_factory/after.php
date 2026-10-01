@@ -39,12 +39,9 @@ trait TypeFactoryTrait
         if ($type->isCollection()) {
             $keyType = $type->getCollectionKeyTypes()[0] ?? null;
             $subType =
-                $type->getCollectionValueTypes()[0] ?? null ?? new LegacyType(
-                    $type->getBuiltinType(),
-                    false,
-                    $type->getClassName(),
-                    false,
-                );
+                $type->getCollectionValueTypes()[0]
+                ?? null
+                ?? new LegacyType($type->getBuiltinType(), false, $type->getClassName(), false);
 
             if (null !== $keyType && LegacyType::BUILTIN_TYPE_STRING === $keyType->getBuiltinType()) {
                 return $this->addNullabilityToTypeDefinition([

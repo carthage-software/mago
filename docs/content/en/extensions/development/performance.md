@@ -65,6 +65,7 @@ Targeted analysis hooks explicitly request data. Each extra `FileAnalysisRequire
 - source text copies file bytes;
 - target subtrees retain and encode more syntax;
 - receiver and argument types serialize complete type information;
+- variable definedness serializes the local scope at each target;
 - all expression types can dominate large files.
 
 Request only values the hook reads. Use lazy `FileAnalysis` methods for uncommon branches rather than embedding expensive data for every matching file.

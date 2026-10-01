@@ -74,6 +74,14 @@ final class AssertionTest extends TestCase
         self::assertFalse($assertions->isEmpty());
     }
 
+    public function testInvocationAssertionsExposeReceiverTarget(): void
+    {
+        $string = new TypeAssertion(TypeAssertionKind::IsType, Type::string());
+        $assertions = new InvocationAssertions(assertions: [InvocationAssertions::RECEIVER => [$string]]);
+
+        self::assertSame(['$this' => [$string]], $assertions->assertions);
+    }
+
     public function testInvocationAssertionsRejectEmptyFactLists(): void
     {
         $this->expectException(InvalidArgumentException::class);

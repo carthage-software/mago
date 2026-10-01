@@ -3,6 +3,7 @@ use std::borrow::Cow;
 use crate::metadata::CodebaseMetadata;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::callable::TCallable;
+use crate::ttype::cast::can_atomic_be_callable;
 use crate::ttype::cast::cast_atomic_to_callable;
 use crate::ttype::comparator::ComparisonResult;
 use crate::ttype::comparator::union_comparator;
@@ -19,7 +20,7 @@ pub(crate) fn is_contained_by(
     };
 
     let Some(input_callable) = cast_atomic_to_callable(input_type_part, codebase, None) else {
-        if input_type_part.can_be_callable() {
+        if can_atomic_be_callable(input_type_part, codebase) {
             atomic_comparison_result.type_coerced = Some(true);
             atomic_comparison_result.type_coerced_from_nested_mixed = Some(true);
         }

@@ -100,22 +100,6 @@ fn should_inherit_docblock_type(
     };
 
     if covariant {
-        if let Some(parent_docblock) = parent_docblock {
-            let child_contained_in_parent_docblock = union_comparator::is_contained_by(
-                codebase,
-                child_native,
-                &parent_docblock.type_union,
-                false,
-                false,
-                false,
-                &mut ComparisonResult::new(),
-            );
-
-            if child_contained_in_parent_docblock {
-                return false;
-            }
-        }
-
         let child_contained_in_parent = union_comparator::is_contained_by(
             codebase,
             child_native,
@@ -136,11 +120,25 @@ fn should_inherit_docblock_type(
             &mut ComparisonResult::new(),
         ) && child_contained_in_parent;
 
-        if types_equal || !child_contained_in_parent {
+        if types_equal {
             return true;
         }
 
         if let Some(parent_docblock) = parent_docblock {
+            let child_contained_in_parent_docblock = union_comparator::is_contained_by(
+                codebase,
+                child_native,
+                &parent_docblock.type_union,
+                false,
+                false,
+                false,
+                &mut ComparisonResult::new(),
+            );
+
+            if child_contained_in_parent_docblock {
+                return false;
+            }
+
             let docblock_type = if !child_native.accepts_null() && parent_docblock.type_union.has_null() {
                 parent_docblock.type_union.to_non_nullable()
             } else {
@@ -486,7 +484,27 @@ fn apply_inheritance_work(codebase: &mut CodebaseMetadata, mut inheritance_work:
                     &mut ComparisonResult::new(),
                 );
 
-                if child_is_more_specific {
+                let child_matches_parent_native = parent_native_return_type.is_some_and(|parent_native_return| {
+                    union_comparator::is_contained_by(
+                        codebase,
+                        &child_native_return.type_union,
+                        &parent_native_return.type_union,
+                        false,
+                        false,
+                        false,
+                        &mut ComparisonResult::new(),
+                    ) && union_comparator::is_contained_by(
+                        codebase,
+                        &parent_native_return.type_union,
+                        &child_native_return.type_union,
+                        false,
+                        false,
+                        false,
+                        &mut ComparisonResult::new(),
+                    )
+                });
+
+                if child_is_more_specific && !child_matches_parent_native {
                     child_native_return.type_union.clone()
                 } else if !child_native_return.type_union.accepts_null() && type_union.has_null() {
                     type_union.to_non_nullable()

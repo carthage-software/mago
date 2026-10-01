@@ -17,6 +17,7 @@ use crate::ttype::atomic::array::list::TList;
 use crate::ttype::atomic::callable::TCallable;
 use crate::ttype::atomic::callable::TCallableSignature;
 use crate::ttype::atomic::object::TObject;
+use crate::ttype::atomic::reference::TReference;
 use crate::ttype::atomic::scalar::TScalar;
 use crate::ttype::template::GenericTemplate;
 use crate::ttype::template::TemplateResult;
@@ -111,6 +112,23 @@ pub fn cast_atomic_to_callable<'atomic>(
     }
 
     None
+}
+
+#[must_use]
+pub fn can_atomic_be_callable(atomic: &TAtomic, codebase: &CodebaseMetadata) -> bool {
+    if cast_atomic_to_callable(atomic, codebase, None).is_some() {
+        return true;
+    }
+
+    match atomic {
+        TAtomic::Scalar(TScalar::String(_)) | TAtomic::Array(TArray::List(_) | TArray::Keyed(_)) => true,
+        TAtomic::Object(TObject::Named(named_object)) => codebase.is_inheritable(named_object.get_name().as_bytes()),
+        TAtomic::Reference(TReference::Symbol { .. }) => true,
+        TAtomic::GenericParameter(generic_parameter) => {
+            generic_parameter.constraint.types.iter().any(|atomic| can_atomic_be_callable(atomic, codebase))
+        }
+        _ => false,
+    }
 }
 
 /// Strips the leading root namespace separator PHP allows in callable strings,

@@ -20,9 +20,12 @@ use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
+use crate::expression::unary::cast_type_to_string;
 use crate::resolver::class_name::resolve_classnames_from_expression;
 use crate::resolver::property::PropertyResolutionResult;
 use crate::resolver::property::ResolvedProperty;
+use crate::utils::expression::get_block_expression_id;
+use crate::utils::expression::get_variable_id;
 use crate::visibility::check_static_property_read_visibility;
 
 /// Resolves all possible static properties from a class expression and a member selector.
@@ -48,7 +51,7 @@ where
     let mut property_names = vec![];
 
     'resolve_names: {
-        let variable_type = match property_variable {
+        let (variable_type, variable_id) = match property_variable {
             Variable::Direct(direct_variable) => {
                 property_names.push(word(direct_variable.name));
 
@@ -60,7 +63,10 @@ where
                 indirect_variable.expression.analyze(context, block_context, artifacts)?;
                 block_context.flags.set_inside_general_use(was_inside_general_use);
 
-                artifacts.get_rc_expression_type(indirect_variable.expression)
+                (
+                    artifacts.get_rc_expression_type(indirect_variable.expression).cloned(),
+                    get_block_expression_id(indirect_variable.expression, context, block_context),
+                )
             }
             Variable::Nested(nested_variable) => {
                 let was_inside_general_use = block_context.flags.inside_general_use();
@@ -68,7 +74,10 @@ where
                 nested_variable.variable.analyze(context, block_context, artifacts)?;
                 block_context.flags.set_inside_general_use(was_inside_general_use);
 
-                artifacts.get_rc_expression_type(nested_variable.variable)
+                (
+                    artifacts.get_rc_expression_type(nested_variable.variable).cloned(),
+                    get_variable_id(nested_variable.variable).map(word),
+                )
             }
         };
 
@@ -76,6 +85,15 @@ where
             result.has_invalid_path = true;
             break 'resolve_names;
         };
+
+        let variable_type = cast_type_to_string(
+            &variable_type,
+            variable_id.as_ref().map(|id| id.as_bytes()),
+            context,
+            block_context,
+            artifacts,
+            property_variable.span(),
+        )?;
 
         for variable_atomic_type in variable_type.types.as_ref() {
             let Some(property_name) = variable_atomic_type.get_literal_string_value() else {

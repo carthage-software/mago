@@ -16,6 +16,8 @@ nav_section = "基础"
 
 可以用逗号分隔的列表一次抑制多个 code,`(N)` 计数简写用于处理同一个 code 在一行内出现 N 次的情况。
 
+逗号前后可以有空格或制表符。也可以在每个 code 前重复同一类别：`@mago-expect analysis:mixed-operand(2), analysis:unused-variable`。
+
 ## `@mago-expect`
 
 声明在下一行上预期出现某个具体问题。两条指令中较严格的一条,也是我们默认推荐的。

@@ -27,7 +27,7 @@ use crate::service::BaselineIssueProcessor;
 ///
 /// This struct is designed to be flattened into other clap commands
 /// that require baseline functionality for filtering issues.
-#[derive(Parser, Debug, Clone)]
+#[derive(Parser, Debug, Clone, Default)]
 #[command(group(
     ArgGroup::new("baseline_write").args(["generate_baseline", "remove_outdated_baseline_entries"]),
 ))]

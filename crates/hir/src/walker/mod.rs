@@ -1798,9 +1798,9 @@ generate_walker! {
     arena AssertAnnotationTargetKind as assert_annotation_target_kind => {
         match assert_annotation_target_kind {
             AssertAnnotationTargetKind::Variable(variable) => walker.walk_direct_variable(variable, context),
-            AssertAnnotationTargetKind::Method(variable, name)
-            | AssertAnnotationTargetKind::Property(variable, name) => {
-                walker.walk_direct_variable(variable, context);
+            AssertAnnotationTargetKind::Method(object, name)
+            | AssertAnnotationTargetKind::Property(object, name) => {
+                walker.walk_assert_annotation_target(object, context);
                 walker.walk_name(name, context);
             }
         }

@@ -427,7 +427,11 @@ final class SchemaPropertyMetadataFactory implements PropertyMetadataFactoryInte
         if (
             [] === $types
             || (
-                $propertySchema['type'] ?? $propertySchema['$ref'] ?? $propertySchema['anyOf'] ?? $propertySchema['allOf'] ?? $propertySchema['oneOf']
+                $propertySchema['type']
+                ?? $propertySchema['$ref']
+                ?? $propertySchema['anyOf']
+                ?? $propertySchema['allOf']
+                ?? $propertySchema['oneOf']
                 ?? false
             )
             || \array_key_exists('type', $propertyMetadata->getOpenapiContext() ?? [])
@@ -513,12 +517,9 @@ final class SchemaPropertyMetadataFactory implements PropertyMetadataFactoryInte
 
         $keyType = $type->getCollectionKeyTypes()[0] ?? null;
         $subType =
-            $type->getCollectionValueTypes()[0] ?? null ?? new LegacyType(
-                $type->getBuiltinType(),
-                false,
-                $type->getClassName(),
-                false,
-            );
+            $type->getCollectionValueTypes()[0]
+            ?? null
+            ?? new LegacyType($type->getBuiltinType(), false, $type->getClassName(), false);
 
         if (null !== $keyType && LegacyType::BUILTIN_TYPE_STRING === $keyType->getBuiltinType()) {
             return $this->addNullabilityToTypeDefinition([

@@ -144,7 +144,10 @@ pub fn populate_template_result_from_invocation<'ctx, 'arena, A>(
         return;
     };
 
-    if let Some(type_parameters) = &instance_type.type_parameters {
+    let is_declaring_instance =
+        instance_type.name.as_bytes().eq_ignore_ascii_case(method_context.class_like_metadata.original_name.as_bytes());
+
+    if is_declaring_instance && let Some(type_parameters) = &instance_type.type_parameters {
         for (template_index, template_type) in type_parameters.iter().enumerate() {
             let Some(template_name) = method_context
                 .class_like_metadata
@@ -170,7 +173,7 @@ pub fn populate_template_result_from_invocation<'ctx, 'arena, A>(
         }
     }
 
-    if !instance_type.name.as_bytes().eq_ignore_ascii_case(method_context.class_like_metadata.original_name.as_bytes())
+    if !is_declaring_instance
         && let Some(calling_class_metadata) = context.codebase.get_class_like(instance_type.name.as_bytes())
     {
         for (template_name, _) in &method_context.class_like_metadata.template_types {

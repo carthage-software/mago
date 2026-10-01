@@ -71,6 +71,7 @@ public function getRequirements(): array
         FileAnalysisRequirement::ReceiverType,
         FileAnalysisRequirement::ArgumentTypes,
         FileAnalysisRequirement::TargetSubtree,
+        FileAnalysisRequirement::VariableDefinedness,
     ];
 }
 ```
@@ -82,6 +83,7 @@ public function getRequirements(): array
 | `ArgumentTypes` | Populates `argumentTypes` in source order; individual entries may be `null` |
 | `TargetSubtree` | Retains the target's concrete-syntax descendants in `source` |
 | `SourceText` | Retains exact in-memory file bytes and all comment trivia in `source` |
+| `VariableDefinedness` | Enables `getVariableDefinedness()` for locals immediately before the target executes |
 | `ExpressionTypes` | Embeds every file expression type in `analysis`; generally an after-file concern |
 
 Without `TargetSubtree`, each selected target is retained as a standalone node without its ancestors or descendants. With `TargetSubtree`, that target's descendants are retained too. Without `SourceText`, `SourceFile::$contents` is an empty string and comment trivia is omitted. Resolved names are limited to the retained target ranges. If a hook only needs the node kind, span, and semantic type, request neither.
@@ -99,7 +101,10 @@ Without `TargetSubtree`, each selected target is retained as a standalone node w
 | `targetType` | Requested target expression type, or `null` |
 | `receiverType` | Requested direct receiver type, or `null` |
 | `argumentTypes` | Requested direct argument types, otherwise an empty list |
+| `getVariableDefinedness()` | Returns `Defined`, `PossiblyDefined`, or `Undefined`; `null` when unavailable |
 | lifecycle members | PHP version, codebase, type comparator, cancellation, and `report()` |
+
+Variable names passed to `getVariableDefinedness()` may include or omit the leading `$`. Request `VariableDefinedness` before relying on the result; skipped, unanalyzed targets return `null`.
 
 Within one plugin callback, the plugin's after-file hooks run first and its targeted hooks then share that same file-scoped reference registry. Different plugins receive separate registries; Mago merges every plugin's contributions with the file result and replaces them if that file is reanalyzed.
 

@@ -173,10 +173,6 @@ impl PreferSelfReturnTypeRule {
                 self.check_hint(ctx, class_fqn, union.left);
                 self.check_hint(ctx, class_fqn, union.right);
             }
-            Hint::Intersection(intersection) => {
-                self.check_hint(ctx, class_fqn, intersection.left);
-                self.check_hint(ctx, class_fqn, intersection.right);
-            }
             _ => {}
         }
     }
@@ -363,25 +359,17 @@ mod tests {
         "}
     }
 
-    test_lint_failure! {
-        name = intersection_containing_class_name_is_flagged,
+    test_lint_success! {
+        name = issue_2405_intersection_return_types_are_ignored,
         rule = PreferSelfReturnTypeRule,
-        code = indoc! {r"
-            <?php
+        code = include_str!("../../../tests/cases/issue_2405/intersections.php"),
+    }
 
-            final class Box implements \Countable
-            {
-                public function refine(): Box&\Countable
-                {
-                    return $this;
-                }
-
-                public function count(): int
-                {
-                    return 0;
-                }
-            }
-        "}
+    test_lint_fix! {
+        name = issue_2405_fixes_only_union_members_outside_intersections,
+        rule = PreferSelfReturnTypeRule,
+        code = include_str!("../../../tests/cases/issue_2405/unions.before.php"),
+        fixed = include_str!("../../../tests/cases/issue_2405/unions.after.php"),
     }
 
     test_lint_failure! {

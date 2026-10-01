@@ -46,7 +46,7 @@ use crate::service::IssueProcessor;
 ///
 /// This struct is designed to be flattened into other clap commands
 /// that require functionality for reporting and/or automatically fixing issues.
-#[derive(Parser, Debug, Clone)]
+#[derive(Parser, Debug, Clone, Default)]
 pub struct ReportingArgs {
     /// Filter the output to only show issues that can be automatically fixed.
     ///

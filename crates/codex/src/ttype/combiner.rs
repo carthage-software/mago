@@ -132,6 +132,36 @@ impl CombinerOptions {
     }
 }
 
+pub fn combine_preserving_array_shapes(
+    types: Vec<TAtomic>,
+    codebase: &CodebaseMetadata,
+    options: CombinerOptions,
+) -> Vec<TAtomic> {
+    if types.iter().filter(|atomic| atomic.is_array()).count() < 2 {
+        return combine(types, codebase, options);
+    }
+
+    let (mut array_types, other_types): (Vec<_>, Vec<_>) = types.into_iter().partition(TAtomic::is_array);
+    let mut combined_types = if other_types.is_empty() { Vec::new() } else { combine(other_types, codebase, options) };
+
+    if combined_types.iter().any(|atomic| matches!(atomic, TAtomic::Mixed(mixed) if mixed.is_vanilla())) {
+        return combined_types;
+    }
+
+    combined_types.retain(|atomic| !atomic.is_never());
+    for atomic in &mut combined_types {
+        if matches!(atomic, TAtomic::Void) {
+            *atomic = TAtomic::Null;
+        }
+    }
+
+    combined_types.append(&mut array_types);
+    combined_types.sort_unstable();
+    combined_types.dedup();
+
+    combined_types
+}
+
 pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, options: CombinerOptions) -> Vec<TAtomic> {
     if types.is_empty() {
         debug_assert!(false, "combine() received an empty Vec; this is a caller bug");
@@ -260,6 +290,7 @@ pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, options: Combin
                 None
             },
             non_empty: combination.flags.contains(CombinationFlags::KEYED_ARRAY_ALWAYS_FILLED),
+            known_non_list: combination.flags.contains(CombinationFlags::KEYED_ARRAY_KNOWN_NON_LIST),
         }));
     }
 
@@ -281,7 +312,12 @@ pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, options: Combin
     }
 
     if arrays.is_empty() && combination.flags.contains(CombinationFlags::HAS_EMPTY_ARRAY) {
-        arrays.push(TArray::Keyed(TKeyedArray { known_items: None, parameters: None, non_empty: false }));
+        arrays.push(TArray::Keyed(TKeyedArray {
+            known_items: None,
+            parameters: None,
+            non_empty: false,
+            known_non_list: false,
+        }));
     }
 
     new_types.extend(arrays.into_iter().map(TAtomic::Array));
@@ -703,7 +739,7 @@ fn scrape_type_properties(
                             Some((*element_type).clone())
                         };
                 }
-                TArray::Keyed(TKeyedArray { parameters, known_items, non_empty }) => {
+                TArray::Keyed(TKeyedArray { parameters, known_items, non_empty, known_non_list }) => {
                     let mut had_previous_keyed_array = combination.flags.contains(CombinationFlags::HAS_KEYED_ARRAY);
                     let sealed_budget_available = !combination.sealed_keyed_budget_exhausted
                         && combination.sealed_arrays.len() < options.array_combination_threshold as usize;
@@ -734,6 +770,7 @@ fn scrape_type_properties(
                                 known_items,
                                 parameters,
                                 non_empty,
+                                known_non_list,
                             }));
 
                             continue;
@@ -767,9 +804,13 @@ fn scrape_type_properties(
                                 known_items: Some(frozen_entries),
                                 parameters: None,
                                 non_empty: combination.flags.contains(CombinationFlags::KEYED_ARRAY_SOMETIMES_FILLED),
+                                known_non_list: combination
+                                    .flags
+                                    .contains(CombinationFlags::KEYED_ARRAY_KNOWN_NON_LIST),
                             });
                             combination.sealed_arrays.push(frozen);
                             combination.flags.remove(CombinationFlags::HAS_KEYED_ARRAY);
+                            combination.flags.remove(CombinationFlags::KEYED_ARRAY_KNOWN_NON_LIST);
                             combination.flags.remove(CombinationFlags::KEYED_ARRAY_SOMETIMES_FILLED);
                             combination.flags.insert(CombinationFlags::KEYED_ARRAY_ALWAYS_FILLED);
                             had_previous_keyed_array = false;
@@ -791,14 +832,19 @@ fn scrape_type_properties(
                                 known_items: Some(std::mem::take(&mut combination.keyed_array_entries)),
                                 parameters: None,
                                 non_empty: combination.flags.contains(CombinationFlags::KEYED_ARRAY_SOMETIMES_FILLED),
+                                known_non_list: combination
+                                    .flags
+                                    .contains(CombinationFlags::KEYED_ARRAY_KNOWN_NON_LIST),
                             });
                             combination.sealed_arrays.push(frozen);
                             combination.sealed_arrays.push(TArray::Keyed(TKeyedArray {
                                 known_items,
                                 parameters,
                                 non_empty,
+                                known_non_list,
                             }));
                             combination.flags.remove(CombinationFlags::HAS_KEYED_ARRAY);
+                            combination.flags.remove(CombinationFlags::KEYED_ARRAY_KNOWN_NON_LIST);
                             combination.flags.remove(CombinationFlags::KEYED_ARRAY_SOMETIMES_FILLED);
                             combination.flags.insert(CombinationFlags::KEYED_ARRAY_ALWAYS_FILLED);
 
@@ -807,6 +853,9 @@ fn scrape_type_properties(
                     }
 
                     combination.flags.insert(CombinationFlags::HAS_KEYED_ARRAY);
+                    if known_non_list {
+                        combination.flags.insert(CombinationFlags::KEYED_ARRAY_KNOWN_NON_LIST);
+                    }
 
                     if non_empty {
                         combination.flags.insert(CombinationFlags::KEYED_ARRAY_SOMETIMES_FILLED);
@@ -824,6 +873,7 @@ fn scrape_type_properties(
 
                             had_previous_keyed_array = false;
                             combination.flags.remove(CombinationFlags::HAS_KEYED_ARRAY);
+                            combination.flags.remove(CombinationFlags::KEYED_ARRAY_KNOWN_NON_LIST);
 
                             continue;
                         }
@@ -1410,7 +1460,11 @@ fn flush_sealed_keyed_arrays_into_combination(
         };
 
         any_keyed = true;
-        let TKeyedArray { known_items, parameters, non_empty } = keyed;
+        let TKeyedArray { known_items, parameters, non_empty, known_non_list } = keyed;
+
+        if known_non_list {
+            combination.flags.insert(CombinationFlags::KEYED_ARRAY_KNOWN_NON_LIST);
+        }
 
         if non_empty {
             combination.flags.insert(CombinationFlags::KEYED_ARRAY_SOMETIMES_FILLED);

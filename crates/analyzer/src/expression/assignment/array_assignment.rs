@@ -388,6 +388,7 @@ where
                                 parameters,
                                 known_items: Some(known_items),
                                 non_empty: true,
+                                known_non_list: true,
                             });
                         }
                         ArrayKey::ClassLikeConstant { .. } => {
@@ -499,6 +500,7 @@ where
                             parameters: Some((Arc::new((*key_type).clone()), Arc::new(value_type.clone()))),
                             known_items: widened_known_items,
                             non_empty: true,
+                            known_non_list: keyed_array.known_non_list,
                         })));
                     }
                 },
@@ -507,6 +509,7 @@ where
                         parameters: Some((Arc::new((*key_type).clone()), Arc::new(value_type.clone()))),
                         known_items: None,
                         non_empty: true,
+                        known_non_list: false,
                     })));
                 }
                 _ => (),
@@ -572,6 +575,7 @@ where
                                 known_items: Some(new_items),
                                 parameters: None,
                                 non_empty: true,
+                                known_non_list: existing_array.known_non_list,
                             })));
 
                             extended_shape = true;
@@ -698,6 +702,7 @@ where
                 known_items: None,
                 parameters: None,
                 non_empty: false,
+                known_non_list: false,
             })));
 
             array_expression_type = Rc::new(atomic);

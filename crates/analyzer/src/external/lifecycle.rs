@@ -43,6 +43,7 @@ use super::ExternalPlugin;
 use super::NODE_REQUIREMENT_ARGUMENT_TYPES;
 use super::NODE_REQUIREMENT_RECEIVER_TYPE;
 use super::NODE_REQUIREMENT_TARGET_EXPRESSION_TYPES;
+use super::NODE_REQUIREMENT_VARIABLE_DEFINEDNESS;
 use super::NodeAnalysisRequirements;
 use super::error::ExternalAnalyzerError;
 use super::error::protocol;
@@ -280,13 +281,25 @@ fn class_like_matches_hook(
     codebase: &CodebaseMetadata,
 ) -> bool {
     let class_like = ascii_lowercase_word(class_like);
-    let Some(metadata) = codebase.class_likes.get(&class_like) else {
+    let Some(metadata) = codebase.get_class_like(class_like.as_bytes()) else {
         return false;
     };
 
     hook.targets.iter().any(|ancestor| {
-        class_like != *ancestor
+        if metadata.name != *ancestor
             && (metadata.all_parent_classes.contains(ancestor) || metadata.all_parent_interfaces.contains(ancestor))
+        {
+            return true;
+        }
+
+        if codebase.class_like_aliases.is_empty() {
+            return false;
+        }
+
+        codebase.class_like_aliases.get(ancestor).is_some_and(|actual| {
+            metadata.name != *actual
+                && (metadata.all_parent_classes.contains(actual) || metadata.all_parent_interfaces.contains(actual))
+        })
     })
 }
 
@@ -490,6 +503,9 @@ fn write_target_analysis(
         if requested & NODE_REQUIREMENT_ARGUMENT_TYPES != 0 {
             write_argument_types(writer, artifacts, target.node)?;
         }
+        if requested & NODE_REQUIREMENT_VARIABLE_DEFINEDNESS != 0 {
+            write_variable_definedness(writer, artifacts, target.node.span())?;
+        }
         writer.write_u32(
             u32::try_from(target.targeted_hook_routes.len())
                 .map_err(|_| protocol("too many targeted analysis hook routes matched one node"))?,
@@ -497,6 +513,28 @@ fn write_target_analysis(
         for route in &target.targeted_hook_routes {
             writer.write_u32(*route);
         }
+    }
+
+    Ok(())
+}
+
+fn write_variable_definedness(
+    writer: &mut PayloadWriter,
+    artifacts: &AnalysisArtifacts,
+    span: Span,
+) -> Result<(), ExternalAnalyzerError> {
+    let variables = artifacts.variable_definedness.get(&(span.start.offset, span.end.offset));
+    writer.write_bool(variables.is_some());
+    let Some(variables) = variables else {
+        return Ok(());
+    };
+
+    writer.write_u32(u32::try_from(variables.len()).map_err(|_| protocol("too many variables in scope"))?);
+    let mut variables = variables.iter().collect::<Vec<_>>();
+    variables.sort_unstable_by_key(|(variable, _)| variable.as_bytes());
+    for (variable, definedness) in variables {
+        writer.write_bytes(variable.as_bytes())?;
+        writer.write_u8(*definedness as u8);
     }
 
     Ok(())
@@ -1477,7 +1515,7 @@ fn read_symbol_identifier_with_kind(
             }
             let raw_member = word(member);
             let lowercase_member = ascii_lowercase_word(member);
-            let member = if codebase.function_likes.contains_key(&(symbol, lowercase_member)) {
+            let member = if codebase.get_method(symbol.as_bytes(), lowercase_member.as_bytes()).is_some() {
                 lowercase_member
             } else {
                 raw_member
@@ -1490,7 +1528,8 @@ fn read_symbol_identifier_with_kind(
 
 fn normalize_symbol(codebase: &CodebaseMetadata, bytes: &[u8], target: bool) -> mago_word::Word {
     let lowercase = ascii_lowercase_word(bytes);
-    if codebase.class_likes.contains_key(&lowercase) || codebase.function_likes.contains_key(&(empty_word(), lowercase))
+    if codebase.class_like_exists(lowercase.as_bytes())
+        || codebase.function_likes.contains_key(&(empty_word(), lowercase))
     {
         return lowercase;
     }
@@ -1541,21 +1580,23 @@ fn validate_reference_target(
         let exists = if kind == SymbolReferenceKind::FunctionLikeReturn {
             codebase.function_likes.contains_key(&(empty_word(), target.0))
         } else {
-            codebase.class_likes.contains_key(&target.0)
+            codebase.class_like_exists(target.0.as_bytes())
                 || codebase.function_likes.contains_key(&(empty_word(), target.0))
                 || codebase.constants.contains_key(&target.0)
         };
         return exists.then_some(()).ok_or_else(|| format!("target `{}` does not exist", target.0));
     }
 
-    let Some(class_like) = codebase.class_likes.get(&target.0) else {
+    let Some(class_like) = codebase.get_class_like(target.0.as_bytes()) else {
         return Err(format!("target class-like `{}` does not exist", target.0));
     };
     let exists = match kind {
         SymbolReferenceKind::PropertyRead | SymbolReferenceKind::PropertyWrite => {
             class_like.properties.contains_key(&target.1)
         }
-        SymbolReferenceKind::FunctionLikeReturn => codebase.function_likes.contains_key(&target),
+        SymbolReferenceKind::FunctionLikeReturn => {
+            codebase.get_method(target.0.as_bytes(), target.1.as_bytes()).is_some()
+        }
         SymbolReferenceKind::OverriddenMember => class_like.methods.contains(&target.1),
         SymbolReferenceKind::Body | SymbolReferenceKind::Signature => {
             class_like.methods.contains(&target.1)

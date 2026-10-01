@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace Mago\Sdk\Analyzer;
 
+use Mago\Sdk\Exception\InvalidArgumentException;
 use Mago\Sdk\Internal\Analyzer\NodeAnalysisData;
 use Mago\Sdk\Syntax\Node;
 use Mago\Sdk\Syntax\SourceFile;
@@ -33,6 +34,9 @@ final class NodeAnalysisContext extends LifecycleContext
      */
     public readonly array $argumentTypes;
 
+    /** @var array<string, VariableDefinedness>|null */
+    private readonly ?array $variableDefinedness;
+
     public function __construct(
         AfterFileAnalysisContext $context,
         public readonly SourceFile $source,
@@ -44,6 +48,30 @@ final class NodeAnalysisContext extends LifecycleContext
         $this->targetType = $data->targetType;
         $this->receiverType = $data->receiverType;
         $this->argumentTypes = $data->argumentTypes;
+        $this->variableDefinedness = $data->variableDefinedness;
         parent::__construct($context->phpVersion, $context->codebase, $context->types, $context->cancellation);
+    }
+
+    /**
+     * Returns whether a local variable exists immediately before the target node executes.
+     *
+     * The name may be passed with or without its leading `$`.
+     */
+    public function getVariableDefinedness(string $variable): ?VariableDefinedness
+    {
+        if ($variable === '' || $variable === '$') {
+            throw new InvalidArgumentException('A variable name cannot be empty.');
+        }
+
+        $definedness = $this->variableDefinedness;
+        if ($definedness === null) {
+            return null;
+        }
+
+        if ($variable[0] !== '$') {
+            $variable = '$' . $variable;
+        }
+
+        return $definedness[$variable] ?? VariableDefinedness::Undefined;
     }
 }

@@ -41,6 +41,7 @@ pub mod reporter;
 
 pub use color::ColorChoice;
 pub use formatter::ReportingFormat;
+pub use formatter::utils::osc8_file_hyperlink;
 pub use formatter::utils::osc8_hyperlink;
 pub use output::ReportingTarget;
 
@@ -68,13 +69,6 @@ pub use output::ReportingTarget;
 pub enum IgnoreEntry {
     /// Ignore a code everywhere: `"code1"`
     Code(String),
-    /// Ignore a code in specific paths or glob patterns:
-    /// `{ code = "code2", in = ["tests/", "src/**/*.php"] }`
-    Scoped {
-        code: String,
-        #[cfg_attr(feature = "serde", serde(rename = "in", deserialize_with = "one_or_many"))]
-        paths: Vec<String>,
-    },
     /// Ignore by regex against issue text, with optional code and path scoping:
     /// `{ pattern = "Symfony", code = "mixed-assignment", in = ["src/Bridge/"] }`.
     Pattern {
@@ -99,6 +93,13 @@ pub enum IgnoreEntry {
             )
         )]
         paths: Option<Vec<String>>,
+    },
+    /// Ignore a code in specific paths or glob patterns:
+    /// `{ code = "code2", in = ["tests/", "src/**/*.php"] }`
+    Scoped {
+        code: String,
+        #[cfg_attr(feature = "serde", serde(rename = "in", deserialize_with = "one_or_many"))]
+        paths: Vec<String>,
     },
 }
 

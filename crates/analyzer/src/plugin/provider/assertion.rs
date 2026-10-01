@@ -40,6 +40,8 @@ pub struct InvocationAssertions {
 }
 
 impl InvocationAssertions {
+    pub const RECEIVER: &'static [u8] = b"$this";
+
     /// Create new empty assertions.
     #[inline]
     #[must_use]

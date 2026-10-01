@@ -67,6 +67,7 @@ use crate::statement::attributes::AttributeTarget;
 use crate::statement::attributes::analyze_attributes;
 use crate::statement::class_like::property::analyze_property_hook;
 use crate::statement::r#return::handle_return_value;
+use crate::statement::r#static::infer_static_local_types;
 use crate::utils::expression::get_variable_id;
 
 pub mod function;
@@ -174,7 +175,8 @@ where
         function_like_metadata.type_resolution_context.clone().unwrap_or_default(),
     );
 
-    let mut artifacts = AnalysisArtifacts::new();
+    let mut artifacts =
+        AnalysisArtifacts::new().with_variable_definedness_targets(parent_artifacts.variable_definedness_targets());
 
     if let Some(return_type) = &function_like_metadata.return_type_metadata {
         report_undefined_type_references(context, return_type);
@@ -278,6 +280,8 @@ where
     if !function_like_metadata.flags.is_unchecked() {
         match body {
             FunctionLikeBody::Statements(statements, _) => {
+                artifacts.static_local_types =
+                    infer_static_local_types(context, block_context, &artifacts, statements)?;
                 analyze_statements(statements, context, block_context, &mut artifacts)?;
             }
             FunctionLikeBody::Expression(value) => {
@@ -340,6 +344,7 @@ where
 
     std::mem::swap(&mut context.type_resolution_context, &mut previous_type_resolution_context);
     parent_artifacts.expression_types.extend(std::mem::take(&mut artifacts.expression_types));
+    parent_artifacts.variable_definedness.extend(std::mem::take(&mut artifacts.variable_definedness));
     parent_artifacts.resolved_method_calls.append(&mut artifacts.resolved_method_calls);
     parent_artifacts.symbol_references.extend(std::mem::take(&mut artifacts.symbol_references));
     parent_artifacts.pending_readonly_property_writes.append(&mut artifacts.pending_readonly_property_writes);

@@ -750,11 +750,7 @@ impl<'input> Lexer<'input> {
                                 break;
                             }
                             [b'{', b'$', ..] | [b'$', b'{', ..] if !last_was_slash => {
-                                let until_offset = read_until_end_of_brace_interpolation(&self.input, length + 2);
-
-                                self.mode = LexerMode::DoubleQuoteString(Interpolation::BraceUntil(
-                                    start.offset + until_offset,
-                                ));
+                                self.mode = LexerMode::DoubleQuoteString(Interpolation::Brace);
 
                                 break;
                             }
@@ -793,11 +789,9 @@ impl<'input> Lexer<'input> {
                     Some(Ok(self.token(token_kind, buffer, start, end)))
                 }
                 Interpolation::Until(offset) => {
-                    self.interpolation(*offset, LexerMode::DoubleQuoteString(Interpolation::None), false)
+                    self.interpolation(Some(*offset), LexerMode::DoubleQuoteString(Interpolation::None))
                 }
-                Interpolation::BraceUntil(offset) => {
-                    self.interpolation(*offset, LexerMode::DoubleQuoteString(Interpolation::None), true)
-                }
+                Interpolation::Brace => self.interpolation(None, LexerMode::DoubleQuoteString(Interpolation::None)),
             },
             LexerMode::ShellExecuteString(interpolation) => match &interpolation {
                 Interpolation::None => {
@@ -817,11 +811,7 @@ impl<'input> Lexer<'input> {
                                 break;
                             }
                             [b'{', b'$', ..] | [b'$', b'{', ..] if !last_was_slash => {
-                                let until_offset = read_until_end_of_brace_interpolation(&self.input, length + 2);
-
-                                self.mode = LexerMode::ShellExecuteString(Interpolation::BraceUntil(
-                                    start.offset + until_offset,
-                                ));
+                                self.mode = LexerMode::ShellExecuteString(Interpolation::Brace);
 
                                 break;
                             }
@@ -859,11 +849,9 @@ impl<'input> Lexer<'input> {
                     Some(Ok(self.token(token_kind, buffer, start, end)))
                 }
                 Interpolation::Until(offset) => {
-                    self.interpolation(*offset, LexerMode::ShellExecuteString(Interpolation::None), false)
+                    self.interpolation(Some(*offset), LexerMode::ShellExecuteString(Interpolation::None))
                 }
-                Interpolation::BraceUntil(offset) => {
-                    self.interpolation(*offset, LexerMode::ShellExecuteString(Interpolation::None), true)
-                }
+                Interpolation::Brace => self.interpolation(None, LexerMode::ShellExecuteString(Interpolation::None)),
             },
             LexerMode::DocumentString(kind, label, indent, interpolation) => match &kind {
                 DocumentKind::Heredoc => match &interpolation {
@@ -921,14 +909,7 @@ impl<'input> Lexer<'input> {
                                     break;
                                 }
                                 [b'{', b'$', ..] | [b'$', b'{', ..] if !last_was_slash => {
-                                    let until_offset = read_until_end_of_brace_interpolation(&self.input, length + 2);
-
-                                    self.mode = LexerMode::DocumentString(
-                                        kind,
-                                        label,
-                                        indent,
-                                        Interpolation::BraceUntil(start.offset + until_offset),
-                                    );
+                                    self.mode = LexerMode::DocumentString(kind, label, indent, Interpolation::Brace);
 
                                     break;
                                 }
@@ -972,15 +953,12 @@ impl<'input> Lexer<'input> {
                         Some(Ok(self.token(token_kind, buffer, start, end)))
                     }
                     Interpolation::Until(offset) => self.interpolation(
-                        *offset,
+                        Some(*offset),
                         LexerMode::DocumentString(kind, label, indent, Interpolation::None),
-                        false,
                     ),
-                    Interpolation::BraceUntil(offset) => self.interpolation(
-                        *offset,
-                        LexerMode::DocumentString(kind, label, indent, Interpolation::None),
-                        true,
-                    ),
+                    Interpolation::Brace => {
+                        self.interpolation(None, LexerMode::DocumentString(kind, label, indent, Interpolation::None))
+                    }
                 },
                 DocumentKind::Nowdoc => {
                     let start = self.input.current_position();
@@ -1270,9 +1248,8 @@ impl<'input> Lexer<'input> {
     #[inline]
     fn interpolation(
         &mut self,
-        end_offset: u32,
+        end_offset: Option<u32>,
         post_interpolation_mode: LexerMode<'input>,
-        brace: bool,
     ) -> Option<Result<Token<'input>, SyntaxError>> {
         self.interpolation_depth += 1;
         if self.interpolation_depth > Self::MAX_INTERPOLATION_DEPTH {
@@ -1281,6 +1258,8 @@ impl<'input> Lexer<'input> {
             return Some(Err(SyntaxError::RecursionLimitExceeded(self.file_id(), self.input.current_position())));
         }
 
+        let brace = end_offset.is_none();
+        let mut brace_depth = 0u32;
         self.mode = LexerMode::Script;
 
         let was_interpolating = self.interpolating;
@@ -1298,7 +1277,20 @@ impl<'input> Lexer<'input> {
                 Some(Ok(token)) => {
                     let token_start = token.start.offset;
                     let token_end = token_start + token.value.len() as u32;
-                    let is_final_token = token_start <= end_offset && end_offset <= token_end;
+                    let is_final_token = match end_offset {
+                        Some(end_offset) => token_start <= end_offset && end_offset <= token_end,
+                        None => match token.kind {
+                            TokenKind::LeftBrace | TokenKind::DollarLeftBrace => {
+                                brace_depth += 1;
+                                false
+                            }
+                            TokenKind::RightBrace => {
+                                brace_depth = brace_depth.saturating_sub(1);
+                                brace_depth == 0
+                            }
+                            _ => false,
+                        },
+                    };
 
                     if brace {
                         if token.kind == TokenKind::DollarLeftBrace && self.peek_string_varname_label() {

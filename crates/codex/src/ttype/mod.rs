@@ -894,6 +894,27 @@ pub fn combine_union_types(
     codebase: &CodebaseMetadata,
     options: combiner::CombinerOptions,
 ) -> TUnion {
+    combine_union_types_inner(type_1, type_2, codebase, options, false)
+}
+
+#[inline]
+#[must_use]
+pub fn combine_union_types_preserving_array_shapes(
+    type_1: &TUnion,
+    type_2: &TUnion,
+    codebase: &CodebaseMetadata,
+    options: combiner::CombinerOptions,
+) -> TUnion {
+    combine_union_types_inner(type_1, type_2, codebase, options, true)
+}
+
+fn combine_union_types_inner(
+    type_1: &TUnion,
+    type_2: &TUnion,
+    codebase: &CodebaseMetadata,
+    options: combiner::CombinerOptions,
+    preserve_array_shapes: bool,
+) -> TUnion {
     if type_1 == type_2 {
         return type_1.clone();
     }
@@ -908,7 +929,13 @@ pub fn combine_union_types(
         let mut all_atomic_types = type_1.types.to_vec();
         all_atomic_types.extend(type_2.types.iter().cloned());
 
-        let mut result = TUnion::from_vec(combiner::combine(all_atomic_types, codebase, options));
+        let types = if preserve_array_shapes {
+            combiner::combine_preserving_array_shapes(all_atomic_types, codebase, options)
+        } else {
+            combiner::combine(all_atomic_types, codebase, options)
+        };
+
+        let mut result = TUnion::from_vec(types);
 
         if type_1.had_template() && type_2.had_template() {
             result.set_had_template(true);
@@ -939,14 +966,37 @@ pub fn combine_union_types(
 #[inline]
 #[must_use]
 pub fn add_union_type(
-    mut base_type: TUnion,
+    base_type: TUnion,
     other_type: &TUnion,
     codebase: &CodebaseMetadata,
     options: combiner::CombinerOptions,
 ) -> TUnion {
+    add_union_type_inner(base_type, other_type, codebase, options, false)
+}
+
+#[inline]
+#[must_use]
+pub fn add_union_type_preserving_array_shapes(
+    base_type: TUnion,
+    other_type: &TUnion,
+    codebase: &CodebaseMetadata,
+    options: combiner::CombinerOptions,
+) -> TUnion {
+    add_union_type_inner(base_type, other_type, codebase, options, true)
+}
+
+fn add_union_type_inner(
+    mut base_type: TUnion,
+    other_type: &TUnion,
+    codebase: &CodebaseMetadata,
+    options: combiner::CombinerOptions,
+    preserve_array_shapes: bool,
+) -> TUnion {
     if &base_type != other_type {
         base_type.types = if base_type.is_vanilla_mixed() && other_type.is_vanilla_mixed() {
             base_type.types
+        } else if preserve_array_shapes {
+            combine_union_types_preserving_array_shapes(&base_type, other_type, codebase, options).types
         } else {
             combine_union_types(&base_type, other_type, codebase, options).types
         };

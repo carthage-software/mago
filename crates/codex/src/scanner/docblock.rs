@@ -10,6 +10,7 @@ use mago_phpdoc_syntax::cst::TypelessParamTagValue;
 use mago_phpdoc_syntax::cst::r#type::Type;
 use mago_span::HasSpan;
 use mago_span::Span;
+use mago_syntax::cst::Trivia;
 use mago_word::Word;
 use mago_word::concat_word;
 use mago_word::word;
@@ -52,7 +53,17 @@ where
 {
     let docblock = context.get_docblock(node)?;
 
-    Some(PHPDocParser::parse_with_span(context.arena, docblock.value, docblock.span))
+    Some(parse_docblock_trivia(context, docblock))
+}
+
+pub fn parse_docblock_trivia<'arena, A>(
+    context: &Context<'_, 'arena, A>,
+    docblock: &'arena Trivia<'arena>,
+) -> Document<'arena>
+where
+    A: Arena,
+{
+    PHPDocParser::parse_with_span(context.arena, docblock.value, docblock.span)
 }
 
 pub fn find_most_trusted_tag<'arena, T>(
@@ -106,7 +117,11 @@ pub fn for_each_tag_by_ascending_trust<'arena>(
 pub fn assertion_subject_word(subject: &AssertSubject<'_>) -> Word {
     match subject {
         AssertSubject::Parameter { variable } => word(variable.value),
-        AssertSubject::Method { parameter, method, .. } => concat_word!(parameter.value, b"->", method.value, b"()"),
-        AssertSubject::Property { parameter, property, .. } => concat_word!(parameter.value, b"->", property.value),
+        AssertSubject::Method { object, method, .. } => {
+            concat_word!(assertion_subject_word(object).as_bytes(), b"->", method.value, b"()")
+        }
+        AssertSubject::Property { object, property, .. } => {
+            concat_word!(assertion_subject_word(object).as_bytes(), b"->", property.value)
+        }
     }
 }

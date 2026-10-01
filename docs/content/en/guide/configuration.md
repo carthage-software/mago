@@ -27,7 +27,7 @@ Every release publishes a JSON schema describing the full configuration tree. Ed
 
 The schema is hosted at:
 
-- `https://mago.carthage.software/<version>/schema.json` — pinned to a specific release such as `1.47.6`.
+- `https://mago.carthage.software/<version>/schema.json` — pinned to a specific release such as `1.50.0`.
 - `https://mago.carthage.software/latest/schema.json` — the most recent stable release.
 - `https://mago.carthage.software/main/schema.json` — the development build from `main`.
 
@@ -36,20 +36,20 @@ Pin the URL to the version of Mago you have installed so the schema and your bin
 How you reference it depends on the format:
 
 ```toml
-#:schema https://mago.carthage.software/1.47.6/schema.json
+#:schema https://mago.carthage.software/1.50.0/schema.json
 version = "1"
 php-version = "8.3"
 ```
 
 ```yaml
-# yaml-language-server: $schema=https://mago.carthage.software/1.47.6/schema.json
+# yaml-language-server: $schema=https://mago.carthage.software/1.50.0/schema.json
 version: "1"
 php-version: "8.3"
 ```
 
 ```json
 {
-  "$schema": "https://mago.carthage.software/1.47.6/schema.json",
+  "$schema": "https://mago.carthage.software/1.50.0/schema.json",
   "version": "1",
   "php-version": "8.3"
 }
@@ -112,6 +112,7 @@ Per top-level key:
 
 - Tables and objects are deep-merged. A child can override a single key inside a nested table without redefining the whole table.
 - Arrays such as `source.excludes` and per-rule `exclude` lists are concatenated, parent first. If a base config excludes `vendor/`, you keep that exclude and add your own.
+- `extension-hosts.<name>.command` is the exception: it is an argv, where each element's meaning comes from its position, so a layer that redeclares it **replaces** it. Concatenating two commands would start the parent's program with the child's path as a stray argument. Every other key inside the host table still merges normally, so a layer can change `workers` or `enabled` and keep the inherited command.
 - Scalars (strings, numbers, booleans) are overwritten by the child.
 
 ```toml
@@ -129,6 +130,8 @@ threads = 8
 excludes = ["build"]   # appended -> ["vendor", "node_modules", "build"]
 ```
 
+`extends` is part of the published JSON schema, so a file using it still validates against `vendor/carthage-software/mago/schema.json`.
+
 Cycles are detected via canonical-path tracking and surface a clear error rather than recursing forever. Diamond inheritance (A extends B and C, both extend D) processes D once and is fine. Layers can mix formats freely; each is parsed by its own driver and merged at a generic value level before the final document is validated against the schema.
 
 ## Global options
@@ -145,7 +148,7 @@ editor-url = "phpstorm://open?file=%file%&line=%line%&column=%column%"
 
 | Option | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
-| `version` | string | none | Pins the Mago version this project is tested against. Accepts a major (`"1"`), minor (`"1.47"`), or exact (`"1.47.6"`) pin. See [version pinning](#version-pinning). |
+| `version` | string | none | Pins the Mago version this project is tested against. Accepts a major (`"1"`), minor (`"1.50"`), or exact (`"1.50.0"`) pin. See [version pinning](#version-pinning). |
 | `php-version` | string | latest stable | The PHP version Mago should target for parsing and analysis. `mago init` autodetects this from `composer.json` when possible. |
 | `allow-unsupported-php-version` | boolean | `false` | Allow Mago to run on a PHP version it does not officially support. Not recommended. |
 | `no-version-check` | boolean | `false` | Silences the warning emitted when the installed binary drifts from the pinned version. Major-version drift is always fatal. |
@@ -160,8 +163,8 @@ Pinning the version surfaces drift between the installed binary and the project'
 Three pin levels:
 
 - **Major pin** (`version = "1"`): any `1.x.y` satisfies the pin. A bump to `2.x` is a hard error because a new major may ship with incompatible defaults, schema changes, or rule behaviour. This is the default `mago init` writes.
-- **Minor pin** (`version = "1.47"`): any `1.47.y` satisfies the pin. Drift to a different minor warns; drift across majors is still fatal.
-- **Exact pin** (`version = "1.47.6"`): any drift warns; drift across majors is still fatal.
+- **Minor pin** (`version = "1.50"`): any `1.50.y` satisfies the pin. Drift to a different minor warns; drift across majors is still fatal.
+- **Exact pin** (`version = "1.50.0"`): any drift warns; drift across majors is still fatal.
 
 The warning can be silenced with `--no-version-check`, the `MAGO_NO_VERSION_CHECK` environment variable, or `no-version-check = true` in the config. None of those affect major-version drift, which is the entire point of pinning.
 
@@ -339,8 +342,15 @@ editor-url = "phpstorm://open?file=%file%&line=%line%&column=%column%"
 | Placeholder | Meaning |
 | :--- | :--- |
 | `%file%` | Absolute path to the file. |
+| `%rel_file%` | File path relative to the workspace. |
 | `%line%` | Line number, 1-based. |
 | `%column%` | Column number, 1-based. |
+
+Use `%rel_file%` when the editor resolves file paths relative to the open workspace:
+
+```sh
+export MAGO_EDITOR_URL="vscode://file/%rel_file%:%line%:%column%"
+```
 
 Common templates:
 

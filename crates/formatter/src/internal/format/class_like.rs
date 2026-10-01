@@ -109,7 +109,21 @@ where
                 let member_start = item.span().start.offset;
                 let member_end = item.span().end.offset;
 
-                if let Some(region) = f.get_ignore_region_for(member_start).copied() {
+                if let Some(region) = f
+                    .get_ignore_region_for(member_start)
+                    .filter(|region| {
+                        region.start >= left_brace.end.offset
+                            && region.end <= right_brace.start.offset
+                            && member_end <= region.end
+                            && class_like_members.iter().all(|member| {
+                                let span = member.span();
+
+                                !(span.start.offset < region.start && region.start < span.end.offset
+                                    || span.start.offset < region.end && region.end < span.end.offset)
+                            })
+                    })
+                    .copied()
+                {
                     let preserved = f.get_source_slice(region.start, region.end);
                     if formatted_count > 0 && !last_has_line_after {
                         members.push(Document::Line(Line::hard()));

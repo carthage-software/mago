@@ -7,6 +7,7 @@ use mago_syntax_core::utils::parse_literal_integer;
 use mago_syntax_core::utils::parse_literal_string_in;
 
 use crate::T;
+use crate::cst::cst::Access;
 use crate::cst::cst::BracedExpressionStringPart;
 use crate::cst::cst::CompositeString;
 use crate::cst::cst::DocumentIndentation;
@@ -208,6 +209,21 @@ where
     ) -> Result<BracedExpressionStringPart<'arena>, ParseError> {
         let left_brace = self.stream.eat_span(T!["{"])?;
         let expr = self.parse_expression()?;
+
+        if !matches!(
+            expr,
+            Expression::Variable(_)
+                | Expression::ArrayAccess(_)
+                | Expression::ArrayAppend(_)
+                | Expression::Call(_)
+                | Expression::PartialApplication(_)
+                | Expression::Access(Access::Property(_) | Access::NullSafeProperty(_) | Access::StaticProperty(_))
+                | Expression::Error(_)
+        ) {
+            let token = self.stream.lookahead(0)?;
+            self.errors.push(self.stream.unexpected(token, &[T!["->"], T!["?->"], T!["["]]));
+        }
+
         let right_brace = self.stream.eat_span(T!["}"])?;
 
         Ok(BracedExpressionStringPart { left_brace, expression: expr, right_brace })

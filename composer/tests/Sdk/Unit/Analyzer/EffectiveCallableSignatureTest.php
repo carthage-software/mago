@@ -22,11 +22,20 @@ final class EffectiveCallableSignatureTest extends TestCase
             byReference: true,
             hasDefault: true,
         );
-        $signature = new EffectiveCallableSignature([$parameter], false);
+        $signature = new EffectiveCallableSignature([$parameter], false, 'Subject::knownMethod');
 
         self::assertSame([$parameter], $signature->parameters);
         self::assertSame($closureThisType, $parameter->closureThisType);
         self::assertFalse($signature->allowsNamedArguments);
+        self::assertSame('Subject::knownMethod', $signature->displayName);
+    }
+
+    public function testEmptyDisplayNameIsRejected(): void
+    {
+        $this->expectException(InvalidArgumentException::class);
+        $this->expectExceptionMessage('display name cannot be empty');
+
+        new EffectiveCallableSignature([], displayName: '');
     }
 
     public function testCallableParameterRejectsInvalidVariableName(): void

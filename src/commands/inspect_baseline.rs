@@ -10,7 +10,7 @@ use std::path::PathBuf;
 use std::process::ExitCode;
 
 use mago_reporting::baseline::Baseline;
-use mago_reporting::osc8_hyperlink;
+use mago_reporting::osc8_file_hyperlink;
 
 use clap::ColorChoice;
 use clap::Parser;
@@ -213,7 +213,7 @@ impl LinkContext {
             Some(template) => {
                 let absolute = self.workspace.join(file);
 
-                Cow::Owned(osc8_hyperlink(template, &absolute.display().to_string(), 1, 1, display))
+                Cow::Owned(osc8_file_hyperlink(template, &absolute.display().to_string(), file, 1, 1, display))
             }
             None => Cow::Borrowed(display),
         }

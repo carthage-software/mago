@@ -545,3 +545,35 @@ impl Default for AnalyzerConfiguration {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use mago_reporting::IgnoreEntry;
+
+    use super::AnalyzerConfiguration;
+
+    #[test]
+    fn ignore_entry_with_pattern_code_and_paths_is_deserialized_as_pattern() {
+        let configuration: AnalyzerConfiguration = toml::from_str(
+            r#"
+ignore = [
+    { pattern = "Symfony", code = "mixed-assignment", in = ["src/Bridge/"] },
+    { code = "unused-variable", in = "tests/" },
+]
+"#,
+        )
+        .unwrap();
+
+        assert_eq!(
+            configuration.ignore,
+            [
+                IgnoreEntry::Pattern {
+                    pattern: "Symfony".to_string(),
+                    code: Some("mixed-assignment".to_string()),
+                    paths: Some(vec!["src/Bridge/".to_string()]),
+                },
+                IgnoreEntry::Scoped { code: "unused-variable".to_string(), paths: vec!["tests/".to_string()] },
+            ]
+        );
+    }
+}

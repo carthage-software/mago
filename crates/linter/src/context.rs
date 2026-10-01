@@ -79,6 +79,9 @@ where
     /// in a single pass. When the whitespace run is exhausted later imports
     /// fall back to the base offset and conflict with the first.
     pub fn import_name(&mut self, fqn: &[u8]) -> Option<ImportResolution> {
+        let scope = self.ancestors.iter().rev().find(|node| matches!(node, Node::Namespace(_) | Node::Program(_)))?;
+        self.imports.collect_class_references(*scope);
+
         self.imports.import(fqn, ImportKind::Name)
     }
 

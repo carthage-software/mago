@@ -99,6 +99,7 @@ pub(super) fn unwrap_awaitable_array(array: &TArray, context: &ProviderContext<'
                     parameters,
                     non_empty: keyed.non_empty,
                     known_items: Some(new_items),
+                    known_non_list: keyed.known_non_list,
                 }))));
             }
 
@@ -109,6 +110,7 @@ pub(super) fn unwrap_awaitable_array(array: &TArray, context: &ProviderContext<'
                 parameters: Some((Arc::new(key_type), Arc::new(inner))),
                 non_empty: keyed.non_empty,
                 known_items: None,
+                known_non_list: keyed.known_non_list,
             }))))
         }
     }
