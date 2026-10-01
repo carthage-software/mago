@@ -812,7 +812,7 @@ echo 'Hello, World!';
 </code></pre>
 <h2 id="token-view">Token view</h2>
 <p><code>--tokens</code> prints the lexer's token stream instead. Useful for debugging low-level syntax issues.</p>
-<pre><code class="language-sh">mago ast example.php --tokens
+<pre><code class="language-sh">mago cst example.php --tokens
 </code></pre>
 <pre><code> Kind                      Value                                              Span
  ─────────────────────────────────────────────────────────────────────────────────────────────
@@ -825,8 +825,8 @@ echo 'Hello, World!';
  Whitespace                "\n"                                               [29..29]
 </code></pre>
 <h2 id="json-output">JSON output</h2>
-<p><code>--json</code> switches either view to pretty-printed JSON. Combine with <code>--tokens</code> for a token-stream JSON, or alone for the full AST.</p>
-<pre><code class="language-sh">mago ast example.php --json
+<p><code>--json</code> switches either view to pretty-printed JSON. Combine with <code>--tokens</code> for a token-stream JSON, or alone for the full CST.</p>
+<pre><code class="language-sh">mago cst example.php --json
 </code></pre>
 <pre><code class="language-json">{
     "error": null,
@@ -839,22 +839,22 @@ echo 'Hello, World!';
 }
 </code></pre>
 <h2 id="reference">Reference</h2>
-<pre><code class="language-sh">Usage: mago ast [OPTIONS] &lt;FILE&gt;
+<pre><code class="language-sh">Usage: mago cst [OPTIONS] &lt;FILE&gt;
 </code></pre>
 <table><thead><tr><th style="text-align: left">Argument</th><th style="text-align: left">Description</th></tr></thead><tbody>
 <tr><td style="text-align: left"><code>&lt;FILE&gt;</code></td><td style="text-align: left">The PHP file to inspect. Required.</td></tr>
 </tbody></table>
 <table><thead><tr><th style="text-align: left">Flag</th><th style="text-align: left">Description</th></tr></thead><tbody>
-<tr><td style="text-align: left"><code>--tokens</code></td><td style="text-align: left">Print the lexer's token stream instead of the parsed AST.</td></tr>
-<tr><td style="text-align: left"><code>--json</code></td><td style="text-align: left">Print the output (AST or token stream) as pretty-printed JSON.</td></tr>
-<tr><td style="text-align: left"><code>--names</code></td><td style="text-align: left">Run the name resolver on the parsed AST and print fully qualified names for every symbol. Cannot be combined with <code>--tokens</code>.</td></tr>
+<tr><td style="text-align: left"><code>--tokens</code></td><td style="text-align: left">Print the lexer's token stream instead of the parsed CST.</td></tr>
+<tr><td style="text-align: left"><code>--json</code></td><td style="text-align: left">Print the output (CST or token stream) as pretty-printed JSON.</td></tr>
+<tr><td style="text-align: left"><code>--names</code></td><td style="text-align: left">Run the name resolver on the parsed CST and print fully qualified names for every symbol. Cannot be combined with <code>--tokens</code>.</td></tr>
 <tr><td style="text-align: left"><code>-h</code>, <code>--help</code></td><td style="text-align: left">Print help and exit.</td></tr>
 </tbody></table>
-<p>Global flags must come before <code>ast</code>. See the <a href="../../../../main/en/fundamentals/command-line-interface">CLI overview</a> for the full list.</p>
+<p>Global flags must come before <code>cst</code>. See the <a href="../../../../main/en/fundamentals/command-line-interface">CLI overview</a> for the full list.</p>
 <h2 id="driving-the-parser-from-rust">Driving the parser from Rust</h2>
 <p>If you are building a tool in Rust and need a fast PHP parser, you can use Mago's crates directly:</p>
 <ul>
-<li><a href="https://crates.io/crates/mago-syntax"><code>mago-syntax</code></a>: the lexer, parser, AST node definitions, and helpers for walking the tree.</li>
+<li><a href="https://crates.io/crates/mago-syntax"><code>mago-syntax</code></a>: the lexer, parser, CST node definitions, and helpers for walking the tree.</li>
 <li><a href="https://crates.io/crates/mago-names"><code>mago-names</code></a>: name resolution, turning a local class name into its fully qualified form.</li>
 </ul>
 

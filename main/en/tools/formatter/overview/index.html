@@ -793,11 +793,11 @@
 <h2 id="how-it-works">How it works</h2>
 <p>Mago borrows the parse-and-reprint approach used by Prettier, <code>rustfmt</code>, and Black:</p>
 <ol>
-<li>Parse the source into an AST.</li>
+<li>Parse the source into an CST (Concrete Syntax Tree).</li>
 <li>Discard the original formatting (whitespace, line breaks, indentation, all of it).</li>
-<li>Reprint the AST from scratch according to a fixed set of rules, <a href="https://www.php-fig.org/per/coding-style/">PER-CS</a> by default.</li>
+<li>Reprint the CST from scratch according to a fixed set of rules, <a href="https://www.php-fig.org/per/coding-style/">PER-CS</a> by default.</li>
 </ol>
-<p>The output is identical for a given AST regardless of the input style. The runtime behaviour of the code is preserved exactly: the AST round-trips, only the surface representation changes.</p>
+<p>The output is identical for a given CST regardless of the input style. The runtime behaviour of the code is preserved exactly: the CST round-trips, only the surface representation changes.</p>
 <h2 id="what-you-get">What you get</h2>
 <ul>
 <li><strong>One consistent style</strong> across the entire project. The formatter is opinionated by design.</li>
