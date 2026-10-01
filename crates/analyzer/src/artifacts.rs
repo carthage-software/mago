@@ -8,13 +8,17 @@ use mago_word::WordMap;
 use mago_word::WordSet;
 
 use mago_algebra::assertion_set::AssertionSet;
+use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::reference::SymbolReferences;
+use mago_codex::ttype::combine_union_types;
+use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::union::TUnion;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::cst::Node;
 
 use crate::context::block::BlockContext;
+use crate::context::block::ReferenceConstraintSource;
 use crate::context::scope::case_scope::CaseScope;
 use crate::context::scope::loop_scope::LoopScope;
 use crate::readonly::PendingReadonlyPropertyWrite;
@@ -67,6 +71,7 @@ pub struct AnalysisArtifacts {
     pub(crate) variable_definedness: HashMap<(u32, u32), WordMap<VariableDefinedness>>,
     variable_definedness_targets: Option<Arc<[bool; u8::MAX as usize + 1]>>,
     pub(crate) pending_readonly_property_writes: Vec<PendingReadonlyPropertyWrite>,
+    pub(crate) static_local_types: Option<WordMap<TUnion>>,
 }
 
 impl Default for AnalysisArtifacts {
@@ -100,6 +105,40 @@ impl AnalysisArtifacts {
             variable_definedness: HashMap::default(),
             variable_definedness_targets: None,
             pending_readonly_property_writes: Vec::new(),
+            static_local_types: None,
+        }
+    }
+
+    pub(crate) fn record_static_local_types(
+        &mut self,
+        block_context: &BlockContext<'_>,
+        codebase: &CodebaseMetadata,
+        options: CombinerOptions,
+    ) {
+        let Some(static_local_types) = self.static_local_types.as_mut() else {
+            return;
+        };
+
+        for variable in &block_context.static_locals {
+            if block_context
+                .by_reference_constraints
+                .get(variable)
+                .is_some_and(|constraint| constraint.source == ReferenceConstraintSource::Static)
+            {
+                continue;
+            }
+
+            let Some(variable_type) = block_context.locals.get(variable) else {
+                continue;
+            };
+
+            if let Some(previous_type) = static_local_types.get_mut(variable) {
+                if previous_type != variable_type.as_ref() {
+                    *previous_type = combine_union_types(previous_type, variable_type, codebase, options);
+                }
+            } else {
+                static_local_types.insert(*variable, variable_type.as_ref().clone());
+            }
         }
     }
 

@@ -790,6 +790,7 @@ function str_decrement(string $string): string {}
 
 /**
  * @pure
+ * @return non-empty-string
  */
 #[Mago\AvailableSince(80300)]
 function str_increment(string $string): string {}

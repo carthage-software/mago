@@ -217,6 +217,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Statement<'arena> {
         context.statement_span = last_statement_span;
         block_context.conditionally_referenced_variable_ids.clear();
 
+        artifacts.record_static_local_types(block_context, context.codebase, context.settings.combiner_options());
+
         Ok(())
     }
 }

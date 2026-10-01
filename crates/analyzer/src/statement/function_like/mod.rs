@@ -67,6 +67,7 @@ use crate::statement::attributes::AttributeTarget;
 use crate::statement::attributes::analyze_attributes;
 use crate::statement::class_like::property::analyze_property_hook;
 use crate::statement::r#return::handle_return_value;
+use crate::statement::r#static::infer_static_local_types;
 use crate::utils::expression::get_variable_id;
 
 pub mod function;
@@ -279,6 +280,8 @@ where
     if !function_like_metadata.flags.is_unchecked() {
         match body {
             FunctionLikeBody::Statements(statements, _) => {
+                artifacts.static_local_types =
+                    infer_static_local_types(context, block_context, &artifacts, statements)?;
                 analyze_statements(statements, context, block_context, &mut artifacts)?;
             }
             FunctionLikeBody::Expression(value) => {
