@@ -1,4 +1,4 @@
-//! Utility helpers for inspecting Twig AST nodes.
+//! Utility helpers for inspecting Twig CST nodes.
 
 use crate::cst::Statement;
 

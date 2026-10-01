@@ -3,7 +3,7 @@
 //! Every syntax crate uses the same two container types, defined in
 //! [`mago_syntax_core::cst`]. PHP fixes the [`TokenSeparatedSequence`]
 //! separator to its own [`Token<'arena>`] via a type alias so that the
-//! rest of the PHP AST can continue to write
+//! rest of the PHP CST can continue to write
 //! `TokenSeparatedSequence<'arena, T>` (one generic) and pick up PHP
 //! extension methods through [`TokenSeparatedSequenceExt`].
 
@@ -17,7 +17,7 @@ use crate::token::Token;
 
 pub use mago_syntax_core::cst::Sequence;
 
-/// A comma-/semicolon-separated sequence of PHP AST nodes.
+/// A comma-/semicolon-separated sequence of PHP CST nodes.
 pub type TokenSeparatedSequence<'arena, T> = CoreTokenSeparatedSequence<'arena, T, Token<'arena>>;
 
 /// PHP-specific helpers on a [`TokenSeparatedSequence`]. Supplies the

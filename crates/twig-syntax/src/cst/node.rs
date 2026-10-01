@@ -1,4 +1,4 @@
-//! Universal walker enum over every Twig AST node.
+//! Universal walker enum over every Twig CST node.
 
 use strum::Display;
 

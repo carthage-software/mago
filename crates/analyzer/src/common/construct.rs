@@ -172,7 +172,7 @@ where
 /// * `input_type` - The type of the value being passed.
 /// * `parameter_type` - The type expected by the language construct.
 /// * `argument_offset` - The 0-based index of the input, used for error messages.
-/// * `input_expression` - The AST node of the input expression for highlighting.
+/// * `input_expression` - The CST node of the input expression for highlighting.
 /// * `construct_kind` - A string name of the construct (e.g., "echo", "exit").
 /// * `construct_keyword` - The span of the construct's keyword for highlighting.
 /// * `is_argument` - Controls terminology in errors. `true` uses "argument", `false` uses "value".

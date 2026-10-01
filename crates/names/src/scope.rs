@@ -132,7 +132,7 @@ impl NamespaceScope {
         &self.constant_aliases
     }
 
-    /// Populates the scope's alias tables based on a PHP `use` statement AST node.
+    /// Populates the scope's alias tables based on a PHP `use` statement CST node.
     ///
     /// This method processes the different forms of `use` statements (simple, function/const,
     /// grouped) and registers the corresponding aliases within this `NamespaceScope`.
@@ -141,9 +141,9 @@ impl NamespaceScope {
     ///
     /// # Arguments
     ///
-    /// * `interner` - A string interner used to resolve identifiers/names from the AST nodes
+    /// * `interner` - A string interner used to resolve identifiers/names from the CST nodes
     ///   into actual string (`&[u8]`) representations.
-    /// * `r#use` - A reference to the `Use` AST node representing the `use` statement.
+    /// * `r#use` - A reference to the `Use` CST node representing the `use` statement.
     ///   (Parameter is named `r#use` because `use` is a Rust keyword).
     pub fn populate_from_use(&mut self, r#use: &Use<'_>) {
         match &r#use.items {

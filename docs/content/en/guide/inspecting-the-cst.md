@@ -41,7 +41,7 @@ Program
 `--tokens` prints the lexer's token stream instead. Useful for debugging low-level syntax issues.
 
 ```sh
-mago ast example.php --tokens
+mago cst example.php --tokens
 ```
 
 ```
@@ -58,10 +58,10 @@ mago ast example.php --tokens
 
 ## JSON output
 
-`--json` switches either view to pretty-printed JSON. Combine with `--tokens` for a token-stream JSON, or alone for the full AST.
+`--json` switches either view to pretty-printed JSON. Combine with `--tokens` for a token-stream JSON, or alone for the full CST.
 
 ```sh
-mago ast example.php --json
+mago cst example.php --json
 ```
 
 ```json
@@ -79,7 +79,7 @@ mago ast example.php --json
 ## Reference
 
 ```sh
-Usage: mago ast [OPTIONS] <FILE>
+Usage: mago cst [OPTIONS] <FILE>
 ```
 
 | Argument | Description |
@@ -88,16 +88,16 @@ Usage: mago ast [OPTIONS] <FILE>
 
 | Flag | Description |
 | :--- | :--- |
-| `--tokens` | Print the lexer's token stream instead of the parsed AST. |
-| `--json` | Print the output (AST or token stream) as pretty-printed JSON. |
-| `--names` | Run the name resolver on the parsed AST and print fully qualified names for every symbol. Cannot be combined with `--tokens`. |
+| `--tokens` | Print the lexer's token stream instead of the parsed CST. |
+| `--json` | Print the output (CST or token stream) as pretty-printed JSON. |
+| `--names` | Run the name resolver on the parsed CST and print fully qualified names for every symbol. Cannot be combined with `--tokens`. |
 | `-h`, `--help` | Print help and exit. |
 
-Global flags must come before `ast`. See the [CLI overview](/fundamentals/command-line-interface/) for the full list.
+Global flags must come before `cst`. See the [CLI overview](/fundamentals/command-line-interface/) for the full list.
 
 ## Driving the parser from Rust
 
 If you are building a tool in Rust and need a fast PHP parser, you can use Mago's crates directly:
 
-- [`mago-syntax`](https://crates.io/crates/mago-syntax): the lexer, parser, AST node definitions, and helpers for walking the tree.
+- [`mago-syntax`](https://crates.io/crates/mago-syntax): the lexer, parser, CST node definitions, and helpers for walking the tree.
 - [`mago-names`](https://crates.io/crates/mago-names): name resolution, turning a local class name into its fully qualified form.

@@ -33,7 +33,7 @@ use crate::internal::utils::unwrap_parenthesized;
 /// like binary operators. This allows us to reuse the same complex formatting
 /// logic for both true `BinaryOperator`s and other constructs like the
 /// Elvis operator (`?:`) from a `Conditional` node, without polluting
-/// the public AST in `mago_syntax`.
+/// the public CST in `mago_syntax`.
 #[derive(Clone, Copy)]
 pub(super) enum BinaryishOperator<'arena> {
     Binary(&'arena BinaryOperator<'arena>),

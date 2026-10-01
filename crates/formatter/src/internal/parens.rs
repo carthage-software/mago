@@ -152,7 +152,7 @@ where
                 }
 
                 // If it's not the left-hand side, it must be the right-hand side,
-                // which requires parentheses to preserve the AST structure.
+                // which requires parentheses to preserve the CST structure.
                 return true;
             }
 

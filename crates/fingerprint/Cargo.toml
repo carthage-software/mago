@@ -1,6 +1,6 @@
 [package]
 name = "mago-fingerprint"
-description = "Position-insensitive AST fingerprinting for incremental analysis"
+description = "Position-insensitive AST/CST fingerprinting for incremental analysis"
 version.workspace = true
 edition.workspace = true
 license.workspace = true

@@ -1,8 +1,8 @@
-//! AST walkers for Twig templates.
+//! CST walkers for Twig templates.
 //!
 //! Provides a [`MutWalker`] (`&mut self`) trait, a [`Walker`] (`&self`) trait,
 //! and a set of free `walk_*` / `walk_*_mut` standalone functions - one method
-//! per AST node type, auto-generated from a single DSL description below.
+//! per CST node type, auto-generated from a single DSL description below.
 
 #![allow(unused_variables, clippy::only_used_in_recursion, clippy::wildcard_imports)]
 
@@ -120,14 +120,14 @@ macro_rules! generate_ast_walker {
             $prefix:tt $node_type:ty as $var_name:ident => $code:block
         )*
     ) => {
-        /// Mutable-`self` AST walker.
+        /// Mutable-`self` CST walker.
         pub trait MutWalker<$ast, $arena, C>: Sync + Send {
             $(
                 gen_mut_trait_methods!($prefix, $node_type, $var_name, $walker, $context, $ast, $arena, $code);
             )*
         }
 
-        /// Immutable-`self` AST walker.
+        /// Immutable-`self` CST walker.
         pub trait Walker<$ast, $arena, C>: Sync + Send {
             $(
                 gen_const_trait_methods!($prefix, $node_type, $var_name, $walker, $context, $ast, $arena, $code);

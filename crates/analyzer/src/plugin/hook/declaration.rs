@@ -14,7 +14,7 @@ use crate::plugin::provider::Provider;
 
 /// Hook trait for intercepting class declaration analysis.
 ///
-/// This hook receives the real AST class node, full class metadata,
+/// This hook receives the real CST class node, full class metadata,
 /// and mutable context, allowing hooks to inspect classes, report issues,
 /// and modify analysis state.
 pub trait ClassDeclarationHook: Provider {
@@ -142,7 +142,7 @@ pub trait EnumDeclarationHook: Provider {
 
 /// Hook trait for intercepting function declaration analysis.
 ///
-/// This hook receives the real AST function node, full function metadata,
+/// This hook receives the real CST function node, full function metadata,
 /// and mutable context, allowing hooks to inspect functions, report issues,
 /// and modify analysis state.
 pub trait FunctionDeclarationHook: Provider {

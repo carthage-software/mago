@@ -10,10 +10,10 @@ use mago_syntax::walker::walk_statement;
 
 use crate::Collector;
 
-/// Attaches scopes to pragmas by walking the AST.
+/// Attaches scopes to pragmas by walking the CST.
 ///
 /// This function initializes and runs the `ScopeAttachmentWalker` over the entire program.
-/// The walker traverses the AST to identify the precise AST node (e.g., a function or class)
+/// The walker traverses the CST to identify the precise CST node (e.g., a function or class)
 /// that each pragma applies to.
 pub fn attach_pragma_scopes<'arena, A>(collector: &mut Collector<'_, 'arena, A>, program: &Program<'arena>)
 where
@@ -22,9 +22,9 @@ where
     ScopeAttachmentWalker.walk_program(program, collector);
 }
 
-/// An AST walker that attaches a `scope_span` to each pragma.
+/// A CST walker that attaches a `scope_span` to each pragma.
 ///
-/// By walking the AST, it can determine the exact declaration a pragma is intended to affect,
+/// By walking the CST, it can determine the exact declaration a pragma is intended to affect,
 /// solving ambiguity issues with simple line-based checks.
 struct ScopeAttachmentWalker;
 

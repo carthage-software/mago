@@ -848,7 +848,7 @@ where
     }
 }
 
-/// Returns `true` for AST nodes that represent declarations whose attached
+/// Returns `true` for CST nodes that represent declarations whose attached
 /// docblocks should always live on their own line. Listed conservatively:
 /// expression-shaped wrappers around declarations (closures, anonymous
 /// classes) are deliberately excluded because they appear in expression

@@ -6,7 +6,7 @@ use crate::ResolvedNames;
 use crate::internal::context::NameResolutionContext;
 use crate::internal::walker::NameWalker;
 
-/// Orchestrates the process of resolving names within a PHP Abstract Syntax Tree (AST).
+/// Orchestrates the process of resolving names within a PHP Concrete Syntax Tree (CST).
 ///
 /// This struct acts as the main entry point for the name resolution pass.
 /// It requires an arena to store resolved names.
@@ -28,12 +28,12 @@ where
         NameResolver { arena }
     }
 
-    /// Resolves names within the provided PHP AST `Program`.
+    /// Resolves names within the provided PHP CST `Program`.
     ///
     /// # Arguments
     ///
-    /// * `program` - A reference to the root `Program` AST node. The lifetime `'ast`
-    ///   ensures the AST outlives the borrowing done within this method.
+    /// * `program` - A reference to the root `Program` CST node. The lifetime `'ast`
+    ///   ensures the CST outlives the borrowing done within this method.
     ///
     /// # Returns
     ///

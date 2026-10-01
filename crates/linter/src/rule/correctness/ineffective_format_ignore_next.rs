@@ -120,7 +120,7 @@ impl LintRule for IneffectiveFormatIgnoreNextRule {
             return;
         }
 
-        // Walk the AST to mark markers as used when they have a statement following
+        // Walk the CST to mark markers as used when they have a statement following
         let mut checker = IgnoreNextChecker { markers: &mut markers };
         mago_syntax::walker::walk_program_mut(&mut checker, program, &mut ());
 

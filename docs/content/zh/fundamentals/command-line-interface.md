@@ -45,7 +45,7 @@ mago lint --colors=never        # 错误, --colors 是全局选项
 | 命令 | 说明 |
 | :--- | :--- |
 | [`mago analyze`](/tools/analyzer/command-reference/) | 静态分析:类型错误、逻辑 bug。 |
-| [`mago cst`](/guide/inspecting-the-ast/) | 打印 PHP 文件的 CST。 |
+| [`mago cst`](/guide/inspecting-the-cst/) | 打印 PHP 文件的 CST。 |
 | [`mago fix`](#mago-fix) | 运行四个工具并应用修复，直到不再产生更改。 |
 | [`mago format`](/tools/formatter/command-reference/) | 格式化 PHP 文件。 |
 | [`mago guard`](/tools/guard/command-reference/) | 强制执行架构规则与边界。 |
