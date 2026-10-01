@@ -1,27 +1,9 @@
 <?php
 
-// Stubs for the rdkafka extension (https://github.com/arnaud-lb/php-rdkafka).
-//
-// MODIFIED AND CONSOLIDATED from all 22 PHP files in JetBrains/phpstorm-stubs:
-// https://github.com/JetBrains/phpstorm-stubs/tree/e4f5f6c3de39f3bab3e9f3fca4b8cdb8b061e681/rdkafka
+// SPDX-License-Identifier: Apache-2.0
 // Copyright 2010-2023 JetBrains s.r.o.
-//
-// Licensed under the Apache License, Version 2.0 (the "License");
-// you may not use this file except in compliance with the License.
-// A copy is provided in the repository's LICENSE-APACHE, or at:
-// https://www.apache.org/licenses/LICENSE-2.0
-// Unless required by applicable law or agreed to in writing, software
-// distributed under the License is distributed on an "AS IS" BASIS,
-// WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-// See the License for the specific language governing permissions and
-// limitations under the License.
-// Mago is dual-licensed MIT OR Apache-2.0; Apache-2.0 applies to this file.
-//
-// Changes: bracketed namespaces, no PhpStorm attributes, typed constants,
-// precise callbacks and collections, and runtime-verified type, default,
-// arity, and exception corrections.
-// Runtime reference (arginfo and implementation, not copied source):
-// https://github.com/arnaud-lb/php-rdkafka/tree/268b500da842932a90c0e9d7ae0530ca00cf41f2
+// Modified and consolidated from JetBrains/phpstorm-stubs:
+// https://github.com/JetBrains/phpstorm-stubs/tree/e4f5f6c3de39f3bab3e9f3fca4b8cdb8b061e681/rdkafka
 
 namespace {
     /** @var int */
@@ -588,39 +570,31 @@ namespace {
     /** @var int */
     const RD_KAFKA_PURGE_F_NON_BLOCKING = UNKNOWN;
 
-    /**
-     * Returns the full list of error codes.
-     *
-     * @phpstan-return list<array{code: int, name: string|null, desc: string|null}>
-     */
+    /** @phpstan-return list<array{code: int, name: string|null, desc: string|null}> */
     function rd_kafka_get_err_descs() {}
 
-    /**
-     * Retrieve the current number of threads in use by librdkafka.
-     *
-     * @return int
-     */
+    /** @return int */
     function rd_kafka_thread_cnt() {}
 
     /**
-     * @param int $err Error code
+     * @param int $err
      *
-     * @return string|null Returns the error as a string.
+     * @return string|null
      */
     function rd_kafka_err2str($err) {}
 
     function rd_kafka_err2name(int $err): ?string {}
 
     /**
-     * @param int $errnox A system errno
+     * @param int $errnox
      *
-     * @return int Returns a kafka error code as an integer.
+     * @return int
      * @deprecated
      */
     function rd_kafka_errno2err($errnox) {}
 
     /**
-     * @return int Returns the system errno as an integer.
+     * @return int
      * @deprecated
      */
     function rd_kafka_errno() {}
@@ -628,7 +602,7 @@ namespace {
     /**
      * @param int $cnt
      *
-     * @return int Returns the special offset as an integer.
+     * @return int
      */
     function rd_kafka_offset_tail($cnt) {}
 
@@ -683,7 +657,7 @@ namespace {
          * @param int $level
          *
          * @return void
-         * @deprecated Use RdKafka\Conf::set() with the log_level configuration property.
+         * @deprecated
          */
         public function setLogLevel($level) {}
 
@@ -728,7 +702,7 @@ namespace {
          * @param int $timeout_ms
          *
          * @return RdKafka\Metadata
-         * @deprecated Use getMetadata().
+         * @deprecated
          */
         public function metadata($all_topics, $only_topic, $timeout_ms) {}
 
@@ -736,13 +710,13 @@ namespace {
          * @param int $logger
          *
          * @return void
-         * @deprecated Use RdKafka\Conf::setLogCb().
+         * @deprecated
          */
         public function setLogger($logger) {}
 
         /**
          * @return int
-         * @deprecated Use getOutQLen().
+         * @deprecated
          */
         public function outqLen() {}
 
@@ -759,11 +733,11 @@ namespace {
         public function resumePartitions(array $topic_partitions): array {}
 
         /**
-         * @param int|float|string $lifetime_ms Token expiry in milliseconds; integer strings support 32-bit PHP.
+         * @param int|float|string $lifetime_ms
          * @param array<string, string> $extensions
          *
-         * @throws \InvalidArgumentException If a string lifetime is not a valid integer.
-         * @throws RdKafka\Exception If librdkafka rejects the token.
+         * @throws \InvalidArgumentException
+         * @throws RdKafka\Exception
          */
         public function oauthbearerSetToken(
             string $token_value,
@@ -777,9 +751,6 @@ namespace {
 }
 
 namespace RdKafka {
-    /**
-     * Configuration reference: https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
-     */
     class Conf
     {
         public function __construct() {}
@@ -1084,13 +1055,11 @@ namespace RdKafka {
         public function poll(int $timeout_ms): int {}
 
         /**
-         * Both client implementations accept the same lifetime types despite the consumer's int arginfo.
-         *
-         * @param int|float|string $lifetime_ms Token expiry in milliseconds; integer strings support 32-bit PHP.
+         * @param int|float|string $lifetime_ms
          * @param array<string, string> $extensions
          *
-         * @throws \InvalidArgumentException If a string lifetime is not a valid integer.
-         * @throws Exception If librdkafka rejects the token.
+         * @throws \InvalidArgumentException
+         * @throws Exception
          */
         public function oauthbearerSetToken(
             string $token_value,
@@ -1181,13 +1150,7 @@ namespace RdKafka {
         /** @var int */
         public $offset;
 
-        /**
-         * Received messages always have an array, including when no headers are present.
-         * The 6.x receiver converts null-valued Kafka headers to empty strings.
-         * Numeric header names can become integer PHP array keys.
-         *
-         * @var array<array-key, string>
-         */
+        /** @var array<array-key, string> */
         public array $headers;
 
         /** @var string|null */
@@ -1274,10 +1237,6 @@ namespace RdKafka {
         public function produce($partition, $msgflags, $payload = null, $key = null, $msg_opaque = null) {}
 
         /**
-         * Scalar and Stringable header values are converted to strings; null becomes an empty string.
-         * Header names must remain string PHP array keys. Integer keys stop header processing,
-         * including numeric names that PHP converts to integer keys.
-         *
          * @param int $partition
          * @param int $msgflags
          * @param string|null $payload
@@ -1317,9 +1276,6 @@ namespace RdKafka {
         public function getName() {}
     }
 
-    /**
-     * Configuration reference: https://github.com/edenhill/librdkafka/blob/master/CONFIGURATION.md
-     */
     class TopicConf
     {
         public function __construct() {}
@@ -1410,14 +1366,14 @@ namespace RdKafka\Metadata {
         private function __construct() {}
 
         /**
-         * @throws \RdKafka\Exception If the iterator is not valid.
+         * @throws \RdKafka\Exception
          * @return T
          */
         public function current(): mixed {}
 
         public function next(): void {}
 
-        /** @throws \RdKafka\Exception If the iterator is not valid. */
+        /** @throws \RdKafka\Exception */
         public function key(): int {}
 
         public function valid(): bool {}
