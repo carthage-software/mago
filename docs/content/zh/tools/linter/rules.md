@@ -6129,7 +6129,7 @@ function hasRequiredFields($user) {
 | :--- | :--- | :--- |
 | `enabled` | `boolean` | `true` |
 | `level` | `string` | `"error"` |
-| `method-threshold` | `null` | `null` |
+| `method-threshold` | `number or null` | `null` |
 | `threshold` | `number` | `15` |
 
 </div>
@@ -6181,7 +6181,7 @@ function processOrder($orderId, $userId, $total, $status, $date) {
 
 | 选项 | 类型 | 默认值 |
 | :--- | :--- | :--- |
-| `constructor-threshold` | `null` | `null` |
+| `constructor-threshold` | `number or null` | `null` |
 | `enabled` | `boolean` | `true` |
 | `level` | `string` | `"error"` |
 | `threshold` | `number` | `5` |
@@ -6608,7 +6608,7 @@ if ($condition) {
 | 选项 | 类型 | 默认值 |
 | :--- | :--- | :--- |
 | `enabled` | `boolean` | `true` |
-| `function-like-threshold` | `null` | `null` |
+| `function-like-threshold` | `number or null` | `null` |
 | `level` | `string` | `"warning"` |
 | `threshold` | `number` | `7` |
 
