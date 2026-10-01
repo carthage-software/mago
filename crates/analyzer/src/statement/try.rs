@@ -393,32 +393,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
             )?;
 
             finally_has_returned = finally_block_context.flags.has_returned();
+            block_context.possibly_undefined_variable_ids.extend(finally_block_context.possibly_undefined_variable_ids);
 
             for (variable_id, _) in finally_block_context.assigned_variable_ids {
                 let finally_variable_type = finally_block_context.locals.remove(&variable_id);
                 if let Some(finally_variable_type) = finally_variable_type {
-                    let resulting_type = match block_context.locals.remove(&variable_id) {
-                        Some(existing_type) => {
-                            let possibly_undefined = finally_variable_type.possibly_undefined_from_try()
-                                && existing_type.possibly_undefined();
-
-                            let mut combined_type = ttype::combine_union_types(
-                                existing_type.as_ref(),
-                                finally_variable_type.as_ref(),
-                                context.codebase,
-                                CombinerOptions::default(),
-                            );
-
-                            if possibly_undefined {
-                                combined_type.set_possibly_undefined(false, Some(false));
-                            }
-
-                            Rc::new(combined_type)
-                        }
-                        None => finally_variable_type,
-                    };
-
-                    block_context.locals.insert(variable_id, resulting_type);
+                    block_context.locals.insert(variable_id, finally_variable_type);
                 }
             }
         }
