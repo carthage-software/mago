@@ -136,7 +136,7 @@ impl LintRule for ArrayStyleRule {
 }
 
 /// Whether the current `[..]` is the target of a destructuring assignment or a `foreach` value,
-/// directly or nested inside another one: `[$a, [$b]] = $c;`, `foreach ($x as [$a, $b])`.
+/// directly or nested inside another one: `[$a, [$b]] = $c;`, `list([$a]) = $c;`, `foreach ($x as [$a, $b])`.
 ///
 /// There, `[..]` is a short list, not an array, and `array(..)` would not parse; the long
 /// form is `list(..)`, which this rule does not enforce.
@@ -159,7 +159,7 @@ where
             Node::Assignment(assignment) => {
                 return child_span.is_some_and(|span| assignment.lhs.span() == span);
             }
-            Node::ForeachValueTarget(_) | Node::ForeachKeyValueTarget(_) => return true,
+            Node::List(_) | Node::ForeachValueTarget(_) | Node::ForeachKeyValueTarget(_) => return true,
             _ => return false,
         }
     }
@@ -190,6 +190,8 @@ mod tests {
             ['x' => $f, 'y' => $g] = $point;
             foreach ($pairs as [$h, $i]) {}
             foreach ($pairs as $key => [$j, $k]) {}
+            list([$m, $n]) = $nested;
+            foreach ($pairs as list([$o])) {}
             $l = array(1, 2);
         "}
     }
