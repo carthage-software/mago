@@ -1203,6 +1203,32 @@ where
     }
 }
 
+/// Returns the document that terminates a statement whose member access chain received
+/// the dangling-semicolon treatment (`method_chain_semicolon_on_next_line`).
+///
+/// A closing-tag terminator must survive the replacement: dropping it would turn any
+/// inline HTML following the statement into PHP code.
+fn member_chain_dangling_semicolon<'arena, A>(
+    f: &mut FormatterState<'_, 'arena, A>,
+    terminator: &'arena Terminator<'arena>,
+) -> Document<'arena, A>
+where
+    A: Arena,
+{
+    match terminator {
+        Terminator::ClosingTag(closing_tag) => Document::Array(vec_in![f.arena;
+            Document::Line(Line::hard()),
+            Document::String(b";"),
+            Document::Line(Line::hard()),
+            closing_tag.format(f),
+        ]),
+        _ => Document::Array(vec_in![f.arena;
+            Document::Line(Line::hard()),
+            Document::String(b";"),
+        ]),
+    }
+}
+
 impl<'arena, A> Format<'arena, A> for ExpressionStatement<'arena>
 where
     A: Arena,
@@ -1214,12 +1240,14 @@ where
             if let Some(chain_group_id) = f.take_member_access_chain_group_id()
                 && f.settings.method_chain_semicolon_on_next_line
             {
+                let semicolon = member_chain_dangling_semicolon(f, &self.terminator);
+
                 Document::Array(vec_in![f.arena;
                     expression,
                     Document::IfBreak(
                         IfBreak::new(
                             f.arena,
-                            Document::Array(vec_in![f.arena; Document::Line(Line::hard()), Document::String(b";")]),
+                            semicolon,
                             terminator,
                         )
                         .with_id(chain_group_id),
@@ -1438,14 +1466,8 @@ where
             if let Some(chain_group_id) = f.take_member_access_chain_group_id()
                 && f.settings.method_chain_semicolon_on_next_line
             {
-                contents.push(Document::IfBreak(
-                    IfBreak::new(
-                        f.arena,
-                        Document::Array(vec_in![f.arena; Document::Line(Line::hard()), Document::String(b";")]),
-                        terminator,
-                    )
-                    .with_id(chain_group_id),
-                ));
+                let semicolon = member_chain_dangling_semicolon(f, &self.terminator);
+                contents.push(Document::IfBreak(IfBreak::new(f.arena, semicolon, terminator).with_id(chain_group_id)));
 
                 Document::Group(Group::new(contents).with_id(chain_group_id))
             } else {
