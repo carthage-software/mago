@@ -54,6 +54,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
                 artifacts.record_loop_assignment_target(*value_id);
 
                 block_context.remove_variable(value_id.as_bytes(), true, context);
+                block_context.possibly_assigned_variable_ids.insert(*value_id);
                 block_context.references_possibly_from_confusing_scope.remove(value_id);
             }
 

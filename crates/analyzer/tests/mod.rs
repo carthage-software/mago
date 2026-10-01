@@ -2784,6 +2784,11 @@ test_case!(issue_2385);
 test_case!(issue_2401);
 test_case!(issue_2409);
 test_case!(issue_2410);
+test_case!(issue_2411, {
+    let mut settings = crate::framework::default_test_settings();
+    settings.strict_array_index_existence = true;
+    settings
+});
 
 #[test]
 #[cfg_attr(miri, ignore)]

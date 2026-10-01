@@ -42,6 +42,8 @@ use crate::context::scope::conditional_scope::IfConditionalScope;
 use crate::context::scope::control_action::ControlAction;
 use crate::context::scope::control_action::ControlActionSet;
 use crate::context::scope::if_scope::IfScope;
+use crate::context::scope::var_has_root;
+use crate::context::scope::var_references_dynamic;
 use crate::context::utils::inherit_branch_context_properties;
 use crate::error::AnalysisError;
 use crate::formula;
@@ -193,7 +195,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
         }
 
         if_scope.reasonable_clauses.clone_from(&if_block_context.clauses);
-        let saved_if_clauses = if_clauses.clone();
+        let mut saved_if_clauses = if_clauses.clone();
         if_scope.negated_clauses = negate_or_synthesize(
             if_clauses,
             self.condition,
@@ -245,22 +247,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
             self,
         )?;
 
-        let if_body_assigned_ids = if_scope.assigned_variable_ids.clone().unwrap_or_default();
-        let mut if_body_redefined_snapshot: WordMap<Rc<TUnion>> = WordMap::default();
-        if let Some(redefined) = &if_scope.redefined_variables {
-            for (k, v) in redefined {
-                if if_body_assigned_ids.contains_key(k) {
-                    if_body_redefined_snapshot.insert(*k, Rc::clone(v));
-                }
-            }
-        }
-
+        let if_body_assigned_ids: WordSet = if_scope
+            .assigned_variable_ids
+            .iter()
+            .flat_map(|ids| ids.keys().copied())
+            .chain(if_scope.possibly_assigned_variable_ids.iter().copied())
+            .collect();
+        let mut if_body_redefined_snapshot = if_scope.redefined_variables.clone().unwrap_or_default();
         if let Some(new_vars) = &if_scope.new_variables {
-            for (k, v) in new_vars {
-                if if_body_assigned_ids.contains_key(k) {
-                    if_body_redefined_snapshot.insert(*k, Rc::clone(v));
-                }
-            }
+            if_body_redefined_snapshot.extend(new_vars.iter().map(|(key, ty)| (*key, Rc::clone(ty))));
         }
 
         let mut else_block_context = if let Some(post_leaving_if_context) = if_scope.post_leaving_if_context.take() {
@@ -297,17 +292,57 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
             self.span(),
         )?;
 
-        synthesize_branch_discriminator_clauses(
-            block_context,
-            &if_body_redefined_snapshot,
-            &else_block_context,
-            &else_block_context.assigned_variable_ids,
-            &saved_if_clauses,
-            &if_scope.negated_clauses,
-            self.condition.span(),
-            &context.settings.algebra_thresholds(),
-            context.settings.formula_size_threshold,
-        );
+        if_body_redefined_snapshot.retain(|variable_id, _| {
+            if_body_assigned_ids.contains(variable_id)
+                || else_block_context.assigned_variable_ids.contains_key(variable_id)
+        });
+        for variable_id in else_block_context.assigned_variable_ids.keys() {
+            if if_body_assigned_ids.iter().any(|assigned_id| {
+                var_has_root(*variable_id, *assigned_id) || var_references_dynamic(*variable_id, *assigned_id)
+            }) {
+                continue;
+            }
+
+            if let Some(variable_type) = if_conditional_scope.if_body_context.locals.get(variable_id) {
+                if_body_redefined_snapshot.entry(*variable_id).or_insert_with(|| Rc::clone(variable_type));
+            }
+        }
+
+        let discriminator_clauses = if if_body_redefined_snapshot.is_empty() || self.body.has_else_if_clauses() {
+            vec![]
+        } else {
+            let unchanged_clause = |clause: &Clause| {
+                clause.possibilities.iter().all(|(variable_id, assertions)| {
+                    if_scope
+                        .possibly_assigned_variable_ids
+                        .iter()
+                        .chain(if_body_assigned_ids.iter())
+                        .chain(else_block_context.assigned_variable_ids.keys())
+                        .all(|assigned_id| {
+                            !var_has_root(*variable_id, *assigned_id)
+                                && !var_references_dynamic(*variable_id, *assigned_id)
+                                && !assertions.values().any(|assertion| {
+                                    assertion.referenced_variable().is_some_and(|referenced_id| {
+                                        var_has_root(referenced_id, *assigned_id)
+                                            || var_references_dynamic(referenced_id, *assigned_id)
+                                    })
+                                })
+                        })
+                })
+            };
+
+            saved_if_clauses.retain(&unchanged_clause);
+            if_scope.negated_clauses.retain(unchanged_clause);
+            synthesize_branch_discriminator_clauses(
+                &if_body_redefined_snapshot,
+                &else_block_context,
+                &saved_if_clauses,
+                &if_scope.negated_clauses,
+                self.condition.span(),
+                &context.settings.algebra_thresholds(),
+                context.settings.formula_size_threshold,
+            )
+        };
 
         let has_returned = !if_scope.final_actions.contains(ControlAction::None);
 
@@ -424,6 +459,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
             block_context.locals.insert(variable_id, Rc::new(new_type));
         }
 
+        block_context.clauses.extend(discriminator_clauses);
         if has_returned {
             block_context.flags.set_has_returned(true);
         }
@@ -1479,30 +1515,25 @@ fn get_definitely_evaluated_ored_expressions<'ast, 'arena>(
     vec![expression]
 }
 
-fn synthesize_branch_discriminator_clauses<'ctx>(
-    outer_block_context: &mut BlockContext<'ctx>,
+fn synthesize_branch_discriminator_clauses(
     if_body_redefined: &WordMap<Rc<TUnion>>,
-    else_block_context: &BlockContext<'ctx>,
-    else_assigned_ids: &WordMap<u32>,
+    else_block_context: &BlockContext<'_>,
     if_clauses: &[mago_algebra::clause::Clause],
     negated_clauses: &[mago_algebra::clause::Clause],
     condition_span: Span,
     algebra_thresholds: &mago_algebra::AlgebraThresholds,
     formula_size_threshold: u16,
-) {
+) -> Vec<Rc<Clause>> {
     if if_body_redefined.is_empty() {
-        return;
+        return vec![];
     }
 
     if if_clauses.is_empty() && negated_clauses.is_empty() {
-        return;
+        return vec![];
     }
 
+    let mut clauses = vec![];
     for (variable_id, if_type) in if_body_redefined {
-        if !else_assigned_ids.contains_key(variable_id) {
-            continue;
-        }
-
         let Some(else_type) = else_block_context.locals.get(variable_id) else {
             continue;
         };
@@ -1539,7 +1570,7 @@ fn synthesize_branch_discriminator_clauses<'ctx>(
 
             let combined = disjoin_clauses(head, truthy_side_clauses.to_vec(), condition_span, algebra_thresholds);
             if combined.len() <= usize::from(formula_size_threshold) {
-                outer_block_context.clauses.extend(combined.into_iter().map(Rc::new));
+                clauses.extend(combined.into_iter().map(Rc::new));
             }
         }
 
@@ -1558,10 +1589,12 @@ fn synthesize_branch_discriminator_clauses<'ctx>(
 
             let combined = disjoin_clauses(head, falsy_side_clauses.to_vec(), condition_span, algebra_thresholds);
             if combined.len() <= usize::from(formula_size_threshold) {
-                outer_block_context.clauses.extend(combined.into_iter().map(Rc::new));
+                clauses.extend(combined.into_iter().map(Rc::new));
             }
         }
     }
+
+    clauses
 }
 
 fn get_branch_control_flags(final_actions: ControlActionSet) -> (bool, bool, bool, bool) {
