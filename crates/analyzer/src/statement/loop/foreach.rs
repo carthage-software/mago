@@ -178,7 +178,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Foreach<'arena> {
             always_enters_loop,
         )?;
 
-        let refined_entry = if let Some((iterator_id, key_id, value_id, entry_id, _)) = foreach_entry
+        let refined_entry = if let Some((iterator_id, key_id, value_id, entry_id, original_entry_type)) = foreach_entry
             && !loop_scope.final_actions.contains(ControlAction::Break)
             && assignments_only_target_current_entry(
                 iterator_id,
@@ -188,6 +188,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Foreach<'arena> {
                 &loop_scope.assignment_targets,
             )
             && let Some(entry_type) = inner_loop_block_context.locals.get(&entry_id)
+            && entry_type != &original_entry_type
             && !entry_type.is_mixed()
         {
             Some((iterator_id, Rc::clone(entry_type)))
