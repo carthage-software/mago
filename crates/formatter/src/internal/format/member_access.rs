@@ -27,6 +27,7 @@ use crate::document::Group;
 use crate::document::IndentIfBreak;
 use crate::document::Line;
 use crate::internal::FormatterState;
+use crate::internal::MemberAccessChainContext;
 use crate::internal::format::Format;
 use crate::internal::format::call_arguments::print_argument_list;
 use crate::internal::format::call_arguments::promote_argument_list_to_partial;
@@ -922,8 +923,8 @@ where
         parts.push(Document::BreakParent);
     }
 
-    if matches!(f.parent_node(), Node::ExpressionStatement(_) | Node::Assignment(_) | Node::Return(_)) {
-        f.set_member_access_chain_group_id(group_id);
+    if f.terminates_statement_from_parent() {
+        f.set_member_access_chain_context(MemberAccessChainContext { group_id, must_break });
     }
 
     // Wrap everything in a group to manage line breaking
