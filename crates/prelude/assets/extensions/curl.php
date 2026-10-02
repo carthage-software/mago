@@ -123,7 +123,7 @@ function curl_multi_getcontent(CurlHandle $handle): ?string {}
  *   handle: resource
  * }
  */
-function curl_multi_info_read(CurlMultiHandle $multi_handle, &$queued_messages): array|false {}
+function curl_multi_info_read(CurlMultiHandle $multi_handle, &$queued_messages = null): array|false {}
 
 function curl_multi_close(CurlMultiHandle $multi_handle): void {}
 

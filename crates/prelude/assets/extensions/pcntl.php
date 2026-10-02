@@ -309,14 +309,14 @@ namespace {
 
     function pcntl_strerror(int $error_code): string {}
 
-    function pcntl_getpriority(?int $process_id, int $mode = PRIO_PROCESS): int|false {}
+    function pcntl_getpriority(?int $process_id = null, int $mode = PRIO_PROCESS): int|false {}
 
-    function pcntl_setpriority(int $priority, ?int $process_id, int $mode = PRIO_PROCESS): bool {}
+    function pcntl_setpriority(int $priority, ?int $process_id = null, int $mode = PRIO_PROCESS): bool {}
 
     /**
      * @param-out array $old_signals
      */
-    function pcntl_sigprocmask(int $mode, array $signals, &$old_signals): bool {}
+    function pcntl_sigprocmask(int $mode, array $signals, &$old_signals = null): bool {}
 
     /**
      * @param-out array $info

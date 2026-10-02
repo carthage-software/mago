@@ -136,7 +136,7 @@ class Phar extends RecursiveDirectoryIterator implements RecursiveIterator, Seek
     /**
      * @param string $stub
      */
-    public function setStub($stub, int $length): bool {}
+    public function setStub($stub, int $length = UNKNOWN): bool {}
 
     public function startBuffering(): void {}
 

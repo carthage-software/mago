@@ -3022,12 +3022,12 @@ function stream_context_get_params($context): array {}
 /**
  * @param resource $context
  */
-function stream_context_set_option($context, string $wrapper_or_options, string $option_name, mixed $value): bool {}
-
-/**
- * @param resource $stream_or_context
- */
-function stream_context_set_option($stream_or_context, array $options): bool {}
+function stream_context_set_option(
+    $context,
+    array|string $wrapper_or_options,
+    ?string $option_name = null,
+    mixed $value = UNKNOWN,
+): bool {}
 
 /**
  * @param resource $context
@@ -3370,7 +3370,7 @@ function pack(string $format, mixed ...$values): string {}
  */
 function unpack(string $format, string $string, int $offset = 0): array|false {}
 
-function get_browser(?string $user_agent, bool $return_array = false): object|array|false {}
+function get_browser(?string $user_agent = null, bool $return_array = false): object|array|false {}
 
 /**
  * @pure
@@ -3978,7 +3978,7 @@ class AssertionError extends Error {}
 /**
  * @deprecated
  */
-function assert_options(int $option, mixed $value): mixed {}
+function assert_options(int $option, mixed $value = UNKNOWN): mixed {}
 
 /**
  * @param null|'<'|'lt'|'<='|'le'|'>'|'gt'|'>='|'ge'|'=='|'='|'eq'|'!='|'<>'|'ne' $operator

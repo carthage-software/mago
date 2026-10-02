@@ -42,7 +42,7 @@ function mb_strtoupper(string $string, ?string $encoding = null): string {}
  */
 function mb_strtolower(string $string, ?string $encoding = null): string {}
 
-function mb_language(?string $language): string|bool {}
+function mb_language(?string $language = null): string|bool {}
 
 /**
  * @return ($encoding is null ? string : bool)
@@ -239,8 +239,8 @@ function mb_convert_kana(string $string, string $mode = 'KV', ?string $encoding 
  */
 function mb_encode_mimeheader(
     string $string,
-    ?string $charset,
-    ?string $transfer_encoding,
+    ?string $charset = null,
+    ?string $transfer_encoding = null,
     string $newline = "\r\n",
     int $indent = 0,
 ): string {}
@@ -312,7 +312,7 @@ function mb_check_encoding(array|string|null $value = null, ?string $encoding = 
 
 function mb_regex_encoding(?string $encoding = null): string|bool {}
 
-function mb_regex_set_options(?string $options): string {}
+function mb_regex_set_options(?string $options = null): string {}
 
 /**
  * @param string[] &$matches

@@ -677,14 +677,21 @@ class Spoofchecker
 class IntlGregorianCalendar extends IntlCalendar
 {
     /**
-     * @param int $timezoneOrYear
-     * @param int $localeOrMonth
+     * @param IntlTimeZone|DateTimeZone|string|int|null $timezoneOrYear
+     * @param string|int|null $localeOrMonth
      * @param int $day
      * @param int $hour
      * @param int $minute
      * @param int $second
      */
-    public function __construct($timezoneOrYear, $localeOrMonth, $day, $hour, $minute, $second) {}
+    public function __construct(
+        $timezoneOrYear = UNKNOWN,
+        $localeOrMonth = UNKNOWN,
+        $day = UNKNOWN,
+        $hour = UNKNOWN,
+        $minute = UNKNOWN,
+        $second = UNKNOWN,
+    ) {}
 
     /**
      * @param mixed $timeZone
@@ -797,7 +804,7 @@ class IntlCalendar
      */
     public function fieldDifference(float $timestamp, int $field): int|false {}
 
-    public static function fromDateTime(DateTime|string $datetime, ?string $locale): ?IntlCalendar {}
+    public static function fromDateTime(DateTime|string $datetime, ?string $locale = null): ?IntlCalendar {}
 
     /**
      * @return ($field is IntlCalendar::FIELD_* ? int : false)
@@ -1050,7 +1057,7 @@ class IntlTimeZone
 
     public static function createDefault(): IntlTimeZone {}
 
-    public static function createEnumeration(mixed $countryOrRawOffset): IntlIterator|false {}
+    public static function createEnumeration(mixed $countryOrRawOffset = null): IntlIterator|false {}
 
     public static function createTimeZone(string $timezoneId): ?IntlTimeZone {}
 
@@ -1065,12 +1072,12 @@ class IntlTimeZone
     /**
      * @param-out bool $isSystemId
      */
-    public static function getCanonicalID(string $timezoneId, &$isSystemId): string|false {}
+    public static function getCanonicalID(string $timezoneId, &$isSystemId = null): string|false {}
 
     /**
      * @pure
      */
-    public function getDisplayName(bool $dst = false, int $style = 2, ?string $locale): string|false {}
+    public function getDisplayName(bool $dst = false, int $style = 2, ?string $locale = null): string|false {}
 
     /**
      * @pure
@@ -1689,10 +1696,10 @@ function intlcal_set(
     IntlCalendar $calendar,
     int $year,
     int $month,
-    int $dayOfMonth,
-    int $hour,
-    int $minute,
-    int $second,
+    int $dayOfMonth = UNKNOWN,
+    int $hour = UNKNOWN,
+    int $minute = UNKNOWN,
+    int $second = UNKNOWN,
 ): bool {}
 
 function intlcal_roll(IntlCalendar $calendar, int $field, int|bool $value): bool {}
@@ -1863,7 +1870,7 @@ function intlz_create_default() {}
  *
  * @pure
  */
-function intltz_create_enumeration($countryOrRawOffset): IntlIterator|false {}
+function intltz_create_enumeration($countryOrRawOffset = null): IntlIterator|false {}
 
 /**
  * @pure
@@ -1880,7 +1887,7 @@ function intltz_from_date_time_zone(DateTimeZone $timezone): ?IntlTimeZone {}
  *
  * @pure
  */
-function intltz_get_canonical_id(string $timezoneId, &$isSystemId): string|false {}
+function intltz_get_canonical_id(string $timezoneId, &$isSystemId = null): string|false {}
 
 /**
  * @pure
@@ -1889,7 +1896,7 @@ function intltz_get_display_name(
     IntlTimeZone $timezone,
     bool $dst = false,
     int $style = 2,
-    ?string $locale,
+    ?string $locale = null,
 ): string|false {}
 
 /**
@@ -1951,7 +1958,7 @@ function intltz_use_daylight_time(IntlTimeZone $timezone): bool {}
 
 /**
  * @param DateTimeZone|IntlTimeZone|string|int|null $timezoneOrYear
- * @param string|null $localeOrMonth
+ * @param string|int|null $localeOrMonth
  * @param int $day
  * @param int $hour
  * @param int $minute
@@ -1963,12 +1970,12 @@ function intltz_use_daylight_time(IntlTimeZone $timezone): bool {}
     'use IntlGregorianCalendar::__construct(), IntlGregorianCalendar::createFromDate(), or IntlGregorianCalendar::createFromDateTime() instead',
 )]
 function intlgregcal_create_instance(
-    $timezoneOrYear,
-    $localeOrMonth,
-    $day,
-    $hour,
-    $minute,
-    $second,
+    $timezoneOrYear = UNKNOWN,
+    $localeOrMonth = UNKNOWN,
+    $day = UNKNOWN,
+    $hour = UNKNOWN,
+    $minute = UNKNOWN,
+    $second = UNKNOWN,
 ): ?IntlGregorianCalendar {}
 
 function intlgregcal_set_gregorian_change(IntlGregorianCalendar $calendar, float $timestamp): bool {}
@@ -2465,13 +2472,13 @@ class IntlBreakIterator implements IteratorAggregate
 
     public static function createCodePointInstance(): IntlCodePointBreakIterator {}
 
-    public static function createLineInstance(?string $locale): ?IntlBreakIterator {}
+    public static function createLineInstance(?string $locale = null): ?IntlBreakIterator {}
 
-    public static function createSentenceInstance(?string $locale): ?IntlBreakIterator {}
+    public static function createSentenceInstance(?string $locale = null): ?IntlBreakIterator {}
 
-    public static function createTitleInstance(?string $locale): ?IntlBreakIterator {}
+    public static function createTitleInstance(?string $locale = null): ?IntlBreakIterator {}
 
-    public static function createWordInstance(?string $locale): ?IntlBreakIterator {}
+    public static function createWordInstance(?string $locale = null): ?IntlBreakIterator {}
 
     /**
      * @pure
@@ -2541,11 +2548,11 @@ class IntlRuleBasedBreakIterator extends IntlBreakIterator implements Traversabl
     public function __construct(string $rules, bool $compiled = false) {}
 
     /**
-     * @param string $locale
+     * @param string|null $locale
      *
      * @return IntlRuleBasedBreakIterator
      */
-    public static function createCharacterInstance($locale) {}
+    public static function createCharacterInstance($locale = null) {}
 
     /**
      * @return IntlRuleBasedBreakIterator
@@ -2553,32 +2560,32 @@ class IntlRuleBasedBreakIterator extends IntlBreakIterator implements Traversabl
     public static function createCodePointInstance() {}
 
     /**
-     * @param string $locale
+     * @param string|null $locale
      *
      * @return IntlRuleBasedBreakIterator
      */
-    public static function createLineInstance($locale) {}
+    public static function createLineInstance($locale = null) {}
 
     /**
-     * @param string $locale
+     * @param string|null $locale
      *
      * @return IntlRuleBasedBreakIterator
      */
-    public static function createSentenceInstance($locale) {}
+    public static function createSentenceInstance($locale = null) {}
 
     /**
-     * @param string $locale
+     * @param string|null $locale
      *
      * @return IntlRuleBasedBreakIterator
      */
-    public static function createTitleInstance($locale) {}
+    public static function createTitleInstance($locale = null) {}
 
     /**
-     * @param string $locale
+     * @param string|null $locale
      *
      * @return IntlRuleBasedBreakIterator
      */
-    public static function createWordInstance($locale) {}
+    public static function createWordInstance($locale = null) {}
 
     /**
      * @pure

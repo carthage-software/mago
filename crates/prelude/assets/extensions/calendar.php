@@ -125,12 +125,12 @@ function jddayofweek(int $julian_day, int $mode = CAL_DOW_DAYNO): string|int {}
 
 function jdmonthname(int $julian_day, int $mode): string {}
 
-function easter_date(?int $year, int $mode = CAL_EASTER_DEFAULT): int {}
+function easter_date(?int $year = null, int $mode = CAL_EASTER_DEFAULT): int {}
 
 /**
  * @param positive-int|null $year
  */
-function easter_days(?int $year, int $mode = CAL_EASTER_DEFAULT): int {}
+function easter_days(?int $year = null, int $mode = CAL_EASTER_DEFAULT): int {}
 
 function unixtojd(?int $timestamp = null): int|false {}
 

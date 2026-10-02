@@ -145,7 +145,7 @@ function localtime(?int $timestamp = null, bool $associative = false): array {}
  *   0: int
  * }
  */
-function getdate(?int $timestamp): array {}
+function getdate(?int $timestamp = null): array {}
 
 function date_create(string $datetime = 'now', ?DateTimeZone $timezone = null): DateTime|false {}
 

@@ -182,7 +182,7 @@ class RecursiveIteratorIterator implements OuterIterator
     /**
      * @return RecursiveIterator<K, V>|null
      */
-    public function getSubIterator(?int $level): ?RecursiveIterator {}
+    public function getSubIterator(?int $level = null): ?RecursiveIterator {}
 
     /**
      * @return RecursiveIterator<K, V>
@@ -2130,7 +2130,7 @@ function spl_autoload_extensions(?string $file_extensions = null): string {}
  *
  * @throws TypeError
  */
-function spl_autoload_register(?callable $callback, bool $throw = true, bool $prepend = false): bool {}
+function spl_autoload_register(?callable $callback = null, bool $throw = true, bool $prepend = false): bool {}
 
 /**
  * @param null|(callable(class-string): void) $callback

@@ -1,6 +1,6 @@
 <?php
 
-function readline(?string $prompt): string|false {}
+function readline(?string $prompt = null): string|false {}
 
 /**
  * @return string|int|bool|array{
@@ -28,9 +28,9 @@ function readline_clear_history(): bool {}
 
 function readline_list_history(): array {}
 
-function readline_read_history(?string $filename): bool {}
+function readline_read_history(?string $filename = null): bool {}
 
-function readline_write_history(?string $filename): bool {}
+function readline_write_history(?string $filename = null): bool {}
 
 function readline_completion_function(callable $callback): bool {}
 

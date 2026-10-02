@@ -807,7 +807,7 @@ function defined(string $constant_name): bool {}
 /**
  * @pure
  */
-function get_class(object $object): string {}
+function get_class(object $object = UNKNOWN): string {}
 
 /**
  * @pure
@@ -817,7 +817,7 @@ function get_called_class(): string {}
 /**
  * @pure
  */
-function get_parent_class(object|string $object_or_class): string|false {}
+function get_parent_class(object|string $object_or_class = UNKNOWN): string|false {}
 
 /**
  * @param object|string $object_or_class
@@ -1072,7 +1072,7 @@ function gc_mem_caches(): int {}
  *
  * @pure
  */
-function get_resources(?string $type): array {}
+function get_resources(?string $type = null): array {}
 
 /**
  * @template T of object

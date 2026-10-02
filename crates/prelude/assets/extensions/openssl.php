@@ -5,7 +5,7 @@
  */
 function openssl_pkey_free(OpenSSLAsymmetricKey $key): void {}
 
-function openssl_pkey_new(?array $options): OpenSSLAsymmetricKey|false {}
+function openssl_pkey_new(?array $options = null): OpenSSLAsymmetricKey|false {}
 
 /**
  * @param-out string $output
@@ -277,7 +277,7 @@ function openssl_pbkdf2(
 function openssl_pkcs7_verify(
     string $input_filename,
     int $flags,
-    ?string $signers_certificates_filename,
+    ?string $signers_certificates_filename = null,
     array $ca_info = [],
     ?string $untrusted_certificates_filename = null,
     ?string $content = null,
@@ -399,7 +399,7 @@ function openssl_pkcs7_read(string $data, &$certificates): bool {}
 function openssl_cms_verify(
     string $input_filename,
     int $flags = 0,
-    ?string $certificates,
+    ?string $certificates = null,
     array $ca_info = [],
     ?string $untrusted_certificates_filename = null,
     ?string $content = null,

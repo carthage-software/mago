@@ -502,7 +502,7 @@ class ReflectionProperty implements Reflector
      */
     public function getValue(?object $object = null): mixed {}
 
-    public function setValue(mixed $objectOrValue, mixed $value): void {}
+    public function setValue(mixed $objectOrValue, mixed $value = UNKNOWN): void {}
 
     /**
      * @pure
@@ -1463,7 +1463,7 @@ class ReflectionClass implements Reflector
     /**
      * @pure
      */
-    public function getStaticPropertyValue(string $name, mixed $default): mixed {}
+    public function getStaticPropertyValue(string $name, mixed $default = UNKNOWN): mixed {}
 
     public function setStaticPropertyValue(string $name, mixed $value): void {}
 

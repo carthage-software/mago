@@ -18,7 +18,7 @@ function exif_tagname(int $index): string|false {}
  * @param int $height
  * @param int $image_type
  */
-function exif_thumbnail($file, &$width, &$height, &$image_type): string|false {}
+function exif_thumbnail($file, &$width = null, &$height = null, &$image_type = null): string|false {}
 
 function exif_imagetype(string $filename): int|false {}
 

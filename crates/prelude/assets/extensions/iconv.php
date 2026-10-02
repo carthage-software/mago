@@ -31,7 +31,7 @@ function iconv_strlen(string $string, ?string $encoding = null): int|false {}
 /**
  * @pure
  */
-function iconv_substr(string $string, int $offset, ?int $length, ?string $encoding = null): string|false {}
+function iconv_substr(string $string, int $offset, ?int $length = null, ?string $encoding = null): string|false {}
 
 /**
  * @pure

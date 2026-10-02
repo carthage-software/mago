@@ -5,7 +5,7 @@ final class SysvSharedMemory
     private function __construct() {}
 }
 
-function shm_attach(int $key, ?int $size, int $permissions = 0666): SysvSharedMemory|false {}
+function shm_attach(int $key, ?int $size = null, int $permissions = 0666): SysvSharedMemory|false {}
 
 function shm_remove(SysvSharedMemory $shm): bool {}
 

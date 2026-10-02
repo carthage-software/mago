@@ -63,7 +63,7 @@ namespace {
      * @param non-negative-int|null $scale
      * @return numeric-string
      */
-    function bcsqrt(string $num, ?int $scale): string {}
+    function bcsqrt(string $num, ?int $scale = null): string {}
 
     /**
      * @param non-negative-int|null $scale

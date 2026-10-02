@@ -10,7 +10,7 @@ function xml_parser_create(?string $encoding = null): XMLParser {}
 /**
  * @pure
  */
-function xml_parser_create_ns(?string $encoding, string $separator = ':'): XMLParser {}
+function xml_parser_create_ns(?string $encoding = null, string $separator = ':'): XMLParser {}
 
 /**
  * @deprecated
@@ -41,7 +41,7 @@ function xml_set_end_namespace_decl_handler(XMLParser $parser, callable|string|n
 
 function xml_parse(XMLParser $parser, string $data, bool $is_final = false): int {}
 
-function xml_parse_into_struct(XMLParser $parser, string $data, array &$values, array &$index): int {}
+function xml_parse_into_struct(XMLParser $parser, string $data, array &$values, array &$index = null): int {}
 
 /**
  * @pure

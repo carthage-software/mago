@@ -493,7 +493,7 @@ final class AddressInfo
 /**
  * @return AddressInfo[]|false
  */
-function socket_addrinfo_lookup(string $host, ?string $service, array $hints = []): array|false {}
+function socket_addrinfo_lookup(string $host, ?string $service = null, array $hints = []): array|false {}
 
 function socket_addrinfo_connect(AddressInfo $address): Socket|false {}
 
