@@ -2789,6 +2789,7 @@ test_case!(issue_2411, {
     settings.strict_array_index_existence = true;
     settings
 });
+test_case!(issue_2418);
 
 #[test]
 #[cfg_attr(miri, ignore)]

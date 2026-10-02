@@ -312,6 +312,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
             vec![]
         } else {
             let unchanged_clause = |clause: &Clause| {
+                if clause.wedge || !clause.reconcilable || clause.possibilities.is_empty() {
+                    return false;
+                }
+
                 clause.possibilities.iter().all(|(variable_id, assertions)| {
                     if_scope
                         .possibly_assigned_variable_ids
