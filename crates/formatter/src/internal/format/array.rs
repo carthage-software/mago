@@ -165,7 +165,10 @@ where
     let has_floating_comments = has_floating_comments(f, &array_like);
     let should_break = preserve_break || has_floating_comments;
 
-    if !should_break && let Some(element) = inline_single_element(f, &array_like) {
+    if !should_break
+        && !f.settings.always_break_multiline_array_like
+        && let Some(element) = inline_single_element(f, &array_like)
+    {
         parts.push(element);
         parts.push(get_right_delimiter(f, &array_like));
 
@@ -255,13 +258,18 @@ where
 
     let force_break = use_table_style || has_floating_comments;
 
-    Document::Group(Group::new(parts).with_id(group_id).with_break_mode(if force_break {
-        BreakMode::Force
-    } else if preserve_break {
-        BreakMode::Preserve
-    } else {
-        BreakMode::Auto
-    }))
+    Document::Group(
+        Group::new(parts)
+            .with_id(group_id)
+            .with_break_mode(if force_break {
+                BreakMode::Force
+            } else if preserve_break {
+                BreakMode::Preserve
+            } else {
+                BreakMode::Auto
+            })
+            .with_strict_fit(f.settings.always_break_multiline_array_like),
+    )
 }
 
 #[inline]

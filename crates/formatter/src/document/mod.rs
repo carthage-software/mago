@@ -103,6 +103,9 @@ where
     pub break_mode: RefCell<BreakMode>,
     pub expanded_states: Option<Vec<'arena, Document<'arena, A>, A>>,
     pub id: Option<GroupIdentifier>,
+    /// When set, the group stays flat only if its whole content fits on one line. A nested
+    /// group that must break, or a hard line, makes this group break as well.
+    pub strict_fit: bool,
 }
 
 #[derive(Debug, Eq, PartialEq, PartialOrd, Ord)]
@@ -170,7 +173,7 @@ where
 {
     #[must_use]
     pub fn new(contents: Vec<'arena, Document<'arena, A>, A>) -> Self {
-        Self { contents, break_mode: RefCell::new(BreakMode::Auto), id: None, expanded_states: None }
+        Self { contents, break_mode: RefCell::new(BreakMode::Auto), id: None, expanded_states: None, strict_fit: false }
     }
 
     #[must_use]
@@ -178,7 +181,13 @@ where
         contents: Vec<'arena, Document<'arena, A>, A>,
         expanded_states: Vec<'arena, Document<'arena, A>, A>,
     ) -> Self {
-        Self { contents, break_mode: RefCell::new(BreakMode::Auto), id: None, expanded_states: Some(expanded_states) }
+        Self {
+            contents,
+            break_mode: RefCell::new(BreakMode::Auto),
+            id: None,
+            expanded_states: Some(expanded_states),
+            strict_fit: false,
+        }
     }
 
     #[must_use]
@@ -190,6 +199,12 @@ where
     #[must_use]
     pub fn with_id(mut self, id: GroupIdentifier) -> Self {
         self.id = Some(id);
+        self
+    }
+
+    #[must_use]
+    pub fn with_strict_fit(mut self, strict_fit: bool) -> Self {
+        self.strict_fit = strict_fit;
         self
     }
 }
@@ -355,6 +370,7 @@ where
             break_mode: g.break_mode.clone(),
             expanded_states: g.expanded_states.as_ref().map(|v| clone_vec_in_arena(arena, v)),
             id: g.id,
+            strict_fit: g.strict_fit,
         }),
         Document::Align(a) => {
             Document::Align(Align { alignment: a.alignment, contents: clone_vec_in_arena(arena, &a.contents) })
@@ -429,7 +445,7 @@ where
             buffer.push('}');
             buffer.push(')');
         }
-        Document::Group(Group { contents, break_mode, expanded_states, id }) => {
+        Document::Group(Group { contents, break_mode, expanded_states, id, strict_fit }) => {
             let mut options = vec_in![arena];
             match *break_mode.borrow() {
                 BreakMode::Auto => {}
@@ -439,6 +455,10 @@ where
 
             if let Some(id) = id {
                 options.push(format!("id: {id}"));
+            }
+
+            if *strict_fit {
+                options.push("strictFit: true".to_string());
             }
 
             let expanded_states_str = if let Some(states) = expanded_states {

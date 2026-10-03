@@ -480,6 +480,30 @@ generate_formatter_settings! {
     /// Default: true
     preserve_breaking_array_like: bool => "default_true",
 
+    /// Whether an array-like that spans several lines always puts each element on its own line.
+    ///
+    /// When disabled, an array can keep its brackets on the lines of its elements when an element
+    /// breaks, for example around its only element or around a call that breaks inside its last
+    /// argument:
+    /// ```php
+    /// $options = ['query' => foo('admin/content', [
+    ///     'langcode' => $langcode,
+    /// ])];
+    /// ```
+    ///
+    /// When enabled, the array breaks instead, and the element breaks only if it still does not fit:
+    /// ```php
+    /// $options = [
+    ///     'query' => foo('admin/content', ['langcode' => $langcode]),
+    /// ];
+    /// ```
+    ///
+    /// When enabled, a parameter list whose only parameter has an array default value also puts
+    /// that parameter on its own line, instead of breaking only inside the array.
+    ///
+    /// Default: false
+    always_break_multiline_array_like: bool => "default_false",
+
     /// Whether to preserve line breaks in parameter lists, even if they could fit on a single line.
     ///
     /// Default: false

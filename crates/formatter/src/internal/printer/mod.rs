@@ -407,12 +407,12 @@ where
         let mut cmds = self.commands.iter().rev();
 
         let mut first = Some(next);
-        while let Some((mode, document)) =
-            stack.next().map(|(mode, doc)| (mode, CommandDocument::Document(doc))).or_else(|| {
+        while let Some((mode, strict, document)) =
+            stack.next().map(|(mode, strict, doc)| (mode, strict, CommandDocument::Document(doc))).or_else(|| {
                 first
                     .take()
                     .or_else(|| if has_line_suffix { None } else { cmds.next() })
-                    .map(|cmd| (cmd.mode, cmd.document))
+                    .map(|cmd| (cmd.mode, false, cmd.document))
             })
         {
             let doc = match document {
@@ -422,7 +422,7 @@ where
                         return false;
                     }
 
-                    stack.push(mode, docs);
+                    stack.push(mode, strict, docs);
                     continue;
                 }
             };
@@ -444,7 +444,7 @@ where
                 | Document::Indent(contents)
                 | Document::Align(Align { contents, .. })
                 | Document::Array(contents) => {
-                    stack.push(mode, contents);
+                    stack.push(mode, strict, contents);
                 }
                 Document::Group(group) => {
                     let group_break_mode = *group.break_mode.borrow();
@@ -452,15 +452,20 @@ where
                         return false;
                     }
 
+                    if strict && group_break_mode == BreakMode::Force {
+                        return false;
+                    }
+
                     let group_mode = if group_break_mode == BreakMode::Force { Mode::Break } else { mode };
+                    let strict = strict || (group.strict_fit && group_mode.is_flat());
                     if group.expanded_states.is_some() && group_mode.is_break() {
                         if let Some(expanded_states) = group.expanded_states.as_ref()
                             && let Some(last_state) = expanded_states.last()
                         {
-                            stack.push(group_mode, std::slice::from_ref(last_state));
+                            stack.push(group_mode, strict, std::slice::from_ref(last_state));
                         }
                     } else {
-                        stack.push(group_mode, &group.contents);
+                        stack.push(group_mode, strict, &group.contents);
                     }
                 }
                 Document::IfBreak(if_break_doc) => {
@@ -468,9 +473,13 @@ where
                         if_break_doc.group_id.map_or(mode, |id| *self.group_mode_map.get(&id).unwrap_or(&Mode::Flat));
                     let contents =
                         if group_mode.is_break() { if_break_doc.break_contents } else { if_break_doc.flat_content };
-                    stack.push(mode, std::slice::from_ref(contents));
+                    stack.push(mode, strict, std::slice::from_ref(contents));
                 }
                 Document::Line(line) => {
+                    if strict && line.hard {
+                        return false;
+                    }
+
                     if mode.is_break() || line.hard {
                         return true;
                     }

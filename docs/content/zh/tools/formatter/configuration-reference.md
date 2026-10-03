@@ -147,6 +147,7 @@ public function bar(
 | `preserve-breaking-argument-list` | 布尔值 | `false` | 保留参数列表(实参)中已有的换行。 |
 | `inline-single-breaking-value-argument` | 布尔值 | `false` | 当调用的唯一实参是一个值(字面量、变量、标识符、类常量)时,即使整行超过 `print-width` 也保持在同一行。对这种实参拆开括号只会多出一个换行、一层缩进和一行单独的右括号,而不会让长值变短。对多实参调用,或本身就是调用、数组、闭包的实参没有效果。在 `tempest` 预设中默认开启,其他预设默认关闭。 |
 | `preserve-breaking-array-like` | 布尔值 | `true` | 保留数组类结构中已有的换行。 |
+| `always-break-multiline-array-like` | 布尔值 | `false` | 跨多行的数组类结构将每个元素放在单独的行上,括号也各占一行,而不是让括号紧贴一个换行的元素。唯一参数以数组为默认值的参数列表也会换行,而不是只在数组内部换行。在 `drupal` 预设中开启,其他预设默认关闭。 |
 | `preserve-breaking-parameter-list` | 布尔值 | `false` | 保留形参列表中已有的换行。 |
 | `preserve-breaking-attribute-list` | 布尔值 | `false` | 保留 attribute 列表中已有的换行。 |
 | `preserve-breaking-conditional-expression` | 布尔值 | `false` | 保留三元表达式中已有的换行。 |

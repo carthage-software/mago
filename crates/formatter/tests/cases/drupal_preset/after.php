@@ -1259,11 +1259,9 @@ $x = new class() {
 
 // Test mago compatibility with single array value over multiple lines.
 $response = new AjaxResponse();
-$response->addCommand(new InvokeCommand(
-  '#edit-field-job-expiration-date-0-value-date',
-  'val',
-  [$end_value->format('Y-m-d')],
-));
+$response->addCommand(new InvokeCommand('#edit-field-job-expiration-date-0-value-date', 'val', [
+  $end_value->format('Y-m-d'),
+]));
 
 foreach ($result['subscriptions'] as $subscription) {
   $group = $subscription->organization->entity;

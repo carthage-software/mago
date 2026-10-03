@@ -4,6 +4,7 @@ use mago_allocator::vec_in;
 
 use mago_php_version::feature::Feature;
 use mago_span::HasSpan;
+use mago_syntax::cst::Expression;
 use mago_syntax::cst::FunctionLikeParameter;
 use mago_syntax::cst::FunctionLikeParameterList;
 use mago_syntax::cst::Modifier;
@@ -208,6 +209,14 @@ where
     }
 
     if !parameter.modifiers.is_empty() && f.settings.break_promoted_properties_list {
+        return false;
+    }
+
+    if f.settings.always_break_multiline_array_like
+        && parameter.default_value.as_ref().is_some_and(|default_value| {
+            matches!(default_value.value, Expression::Array(_) | Expression::LegacyArray(_))
+        })
+    {
         return false;
     }
 
