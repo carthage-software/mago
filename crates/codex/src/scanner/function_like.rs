@@ -578,6 +578,10 @@ fn scan_function_like_docblock<A>(
         }
     });
 
+    for parameter_metadata in metadata.get_parameters_mut() {
+        parameter_metadata.add_null_from_null_default();
+    }
+
     for tag in document.tags() {
         let TagValue::ParamOut(param_out) = &tag.value else {
             continue;

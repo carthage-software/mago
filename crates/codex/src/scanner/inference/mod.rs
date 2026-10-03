@@ -98,6 +98,29 @@ pub fn get_literal_constant_type(name: &[u8]) -> Option<TUnion> {
     }
 }
 
+/// Returns the expression inside any number of parentheses.
+#[inline]
+#[must_use]
+pub(crate) fn unwrap_parens<'expr, 'arena>(mut expression: &'expr Expression<'arena>) -> &'expr Expression<'arena> {
+    while let Expression::Parenthesized(p) = expression {
+        expression = p.expression;
+    }
+    expression
+}
+
+/// Checks whether an expression is the `null` literal, also when written as `\null` or in parentheses.
+#[inline]
+#[must_use]
+pub(crate) fn is_null_literal(expression: &Expression<'_>) -> bool {
+    match unwrap_parens(expression) {
+        Expression::Literal(Literal::Null(_)) => true,
+        Expression::ConstantAccess(access) => {
+            get_literal_constant_type(access.name.value()).is_some_and(|constant_type| constant_type.is_null())
+        }
+        _ => false,
+    }
+}
+
 /// Returns the platform-aware type for a predefined constant, if known.
 ///
 /// These constants have values that vary across platforms (e.g. 32-bit vs 64-bit),

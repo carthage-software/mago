@@ -5,6 +5,7 @@ use crate::metadata::attribute::AttributeMetadata;
 use crate::metadata::flags::MetadataFlags;
 use crate::metadata::ttype::TypeMetadata;
 use crate::misc::VariableIdentifier;
+use crate::ttype::atomic::TAtomic;
 
 /// Contains metadata associated with a single parameter within a function, method, or closure signature.
 ///
@@ -159,6 +160,33 @@ impl FunctionLikeParameterMetadata {
         }
 
         self.type_declaration_metadata = type_declaration;
+    }
+
+    /// Adds `null` to a docblock-only type when the parameter defaults to `null`.
+    ///
+    /// `@param string $x` with `$x = null` accepts `null`, the same way PHP makes a native
+    /// `string $x = null` nullable. This does not depend on the PHP version, because an
+    /// untyped parameter can default to `null` on every version.
+    ///
+    /// A parameter with a native type is left alone. The scanner makes that native type
+    /// nullable where PHP does, and a docblock type keeps the `null` when merged with it.
+    pub fn add_null_from_null_default(&mut self) {
+        if self.type_declaration_metadata.is_some()
+            || !self.default_type.as_ref().is_some_and(|default_type| default_type.type_union.is_null())
+        {
+            return;
+        }
+
+        let Some(type_metadata) = self.type_metadata.as_mut() else {
+            return;
+        };
+
+        if type_metadata.type_union.accepts_null() || type_metadata.type_union.types.iter().any(TAtomic::is_conditional)
+        {
+            return;
+        }
+
+        type_metadata.type_union = type_metadata.type_union.clone().as_nullable();
     }
 }
 
