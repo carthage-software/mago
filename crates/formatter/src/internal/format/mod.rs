@@ -2009,20 +2009,22 @@ where
                 contents.push(Document::space());
             }
 
-            if self.ampersand.is_some() {
-                contents.push(Document::String(b"&"));
-            }
-
-            if self.ellipsis.is_some() {
-                contents.push(Document::String(b"..."));
-            }
-
+            // The alignment padding goes before `&` / `...` so that they stay attached to the
+            // variable name (PSR-12: no space between the variadic operator and the argument name).
             if let (Some(padding), Some(list_id)) =
                 (f.parameter_state.variable_padding, f.parameter_state.list_group_id)
                 && padding > 0
             {
                 let spaces = Document::String(utils::spaces(f.arena, padding));
                 contents.push(Document::IfBreak(IfBreak::new(f.arena, spaces, Document::empty()).with_id(list_id)));
+            }
+
+            if self.ampersand.is_some() {
+                contents.push(Document::String(b"&"));
+            }
+
+            if self.ellipsis.is_some() {
+                contents.push(Document::String(b"..."));
             }
 
             contents.push(self.variable.format(f));

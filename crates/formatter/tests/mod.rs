@@ -191,6 +191,7 @@ test_case!(array_alignment);
 test_case!(align_parameters);
 test_case!(align_parameters_comment_marker_false_positive);
 test_case!(align_parameters_default_off);
+test_case!(align_parameters_variadic_and_by_reference);
 test_case!(align_named_arguments);
 test_case!(align_named_arguments_default_off);
 test_case!(binary_alignment);
