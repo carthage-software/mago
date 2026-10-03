@@ -227,7 +227,6 @@ const PSR12_PRESET: FormatSettings = FormatSettings {
     preserve_breaking_parameter_list: true,
     sort_uses: SortUses(SortOrder::Preserve),
     expand_use_groups: false,
-    space_around_assignment_in_declare: true,
     space_within_grouping_parenthesis: true,
     ..DEFAULT_PRESET
 };
