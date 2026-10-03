@@ -224,7 +224,11 @@ where
             return Document::Group(Group::new(parts));
         }
 
-        if !preserves_breaking_layout || is_control_structure_condition {
+        if !preserves_breaking_layout
+            || is_control_structure_condition
+            || (f.is_wrapped_in_parens
+                && matches!(grandparent, Some(Node::Binary(_) | Node::UnaryPrefix(_) | Node::UnaryPostfix(_))))
+        {
             return Document::Array(parts);
         }
     }
@@ -618,14 +622,16 @@ fn push_binaryish_operation<'arena, A>(
                 && operation.right.node_kind() != NodeKind::Binary));
 
     if should_group {
-        parts.push(Document::Group(Group::new(right_document).with_break_mode(if operation.should_break {
-            BreakMode::Force
-        } else {
-            BreakMode::Auto
-        })));
+        parts.push(Document::Group(
+            Group::new(right_document).with_break_mode(if force_break || operation.should_break {
+                BreakMode::Force
+            } else {
+                BreakMode::Auto
+            }),
+        ));
     } else {
         parts.extend(right_document);
-        if operation.is_nested && operation.should_break {
+        if force_break || (operation.is_nested && operation.should_break) {
             parts.push(Document::BreakParent);
         }
     }
