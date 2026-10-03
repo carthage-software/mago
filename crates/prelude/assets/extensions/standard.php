@@ -1622,7 +1622,7 @@ function array_find(array $array, callable $callback): mixed {}
  * @param array<K, V> $array
  * @param (callable(V, K): bool) $callback
  *
- * @return K|null
+ * @return ($array is array{} ? null : K|null)
  *
  * @since 8.4
  */
