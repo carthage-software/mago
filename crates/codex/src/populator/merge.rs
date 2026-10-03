@@ -7,6 +7,7 @@ use crate::populator::methods::inherit_methods_from_parent;
 use crate::populator::properties::inherit_properties_from_parent;
 use crate::populator::templates::extend_template_parameters;
 use crate::reference::SymbolReferences;
+use crate::visibility::Visibility;
 
 fn canonicalize_template_relationship(metadata: &mut ClassLikeMetadata, source: Word, actual: Word) {
     if source == actual {
@@ -131,7 +132,9 @@ pub fn merge_metadata_from_parent_class_like(
     inherit_properties_from_parent(metadata, parent_metadata);
 
     for (parent_constant_name, parent_constant_metadata) in &parent_metadata.constants {
-        if !metadata.constants.contains_key(parent_constant_name) {
+        if parent_constant_metadata.visibility != Visibility::Private
+            && !metadata.constants.contains_key(parent_constant_name)
+        {
             metadata.constants.insert(*parent_constant_name, parent_constant_metadata.clone());
         }
     }

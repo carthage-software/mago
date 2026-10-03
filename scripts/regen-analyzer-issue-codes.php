@@ -48,6 +48,7 @@ final class AnalyzerCodeModuleGenerator
         'invalid-array-index',
         'invalid-array-access',
         'invalid-method-access',
+        'invalid-constant-access',
         'invalid-property-assignment-value',
         'invalid-continue',
         'invalid-break',

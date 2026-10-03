@@ -34,6 +34,7 @@ use crate::resolver::class_name::resolve_classnames_from_expression;
 use crate::resolver::selector::ResolvedSelector;
 use crate::resolver::selector::resolve_constant_selector;
 use crate::utils::names::display_class_like_name;
+use crate::visibility::check_class_constant_visibility;
 
 /// Represents a successfully resolved class constant or enum case.
 #[derive(Debug)]
@@ -144,12 +145,12 @@ where
 
             if let Some(resolved_const) = find_constant_in_class(
                 context,
+                block_context,
                 metadata,
                 const_name,
                 class_expr.span(),
                 constant_selector.span(),
                 &class_resolution.origin,
-                block_context.flags.inside_class_like_attribute(),
             ) {
                 result.constants.push(resolved_const);
             } else {
@@ -283,16 +284,17 @@ fn is_valid_trait_constant_access(origin: &ResolutionOrigin, inside_class_like_a
 /// Finds a constant or enum case by name within a class.
 fn find_constant_in_class<'ctx, A>(
     context: &mut Context<'ctx, '_, A>,
+    block_context: &BlockContext<'ctx>,
     metadata: &'ctx ClassLikeMetadata,
     const_name: Word,
     class_span: Span,
     const_span: Span,
     resolution_origin: &ResolutionOrigin,
-    inside_class_like_attribute: bool,
 ) -> Option<ResolvedConstant>
 where
     A: Arena,
 {
+    let inside_class_like_attribute = block_context.flags.inside_class_like_attribute();
     if metadata.kind.is_trait() && !is_valid_trait_constant_access(resolution_origin, inside_class_like_attribute) {
         let trait_name = metadata.original_name;
 
@@ -319,6 +321,15 @@ where
 
     // Check for a defined constant
     if let Some(constant_metadata) = metadata.constants.get(&const_name) {
+        check_class_constant_visibility(
+            context,
+            block_context,
+            metadata,
+            constant_metadata,
+            class_span.join(const_span),
+            const_span,
+        );
+
         let display = format!("{}::{}", metadata.original_name, const_name);
         crate::utils::availability::check_class_constant_availability(context, constant_metadata, &display, const_span);
 
@@ -371,6 +382,15 @@ where
         };
 
         if let Some(constant_metadata) = required_metadata.constants.get(&const_name) {
+            check_class_constant_visibility(
+                context,
+                block_context,
+                required_metadata,
+                constant_metadata,
+                class_span.join(const_span),
+                const_span,
+            );
+
             let mut const_type = if let Some(type_metadata) = &constant_metadata.type_metadata
                 && type_metadata.from_docblock
             {

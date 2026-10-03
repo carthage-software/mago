@@ -4,6 +4,7 @@ use mago_word::word;
 
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
+use mago_codex::metadata::class_like_constant::ClassLikeConstantMetadata;
 use mago_codex::metadata::property::PropertyMetadata;
 use mago_codex::visibility::Visibility;
 use mago_php_version::PHPVersion;
@@ -19,6 +20,62 @@ use crate::resolver::property::DeclaredProperty;
 use crate::resolver::property::DeclaredPropertyKind;
 use crate::resolver::property::resolve_declared_property;
 use mago_bytes::BytesDisplay;
+
+pub(crate) fn check_class_constant_visibility<A>(
+    context: &mut Context<'_, '_, A>,
+    block_context: &BlockContext<'_>,
+    class_metadata: &ClassLikeMetadata,
+    constant_metadata: &ClassLikeConstantMetadata,
+    access_span: Span,
+    member_span: Span,
+) where
+    A: Arena,
+{
+    let visibility = constant_metadata.visibility;
+    if visibility == Visibility::Public {
+        return;
+    }
+
+    let mut declaring_class = class_metadata;
+    let inherited_depth = if visibility == Visibility::Private { 0 } else { class_metadata.all_parent_classes.len() };
+    for _ in 0..inherited_depth {
+        let Some(parent_metadata) =
+            declaring_class.direct_parent_class.and_then(|parent| context.codebase.get_class_like(parent.as_bytes()))
+        else {
+            break;
+        };
+
+        if parent_metadata
+            .constants
+            .get(&constant_metadata.name)
+            .is_none_or(|constant| constant.span != constant_metadata.span)
+        {
+            break;
+        }
+
+        declaring_class = parent_metadata;
+    }
+
+    let calling_class = block_context.scope.get_class_like_name();
+    let is_visible =
+        is_visible_from_scope(context.codebase, visibility, declaring_class.name.as_bytes(), calling_class);
+    if !is_visible {
+        let constant_name = constant_metadata.name;
+        let class_name = declaring_class.original_name;
+
+        report_visibility_issue(
+            context,
+            calling_class,
+            IssueCode::InvalidConstantAccess,
+            format!("Cannot access {visibility} constant `{class_name}::{constant_name}`."),
+            visibility,
+            access_span,
+            Some(member_span),
+            Some(constant_metadata.span),
+            format!("Make `{constant_name}` public, or access it from an allowed class scope."),
+        );
+    }
+}
 
 /// Checks if a method is visible from the current scope and reports a detailed
 /// error if it is not.
