@@ -240,7 +240,7 @@ rayon = "1.10.0"
 dhat = "0.3"
 rust-embed = { version = "8.7.2", features = ["interpolate-folder-path", "include-exclude"] }
 bincode = { version = "2.0.1", features = ["serde"] }
-libc = "0.2.175"
+libc = "=0.2.189"
 ryu = "1.0"
 itoa = "1.0"
 notify = "8.2"
