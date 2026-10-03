@@ -351,7 +351,7 @@ fn distinct_class_like_kinds_kept_apart() {
 #[test]
 fn duplicated_class_like_collapses() {
     for atom in [t_class_string(), t_interface_string(), t_enum_string(), t_trait_string()] {
-        assert_combines_to(vec![atom.clone(); 5], vec![atom.clone()]);
+        assert_combines_to(vec![atom.clone(); 5], vec![atom]);
     }
 }
 

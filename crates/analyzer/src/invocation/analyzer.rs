@@ -1899,7 +1899,7 @@ where
 
     let method_name = method_id.as_bytes().to_ascii_lowercase();
 
-    let (new_this_offset, new_scope_offset) = if method_name.as_slice().eq_ignore_ascii_case(b"bind") {
+    let (new_this_offset, new_scope_offset) = if method_name.eq_ignore_ascii_case(b"bind") {
         (1, 2)
     } else {
         return None;

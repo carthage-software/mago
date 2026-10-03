@@ -32,7 +32,7 @@ fn list_not_in_empty() {
 fn list_reflexive() {
     for elem in [t_int(), t_string(), t_float(), t_bool(), mixed()] {
         assert_atomic_subtype(&t_list(u(elem.clone()), false), &t_list(u(elem.clone()), false));
-        assert_atomic_subtype(&t_list(u(elem.clone()), true), &t_list(u(elem.clone()), true));
+        assert_atomic_subtype(&t_list(u(elem.clone()), true), &t_list(u(elem), true));
     }
 }
 
