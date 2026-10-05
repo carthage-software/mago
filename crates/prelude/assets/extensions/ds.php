@@ -337,10 +337,10 @@ final class Map implements Collection, ArrayAccess
     public function filter(callable $callback = null): Map {}
 
     /**
-     * @template TDefault
+     * @template TDefault = never
      * @param TKey $key
      * @param TDefault $default
-     * @return ($default is null ? TValue : TValue|TDefault)
+     * @return TValue|TDefault
      * @throws OutOfBoundsException
      * @mutation-free
      */
@@ -387,10 +387,10 @@ final class Map implements Collection, ArrayAccess
     public function reduce(callable $callback, $initial = null) {}
 
     /**
-     * @template TDefault
+     * @template TDefault = never
      * @param TKey $key
      * @param TDefault $default
-     * @return ($default is null ? TValue : TValue|TDefault)
+     * @return TValue|TDefault
      * @throws \OutOfBoundsException
      */
     public function remove($key, $default = null) {}
