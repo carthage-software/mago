@@ -41,6 +41,14 @@
     font-family: var(--sans);
   }
 
+  @media (width > 760px) {
+    .doc-sidebar {
+      max-block-size: calc(100dvh - var(--header-h) - 2 * var(--s-5));
+      overflow-y: auto;
+      overscroll-behavior-y: contain;
+    }
+  }
+
   .doc-content {
     min-inline-size: 0;
   }
