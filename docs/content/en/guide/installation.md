@@ -132,7 +132,7 @@ nix-shell -p mago
 mago --version
 ```
 
-### Nix Flake
+### Nix flake
 
 You can run and build Mago yourself via [Nix flakes](https://nixos.wiki/wiki/flakes):
 
