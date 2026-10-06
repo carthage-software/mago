@@ -73,8 +73,8 @@
     --ink-soft: #1a1a1a;
     --ink-quiet: #666666;
     --ink-faint: #8c8c8c;
-    --rule: #000000;
-    --rule-hair: rgba(0, 0, 0, 0.18);
+    --rule: #e1e1e1;
+    --rule-hair: #e1e1e1;
     --rule-faint: rgba(0, 0, 0, 0.08);
 
     --accent: #3c8d58;
@@ -137,7 +137,7 @@
     --ink-soft: #d4d4d4;
     --ink-quiet: #a0a0a0;
     --ink-faint: #777777;
-    --rule: #ffffff;
+    --rule: #1e1e1e;
     --rule-hair: rgba(255, 255, 255, 0.18);
     --rule-faint: rgba(255, 255, 255, 0.08);
     --accent: #5fb677;
@@ -170,7 +170,7 @@
       --ink-soft: #d4d4d4;
       --ink-quiet: #a0a0a0;
       --ink-faint: #777777;
-      --rule: #ffffff;
+      --rule: #1e1e1e;
       --rule-hair: rgba(255, 255, 255, 0.18);
       --rule-faint: rgba(255, 255, 255, 0.08);
       --accent: #5fb677;
