@@ -41,6 +41,41 @@
     font-family: var(--sans);
   }
 
+  @media (width > 760px) {
+    .doc-sidebar {
+      max-block-size: calc(100dvh - var(--header-h) - 2 * var(--s-5));
+      overflow-y: auto;
+      overscroll-behavior-y: contain;
+      scrollbar-width: thin;
+      scrollbar-color: var(--rule-hair) transparent;
+    }
+
+    .doc-sidebar:hover,
+    .doc-sidebar:focus-within {
+      scrollbar-color: var(--ink-faint) transparent;
+    }
+
+    .doc-sidebar::-webkit-scrollbar {
+      inline-size: 6px;
+      block-size: 6px;
+    }
+
+    .doc-sidebar::-webkit-scrollbar-track {
+      background: transparent;
+    }
+
+    .doc-sidebar::-webkit-scrollbar-thumb {
+      background: var(--rule-hair);
+      border: 0;
+      border-radius: 999px;
+    }
+
+    .doc-sidebar:hover::-webkit-scrollbar-thumb,
+    .doc-sidebar:focus-within::-webkit-scrollbar-thumb {
+      background: var(--ink-faint);
+    }
+  }
+
   .doc-content {
     min-inline-size: 0;
   }
