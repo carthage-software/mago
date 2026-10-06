@@ -137,6 +137,27 @@ pub trait TType {
         all_child_nodes
     }
 
+    /// Checks child type nodes in depth-first order, stopping at the first match.
+    fn any_child_node(&self, mut predicate: impl FnMut(TypeRef<'_>) -> bool) -> bool
+    where
+        Self: Sized,
+    {
+        let mut child_nodes = self.get_child_nodes();
+
+        while let Some(child_node) = child_nodes.pop() {
+            if predicate(child_node) {
+                return true;
+            }
+
+            child_nodes.extend(match child_node {
+                TypeRef::Union(union) => union.get_child_nodes(),
+                TypeRef::Atomic(atomic) => atomic.get_child_nodes(),
+            });
+        }
+
+        false
+    }
+
     /// Checks if this type can have intersection types (`&B&S`).
     fn can_be_intersected(&self) -> bool {
         false
@@ -846,9 +867,14 @@ pub fn add_optional_union_type_rc(
     codebase: &CodebaseMetadata,
 ) -> Rc<TUnion> {
     match maybe_type {
-        Some(type_2) => {
-            Rc::new(add_union_type((**base_type).clone(), type_2, codebase, combiner::CombinerOptions::default()))
-        }
+        Some(type_2) if base_type.as_ref() == type_2 => Rc::clone(base_type),
+        Some(type_2) => Rc::new(add_unequal_union_type_inner(
+            (**base_type).clone(),
+            type_2,
+            codebase,
+            combiner::CombinerOptions::default(),
+            false,
+        )),
         None => Rc::clone(base_type),
     }
 }
@@ -879,11 +905,11 @@ pub fn combine_union_types_rc(
     codebase: &CodebaseMetadata,
     options: combiner::CombinerOptions,
 ) -> Rc<TUnion> {
-    if Rc::ptr_eq(type_1, type_2) {
+    if type_1 == type_2 {
         return Rc::clone(type_1);
     }
 
-    Rc::new(combine_union_types(type_1, type_2, codebase, options))
+    Rc::new(combine_unequal_union_types_inner(type_1, type_2, codebase, options, false))
 }
 
 #[inline]
@@ -919,6 +945,16 @@ fn combine_union_types_inner(
         return type_1.clone();
     }
 
+    combine_unequal_union_types_inner(type_1, type_2, codebase, options, preserve_array_shapes)
+}
+
+fn combine_unequal_union_types_inner(
+    type_1: &TUnion,
+    type_2: &TUnion,
+    codebase: &CodebaseMetadata,
+    options: combiner::CombinerOptions,
+    preserve_array_shapes: bool,
+) -> TUnion {
     let mut combined_type = if type_1.is_never() || type_1.is_never_template() {
         type_2.clone()
     } else if type_2.is_never() || type_2.is_never_template() {
@@ -986,28 +1022,38 @@ pub fn add_union_type_preserving_array_shapes(
 }
 
 fn add_union_type_inner(
+    base_type: TUnion,
+    other_type: &TUnion,
+    codebase: &CodebaseMetadata,
+    options: combiner::CombinerOptions,
+    preserve_array_shapes: bool,
+) -> TUnion {
+    if &base_type == other_type {
+        return base_type;
+    }
+
+    add_unequal_union_type_inner(base_type, other_type, codebase, options, preserve_array_shapes)
+}
+
+fn add_unequal_union_type_inner(
     mut base_type: TUnion,
     other_type: &TUnion,
     codebase: &CodebaseMetadata,
     options: combiner::CombinerOptions,
     preserve_array_shapes: bool,
 ) -> TUnion {
-    if &base_type != other_type {
-        base_type.types = if base_type.is_vanilla_mixed() && other_type.is_vanilla_mixed() {
-            base_type.types
-        } else if preserve_array_shapes {
-            combine_union_types_preserving_array_shapes(&base_type, other_type, codebase, options).types
-        } else {
-            combine_union_types(&base_type, other_type, codebase, options).types
-        };
+    base_type.types = if base_type.is_vanilla_mixed() && other_type.is_vanilla_mixed() {
+        base_type.types
+    } else {
+        combine_unequal_union_types_inner(&base_type, other_type, codebase, options, preserve_array_shapes).types
+    };
 
-        if !other_type.had_template() {
-            base_type.set_had_template(false);
-        }
+    if !other_type.had_template() {
+        base_type.set_had_template(false);
+    }
 
-        if !other_type.reference_free() {
-            base_type.set_reference_free(false);
-        }
+    if !other_type.reference_free() {
+        base_type.set_reference_free(false);
     }
 
     if other_type.possibly_undefined() {
@@ -1625,4 +1671,108 @@ fn get_iterator_method_return_type(
     let mut return_type = return_type_meta.type_union.clone();
     expander::expand_union(codebase, &mut return_type, &TypeExpansionOptions::default());
     Some(return_type)
+}
+
+#[cfg(test)]
+mod tests {
+    use std::rc::Rc;
+
+    use crate::metadata::CodebaseMetadata;
+    use crate::ttype::combiner::CombinerOptions;
+    use crate::ttype::flags::UnionFlags;
+    use crate::ttype::union::TUnion;
+
+    use super::add_optional_union_type;
+    use super::add_optional_union_type_rc;
+    use super::combine_union_types;
+    use super::combine_union_types_rc;
+    use super::get_int;
+    use super::get_string;
+
+    fn assert_exact(actual: &TUnion, expected: &TUnion) {
+        assert_eq!(actual.types, expected.types);
+        assert_eq!(actual.flags, expected.flags);
+    }
+
+    #[test]
+    fn rc_merges_keep_the_first_equal_union_and_all_its_flags() {
+        let codebase = CodebaseMetadata::new();
+        let ignored_flags = [
+            UnionFlags::empty(),
+            UnionFlags::POPULATED,
+            UnionFlags::NULLSAFE_NULL,
+            UnionFlags::POPULATED.union(UnionFlags::NULLSAFE_NULL),
+        ];
+        for first_flags in ignored_flags {
+            for second_flags in ignored_flags {
+                let mut first = get_int();
+                let shared_flags = UnionFlags::HAD_TEMPLATE
+                    .union(UnionFlags::BY_REFERENCE)
+                    .union(UnionFlags::REFERENCE_FREE)
+                    .union(UnionFlags::POSSIBLY_UNDEFINED_FROM_TRY)
+                    .union(UnionFlags::POSSIBLY_UNDEFINED)
+                    .union(UnionFlags::IGNORE_NULLABLE_ISSUES)
+                    .union(UnionFlags::IGNORE_FALSABLE_ISSUES)
+                    .union(UnionFlags::FROM_TEMPLATE_DEFAULT)
+                    .union(UnionFlags::FROM_UNSPECIFIED_TEMPLATE);
+                first.flags = first_flags.union(shared_flags);
+                let mut second = first.clone();
+                second.flags = second_flags.union(shared_flags);
+                let first = Rc::new(first);
+                let second = Rc::new(second);
+                assert!(!Rc::ptr_eq(&first, &second));
+                assert_eq!(first, second);
+
+                let expected = combine_union_types(&first, &second, &codebase, CombinerOptions::default());
+                let actual = combine_union_types_rc(&first, &second, &codebase, CombinerOptions::default());
+                assert_exact(&actual, &expected);
+                assert!(Rc::ptr_eq(&actual, &first));
+
+                let expected = add_optional_union_type((*first).clone(), Some(&second), &codebase);
+                let actual = add_optional_union_type_rc(&first, Some(&second), &codebase);
+                assert_exact(&actual, &expected);
+                assert!(Rc::ptr_eq(&actual, &first));
+            }
+        }
+    }
+
+    #[test]
+    fn rc_merges_keep_identical_and_missing_optional_inputs() {
+        let codebase = CodebaseMetadata::new();
+        let first = Rc::new(get_int());
+        assert!(Rc::ptr_eq(&combine_union_types_rc(&first, &first, &codebase, CombinerOptions::default()), &first));
+        assert!(Rc::ptr_eq(&add_optional_union_type_rc(&first, Some(&first), &codebase), &first));
+        assert!(Rc::ptr_eq(&add_optional_union_type_rc(&first, None, &codebase), &first));
+    }
+
+    #[test]
+    fn rc_merges_match_owned_results_for_unequal_unions() {
+        let codebase = CodebaseMetadata::new();
+        let first = Rc::new(get_int());
+        for flag in [
+            UnionFlags::HAD_TEMPLATE,
+            UnionFlags::BY_REFERENCE,
+            UnionFlags::REFERENCE_FREE,
+            UnionFlags::POSSIBLY_UNDEFINED_FROM_TRY,
+            UnionFlags::POSSIBLY_UNDEFINED,
+            UnionFlags::IGNORE_NULLABLE_ISSUES,
+            UnionFlags::IGNORE_FALSABLE_ISSUES,
+            UnionFlags::FROM_TEMPLATE_DEFAULT,
+            UnionFlags::FROM_UNSPECIFIED_TEMPLATE,
+        ] {
+            for mut second in [get_int(), get_string()] {
+                second.flags = flag.union(UnionFlags::POPULATED);
+                let second = Rc::new(second);
+                assert_ne!(first, second);
+                assert_exact(
+                    &combine_union_types_rc(&first, &second, &codebase, CombinerOptions::default()),
+                    &combine_union_types(&first, &second, &codebase, CombinerOptions::default()),
+                );
+                assert_exact(
+                    &add_optional_union_type_rc(&first, Some(&second), &codebase),
+                    &add_optional_union_type((*first).clone(), Some(&second), &codebase),
+                );
+            }
+        }
+    }
 }

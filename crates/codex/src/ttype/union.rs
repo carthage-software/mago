@@ -200,10 +200,7 @@ impl TUnion {
     #[must_use]
     pub fn contains_unspecified_template_arguments(&self) -> bool {
         self.from_unspecified_template()
-            || self
-                .get_all_child_nodes()
-                .into_iter()
-                .any(|node| matches!(node, TypeRef::Union(union) if union.from_unspecified_template()))
+            || self.any_child_node(|node| matches!(node, TypeRef::Union(union) if union.from_unspecified_template()))
     }
 
     #[inline]
@@ -672,19 +669,15 @@ impl TUnion {
 
     #[must_use]
     pub fn has_template_types(&self) -> bool {
-        let all_child_nodes = self.get_all_child_nodes();
-
-        for child_node in all_child_nodes {
-            if let TypeRef::Atomic(
-                TAtomic::GenericParameter(_)
-                | TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Generic { .. })),
-            ) = child_node
-            {
-                return true;
-            }
-        }
-
-        false
+        self.any_child_node(|node| {
+            matches!(
+                node,
+                TypeRef::Atomic(
+                    TAtomic::GenericParameter(_)
+                        | TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Generic { .. }))
+                )
+            )
+        })
     }
 
     #[must_use]
@@ -1161,6 +1154,13 @@ impl TUnion {
 impl TType for TUnion {
     fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
         self.types.iter().map(TypeRef::Atomic).collect()
+    }
+
+    fn any_child_node(&self, mut predicate: impl FnMut(TypeRef<'_>) -> bool) -> bool {
+        self.types
+            .iter()
+            .rev()
+            .any(|atomic| predicate(TypeRef::Atomic(atomic)) || atomic.any_child_node(&mut predicate))
     }
 
     fn needs_population(&self) -> bool {
