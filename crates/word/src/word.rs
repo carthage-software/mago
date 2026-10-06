@@ -135,6 +135,14 @@ impl Word {
         }
     }
 
+    /// Returns the ASCII-lowercased word, reusing this handle when no bytes change.
+    #[inline]
+    #[must_use]
+    pub fn to_ascii_lowercase(self) -> Word {
+        let bytes = self.as_bytes();
+        if bytes.iter().any(u8::is_ascii_uppercase) { crate::ascii_lowercase_word(bytes) } else { self }
+    }
+
     /// Returns the length, in bytes, of this `Word`.
     #[inline]
     #[must_use]

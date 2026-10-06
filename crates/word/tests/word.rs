@@ -96,6 +96,50 @@ fn long_non_utf8_bytes_round_trip() {
 }
 
 #[test]
+fn lowercase_word_matches_ascii_bytes_at_storage_boundaries() {
+    for length in [0, 1, 15, 16, 255, 256, 257] {
+        let mut bytes = vec![b'A'; length];
+        for byte in bytes.iter_mut().step_by(3) {
+            *byte = 0xff;
+        }
+        let original = Word::new(&bytes);
+        let expected = Word::new(&bytes.to_ascii_lowercase());
+        let lower = original.to_ascii_lowercase();
+        assert_eq!(lower, expected);
+        assert_eq!(hash_of(&lower), hash_of(&expected));
+        assert_eq!(lower.to_ascii_lowercase(), lower);
+        assert_eq!(lower.is_inline(), cfg!(feature = "sso") && length <= 15);
+
+        if !lower.is_inline() {
+            assert_eq!(lower.as_bytes().as_ptr(), expected.as_bytes().as_ptr());
+        }
+    }
+}
+
+#[test]
+fn lowercase_word_preserves_every_non_ascii_byte() {
+    let bytes: Vec<_> = (0..=u8::MAX).collect();
+    let lower = Word::new(&bytes).to_ascii_lowercase();
+    assert_eq!(lower.as_bytes(), bytes.to_ascii_lowercase());
+
+    let unchanged = Word::new(&(128..=u8::MAX).collect::<Vec<_>>());
+    assert_eq!(unchanged.to_ascii_lowercase(), unchanged);
+    assert_eq!(unchanged.to_ascii_lowercase().as_bytes().as_ptr(), unchanged.as_bytes().as_ptr());
+}
+
+#[test]
+fn lowercase_word_shares_the_global_interned_value() {
+    let original = Word::new(b"GLOBAL_WORD_LOWERCASE_TEST");
+    let lower = original.to_ascii_lowercase();
+    let interned = match thread::spawn(|| Word::new(b"global_word_lowercase_test")).join() {
+        Ok(value) => value,
+        Err(payload) => std::panic::resume_unwind(payload),
+    };
+    assert_eq!(lower, interned);
+    assert_eq!(lower.as_bytes().as_ptr(), interned.as_bytes().as_ptr());
+}
+
+#[test]
 fn word_map_keys_resolve_by_content() {
     let mut map: WordMap<i32> = WordMap::default();
     map.insert(Word::new(b"a"), 1);
