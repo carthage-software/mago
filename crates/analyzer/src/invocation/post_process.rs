@@ -489,7 +489,6 @@ fn clear_object_property_narrowings<'ctx, 'arena, A>(
     if !preserves_stable_method_results {
         block_context.stable_method_call_assertions.clear();
         block_context.stable_method_calls.clear();
-        let references_method_call_key = |key: Word| memchr::memmem::find(key.as_bytes(), b"()").is_some();
         let references_method_call =
             |clause: &Rc<Clause>| clause.possibilities.keys().copied().any(references_method_call_key);
         block_context.locals.retain(|key, _| !references_method_call_key(*key));
@@ -794,6 +793,11 @@ fn clear_object_property_narrowings<'ctx, 'arena, A>(
         .reconciled_expression_clauses
         .retain(|clause| clause.wedge || !clause.possibilities.keys().copied().any(should_wipe));
     block_context.retain_valid_class_type_relations();
+}
+
+fn references_method_call_key(key: Word) -> bool {
+    let bytes = key.as_bytes();
+    memchr::memchr_iter(b'(', bytes).any(|index| bytes.get(index + 1) == Some(&b')'))
 }
 
 fn is_property_or_index_key(var_id: Word) -> bool {
@@ -1629,4 +1633,52 @@ where
     );
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use mago_word::Word;
+
+    use super::references_method_call_key;
+
+    fn check_method_call_key(bytes: &[u8]) {
+        assert_eq!(
+            references_method_call_key(Word::new(bytes)),
+            bytes.windows(2).any(|pair| pair == b"()"),
+            "{bytes:?}"
+        );
+    }
+
+    #[test]
+    fn method_call_keys_match_byte_pair_search() {
+        let alphabet = [b'(', b')', b'$', b'a', 0, 0xff];
+        for length in 0..=4 {
+            for mut value in 0..alphabet.len().pow(length) {
+                let mut bytes = vec![0; length as usize];
+                for byte in &mut bytes {
+                    *byte = alphabet[value % alphabet.len()];
+                    value /= alphabet.len();
+                }
+                check_method_call_key(&bytes);
+            }
+        }
+    }
+
+    #[test]
+    fn method_call_keys_match_at_scan_boundaries() {
+        for length in [15, 16, 17, 31, 32, 33, 63, 64, 65, 255, 256, 257] {
+            let mut bytes = vec![b'('; length];
+            check_method_call_key(&bytes);
+            bytes.push(b')');
+            check_method_call_key(&bytes);
+
+            bytes.fill(0xff);
+            check_method_call_key(&bytes);
+            for index in 0..bytes.len() - 1 {
+                bytes[index..index + 2].copy_from_slice(b"()");
+                check_method_call_key(&bytes);
+                bytes[index..index + 2].fill(0xff);
+            }
+        }
+    }
 }

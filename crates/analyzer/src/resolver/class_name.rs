@@ -1,6 +1,5 @@
 use mago_allocator::Arena;
 use mago_word::Word;
-use mago_word::ascii_lowercase_word;
 use mago_word::word;
 
 use mago_codex::metadata::CodebaseMetadata;
@@ -184,7 +183,7 @@ impl ResolvedClassname {
 
         let mut object_atomic = TAtomic::Object(match self.fqcn {
             Some(fqcn) => {
-                let lowercase_fqcn = ascii_lowercase_word(fqcn.as_bytes());
+                let lowercase_fqcn = fqcn.to_ascii_lowercase();
 
                 if codebase.symbols.contains_enum(lowercase_fqcn) {
                     TObject::Enum(TEnum::new(fqcn))

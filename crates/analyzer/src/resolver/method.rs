@@ -28,7 +28,6 @@ use mago_span::Span;
 use mago_syntax::cst::ClassLikeMemberSelector;
 use mago_syntax::cst::Expression;
 use mago_word::Word;
-use mago_word::ascii_lowercase_word;
 use mago_word::word;
 
 use crate::analyzable::Analyzable;
@@ -188,7 +187,7 @@ where
         }
 
         if let Some(name) = resolved_selector.name() {
-            method_names.push(ascii_lowercase_word(name.as_bytes()));
+            method_names.push(name.to_ascii_lowercase());
         } else {
             result.has_invalid_target = true;
         }
@@ -578,7 +577,7 @@ where
         }
 
         if function_like_metadata.flags.is_magic_method() {
-            let lowercase_method = ascii_lowercase_word(method_name.as_bytes());
+            let lowercase_method = method_name.to_ascii_lowercase();
             let is_pseudo = class_metadata.pseudo_methods.contains(&lowercase_method)
                 || class_metadata.all_parent_classes.iter().any(|parent_name| {
                     context
@@ -1194,10 +1193,10 @@ fn collect_mixin_types_into(
         for mixin_atomic in mixin_type.type_union.types.as_ref() {
             match mixin_atomic {
                 TAtomic::Object(obj @ TObject::Named(named)) => {
-                    direct.push((ascii_lowercase_word(named.name.as_bytes()), obj));
+                    direct.push((named.name.to_ascii_lowercase(), obj));
                 }
                 TAtomic::Object(obj @ TObject::Enum(enum_type)) => {
-                    direct.push((ascii_lowercase_word(enum_type.name.as_bytes()), obj));
+                    direct.push((enum_type.name.to_ascii_lowercase(), obj));
                 }
                 TAtomic::GenericParameter(TGenericParameter {
                     parameter_name, constraint, defining_entity, ..
@@ -1214,11 +1213,11 @@ fn collect_mixin_types_into(
                         for atomic in concrete_type.types.as_ref() {
                             match atomic {
                                 TAtomic::Object(obj @ TObject::Named(named)) => {
-                                    direct.push((ascii_lowercase_word(named.name.as_bytes()), obj));
+                                    direct.push((named.name.to_ascii_lowercase(), obj));
                                     resolved = true;
                                 }
                                 TAtomic::Object(obj @ TObject::Enum(enum_type)) => {
-                                    direct.push((ascii_lowercase_word(enum_type.name.as_bytes()), obj));
+                                    direct.push((enum_type.name.to_ascii_lowercase(), obj));
                                     resolved = true;
                                 }
                                 _ => {}
@@ -1230,10 +1229,10 @@ fn collect_mixin_types_into(
                         for constraint_atomic in constraint.types.as_ref() {
                             match constraint_atomic {
                                 TAtomic::Object(obj @ TObject::Named(named)) => {
-                                    direct.push((ascii_lowercase_word(named.name.as_bytes()), obj));
+                                    direct.push((named.name.to_ascii_lowercase(), obj));
                                 }
                                 TAtomic::Object(obj @ TObject::Enum(enum_type)) => {
-                                    direct.push((ascii_lowercase_word(enum_type.name.as_bytes()), obj));
+                                    direct.push((enum_type.name.to_ascii_lowercase(), obj));
                                 }
                                 _ => {}
                             }
