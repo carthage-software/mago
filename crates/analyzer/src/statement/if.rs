@@ -4,7 +4,6 @@ use std::rc::Rc;
 
 use foldhash::HashSet;
 use indexmap::IndexMap;
-use itertools::Itertools;
 use mago_word::Word;
 use mago_word::WordMap;
 use mago_word::WordSet;
@@ -12,6 +11,7 @@ use mago_word::WordSet;
 use mago_algebra::clause::Clause;
 use mago_algebra::disjoin_clauses;
 use mago_algebra::find_satisfying_assignments;
+use mago_algebra::find_satisfying_assignments_iter;
 use mago_algebra::saturate_clauses;
 use mago_codex::assertion::Assertion;
 use mago_codex::ttype::add_optional_union_type;
@@ -169,15 +169,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
 
         if_clauses = saturate_clauses(if_clauses.iter(), &context.settings.algebra_thresholds());
         let combined_clauses = if block_context.clauses.is_empty() {
-            if_clauses.clone()
+            if_clauses.iter().cloned().map(Rc::new).collect()
         } else {
-            saturate_clauses(
-                if_clauses.iter().chain(block_context.clauses.iter().map(Rc::deref)),
+            mago_algebra::saturate_shared_clauses(
+                if_clauses.iter().cloned().map(Rc::new).chain(block_context.clauses.iter().cloned()),
                 &context.settings.algebra_thresholds(),
             )
         };
 
-        if_block_context.clauses = combined_clauses.into_iter().map(Rc::new).collect();
+        if_block_context.clauses = combined_clauses;
 
         // Extract function_exists/defined assertions.
         extract_function_constant_existence(self.condition, artifacts, &mut if_block_context, false);
@@ -270,13 +270,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
             .definitely_uninitialized_property_ids
             .clone_from(&temporary_else_context.definitely_uninitialized_property_ids);
 
-        else_block_context.clauses = saturate_clauses(
-            else_block_context.clauses.iter().map(Rc::deref).chain(if_scope.negated_clauses.iter()),
+        else_block_context.clauses = mago_algebra::saturate_shared_clauses(
+            else_block_context.clauses.iter().cloned().chain(if_scope.negated_clauses.iter().cloned().map(Rc::new)),
             &context.settings.algebra_thresholds(),
-        )
-        .into_iter()
-        .map(Rc::new)
-        .collect();
+        );
 
         for clause in self.body.else_if_clauses() {
             analyze_else_if_clause(context, &mut if_scope, &mut else_block_context, block_context, artifacts, clause)?;
@@ -433,13 +430,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
             && !if_scope.reasonable_clauses.is_empty()
             && (if_scope.reasonable_clauses.len() > 1 || !if_scope.reasonable_clauses[0].wedge)
         {
-            block_context.clauses = saturate_clauses(
-                if_scope.reasonable_clauses.iter().map(Rc::deref).chain(block_context.clauses.iter().map(Rc::deref)),
+            block_context.clauses = mago_algebra::saturate_shared_clauses(
+                if_scope.reasonable_clauses.iter().cloned().chain(block_context.clauses.iter().cloned()),
                 &context.settings.algebra_thresholds(),
-            )
-            .into_iter()
-            .map(Rc::new)
-            .collect();
+            );
         }
 
         for (variable_id, variable_type) in if_scope.possibly_redefined_variables {
@@ -512,8 +506,8 @@ where
     A: Arena,
 {
     let mut conditionally_referenced_variable_ids = if_block_context.conditionally_referenced_variable_ids.clone();
-    let (reconcilable_if_types, active_if_types) = find_satisfying_assignments(
-        if_block_context.clauses.iter().map(Rc::as_ref).cloned().collect_vec().as_slice(),
+    let (reconcilable_if_types, active_if_types) = find_satisfying_assignments_iter(
+        if_block_context.clauses.iter().map(Rc::as_ref),
         Some(if_statement.condition.span()),
         &mut conditionally_referenced_variable_ids,
     );
@@ -524,8 +518,8 @@ where
             omit_keys.extend(clause.possibilities.keys());
         }
 
-        let (outer_truthes, _) = find_satisfying_assignments(
-            outer_block_context.clauses.iter().map(Rc::as_ref).cloned().collect_vec().as_slice(),
+        let (outer_truthes, _) = find_satisfying_assignments_iter(
+            outer_block_context.clauses.iter().map(Rc::as_ref),
             None,
             &mut WordSet::default(),
         );
@@ -832,16 +826,15 @@ where
     );
 
     let else_if_clauses = saturate_clauses(else_if_clauses.iter(), &context.settings.algebra_thresholds());
-    else_if_block_context.clauses = saturate_clauses(
+    else_if_block_context.clauses = mago_algebra::saturate_shared_clauses(
         else_if_clauses
             .iter()
-            .chain(entry_clauses.iter().map(Rc::deref))
-            .chain(else_if_block_context.clauses.iter().map(Rc::deref)),
+            .cloned()
+            .map(Rc::new)
+            .chain(entry_clauses.iter().cloned())
+            .chain(else_if_block_context.clauses.iter().cloned()),
         &context.settings.algebra_thresholds(),
-    )
-    .into_iter()
-    .map(Rc::new)
-    .collect();
+    );
 
     if !else_if_block_context.reconciled_expression_clauses.is_empty() {
         let reconciled_expression_clauses = else_if_block_context
@@ -857,8 +850,8 @@ where
         let omit_keys =
             entry_clauses.iter().flat_map(|clause| clause.possibilities.keys()).copied().collect::<WordSet>();
 
-        let (outer_truthes, _) = find_satisfying_assignments(
-            outer_block_context.clauses.iter().map(Rc::as_ref).cloned().collect_vec().as_slice(),
+        let (outer_truthes, _) = find_satisfying_assignments_iter(
+            outer_block_context.clauses.iter().map(Rc::as_ref),
             None,
             &mut WordSet::default(),
         );
@@ -868,8 +861,8 @@ where
         conditionally_referenced_variable_ids.retain(|key| !omit_keys.contains(key));
     }
 
-    let (reconcilable_else_if_types, active_else_if_types) = find_satisfying_assignments(
-        else_if_block_context.clauses.iter().map(Rc::as_ref).cloned().collect_vec().as_slice(),
+    let (reconcilable_else_if_types, active_else_if_types) = find_satisfying_assignments_iter(
+        else_if_block_context.clauses.iter().map(Rc::as_ref),
         Some(else_if_clause.0.span()),
         &mut conditionally_referenced_variable_ids,
     );
@@ -1097,16 +1090,13 @@ where
         None => if_span,
     };
 
-    else_block_context.clauses = saturate_clauses(
-        else_block_context.clauses.iter().map(Rc::deref).chain(if_scope.negated_clauses.iter()),
+    else_block_context.clauses = mago_algebra::saturate_shared_clauses(
+        else_block_context.clauses.iter().cloned().chain(if_scope.negated_clauses.iter().cloned().map(Rc::new)),
         &context.settings.algebra_thresholds(),
-    )
-    .into_iter()
-    .map(Rc::new)
-    .collect();
+    );
 
-    let (else_types, _) = find_satisfying_assignments(
-        else_block_context.clauses.iter().map(Rc::deref).cloned().collect_vec().as_slice(),
+    let (else_types, _) = find_satisfying_assignments_iter(
+        else_block_context.clauses.iter().map(Rc::as_ref),
         None,
         &mut WordSet::default(),
     );

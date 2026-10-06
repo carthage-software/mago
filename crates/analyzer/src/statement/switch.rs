@@ -529,12 +529,12 @@ where
         };
 
         let mut entry_clauses = if !self.negated_clauses.is_empty() && self.negated_clauses.len() < 50 {
-            let mut c = original_block_context.clauses.iter().map(|v| &**v).collect::<Vec<_>>();
-            c.extend(self.negated_clauses.iter());
-
-            mago_algebra::saturate_clauses(c, &self.context.settings.algebra_thresholds())
+            mago_algebra::saturate_shared_clauses(
+                original_block_context.clauses.iter().cloned().chain(self.negated_clauses.iter().cloned().map(Rc::new)),
+                &self.context.settings.algebra_thresholds(),
+            )
         } else {
-            original_block_context.clauses.iter().map(|v| (**v).clone()).collect::<Vec<_>>()
+            original_block_context.clauses.clone()
         };
 
         case_block_context.clauses = if case_clauses.is_empty() {
@@ -542,28 +542,25 @@ where
         } else if let Some(case_condition) = switch_case.expression() {
             check_for_paradox(
                 &mut self.context.collector,
-                &entry_clauses.iter().map(|v| Rc::new(v.clone())).collect::<Vec<_>>(),
+                &entry_clauses,
                 &case_clauses,
                 case_condition.span(),
                 &self.context.settings.algebra_thresholds(),
             );
 
-            entry_clauses.extend(case_clauses.clone());
+            entry_clauses.extend(case_clauses.iter().cloned().map(Rc::new));
 
             if entry_clauses.len() < 50 {
-                mago_algebra::saturate_clauses(entry_clauses.iter(), &self.context.settings.algebra_thresholds())
+                mago_algebra::saturate_shared_clauses(entry_clauses, &self.context.settings.algebra_thresholds())
             } else {
                 entry_clauses
             }
         } else {
             entry_clauses
-        }
-        .into_iter()
-        .map(Rc::new)
-        .collect();
+        };
 
-        let (reconcilable_if_types, _) = mago_algebra::find_satisfying_assignments(
-            &case_block_context.clauses.iter().map(|v| v.as_ref().clone()).collect::<Vec<_>>(),
+        let (reconcilable_if_types, _) = mago_algebra::find_satisfying_assignments_iter(
+            case_block_context.clauses.iter().map(Rc::as_ref),
             None,
             &mut WordSet::default(),
         );

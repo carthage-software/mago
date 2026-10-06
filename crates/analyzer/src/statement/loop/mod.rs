@@ -10,11 +10,12 @@ use indexmap::IndexMap;
 
 use mago_algebra::clause::Clause;
 use mago_algebra::find_satisfying_assignments;
+use mago_algebra::find_satisfying_assignments_iter;
 use mago_algebra::negate_formula;
 use mago_allocator::Arena;
 use mago_reporting::IssueCollection;
 
-use mago_algebra::saturate_clauses;
+use mago_algebra::saturate_shared_clauses;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::ttype;
 use mago_codex::ttype::TType;
@@ -1304,20 +1305,13 @@ where
     let always_assigned_before_loop_body_variables =
         BlockContext::get_new_or_updated_locals(loop_context, loop_parent_context);
 
-    loop_context.clauses = saturate_clauses(
-        {
-            let mut clauses = loop_parent_context.clauses.iter().map(|v| &**v).collect::<Vec<_>>();
-            clauses.extend(pre_condition_clauses.iter());
-            clauses
-        },
+    loop_context.clauses = saturate_shared_clauses(
+        loop_parent_context.clauses.iter().cloned().chain(pre_condition_clauses.iter().cloned().map(Rc::new)),
         &context.settings.algebra_thresholds(),
-    )
-    .into_iter()
-    .map(Rc::new)
-    .collect();
+    );
 
-    let (reconcilable_while_types, active_while_types) = find_satisfying_assignments(
-        loop_context.clauses.iter().map(|v| (**v).clone()).collect::<Vec<_>>().as_slice(),
+    let (reconcilable_while_types, active_while_types) = find_satisfying_assignments_iter(
+        loop_context.clauses.iter().map(Rc::as_ref),
         Some(pre_condition_span),
         &mut new_referenced_variable_ids,
     );
