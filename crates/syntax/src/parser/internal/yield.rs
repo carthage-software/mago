@@ -25,7 +25,7 @@ where
             return Ok(Yield::From(YieldFrom {
                 r#yield,
                 from: self.expect_keyword(T!["from"])?,
-                iterator: self.arena.alloc(self.parse_expression_with_precedence(Precedence::YieldFrom)?),
+                iterator: self.parse_expression_with_precedence(Precedence::YieldFrom)?,
             }));
         }
 
@@ -49,12 +49,12 @@ where
         Ok(if matches!(self.stream.peek_kind(0)?, Some(T!["=>"])) {
             Yield::Pair(YieldPair {
                 r#yield,
-                key: self.arena.alloc(key_or_value),
+                key: key_or_value,
                 arrow: self.stream.eat_span(T!["=>"])?,
-                value: self.arena.alloc(self.parse_expression_with_precedence(Precedence::Yield)?),
+                value: self.parse_expression_with_precedence(Precedence::Yield)?,
             })
         } else {
-            Yield::Value(YieldValue { r#yield, value: Some(self.arena.alloc(key_or_value)) })
+            Yield::Value(YieldValue { r#yield, value: Some(key_or_value) })
         })
     }
 }

@@ -23,7 +23,7 @@ where
         Ok(Switch {
             switch: self.expect_keyword(T!["switch"])?,
             left_parenthesis: self.stream.eat_span(T!["("])?,
-            expression: self.arena.alloc(self.parse_expression()?),
+            expression: self.parse_expression()?,
             right_parenthesis: self.stream.eat_span(T![")"])?,
             body: self.parse_switch_body()?,
         })
@@ -83,7 +83,7 @@ where
     fn parse_switch_expression_case(&mut self) -> Result<SwitchExpressionCase<'arena>, ParseError> {
         Ok(SwitchExpressionCase {
             case: self.expect_keyword(T!["case"])?,
-            expression: self.arena.alloc(self.parse_expression()?),
+            expression: self.parse_expression()?,
             separator: self.parse_switch_case_separator()?,
             statements: self.parse_switch_statements()?,
         })

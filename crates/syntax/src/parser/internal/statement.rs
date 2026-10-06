@@ -136,7 +136,7 @@ where
                 Statement::Label(self.parse_label()?)
             }
             _ => Statement::Expression(ExpressionStatement {
-                expression: self.arena.alloc(self.parse_expression()?),
+                expression: self.parse_expression()?,
                 terminator: self.parse_terminator()?,
             }),
         })

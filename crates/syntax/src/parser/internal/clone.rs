@@ -37,7 +37,7 @@ where
         if next.kind != TokenKind::LeftParenthesis {
             return Ok(Expression::Clone(Clone {
                 clone,
-                object: self.arena.alloc(self.parse_expression_with_precedence(Precedence::Clone)?),
+                object: self.parse_expression_with_precedence(Precedence::Clone)?,
             }));
         }
 
@@ -111,7 +111,7 @@ where
 
         let parenthesized = self.arena.alloc(Expression::Parenthesized(Parenthesized {
             left_parenthesis: partial_args.left_parenthesis,
-            expression: self.arena.alloc(cloned_expression),
+            expression: cloned_expression,
             right_parenthesis: partial_args.right_parenthesis,
         }));
 
