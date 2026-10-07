@@ -6498,6 +6498,8 @@ register_activation_hook(__FILE__, 'my_plugin_activate');
 <p>Detects insecure comparison of passwords or tokens using <code>==</code>, <code>!=</code>, <code>===</code>, or <code>!==</code>.</p>
 <p>These operators are vulnerable to timing attacks, which can expose sensitive information.
 Instead, use <code>hash_equals</code> for comparing strings or <code>password_verify</code> for validating hashes.</p>
+<p>Sensitive data is identified by names, such as variables, array keys, and properties.
+String literal values such as <code>'refresh_token'</code> do not by themselves indicate sensitive data.</p>
 <hr class="rule__separator">
 <div class="rule-examples">
 <div class="rule-example rule-example--bad">
