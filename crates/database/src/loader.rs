@@ -414,23 +414,24 @@ impl<'config> DatabaseLoader<'config> {
             }
 
             let workspace = canonical_workspace.as_path();
-            #[cfg(windows)]
-            let logical_name =
-                path.strip_prefix(workspace).unwrap_or(path.as_path()).to_string_lossy().replace('\\', "/");
-            #[cfg(not(windows))]
-            let logical_name = path.strip_prefix(workspace).unwrap_or(path.as_path()).to_string_lossy().into_owned();
+            if let Some((override_name, override_content)) = &self.stdin_override {
+                #[cfg(windows)]
+                let logical_name =
+                    path.strip_prefix(workspace).unwrap_or(path.as_path()).to_string_lossy().replace('\\', "/");
+                #[cfg(not(windows))]
+                let logical_name =
+                    path.strip_prefix(workspace).unwrap_or(path.as_path()).to_string_lossy().into_owned();
 
-            if let Some((override_name, override_content)) = &self.stdin_override
-                && override_name.as_ref() == logical_name.as_bytes()
-            {
-                let file = File::new(
-                    Cow::Owned(logical_name.into_bytes()),
-                    file_type,
-                    Some(path),
-                    Cow::Owned(override_content.clone()),
-                );
+                if override_name.as_ref() == logical_name.as_bytes() {
+                    let file = File::new(
+                        Cow::Owned(logical_name.into_bytes()),
+                        file_type,
+                        Some(path),
+                        Cow::Owned(override_content.clone()),
+                    );
 
-                return Some(Ok(FileWithSpecificity { file, specificity }));
+                    return Some(Ok(FileWithSpecificity { file, specificity }));
+                }
             }
 
             match read_file(workspace, &path, file_type) {
