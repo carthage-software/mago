@@ -34,6 +34,7 @@ use mago_syntax::cst::TraitUseSpecification;
 
 use crate::FingerprintOptions;
 use crate::Fingerprintable;
+use crate::modifier::fingerprint_modifiers;
 
 impl Fingerprintable for AnonymousClass<'_> {
     #[inline]
@@ -49,7 +50,8 @@ impl Fingerprintable for AnonymousClass<'_> {
         for attribute_list in &self.attribute_lists {
             attribute_list.fingerprint_with_hasher(hasher, resolved_names, options);
         }
-        crate::modifier::fingerprint_modifiers(self.modifiers.iter(), hasher, resolved_names, options);
+
+        fingerprint_modifiers(self.modifiers.iter(), hasher);
         self.argument_list.fingerprint_with_hasher(hasher, resolved_names, options);
         self.extends.fingerprint_with_hasher(hasher, resolved_names, options);
         self.implements.fingerprint_with_hasher(hasher, resolved_names, options);
@@ -248,7 +250,8 @@ impl Fingerprintable for ClassLikeConstant<'_> {
         for attribute_list in &self.attribute_lists {
             attribute_list.fingerprint_with_hasher(hasher, resolved_names, options);
         }
-        crate::modifier::fingerprint_modifiers(self.modifiers.iter(), hasher, resolved_names, options);
+
+        fingerprint_modifiers(self.modifiers.iter(), hasher);
         self.hint.fingerprint_with_hasher(hasher, resolved_names, options);
         for item in &self.items {
             item.fingerprint_with_hasher(hasher, resolved_names, options);
@@ -309,7 +312,8 @@ impl Fingerprintable for PlainProperty<'_> {
         for attribute_list in &self.attribute_lists {
             attribute_list.fingerprint_with_hasher(hasher, resolved_names, options);
         }
-        crate::modifier::fingerprint_modifiers(self.modifiers.iter(), hasher, resolved_names, options);
+
+        fingerprint_modifiers(self.modifiers.iter(), hasher);
         self.var.is_some().hash(hasher);
         self.hint.fingerprint_with_hasher(hasher, resolved_names, options);
         for item in &self.items {
@@ -332,7 +336,8 @@ impl Fingerprintable for HookedProperty<'_> {
         for attribute_list in &self.attribute_lists {
             attribute_list.fingerprint_with_hasher(hasher, resolved_names, options);
         }
-        crate::modifier::fingerprint_modifiers(self.modifiers.iter(), hasher, resolved_names, options);
+
+        fingerprint_modifiers(self.modifiers.iter(), hasher);
         self.var.is_some().hash(hasher);
         self.hint.fingerprint_with_hasher(hasher, resolved_names, options);
         self.item.fingerprint_with_hasher(hasher, resolved_names, options);
@@ -395,7 +400,8 @@ impl Fingerprintable for PropertyHook<'_> {
         for attribute_list in &self.attribute_lists {
             attribute_list.fingerprint_with_hasher(hasher, resolved_names, options);
         }
-        crate::modifier::fingerprint_modifiers(self.modifiers.iter(), hasher, resolved_names, options);
+
+        fingerprint_modifiers(self.modifiers.iter(), hasher);
         if self.ampersand.is_some() {
             "by_ref".hash(hasher);
         }
@@ -514,7 +520,8 @@ impl Fingerprintable for Method<'_> {
         for attribute_list in &self.attribute_lists {
             attribute_list.fingerprint_with_hasher(hasher, resolved_names, options);
         }
-        crate::modifier::fingerprint_modifiers(self.modifiers.iter(), hasher, resolved_names, options);
+
+        fingerprint_modifiers(self.modifiers.iter(), hasher);
         if self.ampersand.is_some() {
             "by_ref".hash(hasher);
         }
@@ -571,7 +578,8 @@ impl Fingerprintable for Class<'_> {
         for attribute_list in &self.attribute_lists {
             attribute_list.fingerprint_with_hasher(hasher, resolved_names, options);
         }
-        crate::modifier::fingerprint_modifiers(self.modifiers.iter(), hasher, resolved_names, options);
+
+        fingerprint_modifiers(self.modifiers.iter(), hasher);
         self.name.fingerprint_with_hasher(hasher, resolved_names, options);
         self.extends.fingerprint_with_hasher(hasher, resolved_names, options);
         self.implements.fingerprint_with_hasher(hasher, resolved_names, options);
