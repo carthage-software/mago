@@ -1,3 +1,5 @@
+use std::collections::hash_map::Entry;
+
 use foldhash::HashMap;
 use indexmap::IndexMap;
 
@@ -63,13 +65,25 @@ pub fn inherit_methods_from_parent(
                     .is_some_and(|method| method.is_abstract);
             let parent_overridden = parent_metadata.overridden_method_ids.get(method_name_lc);
             let existing_overridden = if add_parent {
-                let overridden = metadata.overridden_method_ids.entry(*method_name_lc).or_insert_with(|| {
-                    let mut parents = IndexMap::default();
-                    parents.reserve(1 + parent_overridden.map_or(0, IndexMap::len));
-                    parents
-                });
-                overridden.insert(declaring_method_id.get_class_name(), *declaring_method_id);
-                Some(overridden)
+                match (metadata.overridden_method_ids.entry(*method_name_lc), parent_overridden) {
+                    (Entry::Vacant(entry), Some(parents))
+                        if parents.first().is_some_and(|(name, _)| *name == declaring_method_id.get_class_name()) =>
+                    {
+                        // The direct parent is already first; extending would replace its value.
+                        entry.insert(parents.clone());
+                        None
+                    }
+                    (entry, _) => {
+                        let overridden = entry.or_insert_with(|| {
+                            let mut parents = IndexMap::default();
+                            parents.reserve(1 + parent_overridden.map_or(0, IndexMap::len));
+                            parents
+                        });
+
+                        overridden.insert(declaring_method_id.get_class_name(), *declaring_method_id);
+                        Some(overridden)
+                    }
+                }
             } else {
                 metadata.overridden_method_ids.get_mut(method_name_lc)
             };

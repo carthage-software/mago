@@ -221,7 +221,7 @@ pub fn inherit_method_docblocks(
                 continue;
             }
             if let Some(class_metadata) = codebase.class_likes.get(class_name) {
-                collect_inheritance_work(*class_name, class_metadata, &codebase.class_likes, &mut inheritance_work);
+                collect_inheritance_work(*class_name, class_metadata, codebase, &mut inheritance_work);
             }
         }
     } else {
@@ -229,7 +229,7 @@ pub fn inherit_method_docblocks(
             if !safe_symbols.is_empty() && safe_symbols.contains(class_name) {
                 continue;
             }
-            collect_inheritance_work(*class_name, class_metadata, &codebase.class_likes, &mut inheritance_work);
+            collect_inheritance_work(*class_name, class_metadata, codebase, &mut inheritance_work);
         }
     }
 
@@ -240,19 +240,23 @@ pub fn inherit_method_docblocks(
 fn collect_inheritance_work(
     class_name: Word,
     class_metadata: &crate::metadata::class_like::ClassLikeMetadata,
-    class_likes: &WordMap<crate::metadata::class_like::ClassLikeMetadata>,
+    codebase: &CodebaseMetadata,
     inheritance_work: &mut Vec<(Word, Word, Word, Word)>,
 ) {
     for (method_name, method_ids) in &class_metadata.overridden_method_ids {
-        let mut parent_method_id = None;
+        if !codebase.function_likes.contains_key(&(class_name, *method_name)) {
+            continue;
+        }
 
+        let mut parent_method_id = None;
         let mut current_class = class_metadata.direct_parent_class;
         while let Some(parent_name) = current_class {
             if method_ids.contains_key(&parent_name) {
                 parent_method_id = Some((parent_name, *method_name));
                 break;
             }
-            current_class = class_likes.get(&parent_name).and_then(|m| m.direct_parent_class);
+
+            current_class = codebase.class_likes.get(&parent_name).and_then(|m| m.direct_parent_class);
         }
 
         if parent_method_id.is_none() {
@@ -287,8 +291,6 @@ fn collect_inheritance_work(
 
 /// Sorts and applies docblock inheritance work items.
 fn apply_inheritance_work(codebase: &mut CodebaseMetadata, mut inheritance_work: Vec<(Word, Word, Word, Word)>) {
-    inheritance_work
-        .retain(|(class_name, method_name, _, _)| codebase.function_likes.contains_key(&(*class_name, *method_name)));
     inheritance_work.sort_by_cached_key(|(class_name, _, _, _)| {
         codebase.class_likes.get(class_name).map_or(0, |m| m.all_parent_classes.len() + m.all_parent_interfaces.len())
     });

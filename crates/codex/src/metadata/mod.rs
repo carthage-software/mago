@@ -440,6 +440,13 @@ impl CodebaseMetadata {
         self.get_class_like_by_word(lowercase_name)
     }
 
+    /// Retrieves class-like metadata by interned name, ignoring ASCII case.
+    #[inline]
+    #[must_use]
+    pub fn get_class_like_by_name(&self, name: Word) -> Option<&ClassLikeMetadata> {
+        self.get_class_like_by_word(name.to_ascii_lowercase())
+    }
+
     /// Retrieves metadata for a global function (case-insensitive).
     #[inline]
     #[must_use]
@@ -491,11 +498,14 @@ impl CodebaseMetadata {
     #[must_use]
     pub fn get_declaring_method(&self, class: &[u8], method: &[u8]) -> Option<&FunctionLikeMetadata> {
         let method_id = MethodIdentifier::new(word(class), word(method));
-        let declaring_method_id = self.get_declaring_method_identifier(&method_id);
-        self.get_method(
-            declaring_method_id.get_class_name().as_bytes(),
-            declaring_method_id.get_method_name().as_bytes(),
-        )
+        self.get_declaring_method_by_id(&method_id)
+    }
+
+    /// Retrieves the declaring method by identifier, following inheritance and ignoring ASCII case.
+    #[inline]
+    #[must_use]
+    pub fn get_declaring_method_by_id(&self, method_id: &MethodIdentifier) -> Option<&FunctionLikeMetadata> {
+        self.get_method_by_id(&self.get_declaring_method_identifier(method_id))
     }
 
     /// Retrieves metadata for any function-like construct (function, method, or closure).
