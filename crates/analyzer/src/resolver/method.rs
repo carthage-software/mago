@@ -187,7 +187,7 @@ where
         }
 
         if let Some(name) = resolved_selector.name() {
-            method_names.push(name.to_ascii_lowercase());
+            method_names.push(name);
         } else {
             result.has_invalid_target = true;
         }
@@ -266,7 +266,7 @@ where
                     object,
                     selector,
                     obj_type,
-                    method_name,
+                    method_name.to_ascii_lowercase(),
                     access_span,
                     !resolved_magic_call_method.is_empty(),
                     &mut result,
