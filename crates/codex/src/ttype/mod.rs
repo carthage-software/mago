@@ -25,6 +25,7 @@ use crate::ttype::atomic::scalar::string::TStringLiteral;
 use crate::ttype::comparator::ComparisonResult;
 use crate::ttype::comparator::union_comparator;
 use crate::ttype::expander::TypeExpansionOptions;
+use crate::ttype::flags::UnionFlags;
 use crate::ttype::resolution::TypeResolutionContext;
 use crate::ttype::shared::ARRAYKEY_ATOMIC;
 use crate::ttype::shared::BOOL_ATOMIC;
@@ -912,6 +913,27 @@ pub fn combine_union_types_rc(
     Rc::new(combine_unequal_union_types_inner(type_1, type_2, codebase, options, false))
 }
 
+/// Combines types, moving the first union's atoms when it has one owner.
+#[inline]
+#[must_use]
+pub fn combine_owned_union_types_rc(
+    type_1: Rc<TUnion>,
+    type_2: &Rc<TUnion>,
+    codebase: &CodebaseMetadata,
+    options: combiner::CombinerOptions,
+) -> Rc<TUnion> {
+    if type_1 == *type_2 {
+        return type_1;
+    }
+
+    let combined = match Rc::try_unwrap(type_1) {
+        Ok(type_1) => combine_unequal_union_types_cow(Cow::Owned(type_1), type_2, codebase, options, false),
+        Err(type_1) => combine_unequal_union_types_inner(&type_1, type_2, codebase, options, false),
+    };
+
+    Rc::new(combined)
+}
+
 #[inline]
 #[must_use]
 pub fn combine_union_types(
@@ -955,14 +977,29 @@ fn combine_unequal_union_types_inner(
     options: combiner::CombinerOptions,
     preserve_array_shapes: bool,
 ) -> TUnion {
+    combine_unequal_union_types_cow(Cow::Borrowed(type_1), type_2, codebase, options, preserve_array_shapes)
+}
+
+fn combine_unequal_union_types_cow(
+    type_1: Cow<'_, TUnion>,
+    type_2: &TUnion,
+    codebase: &CodebaseMetadata,
+    options: combiner::CombinerOptions,
+    preserve_array_shapes: bool,
+) -> TUnion {
+    let flags_1 = type_1.flags;
     let mut combined_type = if type_1.is_never() || type_1.is_never_template() {
         type_2.clone()
     } else if type_2.is_never() || type_2.is_never_template() {
-        type_1.clone()
+        type_1.into_owned()
     } else if type_1.is_vanilla_mixed() && type_2.is_vanilla_mixed() {
         get_mixed()
     } else {
-        let mut all_atomic_types = type_1.types.to_vec();
+        let mut all_atomic_types = match type_1 {
+            Cow::Borrowed(type_1) => type_1.types.to_vec(),
+            Cow::Owned(type_1) => type_1.types.into_owned(),
+        };
+
         all_atomic_types.extend(type_2.types.iter().cloned());
 
         let types = if preserve_array_shapes {
@@ -973,26 +1010,26 @@ fn combine_unequal_union_types_inner(
 
         let mut result = TUnion::from_vec(types);
 
-        if type_1.had_template() && type_2.had_template() {
+        if flags_1.contains(UnionFlags::HAD_TEMPLATE) && type_2.had_template() {
             result.set_had_template(true);
         }
 
-        if type_1.reference_free() && type_2.reference_free() {
+        if flags_1.contains(UnionFlags::REFERENCE_FREE) && type_2.reference_free() {
             result.set_reference_free(true);
         }
 
         result
     };
 
-    if type_1.possibly_undefined() || type_2.possibly_undefined() {
+    if flags_1.contains(UnionFlags::POSSIBLY_UNDEFINED) || type_2.possibly_undefined() {
         combined_type.set_possibly_undefined(true, None);
     }
 
-    if type_1.possibly_undefined_from_try() || type_2.possibly_undefined_from_try() {
+    if flags_1.contains(UnionFlags::POSSIBLY_UNDEFINED_FROM_TRY) || type_2.possibly_undefined_from_try() {
         combined_type.set_possibly_undefined_from_try(true);
     }
 
-    if type_1.ignore_falsable_issues() || type_2.ignore_falsable_issues() {
+    if flags_1.contains(UnionFlags::IGNORE_FALSABLE_ISSUES) || type_2.ignore_falsable_issues() {
         combined_type.set_ignore_falsable_issues(true);
     }
 
@@ -1684,9 +1721,14 @@ mod tests {
 
     use super::add_optional_union_type;
     use super::add_optional_union_type_rc;
+    use super::combine_owned_union_types_rc;
     use super::combine_union_types;
     use super::combine_union_types_rc;
+    use super::get_empty_keyed_array;
     use super::get_int;
+    use super::get_list;
+    use super::get_mixed;
+    use super::get_never;
     use super::get_string;
 
     fn assert_exact(actual: &TUnion, expected: &TUnion) {
@@ -1772,6 +1814,61 @@ mod tests {
                     &add_optional_union_type_rc(&first, Some(&second), &codebase),
                     &add_optional_union_type((*first).clone(), Some(&second), &codebase),
                 );
+            }
+        }
+    }
+
+    #[test]
+    fn consuming_rc_merges_match_borrowed_types_flags_and_shared_snapshots() {
+        let codebase = CodebaseMetadata::new();
+        let types = [get_int(), get_string(), get_never(), get_mixed(), get_empty_keyed_array(), get_list(get_int())];
+        let flags = [
+            UnionFlags::empty(),
+            UnionFlags::HAD_TEMPLATE,
+            UnionFlags::BY_REFERENCE,
+            UnionFlags::REFERENCE_FREE,
+            UnionFlags::POSSIBLY_UNDEFINED_FROM_TRY,
+            UnionFlags::POSSIBLY_UNDEFINED,
+            UnionFlags::IGNORE_NULLABLE_ISSUES,
+            UnionFlags::IGNORE_FALSABLE_ISSUES,
+            UnionFlags::FROM_TEMPLATE_DEFAULT,
+            UnionFlags::FROM_UNSPECIFIED_TEMPLATE,
+            UnionFlags::POPULATED,
+            UnionFlags::NULLSAFE_NULL,
+        ];
+
+        for first_type in &types {
+            for second_type in &types {
+                for first_flags in flags {
+                    for second_flags in flags {
+                        let mut first = first_type.clone();
+                        first.flags = first_flags;
+                        let mut second = second_type.clone();
+                        second.flags = second_flags;
+                        let second = Rc::new(second);
+                        let expected = combine_union_types(&first, &second, &codebase, CombinerOptions::default());
+
+                        let shared = Rc::new(first.clone());
+                        let actual = combine_owned_union_types_rc(
+                            Rc::clone(&shared),
+                            &second,
+                            &codebase,
+                            CombinerOptions::default(),
+                        );
+                        assert_exact(&actual, &expected);
+                        assert_exact(&shared, &first);
+
+                        let unique = Rc::new(first);
+                        let original_pointer = Rc::as_ptr(&unique);
+                        let equal = unique == second;
+                        let actual =
+                            combine_owned_union_types_rc(unique, &second, &codebase, CombinerOptions::default());
+                        assert_exact(&actual, &expected);
+                        if equal {
+                            assert!(std::ptr::eq(Rc::as_ptr(&actual), original_pointer));
+                        }
+                    }
+                }
             }
         }
     }

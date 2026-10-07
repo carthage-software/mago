@@ -1070,7 +1070,7 @@ fn get_signature_of_function_like_metadata_with_options(
 
 #[must_use]
 pub fn contains_parameter_variable(union: &TUnion) -> bool {
-    union.get_all_child_nodes().into_iter().any(|node| {
+    union.any_child_node(|node| {
         matches!(
             node,
             TypeRef::Atomic(TAtomic::Variable(variable))

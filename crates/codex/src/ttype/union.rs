@@ -1302,7 +1302,7 @@ impl PartialEq for TUnion {
 
         // Check other ⊆ self (needed when duplicates exist in either side)
 
-        is_subset(&self.types, &other.types) && is_subset(&other.types, &self.types)
+        len > 1 && is_subset(&self.types, &other.types) && is_subset(&other.types, &self.types)
     }
 }
 

@@ -39,17 +39,47 @@ fn key_and_value_types(array: &TArray) -> (Option<Cow<'_, TUnion>>, Cow<'_, TUni
     }
 }
 
-fn known_items_view(array: &TArray) -> Option<Cow<'_, BTreeMap<ArrayKey, (bool, TUnion)>>> {
+#[derive(Clone, Copy)]
+enum KnownItems<'array> {
+    Keyed(&'array BTreeMap<ArrayKey, (bool, TUnion)>),
+    List(&'array BTreeMap<usize, (bool, TUnion)>),
+}
+
+impl<'array> KnownItems<'array> {
+    fn get(self, key: &ArrayKey) -> Option<&'array (bool, TUnion)> {
+        match self {
+            Self::Keyed(items) => items.get(key),
+            Self::List(elements) => {
+                let ArrayKey::Integer(index) = *key else {
+                    return None;
+                };
+                let offset = index as usize;
+                if offset as i64 != index { None } else { elements.get(&offset) }
+            }
+        }
+    }
+
+    fn iter(self) -> impl Iterator<Item = (ArrayKey, &'array (bool, TUnion))> {
+        let (items, elements) = match self {
+            Self::Keyed(items) => (Some(items), None),
+            Self::List(elements) => (None, Some(elements)),
+        };
+        // Casting large list offsets to i64 puts them before nonnegative keys.
+        let negative = elements.into_iter().flat_map(|elements| {
+            elements.range((std::ops::Bound::Excluded(i64::MAX as usize), std::ops::Bound::Unbounded))
+        });
+        let nonnegative = elements.into_iter().flat_map(|elements| elements.range(..=i64::MAX as usize));
+        items
+            .into_iter()
+            .flat_map(|items| items.iter().map(|(key, value)| (*key, value)))
+            .chain(negative.chain(nonnegative).map(|(index, value)| (ArrayKey::Integer(*index as i64), value)))
+    }
+}
+
+fn known_items_view(array: &TArray) -> Option<KnownItems<'_>> {
     match array {
-        TArray::Keyed(keyed_array) => keyed_array.known_items.as_ref().map(Cow::Borrowed),
-        TArray::List(list) => list.known_elements.as_ref().map(|elements| {
-            Cow::Owned(
-                elements
-                    .iter()
-                    .map(|(index, value_tuple)| (ArrayKey::Integer(*index as i64), value_tuple.clone()))
-                    .collect(),
-            )
-        }),
+        TArray::Keyed(keyed_array) => keyed_array.known_items.as_ref().map(KnownItems::Keyed),
+        TArray::List(list) => list.known_elements.as_ref().map(KnownItems::List),
     }
 }
 
@@ -84,13 +114,13 @@ pub(crate) fn is_array_contained_by_array(
     let (container_key_type, container_value_type) = key_and_value_types(container_array);
     let (input_key_type, input_value_type) = key_and_value_types(input_array);
 
-    let input_known_items_cow = known_items_view(input_array);
+    let input_known_items = known_items_view(input_array);
     let container_known_items = known_items_view(container_array);
 
-    if let Some(input_known_items) = &input_known_items_cow {
+    if let Some(input_known_items) = &input_known_items {
         for (input_key, (input_is_optional, input_item_value_type)) in input_known_items.iter() {
             if let Some((container_is_optional, container_item_value_type)) =
-                container_known_items.as_ref().and_then(|items| items.get(input_key))
+                container_known_items.as_ref().and_then(|items| items.get(&input_key))
             {
                 if *input_is_optional && !*container_is_optional {
                     return false;
@@ -135,7 +165,7 @@ pub(crate) fn is_array_contained_by_array(
 
     if let Some(container_known_items) = &container_known_items {
         for (container_key, (container_is_optional, container_item_value_type)) in container_known_items.iter() {
-            let input_has_key = input_known_items_cow.as_ref().is_some_and(|items| items.contains_key(container_key));
+            let input_has_key = input_known_items.as_ref().is_some_and(|items| items.get(&container_key).is_some());
 
             if !*container_is_optional {
                 if !input_has_key {
@@ -218,6 +248,55 @@ mod tests {
     use crate::ttype::get_mixed;
     use crate::ttype::get_string;
     use crate::ttype::union::TUnion;
+
+    #[test]
+    fn known_items_borrow_types_and_keep_cast_key_order() {
+        use crate::ttype::atomic::array::list::TList;
+
+        for indices in [vec![], vec![0], vec![0, 1, 42, i64::MAX as usize, usize::MAX / 2 + 1, usize::MAX]] {
+            let elements = indices
+                .into_iter()
+                .map(|index| (index, (index % 2 == 0, get_literal_string(word(format!("item{index}"))))))
+                .collect::<BTreeMap<_, _>>();
+            let expected = elements
+                .iter()
+                .map(|(index, value)| (ArrayKey::Integer(*index as i64), value.clone()))
+                .collect::<BTreeMap<_, _>>();
+            let arrays = [
+                TArray::List(TList::from_known_elements(elements)),
+                TArray::Keyed(TKeyedArray::new().with_known_items(expected.clone())),
+            ];
+            for array in &arrays {
+                let Some(view) = super::known_items_view(array) else {
+                    panic!("Known items should exist");
+                };
+                assert!(view.iter().eq(expected.iter().map(|(key, value)| (*key, value))));
+                for (key, value) in view.iter() {
+                    let Some(found) = view.get(&key) else {
+                        panic!("An iterated key should exist");
+                    };
+                    assert!(std::ptr::eq(value, found));
+                    let source = match array {
+                        TArray::List(list) => list
+                            .known_elements
+                            .as_ref()
+                            .and_then(|items| key.get_integer().and_then(|index| items.get(&(index as usize)))),
+                        TArray::Keyed(array) => array.known_items.as_ref().and_then(|items| items.get(&key)),
+                    };
+                    assert!(source.is_some_and(|source| std::ptr::eq(source, value)));
+                }
+                for key in [
+                    ArrayKey::Integer(-1),
+                    ArrayKey::Integer(-2),
+                    ArrayKey::Integer(41),
+                    ArrayKey::String(word("0")),
+                    ArrayKey::ClassLikeConstant { class_like_name: word("C"), constant_name: word("K") },
+                ] {
+                    assert_eq!(view.get(&key), expected.get(&key));
+                }
+            }
+        }
+    }
 
     fn t_keyed(arr: TKeyedArray) -> TUnion {
         TUnion::from_atomic(TAtomic::Array(TArray::Keyed(arr)))

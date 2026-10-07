@@ -886,6 +886,12 @@ fn scrape_type_properties(
                             combination.keyed_array_entries.keys().copied().collect::<HashSet<_>>();
 
                         let mut has_defined_keys = false;
+                        let known_items = if !has_existing_entries && combination.keyed_array_parameters.is_none() {
+                            has_defined_keys = known_items.values().any(|(optional, _)| !optional);
+                            std::mem::replace(&mut combination.keyed_array_entries, known_items)
+                        } else {
+                            known_items
+                        };
 
                         for (candidate_item_name, (cu, candidate_item_type)) in known_items {
                             if let Some((eu, existing_type)) =
@@ -914,8 +920,7 @@ fn scrape_type_properties(
 
                                         continue;
                                     } else {
-                                        let new_type = candidate_item_type.clone();
-                                        (has_existing_entries || cu, new_type)
+                                        (has_existing_entries || cu, candidate_item_type)
                                     };
 
                                 combination.keyed_array_entries.insert(candidate_item_name, new_item_value_type);
@@ -1630,6 +1635,48 @@ mod tests {
     use crate::ttype::atomic::TAtomic;
     use crate::ttype::atomic::array::list::TList;
     use crate::ttype::atomic::scalar::TScalar;
+
+    #[test]
+    fn first_keyed_shape_keeps_entries_and_empty_predecessor_makes_them_optional() {
+        for optional in [false, true] {
+            for non_empty in [false, true] {
+                let items = BTreeMap::from([
+                    (ArrayKey::Integer(7), (optional, crate::ttype::get_int())),
+                    (ArrayKey::String(word("name")), (true, crate::ttype::get_string())),
+                ]);
+                let shape = TAtomic::Array(TArray::Keyed(TKeyedArray {
+                    known_items: Some(items.clone()),
+                    parameters: None,
+                    non_empty,
+                    known_non_list: true,
+                }));
+                let codebase = CodebaseMetadata::new();
+                let options = CombinerOptions::default();
+                let mut combination = TypeCombination::new();
+                scrape_type_properties(shape.clone(), &mut combination, &codebase, options);
+                assert_eq!(combination.keyed_array_entries, items);
+                assert_eq!(
+                    combination.flags.contains(CombinationFlags::KEYED_ARRAY_ALWAYS_FILLED),
+                    non_empty && !optional
+                );
+                assert_eq!(combination.flags.contains(CombinationFlags::KEYED_ARRAY_SOMETIMES_FILLED), non_empty);
+                assert!(combination.flags.contains(CombinationFlags::KEYED_ARRAY_KNOWN_NON_LIST));
+
+                let mut combination = TypeCombination::new();
+                scrape_type_properties(
+                    TAtomic::Array(TArray::Keyed(TKeyedArray::new())),
+                    &mut combination,
+                    &codebase,
+                    options,
+                );
+                scrape_type_properties(shape, &mut combination, &codebase, options);
+                assert_eq!(
+                    combination.keyed_array_entries,
+                    items.into_iter().map(|(key, (_, value))| (key, (true, value))).collect()
+                );
+            }
+        }
+    }
 
     #[test]
     fn test_combine_scalars() {
