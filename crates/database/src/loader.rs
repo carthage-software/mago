@@ -165,24 +165,34 @@ impl<'config> DatabaseLoader<'config> {
                 )
             },
         );
+
         let host_files_with_spec = host_files_with_spec?;
         let vendored_files_with_spec = vendored_files_with_spec?;
         let patch_files_with_spec = patch_files_with_spec?;
 
-        let mut all_files: HashMap<FileId, File> = HashMap::default();
         // Per-file maximum specificity for each tier the file matched. `None` in a slot means
         // the file did not match any configured pattern in that tier; otherwise it carries the
         // best specificity score that tier could offer, scored by `calculate_pattern_specificity`.
         type TierSpecs = (Option<usize>, Option<usize>, Option<usize>);
-        let mut tier_specs: HashMap<FileId, TierSpecs> = HashMap::default();
+        let file_count = host_files_with_spec.len() + vendored_files_with_spec.len() + patch_files_with_spec.len();
+        let mut all_files: HashMap<FileId, (File, TierSpecs)> =
+            HashMap::with_capacity_and_hasher(file_count, foldhash::fast::RandomState::default());
 
         // Process host files (from paths)
         for file_with_spec in host_files_with_spec {
             let file_id = file_with_spec.file.id;
             let specificity = file_with_spec.specificity;
 
-            all_files.insert(file_id, file_with_spec.file);
-            bump_spec(&mut tier_specs.entry(file_id).or_insert((None, None, None)).0, specificity);
+            match all_files.entry(file_id) {
+                Entry::Vacant(entry) => {
+                    entry.insert((file_with_spec.file, (Some(specificity), None, None)));
+                }
+                Entry::Occupied(mut entry) => {
+                    let (file, specs) = entry.get_mut();
+                    *file = file_with_spec.file;
+                    bump_spec(&mut specs.0, specificity);
+                }
+            }
         }
 
         // When stdin override is set, ensure that the file is in the database
@@ -204,9 +214,9 @@ impl<'config> DatabaseLoader<'config> {
                 } else {
                     self.configuration.workspace.join(excl.as_ref())
                 };
+
                 let canonical = canonical.canonicalize().unwrap_or(canonical);
                 let canonical_str = canonical.to_string_lossy();
-
                 virtual_path_str.starts_with(canonical_str.as_ref())
                     && matches!(virtual_path_str.as_bytes().get(canonical_str.len()), None | Some(&b'/' | &b'\\'))
             });
@@ -215,9 +225,7 @@ impl<'config> DatabaseLoader<'config> {
                 let file = File::ephemeral(Cow::Owned(name.as_ref().to_vec()), Cow::Owned(content.clone()));
                 let file_id = file.id;
                 if let Entry::Vacant(e) = all_files.entry(file_id) {
-                    e.insert(file);
-
-                    bump_spec(&mut tier_specs.entry(file_id).or_insert((None, None, None)).0, usize::MAX);
+                    e.insert((file, (Some(usize::MAX), None, None)));
                 }
             }
         }
@@ -225,25 +233,21 @@ impl<'config> DatabaseLoader<'config> {
         for file_with_spec in vendored_files_with_spec {
             let file_id = file_with_spec.file.id;
             let vendored_specificity = file_with_spec.specificity;
-
-            all_files.entry(file_id).or_insert(file_with_spec.file);
-            bump_spec(&mut tier_specs.entry(file_id).or_insert((None, None, None)).1, vendored_specificity);
+            let (_, specs) = all_files.entry(file_id).or_insert((file_with_spec.file, (None, None, None)));
+            bump_spec(&mut specs.1, vendored_specificity);
         }
 
         for file_with_spec in patch_files_with_spec {
             let file_id = file_with_spec.file.id;
             let specificity = file_with_spec.specificity;
-            all_files.entry(file_id).or_insert(file_with_spec.file);
-            bump_spec(&mut tier_specs.entry(file_id).or_insert((None, None, None)).2, specificity);
+            let (_, specs) = all_files.entry(file_id).or_insert((file_with_spec.file, (None, None, None)));
+            bump_spec(&mut specs.2, specificity);
         }
 
-        db.reserve(tier_specs.len() + self.memory_sources.len());
-
-        for (file_id, (host_spec, vendored_spec, patch_spec)) in tier_specs {
-            if let Some(mut file) = all_files.remove(&file_id) {
-                file.file_type = resolve_file_type(host_spec, vendored_spec, patch_spec);
-                db.add(file);
-            }
+        db.reserve(all_files.len() + self.memory_sources.len());
+        for (_, (mut file, (host_spec, vendored_spec, patch_spec))) in all_files {
+            file.file_type = resolve_file_type(host_spec, vendored_spec, patch_spec);
+            db.add(file);
         }
 
         for (name, contents, file_type) in self.memory_sources {
@@ -457,18 +461,36 @@ impl<'config> DatabaseLoader<'config> {
                                 )
                         });
 
-                        let mut paths = Vec::new();
-                        for entry in walker {
-                            match entry {
-                                Ok(entry) if !entry.file_type().is_dir() => {
-                                    paths.push((entry.into_path(), specificity, false));
-                                }
-                                Ok(_) => {}
-                                Err(err) => warn_walk_error(&err, root.as_path()),
+                        let mut paths = walker.filter_map(|entry| match entry {
+                            Ok(entry) if !entry.file_type().is_dir() => Some((entry.into_path(), specificity, false)),
+                            Ok(_) => None,
+                            Err(err) => {
+                                warn_walk_error(&err, root.as_path());
+                                None
                             }
+                        });
+
+                        let batches = std::iter::from_fn(|| {
+                            let batch: Vec<_> = paths.by_ref().take(128).collect();
+                            (!batch.is_empty()).then_some(batch)
+                        });
+
+                        let mut loaded: Vec<_> = batches
+                            .enumerate()
+                            .par_bridge()
+                            .map(|(index, paths)| {
+                                let files = paths.into_iter().filter_map(&load_path).collect::<Result<Vec<_>, _>>();
+                                (index, files)
+                            })
+                            .collect();
+
+                        loaded.sort_unstable_by_key(|(index, _)| *index);
+                        let mut files = Vec::new();
+                        for (_, batch) in loaded {
+                            files.extend(batch?);
                         }
 
-                        paths.into_par_iter().filter_map(&load_path).collect::<Result<Vec<_>, _>>()
+                        Ok(files)
                     })
                     .collect::<Result<Vec<Vec<FileWithSpecificity>>, DatabaseError>>()
             },
@@ -714,6 +736,47 @@ mod tests {
             std::fs::create_dir_all(parent).unwrap();
         }
         std::fs::write(file_path, content).unwrap();
+    }
+
+    #[test]
+    fn test_batched_walk_keeps_file_order() {
+        let temp_dir = TempDir::new().unwrap();
+        for index in 0..385 {
+            create_test_file(&temp_dir, &format!("src/nested/{index}.php"), "<?php");
+        }
+
+        let root = temp_dir.path().join("src/nested").canonicalize().unwrap();
+        let expected: Vec<_> = WalkDir::new(root)
+            .follow_links(true)
+            .into_iter()
+            .map(Result::unwrap)
+            .filter(|entry| !entry.file_type().is_dir())
+            .map(walkdir::DirEntry::into_path)
+            .collect();
+
+        let config = create_test_config(&temp_dir, vec!["src"], vec![]);
+        let loader = DatabaseLoader::new(config);
+        let extensions = std::iter::once(OsString::from("php")).collect();
+        let globs = GlobSet::empty();
+        let path_excludes = HashSet::default();
+        // ?
+        for threads in [1, 4] {
+            let pool = rayon::ThreadPoolBuilder::new().num_threads(threads).build().unwrap();
+            let files = pool
+                .install(|| {
+                    loader.load_paths(
+                        &loader.configuration.paths,
+                        FileType::Host,
+                        &extensions,
+                        &globs,
+                        &globs,
+                        &path_excludes,
+                    )
+                })
+                .unwrap();
+            let actual: Vec<_> = files.into_iter().map(|entry| entry.file.path.unwrap()).collect();
+            assert_eq!(actual, expected);
+        }
     }
 
     #[test]
