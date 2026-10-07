@@ -1,4 +1,6 @@
 use std::borrow::Cow;
+#[cfg(not(feature = "sso"))]
+use std::cell::Cell;
 use std::cmp::Ordering;
 use std::fmt;
 use std::hash::Hash;
@@ -79,6 +81,11 @@ unsafe impl Send for Word {}
 // lifetime, so concurrent reads are safe.
 unsafe impl Sync for Word {}
 
+#[cfg(not(feature = "sso"))]
+thread_local! {
+    static LOWERCASE_CACHE: [Cell<Option<(Word, Word)>>; 512] = const { [const { Cell::new(None) }; 512] };
+}
+
 impl Word {
     /// Interns `bytes` and returns its canonical [`Word`].
     #[inline]
@@ -145,7 +152,27 @@ impl Word {
         #[cfg(feature = "sso")]
         let has_ascii_uppercase = self.as_bytes().iter().any(u8::is_ascii_uppercase);
 
-        if has_ascii_uppercase { crate::ascii_lowercase_word(self.as_bytes()) } else { self }
+        if !has_ascii_uppercase {
+            return self;
+        }
+
+        #[cfg(not(feature = "sso"))]
+        {
+            LOWERCASE_CACHE.with(|cache| {
+                let slot = &cache[(self.repr.ptr.as_ptr().addr() >> 3) & (cache.len() - 1)];
+                if let Some((original, lowercase)) = slot.get()
+                    && original == self
+                {
+                    return lowercase;
+                }
+
+                let lowercase = crate::ascii_lowercase_word(self.as_bytes());
+                slot.set(Some((self, lowercase)));
+                lowercase
+            })
+        }
+        #[cfg(feature = "sso")]
+        crate::ascii_lowercase_word(self.as_bytes())
     }
 
     /// Returns the length, in bytes, of this `Word`.

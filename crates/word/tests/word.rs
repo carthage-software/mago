@@ -140,6 +140,25 @@ fn lowercase_word_shares_the_global_interned_value() {
 }
 
 #[test]
+fn lowercase_cache_keeps_values_after_collisions_and_across_threads() {
+    let words: Vec<_> =
+        (0..4096).map(|index| Word::new(format!("Cache\\Namespace{index}\\ClassName").as_bytes())).collect();
+    thread::scope(|scope| {
+        for thread_index in 0..4 {
+            let words = &words;
+            scope.spawn(move || {
+                for index in 0..words.len() * 2 {
+                    let original = words[(index * 4051 + thread_index) % words.len()];
+                    let expected = Word::new(&original.as_bytes().to_ascii_lowercase());
+                    assert_eq!(original.to_ascii_lowercase(), expected);
+                    assert_eq!(original.to_ascii_lowercase(), expected);
+                }
+            });
+        }
+    });
+}
+
+#[test]
 fn word_map_keys_resolve_by_content() {
     let mut map: WordMap<i32> = WordMap::default();
     map.insert(Word::new(b"a"), 1);
