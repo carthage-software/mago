@@ -64,8 +64,8 @@ impl ReportingTarget {
     /// A boxed writer that can be written to.
     pub(crate) fn resolve(&self) -> Box<dyn Write + '_> {
         match self {
-            ReportingTarget::Stdout => Box::new(io::BufWriter::new(io::stdout().lock())),
-            ReportingTarget::Stderr => Box::new(io::BufWriter::new(io::stderr().lock())),
+            ReportingTarget::Stdout => Box::new(io::BufWriter::with_capacity(64 * 1024, io::stdout().lock())),
+            ReportingTarget::Stderr => Box::new(io::BufWriter::with_capacity(64 * 1024, io::stderr().lock())),
             ReportingTarget::Writer(writer) => Box::new(LockedWriter { writer: Arc::clone(writer) }),
         }
     }
