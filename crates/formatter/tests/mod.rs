@@ -82,6 +82,7 @@ test_case!(bitwise_precedence_parens_noise);
 test_case!(bitwise_precedence_parens_noise_disabled);
 test_case!(binary_ops_wrapping);
 test_case!(parens_around_constructs);
+test_case!(issue_2432);
 test_case!(interpolated_strings_vars);
 test_case!(closure_creation);
 test_case!(fluid_member_access_chain);

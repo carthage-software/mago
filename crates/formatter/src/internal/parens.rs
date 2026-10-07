@@ -12,6 +12,7 @@ use mago_syntax::cst::Instantiation;
 use mago_syntax::cst::Literal;
 use mago_syntax::cst::Node;
 use mago_syntax::cst::PartialApplication;
+use mago_syntax::cst::Yield;
 use mago_syntax::token::Associativity;
 use mago_syntax::token::GetPrecedence;
 use mago_syntax::token::Precedence;
@@ -91,6 +92,7 @@ where
             || self.class_constant_access_needs_parens(node)
             || self.arrow_function_needs_parens(node)
             || self.construct_needs_parens(node)
+            || self.yield_needs_parens(node)
     }
 
     pub(crate) fn should_indent(&self, node: Node<'arena, 'arena>) -> bool {
@@ -225,6 +227,28 @@ where
         }
 
         matches!(self.nth_parent_kind(2), Some(Node::Binary(_) | Node::Conditional(_) | Node::Pipe(_)))
+    }
+
+    fn yield_needs_parens(&self, node: Node<'arena, 'arena>) -> bool {
+        let Node::Yield(r#yield) = node else {
+            return false;
+        };
+
+        for parent in self.stack.iter().rev().skip(2) {
+            match parent {
+                Node::Binary(binary) if binary.operator.start_offset() > node.end_offset() => {
+                    return match r#yield {
+                        Yield::Value(value) if value.value.is_none() => binary.operator.is_additive(),
+                        Yield::From(_) => binary.operator.precedence() > Precedence::YieldFrom,
+                        _ => binary.operator.precedence() > Precedence::Yield,
+                    };
+                }
+                Node::Binary(_) | Node::Expression(_) | Node::UnaryPrefix(_) => {}
+                _ => return false,
+            }
+        }
+
+        false
     }
 
     /// Check if a class constant access needs parentheses based on its parent context.
