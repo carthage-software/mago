@@ -268,7 +268,10 @@ impl AnalysisService {
             self.settings.version,
             Box::new(reducer),
             self.use_progress_bars,
-        );
+        )
+        // We only need file signatures if there's a custom plugin that can inspect them,
+        // so just don't bother computing them here
+        .with_file_signatures(self.plugin_registry.has_custom_plugins());
 
         let plugin_registry = Arc::clone(&self.plugin_registry);
         let before_plugin_registry = Arc::clone(&self.plugin_registry);

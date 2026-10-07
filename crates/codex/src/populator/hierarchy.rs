@@ -1,8 +1,10 @@
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_word::Word;
+use mago_word::WordMap;
 use mago_word::WordSet;
 use mago_word::word;
+use rayon::prelude::*;
 
 use crate::identifier::method::MethodIdentifier;
 use crate::metadata::CodebaseMetadata;
@@ -112,6 +114,17 @@ pub fn populate_class_like_metadata_iterative(
         return;
     };
 
+    populate_class_like_metadata(classlike_name, &mut metadata, codebase, symbol_references);
+    populate_method_type_aliases(classlike_name, &metadata, codebase);
+    codebase.class_likes.insert(classlike_name, metadata);
+}
+
+fn populate_class_like_metadata(
+    classlike_name: Word,
+    metadata: &mut ClassLikeMetadata,
+    codebase: &CodebaseMetadata,
+    symbol_references: &mut SymbolReferences,
+) {
     for attribute_metadata in &metadata.attributes {
         symbol_references.add_symbol_reference_to_symbol(metadata.name, attribute_metadata.name, true);
     }
@@ -127,29 +140,24 @@ pub fn populate_class_like_metadata_iterative(
     }
 
     for trait_name in sorted_atoms(metadata.used_traits.iter().copied()) {
-        merge_metadata_from_trait(&mut metadata, codebase, trait_name, symbol_references);
+        merge_metadata_from_trait(metadata, codebase, trait_name, symbol_references);
     }
 
     if let Some(parent_classname) = metadata.direct_parent_class {
-        merge_metadata_from_parent_class_like(&mut metadata, codebase, parent_classname, symbol_references);
+        merge_metadata_from_parent_class_like(metadata, codebase, parent_classname, symbol_references);
     }
 
     let direct_parent_interfaces = sorted_atoms(metadata.direct_parent_interfaces.iter().copied());
     for direct_parent_interface in direct_parent_interfaces {
-        merge_interface_metadata_from_parent_interface(
-            &mut metadata,
-            codebase,
-            direct_parent_interface,
-            symbol_references,
-        );
+        merge_interface_metadata_from_parent_interface(metadata, codebase, direct_parent_interface, symbol_references);
     }
 
     for required_class in sorted_atoms(metadata.require_extends.iter().copied()) {
-        merge_metadata_from_required_class_like(&mut metadata, codebase, required_class, symbol_references);
+        merge_metadata_from_required_class_like(metadata, codebase, required_class, symbol_references);
     }
 
     for required_interface in sorted_atoms(metadata.require_implements.iter().copied()) {
-        merge_metadata_from_required_interface(&mut metadata, codebase, required_interface, symbol_references);
+        merge_metadata_from_required_interface(metadata, codebase, required_interface, symbol_references);
     }
 
     if metadata.flags.is_readonly() {
@@ -213,20 +221,6 @@ pub fn populate_class_like_metadata_iterative(
         }
     }
 
-    if !metadata.type_aliases.is_empty() {
-        for method_name in &metadata.methods {
-            let method_id = (classlike_name, *method_name);
-            if let Some(method_metadata) = codebase.function_likes.get_mut(&method_id) {
-                let mut updated_context = method_metadata.type_resolution_context.clone().unwrap_or_default();
-                for alias_name in metadata.type_aliases.keys() {
-                    updated_context = updated_context.with_type_alias(*alias_name);
-                }
-
-                method_metadata.type_resolution_context = Some(updated_context);
-            }
-        }
-    }
-
     if (metadata.kind.is_class() || metadata.kind.is_enum())
         && metadata.appearing_method_ids.contains_key(&word(b"__tostring"))
         && !metadata.all_parent_interfaces.contains(&word(b"stringable"))
@@ -235,7 +229,188 @@ pub fn populate_class_like_metadata_iterative(
     }
 
     metadata.mark_as_populated();
-    codebase.class_likes.insert(classlike_name, metadata);
+}
+
+fn populate_method_type_aliases(classlike_name: Word, metadata: &ClassLikeMetadata, codebase: &mut CodebaseMetadata) {
+    if !metadata.type_aliases.is_empty() {
+        for method_name in &metadata.methods {
+            let method_id = (classlike_name, *method_name);
+            if let Some(method_metadata) = codebase.function_likes.get_mut(&method_id) {
+                let mut updated_context = method_metadata.type_resolution_context.take().unwrap_or_default();
+                for alias_name in metadata.type_aliases.keys() {
+                    updated_context = updated_context.with_type_alias(*alias_name);
+                }
+
+                method_metadata.type_resolution_context = Some(updated_context);
+            }
+        }
+    }
+}
+
+/// Populates independent classes together, keeping cyclic edges in their serial order.
+pub fn populate_class_likes_parallel(
+    sorted_classes: &[Word],
+    codebase: &mut CodebaseMetadata,
+    symbol_references: &mut SymbolReferences,
+) {
+    if sorted_classes.len() < 128 || rayon::current_num_threads() == 1 {
+        for &name in sorted_classes {
+            populate_class_like_metadata_iterative(name, codebase, symbol_references);
+        }
+        return;
+    }
+
+    let positions: WordMap<usize> = sorted_classes.iter().enumerate().map(|(index, name)| (*name, index)).collect();
+    let mut levels = vec![0; sorted_classes.len()];
+    let mut layers: Vec<Vec<usize>> = Vec::new();
+    let mut segment_start = 0;
+    let mut parallel_classes = 0;
+    let mut serial_dependencies = WordSet::default();
+
+    for (index, &name) in sorted_classes.iter().enumerate() {
+        let mut level = 0;
+        let independent = codebase.class_likes.get(&name).is_some_and(|metadata| {
+            if metadata.name != name {
+                return false;
+            }
+
+            let trait_requirements = metadata
+                .used_traits
+                .iter()
+                .filter_map(|name| codebase.get_class_like_by_word(*name))
+                .flat_map(|trait_metadata| trait_metadata.require_implements.iter().copied());
+            let inherited_requirements = metadata
+                .require_extends
+                .iter()
+                .filter_map(|name| codebase.get_class_like_by_word(*name))
+                .flat_map(|required_metadata| required_metadata.all_parent_interfaces.iter().copied());
+            hierarchy_dependencies(metadata).chain(trait_requirements).chain(inherited_requirements).all(|dependency| {
+                let Some(dependency) = codebase.resolve_class_like_word(dependency) else {
+                    return true;
+                };
+                if serial_dependencies.contains(&dependency) {
+                    return false;
+                }
+                let Some(&dependency_index) = positions.get(&dependency) else {
+                    return true;
+                };
+                if dependency_index >= index {
+                    return false;
+                }
+                if dependency_index >= segment_start {
+                    level = level.max(levels[dependency_index] + 1);
+                }
+                true
+            })
+        });
+
+        if !independent {
+            serial_dependencies.insert(name);
+            parallel_classes +=
+                populate_hierarchy_segment(sorted_classes, segment_start, index, &layers, codebase, symbol_references);
+            layers.clear();
+            populate_class_like_metadata_iterative(name, codebase, symbol_references);
+            segment_start = index + 1;
+            continue;
+        }
+
+        levels[index] = level;
+        if layers.len() <= level {
+            layers.resize_with(level + 1, Vec::new);
+        }
+        layers[level].push(index);
+    }
+
+    parallel_classes += populate_hierarchy_segment(
+        sorted_classes,
+        segment_start,
+        sorted_classes.len(),
+        &layers,
+        codebase,
+        symbol_references,
+    );
+
+    tracing::trace!(
+        parallel_classes,
+        serial_classes = sorted_classes.len() - parallel_classes,
+        "Class hierarchy populated."
+    );
+}
+
+fn hierarchy_dependencies(metadata: &ClassLikeMetadata) -> impl Iterator<Item = Word> + '_ {
+    metadata
+        .direct_parent_class
+        .into_iter()
+        .chain(metadata.used_traits.iter().copied())
+        .chain(metadata.direct_parent_interfaces.iter().copied())
+        .chain(metadata.require_extends.iter().copied())
+        .chain(metadata.require_implements.iter().copied())
+        .chain(metadata.imported_type_aliases.values().map(|(name, _, _)| *name))
+}
+
+fn populate_hierarchy_segment(
+    sorted_classes: &[Word],
+    start: usize,
+    end: usize,
+    layers: &[Vec<usize>],
+    codebase: &mut CodebaseMetadata,
+    symbol_references: &mut SymbolReferences,
+) -> usize {
+    if end - start < 128 || !layers.iter().any(|layer| layer.len() >= rayon::current_num_threads()) {
+        for &name in &sorted_classes[start..end] {
+            populate_class_like_metadata_iterative(name, codebase, symbol_references);
+        }
+        return 0;
+    }
+
+    let mut references = Vec::with_capacity(end - start);
+    for layer in layers {
+        let pending: Vec<_> = layer
+            .iter()
+            .filter_map(|&index| {
+                let name = sorted_classes[index];
+                let metadata = codebase.class_likes.get_mut(&name)?;
+                let mut placeholder = ClassLikeMetadata::new(
+                    metadata.name,
+                    metadata.original_name,
+                    metadata.span,
+                    metadata.name_span,
+                    metadata.flags,
+                );
+                // Keep the kind for stale method IDs; other metadata reads use earlier layers.
+                placeholder.kind = metadata.kind;
+                Some((index, std::mem::replace(metadata, placeholder)))
+            })
+            .collect();
+        let populated: Vec<_> = pending
+            .into_par_iter()
+            .map(|(index, mut metadata)| {
+                let mut references = SymbolReferences::new();
+                populate_class_like_metadata(sorted_classes[index], &mut metadata, codebase, &mut references);
+                (index, metadata, references)
+            })
+            .collect();
+
+        for (index, metadata, class_references) in populated {
+            if let Some(target) = codebase.class_likes.get_mut(&sorted_classes[index]) {
+                *target = metadata;
+            }
+            references.push((index, class_references));
+        }
+    }
+
+    references.sort_unstable_by_key(|(index, _)| *index);
+    for (index, references) in references {
+        symbol_references.extend_from_population(references);
+        let name = sorted_classes[index];
+        if let Some(metadata) = codebase.class_likes.remove(&name) {
+            populate_method_type_aliases(name, &metadata, codebase);
+            // Replay the serial remove/insert order: table order can affect trait aliases.
+            codebase.class_likes.insert(name, metadata);
+        }
+    }
+
+    end - start
 }
 
 /// Populates types for properties, constants, enum cases, and type aliases within a class-like.

@@ -518,8 +518,12 @@ impl CodebaseMetadata {
     ) -> Option<&FunctionLikeMetadata> {
         use crate::identifier::function_like::FunctionLikeIdentifier;
         match identifier {
-            FunctionLikeIdentifier::Function(name) => self.get_function(name.as_bytes()),
-            FunctionLikeIdentifier::Method(class, method) => self.get_method(class.as_bytes(), method.as_bytes()),
+            FunctionLikeIdentifier::Function(name) => {
+                self.function_likes.get(&(empty_word(), name.to_ascii_lowercase()))
+            }
+            FunctionLikeIdentifier::Method(class, method) => {
+                self.get_method_by_id(&MethodIdentifier::new(*class, *method))
+            }
             FunctionLikeIdentifier::Closure(name) => self.get_closure(name),
         }
     }
@@ -826,8 +830,18 @@ impl CodebaseMetadata {
     #[inline]
     #[must_use]
     pub fn get_declaring_method_class(&self, class: &[u8], method: &[u8]) -> Option<Word> {
-        let lowercase_class = ascii_lowercase_word(class);
-        let lowercase_method = ascii_lowercase_word(method);
+        self.get_declaring_method_class_by_id(&MethodIdentifier::new(
+            ascii_lowercase_word(class),
+            ascii_lowercase_word(method),
+        ))
+    }
+
+    /// Gets the declaring class of an interned method name, ignoring ASCII case.
+    #[inline]
+    #[must_use]
+    pub fn get_declaring_method_class_by_id(&self, method: &MethodIdentifier) -> Option<Word> {
+        let lowercase_class = method.get_class_name().to_ascii_lowercase();
+        let lowercase_method = method.get_method_name().to_ascii_lowercase();
 
         self.get_class_like_by_word(lowercase_class)?
             .declaring_method_ids
@@ -899,18 +913,27 @@ impl CodebaseMetadata {
     #[inline]
     #[must_use]
     pub fn get_method_visibility(&self, class: &[u8], method: &[u8]) -> Option<Visibility> {
-        let lowercase_class = ascii_lowercase_word(class);
-        let lowercase_method = ascii_lowercase_word(method);
+        self.get_method_visibility_by_id(&MethodIdentifier::new(
+            ascii_lowercase_word(class),
+            ascii_lowercase_word(method),
+        ))
+    }
+
+    /// Gets a method's visibility from interned names, including trait visibility overrides.
+    #[inline]
+    #[must_use]
+    pub fn get_method_visibility_by_id(&self, method: &MethodIdentifier) -> Option<Visibility> {
+        let lowercase_class = method.get_class_name().to_ascii_lowercase();
+        let lowercase_method = method.get_method_name().to_ascii_lowercase();
+        let class_meta = self.get_class_like_by_word(lowercase_class)?;
 
         // First check if there's a trait visibility override for this method
-        if let Some(class_meta) = self.get_class_like_by_word(lowercase_class)
-            && let Some(overridden_visibility) = class_meta.trait_visibility_map.get(&lowercase_method)
-        {
+        if let Some(overridden_visibility) = class_meta.trait_visibility_map.get(&lowercase_method) {
             return Some(*overridden_visibility);
         }
 
         // Fall back to the method's declared visibility
-        let declaring_class = self.get_declaring_method_class(class, method)?;
+        let declaring_class = class_meta.declaring_method_ids.get(&lowercase_method)?.get_class_name();
         let identifier = (declaring_class, lowercase_method);
 
         self.function_likes
@@ -1010,7 +1033,7 @@ impl CodebaseMetadata {
     #[must_use]
     pub fn get_anonymous_class(&self, file: &File, span: Span) -> Option<&ClassLikeMetadata> {
         let name = Self::get_anonymous_class_name(file, span);
-        self.get_class_like(name.as_bytes())
+        self.get_class_like_by_name(name)
     }
 
     /// Gets the file signature for a given file ID.
@@ -1105,21 +1128,7 @@ impl CodebaseMetadata {
 
         self.merge_class_like_alias_declarations(other.class_like_alias_declarations);
 
-        for (k, mut v) in other.function_likes {
-            match self.function_likes.entry(k) {
-                Entry::Occupied(mut entry) => {
-                    if should_replace_metadata(entry.get().flags, entry.get().span, v.flags, v.span) {
-                        v.version_constraint.merge(entry.get().version_constraint.clone());
-                        entry.insert(v);
-                    } else {
-                        entry.get_mut().version_constraint.merge(v.version_constraint);
-                    }
-                }
-                Entry::Vacant(entry) => {
-                    entry.insert(v);
-                }
-            }
-        }
+        merge_function_likes(&mut self.function_likes, other.function_likes);
 
         for (k, mut v) in other.constants {
             match self.constants.entry(k) {
@@ -1154,6 +1163,32 @@ impl CodebaseMetadata {
         self.merge_patch_class_likes(other.patch_class_likes);
         self.merge_patch_function_likes(other.patch_function_likes);
         self.merge_patch_constants(other.patch_constants);
+    }
+
+    /// Merges file metadata in order, with function metadata on a separate worker.
+    pub fn extend_many_parallel(&mut self, mut others: Vec<Self>) {
+        if others.len() < 128 || rayon::current_num_threads() == 1 {
+            for other in others {
+                self.extend(other);
+            }
+            return;
+        }
+
+        let mut function_likes = std::mem::take(&mut self.function_likes);
+        let functions: Vec<_> = others.iter_mut().map(|other| std::mem::take(&mut other.function_likes)).collect();
+        rayon::join(
+            || {
+                for incoming in functions {
+                    merge_function_likes(&mut function_likes, incoming);
+                }
+            },
+            || {
+                for other in others {
+                    self.extend(other);
+                }
+            },
+        );
+        self.function_likes = function_likes;
     }
 
     /// Extends this codebase with another by reference, cloning only individual entries.
@@ -1659,6 +1694,27 @@ fn orphan_patch_constant_diagnostic(meta: &ConstantMetadata) -> Issue {
         "The patch may be misnamed or out-of-date relative to the vendored or built-in definition; \
          check the constant name and verify the patch still matches the upstream source.",
     )
+}
+
+fn merge_function_likes(
+    target: &mut HashMap<(Word, Word), FunctionLikeMetadata>,
+    incoming: HashMap<(Word, Word), FunctionLikeMetadata>,
+) {
+    for (key, mut metadata) in incoming {
+        match target.entry(key) {
+            Entry::Occupied(mut entry) => {
+                if should_replace_metadata(entry.get().flags, entry.get().span, metadata.flags, metadata.span) {
+                    metadata.version_constraint.merge(entry.get().version_constraint.clone());
+                    entry.insert(metadata);
+                } else {
+                    entry.get_mut().version_constraint.merge(metadata.version_constraint);
+                }
+            }
+            Entry::Vacant(entry) => {
+                entry.insert(metadata);
+            }
+        }
+    }
 }
 
 /// Determines which metadata value to keep when merging duplicates.

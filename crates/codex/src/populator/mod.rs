@@ -153,8 +153,12 @@ fn populate_codebase_inner(
     }
 
     let sorted_classes = sorter::sort_class_likes(codebase, &class_likes_to_repopulate);
-    for class_name in sorted_classes {
-        hierarchy::populate_class_like_metadata_iterative(class_name, codebase, symbol_references);
+    if parallel {
+        hierarchy::populate_class_likes_parallel(&sorted_classes, codebase, symbol_references);
+    } else {
+        for class_name in sorted_classes {
+            hierarchy::populate_class_like_metadata_iterative(class_name, codebase, symbol_references);
+        }
     }
     trace_phase!("hierarchy");
 
@@ -368,8 +372,8 @@ fn populate_codebase_inner(
     if !incremental || !class_likes_to_repopulate.is_empty() {
         let dirty_classes = if dirty_symbols.is_some() { Some(&class_likes_to_repopulate) } else { None };
 
-        docblock::inherit_method_docblocks(codebase, &safe_symbols, dirty_classes);
-        docblock::inherit_property_docblocks(codebase, &safe_symbols, dirty_classes);
+        docblock::inherit_method_docblocks(codebase, &safe_symbols, dirty_classes, parallel);
+        docblock::inherit_property_docblocks(codebase, &safe_symbols, dirty_classes, parallel);
     }
     trace_phase!("docblocks");
 

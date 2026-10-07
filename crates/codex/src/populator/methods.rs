@@ -99,6 +99,7 @@ pub fn inherit_methods_from_parent(
                 let implementing_method_name = implementing_method_id.get_method_name();
 
                 let is_existing_pseudo_from_trait = !parent_is_trait
+                    && implementing_class != class_like_name
                     && codebase.class_likes.get(&implementing_class).is_some_and(|c| c.kind.is_trait())
                     && codebase
                         .function_likes
@@ -107,7 +108,9 @@ pub fn inherit_methods_from_parent(
 
                 if !is_existing_pseudo_from_trait
                     && (!codebase
-                        .method_is_abstract(implementing_class.as_bytes(), implementing_method_name.as_bytes())
+                        .get_method_by_id(implementing_method_id)
+                        .and_then(|method| method.method_metadata.as_ref())
+                        .is_some_and(|method| method.is_abstract)
                         || implementing_class == class_like_name)
                 {
                     return;
@@ -125,7 +128,10 @@ pub fn inherit_methods_from_parent(
                     .get(&aliased_method_name)
                     .copied()
                     .or_else(|| {
-                        codebase.get_method_visibility(parent_metadata.name.as_bytes(), aliased_method_name.as_bytes())
+                        codebase.get_method_visibility_by_id(&MethodIdentifier::new(
+                            parent_metadata.name,
+                            aliased_method_name,
+                        ))
                     })
                     .is_none_or(|visibility| !visibility.is_private());
 

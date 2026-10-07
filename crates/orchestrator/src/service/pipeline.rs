@@ -107,6 +107,7 @@ pub struct ParallelPipeline<T, I, R> {
     php_version: PHPVersion,
     reducer: Box<dyn Reducer<I, R> + Send + Sync>,
     should_use_progress_bar: bool,
+    build_file_signatures: bool,
 }
 
 impl<T, I, R> std::fmt::Debug for ParallelPipeline<T, I, R>
@@ -124,6 +125,7 @@ where
             .field("php_version", &self.php_version)
             .field("reducer", &"<reducer>")
             .field("should_use_progress_bar", &self.should_use_progress_bar)
+            .field("build_file_signatures", &self.build_file_signatures)
             .finish()
     }
 }
@@ -170,7 +172,13 @@ where
             php_version,
             reducer,
             should_use_progress_bar,
+            build_file_signatures: true,
         }
+    }
+
+    pub(super) fn with_file_signatures(mut self, enabled: bool) -> Self {
+        self.build_file_signatures = enabled;
+        self
     }
 
     /// Executes the full pipeline with a given map function.
@@ -224,6 +232,7 @@ where
 
         let parser_settings = self.parser_settings;
         let php_version = self.php_version;
+        let build_file_signatures = self.build_file_signatures;
         #[cfg(not(target_arch = "wasm32"))]
         let source_count = source_files.len();
 
@@ -246,10 +255,13 @@ where
                     let resolver = NameResolver::new(arena);
                     let resolved_names = resolver.resolve(program);
 
-                    let file_signature = signature_builder::build_file_signature(program, &resolved_names);
+                    let file_signature = build_file_signatures
+                        .then(|| signature_builder::build_file_signature(program, &resolved_names));
 
                     let mut metadata = scan_program(arena, &file, program, &resolved_names, php_version);
-                    metadata.set_file_signature(file.id, file_signature);
+                    if let Some(file_signature) = file_signature {
+                        metadata.set_file_signature(file.id, file_signature);
+                    }
                     if file.file_type.is_patch() {
                         metadata.convert_partial_to_patch();
                     }
@@ -272,29 +284,33 @@ where
         let mut replaced_classes = (!safe_symbol_members.is_empty()).then(WordSet::default);
         let mut merge_duration = Duration::ZERO;
         measure!(trace_enabled, merge_duration, {
-            for (partial, captured) in compiled {
-                captures.extend(captured);
-                for name in partial.class_likes.keys().chain(partial.patch_class_likes.keys()) {
-                    safe_symbols.remove(name);
-                    if let Some(replaced_classes) = &mut replaced_classes {
-                        replaced_classes.insert(*name);
+            let partials = compiled
+                .into_iter()
+                .map(|(partial, captured)| {
+                    captures.extend(captured);
+                    for name in partial.class_likes.keys().chain(partial.patch_class_likes.keys()) {
+                        safe_symbols.remove(name);
+                        if let Some(replaced_classes) = &mut replaced_classes {
+                            replaced_classes.insert(*name);
+                        }
                     }
-                }
 
-                for (scope, member) in partial.function_likes.keys().chain(partial.patch_function_likes.keys()) {
-                    if member.is_empty() {
-                        safe_symbols.remove(scope);
-                    } else {
-                        safe_symbol_members.remove(&(*scope, *member));
+                    for (scope, member) in partial.function_likes.keys().chain(partial.patch_function_likes.keys()) {
+                        if member.is_empty() {
+                            safe_symbols.remove(scope);
+                        } else {
+                            safe_symbol_members.remove(&(*scope, *member));
+                        }
                     }
-                }
 
-                for name in partial.constants.keys().chain(partial.patch_constants.keys()) {
-                    safe_symbols.remove(name);
-                }
+                    for name in partial.constants.keys().chain(partial.patch_constants.keys()) {
+                        safe_symbols.remove(name);
+                    }
 
-                merged_codex.extend(partial);
-            }
+                    partial
+                })
+                .collect();
+            merged_codex.extend_many_parallel(partials);
 
             if let Some(replaced_classes) = replaced_classes {
                 safe_symbol_members.retain(|(scope, _)| !replaced_classes.contains(scope));
@@ -758,7 +774,14 @@ mod tests {
             false,
         );
         let results = rayon::ThreadPoolBuilder::new().num_threads(4).build()?.install(|| {
-            pipeline.run(|_, _, _| Ok(None::<()>), |_, _, _| Ok(Some(before_map_id)), |(), _, file, _| Ok(file.id))
+            pipeline.run(
+                |_, _, _| Ok(None::<()>),
+                |codebase, _, _| {
+                    assert_eq!(codebase.file_signatures.len(), 33, "Public pipelines keep all file signatures");
+                    Ok(Some(before_map_id))
+                },
+                |(), _, file, _| Ok(file.id),
+            )
         })?;
 
         assert_eq!(results, expected);

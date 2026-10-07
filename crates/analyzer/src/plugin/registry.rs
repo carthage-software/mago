@@ -3,6 +3,8 @@
 use std::sync::Arc;
 use std::sync::OnceLock;
 
+use foldhash::HashMap;
+
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
@@ -109,7 +111,7 @@ pub struct PluginRegistry {
     function_prefix: Vec<(Word, usize)>,
     function_namespace: Vec<(Word, usize)>,
     function_providers: Vec<Box<dyn FunctionReturnTypeProvider>>,
-    method_exact: WordMap<Vec<usize>>,
+    method_exact: HashMap<(Word, Word), Vec<usize>>,
     method_wildcard: Vec<(Vec<MethodTarget>, usize)>,
     method_providers: Vec<Box<dyn MethodReturnTypeProvider>>,
     program_hooks: Vec<Box<dyn ProgramHook>>,
@@ -130,7 +132,7 @@ pub struct PluginRegistry {
     function_assertion_prefix: Vec<(Word, usize)>,
     function_assertion_namespace: Vec<(Word, usize)>,
     function_assertion_providers: Vec<Box<dyn FunctionAssertionProvider>>,
-    method_assertion_exact: WordMap<Vec<usize>>,
+    method_assertion_exact: HashMap<(Word, Word), Vec<usize>>,
     method_assertion_wildcard: Vec<(Vec<MethodTarget>, usize)>,
     method_assertion_providers: Vec<Box<dyn MethodAssertionProvider>>,
     expression_throw_providers: Vec<Box<dyn ExpressionThrowTypeProvider>>,
@@ -138,7 +140,7 @@ pub struct PluginRegistry {
     function_throw_prefix: Vec<(Word, usize)>,
     function_throw_namespace: Vec<(Word, usize)>,
     function_throw_providers: Vec<Box<dyn FunctionThrowTypeProvider>>,
-    method_throw_exact: WordMap<Vec<usize>>,
+    method_throw_exact: HashMap<(Word, Word), Vec<usize>>,
     method_throw_wildcard: Vec<(Vec<MethodTarget>, usize)>,
     method_throw_providers: Vec<Box<dyn MethodThrowTypeProvider>>,
 }
@@ -180,7 +182,13 @@ impl PluginRegistry {
     }
 
     pub(crate) fn allows_loop_convergence(&self) -> bool {
-        self.external_analyzer.is_none() && self.registration_count() == self.built_in_registration_count
+        !self.has_custom_plugins()
+    }
+
+    /// Returns whether native or external plugins were added beyond the built-in set.
+    #[must_use]
+    pub fn has_custom_plugins(&self) -> bool {
+        self.external_analyzer.is_some() || self.registration_count() != self.built_in_registration_count
     }
 
     fn registration_count(&self) -> usize {
@@ -480,7 +488,8 @@ impl PluginRegistry {
         let mut wildcard_targets = Vec::new();
 
         for target in targets {
-            if let Some(key) = target.index_key() {
+            if target.is_exact() {
+                let key = (ascii_lowercase_word(target.class), ascii_lowercase_word(target.method));
                 self.method_exact.entry(key).or_default().push(index);
             } else {
                 has_wildcards = true;
@@ -636,7 +645,8 @@ impl PluginRegistry {
         let mut wildcard_targets = Vec::new();
 
         for target in targets {
-            if let Some(key) = target.index_key() {
+            if target.is_exact() {
+                let key = (ascii_lowercase_word(target.class), ascii_lowercase_word(target.method));
                 self.method_assertion_exact.entry(key).or_default().push(index);
             } else {
                 has_wildcards = true;
@@ -701,7 +711,8 @@ impl PluginRegistry {
         let mut wildcard_targets = Vec::new();
 
         for target in targets {
-            if let Some(key) = target.index_key() {
+            if target.is_exact() {
+                let key = (ascii_lowercase_word(target.class), ascii_lowercase_word(target.method));
                 self.method_throw_exact.entry(key).or_default().push(index);
             } else {
                 has_wildcards = true;
@@ -1254,12 +1265,13 @@ impl PluginRegistry {
     }
 
     fn get_method_provider_indices(&self, class_name: &[u8], method_name: &[u8]) -> Vec<usize> {
-        use mago_word::concat_word;
-        let key = concat_word!(ascii_lowercase_word(class_name), b"::", ascii_lowercase_word(method_name));
         let mut indices = Vec::new();
 
-        if let Some(idxs) = self.method_exact.get(&key) {
-            indices.extend(idxs.iter().copied());
+        if !self.method_exact.is_empty() {
+            let key = (ascii_lowercase_word(class_name), ascii_lowercase_word(method_name));
+            if let Some(idxs) = self.method_exact.get(&key) {
+                indices.extend(idxs.iter().copied());
+            }
         }
 
         for (targets, idx) in &self.method_wildcard {
@@ -1641,12 +1653,13 @@ impl PluginRegistry {
             return Vec::new();
         }
 
-        use mago_word::concat_word;
-        let key = concat_word!(ascii_lowercase_word(class_name), b"::", ascii_lowercase_word(method_name));
         let mut indices = Vec::new();
 
-        if let Some(idxs) = self.method_assertion_exact.get(&key) {
-            indices.extend(idxs.iter().copied());
+        if !self.method_assertion_exact.is_empty() {
+            let key = (ascii_lowercase_word(class_name), ascii_lowercase_word(method_name));
+            if let Some(idxs) = self.method_assertion_exact.get(&key) {
+                indices.extend(idxs.iter().copied());
+            }
         }
 
         for (targets, idx) in &self.method_assertion_wildcard {
@@ -1849,12 +1862,13 @@ impl PluginRegistry {
             return Vec::new();
         }
 
-        use mago_word::concat_word;
-        let key = concat_word!(ascii_lowercase_word(class_name), b"::", ascii_lowercase_word(method_name));
         let mut indices = Vec::new();
 
-        if let Some(idxs) = self.method_throw_exact.get(&key) {
-            indices.extend(idxs.iter().copied());
+        if !self.method_throw_exact.is_empty() {
+            let key = (ascii_lowercase_word(class_name), ascii_lowercase_word(method_name));
+            if let Some(idxs) = self.method_throw_exact.get(&key) {
+                indices.extend(idxs.iter().copied());
+            }
         }
 
         for (targets, idx) in &self.method_throw_wildcard {
@@ -2053,6 +2067,7 @@ mod tests {
         }));
         let mut registry = PluginRegistry::new();
         registry.set_external_analyzer(Arc::new(handle));
+        assert!(registry.has_custom_plugins());
 
         let result = registry.prepare_external_analyzer();
         assert!(matches!(

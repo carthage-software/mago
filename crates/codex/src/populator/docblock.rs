@@ -1,5 +1,7 @@
 use std::collections::BTreeMap;
 
+use rayon::prelude::*;
+
 use mago_span::Span;
 use mago_word::Word;
 use mago_word::WordMap;
@@ -203,6 +205,7 @@ pub fn inherit_method_docblocks(
     codebase: &mut CodebaseMetadata,
     safe_symbols: &mago_word::WordSet,
     dirty_classes: Option<&WordSet>,
+    parallel: bool,
 ) {
     let mut inheritance_work: Vec<(Word, Word, Word, Word)> = Vec::new();
 
@@ -224,6 +227,10 @@ pub fn inherit_method_docblocks(
                 collect_inheritance_work(*class_name, class_metadata, codebase, &mut inheritance_work);
             }
         }
+    } else if parallel && codebase.class_likes.len() >= 1024 && rayon::current_num_threads() > 1 {
+        inheritance_work = collect_parallel_inheritance_work(codebase, safe_symbols, |name, metadata, work| {
+            collect_inheritance_work(name, metadata, codebase, work);
+        });
     } else {
         for (class_name, class_metadata) in &codebase.class_likes {
             if !safe_symbols.is_empty() && safe_symbols.contains(class_name) {
@@ -234,6 +241,35 @@ pub fn inherit_method_docblocks(
     }
 
     apply_inheritance_work(codebase, inheritance_work);
+}
+
+fn collect_parallel_inheritance_work<T>(
+    codebase: &CodebaseMetadata,
+    safe_symbols: &WordSet,
+    collect: impl Fn(Word, &crate::metadata::class_like::ClassLikeMetadata, &mut Vec<T>) + Sync,
+) -> Vec<T>
+where
+    T: Send,
+{
+    let classes: Vec<_> = codebase.class_likes.iter().filter(|(name, _)| !safe_symbols.contains(*name)).collect();
+    let chunk_size = classes.len().div_ceil(rayon::current_num_threads() * 4).max(128);
+    let chunks: Vec<Vec<T>> = classes
+        .par_chunks(chunk_size)
+        .map(|chunk| {
+            let mut work = Vec::new();
+            for (name, metadata) in chunk {
+                collect(**name, metadata, &mut work);
+            }
+            work
+        })
+        .collect();
+
+    // Keep class and member order so equal-depth entries retain their serial order.
+    let mut work = Vec::with_capacity(chunks.iter().map(Vec::len).sum());
+    for chunk in chunks {
+        work.extend(chunk);
+    }
+    work
 }
 
 /// Collects inheritance work items for a single class.
@@ -578,6 +614,7 @@ pub fn inherit_property_docblocks(
     codebase: &mut CodebaseMetadata,
     safe_symbols: &WordSet,
     dirty_classes: Option<&WordSet>,
+    parallel: bool,
 ) {
     let mut inheritance_work: Vec<(Word, Word, Word)> = Vec::new();
 
@@ -603,6 +640,10 @@ pub fn inherit_property_docblocks(
                 );
             }
         }
+    } else if parallel && codebase.class_likes.len() >= 1024 && rayon::current_num_threads() > 1 {
+        inheritance_work = collect_parallel_inheritance_work(codebase, safe_symbols, |name, metadata, work| {
+            collect_property_inheritance_work(name, metadata, &codebase.class_likes, work);
+        });
     } else {
         for (class_name, class_metadata) in &codebase.class_likes {
             if !safe_symbols.is_empty() && safe_symbols.contains(class_name) {
