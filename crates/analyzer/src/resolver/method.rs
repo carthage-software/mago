@@ -541,7 +541,7 @@ where
         return candidates;
     };
 
-    let Some(class_metadata) = context.codebase.get_class_like(name.as_bytes()) else {
+    let Some(class_metadata) = context.codebase.get_class_like_by_name(name) else {
         result.has_invalid_target = true;
         report_non_existent_class_like(context, object.span(), name);
         return candidates;
@@ -582,7 +582,7 @@ where
                 || class_metadata.all_parent_classes.iter().any(|parent_name| {
                     context
                         .codebase
-                        .get_class_like(parent_name.as_bytes())
+                        .get_class_like_by_name(*parent_name)
                         .is_some_and(|parent| parent.pseudo_methods.contains(&lowercase_method))
                 });
 
@@ -590,7 +590,7 @@ where
 
             if is_pseudo {
                 for parent_class_name in &class_metadata.all_parent_classes {
-                    if let Some(parent_metadata) = context.codebase.get_class_like(parent_class_name.as_bytes())
+                    if let Some(parent_metadata) = context.codebase.get_class_like_by_name(*parent_class_name)
                         && parent_metadata.methods.contains(&lowercase_method)
                         && !parent_metadata.pseudo_methods.contains(&lowercase_method)
                     {
@@ -644,7 +644,7 @@ where
         });
     } else if !class_metadata.require_extends.is_empty() || !class_metadata.require_implements.is_empty() {
         for required_class in class_metadata.require_extends.iter().chain(class_metadata.require_implements.iter()) {
-            let Some(required_metadata) = context.codebase.get_class_like(required_class.as_bytes()) else {
+            let Some(required_metadata) = context.codebase.get_class_like_by_name(*required_class) else {
                 continue;
             };
 
@@ -671,7 +671,7 @@ where
         let mixin_types = collect_mixin_types(context.codebase, class_metadata, outer_object, &class_metadata.mixins);
 
         for (mixin_class_name, mixin_object) in mixin_types {
-            let Some(mixin_metadata) = context.codebase.get_class_like(mixin_class_name.as_bytes()) else {
+            let Some(mixin_metadata) = context.codebase.get_class_like_by_name(mixin_class_name) else {
                 continue;
             };
 

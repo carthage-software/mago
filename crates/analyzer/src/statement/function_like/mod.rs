@@ -1,4 +1,5 @@
 use mago_allocator::Arena;
+use std::borrow::Cow;
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -714,7 +715,7 @@ where
             continue;
         }
 
-        let mut property_type = resolution.declared_type(context.codebase);
+        let mut property_type = resolution.declared_type_borrowed(context.codebase);
 
         let property_name_bytes = property_name.as_bytes();
         let raw_property_name = property_name_bytes.strip_prefix(b"$").unwrap_or(property_name_bytes);
@@ -724,16 +725,18 @@ where
         } else {
             let this_type = get_this_type(context, class_like_metadata, function_like_metadata);
 
-            property_type = localize_property_type(
+            property_type = Cow::Owned(localize_property_type(
                 context,
                 &property_type,
                 this_type.get_type_parameters().unwrap_or_default(),
                 class_like_metadata,
                 property_class_metadata,
-            );
+            ));
 
             concat_word!(b"$this->", raw_property_name)
         };
+
+        let mut property_type = property_type.into_owned();
 
         if resolution.is_magic()
             || (property_metadata.type_declaration_metadata.is_some() && !property_metadata.flags.has_default())

@@ -817,13 +817,13 @@ where
             index_type.as_ref(),
         );
 
-        *last_array_expr_type = array_expr_type.clone();
+        *last_array_expr_type = array_expr_type;
         last_array_expression_index = array_target.get_index();
 
         if let Some(array_expr_id) = &array_expr_id
             && memchr::memmem::find(array_expr_id.as_bytes(), b"[$").is_some()
         {
-            block_context.locals.insert(*array_expr_id, Rc::new(array_expr_type));
+            block_context.locals.insert(*array_expr_id, Rc::new(last_array_expr_type.clone()));
             block_context.possibly_assigned_variable_ids.insert(*array_expr_id);
         }
 

@@ -549,14 +549,7 @@ where
         }
 
         if !changed_variable_ids.is_empty() {
-            if_block_context.clauses = BlockContext::remove_reconciled_clauses(
-                &if_block_context.clauses.iter().map(Rc::deref).cloned().collect(),
-                &changed_variable_ids,
-            )
-            .0
-            .into_iter()
-            .map(Rc::new)
-            .collect();
+            BlockContext::retain_unreconciled_clauses(&mut if_block_context.clauses, &changed_variable_ids);
 
             let mut variables_to_remove = vec![];
             for changed_variable_id in &changed_variable_ids {
@@ -911,14 +904,10 @@ where
         );
 
         if !newly_reconciled_variable_ids.is_empty() {
-            else_if_block_context.clauses = BlockContext::remove_reconciled_clauses(
-                &else_if_block_context.clauses.iter().map(Rc::deref).cloned().collect(),
+            BlockContext::retain_unreconciled_clauses(
+                &mut else_if_block_context.clauses,
                 &newly_reconciled_variable_ids,
-            )
-            .0
-            .into_iter()
-            .map(Rc::new)
-            .collect();
+            );
 
             let mut variables_to_remove = vec![];
             for (changed_variable_id, _) in &reconcilable_else_if_types {
@@ -1119,14 +1108,7 @@ where
             false,
         );
 
-        else_block_context.clauses = BlockContext::remove_reconciled_clauses(
-            &else_block_context.clauses.iter().map(Rc::deref).cloned().collect(),
-            &changed_variable_ids,
-        )
-        .0
-        .into_iter()
-        .map(Rc::new)
-        .collect();
+        BlockContext::retain_unreconciled_clauses(&mut else_block_context.clauses, &changed_variable_ids);
 
         let mut variables_to_remove = vec![];
         for changed_variable_id in &changed_variable_ids {
@@ -1393,7 +1375,7 @@ fn update_if_scope<'ctx, A>(
         Some(new_variables) => {
             let mut to_remove = vec![];
             for (new_variable, new_variable_type) in new_variables.iter_mut() {
-                if !if_block_context.has_variable(new_variable.as_bytes()) {
+                if !if_block_context.has_variable_atom(*new_variable) {
                     to_remove.push(*new_variable);
                 } else {
                     *new_variable_type = Rc::new(combine_union_types(

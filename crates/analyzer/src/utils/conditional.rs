@@ -41,9 +41,6 @@ where
 {
     let mut entry_clauses = vec![];
 
-    let old_outer_context = outer_context.clone();
-    let mut has_outer_context_changes = false;
-
     if !if_scope.negated_clauses.is_empty() {
         entry_clauses.extend(if_scope.negated_clauses.iter().cloned());
 
@@ -66,14 +63,13 @@ where
 
             if !changed_var_ids.is_empty() {
                 outer_context = tmp_context;
-                has_outer_context_changes = true;
             }
         }
     }
 
     let externally_applied_if_cond_expr = get_definitely_evaluated_expression_after_if(condition);
     let internally_applied_if_cond_expr = get_definitely_evaluated_expression_inside_if(condition);
-    let mut externally_applied_context = if has_outer_context_changes { outer_context } else { old_outer_context };
+    let mut externally_applied_context = outer_context;
 
     let pre_condition_locals = externally_applied_context.locals.clone();
     let pre_referenced_var_ids = std::mem::take(&mut externally_applied_context.conditionally_referenced_variable_ids);

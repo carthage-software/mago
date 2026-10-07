@@ -63,7 +63,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrayAccess<'arena> {
         block_context.flags.set_inside_general_use(was_inside_general_use);
 
         if let Some(keyed_array_var_id) = &keyed_array_var_id
-            && block_context.has_variable(keyed_array_var_id.as_bytes())
+            && block_context.has_variable_atom(*keyed_array_var_id)
             && let Some(array_access_type) = block_context.locals.get(keyed_array_var_id).cloned()
         {
             let is_variable_key = memchr::memmem::find(keyed_array_var_id.as_bytes(), b"[$").is_some();

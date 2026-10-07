@@ -1435,7 +1435,7 @@ fn update_loop_scope_contexts<'ctx, A>(
         }
 
         for (variable_id, variable_type) in &loop_scope.possibly_redefined_loop_variables {
-            if continue_context.has_variable(variable_id.as_bytes()) {
+            if continue_context.has_variable_atom(*variable_id) {
                 continue_context.locals.insert(
                     *variable_id,
                     combine_union_types_rc(

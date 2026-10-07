@@ -10,7 +10,7 @@ use mago_word::WordSet;
 use mago_algebra::assertion_set::AssertionSet;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::reference::SymbolReferences;
-use mago_codex::ttype::combine_union_types_rc;
+use mago_codex::ttype::combine_owned_union_types_rc;
 use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::union::TUnion;
 use mago_span::HasSpan;
@@ -140,7 +140,8 @@ impl AnalysisArtifacts {
             };
 
             if let Some(previous_type) = static_local_types.get_mut(variable) {
-                *previous_type = combine_union_types_rc(previous_type, variable_type, codebase, options);
+                let previous = std::mem::replace(previous_type, Rc::clone(variable_type));
+                *previous_type = combine_owned_union_types_rc(previous, variable_type, codebase, options);
             } else {
                 static_local_types.insert(*variable, Rc::clone(variable_type));
             }

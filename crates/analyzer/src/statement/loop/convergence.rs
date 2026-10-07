@@ -334,14 +334,29 @@ fn same_atomic_exceptions(left: &TAtomic, right: &TAtomic) -> bool {
 }
 
 fn same_child_exceptions(left: &impl TType, right: &impl TType) -> bool {
-    let left_children = left.get_all_child_nodes();
-    let right_children = right.get_all_child_nodes();
-    left_children.len() == right_children.len()
-        && left_children.iter().zip(&right_children).all(|(left, right)| match (left, right) {
-            (TypeRef::Union(_), TypeRef::Union(_)) => true,
-            (TypeRef::Atomic(left), TypeRef::Atomic(right)) => same_atomic_exceptions(left, right),
-            _ => false,
-        })
+    let mut left_children = left.get_child_nodes();
+    let mut right_children = right.get_child_nodes();
+    while let Some(left) = left_children.pop() {
+        let Some(right) = right_children.pop() else {
+            return false;
+        };
+
+        let (left, right) = match (left, right) {
+            (TypeRef::Union(left), TypeRef::Union(right)) => (left.get_child_nodes(), right.get_child_nodes()),
+            (TypeRef::Atomic(left), TypeRef::Atomic(right)) => {
+                if !same_atomic_exceptions(left, right) {
+                    return false;
+                }
+                (left.get_child_nodes(), right.get_child_nodes())
+            }
+            _ => return false,
+        };
+
+        left_children.extend(left);
+        right_children.extend(right);
+    }
+
+    right_children.is_empty()
 }
 
 fn same_scope_context(left: &ScopeContext<'_>, right: &ScopeContext<'_>) -> bool {

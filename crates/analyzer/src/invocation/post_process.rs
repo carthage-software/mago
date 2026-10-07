@@ -889,6 +889,9 @@ where
 /// might mutate them regardless of its arguments.
 fn is_superglobal_index_key(var_id: Word) -> bool {
     let s = var_id.as_bytes();
+    if !s.starts_with(b"$_") && !s.starts_with(b"$GLOBALS[") {
+        return false;
+    }
     let Some(bracket_pos) = memchr::memchr(b'[', s) else {
         return false;
     };
@@ -1639,7 +1642,40 @@ where
 mod tests {
     use mago_word::Word;
 
+    use super::is_superglobal_index_key;
+    use super::is_superglobal_name;
     use super::references_method_call_key;
+
+    #[test]
+    fn superglobal_index_keys_preserve_first_bracket_matching() {
+        let roots: [&[u8]; 16] = [
+            b"$_SESSION",
+            b"$_GET",
+            b"$_POST",
+            b"$_COOKIE",
+            b"$_SERVER",
+            b"$_ENV",
+            b"$_FILES",
+            b"$_REQUEST",
+            b"$GLOBALS",
+            b"$_UNKNOWN",
+            b"$global",
+            b"$GLOBALSx",
+            b"$_GET->property",
+            b"$local",
+            b"",
+            b"\xff",
+        ];
+        let suffixes: [&[u8]; 7] = [b"", b"[0]", b"['key']", b"[0][1]", b"->property[0]", b"\0[0]", b"\xff[0]"];
+        for root in roots {
+            for suffix in suffixes {
+                let key = [root, suffix].concat();
+                let expected =
+                    key.iter().position(|byte| *byte == b'[').is_some_and(|index| is_superglobal_name(&key[..index]));
+                assert_eq!(is_superglobal_index_key(Word::new(&key)), expected, "{key:?}");
+            }
+        }
+    }
 
     fn check_method_call_key(bytes: &[u8]) {
         assert_eq!(
