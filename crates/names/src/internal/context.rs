@@ -1,5 +1,3 @@
-use std::borrow::Cow;
-
 use mago_allocator::prelude::*;
 
 use mago_syntax::cst::Use;
@@ -90,10 +88,7 @@ where
     ///
     /// The `StringIdentifier` for the potentially qualified name.
     pub fn qualify_name(&self, name: &'arena [u8]) -> &'arena [u8] {
-        match self.scope.qualify_name_str(name) {
-            Cow::Borrowed(name) => name,
-            Cow::Owned(name) => self.arena.alloc_slice_copy(&name),
-        }
+        self.scope.qualify_name_parts(name).into_arena(self.arena)
     }
 
     /// Allocates `s` in the arena and returns a borrow with the arena lifetime.
@@ -115,13 +110,8 @@ where
     ///    (like `\` or `namespace\`), and `false` otherwise (e.g., resolved relative
     ///    to the namespace or returned as-is).
     pub fn resolve(&self, kind: NameKind, name_str: &'arena [u8]) -> (&'arena [u8], bool) {
-        let (cow, is_imported) = self.scope.resolve_str(kind, name_str);
-        let name = match cow {
-            Cow::Borrowed(name) => name,
-            Cow::Owned(name) => self.arena.alloc_slice_copy(&name),
-        };
-
-        (name, is_imported)
+        let (parts, is_imported) = self.scope.resolve_parts(kind, name_str);
+        (parts.into_arena(self.arena), is_imported)
     }
 }
 
@@ -132,15 +122,41 @@ mod tests {
     #[test]
     fn resolved_names_outlive_the_scope() {
         let arena = LocalArena::new();
-        let (qualified, resolved) = {
+        let (qualified, resolved, qualified_alias, namespace_relative) = {
             let mut context = NameResolutionContext::new(&arena);
             context.enter_namespace(Some(b"App"));
             context.scope.add(NameKind::Default, b"Library\\Name", &Some(b"Alias"));
 
-            (context.qualify_name(b"Name"), context.resolve(NameKind::Default, b"Alias"))
+            let names = (
+                context.qualify_name(b"Name"),
+                context.resolve(NameKind::Default, b"Alias"),
+                context.resolve(NameKind::Default, b"Alias\\Child"),
+                context.resolve(NameKind::Default, b"namespace\\Child"),
+            );
+            context.exit_namespace();
+            names
         };
 
         assert_eq!(qualified, b"App\\Name");
         assert_eq!(resolved, (b"Library\\Name".as_slice(), true));
+        assert_eq!(qualified_alias, (b"Library\\Name\\Child".as_slice(), true));
+        assert_eq!(namespace_relative, (b"App\\Child".as_slice(), true));
+    }
+
+    #[test]
+    fn arena_resolution_keeps_empty_namespaces_and_binary_names() {
+        let arena = LocalArena::new();
+        let mut context = NameResolutionContext::new(&arena);
+        context.enter_namespace(Some(b""));
+        assert_eq!(context.qualify_name(b"Name"), b"Name");
+        assert_eq!(context.resolve(NameKind::Default, b"namespace\\Name"), (b"\\Name".as_slice(), true));
+
+        context.enter_namespace(Some(b"\xffApp"));
+        context.scope.add(NameKind::Default, b"\xffLibrary\\Name", &Some(b"\xffAlias"));
+        assert_eq!(context.qualify_name(b"\xfeName"), b"\xffApp\\\xfeName");
+        assert_eq!(
+            context.resolve(NameKind::Default, b"\xffALIAS\\\xfeChild"),
+            (b"\xffLibrary\\Name\\\xfeChild".as_slice(), true)
+        );
     }
 }

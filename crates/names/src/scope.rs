@@ -1,12 +1,46 @@
 use std::borrow::Cow;
 
 use foldhash::HashMap;
+use mago_allocator::Arena;
 
 use mago_syntax::cst::Use;
 use mago_syntax::cst::UseItems;
 use mago_syntax::cst::UseType;
 
 use crate::kind::NameKind;
+
+pub(crate) enum NameParts<'scope, 'name> {
+    Input(&'name [u8]),
+    Alias(&'scope [u8]),
+    Qualified(&'scope [u8], &'name [u8]),
+}
+
+impl<'name> NameParts<'_, 'name> {
+    fn into_cow(self) -> Cow<'name, [u8]> {
+        match self {
+            Self::Input(name) => Cow::Borrowed(name),
+            Self::Alias(name) => Cow::Owned(name.to_vec()),
+            Self::Qualified(prefix, name) => Cow::Owned(concat_with_sep(&[prefix, name], b'\\')),
+        }
+    }
+
+    pub(crate) fn into_arena<A>(self, arena: &'name A) -> &'name [u8]
+    where
+        A: Arena,
+    {
+        match self {
+            Self::Input(name) => name,
+            Self::Alias(name) => arena.alloc_slice_copy(name),
+            Self::Qualified(prefix, name) => {
+                let mut qualified = mago_allocator::vec::Vec::with_capacity_in(prefix.len() + name.len() + 1, arena);
+                qualified.extend_from_slice(prefix);
+                qualified.push(b'\\');
+                qualified.extend_from_slice(name);
+                qualified.leak()
+            }
+        }
+    }
+}
 
 #[inline]
 pub(crate) fn trim_start_byte(s: &[u8], byte: u8) -> &[u8] {
@@ -275,11 +309,15 @@ impl NamespaceScope {
 
     /// non-generic version of `qualify_name` that takes a Vec<u8> slice.
     pub(crate) fn qualify_name_str<'name>(&self, name_ref: &'name [u8]) -> Cow<'name, [u8]> {
+        self.qualify_name_parts(name_ref).into_cow()
+    }
+
+    pub(crate) fn qualify_name_parts<'name>(&self, name_ref: &'name [u8]) -> NameParts<'_, 'name> {
         match &self.namespace_name {
             // If we have a non-empty namespace, prepend it.
-            Some(ns) if !ns.is_empty() => Cow::Owned(concat_with_sep(&[ns, name_ref], b'\\')),
+            Some(ns) if !ns.is_empty() => NameParts::Qualified(ns, name_ref),
             // Otherwise (no namespace, or empty namespace), return the name as is.
-            _ => Cow::Borrowed(name_ref),
+            _ => NameParts::Input(name_ref),
         }
     }
 
@@ -305,13 +343,18 @@ impl NamespaceScope {
     #[inline]
     #[must_use]
     pub fn resolve_str<'name>(&self, kind: NameKind, name_ref: &'name [u8]) -> (Cow<'name, [u8]>, bool) {
+        let (parts, imported) = self.resolve_parts(kind, name_ref);
+        (parts.into_cow(), imported)
+    }
+
+    pub(crate) fn resolve_parts<'name>(&self, kind: NameKind, name_ref: &'name [u8]) -> (NameParts<'_, 'name>, bool) {
         // Try resolving using explicit aliases and constructs
-        if let Some(resolved_name) = self.resolve_alias_bytes(kind, name_ref) {
+        if let Some(resolved_name) = self.resolve_alias_parts(kind, name_ref) {
             return (resolved_name, true); // Resolved via alias or explicit construct
         }
 
         // Qualify it using the current namespace.
-        (self.qualify_name_str(name_ref), false)
+        (self.qualify_name_parts(name_ref), false)
     }
 
     /// Attempts to resolve a name using *only* explicit aliases and constructs.
@@ -329,18 +372,18 @@ impl NamespaceScope {
     /// * `None` if no explicit rule resolves the name.
     #[inline]
     pub fn resolve_alias(&self, kind: NameKind, name: impl AsRef<[u8]>) -> Option<Vec<u8>> {
-        self.resolve_alias_bytes(kind, name.as_ref()).map(std::borrow::Cow::into_owned)
+        self.resolve_alias_parts(kind, name.as_ref()).map(|parts| parts.into_cow().into_owned())
     }
 
     /// non-generic version of `resolve_alias` that takes a string slice.
-    fn resolve_alias_bytes<'name>(&self, kind: NameKind, name_ref: &'name [u8]) -> Option<Cow<'name, [u8]>> {
+    fn resolve_alias_parts<'name>(&self, kind: NameKind, name_ref: &'name [u8]) -> Option<NameParts<'_, 'name>> {
         if name_ref.is_empty() {
             return None;
         }
 
         // Handle `\FQN`
         if let Some(fqn) = name_ref.strip_prefix(b"\\") {
-            return Some(Cow::Borrowed(fqn));
+            return Some(NameParts::Input(fqn));
         }
 
         // Split into `first_part` and `suffix` at the first backslash (memchr).
@@ -352,8 +395,8 @@ impl NamespaceScope {
             && first_part.eq_ignore_ascii_case(b"namespace")
         {
             return Some(match &self.namespace_name {
-                Some(namespace) => Cow::Owned(concat_with_sep(&[namespace, suffix], b'\\')),
-                None => Cow::Borrowed(suffix),
+                Some(namespace) => NameParts::Qualified(namespace, suffix),
+                None => NameParts::Input(suffix),
             });
         }
 
@@ -385,10 +428,10 @@ impl NamespaceScope {
         };
         let resolved = aliases.get(key)?;
 
-        Some(Cow::Owned(match suffix {
-            Some(suffix) => concat_with_sep(&[resolved, suffix], b'\\'),
-            None => resolved.clone(),
-        }))
+        Some(match suffix {
+            Some(suffix) => NameParts::Qualified(resolved, suffix),
+            None => NameParts::Alias(resolved),
+        })
     }
 }
 
