@@ -570,7 +570,11 @@ where
         )
     }
 
-    const fn function_callee_expression_need_parenthesis(&self, expression: &'arena Expression<'arena>) -> bool {
+    fn function_callee_expression_need_parenthesis(&self, expression: &'arena Expression<'arena>) -> bool {
+        if let Expression::Instantiation(i) = expression {
+            return self.instantiation_needs_parens(i);
+        }
+
         if let Expression::Construct(construct) = expression {
             return !construct.has_bounds();
         }
