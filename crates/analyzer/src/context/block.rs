@@ -197,6 +197,10 @@ fn find_accessor_separator(bytes: &[u8]) -> Option<usize> {
 }
 
 impl<'ctx> BlockContext<'ctx> {
+    pub(crate) fn has_same_class_type_relations(&self, other: &BlockContext<'_>) -> bool {
+        self.class_type_relations == other.class_type_relations
+    }
+
     pub fn new(scope: ScopeContext<'ctx>, register_super_globals: bool) -> Self {
         let mut block_context = Self {
             scope,
@@ -402,7 +406,7 @@ impl<'ctx> BlockContext<'ctx> {
             let keep_clause = should_keep_clause(&clause, remove_var_id, new_type);
 
             if keep_clause {
-                clauses_to_keep.push(Rc::clone(&clause));
+                clauses_to_keep.push(clause);
             } else {
                 other_clauses.push(clause);
             }
@@ -414,7 +418,7 @@ impl<'ctx> BlockContext<'ctx> {
             for clause in other_clauses {
                 let mut type_changed = false;
                 let Some(possibilities) = clause.possibilities.get(&remove_var_id) else {
-                    clauses_to_keep.push(Rc::clone(&clause));
+                    clauses_to_keep.push(clause);
 
                     continue;
                 };
@@ -428,7 +432,7 @@ impl<'ctx> BlockContext<'ctx> {
                     let result_type = assertion_reconciler::reconcile(
                         context,
                         assertion,
-                        Some(&new_type.clone()),
+                        Some(new_type),
                         None,
                         false,
                         None,
@@ -443,7 +447,7 @@ impl<'ctx> BlockContext<'ctx> {
                 }
 
                 if !type_changed {
-                    clauses_to_keep.push(Rc::clone(&clause));
+                    clauses_to_keep.push(clause);
                 }
             }
         }
@@ -459,7 +463,8 @@ impl<'ctx> BlockContext<'ctx> {
     ) where
         A: Arena,
     {
-        self.clauses = BlockContext::filter_clauses(context, remove_var_id, self.clauses.clone(), new_type);
+        self.clauses =
+            BlockContext::filter_clauses(context, remove_var_id, std::mem::take(&mut self.clauses), new_type);
 
         self.class_type_relations.retain(|source, targets| {
             if var_has_root(*source, remove_var_id) {
@@ -518,13 +523,7 @@ impl<'ctx> BlockContext<'ctx> {
             },
         );
 
-        let keys = self.locals.keys().copied().collect::<Vec<_>>();
-
-        for var_id in keys {
-            if var_has_root(var_id, remove_var_id) {
-                self.locals.remove(&var_id);
-            }
-        }
+        self.locals.retain(|var_id, _| !var_has_root(*var_id, remove_var_id));
     }
 
     /// Registers a variable that is referenced conditionally, like in a property

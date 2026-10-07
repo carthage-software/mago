@@ -343,7 +343,7 @@ where
     check_thrown_types(context, block_context, &mut artifacts, function_like_metadata);
 
     std::mem::swap(&mut context.type_resolution_context, &mut previous_type_resolution_context);
-    parent_artifacts.expression_types.extend(std::mem::take(&mut artifacts.expression_types));
+    parent_artifacts.extend_expression_types(std::mem::take(&mut artifacts.expression_types));
     parent_artifacts.variable_definedness.extend(std::mem::take(&mut artifacts.variable_definedness));
     parent_artifacts.resolved_method_calls.append(&mut artifacts.resolved_method_calls);
     parent_artifacts.symbol_references.extend(std::mem::take(&mut artifacts.symbol_references));

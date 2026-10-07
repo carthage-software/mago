@@ -16,7 +16,6 @@ use mago_syntax::cst::Expression;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
-use crate::artifacts::get_expression_range;
 use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
@@ -143,7 +142,7 @@ where
         get_signum_result()
     };
 
-    artifacts.expression_types.insert(get_expression_range(binary), Rc::new(result_type));
+    artifacts.set_rc_expression_type(binary, Rc::new(result_type));
 
     Ok(())
 }

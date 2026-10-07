@@ -102,6 +102,7 @@ where
 
 #[derive(Default)]
 pub struct PluginRegistry {
+    built_in_registration_count: usize,
     external_analyzer: Option<Arc<ExternalAnalyzerHandle>>,
     external_capabilities: OnceLock<ExternalAnalyzerCapabilities>,
     function_exact: WordMap<Vec<usize>>,
@@ -174,6 +175,38 @@ impl std::fmt::Debug for PluginRegistry {
 }
 
 impl PluginRegistry {
+    pub(crate) fn mark_built_in_registrations(&mut self) {
+        self.built_in_registration_count = self.registration_count();
+    }
+
+    pub(crate) fn allows_loop_convergence(&self) -> bool {
+        self.external_analyzer.is_none() && self.registration_count() == self.built_in_registration_count
+    }
+
+    fn registration_count(&self) -> usize {
+        self.function_providers.len()
+            + self.method_providers.len()
+            + self.program_hooks.len()
+            + self.statement_hooks.len()
+            + self.expression_hooks.len()
+            + self.function_call_hooks.len()
+            + self.method_call_hooks.len()
+            + self.static_method_call_hooks.len()
+            + self.nullsafe_method_call_hooks.len()
+            + self.class_hooks.len()
+            + self.interface_hooks.len()
+            + self.trait_hooks.len()
+            + self.enum_hooks.len()
+            + self.function_decl_hooks.len()
+            + self.property_initialization_providers.len()
+            + self.issue_filter_hooks.len()
+            + self.function_assertion_providers.len()
+            + self.method_assertion_providers.len()
+            + self.expression_throw_providers.len()
+            + self.function_throw_providers.len()
+            + self.method_throw_providers.len()
+    }
+
     /// Attaches worker-backed analyzer plugins to this registry.
     pub fn set_external_analyzer(&mut self, analyzer: Arc<ExternalAnalyzerHandle>) {
         self.external_analyzer = Some(analyzer);

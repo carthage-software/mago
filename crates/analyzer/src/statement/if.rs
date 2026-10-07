@@ -33,6 +33,7 @@ use mago_syntax::cst::UnaryPrefixOperator;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
+use crate::artifacts::CheckpointAction;
 use crate::code::IssueCode;
 use crate::common::synthetic::new_synthetic_call;
 use crate::common::synthetic::new_synthetic_negation;
@@ -1281,7 +1282,7 @@ where
         return Ok(());
     }
 
-    let old_expression_types = artifacts.expression_types.clone();
+    artifacts.begin_expression_type_checkpoint();
     let expressions = get_definitely_evaluated_ored_expressions(condition);
 
     let (result, _) = context.record(|context| {
@@ -1300,9 +1301,12 @@ where
         Result::<_, AnalysisError>::Ok(())
     });
 
+    artifacts.finish_expression_type_checkpoint(if result.is_ok() {
+        CheckpointAction::Rollback
+    } else {
+        CheckpointAction::Keep
+    });
     result?;
-
-    artifacts.expression_types = old_expression_types;
 
     for variable_id in assigned_in_conditional_variable_ids.keys() {
         if let Some(variable_type) = post_leaving_if_block_context.locals.get(variable_id) {

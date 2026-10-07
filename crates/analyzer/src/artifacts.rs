@@ -10,7 +10,7 @@ use mago_word::WordSet;
 use mago_algebra::assertion_set::AssertionSet;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::reference::SymbolReferences;
-use mago_codex::ttype::combine_union_types;
+use mago_codex::ttype::combine_union_types_rc;
 use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::union::TUnion;
 use mago_span::HasSpan;
@@ -22,6 +22,11 @@ use crate::context::block::ReferenceConstraintSource;
 use crate::context::scope::case_scope::CaseScope;
 use crate::context::scope::loop_scope::LoopScope;
 use crate::readonly::PendingReadonlyPropertyWrite;
+
+pub(crate) use self::expression_types::CheckpointAction;
+pub(crate) use self::expression_types::ExpressionTypeCheckpoints;
+
+mod expression_types;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 #[repr(u8)]
@@ -71,7 +76,8 @@ pub struct AnalysisArtifacts {
     pub(crate) variable_definedness: HashMap<(u32, u32), WordMap<VariableDefinedness>>,
     variable_definedness_targets: Option<Arc<[bool; u8::MAX as usize + 1]>>,
     pub(crate) pending_readonly_property_writes: Vec<PendingReadonlyPropertyWrite>,
-    pub(crate) static_local_types: Option<WordMap<TUnion>>,
+    pub(crate) static_local_types: Option<WordMap<Rc<TUnion>>>,
+    expression_type_checkpoints: ExpressionTypeCheckpoints,
 }
 
 impl Default for AnalysisArtifacts {
@@ -106,6 +112,7 @@ impl AnalysisArtifacts {
             variable_definedness_targets: None,
             pending_readonly_property_writes: Vec::new(),
             static_local_types: None,
+            expression_type_checkpoints: ExpressionTypeCheckpoints::default(),
         }
     }
 
@@ -133,11 +140,9 @@ impl AnalysisArtifacts {
             };
 
             if let Some(previous_type) = static_local_types.get_mut(variable) {
-                if previous_type != variable_type.as_ref() {
-                    *previous_type = combine_union_types(previous_type, variable_type, codebase, options);
-                }
+                *previous_type = combine_union_types_rc(previous_type, variable_type, codebase, options);
             } else {
-                static_local_types.insert(*variable, variable_type.as_ref().clone());
+                static_local_types.insert(*variable, Rc::clone(variable_type));
             }
         }
     }
@@ -236,7 +241,7 @@ impl AnalysisArtifacts {
     where
         T: HasSpan,
     {
-        self.expression_types.insert(get_expression_range(expression), Rc::new(t));
+        self.set_rc_expression_type(expression, Rc::new(t));
     }
 
     /// Get the type of expression `expression`.
@@ -256,7 +261,7 @@ impl AnalysisArtifacts {
     where
         T: HasSpan,
     {
-        self.expression_types.insert(get_expression_range(expression), t);
+        self.expression_type_checkpoints.insert(&mut self.expression_types, get_expression_range(expression), t);
     }
 
     /// Get the type of expression `expression`.
@@ -266,6 +271,44 @@ impl AnalysisArtifacts {
         T: HasSpan,
     {
         self.expression_types.get(&get_expression_range(expression))
+    }
+
+    pub(crate) fn begin_expression_type_checkpoint(&mut self) {
+        self.expression_type_checkpoints.begin_checkpoint();
+    }
+
+    pub(crate) fn expression_type_checkpoint_matches(&self, same: impl Fn(&TUnion, &TUnion) -> bool) -> bool {
+        self.expression_type_checkpoints.checkpoint_matches(&self.expression_types, same)
+    }
+
+    pub(crate) fn finish_expression_type_checkpoint(&mut self, action: CheckpointAction) {
+        self.expression_type_checkpoints.finish_checkpoint(&mut self.expression_types, action);
+    }
+
+    pub(crate) fn remove_expression_type(&mut self, range: &(u32, u32)) {
+        self.expression_type_checkpoints.remove(&mut self.expression_types, range);
+    }
+
+    pub(crate) fn extend_expression_types(&mut self, types: impl IntoIterator<Item = ((u32, u32), Rc<TUnion>)>) {
+        if self.expression_type_checkpoints.is_empty() {
+            self.expression_types.extend(types);
+        } else {
+            for (range, ty) in types {
+                self.expression_type_checkpoints.insert(&mut self.expression_types, range, ty);
+            }
+        }
+    }
+
+    pub(crate) fn detach_expression_type_checkpoints(&mut self) -> Option<ExpressionTypeCheckpoints> {
+        if self.expression_type_checkpoints.is_empty() {
+            return None;
+        }
+
+        Some(self.expression_type_checkpoints.detach(&self.expression_types))
+    }
+
+    pub(crate) fn restore_expression_type_checkpoints(&mut self, checkpoints: ExpressionTypeCheckpoints) {
+        self.expression_type_checkpoints = checkpoints;
     }
 }
 
@@ -304,4 +347,99 @@ where
     let span = expression.span();
 
     (span.start.offset, span.end.offset)
+}
+
+#[cfg(test)]
+#[allow(clippy::unwrap_used)]
+mod tests {
+    use std::rc::Rc;
+
+    use mago_codex::context::ScopeContext;
+    use mago_codex::metadata::CodebaseMetadata;
+    use mago_codex::reference::ReferenceOrigin;
+    use mago_codex::ttype::combine_union_types;
+    use mago_codex::ttype::combiner::CombinerOptions;
+    use mago_codex::ttype::flags::UnionFlags;
+    use mago_codex::ttype::get_int;
+    use mago_codex::ttype::get_list;
+    use mago_codex::ttype::get_string;
+    use mago_codex::ttype::union::TUnion;
+    use mago_span::Span;
+    use mago_word::WordMap;
+    use mago_word::word;
+
+    use super::AnalysisArtifacts;
+    use crate::context::block::BlockContext;
+    use crate::context::block::ReferenceConstraint;
+    use crate::context::block::ReferenceConstraintSource;
+
+    fn static_context(variable_type: Rc<TUnion>) -> BlockContext<'static> {
+        let mut context = BlockContext::new(ScopeContext::new(ReferenceOrigin::File(word("static.php"))), false);
+        context.static_locals.insert(word("$state"));
+        context.locals.insert(word("$state"), variable_type);
+        context
+    }
+
+    #[test]
+    fn static_local_records_share_unchanged_types_and_keep_independent_snapshots() {
+        let variable = word("$state");
+        let original = Rc::new(get_list(get_int()));
+        let mut context = static_context(Rc::clone(&original));
+        let mut artifacts = AnalysisArtifacts::new();
+        artifacts.static_local_types = Some(WordMap::default());
+        let codebase = CodebaseMetadata::new();
+        let options = CombinerOptions::default();
+
+        artifacts.record_static_local_types(&context, &codebase, options);
+        assert!(Rc::ptr_eq(&artifacts.static_local_types.as_ref().unwrap()[&variable], &original));
+        let saved = artifacts.clone();
+
+        artifacts.record_static_local_types(&context, &codebase, options);
+        assert!(Rc::ptr_eq(&artifacts.static_local_types.as_ref().unwrap()[&variable], &original));
+        assert!(Rc::ptr_eq(&saved.static_local_types.as_ref().unwrap()[&variable], &original));
+
+        *Rc::make_mut(context.locals.get_mut(&variable).unwrap()) = get_string();
+        artifacts.record_static_local_types(&context, &codebase, options);
+        let expected = combine_union_types(&original, &get_string(), &codebase, options);
+        let actual = &artifacts.static_local_types.as_ref().unwrap()[&variable];
+        assert_eq!(actual.types, expected.types);
+        assert_eq!(actual.flags, expected.flags);
+        assert!(Rc::ptr_eq(&saved.static_local_types.as_ref().unwrap()[&variable], &original));
+        assert_eq!(original.as_ref(), &get_list(get_int()));
+    }
+
+    #[test]
+    fn equal_static_local_records_keep_the_first_types_flags() {
+        let variable = word("$state");
+        let mut first = get_list(get_int());
+        first.flags.insert(UnionFlags::POPULATED);
+        let first = Rc::new(first);
+        let mut next = get_list(get_int());
+        next.flags.insert(UnionFlags::NULLSAFE_NULL);
+        let next = Rc::new(next);
+        assert_eq!(first, next);
+
+        let context = static_context(next);
+        let mut artifacts = AnalysisArtifacts::new();
+        artifacts.static_local_types = Some(WordMap::from_iter([(variable, Rc::clone(&first))]));
+        artifacts.record_static_local_types(&context, &CodebaseMetadata::new(), CombinerOptions::default());
+
+        let actual = &artifacts.static_local_types.as_ref().unwrap()[&variable];
+        assert!(Rc::ptr_eq(actual, &first));
+        assert_eq!(actual.flags, UnionFlags::POPULATED);
+    }
+
+    #[test]
+    fn explicit_static_constraints_do_not_enter_the_inferred_type_map() {
+        let variable = word("$state");
+        let mut context = static_context(Rc::new(get_int()));
+        context.by_reference_constraints.insert(
+            variable,
+            ReferenceConstraint::new(Span::dummy(0, 0), ReferenceConstraintSource::Static, Some(Rc::new(get_int()))),
+        );
+        let mut artifacts = AnalysisArtifacts::new();
+        artifacts.static_local_types = Some(WordMap::default());
+        artifacts.record_static_local_types(&context, &CodebaseMetadata::new(), CombinerOptions::default());
+        assert!(artifacts.static_local_types.as_ref().unwrap().is_empty());
+    }
 }

@@ -124,7 +124,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Static<'arena> {
                     .static_local_types
                     .as_ref()
                     .and_then(|types| types.get(&variable_name_atom))
-                    .map(|ty| Rc::new(ty.clone()))
+                    .cloned()
                     .or(inferred_type)
                     .unwrap_or_else(|| Rc::new(get_mixed())),
             };
@@ -143,7 +143,7 @@ pub(super) fn infer_static_local_types<'ctx, 'arena, A>(
     block_context: &BlockContext<'ctx>,
     artifacts: &AnalysisArtifacts,
     statements: &[Statement<'arena>],
-) -> Result<Option<WordMap<TUnion>>, AnalysisError>
+) -> Result<Option<WordMap<Rc<TUnion>>>, AnalysisError>
 where
     A: Arena,
 {
@@ -178,7 +178,7 @@ where
             if let Some(previous) = static_local_types.get(variable)
                 && previous != inferred_type
             {
-                widen_static_local_type(inferred_type, previous);
+                widen_static_local_type(Rc::make_mut(inferred_type), previous);
             }
         }
 
@@ -191,7 +191,7 @@ where
 
     for (variable, variable_type) in &mut static_local_types {
         if previous_types.get(variable) != Some(variable_type) {
-            *variable_type = get_mixed();
+            *variable_type = Rc::new(get_mixed());
         }
     }
 

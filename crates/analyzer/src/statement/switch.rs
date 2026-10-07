@@ -7,6 +7,7 @@ use mago_algebra::clause::Clause;
 use mago_allocator::Arena;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::combine_union_types;
+use mago_codex::ttype::combine_union_types_rc;
 use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::comparator::union_comparator::can_expression_types_be_identical;
 use mago_codex::ttype::get_mixed;
@@ -28,6 +29,7 @@ use mago_word::WordSet;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
+use crate::artifacts::CheckpointAction;
 use crate::code::IssueCode;
 use crate::common::synthetic::new_synthetic_disjunctive_equality;
 use crate::common::synthetic::new_synthetic_equals;
@@ -174,7 +176,8 @@ where
                 continue;
             }
 
-            let is_matching = self.analyze_case(
+            self.artifacts.begin_expression_type_checkpoint();
+            let result = self.analyze_case(
                 switch,
                 &subject_for_conditions,
                 is_synthetic,
@@ -185,7 +188,12 @@ where
                 is_last,
                 i,
                 previously_matching_case,
-            )?;
+            );
+            self.artifacts.finish_expression_type_checkpoint(match &result {
+                Ok((_, action)) => *action,
+                Err(_) => CheckpointAction::Keep,
+            });
+            let (is_matching, _) = result?;
 
             if is_matching == Some(true) && !case.is_default() {
                 previously_matching_case = Some(case.span());
@@ -245,12 +253,7 @@ where
             if let Some(context_type) = self.block_context.locals.get(&var_id).cloned() {
                 self.block_context.locals.insert(
                     var_id,
-                    Rc::new(combine_union_types(
-                        &var_type,
-                        &context_type,
-                        self.context.codebase,
-                        CombinerOptions::default(),
-                    )),
+                    combine_union_types_rc(&var_type, &context_type, self.context.codebase, CombinerOptions::default()),
                 );
             }
         }
@@ -275,7 +278,7 @@ where
         is_last: bool,
         case_index: usize,
         previously_matching_case: Option<Span>,
-    ) -> Result<Option<bool>, AnalysisError> {
+    ) -> Result<(Option<bool>, CheckpointAction), AnalysisError> {
         if self.context.settings.version.is_deprecated(Feature::SwitchSemicolonSeparators)
             && matches!(switch_case.separator(), SwitchCaseSeparator::SemiColon(_))
         {
@@ -324,7 +327,7 @@ where
                 );
             }
 
-            return Ok(Some(false));
+            return Ok((Some(false), CheckpointAction::Keep));
         }
 
         let mut result = None;
@@ -338,7 +341,6 @@ where
 
         let mut case_block_context = original_block_context.clone();
 
-        let mut old_expression_types = self.artifacts.expression_types.clone();
         let mut case_equality_expression = None;
 
         if condition_is_synthetic {
@@ -485,9 +487,7 @@ where
             self.has_fallthrough = true;
             self.has_reachable_fallthrough = case_statements_are_reachable;
             self.leftover_statement_groups.push((switch_case.statements().to_vec(), case_has_direct_entry));
-            self.artifacts.expression_types = old_expression_types;
-
-            return Ok(result);
+            return Ok((result, CheckpointAction::Rollback));
         }
 
         if let Some(leftover_case_equality_expr) = &self.leftover_case_equality_expression {
@@ -648,12 +648,8 @@ where
         self.has_reachable_fallthrough = false;
 
         let Some(case_scope) = self.artifacts.case_scopes.pop() else {
-            return Ok(result);
+            return Ok((result, CheckpointAction::Keep));
         };
-
-        let new_expression_types = self.artifacts.expression_types.clone();
-        old_expression_types.extend(new_expression_types);
-        self.artifacts.expression_types = old_expression_types;
 
         let case_exit_type = if case_block_context.control_actions.contains(ControlAction::End) {
             self.case_exit_types.insert(case_index, ControlAction::Return);
@@ -675,12 +671,12 @@ where
                     possibly_redefined_var_ids.insert(
                         *var_id,
                         match possibly_redefined_var_ids.get(var_id) {
-                            Some(possibly_redefined_var_type) => Rc::new(combine_union_types(
+                            Some(possibly_redefined_var_type) => combine_union_types_rc(
                                 var_type,
                                 possibly_redefined_var_type,
                                 self.context.codebase,
                                 CombinerOptions::default(),
-                            )),
+                            ),
                             None => Rc::clone(var_type),
                         },
                     );
@@ -736,7 +732,7 @@ where
             }
         }
 
-        Ok(result)
+        Ok((result, CheckpointAction::Merge))
     }
 
     fn check_for_duplicate_case_condition(

@@ -109,7 +109,7 @@ pub fn reconcile_keyed_types<'ctx, A>(
     }
 
     let inside_loop = block_context.flags.inside_loop();
-    let old_new_types = new_types.clone();
+    let old_new_types = new_types;
     let mut new_types = new_types.clone();
 
     for (derived_local, source) in &block_context.derived_local_sources {

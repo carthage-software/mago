@@ -25,6 +25,7 @@ use mago_word::Word;
 use mago_word::word;
 
 use crate::artifacts::AnalysisArtifacts;
+use crate::artifacts::ExpressionTypeCheckpoints;
 use crate::code::IssueCode;
 use crate::context::block::BlockContext;
 use crate::invocation::Invocation;
@@ -213,6 +214,7 @@ pub struct HookContext<'ctx, 'block> {
     pub(crate) block_context: &'block mut BlockContext<'ctx>,
     pub(crate) artifacts: &'block mut AnalysisArtifacts,
     pub(crate) reported_issues: RefCell<Vec<ReportedIssue>>,
+    expression_type_checkpoints: Option<ExpressionTypeCheckpoints>,
 }
 
 impl<'ctx, 'block> HookContext<'ctx, 'block> {
@@ -222,7 +224,14 @@ impl<'ctx, 'block> HookContext<'ctx, 'block> {
         block_context: &'block mut BlockContext<'ctx>,
         artifacts: &'block mut AnalysisArtifacts,
     ) -> Self {
-        Self { codebase, source_file, artifacts, block_context, reported_issues: RefCell::new(Vec::new()) }
+        Self {
+            codebase,
+            source_file,
+            artifacts,
+            block_context,
+            reported_issues: RefCell::new(Vec::new()),
+            expression_type_checkpoints: None,
+        }
     }
 
     /// Report an issue from a hook.
@@ -230,7 +239,7 @@ impl<'ctx, 'block> HookContext<'ctx, 'block> {
         self.reported_issues.borrow_mut().push(ReportedIssue { code, issue });
     }
 
-    pub(crate) fn take_issues(&self) -> Vec<ReportedIssue> {
+    pub(crate) fn take_issues(self) -> Vec<ReportedIssue> {
         std::mem::take(&mut *self.reported_issues.borrow_mut())
     }
 
@@ -316,6 +325,9 @@ impl<'ctx, 'block> HookContext<'ctx, 'block> {
     /// Get mutable access to the analysis artifacts.
     #[inline]
     pub fn artifacts_mut(&mut self) -> &mut AnalysisArtifacts {
+        if self.expression_type_checkpoints.is_none() {
+            self.expression_type_checkpoints = self.artifacts.detach_expression_type_checkpoints();
+        }
         self.artifacts
     }
 
@@ -335,6 +347,14 @@ impl<'ctx, 'block> HookContext<'ctx, 'block> {
     #[inline]
     pub fn block_context(&self) -> &BlockContext<'ctx> {
         self.block_context
+    }
+}
+
+impl Drop for HookContext<'_, '_> {
+    fn drop(&mut self) {
+        if let Some(checkpoints) = self.expression_type_checkpoints.take() {
+            self.artifacts.restore_expression_type_checkpoints(checkpoints);
+        }
     }
 }
 
