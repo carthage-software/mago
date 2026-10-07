@@ -445,7 +445,10 @@ where
             continue;
         };
 
-        let identifier = FunctionLikeIdentifier::Method(class_like_metadata.original_name, unresolved.method_name);
+        let identifier = FunctionLikeIdentifier::Method(
+            class_like_metadata.original_name,
+            unresolved.method_name.to_ascii_lowercase(),
+        );
         let target = InvocationTarget::ExternalMethod {
             identifier,
             effective_signature: None,
@@ -509,8 +512,10 @@ where
             .get_method_by_id(&magic_call_method.method_identifier)
             .expect("method metadata should exist for resolved magic call method");
 
-        let requested_identifier =
-            FunctionLikeIdentifier::Method(undocumented_method.classname, undocumented_method.method_name);
+        let requested_identifier = FunctionLikeIdentifier::Method(
+            undocumented_method.classname,
+            undocumented_method.method_name.to_ascii_lowercase(),
+        );
         let target = InvocationTarget::FunctionLike {
             identifier: FunctionLikeIdentifier::Method(
                 magic_call_method.method_identifier.get_class_name(),
