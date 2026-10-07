@@ -6,6 +6,7 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
+use mago_span::Span;
 use mago_syntax::cst::Expression;
 use mago_syntax::cst::Literal;
 use mago_syntax::cst::Node;
@@ -57,6 +58,9 @@ impl LintRule for NoInsecureComparisonRule {
 
                 These operators are vulnerable to timing attacks, which can expose sensitive information.
                 Instead, use `hash_equals` for comparing strings or `password_verify` for validating hashes.
+
+                Sensitive data is identified by names, such as variables, array keys, and properties.
+                String literal values such as `'refresh_token'` do not by themselves indicate sensitive data.
             "},
             good_example: indoc! {r"
                 <?php
@@ -103,8 +107,8 @@ impl LintRule for NoInsecureComparisonRule {
             return;
         }
 
-        let lhs = get_password(binary.lhs);
-        let rhs = get_password(binary.rhs);
+        let lhs = get_sensitive_value(binary.lhs);
+        let rhs = get_sensitive_value(binary.rhs);
 
         let is_lhs_like_password = lhs.is_some();
         let is_rhs_like_password = rhs.is_some();
@@ -141,6 +145,20 @@ impl LintRule for NoInsecureComparisonRule {
     }
 }
 
+/// Distinguishes string values from names such as array keys and dynamic selectors.
+#[inline]
+#[must_use]
+fn get_sensitive_value(expr: &Expression<'_>) -> Option<Span> {
+    match expr {
+        Expression::Parenthesized(parenthesized) => get_sensitive_value(parenthesized.expression),
+        Expression::Assignment(assignment) => {
+            get_sensitive_value(assignment.lhs).or_else(|| get_sensitive_value(assignment.rhs))
+        }
+        Expression::Literal(_) => None,
+        _ => get_password(expr),
+    }
+}
+
 #[inline]
 #[must_use]
 const fn is_simple_literal(expr: &Expression<'_>) -> bool {
@@ -154,5 +172,119 @@ const fn is_simple_literal(expr: &Expression<'_>) -> bool {
             }
         }
         _ => false,
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use indoc::indoc;
+
+    use super::NoInsecureComparisonRule;
+    use crate::test_lint_failure;
+    use crate::test_lint_success;
+
+    test_lint_success! {
+        name = issue_2028_grant_type_comparison,
+        rule = NoInsecureComparisonRule,
+        code = indoc! {r"
+            <?php
+
+            declare(strict_types=1);
+
+            namespace App;
+
+            $grantType = 'someValue';
+            if ($grantType === 'refresh_token') {
+                echo 'Refresh Token selected';
+            }
+        "}
+    }
+
+    test_lint_success! {
+        name = string_literals_are_not_sensitive_values,
+        rule = NoInsecureComparisonRule,
+        code = indoc! {r#"
+            <?php
+
+            $request['grant_type'] == 'refresh_token';
+            $request['grant_type'] != 'refresh_token';
+            $request['grant_type'] === "refresh_token";
+            $request['grant_type'] !== "refresh_token";
+            'refresh_token' === $grantType;
+            ('refresh_token') === ($grantType);
+            $grantType === 'password';
+            $kind === 'secret';
+            $kind === 'apikey';
+            $kind === 'api_key';
+        "#}
+    }
+
+    test_lint_success! {
+        name = assigned_literals_are_not_sensitive_values,
+        rule = NoInsecureComparisonRule,
+        code = indoc! {r"
+            <?php
+
+            ($grantType = 'refresh_token') === $expected;
+            $expected !== ($grantType = ('refresh_token'));
+            ($grantType = $other = 'password') == $expected;
+        "}
+    }
+
+    test_lint_failure! {
+        name = sensitive_variable_comparisons,
+        rule = NoInsecureComparisonRule,
+        count = 8,
+        code = indoc! {r"
+            <?php
+
+            $storedToken == $userToken;
+            $storedToken != $userToken;
+            $storedToken === $userToken;
+            $storedToken !== $userToken;
+            $password === 'hardcoded';
+            'hardcoded' !== ($password);
+            ($password = 'hardcoded') === $provided;
+            $provided === ($value = $password);
+        "}
+    }
+
+    test_lint_failure! {
+        name = sensitive_names_in_keys_and_selectors,
+        rule = NoInsecureComparisonRule,
+        count = 12,
+        code = indoc! {r"
+            <?php
+
+            $data['refresh_token'] === $provided;
+            $provided === $data[('password')];
+            $object->password === $provided;
+            $object?->password === $provided;
+            $object->{'password'} === $provided;
+            $object?->{'password'} === $provided;
+            $object->getToken() === $provided;
+            $object->{'getToken'}() === $provided;
+            Credentials::getToken() === $provided;
+            Credentials::$password === $provided;
+            Credentials::PASSWORD === $provided;
+            ${'password'} === $provided;
+        "}
+    }
+
+    test_lint_success! {
+        name = simple_literal_checks_and_secure_comparisons,
+        rule = NoInsecureComparisonRule,
+        code = indoc! {r#"
+            <?php
+
+            $password === '';
+            "" !== $token;
+            ($password) === (null);
+            false === $token;
+            $password == 0;
+            $password != 0.0;
+            hash_equals($storedToken, $userToken);
+            password_verify($password, $hash);
+        "#}
     }
 }
