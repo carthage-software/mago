@@ -12,6 +12,7 @@ use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_never;
+use mago_codex::ttype::get_null;
 use mago_codex::ttype::template::TemplateResult;
 use mago_codex::ttype::union::TUnion;
 use mago_span::HasSpan;
@@ -292,6 +293,15 @@ where
 
     let mut method_resolution =
         resolve_method_targets(context, block_context, artifacts, object, selector, is_null_safe, span)?;
+
+    if artifacts.get_expression_type(object).is_some_and(|ty| ty.is_null() && (is_null_safe || ty.has_nullsafe_null()))
+    {
+        let mut return_type = get_null();
+        return_type.set_nullsafe_null(true);
+        artifacts.set_expression_type(&span, return_type);
+
+        return Ok(());
+    }
 
     let undocumented_template_result =
         (!method_resolution.undocumented_methods.is_empty()).then(|| method_resolution.template_result.clone());
