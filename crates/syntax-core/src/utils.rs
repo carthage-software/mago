@@ -46,8 +46,7 @@ where
         return None;
     };
 
-    let needs_processing = content.contains(&b'\\') || quote_char.is_some_and(|q| content.contains(&q));
-    if !needs_processing {
+    if !content.contains(&b'\\') {
         return Some(content);
     }
 
@@ -488,6 +487,43 @@ mod tests {
         ($input:expr, $expected:expr) => {
             assert_eq!(parse_literal_integer($input), $expected);
         };
+    }
+
+    #[test]
+    fn literal_string_parts_without_escapes_borrow_their_bytes() {
+        let arena = LocalArena::new();
+        for content in [b"a\"b'c".as_slice(), b"<p class=\"value\">text</p>\n", b"\xff\"\r\n'"] {
+            for quote in [None, Some(b'\''), Some(b'"')] {
+                let Some(value) = parse_literal_string_in(&arena, content, quote, false) else {
+                    panic!("String parts without escapes should parse");
+                };
+                assert_eq!(value, content);
+                assert_eq!(value.as_ptr(), content.as_ptr());
+            }
+        }
+    }
+
+    #[test]
+    fn quoted_literals_keep_plain_quotes_and_binary_prefixes() {
+        let arena = LocalArena::new();
+        for (input, start) in [
+            (b"'a\"b'".as_slice(), 1),
+            (b"\"a'b\"", 1),
+            (b"b'a\"b'", 2),
+            (b"B\"a'b\"", 2),
+            (b"\"a\"b\"", 1),
+            (b"'a'b'", 1),
+        ] {
+            let Some(value) = parse_literal_string_in(&arena, input, None, true) else {
+                panic!("Quoted literals without escapes should parse");
+            };
+            let content = &input[start..input.len() - 1];
+            assert_eq!(value, content);
+            assert_eq!(value.as_ptr(), content.as_ptr());
+        }
+        for input in [b"'".as_slice(), b"b\"", b"\"missing", b"'mismatch\""] {
+            assert_eq!(parse_literal_string_in(&arena, input, None, true), None);
+        }
     }
 
     #[test]
