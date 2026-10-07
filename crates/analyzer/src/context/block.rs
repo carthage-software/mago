@@ -197,6 +197,10 @@ fn find_accessor_separator(bytes: &[u8]) -> Option<usize> {
 }
 
 impl<'ctx> BlockContext<'ctx> {
+    pub(crate) fn has_same_class_type_relations(&self, other: &BlockContext<'_>) -> bool {
+        self.class_type_relations == other.class_type_relations
+    }
+
     pub fn new(scope: ScopeContext<'ctx>, register_super_globals: bool) -> Self {
         let mut block_context = Self {
             scope,
@@ -353,27 +357,29 @@ impl<'ctx> BlockContext<'ctx> {
         let mut included_clauses = Vec::new();
         let mut rejected_clauses = Vec::new();
 
-        'outer: for c in clauses {
-            if c.wedge {
-                included_clauses.push(c.clone());
-                continue;
+        for clause in clauses {
+            if Self::is_reconciled_clause(clause, changed_var_ids) {
+                rejected_clauses.push(clause.clone());
+            } else {
+                included_clauses.push(clause.clone());
             }
-
-            for (key, assertions) in &c.possibilities {
-                if changed_var_ids.contains(key)
-                    || assertions.values().any(|assertion| {
-                        assertion.referenced_variable().is_some_and(|variable| changed_var_ids.contains(&variable))
-                    })
-                {
-                    rejected_clauses.push(c.clone());
-                    continue 'outer;
-                }
-            }
-
-            included_clauses.push(c.clone());
         }
 
         (included_clauses, rejected_clauses)
+    }
+
+    pub(crate) fn retain_unreconciled_clauses(clauses: &mut Vec<Rc<Clause>>, changed_var_ids: &WordSet) {
+        clauses.retain(|clause| !Self::is_reconciled_clause(clause, changed_var_ids));
+    }
+
+    fn is_reconciled_clause(clause: &Clause, changed_var_ids: &WordSet) -> bool {
+        !clause.wedge
+            && clause.possibilities.iter().any(|(key, assertions)| {
+                changed_var_ids.contains(key)
+                    || assertions.values().any(|assertion| {
+                        assertion.referenced_variable().is_some_and(|variable| changed_var_ids.contains(&variable))
+                    })
+            })
     }
 
     pub(crate) fn filter_clauses<'arena, A>(
@@ -402,7 +408,7 @@ impl<'ctx> BlockContext<'ctx> {
             let keep_clause = should_keep_clause(&clause, remove_var_id, new_type);
 
             if keep_clause {
-                clauses_to_keep.push(Rc::clone(&clause));
+                clauses_to_keep.push(clause);
             } else {
                 other_clauses.push(clause);
             }
@@ -414,7 +420,7 @@ impl<'ctx> BlockContext<'ctx> {
             for clause in other_clauses {
                 let mut type_changed = false;
                 let Some(possibilities) = clause.possibilities.get(&remove_var_id) else {
-                    clauses_to_keep.push(Rc::clone(&clause));
+                    clauses_to_keep.push(clause);
 
                     continue;
                 };
@@ -428,7 +434,7 @@ impl<'ctx> BlockContext<'ctx> {
                     let result_type = assertion_reconciler::reconcile(
                         context,
                         assertion,
-                        Some(&new_type.clone()),
+                        Some(new_type),
                         None,
                         false,
                         None,
@@ -443,7 +449,7 @@ impl<'ctx> BlockContext<'ctx> {
                 }
 
                 if !type_changed {
-                    clauses_to_keep.push(Rc::clone(&clause));
+                    clauses_to_keep.push(clause);
                 }
             }
         }
@@ -459,7 +465,8 @@ impl<'ctx> BlockContext<'ctx> {
     ) where
         A: Arena,
     {
-        self.clauses = BlockContext::filter_clauses(context, remove_var_id, self.clauses.clone(), new_type);
+        self.clauses =
+            BlockContext::filter_clauses(context, remove_var_id, std::mem::take(&mut self.clauses), new_type);
 
         self.class_type_relations.retain(|source, targets| {
             if var_has_root(*source, remove_var_id) {
@@ -518,13 +525,7 @@ impl<'ctx> BlockContext<'ctx> {
             },
         );
 
-        let keys = self.locals.keys().copied().collect::<Vec<_>>();
-
-        for var_id in keys {
-            if var_has_root(var_id, remove_var_id) {
-                self.locals.remove(&var_id);
-            }
-        }
+        self.locals.retain(|var_id, _| !var_has_root(*var_id, remove_var_id));
     }
 
     /// Registers a variable that is referenced conditionally, like in a property
@@ -544,8 +545,12 @@ impl<'ctx> BlockContext<'ctx> {
     /// as a conditionally referenced variable if it's part of an access chain.
     #[must_use]
     pub fn has_variable(&mut self, var_name: &[u8]) -> bool {
-        self.add_conditionally_referenced_variable(var_name);
-        self.locals.contains_key(&word(var_name))
+        self.has_variable_atom(word(var_name))
+    }
+
+    pub(crate) fn has_variable_atom(&mut self, var_atom: Word) -> bool {
+        self.add_conditionally_referenced_variable_atom(var_atom.as_bytes(), var_atom);
+        self.locals.contains_key(&var_atom)
     }
 
     /// Variant of [`add_conditionally_referenced_variable`] that accepts an
@@ -663,7 +668,7 @@ impl<'ctx> BlockContext<'ctx> {
                 continue;
             }
 
-            let new_type = if !has_leaving_statements && end_block_context.has_variable(variable_id.as_bytes()) {
+            let new_type = if !has_leaving_statements && end_block_context.has_variable_atom(*variable_id) {
                 end_block_context.locals.get(variable_id).cloned()
             } else {
                 None
@@ -836,9 +841,14 @@ fn should_keep_clause(clause: &Rc<Clause>, remove_var_id: Word, new_type: Option
 mod tests {
     use std::rc::Rc;
 
+    use indexmap::IndexMap;
+    use mago_algebra::clause::Clause;
+    use mago_codex::assertion::Assertion;
     use mago_codex::context::ScopeContext;
     use mago_codex::reference::ReferenceOrigin;
     use mago_codex::ttype::get_mixed;
+    use mago_span::Span;
+    use mago_word::WordSet;
     use mago_word::word;
 
     use super::BlockContext;
@@ -852,6 +862,62 @@ mod tests {
         }
 
         block_context
+    }
+
+    #[test]
+    fn has_variable_tracks_plain_and_access_variables_but_not_this() {
+        let variables = ["$this", "$plain", "$this->property", "$plain[0]", "$missing"];
+        for use_atom in [false, true] {
+            let mut context = block_context_with_locals(&variables[..4]);
+            for (index, variable) in variables.iter().enumerate() {
+                let exists = if use_atom {
+                    context.has_variable_atom(word(variable))
+                } else {
+                    context.has_variable(variable.as_bytes())
+                };
+                assert_eq!(exists, index < 4);
+                assert_eq!(context.conditionally_referenced_variable_ids.contains(&word(variable)), index != 0);
+            }
+            assert_eq!(context.conditionally_referenced_variable_ids.len(), 4);
+            assert_eq!(context.locals.len(), 4);
+        }
+    }
+
+    #[test]
+    fn retaining_unreconciled_clauses_keeps_order_sharing_and_exact_variable_matching() {
+        let clauses = [
+            ("$changed", Assertion::IsIsset, false),
+            ("$changed['child']", Assertion::IsIsset, false),
+            ("$other", Assertion::IsLessThanVariable(word("$changed")), false),
+            ("$other", Assertion::IsLessThanVariable(word("$changed['child']")), false),
+            ("$unrelated", Assertion::IsIsset, false),
+            ("$changed", Assertion::IsIsset, true),
+        ]
+        .into_iter()
+        .map(|(variable, assertion, wedge)| {
+            Rc::new(Clause::new(
+                IndexMap::from([(word(variable), IndexMap::from([(0, assertion)]))]),
+                Span::dummy(0, 1),
+                Span::dummy(0, 1),
+                Some(wedge),
+                None,
+                None,
+            ))
+        })
+        .collect::<Vec<_>>();
+        let changed = WordSet::from_iter([word("$changed")]);
+        let mut retained = clauses.clone();
+        BlockContext::retain_unreconciled_clauses(&mut retained, &changed);
+
+        let expected = [1, 3, 4, 5];
+        assert_eq!(retained.len(), expected.len());
+        assert!(retained.iter().zip(expected).all(|(actual, index)| Rc::ptr_eq(actual, &clauses[index])));
+
+        let owned = clauses.iter().map(|clause| clause.as_ref().clone()).collect();
+        let (included, rejected) = BlockContext::remove_reconciled_clauses(&owned, &changed);
+        assert_eq!(included.len(), retained.len());
+        assert_eq!(rejected.len(), 2);
+        assert!(included.iter().zip(&retained).all(|(a, b)| a.possibilities == b.possibilities && a.wedge == b.wedge));
     }
 
     #[test]

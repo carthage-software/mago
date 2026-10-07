@@ -50,10 +50,7 @@ where
         Ok(match self.stream.peek_kind(0)? {
             Some(T!["..."]) => {
                 let ellipsis = self.stream.consume_span()?;
-                ArrayElement::Variadic(VariadicArrayElement {
-                    ellipsis,
-                    value: self.arena.alloc(self.parse_expression()?),
-                })
+                ArrayElement::Variadic(VariadicArrayElement { ellipsis, value: self.parse_expression()? })
             }
             Some(T![","]) => {
                 let next = self.stream.lookahead(0)?.ok_or_else(|| self.stream.unexpected(None, &[]))?;
@@ -70,7 +67,7 @@ where
                 ArrayElement::Value(ValueArrayElement { value })
             }
             _ => {
-                let expr = self.arena.alloc(self.parse_expression()?);
+                let expr = self.parse_expression()?;
 
                 match self.stream.peek_kind(0)? {
                     Some(T!["=>"]) => {

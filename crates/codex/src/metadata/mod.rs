@@ -330,8 +330,8 @@ impl CodebaseMetadata {
     #[inline]
     #[must_use]
     pub fn method_identifier_exists(&self, method_id: &MethodIdentifier) -> bool {
-        let lowercase_class = ascii_lowercase_word(method_id.get_class_name().as_bytes());
-        let lowercase_method = ascii_lowercase_word(method_id.get_method_name().as_bytes());
+        let lowercase_class = method_id.get_class_name().to_ascii_lowercase();
+        let lowercase_method = method_id.get_method_name().to_ascii_lowercase();
         self.get_method_by_words(lowercase_class, lowercase_method).is_some()
     }
 
@@ -440,6 +440,13 @@ impl CodebaseMetadata {
         self.get_class_like_by_word(lowercase_name)
     }
 
+    /// Retrieves class-like metadata by interned name, ignoring ASCII case.
+    #[inline]
+    #[must_use]
+    pub fn get_class_like_by_name(&self, name: Word) -> Option<&ClassLikeMetadata> {
+        self.get_class_like_by_word(name.to_ascii_lowercase())
+    }
+
     /// Retrieves metadata for a global function (case-insensitive).
     #[inline]
     #[must_use]
@@ -480,8 +487,8 @@ impl CodebaseMetadata {
     #[inline]
     #[must_use]
     pub fn get_method_by_id(&self, method_id: &MethodIdentifier) -> Option<&FunctionLikeMetadata> {
-        let lowercase_class = ascii_lowercase_word(method_id.get_class_name().as_bytes());
-        let lowercase_method = ascii_lowercase_word(method_id.get_method_name().as_bytes());
+        let lowercase_class = method_id.get_class_name().to_ascii_lowercase();
+        let lowercase_method = method_id.get_method_name().to_ascii_lowercase();
         self.get_method_by_words(lowercase_class, lowercase_method)
     }
 
@@ -491,11 +498,14 @@ impl CodebaseMetadata {
     #[must_use]
     pub fn get_declaring_method(&self, class: &[u8], method: &[u8]) -> Option<&FunctionLikeMetadata> {
         let method_id = MethodIdentifier::new(word(class), word(method));
-        let declaring_method_id = self.get_declaring_method_identifier(&method_id);
-        self.get_method(
-            declaring_method_id.get_class_name().as_bytes(),
-            declaring_method_id.get_method_name().as_bytes(),
-        )
+        self.get_declaring_method_by_id(&method_id)
+    }
+
+    /// Retrieves the declaring method by identifier, following inheritance and ignoring ASCII case.
+    #[inline]
+    #[must_use]
+    pub fn get_declaring_method_by_id(&self, method_id: &MethodIdentifier) -> Option<&FunctionLikeMetadata> {
+        self.get_method_by_id(&self.get_declaring_method_identifier(method_id))
     }
 
     /// Retrieves metadata for any function-like construct (function, method, or closure).
@@ -828,8 +838,8 @@ impl CodebaseMetadata {
     /// Gets the declaring method identifier for a method.
     #[must_use]
     pub fn get_declaring_method_identifier(&self, method_id: &MethodIdentifier) -> MethodIdentifier {
-        let lowercase_class = ascii_lowercase_word(method_id.get_class_name().as_bytes());
-        let lowercase_method = ascii_lowercase_word(method_id.get_method_name().as_bytes());
+        let lowercase_class = method_id.get_class_name().to_ascii_lowercase();
+        let lowercase_method = method_id.get_method_name().to_ascii_lowercase();
 
         let Some(class_meta) = self.get_class_like_by_word(lowercase_class) else {
             return *method_id;

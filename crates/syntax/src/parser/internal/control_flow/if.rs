@@ -20,7 +20,7 @@ where
         Ok(If {
             r#if: self.expect_keyword(T!["if"])?,
             left_parenthesis: self.stream.eat_span(T!["("])?,
-            condition: self.arena.alloc(self.parse_expression()?),
+            condition: self.parse_expression()?,
             right_parenthesis: self.stream.eat_span(T![")"])?,
             body: self.parse_if_body()?,
         })
@@ -61,7 +61,7 @@ where
         Ok(IfStatementBodyElseIfClause {
             elseif: self.expect_keyword(T!["elseif"])?,
             left_parenthesis: self.stream.eat_span(T!["("])?,
-            condition: self.arena.alloc(self.parse_expression()?),
+            condition: self.parse_expression()?,
             right_parenthesis: self.stream.eat_span(T![")"])?,
             statement: self.arena.alloc(self.parse_statement()?),
         })
@@ -135,7 +135,7 @@ where
         Ok(IfColonDelimitedBodyElseIfClause {
             r#elseif: self.expect_keyword(T!["elseif"])?,
             left_parenthesis: self.stream.eat_span(T!["("])?,
-            condition: self.arena.alloc(self.parse_expression()?),
+            condition: self.parse_expression()?,
             right_parenthesis: self.stream.eat_span(T![")"])?,
             colon: self.stream.eat_span(T![":"])?,
             statements: {

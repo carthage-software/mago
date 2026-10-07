@@ -3,7 +3,6 @@ use std::sync::Arc;
 
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_word::Word;
-use mago_word::ascii_lowercase_word;
 use mago_word::word;
 
 use mago_codex::identifier::method::MethodIdentifier;
@@ -629,7 +628,7 @@ fn has_real_ancestor_method<'ctx, A>(
 where
     A: Arena,
 {
-    let method_name_lc = ascii_lowercase_word(method_name.as_bytes());
+    let method_name_lc = method_name.to_ascii_lowercase();
 
     class_metadata.all_parent_classes.iter().chain(class_metadata.used_traits.iter()).any(|ancestor_name| {
         context.codebase.get_class_like(ancestor_name.as_bytes()).is_some_and(|ancestor| {

@@ -109,7 +109,7 @@ pub fn reconcile_keyed_types<'ctx, A>(
     }
 
     let inside_loop = block_context.flags.inside_loop();
-    let old_new_types = new_types.clone();
+    let old_new_types = new_types;
     let mut new_types = new_types.clone();
 
     for (derived_local, source) in &block_context.derived_local_sources {
@@ -192,11 +192,11 @@ pub fn reconcile_keyed_types<'ctx, A>(
             block_context.definitely_uninitialized_property_ids.remove(key);
         }
 
-        let existing = block_context.locals.get(key);
+        let existing = block_context.locals.get(key).cloned();
         let did_type_exist = existing.is_some();
         let mut has_object_array_access = false;
 
-        let mut result_type = existing.map(|t| t.as_ref().clone()).or_else(|| {
+        let before_adjustment = existing.or_else(|| {
             get_value_for_key(
                 context,
                 *key,
@@ -209,9 +209,10 @@ pub fn reconcile_keyed_types<'ctx, A>(
                 inside_loop,
                 &mut has_object_array_access,
             )
+            .map(Rc::new)
         });
 
-        let before_adjustment = result_type.clone();
+        let mut result_type = before_adjustment.as_deref().map(Cow::Borrowed);
         for (i, new_type_part_parts) in new_type_parts.iter().enumerate() {
             let mut orred_type: Option<TUnion> = None;
 
@@ -225,8 +226,8 @@ pub fn reconcile_keyed_types<'ctx, A>(
                     && let Some(original) = original_types
                         .as_ref()
                         .and_then(|types| types.get(key).map(Rc::as_ref))
-                        .or(before_adjustment.as_ref())
-                    && result_type.as_ref().is_some_and(|current| current != original)
+                        .or(before_adjustment.as_deref())
+                    && result_type.as_deref().is_some_and(|current| current != original)
                 {
                     let probe_on_original = assertion_reconciler::reconcile(
                         context,
@@ -247,7 +248,7 @@ pub fn reconcile_keyed_types<'ctx, A>(
                 let result_type_candidate = assertion_reconciler::reconcile(
                     context,
                     assertion,
-                    result_type.as_ref(),
+                    result_type.as_deref(),
                     Some(key_str),
                     inside_loop,
                     Some(span),
@@ -259,11 +260,11 @@ pub fn reconcile_keyed_types<'ctx, A>(
                     Some(add_optional_union_type(result_type_candidate, orred_type.as_ref(), context.codebase));
             }
 
-            result_type = orred_type;
+            result_type = orred_type.map(Cow::Owned);
         }
 
         let needs_refinement =
-            new_type_parts.len() > 1 && result_type.as_ref().is_some_and(|current| !current.is_never());
+            new_type_parts.len() > 1 && result_type.as_deref().is_some_and(|current| !current.is_never());
         if needs_refinement {
             for new_type_part_parts in new_type_parts {
                 let mut orred_type: Option<TUnion> = None;
@@ -272,7 +273,7 @@ pub fn reconcile_keyed_types<'ctx, A>(
                     let result_type_candidate = assertion_reconciler::reconcile(
                         context,
                         assertion,
-                        result_type.as_ref(),
+                        result_type.as_deref(),
                         Some(key_str),
                         inside_loop,
                         Some(span),
@@ -284,11 +285,11 @@ pub fn reconcile_keyed_types<'ctx, A>(
                         Some(add_optional_union_type(result_type_candidate, orred_type.as_ref(), context.codebase));
                 }
 
-                result_type = orred_type;
+                result_type = orred_type.map(Cow::Owned);
             }
         }
 
-        let result_type = result_type.unwrap_or_else(get_never);
+        let result_type = result_type.map(Cow::into_owned).unwrap_or_else(get_never);
 
         let key_parts = break_up_path_into_parts(key_str);
 
@@ -302,8 +303,11 @@ pub fn reconcile_keyed_types<'ctx, A>(
             continue;
         }
 
-        let type_changed =
-            if let Some(before_adjustment) = &before_adjustment { &result_type != before_adjustment } else { true };
+        let type_changed = if let Some(before_adjustment) = before_adjustment.as_deref() {
+            &result_type != before_adjustment
+        } else {
+            true
+        };
 
         if type_changed {
             changed_var_ids.insert(*key);
@@ -320,7 +324,7 @@ pub fn reconcile_keyed_types<'ctx, A>(
                 let optional_entry_type = reconcile_optional_entry_type(
                     context,
                     new_type_parts,
-                    before_adjustment.as_ref(),
+                    before_adjustment.as_deref(),
                     key_str,
                     inside_loop,
                     span,
@@ -863,131 +867,135 @@ fn add_nested_assertions(
 ) {
     let mut keys_to_remove = vec![];
 
-    'outer: for (nk, new_type) in new_types.clone() {
+    let nested_assertions = new_types
+        .iter()
+        .filter(|(key, assertions)| {
+            let bytes = key.as_bytes();
+            (bytes.contains(&b'[') || memchr::memmem::find(bytes, b"->").is_some())
+                && matches!(assertions[0][0], Assertion::IsEqualIsset | Assertion::IsIsset)
+        })
+        .map(|(key, assertions)| {
+            let only_isset_assertions = assertions.iter().all(|clause| {
+                clause.iter().all(|assertion| matches!(assertion, Assertion::IsIsset | Assertion::IsEqualIsset))
+            });
+
+            (*key, only_isset_assertions)
+        })
+        .collect::<Vec<_>>();
+
+    'outer: for (nk, only_isset_assertions) in nested_assertions {
         let nk_str = nk.as_bytes();
-        if (nk_str.contains(&b'[') || memchr::memmem::find(nk_str, b"->").is_some())
-            && (new_type[0][0] == Assertion::IsEqualIsset || new_type[0][0] == Assertion::IsIsset)
-        {
-            let mut key_parts = break_up_path_into_parts(nk_str);
-            key_parts.reverse();
+        let mut key_parts = break_up_path_into_parts(nk_str);
+        key_parts.reverse();
 
-            let mut nesting = 0;
-            let mut base_key: Vec<u8>;
+        let mut nesting = 0;
+        let mut base_key: Vec<u8>;
 
-            unsafe {
-                // SAFETY: `pop` will always return a value because we checked that the key contains either `[` or `->`.
-                base_key = key_parts.pop().unwrap_unchecked();
+        unsafe {
+            // SAFETY: `pop` will always return a value because we checked that the key contains either `[` or `->`.
+            base_key = key_parts.pop().unwrap_unchecked();
 
-                if !base_key.starts_with(b"$") && key_parts.len() > 2 && key_parts.last().unwrap_unchecked() == b"::$" {
-                    base_key.extend_from_slice(&key_parts.pop().unwrap_unchecked());
-                    base_key.extend_from_slice(&key_parts.pop().unwrap_unchecked());
-                }
+            if !base_key.starts_with(b"$") && key_parts.len() > 2 && key_parts.last().unwrap_unchecked() == b"::$" {
+                base_key.extend_from_slice(&key_parts.pop().unwrap_unchecked());
+                base_key.extend_from_slice(&key_parts.pop().unwrap_unchecked());
             }
+        }
 
-            let base_key_atom = word(&base_key);
-            let base_key_set = if let Some(base_key_type) = context.locals.get(&base_key_atom) {
-                !base_key_type.is_nullable()
-                    && !base_key_type.possibly_undefined()
-                    && !base_key_type.possibly_undefined_from_try()
-            } else {
-                false
-            };
+        let base_key_atom = word(&base_key);
+        let base_key_set = if let Some(base_key_type) = context.locals.get(&base_key_atom) {
+            !base_key_type.is_nullable()
+                && !base_key_type.possibly_undefined()
+                && !base_key_type.possibly_undefined_from_try()
+        } else {
+            false
+        };
 
-            if !base_key_set {
-                new_types.insert(
-                    base_key_atom,
-                    if let Some(mut existing_entry) = new_types.get(&base_key_atom).cloned() {
-                        existing_entry.push(vec![Assertion::IsEqualIsset]);
-                        existing_entry
-                    } else {
-                        vec![vec![Assertion::IsEqualIsset]]
-                    },
-                );
-            }
-
-            while let Some(divider) = key_parts.pop() {
-                if divider == b"[" {
-                    let array_key = unsafe {
-                        // SAFETY: we know that after `[` there is always an array key, so `pop` will not panic.
-                        key_parts.pop().unwrap_unchecked()
-                    };
-
-                    key_parts.pop();
-
-                    let mut new_base_key = base_key.clone();
-                    new_base_key.push(b'[');
-                    new_base_key.extend_from_slice(&array_key);
-                    new_base_key.push(b']');
-                    let base_key_atom = word(&base_key);
-
-                    let entry = new_types.entry(base_key_atom).or_default();
-
-                    let new_key = if array_key.starts_with(b"'") || array_key.starts_with(b"\"") {
-                        Some(ArrayKey::String(word(&array_key[1..(array_key.len() - 1)])))
-                    } else if array_key.starts_with(b"$") {
-                        None
-                    } else if let Some(arraykey_value) =
-                        std::str::from_utf8(&array_key).ok().and_then(|s| s.parse::<i64>().ok())
-                    {
-                        Some(ArrayKey::Integer(arraykey_value))
-                    } else {
-                        continue 'outer;
-                    };
-
-                    if let Some(new_key) = new_key {
-                        entry.push(vec![Assertion::HasNonnullEntryForKey(new_key)]);
-
-                        if key_parts.is_empty() {
-                            // Only remove the nested key if it contains ONLY isset-related assertions
-                            // If it has other assertions (e.g., IsType from is_string()), keep them
-                            let only_isset_assertions = new_type.iter().all(|clause| {
-                                clause
-                                    .iter()
-                                    .all(|assertion| matches!(assertion, Assertion::IsIsset | Assertion::IsEqualIsset))
-                            });
-
-                            if only_isset_assertions {
-                                keys_to_remove.push(nk);
-
-                                if nesting == 0 && base_key_set && active_new_types.swap_remove(&nk).is_some() {
-                                    active_new_types.entry(base_key_atom).or_default().insert(entry.len() - 1);
-                                }
-
-                                continue 'outer;
-                            }
-                        }
-                    } else {
-                        entry.push(vec![Assertion::HasIntOrStringArrayAccess]);
-                    }
-
-                    base_key = new_base_key;
-                    nesting += 1;
-                    continue;
-                }
-
-                if divider == b"->" {
-                    let property_name = unsafe {
-                        // SAFETY: we know that after `->` there is always a property name, so `pop` will not panic.
-                        key_parts.pop().unwrap_unchecked()
-                    };
-
-                    let mut new_base_key = base_key.clone();
-                    new_base_key.extend_from_slice(b"->");
-                    new_base_key.extend_from_slice(&property_name);
-                    let base_key_atom = word(&base_key);
-
-                    if !new_types.contains_key(&base_key_atom) {
-                        new_types.insert(base_key_atom, vec![vec![Assertion::IsIsset]]);
-                    }
-
-                    base_key = new_base_key;
+        if !base_key_set {
+            new_types.insert(
+                base_key_atom,
+                if let Some(mut existing_entry) = new_types.get(&base_key_atom).cloned() {
+                    existing_entry.push(vec![Assertion::IsEqualIsset]);
+                    existing_entry
                 } else {
-                    break;
+                    vec![vec![Assertion::IsEqualIsset]]
+                },
+            );
+        }
+
+        while let Some(divider) = key_parts.pop() {
+            if divider == b"[" {
+                let array_key = unsafe {
+                    // SAFETY: we know that after `[` there is always an array key, so `pop` will not panic.
+                    key_parts.pop().unwrap_unchecked()
+                };
+
+                key_parts.pop();
+
+                let mut new_base_key = base_key.clone();
+                new_base_key.push(b'[');
+                new_base_key.extend_from_slice(&array_key);
+                new_base_key.push(b']');
+                let base_key_atom = word(&base_key);
+                let entry = new_types.entry(base_key_atom).or_default();
+                let new_key = if array_key.starts_with(b"'") || array_key.starts_with(b"\"") {
+                    Some(ArrayKey::String(word(&array_key[1..(array_key.len() - 1)])))
+                } else if array_key.starts_with(b"$") {
+                    None
+                } else if let Some(arraykey_value) =
+                    std::str::from_utf8(&array_key).ok().and_then(|s| s.parse::<i64>().ok())
+                {
+                    Some(ArrayKey::Integer(arraykey_value))
+                } else {
+                    continue 'outer;
+                };
+
+                if let Some(new_key) = new_key {
+                    entry.push(vec![Assertion::HasNonnullEntryForKey(new_key)]);
+
+                    if key_parts.is_empty() {
+                        // Only remove the nested key if it contains ONLY isset-related assertions
+                        // If it has other assertions (e.g., IsType from is_string()), keep them
+                        if only_isset_assertions {
+                            keys_to_remove.push(nk);
+
+                            if nesting == 0 && base_key_set && active_new_types.swap_remove(&nk).is_some() {
+                                active_new_types.entry(base_key_atom).or_default().insert(entry.len() - 1);
+                            }
+
+                            continue 'outer;
+                        }
+                    }
+                } else {
+                    entry.push(vec![Assertion::HasIntOrStringArrayAccess]);
                 }
 
-                if key_parts.is_empty() {
-                    break;
+                base_key = new_base_key;
+                nesting += 1;
+                continue;
+            }
+
+            if divider == b"->" {
+                let property_name = unsafe {
+                    // SAFETY: we know that after `->` there is always a property name, so `pop` will not panic.
+                    key_parts.pop().unwrap_unchecked()
+                };
+
+                let mut new_base_key = base_key.clone();
+                new_base_key.extend_from_slice(b"->");
+                new_base_key.extend_from_slice(&property_name);
+                let base_key_atom = word(&base_key);
+
+                if !new_types.contains_key(&base_key_atom) {
+                    new_types.insert(base_key_atom, vec![vec![Assertion::IsIsset]]);
                 }
+
+                base_key = new_base_key;
+            } else {
+                break;
+            }
+
+            if key_parts.is_empty() {
+                break;
             }
         }
     }

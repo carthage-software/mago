@@ -16,6 +16,9 @@ workspace = true
 mago-span = { workspace = true }
 mago-database = { workspace = true }
 mago-text-edit = { workspace = true }
+memchr = { workspace = true }
+itoa = { workspace = true }
+rayon = { workspace = true }
 foldhash = { workspace = true }
 serde = { workspace = true, optional = true }
 serde_json = { workspace = true, optional = true }

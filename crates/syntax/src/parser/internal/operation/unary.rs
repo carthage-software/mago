@@ -66,6 +66,6 @@ where
 
         let operand = self.parse_expression_with_precedence(operator.precedence())?;
 
-        Ok(UnaryPrefix { operator, operand: self.arena.alloc(operand) })
+        Ok(UnaryPrefix { operator, operand })
     }
 }

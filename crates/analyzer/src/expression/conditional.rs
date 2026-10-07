@@ -248,14 +248,7 @@ where
             false,
         );
 
-        else_block_context.clauses = BlockContext::remove_reconciled_clauses(
-            &else_block_context.clauses.iter().map(Rc::deref).cloned().collect(),
-            &changed_variable_ids,
-        )
-        .0
-        .into_iter()
-        .map(Rc::new)
-        .collect();
+        BlockContext::retain_unreconciled_clauses(&mut else_block_context.clauses, &changed_variable_ids);
     }
 
     // Extract function_exists/defined assertions for the "else" branch.

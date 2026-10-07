@@ -1,6 +1,8 @@
+use std::collections::hash_map::Entry;
+use std::hash::Hash;
+
 use foldhash::HashMap;
 use foldhash::HashSet;
-use mago_word::ascii_lowercase_word;
 use mago_word::empty_word;
 
 use mago_word::Word;
@@ -482,7 +484,7 @@ impl SymbolReferences {
     pub fn add_reference_for_method_call(&mut self, scope: &ScopeContext<'_>, method: &MethodIdentifier) {
         self.add_reference_to_class_member(
             scope,
-            (ascii_lowercase_word(method.get_class_name().as_bytes()), method.get_method_name()),
+            (method.get_class_name().to_ascii_lowercase(), method.get_method_name()),
             false,
         );
     }
@@ -490,7 +492,7 @@ impl SymbolReferences {
     /// Records a read reference to a property (e.g., `$this->prop` used as a value).
     #[inline]
     pub fn add_reference_for_property_read(&mut self, scope: &ScopeContext<'_>, class_name: Word, property_name: Word) {
-        let normalized_class_name = ascii_lowercase_word(class_name.as_bytes());
+        let normalized_class_name = class_name.to_ascii_lowercase();
         let class_member = (normalized_class_name, property_name);
 
         self.add_property_read_reference(scope.get_reference_origin(), class_member);
@@ -505,7 +507,7 @@ impl SymbolReferences {
         class_name: Word,
         property_name: Word,
     ) {
-        let normalized_class_name = ascii_lowercase_word(class_name.as_bytes());
+        let normalized_class_name = class_name.to_ascii_lowercase();
         let class_member = (normalized_class_name, property_name);
 
         self.add_property_write_reference(scope.get_reference_origin(), class_member);
@@ -550,42 +552,51 @@ impl SymbolReferences {
     /// Existing references are extended, not replaced.
     #[inline]
     pub fn extend(&mut self, other: Self) {
-        for (k, v) in other.symbol_references_to_symbols {
-            self.symbol_references_to_symbols.entry(k).or_default().extend(v);
-        }
-        for (k, v) in other.symbol_references_to_symbols_in_signature {
-            self.symbol_references_to_symbols_in_signature.entry(k).or_default().extend(v);
-        }
-        for (k, v) in other.symbol_references_to_overridden_members {
-            self.symbol_references_to_overridden_members.entry(k).or_default().extend(v);
-        }
-        for (k, v) in other.functionlike_references_to_functionlike_returns {
-            self.functionlike_references_to_functionlike_returns.entry(k).or_default().extend(v);
-        }
+        extend_reference_map(&mut self.symbol_references_to_symbols, other.symbol_references_to_symbols);
+        extend_reference_map(
+            &mut self.symbol_references_to_symbols_in_signature,
+            other.symbol_references_to_symbols_in_signature,
+        );
+        extend_reference_map(
+            &mut self.symbol_references_to_overridden_members,
+            other.symbol_references_to_overridden_members,
+        );
+        extend_reference_map(
+            &mut self.functionlike_references_to_functionlike_returns,
+            other.functionlike_references_to_functionlike_returns,
+        );
+        extend_reference_map(&mut self.file_references_to_symbols, other.file_references_to_symbols);
+        extend_reference_map(
+            &mut self.file_references_to_symbols_in_signature,
+            other.file_references_to_symbols_in_signature,
+        );
+        extend_reference_map(&mut self.property_write_references, other.property_write_references);
+        extend_reference_map(&mut self.property_read_references, other.property_read_references);
+        extend_reference_map(&mut self.file_property_write_references, other.file_property_write_references);
+        extend_reference_map(&mut self.file_property_read_references, other.file_property_read_references);
+    }
 
-        for (k, v) in other.file_references_to_symbols {
-            self.file_references_to_symbols.entry(k).or_default().extend(v);
-        }
+    /// Merges population output, whose body edges all use signature-aware insertion.
+    /// Workers cannot see earlier phases' signatures, so apply those checks here.
+    /// Keep existing body edges: later signatures do not remove earlier body edges.
+    pub(crate) fn extend_from_population(&mut self, mut other: Self) {
+        other.symbol_references_to_symbols.retain(|origin, body| {
+            if let Some(signature) = self.symbol_references_to_symbols_in_signature.get(origin) {
+                body.retain(|target| !signature.contains(target));
+            }
 
-        for (k, v) in other.file_references_to_symbols_in_signature {
-            self.file_references_to_symbols_in_signature.entry(k).or_default().extend(v);
-        }
+            !body.is_empty()
+        });
 
-        for (k, v) in other.property_write_references {
-            self.property_write_references.entry(k).or_default().extend(v);
-        }
+        other.file_references_to_symbols.retain(|origin, body| {
+            if let Some(signature) = self.file_references_to_symbols_in_signature.get(origin) {
+                body.retain(|target| !signature.contains(target));
+            }
 
-        for (k, v) in other.property_read_references {
-            self.property_read_references.entry(k).or_default().extend(v);
-        }
+            !body.is_empty()
+        });
 
-        for (k, v) in other.file_property_write_references {
-            self.file_property_write_references.entry(k).or_default().extend(v);
-        }
-
-        for (k, v) in other.file_property_read_references {
-            self.file_property_read_references.entry(k).or_default().extend(v);
-        }
+        self.extend(other);
     }
 
     /// Visits every recorded reference without materializing a copy of the graph.
@@ -1014,6 +1025,21 @@ impl SymbolReferences {
     }
 }
 
+fn extend_reference_map<K, V>(target: &mut HashMap<K, HashSet<V>>, source: HashMap<K, HashSet<V>>)
+where
+    K: Eq + Hash,
+    V: Eq + Hash,
+{
+    for (key, references) in source {
+        match target.entry(key) {
+            Entry::Occupied(mut entry) => entry.get_mut().extend(references),
+            Entry::Vacant(entry) => {
+                entry.insert(references);
+            }
+        }
+    }
+}
+
 fn function_like_symbol_identifier(identifier: &FunctionLikeIdentifier) -> Option<SymbolIdentifier> {
     match identifier {
         FunctionLikeIdentifier::Function(name) => Some((*name, empty_word())),
@@ -1036,6 +1062,90 @@ mod tests {
             refs.symbol_references_to_symbols.insert(key, set);
         }
         refs
+    }
+
+    fn add_every_reference_kind(references: &mut SymbolReferences, source: Word, target: Word) {
+        let symbol = (source, empty_word());
+        let target = (target, empty_word());
+        references.add_symbol_reference(symbol, target, false);
+        references.add_symbol_reference(symbol, target, true);
+        references.add_overridden_member_reference(symbol, target);
+        references.add_functionlike_return_reference(symbol, target);
+        references.add_property_read_reference(ReferenceOrigin::Symbol(symbol), target);
+        references.add_property_write_reference(ReferenceOrigin::Symbol(symbol), target);
+        references.add_reference(ReferenceOrigin::File(source), target, false);
+        references.add_reference(ReferenceOrigin::File(source), target, true);
+        references.add_property_read_reference(ReferenceOrigin::File(source), target);
+        references.add_property_write_reference(ReferenceOrigin::File(source), target);
+    }
+
+    #[test]
+    fn test_extend_preserves_all_reference_kinds_for_vacant_keys() {
+        let mut incoming = SymbolReferences::new();
+        add_every_reference_kind(&mut incoming, word("source"), word("target"));
+        let expected = incoming.clone();
+        let mut references = SymbolReferences::new();
+
+        references.extend(incoming);
+
+        assert_eq!(references, expected);
+    }
+
+    #[test]
+    fn test_extend_unions_overlapping_keys_and_preserves_other_keys() {
+        let mut references = SymbolReferences::new();
+        add_every_reference_kind(&mut references, word("shared"), word("old_target"));
+        add_every_reference_kind(&mut references, word("existing"), word("old_target"));
+
+        let mut incoming = SymbolReferences::new();
+        add_every_reference_kind(&mut incoming, word("shared"), word("old_target"));
+        add_every_reference_kind(&mut incoming, word("shared"), word("new_target"));
+        add_every_reference_kind(&mut incoming, word("new"), word("new_target"));
+
+        let mut expected = references.clone();
+        add_every_reference_kind(&mut expected, word("shared"), word("new_target"));
+        add_every_reference_kind(&mut expected, word("new"), word("new_target"));
+        references.extend(incoming);
+
+        assert_eq!(references, expected);
+    }
+
+    #[test]
+    fn population_merge_checks_prior_signatures_without_removing_prior_body_edges() {
+        let target = (word("target"), empty_word());
+        let origins = [
+            ReferenceOrigin::Symbol((word("function"), empty_word())),
+            ReferenceOrigin::Symbol((word("class"), word("method"))),
+            ReferenceOrigin::File(word("file.php")),
+        ];
+        for retain_body in [false, true] {
+            let mut references = SymbolReferences::new();
+            for origin in origins {
+                if retain_body {
+                    references.add_reference(origin, target, false);
+                }
+                references.add_reference(origin, target, true);
+            }
+            references.add_symbol_reference_to_symbol(word("class"), target.0, true);
+
+            let mut expected = references.clone();
+            let mut incoming = SymbolReferences::new();
+            for origin in origins {
+                expected.add_reference(origin, target, false);
+                incoming.add_reference(origin, target, false);
+            }
+            references.extend_from_population(incoming);
+
+            assert_eq!(references, expected);
+        }
+
+        let mut incoming = SymbolReferences::new();
+        incoming.add_reference(origins[0], target, false);
+        incoming.add_reference(origins[0], target, true);
+        let expected = incoming.clone();
+        let mut references = SymbolReferences::new();
+        references.extend_from_population(incoming);
+        assert_eq!(references, expected, "new signatures must not remove preceding body edges");
     }
 
     #[test]

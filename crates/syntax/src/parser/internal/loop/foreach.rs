@@ -18,7 +18,7 @@ where
         Ok(Foreach {
             foreach: self.expect_keyword(T!["foreach"])?,
             left_parenthesis: self.stream.eat_span(T!["("])?,
-            expression: self.arena.alloc(self.parse_expression()?),
+            expression: self.parse_expression()?,
             r#as: self.expect_keyword(T!["as"])?,
             target: self.parse_foreach_target()?,
             right_parenthesis: self.stream.eat_span(T![")"])?,

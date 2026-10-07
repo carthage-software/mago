@@ -227,21 +227,22 @@ where
             None,
         )?;
 
-        if let Some((argument_type, span)) = analyzed_argument_types.get(argument_offset).cloned()
+        if let Some((argument_type, _)) = analyzed_argument_types.get_mut(argument_offset)
             && let Some(narrowed_type) = narrow_class_related_argument(
                 context,
                 block_context,
                 &invocation.target,
                 class_related_argument_variables,
                 argument_expression,
-                &argument_type,
+                argument_type,
             )
         {
-            analyzed_argument_types.insert(*argument_offset, (narrowed_type, span));
+            *argument_type = narrowed_type;
         }
 
         if let Some(argument_type) = analyzed_argument_types.get(argument_offset)
             && let Some((_, parameter_ref)) = parameter
+            && parameter_ref.get_type().is_some_and(|ty| ty.is_expandable() || ty.has_template_types())
         {
             let parameter_type = get_parameter_type(
                 context,
@@ -1436,7 +1437,7 @@ where
 }
 
 fn contains_parameter_variable(union: &TUnion) -> bool {
-    union.get_all_child_nodes().into_iter().any(|node| {
+    union.any_child_node(|node| {
         matches!(
             node,
             TypeRef::Atomic(TAtomic::Variable(variable))

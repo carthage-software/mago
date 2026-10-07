@@ -10,6 +10,9 @@
 
 use std::io::Write;
 
+#[cfg(not(target_arch = "wasm32"))]
+use rayon::prelude::*;
+
 use mago_database::ReadDatabase;
 
 use crate::IssueCollection;
@@ -110,10 +113,30 @@ impl Reporter {
     /// # Errors
     ///
     /// Returns a [`ReportingError`] if formatting or writing the issues fails.
-    pub fn report(
+    pub fn report(&self, issues: IssueCollection, baseline: Option<Baseline>) -> Result<ReportStatus, ReportingError> {
+        self.report_with_cleanup(issues, baseline, false)
+    }
+
+    /// Reports issues, then frees large issue collections using Rayon.
+    ///
+    /// Cleanup stays serial on WebAssembly and in one-thread pools.
+    ///
+    /// # Errors
+    ///
+    /// Returns a [`ReportingError`] if formatting or writing the issues fails.
+    pub fn report_parallel(
+        &self,
+        issues: IssueCollection,
+        baseline: Option<Baseline>,
+    ) -> Result<ReportStatus, ReportingError> {
+        self.report_with_cleanup(issues, baseline, true)
+    }
+
+    fn report_with_cleanup(
         &self,
         mut issues: IssueCollection,
         baseline: Option<Baseline>,
+        parallel_cleanup: bool,
     ) -> Result<ReportStatus, ReportingError> {
         let mut writer = self.config.target.resolve();
 
@@ -159,6 +182,10 @@ impl Reporter {
         dispatch_format(self.config.format, &mut *writer, &issues, &self.database, &formatter_config)?;
         // When writing to pipes, some formatters do not flush the last line of json
         writer.flush()?;
+        drop(writer);
+        if parallel_cleanup {
+            drop_issues(issues);
+        }
 
         Ok(ReportStatus {
             baseline_dead_issues,
@@ -251,6 +278,15 @@ impl Reporter {
     }
 }
 
+fn drop_issues(issues: IssueCollection) {
+    #[cfg(not(target_arch = "wasm32"))]
+    if issues.len() >= 4096 && rayon::current_num_threads() > 1 {
+        issues.issues.into_par_iter().with_min_len(1024).for_each(drop);
+        return;
+    }
+    drop(issues);
+}
+
 #[cfg(test)]
 mod tests {
     use std::borrow::Cow;
@@ -286,6 +322,37 @@ mod tests {
 
     fn reporter_for(format: ReportingFormat) -> Reporter {
         reporter_for_file(format, File::ephemeral(Cow::Borrowed(b"test.php"), Cow::Borrowed(b"<?php\n")))
+    }
+
+    #[cfg(not(target_arch = "wasm32"))]
+    #[test]
+    fn large_report_keeps_output_and_status_with_parallel_cleanup() {
+        for threads in [1, 2] {
+            let Ok(pool) = rayon::ThreadPoolBuilder::new().num_threads(threads).build() else {
+                panic!("The test pool should start");
+            };
+            let mut reporter = reporter_for(ReportingFormat::Emacs);
+            let (target, buffer) = ReportingTarget::buffer();
+            reporter.config.target = target;
+            let issues = IssueCollection::from(std::iter::repeat_with(|| Issue::error("message")).take(4096));
+            let Ok(status) = pool.install(|| reporter.report_parallel(issues, None)) else {
+                panic!("The large report should succeed");
+            };
+            assert_eq!(
+                status,
+                ReportStatus {
+                    baseline_dead_issues: 0,
+                    baseline_filtered_issues: 0,
+                    highest_reported_level: Some(Level::Error),
+                    lowest_reported_level: Some(Level::Error),
+                    total_reported_issues: 4096,
+                }
+            );
+            let Ok(output) = buffer.lock() else {
+                panic!("The report buffer should remain readable");
+            };
+            assert_eq!(*output, b"<unknown>:0:0:error - other: message\n".repeat(4096));
+        }
     }
 
     fn report_hostile_values(format: ReportingFormat) -> Vec<u8> {

@@ -63,6 +63,7 @@ pub fn create_registry_with_plugins(enabled_plugins: &[String], disable_defaults
         }
     }
 
+    registry.mark_built_in_registrations();
     registry
 }
 
@@ -76,5 +77,6 @@ pub fn create_registry() -> PluginRegistry {
         plugin.register(&mut registry);
     }
 
+    registry.mark_built_in_registrations();
     registry
 }

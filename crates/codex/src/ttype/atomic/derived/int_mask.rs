@@ -36,8 +36,7 @@ impl TIntMask {
     ///
     /// Given values `[1, 2, 4]`, returns `[0, 1, 2, 3, 4, 5, 6, 7]`.
     ///
-    /// The algorithm works by iterating through all possible subsets (using a bitmask
-    /// from 0 to 2^n - 1) and OR-ing together the values in each subset.
+    /// For each value, append each existing combination OR-ed with that value.
     #[must_use]
     pub fn calculate_mask_combinations(values: &[i64]) -> Vec<i64> {
         let n = values.len();
@@ -51,14 +50,12 @@ impl TIntMask {
         let values = &values[..n];
 
         let mut result = Vec::with_capacity(1 << n);
-        for mask in 0..(1u64 << n) {
-            let mut combination = 0i64;
-            for (i, &value) in values.iter().enumerate() {
-                if mask & (1 << i) != 0 {
-                    combination |= value;
-                }
+        result.push(0);
+        for &value in values {
+            let count = result.len();
+            for index in 0..count {
+                result.push(result[index] | value);
             }
-            result.push(combination);
         }
 
         result.sort_unstable();
@@ -90,5 +87,56 @@ impl TType for TIntMask {
         }
         id.push(b'>');
         word(&id)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::TIntMask;
+
+    fn subset_combinations(values: &[i64]) -> Vec<i64> {
+        let values = &values[..values.len().min(20)];
+        let mut result = Vec::with_capacity(1 << values.len());
+        for mask in 0..(1u64 << values.len()) {
+            let mut combination = 0;
+            for (index, &value) in values.iter().enumerate() {
+                if mask & (1 << index) != 0 {
+                    combination |= value;
+                }
+            }
+
+            result.push(combination);
+        }
+
+        result.sort_unstable();
+        result.dedup();
+        result
+    }
+
+    #[test]
+    fn mask_combinations_match_subsets() {
+        let alphabet = [0, 1, 2, 3, -1, i64::MIN, i64::MAX];
+        for length in 0..=4 {
+            for mut value in 0..alphabet.len().pow(length) {
+                let mut values = vec![0; length as usize];
+                for entry in &mut values {
+                    *entry = alphabet[value % alphabet.len()];
+                    value /= alphabet.len();
+                }
+
+                assert_eq!(TIntMask::calculate_mask_combinations(&values), subset_combinations(&values), "{values:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn mask_combinations_use_only_the_first_twenty_values() {
+        let mut values = vec![0, 1, 1, 2, 2, 3, i64::MIN, i64::MIN];
+        values.resize(20, 0);
+        let expected = subset_combinations(&values);
+        assert_eq!(TIntMask::calculate_mask_combinations(&values), expected);
+
+        values.push(4);
+        assert_eq!(TIntMask::calculate_mask_combinations(&values), expected);
     }
 }

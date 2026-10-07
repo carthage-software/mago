@@ -477,7 +477,7 @@ impl IssueProcessor {
         };
 
         let reporter = Reporter::new(read_database, reporter_configuration);
-        let status = reporter.report(issues_to_report, baseline)?;
+        let status = reporter.report_parallel(issues_to_report, baseline)?;
 
         if status.baseline_dead_issues > 0 {
             let dead = status.baseline_dead_issues;

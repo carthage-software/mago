@@ -482,13 +482,17 @@ impl Reducer<AnalysisTaskResult, AnalysisResult> for AnalysisResultReducer {
         results: Vec<AnalysisTaskResult>,
     ) -> Result<AnalysisResult, OrchestratorError> {
         let mut aggregated_result = AnalysisResult::new(symbol_references);
+        let codebase_issues = codebase.take_issues(true);
+        aggregated_result
+            .issues
+            .reserve(codebase_issues.len() + results.iter().map(|result| result.result.issues.len()).sum::<usize>());
         let mut snapshots = Vec::new();
         for result in results {
             aggregated_result.extend(result.result);
             snapshots.extend(result.snapshot);
         }
 
-        aggregated_result.issues.extend(codebase.take_issues(true));
+        aggregated_result.issues.extend(codebase_issues);
         let after_file = self.plugin_registry.has_external_after_file_analysis_hooks().map_err(AnalysisError::from)?;
         if after_file {
             #[cfg(not(target_arch = "wasm32"))]
@@ -546,6 +550,16 @@ impl Reducer<AnalysisTaskResult, AnalysisResult> for AnalysisResultReducer {
             .map_err(AnalysisError::from)?;
         aggregated_result.issues.extend(pragma_reconciler.reconcile(after_issues)?);
         aggregated_result.issues.extend(pragma_reconciler.finish()?);
+
+        #[cfg(not(target_arch = "wasm32"))]
+        if codebase.class_likes.len() + codebase.function_likes.len() >= 4096 && rayon::current_num_threads() > 1 {
+            let class_likes = std::mem::take(&mut codebase.class_likes);
+            let function_likes = std::mem::take(&mut codebase.function_likes);
+            rayon::join(
+                || class_likes.into_par_iter().for_each(drop),
+                || rayon::join(|| function_likes.into_par_iter().for_each(drop), || drop(codebase)),
+            );
+        }
 
         Ok(aggregated_result)
     }

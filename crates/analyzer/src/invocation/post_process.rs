@@ -489,7 +489,6 @@ fn clear_object_property_narrowings<'ctx, 'arena, A>(
     if !preserves_stable_method_results {
         block_context.stable_method_call_assertions.clear();
         block_context.stable_method_calls.clear();
-        let references_method_call_key = |key: Word| memchr::memmem::find(key.as_bytes(), b"()").is_some();
         let references_method_call =
             |clause: &Rc<Clause>| clause.possibilities.keys().copied().any(references_method_call_key);
         block_context.locals.retain(|key, _| !references_method_call_key(*key));
@@ -796,6 +795,11 @@ fn clear_object_property_narrowings<'ctx, 'arena, A>(
     block_context.retain_valid_class_type_relations();
 }
 
+fn references_method_call_key(key: Word) -> bool {
+    let bytes = key.as_bytes();
+    memchr::memchr_iter(b'(', bytes).any(|index| bytes.get(index + 1) == Some(&b')'))
+}
+
 fn is_property_or_index_key(var_id: Word) -> bool {
     let s = var_id.as_bytes();
     memchr::memmem::find(s, b"->").is_some() || (s.starts_with(b"$") && s.contains(&b'['))
@@ -885,6 +889,9 @@ where
 /// might mutate them regardless of its arguments.
 fn is_superglobal_index_key(var_id: Word) -> bool {
     let s = var_id.as_bytes();
+    if !s.starts_with(b"$_") && !s.starts_with(b"$GLOBALS[") {
+        return false;
+    }
     let Some(bracket_pos) = memchr::memchr(b'[', s) else {
         return false;
     };
@@ -1629,4 +1636,85 @@ where
     );
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use mago_word::Word;
+
+    use super::is_superglobal_index_key;
+    use super::is_superglobal_name;
+    use super::references_method_call_key;
+
+    #[test]
+    fn superglobal_index_keys_preserve_first_bracket_matching() {
+        let roots: [&[u8]; 16] = [
+            b"$_SESSION",
+            b"$_GET",
+            b"$_POST",
+            b"$_COOKIE",
+            b"$_SERVER",
+            b"$_ENV",
+            b"$_FILES",
+            b"$_REQUEST",
+            b"$GLOBALS",
+            b"$_UNKNOWN",
+            b"$global",
+            b"$GLOBALSx",
+            b"$_GET->property",
+            b"$local",
+            b"",
+            b"\xff",
+        ];
+        let suffixes: [&[u8]; 7] = [b"", b"[0]", b"['key']", b"[0][1]", b"->property[0]", b"\0[0]", b"\xff[0]"];
+        for root in roots {
+            for suffix in suffixes {
+                let key = [root, suffix].concat();
+                let expected =
+                    key.iter().position(|byte| *byte == b'[').is_some_and(|index| is_superglobal_name(&key[..index]));
+                assert_eq!(is_superglobal_index_key(Word::new(&key)), expected, "{key:?}");
+            }
+        }
+    }
+
+    fn check_method_call_key(bytes: &[u8]) {
+        assert_eq!(
+            references_method_call_key(Word::new(bytes)),
+            bytes.windows(2).any(|pair| pair == b"()"),
+            "{bytes:?}"
+        );
+    }
+
+    #[test]
+    fn method_call_keys_match_byte_pair_search() {
+        let alphabet = [b'(', b')', b'$', b'a', 0, 0xff];
+        for length in 0..=4 {
+            for mut value in 0..alphabet.len().pow(length) {
+                let mut bytes = vec![0; length as usize];
+                for byte in &mut bytes {
+                    *byte = alphabet[value % alphabet.len()];
+                    value /= alphabet.len();
+                }
+                check_method_call_key(&bytes);
+            }
+        }
+    }
+
+    #[test]
+    fn method_call_keys_match_at_scan_boundaries() {
+        for length in [15, 16, 17, 31, 32, 33, 63, 64, 65, 255, 256, 257] {
+            let mut bytes = vec![b'('; length];
+            check_method_call_key(&bytes);
+            bytes.push(b')');
+            check_method_call_key(&bytes);
+
+            bytes.fill(0xff);
+            check_method_call_key(&bytes);
+            for index in 0..bytes.len() - 1 {
+                bytes[index..index + 2].copy_from_slice(b"()");
+                check_method_call_key(&bytes);
+                bytes[index..index + 2].fill(0xff);
+            }
+        }
+    }
 }

@@ -122,13 +122,15 @@ where
     A: Arena,
 {
     let mut resulting_union = union_to_resolve;
-    let mut resulting_atomics = Vec::with_capacity(resulting_union.types.len());
-    for atomic_to_resolve in resulting_union.types.into_owned() {
-        let return_atomics = resolve_atomic(context, invocation, template_result, parameters, atomic_to_resolve);
-        resulting_atomics.extend(return_atomics);
-    }
+    if resulting_union.types.iter().any(needs_invocation_resolution) {
+        let mut resulting_atomics = Vec::with_capacity(resulting_union.types.len());
+        for atomic_to_resolve in resulting_union.types.into_owned() {
+            let return_atomics = resolve_atomic(context, invocation, template_result, parameters, atomic_to_resolve);
+            resulting_atomics.extend(return_atomics);
+        }
 
-    resulting_union.types = Cow::Owned(resulting_atomics);
+        resulting_union.types = Cow::Owned(resulting_atomics);
+    }
 
     if !template_result.lower_bounds.is_empty() || resulting_union.has_template_types() {
         // Replace templates first so derived types (e.g. `template-type<T, ...>`)
@@ -184,10 +186,8 @@ where
         allow_mixin_static_rebind = false;
     }
 
-    let has_lexically_bound_parameter = resulting_union
-        .get_all_child_nodes()
-        .into_iter()
-        .any(|node| matches!(node, TypeRef::Atomic(TAtomic::Variable(_))));
+    let has_lexically_bound_parameter =
+        resulting_union.any_child_node(|node| matches!(node, TypeRef::Atomic(TAtomic::Variable(_))));
     if !has_lexically_bound_parameter {
         expander::expand_union(
             context.codebase,
@@ -197,6 +197,11 @@ where
     }
 
     resulting_union
+}
+
+fn needs_invocation_resolution(atomic: &TAtomic) -> bool {
+    matches!(atomic, TAtomic::Variable(_) | TAtomic::Conditional(_) | TAtomic::Derived(_))
+        || atomic.any_child_node(|node| matches!(node, TypeRef::Atomic(TAtomic::Variable(_))))
 }
 
 fn resolve_atomic<'ctx, 'arena, A>(
@@ -209,12 +214,7 @@ fn resolve_atomic<'ctx, 'arena, A>(
 where
     A: Arena,
 {
-    if !matches!(&atomic_to_resolve, TAtomic::Variable(_) | TAtomic::Conditional(_) | TAtomic::Derived(_))
-        && !atomic_to_resolve
-            .get_all_child_nodes()
-            .into_iter()
-            .any(|node| matches!(node, TypeRef::Atomic(TAtomic::Variable(_))))
-    {
+    if !needs_invocation_resolution(&atomic_to_resolve) {
         return vec![atomic_to_resolve];
     }
 
@@ -602,4 +602,51 @@ where
     }
 
     add_union_type(then_type, &otherwise_type, context.codebase, CombinerOptions::default()).types.into_owned()
+}
+
+#[cfg(test)]
+mod tests {
+    use indoc::indoc;
+
+    use crate::test_analysis;
+
+    test_analysis! {
+        name = unchanged_invocation_atoms_still_expand_templates_and_static,
+        code = indoc! {"
+            <?php
+
+            /** @template T */
+            interface Box {
+                /** @return T */
+                public function get(): mixed;
+            }
+
+            /** @param Box<string> $box */
+            function read(Box $box): string {
+                return $box->get();
+            }
+
+            class Factory {
+                final public function __construct() {}
+
+                public static function make(): static {
+                    return new static();
+                }
+            }
+
+            final class ChildFactory extends Factory {}
+
+            function make_child(): ChildFactory {
+                return ChildFactory::make();
+            }
+
+            function number(): int {
+                return 42;
+            }
+
+            function read_number(): int {
+                return number();
+            }
+        "},
+    }
 }

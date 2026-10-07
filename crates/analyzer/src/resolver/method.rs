@@ -28,7 +28,6 @@ use mago_span::Span;
 use mago_syntax::cst::ClassLikeMemberSelector;
 use mago_syntax::cst::Expression;
 use mago_word::Word;
-use mago_word::ascii_lowercase_word;
 use mago_word::word;
 
 use crate::analyzable::Analyzable;
@@ -188,7 +187,7 @@ where
         }
 
         if let Some(name) = resolved_selector.name() {
-            method_names.push(ascii_lowercase_word(name.as_bytes()));
+            method_names.push(name);
         } else {
             result.has_invalid_target = true;
         }
@@ -267,7 +266,7 @@ where
                     object,
                     selector,
                     obj_type,
-                    method_name,
+                    method_name.to_ascii_lowercase(),
                     access_span,
                     !resolved_magic_call_method.is_empty(),
                     &mut result,
@@ -542,7 +541,7 @@ where
         return candidates;
     };
 
-    let Some(class_metadata) = context.codebase.get_class_like(name.as_bytes()) else {
+    let Some(class_metadata) = context.codebase.get_class_like_by_name(name) else {
         result.has_invalid_target = true;
         report_non_existent_class_like(context, object.span(), name);
         return candidates;
@@ -578,12 +577,12 @@ where
         }
 
         if function_like_metadata.flags.is_magic_method() {
-            let lowercase_method = ascii_lowercase_word(method_name.as_bytes());
+            let lowercase_method = method_name.to_ascii_lowercase();
             let is_pseudo = class_metadata.pseudo_methods.contains(&lowercase_method)
                 || class_metadata.all_parent_classes.iter().any(|parent_name| {
                     context
                         .codebase
-                        .get_class_like(parent_name.as_bytes())
+                        .get_class_like_by_name(*parent_name)
                         .is_some_and(|parent| parent.pseudo_methods.contains(&lowercase_method))
                 });
 
@@ -591,7 +590,7 @@ where
 
             if is_pseudo {
                 for parent_class_name in &class_metadata.all_parent_classes {
-                    if let Some(parent_metadata) = context.codebase.get_class_like(parent_class_name.as_bytes())
+                    if let Some(parent_metadata) = context.codebase.get_class_like_by_name(*parent_class_name)
                         && parent_metadata.methods.contains(&lowercase_method)
                         && !parent_metadata.pseudo_methods.contains(&lowercase_method)
                     {
@@ -645,7 +644,7 @@ where
         });
     } else if !class_metadata.require_extends.is_empty() || !class_metadata.require_implements.is_empty() {
         for required_class in class_metadata.require_extends.iter().chain(class_metadata.require_implements.iter()) {
-            let Some(required_metadata) = context.codebase.get_class_like(required_class.as_bytes()) else {
+            let Some(required_metadata) = context.codebase.get_class_like_by_name(*required_class) else {
                 continue;
             };
 
@@ -672,7 +671,7 @@ where
         let mixin_types = collect_mixin_types(context.codebase, class_metadata, outer_object, &class_metadata.mixins);
 
         for (mixin_class_name, mixin_object) in mixin_types {
-            let Some(mixin_metadata) = context.codebase.get_class_like(mixin_class_name.as_bytes()) else {
+            let Some(mixin_metadata) = context.codebase.get_class_like_by_name(mixin_class_name) else {
                 continue;
             };
 
@@ -1194,10 +1193,10 @@ fn collect_mixin_types_into(
         for mixin_atomic in mixin_type.type_union.types.as_ref() {
             match mixin_atomic {
                 TAtomic::Object(obj @ TObject::Named(named)) => {
-                    direct.push((ascii_lowercase_word(named.name.as_bytes()), obj));
+                    direct.push((named.name.to_ascii_lowercase(), obj));
                 }
                 TAtomic::Object(obj @ TObject::Enum(enum_type)) => {
-                    direct.push((ascii_lowercase_word(enum_type.name.as_bytes()), obj));
+                    direct.push((enum_type.name.to_ascii_lowercase(), obj));
                 }
                 TAtomic::GenericParameter(TGenericParameter {
                     parameter_name, constraint, defining_entity, ..
@@ -1214,11 +1213,11 @@ fn collect_mixin_types_into(
                         for atomic in concrete_type.types.as_ref() {
                             match atomic {
                                 TAtomic::Object(obj @ TObject::Named(named)) => {
-                                    direct.push((ascii_lowercase_word(named.name.as_bytes()), obj));
+                                    direct.push((named.name.to_ascii_lowercase(), obj));
                                     resolved = true;
                                 }
                                 TAtomic::Object(obj @ TObject::Enum(enum_type)) => {
-                                    direct.push((ascii_lowercase_word(enum_type.name.as_bytes()), obj));
+                                    direct.push((enum_type.name.to_ascii_lowercase(), obj));
                                     resolved = true;
                                 }
                                 _ => {}
@@ -1230,10 +1229,10 @@ fn collect_mixin_types_into(
                         for constraint_atomic in constraint.types.as_ref() {
                             match constraint_atomic {
                                 TAtomic::Object(obj @ TObject::Named(named)) => {
-                                    direct.push((ascii_lowercase_word(named.name.as_bytes()), obj));
+                                    direct.push((named.name.to_ascii_lowercase(), obj));
                                 }
                                 TAtomic::Object(obj @ TObject::Enum(enum_type)) => {
-                                    direct.push((ascii_lowercase_word(enum_type.name.as_bytes()), obj));
+                                    direct.push((enum_type.name.to_ascii_lowercase(), obj));
                                 }
                                 _ => {}
                             }

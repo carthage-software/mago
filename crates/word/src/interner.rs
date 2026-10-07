@@ -16,14 +16,15 @@ use crate::bumpalloc::LeakyBumpAlloc;
 /// bytes follow immediately):
 ///
 /// ```text
-/// | hash: u64 | len: u32 | _pad: u32 | bytes: [u8; len] |
-///   ^ Entry                            ^ Entry::bytes()
+/// | hash: u64 | len: u32 | has_ascii_uppercase: u16 | _pad: u16 | bytes: [u8; len] |
+///   ^ Entry                                                       ^ Entry::bytes()
 /// ```
 #[repr(C)]
 pub(crate) struct Entry {
     pub(crate) hash: u64,
     pub(crate) len: u32,
-    _pad: u32,
+    pub(crate) has_ascii_uppercase: u16,
+    _pad: u16,
 }
 
 impl Entry {
@@ -140,7 +141,12 @@ impl Shard {
         unsafe {
             std::ptr::write(
                 ptr,
-                Entry { hash, len: u32::try_from(bytes.len()).expect("word length exceeds u32::MAX"), _pad: 0 },
+                Entry {
+                    hash,
+                    len: u32::try_from(bytes.len()).expect("word length exceeds u32::MAX"),
+                    has_ascii_uppercase: u16::from(bytes.iter().any(u8::is_ascii_uppercase)),
+                    _pad: 0,
+                },
             );
 
             let dest_ptr = ptr.cast::<u8>().add(std::mem::size_of::<Entry>());
@@ -282,6 +288,7 @@ pub(crate) fn intern(bytes: &[u8]) -> NonNull<Entry> {
     // holding the interner lock, which is an unrecoverable invariant violation.
     let mut shard = interner.shards[shard_idx].lock().expect("interner shard mutex poisoned");
     let entry = shard.intern(bytes, hash);
+    drop(shard);
     INTERN_CACHE.with(|cache| {
         let set = &cache[cache_index];
         let previous = set[0].replace(Some(entry));

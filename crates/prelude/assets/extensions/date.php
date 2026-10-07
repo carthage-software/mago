@@ -703,9 +703,9 @@ class DateInterval
 
     public function format(string $format): string {}
 
-    public function __serialize(): array;
+    public function __serialize(): array {}
 
-    public function __unserialize(array $data): void;
+    public function __unserialize(array $data): void {}
 
     public function __wakeup(): void {}
 
@@ -773,9 +773,9 @@ class DatePeriod implements IteratorAggregate
 
     public function getRecurrences(): ?int {}
 
-    public function __serialize(): array;
+    public function __serialize(): array {}
 
-    public function __unserialize(array $data): void;
+    public function __unserialize(array $data): void {}
 
     public function __wakeup(): void {}
 

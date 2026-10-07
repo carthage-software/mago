@@ -41,6 +41,7 @@ use mago_word::WordSet;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
+use crate::artifacts::CheckpointAction;
 use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
@@ -143,7 +144,7 @@ where
             }
             // this rewrites $a += 4 and $a ??= 4 to $a = $a + 4 and $a = $a ?? 4 respectively
             Some(assignment_operator) => {
-                let previous_expression_types = artifacts.expression_types.clone();
+                artifacts.begin_expression_type_checkpoint();
                 block_context.flags.set_inside_assignment_operation(true);
 
                 let binary_expression = Expression::Binary(Binary {
@@ -168,7 +169,10 @@ where
                     rhs: context.arena.alloc(source_expression.clone()),
                 });
 
-                binary_expression.analyze(context, block_context, artifacts)?;
+                if let Err(error) = binary_expression.analyze(context, block_context, artifacts) {
+                    artifacts.finish_expression_type_checkpoint(CheckpointAction::Keep);
+                    return Err(error);
+                }
                 block_context.flags.set_inside_assignment_operation(false);
                 assignment_operation_type = if let Some(assignment_span) = assignment_span {
                     artifacts.get_rc_expression_type(&assignment_span).cloned()
@@ -176,9 +180,7 @@ where
                     None
                 };
 
-                let new_expression_types =
-                    std::mem::replace(&mut artifacts.expression_types, previous_expression_types);
-                artifacts.expression_types.extend(new_expression_types);
+                artifacts.finish_expression_type_checkpoint(CheckpointAction::Merge);
             }
         }
 

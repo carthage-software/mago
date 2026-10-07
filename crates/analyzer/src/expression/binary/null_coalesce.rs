@@ -23,7 +23,6 @@ use mago_word::word;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
-use crate::artifacts::get_expression_range;
 use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
@@ -179,7 +178,7 @@ where
         }
     }
 
-    artifacts.expression_types.insert(get_expression_range(binary), Rc::new(result_type));
+    artifacts.set_rc_expression_type(binary, Rc::new(result_type));
 
     if rhs_is_never {
         let assertion_context = context.get_assertion_context_from_block(block_context);

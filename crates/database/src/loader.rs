@@ -414,23 +414,24 @@ impl<'config> DatabaseLoader<'config> {
             }
 
             let workspace = canonical_workspace.as_path();
-            #[cfg(windows)]
-            let logical_name =
-                path.strip_prefix(workspace).unwrap_or(path.as_path()).to_string_lossy().replace('\\', "/");
-            #[cfg(not(windows))]
-            let logical_name = path.strip_prefix(workspace).unwrap_or(path.as_path()).to_string_lossy().into_owned();
+            if let Some((override_name, override_content)) = &self.stdin_override {
+                #[cfg(windows)]
+                let logical_name =
+                    path.strip_prefix(workspace).unwrap_or(path.as_path()).to_string_lossy().replace('\\', "/");
+                #[cfg(not(windows))]
+                let logical_name =
+                    path.strip_prefix(workspace).unwrap_or(path.as_path()).to_string_lossy().into_owned();
 
-            if let Some((override_name, override_content)) = &self.stdin_override
-                && override_name.as_ref() == logical_name.as_bytes()
-            {
-                let file = File::new(
-                    Cow::Owned(logical_name.into_bytes()),
-                    file_type,
-                    Some(path),
-                    Cow::Owned(override_content.clone()),
-                );
+                if override_name.as_ref() == logical_name.as_bytes() {
+                    let file = File::new(
+                        Cow::Owned(logical_name.into_bytes()),
+                        file_type,
+                        Some(path),
+                        Cow::Owned(override_content.clone()),
+                    );
 
-                return Some(Ok(FileWithSpecificity { file, specificity }));
+                    return Some(Ok(FileWithSpecificity { file, specificity }));
+                }
             }
 
             match read_file(workspace, &path, file_type) {
@@ -456,20 +457,18 @@ impl<'config> DatabaseLoader<'config> {
                                 )
                         });
 
-                        let mut files = Vec::new();
+                        let mut paths = Vec::new();
                         for entry in walker {
                             match entry {
                                 Ok(entry) if !entry.file_type().is_dir() => {
-                                    if let Some(file) = load_path((entry.into_path(), specificity, false)) {
-                                        files.push(file?);
-                                    }
+                                    paths.push((entry.into_path(), specificity, false));
                                 }
                                 Ok(_) => {}
                                 Err(err) => warn_walk_error(&err, root.as_path()),
                             }
                         }
 
-                        Ok(files)
+                        paths.into_par_iter().filter_map(&load_path).collect::<Result<Vec<_>, _>>()
                     })
                     .collect::<Result<Vec<Vec<FileWithSpecificity>>, DatabaseError>>()
             },
@@ -715,6 +714,46 @@ mod tests {
             std::fs::create_dir_all(parent).unwrap();
         }
         std::fs::write(file_path, content).unwrap();
+    }
+
+    #[test]
+    fn test_nested_files_match_with_one_and_many_threads() {
+        let temp_dir = TempDir::new().unwrap();
+        create_test_file(&temp_dir, "src/deep/a.php", "<?php // host");
+        create_test_file(&temp_dir, "src/deep/b.php", "<?php // vendor");
+        create_test_file(&temp_dir, "src/deep/patch/c.php", "<?php // patch");
+        create_test_file(&temp_dir, "src/deep/skip/d.php", "<?php // excluded");
+        create_test_file(&temp_dir, "src/deep/e.txt", "<?php // wrong extension");
+
+        let mut config = create_test_config_with_patches(
+            &temp_dir,
+            vec!["src", "src/deep/a.php"],
+            vec!["src/deep"],
+            vec!["src/deep/patch"],
+        );
+        config.excludes.push(Exclusion::Pattern(Cow::Borrowed("src/deep/skip/**")));
+
+        for threads in [1, 4] {
+            let pool = rayon::ThreadPoolBuilder::new().num_threads(threads).build().unwrap();
+            let db = pool.install(|| {
+                DatabaseLoader::new(config.clone())
+                    .with_stdin_override(b"src/deep/a.php", b"<?php // edited".to_vec())
+                    .load()
+                    .unwrap()
+            });
+            let mut files =
+                db.files().map(|file| (file.name.to_vec(), file.file_type, file.contents.to_vec())).collect::<Vec<_>>();
+            files.sort_by(|left, right| left.0.cmp(&right.0));
+
+            assert_eq!(
+                files,
+                vec![
+                    (b"src/deep/a.php".to_vec(), FileType::Host, b"<?php // edited".to_vec()),
+                    (b"src/deep/b.php".to_vec(), FileType::Vendored, b"<?php // vendor".to_vec()),
+                    (b"src/deep/patch/c.php".to_vec(), FileType::Patch, b"<?php // patch".to_vec()),
+                ],
+            );
+        }
     }
 
     #[test]

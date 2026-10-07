@@ -1,10 +1,10 @@
 +++
-title = "Getting Started"
+title = "Getting started"
 description = "What Mago is, what it does, and where to go next."
 nav_order = 10
 nav_section = "Guide"
 +++
-# Getting Started
+# Getting started
 
 Mago is a PHP toolchain written in Rust. One binary covers the parts of a workflow that usually take three or four separate tools.
 

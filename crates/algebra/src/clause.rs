@@ -110,10 +110,18 @@ impl Clause {
             return false;
         }
 
-        other_clause.possibilities.iter().all(|(var, possible_types)| {
+        other_clause.possibilities.iter().enumerate().all(|(index, (var, possible_types))| {
             self.possibilities
-                .get(var)
-                .is_some_and(|local_possibilities| possible_types.keys().all(|k| local_possibilities.contains_key(k)))
+                .get_index(index)
+                .filter(|(key, _)| *key == var)
+                .map(|(_, possibilities)| possibilities)
+                .or_else(|| self.possibilities.get(var))
+                .is_some_and(|local_possibilities| {
+                    possible_types.keys().enumerate().all(|(index, key)| {
+                        local_possibilities.get_index(index).is_some_and(|(local_key, _)| local_key == key)
+                            || local_possibilities.contains_key(key)
+                    })
+                })
         })
     }
 

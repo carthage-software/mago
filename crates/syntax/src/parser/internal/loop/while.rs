@@ -15,7 +15,7 @@ where
         Ok(While {
             r#while: self.expect_keyword(T!["while"])?,
             left_parenthesis: self.stream.eat_span(T!["("])?,
-            condition: self.arena.alloc(self.parse_expression()?),
+            condition: self.parse_expression()?,
             right_parenthesis: self.stream.eat_span(T![")"])?,
             body: self.parse_while_body()?,
         })

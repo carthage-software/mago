@@ -516,10 +516,9 @@ impl<'input> Lexer<'input> {
                     [b'*', ..] => (TokenKind::Asterisk, 1),
                     [b'/', ..] => (TokenKind::Slash, 1),
                     [b'b' | b'B', b'\'', ..] => read_literal_string(&self.input, b'\'', 1),
-                    [b'b' | b'B', b'"', ..] if matches_literal_double_quote_string(&self.input, 1) => {
-                        read_literal_string(&self.input, b'"', 1)
+                    [b'b' | b'B', b'"', ..] => {
+                        read_literal_double_quote_string(&self.input, 1).unwrap_or((TokenKind::DoubleQuote, 2))
                     }
-                    [b'b' | b'B', b'"', ..] => (TokenKind::DoubleQuote, 2),
                     [b'b' | b'B', b'<', b'<']
                         if self.input.read(4).len() == 4
                             && self.input.read(4)[3] == b'<'
@@ -555,10 +554,9 @@ impl<'input> Lexer<'input> {
                     }
                     // Regular string literals
                     [quote @ b'\'', ..] => read_literal_string(&self.input, *quote, 0),
-                    [quote @ b'"', ..] if matches_literal_double_quote_string(&self.input, 0) => {
-                        read_literal_string(&self.input, *quote, 0)
+                    [b'"', ..] => {
+                        read_literal_double_quote_string(&self.input, 0).unwrap_or((TokenKind::DoubleQuote, 1))
                     }
-                    [b'"', ..] => (TokenKind::DoubleQuote, 1),
                     [b'(', ..] => 'parenthesis: {
                         let mut peek_offset = 1;
                         while let Some(&b) = self.input.read(peek_offset + 1).get(peek_offset) {
@@ -1473,38 +1471,27 @@ fn matches_start_of_nowdoc_document(input: &Input, prefix_len: usize) -> bool {
 }
 
 #[inline]
-fn matches_literal_double_quote_string(input: &Input, prefix_len: usize) -> bool {
-    let total = input.len();
-    let base = input.current_offset();
-
-    // Start after the prefix (if any) and the initial double-quote.
-    let mut pos = base + 1 + prefix_len;
-    loop {
-        if pos >= total {
-            // Reached EOF: assume literal is complete.
-            return true;
-        }
-        let byte = *input.read_at(pos);
-        if byte == b'"' {
-            // Encounter a closing double quote.
-            return true;
-        }
-        if byte == b'\\' {
-            // Skip an escape sequence: assume that the backslash and the escaped character form a pair.
-            pos += 2;
-            continue;
-        }
-
-        // Check for variable interpolation or complex expression start:
-        // If two-byte sequences match either "$" followed by a start-of-identifier or "{" and "$", then return false.
-        if pos + 1 < total {
-            let next = *input.read_at(pos + 1);
-            if (byte == b'$' && (is_start_of_identifier(&next) || next == b'{')) || (byte == b'{' && next == b'$') {
-                return false;
+fn read_literal_double_quote_string(input: &Input, prefix_len: usize) -> Option<(TokenKind, usize)> {
+    let bytes = input.read_remaining();
+    let mut start = prefix_len + 1;
+    while let Some(offset) = memchr::memchr3(b'"', b'\\', b'$', &bytes[start..]) {
+        let position = start + offset;
+        match bytes[position] {
+            b'"' => return Some((TokenKind::LiteralString, position + 1)),
+            b'\\' => start = (position + 2).min(bytes.len()),
+            _ => {
+                // A brace before this scan's start belongs to the escape just skipped.
+                if (position > start && bytes[position - 1] == b'{')
+                    || bytes.get(position + 1).is_some_and(|next| is_start_of_identifier(next) || *next == b'{')
+                {
+                    return None;
+                }
+                start = position + 1;
             }
         }
-        pos += 1;
     }
+
+    Some((TokenKind::PartialLiteralString, bytes.len()))
 }
 
 /// Measures the indentation of a heredoc/nowdoc closing marker by scanning the
@@ -1960,4 +1947,69 @@ fn scan_single_line_comment(bytes: &[u8]) -> usize {
     }
 
     bytes.len()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    fn read_double_quote_reference(input: &Input, prefix_len: usize) -> Option<(TokenKind, usize)> {
+        let mut position = input.current_offset() + prefix_len + 1;
+        while position < input.len() {
+            let byte = *input.read_at(position);
+            if byte == b'"' {
+                break;
+            }
+            if byte == b'\\' {
+                position += 2;
+                continue;
+            }
+            if position + 1 < input.len() {
+                let next = *input.read_at(position + 1);
+                if (byte == b'$' && (is_start_of_identifier(&next) || next == b'{')) || (byte == b'{' && next == b'$') {
+                    return None;
+                }
+            }
+            position += 1;
+        }
+        Some(read_literal_string(input, b'"', prefix_len))
+    }
+
+    fn check_double_quote_body(body: &[u8]) {
+        for prefix in [b"".as_slice(), b"b", b"B"] {
+            for leading in [b"".as_slice(), b"ignored "] {
+                let mut bytes = leading.to_vec();
+                bytes.extend_from_slice(prefix);
+                bytes.push(b'"');
+                bytes.extend_from_slice(body);
+                let mut input = Input::new(FileId::zero(), &bytes);
+                input.skip(leading.len());
+                assert_eq!(
+                    read_literal_double_quote_string(&input, prefix.len()),
+                    read_double_quote_reference(&input, prefix.len()),
+                    "source: {bytes:?}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn double_quote_scan_matches_reference() {
+        const ALPHABET: [u8; 8] = [b'a', 0xff, b'"', b'\\', b'$', b'{', b'}', 0];
+        for length in 0..=5 {
+            for mut value in 0..ALPHABET.len().pow(length) {
+                let mut body = Vec::new();
+                for _ in 0..length {
+                    body.push(ALPHABET[value % ALPHABET.len()]);
+                    value /= ALPHABET.len();
+                }
+                check_double_quote_body(&body);
+            }
+        }
+        for special in [b"\\{$\"".as_slice(), b"{$", b"$\xff", b"\\\\\"", b"\\", b"$1\""] {
+            let mut body = vec![b'a'; 257];
+            body.extend_from_slice(special);
+            check_double_quote_body(&body);
+        }
+    }
 }

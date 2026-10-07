@@ -135,6 +135,19 @@ impl Word {
         }
     }
 
+    /// Returns the ASCII-lowercased word, reusing this handle when no bytes change.
+    #[inline]
+    #[must_use]
+    pub fn to_ascii_lowercase(self) -> Word {
+        #[cfg(not(feature = "sso"))]
+        // SAFETY: the interner entry stays alive and never changes after insertion.
+        let has_ascii_uppercase = unsafe { self.repr.ptr.as_ref().has_ascii_uppercase } != 0;
+        #[cfg(feature = "sso")]
+        let has_ascii_uppercase = self.as_bytes().iter().any(u8::is_ascii_uppercase);
+
+        if has_ascii_uppercase { crate::ascii_lowercase_word(self.as_bytes()) } else { self }
+    }
+
     /// Returns the length, in bytes, of this `Word`.
     #[inline]
     #[must_use]

@@ -42,34 +42,34 @@ where
             T!["empty"] => Construct::Empty(EmptyConstruct {
                 empty: self.expect_keyword(T!["empty"])?,
                 left_parenthesis: self.stream.eat_span(T!["("])?,
-                value: self.arena.alloc(self.parse_expression()?),
+                value: self.parse_expression()?,
                 right_parenthesis: self.stream.eat_span(T![")"])?,
             }),
             T!["eval"] => Construct::Eval(EvalConstruct {
                 eval: self.expect_keyword(T!["eval"])?,
                 left_parenthesis: self.stream.eat_span(T!["("])?,
-                value: self.arena.alloc(self.parse_expression()?),
+                value: self.parse_expression()?,
                 right_parenthesis: self.stream.eat_span(T![")"])?,
             }),
             T!["print"] => Construct::Print(PrintConstruct {
                 print: self.expect_keyword(T!["print"])?,
-                value: self.arena.alloc(self.parse_expression_with_precedence(Precedence::Print)?),
+                value: self.parse_expression_with_precedence(Precedence::Print)?,
             }),
             T!["require"] => Construct::Require(RequireConstruct {
                 require: self.expect_any_keyword()?,
-                value: self.arena.alloc(self.parse_expression()?),
+                value: self.parse_expression()?,
             }),
             T!["require_once"] => Construct::RequireOnce(RequireOnceConstruct {
                 require_once: self.expect_any_keyword()?,
-                value: self.arena.alloc(self.parse_expression()?),
+                value: self.parse_expression()?,
             }),
             T!["include"] => Construct::Include(IncludeConstruct {
                 include: self.expect_any_keyword()?,
-                value: self.arena.alloc(self.parse_expression()?),
+                value: self.parse_expression()?,
             }),
             T!["include_once"] => Construct::IncludeOnce(IncludeOnceConstruct {
                 include_once: self.expect_any_keyword()?,
-                value: self.arena.alloc(self.parse_expression()?),
+                value: self.parse_expression()?,
             }),
             T!["exit"] => {
                 let exit = self.expect_any_keyword()?;

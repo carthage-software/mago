@@ -74,6 +74,8 @@ class CallbackFilterIterator extends FilterIterator implements OuterIterator
      */
     public function __construct(Iterator $iterator, callable $callback) {}
 
+    public function accept(): bool {}
+
     /**
      * @return V|null
      * @ignore-nullable-return
@@ -447,6 +449,28 @@ class CachingIterator extends IteratorIterator implements OuterIterator, ArrayAc
      */
     public function __construct(Iterator $iterator, int $flags = self::CALL_TOSTRING) {}
 
+    /** @return non-negative-int */
+    public function count(): int {}
+
+    /** @param K $key */
+    public function offsetExists($key): bool {}
+
+    /**
+     * @param K $key
+     *
+     * @return V
+     */
+    public function offsetGet($key): mixed {}
+
+    /**
+     * @param K $key
+     * @param V $value
+     */
+    public function offsetSet($key, mixed $value): void {}
+
+    /** @param K $key */
+    public function offsetUnset($key): void {}
+
     /**
      * @return bool
      */
@@ -615,6 +639,8 @@ class RegexIterator extends FilterIterator
         int $preg_flags = 0,
     ) {}
 
+    public function accept(): bool {}
+
     /**
      * @return null|V
      * @ignore-nullable-return
@@ -664,6 +690,8 @@ class RecursiveRegexIterator extends RegexIterator implements RecursiveIterator
      * @return RecursiveRegexIterator<K, V>
      */
     public function getChildren() {}
+
+    public function hasChildren(): bool {}
 }
 
 /**
@@ -1348,6 +1376,10 @@ class RecursiveDirectoryIterator extends FilesystemIterator implements Recursive
     const UNIX_PATHS = 8192;
 
     public function __construct(string $path, int $flags = self::KEY_AS_PATHNAME | self::CURRENT_AS_FILEINFO) {}
+
+    public function getChildren(): RecursiveDirectoryIterator {}
+
+    public function hasChildren(bool $allowLinks = false): bool {}
 
     public function getSubPath(): string {}
 

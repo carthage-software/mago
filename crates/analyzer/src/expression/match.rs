@@ -582,8 +582,8 @@ where
         .collect();
 
         let mut arm_referenced_ids = WordSet::default();
-        let (reconcilable_types, active_types) = mago_algebra::find_satisfying_assignments(
-            &combined_clauses.iter().map(|c| (**c).clone()).collect::<Vec<_>>(),
+        let (reconcilable_types, active_types) = mago_algebra::find_satisfying_assignments_iter(
+            combined_clauses.iter().map(Rc::as_ref),
             None,
             &mut arm_referenced_ids,
         );

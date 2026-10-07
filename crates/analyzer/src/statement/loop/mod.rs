@@ -10,11 +10,12 @@ use indexmap::IndexMap;
 
 use mago_algebra::clause::Clause;
 use mago_algebra::find_satisfying_assignments;
+use mago_algebra::find_satisfying_assignments_iter;
 use mago_algebra::negate_formula;
 use mago_allocator::Arena;
 use mago_reporting::IssueCollection;
 
-use mago_algebra::saturate_clauses;
+use mago_algebra::saturate_shared_clauses;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::ttype;
 use mago_codex::ttype::TType;
@@ -58,6 +59,7 @@ use mago_word::word;
 use crate::analyzable::Analyzable;
 use crate::analyze_statements;
 use crate::artifacts::AnalysisArtifacts;
+use crate::artifacts::CheckpointAction;
 use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
@@ -75,6 +77,7 @@ use crate::statement::r#loop::cleaner::clean_nodes;
 
 mod assignment_map_visitor;
 mod cleaner;
+mod convergence;
 
 pub mod r#break;
 pub mod r#continue;
@@ -595,7 +598,20 @@ where
         }
 
         let mut i = 0;
+        let supports_convergence = convergence::supports_context(
+            context,
+            &continue_context,
+            loop_parent_context,
+            &pre_loop_context,
+            artifacts,
+        ) && convergence::supports_nodes(statements, pre_conditions, &post_expressions);
+        let mut previous_input: Option<Box<convergence::Snapshot<'ctx>>> = None;
+        let mut converged_passes = 0;
         while i <= assignment_depth {
+            let previous_output = previous_input
+                .as_ref()
+                .filter(|previous| previous.outputs_match(artifacts, recorded_issues.is_empty()))
+                .map(|_| Box::new(continue_context.clone()));
             let mut variables_to_remove = Vec::new();
 
             loop_scope.iteration_count += 1;
@@ -708,6 +724,9 @@ where
 
             // if there are no changes to the types, no need to re-examine
             if !has_changes {
+                if previous_input.take().is_some() {
+                    artifacts.finish_expression_type_checkpoint(CheckpointAction::Keep);
+                }
                 continue_context.flags.set_inside_loop_expressions(true);
                 for post_expression in &post_expressions {
                     post_expression.analyze(context, &mut continue_context, artifacts)?;
@@ -723,6 +742,53 @@ where
 
             continue_context.clauses.clone_from(&pre_loop_context.clauses);
             continue_context.by_reference_constraints.clone_from(&pre_loop_context.by_reference_constraints);
+
+            // Only compare later passes: the first body visit records extra break-path state.
+            // An unchanged normalized input repeats the last complete output and recorded issues.
+            if let Some(previous_output) = previous_output
+                && previous_input.as_ref().is_some_and(|previous| {
+                    previous.matches(
+                        context,
+                        &continue_context,
+                        loop_context,
+                        loop_parent_context,
+                        &pre_loop_context,
+                        &loop_scope,
+                        artifacts,
+                        recorded_issues.is_empty(),
+                    )
+                })
+            {
+                artifacts.finish_expression_type_checkpoint(CheckpointAction::Keep);
+                previous_input = None;
+                continue_context = *previous_output;
+                converged_passes = assignment_depth - i + 1;
+                #[cfg(test)]
+                convergence::record_skipped_passes(converged_passes);
+                loop_scope.iteration_count += converged_passes - 1;
+                break;
+            }
+
+            if previous_input.take().is_some() {
+                artifacts.finish_expression_type_checkpoint(CheckpointAction::Keep);
+            }
+            previous_input = (supports_convergence && i < assignment_depth)
+                .then(|| {
+                    convergence::Snapshot::capture(
+                        context,
+                        &continue_context,
+                        loop_context,
+                        loop_parent_context,
+                        &pre_loop_context,
+                        &loop_scope,
+                        artifacts,
+                        recorded_issues.is_empty(),
+                    )
+                })
+                .flatten();
+            if previous_input.is_some() {
+                artifacts.begin_expression_type_checkpoint();
+            }
 
             let (result, new_recorded_issues) = context.record(|context| -> Result<LoopScope, AnalysisError> {
                 for (condition_offset, pre_condition) in pre_conditions.iter().enumerate() {
@@ -826,11 +892,19 @@ where
                 Ok(loop_scope)
             });
 
+            if result.is_err() && previous_input.take().is_some() {
+                artifacts.finish_expression_type_checkpoint(CheckpointAction::Keep);
+            }
             loop_scope = result?;
             recorded_issues = new_recorded_issues;
 
             i += 1;
         }
+
+        if previous_input.is_some() {
+            artifacts.finish_expression_type_checkpoint(CheckpointAction::Keep);
+        }
+        tracing::trace!(file = %String::from_utf8_lossy(context.source_file.name.as_ref()), offset = loop_scope.span.start.offset, converged_passes, "Loop convergence skips");
 
         for issue in first_iteration_issues {
             if !is_iteration_dependent_truthiness_issue(issue.code.as_deref())
@@ -1304,20 +1378,13 @@ where
     let always_assigned_before_loop_body_variables =
         BlockContext::get_new_or_updated_locals(loop_context, loop_parent_context);
 
-    loop_context.clauses = saturate_clauses(
-        {
-            let mut clauses = loop_parent_context.clauses.iter().map(|v| &**v).collect::<Vec<_>>();
-            clauses.extend(pre_condition_clauses.iter());
-            clauses
-        },
+    loop_context.clauses = saturate_shared_clauses(
+        loop_parent_context.clauses.iter().cloned().chain(pre_condition_clauses.iter().cloned().map(Rc::new)),
         &context.settings.algebra_thresholds(),
-    )
-    .into_iter()
-    .map(Rc::new)
-    .collect();
+    );
 
-    let (reconcilable_while_types, active_while_types) = find_satisfying_assignments(
-        loop_context.clauses.iter().map(|v| (**v).clone()).collect::<Vec<_>>().as_slice(),
+    let (reconcilable_while_types, active_while_types) = find_satisfying_assignments_iter(
+        loop_context.clauses.iter().map(Rc::as_ref),
         Some(pre_condition_span),
         &mut new_referenced_variable_ids,
     );
@@ -1368,7 +1435,7 @@ fn update_loop_scope_contexts<'ctx, A>(
         }
 
         for (variable_id, variable_type) in &loop_scope.possibly_redefined_loop_variables {
-            if continue_context.has_variable(variable_id.as_bytes()) {
+            if continue_context.has_variable_atom(*variable_id) {
                 continue_context.locals.insert(
                     *variable_id,
                     combine_union_types_rc(

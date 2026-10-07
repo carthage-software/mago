@@ -1,7 +1,7 @@
 use std::rc::Rc;
 
 use mago_allocator::Arena;
-use mago_codex::ttype::add_optional_union_type;
+use mago_codex::ttype::add_optional_union_type_rc;
 use mago_codex::ttype::combine_union_types;
 use mago_codex::ttype::combiner::CombinerOptions;
 use mago_reporting::Annotation;
@@ -135,14 +135,14 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Break<'arena> {
                 {
                     loop_scope.possibly_redefined_loop_parent_variables.insert(
                         *var_id,
-                        Rc::new(add_optional_union_type(
-                            (**current_type).clone(),
+                        add_optional_union_type_rc(
+                            current_type,
                             loop_scope
                                 .possibly_redefined_loop_parent_variables
                                 .get(var_id)
                                 .map(std::convert::AsRef::as_ref),
                             context.codebase,
-                        )),
+                        ),
                     );
                 }
             }

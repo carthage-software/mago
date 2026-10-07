@@ -56,6 +56,10 @@ macro_rules! test_case {
 test_case!(accessing_undefined_class_constant);
 test_case!(ds_map_defaults);
 test_case!(ds_map_default_type_errors);
+test_case!(rdkafka_producer);
+test_case!(rdkafka_consumer);
+test_case!(rdkafka_metadata);
+test_case!(rdkafka_type_errors);
 test_case!(attribute_target_constant);
 test_case!(attribute_target_constant_php84, {
     let mut settings = default_test_settings();

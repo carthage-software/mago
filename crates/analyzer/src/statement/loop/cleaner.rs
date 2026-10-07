@@ -14,7 +14,7 @@ impl<'ast, 'arena> Walker<'ast, 'arena, AnalysisArtifacts> for TypeCleaningWalke
         let expression_span = expression.span();
         let expression_id = (expression_span.start.offset, expression_span.end.offset);
 
-        artifacts.expression_types.remove(&expression_id);
+        artifacts.remove_expression_type(&expression_id);
     }
 }
 

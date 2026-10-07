@@ -715,7 +715,7 @@ where
             array_expression_type = scoped_type;
         }
 
-        let new_index_type = array_target_index_type.unwrap_or(Rc::new(get_non_negative_int()));
+        let new_index_type = array_target_index_type.unwrap_or_else(|| Rc::new(get_non_negative_int()));
 
         let is_last = i == array_target_expressions.len() - 1;
 
@@ -736,7 +736,6 @@ where
         );
 
         block_context.flags.set_inside_assignment(false);
-        let array_expression_type_inner = (*array_expression_type).clone();
 
         if is_last {
             array_expr_type = assign_value_type.clone();
@@ -745,7 +744,7 @@ where
             artifacts.set_expression_type(&array_target, array_expr_type.clone());
         }
 
-        artifacts.set_expression_type(array_target.get_array(), array_expression_type_inner.clone());
+        artifacts.set_rc_expression_type(array_target.get_array(), Rc::clone(&array_expression_type));
 
         if let Some(root_var_id) = &root_var_id {
             let combined = format!("{}{}", root_var_id, var_id_additions.join(""));
@@ -753,13 +752,13 @@ where
 
             if let Some(parent_var_id) = &parent_var_id {
                 if full_var_id && memchr::memmem::find(parent_var_id.as_bytes(), b"[$").is_some() {
-                    block_context.locals.insert(*parent_var_id, Rc::new(array_expression_type_inner));
+                    block_context.locals.insert(*parent_var_id, array_expression_type);
                     block_context.possibly_assigned_variable_ids.insert(*parent_var_id);
                 }
             } else {
-                *root_type = array_expression_type_inner.clone();
+                *root_type = (*array_expression_type).clone();
 
-                block_context.locals.insert(*root_var_id, Rc::new(array_expression_type_inner));
+                block_context.locals.insert(*root_var_id, array_expression_type);
                 block_context.possibly_assigned_variable_ids.insert(*root_var_id);
             }
         }
@@ -818,13 +817,13 @@ where
             index_type.as_ref(),
         );
 
-        *last_array_expr_type = array_expr_type.clone();
+        *last_array_expr_type = array_expr_type;
         last_array_expression_index = array_target.get_index();
 
         if let Some(array_expr_id) = &array_expr_id
             && memchr::memmem::find(array_expr_id.as_bytes(), b"[$").is_some()
         {
-            block_context.locals.insert(*array_expr_id, Rc::new(array_expr_type));
+            block_context.locals.insert(*array_expr_id, Rc::new(last_array_expr_type.clone()));
             block_context.possibly_assigned_variable_ids.insert(*array_expr_id);
         }
 

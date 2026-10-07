@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use foldhash::HashMap;
 use indexmap::IndexMap;
 use mago_allocator::Arena;
@@ -612,6 +614,10 @@ impl DeclaredProperty<'_> {
     /// `@property` on a subclass), the annotation's type; otherwise the declared type, or
     /// `mixed` when untyped.  A conflicting (non-narrowing) annotation type is ignored.
     pub(crate) fn declared_type(&self, codebase: &CodebaseMetadata) -> TUnion {
+        self.declared_type_borrowed(codebase).into_owned()
+    }
+
+    pub(crate) fn declared_type_borrowed(&self, codebase: &CodebaseMetadata) -> Cow<'_, TUnion> {
         self.declared_type_impl(codebase, false)
     }
 
@@ -619,15 +625,15 @@ impl DeclaredProperty<'_> {
     /// `@property-write` type when the declaration splits read and write types, otherwise the
     /// same type [`Self::declared_type`] returns.
     pub(crate) fn declared_write_type(&self, codebase: &CodebaseMetadata) -> TUnion {
-        self.declared_type_impl(codebase, true)
+        self.declared_type_impl(codebase, true).into_owned()
     }
 
     /// [`Self::declared_write_type`] when `for_assignment`, otherwise [`Self::declared_type`].
     pub(crate) fn declared_type_for(&self, codebase: &CodebaseMetadata, for_assignment: bool) -> TUnion {
-        self.declared_type_impl(codebase, for_assignment)
+        self.declared_type_impl(codebase, for_assignment).into_owned()
     }
 
-    fn declared_type_impl(&self, codebase: &CodebaseMetadata, for_write: bool) -> TUnion {
+    fn declared_type_impl(&self, codebase: &CodebaseMetadata, for_write: bool) -> Cow<'_, TUnion> {
         fn annotation_type_metadata(annotation: &PropertyMetadata, for_write: bool) -> Option<&TypeMetadata> {
             if for_write { annotation.get_write_type_metadata() } else { annotation.type_metadata.as_ref() }
         }
@@ -652,14 +658,14 @@ impl DeclaredProperty<'_> {
             };
 
             if narrows {
-                return annotation_type.clone();
+                return Cow::Borrowed(annotation_type);
             }
         }
 
         annotation_type_metadata(self.property, for_write)
             .or(self.property.type_declaration_metadata.as_ref())
-            .map(|tm| tm.type_union.clone())
-            .unwrap_or_else(get_mixed)
+            .map(|tm| Cow::Borrowed(&tm.type_union))
+            .unwrap_or_else(|| Cow::Owned(get_mixed()))
     }
 }
 
@@ -684,7 +690,7 @@ pub(crate) fn resolve_declared_property<'ctx>(
             let tag_metadata = if tag_class == class_metadata.name {
                 class_metadata
             } else {
-                codebase.get_class_like(tag_class.as_bytes())?
+                codebase.get_class_like_by_name(tag_class)?
             };
 
             Some((tag_metadata, tag_metadata.magic_properties.get(&prop_name)?))
@@ -695,7 +701,7 @@ pub(crate) fn resolve_declared_property<'ctx>(
 
     let Some((declaring_metadata, real_property)) =
         class_metadata.declaring_property_ids.get(&prop_name).copied().and_then(|declaring_class| {
-            let declaring_metadata = codebase.get_class_like(declaring_class.as_bytes())?;
+            let declaring_metadata = codebase.get_class_like_by_name(declaring_class)?;
             let real_property = declaring_metadata.properties.get(&prop_name)?;
 
             Some((declaring_metadata, real_property))

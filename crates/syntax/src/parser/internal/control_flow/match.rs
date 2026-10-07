@@ -16,7 +16,7 @@ where
     pub(crate) fn parse_match(&mut self) -> Result<Match<'arena>, ParseError> {
         let r#match = self.expect_keyword(T!["match"])?;
         let left_parenthesis = self.stream.eat_span(T!["("])?;
-        let expression = self.arena.alloc(self.parse_expression()?);
+        let expression = self.parse_expression()?;
         let right_parenthesis = self.stream.eat_span(T![")"])?;
         let arms_result = self.parse_comma_separated_sequence(T!["{"], T!["}"], |p| p.parse_match_arm())?;
 
@@ -64,7 +64,7 @@ where
                 TokenSeparatedSequence::new(conditions, commas)
             },
             arrow: self.stream.eat_span(T!["=>"])?,
-            expression: self.arena.alloc(self.parse_expression()?),
+            expression: self.parse_expression()?,
         })
     }
 
@@ -77,7 +77,7 @@ where
                 None
             },
             arrow: self.stream.eat_span(T!["=>"])?,
-            expression: self.arena.alloc(self.parse_expression()?),
+            expression: self.parse_expression()?,
         })
     }
 }

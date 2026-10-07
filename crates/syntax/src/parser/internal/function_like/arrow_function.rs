@@ -22,7 +22,7 @@ where
             parameter_list: self.parse_function_like_parameter_list()?,
             return_type_hint: self.parse_optional_function_like_return_type_hint()?,
             arrow: self.stream.eat_span(T!["=>"])?,
-            expression: self.arena.alloc(self.parse_expression()?),
+            expression: self.parse_expression()?,
         })
     }
 }

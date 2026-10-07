@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use mago_allocator::prelude::*;
 
 use mago_syntax::cst::Use;
@@ -87,10 +89,11 @@ where
     /// # Returns
     ///
     /// The `StringIdentifier` for the potentially qualified name.
-    pub fn qualify_name(&self, name: &[u8]) -> &'arena [u8] {
-        let qualified_str = self.scope.qualify_name(name);
-
-        self.arena.alloc_slice_copy(&qualified_str)
+    pub fn qualify_name(&self, name: &'arena [u8]) -> &'arena [u8] {
+        match self.scope.qualify_name_str(name) {
+            Cow::Borrowed(name) => name,
+            Cow::Owned(name) => self.arena.alloc_slice_copy(&name),
+        }
     }
 
     /// Allocates `s` in the arena and returns a borrow with the arena lifetime.
@@ -111,9 +114,33 @@ where
     ///  - The `bool` is `true` if resolution occurred via an explicit alias or construct
     ///    (like `\` or `namespace\`), and `false` otherwise (e.g., resolved relative
     ///    to the namespace or returned as-is).
-    pub fn resolve<'name>(&self, kind: NameKind, name_str: &'name [u8]) -> (&'arena [u8], bool) {
+    pub fn resolve(&self, kind: NameKind, name_str: &'arena [u8]) -> (&'arena [u8], bool) {
         let (cow, is_imported) = self.scope.resolve_str(kind, name_str);
+        let name = match cow {
+            Cow::Borrowed(name) => name,
+            Cow::Owned(name) => self.arena.alloc_slice_copy(&name),
+        };
 
-        (self.arena.alloc_slice_copy(&cow), is_imported)
+        (name, is_imported)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn resolved_names_outlive_the_scope() {
+        let arena = LocalArena::new();
+        let (qualified, resolved) = {
+            let mut context = NameResolutionContext::new(&arena);
+            context.enter_namespace(Some(b"App"));
+            context.scope.add(NameKind::Default, b"Library\\Name", &Some(b"Alias"));
+
+            (context.qualify_name(b"Name"), context.resolve(NameKind::Default, b"Alias"))
+        };
+
+        assert_eq!(qualified, b"App\\Name");
+        assert_eq!(resolved, (b"Library\\Name".as_slice(), true));
     }
 }
