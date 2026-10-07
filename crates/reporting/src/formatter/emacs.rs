@@ -4,6 +4,7 @@ use std::io::Write;
 
 use mago_database::DatabaseReader;
 use mago_database::ReadDatabase;
+use mago_database::file::File;
 use mago_database::file::HasFileId;
 
 use crate::IssueCollection;
@@ -33,6 +34,20 @@ fn escape_record_field(input: &str) -> Cow<'_, str> {
     Cow::Owned(escaped)
 }
 
+fn escaped_file_name(file: &File) -> Cow<'_, str> {
+    match String::from_utf8_lossy(&file.name) {
+        Cow::Borrowed(name) => escape_record_field(name),
+        Cow::Owned(name) => Cow::Owned(escape_owned_record_field(name)),
+    }
+}
+
+fn escape_owned_record_field(input: String) -> String {
+    match escape_record_field(&input) {
+        Cow::Borrowed(_) => input,
+        Cow::Owned(escaped) => escaped,
+    }
+}
+
 impl Formatter for EmacsFormatter {
     fn format(
         &self,
@@ -43,25 +58,30 @@ impl Formatter for EmacsFormatter {
     ) -> Result<(), ReportingError> {
         let use_colors = config.color_choice.should_use_colors(std::io::stdout().is_terminal());
         let editor_url = if use_colors { config.editor_url.as_deref() } else { None };
-        let mut cached_name = None;
+        let mut cached_file: Option<(&File, Cow<'_, str>)> = None;
         let mut number = itoa::Buffer::new();
 
         for issue in crate::formatter::utils::filter_issues(issues, config, false) {
             let (file_display, line, column) = match issue.primary_annotation() {
                 Some(annotation) => {
-                    let file = database.get_ref(&annotation.span.file_id())?;
+                    let file_id = annotation.span.file_id();
+                    let cached = match &mut cached_file {
+                        Some(cached) if cached.0.id == file_id => cached,
+                        cache => {
+                            let file = database.get_ref(&file_id)?;
+                            cache.insert((file, escaped_file_name(file)))
+                        }
+                    };
+                    let (file, name) = (cached.0, &cached.1);
                     let line = file.line_number(annotation.span.start.offset);
                     let column = annotation.span.start.offset - file.lines[line as usize] + 1;
                     let line = line + 1;
 
-                    let cached = cached_name.get_or_insert_with(|| (file.id, String::from_utf8_lossy(&file.name)));
-                    if cached.0 != file.id {
-                        *cached = (file.id, String::from_utf8_lossy(&file.name));
-                    }
-
-                    let name = &cached.1;
                     let display = if let (Some(template), Some(path)) = (editor_url, file.path.as_ref()) {
-                        Cow::Owned(osc8_file_hyperlink(template, &path.display().to_string(), name, line, column, name))
+                        let name = String::from_utf8_lossy(&file.name);
+                        let display =
+                            osc8_file_hyperlink(template, &path.display().to_string(), &name, line, column, &name);
+                        Cow::Owned(escape_owned_record_field(display))
                     } else {
                         Cow::Borrowed(name.as_ref())
                     };
@@ -71,7 +91,6 @@ impl Formatter for EmacsFormatter {
                 None => (Cow::Borrowed("<unknown>"), 0, 0),
             };
 
-            let file_display = escape_record_field(&file_display);
             let severity = match issue.level {
                 Level::Error => "error",
                 Level::Warning | Level::Note | Level::Help => "warning",
