@@ -1,9 +1,11 @@
+use std::hash::BuildHasher;
 use std::hash::Hash;
 use std::ops::Deref;
 use std::rc::Rc;
 
 use foldhash::HashSet;
 use foldhash::HashSetExt;
+use foldhash::fast::FixedState;
 use indexmap::IndexMap;
 
 use mago_codex::assertion::Assertion;
@@ -175,6 +177,12 @@ fn saturate_clause_handles<'clause>(
 
         let mut removed_indices: Vec<bool> = vec![false; unique_clauses_len];
         let mut added_clauses: Vec<Clause> = Vec::new();
+        // Different hashes rule out equal key sets; matches still need exact checks.
+        let hasher = FixedState::default();
+        let variable_hashes: Vec<u64> = unique_clauses
+            .iter()
+            .map(|clause| clause.possibilities.keys().fold(0, |hash, key| hash ^ hasher.hash_one(key)))
+            .collect();
 
         // Pre-built index of every (var, possibility-hash) pair that appears
         // anywhere in the input clauses. Unit propagation needs to know
@@ -273,14 +281,23 @@ fn saturate_clause_handles<'clause>(
                     }
 
                     // Quick size check before detailed comparison
-                    if clause_b.possibilities.len() != clause_a_size {
+                    if clause_b.possibilities.len() != clause_a_size
+                        || variable_hashes[clause_a_idx] != variable_hashes[clause_b_idx]
+                    {
                         continue;
                     }
 
                     let mut opposing_key = None;
                     let mut mismatch = false;
-                    for (&key, a_possibilities) in &clause_a.possibilities {
-                        if let Some(b_possibilities) = clause_b.possibilities.get(&key) {
+                    for (index, (&key, a_possibilities)) in clause_a.possibilities.iter().enumerate() {
+                        let b_possibilities = clause_b
+                            .possibilities
+                            .get_index(index)
+                            .filter(|(candidate, _)| **candidate == key)
+                            .map(|(_, possibilities)| possibilities)
+                            .or_else(|| clause_b.possibilities.get(&key));
+
+                        if let Some(b_possibilities) = b_possibilities {
                             if index_keys_match(a_possibilities, b_possibilities) {
                                 continue;
                             }
@@ -407,11 +424,18 @@ fn saturate_clause_handles<'clause>(
             for (clause_a_idx, clause_a) in simplified_clauses.iter().enumerate() {
                 for clause_b in simplified_clauses.iter().skip(clause_a_idx + 1) {
                     let mut common_negated_keys: HashSet<Word> = HashSet::default();
-                    for (&common_key, a_possibilities) in &clause_a.possibilities {
+                    for (index, (&common_key, a_possibilities)) in clause_a.possibilities.iter().enumerate() {
                         if a_possibilities.len() != 1 {
                             continue;
                         }
-                        let Some(b_possibilities) = clause_b.possibilities.get(&common_key) else {
+
+                        let Some(b_possibilities) = clause_b
+                            .possibilities
+                            .get_index(index)
+                            .filter(|(key, _)| **key == common_key)
+                            .map(|(_, possibilities)| possibilities)
+                            .or_else(|| clause_b.possibilities.get(&common_key))
+                        else {
                             continue;
                         };
 
@@ -856,7 +880,8 @@ fn index_keys_match<T, U, V>(map1: &IndexMap<T, U>, map2: &IndexMap<T, V>) -> bo
 where
     T: Eq + Ord + Hash,
 {
-    map1.len() == map2.len() && map1.keys().all(|k| map2.contains_key(k))
+    map1.len() == map2.len()
+        && (map1.keys().eq(map2.keys()) || (map1.len() > 1 && map1.keys().all(|k| map2.contains_key(k))))
 }
 
 #[cfg(test)]
@@ -890,6 +915,17 @@ mod tests {
             None,
             Some(offset % 2 == 1),
         )
+    }
+
+    #[test]
+    fn clause_containment_matches_reordered_variables_and_assertions() {
+        let container = clause(1, &[("$x", Assertion::Truthy), ("$x", Assertion::IsIsset), ("$y", Assertion::Falsy)]);
+        let reordered = clause(2, &[("$y", Assertion::Falsy), ("$x", Assertion::IsIsset), ("$x", Assertion::Truthy)]);
+        assert!(container.contains(&reordered));
+        assert!(reordered.contains(&container));
+        assert!(container.contains(&clause(3, &[("$y", Assertion::Falsy)])));
+        assert!(!container.contains(&clause(4, &[("$y", Assertion::Truthy)])));
+        assert!(!container.contains(&clause(5, &[("$z", Assertion::Falsy)])));
     }
 
     #[test]
@@ -969,6 +1005,15 @@ mod tests {
     }
 
     #[test]
+    fn resolution_matches_keys_in_different_orders() {
+        let first = clause(1, &[("$x", Assertion::Truthy), ("$y", Assertion::Truthy), ("$y", Assertion::IsIsset)]);
+        let second = clause(2, &[("$y", Assertion::IsIsset), ("$y", Assertion::Truthy), ("$x", Assertion::Falsy)]);
+        let expected = first.remove_possibilities(word("$x")).into_iter().collect::<Vec<_>>();
+
+        assert_exact(&saturate_clauses(&[first, second], &AlgebraThresholds::default()), &expected);
+    }
+
+    #[test]
     fn absorption_preserves_wedges_and_survivor_order() {
         let compound = clause(1, &[("$x", Assertion::Truthy), ("$y", Assertion::Truthy)]);
         let unit = clause(2, &[("$y", Assertion::Truthy)]);
@@ -1009,6 +1054,16 @@ mod tests {
             &saturate_clauses(&input, &AlgebraThresholds { consensus_limit: 4, ..thresholds }),
             &[first, second],
         );
+    }
+
+    #[test]
+    fn consensus_matches_reordered_variable_keys() {
+        let first = clause(1, &[("$x", Assertion::Truthy), ("$y", Assertion::Truthy)]);
+        let second = clause(2, &[("$z", Assertion::Truthy), ("$x", Assertion::Falsy)]);
+        let consensus = clause(3, &[("$y", Assertion::Truthy), ("$z", Assertion::Truthy)]);
+        let expected = [first.clone(), second.clone()];
+
+        assert_exact(&saturate_clauses(&[first, second, consensus], &AlgebraThresholds::default()), &expected);
     }
 
     #[test]
