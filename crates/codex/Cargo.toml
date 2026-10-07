@@ -42,6 +42,7 @@ indexmap = { workspace = true }
 ordered-float = { workspace = true }
 mago-allocator = { workspace = true }
 memchr = { workspace = true }
+rayon = { workspace = true }
 
 [dev-dependencies]
 criterion = { workspace = true }

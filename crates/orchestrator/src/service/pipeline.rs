@@ -1,7 +1,11 @@
 #![allow(clippy::too_many_arguments)]
 
+use std::cmp::Reverse;
 use std::fmt::Debug;
 use std::sync::Arc;
+use std::sync::atomic::AtomicBool;
+use std::sync::atomic::AtomicUsize;
+use std::sync::atomic::Ordering;
 use std::time::Duration;
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
@@ -11,7 +15,7 @@ use mago_php_version::PHPVersion;
 use rayon::prelude::*;
 
 use mago_codex::metadata::CodebaseMetadata;
-use mago_codex::populator::populate_codebase;
+use mago_codex::populator::populate_codebase_parallel;
 use mago_codex::reference::SymbolReferences;
 use mago_codex::scanner::scan_program;
 use mago_codex::signature_builder;
@@ -302,7 +306,7 @@ where
         let mut symbol_references = self.symbol_references;
         let mut populate_duration = Duration::ZERO;
         measure!(trace_enabled, populate_duration, {
-            populate_codebase(&mut merged_codex, &mut symbol_references, safe_symbols, safe_symbol_members);
+            populate_codebase_parallel(&mut merged_codex, &mut symbol_references, safe_symbols, safe_symbol_members);
         });
 
         if let Some(compiling_bar) = compiling_bar {
@@ -310,10 +314,10 @@ where
         }
 
         let mut host_discover_duration = Duration::ZERO;
-        let host_files = measure!(
+        let mut host_files = measure!(
             trace_enabled,
             host_discover_duration,
-            self.database.files().filter(|f| f.file_type == FileType::Host).collect::<Vec<_>>()
+            self.database.files().filter(|f| f.file_type == FileType::Host).enumerate().collect::<Vec<_>>()
         );
 
         let before_map_result = before_map(&mut merged_codex, &mut symbol_references, captures)?;
@@ -322,6 +326,9 @@ where
             tracing::warn!("No host files found for analysis after compilation.");
             return self.reducer.reduce(merged_codex, symbol_references, before_map_result.into_iter().collect());
         }
+
+        // Start large files early, then restore database order before reduction.
+        host_files.sort_unstable_by_key(|(index, file)| (Reverse(file.size), *index));
 
         #[cfg(not(target_arch = "wasm32"))]
         let host_count = host_files.len();
@@ -339,41 +346,42 @@ where
         let hang_watcher = trace_enabled.then(|| HangWatcher::spawn(rayon::current_num_threads()));
 
         let mut analyze_parallel_duration = Duration::ZERO;
-        let mut results: Vec<I> = measure!(
+        let mut results: Vec<(usize, I)> = measure!(
             trace_enabled,
             analyze_parallel_duration,
-            host_files
-                .into_par_iter()
-                .map_init(LocalArena::new, |arena, file| {
-                    let context = self.shared_context.clone();
-                    let codebase = Arc::clone(&final_codebase);
+            map_with_priority_queue(&host_files, LocalArena::new, |arena, (index, file)| {
+                let file = Arc::clone(file);
+                let context = self.shared_context.clone();
+                let codebase = Arc::clone(&final_codebase);
 
-                    #[cfg(not(target_arch = "wasm32"))]
-                    let file_for_record = trace_enabled.then(|| Arc::clone(&file));
-                    #[cfg(not(target_arch = "wasm32"))]
-                    let file_start = trace_enabled.then(Instant::now);
+                #[cfg(not(target_arch = "wasm32"))]
+                let file_for_record = trace_enabled.then(|| Arc::clone(&file));
+                #[cfg(not(target_arch = "wasm32"))]
+                let file_start = trace_enabled.then(Instant::now);
 
-                    #[cfg(not(target_arch = "wasm32"))]
-                    let _hang_guard = hang_watcher.as_ref().map(|w| w.track(Arc::clone(&file)));
+                #[cfg(not(target_arch = "wasm32"))]
+                let _hang_guard = hang_watcher.as_ref().map(|w| w.track(Arc::clone(&file)));
 
-                    let result = map_function(context, arena, file, codebase);
+                let result = map_function(context, arena, file, codebase);
 
-                    #[cfg(not(target_arch = "wasm32"))]
-                    if let (Some(sink), Some(start), Some(recorded_file)) =
-                        (slowest_files_for_closure.as_ref(), file_start, file_for_record)
-                    {
-                        sink.record(start.elapsed(), recorded_file);
-                    }
+                #[cfg(not(target_arch = "wasm32"))]
+                if let (Some(sink), Some(start), Some(recorded_file)) =
+                    (slowest_files_for_closure.as_ref(), file_start, file_for_record)
+                {
+                    sink.record(start.elapsed(), recorded_file);
+                }
 
-                    arena.reset();
-                    if let Some(main_task_bar) = &main_task_bar {
-                        main_task_bar.inc(1);
-                    }
+                arena.reset();
+                if let Some(main_task_bar) = &main_task_bar {
+                    main_task_bar.inc(1);
+                }
 
-                    result
-                })
-                .collect::<Result<Vec<I>, OrchestratorError>>()?
+                result.map(|result| (*index, result))
+            })?
         );
+
+        results.sort_unstable_by_key(|(index, _)| *index);
+        let mut results = results.into_iter().map(|(_, result)| result).collect::<Vec<_>>();
 
         if let Some(result) = before_map_result {
             results.insert(0, result);
@@ -638,5 +646,209 @@ where
         }
 
         reduced
+    }
+}
+
+/// Claims inputs in slice order, with one reusable state per worker.
+fn map_with_priority_queue<T, S, I, E, F, C>(items: &[T], initialize: C, map: F) -> Result<Vec<I>, E>
+where
+    T: Sync,
+    I: Send,
+    E: Send,
+    F: Fn(&mut S, &T) -> Result<I, E> + Sync,
+    C: Fn() -> S + Sync,
+{
+    let next = AtomicUsize::new(0);
+    let cancelled = AtomicBool::new(false);
+    let worker_count = items.len().min(rayon::current_num_threads());
+    let batches = (0..worker_count)
+        .into_par_iter()
+        .with_max_len(1)
+        .map(|_| {
+            let mut state = initialize();
+            let mut results = Vec::new();
+            while !cancelled.load(Ordering::Relaxed) {
+                let index = next.fetch_add(1, Ordering::Relaxed);
+                let Some(item) = items.get(index) else {
+                    break;
+                };
+
+                match map(&mut state, item) {
+                    Ok(result) => results.push(result),
+                    Err(error) => {
+                        cancelled.store(true, Ordering::Relaxed);
+                        return Err(error);
+                    }
+                }
+            }
+            Ok(results)
+        })
+        .collect::<Result<Vec<_>, E>>()?;
+
+    Ok(batches.into_iter().flatten().collect())
+}
+
+#[cfg(test)]
+#[allow(clippy::panic_in_result_fn)]
+mod tests {
+    use std::borrow::Cow;
+    use std::path::Path;
+    use std::sync::Arc;
+    use std::sync::Barrier;
+    use std::sync::Mutex;
+    use std::sync::atomic::AtomicUsize;
+    use std::sync::atomic::Ordering;
+
+    use mago_codex::metadata::CodebaseMetadata;
+    use mago_codex::reference::SymbolReferences;
+    use mago_database::Database;
+    use mago_database::DatabaseConfiguration;
+    use mago_database::DatabaseReader;
+    use mago_database::file::File;
+    use mago_database::file::FileId;
+    use mago_database::file::FileType;
+    use mago_php_version::PHPVersion;
+    use mago_syntax::settings::ParserSettings;
+
+    use super::ParallelPipeline;
+    use super::Reducer;
+    use super::map_with_priority_queue;
+    use crate::error::OrchestratorError;
+
+    #[derive(Debug)]
+    struct FileIds;
+
+    impl Reducer<FileId, Vec<FileId>> for FileIds {
+        fn reduce(
+            &self,
+            _codebase: CodebaseMetadata,
+            _symbol_references: SymbolReferences,
+            results: Vec<FileId>,
+        ) -> Result<Vec<FileId>, OrchestratorError> {
+            Ok(results)
+        }
+    }
+
+    #[test]
+    fn analysis_preserves_host_coverage_and_result_order() -> Result<(), Box<dyn std::error::Error>> {
+        let configuration = DatabaseConfiguration::new(Path::new("."), vec![], vec![], vec![], vec![]);
+        let mut database = Database::new(configuration);
+        for index in 0..32 {
+            database.add(File::ephemeral(
+                Cow::Owned(format!("host-{index}.php").into_bytes()),
+                Cow::Owned(format!("<?php /* {} */", "x".repeat(index * 100)).into_bytes()),
+            ));
+        }
+        database.add(File::new(Cow::Borrowed(b"vendor.php"), FileType::Vendored, None, Cow::Borrowed(b"<?php")));
+
+        let database = database.read_only();
+        let before_map_id = FileId::new(b"before-map");
+        let mut expected = vec![before_map_id];
+        expected.extend(database.files().filter(|file| file.file_type == FileType::Host).map(|file| file.id));
+
+        let pipeline = ParallelPipeline::new(
+            "test",
+            database,
+            CodebaseMetadata::new(),
+            SymbolReferences::new(),
+            (),
+            ParserSettings::default(),
+            PHPVersion::new(8, 4, 0),
+            Box::new(FileIds),
+            false,
+        );
+        let results = rayon::ThreadPoolBuilder::new().num_threads(4).build()?.install(|| {
+            pipeline.run(|_, _, _| Ok(None::<()>), |_, _, _| Ok(Some(before_map_id)), |(), _, file, _| Ok(file.id))
+        })?;
+
+        assert_eq!(results, expected);
+        Ok(())
+    }
+
+    #[test]
+    fn workers_claim_largest_inputs_first_and_process_each_once() -> Result<(), Box<dyn std::error::Error>> {
+        let items = (0..32).rev().collect::<Vec<_>>();
+        let first_claims = Mutex::new(Vec::new());
+        let first_batch = Barrier::new(4);
+        let visits = [const { AtomicUsize::new(0) }; 32];
+        let initialized = AtomicUsize::new(0);
+        let mut results = rayon::ThreadPoolBuilder::new().num_threads(4).build()?.install(|| {
+            map_with_priority_queue(
+                &items,
+                || {
+                    initialized.fetch_add(1, Ordering::Relaxed);
+                    true
+                },
+                |first, value| {
+                    if *first {
+                        first_claims.lock().map_err(|_| "first-claim lock poisoned")?.push(*value);
+                        first_batch.wait();
+                        *first = false;
+                    }
+                    visits[*value].fetch_add(1, Ordering::Relaxed);
+                    Ok::<_, &'static str>(*value)
+                },
+            )
+        })?;
+
+        let mut first_claims = first_claims.into_inner().map_err(|_| "first-claim lock poisoned")?;
+        first_claims.sort_unstable();
+        assert_eq!(first_claims, [28, 29, 30, 31]);
+        assert_eq!(initialized.load(Ordering::Relaxed), 4);
+        assert!(visits.iter().all(|count| count.load(Ordering::Relaxed) == 1));
+        results.sort_unstable();
+        assert_eq!(results, (0..32).collect::<Vec<_>>());
+        Ok(())
+    }
+
+    #[test]
+    fn empty_queue_does_not_initialize_workers() -> Result<(), std::convert::Infallible> {
+        let initialized = AtomicUsize::new(0);
+        let result = map_with_priority_queue(
+            &[] as &[usize],
+            || {
+                initialized.fetch_add(1, Ordering::Relaxed);
+            },
+            |(), value| Ok::<_, std::convert::Infallible>(*value),
+        );
+        assert!(result?.is_empty());
+        assert_eq!(initialized.load(Ordering::Relaxed), 0);
+        Ok(())
+    }
+
+    #[test]
+    fn queue_errors_drop_completed_results() -> Result<(), Box<dyn std::error::Error>> {
+        struct ResultValue(Arc<AtomicUsize>);
+
+        impl Drop for ResultValue {
+            fn drop(&mut self) {
+                self.0.fetch_add(1, Ordering::Relaxed);
+            }
+        }
+
+        for threads in [1, 4] {
+            let created = AtomicUsize::new(0);
+            let dropped = Arc::new(AtomicUsize::new(0));
+            let items = (0..64).collect::<Vec<_>>();
+            let result = rayon::ThreadPoolBuilder::new().num_threads(threads).build()?.install(|| {
+                map_with_priority_queue(
+                    &items,
+                    || (),
+                    |(), value| {
+                        if *value == 5 {
+                            return Err("stop");
+                        }
+                        created.fetch_add(1, Ordering::Relaxed);
+                        Ok(ResultValue(Arc::clone(&dropped)))
+                    },
+                )
+            });
+            assert!(matches!(result, Err("stop")));
+            assert_eq!(created.load(Ordering::Relaxed), dropped.load(Ordering::Relaxed));
+            if threads == 1 {
+                assert_eq!(created.load(Ordering::Relaxed), 5);
+            }
+        }
+        Ok(())
     }
 }
