@@ -6,9 +6,9 @@ use std::collections::HashSet;
 
 use foldhash::fast::FixedState;
 use mago_word::Word;
-use mago_word::ascii_lowercase_word;
 
 use crate::identifier::function_like::FunctionLikeIdentifier;
+use crate::identifier::method::MethodIdentifier;
 use crate::metadata::CodebaseMetadata;
 use crate::metadata::class_like::ClassLikeMetadata;
 use crate::metadata::function_like::FunctionLikeMetadata;
@@ -171,6 +171,16 @@ pub fn expand_union(codebase: &CodebaseMetadata, return_type: &mut TUnion, optio
         return;
     }
 
+    expand_union_inner(codebase, return_type, options);
+}
+
+fn expand_shared_union(codebase: &CodebaseMetadata, return_type: &mut Arc<TUnion>, options: &TypeExpansionOptions) {
+    if return_type.is_expandable() {
+        expand_union_inner(codebase, Arc::make_mut(return_type), options);
+    }
+}
+
+fn expand_union_inner(codebase: &CodebaseMetadata, return_type: &mut TUnion, options: &TypeExpansionOptions) {
     let mut types = std::mem::take(&mut return_type.types).into_owned();
     let mut new_return_type_parts: Vec<TAtomic> = Vec::new();
     let mut skip_mask: u64 = 0;
@@ -221,8 +231,8 @@ pub(crate) fn expand_atomic(
         TAtomic::Array(array_type) => match array_type {
             TArray::Keyed(keyed_data) => {
                 if let Some((key_parameter, value_parameter)) = &mut keyed_data.parameters {
-                    expand_union(codebase, Arc::make_mut(key_parameter), options);
-                    expand_union(codebase, Arc::make_mut(value_parameter), options);
+                    expand_shared_union(codebase, key_parameter, options);
+                    expand_shared_union(codebase, value_parameter, options);
                 }
 
                 if let Some(known_items) = &mut keyed_data.known_items {
@@ -244,7 +254,7 @@ pub(crate) fn expand_atomic(
                 }
             }
             TArray::List(list_data) => {
-                expand_union(codebase, Arc::make_mut(&mut list_data.element_type), options);
+                expand_shared_union(codebase, &mut list_data.element_type, options);
 
                 if let Some(known_elements) = &mut list_data.known_elements {
                     for (_, element_type) in known_elements.values_mut() {
@@ -262,25 +272,27 @@ pub(crate) fn expand_atomic(
             }
         }
         TAtomic::Callable(TCallable::Signature(signature)) => {
-            if let Some(return_type) = signature.get_return_type_mut() {
-                expand_union(codebase, return_type, options);
+            if let Some(return_type) = &mut signature.return_type {
+                expand_shared_union(codebase, return_type, options);
             }
 
             for param in signature.get_parameters_mut() {
-                if let Some(param_type) = param.get_type_signature_mut() {
-                    expand_union(codebase, param_type, options);
+                if param.get_type_signature().is_some_and(TType::is_expandable)
+                    && let Some(param_type) = param.get_type_signature_mut()
+                {
+                    expand_union_inner(codebase, param_type, options);
                 }
             }
 
             for constraint in &mut signature.constraints {
-                expand_union(codebase, Arc::make_mut(&mut constraint.input_type), options);
+                expand_shared_union(codebase, &mut constraint.input_type, options);
                 if !contains_parameter_variable(&constraint.parameter_type) {
-                    expand_union(codebase, Arc::make_mut(&mut constraint.parameter_type), options);
+                    expand_shared_union(codebase, &mut constraint.parameter_type, options);
                 }
             }
         }
         TAtomic::GenericParameter(parameter) => {
-            expand_union(codebase, Arc::make_mut(&mut parameter.constraint), options);
+            expand_shared_union(codebase, &mut parameter.constraint, options);
         }
         TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::OfType { constraint, .. })) => {
             let mut atomic_return_type_parts = vec![];
@@ -335,8 +347,8 @@ pub(crate) fn expand_atomic(
             });
         }
         TAtomic::Iterable(iterable) => {
-            expand_union(codebase, Arc::make_mut(&mut iterable.key_type), options);
-            expand_union(codebase, Arc::make_mut(&mut iterable.value_type), options);
+            expand_shared_union(codebase, &mut iterable.key_type, options);
+            expand_shared_union(codebase, &mut iterable.value_type, options);
         }
         _ => {}
     }
@@ -389,7 +401,7 @@ fn resolve_array_key(key: ArrayKey, codebase: &CodebaseMetadata, options: &TypeE
 
     // Resolve self/static/this/parent to the actual class name
     let resolved_class_name = {
-        let name_lc = ascii_lowercase_word(class_like_name.as_bytes());
+        let name_lc = class_like_name.to_ascii_lowercase();
         match name_lc.as_bytes() {
             b"self" => options.self_class.unwrap_or(class_like_name),
             b"static" | b"$this" => {
@@ -401,7 +413,7 @@ fn resolve_array_key(key: ArrayKey, codebase: &CodebaseMetadata, options: &TypeE
             }
             b"parent" => {
                 if let Some(self_class) = options.self_class
-                    && let Some(class_metadata) = codebase.get_class_like(self_class.as_bytes())
+                    && let Some(class_metadata) = codebase.get_class_like_by_name(self_class)
                     && let Some(parent) = class_metadata.direct_parent_class
                 {
                     parent
@@ -413,7 +425,7 @@ fn resolve_array_key(key: ArrayKey, codebase: &CodebaseMetadata, options: &TypeE
         }
     };
 
-    let Some(class_like) = codebase.get_class_like(resolved_class_name.as_bytes()) else {
+    let Some(class_like) = codebase.get_class_like_by_name(resolved_class_name) else {
         return ArrayKey::ClassLikeConstant { class_like_name, constant_name };
     };
 
@@ -466,12 +478,19 @@ fn expand_member_reference(
         return;
     }
 
-    let Some(class_like) = codebase.get_class_like(class_like_name.as_bytes()) else {
+    let Some(class_like) = codebase.get_class_like_by_name(class_like_name) else {
         new_return_type_parts.push(TAtomic::Mixed(TMixed::new()));
         return;
     };
 
-    for (constant_name, constant) in &class_like.constants {
+    let (constant, constants) = match member_selector {
+        TReferenceMemberSelector::Identifier(name) => (class_like.constants.get_key_value(name), None),
+        _ => (None, Some(&class_like.constants)),
+    };
+
+    for (constant_name, constant) in
+        constant.into_iter().chain(constants.into_iter().flat_map(|constants| constants.iter()))
+    {
         if !member_selector.matches(*constant_name) {
             continue;
         }
@@ -498,7 +517,11 @@ fn expand_member_reference(
         }
     }
 
-    if matches!(member_selector, TReferenceMemberSelector::Wildcard) && !class_like.enum_cases.is_empty() {
+    if let TReferenceMemberSelector::Identifier(name) = member_selector {
+        if class_like.enum_cases.contains_key(name) {
+            new_return_type_parts.push(TAtomic::Object(TObject::new_enum_case(class_like.original_name, *name)));
+        }
+    } else if matches!(member_selector, TReferenceMemberSelector::Wildcard) && !class_like.enum_cases.is_empty() {
         new_return_type_parts.push(TAtomic::Object(TObject::new_enum(class_like.original_name)));
     } else {
         for enum_case_name in class_like.enum_cases.keys() {
@@ -555,21 +578,20 @@ fn expand_global_reference(
 fn expand_object(object: &mut TObject, codebase: &CodebaseMetadata, options: &TypeExpansionOptions) {
     resolve_special_class_names(object, codebase, options);
 
-    if let TObject::Named(named) = object
-        && named.intersection_types.is_none()
-        && let Some(class_metadata) = codebase.get_class_like(named.name.as_bytes())
+    let TObject::Named(named) = object else {
+        return;
+    };
+
+    let class_metadata = codebase.get_class_like_by_name(named.name);
+    if named.intersection_types.is_none()
+        && let Some(class_metadata) = class_metadata
         && class_metadata.kind.is_enum()
     {
         *object = TObject::new_enum(class_metadata.original_name);
         return;
     }
 
-    let TObject::Named(named) = object else {
-        return;
-    };
-
     let has_params = named.type_parameters.as_ref().is_some_and(|p| !p.is_empty());
-    let class_metadata = codebase.get_class_like(named.name.as_bytes());
     let has_required_intersections =
         class_metadata.map(|m| !m.require_extends.is_empty() || !m.require_implements.is_empty()).unwrap_or(false);
     let needs_default_params = !has_params && class_metadata.map(|m| !m.template_types.is_empty()).unwrap_or(false);
@@ -588,7 +610,7 @@ fn expand_object(object: &mut TObject, codebase: &CodebaseMetadata, options: &Ty
         }
     }
 
-    expand_or_fill_type_parameters(named, codebase, options);
+    expand_or_fill_type_parameters(named, class_metadata, codebase, options);
 }
 
 fn resolve_generic_static_type(
@@ -731,7 +753,7 @@ fn resolve_special_class_names(object: &mut TObject, codebase: &CodebaseMetadata
         }
         SpecialClassName::Parent => {
             if let Some(self_class) = options.self_class
-                && let Some(class_metadata) = codebase.get_class_like(self_class.as_bytes())
+                && let Some(class_metadata) = codebase.get_class_like_by_name(self_class)
                 && let Some(parent) = class_metadata.direct_parent_class
             {
                 named.name = parent;
@@ -823,7 +845,7 @@ fn is_effectively_final(class_name: &Word, codebase: &CodebaseMetadata, options:
         return true;
     }
 
-    codebase.get_class_like(class_name.as_bytes()).is_some_and(|meta| meta.name_span.is_none() || meta.flags.is_final())
+    codebase.get_class_like_by_name(*class_name).is_some_and(|meta| meta.name_span.is_none() || meta.flags.is_final())
 }
 
 /// Iterates the class names of an object's intersection types.
@@ -839,7 +861,7 @@ fn intersection_object_names(obj: &TNamedObject) -> impl Iterator<Item = Word> {
 /// to the mixin class, so rebinding them to the class carrying the tag must treat
 /// that class as compatible.
 fn reaches_through_mixins(class_name: Word, target_name: Word, codebase: &CodebaseMetadata) -> bool {
-    let Some(metadata) = codebase.get_class_like(class_name.as_bytes()) else {
+    let Some(metadata) = codebase.get_class_like_by_name(class_name) else {
         return false;
     };
 
@@ -884,7 +906,7 @@ fn direct_mixins<'ctx>(
 
         atomics.iter().filter_map(move |atomic| {
             let mixin_name = atomic.get_object_or_enum_name()?;
-            Some((mixin_name, codebase.get_class_like(mixin_name.as_bytes())))
+            Some((mixin_name, codebase.get_class_like_by_name(mixin_name)))
         })
     })
 }
@@ -896,7 +918,7 @@ fn should_use_static_type_params(named: &TNamedObject, static_obj: &TNamedObject
         return true;
     };
 
-    let Some(class_metadata) = codebase.get_class_like(static_obj.name.as_bytes()) else {
+    let Some(class_metadata) = codebase.get_class_like_by_name(static_obj.name) else {
         return false;
     };
 
@@ -913,10 +935,11 @@ fn should_use_static_type_params(named: &TNamedObject, static_obj: &TNamedObject
 /// Expands existing type parameters and fills omitted arguments.
 fn expand_or_fill_type_parameters(
     named: &mut TNamedObject,
+    class_metadata: Option<&ClassLikeMetadata>,
     codebase: &CodebaseMetadata,
     options: &TypeExpansionOptions,
 ) {
-    if let Some(class_metadata) = codebase.get_class_like(named.name.as_bytes()) {
+    if let Some(class_metadata) = class_metadata {
         let template_count = class_metadata.template_types.len();
         let supplied_count = named.type_parameters.as_ref().map_or(0, Vec::len);
 
@@ -971,12 +994,12 @@ fn get_signature_of_function_like_identifier_with_options(
     preserve_parameter_dependencies: bool,
 ) -> Option<TCallableSignature> {
     let (function_like_metadata, options) = match function_like_identifier {
-        FunctionLikeIdentifier::Function(name) => {
-            (codebase.get_function(name.as_bytes())?, TypeExpansionOptions::default())
+        FunctionLikeIdentifier::Function(_) => {
+            (codebase.get_function_like(function_like_identifier)?, TypeExpansionOptions::default())
         }
         FunctionLikeIdentifier::Closure(name) => (codebase.get_closure(name)?, TypeExpansionOptions::default()),
         FunctionLikeIdentifier::Method(classlike_name, method_name) => (
-            codebase.get_declaring_method(classlike_name.as_bytes(), method_name.as_bytes())?,
+            codebase.get_declaring_method_by_id(&MethodIdentifier::new(*classlike_name, *method_name))?,
             TypeExpansionOptions {
                 self_class: Some(*classlike_name),
                 static_class_type: StaticClassType::Name(*classlike_name),
@@ -1274,6 +1297,7 @@ mod tests {
 
     use mago_syntax::parser::parse_file;
     use mago_word::WordSet;
+    use mago_word::ascii_lowercase_word;
     use mago_word::word;
 
     use crate::metadata::CodebaseMetadata;
@@ -2387,6 +2411,40 @@ mod tests {
     }
 
     #[test]
+    fn test_expand_member_identifier_is_case_sensitive_and_keeps_aliases() {
+        let mut codebase =
+            create_test_codebase("<?php enum Status { case Active; public const VALUE = 42; public const value = 7; }");
+        let metadata = codebase.class_likes.get_mut(&word("status")).unwrap();
+        metadata.type_aliases.insert(
+            word("VALUE"),
+            crate::metadata::ttype::TypeMetadata {
+                span: metadata.span,
+                type_union: get_string(),
+                from_docblock: true,
+                inferred: false,
+            },
+        );
+
+        for (name, expected) in [
+            (
+                "VALUE",
+                TUnion::from_vec(vec![TAtomic::Scalar(TScalar::literal_int(42)), TAtomic::Scalar(TScalar::string())]),
+            ),
+            ("value", crate::ttype::get_literal_int(7)),
+            ("Value", get_mixed()),
+            ("Active", TUnion::from_atomic(TAtomic::Object(TObject::new_enum_case(word("Status"), word("Active"))))),
+            ("active", get_mixed()),
+        ] {
+            let mut actual = TUnion::from_atomic(TAtomic::Reference(TReference::new_member(
+                word("Status"),
+                TReferenceMemberSelector::Identifier(word(name)),
+            )));
+            expand_union(&codebase, &mut actual, &TypeExpansionOptions::default());
+            assert_eq!(actual, expected, "member {name}");
+        }
+    }
+
+    #[test]
     fn test_expand_member_reference_unknown_class() {
         let codebase = CodebaseMetadata::new();
 
@@ -2799,6 +2857,24 @@ mod tests {
                 }
             }));
         }
+    }
+
+    #[test]
+    fn test_expand_shared_iterable_leaves_other_owners_unchanged() {
+        let codebase = create_test_codebase("<?php class Foo {}");
+        let key = Arc::new(get_int());
+        let value = Arc::new(make_self_object());
+        let mut actual = TUnion::from_atomic(TAtomic::Iterable(TIterable::new(Arc::clone(&key), Arc::clone(&value))));
+
+        expand_union(&codebase, &mut actual, &options_with_self("Foo"));
+
+        let TAtomic::Iterable(iterable) = actual.get_single() else {
+            panic!("expected an iterable");
+        };
+        assert!(Arc::ptr_eq(&iterable.key_type, &key));
+        assert!(!Arc::ptr_eq(&iterable.value_type, &value));
+        assert_eq!(*value, make_self_object());
+        assert_eq!(iterable.value_type.get_id(), word("foo"));
     }
 
     #[test]

@@ -82,7 +82,7 @@ pub(super) fn is_intersection_shallowly_contained_by(
                     GenericParent::ClassLike(container_defining_class),
                 ) => {
                     if input_defining_class != container_defining_class
-                        && let Some(input_class_metadata) = codebase.get_class_like(input_defining_class.as_bytes())
+                        && let Some(input_class_metadata) = codebase.get_class_like_by_name(*input_defining_class)
                         && let Some(defining_entity_params) =
                             &input_class_metadata.template_extended_parameters.get(container_defining_class)
                         && defining_entity_params.contains_key(container_parameter_name)

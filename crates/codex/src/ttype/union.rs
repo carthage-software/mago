@@ -1183,23 +1183,26 @@ impl TType for TUnion {
     fn get_id(&self) -> Word {
         let len = self.types.len();
 
+        if len <= 1 {
+            return self.types.first().map_or_else(empty_word, |atomic| {
+                let id = atomic.get_id();
+                if atomic.is_generic_parameter() { concat_word!(b"(", id.as_bytes(), b")") } else { id }
+            });
+        }
+
         let mut atomic_ids: Vec<Word> = self
             .types
             .as_ref()
             .iter()
             .map(|atomic| {
                 let id = atomic.get_id();
-                if atomic.is_generic_parameter() || atomic.has_intersection_types() && len > 1 {
+                if atomic.is_generic_parameter() || atomic.has_intersection_types() {
                     concat_word!(b"(", id.as_bytes(), b")")
                 } else {
                     id
                 }
             })
             .collect();
-
-        if len <= 1 {
-            return atomic_ids.pop().unwrap_or_else(empty_word);
-        }
 
         atomic_ids.sort_unstable();
         join_words(&atomic_ids, b"|")

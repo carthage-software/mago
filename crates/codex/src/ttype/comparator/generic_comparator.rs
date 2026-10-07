@@ -27,11 +27,11 @@ pub(crate) fn is_contained_by(
         _ => return false,
     };
 
-    let Some(container_metadata) = codebase.get_class_like(container_object.name.as_bytes()) else {
+    let Some(container_metadata) = codebase.get_class_like_by_name(container_object.name) else {
         return false;
     };
 
-    let Some(input_metadata) = codebase.get_class_like(input_name.as_bytes()) else {
+    let Some(input_metadata) = codebase.get_class_like_by_name(input_name) else {
         return false;
     };
 

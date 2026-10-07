@@ -1,7 +1,6 @@
 use std::sync::Arc;
 
 use mago_word::Word;
-use mago_word::ascii_lowercase_word;
 use mago_word::concat_word;
 use mago_word::word;
 
@@ -936,7 +935,7 @@ pub fn populate_atomic_type(
                     add_symbol_reference(reference_source, symbol_references, *name);
                 }
 
-                if let Some(symbol_kind) = codebase_symbols.get_kind(ascii_lowercase_word(name.as_bytes())) {
+                if let Some(symbol_kind) = codebase_symbols.get_kind(name.to_ascii_lowercase()) {
                     if symbol_kind == SymbolKind::Enum {
                         *unpopulated_atomic = TAtomic::Object(TObject::new_enum(*name));
                     } else {

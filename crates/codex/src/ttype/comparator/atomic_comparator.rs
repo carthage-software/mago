@@ -361,7 +361,7 @@ pub fn is_contained_by(
             }
             TObject::Named(TNamedObject { name: input_object_name, .. })
             | TObject::Enum(TEnum { name: input_object_name, .. }) => {
-                let Some(class_like_metadata) = codebase.get_class_like(input_object_name.as_bytes()) else {
+                let Some(class_like_metadata) = codebase.get_class_like_by_name(*input_object_name) else {
                     return false;
                 };
 
@@ -373,7 +373,7 @@ pub fn is_contained_by(
                     let real_property = class_like_metadata
                         .declaring_property_ids
                         .get(&property_name)
-                        .and_then(|declaring_class| codebase.get_class_like(declaring_class.as_bytes()))
+                        .and_then(|declaring_class| codebase.get_class_like_by_name(*declaring_class))
                         .and_then(|declaring_metadata| declaring_metadata.properties.get(&property_name));
 
                     // Structural containment is an external view: a publicly readable real
@@ -385,7 +385,7 @@ pub fn is_contained_by(
                         real => class_like_metadata
                             .magic_property_ids
                             .get(&property_name)
-                            .and_then(|tag_class| codebase.get_class_like(tag_class.as_bytes()))
+                            .and_then(|tag_class| codebase.get_class_like_by_name(*tag_class))
                             .and_then(|tag_metadata| tag_metadata.magic_properties.get(&property_name))
                             .or(real),
                     };
@@ -539,7 +539,7 @@ fn is_forwarded_template_parameter(
 
     input_class != container_class
         && codebase
-            .get_class_like(input_class.as_bytes())
+            .get_class_like_by_name(*input_class)
             .and_then(|metadata| metadata.template_extended_parameters.get(container_class))
             .is_some_and(|parameters| parameters.contains_key(&container_generic.parameter_name))
 }
@@ -783,7 +783,7 @@ pub(crate) fn can_be_identical(
     if let (TAtomic::Object(first_object), TAtomic::Object(second_object)) = (first_part, second_part)
         && let (Some(first_name), Some(second_name)) = (first_object.get_name(), second_object.get_name())
     {
-        return match (codebase.get_class_like(first_name.as_bytes()), codebase.get_class_like(second_name.as_bytes())) {
+        return match (codebase.get_class_like_by_name(first_name), codebase.get_class_like_by_name(second_name)) {
             (Some(c1), Some(c2)) => c1.kind.is_interface() || c2.kind.is_interface(),
             _ => true,
         };
