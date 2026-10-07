@@ -48,7 +48,7 @@ use crate::resolver::class_name::ResolutionOrigin;
 use crate::resolver::class_name::ResolvedClassname;
 use crate::resolver::class_name::resolve_classnames_from_expression;
 use crate::utils::template::get_generic_parameter_for_offset;
-use crate::visibility::check_method_visibility;
+use crate::visibility::check_method_visibility_by_id;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Instantiation<'arena> {
     fn analyze<'ctx, A>(
@@ -163,7 +163,7 @@ where
         return Ok(wrap_atomic(classname.get_object_type(context.codebase)));
     };
 
-    let Some(metadata) = context.codebase.get_class_like(fq_classname.as_bytes()) else {
+    let Some(metadata) = context.codebase.get_class_like_by_name(fq_classname) else {
         context.collector.report_with_code(
             IssueCode::NonExistentClass,
             Issue::error(format!("Class `{fq_classname}` not found."))
@@ -362,11 +362,10 @@ where
             true,
         )?;
 
-        if !check_method_visibility(
+        if !check_method_visibility_by_id(
             context,
             block_context.scope.get_class_like_name(),
-            constructor_declraing_id.get_class_name().as_bytes(),
-            constructor_declraing_id.get_method_name().as_bytes(),
+            &constructor_declraing_id,
             instantiation_span,
             None,
         ) {

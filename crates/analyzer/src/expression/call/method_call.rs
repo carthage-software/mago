@@ -53,7 +53,7 @@ use crate::resolver::method::report_non_documented_method;
 use crate::resolver::method::report_non_existent_method;
 use crate::resolver::method::resolve_method_targets;
 use crate::utils::expression::get_block_expression_id;
-use crate::visibility::check_method_visibility;
+use crate::visibility::check_method_visibility_by_id;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for MethodCall<'arena> {
     fn analyze<'ctx, A>(
@@ -206,11 +206,10 @@ pub fn analyze_implicit_method_call<'ctx, 'arena, A>(
 where
     A: Arena,
 {
-    if !check_method_visibility(
+    if !check_method_visibility_by_id(
         context,
         block_context.scope.get_class_like_name(),
-        method_identifier.get_class_name().as_bytes(),
-        method_identifier.get_method_name().as_bytes(),
+        &method_identifier,
         span,
         None,
     ) {
@@ -310,7 +309,7 @@ where
     for resolved_method in method_resolution.resolved_methods {
         let metadata = context
             .codebase
-            .get_class_like(resolved_method.classname.as_bytes())
+            .get_class_like_by_name(resolved_method.classname)
             .expect("class-like metadata should exist for resolved method");
 
         let method_metadata = context
@@ -432,7 +431,7 @@ where
     targets.reserve(unresolved_methods.len());
     let mut has_invalid_target = false;
     for unresolved in unresolved_methods {
-        let Some(class_like_metadata) = context.codebase.get_class_like(unresolved.classname.as_bytes()) else {
+        let Some(class_like_metadata) = context.codebase.get_class_like_by_name(unresolved.classname) else {
             report_non_existent_method(
                 context,
                 unresolved.target_span,
@@ -504,7 +503,7 @@ where
         let magic_call_method = undocumented_method.magic_method;
         let class_like_metadata = context
             .codebase
-            .get_class_like(magic_call_method.classname.as_bytes())
+            .get_class_like_by_name(magic_call_method.classname)
             .expect("class-like metadata should exist for resolved magic call method");
 
         let method_metadata = context

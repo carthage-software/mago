@@ -120,9 +120,7 @@ pub fn reconcile_keyed_types<'ctx, A>(
 
     add_nested_assertions(&mut new_types, &mut active_new_types, block_context);
     if new_types.len() > 1 {
-        new_types.sort_by_cached_key(|key, _| {
-            (old_new_types.get(key).is_none(), break_up_path_into_parts(key.as_bytes()).len())
-        });
+        new_types.sort_by_cached_key(|key, _| (old_new_types.get(key).is_none(), path_part_count(key.as_bytes())));
     }
 
     let original_types = can_report_issues.then(|| {
@@ -291,13 +289,16 @@ pub fn reconcile_keyed_types<'ctx, A>(
 
         let result_type = result_type.map(Cow::into_owned).unwrap_or_else(get_never);
 
-        let key_parts = break_up_path_into_parts(key_str);
-
         if !did_type_exist && result_type.is_never() {
             // Even when the type doesn't exist and result is never, we still need to
             // update parent array types for negated isset/key_exists to remove the key
             if key_str.ends_with(b"]") && (has_inverted_isset || has_inverted_key_exists) {
-                adjust_array_type_remove_key(key_parts, block_context, changed_var_ids, context.codebase);
+                adjust_array_type_remove_key(
+                    borrow_path_parts(key_str),
+                    block_context,
+                    changed_var_ids,
+                    context.codebase,
+                );
             }
 
             continue;
@@ -313,7 +314,7 @@ pub fn reconcile_keyed_types<'ctx, A>(
             changed_var_ids.insert(*key);
             if key_str.ends_with(b"]") && !has_inverted_isset && !has_inverted_key_exists && !has_empty {
                 adjust_array_type(
-                    key_parts.clone(),
+                    borrow_path_parts(key_str),
                     block_context,
                     changed_var_ids,
                     &result_type,
@@ -333,7 +334,7 @@ pub fn reconcile_keyed_types<'ctx, A>(
 
                 if let Some(entry_type) = optional_entry_type {
                     adjust_array_type(
-                        key_parts.clone(),
+                        borrow_path_parts(key_str),
                         block_context,
                         changed_var_ids,
                         &entry_type,
@@ -341,10 +342,21 @@ pub fn reconcile_keyed_types<'ctx, A>(
                         true,
                     );
                 } else {
-                    adjust_array_type_remove_key(key_parts.clone(), block_context, changed_var_ids, context.codebase);
+                    adjust_array_type_remove_key(
+                        borrow_path_parts(key_str),
+                        block_context,
+                        changed_var_ids,
+                        context.codebase,
+                    );
                 }
             } else if memchr::memmem::find(key_str, b"->").is_some() && !is_equality {
-                adjust_object_property_type(key_parts.clone(), block_context, changed_var_ids, &result_type, context);
+                adjust_object_property_type(
+                    borrow_path_parts(key_str),
+                    block_context,
+                    changed_var_ids,
+                    &result_type,
+                    context,
+                );
             }
 
             if key_str != b"$this" {
@@ -419,18 +431,19 @@ pub fn reconcile_keyed_types<'ctx, A>(
             block_context.locals.insert(*key, Rc::new(result_type));
         }
 
-        let key_parts_0_atom = word(&key_parts[0]);
-        if let Some(existing_type) = block_context.locals.get(key).cloned()
-            && !did_type_exist
-            && reference_graph.contains_key(&key_parts_0_atom)
-        {
-            // If key is new, create references for other variables that reference the root variable.
-            let mut reference_key_parts = key_parts;
-            for reference in &reference_graph[&key_parts_0_atom] {
-                reference_key_parts[0] = reference.as_bytes().to_vec();
-                let joined: Vec<u8> = reference_key_parts.iter().flatten().copied().collect();
-                let reference_key = word(&joined);
-                block_context.locals.insert(reference_key, Rc::clone(&existing_type));
+        if !did_type_exist && !reference_graph.is_empty() {
+            let mut key_parts = borrow_path_parts(key_str);
+            let key_parts_0_atom = word(key_parts[0]);
+            if let Some(existing_type) = block_context.locals.get(key).cloned()
+                && let Some(references) = reference_graph.get(&key_parts_0_atom)
+            {
+                // Give new paths to variables that reference the same root.
+                for reference in references {
+                    key_parts[0] = reference.as_bytes();
+                    let joined: Vec<u8> = key_parts.iter().flat_map(|part| part.iter()).copied().collect();
+                    let reference_key = word(&joined);
+                    block_context.locals.insert(reference_key, Rc::clone(&existing_type));
+                }
             }
         }
     }
@@ -498,7 +511,7 @@ where
 }
 
 fn adjust_array_type(
-    mut key_parts: Vec<Vec<u8>>,
+    mut key_parts: Vec<&[u8]>,
     context: &mut BlockContext<'_>,
     changed_var_ids: &mut WordSet,
     result_type: &TUnion,
@@ -511,7 +524,7 @@ fn adjust_array_type(
     };
     key_parts.pop();
 
-    let base_key: Vec<u8> = key_parts.iter().flatten().copied().collect();
+    let base_key: Vec<u8> = key_parts.iter().flat_map(|part| part.iter()).copied().collect();
     let base_key_atom = word(&base_key);
 
     if array_key.starts_with(b"$") {
@@ -524,7 +537,7 @@ fn adjust_array_type(
             narrowed.types.to_mut().retain(|t| !matches!(t, TAtomic::Array(a) if a.is_empty()));
             if !narrowed.types.is_empty() {
                 context.locals.insert(base_key_atom, Rc::new(narrowed));
-                changed_var_ids.insert(concat_word!(base_key.as_slice(), b"[", array_key.as_slice(), b"]"));
+                changed_var_ids.insert(concat_word!(base_key.as_slice(), b"[", array_key, b"]"));
             }
         }
         return;
@@ -532,11 +545,11 @@ fn adjust_array_type(
 
     let mut has_string_offset = false;
 
-    let arraykey_offset: Vec<u8> = if array_key.starts_with(b"'") || array_key.starts_with(b"\"") {
+    let arraykey_offset = if array_key.starts_with(b"'") || array_key.starts_with(b"\"") {
         has_string_offset = true;
-        array_key[1..(array_key.len() - 1)].to_vec()
+        &array_key[1..(array_key.len() - 1)]
     } else {
-        array_key.clone()
+        array_key
     };
 
     let mut existing_type = if let Some(existing_type) = context.locals.get(&base_key_atom) {
@@ -552,9 +565,9 @@ fn adjust_array_type(
         match &mut base_atomic_type {
             TAtomic::Array(TArray::Keyed(TKeyedArray { known_items, .. })) => {
                 let dictkey = if has_string_offset {
-                    ArrayKey::String(word(&arraykey_offset))
+                    ArrayKey::String(word(arraykey_offset))
                 } else if let Some(arraykey_value) =
-                    std::str::from_utf8(&arraykey_offset).ok().and_then(|s| s.parse::<i64>().ok())
+                    std::str::from_utf8(arraykey_offset).ok().and_then(|s| s.parse::<i64>().ok())
                 {
                     ArrayKey::Integer(arraykey_value)
                 } else {
@@ -581,7 +594,7 @@ fn adjust_array_type(
             }
             TAtomic::Array(TArray::List(TList { known_elements, .. })) => {
                 if let Some(arraykey_offset) =
-                    std::str::from_utf8(&arraykey_offset).ok().and_then(|s| s.parse::<usize>().ok())
+                    std::str::from_utf8(arraykey_offset).ok().and_then(|s| s.parse::<usize>().ok())
                 {
                     if let Some(known_elements) = known_elements {
                         if let Some((_, existing_item_type)) = known_elements.get(&arraykey_offset) {
@@ -603,9 +616,9 @@ fn adjust_array_type(
             }
             TAtomic::Mixed(_) => {
                 let key = if has_string_offset {
-                    ArrayKey::String(word(&arraykey_offset))
+                    ArrayKey::String(word(arraykey_offset))
                 } else if let Some(arraykey_value) =
-                    std::str::from_utf8(&arraykey_offset).ok().and_then(|s| s.parse::<i64>().ok())
+                    std::str::from_utf8(arraykey_offset).ok().and_then(|s| s.parse::<i64>().ok())
                 {
                     ArrayKey::Integer(arraykey_value)
                 } else {
@@ -633,10 +646,10 @@ fn adjust_array_type(
             }
         }
 
-        changed_var_ids.insert(concat_word!(base_key.as_slice(), b"[", array_key.as_slice(), b"]"));
+        changed_var_ids.insert(concat_word!(base_key.as_slice(), b"[", array_key, b"]"));
 
         if let Some(last_part) = key_parts.last()
-            && last_part == b"]"
+            && *last_part == b"]"
         {
             adjust_array_type(
                 key_parts.clone(),
@@ -660,7 +673,7 @@ fn adjust_array_type(
 }
 
 fn adjust_array_type_remove_key(
-    mut key_parts: Vec<Vec<u8>>,
+    mut key_parts: Vec<&[u8]>,
     context: &mut BlockContext<'_>,
     changed_var_ids: &mut WordSet,
     codebase: &CodebaseMetadata,
@@ -678,14 +691,14 @@ fn adjust_array_type_remove_key(
 
     let mut has_string_offset = false;
 
-    let arraykey_offset: Vec<u8> = if array_key.starts_with(b"'") || array_key.starts_with(b"\"") {
+    let arraykey_offset = if array_key.starts_with(b"'") || array_key.starts_with(b"\"") {
         has_string_offset = true;
-        array_key[1..(array_key.len() - 1)].to_vec()
+        &array_key[1..(array_key.len() - 1)]
     } else {
-        array_key.clone()
+        array_key
     };
 
-    let base_key: Vec<u8> = key_parts.iter().flatten().copied().collect();
+    let base_key: Vec<u8> = key_parts.iter().flat_map(|part| part.iter()).copied().collect();
     let base_key_atom = word(&base_key);
 
     let mut existing_type = if let Some(existing_type) = context.locals.get(&base_key_atom) {
@@ -698,9 +711,9 @@ fn adjust_array_type_remove_key(
         match base_atomic_type {
             TAtomic::Array(TArray::Keyed(TKeyedArray { known_items, .. })) => {
                 let dictkey = if has_string_offset {
-                    ArrayKey::String(word(&arraykey_offset))
+                    ArrayKey::String(word(arraykey_offset))
                 } else if let Some(arraykey_value) =
-                    std::str::from_utf8(&arraykey_offset).ok().and_then(|s| s.parse::<i64>().ok())
+                    std::str::from_utf8(arraykey_offset).ok().and_then(|s| s.parse::<i64>().ok())
                 {
                     ArrayKey::Integer(arraykey_value)
                 } else {
@@ -713,7 +726,7 @@ fn adjust_array_type_remove_key(
             }
             TAtomic::Array(TArray::List(TList { known_elements, .. })) => {
                 if let Some(arraykey_offset) =
-                    std::str::from_utf8(&arraykey_offset).ok().and_then(|s| s.parse::<usize>().ok())
+                    std::str::from_utf8(arraykey_offset).ok().and_then(|s| s.parse::<usize>().ok())
                     && let Some(known_elements) = known_elements
                 {
                     known_elements.remove(&arraykey_offset);
@@ -724,10 +737,10 @@ fn adjust_array_type_remove_key(
             }
         }
 
-        changed_var_ids.insert(concat_word!(base_key.as_slice(), b"[", array_key.as_slice(), b"]"));
+        changed_var_ids.insert(concat_word!(base_key.as_slice(), b"[", array_key, b"]"));
 
         if let Some(last_part) = key_parts.last()
-            && last_part == b"]"
+            && *last_part == b"]"
         {
             adjust_array_type(
                 key_parts.clone(),
@@ -749,7 +762,7 @@ fn adjust_array_type_remove_key(
 /// checks each object variant to see if its declared property type is compatible
 /// with the narrowed type, and removes incompatible variants.
 fn adjust_object_property_type<A>(
-    mut key_parts: Vec<Vec<u8>>,
+    mut key_parts: Vec<&[u8]>,
     block_context: &mut BlockContext<'_>,
     changed_var_ids: &mut WordSet,
     result_type: &TUnion,
@@ -769,7 +782,7 @@ fn adjust_object_property_type<A>(
         return;
     }
 
-    let base_key: Vec<u8> = key_parts.iter().flatten().copied().collect();
+    let base_key: Vec<u8> = key_parts.iter().flat_map(|part| part.iter()).copied().collect();
     let base_key_atom = word(&base_key);
 
     let mut existing_type = if let Some(existing_type) = block_context.locals.get(&base_key_atom) {
@@ -794,7 +807,7 @@ fn adjust_object_property_type<A>(
                     get_property_type(
                         context,
                         named.get_name(),
-                        &property_name,
+                        property_name,
                         true, // `instance_access`: assertions on `$obj->prop`
                         block_context.scope.get_class_like_name(),
                     )
@@ -885,7 +898,7 @@ fn add_nested_assertions(
 
     'outer: for (nk, only_isset_assertions) in nested_assertions {
         let nk_str = nk.as_bytes();
-        let mut key_parts = break_up_path_into_parts(nk_str);
+        let mut key_parts = borrow_path_parts(nk_str);
         key_parts.reverse();
 
         let mut nesting = 0;
@@ -893,11 +906,11 @@ fn add_nested_assertions(
 
         unsafe {
             // SAFETY: `pop` will always return a value because we checked that the key contains either `[` or `->`.
-            base_key = key_parts.pop().unwrap_unchecked();
+            base_key = key_parts.pop().unwrap_unchecked().to_vec();
 
-            if !base_key.starts_with(b"$") && key_parts.len() > 2 && key_parts.last().unwrap_unchecked() == b"::$" {
-                base_key.extend_from_slice(&key_parts.pop().unwrap_unchecked());
-                base_key.extend_from_slice(&key_parts.pop().unwrap_unchecked());
+            if !base_key.starts_with(b"$") && key_parts.len() > 2 && *key_parts.last().unwrap_unchecked() == b"::$" {
+                base_key.extend_from_slice(key_parts.pop().unwrap_unchecked());
+                base_key.extend_from_slice(key_parts.pop().unwrap_unchecked());
             }
         }
 
@@ -933,7 +946,7 @@ fn add_nested_assertions(
 
                 let mut new_base_key = base_key.clone();
                 new_base_key.push(b'[');
-                new_base_key.extend_from_slice(&array_key);
+                new_base_key.extend_from_slice(array_key);
                 new_base_key.push(b']');
                 let base_key_atom = word(&base_key);
                 let entry = new_types.entry(base_key_atom).or_default();
@@ -942,7 +955,7 @@ fn add_nested_assertions(
                 } else if array_key.starts_with(b"$") {
                     None
                 } else if let Some(arraykey_value) =
-                    std::str::from_utf8(&array_key).ok().and_then(|s| s.parse::<i64>().ok())
+                    std::str::from_utf8(array_key).ok().and_then(|s| s.parse::<i64>().ok())
                 {
                     Some(ArrayKey::Integer(arraykey_value))
                 } else {
@@ -982,7 +995,7 @@ fn add_nested_assertions(
 
                 let mut new_base_key = base_key.clone();
                 new_base_key.extend_from_slice(b"->");
-                new_base_key.extend_from_slice(&property_name);
+                new_base_key.extend_from_slice(property_name);
                 let base_key_atom = word(&base_key);
 
                 if !new_types.contains_key(&base_key_atom) {
@@ -1003,115 +1016,85 @@ fn add_nested_assertions(
     new_types.retain(|k, _| !keys_to_remove.contains(k));
 }
 
-pub fn break_up_path_into_parts(path: &[u8]) -> Vec<Vec<u8>> {
+#[cfg(test)]
+fn break_up_path_into_parts(path: &[u8]) -> Vec<Vec<u8>> {
+    let mut parts = Vec::new();
+    for_each_path_part(path, |part| parts.push(part.to_vec()));
+    parts
+}
+
+fn borrow_path_parts(path: &[u8]) -> Vec<&[u8]> {
+    let mut parts = Vec::new();
+    for_each_path_part(path, |part| parts.push(part));
+    parts
+}
+
+fn path_part_count(path: &[u8]) -> usize {
+    let mut count = 0;
+    for_each_path_part(path, |_| count += 1);
+    count
+}
+
+fn for_each_path_part<'path>(path: &'path [u8], mut visit: impl FnMut(&'path [u8])) {
     if path.is_empty() {
-        return vec![Vec::new()];
+        visit(path);
+        return;
     }
 
-    let mut parts: Vec<Vec<u8>> = Vec::with_capacity(path.len() / 4 + 1);
-    parts.push(Vec::with_capacity(16));
-
-    let mut string_char: Option<u8> = None;
-    let mut escape_char = false;
-    let mut brackets: i32 = 0;
-
+    let mut quote = None;
+    let mut escaped = false;
+    let mut brackets = 0i32;
+    let mut start = 0;
     let mut i = 0;
     while i < path.len() {
-        let c = path[i];
+        let token_start = i;
+        let byte = path[i];
         i += 1;
-        if let Some(quote) = string_char {
-            // SAFETY: `parts` is initialised with one element on line 830 and only grown,
-            // never drained, so `last_mut` is always `Some`.
-            unsafe {
-                parts.last_mut().unwrap_unchecked().push(c);
+        if let Some(quote_char) = quote {
+            if byte == quote_char && !escaped {
+                quote = None;
             }
+            escaped = byte == b'\\' && !escaped;
+            continue;
+        }
 
-            if c == quote && !escape_char {
-                string_char = None;
+        let is_token = match byte {
+            b'[' => {
+                let is_token = brackets == 0;
+                brackets += 1;
+                is_token
             }
-
-            escape_char = c == b'\\' && !escape_char;
-        } else {
-            let mut token_found: Option<&'static [u8]> = None;
-            match c {
-                b'[' => {
-                    if brackets == 0 {
-                        token_found = Some(b"[");
-                    } else {
-                        // SAFETY: `parts` is initialised with one element on line 830 and only grown,
-                        // never drained, so `last_mut` is always `Some`.
-                        unsafe {
-                            parts.last_mut().unwrap_unchecked().push(c);
-                        }
-                    }
-                    brackets += 1;
-                }
-                b']' => {
-                    brackets -= 1;
-                    if brackets == 0 {
-                        token_found = Some(b"]");
-                    } else {
-                        // SAFETY: `parts` is initialised with one element on line 830 and only grown,
-                        // never drained, so `last_mut` is always `Some`.
-                        unsafe {
-                            parts.last_mut().unwrap_unchecked().push(c);
-                        }
-                    }
-                }
-                b'\'' | b'"' => {
-                    string_char = Some(c);
-                    // SAFETY: `parts` is initialised with one element on line 830 and only
-                    // grown, never drained, so `last_mut` is always `Some`.
-                    unsafe {
-                        parts.last_mut().unwrap_unchecked().push(c);
-                    }
-                }
-                b':' if brackets == 0 && path.get(i) == Some(&b':') => {
-                    if path.get(i + 1) == Some(&b'$') {
-                        i += 2;
-                        token_found = Some(b"::$");
-                    } else {
-                        // SAFETY: `parts` is initialised with one element on line 830 and only grown,
-                        // never drained, so `last_mut` is always `Some`.
-                        unsafe {
-                            parts.last_mut().unwrap_unchecked().push(c);
-                        }
-                    }
-                }
-                b'-' if brackets == 0 && path.get(i) == Some(&b'>') => {
-                    i += 1;
-                    token_found = Some(b"->");
-                }
-                _ => {
-                    // SAFETY: `parts` is initialised with one element on line 830 and only
-                    // grown, never drained, so `last_mut` is always `Some`.
-                    unsafe {
-                        parts.last_mut().unwrap_unchecked().push(c);
-                    }
-                }
+            b']' => {
+                brackets -= 1;
+                brackets == 0
             }
-
-            if let Some(token) = token_found {
-                if let Some(last_part) = parts.last_mut()
-                    && last_part.is_empty()
-                {
-                    *last_part = token.to_vec();
-                } else {
-                    parts.push(token.to_vec());
-                }
-
-                parts.push(Vec::new());
+            b'\'' | b'"' => {
+                quote = Some(byte);
+                false
             }
+            b':' if brackets == 0 && path.get(i..i + 2) == Some(b":$") => {
+                i += 2;
+                true
+            }
+            b'-' if brackets == 0 && path.get(i) == Some(&b'>') => {
+                i += 1;
+                true
+            }
+            _ => false,
+        };
+
+        if is_token {
+            if start < token_start {
+                visit(&path[start..token_start]);
+            }
+            visit(&path[token_start..i]);
+            start = i;
         }
     }
 
-    if let Some(last_part) = parts.last()
-        && last_part.is_empty()
-    {
-        parts.pop();
+    if start < path.len() {
+        visit(&path[start..]);
     }
-
-    parts
 }
 
 #[allow(clippy::multiple_unsafe_ops_per_block)]
@@ -1132,7 +1115,11 @@ where
     A: Arena,
 {
     let key_str = key.as_bytes();
-    let mut key_parts = break_up_path_into_parts(key_str);
+    if memchr::memchr3(b'[', b'-', b':', key_str).is_none() {
+        return block_context.locals.get(&key).map(|ty| (**ty).clone());
+    }
+
+    let mut key_parts = borrow_path_parts(key_str);
     if key_parts.is_empty() {
         return None;
     }
@@ -1151,15 +1138,15 @@ where
 
     unsafe {
         // SAFETY: `pop` will always return a value because we checked that the key has more than one part.
-        base_key = key_parts.pop().unwrap_unchecked();
+        base_key = key_parts.pop().unwrap_unchecked().to_vec();
 
         if !base_key.starts_with(b"$")
             && key_parts.len() > 2
             && key_parts.last().is_some_and(|part| part.starts_with(b"::$"))
         {
             // SAFETY: `pop` will always return a value because we checked that the key has more than two parts.
-            base_key.extend_from_slice(&key_parts.pop().unwrap_unchecked());
-            base_key.extend_from_slice(&key_parts.pop().unwrap_unchecked());
+            base_key.extend_from_slice(key_parts.pop().unwrap_unchecked());
+            base_key.extend_from_slice(key_parts.pop().unwrap_unchecked());
         }
     }
 
@@ -1193,7 +1180,7 @@ where
 
             key_parts.pop();
 
-            let array_key_offset = std::str::from_utf8(&array_key)
+            let array_key_offset = std::str::from_utf8(array_key)
                 .ok()
                 .and_then(|s| if INTEGER_REGEX.is_match(s) { s.parse::<usize>().ok() } else { None });
 
@@ -1202,12 +1189,12 @@ where
             } else if array_key.starts_with(b"'") || array_key.starts_with(b"\"") {
                 ArrayKey::String(word(&array_key[1..(array_key.len() - 1)]))
             } else {
-                ArrayKey::String(word(&array_key))
+                ArrayKey::String(word(array_key))
             };
 
             let mut new_base_key = base_key.clone();
             new_base_key.push(b'[');
-            new_base_key.extend_from_slice(&array_key);
+            new_base_key.extend_from_slice(array_key);
             new_base_key.push(b']');
             let new_base_key_atom = word(&new_base_key);
 
@@ -1353,7 +1340,7 @@ where
             let property_name = key_parts.pop()?;
             let mut new_base_key = base_key.clone();
             new_base_key.extend_from_slice(b"->");
-            new_base_key.extend_from_slice(&property_name);
+            new_base_key.extend_from_slice(property_name);
             let new_base_key_atom = word(&new_base_key);
 
             if !block_context.locals.contains_key(&new_base_key_atom) {
@@ -1386,7 +1373,7 @@ where
                             class_property_type = get_property_type(
                                 context,
                                 fq_class_name,
-                                &property_name,
+                                property_name,
                                 divider == b"->",
                                 block_context.scope.get_class_like_name(),
                             )?;
@@ -1702,5 +1689,32 @@ mod tests {
             vec![b"$service_name", b"->", b"prop", b"[", b"0", b"]", b"->", b"foo", b"::$", b"prop"];
         let result = break_up_path_into_parts(path);
         assert_eq!(result, expected);
+    }
+
+    #[test]
+    fn path_parts_preserve_quoted_nested_and_incomplete_paths() {
+        let cases: &[(&[u8], &[&[u8]])] = &[
+            (b"", &[b""]),
+            (b"$plain", &[b"$plain"]),
+            (b"$a[0]", &[b"$a", b"[", b"0", b"]"]),
+            (b"$a[$b[0]]->value", &[b"$a", b"[", b"$b[0]", b"]", b"->", b"value"]),
+            (b"$a['x->y[0]']", &[b"$a", b"[", b"'x->y[0]'", b"]"]),
+            (b"$a[\"x::$y\"]", &[b"$a", b"[", b"\"x::$y\"", b"]"]),
+            (b"$a['it\\'s']->value", &[b"$a", b"[", b"'it\\'s'", b"]", b"->", b"value"]),
+            (b"$a['x\\\\']->value", &[b"$a", b"[", b"'x\\\\'", b"]", b"->", b"value"]),
+            (b"Class::$value[0]", &[b"Class", b"::$", b"value", b"[", b"0", b"]"]),
+            (b"Class::VALUE", &[b"Class::VALUE"]),
+            (b"[]->::$", &[b"[", b"]", b"->", b"::$"]),
+            (b"$a['unterminated", &[b"$a", b"[", b"'unterminated"]),
+            (b"$a[$b[0]", &[b"$a", b"[", b"$b[0]"]),
+            (b"$a]->x", &[b"$a]->x"]),
+            (b"$a['\xff']", &[b"$a", b"[", b"'\xff'", b"]"]),
+        ];
+
+        for (path, expected) in cases {
+            assert_eq!(break_up_path_into_parts(path), *expected, "{path:?}");
+            assert_eq!(borrow_path_parts(path), *expected, "{path:?}");
+            assert_eq!(path_part_count(path), expected.len(), "{path:?}");
+        }
     }
 }

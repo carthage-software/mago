@@ -31,7 +31,7 @@ use crate::invocation::InvocationTarget;
 use crate::invocation::MethodInvocationKind;
 use crate::invocation::MethodTargetContext;
 use crate::invocation::analyzer::analyze_invocation;
-use crate::visibility::check_method_visibility;
+use crate::visibility::check_method_visibility_by_id;
 use mago_bytes::BytesDisplay;
 
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -344,11 +344,10 @@ where
 
     // Attributes are instantiated by reflection, never from the annotated declaration, so
     // the constructor must be reachable from the global scope.
-    check_method_visibility(
+    check_method_visibility_by_id(
         context,
         None,
-        declaring_constructor_id.get_class_name().as_bytes(),
-        declaring_constructor_id.get_method_name().as_bytes(),
+        &declaring_constructor_id,
         attribute.span(),
         Some(attribute.name.span()),
     );

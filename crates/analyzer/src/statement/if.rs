@@ -84,9 +84,13 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
             if_scope.post_leaving_if_context = Some(block_context.clone());
         }
 
-        let mut if_block_context = if_conditional_scope.if_body_context.clone();
-
-        let post_if_block_context = if_conditional_scope.post_if_context.clone();
+        let IfConditionalScope {
+            if_body_context: mut if_block_context,
+            post_if_context: post_if_block_context,
+            assigned_in_conditional_variable_ids,
+            ..
+        } = if_conditional_scope;
+        let pre_if_body_locals = if_block_context.locals.clone();
 
         let mut mixed_variables = vec![];
         for (variable_id, variable_type) in &if_block_context.locals {
@@ -240,7 +244,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
         analyze_if_statement_block(
             context,
             &mut if_scope,
-            &if_conditional_scope,
+            &assigned_in_conditional_variable_ids,
             if_block_context,
             block_context,
             artifacts,
@@ -301,7 +305,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
                 continue;
             }
 
-            if let Some(variable_type) = if_conditional_scope.if_body_context.locals.get(variable_id) {
+            if let Some(variable_type) = pre_if_body_locals.get(variable_id) {
                 if_body_redefined_snapshot.entry(*variable_id).or_insert_with(|| Rc::clone(variable_type));
             }
         }
@@ -496,7 +500,7 @@ const fn is_obvious_boolean_condition(condition: &Expression) -> bool {
 fn analyze_if_statement_block<'ctx, 'arena, A>(
     context: &mut Context<'ctx, 'arena, A>,
     if_scope: &mut IfScope<'ctx>,
-    if_conditional_scope: &IfConditionalScope<'ctx>,
+    assigned_in_conditional_variable_ids: &WordMap<u32>,
     mut if_block_context: BlockContext<'ctx>,
     outer_block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
@@ -576,7 +580,7 @@ where
         .variables_possibly_in_scope
         .extend(if_block_context.variables_possibly_in_scope.iter().copied());
 
-    let old_if_block_context = if_block_context.clone();
+    let old_if_locals = if_block_context.locals.clone();
     let assigned_variable_ids = std::mem::take(&mut if_block_context.assigned_variable_ids);
     let possibly_assigned_variable_ids = std::mem::take(&mut if_block_context.possibly_assigned_variable_ids);
 
@@ -639,7 +643,7 @@ where
         if_scope.reasonable_clauses = vec![];
 
         if let Some(post_leaving_if_context) = if_scope.post_leaving_if_context.as_mut()
-            && !if_conditional_scope.assigned_in_conditional_variable_ids.is_empty()
+            && !assigned_in_conditional_variable_ids.is_empty()
         {
             add_conditionally_assigned_variables_to_context(
                 context,
@@ -647,7 +651,7 @@ where
                 post_leaving_if_context,
                 outer_block_context,
                 if_statement.condition,
-                &if_conditional_scope.assigned_in_conditional_variable_ids,
+                assigned_in_conditional_variable_ids,
             )?;
         }
     }
@@ -660,9 +664,9 @@ where
             .copied()
             .collect::<WordSet>();
 
-        outer_block_context.update(
+        outer_block_context.update_locals(
             context,
-            &old_if_block_context,
+            &old_if_locals,
             &mut if_block_context,
             has_leaving_statements,
             &variables_to_update,
@@ -1156,7 +1160,7 @@ where
         return Ok(());
     }
 
-    let old_else_context = else_block_context.clone();
+    let old_else_locals = else_block_context.locals.clone();
     let pre_assigned_variable_ids = std::mem::take(&mut else_block_context.assigned_variable_ids);
     let pre_possibly_assigned_variable_ids = std::mem::take(&mut else_block_context.possibly_assigned_variable_ids);
 
@@ -1212,9 +1216,9 @@ where
             .filter(|var| outer_block_context.locals.contains_key(var))
             .collect::<WordSet>();
 
-        outer_block_context.update(
+        outer_block_context.update_locals(
             context,
-            &old_else_context,
+            &old_else_locals,
             else_block_context,
             has_leaving_statements,
             &variables_to_update,

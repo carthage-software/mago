@@ -659,11 +659,32 @@ impl<'ctx> BlockContext<'ctx> {
     ) where
         A: Arena,
     {
+        self.update_locals(
+            context,
+            &start_block_context.locals,
+            end_block_context,
+            has_leaving_statements,
+            vars_to_update,
+            updated_vars,
+        );
+    }
+
+    pub(crate) fn update_locals<A>(
+        &mut self,
+        context: &mut Context<'ctx, '_, A>,
+        start_locals: &WordMap<Rc<TUnion>>,
+        end_block_context: &mut Self,
+        has_leaving_statements: bool,
+        vars_to_update: &WordSet,
+        updated_vars: &mut WordSet,
+    ) where
+        A: Arena,
+    {
         if vars_to_update.is_empty() {
             return;
         }
 
-        for (variable_id, old_type) in &start_block_context.locals {
+        for (variable_id, old_type) in start_locals {
             if !vars_to_update.contains(variable_id) {
                 continue;
             }

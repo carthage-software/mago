@@ -1483,9 +1483,9 @@ where
         return;
     }
 
-    for type_ref in type_metadata.type_union.get_all_child_nodes() {
+    type_metadata.type_union.any_child_node(|type_ref| {
         let TypeRef::Atomic(TAtomic::Reference(TReference::Symbol { name, .. })) = type_ref else {
-            continue;
+            return false;
         };
 
         context.collector.report_with_code(
@@ -1499,5 +1499,7 @@ where
                 .with_note("If this type comes from an optional dependency or extension, you can safely suppress this issue using `@mago-ignore` or `@mago-expect`.")
                 .with_help("Verify the type name is spelled correctly, the file containing it is included in analysis, and any required `use` statements are present."),
         );
-    }
+
+        false
+    });
 }

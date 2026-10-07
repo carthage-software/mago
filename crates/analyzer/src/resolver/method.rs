@@ -40,8 +40,8 @@ use crate::resolver::class_name::report_non_existent_class_like;
 use crate::resolver::selector::resolve_member_selector;
 use crate::utils::names::display_class_like_name;
 use crate::utils::names::display_method_name;
-use crate::visibility::check_method_visibility;
-use crate::visibility::is_method_visible;
+use crate::visibility::check_method_visibility_by_id;
+use crate::visibility::is_method_visible_by_id;
 
 #[derive(Debug, Clone)]
 pub struct ResolvedMethod {
@@ -290,7 +290,7 @@ where
                         if !has_method_assertion {
                             let has_incomplete_hierarchy = context
                                 .codebase
-                                .get_class_like(classname.as_bytes())
+                                .get_class_like_by_name(classname)
                                 .is_some_and(ClassLikeMetadata::has_incomplete_hierarchy);
 
                             if resolved_magic_call_method.is_empty() {
@@ -400,7 +400,7 @@ fn collect_asserted_descendant_method_references<'ctx, A>(
 
     for descendant in context.codebase.get_all_descendants(class_name.as_bytes()) {
         if !context.codebase.method_exists(descendant.as_bytes(), method_name.as_bytes())
-            || !is_method_visible(context, block_context, descendant.as_bytes(), method_name.as_bytes())
+            || !is_method_visible_by_id(context, block_context, &MethodIdentifier::new(descendant, method_name))
         {
             continue;
         }
@@ -452,7 +452,7 @@ where
             receiver_object,
         } = candidate;
         let declaring_class_metadata =
-            context.codebase.get_class_like(declaring_method_id.get_class_name().as_bytes()).unwrap_or(metadata);
+            context.codebase.get_class_like_by_name(declaring_method_id.get_class_name()).unwrap_or(metadata);
 
         // Collect class-template bounds from the object the method was found on:
         // for `@mixin`-resolved methods that is the mixin object, whose parameters
@@ -548,16 +548,16 @@ where
     };
 
     let mut method_id = MethodIdentifier::new(class_metadata.original_name, method_name);
-    if !context.codebase.method_identifier_exists(&method_id) {
+    let function_like_metadata = context.codebase.get_method_by_id(&method_id).or_else(|| {
         method_id = context.codebase.get_declaring_method_identifier(&method_id);
-    }
+        context.codebase.get_method_by_id(&method_id)
+    });
 
-    if let Some(function_like_metadata) = context.codebase.get_method_by_id(&method_id) {
-        if !check_method_visibility(
+    if let Some(function_like_metadata) = function_like_metadata {
+        if !check_method_visibility_by_id(
             context,
             block_context.scope.get_class_like_name(),
-            class_metadata.original_name.as_bytes(),
-            method_name.as_bytes(),
+            &MethodIdentifier::new(class_metadata.original_name, method_name),
             access_span,
             Some(selector.span()),
         ) {
@@ -649,11 +649,12 @@ where
             };
 
             let mut required_method_id = MethodIdentifier::new(required_metadata.original_name, method_name);
-            if !context.codebase.method_identifier_exists(&required_method_id) {
+            let method_metadata = context.codebase.get_method_by_id(&required_method_id).or_else(|| {
                 required_method_id = context.codebase.get_declaring_method_identifier(&required_method_id);
-            }
+                context.codebase.get_method_by_id(&required_method_id)
+            });
 
-            if context.codebase.get_method_by_id(&required_method_id).is_some() {
+            if method_metadata.is_some() {
                 candidates.push(MethodCandidate {
                     metadata: required_metadata,
                     method_identifier: required_method_id,
@@ -676,16 +677,16 @@ where
             };
 
             let mut mixin_method_id = MethodIdentifier::new(mixin_metadata.original_name, method_name);
-            if !context.codebase.method_identifier_exists(&mixin_method_id) {
+            let function_like_metadata = context.codebase.get_method_by_id(&mixin_method_id).or_else(|| {
                 mixin_method_id = context.codebase.get_declaring_method_identifier(&mixin_method_id);
-            }
+                context.codebase.get_method_by_id(&mixin_method_id)
+            });
 
-            if let Some(function_like_metadata) = context.codebase.get_method_by_id(&mixin_method_id) {
-                if !check_method_visibility(
+            if let Some(function_like_metadata) = function_like_metadata {
+                if !check_method_visibility_by_id(
                     context,
                     block_context.scope.get_class_like_name(),
-                    mixin_metadata.original_name.as_bytes(),
-                    method_name.as_bytes(),
+                    &MethodIdentifier::new(mixin_metadata.original_name, method_name),
                     access_span,
                     Some(selector.span()),
                 ) {
@@ -766,8 +767,10 @@ where
         }
     }
 
-    let mut seen = HashSet::default();
-    candidates.retain(|candidate| seen.insert(candidate.method_identifier));
+    if candidates.len() > 1 {
+        let mut seen = HashSet::default();
+        candidates.retain(|candidate| seen.insert(candidate.method_identifier));
+    }
 
     candidates
 }
@@ -1254,7 +1257,7 @@ fn collect_mixin_types_into(
 
         results.push((name, obj.clone()));
 
-        if let Some(mixin_metadata) = codebase.get_class_like(name.as_bytes())
+        if let Some(mixin_metadata) = codebase.get_class_like_by_name(name)
             && !mixin_metadata.mixins.is_empty()
         {
             collect_mixin_types_into(codebase, mixin_metadata, obj, &mixin_metadata.mixins, results, visited);

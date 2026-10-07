@@ -2,6 +2,7 @@
 
 use mago_allocator::Arena;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
+use mago_codex::identifier::method::MethodIdentifier;
 use mago_word::Word;
 
 use crate::context::Context;
@@ -13,7 +14,7 @@ pub(crate) fn display_class_like_name<A>(context: &Context<'_, '_, A>, name: Wor
 where
     A: Arena,
 {
-    context.codebase.get_class_like(name.as_bytes()).map(|m| m.original_name).unwrap_or(name)
+    context.codebase.get_class_like_by_name(name).map(|m| m.original_name).unwrap_or(name)
 }
 
 /// Returns the case-preserved method name on the given class-like for
@@ -23,7 +24,10 @@ pub(crate) fn display_method_name<A>(context: &Context<'_, '_, A>, class_name: W
 where
     A: Arena,
 {
-    context.codebase.get_method(class_name.as_bytes(), method_name.as_bytes()).map_or(method_name, |m| m.original_name)
+    context
+        .codebase
+        .get_method_by_id(&MethodIdentifier::new(class_name, method_name))
+        .map_or(method_name, |m| m.original_name)
 }
 
 /// Returns the case-preserved name of a global function for user-facing

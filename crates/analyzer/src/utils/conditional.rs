@@ -76,7 +76,7 @@ where
     let pre_assigned_var_ids = std::mem::take(&mut externally_applied_context.assigned_variable_ids);
 
     let mut if_body_context = None;
-    if externally_applied_if_cond_expr != internally_applied_if_cond_expr {
+    if expressions_differ(externally_applied_if_cond_expr, internally_applied_if_cond_expr) {
         if_body_context = Some(externally_applied_context.clone());
     }
 
@@ -85,8 +85,8 @@ where
     // When the second pass below runs it re-covers everything this pass touches, so record and
     // discard this pass's diagnostics to avoid reporting them twice; its type/data-flow effects
     // are kept regardless.
-    let must_reanalyze_full_condition =
-        internally_applied_if_cond_expr != condition || externally_applied_if_cond_expr != condition;
+    let must_reanalyze_full_condition = expressions_differ(internally_applied_if_cond_expr, condition)
+        || expressions_differ(externally_applied_if_cond_expr, condition);
 
     externally_applied_context.flags.set_inside_conditional(true);
     let tmp_if_body_context = std::mem::take(&mut externally_applied_context.if_body_context);
@@ -106,18 +106,25 @@ where
     externally_applied_context.conditionally_referenced_variable_ids.extend(pre_referenced_var_ids);
     externally_applied_context.flags.set_inside_conditional(was_inside_conditional);
 
-    let mut if_body_context = if_body_context.unwrap_or_else(|| externally_applied_context.clone());
-
-    let tmp_if_body_context_nested = if_body_context.if_body_context;
-    if_body_context.if_body_context = None;
-
-    let mut if_conditional_context = if_body_context.clone();
-    if_conditional_context.if_body_context = Some(Rc::new(RefCell::new(if_body_context)));
-
+    let if_body_context = if_body_context.unwrap_or_else(|| externally_applied_context.clone());
     let post_if_context = externally_applied_context.clone();
     let mut conditionally_referenced_variable_ids;
     let assigned_in_conditional_variable_ids;
-    if must_reanalyze_full_condition {
+    let newish_var_ids;
+    let collect_newish_var_ids = |locals: &WordMap<Rc<TUnion>>, referenced: &WordSet, assigned: &WordMap<u32>| {
+        locals
+            .keys()
+            .filter(|k| {
+                !pre_condition_locals.contains_key(*k) && !referenced.contains(*k) && !assigned.contains_key(*k)
+            })
+            .copied()
+            .collect::<WordSet>()
+    };
+    let mut if_body_context = if must_reanalyze_full_condition {
+        let mut if_body_context = if_body_context;
+        let tmp_if_body_context_nested = if_body_context.if_body_context.take();
+        let mut if_conditional_context = if_body_context.clone();
+        if_conditional_context.if_body_context = Some(Rc::new(RefCell::new(if_body_context)));
         if_conditional_context.assigned_variable_ids = WordMap::default();
         if_conditional_context.conditionally_referenced_variable_ids.clear();
 
@@ -131,20 +138,32 @@ where
 
         conditionally_referenced_variable_ids = if_conditional_context.conditionally_referenced_variable_ids.clone();
         assigned_in_conditional_variable_ids = if_conditional_context.assigned_variable_ids.clone();
+
+        newish_var_ids = collect_newish_var_ids(
+            &if_conditional_context.locals,
+            &conditionally_referenced_variable_ids,
+            &assigned_in_conditional_variable_ids,
+        );
+
+        let mut if_body_context = {
+            // SAFETY: We set this field above.
+            let rc = unsafe { if_conditional_context.if_body_context.unwrap_unchecked() };
+            // SAFETY: The Rc has a strong count of one.
+            let ref_cell = unsafe { Rc::try_unwrap(rc).unwrap_unchecked() };
+            ref_cell.into_inner()
+        };
+        if_body_context.if_body_context = tmp_if_body_context_nested;
+        if_body_context
     } else {
         conditionally_referenced_variable_ids = first_cond_referenced_var_ids;
         assigned_in_conditional_variable_ids = first_cond_assigned_var_ids;
-    }
-
-    let newish_var_ids = if_conditional_context
-        .locals
-        .into_keys()
-        .filter(|k| {
-            !pre_condition_locals.contains_key(k)
-                && !conditionally_referenced_variable_ids.contains(k)
-                && !assigned_in_conditional_variable_ids.contains_key(k)
-        })
-        .collect::<WordSet>();
+        newish_var_ids = collect_newish_var_ids(
+            &if_body_context.locals,
+            &conditionally_referenced_variable_ids,
+            &assigned_in_conditional_variable_ids,
+        );
+        if_body_context
+    };
 
     if check_for_paradoxes && let Some(condition_type) = artifacts.get_rc_expression_type(condition) {
         handle_paradoxical_condition(context, condition, condition_type);
@@ -152,16 +171,6 @@ where
 
     conditionally_referenced_variable_ids.retain(|k| !assigned_in_conditional_variable_ids.contains_key(k));
     conditionally_referenced_variable_ids.extend(newish_var_ids);
-
-    let mut if_body_context = {
-        // SAFETY: We know the Option is `Some`.
-        let rc = unsafe { if_conditional_context.if_body_context.unwrap_unchecked() };
-        // SAFETY: The `Rc` has a strong count of 1.
-        let ref_cell = unsafe { Rc::try_unwrap(rc).unwrap_unchecked() };
-        ref_cell.into_inner()
-    };
-
-    if_body_context.if_body_context = tmp_if_body_context_nested;
 
     let condition_span = condition.span();
     let condition_range = (condition_span.start_offset(), condition_span.end_offset());
@@ -213,6 +222,11 @@ where
     ))
 }
 
+#[inline]
+fn expressions_differ(left: &Expression<'_>, right: &Expression<'_>) -> bool {
+    !std::ptr::eq(left, right) && left != right
+}
+
 fn get_definitely_evaluated_expression_after_if<'ast, 'arena>(
     condition: &'ast Expression<'arena>,
 ) -> &'ast Expression<'arena> {
@@ -235,7 +249,7 @@ fn get_definitely_evaluated_expression_after_if<'ast, 'arena>(
             if let UnaryPrefixOperator::Not(_) = unary.operator {
                 let inner_expression = get_definitely_evaluated_expression_inside_if(unary.operand);
 
-                if inner_expression != unary.operand {
+                if expressions_differ(inner_expression, unary.operand) {
                     return inner_expression;
                 }
             }
@@ -264,7 +278,7 @@ fn get_definitely_evaluated_expression_inside_if<'ast, 'arena>(
             if let UnaryPrefixOperator::Not(_) = unary.operator {
                 let inner_expression = get_definitely_evaluated_expression_inside_if(unary.operand);
 
-                if inner_expression != unary.operand {
+                if expressions_differ(inner_expression, unary.operand) {
                     return inner_expression;
                 }
             }
