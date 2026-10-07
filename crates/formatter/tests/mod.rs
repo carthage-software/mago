@@ -59,6 +59,8 @@ test_case!(php83_instantiation_with_member_access_parentheses, PHPVersion::PHP83
 test_case!(php84_instantiation_with_member_access_parentheses, PHPVersion::PHP84);
 test_case!(php83_instantiation_with_member_access_parentheses_disabled, PHPVersion::PHP83);
 test_case!(php84_instantiation_with_member_access_parentheses_disabled, PHPVersion::PHP84);
+test_case!(issue_2430, PHPVersion::PHP85);
+test_case!(issue_2430_preserve_new_parentheses, PHPVersion::PHP85);
 test_case!(expand_last_argument);
 test_case!(expand_first_argument);
 test_case!(hug_new_expression);

@@ -129,11 +129,12 @@ where
 
         return matches!(
             ancestor,
-            Node::Call(Call::Method(_) | Call::NullSafeMethod(_) | Call::StaticMethod(_))
+            Node::Call(_)
                 | Node::PropertyAccess(_)
                 | Node::NullSafePropertyAccess(_)
                 | Node::StaticPropertyAccess(_)
                 | Node::ClassConstantAccess(_)
+                | Node::FunctionPartialApplication(_)
                 | Node::MethodPartialApplication(_)
                 | Node::StaticMethodPartialApplication(_)
                 | Node::MethodCall(_)
