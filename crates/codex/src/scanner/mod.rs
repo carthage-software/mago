@@ -758,12 +758,20 @@ where
     }
 
     #[inline]
-    fn walk_in_property_hook_concrete_body(&mut self, _: &'arena PropertyHookConcreteBody<'arena>, _: &mut Context<'ctx, 'arena, A>) {
+    fn walk_in_property_hook_concrete_body(
+        &mut self,
+        _: &'arena PropertyHookConcreteBody<'arena>,
+        _: &mut Context<'ctx, 'arena, A>,
+    ) {
         self.function_like_stack.push(None);
     }
 
     #[inline]
-    fn walk_out_property_hook_concrete_body(&mut self, _: &'arena PropertyHookConcreteBody<'arena>, _: &mut Context<'ctx, 'arena, A>) {
+    fn walk_out_property_hook_concrete_body(
+        &mut self,
+        _: &'arena PropertyHookConcreteBody<'arena>,
+        _: &mut Context<'ctx, 'arena, A>,
+    ) {
         self.function_like_stack.pop();
     }
 
