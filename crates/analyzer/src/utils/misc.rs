@@ -27,6 +27,10 @@ pub fn check_for_paradox<A>(
 ) where
     A: Arena,
 {
+    if formula_2.is_empty() || (formula_1.is_empty() && formula_2.len() == 1) {
+        return;
+    }
+
     let formula_1_hashes: HashMap<u32, Span> = formula_1.iter().map(|c| (c.hash, c.condition_span)).collect();
     let mut formula_2_hashes: HashMap<u32, Span> = HashMap::default();
 
@@ -42,6 +46,10 @@ pub fn check_for_paradox<A>(
         }
 
         formula_2_hashes.entry(formula_2_clause.hash).or_insert(formula_2_clause.condition_span);
+    }
+
+    if formula_1.is_empty() {
+        return;
     }
 
     let Some(negated_formula_2) = negate_formula(formula_2.to_vec(), algebra_thresholds) else {
