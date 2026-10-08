@@ -187,7 +187,7 @@
 <span class="feature__num">01 / Analyze</span>
 <h3 class="feature__name" id="static-analysis">静态分析</h3>
 <p class="feature__body">在代码上线前发现 bug、死代码和不可能的类型。兼容 Psalm 和 PHPStan 注解;理解泛型、条件类型和流向收窄。</p>
-<div class="feature__stat"><strong>1.04s</strong> · 7M 行代码</div>
+<div class="feature__stat"><strong>0.92s</strong> · 7M 行代码</div>
 </article>
 <article class="feature">
 <span class="feature__num">02 / Lint</span>
@@ -205,7 +205,7 @@
 </section>
 <section class="home-section">
 <header class="home-section__head"><span class="home-section__num">§ 02</span><h2 class="home-section__title" id="benchmarks">基准测试</h2></header>
-<p>对照 WordPress,在每个工具的最新稳定版本上测量。数值越低越好;"×"列显示最慢同类工具相对 Mago 的倍数。数据来自 <a href="https://carthage-software.github.io/php-toolchain-benchmarks/?project=wordpress&kind=Analyzers">php-toolchain-benchmarks</a> 仪表盘(包含完整的均值、标准差、最大值、内存等指标),最近一次更新:2026-10-07 04:53:33。</p>
+<p>对照 WordPress,在每个工具的最新稳定版本上测量。数值越低越好;"×"列显示最慢同类工具相对 Mago 的倍数。数据来自 <a href="https://carthage-software.github.io/php-toolchain-benchmarks/?project=wordpress&kind=Analyzers">php-toolchain-benchmarks</a> 仪表盘(包含完整的均值、标准差、最大值、内存等指标),最近一次更新:2026-10-08 03:03:26。</p>
 <table class="bench-table">
 <thead>
 <tr><th>操作</th><th>Mago</th><th>同类 A</th><th>同类 B</th><th class="bench-table__factor">×</th></tr>
@@ -213,10 +213,10 @@
 <tbody>
 <tr>
 <td class="bench-table__op">静态分析</td>
-<td class="bench-table__mago">1.04s</td>
+<td class="bench-table__mago">0.92s</td>
 <td class="bench-table__other">Phan 115s</td>
 <td class="bench-table__other">Psalm 51.9s</td>
-<td class="bench-table__factor">111</td>
+<td class="bench-table__factor">124</td>
 </tr>
 <tr>
 <td class="bench-table__op">Lint 检查</td>
