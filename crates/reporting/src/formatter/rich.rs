@@ -19,10 +19,10 @@ use foldhash::HashMap;
 use termcolor::Ansi;
 use termcolor::NoColor;
 
-use mago_database::file::File;
-use mago_database::file::FileId;
 use mago_database::DatabaseReader;
 use mago_database::ReadDatabase;
+use mago_database::file::File;
+use mago_database::file::FileId;
 
 use crate::Annotation;
 use crate::AnnotationKind;
