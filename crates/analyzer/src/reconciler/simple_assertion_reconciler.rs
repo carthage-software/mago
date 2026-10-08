@@ -1760,9 +1760,11 @@ where
 
     let mut redundant = true;
 
+    // `null` and `false` compare as `false`, which is never greater than an int and only less than a non-zero one.
+    let removes_null_and_false = if is_less_than { !or_equal && value == 0 } else { !or_equal || value > 0 };
+
     for atomic in existing_var_types {
-        if is_less_than
-            && value == 0
+        if removes_null_and_false
             && let TAtomic::Null | TAtomic::Scalar(TScalar::Bool(TBool { value: Some(false) })) = &atomic
         {
             existing_var_type.remove_type(atomic);
