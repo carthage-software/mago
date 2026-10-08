@@ -356,6 +356,7 @@ L'analyseur utilise des seuils internes pour équilibrer profondeur et vitesse. 
 | `integer-combination-threshold` | `u16` | `128` | Nombre maximal d'entiers littéraux suivis avant la généralisation à `int`. |
 | `array-combination-threshold` | `u16` | `32` | Nombre maximal de formes de tableaux clés scellés suivies individuellement avant fusion. |
 | `loop-assignment-depth-threshold` | `u8` | `1` | Profondeur maximale d'itération à point fixe de boucle. `0` désactive la ré-itération. |
+| `slow-file-warning-threshold-ms` | `u16` | `5000` | Émet un avertissement si l'analyse d'un fichier dépasse cette durée en millisecondes. |
 
 `string-concat-combination-threshold` est toujours accepté comme alias pour `string-combination-threshold`.
 

@@ -332,6 +332,7 @@ function process(object $obj): mixed
 | `integer-combination-threshold` | `u16` | `128` | 在泛化为 `int` 之前能跟踪的最大字面整数数。 |
 | `array-combination-threshold` | `u16` | `32` | 在合并之前能单独跟踪的最大封闭键控数组形状数。 |
 | `loop-assignment-depth-threshold` | `u8` | `1` | 循环不动点迭代的最大深度。`0` 表示禁用重新迭代。 |
+| `slow-file-warning-threshold-ms` | `u16` | `5000` | 单个源文件的分析耗时超过此毫秒数时发出警告。 |
 
 `string-concat-combination-threshold` 仍作为 `string-combination-threshold` 的别名被接受。
 

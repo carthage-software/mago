@@ -1281,9 +1281,6 @@ impl IncrementalAnalysisService {
         settings: &Settings,
         skip_files: &HashSet<FileId>,
     ) -> Result<SelectiveAnalysisOutput, OrchestratorError> {
-        #[cfg(not(target_arch = "wasm32"))]
-        const ANALYSIS_DURATION_THRESHOLD: Duration = Duration::from_secs(5);
-
         let plugin_registry = &self.plugin_registry;
         #[cfg(not(target_arch = "wasm32"))]
         let trace_enabled = tracing::enabled!(tracing::Level::TRACE);
@@ -1332,6 +1329,8 @@ impl IncrementalAnalysisService {
         }
         let settings = settings.clone();
         let parser_settings = self.parser_settings;
+        #[cfg(not(target_arch = "wasm32"))]
+        let analysis_duration_threshold = Duration::from_millis(u64::from(settings.slow_file_warning_threshold_ms));
 
         let results: Vec<(FileId, AnalysisResult, Option<Arc<FileAnalysisSnapshot>>)> = host_files
             .into_par_iter()
@@ -1390,11 +1389,11 @@ impl IncrementalAnalysisService {
                 }
 
                 #[cfg(not(target_arch = "wasm32"))]
-                if analysis_result.time_in_analysis > ANALYSIS_DURATION_THRESHOLD {
+                if analysis_result.time_in_analysis > analysis_duration_threshold {
                     tracing::warn!(
                         "Analysis of source file '{}' took longer than {}s: {}s",
                         mago_bytes::BytesDisplay(&source_file.name),
-                        ANALYSIS_DURATION_THRESHOLD.as_secs_f32(),
+                        analysis_duration_threshold.as_secs_f32(),
                         analysis_result.time_in_analysis.as_secs_f32()
                     );
                 }
