@@ -1760,8 +1760,8 @@ where
 
     let mut redundant = true;
 
-    // `null` and `false` compare as `false` against these bounds.
-    let removes_null_and_false = if is_less_than { value == 0 } else { !or_equal || value > 0 };
+    // `null` and `false` compare as `false`, which is never greater than an int and only less than a non-zero one.
+    let removes_null_and_false = if is_less_than { !or_equal && value == 0 } else { !or_equal || value > 0 };
 
     for atomic in existing_var_types {
         if removes_null_and_false

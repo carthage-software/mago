@@ -69,3 +69,42 @@ function greaterThanOrEqualZeroKeepsNull(?int $x): int
 
     return 0;
 }
+
+function keepsNullAfterGreaterThan(?int $x): int
+{
+    // @mago-expect analysis:possibly-null-operand
+    if ($x > 0) {
+        echo 'positive';
+    }
+
+    if ($x === null) {
+        return 0;
+    }
+
+    return $x;
+}
+
+/** @return negative-int */
+function lessThanZero(?int $x): int
+{
+    // @mago-expect analysis:possibly-null-operand
+    if ($x < 0) {
+        return $x;
+    }
+
+    return -1;
+}
+
+function lessThanOrEqualZeroKeepsNull(?int $x): int
+{
+    // @mago-expect analysis:possibly-null-operand
+    if ($x <= 0) {
+        if ($x === null) {
+            return 0;
+        }
+
+        return $x;
+    }
+
+    return 0;
+}
