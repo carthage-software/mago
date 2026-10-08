@@ -1,5 +1,6 @@
 use mago_allocator::Arena;
 use std::borrow::Cow;
+use std::rc::Rc;
 
 use foldhash::HashMap;
 use foldhash::HashSet;
@@ -182,7 +183,7 @@ where
     populate_template_result_from_invocation(context, invocation, template_result);
 
     let arg_count = invocation.arguments_source.argument_count();
-    let mut analyzed_argument_types = HashMap::default();
+    let mut analyzed_argument_types = vec![None; arg_count];
 
     let mut non_closure_arguments = Vec::with_capacity(arg_count);
     let mut closure_arguments = Vec::with_capacity(arg_count);
@@ -228,7 +229,7 @@ where
             None,
         )?;
 
-        if let Some((argument_type, _)) = analyzed_argument_types.get_mut(argument_offset)
+        if let Some((argument_type, _)) = &mut analyzed_argument_types[*argument_offset]
             && let Some(narrowed_type) = narrow_class_related_argument(
                 context,
                 block_context,
@@ -238,10 +239,10 @@ where
                 argument_type,
             )
         {
-            *argument_type = narrowed_type;
+            *argument_type = Rc::new(narrowed_type);
         }
 
-        if let Some(argument_type) = analyzed_argument_types.get(argument_offset)
+        if let Some(argument_type) = &analyzed_argument_types[*argument_offset]
             && let Some((_, parameter_ref)) = parameter
             && parameter_ref.get_type().is_some_and(|ty| ty.is_expandable() || ty.has_template_types())
         {
@@ -277,8 +278,8 @@ where
             continue;
         };
 
-        let argument_type = if let Some((argument_type, _)) = analyzed_argument_types.get(argument_offset) {
-            argument_type.clone()
+        let argument_type = if let Some((argument_type, _)) = &analyzed_argument_types[*argument_offset] {
+            (**argument_type).clone()
         } else if argument.is_placeholder() {
             TUnion::from_atomic(TAtomic::Variable(parameter_name.0))
         } else {
@@ -397,7 +398,7 @@ where
         // Use the original unreplaced type for inference to allow closure return types
         // to contribute bounds that can widen literal types from other arguments.
         if parameter_type_had_template_types
-            && let Some(argument_type) = analyzed_argument_types.get(argument_offset)
+            && let Some(argument_type) = &analyzed_argument_types[*argument_offset]
             && let Some(base_type) = &base_parameter_type_for_inference
         {
             infer_parameter_templates_from_argument(
@@ -419,11 +420,11 @@ where
         let Some(parameter_name) = parameter.get_name() else {
             continue;
         };
-        let Some((argument_type, _)) = analyzed_argument_types.get(argument_offset) else {
+        let Some((argument_type, _)) = &analyzed_argument_types[*argument_offset] else {
             continue;
         };
 
-        parameter_types.insert(parameter_name.0, argument_type.clone());
+        parameter_types.insert(parameter_name.0, (**argument_type).clone());
     }
 
     for parameter in invocation.target.iter_parameters() {
@@ -544,10 +545,9 @@ where
             continue;
         };
 
-        let (argument_value_type, _) = analyzed_argument_types
-            .get(argument_offset)
-            .cloned()
-            .unwrap_or_else(|| (get_mixed(), argument_expression.span()));
+        let (argument_value_type, _) = analyzed_argument_types[*argument_offset]
+            .clone()
+            .unwrap_or_else(|| (Rc::new(get_mixed()), argument_expression.span()));
 
         let parameter_ref = get_parameter_of_argument(&invocation.target, argument, *argument_offset);
         if let Some((parameter_offset, parameter_ref)) = parameter_ref {
@@ -647,7 +647,7 @@ where
             }
 
             if let Some(parameter_name) = parameter_ref.get_name() {
-                parameter_types.insert(parameter_name.0, argument_value_type);
+                parameter_types.insert(parameter_name.0, (*argument_value_type).clone());
             }
         } else if let Some(named_argument) = argument.get_named_argument() {
             let argument_name = BytesDisplay(named_argument.name.value);
@@ -1230,7 +1230,7 @@ fn infer_generic_callable_arguments<'ctx, 'arena, A>(
     invocation: &Invocation<'ctx, '_, 'arena>,
     template_result: &mut TemplateResult,
     parameter_types: &WordMap<TUnion>,
-    analyzed_argument_types: &HashMap<usize, (TUnion, Span)>,
+    analyzed_argument_types: &[Option<(Rc<TUnion>, Span)>],
     base_class_metadata: Option<&'ctx ClassLikeMetadata>,
     calling_class_like_metadata: Option<&'ctx ClassLikeMetadata>,
     calling_instance_type: Option<&TAtomic>,
@@ -1239,7 +1239,7 @@ fn infer_generic_callable_arguments<'ctx, 'arena, A>(
     A: Arena,
 {
     for (argument_offset, argument) in invocation.arguments_source.iter_arguments().enumerate() {
-        let Some((argument_type, argument_span)) = analyzed_argument_types.get(&argument_offset) else {
+        let Some((argument_type, argument_span)) = &analyzed_argument_types[argument_offset] else {
             continue;
         };
 
@@ -1402,7 +1402,7 @@ fn resolve_type_in_class_context<'ctx, A>(
 where
     A: Arena,
 {
-    if contains_parameter_variable(&ttype) {
+    if !ttype.is_expandable() || contains_parameter_variable(&ttype) {
         return ttype;
     }
 
@@ -1884,7 +1884,7 @@ fn validate_keyed_array_elements<'ctx, 'arena, A>(
 fn detect_closure_bind_scope<'ctx, 'arena, A>(
     context: &Context<'ctx, 'arena, A>,
     invocation: &Invocation<'ctx, '_, 'arena>,
-    analyzed_argument_types: &HashMap<usize, (TUnion, mago_span::Span)>,
+    analyzed_argument_types: &[Option<(Rc<TUnion>, Span)>],
 ) -> Option<ClosureBindScope>
 where
     A: Arena,
@@ -1907,16 +1907,17 @@ where
         return None;
     };
 
-    let new_this_type = analyzed_argument_types.get(&new_this_offset).map(|(t, _)| t);
+    let new_this_type = analyzed_argument_types.get(new_this_offset).and_then(Option::as_ref).map(|(t, _)| t.as_ref());
     let has_this = new_this_type.is_some_and(|t| !t.is_null());
 
-    let class_name = if let Some((scope_type, _)) = analyzed_argument_types.get(&new_scope_offset) {
-        extract_class_name_from_scope_arg(context, scope_type)
-    } else if has_this {
-        new_this_type.and_then(extract_class_name_from_type)
-    } else {
-        None
-    };
+    let class_name =
+        if let Some((scope_type, _)) = analyzed_argument_types.get(new_scope_offset).and_then(Option::as_ref) {
+            extract_class_name_from_scope_arg(context, scope_type)
+        } else if has_this {
+            new_this_type.and_then(extract_class_name_from_type)
+        } else {
+            None
+        };
 
     if class_name.is_some() || has_this { Some(ClosureBindScope { class_name, has_this }) } else { None }
 }
@@ -1989,7 +1990,7 @@ fn extract_class_name_from_atomic(atomic: &TAtomic) -> Option<Word> {
 fn filter_array_filter_callback_type(
     target: &InvocationTarget<'_>,
     parameter_type: &mut TUnion,
-    analyzed_argument_types: &HashMap<usize, (TUnion, mago_span::Span)>,
+    analyzed_argument_types: &[Option<(Rc<TUnion>, Span)>],
 ) {
     let is_array_filter = target.get_function_like_identifier().is_some_and(
         |id| matches!(id, FunctionLikeIdentifier::Function(name) if name.as_bytes().eq_ignore_ascii_case(b"array_filter")),
@@ -2000,7 +2001,8 @@ fn filter_array_filter_callback_type(
     }
 
     let mode = analyzed_argument_types
-        .get(&2)
+        .get(2)
+        .and_then(Option::as_ref)
         .and_then(|(mode_type, _)| mode_type.get_single_literal_int_value())
         .unwrap_or(0);
 

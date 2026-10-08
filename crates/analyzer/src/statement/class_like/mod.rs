@@ -2128,7 +2128,7 @@ fn check_abstract_method_signatures<'ctx, A>(
         let overridden_declaring_classes: Vec<Word> =
             overridden_method_ids.values().map(|id| id.get_class_name()).collect();
 
-        for (parent_fqcn, parent_declaring_method_id) in overridden_method_ids {
+        for (parent_fqcn, parent_declaring_method_id) in overridden_method_ids.iter() {
             let parent_fqcn_str = parent_fqcn.as_ref();
 
             let declaring_class_name = parent_declaring_method_id.get_class_name();

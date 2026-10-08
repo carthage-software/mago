@@ -67,7 +67,7 @@ pub fn populate_template_result_from_invocation<'ctx, 'arena, A>(
             return;
         };
 
-        let Some(declaring_class_metadata) = context.codebase.get_class_like(identifier.get_class_name().as_bytes())
+        let Some(declaring_class_metadata) = context.codebase.get_class_like_by_name(identifier.get_class_name())
         else {
             return;
         };
@@ -100,7 +100,7 @@ pub fn populate_template_result_from_invocation<'ctx, 'arena, A>(
 
         if let Some(instance_type) = get_named_static_class_type(&method_context.class_type)
             && !instance_type.name.as_bytes().eq_ignore_ascii_case(declaring_class_metadata.original_name.as_bytes())
-            && let Some(calling_class_metadata) = context.codebase.get_class_like(instance_type.name.as_bytes())
+            && let Some(calling_class_metadata) = context.codebase.get_class_like_by_name(instance_type.name)
         {
             for (template_name, _) in &declaring_class_metadata.template_types {
                 if template_result.lower_bounds.get(template_name).is_some_and(|m| !m.is_empty()) {
@@ -174,7 +174,7 @@ pub fn populate_template_result_from_invocation<'ctx, 'arena, A>(
     }
 
     if !is_declaring_instance
-        && let Some(calling_class_metadata) = context.codebase.get_class_like(instance_type.name.as_bytes())
+        && let Some(calling_class_metadata) = context.codebase.get_class_like_by_name(instance_type.name)
     {
         for (template_name, _) in &method_context.class_like_metadata.template_types {
             if template_result.lower_bounds.get(template_name).is_some_and(|m| !m.is_empty()) {
@@ -203,7 +203,7 @@ pub fn populate_template_result_from_invocation<'ctx, 'arena, A>(
         return;
     };
 
-    let Some(metadata) = context.codebase.get_class_like(identifier.get_class_name().as_bytes()) else {
+    let Some(metadata) = context.codebase.get_class_like_by_name(identifier.get_class_name()) else {
         return;
     };
 

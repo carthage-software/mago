@@ -1,4 +1,5 @@
 use std::collections::hash_map::Entry;
+use std::rc::Rc;
 
 use foldhash::HashMap;
 
@@ -90,14 +91,14 @@ pub fn analyze_and_store_argument_type<'ctx, 'arena, A>(
     invocation_target: &InvocationTarget<'ctx>,
     argument_expression: &Expression<'arena>,
     argument_offset: usize,
-    analyzed_argument_types: &mut HashMap<usize, (TUnion, Span)>,
+    analyzed_argument_types: &mut [Option<(Rc<TUnion>, Span)>],
     referenced_parameter: bool,
     closure_parameter_type: Option<&TUnion>,
 ) -> Result<(), AnalysisError>
 where
     A: Arena,
 {
-    if argument_offset != usize::MAX && analyzed_argument_types.contains_key(&argument_offset) {
+    if argument_offset != usize::MAX && analyzed_argument_types[argument_offset].is_some() {
         return Ok(());
     }
 
@@ -149,7 +150,8 @@ where
     block_context.flags.set_inside_variable_reference(was_inside_variable_reference);
     artifacts.inferred_parameter_types = inferred_parameter_types;
 
-    let argument_type = artifacts.get_expression_type(argument_expression).cloned().unwrap_or_else(get_mixed);
+    let argument_type =
+        artifacts.get_rc_expression_type(argument_expression).cloned().unwrap_or_else(|| Rc::new(get_mixed()));
 
     if requires_referenceable_argument(invocation_target, referenced_parameter)
         && !is_argument_referenceable(argument_expression, &argument_type)
@@ -177,7 +179,7 @@ where
     }
 
     if argument_offset != usize::MAX {
-        analyzed_argument_types.insert(argument_offset, (argument_type, argument_expression.span()));
+        analyzed_argument_types[argument_offset] = Some((argument_type, argument_expression.span()));
     }
 
     Ok(())
@@ -196,16 +198,15 @@ pub fn verify_argument_type<'arena, A>(
 {
     let target_kind_str = invocation_target.guess_kind();
     let effective_parameter_name = invocation_target.get_effective_parameter_name(argument_offset);
-    let argument_label = effective_parameter_name.map_or_else(
-        || format!("argument #{}", argument_offset + 1),
-        |name| format!("`{}`", BytesDisplay(name.as_bytes())),
-    );
-    let argument_subject = effective_parameter_name.map_or_else(
-        || format!("Argument #{}", argument_offset + 1),
-        |name| format!("Argument `{}`", BytesDisplay(name.as_bytes())),
-    );
+    let argument_subject = || {
+        effective_parameter_name.map_or_else(
+            || format!("Argument #{}", argument_offset + 1),
+            |name| format!("Argument `{}`", BytesDisplay(name.as_bytes())),
+        )
+    };
 
     if input_type.is_never() {
+        let argument_subject = argument_subject();
         let target_name_str = invocation_target.guess_name(context);
         context.collector.report_with_code(
             IssueCode::NoValue,
@@ -232,6 +233,7 @@ pub fn verify_argument_type<'arena, A>(
 
     if !parameter_type.accepts_null() {
         if input_type.is_null() {
+            let argument_subject = argument_subject();
             let target_name_str = invocation_target.guess_name(context);
             let parameter_type_str = parameter_type.get_id();
             let call_site = Annotation::secondary(invocation_target.span())
@@ -252,6 +254,7 @@ pub fn verify_argument_type<'arena, A>(
         }
 
         if input_type.is_nullable() && !input_type.ignore_nullable_issues() {
+            let argument_subject = argument_subject();
             let target_name_str = invocation_target.guess_name(context);
             let input_type_str = input_type.get_id();
             let parameter_type_str = parameter_type.get_id();
@@ -274,6 +277,7 @@ pub fn verify_argument_type<'arena, A>(
 
     if !parameter_type.accepts_false() {
         if input_type.is_false() {
+            let argument_subject = argument_subject();
             let target_name_str = invocation_target.guess_name(context);
             let parameter_type_str = parameter_type.get_id();
             let call_site = Annotation::secondary(invocation_target.span())
@@ -294,6 +298,7 @@ pub fn verify_argument_type<'arena, A>(
         }
 
         if input_type.is_falsable() && !input_type.ignore_falsable_issues() {
+            let argument_subject = argument_subject();
             let target_name_str = invocation_target.guess_name(context);
             let input_type_str = input_type.get_id();
             let parameter_type_str = parameter_type.get_id();
@@ -322,6 +327,10 @@ pub fn verify_argument_type<'arena, A>(
         return;
     }
 
+    let argument_label = effective_parameter_name.map_or_else(
+        || format!("argument #{}", argument_offset + 1),
+        |name| format!("`{}`", BytesDisplay(name.as_bytes())),
+    );
     let target_name_str = invocation_target.guess_name(context);
     let input_type_str = input_type.get_id();
     let parameter_type_str = parameter_type.get_id();
