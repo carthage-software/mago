@@ -74,8 +74,9 @@ fn narrow_class_related_argument<A>(
 where
     A: Arena,
 {
+    let class_related_argument_variables = class_related_argument_variables?;
     let argument_variable = get_block_expression_id(expression, context, block_context)?;
-    if !class_related_argument_variables?.contains(&argument_variable) {
+    if !class_related_argument_variables.contains(&argument_variable) {
         return None;
     }
 

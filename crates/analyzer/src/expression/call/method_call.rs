@@ -52,6 +52,7 @@ use crate::resolver::method::UnresolvedMethod;
 use crate::resolver::method::report_non_documented_method;
 use crate::resolver::method::report_non_existent_method;
 use crate::resolver::method::resolve_method_targets;
+use crate::utils::availability;
 use crate::utils::expression::get_block_expression_id;
 use crate::visibility::check_method_visibility_by_id;
 
@@ -317,12 +318,16 @@ where
             .get_method_by_id(&resolved_method.method_identifier)
             .expect("method metadata should exist for resolved method");
 
-        let method_display = format!(
-            "{}::{}",
-            resolved_method.method_identifier.get_class_name(),
-            resolved_method.method_identifier.get_method_name(),
+        availability::check_method_availability(
+            context,
+            method_metadata,
+            &format_args!(
+                "{}::{}",
+                resolved_method.method_identifier.get_class_name(),
+                resolved_method.method_identifier.get_method_name(),
+            ),
+            span,
         );
-        crate::utils::availability::check_method_availability(context, method_metadata, &method_display, span);
 
         let method_target_context = MethodTargetContext {
             invocation_kind: MethodInvocationKind::Instance,

@@ -6,7 +6,6 @@ use foldhash::HashSet;
 use mago_algebra::find_satisfying_assignments;
 use mago_algebra::saturate_clauses;
 use mago_bytes::BytesDisplay;
-use mago_codex::ttype::combine_union_types;
 use mago_codex::ttype::combine_union_types_rc;
 use mago_codex::ttype::get_bool;
 use mago_codex::ttype::get_false;
@@ -350,18 +349,16 @@ where
             block_context.remove_variable_from_conflicting_clauses(context, *var_id, None);
         }
 
-        let cloned_vars = block_context.locals.clone();
         for (var_id, left_type) in &left_block_context.locals {
-            if let Some(context_type) = cloned_vars.get(var_id) {
-                block_context.locals.insert(
-                    *var_id,
-                    Rc::new(combine_union_types(
-                        context_type,
-                        left_type,
-                        context.codebase,
-                        context.settings.combiner_options(),
-                    )),
+            if let Some(context_type) = block_context.locals.get(var_id) {
+                let combined_type = combine_union_types_rc(
+                    context_type,
+                    left_type,
+                    context.codebase,
+                    context.settings.combiner_options(),
                 );
+
+                block_context.locals.insert(*var_id, combined_type);
             } else if left_block_context.assigned_variable_ids.contains_key(var_id) {
                 block_context.locals.insert(*var_id, Rc::clone(left_type));
             }
@@ -597,19 +594,16 @@ where
 
     if let Some(if_body_context) = &block_context.if_body_context {
         let mut if_body_context_inner = if_body_context.borrow_mut();
-        let left_vars = left_block_context.locals.clone();
-        let if_vars = if_body_context_inner.locals.clone();
-        for (var_id, right_type) in right_block_context.locals.clone() {
-            if let Some(if_type) = if_vars.get(&var_id) {
+        for (var_id, right_type) in &right_block_context.locals {
+            if let Some(if_type) = if_body_context_inner.locals.get(var_id) {
+                let combined_type =
+                    combine_union_types_rc(right_type, if_type, context.codebase, context.settings.combiner_options());
+                if_body_context_inner.locals.insert(*var_id, combined_type);
+            } else if let Some(left_type) = left_block_context.locals.get(var_id) {
                 if_body_context_inner.locals.insert(
-                    var_id,
-                    combine_union_types_rc(&right_type, if_type, context.codebase, context.settings.combiner_options()),
-                );
-            } else if let Some(left_type) = left_vars.get(&var_id) {
-                if_body_context_inner.locals.insert(
-                    var_id,
+                    *var_id,
                     combine_union_types_rc(
-                        &right_type,
+                        right_type,
                         left_type,
                         context.codebase,
                         context.settings.combiner_options(),

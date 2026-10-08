@@ -470,9 +470,7 @@ where
             }))])
         } else {
             TUnion::from_vec(vec![TAtomic::Array(TArray::Keyed(TKeyedArray {
-                known_items: Some(
-                    array_creation_info.property_types.into_iter().map(|(k, v)| (k, (v.0, v.1))).collect(),
-                ),
+                known_items: Some(array_creation_info.property_types),
                 parameters: if array_creation_info.can_create_objectlike {
                     None
                 } else {
