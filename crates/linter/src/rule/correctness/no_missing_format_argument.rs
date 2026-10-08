@@ -20,7 +20,7 @@ use crate::context::LintContext;
 use crate::requirements::RuleRequirements;
 use crate::rule::Config;
 use crate::rule::LintRule;
-use crate::rule::utils::call::function_call_matches_any;
+use crate::rule::utils::call::function_call_matches_any_iter;
 use crate::rule_meta::RuleMeta;
 use crate::settings::RuleSettings;
 
@@ -102,8 +102,9 @@ impl LintRule for NoMissingFormatArgumentRule {
             return;
         };
 
-        let function_names: Vec<&str> = FORMAT_FUNCTION_MODELS.keys().copied().collect();
-        let Some(function_name) = function_call_matches_any(ctx, function_call, &function_names) else {
+        let Some(function_name) =
+            function_call_matches_any_iter(ctx, function_call, FORMAT_FUNCTION_MODELS.keys().copied())
+        else {
             return;
         };
 

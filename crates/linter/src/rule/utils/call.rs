@@ -29,6 +29,18 @@ where
     S: AsRef<str>,
     A: Arena,
 {
+    function_call_matches_any_iter(context, call, names.iter().map(AsRef::as_ref))
+}
+
+/// Checks function names from an iterator without collecting them into a slice.
+pub fn function_call_matches_any_iter<'arena, 'names, A>(
+    context: &LintContext<'_, 'arena, A>,
+    call: &FunctionCall<'arena>,
+    names: impl Iterator<Item = &'names str> + Clone,
+) -> Option<&'names str>
+where
+    A: Arena,
+{
     function_name_matches_any(context, call.function, names)
 }
 
@@ -50,13 +62,12 @@ where
 
 /// The internal implementation that checks if a function name `Expression`
 /// could resolve to one of the provided names.
-fn function_name_matches_any<'arena, 'names, S, A>(
+fn function_name_matches_any<'arena, 'names, A>(
     context: &LintContext<'_, 'arena, A>,
     function: &Expression<'arena>,
-    names: &'names [S],
+    names: impl Iterator<Item = &'names str> + Clone,
 ) -> Option<&'names str>
 where
-    S: AsRef<str>,
     A: Arena,
 {
     let Expression::Identifier(function_identifier) = function else {
@@ -64,7 +75,7 @@ where
     };
 
     let find = |candidate: &[u8]| -> Option<&'names str> {
-        names.iter().find(|n| candidate.eq_ignore_ascii_case(n.as_ref().as_bytes())).map(AsRef::as_ref)
+        names.clone().find(|name| candidate.eq_ignore_ascii_case(name.as_bytes()))
     };
 
     // Case 1: The name is explicitly imported with `use function`.
