@@ -187,13 +187,13 @@
 <span class="feature__num">01 / Analyser</span>
 <h3 class="feature__name" id="static-analysis">Analyse statique</h3>
 <p class="feature__body">Détectez les bugs, le code mort et les types impossibles avant la mise en production. Compatible avec les annotations Psalm et PHPStan ; comprend les génériques, les types conditionnels et l'affinage de flux.</p>
-<div class="feature__stat"><strong>0.92s</strong> · 7M LOC</div>
+<div class="feature__stat"><strong>0.82s</strong> · 7M LOC</div>
 </article>
 <article class="feature">
 <span class="feature__num">02 / Linter</span>
 <h3 class="feature__name" id="opinionated-linting">Linting avec parti pris</h3>
 <p class="feature__body">Un catalogue soigné de règles pour la justesse, la cohérence et la clarté. Correction à la sauvegarde quand c'est sûr. Discret quand il le faut.</p>
-<div class="feature__stat"><strong>0.90s</strong> · même projet</div>
+<div class="feature__stat"><strong>0.82s</strong> · même projet</div>
 </article>
 <article class="feature">
 <span class="feature__num">03 / Formater</span>
@@ -205,7 +205,7 @@
 </section>
 <section class="home-section">
 <header class="home-section__head"><span class="home-section__num">§ 02</span><h2 class="home-section__title" id="benchmarks">Benchmarks</h2></header>
-<p>Mesuré sur WordPress avec la dernière version stable de chaque outil. Plus la valeur est basse, mieux c'est ; la colonne « × » indique combien de fois le concurrent le plus lent est plus lent que Mago. Les chiffres proviennent du tableau de bord <a href="https://carthage-software.github.io/php-toolchain-benchmarks/?project=wordpress&kind=Analyzers">php-toolchain-benchmarks</a> (détails complets : moyenne, écart-type, max, mémoire), dernière mise à jour le 2026-10-08 03:03:26.</p>
+<p>Mesuré sur WordPress avec la dernière version stable de chaque outil. Plus la valeur est basse, mieux c'est ; la colonne « × » indique combien de fois le concurrent le plus lent est plus lent que Mago. Les chiffres proviennent du tableau de bord <a href="https://carthage-software.github.io/php-toolchain-benchmarks/?project=wordpress&kind=Analyzers">php-toolchain-benchmarks</a> (détails complets : moyenne, écart-type, max, mémoire), dernière mise à jour le 2026-10-08 20:09:00.</p>
 <table class="bench-table">
 <thead>
 <tr><th>Opération</th><th>Mago</th><th>Concurrent A</th><th>Concurrent B</th><th class="bench-table__factor">×</th></tr>
@@ -213,17 +213,17 @@
 <tbody>
 <tr>
 <td class="bench-table__op">Analyse statique</td>
-<td class="bench-table__mago">0.92s</td>
+<td class="bench-table__mago">0.82s</td>
 <td class="bench-table__other">Phan 115s</td>
 <td class="bench-table__other">Psalm 51.9s</td>
-<td class="bench-table__factor">124</td>
+<td class="bench-table__factor">140</td>
 </tr>
 <tr>
 <td class="bench-table__op">Linting</td>
-<td class="bench-table__mago">0.90s</td>
+<td class="bench-table__mago">0.82s</td>
 <td class="bench-table__other">PHPCS 67.6s</td>
 <td class="bench-table__other">PHP-CS-Fixer 59.9s</td>
-<td class="bench-table__factor">75</td>
+<td class="bench-table__factor">82</td>
 </tr>
 <tr>
 <td class="bench-table__op">Formatage</td>
