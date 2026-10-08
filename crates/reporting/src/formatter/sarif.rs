@@ -40,7 +40,7 @@ impl Formatter for SarifFormatter {
         config: &FormatterConfig,
     ) -> Result<(), ReportingError> {
         let sarif_log = build_sarif_log(issues, config, database)?;
-        serde_json::to_writer_pretty(writer, &sarif_log)?;
+        crate::formatter::utils::write_pretty_json(writer, &sarif_log)?;
 
         Ok(())
     }

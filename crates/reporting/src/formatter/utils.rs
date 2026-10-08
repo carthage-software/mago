@@ -6,6 +6,52 @@ use crate::IssueCollection;
 use crate::Level;
 use crate::formatter::FormatterConfig;
 
+#[cfg(feature = "serde")]
+struct JsonWriter<'writer>(&'writer mut dyn std::io::Write);
+
+#[cfg(feature = "serde")]
+impl std::io::Write for JsonWriter<'_> {
+    fn write(&mut self, bytes: &[u8]) -> std::io::Result<usize> {
+        match self.0.write(bytes) {
+            Ok(0) if !bytes.is_empty() => {
+                // Match write_all's WriteZero error before BufWriter substitutes its own message.
+                let mut empty: &mut [u8] = &mut [];
+                std::io::Write::write_all(&mut empty, bytes).map(|()| 0)
+            }
+            result => result,
+        }
+    }
+
+    fn flush(&mut self) -> std::io::Result<()> {
+        self.0.flush()
+    }
+}
+
+#[cfg(feature = "serde")]
+pub(crate) fn write_pretty_json<T>(writer: &mut dyn std::io::Write, value: &T) -> Result<(), serde_json::Error>
+where
+    T: serde::Serialize + ?Sized,
+{
+    let mut buffered = std::io::BufWriter::with_capacity(64 * 1024, JsonWriter(writer));
+    let result = serde_json::to_writer_pretty(&mut buffered, value);
+
+    if result.as_ref().is_err_and(serde_json::Error::is_io) {
+        // Drop the pending bytes without retrying a failed write.
+        drop(buffered.into_parts());
+        return result;
+    }
+
+    // Keep any prefix emitted before a serialization error without flushing the caller's writer.
+    match buffered.into_inner() {
+        Ok(_) => result,
+        Err(error) => {
+            let (error, buffered) = error.into_parts();
+            drop(buffered.into_parts());
+            Err(serde_json::Error::io(error))
+        }
+    }
+}
+
 pub struct LazyFilteredIssues<'issues> {
     iter: std::slice::Iter<'issues, Issue>,
     min_level: Option<Level>,
@@ -136,47 +182,55 @@ fn compare_issues(a: &&Issue, b: &&Issue) -> Ordering {
 /// XML-encode a string by escaping special characters.
 pub fn xml_encode(input: impl AsRef<str>) -> String {
     let input = input.as_ref();
-    // the result will never be smaller than the input,
-    // so we can preallocate the result with the same capacity.
     let mut result = String::with_capacity(input.len());
+    let bytes = input.as_bytes();
+    let mut start = 0;
 
-    for c in input.chars() {
-        if !is_xml_1_0_character(c) {
-            continue;
-        }
-
-        let next = match c {
-            '&' => "&amp;",
-            '<' => "&lt;",
-            '>' => "&gt;",
-            '"' => "&quot;",
-            '\'' => "&apos;",
-            '\n' => "&#10;",
-            '\r' => "&#13;",
-            _ => {
-                result.push(c);
-
-                continue;
+    for (offset, &byte) in bytes.iter().enumerate() {
+        let (replacement, length) = match byte {
+            b'&' => ("&amp;", 1),
+            b'<' => ("&lt;", 1),
+            b'>' => ("&gt;", 1),
+            b'"' => ("&quot;", 1),
+            b'\'' => ("&apos;", 1),
+            b'\n' => ("&#10;", 1),
+            b'\r' => ("&#13;", 1),
+            0..=8 | 11..=12 | 14..=31 => ("", 1),
+            // U+FFFE and U+FFFF are the only forbidden non-ASCII characters in valid UTF-8.
+            0xef if bytes.get(offset + 1) == Some(&0xbf) && matches!(bytes.get(offset + 2), Some(0xbe | 0xbf)) => {
+                ("", 3)
             }
+            _ => continue,
         };
 
-        result.push_str(next);
+        result.push_str(&input[start..offset]);
+        result.push_str(replacement);
+        start = offset + length;
     }
 
+    result.push_str(&input[start..]);
     result
-}
-
-#[inline]
-fn is_xml_1_0_character(character: char) -> bool {
-    matches!(
-        character,
-        '\u{9}' | '\u{A}' | '\u{D}' | '\u{20}'..='\u{D7FF}' | '\u{E000}'..='\u{FFFD}' | '\u{10000}'..='\u{10FFFF}'
-    )
 }
 
 /// Build a long message from an issue including notes, help, and links.
 pub fn long_message(issue: &Issue, include_annotations: bool) -> String {
-    let mut message = issue.message.clone();
+    let annotation_length = if include_annotations {
+        issue
+            .annotations
+            .iter()
+            .filter_map(|annotation| annotation.message.as_ref())
+            .map(|message| message.len() + 2)
+            .sum()
+    } else {
+        0
+    };
+    let notes_length =
+        usize::from(!issue.notes.is_empty()) + issue.notes.iter().map(|note| note.len() + 1).sum::<usize>();
+    let help_length = issue.help.as_ref().map_or(0, |help| "\n\nHelp: ".len() + help.len());
+    let link_length = issue.link.as_ref().map_or(0, |link| "\n\nMore information: ".len() + link.len());
+    let mut message =
+        String::with_capacity(issue.message.len() + annotation_length + notes_length + help_length + link_length);
+    message.push_str(&issue.message);
 
     if include_annotations {
         for annotation in &issue.annotations {

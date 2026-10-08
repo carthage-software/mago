@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 use std::cell::Cell;
 use std::cmp::Ordering;
+use std::collections::hash_map::Entry;
 use std::io::IsTerminal;
 use std::io::Write;
 use std::ops::Range;
@@ -15,10 +16,11 @@ use codespan_reporting::term;
 use codespan_reporting::term::Config;
 use codespan_reporting::term::DisplayStyle;
 use foldhash::HashMap;
-use foldhash::HashSet;
-use mago_database::file::FileId;
-use termcolor::Buffer;
+use termcolor::Ansi;
+use termcolor::NoColor;
 
+use mago_database::file::File;
+use mago_database::file::FileId;
 use mago_database::DatabaseReader;
 use mago_database::ReadDatabase;
 
@@ -62,10 +64,13 @@ pub(super) fn codespan_format_with_config(
     codespan_config: &Config,
 ) -> Result<(), ReportingError> {
     let use_colors = config.color_choice.should_use_colors(std::io::stdout().is_terminal());
-    let mut buffer = if use_colors { Buffer::ansi() } else { Buffer::no_color() };
+    let mut ansi = Ansi::new(Vec::new());
+    let mut plain = NoColor::new(Vec::new());
+    let styled: &mut dyn term::WriteStyle = if use_colors { &mut ansi } else { &mut plain };
 
     let editor_url = if use_colors { config.editor_url.as_deref() } else { None };
     let files = DatabaseFiles::new(database, editor_url, issues);
+    let mut renderer = term::Renderer::new(styled, codespan_config);
 
     let mut highest_level: Option<Level> = None;
     let mut errors = 0;
@@ -73,6 +78,7 @@ pub(super) fn codespan_format_with_config(
     let mut notes = 0;
     let mut help = 0;
     let mut suggestions = 0;
+    let mut diagnostic = Diagnostic::new(Severity::Note);
 
     for issue in crate::formatter::utils::filter_issues(issues, config, true) {
         match issue.level {
@@ -90,7 +96,7 @@ pub(super) fn codespan_format_with_config(
 
         if editor_url.is_some() {
             if let Some(annotation) = issue.annotations.iter().find(|a| a.is_primary()) {
-                if let Ok(file) = database.get_ref(&annotation.span.file_id) {
+                if let Ok(file) = files.file(annotation.span.file_id) {
                     let line = file.line_number(annotation.span.start.offset) + 1;
                     let column = file.column_number(annotation.span.start.offset) + 1;
                     files.line_hint.set(Some(line));
@@ -102,9 +108,9 @@ pub(super) fn codespan_format_with_config(
             }
         }
 
-        let diagnostic: Diagnostic<FileId> = issue.into();
+        update_diagnostic(&mut diagnostic, issue);
 
-        term::emit_to_write_style(&mut buffer, codespan_config, &files, &diagnostic)?;
+        emit_diagnostic(&mut renderer, codespan_config, &files, &diagnostic)?;
     }
 
     if let Some(highest_level) = highest_level {
@@ -136,13 +142,26 @@ pub(super) fn codespan_format_with_config(
             diagnostic = diagnostic.with_notes(vec![format!("{} issues contain auto-fix suggestions", suggestions)]);
         }
 
-        term::emit_to_write_style(&mut buffer, codespan_config, &files, &diagnostic)?;
+        emit_diagnostic(&mut renderer, codespan_config, &files, &diagnostic)?;
     }
 
     // Write buffer to writer
-    writer.write_all(buffer.as_slice())?;
+    writer.write_all(if use_colors { ansi.get_ref() } else { plain.get_ref() })?;
 
     Ok(())
+}
+
+fn emit_diagnostic(
+    renderer: &mut term::Renderer<'_, '_>,
+    config: &Config,
+    files: &DatabaseFiles<'_>,
+    diagnostic: &Diagnostic<FileId>,
+) -> Result<(), Error> {
+    match config.display_style {
+        DisplayStyle::Rich => term::RichDiagnostic::new(diagnostic, config).render(files, renderer),
+        DisplayStyle::Medium => term::ShortDiagnostic::new(diagnostic, true).render(files, renderer),
+        DisplayStyle::Short => term::ShortDiagnostic::new(diagnostic, false).render(files, renderer),
+    }
 }
 
 struct DatabaseFiles<'db> {
@@ -150,26 +169,43 @@ struct DatabaseFiles<'db> {
     editor_url: Option<&'db str>,
     line_hint: Cell<Option<u32>>,
     column_hint: Cell<Option<u32>>,
-    sources: HashMap<FileId, String>,
+    sources: HashMap<FileId, Cow<'db, str>>,
+    last_file: Cell<Option<&'db File>>,
 }
 
 impl<'db> DatabaseFiles<'db> {
     fn new(database: &'db ReadDatabase, editor_url: Option<&'db str>, issues: &IssueCollection) -> Self {
-        let mut referenced_ids: HashSet<FileId> = HashSet::default();
+        let mut sources: HashMap<FileId, Cow<'db, str>> = HashMap::default();
         for issue in issues.iter() {
             for annotation in &issue.annotations {
-                referenced_ids.insert(annotation.span.file_id);
+                let file_id = annotation.span.file_id;
+                if let Entry::Vacant(entry) = sources.entry(file_id)
+                    && let Ok(file) = database.get_ref(&file_id)
+                {
+                    entry.insert(utf8_preserving_byte_offsets(file.contents.as_ref()));
+                }
             }
         }
 
-        let mut sources: HashMap<FileId, String> = HashMap::default();
-        for file_id in referenced_ids {
-            if let Ok(file) = database.get_ref(&file_id) {
-                sources.insert(file_id, utf8_preserving_byte_offsets(file.contents.as_ref()).into_owned());
-            }
+        DatabaseFiles {
+            database,
+            editor_url,
+            line_hint: Cell::new(None),
+            column_hint: Cell::new(None),
+            sources,
+            last_file: Cell::new(None),
         }
+    }
 
-        DatabaseFiles { database, editor_url, line_hint: Cell::new(None), column_hint: Cell::new(None), sources }
+    fn file(&self, file_id: FileId) -> Result<&'db File, Error> {
+        if let Some(file) = self.last_file.get()
+            && file.id == file_id
+        {
+            return Ok(file);
+        }
+        let file = self.database.get_ref(&file_id).map_err(|_| Error::FileMissing)?;
+        self.last_file.set(Some(file));
+        Ok(file)
     }
 }
 
@@ -179,8 +215,8 @@ impl<'files> Files<'files> for DatabaseFiles<'_> {
     type Source = &'files str;
 
     fn name(&'files self, file_id: FileId) -> Result<Cow<'files, str>, Error> {
-        let file = self.database.get_ref(&file_id).map_err(|_| Error::FileMissing)?;
-        let name = String::from_utf8_lossy(&file.name).into_owned();
+        let file = self.file(file_id)?;
+        let name = String::from_utf8_lossy(&file.name);
 
         if let (Some(template), Some(path)) = (self.editor_url, file.path.as_ref()) {
             let abs_path = path.display().to_string();
@@ -189,16 +225,16 @@ impl<'files> Files<'files> for DatabaseFiles<'_> {
 
             Ok(Cow::Owned(osc8_file_hyperlink(template, &abs_path, &name, line, column, &name)))
         } else {
-            Ok(Cow::Owned(name))
+            Ok(name)
         }
     }
 
     fn source(&'files self, file_id: FileId) -> Result<&'files str, Error> {
-        self.sources.get(&file_id).map(String::as_str).ok_or(Error::FileMissing)
+        self.sources.get(&file_id).map(AsRef::as_ref).ok_or(Error::FileMissing)
     }
 
     fn line_index(&self, file_id: FileId, byte_index: usize) -> Result<usize, Error> {
-        let file = self.database.get_ref(&file_id).map_err(|_| Error::FileMissing)?;
+        let file = self.file(file_id)?;
 
         Ok(file.line_number(
             byte_index.try_into().map_err(|_| Error::IndexTooLarge { given: byte_index, max: u32::MAX as usize })?,
@@ -206,9 +242,47 @@ impl<'files> Files<'files> for DatabaseFiles<'_> {
     }
 
     fn line_range(&self, file_id: FileId, line_index: usize) -> Result<Range<usize>, Error> {
-        let file = self.database.get(&file_id).map_err(|_| Error::FileMissing)?;
+        let file = self.file(file_id)?;
 
         codespan_line_range(&file.lines, file.size, line_index)
+    }
+}
+
+fn update_diagnostic(diagnostic: &mut Diagnostic<FileId>, issue: &Issue) {
+    diagnostic.severity = issue.level.into();
+    diagnostic.message.clone_from(&issue.message);
+    diagnostic.code.clone_from(&issue.code);
+
+    for (index, annotation) in issue.annotations.iter().enumerate() {
+        if let Some(label) = diagnostic.labels.get_mut(index) {
+            label.style = annotation.kind.into();
+            label.file_id = annotation.span.file_id;
+            label.range = annotation.span.into();
+            if let Some(message) = &annotation.message {
+                label.message.clone_from(message);
+            } else {
+                label.message.clear();
+            }
+        } else {
+            diagnostic.labels.push(annotation.into());
+        }
+    }
+    diagnostic.labels.truncate(issue.annotations.len());
+
+    let note_count = issue.notes.len() + usize::from(issue.help.is_some()) + usize::from(issue.link.is_some());
+    diagnostic.notes.resize_with(note_count, String::new);
+    for (target, note) in diagnostic.notes.iter_mut().zip(&issue.notes) {
+        target.clone_from(note);
+    }
+    let mut remaining = diagnostic.notes[issue.notes.len()..].iter_mut();
+    for (prefix, text) in [("Help: ", issue.help.as_ref()), ("See: ", issue.link.as_ref())] {
+        if let Some(text) = text
+            && let Some(target) = remaining.next()
+        {
+            target.clear();
+            target.push_str(prefix);
+            target.push_str(text);
+        }
     }
 }
 

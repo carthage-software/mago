@@ -1,158 +1,218 @@
 use std::borrow::Cow;
-use std::path::PathBuf;
+use std::path::Path;
+
+use foldhash::HashMap;
+use serde::Serialize;
+use serde::Serializer;
+use serde::ser::SerializeSeq;
+use serde::ser::SerializeStruct;
 
 use mago_database::DatabaseReader;
 use mago_database::ReadDatabase;
 use mago_database::error::DatabaseError;
+use mago_database::file::File;
 use mago_database::file::FileId;
 use mago_database::file::FileType;
-use mago_span::Span;
-use mago_text_edit::TextEdit;
 
 use crate::Annotation;
-use crate::AnnotationKind;
 use crate::Issue;
-use crate::IssueCollection;
-use crate::Level;
 
-/// Expanded representation of a file id.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct ExpandedFileId {
-    pub name: Cow<'static, str>,
-    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    pub path: Option<PathBuf>,
-    pub size: u32,
-    pub file_type: FileType,
+#[derive(Serialize)]
+struct ExpandedFileId<'file> {
+    name: Cow<'file, str>,
+    #[serde(skip_serializing_if = "Option::is_none")]
+    path: Option<&'file Path>,
+    size: u32,
+    file_type: FileType,
 }
 
-/// Expanded representation of a position within a file.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct ExpandedPosition {
-    pub offset: u32,
-    pub line: u32,
+struct FileDetails<'file> {
+    file: &'file File,
+    expanded: ExpandedFileId<'file>,
 }
 
-/// Expanded representation of a span, including start and end positions.
-#[derive(Debug, Clone, Eq, PartialEq, Hash, PartialOrd, Ord)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct ExpandedSpan {
-    pub file_id: ExpandedFileId,
-    pub start: ExpandedPosition,
-    pub end: ExpandedPosition,
+#[derive(Serialize)]
+struct ExpandedPosition {
+    offset: u32,
+    line: u32,
 }
 
-/// Expanded annotation, enriched with resolved spans.
-#[derive(Debug, PartialEq, Eq, Ord, Clone, Hash, PartialOrd)]
-#[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
-pub struct ExpandedAnnotation {
-    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    pub message: Option<String>,
-    pub kind: AnnotationKind,
-    pub span: ExpandedSpan,
+#[derive(Serialize)]
+struct ExpandedSpan<'file> {
+    file_id: &'file ExpandedFileId<'file>,
+    start: ExpandedPosition,
+    end: ExpandedPosition,
 }
 
-/// Expanded issue, containing detailed information for display or external reporting.
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct ExpandedIssue {
-    pub level: Level,
-    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    pub code: Option<String>,
-    pub message: String,
-    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Vec::is_empty"))]
-    pub notes: Vec<String>,
-    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    pub help: Option<String>,
-    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
-    pub link: Option<String>,
-    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Vec::is_empty"))]
-    pub annotations: Vec<ExpandedAnnotation>,
-    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Vec::is_empty"))]
-    pub edits: Vec<(ExpandedFileId, Vec<TextEdit>)>,
+#[derive(Serialize)]
+struct ExpandedAnnotation<'annotation, 'file> {
+    #[serde(skip_serializing_if = "Option::is_none")]
+    message: Option<&'annotation str>,
+    kind: crate::AnnotationKind,
+    span: ExpandedSpan<'file>,
 }
 
-/// A collection of expanded issues.
-#[derive(Debug, Clone, Eq, PartialEq, Hash)]
-#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-pub struct ExpandedIssueCollection {
-    issues: Vec<ExpandedIssue>,
+pub(crate) struct ExpandedIssueCollection<'issue, 'file> {
+    issues: Vec<&'issue Issue>,
+    files: HashMap<FileId, FileDetails<'file>>,
 }
 
-impl ExpandedIssueCollection {
-    pub fn from_iter(issues: impl IntoIterator<Item = ExpandedIssue>) -> Self {
-        Self { issues: issues.into_iter().collect() }
+impl<'issue, 'file> ExpandedIssueCollection<'issue, 'file> {
+    pub(crate) fn new(issues: Vec<&'issue Issue>, database: &'file ReadDatabase) -> Result<Self, DatabaseError> {
+        let mut files = HashMap::default();
+        // Resolve files in expansion order before writing, preserving the first error and empty output on failure.
+        for issue in &issues {
+            for file_id in issue.annotations.iter().map(|annotation| &annotation.span.file_id).chain(issue.edits.keys())
+            {
+                if let std::collections::hash_map::Entry::Vacant(entry) = files.entry(*file_id) {
+                    let file = database.get_ref(file_id)?;
+                    entry.insert(FileDetails {
+                        file,
+                        expanded: ExpandedFileId {
+                            name: String::from_utf8_lossy(&file.name),
+                            path: file.path.as_deref(),
+                            size: file.size,
+                            file_type: file.file_type,
+                        },
+                    });
+                }
+            }
+        }
+        Ok(Self { issues, files })
     }
 }
 
-pub trait Expandable<T> {
-    fn expand(&self, database: &ReadDatabase) -> Result<T, DatabaseError>;
-}
-
-impl Expandable<ExpandedFileId> for FileId {
-    fn expand(&self, database: &ReadDatabase) -> Result<ExpandedFileId, DatabaseError> {
-        let file = database.get(self)?;
-
-        Ok(ExpandedFileId {
-            name: Cow::Owned(String::from_utf8_lossy(&file.name).into_owned()),
-            path: file.path.clone(),
-            size: file.size,
-            file_type: file.file_type,
-        })
+impl Serialize for ExpandedIssueCollection<'_, '_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut collection = serializer.serialize_struct("ExpandedIssueCollection", 1)?;
+        collection.serialize_field("issues", &ExpandedIssues { issues: &self.issues, files: &self.files })?;
+        collection.end()
     }
 }
 
-impl Expandable<ExpandedSpan> for Span {
-    fn expand(&self, database: &ReadDatabase) -> Result<ExpandedSpan, DatabaseError> {
-        let file = database.get(&self.file_id)?;
-
-        Ok(ExpandedSpan {
-            file_id: self.file_id.expand(database)?,
-            start: ExpandedPosition { offset: self.start.offset, line: file.line_number(self.start.offset) },
-            end: ExpandedPosition { offset: self.end.offset, line: file.line_number(self.end.offset) },
-        })
-    }
+struct ExpandedIssues<'issue, 'file> {
+    issues: &'issue [&'issue Issue],
+    files: &'file HashMap<FileId, FileDetails<'file>>,
 }
 
-impl Expandable<ExpandedAnnotation> for Annotation {
-    fn expand(&self, database: &ReadDatabase) -> Result<ExpandedAnnotation, DatabaseError> {
-        Ok(ExpandedAnnotation { message: self.message.clone(), kind: self.kind, span: self.span.expand(database)? })
-    }
-}
-
-impl Expandable<ExpandedIssue> for Issue {
-    fn expand(&self, database: &ReadDatabase) -> Result<ExpandedIssue, DatabaseError> {
-        let mut annotations = Vec::new();
-        for annotation in &self.annotations {
-            annotations.push(annotation.expand(database)?);
+impl Serialize for ExpandedIssues<'_, '_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut issues = serializer.serialize_seq(Some(self.issues.len()))?;
+        for issue in self.issues {
+            issues.serialize_element(&ExpandedIssue { issue, files: self.files })?;
         }
 
-        let mut edits = Vec::new();
-        for (file_id, edit_list) in &self.edits {
-            edits.push((file_id.expand(database)?, edit_list.clone()));
-        }
-
-        Ok(ExpandedIssue {
-            level: self.level,
-            code: self.code.clone(),
-            message: self.message.clone(),
-            notes: self.notes.clone(),
-            help: self.help.clone(),
-            link: self.link.clone(),
-            annotations,
-            edits,
-        })
+        issues.end()
     }
 }
 
-impl Expandable<ExpandedIssueCollection> for IssueCollection {
-    fn expand(&self, database: &ReadDatabase) -> Result<ExpandedIssueCollection, DatabaseError> {
-        let mut expanded_issues = Vec::new();
-        for issue in &self.issues {
-            expanded_issues.push(issue.expand(database)?);
+struct ExpandedIssue<'issue, 'file> {
+    issue: &'issue Issue,
+    files: &'file HashMap<FileId, FileDetails<'file>>,
+}
+
+impl Serialize for ExpandedIssue<'_, '_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let issue = self.issue;
+        let fields = 2
+            + usize::from(issue.code.is_some())
+            + usize::from(!issue.notes.is_empty())
+            + usize::from(issue.help.is_some())
+            + usize::from(issue.link.is_some())
+            + usize::from(!issue.annotations.is_empty())
+            + usize::from(!issue.edits.is_empty());
+        let mut expanded = serializer.serialize_struct("ExpandedIssue", fields)?;
+        expanded.serialize_field("level", &issue.level)?;
+        if let Some(code) = &issue.code {
+            expanded.serialize_field("code", code)?;
         }
 
-        Ok(ExpandedIssueCollection { issues: expanded_issues })
+        expanded.serialize_field("message", &issue.message)?;
+        if !issue.notes.is_empty() {
+            expanded.serialize_field("notes", &issue.notes)?;
+        }
+
+        if let Some(help) = &issue.help {
+            expanded.serialize_field("help", help)?;
+        }
+
+        if let Some(link) = &issue.link {
+            expanded.serialize_field("link", link)?;
+        }
+
+        if !issue.annotations.is_empty() {
+            expanded.serialize_field(
+                "annotations",
+                &ExpandedAnnotations { annotations: &issue.annotations, files: self.files },
+            )?;
+        }
+
+        if !issue.edits.is_empty() {
+            expanded.serialize_field("edits", &ExpandedEdits { issue, files: self.files })?;
+        }
+
+        expanded.end()
+    }
+}
+
+struct ExpandedAnnotations<'issue, 'file> {
+    annotations: &'issue [Annotation],
+    files: &'file HashMap<FileId, FileDetails<'file>>,
+}
+
+impl Serialize for ExpandedAnnotations<'_, '_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut annotations = serializer.serialize_seq(Some(self.annotations.len()))?;
+        for annotation in self.annotations {
+            let details = &self.files[&annotation.span.file_id];
+            annotations.serialize_element(&ExpandedAnnotation {
+                message: annotation.message.as_deref(),
+                kind: annotation.kind,
+                span: ExpandedSpan {
+                    file_id: &details.expanded,
+                    start: ExpandedPosition {
+                        offset: annotation.span.start.offset,
+                        line: details.file.line_number(annotation.span.start.offset),
+                    },
+                    end: ExpandedPosition {
+                        offset: annotation.span.end.offset,
+                        line: details.file.line_number(annotation.span.end.offset),
+                    },
+                },
+            })?;
+        }
+
+        annotations.end()
+    }
+}
+
+struct ExpandedEdits<'issue, 'file> {
+    issue: &'issue Issue,
+    files: &'file HashMap<FileId, FileDetails<'file>>,
+}
+
+impl Serialize for ExpandedEdits<'_, '_> {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: Serializer,
+    {
+        let mut edits = serializer.serialize_seq(Some(self.issue.edits.len()))?;
+        for (file_id, edit_list) in &self.issue.edits {
+            edits.serialize_element(&(&self.files[file_id].expanded, edit_list))?;
+        }
+
+        edits.end()
     }
 }

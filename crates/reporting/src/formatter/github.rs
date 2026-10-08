@@ -3,6 +3,7 @@ use std::io::Write;
 
 use mago_database::DatabaseReader;
 use mago_database::ReadDatabase;
+use mago_database::file::File;
 use mago_database::file::HasFileId;
 
 use crate::IssueCollection;
@@ -21,19 +22,24 @@ pub(crate) struct GithubFormatter;
 /// encoded forms are introduced, while carriage returns and line feeds must
 /// never reach the runner as physical line boundaries.
 fn escape_data(input: &str) -> Cow<'_, str> {
-    if !input.bytes().any(|byte| matches!(byte, b'%' | b'\r' | b'\n')) {
+    if memchr::memchr3(b'%', b'\r', b'\n', input.as_bytes()).is_none() {
         return Cow::Borrowed(input);
     }
 
     let mut escaped = String::with_capacity(input.len());
-    for character in input.chars() {
-        match character {
-            '%' => escaped.push_str("%25"),
-            '\r' => escaped.push_str("%0D"),
-            '\n' => escaped.push_str("%0A"),
-            character => escaped.push(character),
+    let mut start = 0;
+    for offset in memchr::memchr3_iter(b'%', b'\r', b'\n', input.as_bytes()) {
+        escaped.push_str(&input[start..offset]);
+        match input.as_bytes()[offset] {
+            b'%' => escaped.push_str("%25"),
+            b'\r' => escaped.push_str("%0D"),
+            _ => escaped.push_str("%0A"),
         }
+
+        start = offset + 1;
     }
+
+    escaped.push_str(&input[start..]);
 
     Cow::Owned(escaped)
 }
@@ -48,16 +54,23 @@ fn escape_property(input: &str) -> Cow<'_, str> {
     }
 
     let mut escaped = String::with_capacity(input.len());
-    for character in input.chars() {
-        match character {
-            '%' => escaped.push_str("%25"),
-            '\r' => escaped.push_str("%0D"),
-            '\n' => escaped.push_str("%0A"),
-            ':' => escaped.push_str("%3A"),
-            ',' => escaped.push_str("%2C"),
-            character => escaped.push(character),
-        }
+    let mut start = 0;
+    for (offset, byte) in input.bytes().enumerate() {
+        let replacement = match byte {
+            b'%' => "%25",
+            b'\r' => "%0D",
+            b'\n' => "%0A",
+            b':' => "%3A",
+            b',' => "%2C",
+            _ => continue,
+        };
+
+        escaped.push_str(&input[start..offset]);
+        escaped.push_str(replacement);
+        start = offset + 1;
     }
+
+    escaped.push_str(&input[start..]);
 
     Cow::Owned(escaped)
 }
@@ -70,6 +83,10 @@ impl Formatter for GithubFormatter {
         database: &ReadDatabase,
         config: &FormatterConfig,
     ) -> Result<(), ReportingError> {
+        let mut cached_file: Option<(&File, Cow<'_, str>)> = None;
+        let mut properties = String::new();
+        let mut number = itoa::Buffer::new();
+
         for issue in crate::formatter::utils::filter_issues(issues, config, false) {
             let level = match &issue.level {
                 Level::Note => "notice",
@@ -78,34 +95,46 @@ impl Formatter for GithubFormatter {
                 Level::Error => "error",
             };
 
-            let properties = match issue.primary_annotation() {
-                Some(annotation) => {
-                    let file = database.get(&annotation.span.file_id())?;
-                    let start_line = file.line_number(annotation.span.start.offset) + 1;
-                    let end_line = file.line_number(annotation.span.end.offset) + 1;
-                    let start_col = file.column_number(annotation.span.start.offset) + 1;
-                    let end_col = file.column_number(annotation.span.end.offset) + 1;
+            properties.clear();
+            if let Some(annotation) = issue.primary_annotation() {
+                let file_id = annotation.span.file_id();
+                let cached = match &mut cached_file {
+                    Some(cached) if cached.0.id == file_id => cached,
+                    cache => {
+                        let file = database.get_ref(&file_id)?;
+                        let name = match String::from_utf8_lossy(&file.name) {
+                            Cow::Borrowed(name) => escape_property(name),
+                            Cow::Owned(name) => Cow::Owned(escape_property(&name).into_owned()),
+                        };
+                        cache.insert((file, name))
+                    }
+                };
+                let (file, name) = (cached.0, &cached.1);
+                let start_line = file.line_number(annotation.span.start.offset);
+                let end_line = file.line_number(annotation.span.end.offset);
+                let start_col = annotation.span.start.offset - file.lines[start_line as usize] + 1;
+                let end_col = annotation.span.end.offset - file.lines[end_line as usize] + 1;
 
-                    let name = String::from_utf8_lossy(&file.name);
-                    let name = escape_property(&name);
-                    if let Some(code) = issue.code.as_ref() {
-                        let code = escape_property(code);
-                        format!(
-                            "file={name},line={start_line},endLine={end_line},col={start_col},endColumn={end_col},title={code}"
-                        )
-                    } else {
-                        format!("file={name},line={start_line},endLine={end_line},col={start_col},endColumn={end_col}")
-                    }
+                properties.push_str("file=");
+                properties.push_str(name);
+                properties.push_str(",line=");
+                properties.push_str(number.format(start_line + 1));
+                properties.push_str(",endLine=");
+                properties.push_str(number.format(end_line + 1));
+                properties.push_str(",col=");
+                properties.push_str(number.format(start_col));
+                properties.push_str(",endColumn=");
+                properties.push_str(number.format(end_col));
+            }
+
+            if let Some(code) = issue.code.as_ref() {
+                if !properties.is_empty() {
+                    properties.push(',');
                 }
-                None => {
-                    if let Some(code) = issue.code.as_ref() {
-                        let code = escape_property(code);
-                        format!("title={code}")
-                    } else {
-                        String::new()
-                    }
-                }
-            };
+
+                properties.push_str("title=");
+                properties.push_str(&escape_property(code));
+            }
 
             let message = long_message(issue, true);
             let message = escape_data(&message);

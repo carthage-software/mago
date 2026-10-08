@@ -6,7 +6,6 @@ use crate::IssueCollection;
 use crate::error::ReportingError;
 use crate::formatter::Formatter;
 use crate::formatter::FormatterConfig;
-use crate::internal::Expandable;
 use crate::internal::ExpandedIssueCollection;
 
 /// Formatter that outputs issues in JSON format.
@@ -20,14 +19,10 @@ impl Formatter for JsonFormatter {
         database: &ReadDatabase,
         config: &FormatterConfig,
     ) -> Result<(), ReportingError> {
-        let mut expanded_issues = Vec::new();
-        for issue in crate::formatter::utils::filter_issues(issues, config, true) {
-            expanded_issues.push(issue.expand(database)?);
-        }
+        let issues = crate::formatter::utils::filter_issues(issues, config, true).collect();
+        let expanded = ExpandedIssueCollection::new(issues, database)?;
 
-        let expanded = ExpandedIssueCollection::from_iter(expanded_issues);
-
-        serde_json::to_writer_pretty(writer, &expanded)?;
+        crate::formatter::utils::write_pretty_json(writer, &expanded)?;
 
         Ok(())
     }

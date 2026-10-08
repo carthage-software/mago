@@ -155,8 +155,7 @@ impl Reporter {
 
         // Track reported issue stats before formatting
         let total_reported_issues = issues.len();
-        let highest_reported_level = issues.get_highest_level();
-        let lowest_reported_level = issues.get_lowest_level();
+        let (highest_reported_level, lowest_reported_level) = issue_levels(&issues);
 
         // Early return if no issues to report
         if total_reported_issues == 0 && !self.config.format.requires_output_when_empty() {
@@ -242,8 +241,7 @@ impl Reporter {
 
         // Track reported issue stats before formatting
         let total_reported_issues = issues.len();
-        let highest_reported_level = issues.get_highest_level();
-        let lowest_reported_level = issues.get_lowest_level();
+        let (highest_reported_level, lowest_reported_level) = issue_levels(&issues);
 
         // Early return if no issues to report
         if total_reported_issues == 0 && !self.config.format.requires_output_when_empty() {
@@ -278,12 +276,31 @@ impl Reporter {
     }
 }
 
+fn issue_levels(issues: &IssueCollection) -> (Option<Level>, Option<Level>) {
+    let mut levels = issues.iter().map(|issue| issue.level);
+    let Some(first) = levels.next() else {
+        return (None, None);
+    };
+
+    let (mut highest, mut lowest) = (first, first);
+    for level in levels {
+        highest = highest.max(level);
+        lowest = lowest.min(level);
+        if highest == Level::Error && lowest == Level::Note {
+            break;
+        }
+    }
+
+    (Some(highest), Some(lowest))
+}
+
 fn drop_issues(issues: IssueCollection) {
     #[cfg(not(target_arch = "wasm32"))]
     if issues.len() >= 4096 && rayon::current_num_threads() > 1 {
         issues.issues.into_par_iter().with_min_len(1024).for_each(drop);
         return;
     }
+
     drop(issues);
 }
 

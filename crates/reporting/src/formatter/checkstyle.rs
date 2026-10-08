@@ -1,8 +1,10 @@
+use std::borrow::Cow;
 use std::collections::HashMap;
 use std::io::Write;
 
 use mago_database::DatabaseReader;
 use mago_database::ReadDatabase;
+use mago_database::file::File;
 use mago_database::file::HasFileId;
 
 use crate::IssueCollection;
@@ -25,18 +27,27 @@ impl Formatter for CheckstyleFormatter {
         config: &FormatterConfig,
     ) -> Result<(), ReportingError> {
         let mut issues_by_file: HashMap<String, Vec<String>> = HashMap::new();
+        let mut cached_file: Option<(&File, Cow<'_, str>)> = None;
 
         for issue in crate::formatter::utils::filter_issues(issues, config, false) {
             let (filename, line, column) = match issue.primary_annotation() {
                 Some(annotation) => {
-                    let file = database.get(&annotation.span.file_id())?;
+                    let file_id = annotation.span.file_id();
+                    let cached = match &mut cached_file {
+                        Some(cached) if cached.0.id == file_id => cached,
+                        cache => {
+                            let file = database.get_ref(&file_id)?;
+                            cache.insert((file, String::from_utf8_lossy(&file.name)))
+                        }
+                    };
 
-                    let line = file.line_number(annotation.span.start.offset) + 1;
-                    let column = file.column_number(annotation.span.start.offset) + 1;
+                    let (file, name) = (cached.0, &cached.1);
+                    let line = file.line_number(annotation.span.start.offset);
+                    let column = annotation.span.start.offset - file.lines[line as usize] + 1;
 
-                    (String::from_utf8_lossy(&file.name).into_owned(), line, column)
+                    (name.as_ref(), line + 1, column)
                 }
-                None => ("<unknown>".to_string(), 0, 0),
+                None => ("<unknown>", 0, 0),
             };
 
             let severity = match issue.level {
@@ -50,7 +61,11 @@ impl Formatter for CheckstyleFormatter {
                 "    <error line=\"{line}\" column=\"{column}\" severity=\"{severity}\" message=\"{message}\" />"
             );
 
-            issues_by_file.entry(filename).or_default().push(error_tag);
+            if let Some(errors) = issues_by_file.get_mut(filename) {
+                errors.push(error_tag);
+            } else {
+                issues_by_file.entry(filename.to_owned()).or_default().push(error_tag);
+            }
         }
 
         // Begin Checkstyle XML
