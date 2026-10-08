@@ -4,8 +4,15 @@ use schemars::JsonSchema;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
+use mago_syntax::cst::DoWhile;
+use mago_syntax::cst::Foreach;
+use mago_syntax::cst::If;
+use mago_syntax::cst::Match;
 use mago_syntax::cst::Node;
 use mago_syntax::cst::NodeKind;
+use mago_syntax::cst::Switch;
+use mago_syntax::cst::While;
+use mago_syntax::walker::Walker;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -187,19 +194,41 @@ impl LintRule for KanDefectRule {
     where
         A: Arena,
     {
-        let kind = match node.kind() {
-            NodeKind::Class => "Class",
-            NodeKind::Trait => "Trait",
-            NodeKind::AnonymousClass => "Class",
-            NodeKind::Enum => "Enum",
-            NodeKind::Interface => "Interface",
-            NodeKind::Function => "Function",
-            NodeKind::Closure => "Closure",
+        let mut factors = (0, 0, 0);
+        let kind = match node {
+            Node::Class(class) => {
+                DefectFactorCollector.walk_class(class, &mut factors);
+                "Class"
+            }
+            Node::Trait(r#trait) => {
+                DefectFactorCollector.walk_trait(r#trait, &mut factors);
+                "Trait"
+            }
+            Node::AnonymousClass(class) => {
+                DefectFactorCollector.walk_anonymous_class(class, &mut factors);
+                "Class"
+            }
+            Node::Enum(r#enum) => {
+                DefectFactorCollector.walk_enum(r#enum, &mut factors);
+                "Enum"
+            }
+            Node::Interface(interface) => {
+                DefectFactorCollector.walk_interface(interface, &mut factors);
+                "Interface"
+            }
+            Node::Function(function) => {
+                DefectFactorCollector.walk_function(function, &mut factors);
+                "Function"
+            }
+            Node::Closure(closure) => {
+                DefectFactorCollector.walk_closure(closure, &mut factors);
+                "Closure"
+            }
             _ => return,
         };
 
         let threshold = self.cfg.threshold;
-        let kan_defect = get_kan_defect_of_node(node);
+        let kan_defect = calculate_kan_defect(factors.0, factors.1, factors.2);
 
         if kan_defect > threshold {
             ctx.collector.report(
@@ -217,36 +246,34 @@ impl LintRule for KanDefectRule {
 }
 
 #[inline]
-fn get_kan_defect_of_node(node: Node<'_, '_>) -> f64 {
-    let (select_count, while_count, if_count) = collect_defect_factors(node);
-
-    calculate_kan_defect(select_count, while_count, if_count)
-}
-
-#[inline]
 fn calculate_kan_defect(select: usize, r#while: usize, r#if: usize) -> f64 {
     0.07f64.mul_add(r#if as f64, 0.22f64.mul_add(select as f64, 0.23f64.mul_add(r#while as f64, 0.15)))
 }
 
-#[inline]
-fn collect_defect_factors(node: Node<'_, '_>) -> (usize, usize, usize) {
-    let mut select_count = 0;
-    let mut while_count = 0;
-    let mut if_count = 0;
+struct DefectFactorCollector;
 
-    node.visit_children(|child| {
-        let (s, w, i) = collect_defect_factors(child);
-        select_count += s;
-        while_count += w;
-        if_count += i;
-    });
-
-    match node {
-        Node::Switch(_) | Node::Match(_) => select_count += 1,
-        Node::DoWhile(_) | Node::While(_) | Node::Foreach(_) => while_count += 1,
-        Node::If(_) => if_count += 1,
-        _ => (),
+impl<'ast, 'arena> Walker<'ast, 'arena, (usize, usize, usize)> for DefectFactorCollector {
+    fn walk_in_switch(&self, _: &'ast Switch<'arena>, counts: &mut (usize, usize, usize)) {
+        counts.0 += 1;
     }
 
-    (select_count, while_count, if_count)
+    fn walk_in_match(&self, _: &'ast Match<'arena>, counts: &mut (usize, usize, usize)) {
+        counts.0 += 1;
+    }
+
+    fn walk_in_do_while(&self, _: &'ast DoWhile<'arena>, counts: &mut (usize, usize, usize)) {
+        counts.1 += 1;
+    }
+
+    fn walk_in_while(&self, _: &'ast While<'arena>, counts: &mut (usize, usize, usize)) {
+        counts.1 += 1;
+    }
+
+    fn walk_in_foreach(&self, _: &'ast Foreach<'arena>, counts: &mut (usize, usize, usize)) {
+        counts.1 += 1;
+    }
+
+    fn walk_in_if(&self, _: &'ast If<'arena>, counts: &mut (usize, usize, usize)) {
+        counts.2 += 1;
+    }
 }
