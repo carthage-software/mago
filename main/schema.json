@@ -1024,7 +1024,8 @@
           "string-combination-threshold": 128,
           "integer-combination-threshold": 128,
           "array-combination-threshold": 32,
-          "loop-assignment-depth-threshold": 1
+          "loop-assignment-depth-threshold": 1,
+          "slow-file-warning-threshold-ms": 5000
         }
       }
     },
@@ -8844,7 +8845,8 @@
             "string-combination-threshold": 128,
             "integer-combination-threshold": 128,
             "array-combination-threshold": 32,
-            "loop-assignment-depth-threshold": 1
+            "loop-assignment-depth-threshold": 1,
+            "slow-file-warning-threshold-ms": 5000
           }
         }
       },
@@ -8983,6 +8985,14 @@
           "minimum": 0,
           "maximum": 255,
           "default": 1
+        },
+        "slow-file-warning-threshold-ms": {
+          "description": "Duration in milliseconds after which analysis of a source file is reported as slow.\n\nThis only controls the warning threshold; it does not change analysis behavior.\n\nDefaults to `5000`.",
+          "type": "integer",
+          "format": "uint16",
+          "minimum": 0,
+          "maximum": 65535,
+          "default": 5000
         }
       },
       "additionalProperties": false

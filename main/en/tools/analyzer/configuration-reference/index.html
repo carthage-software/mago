@@ -1044,6 +1044,7 @@ check-throws = false
 <tr><td style="text-align: left"><code>integer-combination-threshold</code></td><td style="text-align: left"><code>u16</code></td><td style="text-align: left"><code>128</code></td><td style="text-align: left">Maximum literal integers tracked before generalising to <code>int</code>.</td></tr>
 <tr><td style="text-align: left"><code>array-combination-threshold</code></td><td style="text-align: left"><code>u16</code></td><td style="text-align: left"><code>32</code></td><td style="text-align: left">Maximum sealed keyed-array shapes tracked individually before merging.</td></tr>
 <tr><td style="text-align: left"><code>loop-assignment-depth-threshold</code></td><td style="text-align: left"><code>u8</code></td><td style="text-align: left"><code>1</code></td><td style="text-align: left">Maximum loop fixed-point iteration depth. <code>0</code> disables re-iteration.</td></tr>
+<tr><td style="text-align: left"><code>slow-file-warning-threshold-ms</code></td><td style="text-align: left"><code>u16</code></td><td style="text-align: left"><code>5000</code></td><td style="text-align: left">Warn when analysis of a source file takes longer than this many milliseconds.</td></tr>
 </tbody></table>
 <p><code>string-concat-combination-threshold</code> is still accepted as an alias for <code>string-combination-threshold</code>.</p>
 <h3 id="when-to-adjust">When to adjust</h3>

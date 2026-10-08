@@ -822,6 +822,7 @@ check-throws = false
 <tr><td style="text-align: left"><code>integer-combination-threshold</code></td><td style="text-align: left"><code>u16</code></td><td style="text-align: left"><code>128</code></td><td style="text-align: left">在泛化为 <code>int</code> 之前能跟踪的最大字面整数数。</td></tr>
 <tr><td style="text-align: left"><code>array-combination-threshold</code></td><td style="text-align: left"><code>u16</code></td><td style="text-align: left"><code>32</code></td><td style="text-align: left">在合并之前能单独跟踪的最大封闭键控数组形状数。</td></tr>
 <tr><td style="text-align: left"><code>loop-assignment-depth-threshold</code></td><td style="text-align: left"><code>u8</code></td><td style="text-align: left"><code>1</code></td><td style="text-align: left">循环不动点迭代的最大深度。<code>0</code> 表示禁用重新迭代。</td></tr>
+<tr><td style="text-align: left"><code>slow-file-warning-threshold-ms</code></td><td style="text-align: left"><code>u16</code></td><td style="text-align: left"><code>5000</code></td><td style="text-align: left">单个源文件的分析耗时超过此毫秒数时发出警告。</td></tr>
 </tbody></table>
 <p><code>string-concat-combination-threshold</code> 仍作为 <code>string-combination-threshold</code> 的别名被接受。</p>
 <h3 id="performance-tuning">何时调整</h3>
