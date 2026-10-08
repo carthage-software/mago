@@ -14,12 +14,21 @@ use mago_syntax::cst::NamespaceBody;
 use mago_syntax::cst::Node;
 use mago_syntax::cst::Program;
 use mago_syntax::cst::Statement;
+use mago_syntax::walker::Walker;
 
 use crate::internal::consts::DECLARE_DIRECTIVES;
 use crate::internal::consts::ENCODING_DECLARE_DIRECTIVE;
 use crate::internal::consts::STRICT_TYPES_DECLARE_DIRECTIVE;
 use crate::internal::consts::TICKS_DECLARE_DIRECTIVE;
 use crate::internal::context::Context;
+
+struct NamespaceCollector;
+
+impl<'ast, 'arena> Walker<'ast, 'arena, Vec<&'ast Namespace<'arena>>> for NamespaceCollector {
+    fn walk_out_namespace(&self, namespace: &'ast Namespace<'arena>, namespaces: &mut Vec<&'ast Namespace<'arena>>) {
+        namespaces.push(namespace);
+    }
+}
 
 #[inline]
 pub fn check_top_level_statements<'ast, 'arena>(
@@ -103,8 +112,8 @@ pub fn check_top_level_statements<'ast, 'arena>(
         }
     }
 
-    let namespaces =
-        Node::Program(program).filter_map(|node| if let Node::Namespace(ns) = node { Some(*ns) } else { None });
+    let mut namespaces = vec![];
+    NamespaceCollector.walk_program(program, &mut namespaces);
 
     let mut last_unbraced = None;
     let mut last_braced = None;
