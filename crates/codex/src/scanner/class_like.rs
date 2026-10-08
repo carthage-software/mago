@@ -293,7 +293,7 @@ where
     A: Arena,
 {
     let original_name = name;
-    let name = ascii_lowercase_word(original_name.as_bytes());
+    let name = original_name.to_ascii_lowercase();
 
     if codebase.class_likes.contains_key(&name) {
         return None;
@@ -644,7 +644,7 @@ where
                 continue;
             };
 
-            let lowercase_parent_name = ascii_lowercase_word(parent_name.as_bytes());
+            let lowercase_parent_name = parent_name.to_ascii_lowercase();
 
             let has_parent = if class_like_metadata.kind.is_interface() {
                 class_like_metadata.all_parent_interfaces.contains(&lowercase_parent_name)
@@ -733,7 +733,7 @@ where
                 }
             };
 
-            let lowercase_parent_name = ascii_lowercase_word(parent_name.as_bytes());
+            let lowercase_parent_name = parent_name.to_ascii_lowercase();
 
             if !class_like_metadata.all_parent_interfaces.contains(&lowercase_parent_name) {
                 class_like_metadata.issues.push(
@@ -829,7 +829,7 @@ where
                 continue;
             };
 
-            class_like_metadata.require_extends.insert(ascii_lowercase_word(required_name.as_bytes()));
+            class_like_metadata.require_extends.insert(required_name.to_ascii_lowercase());
             if let Some(required_params) = required_params {
                 class_like_metadata.add_template_extended_offset(required_name, required_params);
             }
@@ -911,7 +911,7 @@ where
                 continue;
             };
 
-            class_like_metadata.require_implements.insert(ascii_lowercase_word(required_name.as_bytes()));
+            class_like_metadata.require_implements.insert(required_name.to_ascii_lowercase());
             if let Some(required_parameters) = required_parameters {
                 class_like_metadata.add_template_extended_offset(required_name, required_parameters);
             }
@@ -933,7 +933,7 @@ where
                                 class_like_metadata
                                     .permitted_inheritors
                                     .get_or_insert_default()
-                                    .insert(ascii_lowercase_word(name.as_bytes()));
+                                    .insert(name.to_ascii_lowercase());
                             }
                             _ => {
                                 class_like_metadata.issues.push(
@@ -1360,7 +1360,7 @@ where
                         continue;
                     };
 
-                    let lowercase_trait_name = ascii_lowercase_word(trait_name.as_bytes());
+                    let lowercase_trait_name = trait_name.to_ascii_lowercase();
                     if !class_like_metadata.used_traits.contains(&lowercase_trait_name) {
                         class_like_metadata.issues.push(
                             Issue::error("The `@use` tag must refer to a trait that is used.")
