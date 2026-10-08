@@ -24,7 +24,7 @@ use mago_syntax::cst::Interface;
 use mago_syntax::cst::Method;
 use mago_syntax::cst::Namespace;
 use mago_syntax::cst::Program;
-use mago_syntax::cst::PropertyHook;
+use mago_syntax::cst::PropertyHookConcreteBody;
 use mago_syntax::cst::Return;
 use mago_syntax::cst::Trait;
 use mago_syntax::cst::Trivia;
@@ -758,12 +758,12 @@ where
     }
 
     #[inline]
-    fn walk_in_property_hook(&mut self, _hook: &'arena PropertyHook<'arena>, _context: &mut Context<'ctx, 'arena, A>) {
+    fn walk_in_property_hook_concrete_body(&mut self, _: &'arena PropertyHookConcreteBody<'arena>, _: &mut Context<'ctx, 'arena, A>) {
         self.function_like_stack.push(None);
     }
 
     #[inline]
-    fn walk_out_property_hook(&mut self, _hook: &'arena PropertyHook<'arena>, _context: &mut Context<'ctx, 'arena, A>) {
+    fn walk_out_property_hook_concrete_body(&mut self, _: &'arena PropertyHookConcreteBody<'arena>, _: &mut Context<'ctx, 'arena, A>) {
         self.function_like_stack.pop();
     }
 
