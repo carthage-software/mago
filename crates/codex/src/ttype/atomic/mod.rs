@@ -951,8 +951,8 @@ pub fn populate_atomic_type(
                         });
 
                         let mut named_object = TNamedObject::new(*name)
-                            .with_type_parameters(parameters.clone())
-                            .with_variances(variances.clone());
+                            .with_type_parameters(parameters.take())
+                            .with_variances(variances.take());
                         if let Some(intersection_types) = intersection_types {
                             for intersection_type in intersection_types {
                                 named_object.add_intersection_type(intersection_type);

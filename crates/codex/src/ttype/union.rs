@@ -1335,6 +1335,33 @@ pub fn populate_union_type(
     }
 
     unpopulated_union.flags.insert(UnionFlags::POPULATED);
+    // These atoms need neither mutation nor references, even during forced population.
+    if let Cow::Borrowed(atomics) = &unpopulated_union.types
+        && atomics.iter().all(|atomic| {
+            matches!(
+                atomic,
+                TAtomic::Scalar(
+                    TScalar::Generic
+                        | TScalar::Numeric
+                        | TScalar::ArrayKey
+                        | TScalar::Bool(_)
+                        | TScalar::Integer(_)
+                        | TScalar::Float(_)
+                        | TScalar::String(_)
+                        | TScalar::ClassLikeString(TClassLikeString::Any { .. } | TClassLikeString::Literal { .. })
+                ) | TAtomic::Mixed(_)
+                    | TAtomic::Resource(_)
+                    | TAtomic::Object(TObject::Any)
+                    | TAtomic::Never
+                    | TAtomic::Null
+                    | TAtomic::Void
+                    | TAtomic::Placeholder
+            )
+        })
+    {
+        return;
+    }
+
     let unpopulated_atomics = unpopulated_union.types.to_mut();
     for unpopulated_atomic in unpopulated_atomics {
         match unpopulated_atomic {
