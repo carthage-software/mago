@@ -52,14 +52,14 @@ impl Entry {
 
 /// Number of shards. Each shard owns its own mutex, table, and arena, so concurrent
 /// interning rarely contends.
-const NUM_SHARDS: usize = 64;
+const NUM_SHARDS: usize = 256;
 
 /// Initial table capacity (slots) per shard. Sized so the prelude warm-up doesn't
 /// trigger many resizes.
-const INITIAL_TABLE_CAPACITY: usize = 1 << 14; // 16K slots/shard, 1M total
+const INITIAL_TABLE_CAPACITY: usize = 1 << 12; // 4K slots/shard, 1M total
 
 /// Initial bytes per shard arena. Grows by doubling on overflow.
-const INITIAL_ARENA_BYTES: usize = 64 * 1024;
+const INITIAL_ARENA_BYTES: usize = 16 * 1024;
 
 struct Shard {
     /// Open-addressed table of pointers to entries in the arena. `null` is the
@@ -218,7 +218,7 @@ impl Interner {
 static INTERNER: OnceLock<Interner> = OnceLock::new();
 
 /// Per-thread, two-way set-associative cache for recently interned words.
-const CACHE_SETS: usize = 512;
+const CACHE_SETS: usize = 4096;
 const CACHE_WAYS: usize = 2;
 const _: () = assert!(CACHE_SETS.is_power_of_two(), "interner cache set count must be a power of two");
 
@@ -300,7 +300,7 @@ pub(crate) fn intern(bytes: &[u8]) -> NonNull<Entry> {
 
 /// Top-bits shift count for shard selection. Top bits of the hash, not the low bits,
 /// because the low bits are also used for in-shard table indexing.
-const SHARD_BITS: usize = 6; // log2(NUM_SHARDS)
+const SHARD_BITS: usize = 8; // log2(NUM_SHARDS)
 
 const _: () = assert!(1 << SHARD_BITS == NUM_SHARDS, "SHARD_BITS must match NUM_SHARDS");
 
