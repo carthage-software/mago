@@ -47,6 +47,15 @@ where
         parser.parse_document(span)
     }
 
+    /// Parses elements and errors without storing trivia.
+    #[must_use]
+    pub fn parse_without_trivia(arena: &'arena A, content: &'arena [u8], span: Span) -> Document<'arena> {
+        let mut parser = Self::new(arena, content, span);
+        parser.stream.omit_trivia();
+
+        parser.parse_document(span)
+    }
+
     #[must_use]
     pub fn parse(arena: &'arena A, file_id: FileId, content: &'arena [u8]) -> Document<'arena> {
         let span = Span::new(file_id, Position::new(0), Position::new(content.len() as u32));

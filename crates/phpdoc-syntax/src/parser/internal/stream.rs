@@ -36,6 +36,7 @@ where
     pending_newline: bool,
     allow_line_prefix: bool,
     reached_end: bool,
+    collect_trivia: bool,
     depth: u16,
     inline_tag_depth: u32,
 }
@@ -67,9 +68,14 @@ where
             pending_newline: false,
             allow_line_prefix: false,
             reached_end: false,
+            collect_trivia: true,
             depth: 0,
             inline_tag_depth: 0,
         }
+    }
+
+    pub fn omit_trivia(&mut self) {
+        self.collect_trivia = false;
     }
 
     #[inline]
@@ -281,7 +287,7 @@ where
 
                     let after = Position::new(token.start.offset + token.value.len() as u32);
                     let end = Position::new(self.base + self.source.len() as u32);
-                    if after.offset < end.offset {
+                    if self.collect_trivia && after.offset < end.offset {
                         let value = self.raw_between(after, end);
                         self.trivia.push(Trivia {
                             kind: TriviaKind::Trailing,
@@ -306,7 +312,9 @@ where
 
     #[inline]
     fn push_trivia(&mut self, kind: TriviaKind, token: Token<'arena>) {
-        self.trivia.push(Trivia::from_token(kind, token, self.file_id));
+        if self.collect_trivia {
+            self.trivia.push(Trivia::from_token(kind, token, self.file_id));
+        }
     }
 
     #[inline]

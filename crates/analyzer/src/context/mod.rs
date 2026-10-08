@@ -204,7 +204,7 @@ where
     pub fn get_parsed_docblocks(&mut self) -> Vec<Element<'arena>> {
         let mut elements = vec![];
         for trivia in PrecedingDocblocks::new(self.comments, self.statement_span.start.offset) {
-            let document = PHPDocParser::parse_with_span(self.arena, trivia.value, trivia.span);
+            let document = PHPDocParser::parse_without_trivia(self.arena, trivia.value, trivia.span);
 
             for error in document.errors {
                 let error_span = error.span();

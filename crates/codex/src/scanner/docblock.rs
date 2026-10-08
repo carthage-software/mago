@@ -63,7 +63,7 @@ pub fn parse_docblock_trivia<'arena, A>(
 where
     A: Arena,
 {
-    PHPDocParser::parse_with_span(context.arena, docblock.value, docblock.span)
+    PHPDocParser::parse_without_trivia(context.arena, docblock.value, docblock.span)
 }
 
 pub fn find_most_trusted_tag<'arena, T>(

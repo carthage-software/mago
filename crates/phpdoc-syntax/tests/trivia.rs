@@ -8,6 +8,7 @@ use mago_phpdoc_syntax::cst::TriviaKind;
 use mago_phpdoc_syntax::lexer::DocblockLexer;
 use mago_span::HasSpan;
 use mago_span::Position;
+use mago_span::Span;
 use mago_syntax_core::input::Input;
 
 fn parse<'arena>(arena: &'arena LocalArena, source: &'arena [u8]) -> Document<'arena> {
@@ -136,4 +137,28 @@ fn missing_markers_are_not_faked() {
         trivia_pairs(&document),
         vec![(TriviaKind::Whitespace, b" ".as_slice()), (TriviaKind::Whitespace, b" ".as_slice())]
     );
+}
+
+#[test]
+fn omitting_trivia_preserves_elements_spans_and_errors() {
+    let sources: &[&[u8]] = &[
+        b"/**\n * Summary.\n * @param array{a: int, b: string} $map\n * @return bool\n */",
+        b"/**\r\n * @param |\r\n * @return |\r\n */ trailing",
+        b"/** @var int // note */",
+        b"/** Description with `@param int` and {@inheritDoc}. */",
+        b"@var int $x",
+        b"/** @template */",
+        b"/** */",
+    ];
+    for source in sources {
+        let arena = LocalArena::new();
+        let span = Span::new(FileId::new(b"doc.php"), Position::new(42), Position::new(42 + source.len() as u32));
+        let full = PHPDocParser::parse_with_span(&arena, source, span);
+        let lean = PHPDocParser::parse_without_trivia(&arena, source, span);
+        assert!(!full.trivia.is_empty());
+        assert!(lean.trivia.is_empty());
+        assert_eq!(lean.span, full.span);
+        assert_eq!(lean.elements, full.elements);
+        assert_eq!(lean.errors, full.errors);
+    }
 }
