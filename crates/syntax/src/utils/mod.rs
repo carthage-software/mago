@@ -54,13 +54,7 @@ pub fn find_returns_in_statement<'arena>(statement: &'arena Statement<'arena>) -
 #[inline]
 #[must_use]
 pub fn block_has_throws(block: &Block<'_>) -> bool {
-    for control_flow in control_flow::find_control_flows_in_block(block) {
-        if let ControlFlow::Throw(_) = control_flow {
-            return true;
-        }
-    }
-
-    false
+    block.statements.iter().any(statement_has_throws)
 }
 
 #[inline]
