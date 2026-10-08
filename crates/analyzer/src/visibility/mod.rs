@@ -107,13 +107,6 @@ where
         method_id.get_class_name().to_ascii_lowercase(),
         method_id.get_method_name().to_ascii_lowercase(),
     );
-    let declaring_class =
-        context.codebase.get_declaring_method_class_by_id(&lookup_id).unwrap_or_else(|| method_id.get_class_name());
-
-    let Some(method_metadata) = context.codebase.get_declaring_method_by_id(&lookup_id) else {
-        return true;
-    };
-
     // Get the effective visibility, checking trait alias visibility overrides
     let Some(visibility) = context.codebase.get_method_visibility_by_id(&lookup_id) else {
         return true;
@@ -123,6 +116,12 @@ where
         return true;
     }
 
+    let Some(method_metadata) = context.codebase.get_declaring_method_by_id(&lookup_id) else {
+        return true;
+    };
+
+    let declaring_class =
+        context.codebase.get_declaring_method_class_by_id(&lookup_id).unwrap_or_else(|| method_id.get_class_name());
     let is_visible = is_visible_from_scope(context.codebase, visibility, declaring_class.as_bytes(), calling_class);
     if !is_visible {
         let declaring_class_name = context
@@ -174,13 +173,6 @@ where
         method_id.get_class_name().to_ascii_lowercase(),
         method_id.get_method_name().to_ascii_lowercase(),
     );
-    let declaring_class =
-        context.codebase.get_declaring_method_class_by_id(&lookup_id).unwrap_or_else(|| method_id.get_class_name());
-
-    if context.codebase.get_declaring_method_by_id(&lookup_id).is_none() {
-        return true;
-    }
-
     let Some(visibility) = context.codebase.get_method_visibility_by_id(&lookup_id) else {
         return true;
     };
@@ -188,6 +180,13 @@ where
     if visibility == Visibility::Public {
         return true;
     }
+
+    if context.codebase.get_declaring_method_by_id(&lookup_id).is_none() {
+        return true;
+    }
+
+    let declaring_class =
+        context.codebase.get_declaring_method_class_by_id(&lookup_id).unwrap_or_else(|| method_id.get_class_name());
 
     is_visible_from_scope(
         context.codebase,
