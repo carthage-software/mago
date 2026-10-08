@@ -26,6 +26,10 @@ pub fn check_unused_params<'ctx, 'ast, 'arena, A>(
 ) where
     A: Arena,
 {
+    if params.is_empty() {
+        return;
+    }
+
     match body {
         FunctionLikeBody::Statements(statements, _) => {
             if utils::potentially_contains_function_call(statements, FUNC_GET_ARGS, ctx) {
