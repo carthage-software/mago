@@ -24,7 +24,18 @@ final class Builder
 
     public function plain(): self
     {
+        $_n = count([]);
+
         return $this;
+    }
+
+    public function hooked(): object
+    {
+        return new class {
+            public string $v = '' {
+                set => (string) count(func_get_args());
+            }
+        };
     }
 
     public function nested(): \Closure
@@ -58,4 +69,6 @@ function run(Builder $b): void
     $b->plain('a');
     // @mago-expect analysis:too-many-arguments
     $b->nested('a');
+    // @mago-expect analysis:too-many-arguments
+    $b->hooked('a');
 }
