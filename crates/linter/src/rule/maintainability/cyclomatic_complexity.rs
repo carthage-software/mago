@@ -6,12 +6,24 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
+use mago_syntax::cst::Binary;
 use mago_syntax::cst::BinaryOperator;
 use mago_syntax::cst::Block;
 use mago_syntax::cst::ClassLikeMember;
+use mago_syntax::cst::Conditional;
+use mago_syntax::cst::DoWhile;
+use mago_syntax::cst::For;
+use mago_syntax::cst::Foreach;
+use mago_syntax::cst::If;
+use mago_syntax::cst::IfColonDelimitedBodyElseIfClause;
+use mago_syntax::cst::IfStatementBodyElseIfClause;
 use mago_syntax::cst::Method;
 use mago_syntax::cst::Node;
 use mago_syntax::cst::NodeKind;
+use mago_syntax::cst::SwitchDefaultCase;
+use mago_syntax::cst::TryCatchClause;
+use mago_syntax::cst::While;
+use mago_syntax::walker::Walker;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -269,7 +281,8 @@ impl CyclomaticComplexityRule {
     {
         let threshold = self.cfg.threshold;
 
-        let complexity = get_cyclomatic_complexity_of_node(Node::Block(body));
+        let mut complexity = 0;
+        ComplexityCounter.walk_block(body, &mut complexity);
 
         if complexity > threshold {
             let issue = Issue::new(self.cfg.level, format!("{kind} has high complexity."))
@@ -307,37 +320,72 @@ fn get_cyclomatic_complexity_of_method(method: &Method<'_>) -> Option<usize> {
         return None;
     }
 
-    Some(if method.is_abstract() { 1 } else { get_cyclomatic_complexity_of_node(Node::Method(method)) + 1 })
-}
-
-#[inline]
-fn get_cyclomatic_complexity_of_node(node: Node<'_, '_>) -> usize {
-    let mut number = 0;
-
-    node.visit_children(|child| number += get_cyclomatic_complexity_of_node(child));
-
-    match node {
-        Node::If(_)
-        | Node::IfStatementBodyElseIfClause(_)
-        | Node::IfColonDelimitedBodyElseIfClause(_)
-        | Node::For(_)
-        | Node::Foreach(_)
-        | Node::While(_)
-        | Node::DoWhile(_)
-        | Node::TryCatchClause(_)
-        | Node::Conditional(_) => number += 1,
-        Node::Binary(operation) => match operation.operator {
-            operator if operator.is_logical() || operator.is_null_coalesce() => number += 1,
-            BinaryOperator::Spaceship(_) => number += 2,
-            _ => (),
-        },
-        Node::SwitchCase(case) if case.is_default() => {
-            number += 1;
-        }
-        _ => (),
+    let mut complexity = 1;
+    if !method.is_abstract() {
+        ComplexityCounter.walk_method(method, &mut complexity);
     }
 
-    number
+    Some(complexity)
+}
+
+struct ComplexityCounter;
+
+impl<'ast, 'arena> Walker<'ast, 'arena, usize> for ComplexityCounter {
+    fn walk_in_if(&self, _: &'ast If<'arena>, count: &mut usize) {
+        *count += 1;
+    }
+
+    fn walk_in_if_statement_body_else_if_clause(
+        &self,
+        _: &'ast IfStatementBodyElseIfClause<'arena>,
+        count: &mut usize,
+    ) {
+        *count += 1;
+    }
+
+    fn walk_in_if_colon_delimited_body_else_if_clause(
+        &self,
+        _: &'ast IfColonDelimitedBodyElseIfClause<'arena>,
+        count: &mut usize,
+    ) {
+        *count += 1;
+    }
+
+    fn walk_in_for(&self, _: &'ast For<'arena>, count: &mut usize) {
+        *count += 1;
+    }
+
+    fn walk_in_foreach(&self, _: &'ast Foreach<'arena>, count: &mut usize) {
+        *count += 1;
+    }
+
+    fn walk_in_while(&self, _: &'ast While<'arena>, count: &mut usize) {
+        *count += 1;
+    }
+
+    fn walk_in_do_while(&self, _: &'ast DoWhile<'arena>, count: &mut usize) {
+        *count += 1;
+    }
+
+    fn walk_in_try_catch_clause(&self, _: &'ast TryCatchClause<'arena>, count: &mut usize) {
+        *count += 1;
+    }
+
+    fn walk_in_conditional(&self, _: &'ast Conditional<'arena>, count: &mut usize) {
+        *count += 1;
+    }
+
+    fn walk_in_switch_default_case(&self, _: &'ast SwitchDefaultCase<'arena>, count: &mut usize) {
+        *count += 1;
+    }
+
+    fn walk_in_binary(&self, binary: &'ast Binary<'arena>, count: &mut usize) {
+        match binary.operator {
+            operator if operator.is_logical() || operator.is_null_coalesce() => *count += 1,
+            BinaryOperator::Spaceship(_) => *count += 2,
+            _ => (),
+        }
+    }
 }
 
 #[cfg(test)]

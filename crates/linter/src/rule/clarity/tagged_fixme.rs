@@ -104,17 +104,16 @@ impl LintRule for TaggedFixmeRule {
             }
 
             for (_, line) in comment_lines(trivia) {
-                let trimmed_bytes: Vec<u8> = {
-                    let stripped =
-                        line.iter().position(|&b| !b.is_ascii_whitespace()).map_or(&line[line.len()..], |i| &line[i..]);
-                    stripped.to_ascii_lowercase()
-                };
+                let stripped =
+                    line.iter().position(|&b| !b.is_ascii_whitespace()).map_or(&line[line.len()..], |i| &line[i..]);
+                if !stripped.get(..5).is_some_and(|prefix| prefix.eq_ignore_ascii_case(b"fixme")) {
+                    continue;
+                }
+
+                let trimmed_bytes = stripped.to_ascii_lowercase();
                 let Some(trimmied) = std::str::from_utf8(&trimmed_bytes).ok() else {
                     continue;
                 };
-                if !trimmied.starts_with("fixme") {
-                    continue;
-                }
 
                 if (*TAGGED_FIXME_REGEX).is_match(trimmied) {
                     continue;
@@ -135,5 +134,17 @@ impl LintRule for TaggedFixmeRule {
                 break;
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::TaggedFixmeRule;
+
+    crate::test_lint_failure! {
+        name = comment_prefixes_and_unicode_tags,
+        rule = TaggedFixmeRule,
+        count = 3,
+        code = "<?php\r\n// Plain comment\r\n// FiXmE(@name)\r\n// fixme note FIXME(@other)\r\n// FIXME(é)\r\n// fix\r\n// \u{00a0}FIXME\r\n// FIXMEfoo\r\n// FIXME(\u{00a0} )\r\n/*\r\n * FIXME:\r\n * FIXME:\r\n */"
     }
 }

@@ -1011,6 +1011,12 @@ fn scrape_type_properties(
     if let TAtomic::Object(TObject::Named(named_object)) = &atomic {
         let fq_class_name = named_object.get_name();
         if let Some(type_parameters) = named_object.get_type_parameters() {
+            if named_object.has_intersection_types() {
+                combination.value_types.insert(atomic.get_id(), atomic);
+
+                return;
+            }
+
             let object_type_key = get_combiner_key(fq_class_name, type_parameters, codebase);
 
             if let Some((_, existing_type_params)) = combination.object_type_params.get(&object_type_key) {

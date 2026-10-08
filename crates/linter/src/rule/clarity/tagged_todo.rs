@@ -104,17 +104,16 @@ impl LintRule for TaggedTodoRule {
             }
 
             for (_, line) in comment_lines(trivia) {
-                let trimmed_bytes: Vec<u8> = {
-                    let stripped =
-                        line.iter().position(|&b| !b.is_ascii_whitespace()).map_or(&line[line.len()..], |i| &line[i..]);
-                    stripped.to_ascii_lowercase()
-                };
+                let stripped =
+                    line.iter().position(|&b| !b.is_ascii_whitespace()).map_or(&line[line.len()..], |i| &line[i..]);
+                if !stripped.get(..4).is_some_and(|prefix| prefix.eq_ignore_ascii_case(b"todo")) {
+                    continue;
+                }
+
+                let trimmed_bytes = stripped.to_ascii_lowercase();
                 let Some(trimmied) = std::str::from_utf8(&trimmed_bytes).ok() else {
                     continue;
                 };
-                if !trimmied.starts_with("todo") {
-                    continue;
-                }
 
                 if (*TAGGED_TODO_REGEX).is_match(trimmied) {
                     continue;
@@ -135,5 +134,17 @@ impl LintRule for TaggedTodoRule {
                 break;
             }
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::TaggedTodoRule;
+
+    crate::test_lint_failure! {
+        name = comment_prefixes_and_unicode_tags,
+        rule = TaggedTodoRule,
+        count = 3,
+        code = "<?php\r\n// Plain comment\r\n// ToDo(@name)\r\n// todo note TODO(@other)\r\n// TODO(é)\r\n// to\r\n// \u{00a0}TODO\r\n// TODOfoo\r\n// TODO(\u{00a0} )\r\n/*\r\n * TODO:\r\n * TODO:\r\n */"
     }
 }

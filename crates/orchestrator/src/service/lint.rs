@@ -17,7 +17,7 @@ use mago_php_version::PHPVersion;
 use mago_reporting::Issue;
 use mago_reporting::IssueCollection;
 use mago_semantics::SemanticsChecker;
-use mago_syntax::parser::parse_file_with_settings;
+use mago_syntax::parser::parse_file_borrowed_with_settings;
 use mago_syntax::settings::ParserSettings;
 
 use crate::OrchestratorError;
@@ -134,7 +134,7 @@ impl LintService {
         include_disabled: bool,
     ) -> IssueCollection {
         let arena = LocalArena::new();
-        let program = parse_file_with_settings(&arena, file, self.parser_settings);
+        let program = parse_file_borrowed_with_settings(&arena, file, self.parser_settings);
         let resolved_names = NameResolver::new(&arena).resolve(program);
 
         let mut issues = IssueCollection::new();
@@ -149,7 +149,12 @@ impl LintService {
             let registry = Arc::new(self.create_registry(only, include_disabled));
             let linter = Linter::from_registry(&arena, registry, self.settings.php_version);
 
-            issues.extend(linter.lint(file, program, &resolved_names));
+            let lint_issues = linter.lint(file, program, &resolved_names);
+            if issues.is_empty() {
+                issues = lint_issues;
+            } else {
+                issues.extend(lint_issues);
+            }
         }
 
         issues
@@ -199,7 +204,7 @@ impl LintService {
             let per_file_start = trace_enabled.then(Instant::now);
             #[cfg(not(target_arch = "wasm32"))]
             let parse_start = trace_enabled.then(Instant::now);
-            let program = parse_file_with_settings(arena, &file, context.parser_settings);
+            let program = parse_file_borrowed_with_settings(arena, &file, context.parser_settings);
             #[cfg(not(target_arch = "wasm32"))]
             if let Some(start) = parse_start {
                 telemetry_for_closure.parse_ns.fetch_add(start.elapsed().as_nanos() as u64, Relaxed);
@@ -232,10 +237,15 @@ impl LintService {
                 #[cfg(not(target_arch = "wasm32"))]
                 let lint_start = trace_enabled.then(Instant::now);
                 let linter = Linter::from_registry(arena, context.registry, context.php_version);
-                if let Some(external_linter) = context.external_linter.as_deref() {
-                    issues.extend(linter.lint_with_external(&file, program, &resolved_names, external_linter)?);
+                let lint_issues = if let Some(external_linter) = context.external_linter.as_deref() {
+                    linter.lint_with_external(&file, program, &resolved_names, external_linter)?
                 } else {
-                    issues.extend(linter.lint(&file, program, &resolved_names));
+                    linter.lint(&file, program, &resolved_names)
+                };
+                if issues.is_empty() {
+                    issues = lint_issues;
+                } else {
+                    issues.extend(lint_issues);
                 }
                 #[cfg(not(target_arch = "wasm32"))]
                 if let Some(start) = lint_start {
@@ -286,6 +296,7 @@ struct LintResultReducer;
 impl StatelessReducer<IssueCollection, IssueCollection> for LintResultReducer {
     fn reduce(&self, results: Vec<IssueCollection>) -> Result<IssueCollection, OrchestratorError> {
         let mut final_issues = IssueCollection::new();
+        final_issues.reserve(results.iter().map(IssueCollection::len).sum());
         for issues in results {
             final_issues.extend(issues);
         }

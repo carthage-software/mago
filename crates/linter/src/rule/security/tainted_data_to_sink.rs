@@ -17,7 +17,7 @@ use crate::context::LintContext;
 use crate::requirements::RuleRequirements;
 use crate::rule::Config;
 use crate::rule::LintRule;
-use crate::rule::utils::call::function_call_matches_any;
+use crate::rule::utils::call::function_call_matches_any_iter;
 use crate::rule::utils::security::is_user_input;
 use crate::rule_meta::RuleMeta;
 use crate::settings::RuleSettings;
@@ -112,8 +112,13 @@ impl LintRule for TaintedDataToSinkRule {
                 self.check_tainted_data_to_sink(ctx, print_construct.print.span, print_construct.value);
             }
             Node::FunctionCall(function_call) => {
-                let sinks = self.cfg.known_sink_functions.iter().map(String::as_str).collect::<Vec<&str>>();
-                if function_call_matches_any(ctx, function_call, &sinks).is_none() {
+                if function_call_matches_any_iter(
+                    ctx,
+                    function_call,
+                    self.cfg.known_sink_functions.iter().map(String::as_str),
+                )
+                .is_none()
+                {
                     return;
                 }
 

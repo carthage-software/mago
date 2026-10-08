@@ -115,7 +115,7 @@ impl LintRule for ValidDocblockRule {
                 continue;
             }
 
-            let document = PHPDocParser::parse_with_span(ctx.arena, trivia.value, trivia.span);
+            let document = PHPDocParser::parse_without_trivia(ctx.arena, trivia.value, trivia.span);
             for parse_error in document.errors {
                 let issue = Issue::new(self.cfg.level(), parse_error.to_string())
                     .with_code(self.meta.code)

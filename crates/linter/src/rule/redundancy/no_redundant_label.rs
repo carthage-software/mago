@@ -8,8 +8,11 @@ use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
 use mago_span::Span;
+use mago_syntax::cst::Goto;
+use mago_syntax::cst::Label;
 use mago_syntax::cst::Node;
 use mago_syntax::cst::NodeKind;
+use mago_syntax::walker::Walker;
 
 use crate::category::Category;
 use crate::context::LintContext;
@@ -89,16 +92,15 @@ impl LintRule for NoRedundantLabelRule {
     where
         A: Arena,
     {
-        let Node::Program(_) = node else {
+        let Node::Program(program) = node else {
             return;
         };
 
-        let mut labels = Vec::new_in(ctx.arena);
-        let mut gotos = Vec::new_in(ctx.arena);
-        collect_labels_and_gotos(node, &mut labels, &mut gotos);
+        let mut collected = LabelsAndGotos { labels: Vec::new_in(ctx.arena), gotos: Vec::new_in(ctx.arena) };
+        LabelCollector.walk_program(program, &mut collected);
 
-        for (label_name, label_span) in labels {
-            if gotos.contains(&label_name) {
+        for (label_name, label_span) in collected.labels {
+            if collected.gotos.contains(&label_name) {
                 continue;
             }
 
@@ -114,18 +116,25 @@ impl LintRule for NoRedundantLabelRule {
     }
 }
 
-fn collect_labels_and_gotos<'arena, A>(
-    node: Node<'_, 'arena>,
-    labels: &mut Vec<'arena, (&'arena [u8], Span), A>,
-    gotos: &mut Vec<'arena, &'arena [u8], A>,
-) where
+struct LabelsAndGotos<'arena, A>
+where
     A: Arena,
 {
-    match node {
-        Node::Label(label) => labels.push((label.name.value, label.span())),
-        Node::Goto(goto) => gotos.push(goto.label.value),
-        _ => {}
+    labels: Vec<'arena, (&'arena [u8], Span), A>,
+    gotos: Vec<'arena, &'arena [u8], A>,
+}
+
+struct LabelCollector;
+
+impl<'ast, 'arena, A> Walker<'ast, 'arena, LabelsAndGotos<'arena, A>> for LabelCollector
+where
+    A: Arena,
+{
+    fn walk_in_label(&self, label: &'ast Label<'arena>, collected: &mut LabelsAndGotos<'arena, A>) {
+        collected.labels.push((label.name.value, label.span()));
     }
 
-    node.visit_children(|child| collect_labels_and_gotos(child, labels, gotos));
+    fn walk_in_goto(&self, goto: &'ast Goto<'arena>, collected: &mut LabelsAndGotos<'arena, A>) {
+        collected.gotos.push(goto.label.value);
+    }
 }
