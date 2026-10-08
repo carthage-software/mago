@@ -110,17 +110,21 @@ pub fn reconcile_keyed_types<'ctx, A>(
 
     let inside_loop = block_context.flags.inside_loop();
     let old_new_types = new_types;
-    let mut new_types = new_types.clone();
+    let mut new_types = Cow::Borrowed(new_types);
 
     for (derived_local, source) in &block_context.derived_local_sources {
-        if let Some(assertions) = old_new_types.get(derived_local) {
-            new_types.entry(*source).or_insert_with(|| assertions.clone());
+        if let Some(assertions) = old_new_types.get(derived_local)
+            && !new_types.contains_key(source)
+        {
+            new_types.to_mut().insert(*source, assertions.clone());
         }
     }
 
     add_nested_assertions(&mut new_types, &mut active_new_types, block_context);
     if new_types.len() > 1 {
-        new_types.sort_by_cached_key(|key, _| (old_new_types.get(key).is_none(), path_part_count(key.as_bytes())));
+        new_types
+            .to_mut()
+            .sort_by_cached_key(|key, _| (old_new_types.get(key).is_none(), path_part_count(key.as_bytes())));
     }
 
     let original_types = can_report_issues.then(|| {
@@ -130,7 +134,7 @@ pub fn reconcile_keyed_types<'ctx, A>(
             .collect::<WordMap<_>>()
     });
 
-    for (key, new_type_parts) in &new_types {
+    for (key, new_type_parts) in new_types.iter() {
         let key_str = key.as_bytes();
         if key_str.ends_with(b"()") && !block_context.locals.contains_key(key) {
             if block_context.stable_method_calls.contains(key) {
@@ -359,7 +363,7 @@ pub fn reconcile_keyed_types<'ctx, A>(
                 );
             }
 
-            if key_str != b"$this" {
+            if is_real && key_str != b"$this" {
                 let mut removable_keys: Vec<Word> = Vec::new();
                 let local_keys = block_context.locals.keys().copied().collect::<Vec<_>>();
                 for new_key in local_keys {
@@ -367,7 +371,7 @@ pub fn reconcile_keyed_types<'ctx, A>(
                         continue;
                     }
 
-                    if is_real && !new_types.contains_key(&new_key) && var_has_root(new_key, *key) {
+                    if !new_types.contains_key(&new_key) && var_has_root(new_key, *key) {
                         if let Some(references_map) = reference_graph.get(&new_key) {
                             let ref_count = references_map.len();
                             match ref_count {
@@ -874,12 +878,10 @@ static INTEGER_REGEX: LazyLock<Regex> = LazyLock::new(|| unsafe {
 #[allow(clippy::multiple_unsafe_ops_per_block)]
 #[allow(clippy::semicolon_inside_block)]
 fn add_nested_assertions(
-    new_types: &mut IndexMap<Word, AssertionSet>,
+    new_types: &mut Cow<'_, IndexMap<Word, AssertionSet>>,
     active_new_types: &mut IndexMap<Word, HashSet<usize>>,
     context: &BlockContext<'_>,
 ) {
-    let mut keys_to_remove = vec![];
-
     let nested_assertions = new_types
         .iter()
         .filter(|(key, assertions)| {
@@ -895,6 +897,13 @@ fn add_nested_assertions(
             (*key, only_isset_assertions)
         })
         .collect::<Vec<_>>();
+
+    if nested_assertions.is_empty() {
+        return;
+    }
+
+    let new_types = new_types.to_mut();
+    let mut keys_to_remove = vec![];
 
     'outer: for (nk, only_isset_assertions) in nested_assertions {
         let nk_str = nk.as_bytes();
