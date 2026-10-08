@@ -22,6 +22,13 @@ final class Builder
         return func_num_args();
     }
 
+    public function afterHook(): int
+    {
+        $_o = new class { public int $x { get => 1; } };
+
+        return func_num_args();
+    }
+
     public function plain(): self
     {
         $_n = count([]);
@@ -54,6 +61,7 @@ function run(Builder $b): void
     $b->andWhere('a', 'b');
     $b->nth('a', 'b');
     $b->total('a', 'b');
+    echo $b->afterHook('a');
     echo qualified(1, 2);
 
     /** @var non-empty-list<string> $parts */
