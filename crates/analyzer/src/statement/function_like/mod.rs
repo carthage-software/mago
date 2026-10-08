@@ -665,7 +665,7 @@ where
 }
 
 pub(super) fn add_properties_to_context<'ctx, A>(
-    context: &Context<'ctx, '_, A>,
+    context: &mut Context<'ctx, '_, A>,
     block_context: &mut BlockContext<'ctx>,
     class_like_metadata: &'ctx ClassLikeMetadata,
     function_like_metadata: Option<&'ctx FunctionLikeMetadata>,
@@ -676,6 +676,21 @@ where
     let Some(calling_class) = block_context.scope.get_class_like_name() else {
         return Ok(());
     };
+
+    let method_metadata = function_like_metadata.and_then(|metadata| metadata.method_metadata.as_ref());
+    let function_is_final = method_metadata.is_some_and(|metadata| metadata.is_final);
+    let cacheable = class_like_metadata.name == calling_class
+        && method_metadata.is_none_or(|metadata| metadata.where_constraints.is_empty());
+    let cache_key = (calling_class, function_is_final);
+    if cacheable && let Some(property_types) = context.property_types.get(&cache_key) {
+        for (expression_id, property_type) in property_types {
+            block_context.locals.insert(*expression_id, Rc::clone(property_type));
+        }
+
+        return Ok(());
+    }
+
+    let mut property_types = cacheable.then(Vec::new);
 
     // Seed every property name reachable on this class: all real declarations, plus magic
     // `@property*` annotations for names without one.
@@ -750,13 +765,20 @@ where
             &TypeExpansionOptions {
                 self_class: Some(calling_class),
                 static_class_type: StaticClassType::Name(calling_class),
-                function_is_final: function_like_metadata
-                    .is_some_and(|m| m.method_metadata.as_ref().is_some_and(|metadata| metadata.is_final)),
+                function_is_final,
                 ..Default::default()
             },
         );
 
-        block_context.locals.insert(expression_id, Rc::new(property_type));
+        let property_type = Rc::new(property_type);
+        block_context.locals.insert(expression_id, Rc::clone(&property_type));
+        if let Some(property_types) = &mut property_types {
+            property_types.push((expression_id, property_type));
+        }
+    }
+
+    if let Some(property_types) = property_types {
+        context.property_types.insert(cache_key, property_types);
     }
 
     Ok(())

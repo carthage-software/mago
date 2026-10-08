@@ -327,6 +327,12 @@ where
         return return_type;
     };
 
+    if block_context.active_method_call_assertions.is_empty()
+        && (!method_is_stable || block_context.stable_method_call_assertions.is_empty())
+    {
+        return return_type;
+    }
+
     let method_call_key = concat_word!(this_var, "->", method, "()");
 
     let mut apply_assertions = |assertions: &AssertionSet| {

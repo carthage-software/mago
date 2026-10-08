@@ -1671,18 +1671,18 @@ mod tests {
         let mut codebase = CodebaseMetadata::new();
         codebase.class_likes.insert(
             ancestor,
-            ClassLikeMetadata::new(
+            Box::new(ClassLikeMetadata::new(
                 ancestor,
                 word(b"FrameworkTestCase"),
                 Span::dummy(0, 10),
                 None,
                 MetadataFlags::empty(),
-            ),
+            )),
         );
         let mut child_metadata =
             ClassLikeMetadata::new(child, word(b"ApplicationTest"), Span::dummy(11, 20), None, MetadataFlags::empty());
         child_metadata.all_parent_classes.insert(ancestor);
-        codebase.class_likes.insert(child, child_metadata);
+        codebase.class_likes.insert(child, Box::new(child_metadata));
 
         let hook = ClassLikeAnalysisHookRegistration {
             plugin: 0,

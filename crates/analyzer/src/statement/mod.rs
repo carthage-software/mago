@@ -7,6 +7,7 @@ use mago_names::scope::NamespaceScope;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
+use mago_syntax::comments::docblock::PrecedingDocblocks;
 use mago_syntax::cst::Call;
 use mago_syntax::cst::Expression;
 use mago_syntax::cst::ExpressionStatement;
@@ -79,20 +80,22 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Statement<'arena> {
         // For assignment statements, we populate all @var annotations except the one
         // for the assignment target variable. The assignment analyzer handles that one
         // to support the pattern: /** @var Type */ $var = something();
-        if let Statement::Expression(ExpressionStatement { expression, .. }) = self
-            && let Some(target_var) = get_block_expression_id(expression, context, block_context)
-        {
-            populate_docblock_variables_excluding(
-                context,
-                block_context,
-                artifacts,
-                true, // override existing for non-target variables
-                Some(target_var),
-            );
-        } else {
-            let override_existing = !matches!(self, Statement::Foreach(_));
+        if PrecedingDocblocks::new(context.comments, context.statement_span.start.offset).next().is_some() {
+            if let Statement::Expression(ExpressionStatement { expression, .. }) = self
+                && let Some(target_var) = get_block_expression_id(expression, context, block_context)
+            {
+                populate_docblock_variables_excluding(
+                    context,
+                    block_context,
+                    artifacts,
+                    true, // override existing for non-target variables
+                    Some(target_var),
+                );
+            } else {
+                let override_existing = !matches!(self, Statement::Foreach(_));
 
-            populate_docblock_variables(context, block_context, artifacts, override_existing);
+                populate_docblock_variables(context, block_context, artifacts, override_existing);
+            }
         }
 
         let result = match self {

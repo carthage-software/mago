@@ -82,7 +82,7 @@ pub struct CodebaseMetadata {
     /// Configuration flag: Should types be inferred based on usage patterns?
     pub infer_types_from_usage: bool,
     /// Map from class-like FQCN (`Word`) to its detailed metadata (`ClassLikeMetadata`).
-    pub class_likes: WordMap<ClassLikeMetadata>,
+    pub class_likes: WordMap<Box<ClassLikeMetadata>>,
     #[cfg_attr(feature = "serde", serde(default))]
     pub class_like_aliases: WordMap<Word>,
     #[cfg_attr(feature = "serde", serde(default))]
@@ -91,7 +91,7 @@ pub struct CodebaseMetadata {
     class_like_aliases_dirty: bool,
     /// Map from a function/method identifier tuple `(scope_id, function_id)` to its metadata (`FunctionLikeMetadata`).
     /// `scope_id` is the FQCN for methods or often `Word::empty()` for global functions.
-    pub function_likes: HashMap<(Word, Word), FunctionLikeMetadata>,
+    pub function_likes: HashMap<(Word, Word), Box<FunctionLikeMetadata>>,
     /// Stores the kind (Class, Interface, etc.) for every known symbol FQCN.
     pub symbols: Symbols,
     /// Map from global constant FQN (`Word`) to its metadata (`ConstantMetadata`).
@@ -114,12 +114,12 @@ pub struct CodebaseMetadata {
     /// the same FQCN is diagnosed as a [`PatchDuplicateTarget`](ScanningIssueKind::PatchDuplicateTarget)
     /// rather than silently overwriting the first. Entries here are folded into `class_likes`
     /// by [`apply_patches_pass`](Self::apply_patches_pass).
-    pub patch_class_likes: WordMap<ClassLikeMetadata>,
+    pub patch_class_likes: WordMap<Box<ClassLikeMetadata>>,
     /// Per-patch function-like metadata, keyed by `(scope, name)`.
     ///
     /// The key matches the existing `function_likes` key shape: the FQCN for methods,
     /// `empty_word()` for free functions.
-    pub patch_function_likes: HashMap<(Word, Word), FunctionLikeMetadata>,
+    pub patch_function_likes: HashMap<(Word, Word), Box<FunctionLikeMetadata>>,
     /// Per-patch constant metadata, keyed by FQN.
     pub patch_constants: WordMap<ConstantMetadata>,
 }
@@ -231,20 +231,20 @@ impl CodebaseMetadata {
     #[inline]
     pub(crate) fn get_class_like_by_word(&self, name: Word) -> Option<&ClassLikeMetadata> {
         if let Some(metadata) = self.class_likes.get(&name) {
-            return Some(metadata);
+            return Some(metadata.as_ref());
         }
 
         if self.class_like_aliases.is_empty() {
             return None;
         }
 
-        self.class_like_aliases.get(&name).and_then(|actual| self.class_likes.get(actual))
+        self.class_like_aliases.get(&name).and_then(|actual| self.class_likes.get(actual)).map(Box::as_ref)
     }
 
     #[inline]
     fn get_method_by_words(&self, class: Word, method: Word) -> Option<&FunctionLikeMetadata> {
         if let Some(metadata) = self.function_likes.get(&(class, method)) {
-            return Some(metadata);
+            return Some(metadata.as_ref());
         }
 
         if self.class_like_aliases.is_empty() {
@@ -252,7 +252,7 @@ impl CodebaseMetadata {
         }
 
         let actual = self.class_like_aliases.get(&class)?;
-        self.function_likes.get(&(*actual, method))
+        self.function_likes.get(&(*actual, method)).map(Box::as_ref)
     }
 
     /// Checks if a class exists in the codebase (case-insensitive).
@@ -453,7 +453,7 @@ impl CodebaseMetadata {
     pub fn get_function(&self, name: &[u8]) -> Option<&FunctionLikeMetadata> {
         let lowercase_name = ascii_lowercase_word(name);
         let identifier = (empty_word(), lowercase_name);
-        self.function_likes.get(&identifier)
+        self.function_likes.get(&identifier).map(Box::as_ref)
     }
 
     /// Retrieves metadata for a method (case-insensitive for both class and method names).
@@ -470,7 +470,7 @@ impl CodebaseMetadata {
     #[inline]
     #[must_use]
     pub fn get_closure(&self, synthetic_name: &Word) -> Option<&FunctionLikeMetadata> {
-        self.function_likes.get(&(empty_word(), *synthetic_name))
+        self.function_likes.get(&(empty_word(), *synthetic_name)).map(Box::as_ref)
     }
 
     /// Retrieves metadata for a closure declared at the given file and span.
@@ -519,7 +519,7 @@ impl CodebaseMetadata {
         use crate::identifier::function_like::FunctionLikeIdentifier;
         match identifier {
             FunctionLikeIdentifier::Function(name) => {
-                self.function_likes.get(&(empty_word(), name.to_ascii_lowercase()))
+                self.function_likes.get(&(empty_word(), name.to_ascii_lowercase())).map(Box::as_ref)
             }
             FunctionLikeIdentifier::Method(class, method) => {
                 self.get_method_by_id(&MethodIdentifier::new(*class, *method))
@@ -964,7 +964,7 @@ impl CodebaseMetadata {
         let method_name = &function_like.name;
 
         if let Some(overridden_map) = class_like.overridden_method_ids.get(method_name) {
-            for (parent_class_name, parent_method_id) in overridden_map {
+            for (parent_class_name, parent_method_id) in overridden_map.iter() {
                 if class_like.name.as_bytes().eq_ignore_ascii_case(parent_class_name.as_bytes()) {
                     continue; // Skip self-recursion if the method overrides itself
                 }
@@ -1293,7 +1293,7 @@ impl CodebaseMetadata {
     /// entry is kept and a [`PatchDuplicateTarget`](ScanningIssueKind::PatchDuplicateTarget)
     /// diagnostic referencing both sites is attached to it, rather than letting one silently
     /// overwrite the other in hash-order.
-    fn merge_patch_class_likes(&mut self, incoming: impl IntoIterator<Item = (Word, ClassLikeMetadata)>) {
+    fn merge_patch_class_likes(&mut self, incoming: impl IntoIterator<Item = (Word, Box<ClassLikeMetadata>)>) {
         for (k, v) in incoming {
             match self.patch_class_likes.entry(k) {
                 Entry::Occupied(mut entry) => {
@@ -1310,7 +1310,10 @@ impl CodebaseMetadata {
     /// Merges patch function-likes from another codebase, diagnosing collisions on free
     /// functions. Method collisions are subsumed by the enclosing class's duplicate
     /// diagnostic, so only keys with an empty class component are reported here.
-    fn merge_patch_function_likes(&mut self, incoming: impl IntoIterator<Item = ((Word, Word), FunctionLikeMetadata)>) {
+    fn merge_patch_function_likes(
+        &mut self,
+        incoming: impl IntoIterator<Item = ((Word, Word), Box<FunctionLikeMetadata>)>,
+    ) {
         for (k, v) in incoming {
             match self.patch_function_likes.entry(k) {
                 Entry::Occupied(mut entry) => {
@@ -1615,7 +1618,7 @@ impl CodebaseMetadata {
 fn collect_inherited_patch_methods(
     target: &ClassLikeMetadata,
     patch: &ClassLikeMetadata,
-    class_likes: &WordMap<ClassLikeMetadata>,
+    class_likes: &WordMap<Box<ClassLikeMetadata>>,
 ) -> WordSet {
     if patch.methods.is_empty() {
         return WordSet::default();
@@ -1697,8 +1700,8 @@ fn orphan_patch_constant_diagnostic(meta: &ConstantMetadata) -> Issue {
 }
 
 fn merge_function_likes(
-    target: &mut HashMap<(Word, Word), FunctionLikeMetadata>,
-    incoming: HashMap<(Word, Word), FunctionLikeMetadata>,
+    target: &mut HashMap<(Word, Word), Box<FunctionLikeMetadata>>,
+    incoming: HashMap<(Word, Word), Box<FunctionLikeMetadata>>,
 ) {
     for (key, mut metadata) in incoming {
         match target.entry(key) {
@@ -1886,10 +1889,10 @@ mod should_replace_metadata_tests {
         let vendor =
             FunctionLikeMetadata::new(FunctionLikeKind::Function, name, name, vendor_span, MetadataFlags::empty());
         let mut codebase = CodebaseMetadata::new();
-        codebase.function_likes.insert(key, vendor);
+        codebase.function_likes.insert(key, Box::new(vendor));
 
         let patch = FunctionLikeMetadata::new(FunctionLikeKind::Function, name, name, patch_span, MetadataFlags::PATCH);
-        codebase.patch_function_likes.insert(key, patch);
+        codebase.patch_function_likes.insert(key, Box::new(patch));
 
         codebase.apply_patches_pass();
 
@@ -1908,14 +1911,14 @@ mod should_replace_metadata_tests {
         user_class.methods.insert(method_existing);
 
         let mut codebase = CodebaseMetadata::new();
-        codebase.class_likes.insert(class_name, user_class);
+        codebase.class_likes.insert(class_name, Box::new(user_class));
 
         let mut patch_class =
             ClassLikeMetadata::new(class_name, class_name, Span::dummy(0, 50), None, MetadataFlags::PATCH);
         let method_new = word("patchedMethod");
         patch_class.methods.insert(method_new);
 
-        codebase.patch_class_likes.insert(class_name, patch_class);
+        codebase.patch_class_likes.insert(class_name, Box::new(patch_class));
 
         codebase.apply_patches_pass();
 

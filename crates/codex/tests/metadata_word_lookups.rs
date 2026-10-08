@@ -15,13 +15,19 @@ fn codebase() -> CodebaseMetadata {
     let parent_metadata = ClassLikeMetadata::new(parent, parent, Span::zero(), None, MetadataFlags::empty());
     let mut child_metadata = ClassLikeMetadata::new(child, child, Span::zero(), None, MetadataFlags::empty());
     child_metadata.declaring_method_ids.insert(word("renamed"), MethodIdentifier::new(parent, method));
-    codebase.class_likes.insert(parent, parent_metadata);
-    codebase.class_likes.insert(child, child_metadata);
+    codebase.class_likes.insert(parent, Box::new(parent_metadata));
+    codebase.class_likes.insert(child, Box::new(child_metadata));
     codebase.class_like_aliases.insert(word("parentalias"), parent);
     codebase.class_like_aliases.insert(word("childalias"), child);
     codebase.function_likes.insert(
         (parent, method),
-        FunctionLikeMetadata::new(FunctionLikeKind::Method, method, method, Span::zero(), MetadataFlags::empty()),
+        Box::new(FunctionLikeMetadata::new(
+            FunctionLikeKind::Method,
+            method,
+            method,
+            Span::zero(),
+            MetadataFlags::empty(),
+        )),
     );
 
     codebase

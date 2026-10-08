@@ -368,7 +368,7 @@ where
             metadata.flags |= MetadataFlags::POLYFILL;
         }
 
-        self.codebase.function_likes.entry(identifier).or_insert(metadata);
+        self.codebase.function_likes.entry(identifier).or_insert_with(|| Box::new(metadata));
     }
 
     #[inline]
@@ -400,7 +400,7 @@ where
         self.template_constraints
             .push(metadata.template_types.iter().map(|(name, constraints)| (*name, constraints.clone())).collect());
 
-        self.codebase.function_likes.entry(identifier).or_insert(metadata);
+        self.codebase.function_likes.entry(identifier).or_insert_with(|| Box::new(metadata));
     }
 
     #[inline]
@@ -436,7 +436,7 @@ where
 
         self.template_constraints
             .push(metadata.template_types.iter().map(|(name, constraints)| (*name, constraints.clone())).collect());
-        self.codebase.function_likes.entry(identifier).or_insert(metadata);
+        self.codebase.function_likes.entry(identifier).or_insert_with(|| Box::new(metadata));
     }
 
     #[inline]
@@ -720,7 +720,7 @@ where
         );
 
         self.codebase.class_likes.entry(current_class).or_insert(class_like_metadata);
-        self.codebase.function_likes.entry(method_id).or_insert(function_like_metadata);
+        self.codebase.function_likes.entry(method_id).or_insert_with(|| Box::new(function_like_metadata));
     }
 
     #[inline]
@@ -791,13 +791,13 @@ where
 
         scanner.codebase.function_likes.insert(
             (class_like_metadata.name, constructor_name),
-            FunctionLikeMetadata::new(
+            Box::new(FunctionLikeMetadata::new(
                 FunctionLikeKind::Method,
                 constructor_name,
                 constructor_name,
                 class_like_metadata.span,
                 flags,
-            ),
+            )),
         );
     }
 

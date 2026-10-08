@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::BTreeMap;
 
 use rayon::prelude::*;
@@ -112,15 +113,16 @@ fn should_inherit_docblock_type(
             &mut ComparisonResult::new(),
         );
 
-        let types_equal = union_comparator::is_contained_by(
-            codebase,
-            parent_native,
-            child_native,
-            false,
-            false,
-            false,
-            &mut ComparisonResult::new(),
-        ) && child_contained_in_parent;
+        let types_equal = child_contained_in_parent
+            && union_comparator::is_contained_by(
+                codebase,
+                parent_native,
+                child_native,
+                false,
+                false,
+                false,
+                &mut ComparisonResult::new(),
+            );
 
         if types_equal {
             return true;
@@ -142,9 +144,9 @@ fn should_inherit_docblock_type(
             }
 
             let docblock_type = if !child_native.accepts_null() && parent_docblock.type_union.has_null() {
-                parent_docblock.type_union.to_non_nullable()
+                Cow::Owned(parent_docblock.type_union.to_non_nullable())
             } else {
-                parent_docblock.type_union.clone()
+                Cow::Borrowed(&parent_docblock.type_union)
             };
 
             let docblock_compatible_with_child = union_comparator::is_contained_by(
@@ -172,15 +174,16 @@ fn should_inherit_docblock_type(
             &mut ComparisonResult::new(),
         );
 
-        let types_equal = union_comparator::is_contained_by(
-            codebase,
-            child_native,
-            parent_native,
-            false,
-            false,
-            false,
-            &mut ComparisonResult::new(),
-        ) && parent_contained_in_child;
+        let types_equal = parent_contained_in_child
+            && union_comparator::is_contained_by(
+                codebase,
+                child_native,
+                parent_native,
+                false,
+                false,
+                false,
+                &mut ComparisonResult::new(),
+            );
 
         types_equal || !parent_contained_in_child
     }
@@ -669,7 +672,7 @@ pub fn inherit_property_docblocks(
 fn collect_property_inheritance_work(
     class_name: Word,
     class_metadata: &crate::metadata::class_like::ClassLikeMetadata,
-    class_likes: &WordMap<crate::metadata::class_like::ClassLikeMetadata>,
+    class_likes: &WordMap<Box<crate::metadata::class_like::ClassLikeMetadata>>,
     inheritance_work: &mut Vec<(Word, Word, Word)>,
 ) {
     for (property_name, parent_ids) in &class_metadata.overridden_property_ids {
@@ -714,43 +717,29 @@ fn apply_property_inheritance_work(codebase: &mut CodebaseMetadata, inheritance_
         };
 
         let Some(child_metadata) = codebase.class_likes.get(&class_name) else { continue };
-        let parent_template_params =
-            child_metadata.template_extended_parameters.get(&parent_class).cloned().unwrap_or_default();
+        let Some(child_property) = child_metadata.properties.get(&property_name) else { continue };
+        let parent_template_params = child_metadata.template_extended_parameters.get(&parent_class);
 
-        let template_result = if parent_template_params.is_empty() {
-            None
-        } else {
+        let template_result = parent_template_params.filter(|parameters| !parameters.is_empty()).map(|parameters| {
             let mut result = TemplateResult::default();
-            for (template_name, concrete_type) in &parent_template_params {
+            for (template_name, concrete_type) in parameters {
                 result.add_lower_bound(*template_name, GenericParent::ClassLike(parent_class), concrete_type.clone());
             }
-            Some(result)
+            result
+        });
+
+        let substituted_type = if let Some(template_result) = template_result.as_ref() {
+            inferred_type_replacer::replace(&parent_docblock.type_union, template_result, codebase)
+        } else {
+            parent_docblock.type_union.clone()
         };
-
-        let mut substituted_type = parent_docblock.type_union.clone();
-        if let Some(template_result) = template_result.as_ref() {
-            substituted_type = inferred_type_replacer::replace(&substituted_type, template_result, codebase);
-        }
-
-        let parent_docblock_span = parent_docblock.span;
-        let parent_native_for_check = parent_native.map(|m| m.type_union.clone());
-        let parent_docblock_for_check = TypeMetadata::from_docblock(substituted_type.clone(), parent_docblock_span);
-
-        let (child_native, child_docblock_owned) = {
-            let Some(child_metadata) = codebase.class_likes.get(&class_name) else { continue };
-            let Some(child_property) = child_metadata.properties.get(&property_name) else { continue };
-
-            (
-                child_property.type_declaration_metadata.as_ref().map(|m| m.type_union.clone()),
-                child_property.type_metadata.clone().filter(|m| m.from_docblock),
-            )
-        };
+        let mut inherited = TypeMetadata::from_docblock(substituted_type, parent_docblock.span);
 
         if !should_inherit_docblock_type(
-            parent_native_for_check.as_ref(),
-            Some(&parent_docblock_for_check),
-            child_native.as_ref(),
-            child_docblock_owned.as_ref(),
+            parent_native.map(|metadata| &metadata.type_union),
+            Some(&inherited),
+            child_property.type_declaration_metadata.as_ref().map(|metadata| &metadata.type_union),
+            child_property.type_metadata.as_ref().filter(|metadata| metadata.from_docblock),
             true,
             false,
             codebase,
@@ -761,7 +750,6 @@ fn apply_property_inheritance_work(codebase: &mut CodebaseMetadata, inheritance_
         let Some(child_metadata) = codebase.class_likes.get_mut(&class_name) else { continue };
         let Some(child_property) = child_metadata.properties.get_mut(&property_name) else { continue };
 
-        let mut inherited = TypeMetadata::from_docblock(substituted_type, parent_docblock_span);
         inherited.inferred = true;
         child_property.type_metadata = Some(inherited);
     }

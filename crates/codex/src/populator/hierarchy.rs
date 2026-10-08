@@ -365,33 +365,27 @@ fn populate_hierarchy_segment(
 
     let mut references = Vec::with_capacity(end - start);
     for layer in layers {
-        let pending: Vec<_> = layer
-            .iter()
-            .filter_map(|&index| {
-                let name = sorted_classes[index];
-                let metadata = codebase.class_likes.get_mut(&name)?;
-                let mut placeholder = ClassLikeMetadata::new(
-                    metadata.name,
-                    metadata.original_name,
-                    metadata.span,
-                    metadata.name_span,
-                    metadata.flags,
-                );
-                // Keep the kind for stale method IDs; other metadata reads use earlier layers.
-                placeholder.kind = metadata.kind;
-                Some((index, std::mem::replace(metadata, placeholder)))
-            })
-            .collect();
-        let populated: Vec<_> = pending
-            .into_par_iter()
-            .map(|(index, mut metadata)| {
-                let mut references = SymbolReferences::new();
-                populate_class_like_metadata(sorted_classes[index], &mut metadata, codebase, &mut references);
-                (index, metadata, references)
-            })
-            .collect();
+        let mut pending = Vec::with_capacity(layer.len());
+        pending.extend(layer.iter().filter_map(|&index| {
+            let name = sorted_classes[index];
+            let metadata = codebase.class_likes.get_mut(&name)?;
+            let mut placeholder = ClassLikeMetadata::new(
+                metadata.name,
+                metadata.original_name,
+                metadata.span,
+                metadata.name_span,
+                metadata.flags,
+            );
+            // Keep the kind for stale method IDs; other metadata reads use earlier layers.
+            placeholder.kind = metadata.kind;
+            Some((index, std::mem::replace(metadata, Box::new(placeholder)), SymbolReferences::new()))
+        }));
 
-        for (index, metadata, class_references) in populated {
+        pending.par_iter_mut().for_each(|(index, metadata, references)| {
+            populate_class_like_metadata(sorted_classes[*index], metadata, codebase, references);
+        });
+
+        for (index, metadata, class_references) in pending {
             if let Some(target) = codebase.class_likes.get_mut(&sorted_classes[index]) {
                 *target = metadata;
             }

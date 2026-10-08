@@ -406,7 +406,7 @@ fn bench_enum_comparison(c: &mut Criterion) {
 
     let mut codebase = CodebaseMetadata::new();
     codebase.symbols.add_symbol_name(metadata.name, SymbolKind::Enum);
-    codebase.class_likes.insert(metadata.name, metadata);
+    codebase.class_likes.insert(metadata.name, Box::new(metadata));
 
     let enum_type = TUnion::from_atomic(TAtomic::Object(TObject::new_enum(enum_name)));
     let enum_case = TUnion::from_atomic(TAtomic::Object(TObject::new_enum_case(enum_name, hearts)));

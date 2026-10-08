@@ -265,7 +265,7 @@ fn finish_registration(
         .map(|(local_name, (source_class, original_name, _span))| (*local_name, (*source_class, *original_name)))
         .collect::<WordMap<(Word, Word)>>();
 
-    codebase.class_likes.insert(name, class_like_metadata);
+    codebase.class_likes.insert(name, Box::new(class_like_metadata));
 
     Some((name, template_resolution_context, type_aliases, imported_aliases))
 }
@@ -1046,7 +1046,7 @@ where
                 get_type_metadata_from_type(return_type, Some(original_name), &type_context, scope).ok()
             });
 
-            codebase.function_likes.insert(method_id, function_like_metadata);
+            codebase.function_likes.insert(method_id, Box::new(function_like_metadata));
         }
 
         for tag in document.tags() {
@@ -1469,7 +1469,7 @@ fn create_enum_methods(codebase: &mut CodebaseMetadata, class_like: &mut ClassLi
             class_like_metadata.methods.insert(name);
             class_like_metadata.add_declaring_method_id(name, method_identifier);
             class_like_metadata.inheritable_method_ids.insert(name, method_identifier);
-            codebase.function_likes.insert(method_id, function_like_metadata);
+            codebase.function_likes.insert(method_id, Box::new(function_like_metadata));
         };
 
     let enum_name_word = class_like.name;

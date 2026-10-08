@@ -1,3 +1,6 @@
+use std::borrow::Borrow;
+use std::sync::Arc;
+
 use foldhash::fast::RandomState;
 use indexmap::IndexMap;
 use mago_php_version::PHPVersion;
@@ -72,7 +75,7 @@ pub struct ClassLikeMetadata {
     pub declaring_method_ids: WordMap<MethodIdentifier>,
     pub appearing_method_ids: WordMap<MethodIdentifier>,
     pub inheritable_method_ids: WordMap<MethodIdentifier>,
-    pub overridden_method_ids: WordMap<IndexMap<Word, MethodIdentifier, RandomState>>,
+    pub overridden_method_ids: WordMap<Arc<IndexMap<Word, MethodIdentifier, RandomState>>>,
     pub properties: WordMap<PropertyMetadata>,
     /// Magic properties documented via `@property`/`@property-read`/`@property-write` in this
     /// class-like's own docblock.
@@ -405,9 +408,7 @@ impl ClassLikeMetadata {
         method: Word,
         parent_method_id: MethodIdentifier,
     ) -> Option<MethodIdentifier> {
-        self.overridden_method_ids
-            .entry(method)
-            .or_default()
+        Arc::make_mut(self.overridden_method_ids.entry(method).or_default())
             .insert(parent_method_id.get_class_name(), parent_method_id)
     }
 
@@ -934,36 +935,41 @@ impl ClassLikeMetadata {
 ///
 /// Does not include methods defined directly on `class_meta` itself.
 #[must_use]
-pub fn collect_ancestor_methods(class_meta: &ClassLikeMetadata, class_likes: &WordMap<ClassLikeMetadata>) -> WordSet {
+pub fn collect_ancestor_methods<T>(class_meta: &ClassLikeMetadata, class_likes: &WordMap<T>) -> WordSet
+where
+    T: Borrow<ClassLikeMetadata>,
+{
     let mut visited = WordSet::default();
     let mut methods = WordSet::default();
     collect_ancestor_methods_inner(class_meta, class_likes, &mut visited, &mut methods);
     methods
 }
 
-fn collect_ancestor_methods_inner(
+fn collect_ancestor_methods_inner<T>(
     class_meta: &ClassLikeMetadata,
-    class_likes: &WordMap<ClassLikeMetadata>,
+    class_likes: &WordMap<T>,
     visited: &mut WordSet,
     methods: &mut WordSet,
-) {
+) where
+    T: Borrow<ClassLikeMetadata>,
+{
     if !visited.insert(class_meta.name) {
         return;
     }
     if let Some(parent_name) = class_meta.direct_parent_class
-        && let Some(parent_meta) = class_likes.get(&parent_name)
+        && let Some(parent_meta) = class_likes.get(&parent_name).map(Borrow::borrow)
     {
         methods.extend(parent_meta.methods.iter().copied());
         collect_ancestor_methods_inner(parent_meta, class_likes, visited, methods);
     }
     for interface_name in &class_meta.direct_parent_interfaces {
-        if let Some(interface_meta) = class_likes.get(interface_name) {
+        if let Some(interface_meta) = class_likes.get(interface_name).map(Borrow::borrow) {
             methods.extend(interface_meta.methods.iter().copied());
             collect_ancestor_methods_inner(interface_meta, class_likes, visited, methods);
         }
     }
     for trait_name in &class_meta.used_traits {
-        if let Some(trait_meta) = class_likes.get(trait_name) {
+        if let Some(trait_meta) = class_likes.get(trait_name).map(Borrow::borrow) {
             methods.extend(trait_meta.methods.iter().copied());
             collect_ancestor_methods_inner(trait_meta, class_likes, visited, methods);
         }

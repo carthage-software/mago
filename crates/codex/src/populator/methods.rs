@@ -1,4 +1,5 @@
 use std::collections::hash_map::Entry;
+use std::sync::Arc;
 
 use foldhash::HashMap;
 use indexmap::IndexMap;
@@ -70,22 +71,34 @@ pub fn inherit_methods_from_parent(
                         if parents.first().is_some_and(|(name, _)| *name == declaring_method_id.get_class_name()) =>
                     {
                         // The direct parent is already first; extending would replace its value.
-                        entry.insert(parents.clone());
+                        entry.insert(Arc::clone(parents));
+                        None
+                    }
+                    (Entry::Occupied(entry), Some(parents))
+                        if Arc::ptr_eq(entry.get(), parents)
+                            && parents.contains_key(&declaring_method_id.get_class_name()) =>
+                    {
                         None
                     }
                     (entry, _) => {
-                        let overridden = entry.or_insert_with(|| {
+                        let overridden = Arc::make_mut(entry.or_insert_with(|| {
                             let mut parents = IndexMap::default();
-                            parents.reserve(1 + parent_overridden.map_or(0, IndexMap::len));
-                            parents
-                        });
+                            parents.reserve(1 + parent_overridden.map_or(0, |parents| parents.len()));
+                            Arc::new(parents)
+                        }));
 
                         overridden.insert(declaring_method_id.get_class_name(), *declaring_method_id);
                         Some(overridden)
                     }
                 }
+            } else if let Some(parent_overridden) = parent_overridden {
+                metadata
+                    .overridden_method_ids
+                    .get_mut(method_name_lc)
+                    .filter(|existing| !Arc::ptr_eq(existing, parent_overridden))
+                    .map(Arc::make_mut)
             } else {
-                metadata.overridden_method_ids.get_mut(method_name_lc)
+                None
             };
 
             if let (Some(existing_overridden), Some(parent_overridden)) = (existing_overridden, parent_overridden) {
@@ -94,7 +107,14 @@ pub fn inherit_methods_from_parent(
         }
 
         let process_name = |aliased_method_name: Word, metadata: &mut ClassLikeMetadata| {
-            if let Some(implementing_method_id) = metadata.declaring_method_ids.get(&aliased_method_name) {
+            let declaring_entry = metadata.declaring_method_ids.entry(aliased_method_name);
+            if let Entry::Occupied(entry) = &declaring_entry {
+                let implementing_method_id = entry.get();
+                if implementing_method_id == declaring_method_id
+                    && metadata.inheritable_method_ids.get(&aliased_method_name) == Some(declaring_method_id)
+                {
+                    return;
+                }
                 let implementing_class = implementing_method_id.get_class_name();
                 let implementing_method_name = implementing_method_id.get_method_name();
 
@@ -107,17 +127,17 @@ pub fn inherit_methods_from_parent(
                         .is_some_and(|m| m.flags.is_magic_method());
 
                 if !is_existing_pseudo_from_trait
-                    && (!codebase
-                        .get_method_by_id(implementing_method_id)
-                        .and_then(|method| method.method_metadata.as_ref())
-                        .is_some_and(|method| method.is_abstract)
-                        || implementing_class == class_like_name)
+                    && (implementing_class == class_like_name
+                        || !codebase
+                            .get_method_by_id(implementing_method_id)
+                            .and_then(|method| method.method_metadata.as_ref())
+                            .is_some_and(|method| method.is_abstract))
                 {
                     return;
                 }
             }
 
-            metadata.declaring_method_ids.insert(aliased_method_name, *declaring_method_id);
+            declaring_entry.insert_entry(*declaring_method_id);
 
             let is_ctor_or_clone = aliased_method_name == constructor_name || aliased_method_name == clone_name;
             let is_inheritable = !parent_is_trait
@@ -239,7 +259,7 @@ mod tests {
                     MetadataFlags::empty(),
                 );
                 function.method_metadata = Some(MethodMetadata { is_abstract, ..MethodMetadata::default() });
-                codebase.function_likes.insert((parent.name, method), function);
+                codebase.function_likes.insert((parent.name, method), Box::new(function));
                 inherit_methods_from_parent(&mut child, &parent, &codebase);
 
                 let mut expected = Vec::new();

@@ -1,3 +1,6 @@
+use std::rc::Rc;
+
+use foldhash::HashMap;
 use mago_allocator::Arena;
 use mago_word::Word;
 use mago_word::WordMap;
@@ -7,6 +10,7 @@ use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::reference::SymbolReferences;
 use mago_codex::ttype::resolution::TypeResolutionContext;
+use mago_codex::ttype::union::TUnion;
 use mago_collector::Collector;
 use mago_database::file::File;
 use mago_names::ResolvedNames;
@@ -30,6 +34,8 @@ use crate::context::block::BlockContext;
 use crate::external::ExternalAnalysisSession;
 use crate::plugin::PluginRegistry;
 use crate::settings::Settings;
+
+type PropertyTypes = Vec<(Word, Rc<TUnion>)>;
 
 pub mod assertion;
 pub mod block;
@@ -57,6 +63,7 @@ where
     pub(super) plugin_registry: &'ctx PluginRegistry,
     pub(super) external_analysis_session: Option<&'ctx ExternalAnalysisSession>,
     pub(super) additional_symbol_references: Option<&'ctx SymbolReferences>,
+    pub(super) property_types: HashMap<(Word, bool), PropertyTypes>,
     class_initializers: WordMap<WordSet>,
 }
 
@@ -91,6 +98,7 @@ where
             plugin_registry,
             external_analysis_session,
             additional_symbol_references,
+            property_types: HashMap::default(),
             class_initializers: WordMap::default(),
         }
     }
