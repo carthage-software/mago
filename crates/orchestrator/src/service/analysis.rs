@@ -33,7 +33,7 @@ use mago_names::resolver::NameResolver;
 use mago_reporting::Issue;
 use mago_reporting::IssueCollection;
 use mago_semantics::SemanticsChecker;
-use mago_syntax::parser::parse_file_with_settings;
+use mago_syntax::parser::parse_file_borrowed_with_settings;
 use mago_syntax::settings::ParserSettings;
 use mago_word::WordSet;
 
@@ -113,7 +113,7 @@ impl AnalysisService {
 
         let arena = LocalArena::new();
 
-        let program = parse_file_with_settings(&arena, &file, self.parser_settings);
+        let program = parse_file_borrowed_with_settings(&arena, &file, self.parser_settings);
         let resolved_names = NameResolver::new(&arena).resolve(program);
 
         let mut issues = IssueCollection::new();
@@ -346,7 +346,7 @@ impl AnalysisService {
 
                 #[cfg(not(target_arch = "wasm32"))]
                 let parse_start = trace_enabled.then(Instant::now);
-                let program = parse_file_with_settings(arena, &source_file, parser_settings);
+                let program = parse_file_borrowed_with_settings(arena, &source_file, parser_settings);
                 #[cfg(not(target_arch = "wasm32"))]
                 if let Some(start) = parse_start {
                     telemetry_for_closure.parse_ns.fetch_add(start.elapsed().as_nanos() as u64, Relaxed);

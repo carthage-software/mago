@@ -53,7 +53,7 @@
 //! ## `ReadDatabase` (Immutable)
 //!
 //! - Creation: O(n log n) for sorting
-//! - Lookup by ID/name/path: O(1) average
+//! - Lookup by ID/name/path: O(1) average; first name or path lookup builds its index in O(n)
 //! - Iteration: Deterministic, sorted by `FileId`
 //! - Memory: ~3x file count (vector + 3 index maps)
 //!
@@ -66,6 +66,7 @@ use std::borrow::Cow;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Arc;
+use std::sync::OnceLock;
 
 use foldhash::HashMap;
 use foldhash::HashMapExt;
@@ -226,8 +227,8 @@ pub struct Database<'config> {
 pub struct ReadDatabase {
     files: Vec<Arc<File>>,
     id_to_index: HashMap<FileId, usize>,
-    name_to_index: HashMap<Cow<'static, [u8]>, usize>,
-    path_to_index: HashMap<PathBuf, usize>,
+    name_to_index: OnceLock<HashMap<Cow<'static, [u8]>, usize>>,
+    path_to_index: OnceLock<HashMap<PathBuf, usize>>,
 }
 
 impl<'config> Database<'config> {
@@ -385,10 +386,8 @@ impl<'config> Database<'config> {
 
     /// Creates an independent, immutable snapshot of the database.
     ///
-    /// This is a potentially expensive one-time operation as it **clones** all file
-    /// data. The resulting [`ReadDatabase`] is highly optimized for fast reads and
-    /// guarantees a deterministic iteration order. The original `Database` is not
-    /// consumed and can continue to be used.
+    /// Shares file data and sorts it by ID. Name and path lookups build their indexes on first use.
+    /// The snapshot stays unchanged when the original database changes.
     #[inline]
     #[must_use]
     pub fn read_only(&self) -> ReadDatabase {
@@ -396,18 +395,11 @@ impl<'config> Database<'config> {
         files_vec.sort_unstable_by_key(|f| f.id);
 
         let mut id_to_index = HashMap::with_capacity(files_vec.len());
-        let mut name_to_index = HashMap::with_capacity(files_vec.len());
-        let mut path_to_index = HashMap::with_capacity(files_vec.len());
-
         for (index, file) in files_vec.iter().enumerate() {
             id_to_index.insert(file.id, index);
-            name_to_index.insert(file.name.clone(), index);
-            if let Some(path) = &file.path {
-                path_to_index.insert(path.clone(), index);
-            }
         }
 
-        ReadDatabase { files: files_vec, id_to_index, name_to_index, path_to_index }
+        ReadDatabase { files: files_vec, id_to_index, name_to_index: OnceLock::new(), path_to_index: OnceLock::new() }
     }
 }
 
@@ -418,8 +410,8 @@ impl ReadDatabase {
         Self {
             files: Vec::new(),
             id_to_index: HashMap::new(),
-            name_to_index: HashMap::new(),
-            path_to_index: HashMap::new(),
+            name_to_index: OnceLock::new(),
+            path_to_index: OnceLock::new(),
         }
     }
 
@@ -436,16 +428,29 @@ impl ReadDatabase {
     #[must_use]
     pub fn single(file: File) -> Self {
         let mut id_to_index = HashMap::with_capacity(1);
-        let mut name_to_index = HashMap::with_capacity(1);
-        let mut path_to_index = HashMap::with_capacity(1);
-
         id_to_index.insert(file.id, 0);
-        name_to_index.insert(file.name.clone(), 0);
-        if let Some(path) = &file.path {
-            path_to_index.insert(path.clone(), 0);
-        }
 
-        Self { files: vec![Arc::new(file)], id_to_index, name_to_index, path_to_index }
+        Self {
+            files: vec![Arc::new(file)],
+            id_to_index,
+            name_to_index: OnceLock::new(),
+            path_to_index: OnceLock::new(),
+        }
+    }
+
+    fn name_index(&self) -> &HashMap<Cow<'static, [u8]>, usize> {
+        self.name_to_index
+            .get_or_init(|| self.files.iter().enumerate().map(|(index, file)| (file.name.clone(), index)).collect())
+    }
+
+    fn path_index(&self) -> &HashMap<PathBuf, usize> {
+        self.path_to_index.get_or_init(|| {
+            self.files
+                .iter()
+                .enumerate()
+                .filter_map(|(index, file)| file.path.as_ref().map(|path| (path.clone(), index)))
+                .collect()
+        })
     }
 }
 
@@ -576,7 +581,7 @@ impl DatabaseReader for Database<'_> {
 impl DatabaseReader for ReadDatabase {
     #[inline]
     fn get_id(&self, name: &[u8]) -> Option<FileId> {
-        self.name_to_index.get(name).and_then(|&i| self.files.get(i)).map(|f| f.id)
+        self.name_index().get(name).and_then(|&i| self.files.get(i)).map(|f| f.id)
     }
 
     #[inline]
@@ -595,12 +600,12 @@ impl DatabaseReader for ReadDatabase {
 
     #[inline]
     fn get_by_name(&self, name: &[u8]) -> Result<Arc<File>, DatabaseError> {
-        self.name_to_index.get(name).and_then(|&i| self.files.get(i)).cloned().ok_or(DatabaseError::FileNotFound)
+        self.name_index().get(name).and_then(|&i| self.files.get(i)).cloned().ok_or(DatabaseError::FileNotFound)
     }
 
     #[inline]
     fn get_by_path(&self, path: &Path) -> Result<Arc<File>, DatabaseError> {
-        self.path_to_index.get(path).and_then(|&i| self.files.get(i)).cloned().ok_or(DatabaseError::FileNotFound)
+        self.path_index().get(path).and_then(|&i| self.files.get(i)).cloned().ok_or(DatabaseError::FileNotFound)
     }
 
     #[inline]

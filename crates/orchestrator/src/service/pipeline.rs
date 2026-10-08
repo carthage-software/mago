@@ -30,7 +30,7 @@ use mago_database::file::FileType;
 use mago_names::ResolvedNames;
 use mago_names::resolver::NameResolver;
 use mago_syntax::cst::Program;
-use mago_syntax::parser::parse_file_with_settings;
+use mago_syntax::parser::parse_file_borrowed_with_settings;
 use mago_syntax::settings::ParserSettings;
 
 use crate::error::OrchestratorError;
@@ -213,10 +213,10 @@ where
         let slowest_files = trace_enabled.then(|| Arc::new(SlowestFiles::new()));
 
         let mut source_discover_duration = Duration::ZERO;
-        let source_files: Vec<_> = measure!(
+        let mut source_files: Vec<_> = measure!(
             trace_enabled,
             source_discover_duration,
-            self.database.files().filter(|f| f.file_type != FileType::Builtin).collect()
+            self.database.files().filter(|f| f.file_type != FileType::Builtin).enumerate().collect()
         );
 
         if source_files.is_empty() {
@@ -236,14 +236,20 @@ where
         #[cfg(not(target_arch = "wasm32"))]
         let source_count = source_files.len();
 
+        // Start large files early, then restore database order before merging.
+        if rayon::current_num_threads() > 1 {
+            source_files.sort_unstable_by_key(|(index, file)| (Reverse(file.size), *index));
+        }
+
         let mut compile_parallel_duration = Duration::ZERO;
-        let compiled: Vec<(CodebaseMetadata, Option<S>)> = measure!(
+        let mut compiled: Vec<(usize, (CodebaseMetadata, Option<S>))> = measure!(
             trace_enabled,
             compile_parallel_duration,
-            source_files
-                .into_par_iter()
-                .map_init(LocalArena::new, |arena, file| -> Result<_, OrchestratorError> {
-                    let program = parse_file_with_settings(arena, &file, parser_settings);
+            map_with_priority_queue(
+                &source_files,
+                LocalArena::new,
+                |arena, (index, file)| -> Result<_, OrchestratorError> {
+                    let program = parse_file_borrowed_with_settings(arena, file, parser_settings);
                     if program.has_errors() {
                         tracing::warn!(
                             "Encountered {} parsing errors in file '{}'. Codebase analysis may be incomplete.",
@@ -258,24 +264,27 @@ where
                     let file_signature = build_file_signatures
                         .then(|| signature_builder::build_file_signature(program, &resolved_names));
 
-                    let mut metadata = scan_program(arena, &file, program, &resolved_names, php_version);
+                    let mut metadata = scan_program(arena, file, program, &resolved_names, php_version);
                     if let Some(file_signature) = file_signature {
                         metadata.set_file_signature(file.id, file_signature);
                     }
+
                     if file.file_type.is_patch() {
                         metadata.convert_partial_to_patch();
                     }
-                    let captured = capture(&file, program, &resolved_names)?;
 
+                    let record = capture(file, program, &resolved_names)?;
                     arena.reset();
                     if let Some(compiling_bar) = &compiling_bar {
                         compiling_bar.inc(1);
                     }
 
-                    Ok((metadata, captured))
-                })
-                .collect::<Result<Vec<_>, _>>()?
+                    Ok((*index, (metadata, record)))
+                }
+            )?
         );
+        compiled.sort_unstable_by_key(|(index, _)| *index);
+        drop(source_files);
 
         let mut merged_codex = self.codebase;
         let mut captures = Vec::new();
@@ -286,8 +295,8 @@ where
         measure!(trace_enabled, merge_duration, {
             let partials = compiled
                 .into_iter()
-                .map(|(partial, captured)| {
-                    captures.extend(captured);
+                .map(|(_, (partial, record))| {
+                    captures.extend(record);
                     for name in partial.class_likes.keys().chain(partial.patch_class_likes.keys()) {
                         safe_symbols.remove(name);
                         if let Some(replaced_classes) = &mut replaced_classes {
@@ -310,8 +319,8 @@ where
                     partial
                 })
                 .collect();
-            merged_codex.extend_many_parallel(partials);
 
+            merged_codex.extend_many_parallel(partials);
             if let Some(replaced_classes) = replaced_classes {
                 safe_symbol_members.retain(|(scope, _)| !replaced_classes.contains(scope));
             }
@@ -757,34 +766,41 @@ mod tests {
         }
         database.add(File::new(Cow::Borrowed(b"vendor.php"), FileType::Vendored, None, Cow::Borrowed(b"<?php")));
 
-        let database = database.read_only();
+        let snapshot = database.read_only();
+        let expected_captures = snapshot.files().map(|file| file.id).collect::<Vec<_>>();
         let before_map_id = FileId::new(b"before-map");
         let mut expected = vec![before_map_id];
-        expected.extend(database.files().filter(|file| file.file_type == FileType::Host).map(|file| file.id));
+        expected.extend(snapshot.files().filter(|file| file.file_type == FileType::Host).map(|file| file.id));
 
-        let pipeline = ParallelPipeline::new(
-            "test",
-            database,
-            CodebaseMetadata::new(),
-            SymbolReferences::new(),
-            (),
-            ParserSettings::default(),
-            PHPVersion::new(8, 4, 0),
-            Box::new(FileIds),
-            false,
-        );
-        let results = rayon::ThreadPoolBuilder::new().num_threads(4).build()?.install(|| {
-            pipeline.run(
-                |_, _, _| Ok(None::<()>),
-                |codebase, _, _| {
-                    assert_eq!(codebase.file_signatures.len(), 33, "Public pipelines keep all file signatures");
-                    Ok(Some(before_map_id))
-                },
-                |(), _, file, _| Ok(file.id),
-            )
-        })?;
+        for threads in [1, 4] {
+            let pipeline = ParallelPipeline::new(
+                "test",
+                // database,
+                database.read_only(),
+                CodebaseMetadata::new(),
+                SymbolReferences::new(),
+                (),
+                ParserSettings::default(),
+                PHPVersion::new(8, 4, 0),
+                Box::new(FileIds),
+                false,
+            );
 
-        assert_eq!(results, expected);
+            let results = rayon::ThreadPoolBuilder::new().num_threads(threads).build()?.install(|| {
+                pipeline.run(
+                    |file, _, _| Ok(Some(file.id)),
+                    |codebase, _, captures| {
+                        assert_eq!(captures, expected_captures, "Compilation keeps database order");
+                        assert_eq!(codebase.file_signatures.len(), 33, "Public pipelines keep all file signatures");
+                        Ok(Some(before_map_id))
+                    },
+                    |(), _, file, _| Ok(file.id),
+                )
+            })?;
+
+            assert_eq!(results, expected);
+        }
+
         Ok(())
     }
 

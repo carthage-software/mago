@@ -5,6 +5,12 @@ use std::collections::hash_map::Entry;
 use std::ffi::OsString;
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::Mutex;
+use std::sync::PoisonError;
+#[cfg(unix)]
+use std::sync::atomic::AtomicBool;
+#[cfg(unix)]
+use std::sync::atomic::Ordering;
 
 use foldhash::HashMap;
 use foldhash::HashSet;
@@ -450,6 +456,30 @@ impl<'config> DatabaseLoader<'config> {
                 directory_roots
                     .into_par_iter()
                     .map(|(root, specificity)| {
+                        #[cfg(unix)]
+                        if rayon::current_num_threads() > 1
+                            && root.symlink_metadata().is_ok_and(|metadata| metadata.file_type().is_dir())
+                        {
+                            let fallback = AtomicBool::new(false);
+                            if let Some(files) = try_load_directory_parallel(
+                                &root,
+                                specificity,
+                                &load_path,
+                                &|path| {
+                                    is_pruned_directory(
+                                        path,
+                                        canonical_workspace.as_path(),
+                                        &canonical_excludes,
+                                        dir_prune_globs,
+                                    )
+                                },
+                                &fallback,
+                                0,
+                            ) {
+                                return files;
+                            }
+                        }
+
                         let walker = WalkDir::new(&root).follow_links(true).into_iter().filter_entry(|entry| {
                             entry.depth() == 0
                                 || !entry.file_type().is_dir()
@@ -475,15 +505,20 @@ impl<'config> DatabaseLoader<'config> {
                             (!batch.is_empty()).then_some(batch)
                         });
 
-                        let mut loaded: Vec<_> = batches
-                            .enumerate()
-                            .par_bridge()
-                            .map(|(index, paths)| {
-                                let files = paths.into_iter().filter_map(&load_path).collect::<Result<Vec<_>, _>>();
-                                (index, files)
-                            })
-                            .collect();
+                        let loaded = Mutex::new(Vec::new());
+                        let load_path = &load_path;
+                        // Let workers read batches while this worker walks the directory.
+                        rayon::scope(|scope| {
+                            for (index, paths) in batches.enumerate() {
+                                let loaded = &loaded;
+                                scope.spawn(move |_| {
+                                    let files = paths.into_iter().filter_map(load_path).collect::<Result<Vec<_>, _>>();
+                                    loaded.lock().unwrap_or_else(PoisonError::into_inner).push((index, files));
+                                });
+                            }
+                        });
 
+                        let mut loaded = loaded.into_inner().unwrap_or_else(PoisonError::into_inner);
                         loaded.sort_unstable_by_key(|(index, _)| *index);
                         let mut files = Vec::new();
                         for (_, batch) in loaded {
@@ -501,6 +536,95 @@ impl<'config> DatabaseLoader<'config> {
 
         Ok(files)
     }
+}
+
+#[cfg(unix)]
+enum LoadedDirectoryEntry {
+    File(Option<Result<FileWithSpecificity, DatabaseError>>),
+    Directory(Option<Result<Vec<FileWithSpecificity>, DatabaseError>>),
+}
+
+// Windows WalkDir also opens ancestor handles, with distinct error behavior.
+#[cfg(unix)]
+fn try_load_directory_parallel<F, P>(
+    root: &Path,
+    specificity: usize,
+    load_path: &F,
+    is_pruned: &P,
+    fallback: &AtomicBool,
+    depth: usize,
+) -> Option<Result<Vec<FileWithSpecificity>, DatabaseError>>
+where
+    F: Fn((PathBuf, usize, bool)) -> Option<Result<FileWithSpecificity, DatabaseError>> + Sync,
+    P: Fn(&Path) -> bool + Sync,
+{
+    let use_walker = || {
+        fallback.store(true, Ordering::Relaxed);
+        None
+    };
+
+    if depth == 64 || fallback.load(Ordering::Relaxed) {
+        return use_walker();
+    }
+
+    let Ok(directory) = std::fs::read_dir(root) else {
+        return use_walker();
+    };
+
+    let entries = directory
+        .map(|entry| {
+            let entry = entry?;
+            Ok((entry.path(), entry.file_type()?))
+        })
+        .collect::<Result<Vec<_>, std::io::Error>>();
+    let Ok(entries) = entries else {
+        return use_walker();
+    };
+    if entries.iter().any(|(_, file_type)| !file_type.is_file() && !file_type.is_dir()) {
+        return use_walker();
+    }
+
+    // Drop directory handles before recursing; keep native entry order in the result.
+    let entries: Vec<_> = entries
+        .into_par_iter()
+        .map(|(path, file_type)| {
+            if fallback.load(Ordering::Relaxed) {
+                LoadedDirectoryEntry::Directory(None)
+            } else if file_type.is_dir() {
+                if is_pruned(&path) {
+                    LoadedDirectoryEntry::File(None)
+                } else {
+                    LoadedDirectoryEntry::Directory(try_load_directory_parallel(
+                        &path,
+                        specificity,
+                        load_path,
+                        is_pruned,
+                        fallback,
+                        depth + 1,
+                    ))
+                }
+            } else {
+                LoadedDirectoryEntry::File(load_path((path, specificity, false)))
+            }
+        })
+        .collect();
+    if fallback.load(Ordering::Relaxed) {
+        return None;
+    }
+
+    let mut files = Vec::new();
+    for entry in entries {
+        match entry {
+            LoadedDirectoryEntry::File(Some(Ok(file))) => files.push(file),
+            LoadedDirectoryEntry::Directory(Some(Ok(children))) => files.extend(children),
+            LoadedDirectoryEntry::File(Some(Err(error))) | LoadedDirectoryEntry::Directory(Some(Err(error))) => {
+                return Some(Err(error));
+            }
+            LoadedDirectoryEntry::File(None) | LoadedDirectoryEntry::Directory(None) => {}
+        }
+    }
+
+    Some(Ok(files))
 }
 
 fn workspace_relative_string(path: &Path, workspace: &Path) -> String {
@@ -742,7 +866,7 @@ mod tests {
     fn test_batched_walk_keeps_file_order() {
         let temp_dir = TempDir::new().unwrap();
         for index in 0..385 {
-            create_test_file(&temp_dir, &format!("src/nested/{index}.php"), "<?php");
+            create_test_file(&temp_dir, &format!("src/nested/{}/{index}.php", index / 64), "<?php");
         }
 
         let root = temp_dir.path().join("src/nested").canonicalize().unwrap();
@@ -1095,16 +1219,19 @@ mod tests {
     #[test]
     fn test_symlink_cycle_is_warned_and_skipped() {
         let temp_dir = TempDir::new().unwrap();
-        create_test_file(&temp_dir, "src/Real.php", "<?php class Real {}\n");
-        std::os::unix::fs::symlink(temp_dir.path().join("src"), temp_dir.path().join("src/loop")).unwrap();
+        create_test_file(&temp_dir, "src/nested/Real.php", "<?php class Real {}\n");
+        std::os::unix::fs::symlink(temp_dir.path().join("src/nested"), temp_dir.path().join("src/nested/loop"))
+            .unwrap();
 
         let config = create_test_config(&temp_dir, vec![], vec!["src/"]);
-        let db = DatabaseLoader::new(config).load().expect("symlink cycle should not abort the load");
-
-        assert!(
-            db.files().any(|f| name_str(&f.name).contains("Real.php")),
-            "Real.php still reachable despite the loop"
-        );
+        for threads in [1, 4] {
+            let pool = rayon::ThreadPoolBuilder::new().num_threads(threads).build().unwrap();
+            let db = pool.install(|| {
+                DatabaseLoader::new(config.clone()).load().expect("symlink cycle should not abort the load")
+            });
+            let names = db.files().map(|file| file.name.to_vec()).collect::<Vec<_>>();
+            assert_eq!(names, [b"src/nested/Real.php".to_vec()]);
+        }
     }
 
     #[test]

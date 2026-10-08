@@ -170,6 +170,21 @@ where
     parse_file_content_with_settings(arena, file.file_id(), file.contents.as_ref(), settings)
 }
 
+/// Parses a file without copying its source bytes into the arena.
+///
+/// The file must remain alive while the returned program is in use.
+#[inline]
+pub fn parse_file_borrowed_with_settings<'arena, A>(
+    arena: &'arena A,
+    file: &'arena File,
+    settings: ParserSettings,
+) -> &'arena Program<'arena>
+where
+    A: Arena,
+{
+    Parser::for_file(arena, file, settings).parse(file.contents.as_ref(), file.file_id())
+}
+
 /// Parses the given file content and returns the program CST.
 ///
 /// # Parameters
