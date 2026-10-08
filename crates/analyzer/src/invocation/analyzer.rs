@@ -202,6 +202,9 @@ where
     }
 
     let has_unpacked_arguments = !unpacked_arguments.is_empty();
+    // The callee reads its extra arguments through `func_get_args()` and friends.
+    let reads_extra_arguments =
+        invocation.target.get_function_like_metadata().is_some_and(|metadata| metadata.flags.uses_func_get_args());
 
     let calling_class_like_metadata =
         calling_class_like.and_then(|(id, _)| context.codebase.get_class_like(id.as_bytes()));
@@ -1030,7 +1033,7 @@ where
                     }
                 }
             }
-        } else if !unpacked_arguments.is_empty() {
+        } else if !unpacked_arguments.is_empty() && !reads_extra_arguments {
             context.collector.report_with_code(
                 IssueCode::TooManyArguments,
                 Issue::error(format!(
@@ -1145,15 +1148,16 @@ where
 
         issue = issue.with_help("Provide all required arguments.");
         context.collector.report_with_code(IssueCode::TooFewArguments, issue);
-    } else if has_too_many_arguments
-        || (!invocation
-            .target
-            .parameter_count()
-            .checked_sub(1)
-            .and_then(|idx| invocation.target.get_parameter(idx))
-            .is_some_and(|parameter| parameter.is_variadic())
-            && number_of_provided_parameters > max_params
-            && max_params > 0)
+    } else if !reads_extra_arguments
+        && (has_too_many_arguments
+            || (!invocation
+                .target
+                .parameter_count()
+                .checked_sub(1)
+                .and_then(|idx| invocation.target.get_parameter(idx))
+                .is_some_and(|parameter| parameter.is_variadic())
+                && number_of_provided_parameters > max_params
+                && max_params > 0))
     {
         let target_name_str = invocation.target.guess_name(context);
         let first_extra_arg_span = invocation

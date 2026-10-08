@@ -24,6 +24,7 @@ use mago_syntax::cst::Interface;
 use mago_syntax::cst::Method;
 use mago_syntax::cst::Namespace;
 use mago_syntax::cst::Program;
+use mago_syntax::cst::PropertyHook;
 use mago_syntax::cst::Return;
 use mago_syntax::cst::Trait;
 use mago_syntax::cst::Trivia;
@@ -176,6 +177,7 @@ struct Scanner {
     file_imported_aliases: WordMap<(Word, Word)>,
     polyfill_depth: u32,
     return_docblock_starts: Vec<Option<u32>>,
+    function_like_stack: Vec<Option<(Word, Word)>>,
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq)]
@@ -358,6 +360,7 @@ where
         ) else {
             // Push an empty frame so the matching `walk_out_function` pop balances.
             self.template_constraints.push(vec![]);
+            self.function_like_stack.push(None);
             return;
         };
 
@@ -368,11 +371,13 @@ where
             metadata.flags |= MetadataFlags::POLYFILL;
         }
 
+        self.function_like_stack.push(Some(identifier));
         self.codebase.function_likes.entry(identifier).or_insert_with(|| Box::new(metadata));
     }
 
     #[inline]
     fn walk_out_function(&mut self, _function: &'arena Function<'arena>, _context: &mut Context<'ctx, 'arena, A>) {
+        self.function_like_stack.pop();
         self.template_constraints.pop().expect("Expected template stack to be non-empty");
     }
 
@@ -400,11 +405,13 @@ where
         self.template_constraints
             .push(metadata.template_types.iter().map(|(name, constraints)| (*name, constraints.clone())).collect());
 
+        self.function_like_stack.push(Some(identifier));
         self.codebase.function_likes.entry(identifier).or_insert_with(|| Box::new(metadata));
     }
 
     #[inline]
     fn walk_out_closure(&mut self, _closure: &'arena Closure<'arena>, _context: &mut Context<'ctx, 'arena, A>) {
+        self.function_like_stack.pop();
         self.template_constraints.pop().expect("Expected template stack to be non-empty");
     }
 
@@ -436,6 +443,7 @@ where
 
         self.template_constraints
             .push(metadata.template_types.iter().map(|(name, constraints)| (*name, constraints.clone())).collect());
+        self.function_like_stack.push(Some(identifier));
         self.codebase.function_likes.entry(identifier).or_insert_with(|| Box::new(metadata));
     }
 
@@ -445,6 +453,7 @@ where
         _arrow_function: &'arena ArrowFunction<'arena>,
         _context: &mut Context<'ctx, 'arena, A>,
     ) {
+        self.function_like_stack.pop();
         self.template_constraints.pop().expect("Expected template stack to be non-empty");
     }
 
@@ -472,6 +481,22 @@ where
         };
 
         let function_name = identifier.value();
+        let bare_name = function_name.strip_prefix(b"\\").unwrap_or(function_name);
+        if matches!(bare_name.len(), 12 | 13)
+            && (bare_name.eq_ignore_ascii_case(b"func_get_args")
+                || bare_name.eq_ignore_ascii_case(b"func_get_arg")
+                || bare_name.eq_ignore_ascii_case(b"func_num_args"))
+        {
+            // Innermost function-like only: a nested closure has its own arguments.
+            if let Some(Some(enclosing)) = self.function_like_stack.last()
+                && let Some(metadata) = self.codebase.function_likes.get_mut(enclosing)
+            {
+                metadata.flags |= MetadataFlags::USES_FUNC_GET_ARGS;
+            }
+
+            return;
+        }
+
         let is_class_alias = matches!(function_name.len(), 11 | 12)
             && (function_name.eq_ignore_ascii_case(b"class_alias")
                 || function_name.eq_ignore_ascii_case(b"\\class_alias"));
@@ -627,6 +652,7 @@ where
 
             self.codebase.class_likes.insert(current_class, class_like_metadata);
             self.template_constraints.push(vec![]);
+            self.function_like_stack.push(None);
 
             return;
         }
@@ -659,6 +685,7 @@ where
             // frame so the matching `walk_out_method` pop balances.
             self.codebase.class_likes.insert(current_class, class_like_metadata);
             self.template_constraints.push(vec![]);
+            self.function_like_stack.push(None);
             return;
         };
 
@@ -720,12 +747,24 @@ where
         );
 
         self.codebase.class_likes.entry(current_class).or_insert(class_like_metadata);
+        self.function_like_stack.push(Some(method_id));
         self.codebase.function_likes.entry(method_id).or_insert_with(|| Box::new(function_like_metadata));
     }
 
     #[inline]
     fn walk_out_method(&mut self, _method: &'arena Method<'arena>, _context: &mut Context<'ctx, 'arena, A>) {
+        self.function_like_stack.pop();
         self.template_constraints.pop().expect("Expected template stack to be non-empty");
+    }
+
+    #[inline]
+    fn walk_in_property_hook(&mut self, _hook: &'arena PropertyHook<'arena>, _context: &mut Context<'ctx, 'arena, A>) {
+        self.function_like_stack.push(None);
+    }
+
+    #[inline]
+    fn walk_out_property_hook(&mut self, _hook: &'arena PropertyHook<'arena>, _context: &mut Context<'ctx, 'arena, A>) {
+        self.function_like_stack.pop();
     }
 
     #[inline]

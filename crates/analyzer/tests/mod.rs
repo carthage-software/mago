@@ -2798,6 +2798,7 @@ test_case!(issue_2411, {
 test_case!(issue_2418);
 test_case!(issue_2419);
 test_case!(issue_2434);
+test_case!(issue_2435);
 test_case!(issue_2440);
 
 #[test]

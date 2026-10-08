@@ -52,6 +52,7 @@ impl MetadataFlags {
     pub const POLYFILL: MetadataFlags = MetadataFlags(1 << 41);
     pub const PATCH: MetadataFlags = MetadataFlags(1 << 42);
     pub const EXTERNAL: MetadataFlags = MetadataFlags(1 << 43);
+    pub const USES_FUNC_GET_ARGS: MetadataFlags = MetadataFlags(1 << 44);
 }
 
 impl MetadataFlags {
@@ -116,6 +117,12 @@ impl MetadataFlags {
     #[must_use]
     pub const fn has_yield(self) -> bool {
         self.contains(Self::HAS_YIELD)
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn uses_func_get_args(self) -> bool {
+        self.contains(Self::USES_FUNC_GET_ARGS)
     }
 
     #[inline]
