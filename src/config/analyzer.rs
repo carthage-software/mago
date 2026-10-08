@@ -8,6 +8,7 @@ use mago_algebra::DEFAULT_SATURATION_COMPLEXITY;
 use mago_analyzer::settings::ClassInitializer;
 use mago_analyzer::settings::DEFAULT_FORMULA_SIZE_THRESHOLD;
 use mago_analyzer::settings::DEFAULT_LOOP_ASSIGNMENT_DEPTH_THRESHOLD;
+use mago_analyzer::settings::DEFAULT_SLOW_FILE_WARNING_THRESHOLD_MS;
 use mago_analyzer::settings::Settings;
 use mago_codex::ttype::combiner::DEFAULT_ARRAY_COMBINATION_THRESHOLD;
 use mago_codex::ttype::combiner::DEFAULT_INTEGER_COMBINATION_THRESHOLD;
@@ -416,6 +417,13 @@ pub struct PerformanceConfiguration {
     ///
     /// Defaults to `1`.
     pub loop_assignment_depth_threshold: u8,
+
+    /// Duration in milliseconds after which analysis of a source file is reported as slow.
+    ///
+    /// This only controls the warning threshold; it does not change analysis behavior.
+    ///
+    /// Defaults to `5000`.
+    pub slow_file_warning_threshold_ms: u16,
 }
 
 impl Default for PerformanceConfiguration {
@@ -430,6 +438,7 @@ impl Default for PerformanceConfiguration {
             integer_combination_threshold: DEFAULT_INTEGER_COMBINATION_THRESHOLD,
             array_combination_threshold: DEFAULT_ARRAY_COMBINATION_THRESHOLD,
             loop_assignment_depth_threshold: DEFAULT_LOOP_ASSIGNMENT_DEPTH_THRESHOLD,
+            slow_file_warning_threshold_ms: DEFAULT_SLOW_FILE_WARNING_THRESHOLD_MS,
         }
     }
 }
@@ -495,6 +504,7 @@ impl AnalyzerConfiguration {
             integer_combination_threshold: self.performance.integer_combination_threshold,
             array_combination_threshold: self.performance.array_combination_threshold,
             loop_assignment_depth_threshold: self.performance.loop_assignment_depth_threshold,
+            slow_file_warning_threshold_ms: self.performance.slow_file_warning_threshold_ms,
         }
     }
 }

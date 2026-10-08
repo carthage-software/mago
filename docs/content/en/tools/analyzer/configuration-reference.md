@@ -356,6 +356,7 @@ The analyzer uses internal thresholds to balance depth against speed. Settings l
 | `integer-combination-threshold` | `u16` | `128` | Maximum literal integers tracked before generalising to `int`. |
 | `array-combination-threshold` | `u16` | `32` | Maximum sealed keyed-array shapes tracked individually before merging. |
 | `loop-assignment-depth-threshold` | `u8` | `1` | Maximum loop fixed-point iteration depth. `0` disables re-iteration. |
+| `slow-file-warning-threshold-ms` | `u16` | `5000` | Warn when analysis of a source file takes longer than this many milliseconds. |
 
 `string-concat-combination-threshold` is still accepted as an alias for `string-combination-threshold`.
 

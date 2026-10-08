@@ -19,6 +19,9 @@ pub const DEFAULT_FORMULA_SIZE_THRESHOLD: u16 = 512;
 /// raise this in their config at the cost of analysis time.
 pub const DEFAULT_LOOP_ASSIGNMENT_DEPTH_THRESHOLD: u8 = 1;
 
+/// Default duration before analysis of a source file is reported as slow.
+pub const DEFAULT_SLOW_FILE_WARNING_THRESHOLD_MS: u16 = 5_000;
+
 /// Configuration settings that control the behavior of the Mago analyzer.
 ///
 /// This struct allows you to enable/disable specific checks, suppress categories of issues,
@@ -377,6 +380,11 @@ pub struct Settings {
     ///
     /// Defaults to `1`.
     pub loop_assignment_depth_threshold: u8,
+
+    /// Duration in milliseconds after which analysis of a source file is reported as slow.
+    ///
+    /// Defaults to `5000`.
+    pub slow_file_warning_threshold_ms: u16,
 }
 
 impl Default for Settings {
@@ -433,6 +441,7 @@ impl Settings {
             integer_combination_threshold: default_combiner_options.integer_combination_threshold,
             array_combination_threshold: default_combiner_options.array_combination_threshold,
             loop_assignment_depth_threshold: DEFAULT_LOOP_ASSIGNMENT_DEPTH_THRESHOLD,
+            slow_file_warning_threshold_ms: DEFAULT_SLOW_FILE_WARNING_THRESHOLD_MS,
         }
     }
 

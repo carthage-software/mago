@@ -238,10 +238,11 @@ impl AnalysisService {
     ///
     /// Returns [`OrchestratorError`] when scanning, codebase population, or per-file analysis fails.
     pub fn run(self) -> Result<AnalysisResult, OrchestratorError> {
-        #[cfg(not(target_arch = "wasm32"))]
-        const ANALYSIS_DURATION_THRESHOLD: Duration = Duration::from_secs(5);
         const ANALYSIS_PROGRESS_PREFIX: &str = "🔬 Analyzing";
 
+        #[cfg(not(target_arch = "wasm32"))]
+        let analysis_duration_threshold =
+            Duration::from_millis(u64::from(self.settings.slow_file_warning_threshold_ms));
         let external_session =
             self.plugin_registry.create_external_analysis_session(self.database.files()).map(Arc::new);
         let codebase_scan_plan =
@@ -411,11 +412,11 @@ impl AnalysisService {
                 }
 
                 #[cfg(not(target_arch = "wasm32"))]
-                if analysis_result.time_in_analysis > ANALYSIS_DURATION_THRESHOLD {
+                if analysis_result.time_in_analysis > analysis_duration_threshold {
                     tracing::warn!(
                         "Analysis of source file '{}' took longer than {}s: {}s",
                         mago_bytes::BytesDisplay(&source_file.name),
-                        ANALYSIS_DURATION_THRESHOLD.as_secs_f32(),
+                        analysis_duration_threshold.as_secs_f32(),
                         analysis_result.time_in_analysis.as_secs_f32()
                     );
                 }
