@@ -16,6 +16,8 @@ use codespan_reporting::term;
 use codespan_reporting::term::Config;
 use codespan_reporting::term::DisplayStyle;
 use foldhash::HashMap;
+#[cfg(not(target_arch = "wasm32"))]
+use rayon::prelude::*;
 use termcolor::Ansi;
 use termcolor::NoColor;
 
@@ -64,13 +66,22 @@ pub(super) fn codespan_format_with_config(
     codespan_config: &Config,
 ) -> Result<(), ReportingError> {
     let use_colors = config.color_choice.should_use_colors(std::io::stdout().is_terminal());
-    let mut ansi = Ansi::new(Vec::new());
-    let mut plain = NoColor::new(Vec::new());
-    let styled: &mut dyn term::WriteStyle = if use_colors { &mut ansi } else { &mut plain };
-
     let editor_url = if use_colors { config.editor_url.as_deref() } else { None };
-    let files = DatabaseFiles::new(database, editor_url, issues);
-    let mut renderer = term::Renderer::new(styled, codespan_config);
+    let issues: Vec<_> = crate::formatter::utils::filter_issues(issues, config, true).collect();
+    let mut sources = HashMap::default();
+
+    for issue in &issues {
+        for annotation in &issue.annotations {
+            if !matches!(codespan_config.display_style, DisplayStyle::Rich) && !annotation.is_primary() {
+                continue;
+            }
+
+            if let Entry::Vacant(entry) = sources.entry(annotation.span.file_id) {
+                let file = database.get_ref(&annotation.span.file_id).map_err(|_| Error::FileMissing)?;
+                entry.insert(utf8_preserving_byte_offsets(file.contents.as_ref()));
+            }
+        }
+    }
 
     let mut highest_level: Option<Level> = None;
     let mut errors = 0;
@@ -78,9 +89,7 @@ pub(super) fn codespan_format_with_config(
     let mut notes = 0;
     let mut help = 0;
     let mut suggestions = 0;
-    let mut diagnostic = Diagnostic::new(Severity::Note);
-
-    for issue in crate::formatter::utils::filter_issues(issues, config, true) {
+    for issue in &issues {
         match issue.level {
             Level::Note => notes += 1,
             Level::Help => help += 1,
@@ -93,24 +102,26 @@ pub(super) fn codespan_format_with_config(
         if !issue.edits.is_empty() {
             suggestions += 1;
         }
+    }
 
-        if editor_url.is_some() {
-            if let Some(annotation) = issue.annotations.iter().find(|a| a.is_primary()) {
-                if let Ok(file) = files.file(annotation.span.file_id) {
-                    let line = file.line_number(annotation.span.start.offset) + 1;
-                    let column = file.column_number(annotation.span.start.offset) + 1;
-                    files.line_hint.set(Some(line));
-                    files.column_hint.set(Some(column));
-                }
-            } else {
-                files.line_hint.set(None);
-                files.column_hint.set(None);
+    for batch in issues.chunks(1024) {
+        #[cfg(not(target_arch = "wasm32"))]
+        if matches!(codespan_config.display_style, DisplayStyle::Rich)
+            && batch.len() >= 256
+            && rayon::current_num_threads() > 1
+        {
+            let chunks: Vec<_> = batch
+                .par_chunks(64)
+                .map(|chunk| render_issues(chunk, database, &sources, editor_url, use_colors, codespan_config))
+                .collect();
+            for chunk in chunks {
+                writer.write_all(&chunk?)?;
             }
+
+            continue;
         }
 
-        update_diagnostic(&mut diagnostic, issue);
-
-        emit_diagnostic(&mut renderer, codespan_config, &files, &diagnostic)?;
+        writer.write_all(&render_issues(batch, database, &sources, editor_url, use_colors, codespan_config)?)?;
     }
 
     if let Some(highest_level) = highest_level {
@@ -142,13 +153,50 @@ pub(super) fn codespan_format_with_config(
             diagnostic = diagnostic.with_notes(vec![format!("{} issues contain auto-fix suggestions", suggestions)]);
         }
 
+        let mut ansi = Ansi::new(Vec::new());
+        let mut plain = NoColor::new(Vec::new());
+        let styled: &mut dyn term::WriteStyle = if use_colors { &mut ansi } else { &mut plain };
+        let files = DatabaseFiles::new(database, editor_url, &sources);
+        let mut renderer = term::Renderer::new(styled, codespan_config);
         emit_diagnostic(&mut renderer, codespan_config, &files, &diagnostic)?;
+        writer.write_all(if use_colors { ansi.get_ref() } else { plain.get_ref() })?;
     }
 
-    // Write buffer to writer
-    writer.write_all(if use_colors { ansi.get_ref() } else { plain.get_ref() })?;
-
     Ok(())
+}
+
+fn render_issues(
+    issues: &[&Issue],
+    database: &ReadDatabase,
+    sources: &HashMap<FileId, Cow<'_, str>>,
+    editor_url: Option<&str>,
+    use_colors: bool,
+    config: &Config,
+) -> Result<Vec<u8>, Error> {
+    let mut ansi = Ansi::new(Vec::new());
+    let mut plain = NoColor::new(Vec::new());
+    let styled: &mut dyn term::WriteStyle = if use_colors { &mut ansi } else { &mut plain };
+    let files = DatabaseFiles::new(database, editor_url, sources);
+    let mut renderer = term::Renderer::new(styled, config);
+    let mut diagnostic = Diagnostic::new(Severity::Note);
+
+    for issue in issues {
+        if editor_url.is_some() {
+            if let Some(annotation) = issue.annotations.iter().find(|a| a.is_primary()) {
+                let file = files.file(annotation.span.file_id)?;
+                files.line_hint.set(Some(file.line_number(annotation.span.start.offset) + 1));
+                files.column_hint.set(Some(file.column_number(annotation.span.start.offset) + 1));
+            } else {
+                files.line_hint.set(None);
+                files.column_hint.set(None);
+            }
+        }
+
+        update_diagnostic(&mut diagnostic, issue);
+        emit_diagnostic(&mut renderer, config, &files, &diagnostic)?;
+    }
+
+    Ok(if use_colors { ansi.into_inner() } else { plain.into_inner() })
 }
 
 fn emit_diagnostic(
@@ -169,24 +217,16 @@ struct DatabaseFiles<'db> {
     editor_url: Option<&'db str>,
     line_hint: Cell<Option<u32>>,
     column_hint: Cell<Option<u32>>,
-    sources: HashMap<FileId, Cow<'db, str>>,
+    sources: &'db HashMap<FileId, Cow<'db, str>>,
     last_file: Cell<Option<&'db File>>,
 }
 
 impl<'db> DatabaseFiles<'db> {
-    fn new(database: &'db ReadDatabase, editor_url: Option<&'db str>, issues: &IssueCollection) -> Self {
-        let mut sources: HashMap<FileId, Cow<'db, str>> = HashMap::default();
-        for issue in issues.iter() {
-            for annotation in &issue.annotations {
-                let file_id = annotation.span.file_id;
-                if let Entry::Vacant(entry) = sources.entry(file_id)
-                    && let Ok(file) = database.get_ref(&file_id)
-                {
-                    entry.insert(utf8_preserving_byte_offsets(file.contents.as_ref()));
-                }
-            }
-        }
-
+    fn new(
+        database: &'db ReadDatabase,
+        editor_url: Option<&'db str>,
+        sources: &'db HashMap<FileId, Cow<'db, str>>,
+    ) -> Self {
         DatabaseFiles {
             database,
             editor_url,
@@ -411,29 +451,35 @@ mod tests {
     use std::path::PathBuf;
 
     use codespan_reporting::files::Files;
+    use foldhash::HashMap;
     use mago_database::Database;
     use mago_database::DatabaseConfiguration;
+    use mago_database::ReadDatabase;
     use mago_database::file::File;
+    use mago_database::file::FileId;
     use mago_database::file::FileType;
-
-    use crate::IssueCollection;
 
     use super::DatabaseFiles;
 
-    #[test]
-    fn editor_url_uses_the_logical_name_for_the_relative_file_placeholder() {
+    fn fixture() -> (ReadDatabase, FileId) {
         let file = File::new(
             Cow::Borrowed(b"src/Foo.php"),
             FileType::Host,
             Some(PathBuf::from("/workspace/src/Foo.php")),
-            Cow::Borrowed(b"<?php\n"),
+            Cow::Borrowed(b"<?php\n$x = '\xc3\xa9';\n// \xff\n"),
         );
         let file_id = file.id;
         let configuration =
             DatabaseConfiguration::new(Path::new("/workspace"), vec![], vec![], vec![], vec![]).into_static();
-        let database = Database::single(file, configuration).read_only();
-        let issues = IssueCollection::new();
-        let files = DatabaseFiles::new(&database, Some("editor://%rel_file%:%line%:%column%"), &issues);
+
+        (Database::single(file, configuration).read_only(), file_id)
+    }
+
+    #[test]
+    fn editor_url_uses_the_logical_name_for_the_relative_file_placeholder() {
+        let (database, file_id) = fixture();
+        let sources = HashMap::default();
+        let files = DatabaseFiles::new(&database, Some("editor://%rel_file%:%line%:%column%"), &sources);
         let Ok(name) = Files::name(&files, file_id) else {
             panic!("file should exist");
         };

@@ -13,6 +13,7 @@
 //! - [`baseline::Baseline`]: Manages baseline files to filter out known issues
 
 use std::cmp::Ordering;
+use std::collections::hash_map::Entry;
 use std::iter::Once;
 use std::str::FromStr;
 
@@ -641,7 +642,12 @@ impl Issue {
     #[must_use]
     pub fn with_file_edits(mut self, file_id: FileId, edits: IssueEdits) -> Self {
         if !edits.is_empty() {
-            self.edits.entry(file_id).or_default().extend(edits);
+            match self.edits.entry(file_id) {
+                Entry::Vacant(entry) => {
+                    entry.insert(edits);
+                }
+                Entry::Occupied(mut entry) => entry.get_mut().extend(edits),
+            }
         }
 
         self
