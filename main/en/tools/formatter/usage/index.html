@@ -799,6 +799,7 @@
 <pre><code class="language-sh">mago format --check
 </code></pre>
 <p>Exits <code>0</code> when every file is already formatted, <code>1</code> when at least one file would change. No output on success, so it stays quiet on the happy path.</p>
+<p>After formatting, run <code>mago format --check</code> with the same configuration to verify that another pass would leave the output unchanged.</p>
 <h2 id="preview-changes">Preview changes</h2>
 <p>To see what the formatter would do without writing anything to disk, ask for a dry run:</p>
 <pre><code class="language-sh">mago format --dry-run
