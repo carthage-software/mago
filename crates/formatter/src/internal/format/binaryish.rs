@@ -144,8 +144,7 @@ where
     let left = unwrap_parenthesized(left);
     let right = unwrap_parenthesized(right);
 
-    let preserves_breaking_layout = f.settings.preserve_breaking_binary_expression
-        && misc::has_new_line_in_range(f.source_text, left.end_offset(), original_right.start_offset());
+    let preserves_breaking_layout = f.settings.preserve_breaking_binary_expression;
 
     let grandparent = f.grandparent_node();
 
@@ -295,6 +294,7 @@ where
     // context, operators like ?? that would normally skip indentation (because
     // their RHS is "inlined") should still get indented.
     let preserve_breaking_continuation = preserves_breaking_layout
+        && misc::has_new_line_in_range(f.source_text, left.end_offset(), original_right.start_offset())
         && (should_indent_if_inlining
             || f.is_wrapped_in_parens
             || matches!(grandparent, Some(Node::Return(_) | Node::Throw(_))));
