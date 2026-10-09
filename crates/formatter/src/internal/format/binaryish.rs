@@ -718,6 +718,9 @@ where
     let always_inline_operator = operator.is_null_coalesce() || operator.is_equality() || operator.is_comparison();
 
     match unwrap_parenthesized(rhs) {
+        Expression::UnaryPrefix(unary) if unary.operator.is_cast() => {
+            should_inline_binary_rhs_expression(f, unary.operand, operator)
+        }
         Expression::Assignment(_) => true,
         Expression::Array(Array { elements, .. })
         | Expression::List(List { elements, .. })
