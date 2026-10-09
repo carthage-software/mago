@@ -77,9 +77,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
                 || (!final_actions.is_empty() && !final_actions.contains(ControlAction::None))
         };
 
-        let (if_conditional_scope, applied_block_context) =
-            conditional::analyze(context, block_context.clone(), artifacts, &mut if_scope, self.condition, true)?;
-        *block_context = applied_block_context;
+        let if_conditional_scope =
+            conditional::analyze(context, block_context, artifacts, &mut if_scope, self.condition, true)?;
 
         if needs_post_leaving_context {
             if_scope.post_leaving_if_context = Some(block_context.clone());
@@ -710,9 +709,8 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena, A>(
 where
     A: Arena,
 {
-    let (if_conditional_scope, applied_else_block_context) =
-        conditional::analyze(context, else_block_context.clone(), artifacts, if_scope, else_if_clause.0, true)?;
-    *else_block_context = applied_else_block_context;
+    let if_conditional_scope =
+        conditional::analyze(context, else_block_context, artifacts, if_scope, else_if_clause.0, true)?;
 
     let mut else_if_block_context = if_conditional_scope.if_body_context;
     let mut conditionally_referenced_variable_ids = if_conditional_scope.conditionally_referenced_variable_ids;

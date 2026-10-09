@@ -29,12 +29,12 @@ use crate::reconciler::reconcile_keyed_types;
 
 pub(crate) fn analyze<'ctx, 'arena, A>(
     context: &mut Context<'ctx, 'arena, A>,
-    mut outer_context: BlockContext<'ctx>,
+    outer_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     if_scope: &mut IfScope,
     condition: &Expression<'arena>,
     check_for_paradoxes: bool,
-) -> Result<(IfConditionalScope<'ctx>, BlockContext<'ctx>), AnalysisError>
+) -> Result<IfConditionalScope<'ctx>, AnalysisError>
 where
     A: Arena,
 {
@@ -61,14 +61,14 @@ where
             );
 
             if !changed_var_ids.is_empty() {
-                outer_context = tmp_context;
+                *outer_context = tmp_context;
             }
         }
     }
 
     let externally_applied_if_cond_expr = get_definitely_evaluated_expression_after_if(condition);
     let internally_applied_if_cond_expr = get_definitely_evaluated_expression_inside_if(condition);
-    let mut externally_applied_context = outer_context;
+    let externally_applied_context = outer_context;
 
     let pre_condition_locals = externally_applied_context.locals.clone();
     let pre_referenced_var_ids = std::mem::take(&mut externally_applied_context.conditionally_referenced_variable_ids);
@@ -92,7 +92,7 @@ where
     if must_reanalyze_full_condition {
         context.collector.start_recording();
     }
-    externally_applied_if_cond_expr.analyze(context, &mut externally_applied_context, artifacts)?;
+    externally_applied_if_cond_expr.analyze(context, externally_applied_context, artifacts)?;
     if must_reanalyze_full_condition {
         context.collector.finish_recording();
     }
@@ -209,16 +209,13 @@ where
         if_body_context.add_class_type_relation(source, target);
     }
 
-    Ok((
-        IfConditionalScope {
-            if_body_context,
-            post_if_context,
-            conditionally_referenced_variable_ids,
-            assigned_in_conditional_variable_ids,
-            entry_clauses,
-        },
-        externally_applied_context,
-    ))
+    Ok(IfConditionalScope {
+        if_body_context,
+        post_if_context,
+        conditionally_referenced_variable_ids,
+        assigned_in_conditional_variable_ids,
+        entry_clauses,
+    })
 }
 
 #[inline]

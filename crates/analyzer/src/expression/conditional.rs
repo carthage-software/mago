@@ -67,10 +67,8 @@ where
     A: Arena,
 {
     let mut if_scope = IfScope::new();
-    let (if_conditional_scope, applied_block_context) =
-        conditional::analyze(context, block_context.clone(), artifacts, &mut if_scope, condition, false)?;
-
-    *block_context = applied_block_context;
+    let if_conditional_scope =
+        conditional::analyze(context, block_context, artifacts, &mut if_scope, condition, false)?;
 
     let mut if_block_context = if_conditional_scope.if_body_context;
     let mut conditionally_referenced_variable_ids = if_conditional_scope.conditionally_referenced_variable_ids;
