@@ -30,6 +30,7 @@ use mago_guard::settings::StructuralSettings;
 use mago_guard::settings::StructuralSymbolKind;
 use mago_names::resolver::NameResolver;
 use mago_prelude::Prelude;
+use mago_reporting::Issue;
 use mago_syntax::parser::parse_file;
 use mago_word::WordSet;
 
@@ -43,6 +44,7 @@ fn deny_all_settings() -> Settings {
             rules: vec![PerimeterRule {
                 namespace: NamespacePath::Specific("App\\Module\\".to_string()),
                 permit: vec![], // Deny everything
+                reason: None,
             }],
             ..Default::default()
         },
@@ -217,6 +219,7 @@ pub fn test_enum_dependency_violation() {
             rules: vec![PerimeterRule {
                 namespace: NamespacePath::Specific("App\\Module\\".to_string()),
                 permit: vec![],
+                reason: None,
             }],
             ..Default::default()
         },
@@ -269,6 +272,7 @@ pub fn test_native_type_is_allowed() {
             rules: vec![PerimeterRule {
                 namespace: NamespacePath::Specific("App\\Module\\".to_string()),
                 permit: vec![PermittedDependency::Dependency(Path::Native)],
+                reason: None,
             }],
             ..Default::default()
         },
@@ -307,6 +311,7 @@ pub fn test_union_type_violation() {
                 permit: vec![PermittedDependency::Dependency(Path::Selector(SymbolSelector::Namespace(
                     NamespacePath::Specific("App\\Domain\\".to_string()),
                 )))],
+                reason: None,
             }],
             ..Default::default()
         },
@@ -345,6 +350,7 @@ pub fn test_intersection_type_violation() {
                 permit: vec![PermittedDependency::Dependency(Path::Selector(SymbolSelector::Namespace(
                     NamespacePath::Specific("App\\Domain\\".to_string()),
                 )))],
+                reason: None,
             }],
             ..Default::default()
         },
@@ -388,6 +394,7 @@ pub fn test_multiple_allowed_types_rule() {
                     path: Path::Selector(SymbolSelector::Pattern("App\\Vendor\\**".to_string())),
                     kinds: vec![PermittedDependencyKind::ClassLike],
                 }],
+                reason: None,
             }],
             ..Default::default()
         },
@@ -416,6 +423,7 @@ pub fn test_global_namespace_dependency_violation() {
             rules: vec![PerimeterRule {
                 namespace: NamespacePath::Specific("App\\Module\\".to_string()),
                 permit: vec![],
+                reason: None,
             }],
             ..Default::default()
         },
@@ -518,6 +526,7 @@ pub fn test_ddd() {
                             NamespacePath::Specific("Symfony\\Component\\HttpFoundation\\".to_string()),
                         ))),
                     ],
+                    reason: None,
                 },
                 PerimeterRule {
                     namespace: NamespacePath::Specific("CarthageSoftware\\Application\\".to_string()),
@@ -527,6 +536,7 @@ pub fn test_ddd() {
                         ))),
                         PermittedDependency::Dependency(Path::Native),
                     ],
+                    reason: None,
                 },
                 PerimeterRule {
                     namespace: NamespacePath::Specific("CarthageSoftware\\Domain\\".to_string()),
@@ -534,10 +544,12 @@ pub fn test_ddd() {
                         PermittedDependency::Dependency(Path::Self_),
                         PermittedDependency::Dependency(Path::Native),
                     ],
+                    reason: None,
                 },
                 PerimeterRule {
                     namespace: NamespacePath::Specific("CarthageSoftware\\Domain\\".to_string()),
                     permit: vec![PermittedDependency::Dependency(Path::Native)],
+                    reason: None,
                 },
             ],
             ..Default::default()
@@ -577,6 +589,7 @@ pub fn test_narrow_rule_not_widened_by_broad_catchall() {
                             NamespacePath::Specific("App\\Domain\\".to_string()),
                         ))),
                     ],
+                    reason: None,
                 },
                 PerimeterRule {
                     namespace: NamespacePath::Specific("App\\".to_string()),
@@ -589,6 +602,7 @@ pub fn test_narrow_rule_not_widened_by_broad_catchall() {
                             NamespacePath::Specific("App\\Infrastructure\\".to_string()),
                         ))),
                     ],
+                    reason: None,
                 },
             ],
             ..Default::default()
@@ -628,6 +642,7 @@ pub fn test_self_permit_is_scoped_to_rule_namespace() {
             rules: vec![PerimeterRule {
                 namespace: NamespacePath::Specific("App\\Domain\\".to_string()),
                 permit: vec![PermittedDependency::Dependency(Path::Self_)],
+                reason: None,
             }],
             ..Default::default()
         },
@@ -672,6 +687,7 @@ pub fn test_dependency_restriction_allows_only_configured_source_namespaces() {
                 allow_from: vec!["App\\Http\\Controllers\\".to_string()],
                 deny_from: vec!["App\\Http\\Controllers\\Internal\\".to_string()],
                 kinds: vec![],
+                reason: None,
             }],
             ..Default::default()
         },
@@ -752,6 +768,7 @@ pub fn test_dependency_restriction_takes_precedence_over_permits() {
             rules: vec![PerimeterRule {
                 namespace: NamespacePath::Specific("App\\".to_string()),
                 permit: vec![PermittedDependency::Dependency(Path::All)],
+                reason: None,
             }],
             restrictions: vec![
                 DependencyRestriction {
@@ -759,12 +776,14 @@ pub fn test_dependency_restriction_takes_precedence_over_permits() {
                     allow_from: vec![],
                     deny_from: vec!["App\\".to_string()],
                     kinds: vec![PermittedDependencyKind::ClassLike],
+                    reason: None,
                 },
                 DependencyRestriction {
                     dependency: SymbolSelector::Symbol("Illuminate\\Foundation\\Bus\\dispatch".to_string()),
                     allow_from: vec![],
                     deny_from: vec!["App\\".to_string()],
                     kinds: vec![PermittedDependencyKind::Function],
+                    reason: None,
                 },
             ],
             ..Default::default()
@@ -866,5 +885,239 @@ pub fn test_is_final_annotation_counted() {
     assert!(
         result.structural_flaws.is_empty(),
         "Expected non violations: Should allow declare final class with annotation"
+    );
+}
+
+#[test]
+pub fn test_restriction_reason_is_attached_to_issue() {
+    let code = indoc! {r"
+        <?php
+
+        namespace App\Http\Controllers {
+            class Controller {}
+        }
+
+        namespace App\Services {
+            class ForbiddenController extends \App\Http\Controllers\Controller {}
+        }
+    "};
+
+    let reason = "Controllers must stay in the HTTP layer.".to_string();
+    let settings = Settings {
+        perimeter: PerimeterSettings {
+            restrictions: vec![DependencyRestriction {
+                dependency: SymbolSelector::Symbol("App\\Http\\Controllers\\Controller".to_string()),
+                allow_from: vec!["App\\Http\\Controllers\\".to_string()],
+                deny_from: vec![],
+                kinds: vec![],
+                reason: Some(reason.clone()),
+            }],
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let mut result = test_guard("restriction_reason_is_attached_to_issue", code, settings);
+    assert_eq!(result.boundary_breaches.len(), 1);
+    let breach = result.boundary_breaches.remove(0);
+    assert!(matches!(&breach.reason, BreachReason::ForbiddenByRestriction { .. }));
+    assert_eq!(breach.explanation.as_deref(), Some(reason.as_str()));
+
+    let issue = Issue::from(breach);
+    assert!(issue.notes.iter().any(|note| note == &reason));
+    assert!(issue.notes.iter().any(|note| note == "Dependency forbidden by an architectural restriction"));
+}
+
+#[test]
+pub fn test_restriction_without_reason_has_no_explanation() {
+    let code = indoc! {r"
+        <?php
+
+        namespace App\Http\Controllers {
+            class Controller {}
+        }
+
+        namespace App\Services {
+            class ForbiddenController extends \App\Http\Controllers\Controller {}
+        }
+    "};
+
+    let settings = Settings {
+        perimeter: PerimeterSettings {
+            restrictions: vec![DependencyRestriction {
+                dependency: SymbolSelector::Symbol("App\\Http\\Controllers\\Controller".to_string()),
+                allow_from: vec!["App\\Http\\Controllers\\".to_string()],
+                deny_from: vec![],
+                kinds: vec![],
+                reason: None,
+            }],
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let result = test_guard("restriction_without_reason_has_no_explanation", code, settings);
+    assert_eq!(result.boundary_breaches.len(), 1);
+    assert_eq!(result.boundary_breaches[0].explanation, None);
+}
+
+#[test]
+pub fn test_rule_reason_is_attached_to_issue() {
+    let code = indoc! {r"
+        <?php
+
+        namespace App\Core { class Helper {} }
+
+        namespace App\Module {
+            new \App\Core\Helper();
+        }
+    "};
+
+    let reason = "Module code may only use PHP built-ins.".to_string();
+    let settings = Settings {
+        perimeter: PerimeterSettings {
+            rules: vec![PerimeterRule {
+                namespace: NamespacePath::Specific("App\\Module\\".to_string()),
+                permit: vec![PermittedDependency::Dependency(Path::Native)],
+                reason: Some(reason.clone()),
+            }],
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let mut result = test_guard("rule_reason_is_attached_to_issue", code, settings);
+    assert_eq!(result.boundary_breaches.len(), 1);
+    let breach = result.boundary_breaches.remove(0);
+    assert!(matches!(&breach.reason, BreachReason::ForbiddenByRule { .. }));
+    assert_eq!(breach.explanation.as_deref(), Some(reason.as_str()));
+
+    let issue = Issue::from(breach);
+    assert!(issue.notes.iter().any(|note| note == &reason));
+    assert!(issue.notes.iter().any(|note| note == "Dependency forbidden by architectural rules"));
+}
+
+#[test]
+pub fn test_rule_without_reason_has_no_explanation() {
+    let code = indoc! {r"
+        <?php
+
+        namespace App\Core { class Helper {} }
+
+        namespace App\Module {
+            new \App\Core\Helper();
+        }
+    "};
+
+    let settings = Settings {
+        perimeter: PerimeterSettings {
+            rules: vec![PerimeterRule {
+                namespace: NamespacePath::Specific("App\\Module\\".to_string()),
+                permit: vec![PermittedDependency::Dependency(Path::Native)],
+                reason: None,
+            }],
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let result = test_guard("rule_without_reason_has_no_explanation", code, settings);
+    assert_eq!(result.boundary_breaches.len(), 1);
+    assert_eq!(result.boundary_breaches[0].explanation, None);
+}
+
+#[test]
+pub fn test_allowed_dependency_ignores_rule_reason() {
+    let code = indoc! {r"
+        <?php
+
+        namespace App\Module;
+
+        use DateTime;
+
+        function test(DateTime $d): void {}
+    "};
+
+    let settings = Settings {
+        perimeter: PerimeterSettings {
+            rules: vec![PerimeterRule {
+                namespace: NamespacePath::Specific("App\\Module\\".to_string()),
+                permit: vec![PermittedDependency::Dependency(Path::Native)],
+                reason: Some("unused when permitted".to_string()),
+            }],
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let result = test_guard("allowed_dependency_ignores_rule_reason", code, settings);
+    assert!(result.is_empty(), "found: {:#?}", result.boundary_breaches);
+}
+
+#[test]
+pub fn test_whitespace_reason_adds_no_note() {
+    let code = indoc! {r"
+        <?php
+
+        namespace App\Core { class Helper {} }
+
+        namespace App\Module {
+            new \App\Core\Helper();
+        }
+    "};
+
+    let settings = Settings {
+        perimeter: PerimeterSettings {
+            rules: vec![PerimeterRule {
+                namespace: NamespacePath::Specific("App\\Module\\".to_string()),
+                permit: vec![],
+                reason: Some("   \t  ".to_string()),
+            }],
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let mut result = test_guard("whitespace_reason_adds_no_note", code, settings);
+    assert_eq!(result.boundary_breaches.len(), 1);
+    let issue = Issue::from(result.boundary_breaches.remove(0));
+    assert!(!issue.notes.iter().any(|note| note.trim().is_empty()));
+    assert!(issue.notes.iter().any(|note| note == "Dependency forbidden by architectural rules"));
+}
+
+#[cfg(feature = "serde")]
+#[test]
+pub fn test_perimeter_reason_is_optional_in_toml() {
+    let without_reason = r#"
+[[perimeter.rules]]
+namespace = "App\\Module\\"
+permit = ["@native"]
+
+[[perimeter.restrictions]]
+dependency = "App\\Http\\Controllers\\Controller"
+deny-from = ["App\\"]
+"#;
+
+    let with_reason = r#"
+[[perimeter.rules]]
+namespace = "App\\Module\\"
+permit = ["@native"]
+reason = "Module code may only use PHP built-ins."
+
+[[perimeter.restrictions]]
+dependency = "App\\Http\\Controllers\\Controller"
+deny-from = ["App\\"]
+reason = "Controllers must stay in the HTTP layer."
+"#;
+
+    let settings_without: Settings = toml::from_str(without_reason).unwrap();
+    assert_eq!(settings_without.perimeter.rules[0].reason, None);
+    assert_eq!(settings_without.perimeter.restrictions[0].reason, None);
+
+    let settings_with: Settings = toml::from_str(with_reason).unwrap();
+    assert_eq!(settings_with.perimeter.rules[0].reason.as_deref(), Some("Module code may only use PHP built-ins."));
+    assert_eq!(
+        settings_with.perimeter.restrictions[0].reason.as_deref(),
+        Some("Controllers must stay in the HTTP layer.")
     );
 }

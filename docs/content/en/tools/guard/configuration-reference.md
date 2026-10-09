@@ -63,6 +63,7 @@ framework = ["Symfony\\**", "Doctrine\\**"]
 [[guard.perimeter.rules]]
 namespace = "CarthageSoftware\\Domain"
 permit = ["@layer:core"]
+reason = "Domain code may only use PHP built-ins and Psl."
 
 [[guard.perimeter.rules]]
 namespace = "CarthageSoftware\\Application"
@@ -91,6 +92,7 @@ Each `[[guard.perimeter.rules]]` table defines one rule:
 
 - `namespace`: the namespace this rule applies to. Either a namespace ending in `\` or the special keyword `@global` for the global namespace.
 - `permit`: the dependencies that are allowed. Either a list of strings or a list of detailed objects.
+- `reason`: optional human-readable explanation shown in error messages.
 
 #### `permit` values
 
@@ -127,6 +129,7 @@ permit = [{ path = "@all", kinds = ["class-like"] }]
 dependency = "App\\Http\\Controllers\\Controller"
 allow-from = ["App\\Http\\Controllers\\"]
 kinds = ["class-like"]
+reason = "Controllers must stay in the HTTP layer."
 
 [[guard.perimeter.restrictions]]
 dependency = "Illuminate\\Foundation\\Bus\\Dispatchable"
@@ -139,6 +142,7 @@ deny-from = ["App\\"]
 | `allow-from` | Optional source namespace patterns. When non-empty, matching dependencies are only allowed from these namespaces. |
 | `deny-from` | Optional source namespace patterns. Matching dependencies are forbidden from these namespaces. |
 | `kinds` | Optional dependency-kind filter. Values: `class-like`, `function`, `constant`, `attribute`. An empty list applies to every kind. |
+| `reason` | Optional human-readable explanation shown in error messages. |
 
 Restrictions are evaluated before ordinary `permit` rules and layering, so a permit cannot override a restriction. If both `allow-from` and `deny-from` match, `deny-from` wins. Matching `allow-from` only satisfies the restriction; ordinary perimeter rules and layering must still allow the dependency when configured. A configuration containing only restrictions allows unrelated dependencies; restrictions do not create an implicit allowlist.
 

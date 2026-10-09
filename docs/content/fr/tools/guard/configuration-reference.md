@@ -63,6 +63,7 @@ framework = ["Symfony\\**", "Doctrine\\**"]
 [[guard.perimeter.rules]]
 namespace = "CarthageSoftware\\Domain"
 permit = ["@layer:core"]
+reason = "Domain code may only use PHP built-ins and Psl."
 
 [[guard.perimeter.rules]]
 namespace = "CarthageSoftware\\Application"
@@ -91,6 +92,7 @@ Chaque table `[[guard.perimeter.rules]]` définit une règle :
 
 - `namespace` : l'espace de noms auquel cette règle s'applique. Soit un espace de noms se terminant par `\`, soit le mot-clé spécial `@global` pour l'espace de noms global.
 - `permit` : les dépendances autorisées. Soit une liste de chaînes, soit une liste d'objets détaillés.
+- `reason` : explication optionnelle affichée dans les messages d'erreur.
 
 #### Valeurs `permit`
 
@@ -127,6 +129,7 @@ permit = [{ path = "@all", kinds = ["class-like"] }]
 dependency = "App\\Http\\Controllers\\Controller"
 allow-from = ["App\\Http\\Controllers\\"]
 kinds = ["class-like"]
+reason = "Controllers must stay in the HTTP layer."
 
 [[guard.perimeter.restrictions]]
 dependency = "Illuminate\\Foundation\\Bus\\Dispatchable"
@@ -139,6 +142,7 @@ deny-from = ["App\\"]
 | `allow-from` | Motifs optionnels d'espaces de noms sources. Lorsque la liste n'est pas vide, les dépendances correspondantes ne sont autorisées que depuis ces espaces de noms. |
 | `deny-from` | Motifs optionnels d'espaces de noms sources. Les dépendances correspondantes sont interdites depuis ces espaces de noms. |
 | `kinds` | Filtre optionnel sur le type de dépendance. Valeurs : `class-like`, `function`, `constant`, `attribute`. Une liste vide s'applique à tous les types. |
+| `reason` | Explication optionnelle affichée dans les messages d'erreur. |
 
 Les restrictions sont évaluées avant les règles `permit` ordinaires et le layering ; une permission ne peut donc pas remplacer une restriction. Si `allow-from` et `deny-from` correspondent tous les deux, `deny-from` l'emporte. Une correspondance avec `allow-from` satisfait uniquement la restriction ; les règles de périmètre ordinaires et le layering doivent toujours autoriser la dépendance lorsqu'ils sont configurés. Une configuration qui ne contient que des restrictions autorise les dépendances sans rapport ; les restrictions ne créent pas une liste d'autorisation implicite.
 
