@@ -306,9 +306,7 @@ $derivatives["entity:$entity_type_id"] =
       'alias' => ContextDefinition::create('string')
         ->setLabel(t('Path alias'))
         ->setRequired(TRUE)
-        ->setDescription(t(
-          "Specify an alternative path by which the content can be accessed. For example, 'about' for an about page. Use a relative path and do not add a trailing slash.",
-        )),
+        ->setDescription(t("Specify an alternative path by which the content can be accessed. For example, 'about' for an about page. Use a relative path and do not add a trailing slash.")),
     ],
     'provides' => [],
   ] + $base_plugin_definition;
@@ -328,9 +326,7 @@ $derivatives["entity:$entity_type_id"] =
       'alias' => ContextDefinition::create('string')
         ->setLabel(t('Path alias'))
         ->setRequired(TRUE)
-        ->setDescription(t(
-          "Specify an alternative path by which the content can be accessed. For example, 'about' for an about page. Use a relative path and do not add a trailing slash.",
-        )),
+        ->setDescription(t("Specify an alternative path by which the content can be accessed. For example, 'about' for an about page. Use a relative path and do not add a trailing slash.")),
     ],
     'provides' => [],
   ] + $base_plugin_definition;
@@ -1263,9 +1259,11 @@ $x = new class() {
 
 // Test mago compatibility with single array value over multiple lines.
 $response = new AjaxResponse();
-$response->addCommand(new InvokeCommand('#edit-field-job-expiration-date-0-value-date', 'val', [$end_value->format(
-  'Y-m-d',
-)]));
+$response->addCommand(new InvokeCommand(
+  '#edit-field-job-expiration-date-0-value-date',
+  'val',
+  [$end_value->format('Y-m-d')],
+));
 
 foreach ($result['subscriptions'] as $subscription) {
   $group = $subscription->organization->entity;
@@ -1311,9 +1309,7 @@ $form['account']['notify_message'] = [
   '#type' => 'container',
   '#markup' =>
     '<div class="messages messages--warning">'
-      . t(
-        "By turning this off, no welcome or verification emails will be sent to the account that's being created.",
-      )
+      . t("By turning this off, no welcome or verification emails will be sent to the account that's being created.")
       . '</div>',
   '#states' => [
     'visible' => [
