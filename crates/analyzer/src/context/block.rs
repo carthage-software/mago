@@ -862,7 +862,7 @@ fn should_keep_clause(clause: &Rc<Clause>, remove_var_id: Word, new_type: Option
 mod tests {
     use std::rc::Rc;
 
-    use indexmap::IndexMap;
+    use mago_algebra::AssertionMap;
     use mago_algebra::clause::Clause;
     use mago_codex::assertion::Assertion;
     use mago_codex::context::ScopeContext;
@@ -917,7 +917,7 @@ mod tests {
         .into_iter()
         .map(|(variable, assertion, wedge)| {
             Rc::new(Clause::new(
-                IndexMap::from([(word(variable), IndexMap::from([(0, assertion)]))]),
+                AssertionMap::from_iter([(word(variable), AssertionMap::from_iter([(0, assertion)]))]),
                 Span::dummy(0, 1),
                 Span::dummy(0, 1),
                 Some(wedge),

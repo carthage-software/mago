@@ -2,11 +2,13 @@ use mago_allocator::Arena;
 use std::ops::Deref;
 use std::rc::Rc;
 
-use indexmap::IndexMap;
+use mago_algebra::AssertionMap;
 
 use mago_algebra::clause::Clause;
 use mago_algebra::find_satisfying_assignments;
+use mago_algebra::find_satisfying_assignments_iter;
 use mago_algebra::saturate_clauses;
+use mago_algebra::saturate_shared_clauses;
 use mago_codex::assertion::Assertion;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::combine_optional_union_types;
@@ -130,7 +132,7 @@ where
                     }
 
                     *clause = Clause::new(
-                        IndexMap::default(),
+                        AssertionMap::default(),
                         condition.span(),
                         condition.span(),
                         Some(true),
@@ -150,13 +152,10 @@ where
     let mut conditional_context_clauses = if entry_clauses.is_empty() {
         if_clauses.clone().into_iter().map(Rc::new).collect::<Vec<_>>()
     } else {
-        saturate_clauses(
-            if_clauses.iter().chain(entry_clauses.iter().map(Rc::deref)),
+        saturate_shared_clauses(
+            if_clauses.iter().cloned().map(Rc::new).chain(entry_clauses),
             &context.settings.algebra_thresholds(),
         )
-        .into_iter()
-        .map(Rc::new)
-        .collect::<Vec<_>>()
     };
 
     if !if_block_context.reconciled_expression_clauses.is_empty() {
@@ -193,8 +192,8 @@ where
     )
     .0;
 
-    let (reconcilable_if_types, active_if_types) = find_satisfying_assignments(
-        conditional_context_clauses.into_iter().map(|rc| (*rc).clone()).collect::<Vec<_>>().as_slice(),
+    let (reconcilable_if_types, active_if_types) = find_satisfying_assignments_iter(
+        conditional_context_clauses.iter().map(Rc::as_ref),
         Some(condition.span()),
         &mut conditionally_referenced_variable_ids,
     );
@@ -225,13 +224,10 @@ where
             .extend(if_block_context.conditionally_referenced_variable_ids.iter().copied());
     }
 
-    else_block_context.clauses = saturate_clauses(
-        else_block_context.clauses.iter().map(Rc::deref).chain(if_scope.negated_clauses.iter()),
+    else_block_context.clauses = saturate_shared_clauses(
+        else_block_context.clauses.into_iter().chain(if_scope.negated_clauses.iter().cloned().map(Rc::new)),
         &context.settings.algebra_thresholds(),
-    )
-    .into_iter()
-    .map(Rc::new)
-    .collect::<Vec<_>>();
+    );
 
     if !if_scope.negated_types.is_empty() {
         let mut changed_variable_ids = WordSet::default();
@@ -239,7 +235,7 @@ where
         reconcile_keyed_types(
             context,
             &if_scope.negated_types,
-            IndexMap::default(), // todo: this is sort of a hack, we should probably pass the active types here
+            AssertionMap::default(), // todo: this is sort of a hack, we should probably pass the active types here
             &mut else_block_context,
             &mut changed_variable_ids,
             &conditionally_referenced_variable_ids,

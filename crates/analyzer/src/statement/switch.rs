@@ -1,8 +1,8 @@
 use std::rc::Rc;
 
 use foldhash::HashMap;
-use indexmap::IndexMap;
 
+use mago_algebra::AssertionMap;
 use mago_algebra::clause::Clause;
 use mago_allocator::Arena;
 use mago_codex::ttype::TType;
@@ -216,7 +216,7 @@ where
                 reconcile_keyed_types(
                     self.context,
                     &reconcilable_types,
-                    IndexMap::default(),
+                    AssertionMap::default(),
                     &mut final_else_context,
                     &mut WordSet::default(),
                     &final_else_referenced_ids,
@@ -571,7 +571,7 @@ where
             reconcile_keyed_types(
                 self.context,
                 &reconcilable_if_types,
-                IndexMap::new(),
+                AssertionMap::default(),
                 &mut case_block_context,
                 &mut changed_var_ids,
                 &if switch_case.is_default() { WordSet::default() } else { WordSet::from_iter([switch_var_id]) },

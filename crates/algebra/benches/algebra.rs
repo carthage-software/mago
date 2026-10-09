@@ -1,4 +1,4 @@
-use indexmap::IndexMap;
+use mago_algebra::AssertionMap;
 
 use criterion::Criterion;
 use criterion::criterion_group;
@@ -50,10 +50,10 @@ fn assertion_falsy() -> Assertion {
 /// Builds a clause asserting a single variable has a single assertion.
 /// Mirrors the most common analyzer pattern (e.g., `if ($x === null)`).
 fn single_assertion_clause(var_index: usize, span_offset: u32, assertion: Assertion) -> Clause {
-    let mut type_map: IndexMap<u64, Assertion> = IndexMap::new();
+    let mut type_map: AssertionMap<u64, Assertion> = AssertionMap::default();
     type_map.insert(assertion.to_hash(), assertion);
 
-    let mut possibilities: IndexMap<Word, IndexMap<u64, Assertion>> = IndexMap::new();
+    let mut possibilities: AssertionMap<Word, AssertionMap<u64, Assertion>> = AssertionMap::default();
     possibilities.insert(variable(var_index), type_map);
 
     let s = span(span_offset);
@@ -63,12 +63,12 @@ fn single_assertion_clause(var_index: usize, span_offset: u32, assertion: Assert
 /// Builds a disjunctive clause: a single variable with multiple assertions
 /// (`$x === int || $x === string`).
 fn disjunctive_clause(var_index: usize, span_offset: u32, assertions: Vec<Assertion>) -> Clause {
-    let mut type_map: IndexMap<u64, Assertion> = IndexMap::new();
+    let mut type_map: AssertionMap<u64, Assertion> = AssertionMap::default();
     for a in assertions {
         type_map.insert(a.to_hash(), a);
     }
 
-    let mut possibilities: IndexMap<Word, IndexMap<u64, Assertion>> = IndexMap::new();
+    let mut possibilities: AssertionMap<Word, AssertionMap<u64, Assertion>> = AssertionMap::default();
     possibilities.insert(variable(var_index), type_map);
 
     let s = span(span_offset);
@@ -78,9 +78,9 @@ fn disjunctive_clause(var_index: usize, span_offset: u32, assertions: Vec<Assert
 /// Builds a clause covering multiple variables with one assertion each
 /// (matches the shape produced by `&&` over different variables).
 fn multi_var_clause(span_offset: u32, vars: &[(usize, Assertion)]) -> Clause {
-    let mut possibilities: IndexMap<Word, IndexMap<u64, Assertion>> = IndexMap::new();
+    let mut possibilities: AssertionMap<Word, AssertionMap<u64, Assertion>> = AssertionMap::default();
     for (var_index, assertion) in vars {
-        let mut type_map: IndexMap<u64, Assertion> = IndexMap::new();
+        let mut type_map: AssertionMap<u64, Assertion> = AssertionMap::default();
         type_map.insert(assertion.to_hash(), assertion.clone());
         possibilities.insert(variable(*var_index), type_map);
     }

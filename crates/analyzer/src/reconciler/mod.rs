@@ -5,9 +5,9 @@ use std::sync::Arc;
 use std::sync::LazyLock;
 
 use foldhash::HashSet;
-use indexmap::IndexMap;
 use regex::Regex;
 
+use mago_algebra::AssertionMap;
 use mago_algebra::assertion_set::AssertionSet;
 use mago_allocator::Arena;
 use mago_bytes::BytesDisplay;
@@ -62,8 +62,8 @@ mod macros;
 #[allow(clippy::similar_names)]
 pub fn reconcile_keyed_types<'ctx, A>(
     context: &mut Context<'ctx, '_, A>,
-    new_types: &IndexMap<Word, AssertionSet>,
-    mut active_new_types: IndexMap<Word, HashSet<usize>>,
+    new_types: &AssertionMap<Word, AssertionSet>,
+    mut active_new_types: AssertionMap<Word, HashSet<usize>>,
     block_context: &mut BlockContext<'ctx>,
     changed_var_ids: &mut WordSet,
     referenced_var_ids: &WordSet,
@@ -878,8 +878,8 @@ static INTEGER_REGEX: LazyLock<Regex> = LazyLock::new(|| unsafe {
 #[allow(clippy::multiple_unsafe_ops_per_block)]
 #[allow(clippy::semicolon_inside_block)]
 fn add_nested_assertions(
-    new_types: &mut Cow<'_, IndexMap<Word, AssertionSet>>,
-    active_new_types: &mut IndexMap<Word, HashSet<usize>>,
+    new_types: &mut Cow<'_, AssertionMap<Word, AssertionSet>>,
+    active_new_types: &mut AssertionMap<Word, HashSet<usize>>,
     context: &BlockContext<'_>,
 ) {
     let nested_assertions = new_types
@@ -1112,7 +1112,7 @@ fn get_value_for_key<A>(
     context: &Context<'_, '_, A>,
     key: Word,
     block_context: &mut BlockContext<'_>,
-    new_assertions: &IndexMap<Word, AssertionSet>,
+    new_assertions: &AssertionMap<Word, AssertionSet>,
     has_isset: bool,
     has_inverted_isset: bool,
     has_inverted_key_exists: bool,

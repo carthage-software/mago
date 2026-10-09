@@ -1,4 +1,4 @@
-use indexmap::IndexMap;
+use mago_algebra::AssertionMap;
 use mago_allocator::Arena;
 
 use itertools::Itertools;
@@ -86,8 +86,8 @@ where
             if is_identical { Assertion::IsType(literal_atomic) } else { Assertion::IsNotType(literal_atomic) }
         };
 
-        let mut clause_map = IndexMap::new();
-        let mut type_map = IndexMap::new();
+        let mut clause_map = AssertionMap::default();
+        let mut type_map = AssertionMap::default();
         type_map.insert(assertion.to_hash(), assertion);
         clause_map.insert(var_name, type_map);
 
@@ -271,11 +271,11 @@ where
                         let mapped_orred_types = orred_types
                             .into_iter()
                             .map(|orred_type| (orred_type.to_hash(), orred_type))
-                            .collect::<IndexMap<_, _>>();
+                            .collect::<AssertionMap<_, _>>();
 
                         clauses.push(Clause::new(
                             {
-                                let mut map = IndexMap::new();
+                                let mut map = AssertionMap::default();
                                 map.insert(var, mapped_orred_types);
                                 map
                             },
@@ -483,7 +483,7 @@ fn add_conditional_assertion_clauses(
             };
 
             let generated = first_assertion.has_equality();
-            let possibilities = IndexMap::from([(
+            let possibilities = AssertionMap::from_iter([(
                 variable,
                 assertions.into_iter().map(|assertion| (assertion.to_hash(), assertion)).collect(),
             )]);
@@ -752,7 +752,7 @@ fn add_nullsafe_null_equality_clauses<A>(
     let placeholder =
         Word::from(format!("*nullsafe-{}-{}", expression.start_offset(), expression.end_offset()).as_str());
     let null = Assertion::IsType(TAtomic::Null);
-    let mut possibilities = IndexMap::from([(placeholder, IndexMap::from([(null.to_hash(), null)]))]);
+    let mut possibilities = AssertionMap::from_iter([(placeholder, AssertionMap::from_iter([(null.to_hash(), null)]))]);
     for base_id in base_ids {
         let null = Assertion::IsType(TAtomic::Null);
         possibilities.entry(base_id).or_default().insert(null.to_hash(), null);
@@ -821,8 +821,8 @@ fn push_not_null_clause_for_id(
         return;
     }
 
-    let mut clause_map = IndexMap::new();
-    let mut type_map = IndexMap::new();
+    let mut clause_map = AssertionMap::default();
+    let mut type_map = AssertionMap::default();
     type_map.insert(assertion_hash, assertion);
     clause_map.insert(base_id, type_map);
 
@@ -854,10 +854,10 @@ fn get_formula_from_assertions(
                 let has_equality = first_type.has_equality();
                 clauses.push(Clause::new(
                     {
-                        let mut map = IndexMap::new();
+                        let mut map = AssertionMap::default();
                         map.insert(
                             var_id,
-                            orred_types.into_iter().map(|a| (a.to_hash(), a)).collect::<IndexMap<_, _>>(),
+                            orred_types.into_iter().map(|a| (a.to_hash(), a)).collect::<AssertionMap<_, _>>(),
                         );
                         map
                     },
@@ -881,8 +881,8 @@ fn get_formula_from_assertions(
 
     Some(vec![Clause::new(
         {
-            let mut map = IndexMap::new();
-            map.insert(conditional_ref, IndexMap::from([(Assertion::Truthy.to_hash(), Assertion::Truthy)]));
+            let mut map = AssertionMap::default();
+            map.insert(conditional_ref, AssertionMap::from_iter([(Assertion::Truthy.to_hash(), Assertion::Truthy)]));
             map
         },
         conditional_object_id,
@@ -950,7 +950,14 @@ where
             None => {
                 // If we cannot negate the formula, we return an empty vector
                 // This is a fallback, and it should not happen in normal cases
-                vec![Clause::new(IndexMap::new(), conditional.span(), conditional.span(), Some(true), None, None)]
+                vec![Clause::new(
+                    AssertionMap::default(),
+                    conditional.span(),
+                    conditional.span(),
+                    Some(true),
+                    None,
+                    None,
+                )]
             }
         },
     }
@@ -1038,7 +1045,7 @@ pub fn remove_clauses_with_mixed_variables(
             mixed_var_ids.retain(|id| !c.possibilities.contains_key(id));
 
             if c.possibilities.keys().cartesian_product(&mixed_var_ids).any(|(key, id)| var_has_root(*key, *id)) {
-                return Clause::new(IndexMap::new(), cond_object_id, cond_object_id, Some(true), None, None);
+                return Clause::new(AssertionMap::default(), cond_object_id, cond_object_id, Some(true), None, None);
             }
 
             c

@@ -2,8 +2,7 @@ use mago_allocator::Arena;
 use std::cell::RefCell;
 use std::rc::Rc;
 
-use indexmap::IndexMap;
-
+use mago_algebra::AssertionMap;
 use mago_codex::assertion::Assertion;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::union::TUnion;
@@ -52,7 +51,7 @@ where
             reconcile_keyed_types(
                 context,
                 &if_scope.negated_types,
-                IndexMap::new(),
+                AssertionMap::default(),
                 &mut tmp_context,
                 &mut changed_var_ids,
                 &WordSet::default(),
@@ -183,7 +182,7 @@ where
     }
 
     if let Some(assertions) = artifacts.true_branch_only_assertions.get(&condition_range) {
-        let mut var_assertions: IndexMap<Word, Vec<Vec<Assertion>>> = IndexMap::new();
+        let mut var_assertions: AssertionMap<Word, Vec<Vec<Assertion>>> = AssertionMap::default();
         for (key, assertion_set) in assertions {
             var_assertions.entry(*key).or_default().extend(assertion_set.clone());
         }
@@ -193,7 +192,7 @@ where
             reconcile_keyed_types(
                 context,
                 &var_assertions,
-                IndexMap::new(),
+                AssertionMap::default(),
                 &mut if_body_context,
                 &mut changed_var_ids,
                 &WordSet::default(),

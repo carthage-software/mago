@@ -3,7 +3,8 @@ use std::ops::Deref;
 use std::rc::Rc;
 
 use foldhash::HashSet;
-use indexmap::IndexMap;
+
+use mago_algebra::AssertionMap;
 use mago_word::Word;
 use mago_word::WordMap;
 use mago_word::WordSet;
@@ -150,7 +151,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
                         }
 
                         *clause = Clause::new(
-                            IndexMap::default(),
+                            AssertionMap::default(),
                             self.condition.span(),
                             self.condition.span(),
                             Some(true),
@@ -225,7 +226,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
             reconcile_keyed_types(
                 context,
                 &if_scope.negated_types,
-                IndexMap::new(),
+                AssertionMap::default(),
                 &mut temporary_else_context,
                 &mut changed_variable_ids,
                 &WordSet::default(),
@@ -776,7 +777,7 @@ where
                 }
 
                 *clause = Clause::new(
-                    IndexMap::default(),
+                    AssertionMap::default(),
                     else_if_clause.0.span(),
                     else_if_clause.0.span(),
                     Some(true),
@@ -800,7 +801,7 @@ where
                 }
 
                 clause = Clause::new(
-                    IndexMap::default(),
+                    AssertionMap::default(),
                     else_if_clause.0.span(),
                     else_if_clause.0.span(),
                     Some(true),
@@ -964,7 +965,7 @@ where
             reconcile_keyed_types(
                 context,
                 &negated_else_if_types,
-                IndexMap::new(),
+                AssertionMap::default(),
                 &mut implied_outer_context,
                 &mut WordSet::default(),
                 &WordSet::default(),
@@ -1103,7 +1104,7 @@ where
         reconcile_keyed_types(
             context,
             &else_types,
-            IndexMap::new(),
+            AssertionMap::default(),
             else_block_context,
             &mut changed_variable_ids,
             &WordSet::default(),
@@ -1540,8 +1541,9 @@ fn synthesize_branch_discriminator_clauses(
         }
 
         if !truthy_side_clauses.is_empty() {
-            let mut possibilities = IndexMap::default();
-            possibilities.insert(*variable_id, IndexMap::from([(Assertion::Falsy.to_hash(), Assertion::Falsy)]));
+            let mut possibilities = AssertionMap::default();
+            possibilities
+                .insert(*variable_id, AssertionMap::from_iter([(Assertion::Falsy.to_hash(), Assertion::Falsy)]));
 
             let head = vec![mago_algebra::clause::Clause::new(
                 possibilities,
@@ -1559,8 +1561,9 @@ fn synthesize_branch_discriminator_clauses(
         }
 
         if !falsy_side_clauses.is_empty() {
-            let mut possibilities = IndexMap::default();
-            possibilities.insert(*variable_id, IndexMap::from([(Assertion::Truthy.to_hash(), Assertion::Truthy)]));
+            let mut possibilities = AssertionMap::default();
+            possibilities
+                .insert(*variable_id, AssertionMap::from_iter([(Assertion::Truthy.to_hash(), Assertion::Truthy)]));
 
             let head = vec![mago_algebra::clause::Clause::new(
                 possibilities,
