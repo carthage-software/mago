@@ -236,9 +236,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
         }
 
         let pre_assignment_else_redefined_locals: WordMap<Rc<TUnion>> = temporary_else_context
-            .get_redefined_locals(&if_block_context.locals, true, &mut WordSet::default())
-            .into_iter()
-            .filter(|(k, _)| changed_variable_ids.contains(k))
+            .locals
+            .iter()
+            .filter(|(key, ty)| changed_variable_ids.contains(key) && if_block_context.locals.get(key) != Some(*ty))
+            .map(|(&key, ty)| (key, Rc::clone(ty)))
             .collect();
 
         analyze_if_statement_block(
