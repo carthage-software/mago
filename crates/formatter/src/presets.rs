@@ -224,6 +224,7 @@ const PSR12_PRESET: FormatSettings = FormatSettings {
     inline_empty_method_braces: false,
     inline_empty_constructor_braces: false,
     inline_empty_classlike_braces: false,
+    inline_empty_closure_braces: false,
     preserve_breaking_parameter_list: true,
     sort_uses: SortUses(SortOrder::Preserve),
     expand_use_groups: false,

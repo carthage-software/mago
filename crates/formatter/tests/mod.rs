@@ -498,6 +498,7 @@ test_case!(issue_2150);
 test_case!(issue_2316);
 test_case!(issue_2380);
 test_case!(issue_2416);
+test_case!(issue_2358);
 test_case!(issue_2183);
 
 // PHP identifiers may contain non-UTF-8 bytes; the formatter must round-trip
