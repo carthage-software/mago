@@ -355,6 +355,40 @@ fn apply_inheritance_work(codebase: &mut CodebaseMetadata, mut inheritance_work:
             continue;
         };
 
+        let parent_template_params = child_class.template_extended_parameters.get(&parent_class);
+        let template_result = parent_template_params.filter(|parameters| !parameters.is_empty()).map(|parent_params| {
+            let mut template_result = TemplateResult::default();
+            for (template_name, concrete_type) in parent_params {
+                template_result.add_lower_bound(
+                    *template_name,
+                    GenericParent::ClassLike(parent_class),
+                    concrete_type.clone(),
+                );
+            }
+            template_result
+        });
+
+        let substitute_type = |metadata: &TypeMetadata| {
+            if let Some(template_result) = template_result.as_ref() {
+                inferred_type_replacer::replace(&metadata.type_union, template_result, codebase)
+            } else {
+                metadata.type_union.clone()
+            }
+        };
+
+        let parent_return_type = parent_return_type.map(|metadata| {
+            if template_result.is_some() {
+                Cow::Owned(TypeMetadata {
+                    type_union: substitute_type(metadata),
+                    span: metadata.span,
+                    from_docblock: metadata.from_docblock,
+                    inferred: metadata.inferred,
+                })
+            } else {
+                Cow::Borrowed(metadata)
+            }
+        });
+
         let (
             should_inherit_return,
             params_to_inherit,
@@ -373,7 +407,7 @@ fn apply_inheritance_work(codebase: &mut CodebaseMetadata, mut inheritance_work:
 
             let should_inherit_return = should_inherit_docblock_type(
                 parent_native_return_type.map(|m| &m.type_union),
-                parent_return_type.filter(|m| m.from_docblock),
+                parent_return_type.as_deref().filter(|m| m.from_docblock),
                 child_method.return_type_declaration_metadata.as_ref().map(|m| &m.type_union),
                 child_method.return_type_metadata.as_ref().filter(|m| m.from_docblock),
                 true,
@@ -445,30 +479,11 @@ fn apply_inheritance_work(codebase: &mut CodebaseMetadata, mut inheritance_work:
             continue;
         }
 
-        let parent_template_params = child_class.template_extended_parameters.get(&parent_class);
-        let template_result = parent_template_params.map(|parent_params| {
-            let mut template_result = TemplateResult::default();
-            for (template_name, concrete_type) in parent_params {
-                template_result.add_lower_bound(
-                    *template_name,
-                    GenericParent::ClassLike(parent_class),
-                    concrete_type.clone(),
-                );
-            }
-            template_result
+        let substituted_return_type = parent_return_type.filter(|_| should_inherit_return).map(|metadata| {
+            let metadata = metadata.into_owned();
+
+            (metadata.type_union, metadata.span, metadata.from_docblock)
         });
-
-        let substitute_type = |metadata: &TypeMetadata| {
-            if let Some(template_result) = template_result.as_ref() {
-                inferred_type_replacer::replace(&metadata.type_union, template_result, codebase)
-            } else {
-                metadata.type_union.clone()
-            }
-        };
-
-        let substituted_return_type = parent_return_type
-            .filter(|_| should_inherit_return)
-            .map(|metadata| (substitute_type(metadata), metadata.span, metadata.from_docblock));
 
         let substituted_param_types: Vec<Option<(TUnion, Span, bool)>> = parent_parameters
             .iter()
