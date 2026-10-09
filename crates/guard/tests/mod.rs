@@ -909,6 +909,7 @@ pub fn test_clone_exit_die_are_not_namespaced_function_dependencies() {
             rules: vec![PerimeterRule {
                 namespace: NamespacePath::Specific("App\\Module\\".to_string()),
                 permit: vec![PermittedDependency::Dependency(Path::Native)],
+                reason: None,
             }],
             ..Default::default()
         },
