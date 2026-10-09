@@ -868,3 +868,35 @@ pub fn test_is_final_annotation_counted() {
         "Expected non violations: Should allow declare final class with annotation"
     );
 }
+
+#[test]
+pub fn test_clone_exit_die_are_not_namespaced_function_dependencies() {
+    let code = indoc! {r"
+        <?php
+
+        namespace App\Module {
+            function with_value(object $value): object {
+                return clone($value, ['value' => 'x']);
+            }
+
+            exit('done');
+            die('done');
+            custom_function();
+        }
+    "};
+
+    let settings = Settings {
+        perimeter: PerimeterSettings {
+            rules: vec![PerimeterRule {
+                namespace: NamespacePath::Specific("App\\Module\\".to_string()),
+                permit: vec![PermittedDependency::Dependency(Path::Native)],
+            }],
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+    let result = test_guard("clone_exit_die_are_not_namespaced_function_dependencies", code, settings);
+    assert_eq!(result.boundary_breaches.len(), 1, "found: {:#?}", result.boundary_breaches);
+    assert_eq!(result.boundary_breaches[0].dependency_fqn, b"App\\Module\\custom_function".as_slice());
+    assert_eq!(result.boundary_breaches[0].vector, BreachVector::FunctionCall);
+}

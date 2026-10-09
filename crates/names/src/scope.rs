@@ -353,6 +353,11 @@ impl NamespaceScope {
             return (resolved_name, true); // Resolved via alias or explicit construct
         }
 
+        // `clone`, `exit`, and `die` compile to fully-qualified global calls.
+        if kind.is_function() && is_never_namespaced_function(name_ref) {
+            return (NameParts::Input(name_ref), true);
+        }
+
         // Qualify it using the current namespace.
         (self.qualify_name_parts(name_ref), false)
     }
@@ -435,6 +440,16 @@ impl NamespaceScope {
     }
 }
 
+/// Returns whether `name` is a function PHP always resolves in the global namespace.
+///
+/// `clone`, `exit`, and `die` stay keywords. Bare calls compile as `\clone`, `\exit`,
+/// and `\die`; they cannot be defined or imported inside a namespace.
+#[inline]
+#[must_use]
+pub fn is_never_namespaced_function(name: &[u8]) -> bool {
+    name.eq_ignore_ascii_case(b"clone") || name.eq_ignore_ascii_case(b"exit") || name.eq_ignore_ascii_case(b"die")
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -499,6 +514,23 @@ mod tests {
 
         assert_eq!(scope.resolve(NameKind::Default, b"\xffALIAS"), (b"Library\\Name".to_vec(), true));
         assert_eq!(scope.resolve(NameKind::Default, b"\xfeALIAS"), (b"\xfeALIAS".to_vec(), false));
+    }
+
+    #[test]
+    fn resolves_never_namespaced_functions_globally() {
+        let namespaced = NamespaceScope::for_namespace(b"App".to_vec());
+
+        for name in [b"clone".as_slice(), b"exit", b"die", b"ClOnE", b"EXIT", b"DiE"] {
+            assert_eq!(namespaced.resolve(NameKind::Function, name), (name.to_vec(), true));
+        }
+
+        assert_eq!(namespaced.resolve(NameKind::Default, b"clone"), (b"App\\clone".to_vec(), false));
+        assert_eq!(namespaced.resolve(NameKind::Constant, b"exit"), (b"App\\exit".to_vec(), false));
+        assert_eq!(namespaced.resolve(NameKind::Function, b"clone_object"), (b"App\\clone_object".to_vec(), false));
+        assert_eq!(namespaced.resolve(NameKind::Function, b"exit_now"), (b"App\\exit_now".to_vec(), false));
+        assert_eq!(namespaced.resolve(NameKind::Function, b"die_hard"), (b"App\\die_hard".to_vec(), false));
+        assert_eq!(namespaced.resolve(NameKind::Function, b"Other\\clone"), (b"App\\Other\\clone".to_vec(), false));
+        assert_eq!(namespaced.resolve(NameKind::Function, b"\\clone"), (b"clone".to_vec(), true));
     }
 
     #[test]

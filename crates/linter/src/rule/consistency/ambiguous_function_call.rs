@@ -127,10 +127,7 @@ impl LintRule for AmbiguousFunctionCallRule {
             return;
         }
 
-        if identifier.value().eq_ignore_ascii_case(b"clone")
-            || identifier.value().eq_ignore_ascii_case(b"exit")
-            || identifier.value().eq_ignore_ascii_case(b"die")
-        {
+        if mago_names::is_never_namespaced_function(identifier.value()) {
             return;
         }
 
