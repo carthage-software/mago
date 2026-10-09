@@ -39,6 +39,9 @@ pub struct Settings {
 pub struct PerimeterSettings {
     pub layers: HashMap<String, Vec<Path>>,
     pub layering: Vec<NamespacePath>,
+    /// A human-readable reason for layering breaches.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub layering_reason: Option<String>,
     pub rules: Vec<PerimeterRule>,
     /// Target-oriented dependency restrictions applied before ordinary perimeter rules.
     pub restrictions: Vec<DependencyRestriction>,
@@ -50,6 +53,9 @@ pub struct PerimeterSettings {
 pub struct PerimeterRule {
     pub namespace: NamespacePath,
     pub permit: Vec<PermittedDependency>,
+    /// A human-readable reason for this rule.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub reason: Option<String>,
 }
 
 /// Restricts where a dependency may or may not be used.
@@ -68,6 +74,9 @@ pub struct DependencyRestriction {
     /// Optional dependency kinds to which this restriction applies. An empty list means all kinds.
     #[cfg_attr(feature = "serde", serde(default))]
     pub kinds: Vec<PermittedDependencyKind>,
+    /// A human-readable reason for this restriction.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub reason: Option<String>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, JsonSchema)]
