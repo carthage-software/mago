@@ -117,7 +117,7 @@ fn find_breach(
                     source_layer: ctx.settings.perimeter.layering[src_idx].clone(),
                     target_layer: ctx.settings.perimeter.layering[tgt_idx].clone(),
                 },
-                None,
+                ctx.settings.perimeter.layering_reason.clone(),
             ));
         }
     }

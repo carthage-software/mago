@@ -39,6 +39,9 @@ pub struct Settings {
 pub struct PerimeterSettings {
     pub layers: HashMap<String, Vec<Path>>,
     pub layering: Vec<NamespacePath>,
+    /// A human-readable reason for layering breaches.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub layering_reason: Option<String>,
     pub rules: Vec<PerimeterRule>,
     /// Target-oriented dependency restrictions applied before ordinary perimeter rules.
     pub restrictions: Vec<DependencyRestriction>,

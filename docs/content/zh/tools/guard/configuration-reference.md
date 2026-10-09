@@ -54,6 +54,7 @@ layering = [
     "CarthageSoftware\\UI",
     "CarthageSoftware\\Infrastructure",
 ]
+layering-reason = "Outer layers may depend on inner layers, never the reverse."
 
 [guard.perimeter.layers]
 core = ["@native", "Psl\\**"]
@@ -81,6 +82,10 @@ permit = ["@all"]
 ### `layering`
 
 一个有序的命名空间列表,从最独立的核心,依次向外延展到最外层。每一层只能依赖在其之前定义的层。指向更外层的依赖会触发违规。
+
+### `layering-reason`
+
+可选的人类可读说明,会在报告分层违规时显示。
 
 ### 层别名
 

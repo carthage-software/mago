@@ -1027,6 +1027,72 @@ pub fn test_rule_without_reason_has_no_explanation() {
 }
 
 #[test]
+pub fn test_layering_reason_is_attached_to_issue() {
+    let code = indoc! {r"
+        <?php
+
+        namespace App\Outer { class Helper {} }
+
+        namespace App\Core {
+            new \App\Outer\Helper();
+        }
+    "};
+
+    let reason = "Inner layers must not depend on outer layers.".to_string();
+    let settings = Settings {
+        perimeter: PerimeterSettings {
+            layering: vec![
+                NamespacePath::Specific("App\\Core\\".to_string()),
+                NamespacePath::Specific("App\\Outer\\".to_string()),
+            ],
+            layering_reason: Some(reason.clone()),
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let mut result = test_guard("layering_reason_is_attached_to_issue", code, settings);
+    assert_eq!(result.boundary_breaches.len(), 1);
+    let breach = result.boundary_breaches.remove(0);
+    assert!(matches!(&breach.reason, BreachReason::Layering { .. }));
+    assert_eq!(breach.explanation.as_deref(), Some(reason.as_str()));
+
+    let issue = Issue::from(breach);
+    assert!(issue.notes.iter().any(|note| note == &reason));
+    assert!(issue.notes.iter().any(|note| note == "Layering Rule Conflict"));
+}
+
+#[test]
+pub fn test_layering_without_reason_has_no_explanation() {
+    let code = indoc! {r"
+        <?php
+
+        namespace App\Outer { class Helper {} }
+
+        namespace App\Core {
+            new \App\Outer\Helper();
+        }
+    "};
+
+    let settings = Settings {
+        perimeter: PerimeterSettings {
+            layering: vec![
+                NamespacePath::Specific("App\\Core\\".to_string()),
+                NamespacePath::Specific("App\\Outer\\".to_string()),
+            ],
+            layering_reason: None,
+            ..Default::default()
+        },
+        ..Default::default()
+    };
+
+    let result = test_guard("layering_without_reason_has_no_explanation", code, settings);
+    assert_eq!(result.boundary_breaches.len(), 1);
+    assert!(matches!(&result.boundary_breaches[0].reason, BreachReason::Layering { .. }));
+    assert_eq!(result.boundary_breaches[0].explanation, None);
+}
+
+#[test]
 pub fn test_allowed_dependency_ignores_rule_reason() {
     let code = indoc! {r"
         <?php
@@ -1089,6 +1155,9 @@ pub fn test_whitespace_reason_adds_no_note() {
 #[test]
 pub fn test_perimeter_reason_is_optional_in_toml() {
     let without_reason = r#"
+[perimeter]
+layering = ["App\\Core\\", "App\\Outer\\"]
+
 [[perimeter.rules]]
 namespace = "App\\Module\\"
 permit = ["@native"]
@@ -1099,6 +1168,10 @@ deny-from = ["App\\"]
 "#;
 
     let with_reason = r#"
+[perimeter]
+layering = ["App\\Core\\", "App\\Outer\\"]
+layering-reason = "Inner layers must not depend on outer layers."
+
 [[perimeter.rules]]
 namespace = "App\\Module\\"
 permit = ["@native"]
@@ -1111,10 +1184,15 @@ reason = "Controllers must stay in the HTTP layer."
 "#;
 
     let settings_without: Settings = toml::from_str(without_reason).unwrap();
+    assert_eq!(settings_without.perimeter.layering_reason, None);
     assert_eq!(settings_without.perimeter.rules[0].reason, None);
     assert_eq!(settings_without.perimeter.restrictions[0].reason, None);
 
     let settings_with: Settings = toml::from_str(with_reason).unwrap();
+    assert_eq!(
+        settings_with.perimeter.layering_reason.as_deref(),
+        Some("Inner layers must not depend on outer layers.")
+    );
     assert_eq!(settings_with.perimeter.rules[0].reason.as_deref(), Some("Module code may only use PHP built-ins."));
     assert_eq!(
         settings_with.perimeter.restrictions[0].reason.as_deref(),

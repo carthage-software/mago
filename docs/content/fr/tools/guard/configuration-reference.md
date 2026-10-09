@@ -54,6 +54,7 @@ layering = [
     "CarthageSoftware\\UI",
     "CarthageSoftware\\Infrastructure",
 ]
+layering-reason = "Outer layers may depend on inner layers, never the reverse."
 
 [guard.perimeter.layers]
 core = ["@native", "Psl\\**"]
@@ -81,6 +82,10 @@ permit = ["@all"]
 ### `layering`
 
 Une liste ordonnée d'espaces de noms, du cœur le plus indépendant jusqu'à la couche la plus externe. Chaque couche ne peut dépendre que des couches définies avant elle. Une dépendance qui pointe vers une couche plus externe déclenche une violation.
+
+### `layering-reason`
+
+Explication optionnelle affichée lorsqu'une violation de layering est signalée.
 
 ### Alias de couche
 
