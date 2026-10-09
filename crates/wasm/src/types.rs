@@ -77,7 +77,7 @@ impl WasmIssue {
                 let end_column = file.column_number(end_offset) + 1;
 
                 WasmAnnotation {
-                    message: ann.message.clone(),
+                    message: ann.message.as_deref().map(str::to_owned),
                     kind: match ann.kind {
                         AnnotationKind::Primary => "primary".to_string(),
                         AnnotationKind::Secondary => "secondary".to_string(),
@@ -99,9 +99,9 @@ impl WasmIssue {
                 Level::Help => "help".to_string(),
             },
             code: issue.code.clone(),
-            message: issue.message.clone(),
-            notes: issue.notes.clone(),
-            help: issue.help.clone(),
+            message: issue.message.to_string(),
+            notes: issue.notes.iter().map(ToString::to_string).collect(),
+            help: issue.help.as_deref().map(str::to_owned),
             link: issue.link.clone(),
             annotations,
         }

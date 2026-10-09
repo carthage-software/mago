@@ -97,7 +97,7 @@ fn declarative_entry_points_reference_inherited_trait_and_attributed_methods_wit
         .issues
         .iter()
         .filter(|issue| issue.code.as_deref() == Some("unused-method"))
-        .map(|issue| issue.message.as_str())
+        .map(|issue| issue.message.as_ref())
         .collect::<Vec<_>>();
     assert_eq!(unused_methods.len(), 1, "only the undeclared entry point should be unused: {unused_methods:#?}");
     assert!(unused_methods[0].contains("actuallyUnused"));

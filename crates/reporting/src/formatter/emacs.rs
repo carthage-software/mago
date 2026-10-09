@@ -265,7 +265,7 @@ mod tests {
         }
 
         let message = "long €\n".repeat(2048);
-        let issues = IssueCollection::from([Issue::error(&message), Issue::warning("short").with_link("")]);
+        let issues = IssueCollection::from([Issue::error(message.clone()), Issue::warning("short").with_link("")]);
         let expected = format!(
             "<unknown>:0:0:error - other: {}\n<unknown>:0:0:warning - other: short (see )\n",
             message.replace('\n', "\\n")

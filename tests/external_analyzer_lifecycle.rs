@@ -269,7 +269,7 @@ fn external_analyzer_lifecycle_is_exact_across_workers_and_incremental_runs() {
         .filter(|issue| {
             issue.code.as_deref().is_none_or(|code| !code.starts_with("lifecycle-") && code != "unused-method")
         })
-        .map(|issue| (issue.code.as_deref(), issue.message.as_str()))
+        .map(|issue| (issue.code.as_deref(), issue.message.as_ref()))
         .collect::<Vec<_>>();
     assert!(unexpected.is_empty(), "unexpected analyzer issues: {unexpected:#?}");
     assert_eq!(count_code(&initial.issues, "unused-method"), 1);

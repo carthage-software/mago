@@ -181,7 +181,7 @@ impl LintRule for DisallowedFunctionsRule {
                 .with_note(format!(
                     "The function `{function_name}` is explicitly disallowed by your project configuration."
                 ))
-                .with_help(help_text);
+                .with_help(help_text.to_owned());
 
             ctx.collector.report(issue);
 
@@ -217,7 +217,7 @@ impl LintRule for DisallowedFunctionsRule {
                     .with_note(format!(
                         "All functions from the `{extension}` extension are disallowed by your project configuration."
                     ))
-                    .with_help(help_text),
+                    .with_help(help_text.to_owned()),
                 );
 
                 return;
