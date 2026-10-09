@@ -591,6 +591,7 @@ layering = [
     "CarthageSoftware\\UI",
     "CarthageSoftware\\Infrastructure",
 ]
+layering-reason = "Outer layers may depend on inner layers, never the reverse."
 
 [guard.perimeter.layers]
 core = ["@native", "Psl\\**"]
@@ -600,6 +601,7 @@ framework = ["Symfony\\**", "Doctrine\\**"]
 [[guard.perimeter.rules]]
 namespace = "CarthageSoftware\\Domain"
 permit = ["@layer:core"]
+reason = "Domain code may only use PHP built-ins and Psl."
 
 [[guard.perimeter.rules]]
 namespace = "CarthageSoftware\\Application"
@@ -615,6 +617,8 @@ permit = ["@all"]
 </code></pre>
 <h3 id="layering"><code>layering</code></h3>
 <p>Une liste ordonnée d'espaces de noms, du cœur le plus indépendant jusqu'à la couche la plus externe. Chaque couche ne peut dépendre que des couches définies avant elle. Une dépendance qui pointe vers une couche plus externe déclenche une violation.</p>
+<h3 id="layering-reason"><code>layering-reason</code></h3>
+<p>Explication optionnelle affichée lorsqu'une violation de layering est signalée.</p>
 <h3 id="layer-aliases">Alias de couche</h3>
 <p><code>[guard.perimeter.layers]</code> définit des groupes réutilisables d'espaces de noms et de chemins, référencés depuis les règles avec <code>@layer:&lt;name&gt;</code>.</p>
 <h3 id="rules">Règles</h3>
@@ -622,6 +626,7 @@ permit = ["@all"]
 <ul>
 <li><code>namespace</code> : l'espace de noms auquel cette règle s'applique. Soit un espace de noms se terminant par <code>\</code>, soit le mot-clé spécial <code>@global</code> pour l'espace de noms global.</li>
 <li><code>permit</code> : les dépendances autorisées. Soit une liste de chaînes, soit une liste d'objets détaillés.</li>
+<li><code>reason</code> : explication optionnelle affichée dans les messages d'erreur.</li>
 </ul>
 <h4 id="permit-values">Valeurs <code>permit</code></h4>
 <p><code>permit</code> accepte des chemins. Un chemin peut être un mot-clé, un espace de noms, un symbole ou un motif glob.</p>
@@ -650,6 +655,7 @@ permit = [{ path = "@all", kinds = ["class-like"] }]
 dependency = "App\\Http\\Controllers\\Controller"
 allow-from = ["App\\Http\\Controllers\\"]
 kinds = ["class-like"]
+reason = "Controllers must stay in the HTTP layer."
 
 [[guard.perimeter.restrictions]]
 dependency = "Illuminate\\Foundation\\Bus\\Dispatchable"
@@ -660,6 +666,7 @@ deny-from = ["App\\"]
 <tr><td style="text-align: left"><code>allow-from</code></td><td style="text-align: left">Motifs optionnels d'espaces de noms sources. Lorsque la liste n'est pas vide, les dépendances correspondantes ne sont autorisées que depuis ces espaces de noms.</td></tr>
 <tr><td style="text-align: left"><code>deny-from</code></td><td style="text-align: left">Motifs optionnels d'espaces de noms sources. Les dépendances correspondantes sont interdites depuis ces espaces de noms.</td></tr>
 <tr><td style="text-align: left"><code>kinds</code></td><td style="text-align: left">Filtre optionnel sur le type de dépendance. Valeurs : <code>class-like</code>, <code>function</code>, <code>constant</code>, <code>attribute</code>. Une liste vide s'applique à tous les types.</td></tr>
+<tr><td style="text-align: left"><code>reason</code></td><td style="text-align: left">Explication optionnelle affichée dans les messages d'erreur.</td></tr>
 </tbody></table>
 <p>Les restrictions sont évaluées avant les règles <code>permit</code> ordinaires et le layering ; une permission ne peut donc pas remplacer une restriction. Si <code>allow-from</code> et <code>deny-from</code> correspondent tous les deux, <code>deny-from</code> l'emporte. Une correspondance avec <code>allow-from</code> satisfait uniquement la restriction ; les règles de périmètre ordinaires et le layering doivent toujours autoriser la dépendance lorsqu'ils sont configurés. Une configuration qui ne contient que des restrictions autorise les dépendances sans rapport ; les restrictions ne créent pas une liste d'autorisation implicite.</p>
 <h2 id="structural-guard">Guard structurel</h2>
@@ -752,6 +759,10 @@ must-implement = "@nothing"
     
     <li class="doc-toc__item doc-toc__item--lvl3">
       <a class="doc-toc__link" href="#layering">layering</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#layering-reason">layering-reason</a>
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl3">

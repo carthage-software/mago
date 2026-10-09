@@ -1041,6 +1041,7 @@
         "perimeter": {
           "layers": {},
           "layering": [],
+          "layering-reason": null,
           "rules": [],
           "restrictions": []
         },
@@ -9035,6 +9036,7 @@
           "default": {
             "layers": {},
             "layering": [],
+            "layering-reason": null,
             "rules": [],
             "restrictions": []
           }
@@ -9088,6 +9090,14 @@
           },
           "default": []
         },
+        "layering-reason": {
+          "description": "A human-readable reason for layering breaches.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
+        },
         "rules": {
           "type": "array",
           "items": {
@@ -9121,6 +9131,14 @@
           "items": {
             "$ref": "#/$defs/PermittedDependency"
           }
+        },
+        "reason": {
+          "description": "A human-readable reason for this rule.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
         }
       },
       "additionalProperties": false,
@@ -9195,6 +9213,14 @@
             "$ref": "#/$defs/PermittedDependencyKind"
           },
           "default": []
+        },
+        "reason": {
+          "description": "A human-readable reason for this restriction.",
+          "type": [
+            "string",
+            "null"
+          ],
+          "default": null
         }
       },
       "additionalProperties": false,

@@ -824,6 +824,7 @@ layering = [
     "CarthageSoftware\\UI",
     "CarthageSoftware\\Infrastructure",
 ]
+layering-reason = "Outer layers may depend on inner layers, never the reverse."
 
 [guard.perimeter.layers]
 core = ["@native", "Psl\\**"]
@@ -833,6 +834,7 @@ framework = ["Symfony\\**", "Doctrine\\**"]
 [[guard.perimeter.rules]]
 namespace = "CarthageSoftware\\Domain"
 permit = ["@layer:core"]
+reason = "Domain code may only use PHP built-ins and Psl."
 
 [[guard.perimeter.rules]]
 namespace = "CarthageSoftware\\Application"
@@ -848,6 +850,8 @@ permit = ["@all"]
 </code></pre>
 <h3 id="layering"><code>layering</code></h3>
 <p>An ordered list of namespaces, from the most independent core down to the outermost layer. Each layer can only depend on layers defined before it. A dependency that points to a layer further out triggers a violation.</p>
+<h3 id="layering-reason"><code>layering-reason</code></h3>
+<p>Optional human-readable explanation shown when a layering breach is reported.</p>
 <h3 id="layer-aliases">Layer aliases</h3>
 <p><code>[guard.perimeter.layers]</code> defines reusable groups of namespaces and paths, referenced from rules with <code>@layer:&lt;name&gt;</code>.</p>
 <h3 id="rules">Rules</h3>
@@ -855,6 +859,7 @@ permit = ["@all"]
 <ul>
 <li><code>namespace</code>: the namespace this rule applies to. Either a namespace ending in <code>\</code> or the special keyword <code>@global</code> for the global namespace.</li>
 <li><code>permit</code>: the dependencies that are allowed. Either a list of strings or a list of detailed objects.</li>
+<li><code>reason</code>: optional human-readable explanation shown in error messages.</li>
 </ul>
 <h4 id="permit-values"><code>permit</code> values</h4>
 <p><code>permit</code> accepts paths. A path can be a keyword, a namespace, a symbol, or a glob pattern.</p>
@@ -883,6 +888,7 @@ permit = [{ path = "@all", kinds = ["class-like"] }]
 dependency = "App\\Http\\Controllers\\Controller"
 allow-from = ["App\\Http\\Controllers\\"]
 kinds = ["class-like"]
+reason = "Controllers must stay in the HTTP layer."
 
 [[guard.perimeter.restrictions]]
 dependency = "Illuminate\\Foundation\\Bus\\Dispatchable"
@@ -893,6 +899,7 @@ deny-from = ["App\\"]
 <tr><td style="text-align: left"><code>allow-from</code></td><td style="text-align: left">Optional source namespace patterns. When non-empty, matching dependencies are only allowed from these namespaces.</td></tr>
 <tr><td style="text-align: left"><code>deny-from</code></td><td style="text-align: left">Optional source namespace patterns. Matching dependencies are forbidden from these namespaces.</td></tr>
 <tr><td style="text-align: left"><code>kinds</code></td><td style="text-align: left">Optional dependency-kind filter. Values: <code>class-like</code>, <code>function</code>, <code>constant</code>, <code>attribute</code>. An empty list applies to every kind.</td></tr>
+<tr><td style="text-align: left"><code>reason</code></td><td style="text-align: left">Optional human-readable explanation shown in error messages.</td></tr>
 </tbody></table>
 <p>Restrictions are evaluated before ordinary <code>permit</code> rules and layering, so a permit cannot override a restriction. If both <code>allow-from</code> and <code>deny-from</code> match, <code>deny-from</code> wins. Matching <code>allow-from</code> only satisfies the restriction; ordinary perimeter rules and layering must still allow the dependency when configured. A configuration containing only restrictions allows unrelated dependencies; restrictions do not create an implicit allowlist.</p>
 <h2 id="structural-guard">Structural guard</h2>
@@ -985,6 +992,10 @@ must-implement = "@nothing"
     
     <li class="doc-toc__item doc-toc__item--lvl3">
       <a class="doc-toc__link" href="#layering">layering</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl3">
+      <a class="doc-toc__link" href="#layering-reason">layering-reason</a>
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl3">
