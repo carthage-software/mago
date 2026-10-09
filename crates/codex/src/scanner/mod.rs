@@ -1,3 +1,5 @@
+use std::borrow::Cow;
+
 use mago_allocator::Arena;
 
 use mago_database::file::File;
@@ -92,7 +94,11 @@ mod version_claim;
 /// so the resulting metadata is already version-correct and downstream
 /// consumers don't need a separate filter pass.
 #[inline]
-pub(super) fn typing_error_issue(message: &str, kind: ScanningIssueKind, typing_error: &TypeError) -> Issue {
+pub(super) fn typing_error_issue(
+    message: impl Into<Cow<'static, str>>,
+    kind: ScanningIssueKind,
+    typing_error: &TypeError,
+) -> Issue {
     Issue::error(message)
         .with_code(kind)
         .with_annotation(Annotation::primary(typing_error.span()).with_message(typing_error.to_string()))

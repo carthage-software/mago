@@ -37,11 +37,9 @@ impl TDerivedIntersection {
 }
 
 impl TType for TDerivedIntersection {
-    fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
-        let mut children = Vec::with_capacity(1 + self.intersection_types.len());
+    fn append_child_nodes<'types>(&'types self, children: &mut Vec<TypeRef<'types>>) {
         children.push(TypeRef::Union(&self.base_type));
         children.extend(self.intersection_types.iter().map(TypeRef::Atomic));
-        children
     }
 
     fn can_be_intersected(&self) -> bool {

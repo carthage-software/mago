@@ -1,4 +1,4 @@
-use indexmap::IndexMap;
+use mago_algebra::AssertionMap;
 
 use mago_algebra::clause::Clause;
 use mago_algebra::find_satisfying_assignments;
@@ -346,7 +346,7 @@ pub fn find_expression_logic_issues<'ctx, 'arena, A>(
                 for mixed_var_id in &mixed_var_ids {
                     if var_has_root(key, *mixed_var_id) {
                         return Clause::new(
-                            IndexMap::default(),
+                            AssertionMap::default(),
                             expression.span(),
                             expression.span(),
                             Some(true),

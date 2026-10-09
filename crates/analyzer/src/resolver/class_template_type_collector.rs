@@ -114,7 +114,7 @@ pub(crate) fn resolve_template_parameter(
     codebase: &CodebaseMetadata,
     input_type_extends: &TUnion,
     static_class_storage: &ClassLikeMetadata,
-    type_params: &Vec<TUnion>,
+    type_params: &[TUnion],
 ) -> Option<TUnion> {
     let mut output_type_extends = None;
 

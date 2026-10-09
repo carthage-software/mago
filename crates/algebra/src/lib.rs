@@ -3,6 +3,7 @@ use std::hash::Hash;
 use std::ops::Deref;
 use std::rc::Rc;
 
+use foldhash::HashMap;
 use foldhash::HashSet;
 use foldhash::HashSetExt;
 use foldhash::fast::FixedState;
@@ -19,8 +20,11 @@ use crate::clause::Clause;
 pub mod assertion_set;
 pub mod clause;
 
-pub type SatisfyingAssignments = IndexMap<Word, AssertionSet>;
-pub type ActiveTruths = IndexMap<Word, HashSet<usize>>;
+/// An ordered assertion map keyed by interned names or assertion hashes.
+pub type AssertionMap<K, V> = IndexMap<K, V, FixedState>;
+
+pub type SatisfyingAssignments = AssertionMap<Word, AssertionSet>;
+pub type ActiveTruths = AssertionMap<Word, HashSet<usize>>;
 
 /// Default maximum clauses during CNF saturation.
 pub const DEFAULT_SATURATION_COMPLEXITY: u16 = 8_192;
@@ -175,14 +179,29 @@ fn saturate_clause_handles<'clause>(
             return unique_clauses;
         }
 
+        if unique_clauses_len == 2
+            && unique_clauses[0].possibilities.len() == 1
+            && unique_clauses[1].possibilities.len() == 1
+            && unique_clauses[0].possibilities.first().map(|(key, _)| key)
+                != unique_clauses[1].possibilities.first().map(|(key, _)| key)
+        {
+            return unique_clauses;
+        }
+
         let mut removed_indices: Vec<bool> = vec![false; unique_clauses_len];
         let mut added_clauses: Vec<Clause> = Vec::new();
-        // Different hashes rule out equal key sets; matches still need exact checks.
+        // Link clauses with matching key sets in input order. Hash collisions still
+        // reach the exact comparison below. Resolution needs at least two variables.
         let hasher = FixedState::default();
-        let variable_hashes: Vec<u64> = unique_clauses
-            .iter()
-            .map(|clause| clause.possibilities.keys().fold(0, |hash, key| hash ^ hasher.hash_one(key)))
-            .collect();
+        let mut next_matching_clause = vec![usize::MAX; unique_clauses_len];
+        let mut first_by_keys = HashMap::default();
+        for (index, clause) in unique_clauses.iter().enumerate().rev() {
+            if clause.reconcilable && !clause.wedge && clause.possibilities.len() > 1 {
+                let hash = clause.possibilities.keys().fold(0, |hash, key| hash ^ hasher.hash_one(key));
+                next_matching_clause[index] =
+                    first_by_keys.insert((clause.possibilities.len(), hash), index).unwrap_or(usize::MAX);
+            }
+        }
 
         // Pre-built index of every (var, possibility-hash) pair that appears
         // anywhere in the input clauses. Unit propagation needs to know
@@ -223,8 +242,7 @@ fn saturate_clause_handles<'clause>(
                     continue;
                 };
 
-                let negated_clause_type = only_type.get_negation();
-                let negated_hash = negated_clause_type.to_hash();
+                let negated_hash = only_type.negated_hash();
 
                 // Fast path: if no clause anywhere in the set contains the
                 // negation of this literal, the inner scan can't possibly do
@@ -253,39 +271,32 @@ fn saturate_clause_handles<'clause>(
                         continue;
                     }
 
-                    let mut clause_var_possibilities = matching_clause_possibilities.clone();
-                    clause_var_possibilities.retain(|k, _| k != &negated_hash);
-
                     removed_indices[clause_b_idx] = true;
 
-                    if clause_var_possibilities.is_empty() {
+                    if matching_clause_possibilities.len() == 1 {
                         if let Some(updated_clause) = clause_b.remove_possibilities(clause_var) {
                             added_clauses.push(updated_clause);
                         }
                     } else {
+                        let clause_var_possibilities = matching_clause_possibilities
+                            .iter()
+                            .filter(|(hash, _)| **hash != negated_hash)
+                            .map(|(&hash, assertion)| (hash, assertion.clone()))
+                            .collect();
                         let updated_clause = clause_b.add_possibility(clause_var, clause_var_possibilities);
                         added_clauses.push(updated_clause);
                     }
                 }
             } else {
-                // Resolution: check all other clauses with the same size
-                let clause_a_size = clause_a.possibilities.len();
-
-                'inner: for (clause_b_idx, clause_b) in unique_clauses.iter().enumerate() {
-                    if clause_a_idx >= clause_b_idx || removed_indices[clause_b_idx] {
+                let mut next = next_matching_clause[clause_a_idx];
+                'inner: while next != usize::MAX {
+                    let clause_b_idx = next;
+                    next = next_matching_clause[clause_b_idx];
+                    if removed_indices[clause_b_idx] {
                         continue;
                     }
 
-                    if !clause_b.reconcilable || clause_b.wedge {
-                        continue;
-                    }
-
-                    // Quick size check before detailed comparison
-                    if clause_b.possibilities.len() != clause_a_size
-                        || variable_hashes[clause_a_idx] != variable_hashes[clause_b_idx]
-                    {
-                        continue;
-                    }
+                    let clause_b = &unique_clauses[clause_b_idx];
 
                     let mut opposing_key = None;
                     let mut mismatch = false;
@@ -343,19 +354,20 @@ fn saturate_clause_handles<'clause>(
             }
         }
 
-        // Combine original clauses (minus removed ones) with newly added clauses.
-        let mut seen_hashes: HashSet<u32> = HashSet::with_capacity(unique_clauses_len);
-        let mut combined_clauses = Vec::with_capacity(unique_clauses_len);
+        let mut combined_clauses = unique_clauses;
+        let mut index = 0;
+        combined_clauses.retain(|_| {
+            let keep = !removed_indices[index];
+            index += 1;
+            keep
+        });
 
-        for (idx, clause) in unique_clauses.into_iter().enumerate() {
-            if !removed_indices[idx] && seen_hashes.insert(clause.hash) {
-                combined_clauses.push(clause);
-            }
-        }
-
-        for clause in added_clauses {
-            if seen_hashes.insert(clause.hash) {
-                combined_clauses.push(ClauseHandle::Shared(Rc::new(clause)));
+        if !added_clauses.is_empty() {
+            let mut seen_hashes: HashSet<u32> = combined_clauses.iter().map(|clause| clause.hash).collect();
+            for clause in added_clauses {
+                if seen_hashes.insert(clause.hash) {
+                    combined_clauses.push(ClauseHandle::Shared(Rc::new(clause)));
+                }
             }
         }
 
@@ -373,6 +385,15 @@ fn saturate_clause_handles<'clause>(
         let mut simplified_clauses = if all_combined_size_one {
             combined_clauses
         } else {
+            let variable_masks: Vec<u64> = combined_clauses
+                .iter()
+                .map(|clause| {
+                    clause
+                        .possibilities
+                        .keys()
+                        .fold(0, |mask, key| mask | 1u64.rotate_left(hasher.hash_one(key) as u32))
+                })
+                .collect();
             let mut redundant_indices = vec![false; combined_clauses.len()];
             for (clause_a_idx, clause_a) in combined_clauses.iter().enumerate() {
                 if clause_a.wedge {
@@ -380,7 +401,7 @@ fn saturate_clause_handles<'clause>(
                 }
 
                 // Check if any smaller clause is a subset of clause_a
-                for clause_b in &combined_clauses {
+                for (clause_b_idx, clause_b) in combined_clauses.iter().enumerate() {
                     if std::ptr::eq(clause_a, clause_b) {
                         continue;
                     }
@@ -390,7 +411,9 @@ fn saturate_clause_handles<'clause>(
                     }
 
                     // Only check if clause_b is strictly smaller
-                    if clause_b.possibilities.len() >= clause_a.possibilities.len() {
+                    if clause_b.possibilities.len() >= clause_a.possibilities.len()
+                        || variable_masks[clause_a_idx] & variable_masks[clause_b_idx] != variable_masks[clause_b_idx]
+                    {
                         continue;
                     }
 
@@ -420,9 +443,23 @@ fn saturate_clause_handles<'clause>(
             && simplified_clauses.iter().all(|c| c.wedge || !c.reconcilable || c.possibilities.len() == 1);
         if !all_simplified_size_one && simplified_clauses_len > 2 && simplified_clauses_len < consensus_limit {
             let mut removed_hashes: HashSet<u32> = HashSet::default();
+            let singleton_masks: Vec<u64> = simplified_clauses
+                .iter()
+                .map(|clause| {
+                    clause
+                        .possibilities
+                        .iter()
+                        .filter(|(_, assertions)| assertions.len() == 1)
+                        .fold(0, |mask, (key, _)| mask | 1u64.rotate_left(hasher.hash_one(key) as u32))
+                })
+                .collect();
 
             for (clause_a_idx, clause_a) in simplified_clauses.iter().enumerate() {
-                for clause_b in simplified_clauses.iter().skip(clause_a_idx + 1) {
+                for (clause_b_idx, clause_b) in simplified_clauses.iter().enumerate().skip(clause_a_idx + 1) {
+                    if singleton_masks[clause_a_idx] & singleton_masks[clause_b_idx] == 0 {
+                        continue;
+                    }
+
                     let mut common_negated_keys: HashSet<Word> = HashSet::default();
                     for (index, (&common_key, a_possibilities)) in clause_a.possibilities.iter().enumerate() {
                         if a_possibilities.len() != 1 {
@@ -450,7 +487,8 @@ fn saturate_clause_handles<'clause>(
                     }
 
                     if !common_negated_keys.is_empty() {
-                        let mut new_possibilities: IndexMap<Word, IndexMap<u64, Assertion>> = IndexMap::default();
+                        let mut new_possibilities: AssertionMap<Word, AssertionMap<u64, Assertion>> =
+                            AssertionMap::default();
 
                         for (var_id, possibilities) in &clause_a.possibilities {
                             if !common_negated_keys.contains(var_id) {
@@ -539,8 +577,8 @@ pub fn find_satisfying_assignments_iter<'clause>(
     creating_conditional_id: Option<Span>,
     conditionally_referenced_var_ids: &mut WordSet,
 ) -> (SatisfyingAssignments, ActiveTruths) {
-    let mut truths: IndexMap<Word, AssertionSet> = IndexMap::default();
-    let mut active_truths: IndexMap<Word, HashSet<usize>> = IndexMap::default();
+    let mut truths: AssertionMap<Word, AssertionSet> = AssertionMap::default();
+    let mut active_truths: AssertionMap<Word, HashSet<usize>> = AssertionMap::default();
 
     for clause in clauses {
         // Populate referenced variables from all non-generated clauses.
@@ -780,8 +818,8 @@ fn group_impossibilities(mut clauses: Vec<Clause>, max_complexity: usize) -> Opt
                 let impossible_type = assertion.get_negation();
                 let hash = impossible_type.to_hash();
 
-                let mut seed_clause_possibilities = IndexMap::new();
-                seed_clause_possibilities.insert(*var, IndexMap::from([(hash, impossible_type)]));
+                let mut seed_clause_possibilities = AssertionMap::default();
+                seed_clause_possibilities.insert(*var, AssertionMap::from_iter([(hash, impossible_type)]));
 
                 let seed_clause = Clause::new(
                     seed_clause_possibilities,
@@ -803,7 +841,7 @@ fn group_impossibilities(mut clauses: Vec<Clause>, max_complexity: usize) -> Opt
 
     let mut complexity_upper_bound = seed_clauses.len();
     for clause in &clauses {
-        let possibilities_count: usize = clause.possibilities.values().map(IndexMap::len).sum();
+        let possibilities_count: usize = clause.possibilities.values().map(AssertionMap::len).sum();
 
         complexity_upper_bound = complexity_upper_bound.saturating_mul(possibilities_count);
 
@@ -852,7 +890,7 @@ fn group_impossibilities(mut clauses: Vec<Clause>, max_complexity: usize) -> Opt
 
                     new_clause_possibilities
                         .entry(*var)
-                        .or_insert_with(IndexMap::new)
+                        .or_insert_with(AssertionMap::default)
                         .insert(*impossible_hash, impossible_type.clone());
 
                     new_clauses.push(Clause::new(
@@ -876,7 +914,7 @@ fn group_impossibilities(mut clauses: Vec<Clause>, max_complexity: usize) -> Opt
 }
 
 #[inline]
-fn index_keys_match<T, U, V>(map1: &IndexMap<T, U>, map2: &IndexMap<T, V>) -> bool
+fn index_keys_match<T, U, V>(map1: &AssertionMap<T, U>, map2: &AssertionMap<T, V>) -> bool
 where
     T: Eq + Ord + Hash,
 {
@@ -886,13 +924,13 @@ where
 
 #[cfg(test)]
 mod tests {
-    use indexmap::IndexMap;
+    use std::rc::Rc;
+
     use mago_codex::assertion::Assertion;
     use mago_span::Span;
     use mago_word::Word;
     use mago_word::WordSet;
     use mago_word::word;
-    use std::rc::Rc;
 
     use super::ActiveTruths;
     use super::AlgebraThresholds;
@@ -900,10 +938,11 @@ mod tests {
     use super::find_satisfying_assignments;
     use super::saturate_clauses;
     use super::saturate_shared_clauses;
+    use crate::AssertionMap;
     use crate::clause::Clause;
 
     fn clause(offset: u32, literals: &[(&str, Assertion)]) -> Clause {
-        let mut possibilities: IndexMap<Word, IndexMap<u64, Assertion>> = IndexMap::new();
+        let mut possibilities: AssertionMap<Word, AssertionMap<u64, Assertion>> = AssertionMap::default();
         for (variable, assertion) in literals {
             possibilities.entry(word(variable)).or_default().insert(assertion.to_hash(), assertion.clone());
         }

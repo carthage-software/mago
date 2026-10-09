@@ -61,7 +61,7 @@ where
         *return_type = inferred_type_replacer::replace(return_type, template_result, context.codebase);
     }
 
-    for constraint in &mut signature.constraints {
+    for constraint in Arc::make_mut(&mut signature.constraints).iter_mut() {
         constraint.input_type =
             Arc::new(inferred_type_replacer::replace(&constraint.input_type, template_result, context.codebase));
         constraint.parameter_type =

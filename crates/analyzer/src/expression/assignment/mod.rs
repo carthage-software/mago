@@ -1,7 +1,7 @@
 use mago_allocator::Arena;
 use std::rc::Rc;
 
-use indexmap::IndexMap;
+use mago_algebra::AssertionMap;
 
 use mago_algebra::clause::Clause;
 use mago_algebra::disjoin_clauses;
@@ -334,9 +334,9 @@ fn add_nullsafe_assignment_clauses<'ctx, 'arena, A>(
 
         let target_null = Assertion::IsType(TAtomic::Null);
         let base_not_null = Assertion::IsNotType(TAtomic::Null);
-        let possibilities = IndexMap::from([
-            (target_variable_id, IndexMap::from([(target_null.to_hash(), target_null)])),
-            (base_id, IndexMap::from([(base_not_null.to_hash(), base_not_null)])),
+        let possibilities = AssertionMap::from_iter([
+            (target_variable_id, AssertionMap::from_iter([(target_null.to_hash(), target_null)])),
+            (base_id, AssertionMap::from_iter([(base_not_null.to_hash(), base_not_null)])),
         ]);
 
         block_context.clauses.push(Rc::new(Clause::new(
@@ -1239,8 +1239,8 @@ fn handle_assignment_with_boolean_logic<'ctx, 'arena, A>(
 
     block_context.parent_conflicting_clause_variables.retain(|var| !covered_variable_ids.contains(var));
 
-    let mut possibilities = IndexMap::default();
-    possibilities.insert(variable_id, IndexMap::from([(Assertion::Falsy.to_hash(), Assertion::Falsy)]));
+    let mut possibilities = AssertionMap::default();
+    possibilities.insert(variable_id, AssertionMap::from_iter([(Assertion::Falsy.to_hash(), Assertion::Falsy)]));
 
     block_context.clauses.extend(
         disjoin_clauses(

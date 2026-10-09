@@ -206,7 +206,7 @@ fn widen_static_local_type(inferred: &mut TUnion, previous: &TUnion) {
     match (inferred.types.to_mut().as_mut_slice(), previous.get_single_array()) {
         ([TAtomic::Array(TArray::Keyed(inferred))], Some(TArray::Keyed(previous))) => {
             if let (Some(items), Some(previous_items)) = (&mut inferred.known_items, &previous.known_items) {
-                for (key, (_, item_type)) in items {
+                for (key, (_, item_type)) in Arc::make_mut(items) {
                     if let Some((_, previous_type)) = previous_items.get(key) {
                         widen_static_local_type(item_type, previous_type);
                     }
@@ -221,7 +221,9 @@ fn widen_static_local_type(inferred: &mut TUnion, previous: &TUnion) {
             }
         }
         ([TAtomic::Array(TArray::List(inferred))], Some(TArray::List(previous))) => {
-            if let (Some(items), Some(previous_items)) = (&mut inferred.known_elements, &previous.known_elements) {
+            if let (Some(items), Some(previous_items)) =
+                (inferred.known_elements.as_mut().map(Arc::make_mut), &previous.known_elements)
+            {
                 for (key, (_, item_type)) in items {
                     if let Some((_, previous_type)) = previous_items.get(key) {
                         widen_static_local_type(item_type, previous_type);

@@ -666,7 +666,7 @@ fn analyze_with_fixture(
         Arc::new(registry),
     );
     let result = service.analyze()?;
-    let issues = result.issues.iter().map(|issue| (issue.code.clone(), issue.message.clone())).collect::<Vec<_>>();
+    let issues = result.issues.iter().map(|issue| (issue.code.clone(), issue.message.to_string())).collect::<Vec<_>>();
     let invocations = std::fs::read_to_string(audit)?.lines().map(str::to_owned).collect::<Vec<_>>();
 
     Ok(AnalysisObservation { issues, invocations })

@@ -356,7 +356,7 @@ pub fn t_keyed_unsealed(key: TUnion, value: TUnion, non_empty: bool) -> TAtomic 
 #[must_use]
 pub fn t_keyed_sealed(items: BTreeMap<ArrayKey, (bool, TUnion)>, non_empty: bool) -> TAtomic {
     TAtomic::Array(TArray::Keyed(TKeyedArray {
-        known_items: Some(items),
+        known_items: Some(items.into()),
         parameters: None,
         non_empty,
         known_non_list: false,

@@ -3,7 +3,6 @@ use mago_word::concat_word;
 
 use crate::metadata::CodebaseMetadata;
 use crate::ttype::TType;
-use crate::ttype::TypeRef;
 use crate::ttype::union::TUnion;
 
 /// Represents a reference to a type alias that needs to be expanded during analysis.
@@ -65,10 +64,6 @@ impl TAlias {
 }
 
 impl TType for TAlias {
-    fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
-        vec![]
-    }
-
     fn is_expandable(&self) -> bool {
         true
     }

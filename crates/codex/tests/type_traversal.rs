@@ -32,10 +32,14 @@ fn type_trees() -> Vec<TUnion> {
     let mut object = t_generic_named("Box", vec![u(generic.clone()), u(variable.clone())]);
     object.add_intersection_type(t_named("Countable"));
 
-    let mut callable = TCallableSignature::new(false, true)
+    let callable = TCallableSignature::new(false, true)
         .with_parameters(vec![TCallableParameter::new(Some(Arc::new(u(generic.clone()))), false, false, false)])
-        .with_return_type(Some(Arc::new(u(object.clone()))));
-    callable.constraints.push(TCallableConstraint::new(vec![], Arc::new(u(t_string())), Arc::new(u(variable.clone()))));
+        .with_return_type(Some(Arc::new(u(object.clone()))))
+        .with_constraints(vec![TCallableConstraint::new(
+            vec![],
+            Arc::new(u(t_string())),
+            Arc::new(u(variable.clone())),
+        )]);
 
     vec![
         u(t_int()),

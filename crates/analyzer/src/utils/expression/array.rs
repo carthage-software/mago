@@ -1020,7 +1020,7 @@ where
                             if let ArrayKey::Integer(k) = &array_key {
                                 if !other_list.element_type.is_never() {
                                     true
-                                } else if let Some(elems) = other_list.known_elements.as_ref() {
+                                } else if let Some(elems) = other_list.known_elements.as_deref() {
                                     *k >= 0 && elems.contains_key(&(*k as usize))
                                 } else {
                                     false

@@ -74,7 +74,7 @@ impl FunctionReturnTypeProvider for ShapeProvider {
         match argument_array {
             TArray::List(list) => {
                 let mut known_elements = BTreeMap::new();
-                for (index, (possibly_undefined, element)) in list.known_elements.as_ref()? {
+                for (index, (possibly_undefined, element)) in list.known_elements.as_deref()? {
                     let inner_type = element
                         .get_single_named_object()?
                         .type_parameters
@@ -97,13 +97,13 @@ impl FunctionReturnTypeProvider for ShapeProvider {
                         },
                         known_count: Some(known_elements.len()),
                         non_empty: !known_elements.is_empty(),
-                        known_elements: Some(known_elements),
+                        known_elements: Some(known_elements.into()),
                     })))]),
                 )))))
             }
             TArray::Keyed(keyed_array) => {
                 let mut known_items = BTreeMap::new();
-                for (key, (possibly_undefined, item)) in keyed_array.known_items.as_ref()? {
+                for (key, (possibly_undefined, item)) in keyed_array.known_items.as_deref()? {
                     let inner_type = item
                         .get_single_named_object()?
                         .type_parameters
@@ -125,7 +125,7 @@ impl FunctionReturnTypeProvider for ShapeProvider {
                             None
                         },
                         non_empty: !known_items.is_empty(),
-                        known_items: Some(known_items),
+                        known_items: Some(known_items.into()),
                         known_non_list: false,
                     })))]),
                 )))))

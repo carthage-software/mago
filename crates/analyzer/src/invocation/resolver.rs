@@ -248,7 +248,7 @@ where
                     *std::sync::Arc::make_mut(&mut list.element_type) =
                         resolve_union(context, invocation, template_result, parameters, (*list.element_type).clone());
 
-                    if let Some(known_elements) = &mut list.known_elements {
+                    if let Some(known_elements) = list.known_elements.as_mut().map(Arc::make_mut) {
                         for (_, element_type) in known_elements.values_mut() {
                             *element_type =
                                 resolve_union(context, invocation, template_result, parameters, element_type.clone());
@@ -264,7 +264,7 @@ where
                     }
 
                     if let Some(known_items) = &mut keyed.known_items {
-                        for (_, item_type) in known_items.values_mut() {
+                        for (_, item_type) in Arc::make_mut(known_items).values_mut() {
                             *item_type =
                                 resolve_union(context, invocation, template_result, parameters, item_type.clone());
                         }
@@ -345,7 +345,7 @@ where
                         resolve_union(context, invocation, template_result, &scoped_parameters, return_type.clone());
                 }
 
-                for constraint in &mut signature.constraints {
+                for constraint in Arc::make_mut(&mut signature.constraints).iter_mut() {
                     constraint.input_type = Arc::new(resolve_union(
                         context,
                         invocation,
@@ -397,7 +397,7 @@ where
                     invocation,
                     template_result,
                     parameters,
-                    intersection_types.as_mut(),
+                    intersection_types.as_deref_mut(),
                 );
             }
 

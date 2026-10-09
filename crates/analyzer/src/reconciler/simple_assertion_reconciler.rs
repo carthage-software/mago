@@ -1925,6 +1925,7 @@ where
             TAtomic::Array(TArray::Keyed(TKeyedArray { known_items, parameters, non_empty, .. })) => {
                 did_remove_type = true;
                 if let Some(known_items) = known_items {
+                    let known_items = Arc::make_mut(known_items);
                     if let Some(known_item) = known_items.get_mut(key_name) {
                         if known_item.0 {
                             *non_empty = true;
@@ -1945,7 +1946,7 @@ where
                         false,
                     ) {
                         *non_empty = true;
-                        *known_items = Some(BTreeMap::from([(*key_name, (false, (**value_param).clone()))]));
+                        *known_items = Some(BTreeMap::from([(*key_name, (false, (**value_param).clone()))]).into());
                     } else {
                         continue;
                     }
@@ -1958,7 +1959,7 @@ where
             TAtomic::Array(TArray::List(TList { known_elements, element_type, non_empty, .. })) => {
                 did_remove_type = true;
                 if let ArrayKey::Integer(i) = key_name {
-                    if let Some(known_elements) = known_elements {
+                    if let Some(known_elements) = known_elements.as_mut().map(Arc::make_mut) {
                         if let Some(known_element) = known_elements.get_mut(&(*i as usize)) {
                             if known_element.0 {
                                 *non_empty = true;
@@ -1972,7 +1973,8 @@ where
                         }
                     } else if !element_type.is_never() {
                         *non_empty = true;
-                        *known_elements = Some(BTreeMap::from([(*i as usize, (false, (**element_type).clone()))]));
+                        *known_elements =
+                            Some(BTreeMap::from([(*i as usize, (false, (**element_type).clone()))]).into());
                     }
 
                     acceptable_types.push(atomic);
@@ -2058,6 +2060,7 @@ where
         match &mut atomic {
             TAtomic::Array(TArray::Keyed(TKeyedArray { known_items, parameters, .. })) => {
                 if let Some(known_items) = known_items {
+                    let known_items = Arc::make_mut(known_items);
                     if let Some(known_item) = known_items.get_mut(key_name) {
                         let nonnull = subtract_null(context, assertion, &known_item.1, None, negated, None);
 
@@ -2081,7 +2084,7 @@ where
                         false,
                     ) {
                         let nonnull = subtract_null(context, assertion, value_param, None, negated, None);
-                        *known_items = Some(BTreeMap::from([(*key_name, (false, nonnull))]));
+                        *known_items = Some(BTreeMap::from([(*key_name, (false, nonnull))]).into());
                     } else {
                         continue;
                     }
@@ -2096,7 +2099,7 @@ where
                     continue;
                 };
 
-                if let Some(known_elements) = known_elements {
+                if let Some(known_elements) = known_elements.as_mut().map(Arc::make_mut) {
                     if let Some(known_element) = known_elements.get_mut(&(*i as usize)) {
                         let nonnull = subtract_null(context, assertion, &known_element.1, None, negated, None);
 
@@ -2113,7 +2116,7 @@ where
                     }
                 } else if !element_type.is_never() {
                     let nonnull = subtract_null(context, assertion, element_type, None, negated, None);
-                    *known_elements = Some(BTreeMap::from([(*i as usize, (false, nonnull))]));
+                    *known_elements = Some(BTreeMap::from([(*i as usize, (false, nonnull))]).into());
                 }
 
                 acceptable_types.push(atomic);
@@ -2132,10 +2135,13 @@ where
                 // Narrow mixed to a keyed array with the specific key having a non-null value
                 let mut keyed_array = get_mixed_keyed_array();
                 keyed_array.types.to_mut()[0] = TAtomic::Array(TArray::Keyed(TKeyedArray {
-                    known_items: Some(BTreeMap::from([(
-                        *key_name,
-                        (false, subtract_null(context, assertion, &get_mixed(), None, negated, None)),
-                    )])),
+                    known_items: Some(
+                        BTreeMap::from([(
+                            *key_name,
+                            (false, subtract_null(context, assertion, &get_mixed(), None, negated, None)),
+                        )])
+                        .into(),
+                    ),
                     parameters: Some((Arc::new(get_arraykey()), Arc::new(get_mixed()))),
                     non_empty: false,
                     known_non_list: false,

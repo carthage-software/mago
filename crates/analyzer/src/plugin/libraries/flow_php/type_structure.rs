@@ -88,7 +88,7 @@ impl FunctionReturnTypeProvider for TypeStructureProvider {
         };
 
         let mut known_items = BTreeMap::new();
-        for (key, (possibly_undefined, item)) in keyed_array.known_items.as_ref()? {
+        for (key, (possibly_undefined, item)) in keyed_array.known_items.as_deref()? {
             let inner_type = item
                 .get_single_named_object()?
                 .type_parameters
@@ -102,7 +102,7 @@ impl FunctionReturnTypeProvider for TypeStructureProvider {
         }
 
         if let Some(TArray::Keyed(optional_keyed_array)) = optional_elements_array
-            && let Some(optional_items) = optional_keyed_array.known_items.as_ref()
+            && let Some(optional_items) = optional_keyed_array.known_items.as_deref()
         {
             for (key, (_possibly_undefined, item)) in optional_items {
                 let inner_type = item
@@ -125,7 +125,7 @@ impl FunctionReturnTypeProvider for TypeStructureProvider {
                     None
                 },
                 non_empty: !known_items.is_empty(),
-                known_items: Some(known_items),
+                known_items: Some(known_items.into()),
                 known_non_list: false,
             })))]),
         )))))

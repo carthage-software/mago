@@ -1107,7 +1107,7 @@ where
                 scalar_list.known_count = Some(1);
                 scalar_list.non_empty = true;
                 scalar_list.known_elements =
-                    Some(BTreeMap::from_iter([(0, (false, wrap_atomic(atomic_type.clone())))]));
+                    Some(BTreeMap::from_iter([(0, (false, wrap_atomic(atomic_type.clone())))]).into());
 
                 resulting_array_atomics.push(TAtomic::Array(TArray::List(scalar_list)));
             }
@@ -1647,7 +1647,7 @@ where
             TAtomic::Array(TArray::Keyed(keyed_array)) => {
                 let mut known_properties = BTreeMap::new();
                 if let Some(known_items) = &keyed_array.known_items {
-                    for (key, item) in known_items {
+                    for (key, item) in known_items.iter() {
                         let property_name = key.to_atom();
 
                         known_properties.insert(property_name, item.clone());
@@ -1657,10 +1657,10 @@ where
                     // so intersect the shape with `stdClass` to preserve both the shape
                     // information and the nominal `stdClass` type.
                     let mut named = TNamedObject::new(word("stdClass"));
-                    named.intersection_types = Some(vec![TAtomic::Object(TObject::new_with_properties(
+                    named.intersection_types = Some(Box::new(vec![TAtomic::Object(TObject::new_with_properties(
                         keyed_array.parameters.is_none(),
                         known_properties,
-                    ))]);
+                    ))]));
 
                     possibilities.push(TAtomic::Object(TObject::Named(named)));
                 }

@@ -515,6 +515,7 @@ test_case!(idempotency_mixed_breaking_logical_chain);
 test_case!(idempotency_negated_logical_group, PHPVersion::PHP85);
 test_case!(idempotency_preserved_logical_groups);
 test_case!(idempotency_hugged_condition, PHPVersion::PHP85);
+test_case!(idempotency_cast_comparison, PHPVersion::PHP85);
 test_case!(idempotency_docblock_before_parameter);
 test_case!(idempotency_html_echo_ternary_break);
 test_case!(idempotency_inline_echo_mid_line_call);

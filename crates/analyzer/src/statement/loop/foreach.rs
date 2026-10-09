@@ -256,7 +256,7 @@ fn refine_foreach_array_values(array_type: &TUnion, value_type: &TUnion) -> Opti
                     list.element_type = Arc::new(value_type.clone());
                 }
 
-                if let Some(known_elements) = list.known_elements.as_mut() {
+                if let Some(known_elements) = list.known_elements.as_mut().map(Arc::make_mut) {
                     for (_, element_type) in known_elements.values_mut() {
                         *element_type = value_type.clone();
                     }
@@ -264,7 +264,7 @@ fn refine_foreach_array_values(array_type: &TUnion, value_type: &TUnion) -> Opti
             }
             TArray::Keyed(keyed) => {
                 if let Some(known_items) = keyed.known_items.as_mut() {
-                    for (_, item_type) in known_items.values_mut() {
+                    for (_, item_type) in Arc::make_mut(known_items).values_mut() {
                         *item_type = value_type.clone();
                     }
                 }

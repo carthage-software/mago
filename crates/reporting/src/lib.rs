@@ -12,6 +12,7 @@
 //! - [`reporter::Reporter`]: Handles formatting and outputting issues in various formats
 //! - [`baseline::Baseline`]: Manages baseline files to filter out known issues
 
+use std::borrow::Cow;
 use std::cmp::Ordering;
 use std::collections::hash_map::Entry;
 use std::iter::Once;
@@ -163,7 +164,7 @@ pub enum AnnotationKind {
 #[cfg_attr(feature = "serde", derive(serde::Deserialize, serde::Serialize))]
 pub struct Annotation {
     /// An optional message associated with the annotation.
-    pub message: Option<String>,
+    pub message: Option<Cow<'static, str>>,
     /// The kind of annotation.
     pub kind: AnnotationKind,
     /// The code span that the annotation refers to.
@@ -215,11 +216,11 @@ pub struct Issue {
     /// An optional code associated with the issue.
     pub code: Option<String>,
     /// The main message describing the issue.
-    pub message: String,
+    pub message: Cow<'static, str>,
     /// Additional notes related to the issue.
-    pub notes: Vec<String>,
+    pub notes: Vec<Cow<'static, str>>,
     /// An optional help message suggesting possible solutions or further actions.
-    pub help: Option<String>,
+    pub help: Option<Cow<'static, str>>,
     /// An optional link to external resources for more information about the issue.
     pub link: Option<String>,
     /// Annotations associated with the issue, providing additional context or highlighting specific code spans.
@@ -394,7 +395,7 @@ impl Annotation {
     /// let annotation = Annotation::primary(span).with_message("This is a primary annotation");
     /// ```
     #[must_use]
-    pub fn with_message(mut self, message: impl Into<String>) -> Self {
+    pub fn with_message(mut self, message: impl Into<Cow<'static, str>>) -> Self {
         self.message = Some(message.into());
 
         self
@@ -454,7 +455,7 @@ impl Issue {
     ///
     /// let issue = Issue::new(Level::Error, "This is an error");
     /// ```
-    pub fn new(level: Level, message: impl Into<String>) -> Self {
+    pub fn new(level: Level, message: impl Into<Cow<'static, str>>) -> Self {
         Self {
             level,
             code: None,
@@ -476,7 +477,7 @@ impl Issue {
     ///
     /// let issue = Issue::error("This is an error");
     /// ```
-    pub fn error(message: impl Into<String>) -> Self {
+    pub fn error(message: impl Into<Cow<'static, str>>) -> Self {
         Self::new(Level::Error, message)
     }
 
@@ -489,7 +490,7 @@ impl Issue {
     ///
     /// let issue = Issue::warning("This is a warning");
     /// ```
-    pub fn warning(message: impl Into<String>) -> Self {
+    pub fn warning(message: impl Into<Cow<'static, str>>) -> Self {
         Self::new(Level::Warning, message)
     }
 
@@ -502,7 +503,7 @@ impl Issue {
     ///
     /// let issue = Issue::help("This is a help message");
     /// ```
-    pub fn help(message: impl Into<String>) -> Self {
+    pub fn help(message: impl Into<Cow<'static, str>>) -> Self {
         Self::new(Level::Help, message)
     }
 
@@ -515,7 +516,7 @@ impl Issue {
     ///
     /// let issue = Issue::note("This is a note");
     /// ```
-    pub fn note(message: impl Into<String>) -> Self {
+    pub fn note(message: impl Into<Cow<'static, str>>) -> Self {
         Self::new(Level::Note, message)
     }
 
@@ -590,7 +591,7 @@ impl Issue {
     /// let issue = Issue::error("This is an error").with_note("This is a note");
     /// ```
     #[must_use]
-    pub fn with_note(mut self, note: impl Into<String>) -> Self {
+    pub fn with_note(mut self, note: impl Into<Cow<'static, str>>) -> Self {
         self.notes.push(note.into());
 
         self
@@ -608,7 +609,7 @@ impl Issue {
     /// let issue = Issue::error("This is an error").with_help("This is a help message");
     /// ```
     #[must_use]
-    pub fn with_help(mut self, help: impl Into<String>) -> Self {
+    pub fn with_help(mut self, help: impl Into<Cow<'static, str>>) -> Self {
         self.help = Some(help.into());
 
         self

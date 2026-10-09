@@ -1,5 +1,4 @@
-use indexmap::IndexMap;
-
+use mago_algebra::AssertionMap;
 use mago_algebra::clause::Clause;
 use mago_algebra::find_satisfying_assignments;
 use mago_algebra::saturate_clauses;
@@ -84,7 +83,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for DoWhile<'arena> {
         while_clauses = remove_clauses_with_mixed_variables(while_clauses, mixed_variable_ids, self.condition.span());
         if while_clauses.is_empty() {
             while_clauses.push(Clause::new(
-                IndexMap::new(),
+                AssertionMap::default(),
                 self.condition.span(),
                 self.condition.span(),
                 Some(true),
@@ -136,7 +135,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for DoWhile<'arena> {
             reconcile_keyed_types(
                 context,
                 &negated_while_types,
-                IndexMap::new(),
+                AssertionMap::default(),
                 &mut inner_loop_block_context,
                 &mut WordSet::default(),
                 &WordSet::default(),

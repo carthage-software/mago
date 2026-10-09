@@ -15,11 +15,12 @@ use crate::ttype::wrap_atomic;
 
 fn has_required_known_entry(array: &TArray) -> bool {
     match array {
-        TArray::List(list) => {
-            list.known_elements.as_ref().is_some_and(|elements| elements.values().any(|(is_optional, _)| !*is_optional))
-        }
+        TArray::List(list) => list
+            .known_elements
+            .as_deref()
+            .is_some_and(|elements| elements.values().any(|(is_optional, _)| !*is_optional)),
         TArray::Keyed(keyed_array) => {
-            keyed_array.known_items.as_ref().is_some_and(|items| items.values().any(|(is_optional, _)| !*is_optional))
+            keyed_array.known_items.as_deref().is_some_and(|items| items.values().any(|(is_optional, _)| !*is_optional))
         }
     }
 }
@@ -78,8 +79,8 @@ impl<'array> KnownItems<'array> {
 
 fn known_items_view(array: &TArray) -> Option<KnownItems<'_>> {
     match array {
-        TArray::Keyed(keyed_array) => keyed_array.known_items.as_ref().map(KnownItems::Keyed),
-        TArray::List(list) => list.known_elements.as_ref().map(KnownItems::List),
+        TArray::Keyed(keyed_array) => keyed_array.known_items.as_deref().map(KnownItems::Keyed),
+        TArray::List(list) => list.known_elements.as_deref().map(KnownItems::List),
     }
 }
 
@@ -281,7 +282,7 @@ mod tests {
                             .known_elements
                             .as_ref()
                             .and_then(|items| key.get_integer().and_then(|index| items.get(&(index as usize)))),
-                        TArray::Keyed(array) => array.known_items.as_ref().and_then(|items| items.get(&key)),
+                        TArray::Keyed(array) => array.known_items.as_deref().and_then(|items| items.get(&key)),
                     };
                     assert!(source.is_some_and(|source| std::ptr::eq(source, value)));
                 }

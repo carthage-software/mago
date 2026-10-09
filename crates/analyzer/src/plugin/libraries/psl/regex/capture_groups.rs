@@ -65,7 +65,7 @@ impl FunctionReturnTypeProvider for CaptureGroupsProvider {
 
         let has_extra = match array_atomic {
             TArray::Keyed(keyed_array) => {
-                let Some(groups_known_items) = keyed_array.known_items.as_ref() else {
+                let Some(groups_known_items) = keyed_array.known_items.as_deref() else {
                     return Some(capture_groups_fallback_type());
                 };
 
@@ -82,7 +82,7 @@ impl FunctionReturnTypeProvider for CaptureGroupsProvider {
                 has_unknown || keyed_array.parameters.is_some()
             }
             TArray::List(list) => {
-                let Some(groups_known_elements) = list.known_elements.as_ref() else {
+                let Some(groups_known_elements) = list.known_elements.as_deref() else {
                     return Some(capture_groups_fallback_type());
                 };
 
@@ -105,7 +105,7 @@ impl FunctionReturnTypeProvider for CaptureGroupsProvider {
             Some(vec![TUnion::from_atomic(TAtomic::Array(TArray::Keyed(TKeyedArray {
                 parameters: if has_extra { Some((Arc::new(get_arraykey()), Arc::new(get_string()))) } else { None },
                 non_empty: true,
-                known_items: Some(known_items),
+                known_items: Some(known_items.into()),
                 known_non_list: false,
             })))]),
         )))))

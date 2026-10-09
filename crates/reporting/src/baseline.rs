@@ -399,7 +399,7 @@ impl LooseBaseline {
 
             let normalized_path = normalize_path(&file.name);
             let code = issue.code.as_ref().unwrap_or(&String::from("unknown")).clone();
-            let message = issue.message.clone();
+            let message = issue.message.to_string();
 
             let key = (normalized_path, code, message);
             *issue_counts.entry(key).or_insert(0) += 1;
@@ -439,7 +439,7 @@ impl LooseBaseline {
 
             let normalized_path = normalize_path(&file.name);
             let code = issue.code.as_ref().unwrap_or(&String::from("unknown")).clone();
-            let key = (normalized_path, code, issue.message.clone());
+            let key = (normalized_path, code, issue.message.to_string());
 
             if let Some(count) = remaining_counts.get_mut(&key)
                 && *count > 0
@@ -528,14 +528,14 @@ impl LooseBaseline {
         let current_counts: HashMap<(String, String, String), u32> = current
             .issues
             .iter()
-            .map(|issue| ((issue.file.clone(), issue.code.clone(), issue.message.clone()), issue.count))
+            .map(|issue| ((issue.file.clone(), issue.code.clone(), issue.message.to_string()), issue.count))
             .collect();
 
         let mut kept: Vec<LooseBaselineIssue> = Vec::new();
         let mut removed_count = 0;
 
         for issue in &self.issues {
-            let key = (issue.file.clone(), issue.code.clone(), issue.message.clone());
+            let key = (issue.file.clone(), issue.code.clone(), issue.message.to_string());
             let current_count = current_counts.get(&key).copied().unwrap_or(0);
             let new_count = issue.count.min(current_count);
 
@@ -545,7 +545,7 @@ impl LooseBaseline {
                 kept.push(LooseBaselineIssue {
                     file: issue.file.clone(),
                     code: issue.code.clone(),
-                    message: issue.message.clone(),
+                    message: issue.message.to_string(),
                     count: new_count,
                 });
             }
@@ -664,7 +664,7 @@ mod tests {
         start_offset: u32,
         end_offset: u32,
     ) -> Issue {
-        Issue::error(message).with_code(code).with_annotation(Annotation::primary(Span::new(
+        Issue::error(message.to_owned()).with_code(code).with_annotation(Annotation::primary(Span::new(
             file_id,
             Position::new(start_offset),
             Position::new(end_offset),

@@ -693,7 +693,7 @@ fn get_shape_from_type(
                 tree.insert(offset, (field_is_optional, field_value_type));
             }
 
-            tree
+            tree.into()
         });
 
         list.non_empty = shape.has_non_optional_fields() || shape.kind.is_non_empty();
@@ -754,7 +754,7 @@ fn get_shape_from_type(
                 tree.insert(array_key, (field_is_optional, field_value_type));
             }
 
-            tree
+            tree.into()
         });
 
         keyed_array.non_empty = shape.has_non_optional_fields() || shape.kind.is_non_empty();
@@ -945,8 +945,8 @@ fn get_reference_from_kind(
     if is_named_object {
         Ok(TAtomic::Object(TObject::Named(TNamedObject {
             name: fq_reference_name_id,
-            type_parameters,
-            variances: type_parameter_variances,
+            type_parameters: type_parameters.map(Vec::into_boxed_slice),
+            variances: type_parameter_variances.map(Box::new),
             intersection_types: None,
             is_static,
             is_this,
@@ -956,7 +956,7 @@ fn get_reference_from_kind(
         Ok(TAtomic::Reference(TReference::Symbol {
             name: fq_reference_name_id,
             parameters: type_parameters,
-            variances: type_parameter_variances,
+            variances: type_parameter_variances.map(Box::new),
             intersection_types: None,
         }))
     }

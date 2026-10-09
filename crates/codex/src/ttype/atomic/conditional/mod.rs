@@ -52,13 +52,13 @@ impl TConditional {
 }
 
 impl TType for TConditional {
-    fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
-        vec![
+    fn append_child_nodes<'types>(&'types self, children: &mut Vec<TypeRef<'types>>) {
+        children.extend([
             TypeRef::Union(self.subject.as_ref()),
             TypeRef::Union(self.target.as_ref()),
             TypeRef::Union(self.then.as_ref()),
             TypeRef::Union(self.otherwise.as_ref()),
-        ]
+        ]);
     }
 
     fn needs_population(&self) -> bool {

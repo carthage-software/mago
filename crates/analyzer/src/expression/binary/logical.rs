@@ -4,7 +4,9 @@ use std::rc::Rc;
 use foldhash::HashSet;
 
 use mago_algebra::find_satisfying_assignments;
+use mago_algebra::find_satisfying_assignments_iter;
 use mago_algebra::saturate_clauses;
+use mago_algebra::saturate_shared_clauses;
 use mago_bytes::BytesDisplay;
 use mago_codex::ttype::combine_union_types_rc;
 use mago_codex::ttype::get_bool;
@@ -374,9 +376,8 @@ where
     } else {
         let mut if_scope = IfScope::default();
 
-        let (if_conditional_scope, applied_block_context) =
-            conditional::analyze(context, block_context.clone(), artifacts, &mut if_scope, binary.lhs, false)?;
-        *block_context = applied_block_context;
+        let if_conditional_scope =
+            conditional::analyze(context, block_context, artifacts, &mut if_scope, binary.lhs, false)?;
 
         left_block_context = if_conditional_scope.if_body_context;
         left_referenced_var_ids = if_conditional_scope.conditionally_referenced_variable_ids;
@@ -425,13 +426,13 @@ where
         }
     }
 
-    let clauses_for_right_analysis = saturate_clauses(
-        block_context.clauses.iter().map(|v| &**v).chain(negated_left_clauses.iter()),
+    let clauses_for_right_analysis = saturate_shared_clauses(
+        block_context.clauses.iter().cloned().chain(negated_left_clauses.into_iter().map(Rc::new)),
         &context.settings.algebra_thresholds(),
     );
 
-    let (negated_type_assertions, active_negated_type_assertions) = find_satisfying_assignments(
-        clauses_for_right_analysis.as_slice(),
+    let (negated_type_assertions, active_negated_type_assertions) = find_satisfying_assignments_iter(
+        clauses_for_right_analysis.iter().map(Rc::as_ref),
         Some(binary.lhs.span()),
         &mut left_referenced_var_ids,
     );
@@ -462,7 +463,7 @@ where
             );
         }
 
-        right_block_context.clauses = clauses_for_right_analysis.iter().map(|v| Rc::new(v.clone())).collect();
+        right_block_context.clauses.clone_from(&clauses_for_right_analysis);
 
         if !changed_var_ids.is_empty() {
             let partiioned_clauses =
@@ -553,19 +554,19 @@ where
         )
         .unwrap_or_default();
 
-        let mut clauses_for_right_analysis = BlockContext::remove_reconciled_clauses(
+        let mut clauses_for_right_analysis = BlockContext::remove_reconciled_clause_refs(
             &clauses_for_right_analysis,
             &right_assigned_var_ids.into_keys().collect::<WordSet>(),
         )
         .0;
 
-        clauses_for_right_analysis.extend(right_clauses);
+        clauses_for_right_analysis.extend(right_clauses.into_iter().map(Rc::new));
 
         let combined_right_clauses =
-            saturate_clauses(clauses_for_right_analysis.iter(), &context.settings.algebra_thresholds());
+            saturate_shared_clauses(clauses_for_right_analysis, &context.settings.algebra_thresholds());
 
-        let (right_type_assertions, active_right_type_assertions) = find_satisfying_assignments(
-            combined_right_clauses.as_slice(),
+        let (right_type_assertions, active_right_type_assertions) = find_satisfying_assignments_iter(
+            combined_right_clauses.iter().map(Rc::as_ref),
             Some(binary.rhs.span()),
             &mut right_referenced_var_ids,
         );

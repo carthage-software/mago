@@ -71,12 +71,12 @@ fn unwrap_closure_return_array(array: &TArray, context: &ProviderContext<'_, '_,
             non_empty: list.non_empty,
             known_elements: if let Some(known_elements) = &list.known_elements {
                 let mut new_elements = BTreeMap::new();
-                for (index, (possibly_undefined, element_type)) in known_elements {
+                for (index, (possibly_undefined, element_type)) in known_elements.iter() {
                     let inner = extract_closure_return_type(element_type)?;
                     new_elements.insert(*index, (*possibly_undefined, inner));
                 }
 
-                Some(new_elements)
+                Some(new_elements.into())
             } else {
                 None
             },
@@ -84,7 +84,7 @@ fn unwrap_closure_return_array(array: &TArray, context: &ProviderContext<'_, '_,
         TArray::Keyed(keyed) => {
             if let Some(known_items) = &keyed.known_items {
                 let mut new_items = BTreeMap::new();
-                for (key, (possibly_undefined, item_type)) in known_items {
+                for (key, (possibly_undefined, item_type)) in known_items.iter() {
                     let inner = extract_closure_return_type(item_type)?;
                     new_items.insert(*key, (*possibly_undefined, inner));
                 }
@@ -95,7 +95,7 @@ fn unwrap_closure_return_array(array: &TArray, context: &ProviderContext<'_, '_,
                         (Arc::clone(k), Arc::new(unwrapped_v))
                     }),
                     non_empty: keyed.non_empty,
-                    known_items: Some(new_items),
+                    known_items: Some(new_items.into()),
                     known_non_list: keyed.known_non_list,
                 }))));
             }

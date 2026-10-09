@@ -18,7 +18,8 @@ use crate::ttype::union::TUnion;
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TKeyedArray {
     /// Specific types known for certain keys (`ArrayKey`). The bool indicates if the element is optional.
-    pub known_items: Option<BTreeMap<ArrayKey, (bool, TUnion)>>,
+    /// Clones share this map; use `Arc::make_mut` to change it.
+    pub known_items: Option<Arc<BTreeMap<ArrayKey, (bool, TUnion)>>>,
     /// The general key and value types (`TKey`, `TValue` in `array<TKey, TValue>`).
     /// `None` if only `known_items` are present or types are unknown/mixed.
     pub parameters: Option<(Arc<TUnion>, Arc<TUnion>)>,
@@ -78,7 +79,7 @@ impl TKeyedArray {
     #[inline]
     #[must_use]
     pub fn with_known_items(self, known_items: BTreeMap<ArrayKey, (bool, TUnion)>) -> Self {
-        Self { known_items: Some(known_items), ..self }
+        Self { known_items: Some(Arc::new(known_items)), ..self }
     }
 
     #[inline]
@@ -97,7 +98,7 @@ impl TKeyedArray {
     #[inline]
     #[must_use]
     pub fn get_known_items(&self) -> Option<&BTreeMap<ArrayKey, (bool, TUnion)>> {
-        self.known_items.as_ref()
+        self.known_items.as_deref()
     }
 
     /// Returns the generic key and value types (`(&TKey, &TValue)`), if specified.
@@ -132,7 +133,7 @@ impl TKeyedArray {
     #[inline]
     #[must_use]
     pub fn has_known_items(&self) -> bool {
-        self.known_items.as_ref().is_some_and(|elements| !elements.is_empty())
+        self.known_items.as_deref().is_some_and(|elements| !elements.is_empty())
     }
 
     /// Returns a new `TKeyedArray` with the specified non-empty flag.
@@ -148,18 +149,17 @@ impl TKeyedArray {
     /// arrays with no key information at all (empty untyped arrays).
     #[must_use]
     pub fn has_exclusively_string_keys(&self) -> bool {
-        let has_key_info = self.parameters.is_some() || self.known_items.as_ref().is_some_and(|i| !i.is_empty());
+        let has_key_info = self.parameters.is_some() || self.known_items.as_deref().is_some_and(|i| !i.is_empty());
 
         has_key_info
             && self.parameters.as_ref().is_none_or(|(k, _)| k.is_any_string())
-            && self.known_items.as_ref().is_none_or(|i| i.keys().all(|k| matches!(k, ArrayKey::String(_))))
+            && self.known_items.as_deref().is_none_or(|i| i.keys().all(|k| matches!(k, ArrayKey::String(_))))
     }
 }
 
 impl TType for TKeyedArray {
-    fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
-        let mut children = vec![];
-        if let Some(known_items) = self.known_items.as_ref() {
+    fn append_child_nodes<'types>(&'types self, children: &mut Vec<TypeRef<'types>>) {
+        if let Some(known_items) = self.known_items.as_deref() {
             for (_, item_type) in known_items.values() {
                 children.push(TypeRef::Union(item_type));
             }
@@ -169,8 +169,6 @@ impl TType for TKeyedArray {
             children.push(TypeRef::Union(parameters.0));
             children.push(TypeRef::Union(parameters.1));
         }
-
-        children
     }
 
     fn needs_population(&self) -> bool {
@@ -226,7 +224,7 @@ impl TType for TKeyedArray {
             let mut buf: Vec<u8> = Vec::new();
             buf.extend_from_slice(b"array{");
             let mut first = true;
-            for (key, (indefinite, item_type)) in items {
+            for (key, (indefinite, item_type)) in items.iter() {
                 if first {
                     first = false;
                 } else {
@@ -284,7 +282,7 @@ impl TType for TKeyedArray {
             buf.extend_from_slice(b"array{\n");
             let item_indent = indent + 2;
 
-            for (key, (indefinite, item_type)) in items {
+            for (key, (indefinite, item_type)) in items.iter() {
                 buf.resize(buf.len() + item_indent, b' ');
                 buf.extend_from_slice(key.id_word().as_bytes());
                 if *indefinite {

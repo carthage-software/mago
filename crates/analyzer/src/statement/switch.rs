@@ -1,8 +1,8 @@
 use std::rc::Rc;
 
 use foldhash::HashMap;
-use indexmap::IndexMap;
 
+use mago_algebra::AssertionMap;
 use mago_algebra::clause::Clause;
 use mago_allocator::Arena;
 use mago_codex::ttype::TType;
@@ -148,24 +148,22 @@ where
             return Ok(());
         }
 
-        let indexed_cases = cases.iter().enumerate().collect::<IndexMap<_, _>>();
-
         let last_case_index = cases.len() - 1;
-        for (_, case) in &indexed_cases {
+        for case in cases {
             if case.is_default() {
                 self.has_default_case = true;
                 break;
             }
         }
 
-        for (i, case) in indexed_cases.iter().rev() {
-            self.update_case_exit_map(case, *i);
+        for (i, case) in cases.iter().enumerate().rev() {
+            self.update_case_exit_map(case, i);
         }
 
         let mut previous_empty_cases = vec![];
 
         let mut previously_matching_case = None;
-        for (i, case) in indexed_cases {
+        for (i, case) in cases.iter().enumerate() {
             let is_last = i == last_case_index;
 
             if let SwitchCase::Expression(switch_case) = case
@@ -216,7 +214,7 @@ where
                 reconcile_keyed_types(
                     self.context,
                     &reconcilable_types,
-                    IndexMap::default(),
+                    AssertionMap::default(),
                     &mut final_else_context,
                     &mut WordSet::default(),
                     &final_else_referenced_ids,
@@ -571,7 +569,7 @@ where
             reconcile_keyed_types(
                 self.context,
                 &reconcilable_if_types,
-                IndexMap::new(),
+                AssertionMap::default(),
                 &mut case_block_context,
                 &mut changed_var_ids,
                 &if switch_case.is_default() { WordSet::default() } else { WordSet::from_iter([switch_var_id]) },

@@ -1050,7 +1050,7 @@ where
     }
 
     if let InvocationTarget::Callable { signature, .. } = &invocation.target {
-        for constraint in &signature.constraints {
+        for constraint in signature.constraints.iter() {
             let Some((argument_offset, argument_expression)) =
                 invocation.arguments_source.iter_arguments().enumerate().find_map(|(argument_offset, argument)| {
                     let (_, parameter) = get_parameter_of_argument(&invocation.target, &argument, argument_offset)?;
@@ -1515,7 +1515,7 @@ fn populate_parameter_types_from_unpacked<A>(
         match array {
             TArray::List(list) => {
                 if let Some(known_elements) = &list.known_elements {
-                    for (offset, (is_optional, element_type)) in known_elements {
+                    for (offset, (is_optional, element_type)) in known_elements.iter() {
                         insert_unpacked_parameter_type(
                             context,
                             invocation_target,
@@ -1543,7 +1543,7 @@ fn populate_parameter_types_from_unpacked<A>(
                     continue;
                 };
 
-                for (key, (is_optional, element_type)) in known_items {
+                for (key, (is_optional, element_type)) in known_items.iter() {
                     let parameter_offset = match key {
                         ArrayKey::Integer(offset) => {
                             usize::try_from(*offset).ok().map(|offset| starting_parameter_position + offset)
@@ -1655,7 +1655,7 @@ fn validate_unpacked_argument_elements<'ctx, 'arena, A>(
         match array {
             TArray::List(list) => {
                 if let Some(known_elements) = &list.known_elements {
-                    for (array_index, (_, element_type)) in known_elements {
+                    for (array_index, (_, element_type)) in known_elements.iter() {
                         let parameter_position = starting_parameter_position + array_index;
                         if parameter_position >= invocation_target.parameter_count() {
                             break;
@@ -1776,7 +1776,7 @@ fn validate_keyed_array_elements<'ctx, 'arena, A>(
         return;
     };
 
-    for (array_key, (_, element_type)) in known_items {
+    for (array_key, (_, element_type)) in known_items.iter() {
         let parameter_name = match array_key {
             ArrayKey::String(key_str) => concat_word!(b"$", key_str.as_bytes()),
             ArrayKey::Integer(key_int) => {

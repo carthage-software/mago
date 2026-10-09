@@ -3,8 +3,7 @@ use std::cell::OnceCell;
 use std::collections::BTreeMap;
 use std::rc::Rc;
 
-use indexmap::IndexMap;
-
+use mago_algebra::AssertionMap;
 use mago_algebra::assertion_set::AssertionSet;
 use mago_algebra::assertion_set::Conjunction;
 use mago_algebra::assertion_set::Disjunction;
@@ -294,7 +293,7 @@ fn apply_assertion_to_call_context<'ctx, 'arena, A>(
 
     let referenced_variable_ids: WordSet = type_assertions.keys().copied().collect();
     let mut changed_variable_ids: WordSet = WordSet::default();
-    let mut active_type_assertions = IndexMap::new();
+    let mut active_type_assertions = AssertionMap::default();
     for (variable, type_assertion) in &type_assertions {
         active_type_assertions.insert(*variable, (1..type_assertion.len()).collect());
     }
@@ -568,7 +567,7 @@ fn clear_object_property_narrowings<'ctx, 'arena, A>(
             return false;
         }
         if is_superglobal_name(var_id.as_bytes()) {
-            if let Some(declared) = crate::common::global::get_global_variable_type(var_id.as_bytes()) {
+            if let Some(declared) = crate::common::global::get_global_variable_type(*var_id) {
                 *current_type = declared;
                 return true;
             }
@@ -829,11 +828,11 @@ fn resolve_invocation_assertion<'ctx, 'arena, A>(
     template_result: &TemplateResult,
     parameters: &WordMap<TUnion>,
     is_unconditional_assert: bool,
-) -> IndexMap<Word, AssertionSet>
+) -> AssertionMap<Word, AssertionSet>
 where
     A: Arena,
 {
-    let mut type_assertions: IndexMap<Word, AssertionSet> = IndexMap::new();
+    let mut type_assertions: AssertionMap<Word, AssertionSet> = AssertionMap::default();
     if assertions.is_empty() {
         return type_assertions;
     }

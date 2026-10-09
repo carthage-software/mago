@@ -290,7 +290,7 @@ impl<'files> Files<'files> for DatabaseFiles<'_> {
 
 fn update_diagnostic(diagnostic: &mut Diagnostic<FileId>, issue: &Issue) {
     diagnostic.severity = issue.level.into();
-    diagnostic.message.clone_from(&issue.message);
+    issue.message.as_ref().clone_into(&mut diagnostic.message);
     diagnostic.code.clone_from(&issue.code);
 
     for (index, annotation) in issue.annotations.iter().enumerate() {
@@ -299,7 +299,7 @@ fn update_diagnostic(diagnostic: &mut Diagnostic<FileId>, issue: &Issue) {
             label.file_id = annotation.span.file_id;
             label.range = annotation.span.into();
             if let Some(message) = &annotation.message {
-                label.message.clone_from(message);
+                message.as_ref().clone_into(&mut label.message);
             } else {
                 label.message.clear();
             }
@@ -312,10 +312,10 @@ fn update_diagnostic(diagnostic: &mut Diagnostic<FileId>, issue: &Issue) {
     let note_count = issue.notes.len() + usize::from(issue.help.is_some()) + usize::from(issue.link.is_some());
     diagnostic.notes.resize_with(note_count, String::new);
     for (target, note) in diagnostic.notes.iter_mut().zip(&issue.notes) {
-        target.clone_from(note);
+        note.as_ref().clone_into(target);
     }
     let mut remaining = diagnostic.notes[issue.notes.len()..].iter_mut();
-    for (prefix, text) in [("Help: ", issue.help.as_ref()), ("See: ", issue.link.as_ref())] {
+    for (prefix, text) in [("Help: ", issue.help.as_deref()), ("See: ", issue.link.as_deref())] {
         if let Some(text) = text
             && let Some(target) = remaining.next()
         {
@@ -358,7 +358,7 @@ impl From<Annotation> for Label<FileId> {
         let mut label = Label::new(annotation.kind.into(), annotation.span.file_id, annotation.span);
 
         if let Some(message) = annotation.message {
-            label.message = message;
+            label.message = message.into_owned();
         }
 
         label
@@ -370,7 +370,7 @@ impl From<&Annotation> for Label<FileId> {
         let mut label = Label::new(annotation.kind.into(), annotation.span.file_id, annotation.span);
 
         if let Some(message) = &annotation.message {
-            label.message.clone_from(message);
+            message.as_ref().clone_into(&mut label.message);
         }
 
         label
@@ -401,7 +401,7 @@ impl From<Issue> for Diagnostic<FileId> {
         }
 
         for note in issue.notes {
-            diagnostic.notes.push(note);
+            diagnostic.notes.push(note.into_owned());
         }
 
         if let Some(help) = issue.help {
@@ -429,7 +429,7 @@ impl From<&Issue> for Diagnostic<FileId> {
         }
 
         for note in &issue.notes {
-            diagnostic.notes.push(note.clone());
+            diagnostic.notes.push(note.to_string());
         }
 
         if let Some(help) = &issue.help {

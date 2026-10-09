@@ -122,7 +122,7 @@ impl FunctionReturnTypeProvider for SelectKeysProvider {
         }
 
         let mut result = TKeyedArray::new();
-        result.known_items = Some(result_items);
+        result.known_items = Some(result_items.into());
         result.non_empty = known_items.values().any(|(optional, _)| !optional);
 
         Some(TUnion::from_atomic(TAtomic::Array(TArray::Keyed(result))))
@@ -133,7 +133,7 @@ impl FunctionReturnTypeProvider for SelectKeysProvider {
 fn extract_literal_keys(atomic: &TAtomic) -> Option<Vec<ArrayKey>> {
     match atomic {
         TAtomic::Array(TArray::List(list)) => {
-            let known_elements = list.known_elements.as_ref()?;
+            let known_elements = list.known_elements.as_deref()?;
             let mut keys = Vec::new();
 
             for (_, element_type) in known_elements.values() {
@@ -143,7 +143,7 @@ fn extract_literal_keys(atomic: &TAtomic) -> Option<Vec<ArrayKey>> {
             if keys.is_empty() { None } else { Some(keys) }
         }
         TAtomic::Array(TArray::Keyed(keyed)) => {
-            let known_items = keyed.known_items.as_ref()?;
+            let known_items = keyed.known_items.as_deref()?;
             let mut keys = Vec::new();
 
             for (_, value_type) in known_items.values() {

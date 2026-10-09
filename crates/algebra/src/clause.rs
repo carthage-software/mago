@@ -5,7 +5,6 @@ use std::hash::Hasher;
 use std::num::Wrapping;
 
 use foldhash::fast::FixedState;
-use indexmap::IndexMap;
 
 use mago_codex::assertion::Assertion;
 use mago_codex::ttype::TType;
@@ -15,12 +14,14 @@ use mago_word::concat_word;
 use mago_word::empty_word;
 use mago_word::word;
 
+use crate::AssertionMap;
+
 #[derive(Clone, Debug, Eq)]
 pub struct Clause {
     pub condition_span: Span,
     pub span: Span,
     pub hash: u32,
-    pub possibilities: IndexMap<Word, IndexMap<u64, Assertion>>,
+    pub possibilities: AssertionMap<Word, AssertionMap<u64, Assertion>>,
     pub wedge: bool,
     pub reconcilable: bool,
     pub generated: bool,
@@ -47,7 +48,7 @@ impl Clause {
     #[inline]
     #[must_use]
     pub fn new(
-        possibilities: IndexMap<Word, IndexMap<u64, Assertion>>,
+        possibilities: AssertionMap<Word, AssertionMap<u64, Assertion>>,
         condition_span: Span,
         span: Span,
         wedge: Option<bool>,
@@ -68,9 +69,12 @@ impl Clause {
     #[inline]
     #[must_use]
     pub fn remove_possibilities(&self, var_id: Word) -> Option<Clause> {
-        let mut possibilities = self.possibilities.clone();
-
-        possibilities.shift_remove(&var_id);
+        let possibilities: AssertionMap<_, _> = self
+            .possibilities
+            .iter()
+            .filter(|(key, _)| **key != var_id)
+            .map(|(&key, assertions)| (key, assertions.clone()))
+            .collect();
 
         if possibilities.is_empty() {
             return None;
@@ -88,10 +92,23 @@ impl Clause {
 
     #[inline]
     #[must_use]
-    pub fn add_possibility(&self, var_id: Word, new_possibility: IndexMap<u64, Assertion>) -> Clause {
-        let mut possibilities = self.possibilities.clone();
-
-        possibilities.insert(var_id, new_possibility);
+    pub fn add_possibility(&self, var_id: Word, new_possibility: AssertionMap<u64, Assertion>) -> Clause {
+        let mut replacement = Some(new_possibility);
+        let mut possibilities: AssertionMap<_, _> = self
+            .possibilities
+            .iter()
+            .map(|(&key, assertions)| {
+                let assertions = if key == var_id {
+                    replacement.take().unwrap_or_else(|| assertions.clone())
+                } else {
+                    assertions.clone()
+                };
+                (key, assertions)
+            })
+            .collect();
+        if let Some(replacement) = replacement {
+            possibilities.insert(var_id, replacement);
+        }
 
         Clause::new(
             possibilities,
@@ -194,7 +211,7 @@ impl Clause {
 
 #[inline]
 fn get_hash(
-    possibilities: &IndexMap<Word, IndexMap<u64, Assertion>>,
+    possibilities: &AssertionMap<Word, AssertionMap<u64, Assertion>>,
     clause_span: Span,
     wedge: bool,
     reconcilable: bool,
