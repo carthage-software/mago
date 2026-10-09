@@ -161,6 +161,24 @@ impl Assertion {
         FixedState::default().hash_one(self.to_atom())
     }
 
+    /// Hash the opposite assertion without copying its type.
+    #[must_use]
+    pub fn negated_hash(&self) -> u64 {
+        let atom = match self {
+            Self::IsType(atomic) => concat_word!(b"!", atomic.get_id()),
+            Self::IsNotType(atomic) => atomic.get_id(),
+            Self::IsIdentical(atomic) => concat_word!(b"!=", atomic.get_id()),
+            Self::IsNotIdentical(atomic) => concat_word!(b"=", atomic.get_id()),
+            Self::IsEqual(atomic) => concat_word!(b"!~", atomic.get_id()),
+            Self::IsNotEqual(atomic) => concat_word!(b"~", atomic.get_id()),
+            Self::InArray(union) => concat_word!(b"!=in-array-", union.get_id()),
+            Self::NotInArray(union) => concat_word!(b"=in-array-", union.get_id()),
+            _ => self.get_negation().to_atom(),
+        };
+
+        FixedState::default().hash_one(atom)
+    }
+
     #[must_use]
     pub fn is_negation(&self) -> bool {
         matches!(

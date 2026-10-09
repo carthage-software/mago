@@ -164,7 +164,7 @@ fn replace_atomic(
     match &mut atomic_type {
         TAtomic::Array(array_type) => match array_type {
             TArray::Keyed(keyed_data) => {
-                if let Some(known_items) = &mut keyed_data.known_items {
+                if let Some(known_items) = keyed_data.known_items.as_mut().map(Arc::make_mut) {
                     for (_, item_union) in known_items.values_mut() {
                         *item_union = self::replace(item_union, template_result, codebase, next_opts);
                     }
@@ -176,7 +176,7 @@ fn replace_atomic(
                 }
             }
             TArray::List(list_data) => {
-                if let Some(known_elements) = &mut list_data.known_elements {
+                if let Some(known_elements) = list_data.known_elements.as_mut().map(Arc::make_mut) {
                     for (_, element_union_arc) in known_elements.values_mut() {
                         *element_union_arc = self::replace(element_union_arc, template_result, codebase, next_opts);
                     }
@@ -360,7 +360,7 @@ fn handle_template_param_substitution(
         match &mut atomic_type {
             TAtomic::Object(TObject::Named(named_object)) => {
                 named_object.intersection_types =
-                    if new_intersection_types.is_empty() { None } else { Some(new_intersection_types.clone()) };
+                    if new_intersection_types.is_empty() { None } else { Some(new_intersection_types.clone().into()) };
             }
             TAtomic::GenericParameter(parameter) => {
                 parameter.intersection_types =

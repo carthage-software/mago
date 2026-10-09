@@ -109,7 +109,7 @@ impl FunctionReturnTypeProvider for ArrayMergeProvider {
                             any_argument_non_empty = true;
                         }
 
-                        if let Some(items) = keyed.known_items.as_ref() {
+                        if let Some(items) = keyed.known_items.as_deref() {
                             for (key, value) in items {
                                 merged_items.insert(*key, value.clone());
                             }
@@ -141,7 +141,7 @@ impl FunctionReturnTypeProvider for ArrayMergeProvider {
                             all_lists_are_closed = false;
                         }
 
-                        if let Some(known_elements) = list.known_elements.as_ref() {
+                        if let Some(known_elements) = list.known_elements.as_deref() {
                             for (idx, (optional, element_type)) in known_elements {
                                 let new_idx = next_list_index + idx;
                                 merged_list_elements.insert(new_idx, (*optional, element_type.clone()));
@@ -202,7 +202,7 @@ impl FunctionReturnTypeProvider for ArrayMergeProvider {
             result_list.non_empty = any_argument_non_empty;
 
             if !merged_list_elements.is_empty() {
-                result_list.known_elements = Some(merged_list_elements);
+                result_list.known_elements = Some(merged_list_elements.into());
             }
 
             Some(TUnion::from_atomic(TAtomic::Array(TArray::List(result_list))))
@@ -211,7 +211,7 @@ impl FunctionReturnTypeProvider for ArrayMergeProvider {
 
             let has_merged_items = !merged_items.is_empty();
             if has_merged_items {
-                result_array.known_items = Some(merged_items);
+                result_array.known_items = Some(merged_items.into());
             }
 
             result_array.non_empty = any_argument_non_empty || has_merged_items;

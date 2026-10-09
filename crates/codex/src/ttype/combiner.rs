@@ -282,7 +282,7 @@ pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, options: Combin
             known_items: if combination.keyed_array_entries.is_empty() {
                 None
             } else {
-                Some(combination.keyed_array_entries)
+                Some(combination.keyed_array_entries.into())
             },
             parameters: if let Some((k, v)) = combination.keyed_array_parameters {
                 Some((Arc::new(k), Arc::new(v)))
@@ -299,7 +299,7 @@ pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, options: Combin
             known_elements: if combination.list_array_entries.is_empty() {
                 None
             } else {
-                Some(combination.list_array_entries)
+                Some(combination.list_array_entries.into())
             },
             element_type: Arc::new(list_parameter),
             non_empty: combination.flags.contains(CombinationFlags::LIST_ARRAY_ALWAYS_FILLED),
@@ -402,8 +402,8 @@ fn finalize_sealed_arrays(arrays: &mut Vec<TArray>, codebase: &CodebaseMetadata)
     }
 
     arrays.sort_unstable_by_key(|a| match a {
-        TArray::List(list) => list.known_elements.as_ref().map_or(0, std::collections::BTreeMap::len),
-        TArray::Keyed(keyed) => keyed.known_items.as_ref().map_or(0, std::collections::BTreeMap::len),
+        TArray::List(list) => list.known_elements.as_deref().map_or(0, std::collections::BTreeMap::len),
+        TArray::Keyed(keyed) => keyed.known_items.as_deref().map_or(0, std::collections::BTreeMap::len),
     });
 
     let mut keep = vec![true; arrays.len()];
@@ -671,7 +671,9 @@ fn scrape_type_properties(
                     if let Some(known_elements) = known_elements {
                         let mut has_defined_keys = false;
 
-                        for (candidate_element_index, (candidate_optional, candidate_element_type)) in known_elements {
+                        for (candidate_element_index, (candidate_optional, candidate_element_type)) in
+                            Arc::unwrap_or_clone(known_elements)
+                        {
                             let existing_entry = combination.list_array_entries.get(&candidate_element_index);
 
                             let new_entry = if let Some((existing_optional, existing_type)) = existing_entry {
@@ -801,7 +803,7 @@ fn scrape_type_properties(
                             }
 
                             let frozen = TArray::Keyed(TKeyedArray {
-                                known_items: Some(frozen_entries),
+                                known_items: Some(frozen_entries.into()),
                                 parameters: None,
                                 non_empty: combination.flags.contains(CombinationFlags::KEYED_ARRAY_SOMETIMES_FILLED),
                                 known_non_list: combination
@@ -829,7 +831,7 @@ fn scrape_type_properties(
                                 ))
                         {
                             let frozen = TArray::Keyed(TKeyedArray {
-                                known_items: Some(std::mem::take(&mut combination.keyed_array_entries)),
+                                known_items: Some(std::mem::take(&mut combination.keyed_array_entries).into()),
                                 parameters: None,
                                 non_empty: combination.flags.contains(CombinationFlags::KEYED_ARRAY_SOMETIMES_FILLED),
                                 known_non_list: combination
@@ -880,6 +882,7 @@ fn scrape_type_properties(
                     }
 
                     if let Some(known_items) = known_items {
+                        let known_items = Arc::unwrap_or_clone(known_items);
                         let has_existing_entries =
                             !combination.keyed_array_entries.is_empty() || had_previous_keyed_array;
                         let mut possibly_undefined_entries =
@@ -1375,12 +1378,12 @@ fn shapes_are_discriminated(
 /// This is needed when combining a sealed array with a parametric one, the parametric
 /// array's generic string keys could overwrite any of the sealed array's known keys.
 fn widen_known_items_with_params(
-    known_items: Option<BTreeMap<ArrayKey, (bool, TUnion)>>,
+    known_items: Option<Arc<BTreeMap<ArrayKey, (bool, TUnion)>>>,
     params: Option<&(TUnion, TUnion)>,
     other_known_items: &BTreeMap<ArrayKey, (bool, TUnion)>,
     codebase: &CodebaseMetadata,
     options: CombinerOptions,
-) -> Option<BTreeMap<ArrayKey, (bool, TUnion)>> {
+) -> Option<Arc<BTreeMap<ArrayKey, (bool, TUnion)>>> {
     let mut items = known_items?;
 
     if let Some((key_param, value_param)) = params {
@@ -1416,7 +1419,7 @@ fn widen_known_items_with_params(
             return Some(items);
         }
 
-        for (key, (_, entry_type)) in items.iter_mut() {
+        for (key, (_, entry_type)) in Arc::make_mut(&mut items).iter_mut() {
             if entry_type == value_param {
                 continue;
             }
@@ -1484,6 +1487,7 @@ fn flush_sealed_keyed_arrays_into_combination(
         }
 
         if let Some(known_items) = known_items {
+            let known_items = Arc::unwrap_or_clone(known_items);
             for (candidate_item_name, (candidate_optional, candidate_item_type)) in known_items {
                 if let Some((existing_optional, existing_type)) =
                     combination.keyed_array_entries.get_mut(&candidate_item_name)
@@ -1651,7 +1655,7 @@ mod tests {
                     (ArrayKey::String(word("name")), (true, crate::ttype::get_string())),
                 ]);
                 let shape = TAtomic::Array(TArray::Keyed(TKeyedArray {
-                    known_items: Some(items.clone()),
+                    known_items: Some(items.clone().into()),
                     parameters: None,
                     non_empty,
                     known_non_list: true,

@@ -1,8 +1,8 @@
 use std::rc::Rc;
 
 use foldhash::HashSet;
-use indexmap::IndexMap;
 
+use mago_algebra::AssertionMap;
 use mago_algebra::assertion_set::AssertionSet;
 use mago_algebra::clause::Clause;
 use mago_codex::ttype::union::TUnion;
@@ -23,7 +23,7 @@ pub struct IfScope<'ctx> {
     pub possibly_assigned_variable_ids: WordSet,
     pub possibly_redefined_variables: WordMap<Rc<TUnion>>,
     pub updated_variables: WordSet,
-    pub negated_types: IndexMap<Word, AssertionSet>,
+    pub negated_types: AssertionMap<Word, AssertionSet>,
     pub conditionally_changed_variable_ids: WordSet,
     pub negated_clauses: Vec<Clause>,
     pub reasonable_clauses: Vec<Rc<Clause>>,
@@ -51,7 +51,7 @@ impl IfScope<'_> {
             possibly_assigned_variable_ids: WordSet::default(),
             possibly_redefined_variables: WordMap::default(),
             updated_variables: WordSet::default(),
-            negated_types: IndexMap::default(),
+            negated_types: AssertionMap::default(),
             conditionally_changed_variable_ids: WordSet::default(),
             negated_clauses: Vec::default(),
             reasonable_clauses: Vec::default(),

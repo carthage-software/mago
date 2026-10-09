@@ -67,6 +67,7 @@ impl TGlobalReferenceSelector {
 /// into a concrete type (`TObject`, `TEnum`, constant type, etc.).
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[allow(clippy::box_collection, reason = "Keep the collection header off the stack to shrink every TAtomic.")]
 pub enum TReference {
     /// A reference to a symbol name (class, interface, trait, enum, ..etc).
     /// Example: `Foo`, `Bar<int>`, `T`.
@@ -76,10 +77,10 @@ pub enum TReference {
         /// Generic arguments provided at the reference site, e.g., the `<int>` in `Foo<int>`.
         /// Kept original name `type_params` as requested for fields.
         parameters: Option<Vec<TUnion>>,
-        variances: Option<Vec<Variance>>,
+        variances: Option<Box<Vec<Variance>>>,
         /// Represents additional types in an intersection type (`&B&S` part of `A&B&S`).
         /// Contains other *atomic* types (boxed due to potential recursion).
-        intersection_types: Option<Vec<TAtomic>>,
+        intersection_types: Option<Box<Vec<TAtomic>>>,
     },
     /// A reference to a member within a class-like scope (class constant, enum case).
     /// Example: `Client::THRESHOLD`, `Status::Ok`.
@@ -108,8 +109,7 @@ impl TReference {
 }
 
 impl TType for TReference {
-    fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
-        let mut children = Vec::new();
+    fn append_child_nodes<'types>(&'types self, children: &mut Vec<TypeRef<'types>>) {
         if let TReference::Symbol { parameters, intersection_types, .. } = self {
             if let Some(params) = parameters {
                 for param in params {
@@ -118,13 +118,11 @@ impl TType for TReference {
             }
 
             if let Some(intersection_types) = intersection_types {
-                for atomic in intersection_types {
+                for atomic in intersection_types.iter() {
                     children.push(TypeRef::Atomic(atomic));
                 }
             }
         }
-
-        children
     }
 
     fn can_be_intersected(&self) -> bool {
@@ -133,14 +131,14 @@ impl TType for TReference {
 
     fn get_intersection_types(&self) -> Option<&[TAtomic]> {
         match self {
-            TReference::Symbol { intersection_types, .. } => intersection_types.as_deref(),
+            TReference::Symbol { intersection_types, .. } => intersection_types.as_deref().map(Vec::as_slice),
             _ => None,
         }
     }
 
     fn get_intersection_types_mut(&mut self) -> Option<&mut Vec<TAtomic>> {
         match self {
-            TReference::Symbol { intersection_types, .. } => intersection_types.as_mut(),
+            TReference::Symbol { intersection_types, .. } => intersection_types.as_deref_mut(),
             _ => None,
         }
     }
@@ -158,7 +156,7 @@ impl TType for TReference {
                 if let Some(intersection_types) = intersection_types {
                     intersection_types.push(intersection_type);
                 } else {
-                    *intersection_types = Some(vec![intersection_type]);
+                    *intersection_types = Some(Box::new(vec![intersection_type]));
                 }
 
                 true

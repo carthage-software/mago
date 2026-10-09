@@ -3,7 +3,6 @@ use std::rc::Rc;
 use std::sync::Arc;
 use std::sync::LazyLock;
 
-use foldhash::HashMap;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::key::ArrayKey;
@@ -23,13 +22,15 @@ use mago_codex::ttype::get_positive_int;
 use mago_codex::ttype::get_string;
 use mago_codex::ttype::get_truthy_string;
 use mago_codex::ttype::union::TUnion;
+use mago_word::Word;
+use mago_word::WordMap;
 use mago_word::word;
 
 std::thread_local! {
-    static SUPERGLOBALS_MAP: LazyLock<HashMap<&'static str, Rc<TUnion>>> = LazyLock::new(|| {
-        let mut map = HashMap::default();
+    static SUPERGLOBALS_MAP: LazyLock<WordMap<Rc<TUnion>>> = LazyLock::new(|| {
+        let mut map = WordMap::default();
 
-        map.insert("$argv", Rc::new({
+        map.insert(word("$argv"), Rc::new({
             let mut type_union = TUnion::from_vec(vec![
                 TAtomic::Null,
                 TAtomic::Array(TArray::List(TList::new_non_empty(Arc::new(get_string())))),
@@ -39,14 +40,14 @@ std::thread_local! {
             type_union
         }));
 
-        map.insert("$argc", Rc::new({
+        map.insert(word("$argc"), Rc::new({
             let mut type_union = get_one_int();
 
             type_union.set_ignore_nullable_issues(true);
             type_union
         }));
 
-        map.insert("$http_response_header", Rc::new({
+        map.insert(word("$http_response_header"), Rc::new({
             let mut type_union =
                 TUnion::from_atomic(TAtomic::Array(TArray::List(TList::new_non_empty(Arc::new(get_truthy_string())))));
 
@@ -54,7 +55,7 @@ std::thread_local! {
             type_union
         }));
 
-        map.insert("$GLOBALS", Rc::new({
+        map.insert(word("$GLOBALS"), Rc::new({
             let mut known_items = BTreeMap::new();
             known_items.insert(ArrayKey::String(word("argc")), (true, get_positive_int()));
             known_items.insert(
@@ -63,7 +64,7 @@ std::thread_local! {
             );
 
             TUnion::from_atomic(TAtomic::Array(TArray::Keyed(TKeyedArray {
-                known_items: Some(known_items),
+                known_items: Some(known_items.into()),
                 parameters: Some((Arc::new(get_non_empty_string()), Arc::new(get_mixed()))),
                 non_empty: true,
                 known_non_list: false,
@@ -99,12 +100,12 @@ std::thread_local! {
             ])),
         )))));
 
-        map.insert("$_GET", Rc::clone(&user_input_type_union));
-        map.insert("$_POST", Rc::clone(&user_input_type_union));
-        map.insert("$_REQUEST", Rc::clone(&user_input_type_union));
-        map.insert("$_COOKIE", user_input_type_union);
+        map.insert(word("$_GET"), Rc::clone(&user_input_type_union));
+        map.insert(word("$_POST"), Rc::clone(&user_input_type_union));
+        map.insert(word("$_REQUEST"), Rc::clone(&user_input_type_union));
+        map.insert(word("$_COOKIE"), user_input_type_union);
 
-        map.insert("$_SERVER", Rc::new({
+        map.insert(word("$_SERVER"), Rc::new({
             // Use a fixed timestamp to ensure deterministic type representations.
             // This value (1764191486) was chosen at the time of implementation and has no special meaning.
             // Using a dynamic timestamp would cause baseline matching to fail since error messages
@@ -216,14 +217,14 @@ std::thread_local! {
             );
 
             TUnion::from_atomic(TAtomic::Array(TArray::Keyed(TKeyedArray {
-                known_items: Some(known_items),
+                known_items: Some(known_items.into()),
                 parameters: Some((Arc::new(get_non_empty_string()), Arc::new(get_string()))),
                 non_empty: true,
                 known_non_list: false,
             })))
         }));
 
-        map.insert("$_ENV", Rc::new({
+        map.insert(word("$_ENV"), Rc::new({
             let mut known_items = BTreeMap::new();
 
             // Standard environment variables
@@ -252,14 +253,14 @@ std::thread_local! {
             known_items.insert(ArrayKey::String(word("DB_PASSWORD")), (true, get_string()));
 
             TUnion::from_atomic(TAtomic::Array(TArray::Keyed(TKeyedArray {
-                known_items: Some(known_items),
+                known_items: Some(known_items.into()),
                 parameters: Some((Arc::new(get_non_empty_string()), Arc::new(get_string()))),
                 non_empty: true,
                 known_non_list: false,
             })))
         }));
 
-        map.insert("$_FILES", Rc::new(TUnion::from_atomic(TAtomic::Array(TArray::Keyed(TKeyedArray {
+        map.insert(word("$_FILES"), Rc::new(TUnion::from_atomic(TAtomic::Array(TArray::Keyed(TKeyedArray {
             known_items: None,
             parameters: Some((
                 Arc::new(get_non_empty_string()),
@@ -337,7 +338,7 @@ std::thread_local! {
                                 ]),
                             ),
                         ),
-                    ])),
+                    ]).into()),
                     parameters: None,
                     non_empty: true,
                     known_non_list: false,
@@ -347,7 +348,7 @@ std::thread_local! {
             known_non_list: false,
         })))));
 
-        map.insert("$_SESSION", Rc::new({
+        map.insert(word("$_SESSION"), Rc::new({
             let mut type_union = TUnion::from_atomic(TAtomic::Array(TArray::Keyed(TKeyedArray::new_with_parameters(
                 Arc::new(get_non_empty_string()),
                 Arc::new(get_mixed()),
@@ -361,12 +362,10 @@ std::thread_local! {
     });
 }
 
-/// Return a read reference to the superglobals map.
-pub fn get_super_globals() -> impl Iterator<Item = (&'static str, Rc<TUnion>)> {
-    SUPERGLOBALS_MAP.with(|map| map.iter().map(|(k, v)| (*k, Rc::clone(v))).collect::<Vec<_>>().into_iter())
+pub fn get_super_globals() -> WordMap<Rc<TUnion>> {
+    SUPERGLOBALS_MAP.with(|map| WordMap::clone(map))
 }
 
-pub fn get_global_variable_type(variable_name: &[u8]) -> Option<Rc<TUnion>> {
-    let key = std::str::from_utf8(variable_name).ok()?;
-    SUPERGLOBALS_MAP.with(|map| map.get(key).cloned())
+pub fn get_global_variable_type(variable_name: Word) -> Option<Rc<TUnion>> {
+    SUPERGLOBALS_MAP.with(|map| map.get(&variable_name).cloned())
 }

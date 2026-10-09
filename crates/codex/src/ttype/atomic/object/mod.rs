@@ -16,11 +16,10 @@ use crate::ttype::union::TUnion;
 macro_rules! has_member_ttype_impl {
     ($member_type:ident, $member_field:ident, $id_prefix:literal) => {
         impl TType for $member_type {
-            fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
-                self.intersection_types
-                    .as_ref()
-                    .map(|types| types.iter().map(TypeRef::Atomic).collect())
-                    .unwrap_or_default()
+            fn append_child_nodes<'types>(&'types self, children: &mut Vec<TypeRef<'types>>) {
+                if let Some(types) = &self.intersection_types {
+                    children.extend(types.iter().map(TypeRef::Atomic));
+                }
             }
 
             fn can_be_intersected(&self) -> bool {
@@ -182,14 +181,14 @@ impl TObject {
 }
 
 impl TType for TObject {
-    fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
+    fn append_child_nodes<'types>(&'types self, children: &mut Vec<TypeRef<'types>>) {
         match self {
-            TObject::Any => vec![],
-            TObject::HasMethod(has_method) => has_method.get_child_nodes(),
-            TObject::HasProperty(has_property) => has_property.get_child_nodes(),
-            TObject::Enum(ttype) => ttype.get_child_nodes(),
-            TObject::Named(ttype) => ttype.get_child_nodes(),
-            TObject::WithProperties(ttype) => ttype.get_child_nodes(),
+            TObject::Any => (),
+            TObject::HasMethod(has_method) => has_method.append_child_nodes(children),
+            TObject::HasProperty(has_property) => has_property.append_child_nodes(children),
+            TObject::Enum(ttype) => ttype.append_child_nodes(children),
+            TObject::Named(ttype) => ttype.append_child_nodes(children),
+            TObject::WithProperties(ttype) => ttype.append_child_nodes(children),
         }
     }
 

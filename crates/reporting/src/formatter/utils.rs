@@ -237,7 +237,7 @@ pub fn long_message(issue: &Issue, include_annotations: bool) -> String {
             if let Some(annotation_msg) = annotation.message.as_ref() {
                 message.push('\n');
                 message.push('>');
-                message.push_str(annotation_msg.as_str());
+                message.push_str(annotation_msg.as_ref());
             }
         }
     }
@@ -247,13 +247,13 @@ pub fn long_message(issue: &Issue, include_annotations: bool) -> String {
 
         for note in &issue.notes {
             message.push('\n');
-            message.push_str(note.as_str());
+            message.push_str(note.as_ref());
         }
     }
 
     if let Some(help) = issue.help.as_ref() {
         message.push_str("\n\nHelp: ");
-        message.push_str(help.as_str());
+        message.push_str(help.as_ref());
     }
 
     if let Some(link) = issue.link.as_ref() {

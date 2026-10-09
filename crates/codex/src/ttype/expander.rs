@@ -235,7 +235,7 @@ pub(crate) fn expand_atomic(
                     expand_shared_union(codebase, value_parameter, options);
                 }
 
-                if let Some(known_items) = &mut keyed_data.known_items {
+                if let Some(known_items) = keyed_data.known_items.as_mut().map(Arc::make_mut) {
                     // Check if any keys need resolution
                     let needs_key_resolution = known_items.keys().any(|k| k.is_class_like_constant());
 
@@ -256,7 +256,7 @@ pub(crate) fn expand_atomic(
             TArray::List(list_data) => {
                 expand_shared_union(codebase, &mut list_data.element_type, options);
 
-                if let Some(known_elements) = &mut list_data.known_elements {
+                if let Some(known_elements) = list_data.known_elements.as_mut().map(Arc::make_mut) {
                     for (_, element_type) in known_elements.values_mut() {
                         expand_union(codebase, element_type, options);
                     }
@@ -284,7 +284,7 @@ pub(crate) fn expand_atomic(
                 }
             }
 
-            for constraint in &mut signature.constraints {
+            for constraint in Arc::make_mut(&mut signature.constraints).iter_mut() {
                 expand_shared_union(codebase, &mut constraint.input_type, options);
                 if !contains_parameter_variable(&constraint.parameter_type) {
                     expand_shared_union(codebase, &mut constraint.parameter_type, options);
@@ -637,7 +637,7 @@ fn resolve_generic_static_type(
     }
 
     let mut parameter = parameter.clone();
-    for intersection in named.intersection_types.iter().flatten() {
+    for intersection in named.intersection_types.iter().flat_map(|types| types.iter()) {
         parameter.add_intersection_type(intersection.clone());
     }
 
@@ -804,7 +804,7 @@ fn resolve_static_type(
             }
 
             if let Some(intersections) = &static_obj.intersection_types {
-                named.intersection_types.get_or_insert_with(Vec::new).extend(intersections.iter().cloned());
+                named.intersection_types.get_or_insert_with(Box::default).extend(intersections.iter().cloned());
             }
 
             // When the receiver reaches the declaring class through `@mixin`, the
@@ -852,7 +852,7 @@ fn is_effectively_final(class_name: &Word, codebase: &CodebaseMetadata, options:
 fn intersection_object_names(obj: &TNamedObject) -> impl Iterator<Item = Word> {
     obj.intersection_types
         .iter()
-        .flatten()
+        .flat_map(|types| types.iter())
         .filter_map(|t| if let TAtomic::Object(obj) = t { obj.get_name() } else { None })
 }
 
@@ -941,10 +941,10 @@ fn expand_or_fill_type_parameters(
 ) {
     if let Some(class_metadata) = class_metadata {
         let template_count = class_metadata.template_types.len();
-        let supplied_count = named.type_parameters.as_ref().map_or(0, Vec::len);
+        let supplied_count = named.type_parameters.as_ref().map_or(0, |parameters| parameters.len());
 
         if supplied_count < template_count {
-            let mut params = named.type_parameters.take().unwrap_or_default();
+            let mut params = named.type_parameters.take().unwrap_or_default().into_vec();
             params.extend(class_metadata.template_types.values().skip(supplied_count).map(|template| {
                 if let Some(default) = &template.default {
                     let mut default = default.clone();
@@ -956,7 +956,7 @@ fn expand_or_fill_type_parameters(
                     constraint
                 }
             }));
-            named.type_parameters = Some(params);
+            named.type_parameters = Some(params.into_boxed_slice());
         }
     }
 
@@ -1509,7 +1509,7 @@ mod tests {
         let mut keyed = TKeyedArray::new();
         let mut known_items = BTreeMap::new();
         known_items.insert(ArrayKey::String(word("key")), (false, make_self_object()));
-        keyed.known_items = Some(known_items);
+        keyed.known_items = Some(known_items.into());
         let input = TUnion::from_atomic(TAtomic::Array(TArray::Keyed(keyed)));
 
         let options = options_with_self("Foo");
@@ -1563,7 +1563,7 @@ mod tests {
         let mut list = TList::new(Arc::new(get_mixed()));
         let mut known_elements = BTreeMap::new();
         known_elements.insert(0, (false, make_self_object()));
-        list.known_elements = Some(known_elements);
+        list.known_elements = Some(known_elements.into());
         let input = TUnion::from_atomic(TAtomic::Array(TArray::List(list)));
 
         let options = options_with_self("Foo");
@@ -1730,7 +1730,7 @@ mod tests {
         default_key.set_from_template_default(true);
         let mut default_value = crate::ttype::get_mixed();
         default_value.set_from_template_default(true);
-        input.type_parameters = Some(vec![default_key, default_value]);
+        input.type_parameters = Some(Box::new([default_key, default_value]));
 
         let receiver = TNamedObject::new_with_type_parameters(
             ascii_lowercase_word(b"collection"),
@@ -1744,7 +1744,7 @@ mod tests {
             panic!("expected a named object");
         };
         let parameters = actual.type_parameters.as_ref().expect("expected type parameters");
-        assert_eq!(parameters, &[crate::ttype::get_int(), crate::ttype::get_string()]);
+        assert_eq!(parameters.as_ref(), &[crate::ttype::get_int(), crate::ttype::get_string()]);
     }
 
     #[test]
@@ -1881,6 +1881,7 @@ mod tests {
         if let TAtomic::Object(TObject::Named(named)) = &actual.types[0]
             && let Some(params) = &named.type_parameters
         {
+            assert_eq!(params.len(), 1);
             assert!(params[0].types.iter().any(|t| {
                 if let TAtomic::Object(TObject::Named(named)) = t {
                     named.name == ascii_lowercase_word(b"foo")
@@ -1950,8 +1951,9 @@ mod tests {
         let input = make_static_object();
 
         let mut static_named = TNamedObject::new(ascii_lowercase_word(b"foo"));
-        static_named.intersection_types =
-            Some(vec![TAtomic::Object(TObject::Named(TNamedObject::new(ascii_lowercase_word(b"stringable"))))]);
+        static_named.intersection_types = Some(Box::new(vec![TAtomic::Object(TObject::Named(TNamedObject::new(
+            ascii_lowercase_word(b"stringable"),
+        )))]));
         let static_obj = TObject::Named(static_named);
         let options = options_with_static_object(static_obj);
 
@@ -2154,6 +2156,7 @@ mod tests {
             && let TAtomic::Object(TObject::Named(named)) = &param.constraint.types[0]
             && let Some(params) = &named.type_parameters
         {
+            assert_eq!(params.len(), 1);
             assert!(params[0].types.iter().any(|t| {
                 if let TAtomic::Object(TObject::Named(named)) = t {
                     named.name == ascii_lowercase_word(b"foo")
@@ -2771,7 +2774,7 @@ mod tests {
         let mut keyed = TKeyedArray::new();
         let mut known_items = BTreeMap::new();
         known_items.insert(ArrayKey::String(word("key")), (false, get_int()));
-        keyed.known_items = Some(known_items);
+        keyed.known_items = Some(known_items.into());
         let array_type = TUnion::from_atomic(TAtomic::Array(TArray::Keyed(keyed)));
 
         use crate::ttype::get_literal_string;
@@ -2797,7 +2800,7 @@ mod tests {
         let mut keyed = TKeyedArray::new();
         let mut known_items = BTreeMap::new();
         known_items.insert(ArrayKey::String(word("key")), (false, make_self_object()));
-        keyed.known_items = Some(known_items);
+        keyed.known_items = Some(known_items.into());
         let array_type = TUnion::from_atomic(TAtomic::Array(TArray::Keyed(keyed)));
 
         use crate::ttype::get_literal_string;
@@ -3097,6 +3100,7 @@ mod tests {
         if let TAtomic::Object(TObject::Named(named)) = &actual.types[0]
             && let Some(params) = &named.type_parameters
         {
+            assert_eq!(params.len(), 2);
             assert!(params[0].types.iter().any(|t| {
                 if let TAtomic::Object(TObject::Named(named)) = t {
                     named.name == ascii_lowercase_word(b"foo")

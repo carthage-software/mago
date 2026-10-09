@@ -1625,7 +1625,7 @@ fn encode_callable_snapshot<'type_info>(
             writer.write_bool(signature.is_pure);
             writer.write_bool(signature.is_closure);
             write_snapshot_count(writer, signature.parameters.len(), "callable parameters")?;
-            for parameter in &signature.parameters {
+            for parameter in signature.parameters.iter() {
                 writer.write_bool(parameter.get_name().is_some());
                 if let Some(name) = parameter.get_name() {
                     writer.write_bytes(name.0.as_bytes())?;
@@ -1657,7 +1657,7 @@ fn encode_callable_snapshot<'type_info>(
             }
 
             write_snapshot_count(writer, signature.constraints.len(), "callable constraints")?;
-            for constraint in &signature.constraints {
+            for constraint in signature.constraints.iter() {
                 write_snapshot_count(writer, constraint.parameter_names.len(), "callable constraint names")?;
                 for name in &constraint.parameter_names {
                     writer.write_bytes(name.0.as_bytes())?;
@@ -1689,10 +1689,15 @@ fn encode_object_snapshot<'type_info>(
             writer.write_u8(2);
             writer.write_bytes(named.name.as_bytes())?;
             encode_optional_unions(writer, named.type_parameters.as_deref(), types, depth + 1)?;
-            encode_optional_variances(writer, named.variances.as_deref())?;
+            encode_optional_variances(writer, named.variances.as_deref().map(Vec::as_slice))?;
             writer.write_bool(named.is_static);
             writer.write_bool(named.is_this);
-            encode_optional_atomic_snapshots(writer, named.intersection_types.as_deref(), types, depth + 1)?;
+            encode_optional_atomic_snapshots(
+                writer,
+                named.intersection_types.as_deref().map(Vec::as_slice),
+                types,
+                depth + 1,
+            )?;
             writer.write_bool(named.remapped_parameters);
         }
         TObject::Enum(r#enum) => {
@@ -1738,7 +1743,7 @@ fn encode_array_snapshot<'type_info>(
             writer.write_bool(list.known_elements.is_some());
             if let Some(elements) = &list.known_elements {
                 write_snapshot_count(writer, elements.len(), "known list elements")?;
-                for (index, (optional, element_type)) in elements {
+                for (index, (optional, element_type)) in elements.iter() {
                     writer.write_u64(*index as u64);
                     writer.write_bool(*optional);
                     encode_union_snapshot_inner(writer, element_type, types, depth + 1)?;
@@ -1757,7 +1762,7 @@ fn encode_array_snapshot<'type_info>(
             writer.write_bool(keyed.known_items.is_some());
             if let Some(items) = &keyed.known_items {
                 write_snapshot_count(writer, items.len(), "known array items")?;
-                for (key, (optional, value_type)) in items {
+                for (key, (optional, value_type)) in items.iter() {
                     encode_array_key(writer, key)?;
                     writer.write_bool(*optional);
                     encode_union_snapshot_inner(writer, value_type, types, depth + 1)?;
@@ -1788,8 +1793,13 @@ fn encode_reference_snapshot<'type_info>(
             writer.write_u8(1);
             writer.write_bytes(name.as_bytes())?;
             encode_optional_unions(writer, parameters.as_deref(), types, depth + 1)?;
-            encode_optional_variances(writer, variances.as_deref())?;
-            encode_optional_atomic_snapshots(writer, intersection_types.as_deref(), types, depth + 1)?;
+            encode_optional_variances(writer, variances.as_deref().map(Vec::as_slice))?;
+            encode_optional_atomic_snapshots(
+                writer,
+                intersection_types.as_deref().map(Vec::as_slice),
+                types,
+                depth + 1,
+            )?;
         }
         TReference::Member { class_like_name, member_selector } => {
             writer.write_u8(2);
@@ -2755,11 +2765,11 @@ fn decode_complete_object(reader: &mut PayloadReader<'_>, depth: usize) -> Resul
             let remapped_parameters = reader.read_bool("named object remapped parameters flag")?;
             TObject::Named(TNamedObject {
                 name,
-                type_parameters,
-                variances,
+                type_parameters: type_parameters.map(Vec::into_boxed_slice),
+                variances: variances.map(Box::new),
                 is_static,
                 is_this,
-                intersection_types,
+                intersection_types: intersection_types.map(Box::new),
                 remapped_parameters,
             })
         }
@@ -2821,7 +2831,7 @@ fn decode_complete_array(reader: &mut PayloadReader<'_>, depth: usize) -> Result
             };
 
             let non_empty = reader.read_bool("list non-empty flag")?;
-            TArray::List(TList { element_type, known_elements, known_count, non_empty })
+            TArray::List(TList { element_type, known_elements: known_elements.map(Into::into), known_count, non_empty })
         }
         2 => {
             let known_items = if reader.read_bool("known array items presence")? {
@@ -2847,7 +2857,12 @@ fn decode_complete_array(reader: &mut PayloadReader<'_>, depth: usize) -> Result
             };
 
             let non_empty = reader.read_bool("array non-empty flag")?;
-            TArray::Keyed(TKeyedArray { known_items, parameters, non_empty, known_non_list: false })
+            TArray::Keyed(TKeyedArray {
+                known_items: known_items.map(Into::into),
+                parameters,
+                non_empty,
+                known_non_list: false,
+            })
         }
         unknown => return Err(protocol(format!("unknown complete array kind {unknown}"))),
     })
@@ -2873,8 +2888,8 @@ fn decode_complete_reference(
         1 => TReference::Symbol {
             name: word(reader.read_bytes("referenced symbol name")?),
             parameters: decode_optional_complete_unions(reader, depth + 1)?,
-            variances: decode_optional_variances(reader)?,
-            intersection_types: decode_optional_complete_atomics(reader, depth + 1)?,
+            variances: decode_optional_variances(reader)?.map(Box::new),
+            intersection_types: decode_optional_complete_atomics(reader, depth + 1)?.map(Box::new),
         },
         2 => TReference::Member {
             class_like_name: word(reader.read_bytes("reference member class")?),

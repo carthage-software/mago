@@ -31,13 +31,10 @@ impl TObjectWithProperties {
 }
 
 impl TType for TObjectWithProperties {
-    fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
-        let mut children = vec![];
+    fn append_child_nodes<'types>(&'types self, children: &mut Vec<TypeRef<'types>>) {
         for (_, item_type) in self.known_properties.values() {
             children.push(TypeRef::Union(item_type));
         }
-
-        children
     }
 
     fn needs_population(&self) -> bool {

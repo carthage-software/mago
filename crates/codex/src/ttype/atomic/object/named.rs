@@ -15,12 +15,13 @@ use crate::ttype::union::TUnion;
 /// flags (`$this`, internal state), and potential intersection types (`&OtherType`).
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[allow(clippy::box_collection, reason = "Keep the collection header off the stack to shrink every TAtomic.")]
 pub struct TNamedObject {
     /// The fully qualified class name (FQCN) of the primary type (e.g., `A` in `A&B<T>&S`).
     pub name: Word,
     /// Concrete types provided for generic type parameters, if any.
-    pub type_parameters: Option<Vec<TUnion>>,
-    pub variances: Option<Vec<Variance>>,
+    pub type_parameters: Option<Box<[TUnion]>>,
+    pub variances: Option<Box<Vec<Variance>>>,
     /// `true` if this represents the `static` type (same class, possibly different instance).
     /// Set for `new static()`, `: static` return type, and `$this`.
     pub is_static: bool,
@@ -29,7 +30,7 @@ pub struct TNamedObject {
     pub is_this: bool,
     /// Represents additional types in an intersection type (`&B&S` part of `A&B&S`).
     /// Contains other *atomic* types (boxed due to potential recursion).
-    pub intersection_types: Option<Vec<TAtomic>>,
+    pub intersection_types: Option<Box<Vec<TAtomic>>>,
     /// Internal analysis flag: `true` if the type parameters have been remapped.
     pub remapped_parameters: bool,
 }
@@ -116,14 +117,14 @@ impl TNamedObject {
     #[inline]
     #[must_use]
     pub fn with_type_parameters(mut self, type_parameters: Option<Vec<TUnion>>) -> Self {
-        self.type_parameters = type_parameters;
+        self.type_parameters = type_parameters.map(Vec::into_boxed_slice);
         self
     }
 
     #[inline]
     #[must_use]
     pub fn with_variances(mut self, variances: Option<Vec<Variance>>) -> Self {
-        self.variances = variances;
+        self.variances = variances.map(Box::new);
         self
     }
 
@@ -146,9 +147,7 @@ impl TNamedObject {
 }
 
 impl TType for TNamedObject {
-    fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
-        let mut children = vec![];
-
+    fn append_child_nodes<'types>(&'types self, children: &mut Vec<TypeRef<'types>>) {
         if let Some(type_parameters) = &self.type_parameters {
             for parameter in type_parameters {
                 children.push(TypeRef::Union(parameter));
@@ -156,12 +155,10 @@ impl TType for TNamedObject {
         }
 
         if let Some(intersection_types) = &self.intersection_types {
-            for atomic in intersection_types {
+            for atomic in intersection_types.iter() {
                 children.push(TypeRef::Atomic(atomic));
             }
         }
-
-        children
     }
 
     fn can_be_intersected(&self) -> bool {
@@ -169,11 +166,11 @@ impl TType for TNamedObject {
     }
 
     fn get_intersection_types(&self) -> Option<&[TAtomic]> {
-        self.intersection_types.as_deref()
+        self.intersection_types.as_deref().map(Vec::as_slice)
     }
 
     fn get_intersection_types_mut(&mut self) -> Option<&mut Vec<TAtomic>> {
-        self.intersection_types.as_mut()
+        self.intersection_types.as_deref_mut()
     }
 
     fn has_intersection_types(&self) -> bool {
@@ -184,7 +181,7 @@ impl TType for TNamedObject {
         if let Some(intersection_types) = self.intersection_types.as_mut() {
             intersection_types.push(intersection_type);
         } else {
-            self.intersection_types = Some(vec![intersection_type]);
+            self.intersection_types = Some(Box::new(vec![intersection_type]));
         }
 
         true

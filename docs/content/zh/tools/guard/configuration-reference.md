@@ -54,6 +54,7 @@ layering = [
     "CarthageSoftware\\UI",
     "CarthageSoftware\\Infrastructure",
 ]
+layering-reason = "Outer layers may depend on inner layers, never the reverse."
 
 [guard.perimeter.layers]
 core = ["@native", "Psl\\**"]
@@ -63,6 +64,7 @@ framework = ["Symfony\\**", "Doctrine\\**"]
 [[guard.perimeter.rules]]
 namespace = "CarthageSoftware\\Domain"
 permit = ["@layer:core"]
+reason = "Domain code may only use PHP built-ins and Psl."
 
 [[guard.perimeter.rules]]
 namespace = "CarthageSoftware\\Application"
@@ -81,6 +83,10 @@ permit = ["@all"]
 
 一个有序的命名空间列表,从最独立的核心,依次向外延展到最外层。每一层只能依赖在其之前定义的层。指向更外层的依赖会触发违规。
 
+### `layering-reason`
+
+可选的人类可读说明,会在报告分层违规时显示。
+
 ### 层别名
 
 `[guard.perimeter.layers]` 定义可重用的命名空间和路径分组,在规则中通过 `@layer:<name>` 引用。
@@ -91,6 +97,7 @@ permit = ["@all"]
 
 - `namespace`:此规则所适用的命名空间。可以是以 `\` 结尾的命名空间,或特殊关键字 `@global`(表示全局命名空间)。
 - `permit`:被允许的依赖。可以是字符串列表或带详细字段的对象列表。
+- `reason`:可选的人类可读说明,会显示在错误消息中。
 
 #### `permit` 的取值
 
@@ -127,6 +134,7 @@ permit = [{ path = "@all", kinds = ["class-like"] }]
 dependency = "App\\Http\\Controllers\\Controller"
 allow-from = ["App\\Http\\Controllers\\"]
 kinds = ["class-like"]
+reason = "Controllers must stay in the HTTP layer."
 
 [[guard.perimeter.restrictions]]
 dependency = "Illuminate\\Foundation\\Bus\\Dispatchable"
@@ -139,6 +147,7 @@ deny-from = ["App\\"]
 | `allow-from` | 可选的来源命名空间模式。列表非空时,匹配的依赖只能从这些命名空间使用。 |
 | `deny-from` | 可选的来源命名空间模式。匹配的依赖禁止从这些命名空间使用。 |
 | `kinds` | 可选的依赖种类过滤器。取值为 `class-like`、`function`、`constant`、`attribute`。空列表表示适用于所有种类。 |
+| `reason` | 可选的人类可读说明,会显示在错误消息中。 |
 
 限制会在普通 `permit` 规则和 layering 之前求值,因此权限不能覆盖限制。如果 `allow-from` 和 `deny-from` 同时匹配,以 `deny-from` 为准。匹配 `allow-from` 只表示满足该限制;如果配置了普通边界规则或 layering,它们仍然必须允许该依赖。仅包含限制的配置会允许无关依赖;限制不会建立隐式允许列表。
 

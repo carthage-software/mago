@@ -130,7 +130,7 @@ impl FunctionReturnTypeProvider for ArrayMapProvider {
                 Some(wrap_atomic(TAtomic::Array(TArray::Keyed(result))))
             }
             TArray::List(list) if list.known_elements.is_some() => {
-                let known_elements = list.known_elements.as_ref()?;
+                let known_elements = list.known_elements.as_deref()?;
                 let new_elements: BTreeMap<_, _> = known_elements
                     .iter()
                     .map(|(idx, (optional, value))| (*idx, (*optional, resolve_for(value))))
@@ -142,7 +142,7 @@ impl FunctionReturnTypeProvider for ArrayMapProvider {
                     } else {
                         Arc::new(resolve_for(&list.element_type))
                     },
-                    known_elements: Some(new_elements),
+                    known_elements: Some(new_elements.into()),
                     known_count: list.known_count,
                     non_empty: list.non_empty,
                 };

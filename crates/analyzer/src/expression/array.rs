@@ -460,7 +460,8 @@ where
                         .into_iter()
                         .enumerate()
                         .map(|(index, (_, value_tuple))| (index, (value_tuple.0, value_tuple.1)))
-                        .collect(),
+                        .collect::<BTreeMap<_, _>>()
+                        .into(),
                 ),
                 element_type: Arc::new(match item_value_type {
                     Some(value) => value,
@@ -470,7 +471,7 @@ where
             }))])
         } else {
             TUnion::from_vec(vec![TAtomic::Array(TArray::Keyed(TKeyedArray {
-                known_items: Some(array_creation_info.property_types),
+                known_items: Some(array_creation_info.property_types.into()),
                 parameters: if array_creation_info.can_create_objectlike {
                     None
                 } else {
@@ -528,7 +529,7 @@ fn handle_variadic_array_element<'arena, A>(
             TAtomic::Array(array_type) => match array_type {
                 TArray::Keyed(keyed_data) => {
                     if let Some(known_items) = &keyed_data.known_items {
-                        for (key, (possibly_undefined, value_type)) in known_items {
+                        for (key, (possibly_undefined, value_type)) in known_items.iter() {
                             if *possibly_undefined {
                                 continue;
                             }

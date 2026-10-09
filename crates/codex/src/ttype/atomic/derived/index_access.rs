@@ -85,7 +85,7 @@ impl TIndexAccess {
                             continue 'indices;
                         }
 
-                        let Some(known_elements) = list_array.known_elements.as_ref() else {
+                        let Some(known_elements) = list_array.known_elements.as_deref() else {
                             continue 'indices;
                         };
 
@@ -98,7 +98,7 @@ impl TIndexAccess {
                     TAtomic::Array(TArray::Keyed(keyed_array)) => {
                         let literal_key = index_type.to_array_key();
                         if let Some((_, known_item_type)) = literal_key.as_ref().and_then(|array_key| {
-                            keyed_array.known_items.as_ref().and_then(|items| items.get(array_key))
+                            keyed_array.known_items.as_deref().and_then(|items| items.get(array_key))
                         }) {
                             indexed_values.extend(known_item_type.types.iter().cloned());
                             continue 'indices;
@@ -107,7 +107,7 @@ impl TIndexAccess {
                         let index_union = TUnion::from_atomic(index_type.clone());
 
                         if literal_key.is_none()
-                            && let Some(known_items) = keyed_array.known_items.as_ref()
+                            && let Some(known_items) = keyed_array.known_items.as_deref()
                         {
                             for (known_key, (_, known_item_type)) in known_items {
                                 if union_comparator::can_expression_types_be_identical(
@@ -158,8 +158,8 @@ impl TIndexAccess {
 }
 
 impl TType for TIndexAccess {
-    fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
-        vec![TypeRef::Union(&self.target_type), TypeRef::Union(&self.index_type)]
+    fn append_child_nodes<'types>(&'types self, children: &mut Vec<TypeRef<'types>>) {
+        children.extend([TypeRef::Union(&self.target_type), TypeRef::Union(&self.index_type)]);
     }
 
     fn needs_population(&self) -> bool {

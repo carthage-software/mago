@@ -77,7 +77,7 @@ fn convert_issue_to_result(issue: &Issue, database: &ReadDatabase) -> Result<Sar
     let level = level_to_sarif(issue.level);
 
     let message = if !issue.notes.is_empty() || issue.help.is_some() {
-        let mut markdown = issue.message.clone();
+        let mut markdown = issue.message.to_string();
 
         if !issue.notes.is_empty() {
             markdown.push_str("\n\n**Notes:**\n");

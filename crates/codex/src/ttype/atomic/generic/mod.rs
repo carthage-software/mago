@@ -80,13 +80,10 @@ impl TGenericParameter {
 }
 
 impl TType for TGenericParameter {
-    fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
-        let children = vec![TypeRef::Union(&self.constraint)];
-
-        if let Some(intersection_types) = &self.intersection_types {
-            children.into_iter().chain(intersection_types.iter().map(TypeRef::Atomic)).collect()
-        } else {
-            children
+    fn append_child_nodes<'types>(&'types self, children: &mut Vec<TypeRef<'types>>) {
+        children.push(TypeRef::Union(&self.constraint));
+        if let Some(types) = &self.intersection_types {
+            children.extend(types.iter().map(TypeRef::Atomic));
         }
     }
 

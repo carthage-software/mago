@@ -101,7 +101,7 @@ impl Serialize for CodeQualityIssues<'_, '_> {
                 && issue.link.is_none()
                 && issue.annotations.iter().all(|annotation| annotation.message.is_none())
             {
-                Cow::Borrowed(issue.message.as_str())
+                Cow::Borrowed(issue.message.as_ref())
             } else {
                 Cow::Owned(long_message(issue, true))
             };

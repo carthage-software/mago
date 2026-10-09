@@ -65,8 +65,8 @@ impl TIntMask {
 }
 
 impl TType for TIntMask {
-    fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
-        self.values.iter().map(TypeRef::Union).collect()
+    fn append_child_nodes<'types>(&'types self, children: &mut Vec<TypeRef<'types>>) {
+        children.extend(self.values.iter().map(TypeRef::Union));
     }
 
     fn needs_population(&self) -> bool {

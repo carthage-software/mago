@@ -30,30 +30,38 @@ pub fn check_usage(
     vector: BreachVector,
     span: Span,
 ) {
-    if let Some(reason) = check_allowed(ctx, dependency_fqn, dependency_kind) {
-        ctx.boundary_breaches.push(BoundaryBreach {
-            source_namespace: ctx.get_current_namespace().to_vec(),
-            dependency_fqn: dependency_fqn.to_vec(),
-            dependency_kind,
-            vector,
-            span,
-            reason,
-        });
+    if let Some(breach) = find_breach(ctx, dependency_fqn, dependency_kind, vector, span) {
+        ctx.boundary_breaches.push(breach);
     }
 }
 
-/// Checks if a usage is allowed based on the configured rules.
-fn check_allowed(
+/// Returns the boundary breach when a usage violates the configured perimeter.
+fn find_breach(
     ctx: &GuardContext<'_, '_>,
     target_fqn: &[u8],
     dependency_kind: PermittedDependencyKind,
-) -> Option<BreachReason> {
+    vector: BreachVector,
+    span: Span,
+) -> Option<BoundaryBreach> {
+    let breach = |reason, explanation| BoundaryBreach {
+        source_namespace: ctx.get_current_namespace().to_vec(),
+        dependency_fqn: target_fqn.to_vec(),
+        dependency_kind,
+        vector,
+        span,
+        reason,
+        explanation,
+    };
+
     if let Some(restriction) =
         ctx.settings.perimeter.restrictions.iter().find(|restriction| {
             violates_restriction(restriction, ctx.get_current_namespace(), target_fqn, dependency_kind)
         })
     {
-        return Some(BreachReason::ForbiddenByRestriction { dependency: restriction.dependency.clone() });
+        return Some(breach(
+            BreachReason::ForbiddenByRestriction { dependency: restriction.dependency.clone() },
+            restriction.reason.clone(),
+        ));
     }
 
     let rule = ctx
@@ -96,7 +104,6 @@ fn check_allowed(
         }
     }
 
-    let rules: Vec<_> = rule.into_iter().collect();
     if !ctx.settings.perimeter.layering.is_empty() {
         let source_layer_index = get_layer_index(ctx.get_current_namespace(), ctx.settings);
         let target_layer_index = get_layer_index(target_fqn, ctx.settings);
@@ -105,19 +112,23 @@ fn check_allowed(
             if src_idx >= tgt_idx {
                 return None;
             }
-            return Some(BreachReason::Layering {
-                source_layer: ctx.settings.perimeter.layering[src_idx].clone(),
-                target_layer: ctx.settings.perimeter.layering[tgt_idx].clone(),
-            });
+            return Some(breach(
+                BreachReason::Layering {
+                    source_layer: ctx.settings.perimeter.layering[src_idx].clone(),
+                    target_layer: ctx.settings.perimeter.layering[tgt_idx].clone(),
+                },
+                ctx.settings.perimeter.layering_reason.clone(),
+            ));
         }
     }
 
-    if rules.is_empty() && ctx.settings.perimeter.rules.is_empty() && ctx.settings.perimeter.layering.is_empty() {
-        None
-    } else if rules.is_empty() {
-        Some(BreachReason::NoMatchingRule)
-    } else {
-        Some(BreachReason::ForbiddenByRule { rule_namespaces: rules.iter().map(|r| r.namespace.clone()).collect() })
+    match rule {
+        None if ctx.settings.perimeter.rules.is_empty() && ctx.settings.perimeter.layering.is_empty() => None,
+        None => Some(breach(BreachReason::NoMatchingRule, None)),
+        Some(rule) => Some(breach(
+            BreachReason::ForbiddenByRule { rule_namespaces: vec![rule.namespace.clone()] },
+            rule.reason.clone(),
+        )),
     }
 }
 

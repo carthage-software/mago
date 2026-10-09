@@ -717,8 +717,8 @@ macro_rules! with_inner_ttype {
 }
 
 impl TType for TAtomic {
-    fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
-        with_inner_ttype!(self, ttype => ttype.get_child_nodes(), vec![])
+    fn append_child_nodes<'types>(&'types self, children: &mut Vec<TypeRef<'types>>) {
+        with_inner_ttype!(self, ttype => ttype.append_child_nodes(children), ())
     }
 
     fn can_be_intersected(&self) -> bool {
@@ -845,14 +845,14 @@ pub fn populate_atomic_type(
             TArray::List(list) => {
                 populate!(union Arc::make_mut(&mut list.element_type));
 
-                if let Some(known_elements) = list.known_elements.as_mut() {
+                if let Some(known_elements) = list.known_elements.as_mut().map(Arc::make_mut) {
                     for (_, element_type) in known_elements.values_mut() {
                         populate!(union element_type);
                     }
                 }
             }
             TArray::Keyed(keyed_array) => {
-                if let Some(known_items) = keyed_array.known_items.as_mut() {
+                if let Some(known_items) = keyed_array.known_items.as_mut().map(Arc::make_mut) {
                     for (_, item_type) in known_items.values_mut() {
                         populate!(union item_type);
                     }
@@ -876,7 +876,7 @@ pub fn populate_atomic_type(
                 }
             }
 
-            for constraint in &mut signature.constraints {
+            for constraint in Arc::make_mut(&mut signature.constraints).iter_mut() {
                 populate!(union Arc::make_mut(&mut constraint.input_type));
                 populate!(union Arc::make_mut(&mut constraint.parameter_type));
             }
@@ -952,7 +952,7 @@ pub fn populate_atomic_type(
 
                         let mut named_object = TNamedObject::new(*name)
                             .with_type_parameters(parameters.take())
-                            .with_variances(variances.take());
+                            .with_variances(variances.take().map(|variances| *variances));
                         if let Some(intersection_types) = intersection_types {
                             for intersection_type in intersection_types {
                                 named_object.add_intersection_type(intersection_type);

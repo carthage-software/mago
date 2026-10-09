@@ -1111,7 +1111,7 @@ pub(super) fn decode_lifecycle_response(
         let note_count = reader.read_count("lifecycle issue notes", MAXIMUM_NOTES)?;
         let mut notes = Vec::with_capacity(note_count);
         for _ in 0..note_count {
-            notes.push(reader.read_string("lifecycle issue note")?);
+            notes.push(reader.read_string("lifecycle issue note")?.into());
         }
 
         let help = reader.read_optional_string("lifecycle issue help")?;
@@ -1207,7 +1207,7 @@ pub(super) fn decode_lifecycle_response(
             .with_code(format!("{}/{}", plugin.identifier, local_code))
             .with_annotations(annotations);
         issue.notes = notes;
-        issue.help = help;
+        issue.help = help.map(Into::into);
         issue.link = link;
         issue.edits = edits;
         issues.push(issue);

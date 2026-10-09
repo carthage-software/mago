@@ -24,6 +24,8 @@ pub struct BoundaryBreach {
     pub span: Span,
     /// The logical reason why this dependency is considered a breach.
     pub reason: BreachReason,
+    /// Optional human-readable explanation from the matching perimeter rule or restriction.
+    pub explanation: Option<String>,
 }
 
 /// Describes the specific "vector" or method by which a boundary breach occurred.
@@ -92,6 +94,10 @@ impl From<BoundaryBreach> for Issue {
                         "The dependency matches the restricted selector `{dependency}` and cannot be used from this namespace."
                     ));
             }
+        }
+
+        if let Some(explanation) = breach.explanation.filter(|explanation| !explanation.trim().is_empty()) {
+            issue = issue.with_note(explanation);
         }
 
         issue.with_help("Update your guard configuration to allow this dependency or refactor the code to remove it.")

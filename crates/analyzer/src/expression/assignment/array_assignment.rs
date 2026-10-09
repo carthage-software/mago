@@ -80,11 +80,12 @@ where
         block_context.flags.set_inside_general_use(was_inside_general_use);
     }
 
-    let mut root_array_type = artifacts.get_expression_type(root_array_expression).cloned().unwrap_or_else(get_mixed);
+    let mut root_array_type =
+        artifacts.get_rc_expression_type(root_array_expression).cloned().unwrap_or_else(|| Rc::new(get_mixed()));
     let root_is_array_access_object =
         root_array_type.types.iter().all(|atomic| atomic.extends_or_implements(context.codebase, b"ArrayAccess"));
 
-    let mut current_type = root_array_type.clone();
+    let mut current_type = Rc::clone(&root_array_type);
 
     let root_var_id = get_block_expression_id(root_array_expression, context, block_context);
     let current_index = analyze_nested_array_assignment(
@@ -103,7 +104,7 @@ where
     let mut key_values = Vec::new();
 
     let index_type = current_index.map(|current_index| {
-        artifacts.get_rc_expression_type(current_index).cloned().unwrap_or(Rc::new(get_arraykey()))
+        artifacts.get_rc_expression_type(current_index).cloned().unwrap_or_else(|| Rc::new(get_arraykey()))
     });
 
     if let Some(index_type) = &index_type {
@@ -114,7 +115,8 @@ where
         }
     }
 
-    root_array_type = if !key_values.is_empty() {
+    let root_array_type = Rc::unwrap_or_clone(root_array_type);
+    let root_array_type = if !key_values.is_empty() {
         update_type_with_key_values(context, root_array_type, &current_type, &key_values, index_type.as_ref())
     } else if !root_is_string {
         update_array_assignment_child_type(
@@ -311,7 +313,7 @@ where
                 TArray::Keyed(keyed_array) => {
                     if key_type.is_none()
                         && keyed_array.parameters.is_none()
-                        && let Some(known_items) = keyed_array.known_items.as_mut()
+                        && let Some(known_items) = keyed_array.known_items.as_mut().map(Arc::make_mut)
                     {
                         let max_int_key =
                             known_items.keys().filter_map(ArrayKey::get_integer).filter(|&k| k >= 0).max();
@@ -352,7 +354,7 @@ where
                         ArrayKey::Integer(key_value) => {
                             *has_matching_item = true;
 
-                            if let Some(known_elements) = list.known_elements.as_mut() {
+                            if let Some(known_elements) = list.known_elements.as_mut().map(Arc::make_mut) {
                                 if let Some((pu, entry)) = known_elements.get_mut(&(key_value as usize)) {
                                     *entry = current_type.clone();
                                     *pu = false;
@@ -361,7 +363,7 @@ where
                                 }
                             } else {
                                 list.known_elements =
-                                    Some(BTreeMap::from([(key_value as usize, (false, current_type.clone()))]));
+                                    Some(BTreeMap::from([(key_value as usize, (false, current_type.clone()))]).into());
                             }
 
                             list.non_empty = true;
@@ -376,7 +378,7 @@ where
                             };
 
                             let mut known_items = BTreeMap::new();
-                            if let Some(known_elements) = list.known_elements.as_ref() {
+                            if let Some(known_elements) = list.known_elements.as_deref() {
                                 for (k, v) in known_elements {
                                     known_items.insert(ArrayKey::Integer(*k as i64), v.clone());
                                 }
@@ -386,7 +388,7 @@ where
 
                             *array = TArray::Keyed(TKeyedArray {
                                 parameters,
-                                known_items: Some(known_items),
+                                known_items: Some(known_items.into()),
                                 non_empty: true,
                                 known_non_list: true,
                             });
@@ -398,7 +400,7 @@ where
                     TArray::Keyed(keyed_array) => {
                         *has_matching_item = true;
 
-                        if let Some(known_items) = keyed_array.known_items.as_mut() {
+                        if let Some(known_items) = keyed_array.known_items.as_mut().map(Arc::make_mut) {
                             if let Some((pu, entry)) = known_items.get_mut(&array_key) {
                                 *entry = current_type.clone();
                                 *pu = false;
@@ -407,7 +409,7 @@ where
                             }
                         } else {
                             keyed_array.known_items =
-                                Some(BTreeMap::from([(array_key, (false, current_type.clone()))]));
+                                Some(BTreeMap::from([(array_key, (false, current_type.clone()))]).into());
                         }
 
                         keyed_array.non_empty = true;
@@ -498,7 +500,7 @@ where
 
                         collection_types.push(TAtomic::Array(TArray::Keyed(TKeyedArray {
                             parameters: Some((Arc::new((*key_type).clone()), Arc::new(value_type.clone()))),
-                            known_items: widened_known_items,
+                            known_items: widened_known_items.map(Into::into),
                             non_empty: true,
                             known_non_list: keyed_array.known_non_list,
                         })));
@@ -523,17 +525,16 @@ where
                         // Track individual array elements outside loops when element_type is never,
                         // but only up to the threshold to prevent memory explosion on files with
                         // thousands of array pushes.
-                        let current_known_count = list.known_elements.as_ref().map_or(0, BTreeMap::len);
+                        let current_known_count = list.known_elements.as_deref().map_or(0, BTreeMap::len);
                         if !block_context.flags.inside_loop()
                             && list.element_type.is_never()
                             && current_known_count < context.settings.array_combination_threshold as usize
                         {
                             collection_types.push(TAtomic::Array(TArray::List(TList {
                                 element_type: Arc::new(get_never()),
-                                known_elements: Some(BTreeMap::from([(
-                                    current_known_count,
-                                    (false, value_type.clone()),
-                                )])),
+                                known_elements: Some(
+                                    BTreeMap::from([(current_known_count, (false, value_type.clone()))]).into(),
+                                ),
                                 known_count: None,
                                 non_empty: true,
                             })));
@@ -549,7 +550,7 @@ where
                     TArray::Keyed(existing_array) => {
                         if !block_context.flags.inside_loop()
                             && existing_array.parameters.is_none()
-                            && let Some(known_items) = existing_array.known_items.as_ref()
+                            && let Some(known_items) = existing_array.known_items.as_deref()
                         {
                             let max_int_key =
                                 known_items.keys().filter_map(ArrayKey::get_integer).filter(|&k| k >= 0).max();
@@ -572,7 +573,7 @@ where
                             new_items.insert(ArrayKey::Integer(next_key), (false, value_type.clone()));
 
                             collection_types.push(TAtomic::Array(TArray::Keyed(TKeyedArray {
-                                known_items: Some(new_items),
+                                known_items: Some(new_items.into()),
                                 parameters: None,
                                 non_empty: true,
                                 known_non_list: existing_array.known_non_list,
@@ -641,8 +642,8 @@ pub(crate) fn analyze_nested_array_assignment<'ctx, 'ast, 'arena, A>(
     mut array_target_expressions: Vec<ArrayTarget<'ast, 'arena>>,
     assign_value_type: &TUnion,
     root_var_id: Option<Word>,
-    root_type: &mut TUnion,
-    last_array_expr_type: &mut TUnion,
+    root_type: &mut Rc<TUnion>,
+    last_array_expr_type: &mut Rc<TUnion>,
 ) -> Result<Option<&'ast Expression<'arena>>, AnalysisError>
 where
     A: Arena,
@@ -721,7 +722,7 @@ where
 
         block_context.flags.set_inside_assignment(true);
 
-        let mut array_expr_type = get_array_target_type_given_index(
+        let array_expr_type = get_array_target_type_given_index(
             context,
             block_context,
             array_target.span(),
@@ -737,12 +738,8 @@ where
 
         block_context.flags.set_inside_assignment(false);
 
-        if is_last {
-            array_expr_type = assign_value_type.clone();
-            artifacts.set_expression_type(&array_target, assign_value_type.clone());
-        } else {
-            artifacts.set_expression_type(&array_target, array_expr_type.clone());
-        }
+        let array_expr_type = Rc::new(if is_last { assign_value_type.clone() } else { array_expr_type });
+        artifacts.set_rc_expression_type(&array_target, Rc::clone(&array_expr_type));
 
         artifacts.set_rc_expression_type(array_target.get_array(), Rc::clone(&array_expression_type));
 
@@ -756,7 +753,7 @@ where
                     block_context.possibly_assigned_variable_ids.insert(*parent_var_id);
                 }
             } else {
-                *root_type = (*array_expression_type).clone();
+                *root_type = Rc::clone(&array_expression_type);
 
                 block_context.locals.insert(*root_var_id, array_expression_type);
                 block_context.possibly_assigned_variable_ids.insert(*root_var_id);
@@ -780,7 +777,7 @@ where
         let extended_var_id = mago_word::word(&combined);
 
         if full_var_id && memchr::memmem::find(extended_var_id.as_bytes(), b"[$").is_some() {
-            block_context.locals.insert(extended_var_id, Rc::new(assign_value_type.clone()));
+            block_context.locals.insert(extended_var_id, Rc::clone(last_array_expr_type));
             block_context.possibly_assigned_variable_ids.insert(extended_var_id);
         }
     }
@@ -817,24 +814,25 @@ where
             index_type.as_ref(),
         );
 
-        *last_array_expr_type = array_expr_type;
+        *last_array_expr_type = Rc::new(array_expr_type);
         last_array_expression_index = array_target.get_index();
 
         if let Some(array_expr_id) = &array_expr_id
             && memchr::memmem::find(array_expr_id.as_bytes(), b"[$").is_some()
         {
-            block_context.locals.insert(*array_expr_id, Rc::new(last_array_expr_type.clone()));
+            block_context.locals.insert(*array_expr_id, Rc::clone(last_array_expr_type));
             block_context.possibly_assigned_variable_ids.insert(*array_expr_id);
         }
 
-        let array_type = artifacts.get_expression_type(array_target.get_array()).cloned().unwrap_or_else(get_mixed);
+        let array_type =
+            artifacts.get_rc_expression_type(array_target.get_array()).cloned().unwrap_or_else(|| Rc::new(get_mixed()));
 
         let is_first = i == array_target_expressions.len() - 1;
 
         if is_first {
             *root_type = array_type;
         } else {
-            artifacts.set_expression_type(array_target.get_array(), array_type);
+            artifacts.set_rc_expression_type(array_target.get_array(), array_type);
         }
 
         var_id_additions.pop();

@@ -53,7 +53,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Global<'arena> {
 
             let var_id_atom = mago_word::word(var_id);
             let is_argc_or_argv = var_id == b"$argc" || var_id == b"$argv";
-            let known_type = get_global_variable_type(var_id);
+            let known_type = get_global_variable_type(var_id_atom);
             let docblock_type =
                 get_type_from_var_docblock(context, block_context, artifacts, Some(var_id), self.variables.len() == 1)
                     .map(|(docblock_type, docblock_type_span)| (Rc::new(docblock_type), docblock_type_span));

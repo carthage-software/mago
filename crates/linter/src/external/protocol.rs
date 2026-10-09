@@ -255,7 +255,7 @@ pub(super) fn decode_lint_response(
         let note_count = reader.read_count("issue notes", MAXIMUM_NOTES_PER_ISSUE)?;
         let mut notes = Vec::with_capacity(note_count);
         for _ in 0..note_count {
-            notes.push(reader.read_string("issue note")?);
+            notes.push(reader.read_string("issue note")?.into());
         }
 
         let help = reader.read_optional_string("issue help")?;
@@ -309,7 +309,7 @@ pub(super) fn decode_lint_response(
             .with_annotations(annotations)
             .with_file_edits(file.id, edits);
         issue.notes = notes;
-        issue.help = help;
+        issue.help = help.map(Into::into);
         issue.link = link;
         issues.push(issue);
     }

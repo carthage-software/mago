@@ -1152,8 +1152,8 @@ impl TUnion {
 }
 
 impl TType for TUnion {
-    fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
-        self.types.iter().map(TypeRef::Atomic).collect()
+    fn append_child_nodes<'types>(&'types self, children: &mut Vec<TypeRef<'types>>) {
+        children.extend(self.types.iter().map(TypeRef::Atomic));
     }
 
     fn any_child_node(&self, mut predicate: impl FnMut(TypeRef<'_>) -> bool) -> bool {
@@ -1409,7 +1409,7 @@ fn widen_atomic(atomic: &mut TAtomic, kind: WidenKind) {
         TAtomic::Array(array) => match array {
             TArray::List(list) => {
                 widen_arc_union(&mut list.element_type, kind);
-                if let Some(known) = list.known_elements.as_mut() {
+                if let Some(known) = list.known_elements.as_mut().map(Arc::make_mut) {
                     for (_, ty) in known.values_mut() {
                         ty.widen(kind);
                     }
@@ -1420,7 +1420,7 @@ fn widen_atomic(atomic: &mut TAtomic, kind: WidenKind) {
                     widen_arc_union(key, kind);
                     widen_arc_union(value, kind);
                 }
-                if let Some(known) = keyed.known_items.as_mut() {
+                if let Some(known) = keyed.known_items.as_mut().map(Arc::make_mut) {
                     for (_, ty) in known.values_mut() {
                         ty.widen(kind);
                     }
@@ -1522,11 +1522,11 @@ fn atomic_has_widenable(atomic: &TAtomic, kind: WidenKind) -> bool {
         TAtomic::Scalar(scalar) => widened_scalar(scalar, kind).is_some(),
         TAtomic::Array(TArray::List(list)) => {
             union_has_widenable(&list.element_type, kind)
-                || list.known_elements.as_ref().is_some_and(|m| m.values().any(|(_, t)| union_has_widenable(t, kind)))
+                || list.known_elements.as_deref().is_some_and(|m| m.values().any(|(_, t)| union_has_widenable(t, kind)))
         }
         TAtomic::Array(TArray::Keyed(keyed)) => {
             keyed.parameters.as_ref().is_some_and(|(k, v)| union_has_widenable(k, kind) || union_has_widenable(v, kind))
-                || keyed.known_items.as_ref().is_some_and(|m| m.values().any(|(_, t)| union_has_widenable(t, kind)))
+                || keyed.known_items.as_deref().is_some_and(|m| m.values().any(|(_, t)| union_has_widenable(t, kind)))
         }
         TAtomic::Iterable(iterable) => {
             union_has_widenable(&iterable.key_type, kind)

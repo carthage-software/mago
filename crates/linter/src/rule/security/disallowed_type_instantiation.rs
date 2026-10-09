@@ -195,7 +195,7 @@ impl LintRule for DisallowedTypeInstantiationRule {
             .with_note(format!(
                 "The type `{disallowed_type}` is explicitly disallowed from being instantiated directly by your project configuration."
             ))
-            .with_help(help_text);
+            .with_help(help_text.to_owned());
 
             ctx.collector.report(issue);
 

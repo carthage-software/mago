@@ -652,13 +652,13 @@ pub(crate) fn can_be_identical(
             return false;
         }
 
-        let list_has_known_elements = list.known_elements.as_ref().is_some_and(|e| !e.is_empty());
+        let list_has_known_elements = list.known_elements.as_deref().is_some_and(|e| !e.is_empty());
         let list_element_is_never = list.element_type.is_never();
 
         if let Some((_, keyed_val_type)) = keyed_array.parameters.as_ref() {
             if list_has_known_elements
                 && list_element_is_never
-                && let Some(known_elements) = list.known_elements.as_ref()
+                && let Some(known_elements) = list.known_elements.as_deref()
             {
                 for (_, list_elem_type) in known_elements.values() {
                     if union_comparator::can_expression_types_be_identical(

@@ -37,8 +37,8 @@ impl TIntMaskOf {
 }
 
 impl TType for TIntMaskOf {
-    fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
-        vec![TypeRef::Union(&self.0)]
+    fn append_child_nodes<'types>(&'types self, children: &mut Vec<TypeRef<'types>>) {
+        children.extend([TypeRef::Union(&self.0)]);
     }
 
     fn needs_population(&self) -> bool {

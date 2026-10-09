@@ -55,7 +55,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrayAccess<'arena> {
         block_context.flags.set_inside_unset(was_inside_unset);
         block_context.flags.set_inside_general_use(was_inside_general_use);
 
-        let index_type = artifacts.get_expression_type(&self.index).cloned().unwrap_or_else(get_arraykey);
+        let index_type =
+            artifacts.get_rc_expression_type(&self.index).cloned().unwrap_or_else(|| Rc::new(get_arraykey()));
 
         let was_inside_general_use = block_context.flags.inside_general_use();
         block_context.flags.set_inside_general_use(true);
@@ -87,7 +88,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrayAccess<'arena> {
         let container_type = artifacts.get_rc_expression_type(&self.array).cloned();
 
         if let Some(container_type) = container_type {
-            let access_type = get_array_target_type_given_index(
+            let access_type = Rc::new(get_array_target_type_given_index(
                 context,
                 block_context,
                 self.span(),
@@ -99,7 +100,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrayAccess<'arena> {
                 extended_var_id,
                 None,
                 container_type.can_be_null() && expression_is_nullsafe(self.array),
-            );
+            ));
 
             if let Some(keyed_array_var_id) = &keyed_array_var_id {
                 let can_store_result = block_context.flags.inside_assignment() || !container_type.is_mixed();
@@ -109,11 +110,11 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrayAccess<'arena> {
                     && memchr::memmem::find(keyed_array_var_id.as_bytes(), b"[$").is_some()
                     && !block_context.locals.contains_key(keyed_array_var_id)
                 {
-                    block_context.locals.insert(*keyed_array_var_id, Rc::new(access_type.clone()));
+                    block_context.locals.insert(*keyed_array_var_id, Rc::clone(&access_type));
                 }
             }
 
-            artifacts.set_expression_type(self, access_type);
+            artifacts.set_rc_expression_type(self, access_type);
         } else {
             artifacts.set_expression_type(self, get_mixed());
         }

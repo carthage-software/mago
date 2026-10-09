@@ -3,7 +3,7 @@ use std::convert::AsRef;
 use std::ops::Deref;
 use std::rc::Rc;
 
-use indexmap::IndexMap;
+use mago_algebra::AssertionMap;
 
 use mago_algebra::clause::Clause;
 use mago_algebra::saturate_clauses;
@@ -364,7 +364,7 @@ where
                     reconcile_keyed_types(
                         self.context,
                         &reconcilable_else_types,
-                        IndexMap::default(),
+                        AssertionMap::default(),
                         &mut running_else_context,
                         &mut changed_variables,
                         &else_referenced_ids,

@@ -97,17 +97,17 @@ impl TDerived {
 }
 
 impl TType for TDerived {
-    fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
+    fn append_child_nodes<'types>(&'types self, children: &mut Vec<TypeRef<'types>>) {
         match self {
-            TDerived::KeyOf(ttype) => ttype.get_child_nodes(),
-            TDerived::ValueOf(ttype) => ttype.get_child_nodes(),
-            TDerived::IntMask(ttype) => ttype.get_child_nodes(),
-            TDerived::IntMaskOf(ttype) => ttype.get_child_nodes(),
-            TDerived::PropertiesOf(ttype) => ttype.get_child_nodes(),
-            TDerived::IndexAccess(ttype) => ttype.get_child_nodes(),
-            TDerived::New(ttype) => ttype.get_child_nodes(),
-            TDerived::TemplateType(ttype) => ttype.get_child_nodes(),
-            TDerived::Intersection(ttype) => ttype.get_child_nodes(),
+            TDerived::KeyOf(ttype) => ttype.append_child_nodes(children),
+            TDerived::ValueOf(ttype) => ttype.append_child_nodes(children),
+            TDerived::IntMask(ttype) => ttype.append_child_nodes(children),
+            TDerived::IntMaskOf(ttype) => ttype.append_child_nodes(children),
+            TDerived::PropertiesOf(ttype) => ttype.append_child_nodes(children),
+            TDerived::IndexAccess(ttype) => ttype.append_child_nodes(children),
+            TDerived::New(ttype) => ttype.append_child_nodes(children),
+            TDerived::TemplateType(ttype) => ttype.append_child_nodes(children),
+            TDerived::Intersection(ttype) => ttype.append_child_nodes(children),
         }
     }
 

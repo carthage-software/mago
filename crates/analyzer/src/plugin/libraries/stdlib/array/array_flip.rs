@@ -72,7 +72,7 @@ fn flip_keyed_array(keyed: &TKeyedArray) -> Option<TUnion> {
     let mut new_known_items: BTreeMap<ArrayKey, (bool, TUnion)> = BTreeMap::new();
 
     if let Some(items) = &keyed.known_items {
-        for (key, (optional, value_type)) in items {
+        for (key, (optional, value_type)) in items.iter() {
             let new_key = value_type.get_single_array_key()?;
             new_known_items.insert(new_key, (*optional, key.to_union()));
         }
@@ -105,7 +105,7 @@ fn flip_list(list: &TList) -> Option<TUnion> {
     let mut new_known_items: BTreeMap<ArrayKey, (bool, TUnion)> = BTreeMap::new();
 
     if let Some(elements) = &list.known_elements {
-        for (idx, (optional, value_type)) in elements {
+        for (idx, (optional, value_type)) in elements.iter() {
             let new_key = value_type.get_single_array_key()?;
             new_known_items.insert(new_key, (*optional, ArrayKey::Integer(*idx as i64).to_union()));
         }

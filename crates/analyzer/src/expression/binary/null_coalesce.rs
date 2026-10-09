@@ -196,8 +196,8 @@ where
         let mut if_scope = IfScope::new();
         let mut inner_block_context = block_context.clone();
         inner_block_context.flags.set_inside_isset(true);
-        let (if_conditional_scope, _) =
-            conditional::analyze(context, inner_block_context, artifacts, &mut if_scope, binary.lhs, false)?;
+        let if_conditional_scope =
+            conditional::analyze(context, &mut inner_block_context, artifacts, &mut if_scope, binary.lhs, false)?;
         let mut conditionally_referenced_variable_ids = if_conditional_scope.conditionally_referenced_variable_ids;
 
         let (reconcilable_if_types, active_if_types) = find_satisfying_assignments(
