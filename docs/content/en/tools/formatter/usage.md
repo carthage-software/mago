@@ -27,6 +27,8 @@ mago format --check
 
 Exits `0` when every file is already formatted, `1` when at least one file would change. No output on success, so it stays quiet on the happy path.
 
+After formatting, run `mago format --check` with the same configuration to verify that another pass would leave the output unchanged.
+
 ## Preview changes
 
 To see what the formatter would do without writing anything to disk, ask for a dry run:
