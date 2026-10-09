@@ -629,7 +629,7 @@ where
 
             Some(wrap_atomic(TAtomic::Array(TArray::List(TList {
                 known_count: Some(entries.len()),
-                known_elements: Some(entries),
+                known_elements: Some(entries.into()),
                 element_type: Arc::new(get_never()),
                 non_empty: !elements.is_empty(),
             }))))
@@ -677,7 +677,7 @@ where
             let mut keyed_array = TKeyedArray::new();
             keyed_array.non_empty = !known_items.is_empty();
             if !known_items.is_empty() {
-                keyed_array.known_items = Some(known_items);
+                keyed_array.known_items = Some(known_items.into());
             }
 
             if !unknown_key_values.is_empty() {

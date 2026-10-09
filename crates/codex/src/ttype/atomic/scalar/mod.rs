@@ -501,14 +501,14 @@ impl TScalar {
 }
 
 impl TType for TScalar {
-    fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
+    fn append_child_nodes<'types>(&'types self, children: &mut Vec<TypeRef<'types>>) {
         match self {
-            TScalar::Bool(ttype) => ttype.get_child_nodes(),
-            TScalar::Integer(ttype) => ttype.get_child_nodes(),
-            TScalar::Float(ttype) => ttype.get_child_nodes(),
-            TScalar::String(ttype) => ttype.get_child_nodes(),
-            TScalar::ClassLikeString(ttype) => ttype.get_child_nodes(),
-            _ => vec![],
+            TScalar::Bool(ttype) => ttype.append_child_nodes(children),
+            TScalar::Integer(ttype) => ttype.append_child_nodes(children),
+            TScalar::Float(ttype) => ttype.append_child_nodes(children),
+            TScalar::String(ttype) => ttype.append_child_nodes(children),
+            TScalar::ClassLikeString(ttype) => ttype.append_child_nodes(children),
+            _ => (),
         }
     }
 

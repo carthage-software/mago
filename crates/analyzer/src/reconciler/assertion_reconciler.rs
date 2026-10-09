@@ -178,11 +178,11 @@ where
                 continue;
             }
 
-            let mut new_known_items = existing_known_items.clone();
+            let mut new_known_items = Arc::clone(existing_known_items);
             let mut has_non_optional = false;
             let mut variant_compatible = true;
-            for (key, (new_is_optional, new_item_type)) in known_items {
-                if let Some((is_optional, existing_item_type)) = new_known_items.get_mut(key) {
+            for (key, (new_is_optional, new_item_type)) in known_items.iter() {
+                if let Some((is_optional, existing_item_type)) = Arc::make_mut(&mut new_known_items).get_mut(key) {
                     match intersect_union_types(new_item_type, existing_item_type, context.codebase) {
                         Some(intersected) if !intersected.is_never() => {
                             *is_optional = *new_is_optional;
@@ -238,11 +238,11 @@ where
                 continue;
             }
 
-            let mut new_known_elements = existing_known_elements.clone();
+            let mut new_known_elements = Arc::clone(existing_known_elements);
             let mut has_non_optional = false;
             let mut variant_compatible = true;
-            for (key, (new_is_optional, new_item_type)) in known_elements {
-                if let Some((is_optional, existing_item_type)) = new_known_elements.get_mut(key) {
+            for (key, (new_is_optional, new_item_type)) in known_elements.iter() {
+                if let Some((is_optional, existing_item_type)) = Arc::make_mut(&mut new_known_elements).get_mut(key) {
                     match intersect_union_types(new_item_type, existing_item_type, context.codebase) {
                         Some(intersected) if !intersected.is_never() => {
                             *is_optional = *new_is_optional;
@@ -531,7 +531,7 @@ where
 {
     let element_type = intersect_union_with_union(context, &first_list.element_type, &second_list.element_type);
 
-    match (first_list.known_elements.as_ref(), second_list.known_elements.as_ref()) {
+    match (first_list.known_elements.as_deref(), second_list.known_elements.as_deref()) {
         (Some(first_list_known_elements), Some(second_list_known_elements)) => {
             let mut second_list_known_elements = second_list_known_elements.clone();
 
@@ -551,7 +551,7 @@ where
 
             if let Some(element_type) = element_type {
                 return Some(TAtomic::Array(TArray::List(TList {
-                    known_elements: Some(second_list_known_elements),
+                    known_elements: Some(second_list_known_elements.into()),
                     element_type: Arc::new(element_type),
                     non_empty: true,
                     known_count: None,
@@ -569,7 +569,7 @@ where
 
             if let Some(element_type) = element_type {
                 return Some(TAtomic::Array(TArray::List(TList {
-                    known_elements: Some(second_known_elements),
+                    known_elements: Some(second_known_elements.into()),
                     element_type: Arc::new(element_type),
                     non_empty: false,
                     known_count: None,
@@ -587,7 +587,7 @@ where
 
             if let Some(element_type) = element_type {
                 return Some(TAtomic::Array(TArray::List(TList {
-                    known_elements: Some(first_known_elements),
+                    known_elements: Some(first_known_elements.into()),
                     element_type: Arc::new(element_type),
                     non_empty: false,
                     known_count: None,
@@ -638,7 +638,7 @@ where
         (Some(first_known_items), Some(second_known_items)) => {
             let mut intersected_items = BTreeMap::new();
 
-            for (second_key, second_value) in second_known_items {
+            for (second_key, second_value) in second_known_items.iter() {
                 if let Some(first_value) = first_known_items.get(second_key) {
                     intersected_items.insert(
                         *second_key,
@@ -658,16 +658,16 @@ where
             }
 
             Some(TAtomic::Array(TArray::Keyed(TKeyedArray {
-                known_items: Some(intersected_items),
+                known_items: Some(intersected_items.into()),
                 parameters,
                 non_empty: true,
                 known_non_list,
             })))
         }
         (None, Some(second_known_items)) => {
-            let mut second_known_items = second_known_items.clone();
+            let mut second_known_items = Arc::clone(second_known_items);
 
-            for second_value in second_known_items.values_mut() {
+            for second_value in Arc::make_mut(&mut second_known_items).values_mut() {
                 if let Some(first_parameters) = &first_keyed_array.parameters {
                     second_value.1 = intersect_union_with_union(context, &second_value.1, &first_parameters.1)?;
                 } else if second_keyed_array.parameters.is_none() && !second_value.0 {
@@ -683,9 +683,9 @@ where
             })))
         }
         (Some(first_known_items), None) => {
-            let mut first_known_items = first_known_items.clone();
+            let mut first_known_items = Arc::clone(first_known_items);
 
-            for first_value in first_known_items.values_mut() {
+            for first_value in Arc::make_mut(&mut first_known_items).values_mut() {
                 if let Some(second_params) = &second_keyed_array.parameters {
                     first_value.1 = intersect_union_with_union(context, &first_value.1, &second_params.1)?;
                 } else if first_keyed_array.parameters.is_none() && !first_value.0 {

@@ -80,16 +80,14 @@ impl TIterable {
 }
 
 impl TType for TIterable {
-    fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
-        let mut children = vec![TypeRef::Union(&self.key_type), TypeRef::Union(&self.value_type)];
+    fn append_child_nodes<'types>(&'types self, children: &mut Vec<TypeRef<'types>>) {
+        children.extend([TypeRef::Union(&self.key_type), TypeRef::Union(&self.value_type)]);
 
         if let Some(intersection_types) = &self.intersection_types {
             for atomic in intersection_types {
                 children.push(TypeRef::Atomic(atomic));
             }
         }
-
-        children
     }
 
     fn can_be_intersected(&self) -> bool {

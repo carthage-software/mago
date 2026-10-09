@@ -820,7 +820,7 @@ where
         interface_type.is_this = false;
         intersections.push(TAtomic::Object(TObject::Named(interface_type)));
         if let Some(interface_intersactions) = interface_intersactions {
-            intersections.extend(interface_intersactions);
+            intersections.extend(*interface_intersactions);
         }
     }
 
@@ -840,7 +840,7 @@ where
         parent_type.is_this = false;
         intersections.push(TAtomic::Object(TObject::Named(parent_type)));
         if let Some(parent_intersections) = parent_intersections {
-            intersections.extend(parent_intersections);
+            intersections.extend(*parent_intersections);
         }
     }
 
@@ -867,11 +867,11 @@ where
 
     TObject::Named(TNamedObject {
         name: class_like_metadata.original_name,
-        type_parameters: if type_parameters.is_empty() { None } else { Some(type_parameters) },
+        type_parameters: if type_parameters.is_empty() { None } else { Some(type_parameters.into_boxed_slice()) },
         variances: None,
         is_static: true,
         is_this: true,
-        intersection_types: if intersections.is_empty() { None } else { Some(intersections) },
+        intersection_types: if intersections.is_empty() { None } else { Some(Box::new(intersections)) },
         remapped_parameters: false,
     })
 }

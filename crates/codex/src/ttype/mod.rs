@@ -116,8 +116,13 @@ pub enum TypeRef<'ty> {
 pub trait TType {
     /// Returns a vector of child type nodes that this type contains.
     fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
-        vec![]
+        let mut children = Vec::new();
+        self.append_child_nodes(&mut children);
+        children
     }
+
+    /// Appends direct children without allocating a separate vector.
+    fn append_child_nodes<'types>(&'types self, _children: &mut Vec<TypeRef<'types>>) {}
 
     /// Returns a vector of all child type nodes, including nested ones.
     fn get_all_child_nodes(&self) -> Vec<TypeRef<'_>> {
@@ -125,14 +130,11 @@ pub trait TType {
         let mut all_child_nodes = Vec::with_capacity(16);
 
         while let Some(child_node) = child_nodes.pop() {
-            let new_child_nodes = match child_node {
-                TypeRef::Union(union) => union.get_child_nodes(),
-                TypeRef::Atomic(atomic) => atomic.get_child_nodes(),
-            };
-
+            match child_node {
+                TypeRef::Union(union) => union.append_child_nodes(&mut child_nodes),
+                TypeRef::Atomic(atomic) => atomic.append_child_nodes(&mut child_nodes),
+            }
             all_child_nodes.push(child_node);
-
-            child_nodes.extend(new_child_nodes);
         }
 
         all_child_nodes
@@ -150,10 +152,10 @@ pub trait TType {
                 return true;
             }
 
-            child_nodes.extend(match child_node {
-                TypeRef::Union(union) => union.get_child_nodes(),
-                TypeRef::Atomic(atomic) => atomic.get_child_nodes(),
-            });
+            match child_node {
+                TypeRef::Union(union) => union.append_child_nodes(&mut child_nodes),
+                TypeRef::Atomic(atomic) => atomic.append_child_nodes(&mut child_nodes),
+            }
         }
 
         false
@@ -223,6 +225,13 @@ impl<'ty> TType for TypeRef<'ty> {
         match self {
             TypeRef::Union(ttype) => ttype.get_child_nodes(),
             TypeRef::Atomic(ttype) => ttype.get_child_nodes(),
+        }
+    }
+
+    fn append_child_nodes<'types>(&'types self, children: &mut Vec<TypeRef<'types>>) {
+        match self {
+            TypeRef::Union(ttype) => ttype.append_child_nodes(children),
+            TypeRef::Atomic(ttype) => ttype.append_child_nodes(children),
         }
     }
 
@@ -1497,7 +1506,7 @@ pub fn get_array_parameters(array_type: &TArray, codebase: &CodebaseMetadata) ->
             }
 
             if let Some(known_items) = &keyed_data.known_items {
-                for (key, (_, item_type)) in known_items {
+                for (key, (_, item_type)) in known_items.iter() {
                     key_types.push(key.to_atomic());
                     value_param =
                         add_union_type(value_param, item_type, codebase, combiner::CombinerOptions::default());
@@ -1518,7 +1527,7 @@ pub fn get_array_parameters(array_type: &TArray, codebase: &CodebaseMetadata) ->
             let mut value_type = (*list_data.element_type).clone();
 
             if let Some(known_elements) = &list_data.known_elements {
-                for (key_idx, (_, element_type)) in known_elements {
+                for (key_idx, (_, element_type)) in known_elements.iter() {
                     key_types.push(TAtomic::Scalar(TScalar::literal_int(*key_idx as i64)));
 
                     value_type =

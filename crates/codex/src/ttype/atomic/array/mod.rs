@@ -73,11 +73,11 @@ impl TArray {
         match &self {
             Self::Keyed(keyed_array) => {
                 keyed_array.parameters.is_none()
-                    && keyed_array.known_items.as_ref().is_none_or(std::collections::BTreeMap::is_empty)
+                    && keyed_array.known_items.as_deref().is_none_or(std::collections::BTreeMap::is_empty)
             }
             Self::List(list) => {
                 list.element_type.is_never()
-                    && list.known_elements.as_ref().is_none_or(std::collections::BTreeMap::is_empty)
+                    && list.known_elements.as_deref().is_none_or(std::collections::BTreeMap::is_empty)
             }
         }
     }
@@ -86,8 +86,8 @@ impl TArray {
     #[must_use]
     pub fn has_known_items(&self) -> bool {
         match &self {
-            Self::Keyed(keyed_array) => keyed_array.known_items.as_ref().is_some_and(|items| !items.is_empty()),
-            Self::List(list) => list.known_elements.as_ref().is_some_and(|items| !items.is_empty()),
+            Self::Keyed(keyed_array) => keyed_array.known_items.as_deref().is_some_and(|items| !items.is_empty()),
+            Self::List(list) => list.known_elements.as_deref().is_some_and(|items| !items.is_empty()),
         }
     }
 
@@ -140,7 +140,7 @@ impl TArray {
 
         match &self {
             Self::Keyed(keyed_array) => {
-                if let Some(known_items) = keyed_array.known_items.as_ref() {
+                if let Some(known_items) = keyed_array.known_items.as_deref() {
                     for (optional, _) in known_items.values() {
                         if !optional {
                             size += 1;
@@ -153,7 +153,7 @@ impl TArray {
             Self::List(list) => {
                 if let Some(count) = list.known_count {
                     size = count;
-                } else if let Some(known_elements) = list.known_elements.as_ref() {
+                } else if let Some(known_elements) = list.known_elements.as_deref() {
                     for (optional, _) in known_elements.values() {
                         if !optional {
                             size += 1;
@@ -298,10 +298,10 @@ impl TArray {
 }
 
 impl TType for TArray {
-    fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
+    fn append_child_nodes<'types>(&'types self, children: &mut Vec<TypeRef<'types>>) {
         match self {
-            TArray::Keyed(keyed_array) => keyed_array.get_child_nodes(),
-            TArray::List(list) => list.get_child_nodes(),
+            TArray::Keyed(keyed_array) => keyed_array.append_child_nodes(children),
+            TArray::List(list) => list.append_child_nodes(children),
         }
     }
 

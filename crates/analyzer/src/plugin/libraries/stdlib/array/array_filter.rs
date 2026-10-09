@@ -127,7 +127,7 @@ where
     if let TArray::Keyed(keyed) = array
         && keyed.known_items.is_some()
     {
-        let items = keyed.known_items.as_ref()?;
+        let items = keyed.known_items.as_deref()?;
 
         let mut new_known_items: BTreeMap<ArrayKey, (bool, TUnion)> = BTreeMap::new();
         for (key, (original_optional, value_type)) in items {

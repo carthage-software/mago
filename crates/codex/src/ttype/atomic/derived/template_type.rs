@@ -139,7 +139,7 @@ fn resolve_template_from_atomic(
             );
 
             if let Some(intersections) = named.intersection_types.as_ref() {
-                for intersection in intersections {
+                for intersection in intersections.iter() {
                     if let Some(resolved) =
                         resolve_template_from_atomic(intersection, class_name, template_name, codebase)
                     {
@@ -168,8 +168,12 @@ fn resolve_template_from_atomic(
 }
 
 impl TType for TTemplateType {
-    fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
-        vec![TypeRef::Union(&self.object), TypeRef::Union(&self.class_name), TypeRef::Union(&self.template_name)]
+    fn append_child_nodes<'types>(&'types self, children: &mut Vec<TypeRef<'types>>) {
+        children.extend([
+            TypeRef::Union(&self.object),
+            TypeRef::Union(&self.class_name),
+            TypeRef::Union(&self.template_name),
+        ]);
     }
 
     fn needs_population(&self) -> bool {

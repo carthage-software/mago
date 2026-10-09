@@ -1486,7 +1486,7 @@ where
                 if let Some(known_items) = known_items {
                     if let Some(known_item) = known_items.get(key_name) {
                         if known_item.0 {
-                            known_items.remove(key_name);
+                            Arc::make_mut(known_items).remove(key_name);
                             did_remove_type = true;
                         }
                     } else if let Some((key_parameter, _)) = parameters
@@ -1519,7 +1519,7 @@ where
                     if let Some(known_elements) = known_elements {
                         if let Some(known_element) = known_elements.get(&(*i as usize)) {
                             if known_element.0 {
-                                known_elements.remove(&(*i as usize));
+                                Arc::make_mut(known_elements).remove(&(*i as usize));
                                 did_remove_type = true;
                             }
                         } else if !element_type.is_never() {
@@ -1578,7 +1578,7 @@ fn reconcile_no_nonnull_entry_for_key(existing_var_type: &TUnion, key_name: &Arr
         if let TAtomic::Array(TArray::Keyed(TKeyedArray { known_items, .. })) = atomic {
             let mut all_known_items_removed = false;
             if let Some(known_items_inner) = known_items {
-                if let Some(known_item) = known_items_inner.remove(key_name) {
+                if let Some(known_item) = Arc::make_mut(known_items_inner).remove(key_name) {
                     if !known_item.0 {
                         // impossible to not have this key
                         // todo emit issue
@@ -1647,7 +1647,7 @@ fn subtract_list_elements(existing_list: &TList, list_to_subtract: &TList) -> Op
                 }
 
                 let mut result_list = TList::new(Arc::new(get_never()));
-                result_list.known_elements = Some(known_elements);
+                result_list.known_elements = Some(known_elements.into());
                 result_list.known_count = Some(existing_size);
                 result_list.non_empty = existing_list.non_empty || existing_size > 0;
                 if result_lists.iter().any(|existing_list| existing_list == &result_list) {

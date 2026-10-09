@@ -1,4 +1,5 @@
 use std::sync::Arc;
+use std::sync::LazyLock;
 
 use mago_word::Word;
 use mago_word::concat_word;
@@ -14,6 +15,10 @@ use crate::ttype::union::TUnion;
 
 pub mod parameter;
 
+// Keep a thin pointer without allocating a separate empty vector for each signature.
+#[allow(clippy::rc_buffer)]
+static EMPTY_CONSTRAINTS: LazyLock<Arc<Vec<TCallableConstraint>>> = LazyLock::new(|| Arc::new(Vec::new()));
+
 /// Represents the detailed signature of a PHP `callable` type.
 ///
 /// This includes parameter types and flags, return type, and purity information,
@@ -21,20 +26,21 @@ pub mod parameter;
 /// or inferred from usage.
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[allow(clippy::box_collection, reason = "Keep the collection header off the stack to shrink every TAtomic.")]
 pub struct TCallableSignature {
     /// `true` if the callable is known to be pure (no side effects), often from `@psalm-pure`.
     pub is_pure: bool,
     /// `true` if this signature specifically represents a closure instance.
     pub is_closure: bool,
     /// Ordered list of parameters expected by the callable signature.
-    pub parameters: Vec<TCallableParameter>,
+    pub parameters: Box<Vec<TCallableParameter>>,
     /// The return type of the callable, if specified. `None` implies `mixed` or unknown.
     pub return_type: Option<Arc<TUnion>>,
     /// The source of the callable, if it is an alias or reference to another function-like construct.
     pub source: Option<FunctionLikeIdentifier>,
     /// Captured arguments whose validity depends on parameters that will be
     /// supplied when this callable is invoked.
-    pub constraints: Vec<TCallableConstraint>,
+    pub constraints: Arc<Vec<TCallableConstraint>>,
 }
 
 /// A captured argument check deferred by a partial application.
@@ -75,7 +81,14 @@ impl TCallableSignature {
     #[inline]
     #[must_use]
     pub fn new(is_pure: bool, is_closure: bool) -> Self {
-        Self { is_pure, is_closure, parameters: Vec::new(), return_type: None, source: None, constraints: Vec::new() }
+        Self {
+            is_pure,
+            is_closure,
+            parameters: Box::default(),
+            return_type: None,
+            source: None,
+            constraints: Arc::clone(&EMPTY_CONSTRAINTS),
+        }
     }
 
     #[must_use]
@@ -136,7 +149,7 @@ impl TCallableSignature {
     #[inline]
     #[must_use]
     pub fn with_parameters(mut self, parameters: Vec<TCallableParameter>) -> Self {
-        self.parameters = parameters;
+        self.parameters = Box::new(parameters);
         self
     }
 
@@ -160,7 +173,7 @@ impl TCallableSignature {
     #[inline]
     #[must_use]
     pub fn with_constraints(mut self, constraints: Vec<TCallableConstraint>) -> Self {
-        self.constraints = constraints;
+        self.constraints = if constraints.is_empty() { Arc::clone(&EMPTY_CONSTRAINTS) } else { Arc::new(constraints) };
         self
     }
 }
@@ -197,27 +210,23 @@ impl TCallable {
 }
 
 impl TType for TCallable {
-    fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
-        let mut children = Vec::new();
-
+    fn append_child_nodes<'types>(&'types self, children: &mut Vec<TypeRef<'types>>) {
         if let TCallable::Signature(signature) = self {
             if let Some(return_type) = &signature.return_type {
                 children.push(TypeRef::Union(return_type));
             }
 
-            for parameter in &signature.parameters {
+            for parameter in signature.parameters.iter() {
                 if let Some(parameter_type) = parameter.get_type_signature() {
                     children.push(TypeRef::Union(parameter_type));
                 }
             }
 
-            for constraint in &signature.constraints {
+            for constraint in signature.constraints.iter() {
                 children.push(TypeRef::Union(&constraint.input_type));
                 children.push(TypeRef::Union(&constraint.parameter_type));
             }
         }
-
-        children
     }
 
     fn needs_population(&self) -> bool {

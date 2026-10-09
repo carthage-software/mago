@@ -1152,7 +1152,7 @@ fn mark_array_keys_definite(union: &mut TUnion) -> bool {
     for atomic in union.types.to_mut().iter_mut() {
         match atomic {
             TAtomic::Array(TArray::Keyed(TKeyedArray { known_items: Some(items), parameters, .. })) => {
-                for (optional, value) in items.values_mut() {
+                for (optional, value) in Arc::make_mut(items).values_mut() {
                     if *optional {
                         *optional = false;
                         changed = true;
@@ -1171,7 +1171,7 @@ fn mark_array_keys_definite(union: &mut TUnion) -> bool {
                 }
             }
             TAtomic::Array(TArray::List(TList { known_elements: Some(elements), element_type, .. })) => {
-                for (optional, value) in elements.values_mut() {
+                for (optional, value) in Arc::make_mut(elements).values_mut() {
                     if *optional {
                         *optional = false;
                         changed = true;

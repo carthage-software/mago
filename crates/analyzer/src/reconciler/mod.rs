@@ -580,6 +580,7 @@ fn adjust_array_type(
                 };
 
                 if let Some(known_items) = known_items {
+                    let known_items = Arc::make_mut(known_items);
                     if let Some((existing_optional, existing_item_type)) = known_items.get(&dictkey) {
                         match intersect_union_types(result_type, existing_item_type, codebase) {
                             Some(intersected) if !intersected.is_never() => {
@@ -593,14 +594,14 @@ fn adjust_array_type(
                         known_items.insert(dictkey, (optional, result_type.clone()));
                     }
                 } else {
-                    *known_items = Some(BTreeMap::from([(dictkey, (optional, result_type.clone()))]));
+                    *known_items = Some(BTreeMap::from([(dictkey, (optional, result_type.clone()))]).into());
                 }
             }
             TAtomic::Array(TArray::List(TList { known_elements, .. })) => {
                 if let Some(arraykey_offset) =
                     std::str::from_utf8(arraykey_offset).ok().and_then(|s| s.parse::<usize>().ok())
                 {
-                    if let Some(known_elements) = known_elements {
+                    if let Some(known_elements) = known_elements.as_mut().map(Arc::make_mut) {
                         if let Some((_, existing_item_type)) = known_elements.get(&arraykey_offset) {
                             match intersect_union_types(result_type, existing_item_type, codebase) {
                                 Some(intersected) if !intersected.is_never() => {
@@ -614,7 +615,8 @@ fn adjust_array_type(
                             known_elements.insert(arraykey_offset, (optional, result_type.clone()));
                         }
                     } else {
-                        *known_elements = Some(BTreeMap::from([(arraykey_offset, (optional, result_type.clone()))]));
+                        *known_elements =
+                            Some(BTreeMap::from([(arraykey_offset, (optional, result_type.clone()))]).into());
                     }
                 }
             }
@@ -631,7 +633,7 @@ fn adjust_array_type(
                 };
 
                 base_atomic_type = TAtomic::Array(TArray::Keyed(TKeyedArray {
-                    known_items: Some(BTreeMap::from([(key, (optional, result_type.clone()))])),
+                    known_items: Some(BTreeMap::from([(key, (optional, result_type.clone()))]).into()),
                     parameters: Some((Arc::new(get_arraykey()), Arc::new(get_mixed()))),
                     non_empty: !optional,
                     known_non_list: false,
@@ -725,7 +727,7 @@ fn adjust_array_type_remove_key(
                 };
 
                 if let Some(known_items) = known_items {
-                    known_items.remove(&dictkey);
+                    Arc::make_mut(known_items).remove(&dictkey);
                 }
             }
             TAtomic::Array(TArray::List(TList { known_elements, .. })) => {
@@ -733,7 +735,7 @@ fn adjust_array_type_remove_key(
                     std::str::from_utf8(arraykey_offset).ok().and_then(|s| s.parse::<usize>().ok())
                     && let Some(known_elements) = known_elements
                 {
-                    known_elements.remove(&arraykey_offset);
+                    Arc::make_mut(known_elements).remove(&arraykey_offset);
                 }
             }
             _ => {

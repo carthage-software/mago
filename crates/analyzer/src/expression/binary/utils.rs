@@ -166,7 +166,7 @@ fn are_sealed_arrays_always_identical(lhs: &TArray, rhs: &TArray) -> bool {
             };
 
             lhs_elements.len() == rhs_elements.len()
-                && lhs_elements.iter().zip(rhs_elements).all(
+                && lhs_elements.iter().zip(rhs_elements.iter()).all(
                     |((lhs_offset, (lhs_optional, lhs_type)), (rhs_offset, (rhs_optional, rhs_type)))| {
                         lhs_offset == rhs_offset
                             && !lhs_optional
@@ -180,8 +180,8 @@ fn are_sealed_arrays_always_identical(lhs: &TArray, rhs: &TArray) -> bool {
                 return false;
             }
 
-            let lhs_items = lhs.known_items.as_ref().filter(|items| !items.is_empty());
-            let rhs_items = rhs.known_items.as_ref().filter(|items| !items.is_empty());
+            let lhs_items = lhs.known_items.as_deref().filter(|items| !items.is_empty());
+            let rhs_items = rhs.known_items.as_deref().filter(|items| !items.is_empty());
 
             match (lhs_items, rhs_items) {
                 (None, None) => !lhs.non_empty && !rhs.non_empty,

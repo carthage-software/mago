@@ -1,4 +1,5 @@
 use mago_allocator::Arena;
+use std::collections::BTreeMap;
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -122,7 +123,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
                         TArray::List(array) => {
                             let TList { element_type, known_elements, known_count, non_empty } = array;
 
-                            let Some(mut known_elements) = known_elements else {
+                            let Some(known_elements) = known_elements else {
                                 atomics.push(TAtomic::Array(TArray::Keyed(TKeyedArray {
                                     known_items: None,
                                     parameters: Some((Arc::new(get_int()), element_type)),
@@ -136,6 +137,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
 
                                 continue;
                             };
+
+                            let mut known_elements = Arc::unwrap_or_clone(known_elements);
 
                             let Some(ArrayKey::Integer(target_index)) = &array_key else {
                                 if array_key.is_none() {
@@ -151,7 +154,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
 
                                                     (index, element)
                                                 })
-                                                .collect(),
+                                                .collect::<BTreeMap<_, _>>()
+                                                .into(),
                                         ),
                                         element_type,
                                         known_count,
@@ -163,7 +167,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
                                     // makes no sense.
                                     // An error will be emitted when we are analyzing the expression above, so ignore it here.
                                     atomics.push(TAtomic::Array(TArray::List(TList {
-                                        known_elements: Some(known_elements),
+                                        known_elements: Some(known_elements.into()),
                                         element_type,
                                         known_count,
                                         non_empty,
@@ -202,7 +206,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
 
                             if !element_removed {
                                 atomics.push(TAtomic::Array(TArray::List(TList {
-                                    known_elements: Some(known_elements),
+                                    known_elements: Some(known_elements.into()),
                                     element_type,
                                     known_count,
                                     non_empty,
@@ -224,7 +228,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
                                 atomics.push(TAtomic::Array(TArray::List(TList {
                                     known_count,
                                     non_empty,
-                                    known_elements,
+                                    known_elements: known_elements.map(Into::into),
                                     element_type,
                                 })));
                             } else {
@@ -237,7 +241,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
                                         known_elements
                                             .into_iter()
                                             .map(|(index, element)| (ArrayKey::Integer(index as i64), element))
-                                            .collect()
+                                            .collect::<BTreeMap<_, _>>()
+                                            .into()
                                     }),
                                     parameters: if element_type.is_never() {
                                         None
@@ -269,7 +274,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
                                     known_items: Some(
                                         // We don't know the key value, so we can't unset it.
                                         // Mark all items as potentially undefined.
-                                        known_items
+                                        Arc::unwrap_or_clone(known_items)
                                             .into_iter()
                                             .map(|(key, mut item)| {
                                                 // Mark the item as potentially undefined.
@@ -277,7 +282,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
 
                                                 (key, item)
                                             })
-                                            .collect(),
+                                            .collect::<BTreeMap<_, _>>()
+                                            .into(),
                                     ),
                                     parameters,
                                     non_empty,
@@ -287,7 +293,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
                                 continue;
                             };
 
-                            let Some(_) = known_items.remove(array_key) else {
+                            let Some(_) = Arc::make_mut(&mut known_items).remove(array_key) else {
                                 atomics.push(TAtomic::Array(TArray::Keyed(TKeyedArray {
                                     known_items: Some(known_items),
                                     parameters,

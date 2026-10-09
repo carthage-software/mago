@@ -19,7 +19,7 @@ pub struct TList {
     /// The general type of elements in the list (`TValue` in `list<TValue>`).
     pub element_type: Arc<TUnion>,
     /// Specific types known for certain integer indices. The bool indicates if the element is optional.
-    pub known_elements: Option<BTreeMap<usize, (bool, TUnion)>>,
+    pub known_elements: Option<Arc<BTreeMap<usize, (bool, TUnion)>>>,
     /// The known exact number of elements, if determined (e.g., from `count()` or literal definition).
     pub known_count: Option<usize>,
     /// Flag indicating if the list is known to contain at least one element.
@@ -80,7 +80,7 @@ impl TList {
                 None
             },
             non_empty: known_elements.values().any(|(optional, _)| !*optional),
-            known_elements: Some(known_elements),
+            known_elements: Some(Arc::new(known_elements)),
         }
     }
 
@@ -101,7 +101,7 @@ impl TList {
     #[inline]
     #[must_use]
     pub fn get_known_elements(&self) -> Option<&BTreeMap<usize, (bool, TUnion)>> {
-        self.known_elements.as_ref()
+        self.known_elements.as_deref()
     }
 
     /// Create a non-empty clone of the list type.
@@ -127,13 +127,12 @@ impl TList {
     #[inline]
     #[must_use]
     pub fn has_known_optional_elements(&self) -> bool {
-        self.known_elements.as_ref().is_some_and(|elements| elements.values().any(|(optional, _)| *optional))
+        self.known_elements.as_deref().is_some_and(|elements| elements.values().any(|(optional, _)| *optional))
     }
 }
 
 impl TType for TList {
-    fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
-        let mut children = vec![];
+    fn append_child_nodes<'types>(&'types self, children: &mut Vec<TypeRef<'types>>) {
         if let Some(known_items) = self.get_known_elements() {
             for (_, item_type) in known_items.values() {
                 children.push(TypeRef::Union(item_type));
@@ -141,7 +140,6 @@ impl TType for TList {
         }
 
         children.push(TypeRef::Union(self.get_element_type()));
-        children
     }
 
     fn needs_population(&self) -> bool {
@@ -182,7 +180,7 @@ impl TType for TList {
             let has_optional = self.has_known_optional_elements();
             let mut first = true;
             let mut include_index = false;
-            for (i, (optional, element_type)) in elements {
+            for (i, (optional, element_type)) in elements.iter() {
                 if first {
                     first = false;
                     include_index = *i != 0;
@@ -237,7 +235,7 @@ impl TType for TList {
             let has_optional = self.has_known_optional_elements();
             let mut include_index = false;
 
-            for (i, (optional, element_type)) in elements {
+            for (i, (optional, element_type)) in elements.iter() {
                 if *i == 0 {
                     include_index = elements.len() > 1 || has_optional;
                 }

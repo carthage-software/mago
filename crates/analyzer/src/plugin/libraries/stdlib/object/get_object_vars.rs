@@ -88,7 +88,7 @@ impl FunctionReturnTypeProvider for GetObjectVarsProvider {
         }
 
         let mut keyed_array = TKeyedArray::new();
-        keyed_array.known_items = Some(known_items);
+        keyed_array.known_items = Some(known_items.into());
         keyed_array.non_empty = true;
 
         if !class_metadata.flags.is_final() || !class_metadata.flags.is_readonly() {

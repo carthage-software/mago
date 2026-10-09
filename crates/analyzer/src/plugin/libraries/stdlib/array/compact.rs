@@ -76,7 +76,7 @@ impl FunctionReturnTypeProvider for CompactProvider {
         }
 
         let mut keyed_array = TKeyedArray::new();
-        keyed_array.known_items = Some(known_items);
+        keyed_array.known_items = Some(known_items.into());
         keyed_array.non_empty = true;
         if has_unknown {
             keyed_array.parameters = Some((Arc::new(get_string()), Arc::new(get_mixed())));

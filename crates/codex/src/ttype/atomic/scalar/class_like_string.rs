@@ -218,14 +218,10 @@ impl TClassLikeString {
 }
 
 impl TType for TClassLikeString {
-    fn get_child_nodes(&self) -> Vec<TypeRef<'_>> {
-        let mut children = vec![];
-
+    fn append_child_nodes<'types>(&'types self, children: &mut Vec<TypeRef<'types>>) {
         if let Some(constraint) = self.constraint() {
             children.push(TypeRef::Atomic(constraint));
         }
-
-        children
     }
 
     fn needs_population(&self) -> bool {

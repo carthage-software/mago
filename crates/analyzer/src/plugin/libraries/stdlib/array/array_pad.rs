@@ -104,7 +104,7 @@ impl FunctionReturnTypeProvider for ArrayPadProvider {
                 (result_elements, Some(target_count))
             }
             None => {
-                let mut result_elements = list.known_elements.clone().unwrap_or_default();
+                let mut result_elements = list.known_elements.as_deref().cloned().unwrap_or_default();
 
                 for index in 0..target_count {
                     let result_type = if length >= 0 {
@@ -122,7 +122,7 @@ impl FunctionReturnTypeProvider for ArrayPadProvider {
 
         Some(TUnion::from_atomic(TAtomic::Array(TArray::List(TList {
             element_type: Arc::new(element_type),
-            known_elements: Some(result_elements),
+            known_elements: Some(result_elements.into()),
             known_count,
             non_empty: true,
         }))))
