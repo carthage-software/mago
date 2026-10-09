@@ -1073,17 +1073,19 @@ fn add_union_type_inner(
 }
 
 fn add_unequal_union_type_inner(
-    mut base_type: TUnion,
+    base_type: TUnion,
     other_type: &TUnion,
     codebase: &CodebaseMetadata,
     options: combiner::CombinerOptions,
     preserve_array_shapes: bool,
 ) -> TUnion {
-    base_type.types = if base_type.is_vanilla_mixed() && other_type.is_vanilla_mixed() {
-        base_type.types
+    let original_flags = base_type.flags;
+    let mut base_type = if base_type.is_vanilla_mixed() && other_type.is_vanilla_mixed() {
+        base_type
     } else {
-        combine_unequal_union_types_inner(&base_type, other_type, codebase, options, preserve_array_shapes).types
+        combine_unequal_union_types_cow(Cow::Owned(base_type), other_type, codebase, options, preserve_array_shapes)
     };
+    base_type.flags = original_flags;
 
     if !other_type.had_template() {
         base_type.set_had_template(false);
