@@ -1182,7 +1182,7 @@ where
 
     let mut base_key_atom = word(&base_key);
     while let Some(divider) = key_parts.pop() {
-        let base_key_type = block_context.locals.get(&base_key_atom)?;
+        let base_key_type = Rc::clone(block_context.locals.get(&base_key_atom)?);
 
         if divider == b"[" {
             let array_key = key_parts.pop()?;
@@ -1209,18 +1209,18 @@ where
 
             if !block_context.locals.contains_key(&new_base_key_atom) {
                 let mut new_base_type: Option<Rc<TUnion>> = None;
-                let mut atomic_types = base_key_type.types.to_vec();
+                let mut atomic_types: Vec<_> = base_key_type.types.iter().collect();
 
                 atomic_types.reverse();
                 while let Some(existing_key_type_part) = atomic_types.pop() {
                     if let TAtomic::GenericParameter(TGenericParameter { constraint, .. }) = existing_key_type_part {
-                        atomic_types.extend(Arc::unwrap_or_clone(constraint).types.into_owned());
+                        atomic_types.extend(constraint.types.iter());
                         continue;
                     }
 
                     let mut new_base_type_candidate;
 
-                    if let TAtomic::Array(TArray::Keyed(TKeyedArray { known_items, .. })) = &existing_key_type_part {
+                    if let TAtomic::Array(TArray::Keyed(TKeyedArray { known_items, .. })) = existing_key_type_part {
                         if has_empty {
                             return None;
                         }
@@ -1234,8 +1234,6 @@ where
                         };
 
                         if let Some(known_item) = known_item {
-                            let known_item = known_item.clone();
-
                             new_base_type_candidate = known_item.1.clone();
 
                             if known_item.0 {
@@ -1247,7 +1245,7 @@ where
                             }
 
                             new_base_type_candidate =
-                                get_iterable_value_parameter(&existing_key_type_part, context.codebase)?;
+                                get_iterable_value_parameter(existing_key_type_part, context.codebase)?;
 
                             if new_base_type_candidate.is_mixed()
                                 && !has_isset
@@ -1272,7 +1270,7 @@ where
                                 new_base_type_candidate.set_possibly_undefined(true, None);
                             }
                         }
-                    } else if let TAtomic::Array(TArray::List(TList { known_elements, .. })) = &existing_key_type_part {
+                    } else if let TAtomic::Array(TArray::List(TList { known_elements, .. })) = existing_key_type_part {
                         if has_empty {
                             return None;
                         }
@@ -1293,7 +1291,7 @@ where
                             }
                         } else {
                             new_base_type_candidate =
-                                get_iterable_value_parameter(&existing_key_type_part, context.codebase)?;
+                                get_iterable_value_parameter(existing_key_type_part, context.codebase)?;
 
                             if (has_isset || has_inverted_isset || has_inverted_key_exists)
                                 && new_assertions.contains_key(&new_base_key_atom)
@@ -1314,7 +1312,7 @@ where
                         new_base_type_candidate = get_string();
                     } else if existing_key_type_part.is_never() || existing_key_type_part.is_mixed_isset_from_loop() {
                         return Some(get_mixed_maybe_from_loop(inside_loop));
-                    } else if let TAtomic::Object(TObject::Named(_named_object)) = &existing_key_type_part {
+                    } else if let TAtomic::Object(TObject::Named(_named_object)) = existing_key_type_part {
                         if has_isset || has_inverted_isset || has_inverted_key_exists {
                             *has_object_array_access = true;
                             block_context.locals.remove(&new_base_key_atom);
@@ -1335,7 +1333,7 @@ where
                             CombinerOptions::default(),
                         )
                     } else {
-                        new_base_type_candidate.clone()
+                        new_base_type_candidate
                     });
 
                     new_base_type = Some(Rc::clone(&resulting_type));
@@ -1354,17 +1352,17 @@ where
 
             if !block_context.locals.contains_key(&new_base_key_atom) {
                 let mut new_base_type: Option<Rc<TUnion>> = None;
-                let mut atomic_types = base_key_type.types.to_vec();
+                let mut atomic_types: Vec<_> = base_key_type.types.iter().collect();
 
                 while let Some(existing_key_type_part) = atomic_types.pop() {
                     if let TAtomic::GenericParameter(TGenericParameter { constraint, .. }) = existing_key_type_part {
-                        atomic_types.extend(Arc::unwrap_or_clone(constraint).types.into_owned());
+                        atomic_types.extend(constraint.types.iter());
                         continue;
                     }
 
                     let class_property_type: TUnion;
 
-                    if existing_key_type_part == TAtomic::Null {
+                    if *existing_key_type_part == TAtomic::Null {
                         class_property_type = get_null();
                         // TODO(azjezz): maybe we should exclude mixed from isset in loop?
                     } else if let TAtomic::Mixed(_) | TAtomic::GenericParameter(_) | TAtomic::Object(TObject::Any) =
