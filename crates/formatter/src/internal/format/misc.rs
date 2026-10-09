@@ -46,6 +46,7 @@ use crate::internal::format::format_token;
 use crate::internal::format::member_access::collect_member_access_chain;
 use crate::internal::format::statement::print_statement_sequence;
 use crate::internal::utils::string_width;
+use crate::internal::utils::unwrap_parenthesized;
 use crate::settings::BraceStyle;
 use crate::settings::SortOrder;
 
@@ -294,6 +295,21 @@ fn contains_breaking_concatenation(node: &Expression<'_>) -> bool {
             matches!(binary.lhs, Expression::Call(_)) || matches!(binary.rhs, Expression::Call(_))
         }
         Expression::Parenthesized(inner) => contains_breaking_concatenation(inner.expression),
+        _ => false,
+    }
+}
+
+fn contains_breaking_binary_expression(source_text: &[u8], node: &Expression<'_>) -> bool {
+    match unwrap_parenthesized(node) {
+        Expression::Binary(binary) => {
+            let left = unwrap_parenthesized(binary.lhs);
+            let right = unwrap_parenthesized(binary.rhs);
+            has_new_line_in_range(source_text, left.end_offset(), right.start_offset())
+                || contains_breaking_binary_expression(source_text, left)
+                || contains_breaking_binary_expression(source_text, right)
+        }
+        Expression::UnaryPrefix(unary) => contains_breaking_binary_expression(source_text, unary.operand),
+        Expression::UnaryPostfix(unary) => contains_breaking_binary_expression(source_text, unary.operand),
         _ => false,
     }
 }
@@ -788,7 +804,9 @@ where
     f.in_condition = true;
 
     let must_break = f.settings.preserve_breaking_condition_expression
-        && has_new_line_in_range(f.source_text, left_parenthesis.end.offset, condition.span().start.offset);
+        && (has_new_line_in_range(f.source_text, left_parenthesis.end.offset, condition.span().start.offset)
+            || (f.settings.preserve_breaking_binary_expression
+                && contains_breaking_binary_expression(f.source_text, condition)));
 
     f.must_break_condition = must_break;
 
