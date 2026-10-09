@@ -175,6 +175,7 @@ impl Assertion {
             Self::NotInArray(union) => concat_word!(b"=in-array-", union.get_id()),
             _ => self.get_negation().to_atom(),
         };
+
         FixedState::default().hash_one(atom)
     }
 
