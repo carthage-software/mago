@@ -202,9 +202,9 @@ impl<'ctx> BlockContext<'ctx> {
     }
 
     pub fn new(scope: ScopeContext<'ctx>, register_super_globals: bool) -> Self {
-        let mut block_context = Self {
+        Self {
             scope,
-            locals: WordMap::default(),
+            locals: if register_super_globals { get_super_globals() } else { WordMap::default() },
             static_locals: WordSet::default(),
             variables_possibly_in_scope: WordSet::default(),
             conditionally_referenced_variable_ids: WordSet::default(),
@@ -239,15 +239,7 @@ impl<'ctx> BlockContext<'ctx> {
             stable_method_call_assertions: WordMap::default(),
             stable_method_calls: WordSet::default(),
             class_type_relations: WordMap::default(),
-        };
-
-        if register_super_globals {
-            for (var_name, var_type) in get_super_globals() {
-                block_context.locals.insert(word(var_name), var_type);
-            }
         }
-
-        block_context
     }
 
     pub fn is_global_scope(&self) -> bool {

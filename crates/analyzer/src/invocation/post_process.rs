@@ -567,7 +567,7 @@ fn clear_object_property_narrowings<'ctx, 'arena, A>(
             return false;
         }
         if is_superglobal_name(var_id.as_bytes()) {
-            if let Some(declared) = crate::common::global::get_global_variable_type(var_id.as_bytes()) {
+            if let Some(declared) = crate::common::global::get_global_variable_type(*var_id) {
                 *current_type = declared;
                 return true;
             }
