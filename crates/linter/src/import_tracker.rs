@@ -525,7 +525,7 @@ fn is_reserved_type_name(short: &[u8], kind: ImportKind) -> bool {
 
     match kind {
         ImportKind::Name => RESERVED_CLASS_NAMES.iter().any(|r| short.eq_ignore_ascii_case(r)),
-        ImportKind::Function => false,
+        ImportKind::Function => mago_names::is_never_namespaced_function(short),
         ImportKind::Constant => matches!(short.to_ascii_lowercase().as_slice(), b"true" | b"false" | b"null"),
     }
 }
@@ -572,6 +572,10 @@ mod tests {
     fn reserved_names_allow_functions() {
         assert!(!is_reserved_type_name(b"int", ImportKind::Function));
         assert!(!is_reserved_type_name(b"strlen", ImportKind::Function));
+        assert!(is_reserved_type_name(b"clone", ImportKind::Function));
+        assert!(is_reserved_type_name(b"EXIT", ImportKind::Function));
+        assert!(is_reserved_type_name(b"DiE", ImportKind::Function));
+        assert!(!is_reserved_type_name(b"clone_object", ImportKind::Function));
     }
 
     #[test]
@@ -1291,6 +1295,15 @@ mod tests {
         let mut tracker = tracker_with_anchor(Some(b"App"), 10);
         assert!(tracker.import(b"Other\\int", ImportKind::Function).is_some());
         assert!(tracker.import(b"Other\\void", ImportKind::Function).is_some());
+    }
+
+    #[test]
+    fn never_namespaced_functions_are_not_importable() {
+        let mut tracker = tracker_with_anchor(Some(b"App"), 10);
+        assert!(tracker.import(b"clone", ImportKind::Function).is_none());
+        assert!(tracker.import(b"\\exit", ImportKind::Function).is_none());
+        assert!(tracker.import(b"App\\die", ImportKind::Function).is_none());
+        assert!(tracker.import(b"App\\clone_object", ImportKind::Function).is_some());
     }
 
     #[test]

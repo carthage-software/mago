@@ -12,6 +12,8 @@ pub mod scope;
 
 mod internal;
 
+pub use scope::is_never_namespaced_function;
+
 /// Stores the results of a name resolution pass over a PHP program.
 ///
 /// Maps the start byte offset of every identifier in the source to a tuple of
