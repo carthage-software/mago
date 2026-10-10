@@ -561,6 +561,24 @@ impl TAtomic {
             TAtomic::Array(array) => array.is_truthy(),
             TAtomic::Mixed(mixed) => mixed.is_truthy(),
             TAtomic::Resource(resource) => resource.closed.is_none_or(|closed| !closed),
+            // An empty `SimpleXMLElement` (or `SimpleXMLIterator`) casts to `false`,
+            // so it is neither always truthy nor always falsy.
+            TAtomic::Object(TObject::Named(named_object)) => {
+                let name = named_object.name.as_bytes().strip_prefix(b"\\").unwrap_or(named_object.name.as_bytes());
+                if name.eq_ignore_ascii_case(b"SimpleXMLElement") || name.eq_ignore_ascii_case(b"SimpleXMLIterator") {
+                    return false;
+                }
+
+                if let Some(intersection_types) = named_object.get_intersection_types() {
+                    for intersection_type in intersection_types {
+                        if !intersection_type.is_truthy() {
+                            return false;
+                        }
+                    }
+                }
+
+                true
+            }
             TAtomic::Object(_) | TAtomic::Callable(_) => true,
             _ => false,
         }
