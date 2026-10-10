@@ -28,30 +28,6 @@ fn assert_code_eq(expected: &[u8], actual: &[u8], message: &str) {
     );
 }
 
-#[test]
-fn formatting_diff_shows_source_text() {
-    let failure = std::panic::catch_unwind(|| {
-        assert_code_eq(b"<?php\nfoo();\n", b"<?php\nbar();\n", "Formatting mismatch");
-    })
-    .unwrap_err();
-    let message = failure.downcast_ref::<String>().unwrap();
-    assert!(message.contains("Formatting mismatch"));
-    assert!(message.contains("<?php\n"));
-    assert!(message.contains("foo"));
-    assert!(message.contains("bar"));
-}
-
-#[test]
-fn formatting_diff_preserves_non_utf8_byte_differences() {
-    let failure = std::panic::catch_unwind(|| {
-        assert_code_eq(b"<?php\n$\x80;\n", b"<?php\n$\xFF;\n", "Formatting mismatch");
-    })
-    .unwrap_err();
-    let message = failure.downcast_ref::<String>().unwrap();
-    assert!(message.contains("80"));
-    assert!(message.contains("FF"));
-}
-
 #[macro_export]
 macro_rules! test_case {
     ($name:ident) => {
@@ -653,4 +629,28 @@ fn test_all_test_cases_are_ran() {
             "Directory '{file_name}' was not found as a test case"
         );
     }
+}
+
+#[test]
+fn formatting_diff_shows_source_text() {
+    let failure = std::panic::catch_unwind(|| {
+        assert_code_eq(b"<?php\nfoo();\n", b"<?php\nbar();\n", "Formatting mismatch");
+    })
+    .unwrap_err();
+    let message = failure.downcast_ref::<String>().unwrap();
+    assert!(message.contains("Formatting mismatch"));
+    assert!(message.contains("<?php\n"));
+    assert!(message.contains("foo"));
+    assert!(message.contains("bar"));
+}
+
+#[test]
+fn formatting_diff_preserves_non_utf8_byte_differences() {
+    let failure = std::panic::catch_unwind(|| {
+        assert_code_eq(b"<?php\n$\x80;\n", b"<?php\n$\xFF;\n", "Formatting mismatch");
+    })
+    .unwrap_err();
+    let message = failure.downcast_ref::<String>().unwrap();
+    assert!(message.contains("80"));
+    assert!(message.contains("FF"));
 }
