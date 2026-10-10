@@ -209,7 +209,9 @@ where
             if object_atomic.is_null() {
                 result.encountered_null = true;
                 if !object_type.ignore_nullable_issues() && !is_null_safe && !object_type.has_nullsafe_null() {
-                    result.has_invalid_target = true;
+                    if object_type.is_null() {
+                        result.has_invalid_target = true;
+                    }
 
                     context.collector.report_with_code(
                         if object_type.is_null() {

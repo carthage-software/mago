@@ -12,7 +12,6 @@ final class Service
 
 /**
  * @mago-expect analysis:possible-method-access-on-null
- * @mago-expect analysis:mixed-return-statement
  */
 function flow_method_on_possibly_null(null|Service $s): string
 {
