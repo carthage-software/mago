@@ -1,4 +1,5 @@
 use std::rc::Rc;
+use std::sync::Arc;
 
 use foldhash::HashMap;
 
@@ -6,7 +7,12 @@ use mago_allocator::Arena;
 use mago_bytes::BytesDisplay;
 use mago_codex::context::ScopeContext;
 use mago_codex::ttype::add_union_type;
+use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::atomic::array::TArray;
+use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
+use mago_codex::ttype::get_arraykey;
 use mago_codex::ttype::get_mixed;
+use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -127,6 +133,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
                 if is_by_reference {
                     let inner_variable_type = Rc::make_mut(&mut variable_type);
                     inner_variable_type.set_by_reference(true);
+                    widen_by_reference_type(inner_variable_type);
 
                     inner_block_context.references_to_external_scope.insert(variable_atom);
                 }
@@ -140,7 +147,14 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
                     };
 
                     if stripped_variable_id.starts_with(b"[") || stripped_variable_id.starts_with(b"-") {
-                        inner_block_context.locals.insert(*variable_id, Rc::clone(variable_type));
+                        let mut imported_type = Rc::clone(variable_type);
+                        if is_by_reference {
+                            let inner_descendant = Rc::make_mut(&mut imported_type);
+                            inner_descendant.set_by_reference(true);
+                            widen_by_reference_type(inner_descendant);
+                        }
+
+                        inner_block_context.locals.insert(*variable_id, imported_type);
                         inner_block_context.variables_possibly_in_scope.insert(*variable_id);
                     }
                 }
@@ -200,15 +214,20 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
                 continue;
             };
 
-            let variable_type = match block_context.locals.remove(&referenced_variable) {
-                Some(existing_type) => Rc::new(add_union_type(
+            let existing_type = block_context.locals.remove(&referenced_variable);
+            let variable_type = match &existing_type {
+                Some(existing) => Rc::new(add_union_type(
                     Rc::unwrap_or_clone(inner_type),
-                    &existing_type,
+                    existing,
                     context.codebase,
                     context.settings.combiner_options(),
                 )),
                 None => inner_type,
             };
+
+            if let Some(existing) = &existing_type {
+                block_context.remove_descendants(context, referenced_variable, existing, Some(&variable_type));
+            }
 
             block_context.locals.insert(referenced_variable, variable_type);
         }
@@ -233,6 +252,37 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
         }
 
         Ok(())
+    }
+}
+
+fn widen_by_reference_type(union: &mut TUnion) {
+    union.widen_literals();
+
+    for atomic in union.types.to_mut() {
+        if let TAtomic::Array(array) = atomic {
+            if array.is_empty() {
+                *atomic = TAtomic::Array(TArray::Keyed(TKeyedArray::new_with_parameters(
+                    Arc::new(get_arraykey()),
+                    Arc::new(get_mixed()),
+                )));
+            } else {
+                match array {
+                    TArray::Keyed(keyed) => {
+                        if keyed.parameters.is_none() {
+                            keyed.parameters = Some((Arc::new(get_arraykey()), Arc::new(get_mixed())));
+                        }
+                        keyed.non_empty = false;
+                    }
+                    TArray::List(list) => {
+                        if list.element_type.is_never() {
+                            list.element_type = Arc::new(get_mixed());
+                        }
+                        list.known_count = None;
+                        list.non_empty = false;
+                    }
+                }
+            }
+        }
     }
 }
 
@@ -460,5 +510,22 @@ mod tests {
             IssueCode::UndefinedVariable,
             IssueCode::UndefinedVariableInClosureUse,
         ]
+    }
+
+    test_analysis! {
+        name = capture_by_reference_empty_array,
+        code = indoc! {"
+            <?php
+
+            $seen = [];
+            $isDuplicate = static function (string $key) use (&$seen): bool {
+                if (isset($seen[$key])) {
+                    return true;
+                }
+
+                $seen[$key] = true;
+                return false;
+            };
+        "},
     }
 }
