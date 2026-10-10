@@ -160,6 +160,11 @@ where
         right_block_context.known_functions.extend(left_block_context.known_functions.iter().copied());
         right_block_context.known_constants.extend(left_block_context.known_constants.iter().copied());
 
+        // The right-hand side only runs after the left-hand side, so method calls evaluated on
+        // the left must stay stable while reconciling the left assertions below.
+        right_block_context.stable_method_calls.clone_from(&left_block_context.stable_method_calls);
+        right_block_context.stable_method_call_assertions.clone_from(&left_block_context.stable_method_call_assertions);
+
         for variable_id in left_assertions.keys() {
             if let Some(variable_type) = left_block_context.locals.get(variable_id) {
                 right_block_context.locals.entry(*variable_id).or_insert_with(|| Rc::clone(variable_type));
@@ -284,6 +289,15 @@ where
         .parent_conflicting_clause_variables
         .extend(right_block_context.parent_conflicting_clause_variables.iter().copied());
 
+    // The right-hand side context started from the left-hand side context, so it holds every
+    // method call that is still stable after either operand ran. Narrowings recorded before this
+    // expression survive only if neither operand invalidated them.
+    block_context.stable_method_calls.clone_from(&right_block_context.stable_method_calls);
+    block_context.stable_method_call_assertions.retain(|method_call, _| {
+        left_block_context.stable_method_call_assertions.contains_key(method_call)
+            && right_block_context.stable_method_call_assertions.contains_key(method_call)
+    });
+
     if let Some(if_body_context) = &block_context.if_body_context {
         let mut if_body_context_inner = if_body_context.borrow_mut();
 
@@ -300,6 +314,10 @@ where
                 .assigned_variable_ids
                 .extend(block_context.assigned_variable_ids.iter().map(|(k, v)| (*k, *v)));
             if_body_context_inner.reconciled_expression_clauses.extend(partitioned_clauses.1);
+            if_body_context_inner.stable_method_calls.clone_from(&block_context.stable_method_calls);
+            if_body_context_inner
+                .stable_method_call_assertions
+                .retain(|method_call, _| block_context.stable_method_call_assertions.contains_key(method_call));
         }
     } else {
         let left_locals = left_block_context.locals;
