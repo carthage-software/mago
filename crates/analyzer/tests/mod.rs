@@ -2841,6 +2841,7 @@ test_case!(enum_case_constant_array_isset);
 test_case!(parameter_null_default_native_type);
 test_case!(parameter_null_default_docblock_type);
 test_case!(parameter_null_default_php90, crate::framework::php_90_settings());
+test_case!(multilevel_inheritance_unbound_template_bound);
 
 #[test]
 #[cfg_attr(miri, ignore)]
