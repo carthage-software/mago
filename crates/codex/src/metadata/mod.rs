@@ -35,6 +35,10 @@ use crate::symbol::SymbolKind;
 use crate::symbol::Symbols;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::object::TObject;
+use crate::ttype::expander::StaticClassType;
+use crate::ttype::expander::TypeExpansionOptions;
+use crate::ttype::expander::expand_union;
+use crate::ttype::get_mixed;
 use crate::ttype::union::TUnion;
 use crate::visibility::Visibility;
 
@@ -675,15 +679,15 @@ impl CodebaseMetadata {
                 .clone()
                 .map(TUnion::from_atomic)
                 .or_else(|| constant_meta.type_metadata.as_ref().map(|type_metadata| type_metadata.type_union.clone()))
-                .unwrap_or_else(crate::ttype::get_mixed)
+                .unwrap_or_else(get_mixed)
         };
 
-        crate::ttype::expander::expand_union(
+        expand_union(
             self,
             &mut constant_type,
-            &crate::ttype::expander::TypeExpansionOptions {
+            &TypeExpansionOptions {
                 self_class: Some(class_meta.name),
-                static_class_type: crate::ttype::expander::StaticClassType::Name(class_meta.name),
+                static_class_type: StaticClassType::Name(class_meta.name),
                 function_is_final: class_meta.flags.is_final(),
                 ..Default::default()
             },
