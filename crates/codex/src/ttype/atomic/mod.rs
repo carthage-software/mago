@@ -812,6 +812,7 @@ pub(crate) fn append_intersection_ids(mut base: Word, intersection_types: &[TAto
 }
 
 fn add_symbol_reference(reference_source: &ReferenceSource, symbol_references: &mut SymbolReferences, name: Word) {
+    let name = name.to_ascii_lowercase();
     match reference_source {
         ReferenceSource::Symbol(in_signature, a) => {
             symbol_references.add_symbol_reference_to_symbol(*a, name, *in_signature);
