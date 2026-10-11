@@ -27,14 +27,19 @@ pub fn inherit_methods_from_parent(
     {
         let mut map: HashMap<Word, Vec<Word>> = HashMap::default();
         for (alias, original) in metadata.get_trait_alias_map() {
-            map.entry(*original).or_default().push(*alias);
+            if metadata.trait_alias_applies(parent_metadata.name, *original, *alias, codebase) {
+                map.entry(*original).or_default().push(*alias);
+            }
         }
+
         Some(map)
     } else {
         None
     };
 
     for (method_name_lc, appearing_method_id) in &parent_metadata.appearing_method_ids {
+        let inherit_original =
+            !parent_is_trait || !metadata.excludes_trait_method(parent_metadata.name, *method_name_lc, codebase);
         let mut process_name = |aliased_method_name: Word| {
             metadata.appearing_method_ids.entry(aliased_method_name).or_insert_with(|| {
                 if parent_is_trait {
@@ -45,7 +50,9 @@ pub fn inherit_methods_from_parent(
             });
         };
 
-        process_name(*method_name_lc);
+        if inherit_original {
+            process_name(*method_name_lc);
+        }
 
         if let Some(reverse_map) = reverse_alias_map.as_ref()
             && let Some(aliases) = reverse_map.get(method_name_lc)
@@ -57,7 +64,11 @@ pub fn inherit_methods_from_parent(
     }
 
     for (method_name_lc, declaring_method_id) in &parent_metadata.inheritable_method_ids {
-        if *method_name_lc != constructor_name || parent_metadata.flags.has_consistent_constructor() {
+        let inherit_original =
+            !parent_is_trait || !metadata.excludes_trait_method(parent_metadata.name, *method_name_lc, codebase);
+        if inherit_original
+            && (*method_name_lc != constructor_name || parent_metadata.flags.has_consistent_constructor())
+        {
             let add_parent = !parent_is_trait
                 || codebase
                     .function_likes
@@ -144,14 +155,11 @@ pub fn inherit_methods_from_parent(
                 || metadata.kind.is_trait()
                 || is_ctor_or_clone
                 || metadata
-                    .trait_visibility_map
-                    .get(&aliased_method_name)
-                    .copied()
+                    .trait_method_modifiers(aliased_method_name, *declaring_method_id, codebase)
+                    .visibility
                     .or_else(|| {
-                        codebase.get_method_visibility_by_id(&MethodIdentifier::new(
-                            parent_metadata.name,
-                            aliased_method_name,
-                        ))
+                        codebase
+                            .get_method_visibility_by_id(&MethodIdentifier::new(parent_metadata.name, *method_name_lc))
                     })
                     .is_none_or(|visibility| !visibility.is_private());
 
@@ -160,7 +168,9 @@ pub fn inherit_methods_from_parent(
             }
         };
 
-        process_name(*method_name_lc, metadata);
+        if inherit_original {
+            process_name(*method_name_lc, metadata);
+        }
 
         if let Some(reverse_map) = reverse_alias_map.as_ref()
             && let Some(aliases) = reverse_map.get(method_name_lc)

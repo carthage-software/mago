@@ -48,6 +48,7 @@ pub mod function_like;
 pub mod parameter;
 pub mod property;
 pub mod property_hook;
+mod trait_adaptation;
 pub mod ttype;
 pub mod version_constraint;
 
@@ -900,16 +901,16 @@ impl CodebaseMetadata {
     pub fn method_is_final(&self, class: &[u8], method: &[u8]) -> bool {
         let lowercase_class = ascii_lowercase_word(class);
         let lowercase_method = ascii_lowercase_word(method);
-        self.get_method_by_words(lowercase_class, lowercase_method)
+        let Some(class) = self.get_class_like_by_word(lowercase_class) else { return false };
+        let declaring = self.get_declaring_method_identifier(&MethodIdentifier::new(lowercase_class, lowercase_method));
+        self.get_method_by_id(&declaring)
             .and_then(|meta| meta.method_metadata.as_ref())
-            .is_some_and(|method_meta| method_meta.is_final)
+            .is_some_and(|method| method.is_final)
+            || self.effective_trait_method_modifiers(class, lowercase_method, declaring).is_final
     }
 
-    /// Gets the effective visibility of a method, taking into account trait alias visibility overrides.
-    ///
-    /// When a trait method is aliased with a visibility modifier (e.g., `use Trait { method as public aliasedMethod; }`),
-    /// the visibility is stored in the class's `trait_visibility_map`. This method checks that map first,
-    /// then falls back to the method's declared visibility.
+    /// Gets a method's visibility through inheritance and trait adaptations.
+    /// The nearest visibility adaptation wins; otherwise the source declaration supplies it.
     #[inline]
     #[must_use]
     pub fn get_method_visibility(&self, class: &[u8], method: &[u8]) -> Option<Visibility> {
@@ -927,19 +928,12 @@ impl CodebaseMetadata {
         let lowercase_method = method.get_method_name().to_ascii_lowercase();
         let class_meta = self.get_class_like_by_word(lowercase_class)?;
 
-        // First check if there's a trait visibility override for this method
-        if let Some(overridden_visibility) = class_meta.trait_visibility_map.get(&lowercase_method) {
-            return Some(*overridden_visibility);
-        }
-
-        // Fall back to the method's declared visibility
-        let declaring_class = class_meta.declaring_method_ids.get(&lowercase_method)?.get_class_name();
-        let identifier = (declaring_class, lowercase_method);
-
-        self.function_likes
-            .get(&identifier)
-            .and_then(|meta| meta.method_metadata.as_ref())
-            .map(|method_meta| method_meta.visibility)
+        let declaring = *class_meta.declaring_method_ids.get(&lowercase_method)?;
+        self.effective_trait_method_modifiers(class_meta, lowercase_method, declaring).visibility.or_else(|| {
+            self.get_method_by_id(&declaring)
+                .and_then(|meta| meta.method_metadata.as_ref())
+                .map(|method| method.visibility)
+        })
     }
 
     /// Gets thrown types for a function-like, including inherited throws.

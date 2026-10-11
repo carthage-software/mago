@@ -23,6 +23,9 @@ mod signatures;
 mod sorter;
 mod templates;
 
+#[cfg(test)]
+mod ancestry_tests;
+
 /// Populates the codebase metadata, resolving types and inheritance.
 ///
 /// This function processes class-likes, function-likes, and constants to:
@@ -141,6 +144,7 @@ fn populate_codebase_inner(
 
     for class_like_name in &class_likes_to_repopulate {
         if let Some(classlike_info) = codebase.class_likes.get_mut(class_like_name) {
+            classlike_info.reset_ancestry();
             classlike_info.flags &= !MetadataFlags::POPULATED;
             classlike_info.declaring_property_ids.clear();
             classlike_info.appearing_property_ids.clear();
