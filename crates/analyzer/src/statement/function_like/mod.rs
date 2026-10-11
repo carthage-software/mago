@@ -192,12 +192,14 @@ where
         AnalysisArtifacts::new().with_variable_definedness_targets(parent_artifacts.variable_definedness_targets());
 
     if let Some(return_type) = &function_like_metadata.return_type_metadata {
+        add_symbol_references(&return_type.type_union, &block_context.scope, &mut artifacts);
         report_undefined_type_references(context, return_type);
 
         // Only check native declaration if effective type is from docblock (to avoid duplicates)
         if return_type.from_docblock
             && let Some(native_return) = &function_like_metadata.return_type_declaration_metadata
         {
+            add_symbol_references(&native_return.type_union, &block_context.scope, &mut artifacts);
             report_undefined_type_references(context, native_return);
         }
     }
@@ -644,11 +646,7 @@ fn expand_type_metadata<'ctx, A>(
 where
     A: Arena,
 {
-    add_symbol_references(
-        &type_metadata.type_union,
-        block_context.scope.get_function_like_identifier().as_ref(),
-        artifacts,
-    );
+    add_symbol_references(&type_metadata.type_union, &block_context.scope, artifacts);
 
     let mut signature_union = type_metadata.type_union.clone();
 
@@ -893,53 +891,24 @@ where
     })
 }
 
-fn add_symbol_references(
-    parameter_type: &TUnion,
-    calling_function_like_id: Option<&FunctionLikeIdentifier>,
-    artifacts: &mut AnalysisArtifacts,
-) {
-    for type_node in parameter_type.get_all_child_nodes() {
-        if let TypeRef::Atomic(atomic) = type_node {
-            match atomic {
-                TAtomic::Reference(TReference::Symbol { name, .. })
-                | TAtomic::Callable(TCallable::Alias(FunctionLikeIdentifier::Function(name))) => {
-                    match calling_function_like_id {
-                        Some(FunctionLikeIdentifier::Function(calling_function)) => {
-                            artifacts.symbol_references.add_symbol_reference_to_symbol(*calling_function, *name, true);
-                        }
-                        Some(FunctionLikeIdentifier::Method(calling_classlike, calling_function)) => {
-                            artifacts.symbol_references.add_class_member_reference_to_symbol(
-                                (*calling_classlike, *calling_function),
-                                *name,
-                                true,
-                            );
-                        }
-                        _ => {}
-                    }
-                }
-                TAtomic::Callable(TCallable::Alias(FunctionLikeIdentifier::Method(name, member_name))) => {
-                    match calling_function_like_id {
-                        Some(FunctionLikeIdentifier::Function(calling_function)) => {
-                            artifacts.symbol_references.add_symbol_reference_to_class_member(
-                                *calling_function,
-                                (*name, *member_name),
-                                true,
-                            );
-                        }
-                        Some(FunctionLikeIdentifier::Method(calling_classlike, calling_function)) => {
-                            artifacts.symbol_references.add_class_member_reference_to_class_member(
-                                (*calling_classlike, *calling_function),
-                                (*name, *member_name),
-                                true,
-                            );
-                        }
-                        _ => {}
-                    }
-                }
-                _ => {}
+fn add_symbol_references(parameter_type: &TUnion, scope: &ScopeContext<'_>, artifacts: &mut AnalysisArtifacts) {
+    let in_signature = !matches!(scope.get_function_like_identifier(), Some(FunctionLikeIdentifier::Closure(_)));
+    parameter_type.any_child_node(|type_node| {
+        let reference = match type_node {
+            TypeRef::Atomic(TAtomic::Reference(TReference::Symbol { name, .. }))
+            | TypeRef::Atomic(TAtomic::Object(TObject::Named(TNamedObject { name, .. })))
+            | TypeRef::Atomic(TAtomic::Object(TObject::Enum(TEnum { name, .. })))
+            | TypeRef::Atomic(TAtomic::Callable(TCallable::Alias(FunctionLikeIdentifier::Function(name)))) => {
+                (name.to_ascii_lowercase(), mago_word::empty_word())
             }
-        }
-    }
+            TypeRef::Atomic(TAtomic::Callable(TCallable::Alias(FunctionLikeIdentifier::Method(class, method)))) => {
+                (class.to_ascii_lowercase(), method.to_ascii_lowercase())
+            }
+            _ => return false,
+        };
+        artifacts.symbol_references.add_reference(scope.get_reference_origin(), reference, in_signature);
+        false
+    });
 }
 
 /// Flags declared return types that are strictly wider than the union of every
@@ -1510,10 +1479,7 @@ fn check_parameter_default_value<'ctx, 'arena, A>(
     context.collector.report_with_code(IssueCode::InvalidParameterDefaultValue, issue);
 }
 
-/// Reports errors for any undefined type references in the given type metadata.
-///
-/// This function scans the type union for unresolved `TReference::Symbol` entries,
-/// which indicate types that were not found during the population phase.
+/// Reports missing types, including object types whose declarations were removed after population.
 pub fn report_undefined_type_references<A>(context: &mut Context<'_, '_, A>, type_metadata: &TypeMetadata)
 where
     A: Arena,
@@ -1523,8 +1489,12 @@ where
     }
 
     type_metadata.type_union.any_child_node(|type_ref| {
-        let TypeRef::Atomic(TAtomic::Reference(TReference::Symbol { name, .. })) = type_ref else {
-            return false;
+        let name = match type_ref {
+            TypeRef::Atomic(TAtomic::Reference(TReference::Symbol { name, .. })) => name,
+            TypeRef::Atomic(TAtomic::Object(TObject::Named(TNamedObject { name, .. }) | TObject::Enum(TEnum { name, .. })))
+                if !matches!(name.as_bytes(), b"self" | b"static" | b"parent" | b"$this")
+                    && context.codebase.get_class_like(name.as_bytes()).is_none() => name,
+            _ => return false,
         };
 
         context.collector.report_with_code(

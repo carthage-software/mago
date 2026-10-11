@@ -1,3 +1,4 @@
+use mago_database::file::File;
 use mago_fingerprint::FingerprintOptions;
 use mago_fingerprint::Fingerprintable;
 use mago_names::ResolvedNames;
@@ -26,6 +27,7 @@ use crate::signature::FileSignature;
 ///
 /// # Arguments
 ///
+/// * `file` - Source file, including its logical filename.
 /// * `program` - The parsed program CST
 /// * `resolved_names` - The resolved names for the program (needed for fingerprinting)
 ///
@@ -34,6 +36,7 @@ use crate::signature::FileSignature;
 /// A `FileSignature` containing all top-level definitions with their hashes and positions.
 #[must_use]
 pub fn build_file_signature<'arena>(
+    file: &File,
     program: &'arena Program<'arena>,
     resolved_names: &'arena ResolvedNames<'arena>,
 ) -> FileSignature {
@@ -42,7 +45,7 @@ pub fn build_file_signature<'arena>(
 
     let hash = program.fingerprint(resolved_names, &builder.fingerprint_options);
 
-    FileSignature { hash, ast_nodes: builder.ast_nodes }
+    FileSignature { file_name: word(file.name.as_ref()), hash, ast_nodes: builder.ast_nodes }
 }
 
 /// Context for building file signatures while walking the CST.

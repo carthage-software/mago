@@ -837,6 +837,7 @@ test_case!(closure_calls_bind_parent_parameters, mago_analyzer::settings::Settin
 test_case!(closure_conditional_types_bind_class_context, mago_analyzer::settings::Settings::default());
 test_case!(escaped_closure_effects_keep_class_context, mago_analyzer::settings::Settings::default());
 test_case!(trait_closure_parent_types_follow_each_using_class, mago_analyzer::settings::Settings::default());
+test_case!(closure_parent_signature_types, mago_analyzer::settings::Settings::default());
 test_case!(octal_zero_prefix);
 test_case!(switch_semicolon);
 test_case!(redundant_assert);

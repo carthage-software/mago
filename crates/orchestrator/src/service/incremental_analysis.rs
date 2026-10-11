@@ -27,6 +27,7 @@ use mago_codex::diff::CodebaseDiff;
 use mago_codex::metadata::CodebaseEntryKeys;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::populator::populate_codebase;
+use mago_codex::populator::populate_codebase_after_body_edit;
 use mago_codex::populator::populate_codebase_targeted;
 use mago_codex::reference::SymbolReferences;
 use mago_codex::scanner::scan_program;
@@ -366,7 +367,7 @@ impl IncrementalAnalysisService {
 
                 let resolver = NameResolver::new(arena);
                 let resolved_names = resolver.resolve(program);
-                let file_signature = signature_builder::build_file_signature(program, &resolved_names);
+                let file_signature = signature_builder::build_file_signature(&file, program, &resolved_names);
                 let mut metadata = scan_program(arena, &file, program, &resolved_names, php_version);
                 metadata.set_file_signature(file.id, file_signature);
                 if file.file_type.is_patch() {
@@ -629,7 +630,10 @@ impl IncrementalAnalysisService {
                 let resolver = NameResolver::new(arena);
                 let resolved_names = resolver.resolve(program);
                 let mut metadata = scan_program(arena, file, program, &resolved_names, php_version);
-                metadata.set_file_signature(file.id, signature_builder::build_file_signature(program, &resolved_names));
+                metadata.set_file_signature(
+                    file.id,
+                    signature_builder::build_file_signature(file, program, &resolved_names),
+                );
                 if file.file_type.is_patch() {
                     metadata.convert_partial_to_patch();
                 }
@@ -802,11 +806,10 @@ impl IncrementalAnalysisService {
                 .copied()
                 .filter(|name| !changed_class_like_names.contains(name))
                 .collect();
-            populate_codebase_targeted(
+            populate_codebase_after_body_edit(
                 &mut merged_codebase,
                 &mut symbol_references,
                 safe_symbols,
-                HashSet::default(),
                 changed_symbols,
             );
             let SelectiveAnalysisOutput {

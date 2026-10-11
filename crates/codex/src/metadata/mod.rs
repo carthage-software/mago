@@ -42,6 +42,7 @@ pub mod attribute;
 pub mod class_like;
 pub mod class_like_constant;
 pub mod constant;
+mod entry_spans;
 pub mod enum_case;
 pub mod flags;
 pub mod function_like;
@@ -52,11 +53,13 @@ mod trait_adaptation;
 pub mod ttype;
 pub mod version_constraint;
 
+pub use entry_spans::CodebaseEntrySpans;
+
 /// Lightweight set of keys extracted from a per-file [`CodebaseMetadata`].
 ///
 /// Used by the incremental engine to efficiently remove a file's contributions from the
 /// merged codebase without keeping a full `CodebaseMetadata` clone per file.
-/// Created via [`CodebaseMetadata::extract_keys()`].
+/// Created via [`CodebaseMetadata::extract_owned_keys()`].
 #[derive(Debug, Clone)]
 pub struct CodebaseEntryKeys {
     /// Class-like FQCN atoms (also used for symbol removal).
