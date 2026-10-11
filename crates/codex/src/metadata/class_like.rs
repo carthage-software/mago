@@ -319,7 +319,7 @@ impl ClassLikeMetadata {
     /// Adds or updates a single trait alias. Returns the previous original name if one existed for the alias.
     #[inline]
     pub fn add_trait_alias(&mut self, method: Word, alias: Word) -> Option<Word> {
-        self.trait_alias_map.insert(method, alias)
+        self.trait_alias_map.insert(alias, method)
     }
 
     /// Adds or updates a single trait visibility override. Returns the previous visibility if one existed.

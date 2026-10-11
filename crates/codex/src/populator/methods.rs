@@ -26,7 +26,7 @@ pub fn inherit_methods_from_parent(
     let reverse_alias_map: Option<HashMap<Word, Vec<Word>>> = if parent_is_trait && !metadata.trait_alias_map.is_empty()
     {
         let mut map: HashMap<Word, Vec<Word>> = HashMap::default();
-        for (original, alias) in metadata.get_trait_alias_map() {
+        for (alias, original) in metadata.get_trait_alias_map() {
             map.entry(*original).or_default().push(*alias);
         }
         Some(map)
@@ -308,7 +308,7 @@ mod tests {
         let mut child = class("Child");
         let own_alias = MethodIdentifier::new(child.name, alias);
         child.appearing_method_ids.insert(alias, own_alias);
-        child.trait_alias_map.insert(method, alias);
+        child.add_trait_alias(method, alias);
         for name in [method, alias, constructor, clone_method] {
             child.trait_visibility_map.insert(name, Visibility::Private);
         }
