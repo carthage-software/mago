@@ -469,7 +469,7 @@ switch ($condition) {
     $i;
     break;
 
-  // Blank line after the case statement is allowed.
+    // Blank line after the case statement is allowed.
   case 3:
     $i;
     break;

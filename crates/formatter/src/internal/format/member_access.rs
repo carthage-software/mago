@@ -473,6 +473,38 @@ where
         })
     }
 
+    #[inline]
+    fn has_comments_requiring_hard_break(&self, f: &FormatterState<'_, '_, A>) -> bool {
+        let comment_requires_hard_break = |start: Position, end: Position| {
+            f.all_comments()[f.get_next_comment_index()..]
+                .iter()
+                .take_while(|comment| comment.span.start.offset <= end.offset)
+                .any(|comment| {
+                    let span = comment.span;
+                    if span.start.offset < start.offset || span.end.offset > end.offset {
+                        return false;
+                    }
+
+                    if !comment.kind.is_block_comment() {
+                        return true;
+                    }
+
+                    let comment_start_line = f.file.line_number(span.start.offset);
+
+                    f.file.line_number(span.end.offset) != comment_start_line
+                        || f.file.line_number(start.offset) != comment_start_line
+                })
+        };
+
+        self.link_gaps().any(|(start, end)| comment_requires_hard_break(start, end))
+            || self.accesses.iter().skip(1).any(|access| {
+                comment_requires_hard_break(
+                    access.get_operator_span().end_position(),
+                    access.get_selector().span().start_position(),
+                )
+            })
+    }
+
     /// Checks if any method call in the chain has arguments that will force the chain to break.
     #[inline]
     fn has_breaking_arguments(&self) -> bool {
@@ -496,7 +528,10 @@ where
             return true;
         }
 
-        if self.has_comments_in_chain(f) && self.is_already_broken(f) {
+        // Line, multi-line, and own-line block comments need a stable hard-break decision.
+        // Otherwise, collapsing an unrelated link can make a short chain appear unbroken and
+        // move an intermediate trailing comment to the end of the chain on the next pass.
+        if self.has_comments_requiring_hard_break(f) {
             return true;
         }
 

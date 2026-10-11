@@ -16,6 +16,7 @@ use crate::document::BreakMode;
 use crate::document::Document;
 use crate::document::Group;
 use crate::document::IfBreak;
+use crate::document::IndentIfBreak;
 use crate::document::Line;
 use crate::document::clone_in_arena;
 use crate::document::group::GroupIdentifier;
@@ -179,7 +180,7 @@ where
     let outer_alignment = f.alignment_context();
     f.set_alignment_context(None);
 
-    parts.push(Document::Indent({
+    parts.push(Document::IndentIfBreak(IndentIfBreak::new(group_id, {
         let len = elements.len();
         let mut indent_parts = vec_in![f.arena;];
         indent_parts.push(Document::Line(Line::soft()));
@@ -231,7 +232,7 @@ where
         }
 
         indent_parts
-    }));
+    })));
 
     f.set_alignment_context(outer_alignment);
 
@@ -448,7 +449,9 @@ where
                     }
                 }
             }
-            Document::Indent(indent_docs) if in_elements => {
+            Document::Indent(indent_docs) | Document::IndentIfBreak(IndentIfBreak { contents: indent_docs, .. })
+                if in_elements =>
+            {
                 // Extract elements from the indented content
                 let mut element_start = 1;
                 for (i, item) in indent_docs.iter().enumerate() {

@@ -38,7 +38,12 @@ where
 
             if i < (length - 1) {
                 formatted.push(Document::Line(Line::hard()));
-                if f.is_next_line_empty(item.span()) {
+                let end = if matches!(f.current_node(), Node::SwitchBraceDelimitedBody(_)) {
+                    f.end_offset_with_printed_comments(item.span())
+                } else {
+                    item.end_offset()
+                };
+                if f.is_next_line_empty_after_index(end) {
                     formatted.push(Document::Line(Line::hard()));
                 }
             }

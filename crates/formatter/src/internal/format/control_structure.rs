@@ -424,6 +424,9 @@ where
             let mut contents = vec_in![f.arena; Document::String(b":")];
             for case in &self.cases {
                 contents.push(Document::Indent(vec_in![f.arena; Document::Line(Line::hard()), case.format(f)]));
+                if f.is_next_line_empty_after_index(f.end_offset_with_printed_comments(case.span())) {
+                    contents.push(Document::Line(Line::hard()));
+                }
             }
 
             if let Some(comment) = f.print_dangling_comments(self.colon.join(self.end_switch.span), true) {
@@ -495,6 +498,9 @@ where
             let mut parts = vec_in![f.arena; self.case.format(f), Document::space(), self.expression.format(f), self.separator.format(f)];
 
             push_indented_case_statements(f, &mut parts, &self.statements);
+            if let Some(comments) = f.print_trailing_own_line_comments(self.span()) {
+                parts.push(comments);
+            }
 
             Document::Group(Group::new(parts))
         })
@@ -509,6 +515,9 @@ where
         wrap!(f, self, SwitchDefaultCase, {
             let mut parts = vec_in![f.arena; self.default.format(f), self.separator.format(f)];
             push_indented_case_statements(f, &mut parts, &self.statements);
+            if let Some(comments) = f.print_trailing_own_line_comments(self.span()) {
+                parts.push(comments);
+            }
 
             Document::Group(Group::new(parts))
         })
