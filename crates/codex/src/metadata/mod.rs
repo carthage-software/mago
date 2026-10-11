@@ -153,7 +153,7 @@ impl CodebaseMetadata {
         self.class_like_alias_declarations.iter().map(|(alias, (target, span, _))| (*alias, *target, *span))
     }
 
-    pub(crate) fn populate_class_like_aliases(&mut self) -> bool {
+    pub fn populate_class_like_aliases(&mut self) -> bool {
         if !self.class_like_aliases_dirty {
             return false;
         }

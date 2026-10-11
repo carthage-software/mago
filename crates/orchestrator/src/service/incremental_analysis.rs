@@ -936,6 +936,10 @@ impl IncrementalAnalysisService {
         }
         self.apply_scan_results(&mut merged_codebase, &new_file_scans);
 
+        if merged_codebase.populate_class_like_aliases() {
+            return self.analyze();
+        }
+
         merged_codebase.safe_symbols.clear();
         merged_codebase.safe_symbol_members.clear();
 
@@ -3182,6 +3186,78 @@ mod tests {
         service.update_database(db.read_only());
         service.analyze_incremental(None).expect("Incremental failed.");
         assert_matches_full(&service, &db, "removed class alias");
+    }
+
+    #[test]
+    fn unchanged_alias_declarations_follow_binding_changes() {
+        use mago_codex::reference::ReferenceOrigin;
+        use mago_word::word;
+
+        let target = "<?php class First { public function value(): int { return 1; } }";
+        let mut database = make_database(vec![
+            ("src/Target.php", target),
+            ("src/Alias.php", "<?php class_alias(First::class, Alias::class);"),
+            (
+                "src/Consumer.php",
+                "<?php function consume(): int { return (new Alias())->value(); } (new Alias())->value();",
+            ),
+            ("src/Stable.php", "<?php function stable(): void { missing_stable(); }"),
+        ]);
+
+        let target_id = FileId::new(b"src/Target.php");
+        let stable_id = FileId::new(b"src/Stable.php");
+        let mut service = make_watch_service(&database);
+        service.analyze().unwrap();
+        assert_matches_full(&service, &database, "initial alias binding");
+        let caller_references = |references: &SymbolReferences| {
+            let mut result = Vec::new();
+            references.for_each_reference(|origin, target, kind| {
+                if match origin {
+                    ReferenceOrigin::Symbol((name, _)) => name == word("consume"),
+                    ReferenceOrigin::File(name) => name == word("src/Consumer.php"),
+                } {
+                    result.push((origin, target, kind));
+                }
+            });
+
+            result.sort_unstable();
+            result
+        };
+
+        for source in [
+            "<?php",
+            target,
+            "<?php class First { public function value(): int { return 1; } }
+                class Alias { public function value(): string { return 'shadow'; } }",
+            target,
+        ] {
+            database.update(target_id, Cow::Borrowed(source.as_bytes()));
+            service.update_database(database.read_only());
+            service.analyze_incremental(Some(&[target_id])).unwrap();
+            let mut fresh = make_watch_service(&database);
+            let full = fresh.analyze().unwrap();
+            let (only_incremental, only_full) = diff_issues(&service.collect_all_issues(), &full.issues);
+            assert!(
+                only_incremental.is_empty() && only_full.is_empty(),
+                "{source}: incremental {only_incremental:?}; full {only_full:?}",
+            );
+            assert_eq!(
+                caller_references(&service.native_symbol_references),
+                caller_references(&fresh.native_symbol_references),
+                "{source}",
+            );
+        }
+
+        let unchanged = service.file_states[&stable_id].unreconciled_analysis_issues.clone();
+        database.update(
+            target_id,
+            Cow::Borrowed(b"<?php class First { public function value(): string { return 'changed'; } }"),
+        );
+
+        service.update_database(database.read_only());
+        service.analyze_incremental(Some(&[target_id])).unwrap();
+        assert_eq!(unchanged, service.file_states[&stable_id].unreconciled_analysis_issues);
+        assert_matches_full(&service, &database, "same alias binding after target signature changes");
     }
 
     /// Parent changes return type making child's override incompatible.
