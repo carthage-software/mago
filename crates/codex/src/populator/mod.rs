@@ -14,6 +14,8 @@ use crate::symbol::SymbolIdentifier;
 use crate::symbol::Symbols;
 use crate::ttype::union::populate_union_type;
 
+mod closures;
+mod descendants;
 mod docblock;
 mod hierarchy;
 mod merge;
@@ -22,6 +24,9 @@ mod properties;
 mod signatures;
 mod sorter;
 mod templates;
+
+#[cfg(test)]
+mod ancestry_tests;
 
 /// Populates the codebase metadata, resolving types and inheritance.
 ///
@@ -38,7 +43,7 @@ pub fn populate_codebase(
     safe_symbols: WordSet,
     safe_symbol_members: HashSet<SymbolIdentifier>,
 ) {
-    populate_codebase_inner(codebase, symbol_references, safe_symbols, safe_symbol_members, None, false)
+    populate_codebase_inner(codebase, symbol_references, safe_symbols, safe_symbol_members, None, false, true)
 }
 
 /// Populates independent type signatures in the current Rayon pool.
@@ -56,6 +61,7 @@ pub fn populate_codebase_parallel(
         safe_symbol_members,
         None,
         !cfg!(target_arch = "wasm32"),
+        true,
     )
 }
 
@@ -72,7 +78,34 @@ pub fn populate_codebase_targeted(
     safe_symbol_members: HashSet<SymbolIdentifier>,
     dirty_symbols: HashSet<SymbolIdentifier>,
 ) {
-    populate_codebase_inner(codebase, symbol_references, safe_symbols, safe_symbol_members, Some(dirty_symbols), false)
+    populate_codebase_inner(
+        codebase,
+        symbol_references,
+        safe_symbols,
+        safe_symbol_members,
+        Some(dirty_symbols),
+        false,
+        true,
+    )
+}
+
+/// Populates fresh scans after edits that leave all declaration signatures unchanged.
+#[allow(clippy::implicit_hasher)]
+pub fn populate_codebase_after_body_edit(
+    codebase: &mut CodebaseMetadata,
+    symbol_references: &mut SymbolReferences,
+    safe_symbols: WordSet,
+    dirty_symbols: HashSet<SymbolIdentifier>,
+) {
+    populate_codebase_inner(
+        codebase,
+        symbol_references,
+        safe_symbols,
+        HashSet::default(),
+        Some(dirty_symbols),
+        false,
+        false,
+    )
 }
 
 fn populate_codebase_inner(
@@ -82,6 +115,7 @@ fn populate_codebase_inner(
     mut safe_symbol_members: HashSet<SymbolIdentifier>,
     mut dirty_symbols: Option<HashSet<SymbolIdentifier>>,
     parallel: bool,
+    mut repopulate_unchanged_signatures: bool,
 ) {
     #[cfg(not(target_arch = "wasm32"))]
     let mut phase_start = tracing::enabled!(tracing::Level::TRACE).then(std::time::Instant::now);
@@ -100,6 +134,7 @@ fn populate_codebase_inner(
         safe_symbols.clear();
         safe_symbol_members.clear();
         dirty_symbols = None;
+        repopulate_unchanged_signatures = true;
     }
 
     let mut class_likes_to_repopulate = WordSet::default();
@@ -112,19 +147,14 @@ fn populate_codebase_inner(
         for class_name in &dirty_class_names {
             if let Some(metadata) = codebase.class_likes.get(class_name)
                 && (!metadata.flags.is_populated()
-                    || (metadata.flags.is_user_defined() && !safe_symbols.contains(class_name)))
+                    || (!metadata.flags.is_built_in() && !safe_symbols.contains(class_name)))
             {
                 class_likes_to_repopulate.insert(*class_name);
             }
         }
 
-        // Also repopulate user-defined classes that were invalidated by the
-        // cascade (not in safe_symbols) but are not directly in dirty_symbols.
-        // This handles e.g. a child class whose parent's method was removed:
-        // the child is invalidated (not safe) but its file didn't change,
-        // so it's not in dirty_symbols.
         for (class_name, metadata) in &codebase.class_likes {
-            if metadata.flags.is_user_defined()
+            if !metadata.flags.is_built_in()
                 && !safe_symbols.contains(class_name)
                 && !class_likes_to_repopulate.contains(class_name)
             {
@@ -133,7 +163,7 @@ fn populate_codebase_inner(
         }
     } else {
         for (name, metadata) in &codebase.class_likes {
-            if !metadata.flags.is_populated() || (metadata.flags.is_user_defined() && !safe_symbols.contains(name)) {
+            if !metadata.flags.is_populated() || (!metadata.flags.is_built_in() && !safe_symbols.contains(name)) {
                 class_likes_to_repopulate.insert(*name);
             }
         }
@@ -141,6 +171,17 @@ fn populate_codebase_inner(
 
     for class_like_name in &class_likes_to_repopulate {
         if let Some(classlike_info) = codebase.class_likes.get_mut(class_like_name) {
+            if classlike_info.flags.is_populated() {
+                for method_name in &classlike_info.methods {
+                    if let Some(method) = codebase.function_likes.get_mut(&(*class_like_name, *method_name)) {
+                        method.thrown_types.retain(|thrown| !thrown.inferred);
+                    }
+                }
+            }
+
+            classlike_info.reset_ancestry();
+            classlike_info.reset_inherited_constants();
+            classlike_info.reset_inherited_members();
             classlike_info.flags &= !MetadataFlags::POPULATED;
             classlike_info.declaring_property_ids.clear();
             classlike_info.appearing_property_ids.clear();
@@ -163,6 +204,28 @@ fn populate_codebase_inner(
     trace_phase!("hierarchy");
 
     let incremental = !safe_symbols.is_empty() || !safe_symbol_members.is_empty();
+    let closure_sources = closures::reference_sources(codebase, repopulate_unchanged_signatures);
+    let reference_source = |name: SymbolIdentifier| {
+        closure_sources.get(&name).copied().unwrap_or_else(|| {
+            if name.0.is_empty() {
+                ReferenceSource::Symbol(true, name.1)
+            } else {
+                ReferenceSource::ClassLikeMember(true, name.0, name.1)
+            }
+        })
+    };
+    let is_safe = |name: SymbolIdentifier, is_closure: bool| {
+        if is_closure && !closure_sources.contains_key(&name) {
+            return false;
+        }
+        match reference_source(name) {
+            ReferenceSource::Symbol(_, name) => safe_symbols.contains(&name),
+            ReferenceSource::ClassLikeMember(_, class, member) => {
+                safe_symbols.contains(&class) || safe_symbol_members.contains(&(class, member))
+            }
+            ReferenceSource::File(_, _) => false,
+        }
+    };
 
     if let Some(dirty) = &dirty_symbols {
         for dirty_key in dirty {
@@ -172,11 +235,7 @@ fn populate_codebase_inner(
                     continue;
                 }
 
-                let reference_source = if dirty_key.1.is_empty() || function_like_metadata.get_kind().is_closure() {
-                    ReferenceSource::Symbol(true, dirty_key.0)
-                } else {
-                    ReferenceSource::ClassLikeMember(true, dirty_key.0, dirty_key.1)
-                };
+                let reference_source = reference_source(*dirty_key);
 
                 signatures::populate_function_like_metadata(
                     function_like_metadata,
@@ -193,31 +252,22 @@ fn populate_codebase_inner(
         // the child method isn't dirty (file didn't change) but it's not safe
         // (parent class changed), so it needs type signature repopulation.
         for (name, function_like_metadata) in &mut codebase.function_likes {
-            if dirty.contains(name) {
+            if dirty.contains(name) || (!repopulate_unchanged_signatures && function_like_metadata.flags.is_populated())
+            {
                 continue;
             }
 
             let is_closure_or_arrow =
                 function_like_metadata.get_kind().is_closure() || function_like_metadata.get_kind().is_arrow_function();
 
-            let is_safe = if is_closure_or_arrow {
-                true
-            } else if name.1.is_empty() {
-                safe_symbols.contains(&name.0)
-            } else {
-                safe_symbol_members.contains(name) || safe_symbols.contains(&name.0)
-            };
-
-            let force_repopulation = function_like_metadata.flags.is_user_defined() && !is_safe;
+            let force_repopulation = (function_like_metadata.flags.is_user_defined()
+                || (is_closure_or_arrow && !function_like_metadata.flags.is_built_in()))
+                && !is_safe(*name, is_closure_or_arrow);
             if function_like_metadata.flags.is_populated() && !force_repopulation {
                 continue;
             }
 
-            let reference_source = if name.1.is_empty() || function_like_metadata.get_kind().is_closure() {
-                ReferenceSource::Symbol(true, name.0)
-            } else {
-                ReferenceSource::ClassLikeMember(true, name.0, name.1)
-            };
+            let reference_source = reference_source(*name);
 
             signatures::populate_function_like_metadata(
                 function_like_metadata,
@@ -232,15 +282,9 @@ fn populate_codebase_inner(
             let is_closure_or_arrow =
                 function_like_metadata.get_kind().is_closure() || function_like_metadata.get_kind().is_arrow_function();
 
-            let is_safe = if is_closure_or_arrow {
-                true
-            } else if name.1.is_empty() {
-                safe_symbols.contains(&name.0)
-            } else {
-                safe_symbol_members.contains(name) || safe_symbols.contains(&name.0)
-            };
-
-            let force_repopulation = function_like_metadata.flags.is_user_defined() && !is_safe;
+            let force_repopulation = (function_like_metadata.flags.is_user_defined()
+                || (is_closure_or_arrow && !function_like_metadata.flags.is_built_in()))
+                && !is_safe(*name, is_closure_or_arrow);
             if incremental && function_like_metadata.flags.is_populated() && !force_repopulation {
                 return None;
             }
@@ -252,11 +296,7 @@ fn populate_codebase_inner(
             symbol_references,
             parallel,
             |(name, function_like_metadata, force_repopulation), references| {
-                let reference_source = if name.1.is_empty() || function_like_metadata.get_kind().is_closure() {
-                    ReferenceSource::Symbol(true, name.0)
-                } else {
-                    ReferenceSource::ClassLikeMember(true, name.0, name.1)
-                };
+                let reference_source = reference_source(name);
 
                 signatures::populate_function_like_metadata(
                     function_like_metadata,
@@ -269,6 +309,7 @@ fn populate_codebase_inner(
         );
     }
     trace_phase!("function_signatures");
+    drop(closure_sources);
 
     if let Some(_dirty) = &dirty_symbols {
         for class_name in &class_likes_to_repopulate {
@@ -332,7 +373,9 @@ fn populate_codebase_inner(
     }
     trace_phase!("constants");
 
-    if !incremental || !class_likes_to_repopulate.is_empty() {
+    if incremental && dirty_symbols.is_some() {
+        descendants::update(codebase, &class_likes_to_repopulate);
+    } else if !incremental || !class_likes_to_repopulate.is_empty() {
         let mut direct_classlike_descendants: WordMap<WordSet> = WordMap::default();
         let mut all_classlike_descendants: WordMap<WordSet> = WordMap::default();
 
@@ -416,9 +459,8 @@ fn populate_entries<I>(
             references
         })
         .collect::<Vec<_>>();
-    // Earlier signatures suppress later body edges, but never remove earlier ones.
     for references_in_chunk in populated {
-        references.extend_from_population(references_in_chunk);
+        references.extend(references_in_chunk);
     }
 }
 

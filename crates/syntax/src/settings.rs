@@ -15,6 +15,9 @@ pub struct LexerSettings {
 pub struct ParserSettings {
     /// Settings for the lexer.
     pub lexer: LexerSettings,
+    /// Keep unfinished bodies and lists at EOF for editor queries.
+    /// Missing delimiters still produce parse errors.
+    pub recover_incomplete: bool,
 }
 
 impl Default for LexerSettings {

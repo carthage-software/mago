@@ -75,6 +75,7 @@ where
     pub additional_symbol_references: Option<&'ctx SymbolReferences>,
     variable_definedness_targets: Option<Arc<[bool; u8::MAX as usize + 1]>>,
     defer_pragmas: bool,
+    editor_artifacts: bool,
 }
 
 impl<'ctx, 'ast, 'arena, A> Analyzer<'ctx, 'ast, 'arena, A>
@@ -100,6 +101,7 @@ where
             additional_symbol_references: None,
             variable_definedness_targets: None,
             defer_pragmas: false,
+            editor_artifacts: false,
         }
     }
 
@@ -126,6 +128,13 @@ where
     #[must_use]
     pub fn with_deferred_pragmas(mut self) -> Self {
         self.defer_pragmas = true;
+        self
+    }
+
+    /// Captures compact method targets and named expression types for editor queries.
+    #[must_use]
+    pub fn with_editor_artifacts(mut self) -> Self {
+        self.editor_artifacts = true;
         self
     }
 
@@ -164,9 +173,9 @@ where
                 analysis_result.time_in_analysis = start_time.elapsed();
             }
 
-            return Ok(
-                AnalysisArtifacts::new().with_variable_definedness_targets(self.variable_definedness_targets.clone())
-            );
+            return Ok(AnalysisArtifacts::new()
+                .with_variable_definedness_targets(self.variable_definedness_targets.clone())
+                .with_editor_artifacts(self.editor_artifacts));
         }
 
         #[cfg(not(target_arch = "wasm32"))]
@@ -199,8 +208,9 @@ where
             ScopeContext::new(ReferenceOrigin::File(word(context.source_file.name.as_ref()))),
             context.settings.register_super_globals,
         );
-        let mut artifacts =
-            AnalysisArtifacts::new().with_variable_definedness_targets(self.variable_definedness_targets.clone());
+        let mut artifacts = AnalysisArtifacts::new()
+            .with_variable_definedness_targets(self.variable_definedness_targets.clone())
+            .with_editor_artifacts(self.editor_artifacts);
         artifacts.record_variable_definedness(Node::Program(program), &block_context);
         #[cfg(not(target_arch = "wasm32"))]
         if let Some(start) = setup_start {

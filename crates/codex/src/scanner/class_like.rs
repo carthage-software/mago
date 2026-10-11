@@ -90,7 +90,7 @@ pub fn register_anonymous_class<'arena, A>(
     class: &'arena AnonymousClass<'arena>,
     docblock_start: u32,
     context: &mut Context<'_, 'arena, A>,
-    scope: &mut NamespaceScope,
+    scope: &NamespaceScope,
 ) -> ClassLikeRegistration
 where
     A: Arena,
@@ -124,7 +124,7 @@ pub fn register_class<'arena, A>(
     codebase: &mut CodebaseMetadata,
     class: &'arena Class<'arena>,
     context: &mut Context<'_, 'arena, A>,
-    scope: &mut NamespaceScope,
+    scope: &NamespaceScope,
 ) -> ClassLikeRegistration
 where
     A: Arena,
@@ -156,7 +156,7 @@ pub fn register_interface<'arena, A>(
     codebase: &mut CodebaseMetadata,
     interface: &'arena Interface<'arena>,
     context: &mut Context<'_, 'arena, A>,
-    scope: &mut NamespaceScope,
+    scope: &NamespaceScope,
 ) -> ClassLikeRegistration
 where
     A: Arena,
@@ -188,7 +188,7 @@ pub fn register_trait<'arena, A>(
     codebase: &mut CodebaseMetadata,
     r#trait: &'arena Trait<'arena>,
     context: &mut Context<'_, 'arena, A>,
-    scope: &mut NamespaceScope,
+    scope: &NamespaceScope,
 ) -> ClassLikeRegistration
 where
     A: Arena,
@@ -220,7 +220,7 @@ pub fn register_enum<'arena, A>(
     codebase: &mut CodebaseMetadata,
     r#enum: &'arena Enum<'arena>,
     context: &mut Context<'_, 'arena, A>,
-    scope: &mut NamespaceScope,
+    scope: &NamespaceScope,
 ) -> ClassLikeRegistration
 where
     A: Arena,
@@ -287,7 +287,7 @@ fn scan_class_like<'arena, A>(
     implements: Option<&'arena Implements<'arena>>,
     enum_type: Option<&'arena EnumBackingTypeHint<'arena>>,
     context: &mut Context<'_, 'arena, A>,
-    scope: &mut NamespaceScope,
+    scope: &NamespaceScope,
 ) -> Option<ClassLikeMetadata>
 where
     A: Arena,
@@ -473,12 +473,6 @@ where
             };
 
             type_context = type_context.with_type_alias(word(type_alias.alias.value));
-        }
-
-        for tag in document.tags() {
-            if let TagValue::Template(template) = &tag.value {
-                scope.add(NameKind::Default, template.name.value, &(None as Option<&str>));
-            }
         }
 
         let mut template_variance = Vec::new();
@@ -1240,21 +1234,62 @@ where
                 if let TraitUseSpecification::Concrete(specification) = &trait_use.specification {
                     for adaptation in &specification.adaptations {
                         match adaptation {
-                            TraitUseAdaptation::Precedence(_) => {}
+                            TraitUseAdaptation::Precedence(adaptation) => {
+                                let method = ascii_lowercase_word(adaptation.method_reference.method_name.value);
+                                let adaptations =
+                                    class_like_metadata.trait_method_adaptations.get_or_insert_with(Default::default);
+                                for excluded in &adaptation.trait_names {
+                                    let source =
+                                        ascii_lowercase_word(&scope.resolve_str(NameKind::Default, excluded.value()).0);
+                                    adaptations.excluded_methods.insert(MethodIdentifier::new(source, method));
+                                }
+                            }
                             TraitUseAdaptation::Alias(adaptation) => {
-                                let method_name = ascii_lowercase_word(match &adaptation.method_reference {
-                                    TraitUseMethodReference::Identifier(local_identifier) => local_identifier.value,
-                                    TraitUseMethodReference::Absolute(reference) => reference.method_name.value,
-                                });
+                                let (method_name, source) = match &adaptation.method_reference {
+                                    TraitUseMethodReference::Identifier(identifier) => {
+                                        (ascii_lowercase_word(identifier.value), None)
+                                    }
+                                    TraitUseMethodReference::Absolute(reference) => (
+                                        ascii_lowercase_word(reference.method_name.value),
+                                        Some(ascii_lowercase_word(
+                                            &scope.resolve_str(NameKind::Default, reference.trait_name.value()).0,
+                                        )),
+                                    ),
+                                };
 
                                 let method_alias =
                                     adaptation.alias.as_ref().map(|alias| ascii_lowercase_word(alias.value));
 
                                 if let Some(alias) = method_alias {
                                     class_like_metadata.add_trait_alias(method_name, alias);
+                                    if let Some(source) = source {
+                                        class_like_metadata
+                                            .trait_method_adaptations
+                                            .get_or_insert_with(Default::default)
+                                            .alias_sources
+                                            .insert(alias, source);
+                                    }
                                 }
 
                                 if let Some(modifier) = &adaptation.modifier {
+                                    if let Some(source) = source
+                                        && method_alias.is_none()
+                                    {
+                                        let modifiers = class_like_metadata
+                                            .trait_method_adaptations
+                                            .get_or_insert_with(Default::default)
+                                            .modifiers
+                                            .entry(MethodIdentifier::new(source, method_name))
+                                            .or_default();
+                                        if matches!(modifier, Modifier::Final(_)) {
+                                            modifiers.is_final = true;
+                                        } else if let Ok(visibility) = Visibility::try_from(modifier) {
+                                            modifiers.visibility = Some(visibility);
+                                        }
+
+                                        continue;
+                                    }
+
                                     let visibility = match modifier {
                                         Modifier::Public(_) => Visibility::Public,
                                         Modifier::Protected(_) => Visibility::Protected,

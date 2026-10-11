@@ -419,6 +419,11 @@ final class TypeCodec
                 self::writeUnion($writer, $parameter->closureThisType);
             }
 
+            $writer->writeBoolean($parameter->outType !== null);
+            if ($parameter->outType !== null) {
+                self::writeUnion($writer, $parameter->outType);
+            }
+
             $writer->writeBoolean($parameter->byReference);
             $writer->writeBoolean($parameter->variadic);
             $writer->writeBoolean($parameter->hasDefault);
@@ -949,13 +954,16 @@ final class TypeCodec
         for ($index = 0; $index < $parameterCount; ++$index) {
             $name = $reader->readBoolean() ? $reader->readBytes() : null;
             $type = $reader->readBoolean() ? self::readNestedType($reader, $references) : null;
+            $closureThisType = $reader->readBoolean() ? self::readNestedType($reader, $references) : null;
+            $outType = $reader->readBoolean() ? self::readNestedType($reader, $references) : null;
             $parameters[] = new CallableParameter(
                 $name,
                 $type,
-                $reader->readBoolean() ? self::readNestedType($reader, $references) : null,
+                $closureThisType,
                 $reader->readBoolean(),
                 $reader->readBoolean(),
                 $reader->readBoolean(),
+                $outType,
             );
         }
 

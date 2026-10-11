@@ -40,6 +40,6 @@ impl ParserConfiguration {
     /// Converts this configuration into `ParserSettings` for use with the parser.
     #[must_use]
     pub fn to_settings(&self) -> ParserSettings {
-        ParserSettings { lexer: LexerSettings { enable_short_tags: self.enable_short_tags } }
+        ParserSettings { lexer: LexerSettings { enable_short_tags: self.enable_short_tags }, ..Default::default() }
     }
 }

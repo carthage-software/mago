@@ -253,6 +253,73 @@ impl AnnotationKind {
 }
 
 impl CompiledIgnoreSet {
+    /// Whether one borrowed issue matches an ignore rule.
+    #[must_use]
+    pub fn is_ignored<F>(&self, issue: &Issue, resolve_file_name: F) -> bool
+    where
+        F: Fn(FileId) -> Option<String>,
+    {
+        let mut cached_path: Option<Option<String>> = None;
+        let mut resolve_path = |issue: &Issue| -> Option<String> {
+            cached_path
+                .get_or_insert_with(|| issue.primary_span().and_then(|span| resolve_file_name(span.file_id)))
+                .clone()
+        };
+
+        for entry in &self.entries {
+            match entry {
+                CompiledIgnoreEntry::Code(ignored_code) => {
+                    if let Some(code) = &issue.code
+                        && ignored_code == code
+                    {
+                        return true;
+                    }
+                }
+                CompiledIgnoreEntry::Scoped { code: ignored_code, matcher } => {
+                    let Some(code) = &issue.code else {
+                        continue;
+                    };
+
+                    if ignored_code != code {
+                        continue;
+                    }
+
+                    if let Some(name) = resolve_path(issue)
+                        && matcher.is_match(&name)
+                    {
+                        return true;
+                    }
+                }
+                CompiledIgnoreEntry::Pattern { regex, code: ignored_code, matcher } => {
+                    if let Some(ignored_code) = ignored_code {
+                        let Some(code) = &issue.code else {
+                            continue;
+                        };
+
+                        if ignored_code != code {
+                            continue;
+                        }
+                    }
+
+                    if let Some(matcher) = matcher {
+                        let Some(name) = resolve_path(issue) else {
+                            continue;
+                        };
+
+                        if !matcher.is_match(&name) {
+                            continue;
+                        }
+                    }
+
+                    if issue_text_matches(issue, regex) {
+                        return true;
+                    }
+                }
+            }
+        }
+        false
+    }
+
     /// Compiles the given ignore entries into a reusable matcher set.
     ///
     /// Bad regex/glob entries are reported via `tracing::error!` and skipped;
@@ -740,72 +807,9 @@ impl IssueCollection {
     where
         F: Fn(FileId) -> Option<String>,
     {
-        if set.is_empty() {
-            return;
+        if !set.is_empty() {
+            self.issues.retain(|issue| !set.is_ignored(issue, &resolve_file_name));
         }
-
-        self.issues.retain(|issue| {
-            let mut cached_path: Option<Option<String>> = None;
-            let mut resolve_path = |issue: &Issue| -> Option<String> {
-                cached_path
-                    .get_or_insert_with(|| issue.primary_span().and_then(|span| resolve_file_name(span.file_id)))
-                    .clone()
-            };
-
-            for entry in &set.entries {
-                match entry {
-                    CompiledIgnoreEntry::Code(ignored_code) => {
-                        if let Some(code) = &issue.code
-                            && ignored_code == code
-                        {
-                            return false;
-                        }
-                    }
-                    CompiledIgnoreEntry::Scoped { code: ignored_code, matcher } => {
-                        let Some(code) = &issue.code else {
-                            continue;
-                        };
-
-                        if ignored_code != code {
-                            continue;
-                        }
-
-                        if let Some(name) = resolve_path(issue)
-                            && matcher.is_match(&name)
-                        {
-                            return false;
-                        }
-                    }
-                    CompiledIgnoreEntry::Pattern { regex, code: ignored_code, matcher } => {
-                        if let Some(ignored_code) = ignored_code {
-                            let Some(code) = &issue.code else {
-                                continue;
-                            };
-
-                            if ignored_code != code {
-                                continue;
-                            }
-                        }
-
-                        if let Some(matcher) = matcher {
-                            let Some(name) = resolve_path(issue) else {
-                                continue;
-                            };
-
-                            if !matcher.is_match(&name) {
-                                continue;
-                            }
-                        }
-
-                        if issue_text_matches(issue, regex) {
-                            return false;
-                        }
-                    }
-                }
-            }
-
-            true
-        });
     }
 
     pub fn filter_retain_codes(&mut self, retain_codes: &[String]) {

@@ -34,13 +34,17 @@ where
                     }
                 }
                 None => {
+                    if self.recovery_end.is_some() {
+                        break;
+                    }
+
                     // EOF without closing brace
                     return Err(self.stream.unexpected(None, &[T!["}"]]));
                 }
             }
         }
 
-        let right_brace = self.stream.eat_span(T!["}"])?;
+        let right_brace = self.parse_closing_span(T!["}"])?;
 
         Ok(Block { left_brace, statements: Sequence::new(statements), right_brace })
     }

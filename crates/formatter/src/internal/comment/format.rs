@@ -620,6 +620,12 @@ where
 
     #[must_use]
     fn print_comment(&self, comment: Comment) -> Document<'arena, A> {
+        if let Some(range) = &self.range
+            && range.active.get()
+        {
+            let (start, end) = range.source.get();
+            range.source.set((start.min(comment.start), end.max(comment.end)));
+        }
         let content = &self.source_text[comment.start as usize..comment.end as usize];
 
         if comment.is_inline_comment() {

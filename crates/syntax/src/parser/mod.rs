@@ -3,6 +3,7 @@ use mago_allocator::prelude::*;
 use mago_database::file::File;
 use mago_database::file::FileId;
 use mago_database::file::HasFileId;
+use mago_span::{Position, Span};
 use mago_syntax_core::input::Input;
 
 use crate::cst::Program;
@@ -11,6 +12,7 @@ use crate::error::ParseError;
 use crate::lexer::Lexer;
 use crate::parser::stream::TokenStream;
 use crate::settings::ParserSettings;
+use crate::token::TokenKind;
 
 mod internal;
 
@@ -40,6 +42,7 @@ where
     pub(crate) state: State,
     pub(crate) stream: TokenStream<'input, 'arena, A>,
     pub(crate) errors: Vec<'arena, ParseError, A>,
+    pub(crate) recovery_end: Option<Span>,
 }
 
 impl<'input, 'arena, A> Parser<'input, 'arena, A>
@@ -64,7 +67,27 @@ where
         let lexer = Lexer::new(input, settings.lexer);
         let stream = TokenStream::new(arena, lexer);
 
-        Self { arena, state: State::default(), stream, errors: Vec::new_in(arena) }
+        let end = Position::new(content.len() as u32);
+        let recovery_end = settings.recover_incomplete.then_some(Span::new(file_id, end, end));
+        Self { arena, state: State::default(), stream, errors: Vec::new_in(arena), recovery_end }
+    }
+
+    fn recover_at_eof(&mut self, error: ParseError) -> Result<Span, ParseError> {
+        if let Some(end) = self.recovery_end
+            && matches!(error, ParseError::UnexpectedEndOfFile(..))
+        {
+            self.errors.push(error);
+            Ok(end)
+        } else {
+            Err(error)
+        }
+    }
+
+    fn parse_closing_span(&mut self, kind: TokenKind) -> Result<Span, ParseError> {
+        match self.stream.eat_span(kind) {
+            Ok(span) => Ok(span),
+            Err(error) => self.recover_at_eof(error),
+        }
     }
 
     /// Creates a new parser for the given file.

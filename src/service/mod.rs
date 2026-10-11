@@ -575,7 +575,7 @@ impl IssueProcessor {
                 // Each batch contains all edits from a single issue - they must be applied together
                 for (rule_code, edits) in batches {
                     let rule_code = rule_code.as_deref().unwrap_or("unknown");
-                    let result = editor.apply_batch(edits, Some(|code: &[u8]| check_php_code(arena, file_id, code, parser_settings)));
+                    let result = editor.apply_unique_batch(edits, Some(|code: &[u8]| check_php_code(arena, file_id, code, parser_settings)));
                     arena.reset();
 
                     match result {

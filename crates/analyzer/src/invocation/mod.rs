@@ -33,6 +33,9 @@ use crate::context::Context;
 mod resolver;
 mod template_inference;
 
+#[cfg(test)]
+mod parameter_tests;
+
 pub(crate) use resolver::resolve_invocation_type;
 
 pub(crate) mod arguments;
@@ -140,6 +143,8 @@ pub enum InvocationTarget<'ctx> {
 pub enum InvocationTargetParameter<'ctx> {
     /// Parameter from a statically defined function or method.
     FunctionLike(&'ctx FunctionLikeParameterMetadata),
+    /// A closure parameter with its class-relative type resolved at creation.
+    BoundFunctionLike(&'ctx FunctionLikeParameterMetadata, &'ctx TCallableParameter),
     /// Parameter from a `TCallableSignature` (e.g., from a closure type or `callable` type hint).
     Callable(&'ctx TCallableParameter),
 }
@@ -325,6 +330,31 @@ impl<'ctx> InvocationTarget<'ctx> {
         }
     }
 
+    /// Keeps a closure's bound types alongside its original parameter metadata.
+    pub(crate) fn bind_closure_parameters(&mut self, signature: &TCallableSignature) {
+        let Self::FunctionLike {
+            identifier: FunctionLikeIdentifier::Closure(_), metadata, effective_signature, ..
+        } = self
+        else {
+            return;
+        };
+        if signature.get_parameters().len() != metadata.parameters.len()
+            || signature.get_parameters().iter().zip(&metadata.parameters).all(|(bound, declared)| {
+                bound.get_type_signature() == declared.get_type_metadata().map(|ty| &ty.type_union)
+                    && bound.get_out_type() == declared.out_type.as_ref().map(|ty| &ty.type_union)
+                    && bound.get_closure_this_type() == declared.closure_this_type.as_ref().map(|ty| &ty.type_union)
+            })
+        {
+            return;
+        }
+
+        *effective_signature = Some(EffectiveCallableSignature {
+            parameters: signature.get_parameters().to_vec(),
+            allows_named_arguments: !metadata.flags.forbids_named_arguments(),
+            display_name: None,
+        });
+    }
+
     #[inline]
     pub(crate) const fn has_effective_signature(&self) -> bool {
         match self {
@@ -377,6 +407,15 @@ impl<'ctx> InvocationTarget<'ctx> {
         'ctx: 'target,
     {
         match self {
+            InvocationTarget::FunctionLike {
+                identifier: FunctionLikeIdentifier::Closure(_),
+                metadata,
+                effective_signature: Some(signature),
+                ..
+            } => Some(InvocationTargetParameter::BoundFunctionLike(
+                metadata.parameters.get(index)?,
+                signature.parameters.get(index)?,
+            )),
             InvocationTarget::Callable { effective_signature: Some(signature), .. }
             | InvocationTarget::FunctionLike { effective_signature: Some(signature), .. }
             | InvocationTarget::ExternalMethod { effective_signature: Some(signature), .. } => {
@@ -434,7 +473,10 @@ impl<'ctx> InvocationTargetParameter<'ctx> {
             InvocationTargetParameter::FunctionLike(metadata) => {
                 metadata.out_type.as_ref().map(|type_metadata| &type_metadata.type_union)
             }
-            _ => None,
+            InvocationTargetParameter::BoundFunctionLike(metadata, parameter) => {
+                parameter.get_out_type().or_else(|| metadata.out_type.as_ref().map(|ty| &ty.type_union))
+            }
+            InvocationTargetParameter::Callable(parameter) => parameter.get_out_type(),
         }
     }
 
@@ -445,6 +487,9 @@ impl<'ctx> InvocationTargetParameter<'ctx> {
             InvocationTargetParameter::FunctionLike(metadata) => {
                 metadata.closure_this_type.as_ref().map(|type_metadata| &type_metadata.type_union)
             }
+            InvocationTargetParameter::BoundFunctionLike(metadata, parameter) => parameter
+                .get_closure_this_type()
+                .or_else(|| metadata.closure_this_type.as_ref().map(|ty| &ty.type_union)),
             InvocationTargetParameter::Callable(parameter) => parameter.get_closure_this_type(),
         }
     }
@@ -456,7 +501,8 @@ impl<'ctx> InvocationTargetParameter<'ctx> {
             InvocationTargetParameter::FunctionLike(metadata) => {
                 metadata.get_type_metadata().map(|type_metadata| &type_metadata.type_union)
             }
-            InvocationTargetParameter::Callable(parameter) => parameter.get_type_signature(),
+            InvocationTargetParameter::Callable(parameter)
+            | InvocationTargetParameter::BoundFunctionLike(_, parameter) => parameter.get_type_signature(),
         }
     }
 
@@ -464,7 +510,8 @@ impl<'ctx> InvocationTargetParameter<'ctx> {
     #[inline]
     pub fn get_name(&self) -> Option<&'ctx VariableIdentifier> {
         match self {
-            InvocationTargetParameter::FunctionLike(metadata) => Some(metadata.get_name()),
+            InvocationTargetParameter::FunctionLike(metadata)
+            | InvocationTargetParameter::BoundFunctionLike(metadata, _) => Some(metadata.get_name()),
             InvocationTargetParameter::Callable(parameter) => parameter.get_name(),
         }
     }
@@ -473,7 +520,8 @@ impl<'ctx> InvocationTargetParameter<'ctx> {
     #[inline]
     pub const fn is_variadic(&self) -> bool {
         match self {
-            InvocationTargetParameter::FunctionLike(metadata) => metadata.flags.is_variadic(),
+            InvocationTargetParameter::FunctionLike(metadata)
+            | InvocationTargetParameter::BoundFunctionLike(metadata, _) => metadata.flags.is_variadic(),
             InvocationTargetParameter::Callable(parameter) => parameter.is_variadic(),
         }
     }
@@ -481,7 +529,8 @@ impl<'ctx> InvocationTargetParameter<'ctx> {
     #[inline]
     pub const fn is_by_reference(&self) -> bool {
         match self {
-            InvocationTargetParameter::FunctionLike(metadata) => metadata.flags.is_by_reference(),
+            InvocationTargetParameter::FunctionLike(metadata)
+            | InvocationTargetParameter::BoundFunctionLike(metadata, _) => metadata.flags.is_by_reference(),
             InvocationTargetParameter::Callable(parameter) => parameter.is_by_reference(),
         }
     }
@@ -490,7 +539,8 @@ impl<'ctx> InvocationTargetParameter<'ctx> {
     #[inline]
     pub const fn has_default(&self) -> bool {
         match self {
-            InvocationTargetParameter::FunctionLike(metadata) => metadata.flags.has_default(),
+            InvocationTargetParameter::FunctionLike(metadata)
+            | InvocationTargetParameter::BoundFunctionLike(metadata, _) => metadata.flags.has_default(),
             InvocationTargetParameter::Callable(parameter) => parameter.has_default(),
         }
     }
@@ -499,7 +549,8 @@ impl<'ctx> InvocationTargetParameter<'ctx> {
     #[inline]
     pub fn get_default_type(&self) -> Option<&'ctx TUnion> {
         match self {
-            InvocationTargetParameter::FunctionLike(metadata) => {
+            InvocationTargetParameter::FunctionLike(metadata)
+            | InvocationTargetParameter::BoundFunctionLike(metadata, _) => {
                 metadata.get_default_type().map(|type_metadata| &type_metadata.type_union)
             }
             InvocationTargetParameter::Callable(_) => None,

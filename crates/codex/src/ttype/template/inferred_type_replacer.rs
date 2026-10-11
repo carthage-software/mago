@@ -327,6 +327,12 @@ fn replace_atomic(
                 if let Some(t) = parameter.get_type_signature_mut() {
                     *t = replace_with_polarity(t, template_result, codebase, polarity.flip());
                 }
+                if let Some(t) = parameter.get_out_type_mut() {
+                    *t = replace_with_polarity(t, template_result, codebase, polarity);
+                }
+                if let Some(t) = parameter.get_closure_this_type_mut() {
+                    *t = replace_with_polarity(t, template_result, codebase, polarity.flip());
+                }
             }
 
             if let Some(return_type) = signature.get_return_type_mut() {

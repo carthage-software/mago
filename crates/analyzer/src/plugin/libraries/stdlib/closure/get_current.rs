@@ -2,6 +2,7 @@
 
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::callable::TCallable;
+use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::expander::TypeExpansionOptions;
 use mago_codex::ttype::expander::get_signature_of_function_like_metadata;
 use mago_codex::ttype::get_never;
@@ -94,7 +95,11 @@ impl MethodReturnTypeProvider for ClosureGetCurrentProvider {
                 &closure_identifier,
                 closure,
                 codebase,
-                &TypeExpansionOptions::default(),
+                &TypeExpansionOptions {
+                    self_class: scope.get_class_like_name(),
+                    static_class_type: scope.get_class_like_name().map_or(StaticClassType::None, StaticClassType::Name),
+                    ..Default::default()
+                },
             ))))
         } else {
             TUnion::from_atomic(TAtomic::Callable(TCallable::Alias(closure_identifier)))

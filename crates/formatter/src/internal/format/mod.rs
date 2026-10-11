@@ -54,6 +54,7 @@ use mago_syntax::cst::Modifier;
 use mago_syntax::cst::Namespace;
 use mago_syntax::cst::NamespaceBody;
 use mago_syntax::cst::Node;
+use mago_syntax::cst::NodeKind;
 use mago_syntax::cst::OpeningTag;
 use mago_syntax::cst::PlainProperty;
 use mago_syntax::cst::Program;
@@ -247,6 +248,7 @@ where
 {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena, A>) -> Document<'arena, A> {
         let was_in_script_terminating_statement = f.in_script_terminating_statement;
+        let capture = f.begin_range(self.span(), NodeKind::Statement);
 
         f.in_script_terminating_statement = !self.is_closing_tag() && self.terminates_scripting();
 
@@ -292,7 +294,7 @@ where
 
         f.in_script_terminating_statement = was_in_script_terminating_statement;
 
-        result
+        f.end_range(capture, result)
     }
 }
 
@@ -1289,7 +1291,8 @@ where
     A: Arena,
 {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena, A>) -> Document<'arena, A> {
-        wrap!(f, self, ClassLikeMember, {
+        let capture = f.begin_range(self.span(), NodeKind::ClassLikeMember);
+        let document = wrap!(f, self, ClassLikeMember, {
             match self {
                 ClassLikeMember::TraitUse(m) => m.format(f),
                 ClassLikeMember::Constant(m) => m.format(f),
@@ -1297,7 +1300,9 @@ where
                 ClassLikeMember::EnumCase(m) => m.format(f),
                 ClassLikeMember::Method(m) => m.format(f),
             }
-        })
+        });
+
+        f.end_range(capture, document)
     }
 }
 

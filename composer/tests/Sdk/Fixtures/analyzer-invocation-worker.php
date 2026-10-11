@@ -39,6 +39,8 @@ use Mago\Sdk\Analyzer\PropertyTypeProviderContext;
 use Mago\Sdk\Analyzer\ReturnTypeProviderContext;
 use Mago\Sdk\Analyzer\Type;
 use Mago\Sdk\Analyzer\Type\CallableParameter;
+use Mago\Sdk\Analyzer\Type\CallableSignature;
+use Mago\Sdk\Analyzer\Type\CallableType;
 use Mago\Sdk\Analyzer\Type\NamedObjectType;
 use Mago\Sdk\Analyzer\TypeComparison;
 use Mago\Sdk\Extension;
@@ -83,7 +85,11 @@ final class InvocationFunctionProvider implements FunctionReturnTypeProvider, Ca
 {
     public function getTargets(): array
     {
-        return [FunctionTarget::exact('external_function'), FunctionTarget::exact('collect')];
+        return [
+            FunctionTarget::exact('external_function'),
+            FunctionTarget::exact('collect'),
+            FunctionTarget::exact('roundtrip_effects'),
+        ];
     }
 
     public function getCallableSignature(CallableSignatureProviderContext $context): ?EffectiveCallableSignature
@@ -107,6 +113,35 @@ final class InvocationFunctionProvider implements FunctionReturnTypeProvider, Ca
     public function getReturnType(ReturnTypeProviderContext $context): ?Type
     {
         $invocation = $context->invocation;
+        if ($invocation->name === 'roundtrip_effects') {
+            $callable = $invocation->arguments[0]->type?->atomicTypes[0] ?? null;
+            if (!$callable instanceof CallableType || $callable->signature === null) {
+                throw new RuntimeException('The worker received no callable signature.');
+            }
+
+            $signature = $callable->signature;
+            $outType = $signature->parameters[0]->outType;
+            if ($outType === null || !$context->types->equals($outType, Type::namedObject('Payload'))) {
+                throw new RuntimeException('The callable snapshot lost its out type.');
+            }
+
+            InvocationAudit::record('callable-effects');
+
+            return Type::fromAtomic(
+                new CallableType(
+                    new CallableSignature(
+                        $signature->pure,
+                        $signature->closure,
+                        $signature->parameters,
+                        $signature->returnType,
+                        null,
+                        $signature->constraints,
+                    ),
+                    null,
+                ),
+            );
+        }
+
         if (
             $invocation->kind !== InvocationKind::Function
             || $invocation->declaringClass !== null

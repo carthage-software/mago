@@ -14,6 +14,9 @@ where
     A: Arena,
 {
     String(&'arena [u8]),
+    /// Zero-width bounds used to return a selected source region.
+    RangeStart,
+    RangeEnd,
     Array(Vec<'arena, Document<'arena, A>, A>),
     /// Increase the level of indentation.
     Indent(Vec<'arena, Document<'arena, A>, A>),
@@ -326,6 +329,8 @@ where
     match document {
         // Trivial `Copy` cases
         Document::String(s) => Document::String(s),
+        Document::RangeStart => Document::RangeStart,
+        Document::RangeEnd => Document::RangeEnd,
         Document::Line(line) => Document::Line(*line),
         Document::Trim(trim) => Document::Trim(*trim),
         Document::Space(space) => Document::Space(*space),
@@ -499,6 +504,8 @@ where
             buffer.push(')');
         }
         Document::BreakParent => buffer.push_str("breakParent"),
+        Document::RangeStart => buffer.push_str("rangeStart"),
+        Document::RangeEnd => buffer.push_str("rangeEnd"),
         Document::Align(Align { alignment, contents }) => {
             buffer.push_str("dedentToRoot(align(");
             use std::fmt::Write as _;

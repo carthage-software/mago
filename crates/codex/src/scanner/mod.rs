@@ -360,7 +360,7 @@ where
             function,
             self.stack.last().copied(),
             context,
-            &mut self.scope,
+            &self.scope,
             type_context,
             Some(&self.codebase.constants),
         ) else {
@@ -404,7 +404,7 @@ where
             closure,
             self.stack.last().copied(),
             context,
-            &mut self.scope,
+            &self.scope,
             type_resolution_context,
         );
 
@@ -443,7 +443,7 @@ where
             arrow_function,
             self.stack.last().copied(),
             context,
-            &mut self.scope,
+            &self.scope,
             type_resolution_context,
         );
 
@@ -558,7 +558,7 @@ where
             .unwrap_or_else(|| anonymous_class.span().start.offset);
 
         if let Some((id, template_definition, type_aliases, imported_aliases)) =
-            register_anonymous_class(&mut self.codebase, anonymous_class, docblock_start, context, &mut self.scope)
+            register_anonymous_class(&mut self.codebase, anonymous_class, docblock_start, context, &self.scope)
         {
             self.apply_polyfill_flag_to_class_like(id);
             self.file_type_aliases.extend(type_aliases);
@@ -583,7 +583,7 @@ where
     #[inline]
     fn walk_class(&mut self, class: &'arena Class<'arena>, context: &mut Context<'ctx, 'arena, A>) {
         if let Some((id, templates, type_aliases, imported_aliases)) =
-            register_class(&mut self.codebase, class, context, &mut self.scope)
+            register_class(&mut self.codebase, class, context, &self.scope)
         {
             self.apply_polyfill_flag_to_class_like(id);
             self.file_type_aliases.extend(type_aliases);
@@ -598,7 +598,7 @@ where
     #[inline]
     fn walk_trait(&mut self, r#trait: &'arena Trait<'arena>, context: &mut Context<'ctx, 'arena, A>) {
         if let Some((id, templates, type_aliases, imported_aliases)) =
-            register_trait(&mut self.codebase, r#trait, context, &mut self.scope)
+            register_trait(&mut self.codebase, r#trait, context, &self.scope)
         {
             self.apply_polyfill_flag_to_class_like(id);
             self.file_type_aliases.extend(type_aliases);
@@ -613,7 +613,7 @@ where
     #[inline]
     fn walk_enum(&mut self, r#enum: &'arena Enum<'arena>, context: &mut Context<'ctx, 'arena, A>) {
         if let Some((id, templates, type_aliases, imported_aliases)) =
-            register_enum(&mut self.codebase, r#enum, context, &mut self.scope)
+            register_enum(&mut self.codebase, r#enum, context, &self.scope)
         {
             self.apply_polyfill_flag_to_class_like(id);
             self.file_type_aliases.extend(type_aliases);
@@ -628,7 +628,7 @@ where
     #[inline]
     fn walk_interface(&mut self, interface: &'arena Interface<'arena>, context: &mut Context<'ctx, 'arena, A>) {
         if let Some((id, templates, type_aliases, imported_aliases)) =
-            register_interface(&mut self.codebase, interface, context, &mut self.scope)
+            register_interface(&mut self.codebase, interface, context, &self.scope)
         {
             self.apply_polyfill_flag_to_class_like(id);
             self.file_type_aliases.extend(type_aliases);
@@ -678,14 +678,9 @@ where
             context
         };
 
-        let Some(mut function_like_metadata) = scan_method(
-            method_id,
-            method,
-            &class_like_metadata,
-            context,
-            &mut self.scope,
-            Some(type_resolution_context),
-        ) else {
+        let Some(mut function_like_metadata) =
+            scan_method(method_id, method, &class_like_metadata, context, &self.scope, Some(type_resolution_context))
+        else {
             // Restore the class-like metadata we removed above so the next method on
             // this class can still find it, and push an empty template-constraints
             // frame so the matching `walk_out_method` pop balances.

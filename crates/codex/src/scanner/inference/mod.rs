@@ -43,6 +43,7 @@ use crate::ttype::atomic::array::list::TList;
 use crate::ttype::atomic::callable::TCallable;
 use crate::ttype::atomic::derived::TDerived;
 use crate::ttype::atomic::derived::value_of::TValueOf;
+use crate::ttype::atomic::reference::TGlobalReferenceSelector;
 use crate::ttype::atomic::reference::TReference;
 use crate::ttype::atomic::reference::TReferenceMemberSelector;
 use crate::ttype::atomic::scalar::TScalar;
@@ -734,7 +735,9 @@ fn infer_constant<'ctx, 'arena>(
         }
     }
 
-    None
+    Some(wrap_atomic(TAtomic::Reference(TReference::Global {
+        selector: TGlobalReferenceSelector::Identifier(ascii_lowercase_constant_name_word(fqn)),
+    })))
 }
 
 #[inline]

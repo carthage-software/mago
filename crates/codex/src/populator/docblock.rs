@@ -502,7 +502,12 @@ fn apply_inheritance_work(codebase: &mut CodebaseMetadata, mut inheritance_work:
         let parent_thrown_to_apply = should_inherit_thrown.then(|| {
             parent_thrown_types
                 .iter()
-                .map(|metadata| TypeMetadata::from_docblock(substitute_type(metadata), metadata.span))
+                .map(|metadata| TypeMetadata {
+                    type_union: substitute_type(metadata),
+                    span: metadata.span,
+                    from_docblock: true,
+                    inferred: true,
+                })
                 .collect()
         });
 

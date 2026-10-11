@@ -729,6 +729,10 @@ pub fn analyze_assignment_to_variable<'ctx, 'arena, A>(
     block_context.derived_local_sources.remove(&variable_id);
     block_context.possibly_undefined_variable_ids.remove(&variable_id);
 
+    if artifacts.editor.is_some() {
+        artifacts.set_rc_expression_type(&variable_span, Rc::clone(&assigned_type));
+    }
+
     block_context.locals.insert(variable_id, assigned_type);
     block_context.variables_possibly_in_scope.insert(variable_id);
 }

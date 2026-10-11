@@ -221,7 +221,8 @@ fn populate_class_like_metadata(
         }
     }
 
-    if (metadata.kind.is_class() || metadata.kind.is_enum())
+    if !metadata.kind.is_trait()
+        && metadata.name != word(b"stringable")
         && metadata.appearing_method_ids.contains_key(&word(b"__tostring"))
         && !metadata.all_parent_interfaces.contains(&word(b"stringable"))
     {
@@ -395,7 +396,7 @@ fn populate_hierarchy_segment(
 
     references.sort_unstable_by_key(|(index, _)| *index);
     for (index, references) in references {
-        symbol_references.extend_from_population(references);
+        symbol_references.extend(references);
         let name = sorted_classes[index];
         if let Some(metadata) = codebase.class_likes.remove(&name) {
             populate_method_type_aliases(name, &metadata, codebase);
@@ -569,13 +570,7 @@ pub fn populate_class_like_types(
 
     for p in metadata.template_extended_parameters.values_mut().flat_map(|m| m.values_mut()) {
         if p.needs_population() || force_repopulation {
-            populate_union_type(
-                p,
-                codebase_symbols,
-                Some(&class_like_reference_source),
-                symbol_references,
-                force_repopulation,
-            );
+            populate_union_type(p, codebase_symbols, None, symbol_references, force_repopulation);
         }
     }
 
@@ -586,13 +581,7 @@ pub fn populate_class_like_types(
         .flat_map(|m| m.values_mut())
     {
         if p.needs_population() || force_repopulation {
-            populate_union_type(
-                p,
-                codebase_symbols,
-                Some(&class_like_reference_source),
-                symbol_references,
-                force_repopulation,
-            );
+            populate_union_type(p, codebase_symbols, None, symbol_references, force_repopulation);
         }
     }
 
@@ -606,12 +595,13 @@ pub fn populate_class_like_types(
         );
     }
 
-    for mixin_type in &mut metadata.mixins {
+    let declared_mixins = metadata.declared_mixin_count();
+    for (index, mixin_type) in metadata.mixins.iter_mut().enumerate() {
         if mixin_type.type_union.needs_population() || force_repopulation {
             populate_union_type(
                 &mut mixin_type.type_union,
                 codebase_symbols,
-                Some(&class_like_reference_source),
+                (index < declared_mixins).then_some(&class_like_reference_source),
                 symbol_references,
                 force_repopulation,
             );

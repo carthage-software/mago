@@ -130,7 +130,7 @@ where
 {
     use mago_text_edit::TextEditor;
 
-    let mut issues = collect_issues::<R, F>(code, filename, settings_fn);
+    let issues = collect_issues::<R, F>(code, filename, settings_fn);
     let rule_code = R::meta().code;
 
     assert!(
@@ -140,10 +140,10 @@ where
 
     let mut editor = TextEditor::new(code.as_bytes());
     let mut has_edits = false;
-    for (_, edits) in issues.take_edits() {
-        for edit in edits {
-            has_edits = true;
-            editor.apply(edit, None::<fn(&[u8]) -> bool>);
+    for batches in issues.to_edit_batches().into_values() {
+        for (_, edits) in batches {
+            has_edits |= !edits.is_empty();
+            editor.apply_unique_batch(edits, None::<fn(&[u8]) -> bool>);
         }
     }
 

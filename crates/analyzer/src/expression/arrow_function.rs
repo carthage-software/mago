@@ -51,10 +51,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
                 scope.set_class_like(block_context.scope.get_class_like());
             }
 
-            scope.set_static(!bind_scope.has_this);
+            scope.set_static(self.r#static.is_some() || !bind_scope.has_this);
         } else {
             scope.set_class_like(block_context.scope.get_class_like());
-            scope.set_static(self.r#static.is_some());
+            scope.set_static(self.r#static.is_some() || block_context.scope.is_static());
         }
 
         let mut inner_block_context = BlockContext::new(scope, context.settings.register_super_globals);
@@ -63,7 +63,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
         let params = self.parameter_list.parameters.iter().map(|param| param.variable.name).collect::<HashSet<_>>();
 
         for (variable, _) in variables {
-            if params.contains(&variable) {
+            if variable == b"$this" || params.contains(&variable) {
                 continue;
             }
 
@@ -129,6 +129,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
             context,
             s,
             function_metadata,
+            &inner_block_context.scope,
             inner_block_context.flags.has_returned(),
             inner_artifacts,
         );

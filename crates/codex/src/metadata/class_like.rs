@@ -21,6 +21,7 @@ use crate::metadata::class_like_constant::ClassLikeConstantMetadata;
 use crate::metadata::enum_case::EnumCaseMetadata;
 use crate::metadata::flags::MetadataFlags;
 use crate::metadata::property::PropertyMetadata;
+use crate::metadata::trait_adaptation::TraitMethodAdaptations;
 use crate::metadata::ttype::TypeMetadata;
 use crate::metadata::version_constraint::VersionConstraint;
 use crate::symbol::SymbolKind;
@@ -33,6 +34,16 @@ use crate::visibility::Visibility;
 /// Type alias for template types stored in metadata.
 /// Maps template parameter names to their defining entity and constraint type.
 pub type TemplateTypes = IndexMap<Word, GenericTemplate, RandomState>;
+
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+enum DeclaredAncestor {
+    ParentClass(Word),
+    ParentInterface(Word),
+    Trait(Word),
+    RequiredClass(Word),
+    RequiredInterface(Word),
+}
 
 /// Contains comprehensive metadata for a PHP class-like structure (class, interface, trait, enum).
 ///
@@ -54,9 +65,13 @@ pub struct ClassLikeMetadata {
     pub require_implements: WordSet,
     pub all_parent_classes: WordSet,
     pub used_traits: WordSet,
+    #[cfg_attr(feature = "serde", serde(default))]
+    declared_ancestry: Option<Box<[DeclaredAncestor]>>,
     pub trait_alias_map: WordMap<Word>,
     pub trait_visibility_map: WordMap<Visibility>,
     pub trait_final_map: WordSet,
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub(crate) trait_method_adaptations: Option<Box<TraitMethodAdaptations>>,
     pub child_class_likes: Option<WordSet>,
     pub name_span: Option<Span>,
     pub kind: SymbolKind,
@@ -96,6 +111,8 @@ pub struct ClassLikeMetadata {
     pub overridden_property_ids: WordMap<WordSet>,
     pub initialized_properties: WordSet,
     pub constants: WordMap<ClassLikeConstantMetadata>,
+    #[cfg_attr(feature = "serde", serde(default))]
+    declared_constants: Option<Box<[Word]>>,
     pub trait_constant_ids: WordMap<Word>,
     pub enum_cases: WordMap<EnumCaseMetadata>,
     pub invalid_dependencies: WordSet,
@@ -113,6 +130,8 @@ pub struct ClassLikeMetadata {
     /// Mixin types from @mixin annotations - these types' methods/properties
     /// can be accessed via magic methods (__call, __get, __set, __callStatic)
     pub mixins: Vec<TypeMetadata>,
+    #[cfg_attr(feature = "serde", serde(default))]
+    declared_mixin_count: Option<usize>,
     pub version_constraint: VersionConstraint,
 }
 
@@ -157,6 +176,7 @@ impl ClassLikeMetadata {
     ) -> ClassLikeMetadata {
         ClassLikeMetadata {
             constants: WordMap::default(),
+            declared_constants: None,
             trait_constant_ids: WordMap::default(),
             enum_cases: WordMap::default(),
             flags,
@@ -196,9 +216,11 @@ impl ClassLikeMetadata {
             template_type_uses_count: WordMap::default(),
             template_types: TemplateTypes::default(),
             used_traits: WordSet::default(),
+            declared_ancestry: None,
             trait_alias_map: WordMap::default(),
             trait_visibility_map: WordMap::default(),
             trait_final_map: WordSet::default(),
+            trait_method_adaptations: None,
             name,
             original_name,
             aliases: Vec::new(),
@@ -212,6 +234,7 @@ impl ClassLikeMetadata {
             type_aliases: WordMap::default(),
             imported_type_aliases: WordMap::default(),
             mixins: Vec::default(),
+            declared_mixin_count: None,
             version_constraint: VersionConstraint::unconstrained(),
         }
     }
@@ -316,10 +339,98 @@ impl ClassLikeMetadata {
         self.used_traits.extend(traits);
     }
 
+    pub fn direct_trait_names(&self) -> impl Iterator<Item = Word> + '_ {
+        self.declared_ancestry
+            .as_deref()
+            .into_iter()
+            .flatten()
+            .filter_map(|ancestor| match ancestor {
+                DeclaredAncestor::Trait(name) => Some(*name),
+                _ => None,
+            })
+            .chain(self.used_traits.iter().copied().filter(|_| self.declared_ancestry.is_none()))
+    }
+
+    pub(crate) fn declared_mixin_count(&self) -> usize {
+        self.declared_mixin_count.unwrap_or(self.mixins.len())
+    }
+
+    pub(crate) fn reset_inherited_members(&mut self) {
+        let declared_mixins = *self.declared_mixin_count.get_or_insert(self.mixins.len());
+        self.mixins.truncate(declared_mixins);
+        self.properties
+            .retain(|name, _| self.declaring_property_ids.get(name).is_none_or(|declaring| *declaring == self.name));
+        self.inheritable_method_ids.retain(|_, method| method.get_class_name() == self.name);
+        self.inheritable_property_ids.clear();
+        self.inheritable_property_ids.extend(
+            self.properties.iter().filter(|(_, property)| !property.is_final()).map(|(name, _)| (*name, self.name)),
+        );
+
+        self.magic_property_ids.retain(|_, declaring| *declaring == self.name);
+    }
+
+    pub(crate) fn reset_inherited_constants(&mut self) {
+        let declared = self.declared_constants.get_or_insert_with(|| {
+            let mut names: Box<[_]> = self.constants.keys().copied().collect();
+            names.sort_unstable();
+            names
+        });
+
+        self.constants.retain(|name, _| declared.binary_search(name).is_ok());
+        self.trait_constant_ids.clear();
+    }
+
+    pub(crate) fn reset_ancestry(&mut self) {
+        if self.declared_ancestry.is_none() {
+            self.declared_ancestry = Some(
+                self.direct_parent_class
+                    .into_iter()
+                    .map(DeclaredAncestor::ParentClass)
+                    .chain(self.direct_parent_interfaces.iter().copied().map(DeclaredAncestor::ParentInterface))
+                    .chain(self.used_traits.iter().copied().map(DeclaredAncestor::Trait))
+                    .chain(self.require_extends.iter().copied().map(DeclaredAncestor::RequiredClass))
+                    .chain(self.require_implements.iter().copied().map(DeclaredAncestor::RequiredInterface))
+                    .collect(),
+            );
+        }
+
+        self.direct_parent_class = None;
+        self.direct_parent_interfaces.clear();
+        self.all_parent_classes.clear();
+        self.all_parent_interfaces.clear();
+        self.used_traits.clear();
+        self.require_extends.clear();
+        self.require_implements.clear();
+        self.template_extended_parameters.clear();
+        self.template_extended_parameter_paths.clear();
+
+        for ancestor in self.declared_ancestry.as_deref().unwrap_or_default() {
+            match *ancestor {
+                DeclaredAncestor::ParentClass(name) => {
+                    self.direct_parent_class = Some(name);
+                    self.all_parent_classes.insert(name);
+                }
+                DeclaredAncestor::ParentInterface(name) => {
+                    self.direct_parent_interfaces.insert(name);
+                    self.all_parent_interfaces.insert(name);
+                }
+                DeclaredAncestor::Trait(name) => {
+                    self.used_traits.insert(name);
+                }
+                DeclaredAncestor::RequiredClass(name) => {
+                    self.require_extends.insert(name);
+                }
+                DeclaredAncestor::RequiredInterface(name) => {
+                    self.require_implements.insert(name);
+                }
+            }
+        }
+    }
+
     /// Adds or updates a single trait alias. Returns the previous original name if one existed for the alias.
     #[inline]
     pub fn add_trait_alias(&mut self, method: Word, alias: Word) -> Option<Word> {
-        self.trait_alias_map.insert(method, alias)
+        self.trait_alias_map.insert(alias, method)
     }
 
     /// Adds or updates a single trait visibility override. Returns the previous visibility if one existed.

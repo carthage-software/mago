@@ -19,15 +19,18 @@ use mago_syntax::cst::PropertyAccess;
 use mago_syntax::cst::Variable;
 use mago_word::Word;
 use mago_word::concat_word;
+use mago_word::word;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
+use crate::artifacts::editor::MemberReference;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::resolver::property::resolve_instance_properties;
 use crate::utils::expression::get_block_expression_id;
 use crate::utils::expression::get_property_access_expression_id;
+use crate::utils::expression::get_variable_id;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for PropertyAccess<'arena> {
     fn analyze<'ctx, A>(
@@ -102,7 +105,7 @@ where
         && let Some(property_access_id) = &property_access_id
         && let Some(existing_type) = block_context.locals.get(property_access_id).cloned()
     {
-        add_memoized_property_reference(context, block_context, artifacts, object, property_selector)?;
+        add_memoized_property_reference(context, block_context, artifacts, object, property_selector, is_null_safe)?;
 
         artifacts.set_rc_expression_type(&span, existing_type);
 
@@ -216,22 +219,79 @@ where
 ///
 /// When property access is memoized, we still need to track the symbol reference
 /// so that unused property detection works correctly.
-fn add_memoized_property_reference<'ctx, 'ast, 'arena, A>(
+pub(super) fn add_memoized_property_reference<'ctx, 'ast, 'arena, A>(
     context: &Context<'ctx, 'arena, A>,
     block_context: &BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     object: &'ast Expression<'arena>,
     property_selector: &'ast ClassLikeMemberSelector<'arena>,
+    is_null_safe: bool,
 ) -> Result<(), AnalysisError>
 where
     A: Arena,
 {
+    let is_this = matches!(object, Expression::Variable(Variable::Direct(var)) if var.name == b"$this");
+    if artifacts.editor.is_some() {
+        super::record_cached_receiver(context, block_context, artifacts, object)?;
+        if let ClassLikeMemberSelector::Expression(selector) = property_selector {
+            super::record_cached_receiver(context, block_context, artifacts, selector.expression)?;
+        }
+
+        let selector_type = match property_selector {
+            ClassLikeMemberSelector::Variable(variable) => {
+                get_variable_id(variable).and_then(|id| block_context.locals.get(&word(id)).cloned())
+            }
+            ClassLikeMemberSelector::Expression(selector) => {
+                artifacts.get_rc_expression_type(selector.expression).cloned().or_else(|| {
+                    get_block_expression_id(selector.expression, context, block_context)
+                        .and_then(|id| block_context.locals.get(&id).cloned())
+                })
+            }
+            _ => None,
+        };
+
+        let names = match property_selector {
+            ClassLikeMemberSelector::Identifier(ident) => vec![concat_word!(b"$", ident.value)],
+            _ => selector_type
+                .iter()
+                .flat_map(|union| union.types.iter())
+                .filter_map(|atomic| atomic.get_literal_string_value().map(|name| concat_word!(b"$", name)))
+                .collect(),
+        };
+
+        let receiver_type = super::saved_receiver_type(context, block_context, artifacts, object);
+        let mut reference = MemberReference::property(
+            block_context.scope.get_reference_origin(),
+            object.span(),
+            property_selector.span(),
+            word(""),
+        );
+
+        reference.dynamic = !matches!(property_selector, ClassLikeMemberSelector::Identifier(_));
+        reference.uncertain = selector_type
+            .is_some_and(|union| union.types.iter().any(|atomic| atomic.get_literal_string_value().is_none()));
+        reference.uncertain |= !is_null_safe && receiver_type.as_ref().is_some_and(|union| union.can_be_null());
+        if is_this {
+            reference.lookup_class = block_context.scope.get_class_like_name();
+        }
+
+        if let Some(editor) = &mut artifacts.editor {
+            for name in names {
+                reference.name = name;
+                editor.record_saved_properties(
+                    context.codebase,
+                    block_context.scope.get_class_like_name(),
+                    reference,
+                    receiver_type.as_deref(),
+                );
+            }
+        }
+    }
+
     let property_name = match property_selector {
         ClassLikeMemberSelector::Identifier(ident) => concat_word!(b"$", ident.value),
         _ => return Ok(()),
     };
-
-    let is_this = matches!(object, Expression::Variable(Variable::Direct(var)) if var.name == b"$this");
     let mut declaring_classes: Vec<Word> = Vec::new();
 
     if is_this {

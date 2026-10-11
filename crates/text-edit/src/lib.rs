@@ -276,6 +276,26 @@ impl<'src> TextEditor<'src> {
         ApplyResult::Applied
     }
 
+    /// Applies an issue's edits atomically, skipping exact edits already accepted.
+    ///
+    /// Shared edits, such as imports, must remain in each issue until a batch succeeds.
+    /// Distinct insertions at the same offset retain their order.
+    pub fn apply_unique_batch<F>(&mut self, mut new_edits: Vec<TextEdit>, checker: Option<F>) -> ApplyResult
+    where
+        F: FnOnce(&[u8]) -> bool,
+    {
+        new_edits.retain(|edit| {
+            let range = (edit.range.start, edit.range.end);
+            let start = self.edits.partition_point(|existing| (existing.range.start, existing.range.end) < range);
+            !self.edits[start..]
+                .iter()
+                .take_while(|existing| existing.range == edit.range)
+                .any(|existing| existing == edit)
+        });
+
+        self.apply_batch(new_edits, checker)
+    }
+
     /// Applies a batch of edits atomically.
     ///
     /// Either all edits are applied, or none are (if overlap/check/safety fails).
@@ -460,6 +480,60 @@ fn stitch_merged(original: &[u8], old_edits: &[TextEdit], new_edits: &[TextEdit]
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn unique_batches_share_edits_and_preserve_distinct_insert_order() {
+        let mut editor = TextEditor::new(b"ab");
+        let shared = TextEdit::insert(0, "use A;\n");
+        assert_eq!(
+            editor.apply_unique_batch(vec![shared.clone(), TextEdit::replace(0..1, "A")], None::<fn(&[u8]) -> bool>),
+            ApplyResult::Applied
+        );
+        assert_eq!(
+            editor.apply_unique_batch(
+                vec![shared, TextEdit::insert(0, "use B;\n"), TextEdit::replace(1..2, "B")],
+                None::<fn(&[u8]) -> bool>
+            ),
+            ApplyResult::Applied
+        );
+        assert_eq!(editor.finish(), b"use A;\nuse B;\nAB");
+    }
+
+    #[test]
+    fn unique_batches_keep_required_edits_after_rejection() {
+        let mut editor = TextEditor::new(b"ab");
+        let shared = TextEdit::insert(0, "use A;\n");
+        assert_eq!(editor.apply_unique_batch(vec![shared.clone()], Some(|_: &[u8]| false)), ApplyResult::Rejected);
+        assert_eq!(
+            editor.apply_unique_batch(vec![shared, TextEdit::replace(1..2, "B")], None::<fn(&[u8]) -> bool>),
+            ApplyResult::Applied
+        );
+        assert_eq!(editor.finish(), b"use A;\naB");
+    }
+
+    #[test]
+    fn unique_batches_do_not_skip_different_safety() {
+        let mut editor = TextEditor::with_safety(b"", Safety::Safe);
+        let shared = TextEdit::insert(0, "use A;\n");
+        assert_eq!(editor.apply_unique_batch(vec![shared.clone()], None::<fn(&[u8]) -> bool>), ApplyResult::Applied);
+        assert_eq!(
+            editor.apply_unique_batch(vec![shared.with_safety(Safety::Unsafe)], None::<fn(&[u8]) -> bool>),
+            ApplyResult::Unsafe
+        );
+        assert_eq!(editor.finish(), b"use A;\n");
+    }
+
+    #[test]
+    fn ordinary_batches_still_allow_repeated_insertions() {
+        let mut editor = TextEditor::new(b"");
+        for _ in 0..2 {
+            assert_eq!(
+                editor.apply_batch(vec![TextEdit::insert(0, ")")], None::<fn(&[u8]) -> bool>),
+                ApplyResult::Applied
+            );
+        }
+        assert_eq!(editor.finish(), b"))");
+    }
 
     #[test]
     fn test_apply_single() {

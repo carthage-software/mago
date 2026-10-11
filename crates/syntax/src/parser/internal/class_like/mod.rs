@@ -61,7 +61,7 @@ where
 
                 Sequence::new(members)
             },
-            right_brace: self.stream.eat_span(T!["}"])?,
+            right_brace: self.parse_closing_span(T!["}"])?,
         })
     }
 
@@ -114,7 +114,7 @@ where
 
                 Sequence::new(members)
             },
-            right_brace: self.stream.eat_span(T!["}"])?,
+            right_brace: self.parse_closing_span(T!["}"])?,
         })
     }
 
@@ -155,7 +155,7 @@ where
 
                 Sequence::new(members)
             },
-            right_brace: self.stream.eat_span(T!["}"])?,
+            right_brace: self.parse_closing_span(T!["}"])?,
         })
     }
 
@@ -194,7 +194,7 @@ where
                 }
                 Sequence::new(members)
             },
-            right_brace: self.stream.eat_span(T!["}"])?,
+            right_brace: self.parse_closing_span(T!["}"])?,
         })
     }
 
@@ -235,7 +235,7 @@ where
                 }
                 Sequence::new(members)
             },
-            right_brace: self.stream.eat_span(T!["}"])?,
+            right_brace: self.parse_closing_span(T!["}"])?,
         })
     }
 

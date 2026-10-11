@@ -42,9 +42,18 @@ impl DefSignatureNode {
 /// This contains all top-level definitions (classes, interfaces, traits, enums,
 /// functions, constants) in the file as a flat vector. Nested definitions
 /// (methods, properties) are stored within the `children` of their parent nodes.
-#[derive(Debug, Clone, PartialEq, Eq, Default)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct FileSignature {
+    /// Logical filename used by dependencies from top-level code.
+    #[cfg_attr(feature = "serde", serde(default = "mago_word::empty_word"))]
+    pub file_name: Word,
     pub hash: u64,
     pub ast_nodes: Vec<DefSignatureNode>,
+}
+
+impl Default for FileSignature {
+    fn default() -> Self {
+        Self { file_name: mago_word::empty_word(), hash: 0, ast_nodes: Vec::new() }
+    }
 }

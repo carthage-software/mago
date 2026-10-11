@@ -77,48 +77,59 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for FunctionPartialApplication<'aren
         } else {
             let mut closure_types = Vec::new();
             for callable in callables {
-                let (identifier, signature) = match &callable {
-                    TCallable::Alias(id) => {
-                        let Some(sig) =
-                            get_parameter_dependent_signature_of_function_like_identifier(id, context.codebase)
-                        else {
-                            continue;
-                        };
-
-                        (*id, sig)
-                    }
-                    TCallable::Signature(sig) => {
-                        if let Some(source_id) = sig.get_source() {
+                let identifier = match &callable {
+                    TCallable::Alias(identifier) => Some(*identifier),
+                    TCallable::Signature(signature) => signature.get_source(),
+                };
+                let (signature, invocation_target) = if let Some(identifier) = identifier {
+                    let signature = match &callable {
+                        TCallable::Signature(signature) if identifier.is_closure() => signature.clone(),
+                        _ => {
                             let Some(signature) = get_parameter_dependent_signature_of_function_like_identifier(
-                                &source_id,
+                                &identifier,
                                 context.codebase,
                             ) else {
                                 continue;
                             };
 
-                            (source_id, signature)
-                        } else {
-                            continue;
+                            signature
                         }
-                    }
-                };
+                    };
 
-                let Some(metadata) = context.codebase.get_function_like(&identifier) else {
+                    let Some(metadata) = context.codebase.get_function_like(&identifier) else {
+                        continue;
+                    };
+
+                    let mut target = InvocationTarget::FunctionLike {
+                        identifier,
+                        metadata,
+                        inferred_return_type: if identifier.is_closure() {
+                            signature.return_type.clone()
+                        } else {
+                            None
+                        },
+                        effective_signature: None,
+                        method_context: None,
+                        span: self.function.span(),
+                    };
+
+                    target.bind_closure_parameters(&signature);
+                    (signature, target)
+                } else if let TCallable::Signature(signature) = &callable {
+                    let target = InvocationTarget::Callable {
+                        source: None,
+                        signature: signature.clone(),
+                        effective_signature: None,
+                        span: self.function.span(),
+                    };
+
+                    (signature.clone(), target)
+                } else {
                     continue;
                 };
 
-                // Get parameters from metadata before creating InvocationTarget
                 let original_parameters: Vec<_> =
-                    metadata.parameters.iter().map(InvocationTargetParameter::FunctionLike).collect();
-
-                let invocation_target = InvocationTarget::FunctionLike {
-                    identifier,
-                    metadata,
-                    inferred_return_type: None,
-                    effective_signature: None,
-                    method_context: None,
-                    span: self.function.span(),
-                };
+                    signature.get_parameters().iter().map(InvocationTargetParameter::Callable).collect();
 
                 let mut invocation = Invocation::new(
                     invocation_target,
@@ -172,6 +183,7 @@ where
     if let Expression::Identifier(function_name) = expression {
         let name = word(context.resolved_names.get(function_name));
         let unqualified_name = word(function_name.value());
+        artifacts.symbol_references.add_reference_to_symbol(&block_context.scope, name.to_ascii_lowercase(), false);
 
         let identifier = if context.codebase.function_exists(name.as_bytes()) {
             FunctionLikeIdentifier::Function(name)
@@ -181,6 +193,14 @@ where
         {
             FunctionLikeIdentifier::Function(unqualified_name)
         } else {
+            if !function_name.is_fully_qualified() && unqualified_name != name {
+                artifacts.symbol_references.add_reference_to_symbol(
+                    &block_context.scope,
+                    unqualified_name.to_ascii_lowercase(),
+                    false,
+                );
+            }
+
             let issue = if unqualified_name == name {
                 Issue::error(format!("Function `{name}` could not be found.")).with_annotation(
                     Annotation::primary(expression.span())

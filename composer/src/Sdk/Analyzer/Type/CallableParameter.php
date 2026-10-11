@@ -20,6 +20,7 @@ final class CallableParameter
         public readonly bool $byReference = false,
         public readonly bool $variadic = false,
         public readonly bool $hasDefault = false,
+        public readonly ?Type $outType = null,
     ) {
         if ($name !== null) {
             DefinitionName::assertVariable($name, 'A callable parameter name');

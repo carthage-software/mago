@@ -832,7 +832,9 @@ where
     }
 
     let chain_owns_parens = match chain_base_frame {
-        ChainBaseFrame::BaseHandlesParens => false,
+        ChainBaseFrame::BaseHandlesParens => {
+            matches!(member_access_chain.base, Expression::Instantiation(i) if f.instantiation_needs_parens(i))
+        }
         ChainBaseFrame::None | ChainBaseFrame::ChainHandlesParens => base_needs_parens(f, member_access_chain.base),
     };
 
@@ -989,7 +991,9 @@ where
     let preserve_same_line_first_method = f.settings.preserve_breaking_member_access_chain
         && f.settings.preserve_breaking_member_access_chain_first_method_on_same_line
         && member_access_chain.is_first_link_object_method_call()
-        && (member_access_chain.is_first_link_already_broken(f)
+        // A lone broken call has no later links to keep broken after inlining it.
+        // Moving it back onto the receiver's line can make the next pass break it again.
+        && ((member_access_chain.accesses.len() > 1 && member_access_chain.is_first_link_already_broken(f))
             || member_access_chain.has_break_after_first_access(f)
             || member_access_chain.exceeds_print_width_from_line_start(f));
 

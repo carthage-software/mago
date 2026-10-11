@@ -439,6 +439,28 @@ final class DynamicProxy
 ";
 
 #[test]
+fn callable_out_types_survive_worker_round_trips() -> Result<(), Box<dyn std::error::Error>> {
+    if !php_sdk_is_available() {
+        return Ok(());
+    }
+    let source = r"<?php
+class Payload {}
+function roundtrip_effects(Closure $callback): Closure { return $callback; }
+function proof(): Payload {
+    $callback = /** @param-out Payload $value */ static function (mixed &$value): void { $value = new Payload(); };
+    $callback = roundtrip_effects($callback);
+    $value = null;
+    $callback($value);
+    return $value;
+}
+";
+    let observation = analyze_with_fixture(source, true, false, false)?;
+    assert!(observation.issues.is_empty(), "the returned callable must keep its out type: {:#?}", observation.issues);
+    assert_eq!(observation.invocations, ["callable-effects"]);
+    Ok(())
+}
+
+#[test]
 fn external_providers_receive_complete_invocation_context() -> Result<(), Box<dyn std::error::Error>> {
     if !php_sdk_is_available() {
         return Ok(());

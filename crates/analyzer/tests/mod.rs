@@ -771,6 +771,16 @@ test_case!(trait_constant_conflicts);
 test_case!(trait_constant_direct_access);
 test_case!(trait_constant_access);
 test_case!(trait_override_final_methods);
+test_case!(trait_final_same_source, {
+    let mut settings = default_test_settings();
+    settings.version = mago_php_version::PHPVersion::PHP83;
+    settings
+});
+test_case!(trait_final_alias_adaptations, {
+    let mut settings = default_test_settings();
+    settings.version = mago_php_version::PHPVersion::PHP83;
+    settings
+});
 test_case!(inheritdoc_basic_parent_class);
 test_case!(inheritdoc_multiple_interfaces);
 test_case!(inheritdoc_nested_generics);
@@ -816,6 +826,21 @@ test_case!(partial_application_templates);
 test_case!(partial_application_type_inference);
 test_case!(partial_application_simple);
 test_case!(partial_application_named_argument_reordering);
+test_case!(partial_origin_preserves_reduced_parameters, mago_analyzer::settings::Settings::default());
+test_case!(nested_partial_keeps_reduced_parameter_order_and_names, mago_analyzer::settings::Settings::default());
+test_case!(partial_conditional_capture_waits_for_its_argument, mago_analyzer::settings::Settings::default());
+test_case!(nested_partial_keeps_captured_argument_constraints, mago_analyzer::settings::Settings::default());
+test_case!(
+    nested_partial_checks_a_capture_when_its_last_dependency_is_bound,
+    mago_analyzer::settings::Settings::default()
+);
+test_case!(get_current_closure_keeps_parent_signature, mago_analyzer::settings::Settings::default());
+test_case!(partial_closure_keeps_parameter_dependencies, mago_analyzer::settings::Settings::default());
+test_case!(closure_calls_bind_parent_parameters, mago_analyzer::settings::Settings::default());
+test_case!(closure_conditional_types_bind_class_context, mago_analyzer::settings::Settings::default());
+test_case!(escaped_closure_effects_keep_class_context, mago_analyzer::settings::Settings::default());
+test_case!(trait_closure_parent_types_follow_each_using_class, mago_analyzer::settings::Settings::default());
+test_case!(closure_parent_signature_types, mago_analyzer::settings::Settings::default());
 test_case!(octal_zero_prefix);
 test_case!(switch_semicolon);
 test_case!(redundant_assert);
@@ -914,6 +939,7 @@ test_case!(undefined_type_reference);
 test_case!(duplicate_definition);
 test_case!(method_call_assertions);
 test_case!(stable_method_call_narrowing);
+test_case!(stable_method_call_narrowing_logical_and);
 test_case!(invalid_default_values);
 test_case!(class_must_be_final, {
     let mut s = crate::framework::default_test_settings();
@@ -1232,6 +1258,10 @@ test_case!(callables_closure_use_by_reference);
 test_case!(callables_arrow_function_inherits_scope);
 test_case!(callables_static_closure);
 test_case!(callables_static_arrow_function);
+test_case!(closure_this_static_scopes, mago_analyzer::settings::Settings::default());
+test_case!(closure_this_property_cache, mago_analyzer::settings::Settings::default());
+test_case!(closure_this_instance_and_binding, mago_analyzer::settings::Settings::default());
+test_case!(closure_this_static_binding, mago_analyzer::settings::Settings::default());
 test_case!(callables_first_class_callable_function);
 test_case!(callables_first_class_static_method);
 test_case!(callables_first_class_instance_method);
@@ -1329,6 +1359,7 @@ test_case!(strings_redundant_string_eq_literal);
 test_case!(strings_redundant_strlen_of_literal);
 test_case!(strings_string_intersected_with_stringable);
 test_case!(strings_stringable_to_string_implicit);
+test_case!(stringable_interfaces);
 test_case!(stringable_names);
 test_case!(strings_ucfirst_with_int);
 test_case!(strings_ucwords_with_array);
@@ -2802,11 +2833,12 @@ test_case!(issue_2434);
 test_case!(issue_2435);
 test_case!(issue_2440);
 test_case!(simplexml_truthiness);
+test_case!(closure_capture_by_reference_array);
 
 #[test]
 #[cfg_attr(miri, ignore)]
 fn test_all_test_cases_are_ran() {
-    let test_case_file = include_str!("mod.rs");
+    let test_case_file = include_str!("mod.rs").split_whitespace().collect::<String>();
     let test_cases_dir = fs::read_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/cases")).unwrap();
 
     for entry in test_cases_dir {

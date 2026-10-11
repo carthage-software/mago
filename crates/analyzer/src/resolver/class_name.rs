@@ -405,6 +405,12 @@ where
         }
     }
 
+    for resolved in &possible_types {
+        if let Some(name) = resolved.fqcn {
+            artifacts.symbol_references.add_reference_to_symbol(&block_context.scope, name.to_ascii_lowercase(), false);
+        }
+    }
+
     Ok(possible_types)
 }
 

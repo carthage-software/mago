@@ -15,6 +15,19 @@ use mago_formatter::settings::SortOrder;
 use mago_formatter::settings::SortUses;
 use mago_php_version::PHPVersion;
 
+/// Compare the original bytes, but render formatting failures as readable source diffs.
+#[track_caller]
+fn assert_code_eq(expected: &[u8], actual: &[u8], message: &str) {
+    assert!(
+        expected == actual,
+        "{message}\n{}",
+        pretty_assertions::StrComparison::new(
+            &mago_bytes::BytesDisplay(expected).to_string(),
+            &mago_bytes::BytesDisplay(actual).to_string(),
+        ),
+    );
+}
+
 #[macro_export]
 macro_rules! test_case {
     ($name:ident) => {
@@ -32,13 +45,13 @@ macro_rules! test_case {
 
             let formatted_code = formatter.format_code(Cow::Borrowed(b"code.php"), Cow::Borrowed(code)).unwrap();
 
-            pretty_assertions::assert_eq!(expected, formatted_code, "Formatted code does not match expected",);
+            $crate::assert_code_eq(expected, formatted_code, "Formatted code does not match expected");
 
             let reformatted_code = formatter
                 .format_code(Cow::Borrowed(b"formatted_code.php"), Cow::Owned(formatted_code.to_vec()))
                 .unwrap();
 
-            pretty_assertions::assert_eq!(expected, reformatted_code, "Reformatted code does not match expected",);
+            $crate::assert_code_eq(expected, reformatted_code, "Reformatted code does not match expected");
         }
     };
 }
@@ -59,6 +72,9 @@ test_case!(php83_instantiation_with_member_access_parentheses, PHPVersion::PHP83
 test_case!(php84_instantiation_with_member_access_parentheses, PHPVersion::PHP84);
 test_case!(php83_instantiation_with_member_access_parentheses_disabled, PHPVersion::PHP83);
 test_case!(php84_instantiation_with_member_access_parentheses_disabled, PHPVersion::PHP84);
+test_case!(issue_2455, PHPVersion::PHP83);
+test_case!(issue_2455_php84, PHPVersion::PHP84);
+test_case!(issue_2455_php84_parentheses, PHPVersion::PHP84);
 test_case!(issue_2430, PHPVersion::PHP85);
 test_case!(issue_2430_preserve_new_parentheses, PHPVersion::PHP85);
 test_case!(expand_last_argument);
@@ -330,6 +346,7 @@ test_case!(align_run_breaking);
 test_case!(align_modifier_breaking);
 test_case!(inline_block_comments_in_arguments);
 test_case!(idempotent_chain_with_array);
+test_case!(idempotent_nested_member_chain);
 test_case!(idempotent_chain_with_complex_arguments);
 test_case!(match_idempotency);
 test_case!(heredoc_indentation);
@@ -590,7 +607,7 @@ fn preserves_non_utf8_identifiers() {
     else {
         panic!("second format pass must succeed");
     };
-    assert_eq!(formatted_pass1, reformatted, "formatter is not idempotent on non-UTF-8 identifiers");
+    assert_code_eq(formatted_pass1, reformatted, "formatter is not idempotent on non-UTF-8 identifiers");
 }
 
 #[test]
@@ -616,4 +633,28 @@ fn test_all_test_cases_are_ran() {
             "Directory '{file_name}' was not found as a test case"
         );
     }
+}
+
+#[test]
+fn formatting_diff_shows_source_text() {
+    let failure = std::panic::catch_unwind(|| {
+        assert_code_eq(b"<?php\nfoo();\n", b"<?php\nbar();\n", "Formatting mismatch");
+    })
+    .unwrap_err();
+    let message = failure.downcast_ref::<String>().unwrap();
+    assert!(message.contains("Formatting mismatch"));
+    assert!(message.contains("<?php\n"));
+    assert!(message.contains("foo"));
+    assert!(message.contains("bar"));
+}
+
+#[test]
+fn formatting_diff_preserves_non_utf8_byte_differences() {
+    let failure = std::panic::catch_unwind(|| {
+        assert_code_eq(b"<?php\n$\x80;\n", b"<?php\n$\xFF;\n", "Formatting mismatch");
+    })
+    .unwrap_err();
+    let message = failure.downcast_ref::<String>().unwrap();
+    assert!(message.contains("80"));
+    assert!(message.contains("FF"));
 }

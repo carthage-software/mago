@@ -69,6 +69,7 @@ where
         loop {
             match self.stream.peek_kind(0)? {
                 Some(kind) if kind == close_kind => break,
+                None if self.recovery_end.is_some() => break,
                 None => return Err(self.stream.unexpected_kind(None, close_kind)),
                 _ => {}
             }
@@ -87,7 +88,12 @@ where
         }
 
         let Some(current) = self.stream.lookahead(0)? else {
-            return Err(self.stream.unexpected_kind(None, close_kind));
+            let close = self.recover_at_eof(self.stream.unexpected_kind(None, close_kind))?;
+            return Ok(TokenSeparatedSequenceResult {
+                open,
+                sequence: TokenSeparatedSequence::new(elements, separators),
+                close,
+            });
         };
 
         if current.kind == close_kind {

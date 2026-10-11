@@ -140,6 +140,7 @@ impl CombinationFlags {
 pub struct TypeCombination {
     pub flags: CombinationFlags,
     pub value_types: WordMap<TAtomic>,
+    pub callable_collisions: WordMap<Vec<TAtomic>>,
     pub enum_names: HashSet<(Word, Option<Word>)>,
     pub object_type_params: WordMap<(Word, Vec<TUnion>)>,
     pub object_static: WordMap<bool>,
@@ -169,6 +170,7 @@ impl TypeCombination {
         Self {
             flags,
             value_types: WordMap::default(),
+            callable_collisions: WordMap::default(),
             object_type_params: WordMap::default(),
             object_static: WordMap::default(),
             keyed_array_entries: BTreeMap::new(),
@@ -189,6 +191,7 @@ impl TypeCombination {
     #[must_use]
     pub fn is_simple(&self) -> bool {
         if self.value_types.len() == 1
+            && self.callable_collisions.is_empty()
             && self.sealed_arrays.is_empty()
             && !self.flags.contains(CombinationFlags::HAS_KEYED_ARRAY)
             && !self.flags.contains(CombinationFlags::HAS_EMPTY_ARRAY)

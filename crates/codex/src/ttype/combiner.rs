@@ -30,6 +30,8 @@ use crate::ttype::atomic::array::TArray;
 use crate::ttype::atomic::array::key::ArrayKey;
 use crate::ttype::atomic::array::keyed::TKeyedArray;
 use crate::ttype::atomic::array::list::TList;
+use crate::ttype::atomic::callable::TCallable;
+use crate::ttype::atomic::callable::TCallableSignature;
 use crate::ttype::atomic::mixed::TMixed;
 use crate::ttype::atomic::mixed::truthiness::TMixedTruthiness;
 use crate::ttype::atomic::object::TObject;
@@ -215,7 +217,8 @@ pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, options: Combin
 
     // `never` is the bottom type, absorbed by any other member of the union. Drop it up front so
     // that it does not make the combination look non-simple, which would turn `void` into `null`.
-    if combination.value_types.len() > 1 {
+    let callable_collision_count: usize = combination.callable_collisions.values().map(Vec::len).sum();
+    if combination.value_types.len() + callable_collision_count > 1 {
         combination.value_types.remove(&*ATOM_NEVER);
     }
 
@@ -246,6 +249,7 @@ pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, options: Combin
         + combination.literal_floats.len()
         + combination.enum_names.len()
         + combination.value_types.len()
+        + callable_collision_count
         + combination.sealed_arrays.len()
         + 5;
 
@@ -365,10 +369,10 @@ pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, options: Combin
 
     let mut has_never = combination.value_types.contains_key(&*ATOM_NEVER);
 
-    let combination_value_type_count = combination.value_types.len();
+    let combination_value_type_count = combination.value_types.len() + callable_collision_count;
     let mixed_from_loop_isset = combination.flags.mixed_from_loop_isset().unwrap_or(false);
 
-    for (_, atomic) in combination.value_types {
+    for atomic in combination.value_types.into_values().chain(combination.callable_collisions.into_values().flatten()) {
         let tc = usize::from(has_never);
         if atomic.is_mixed()
             && mixed_from_loop_isset
@@ -1324,7 +1328,49 @@ fn scrape_type_properties(
         return;
     }
 
-    combination.value_types.insert(atomic.get_id(), atomic);
+    let key = atomic.get_id();
+    let mut atomic = atomic;
+    if let TAtomic::Callable(TCallable::Signature(signature)) = &mut atomic
+        && let Some(TAtomic::Callable(TCallable::Signature(previous))) = combination.value_types.get(&key)
+    {
+        if !same_callable_target_and_effects(previous, signature) {
+            let collisions = combination.callable_collisions.entry(key).or_default();
+            for previous in collisions.iter_mut() {
+                if let TAtomic::Callable(TCallable::Signature(previous_signature)) = previous
+                    && same_callable_target_and_effects(previous_signature, signature)
+                {
+                    merge_callable_parameter_names(signature, previous_signature);
+                    *previous = atomic;
+                    return;
+                }
+            }
+
+            collisions.push(atomic);
+            return;
+        }
+
+        merge_callable_parameter_names(signature, previous);
+    }
+
+    combination.value_types.insert(key, atomic);
+}
+
+fn same_callable_target_and_effects(left: &TCallableSignature, right: &TCallableSignature) -> bool {
+    left.invocation_target() == right.invocation_target()
+        && left.parameters == right.parameters
+        && left.return_type == right.return_type
+        && left.constraints == right.constraints
+}
+
+fn merge_callable_parameter_names(signature: &mut TCallableSignature, previous: &TCallableSignature) {
+    if signature.is_partial || previous.is_partial {
+        signature.is_partial = true;
+        for (parameter, previous) in signature.parameters.iter_mut().zip(previous.parameters.iter()) {
+            if parameter.get_name() != previous.get_name() {
+                *parameter = parameter.clone().with_name(None);
+            }
+        }
+    }
 }
 
 fn shapes_are_discriminated(
@@ -1644,7 +1690,246 @@ mod tests {
 
     use crate::ttype::atomic::TAtomic;
     use crate::ttype::atomic::array::list::TList;
+    use crate::ttype::atomic::callable::TCallableSignature;
     use crate::ttype::atomic::scalar::TScalar;
+
+    #[test]
+    fn partial_callable_names_survive_union_equality_shortcuts() {
+        use std::rc::Rc;
+
+        use crate::identifier::function_like::FunctionLikeIdentifier;
+        use crate::misc::VariableIdentifier;
+        use crate::ttype::atomic::callable::parameter::TCallableParameter;
+        use crate::ttype::{
+            add_optional_union_type_rc, combine_owned_union_types_rc, combine_union_types, combine_union_types_rc,
+        };
+
+        let key = FunctionLikeIdentifier::Function(word("read"));
+        let signature = |name: Option<&str>, partial: bool| {
+            let mut signature = TCallableSignature::new(false, true).with_source(Some(key)).with_parameters(vec![
+                TCallableParameter::default().with_name(name.map(|name| VariableIdentifier(word(name)))),
+            ]);
+            signature.is_partial = partial;
+            TUnion::from_atomic(TAtomic::Callable(TCallable::Signature(signature)))
+        };
+        let codebase = CodebaseMetadata::default();
+        let options = CombinerOptions::default();
+        let expected = signature(None, true);
+        for (left, right) in [("$value", "$other"), ("$other", "$value")] {
+            for (left_partial, right_partial) in [(true, true), (false, true), (true, false)] {
+                let left = Rc::new(signature(Some(left), left_partial));
+                let right = Rc::new(signature(Some(right), right_partial));
+                let results = [
+                    combine_union_types(&left, &right, &codebase, options),
+                    (*combine_union_types_rc(&left, &right, &codebase, options)).clone(),
+                    (*combine_owned_union_types_rc(Rc::clone(&left), &right, &codebase, options)).clone(),
+                    (*add_optional_union_type_rc(&left, Some(&right), &codebase)).clone(),
+                ];
+                for result in results {
+                    assert_eq!(result, expected);
+                    assert_eq!(combine_union_types(&result, &left, &codebase, options), expected);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn callable_unions_keep_distinct_invocation_origins() {
+        use crate::identifier::function_like::FunctionLikeIdentifier;
+
+        let read = FunctionLikeIdentifier::Function(word("read"));
+        let other = FunctionLikeIdentifier::Function(word("other"));
+        let partial = TCallableSignature::new(false, true).with_partial_source(Some(read));
+        assert_eq!(partial.get_source(), None);
+        assert_eq!(partial.invocation_target(), Some(read));
+        let same = combine(
+            vec![TAtomic::Callable(TCallable::Signature(partial.clone())); 2],
+            &CodebaseMetadata::default(),
+            CombinerOptions::default(),
+        );
+        assert_eq!(same, [TAtomic::Callable(TCallable::Signature(partial.clone()))]);
+        for conflict in [partial.clone().with_partial_source(Some(other)), partial.clone().with_source(None)] {
+            for reverse in [false, true] {
+                let mut signatures = [partial.clone(), conflict.clone()];
+                if reverse {
+                    signatures.reverse();
+                }
+                let combined = combine(
+                    signatures
+                        .into_iter()
+                        .chain([partial.clone()])
+                        .map(|sig| TAtomic::Callable(TCallable::Signature(sig)))
+                        .collect(),
+                    &CodebaseMetadata::default(),
+                    CombinerOptions::default(),
+                );
+                assert_eq!(
+                    TUnion::from_vec(combined),
+                    TUnion::from_vec(vec![
+                        TAtomic::Callable(TCallable::Signature(partial.clone())),
+                        TAtomic::Callable(TCallable::Signature(conflict.clone())),
+                    ])
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn callable_unions_merge_names_only_within_each_origin() {
+        use crate::identifier::function_like::FunctionLikeIdentifier;
+        use crate::misc::VariableIdentifier;
+        use crate::ttype::atomic::callable::parameter::TCallableParameter;
+
+        let signature = |source: Option<&str>, name: Option<&str>| {
+            TAtomic::Callable(TCallable::Signature(
+                TCallableSignature::new(false, true)
+                    .with_partial_source(source.map(|source| FunctionLikeIdentifier::Function(word(source))))
+                    .with_parameters(vec![
+                        TCallableParameter::default().with_name(name.map(|name| VariableIdentifier(word(name)))),
+                    ]),
+            ))
+        };
+
+        for reverse in [false, true] {
+            let mut inputs = vec![
+                signature(Some("read"), Some("$value")),
+                signature(Some("other"), Some("$value")),
+                signature(Some("other"), Some("$bound")),
+                signature(Some("other"), Some("$value")),
+                signature(None, Some("$first")),
+                signature(None, Some("$second")),
+            ];
+
+            if reverse {
+                inputs.reverse();
+            }
+
+            let combined = TUnion::from_vec(combine(inputs, &CodebaseMetadata::default(), CombinerOptions::default()));
+            assert_eq!(
+                combined,
+                TUnion::from_vec(vec![
+                    signature(Some("read"), Some("$value")),
+                    signature(Some("other"), None),
+                    signature(None, None),
+                ])
+            );
+        }
+    }
+
+    #[test]
+    fn callable_unions_keep_origins_through_finalization() {
+        use crate::identifier::function_like::FunctionLikeIdentifier;
+
+        let callables: Vec<_> = ["read", "other"]
+            .into_iter()
+            .map(|name| {
+                TAtomic::Callable(TCallable::Signature(
+                    TCallableSignature::new(false, true)
+                        .with_partial_source(Some(FunctionLikeIdentifier::Function(word(name)))),
+                ))
+            })
+            .collect();
+        for (extra, expected) in [
+            (TAtomic::Never, callables.clone()),
+            (TAtomic::Mixed(TMixed::isset_from_loop()), callables.clone()),
+            (TAtomic::Void, [callables.clone(), vec![TAtomic::Null]].concat()),
+            (TAtomic::Mixed(TMixed::new()), vec![TAtomic::Mixed(TMixed::new())]),
+            (TAtomic::Mixed(TMixed::truthy()), vec![TAtomic::Mixed(TMixed::truthy())]),
+        ] {
+            for reverse in [false, true] {
+                let mut inputs = callables.clone();
+                inputs.push(extra.clone());
+                if reverse {
+                    inputs.reverse();
+                }
+
+                assert_eq!(
+                    TUnion::from_vec(combine(inputs, &CodebaseMetadata::default(), CombinerOptions::default())),
+                    TUnion::from_vec(expected.clone()),
+                    "{extra:?}, reverse={reverse}"
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn callable_unions_keep_distinct_effects_from_the_same_closure() {
+        use crate::identifier::function_like::FunctionLikeIdentifier;
+        use crate::ttype::atomic::callable::parameter::TCallableParameter;
+
+        let signature = |name: &str, closure_this: bool| {
+            let ty =
+                Some(Arc::new(TUnion::from_atomic(TAtomic::Object(TObject::Named(TNamedObject::new(word(name)))))));
+            let parameter = TCallableParameter::new(None, true, false, false);
+            let parameter =
+                if closure_this { parameter.with_closure_this_type(ty) } else { parameter.with_out_type(ty) };
+            TAtomic::Callable(TCallable::Signature(
+                TCallableSignature::new(false, true)
+                    .with_source(Some(FunctionLikeIdentifier::Closure(word("trait-closure"))))
+                    .with_parameters(vec![parameter]),
+            ))
+        };
+        for closure_this in [false, true] {
+            let left = signature("FirstBase", closure_this);
+            let right = signature("SecondBase", closure_this);
+            assert_eq!(left.get_id(), right.get_id());
+            for reverse in [false, true] {
+                let mut inputs = vec![left.clone(), right.clone(), left.clone(), right.clone(), TAtomic::Never];
+                if reverse {
+                    inputs.reverse();
+                }
+                let combined =
+                    TUnion::from_vec(combine(inputs, &CodebaseMetadata::default(), CombinerOptions::default()));
+                assert_eq!(combined, TUnion::from_vec(vec![left.clone(), right.clone()]));
+                assert_eq!(combined.get_id(), left.get_id());
+            }
+        }
+    }
+
+    #[test]
+    fn callable_unions_render_each_shape_once() {
+        use crate::identifier::function_like::FunctionLikeIdentifier;
+        use crate::ttype::atomic::callable::parameter::TCallableParameter;
+
+        let signature = TCallableSignature::new(false, true).with_parameters(vec![TCallableParameter::default(); 3]);
+        let callables: Vec<_> = ["first", "second", "third", "fourth"]
+            .into_iter()
+            .map(|name| {
+                TAtomic::Callable(TCallable::Signature(
+                    signature.clone().with_partial_source(Some(FunctionLikeIdentifier::Function(word(name)))),
+                ))
+            })
+            .collect();
+
+        let mut extra = Vec::new();
+        for next in
+            [None, Some(TAtomic::Null), Some(TAtomic::Scalar(TScalar::bool())), Some(TAtomic::Scalar(TScalar::float()))]
+        {
+            extra.extend(next);
+            let all = TUnion::from_vec([callables.clone(), extra.clone()].concat());
+            let expected = TUnion::from_vec([vec![callables[0].clone()], extra.clone()].concat());
+            assert_eq!(all.get_id(), expected.get_id());
+            assert_eq!(all.is_complex(), expected.is_complex());
+            for indent in [0, 4] {
+                assert_eq!(all.get_pretty_id_with_indent(indent), expected.get_pretty_id_with_indent(indent));
+            }
+        }
+
+        let simple: Vec<_> = ["first", "second", "third", "fourth"]
+            .into_iter()
+            .map(|name| {
+                TAtomic::Callable(TCallable::Signature(
+                    TCallableSignature::new(false, true)
+                        .with_source(Some(FunctionLikeIdentifier::Function(word(name)))),
+                ))
+            })
+            .collect();
+
+        let expected = TList::new(Arc::new(TUnion::from_atomic(simple[0].clone())));
+        let all = TList::new(Arc::new(TUnion::from_vec(simple)));
+        assert_eq!(all.is_complex(), expected.is_complex());
+        assert_eq!(all.get_pretty_id_with_indent(4), expected.get_pretty_id_with_indent(4));
+    }
 
     #[test]
     fn first_keyed_shape_keeps_entries_and_empty_predecessor_makes_them_optional() {

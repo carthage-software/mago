@@ -16,6 +16,7 @@ use mago_syntax::cst::Variable;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
+use crate::artifacts::editor::MemberReference;
 use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
@@ -35,6 +36,7 @@ pub fn resolve_static_properties<'ctx, 'ast, 'arena, A>(
     artifacts: &mut AnalysisArtifacts,
     class_expression: &'ast Expression<'arena>,
     property_variable: &'ast Variable<'arena>,
+    for_assignment: bool,
 ) -> Result<PropertyResolutionResult, AnalysisError>
 where
     A: Arena,
@@ -141,6 +143,20 @@ where
         }
     }
 
+    if let Some(editor) = &mut artifacts.editor {
+        let mut reference = MemberReference::property(
+            block_context.scope.get_reference_origin(),
+            class_expression.span(),
+            property_variable.span(),
+            word(""),
+        );
+        reference.static_access = true;
+        reference.dynamic = !matches!(property_variable, Variable::Direct(_));
+        reference.write = for_assignment;
+        reference.uncertain = result.encountered_null;
+        editor.record_properties(reference, &result);
+    }
+
     Ok(result)
 }
 
@@ -214,6 +230,7 @@ where
                 );
 
                 return Some(ResolvedProperty {
+                    lookup_class: Some(class_id),
                     property_span: prop_meta.name_span.or(prop_meta.span),
                     property_name,
                     declaring_class_id: Some(required_declaring_id),
@@ -282,6 +299,7 @@ where
     );
 
     Some(ResolvedProperty {
+        lookup_class: Some(class_id),
         property_span: property_metadata.name_span.or(property_metadata.span),
         property_name,
         declaring_class_id: Some(declaring_class_id),

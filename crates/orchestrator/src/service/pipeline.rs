@@ -262,7 +262,7 @@ where
                     let resolved_names = resolver.resolve(program);
 
                     let file_signature = build_file_signatures
-                        .then(|| signature_builder::build_file_signature(program, &resolved_names));
+                        .then(|| signature_builder::build_file_signature(file, program, &resolved_names));
 
                     let mut metadata = scan_program(arena, file, program, &resolved_names, php_version);
                     if let Some(file_signature) = file_signature {

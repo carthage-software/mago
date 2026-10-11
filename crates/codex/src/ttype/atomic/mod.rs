@@ -24,6 +24,7 @@ use crate::ttype::atomic::mixed::TMixed;
 use crate::ttype::atomic::object::TObject;
 use crate::ttype::atomic::object::r#enum::TEnum;
 use crate::ttype::atomic::object::named::TNamedObject;
+use crate::ttype::atomic::reference::TGlobalReferenceSelector;
 use crate::ttype::atomic::reference::TReference;
 use crate::ttype::atomic::reference::TReferenceMemberSelector;
 use crate::ttype::atomic::resource::TResource;
@@ -830,6 +831,7 @@ pub(crate) fn append_intersection_ids(mut base: Word, intersection_types: &[TAto
 }
 
 fn add_symbol_reference(reference_source: &ReferenceSource, symbol_references: &mut SymbolReferences, name: Word) {
+    let name = name.to_ascii_lowercase();
     match reference_source {
         ReferenceSource::Symbol(in_signature, a) => {
             symbol_references.add_symbol_reference_to_symbol(*a, name, *in_signature);
@@ -892,6 +894,12 @@ pub fn populate_atomic_type(
             for param in signature.get_parameters_mut() {
                 if let Some(param_type) = param.get_type_signature_mut() {
                     populate!(union param_type);
+                }
+                if let Some(out_type) = param.get_out_type_mut() {
+                    populate!(union out_type);
+                }
+                if let Some(closure_this_type) = param.get_closure_this_type_mut() {
+                    populate!(union closure_this_type);
                 }
             }
 
@@ -1000,8 +1008,12 @@ pub fn populate_atomic_type(
                     }
                 }
             }
-            TReference::Global { .. } => {
-                // Global-constant wildcards are resolved at expansion time; nothing to populate.
+            TReference::Global { selector } => {
+                if let TGlobalReferenceSelector::Identifier(name) = selector
+                    && let Some(reference_source) = reference_source
+                {
+                    add_symbol_reference(reference_source, symbol_references, *name);
+                }
             }
         },
         TAtomic::GenericParameter(TGenericParameter { constraint, intersection_types, .. }) => {

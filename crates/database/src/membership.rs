@@ -1,14 +1,11 @@
 //! Single-path membership test: would a given file be part of the database
 //! under a [`DatabaseConfiguration`]?
 //!
-//! The loader discovers files by walking the configured `paths` / `includes`
-//! roots and filtering by extension and `excludes`.
-//!
-//! The decision mirrors [`crate::loader`] exactly: a path is tracked iff it lies
-//! under a configured root, carries a configured extension, and is not excluded.
-//! Excludes apply to `includes` roots too, just as they do during a full scan.
+//! Source directories, exact paths, and globs retain the loader's source types,
+//! extension rules, and exclusions. Watch roots remain separate from membership.
 
 use std::borrow::Cow;
+use std::ffi::OsStr;
 use std::ffi::OsString;
 use std::path::Path;
 use std::path::PathBuf;
@@ -20,11 +17,14 @@ use crate::DatabaseConfiguration;
 use crate::error::DatabaseError;
 use crate::exclusion::Exclusion;
 use crate::file::FileType;
-use crate::loader::calculate_pattern_specificity;
 use crate::loader::resolve_file_type;
 use crate::matcher::build_glob_set;
 use crate::utils::bytes_to_os_str;
-use crate::utils::bytes_to_path;
+
+mod source;
+
+use source::SourcePattern;
+use source::canonical_path;
 
 /// Resolves whether a single path belongs to the workspace database and, if so,
 /// as which [`FileType`]. Built once from a [`DatabaseConfiguration`]; cheap to
@@ -35,9 +35,9 @@ pub struct WorkspaceMatcher {
     extensions: HashSet<OsString>,
     glob_excludes: GlobSet,
     path_excludes: Vec<PathBuf>,
-    host_bases: Vec<(PathBuf, usize)>,
-    include_bases: Vec<(PathBuf, usize)>,
-    patch_bases: Vec<(PathBuf, usize)>,
+    host_sources: Vec<SourcePattern>,
+    include_sources: Vec<SourcePattern>,
+    patch_sources: Vec<SourcePattern>,
 }
 
 impl WorkspaceMatcher {
@@ -45,10 +45,10 @@ impl WorkspaceMatcher {
     ///
     /// # Errors
     ///
-    /// Returns a [`DatabaseError`] if an exclude glob pattern fails to compile.
+    /// Returns a [`DatabaseError`] if a source or exclude glob fails to compile.
     pub fn from_configuration(configuration: &DatabaseConfiguration<'_>) -> Result<Self, DatabaseError> {
         let workspace = configuration.workspace.as_ref();
-        let workspace = workspace.canonicalize().unwrap_or_else(|_| workspace.to_path_buf());
+        let workspace = canonical_path(workspace);
 
         let extensions: HashSet<OsString> = if configuration.extensions.is_empty() {
             std::iter::once(OsString::from("php")).collect()
@@ -73,62 +73,54 @@ impl WorkspaceMatcher {
                 Exclusion::Path(path) => {
                     let path =
                         if path.is_absolute() { path.as_ref().to_path_buf() } else { workspace.join(path.as_ref()) };
-                    Some(path.canonicalize().unwrap_or(path))
+                    Some(canonical_path(&path))
                 }
                 Exclusion::Pattern(_) => None,
             })
             .collect();
 
-        let make_bases = |patterns: &[Cow<'_, [u8]>]| -> Vec<(PathBuf, usize)> {
-            patterns
-                .iter()
-                .map(|pattern| {
-                    let specificity = calculate_pattern_specificity(pattern.as_ref());
-                    let base = extract_base_path(pattern.as_ref());
-                    let absolute = if base.is_absolute() { base } else { workspace.join(base) };
-                    (absolute.canonicalize().unwrap_or(absolute), specificity)
-                })
-                .collect()
+        let make_sources = |patterns: &[Cow<'_, [u8]>]| -> Result<Vec<SourcePattern>, DatabaseError> {
+            patterns.iter().map(|pattern| SourcePattern::new(&workspace, pattern)).collect()
         };
 
-        // An empty `paths` means "scan the whole workspace", matching the loader.
-        let host_bases = if configuration.paths.is_empty() {
-            vec![(workspace.clone(), calculate_pattern_specificity(workspace.to_string_lossy().as_bytes()))]
+        let host_sources = if configuration.paths.is_empty() {
+            vec![SourcePattern::new(&workspace, workspace.to_string_lossy().as_bytes())?]
         } else {
-            make_bases(&configuration.paths)
+            make_sources(&configuration.paths)?
         };
 
-        let include_bases = make_bases(&configuration.includes);
-        let patch_bases = make_bases(&configuration.patches);
+        let include_sources = make_sources(&configuration.includes)?;
+        let patch_sources = make_sources(&configuration.patches)?;
 
-        Ok(Self { workspace, extensions, glob_excludes, path_excludes, host_bases, include_bases, patch_bases })
+        Ok(Self { workspace, extensions, glob_excludes, path_excludes, host_sources, include_sources, patch_sources })
     }
 
     /// Returns the [`FileType`] for `file` if it would be part of the database,
     /// or `None` if the path lies outside every configured root or is excluded.
     #[must_use]
     pub fn classify(&self, file: &Path) -> Option<FileType> {
-        let canonical = file.canonicalize().unwrap_or_else(|_| file.to_path_buf());
+        let canonical = canonical_path(file);
 
-        let host = max_specificity(&self.host_bases, &canonical);
-        let include = max_specificity(&self.include_bases, &canonical);
-        let patch = max_specificity(&self.patch_bases, &canonical);
+        let specificity = |sources: &[SourcePattern]| {
+            let extension_ok = file.extension().is_some_and(|extension| self.extensions.contains(extension));
+            let canonical_extension_ok =
+                canonical.extension().is_some_and(|extension| self.extensions.contains(extension));
+
+            let lexical = (!file.components().any(|part| part == std::path::Component::ParentDir))
+                .then(|| max_specificity(sources, file, extension_ok))
+                .flatten();
+
+            lexical.max(max_specificity(sources, &canonical, canonical_extension_ok))
+        };
+
+        let host = specificity(&self.host_sources);
+        let include = specificity(&self.include_sources);
+        let patch = specificity(&self.patch_sources);
         if host.is_none() && include.is_none() && patch.is_none() {
             return None;
         }
 
-        if self.is_excluded(&canonical) {
-            return None;
-        }
-
-        let extension_ok = canonical.extension().is_some_and(|ext| self.extensions.contains(ext));
-        let exact_base = self
-            .host_bases
-            .iter()
-            .chain(self.include_bases.iter())
-            .chain(self.patch_bases.iter())
-            .any(|(base, _)| base == &canonical);
-        if !extension_ok && !exact_base {
+        if self.is_excluded(file) || self.is_excluded(&canonical) {
             return None;
         }
 
@@ -141,7 +133,38 @@ impl WorkspaceMatcher {
         self.classify(path).is_some()
     }
 
-    fn is_excluded(&self, canonical: &Path) -> bool {
+    /// Roots for filesystem watchers, filtered by exclusions rather than file membership.
+    pub fn watch_roots(&self) -> impl Iterator<Item = &Path> {
+        self.host_sources
+            .iter()
+            .chain(&self.include_sources)
+            .chain(&self.patch_sources)
+            .map(|source| source.root.as_path())
+            .filter(|root| !self.is_excluded(root))
+    }
+
+    /// Whether a directory can contain files from any configured source.
+    #[must_use]
+    pub fn can_contain_files(&self, directory: &Path) -> bool {
+        let canonical = canonical_path(directory);
+        !self.is_excluded(directory)
+            && !self.is_excluded(&canonical)
+            && self.watch_roots().any(|root| {
+                directory.starts_with(root)
+                    || root.starts_with(directory)
+                    || canonical.starts_with(root)
+                    || root.starts_with(&canonical)
+            })
+    }
+
+    /// File extensions accepted below the configured roots.
+    pub fn extensions(&self) -> impl Iterator<Item = &OsStr> {
+        self.extensions.iter().map(OsString::as_os_str)
+    }
+
+    /// Check an absolute source path against the configured exclusions.
+    #[must_use]
+    pub fn is_excluded(&self, canonical: &Path) -> bool {
         if !self.glob_excludes.is_empty() {
             if self.glob_excludes.is_match(canonical) {
                 return true;
@@ -158,29 +181,13 @@ impl WorkspaceMatcher {
     }
 }
 
-fn max_specificity(bases: &[(PathBuf, usize)], path: &Path) -> Option<usize> {
-    bases.iter().filter(|(base, _)| path.starts_with(base)).map(|(_, specificity)| *specificity).max()
+fn max_specificity(sources: &[SourcePattern], path: &Path, extension_ok: bool) -> Option<usize> {
+    sources.iter().filter(|source| source.matches(path, extension_ok)).map(|source| source.specificity).max()
 }
 
-/// Extracts the literal directory portion of a path pattern, dropping any
-/// trailing glob segment. Mirrors the loader's view of a configured root: a
-/// glob like `src/**/*.php` is rooted at `src`, while a plain `tests/fixtures`
-/// is returned unchanged.
-fn extract_base_path(pattern: &[u8]) -> PathBuf {
-    let is_glob = pattern.iter().any(|&b| matches!(b, b'*' | b'?' | b'[' | b'{'));
-    if !is_glob {
-        return bytes_to_path(pattern).into_owned();
-    }
-
-    let first_glob = pattern.iter().position(|&b| matches!(b, b'*' | b'?' | b'[' | b'{')).unwrap_or(pattern.len());
-    let mut end = first_glob;
-    while end > 0 && matches!(pattern[end - 1], b'/' | b'\\') {
-        end -= 1;
-    }
-
-    let base = &pattern[..end];
-    if base.is_empty() { PathBuf::from(".") } else { bytes_to_path(base).into_owned() }
-}
+#[cfg(test)]
+#[path = "membership/tests.rs"]
+mod parity_tests;
 
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]

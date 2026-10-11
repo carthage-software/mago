@@ -113,6 +113,18 @@ where
         }
     }
 
+    if let Some(editor) = &mut artifacts.editor {
+        editor.record_methods(
+            context.codebase,
+            block_context.scope.get_reference_origin(),
+            class_expr.span(),
+            method_selector,
+            access_span,
+            true,
+            &result,
+        );
+    }
+
     Ok(result)
 }
 
