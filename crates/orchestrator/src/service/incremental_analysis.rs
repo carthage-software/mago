@@ -25,6 +25,7 @@ use mago_analyzer::plugin::PluginRegistry;
 use mago_analyzer::settings::Settings;
 use mago_codex::diff::CodebaseDiff;
 use mago_codex::metadata::CodebaseEntryKeys;
+use mago_codex::metadata::CodebaseEntrySpans;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::populator::populate_codebase;
 use mago_codex::populator::populate_codebase_after_body_edit;
@@ -388,17 +389,17 @@ impl IncrementalAnalysisService {
         let mut merged_codebase = (*self.base_codebase).clone();
 
         self.codebase_scan_files.clear();
-        let staged: Vec<(FileId, u64, CodebaseMetadata)> = per_file_results
-            .into_iter()
-            .map(|(file_id, content_hash, metadata, codebase_scan)| {
-                if let Some(codebase_scan) = codebase_scan {
-                    self.codebase_scan_files.insert(file_id, codebase_scan);
-                }
-                let clone_for_ownership = metadata.clone();
-                merged_codebase.extend(metadata);
-                (file_id, content_hash, clone_for_ownership)
-            })
-            .collect();
+        let mut staged: Vec<(FileId, u64, CodebaseEntrySpans)> = Vec::with_capacity(per_file_results.len());
+        for (file_id, content_hash, metadata, codebase_scan) in per_file_results {
+            if let Some(codebase_scan) = codebase_scan {
+                self.codebase_scan_files.insert(file_id, codebase_scan);
+            }
+
+            let entry_spans = metadata.entry_spans();
+            merged_codebase.extend(metadata);
+            staged.push((file_id, content_hash, entry_spans));
+        }
+
         merged_codebase.apply_patches_pass();
 
         let mut symbol_references = (*self.base_symbol_references).clone();
@@ -407,8 +408,8 @@ impl IncrementalAnalysisService {
             .run_external_codebase_scan(self.codebase_scan_files.values().cloned().collect())
             .map_err(mago_analyzer::error::AnalysisError::from)?;
         let mut file_states: HashMap<FileId, FileState> = HashMap::default();
-        for (file_id, content_hash, metadata) in staged {
-            let entry_keys = metadata.extract_owned_keys(&merged_codebase);
+        for (file_id, content_hash, entry_spans) in staged {
+            let entry_keys = entry_spans.into_owned_keys(&merged_codebase);
             file_states.insert(
                 file_id,
                 FileState {
@@ -487,6 +488,16 @@ impl IncrementalAnalysisService {
         &mut self,
         changed_hint: Option<&[FileId]>,
     ) -> Result<AnalysisResult, OrchestratorError> {
+        match self.try_analyze_incremental(changed_hint)? {
+            Some(result) => Ok(result),
+            None => self.analyze(),
+        }
+    }
+
+    fn try_analyze_incremental(
+        &mut self,
+        changed_hint: Option<&[FileId]>,
+    ) -> Result<Option<AnalysisResult>, OrchestratorError> {
         if !self.initialized {
             return Err(OrchestratorError::General(
                 "analyze() must be called before analyze_incremental()".to_string(),
@@ -521,7 +532,7 @@ impl IncrementalAnalysisService {
                 .chain(self.codebase.patch_constants.values().map(|meta| meta.span.file_id))
                 .any(|file_id| !current_file_ids.contains(&file_id));
             if patch_deleted {
-                return self.analyze();
+                return Ok(None);
             }
         }
 
@@ -588,7 +599,7 @@ impl IncrementalAnalysisService {
             tracing::debug!("No files changed, reconstructing cached issues");
             let mut result = AnalysisResult::new(SymbolReferences::new());
             result.issues = self.collect_all_issues();
-            return Ok(result);
+            return Ok(Some(result));
         }
 
         // When a vendor file changes, patch files that were unchanged by content must still be
@@ -659,7 +670,7 @@ impl IncrementalAnalysisService {
                 && self.file_states.get(fid).is_none_or(|s| s.content_hash != file_hashes[fid])
         });
         if any_patch_content_changed {
-            return self.analyze();
+            return Ok(None);
         }
 
         let scan_state_changed = self.codebase_scan_files.keys().any(|file_id| !current_file_ids.contains(file_id))
@@ -701,7 +712,7 @@ impl IncrementalAnalysisService {
                         )
                         .any(|&name| Self::reference_origin_has_other_owner(&self.codebase, name, *file_id))
                 {
-                    return self.analyze();
+                    return Ok(None);
                 }
 
                 if let Some(old_sig) = self.codebase.get_file_signature(file_id) {
@@ -715,7 +726,7 @@ impl IncrementalAnalysisService {
             for &file_id in self.file_states.keys() {
                 if !current_file_ids.contains(&file_id) {
                     if self.file_has_other_reference_owner(file_id) {
-                        return self.analyze();
+                        return Ok(None);
                     }
 
                     if let Some(sig) = self.codebase.get_file_signature(&file_id) {
@@ -745,7 +756,7 @@ impl IncrementalAnalysisService {
         });
 
         if aliases_changed {
-            return self.analyze();
+            return Ok(None);
         }
 
         let body_only = diff.get_changed().is_empty() && deleted_count == 0;
@@ -914,7 +925,7 @@ impl IncrementalAnalysisService {
             self.refresh_late_reference_issues();
             analysis_result.issues = self.collect_all_issues();
 
-            return Ok(analysis_result);
+            return Ok(Some(analysis_result));
         }
 
         let mut merged_codebase = std::mem::take(&mut self.codebase);
@@ -937,7 +948,7 @@ impl IncrementalAnalysisService {
         self.apply_scan_results(&mut merged_codebase, &new_file_scans);
 
         if merged_codebase.populate_class_like_aliases() {
-            return self.analyze();
+            return Ok(None);
         }
 
         merged_codebase.safe_symbols.clear();
@@ -946,7 +957,7 @@ impl IncrementalAnalysisService {
         let Some(invalid_files) = merged_codebase.mark_safe_symbols(&diff, &self.native_symbol_references) else {
             tracing::warn!("Invalidation cascade too expensive (>5000 steps), falling back to full analysis");
 
-            return self.analyze();
+            return Ok(None);
         };
 
         // Ensure classes that depend on changed class_likes are not marked safe.
@@ -1004,7 +1015,7 @@ impl IncrementalAnalysisService {
             &unchanged_file_ids,
             &invalid_files,
         ) {
-            return self.analyze();
+            return Ok(None);
         }
 
         let safe_symbols = std::mem::take(&mut merged_codebase.safe_symbols);
@@ -1163,7 +1174,7 @@ impl IncrementalAnalysisService {
         self.refresh_late_reference_issues();
         analysis_result.issues = self.collect_all_issues();
 
-        Ok(analysis_result)
+        Ok(Some(analysis_result))
     }
 
     fn can_skip_file(&self, codebase: &CodebaseMetadata, file_id: FileId, invalid_files: &WordSet) -> bool {
