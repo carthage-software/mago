@@ -1567,7 +1567,7 @@ impl IncrementalAnalysisService {
 
                 analysis_result.issues.extend(semantics_checker.check(&source_file, program, &resolved_names));
                 let artifacts = analyzer.analyze_with_artifacts(program, &mut analysis_result)?;
-                let editor_data = artifacts.editor_data().map(Arc::new);
+                let editor_data = artifacts.editor_data(codebase).map(Arc::new);
                 #[cfg(not(target_arch = "wasm32"))]
                 let snapshot_start = (trace_enabled && (after_file || after_analysis)).then(Instant::now);
                 let snapshot = if after_file || after_analysis {
