@@ -24,7 +24,7 @@ use crate::resolver::property::resolve_declared_property;
 
 mod callable_types;
 
-pub use callable_types::{CallableTarget, CallableTypes, PartialParameter, PartialSignature};
+pub use callable_types::{BoundParameter, BoundSignature, CallableTarget, CallableTypes};
 
 /// Owned editor data from one completed file analysis.
 #[derive(Debug, Default)]

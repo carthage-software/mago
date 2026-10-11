@@ -7,6 +7,7 @@ use foldhash::{HashMap, HashSet};
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::metadata::CodebaseMetadata;
+use mago_codex::metadata::function_like::FunctionLikeMetadata;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::{
     TAtomic,
@@ -19,7 +20,7 @@ use mago_word::Word;
 #[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub enum CallableTarget {
     Full(FunctionLikeIdentifier),
-    Partial(Arc<PartialSignature>),
+    Signature(Arc<BoundSignature>),
 }
 
 impl CallableTarget {
@@ -27,21 +28,21 @@ impl CallableTarget {
     pub fn key(&self) -> FunctionLikeIdentifier {
         match self {
             Self::Full(key) => *key,
-            Self::Partial(signature) => signature.key,
+            Self::Signature(signature) => signature.key,
         }
     }
 }
 
-/// The remaining signature after binding arguments, with rendered types instead of type unions.
+/// A signature with bound arguments or class types, without retaining type unions.
 #[derive(Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct PartialSignature {
+pub struct BoundSignature {
     pub key: FunctionLikeIdentifier,
-    pub parameters: Box<[PartialParameter]>,
+    pub parameters: Box<[BoundParameter]>,
     pub return_type: Option<Word>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
-pub struct PartialParameter {
+pub struct BoundParameter {
     /// Includes `$`. Missing names cannot bind named arguments to a declaration.
     pub name: Option<Word>,
     pub type_name: Option<Word>,
@@ -50,14 +51,14 @@ pub struct PartialParameter {
     pub has_default: bool,
 }
 
-impl PartialSignature {
+impl BoundSignature {
     fn new(key: FunctionLikeIdentifier, signature: &TCallableSignature) -> Self {
         Self {
             key,
             parameters: signature
                 .get_parameters()
                 .iter()
-                .map(|parameter| PartialParameter {
+                .map(|parameter| BoundParameter {
                     name: parameter.get_name().map(|name| name.0),
                     type_name: parameter.get_type_signature().map(TType::get_id),
                     by_reference: parameter.is_by_reference(),
@@ -85,12 +86,12 @@ struct Entry {
 impl CallableTypes {
     pub(super) fn collect(expressions: &HashMap<(u32, u32), Rc<TUnion>>, codebase: &CodebaseMetadata) -> Self {
         let mut entries = Vec::new();
-        let mut partials = HashSet::default();
+        let mut signatures = HashSet::default();
         for (&span, union) in expressions {
             let mut targets = Vec::new();
             let mut uncertain = false;
             for atomic in union.types.iter() {
-                if let Some(target) = callable_target(atomic, codebase, &mut partials) {
+                if let Some(target) = callable_target(atomic, codebase, &mut signatures) {
                     targets.push(target);
                 } else {
                     uncertain = true;
@@ -130,12 +131,12 @@ impl CallableTypes {
 fn callable_target(
     atomic: &TAtomic,
     codebase: &CodebaseMetadata,
-    partials: &mut HashSet<Arc<PartialSignature>>,
+    signatures: &mut HashSet<Arc<BoundSignature>>,
 ) -> Option<CallableTarget> {
     let callable = cast_atomic_to_callable(atomic, codebase, None)?;
-    let (target, partial) = match callable.as_ref() {
-        TCallable::Alias(target) => (*target, false),
-        TCallable::Signature(signature) => (signature.invocation_target()?, signature.is_partial),
+    let target = match callable.as_ref() {
+        TCallable::Alias(target) => *target,
+        TCallable::Signature(signature) => signature.invocation_target()?,
     };
 
     let target = match target {
@@ -144,27 +145,44 @@ fn callable_target(
         }
         target => target,
     };
-    if codebase.get_function_like(&target)?.flags.is_magic_method() {
+    let declaration = codebase.get_function_like(&target)?;
+    if declaration.flags.is_magic_method() {
         return None;
     }
 
-    if partial && let TCallable::Signature(signature) = callable.as_ref() {
-        let summary = PartialSignature::new(target, signature);
-        let shared = if let Some(shared) = partials.get(&summary) {
+    if let TCallable::Signature(signature) = callable.as_ref()
+        && (signature.is_partial || target.is_closure() && closure_types_differ(signature, declaration))
+    {
+        let summary = BoundSignature::new(target, signature);
+        let shared = if let Some(shared) = signatures.get(&summary) {
             Arc::clone(shared)
         } else {
             let shared = Arc::new(summary);
-            partials.insert(Arc::clone(&shared));
+            signatures.insert(Arc::clone(&shared));
             shared
         };
 
-        Some(CallableTarget::Partial(shared))
+        Some(CallableTarget::Signature(shared))
     } else {
         Some(CallableTarget::Full(target))
     }
 }
 
+fn closure_types_differ(signature: &TCallableSignature, declaration: &FunctionLikeMetadata) -> bool {
+    declaration
+        .return_type_metadata
+        .as_ref()
+        .is_some_and(|ty| signature.get_return_type().map(|bound| &bound.types) != Some(&ty.type_union.types))
+        || signature.get_parameters().iter().zip(&declaration.parameters).any(|(bound, parameter)| {
+            parameter
+                .type_metadata
+                .as_ref()
+                .is_some_and(|ty| bound.get_type_signature().map(|bound| &bound.types) != Some(&ty.type_union.types))
+        })
+}
+
 #[cfg(test)]
+#[allow(clippy::unwrap_used)]
 mod tests {
     use mago_codex::metadata::flags::MetadataFlags;
     use mago_codex::metadata::function_like::{FunctionLikeKind, FunctionLikeMetadata};
@@ -257,10 +275,11 @@ mod tests {
         let (first, uncertain) = types.at_end(10).unwrap();
         assert!(!uncertain);
         assert_eq!(first[0].key(), key);
-        let CallableTarget::Partial(first) = &first[0] else { panic!("expected a reduced signature") };
+        let CallableTarget::Signature(first) = &first[0] else { panic!("expected a reduced signature") };
+        assert_eq!(first.parameters.len(), 2);
         assert_eq!(
             first.parameters[0],
-            PartialParameter {
+            BoundParameter {
                 name: Some(word("$value")),
                 type_name: Some(word("int")),
                 by_reference: true,
@@ -270,7 +289,7 @@ mod tests {
         );
         assert_eq!(
             first.parameters[1],
-            PartialParameter {
+            BoundParameter {
                 name: Some(word("$rest")),
                 type_name: None,
                 by_reference: false,
@@ -281,15 +300,57 @@ mod tests {
         assert_eq!(first.return_type, Some(word("int")));
         let (nullable, uncertain) = types.at_end(30).unwrap();
         assert!(uncertain);
-        let CallableTarget::Partial(nullable) = &nullable[0] else { panic!("expected a reduced signature") };
+        let CallableTarget::Signature(nullable) = &nullable[0] else { panic!("expected a reduced signature") };
         assert!(Arc::ptr_eq(first, nullable));
         let (distinct, uncertain) = types.at_end(50).unwrap();
         assert!(!uncertain, "unknown names do not erase the invoked declaration");
         assert_eq!(distinct.len(), 2, "the same origin can have different remaining names");
         assert!(distinct.iter().any(
-            |target| matches!(target, CallableTarget::Partial(signature) if signature.parameters[0].name.is_none())
+            |target| matches!(target, CallableTarget::Signature(signature) if signature.parameters[0].name.is_none())
         ));
         assert_eq!(types.invocation_targets_at_end(10), types.at_end(10));
+    }
+
+    #[test]
+    fn full_closures_only_store_signatures_when_declared_types_change() {
+        use mago_codex::metadata::ttype::TypeMetadata;
+        use mago_codex::ttype::atomic::object::{TObject, named::TNamedObject};
+        use mago_codex::ttype::get_int;
+
+        let name = word("{closure:a.php:1:1}");
+        let key = FunctionLikeIdentifier::Closure(name);
+        let mut declaration =
+            FunctionLikeMetadata::new(FunctionLikeKind::Closure, name, name, Span::dummy(0, 0), MetadataFlags::empty());
+        let named = |name| TUnion::from_atomic(TAtomic::Object(TObject::Named(TNamedObject::new(word(name)))));
+        declaration.return_type_metadata = Some(TypeMetadata::new(named("parent"), Span::dummy(0, 0)));
+        let mut codebase = CodebaseMetadata::default();
+        codebase.function_likes.insert((word(""), name), Box::new(declaration));
+        let signature = |ty| {
+            TAtomic::Callable(TCallable::Signature(
+                TCallableSignature::new(false, true).with_source(Some(key)).with_return_type(Some(Arc::new(ty))),
+            ))
+        };
+        let mut flagged = named("parent");
+        flagged.set_by_reference(true);
+        let expressions = HashMap::from_iter([
+            ((0, 10), Rc::new(TUnion::from_atomic(signature(named("parent"))))),
+            ((20, 30), Rc::new(TUnion::from_atomic(signature(named("Domain\\Base"))))),
+            ((40, 50), Rc::new(TUnion::from_atomic(signature(flagged)))),
+        ]);
+
+        let collected = CallableTypes::collect(&expressions, &codebase);
+        assert_eq!(collected.at_end(10), Some(([CallableTarget::Full(key)].as_slice(), false)));
+        assert_eq!(collected.at_end(50), Some(([CallableTarget::Full(key)].as_slice(), false)));
+        let (targets, uncertain) = collected.at_end(30).unwrap();
+        assert!(!uncertain);
+        let CallableTarget::Signature(bound) = &targets[0] else { panic!("expected a bound signature") };
+        assert_eq!(bound.key, key);
+        assert_eq!(bound.return_type, Some(word("Domain\\Base")));
+
+        codebase.function_likes.get_mut(&(word(""), name)).unwrap().return_type_metadata = None;
+        let inferred = HashMap::from_iter([((0, 10), Rc::new(TUnion::from_atomic(signature(get_int()))))]);
+        let collected = CallableTypes::collect(&inferred, &codebase);
+        assert_eq!(collected.at_end(10), Some(([CallableTarget::Full(key)].as_slice(), false)));
     }
 
     #[test]
