@@ -67,7 +67,7 @@ pub fn replace_with_polarity(
         .map_or_else(|| union.clone(), |replacement| union.clone_with_types(replacement.types.into_owned()));
     }
 
-    let mut new_types = Vec::new();
+    let mut new_types = Vec::with_capacity(union.types.len());
 
     for atomic_type in union.types.as_ref() {
         let mut atomic_type = atomic_type.clone();

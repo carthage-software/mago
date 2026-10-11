@@ -1007,10 +1007,10 @@ fn insert_dependency<K>(
 {
     if in_signature {
         insert_reference(signature, origin, target);
-        if let Entry::Occupied(mut entry) = body.entry(origin) {
-            entry.get_mut().remove(&target);
-            if entry.get().is_empty() {
-                entry.remove();
+        if let Some(targets) = body.get_mut(&origin) {
+            targets.remove(&target);
+            if targets.is_empty() {
+                body.remove(&origin);
             }
         }
     } else if signature.get(&origin).is_none_or(|targets| !targets.contains(&target)) {
@@ -1027,13 +1027,13 @@ fn extend_dependencies<K>(
     K: Copy + Eq + Hash,
 {
     for (origin, targets) in &incoming_signature {
-        if let Entry::Occupied(mut entry) = body.entry(*origin) {
+        if let Some(existing) = body.get_mut(origin) {
             for target in targets {
-                entry.get_mut().remove(target);
+                existing.remove(target);
             }
 
-            if entry.get().is_empty() {
-                entry.remove();
+            if existing.is_empty() {
+                body.remove(origin);
             }
         }
     }
@@ -1073,7 +1073,7 @@ where
             Entry::Occupied(mut entry) => {
                 let existing = entry.get_mut();
                 for reference in references {
-                    if !existing.contains(&reference) {
+                    if existing.len() < existing.capacity() || !existing.contains(&reference) {
                         existing.insert(reference);
                     }
                 }

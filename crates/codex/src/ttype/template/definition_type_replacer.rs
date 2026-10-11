@@ -78,11 +78,11 @@ pub fn replace(
     codebase: &CodebaseMetadata,
     options: DefinitionReplacementOptions<'_>,
 ) -> TUnion {
-    let original_parameter_atomics = parameter_type.types.to_vec();
+    let original_parameter_atomics = parameter_type.types.as_ref();
     let mut new_parameter_atomics = Vec::with_capacity(original_parameter_atomics.len());
 
     let mut had_template = false;
-    for atomic_type in &original_parameter_atomics {
+    for atomic_type in original_parameter_atomics {
         new_parameter_atomics.extend(handle_atomic_substitution(
             atomic_type,
             template_result,

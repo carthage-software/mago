@@ -19,6 +19,7 @@ use crate::ttype::atomic::mixed::TMixed;
 use crate::ttype::atomic::object::TObject;
 use crate::ttype::atomic::resource::TResource;
 use crate::ttype::atomic::scalar::TScalar;
+use crate::ttype::atomic::scalar::float::TFloat;
 use crate::ttype::atomic::scalar::int::TInteger;
 use crate::ttype::atomic::scalar::string::TString;
 use crate::ttype::atomic::scalar::string::TStringLiteral;
@@ -26,6 +27,57 @@ use crate::ttype::get_arraykey;
 use crate::ttype::get_mixed;
 
 use super::atomic::scalar::string::TStringCasing;
+
+pub(super) fn get_static_atomic(atomic: &TAtomic) -> Option<&'static TAtomic> {
+    Some(match atomic {
+        TAtomic::Never => NEVER_ATOMIC,
+        TAtomic::Null => NULL_ATOMIC,
+        TAtomic::Void => VOID_ATOMIC,
+        TAtomic::Placeholder => PLACEHOLDER_ATOMIC,
+        TAtomic::Object(TObject::Any) => OBJECT_ATOMIC,
+        TAtomic::Resource(resource) => match resource.closed {
+            None => RESOURCE_ATOMIC,
+            Some(false) => OPEN_RESOURCE_ATOMIC,
+            Some(true) => CLOSED_RESOURCE_ATOMIC,
+        },
+        TAtomic::Mixed(mixed) if *mixed == TMixed::new() => MIXED_ATOMIC,
+        TAtomic::Mixed(mixed) if *mixed == TMixed::isset_from_loop() => ISSET_FROM_LOOP_MIXED_ATOMIC,
+        TAtomic::Mixed(mixed) if *mixed == TMixed::truthy() => TRUTHY_MIXED_ATOMIC,
+        TAtomic::Scalar(scalar) => match scalar {
+            TScalar::Generic => SCALAR_ATOMIC,
+            TScalar::Numeric => NUMERIC_ATOMIC,
+            TScalar::ArrayKey => ARRAYKEY_ATOMIC,
+            TScalar::Bool(boolean) => match boolean.value {
+                None => BOOL_ATOMIC,
+                Some(false) => FALSE_ATOMIC,
+                Some(true) => TRUE_ATOMIC,
+            },
+            TScalar::Integer(integer) => match integer {
+                TInteger::Unspecified => INT_ATOMIC,
+                TInteger::UnspecifiedLiteral => UNSPECIFIED_LITERAL_INT_ATOMIC,
+                TInteger::Literal(-1) => MINUS_ONE_INT_ATOMIC,
+                TInteger::Literal(0) => ZERO_INT_ATOMIC,
+                TInteger::Literal(1) => ONE_INT_ATOMIC,
+                TInteger::From(0) => NON_NEGATIVE_INT_ATOMIC,
+                TInteger::From(1) => POSITIVE_INT_ATOMIC,
+                TInteger::To(-1) => NEGATIVE_INT_ATOMIC,
+                TInteger::To(0) => NON_POSITIVE_INT_ATOMIC,
+                _ => return None,
+            },
+            TScalar::Float(TFloat::Float) => FLOAT_ATOMIC,
+            TScalar::Float(TFloat::UnspecifiedLiteral) => UNSPECIFIED_LITERAL_FLOAT_ATOMIC,
+            TScalar::String(string) if *string == TString::general() => STRING_ATOMIC,
+            TScalar::String(string) if *string == TString::non_empty() => NON_EMPTY_STRING_ATOMIC,
+            TScalar::String(string) if *string == TString::truthy() => TRUTHY_STRING_ATOMIC,
+            TScalar::String(string) if *string == TString::numeric() => NUMERIC_STRING_ATOMIC,
+            TScalar::String(string) if *string == TString::lowercase() => LOWERCASE_STRING_ATOMIC,
+            TScalar::String(string) if *string == TString::uppercase() => UPPERCASE_STRING_ATOMIC,
+            TScalar::String(string) if *string == TString::callable() => CALLABLE_STRING_ATOMIC,
+            _ => return None,
+        },
+        _ => return None,
+    })
+}
 
 /// A static `TAtomic` representing the integer literal `1`.
 pub const ONE_INT_ATOMIC: &TAtomic = &TAtomic::Scalar(TScalar::literal_int(1));

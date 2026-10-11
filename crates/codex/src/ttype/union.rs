@@ -36,6 +36,7 @@ use crate::ttype::atomic::scalar::string::TString;
 use crate::ttype::atomic::scalar::string::TStringCasing;
 use crate::ttype::flags::UnionFlags;
 use crate::ttype::get_mixed;
+use crate::ttype::shared::get_static_atomic;
 
 #[cfg(test)]
 mod tests;
@@ -77,6 +78,19 @@ impl TUnion {
     /// zero-allocation static helpers and the `from_vec` constructor.
     #[must_use]
     pub fn new(types: Cow<'static, [TAtomic]>) -> TUnion {
+        let types = match types {
+            Cow::Owned(types) => {
+                if let [atomic] = types.as_slice()
+                    && let Some(shared) = get_static_atomic(atomic)
+                {
+                    Cow::Borrowed(std::slice::from_ref(shared))
+                } else {
+                    Cow::Owned(types)
+                }
+            }
+            borrowed => borrowed,
+        };
+
         TUnion { types, flags: UnionFlags::empty() }
     }
 
@@ -136,16 +150,19 @@ impl TUnion {
     pub fn from_single(atomic: Cow<'static, TAtomic>) -> TUnion {
         let types_cow = match atomic {
             Cow::Borrowed(borrowed_atomic) => Cow::Borrowed(std::slice::from_ref(borrowed_atomic)),
-            Cow::Owned(owned_atomic) => Cow::Owned(vec![owned_atomic]),
+            Cow::Owned(owned_atomic) => match get_static_atomic(&owned_atomic) {
+                Some(shared) => Cow::Borrowed(std::slice::from_ref(shared)),
+                None => Cow::Owned(vec![owned_atomic]),
+            },
         };
 
-        TUnion::new(types_cow)
+        TUnion { types: types_cow, flags: UnionFlags::empty() }
     }
 
     /// Creates a `TUnion` from a single owned atomic type.
     #[must_use]
     pub fn from_atomic(atomic: TAtomic) -> TUnion {
-        TUnion::new(Cow::Owned(vec![atomic]))
+        TUnion::from_single(Cow::Owned(atomic))
     }
 
     #[inline]
@@ -384,6 +401,7 @@ impl TUnion {
         }
 
         if !types.iter().any(|atomic| atomic.is_null() || atomic.is_mixed()) {
+            types.reserve_exact(1);
             types.push(TAtomic::Null);
         }
 
@@ -1000,7 +1018,10 @@ impl TUnion {
     #[inline]
     #[must_use]
     pub fn get_single_owned(self) -> TAtomic {
-        self.types[0].clone()
+        match self.types {
+            Cow::Borrowed(types) => types[0].clone(),
+            Cow::Owned(mut types) => types.swap_remove(0),
+        }
     }
 
     #[inline]

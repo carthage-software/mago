@@ -244,14 +244,31 @@ pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, options: Combin
         combination.value_types.insert(*ATOM_BOOL, TAtomic::Scalar(TScalar::bool()));
     }
 
+    let generic_scalar = combination.value_types.contains_key(&*ATOM_STRING)
+        && combination.value_types.contains_key(&*ATOM_FLOAT)
+        && combination.value_types.contains_key(&*ATOM_BOOL)
+        && combination.integers.iter().any(super::atomic::scalar::int::TInteger::is_unspecified);
+    let integer_types = if generic_scalar { Vec::new() } else { TInteger::combine(combination.integers) };
+    let resource_count =
+        usize::from(combination.flags.intersects(
+            CombinationFlags::RESOURCE | CombinationFlags::OPEN_RESOURCE | CombinationFlags::CLOSED_RESOURCE,
+        ));
+    let array_count = usize::from(combination.flags.contains(CombinationFlags::HAS_KEYED_ARRAY))
+        + usize::from(combination.list_array_parameter.is_some())
+        + combination.sealed_arrays.len();
+    let array_count = array_count.max(usize::from(combination.flags.contains(CombinationFlags::HAS_EMPTY_ARRAY)));
+    let value_type_count = combination.value_types.len() - usize::from(generic_scalar) * 3;
     let estimated_capacity = combination.derived_types.len()
-        + combination.integers.len().min(10)
+        + integer_types.len()
         + combination.literal_floats.len()
         + combination.enum_names.len()
-        + combination.value_types.len()
+        + value_type_count
         + callable_collision_count
-        + combination.sealed_arrays.len()
-        + 5;
+        + resource_count
+        + array_count
+        + combination.object_type_params.len()
+        + combination.literal_strings.len()
+        + usize::from(generic_scalar);
 
     let mut new_types = Vec::with_capacity(estimated_capacity);
     for derived_type in combination.derived_types {
@@ -279,10 +296,10 @@ pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, options: Combin
         }
     }
 
-    let mut arrays = vec![];
+    let arrays_start = new_types.len();
 
     if combination.flags.contains(CombinationFlags::HAS_KEYED_ARRAY) {
-        arrays.push(TArray::Keyed(TKeyedArray {
+        new_types.push(TAtomic::Array(TArray::Keyed(TKeyedArray {
             known_items: if combination.keyed_array_entries.is_empty() {
                 None
             } else {
@@ -295,11 +312,11 @@ pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, options: Combin
             },
             non_empty: combination.flags.contains(CombinationFlags::KEYED_ARRAY_ALWAYS_FILLED),
             known_non_list: combination.flags.contains(CombinationFlags::KEYED_ARRAY_KNOWN_NON_LIST),
-        }));
+        })));
     }
 
     if let Some(list_parameter) = combination.list_array_parameter {
-        arrays.push(TArray::List(TList {
+        new_types.push(TAtomic::Array(TArray::List(TList {
             known_elements: if combination.list_array_entries.is_empty() {
                 None
             } else {
@@ -308,23 +325,19 @@ pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, options: Combin
             element_type: Arc::new(list_parameter),
             non_empty: combination.flags.contains(CombinationFlags::LIST_ARRAY_ALWAYS_FILLED),
             known_count: None,
-        }));
+        })));
     }
 
-    for array in combination.sealed_arrays {
-        arrays.push(array);
-    }
+    new_types.extend(combination.sealed_arrays.into_iter().map(TAtomic::Array));
 
-    if arrays.is_empty() && combination.flags.contains(CombinationFlags::HAS_EMPTY_ARRAY) {
-        arrays.push(TArray::Keyed(TKeyedArray {
+    if new_types.len() == arrays_start && combination.flags.contains(CombinationFlags::HAS_EMPTY_ARRAY) {
+        new_types.push(TAtomic::Array(TArray::Keyed(TKeyedArray {
             known_items: None,
             parameters: None,
             non_empty: false,
             known_non_list: false,
-        }));
+        })));
     }
-
-    new_types.extend(arrays.into_iter().map(TAtomic::Array));
 
     for (_, (generic_type, generic_type_parameters)) in combination.object_type_params {
         let generic_object = TAtomic::Object(TObject::Named(
@@ -338,12 +351,7 @@ pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, options: Combin
 
     new_types.extend(combination.literal_strings.into_iter().map(|s| TAtomic::Scalar(TScalar::literal_string(s))));
 
-    if combination.value_types.contains_key(&*ATOM_STRING)
-        && combination.value_types.contains_key(&*ATOM_FLOAT)
-        && combination.value_types.contains_key(&*ATOM_BOOL)
-        && combination.integers.iter().any(super::atomic::scalar::int::TInteger::is_unspecified)
-    {
-        combination.integers.clear();
+    if generic_scalar {
         combination.value_types.remove(&*ATOM_STRING);
         combination.value_types.remove(&*ATOM_FLOAT);
         combination.value_types.remove(&*ATOM_BOOL);
@@ -351,7 +359,7 @@ pub fn combine(types: Vec<TAtomic>, codebase: &CodebaseMetadata, options: Combin
         new_types.push(TAtomic::Scalar(TScalar::Generic));
     }
 
-    new_types.extend(TInteger::combine(combination.integers));
+    new_types.extend(integer_types);
     new_types.extend(combination.literal_floats.into_iter().map(|f| TAtomic::Scalar(TScalar::literal_float(f.into()))));
 
     for (enum_name, enum_case) in combination.enum_names {
@@ -1624,9 +1632,8 @@ fn get_combiner_key(name: Word, type_params: &[TUnion], codebase: &CodebaseMetad
                 buffer[pos..pos + 2].copy_from_slice(b", ");
                 pos += 2;
             }
-            let id_word = tunion.get_id();
-            let param_bytes: &[u8] =
-                if covariants.get(i) == Some(&Variance::Covariant) { b"*" } else { id_word.as_bytes() };
+            let id_word = if covariants.get(i) == Some(&Variance::Covariant) { None } else { Some(tunion.get_id()) };
+            let param_bytes = id_word.as_ref().map_or(b"*".as_slice(), Word::as_bytes);
             let need = param_bytes.len();
             buffer[pos..pos + need].copy_from_slice(param_bytes);
             pos += need;
