@@ -351,6 +351,10 @@ impl ClassLikeMetadata {
             .chain(self.used_traits.iter().copied().filter(|_| self.declared_ancestry.is_none()))
     }
 
+    pub(crate) fn declared_mixin_count(&self) -> usize {
+        self.declared_mixin_count.unwrap_or(self.mixins.len())
+    }
+
     pub(crate) fn reset_inherited_members(&mut self) {
         let declared_mixins = *self.declared_mixin_count.get_or_insert(self.mixins.len());
         self.mixins.truncate(declared_mixins);

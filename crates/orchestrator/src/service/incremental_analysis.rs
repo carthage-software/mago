@@ -1851,6 +1851,124 @@ mod tests {
     }
 
     #[test]
+    fn inherited_population_references_match_fresh_analysis() {
+        use mago_codex::reference::{ReferenceOrigin, SymbolReferenceKind};
+        use mago_word::{empty_word, word};
+
+        let prelude = File::new(
+            Cow::Borrowed(b"prelude.php"),
+            FileType::Builtin,
+            None,
+            Cow::Borrowed(
+                b"<?php
+                class BuiltinBound {} class TraitBound {}
+                /**
+                 * @template T of BuiltinBound
+                 * @mixin T
+                 */
+                class GenericBase {}
+                /** @mixin TraitBound */
+                trait SharedMixin {}",
+            ),
+        );
+
+        let arena = LocalArena::new();
+        let program = parse_file_with_settings(&arena, &prelude, ParserSettings::default());
+        let names = NameResolver::new(&arena).resolve(program);
+        let mut base = scan_program(&arena, &prelude, program, &names, Settings::default().version);
+        let mut base_references = SymbolReferences::new();
+        populate_codebase(&mut base, &mut base_references, WordSet::default(), HashSet::default());
+        let make = |database: &Database<'_>| {
+            IncrementalAnalysisService::new(
+                database.read_only(),
+                base.clone(),
+                base_references.clone(),
+                Settings::default(),
+                ParserSettings::default(),
+                Arc::clone(&PLUGIN_REGISTRY),
+            )
+        };
+
+        let child = || {
+            File::new(
+                Cow::Borrowed(b"vendor/child.php"),
+                FileType::Vendored,
+                None,
+                Cow::Borrowed(
+                    b"<?php
+                /**
+                 * @template Own of OwnBound
+                 * @mixin OwnMixin
+                 */
+                class VendorChild extends GenericBase { use SharedMixin; }
+                /** @extends GenericBase<OwnArgument> */
+                class ExplicitChild extends GenericBase {}",
+                ),
+            )
+        };
+
+        let child_id = FileId::new(b"vendor/child.php");
+        let mut database = make_database(vec![(
+            "src/caller.php",
+            "<?php
+                class OwnBound {} class OwnMixin {} class OwnArgument extends BuiltinBound {}
+                function consume(VendorChild $value): void {}",
+        )]);
+
+        database.add(prelude);
+        database.add(child());
+        let mut service = make(&database);
+        service.analyze().unwrap();
+
+        for present in [true, false, true, false, true] {
+            if present {
+                database.add(child());
+            } else {
+                assert!(database.delete(child_id));
+            }
+
+            service.update_database(database.read_only());
+            service.analyze_incremental(Some(&[child_id])).unwrap();
+            let mut fresh = make(&database);
+            fresh.analyze().unwrap();
+            assert_eq!(service.native_symbol_references, fresh.native_symbol_references, "child present: {present}");
+            if !present {
+                continue;
+            }
+
+            let mut edges = HashSet::default();
+            service.native_symbol_references.for_each_reference(|origin, target, kind| {
+                if kind == SymbolReferenceKind::Signature
+                    && let ReferenceOrigin::Symbol((owner, member)) = origin
+                    && member.is_empty()
+                {
+                    edges.insert((owner, target.0));
+                }
+            });
+
+            for (owner, target) in [
+                ("genericbase", "builtinbound"),
+                ("sharedmixin", "traitbound"),
+                ("vendorchild", "genericbase"),
+                ("vendorchild", "sharedmixin"),
+                ("vendorchild", "ownbound"),
+                ("vendorchild", "ownmixin"),
+                ("explicitchild", "ownargument"),
+            ] {
+                assert!(edges.contains(&(word(owner), word(target))), "missing {owner} -> {target}");
+            }
+
+            for target in ["builtinbound", "traitbound"] {
+                assert!(!edges.contains(&(word("vendorchild"), word(target))));
+                let diff = CodebaseDiff::new().with_changed(HashSet::from_iter([(word(target), empty_word())]));
+                let (invalid, _, _) = service.native_symbol_references.get_invalid_symbols(&diff).unwrap();
+                assert!(invalid.contains(&(word("vendorchild"), empty_word())));
+                assert!(invalid.contains(&(word("consume"), empty_word())));
+            }
+        }
+    }
+
+    #[test]
     fn removing_signature_type_restores_its_remaining_body_reference() {
         use mago_codex::reference::{ReferenceOrigin, SymbolReferenceKind};
         use mago_word::{empty_word, word};

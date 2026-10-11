@@ -570,13 +570,7 @@ pub fn populate_class_like_types(
 
     for p in metadata.template_extended_parameters.values_mut().flat_map(|m| m.values_mut()) {
         if p.needs_population() || force_repopulation {
-            populate_union_type(
-                p,
-                codebase_symbols,
-                Some(&class_like_reference_source),
-                symbol_references,
-                force_repopulation,
-            );
+            populate_union_type(p, codebase_symbols, None, symbol_references, force_repopulation);
         }
     }
 
@@ -587,13 +581,7 @@ pub fn populate_class_like_types(
         .flat_map(|m| m.values_mut())
     {
         if p.needs_population() || force_repopulation {
-            populate_union_type(
-                p,
-                codebase_symbols,
-                Some(&class_like_reference_source),
-                symbol_references,
-                force_repopulation,
-            );
+            populate_union_type(p, codebase_symbols, None, symbol_references, force_repopulation);
         }
     }
 
@@ -607,12 +595,13 @@ pub fn populate_class_like_types(
         );
     }
 
-    for mixin_type in &mut metadata.mixins {
+    let declared_mixins = metadata.declared_mixin_count();
+    for (index, mixin_type) in metadata.mixins.iter_mut().enumerate() {
         if mixin_type.type_union.needs_population() || force_repopulation {
             populate_union_type(
                 &mut mixin_type.type_union,
                 codebase_symbols,
-                Some(&class_like_reference_source),
+                (index < declared_mixins).then_some(&class_like_reference_source),
                 symbol_references,
                 force_repopulation,
             );
