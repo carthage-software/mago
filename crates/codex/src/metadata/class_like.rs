@@ -397,6 +397,8 @@ impl ClassLikeMetadata {
         self.used_traits.clear();
         self.require_extends.clear();
         self.require_implements.clear();
+        self.template_extended_parameters.clear();
+        self.template_extended_parameter_paths.clear();
 
         for ancestor in self.declared_ancestry.as_deref().unwrap_or_default() {
             match *ancestor {
