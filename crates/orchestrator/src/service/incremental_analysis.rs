@@ -64,7 +64,7 @@ struct FileState {
 
 struct SelectiveAnalysisOutput {
     result: AnalysisResult,
-    native_symbol_references: SymbolReferences,
+    native_symbol_references: Option<SymbolReferences>,
     external_symbol_references: SymbolReferences,
     late_symbol_references: SymbolReferences,
     late_symbol_references_by_file: HashMap<FileId, SymbolReferences>,
@@ -92,7 +92,7 @@ struct SelectiveAnalysisOutput {
 pub struct IncrementalAnalysisService {
     database: ReadDatabase,
     codebase: CodebaseMetadata,
-    symbol_references: SymbolReferences,
+    symbol_references: Option<SymbolReferences>,
     native_symbol_references: SymbolReferences,
     external_symbol_references: SymbolReferences,
     late_symbol_references: SymbolReferences,
@@ -168,13 +168,11 @@ impl IncrementalAnalysisService {
     ) -> Self {
         let base_codebase = Arc::new(codebase.clone());
         let base_symbol_references = Arc::new(symbol_references.clone());
-        let native_symbol_references = symbol_references.clone();
-
         Self {
             database,
             codebase,
-            symbol_references,
-            native_symbol_references,
+            symbol_references: None,
+            native_symbol_references: symbol_references,
             external_symbol_references: SymbolReferences::new(),
             late_symbol_references: SymbolReferences::new(),
             base_codebase,
@@ -244,7 +242,21 @@ impl IncrementalAnalysisService {
     /// Returns a reference to the current symbol references.
     #[must_use]
     pub fn symbol_references(&self) -> &SymbolReferences {
-        &self.symbol_references
+        self.symbol_references.as_ref().unwrap_or(&self.native_symbol_references)
+    }
+
+    fn replace_references(&mut self, result: &mut AnalysisResult, native: Option<SymbolReferences>) {
+        let references = std::mem::take(&mut result.symbol_references);
+        match native {
+            Some(native) => {
+                self.native_symbol_references = native;
+                self.symbol_references = Some(references);
+            }
+            None => {
+                self.native_symbol_references = references;
+                self.symbol_references = None;
+            }
+        }
     }
 
     /// Returns a reference to the current database.
@@ -365,7 +377,8 @@ impl IncrementalAnalysisService {
             return;
         }
 
-        let reconciler = LateSymbolReferenceIssueReconciler::new(&self.codebase, &self.symbol_references);
+        let references = self.symbol_references.as_ref().unwrap_or(&self.native_symbol_references);
+        let reconciler = LateSymbolReferenceIssueReconciler::new(&self.codebase, references);
         for state in self.file_states.values_mut() {
             state.analysis_issues = Arc::new(reconciler.reconcile((*state.unreconciled_analysis_issues).clone()));
         }
@@ -411,7 +424,7 @@ impl IncrementalAnalysisService {
         self.initialized = false;
         self.needs_full_rebuild = true;
         self.codebase = CodebaseMetadata::new();
-        self.symbol_references = SymbolReferences::new();
+        self.symbol_references = None;
         self.native_symbol_references = SymbolReferences::new();
         self.external_symbol_references = SymbolReferences::new();
         self.late_symbol_references = SymbolReferences::new();
@@ -526,7 +539,7 @@ impl IncrementalAnalysisService {
             self.run_analyzer_selective(&mut merged_codebase, symbol_references, &self.settings, &HashSet::default())?;
         self.external_symbol_references = external_symbol_references;
         self.late_symbol_references = late_symbol_references;
-        self.native_symbol_references = native_symbol_references;
+        self.replace_references(&mut analysis_result, native_symbol_references);
         self.lifecycle_issues = Arc::new(std::mem::take(&mut analysis_result.issues));
         self.analysis_snapshots = snapshots.into_iter().map(|snapshot| (snapshot.file_id(), snapshot)).collect();
         self.editor_files = editor_files;
@@ -547,7 +560,6 @@ impl IncrementalAnalysisService {
         }
 
         self.codebase = merged_codebase;
-        self.symbol_references = std::mem::take(&mut analysis_result.symbol_references);
         self.refresh_late_reference_issues();
         tracing::debug!(
             "Initial analysis: {} total issues ({} codebase-level)",
@@ -984,7 +996,7 @@ impl IncrementalAnalysisService {
             } = self.run_analyzer_selective(&mut merged_codebase, symbol_references, &self.settings, &files_to_skip)?;
             self.external_symbol_references = external_symbol_references;
             self.late_symbol_references = late_symbol_references;
-            self.native_symbol_references = native_symbol_references;
+            self.replace_references(&mut analysis_result, native_symbol_references);
             self.lifecycle_issues = Arc::new(std::mem::take(&mut analysis_result.issues));
             self.editor_files.retain(|file_id, _| current_editor_files.contains(file_id));
             self.editor_files.extend(editor_files);
@@ -1049,7 +1061,6 @@ impl IncrementalAnalysisService {
             }
 
             self.codebase = merged_codebase;
-            self.symbol_references = std::mem::take(&mut analysis_result.symbol_references);
             self.refresh_late_reference_issues();
 
             return Ok(Some(analysis_result));
@@ -1239,7 +1250,7 @@ impl IncrementalAnalysisService {
         } = self.run_analyzer_selective(&mut merged_codebase, symbol_references, &self.settings, &files_to_skip)?;
         self.external_symbol_references = external_symbol_references;
         self.late_symbol_references = late_symbol_references;
-        self.native_symbol_references = native_symbol_references;
+        self.replace_references(&mut analysis_result, native_symbol_references);
         self.lifecycle_issues = Arc::new(std::mem::take(&mut analysis_result.issues));
         self.editor_files.retain(|file_id, _| current_editor_files.contains(file_id));
         self.editor_files.extend(editor_files);
@@ -1305,7 +1316,6 @@ impl IncrementalAnalysisService {
         }
 
         self.codebase = merged_codebase;
-        self.symbol_references = std::mem::take(&mut analysis_result.symbol_references);
         self.refresh_late_reference_issues();
 
         Ok(Some(analysis_result))
@@ -1469,7 +1479,7 @@ impl IncrementalAnalysisService {
             issues.extend(analysis_result.issues);
         } else {
             issues.extend(
-                LateSymbolReferenceIssueReconciler::new(&self.codebase, &self.symbol_references)
+                LateSymbolReferenceIssueReconciler::new(&self.codebase, self.symbol_references())
                     .reconcile(analysis_result.issues),
             );
         }
@@ -1523,7 +1533,7 @@ impl IncrementalAnalysisService {
             issues.extend(analysis_result.issues);
         } else {
             issues.extend(
-                LateSymbolReferenceIssueReconciler::new(&self.codebase, &self.symbol_references)
+                LateSymbolReferenceIssueReconciler::new(&self.codebase, self.symbol_references())
                     .reconcile(analysis_result.issues),
             );
         }
@@ -1543,8 +1553,8 @@ impl IncrementalAnalysisService {
     ) -> Result<SelectiveAnalysisOutput, OrchestratorError> {
         if self.scan_only {
             return Ok(SelectiveAnalysisOutput {
-                result: AnalysisResult::new(current_symbol_references.clone()),
-                native_symbol_references: current_symbol_references,
+                result: AnalysisResult::new(current_symbol_references),
+                native_symbol_references: None,
                 external_symbol_references: SymbolReferences::new(),
                 late_symbol_references: SymbolReferences::new(),
                 late_symbol_references_by_file: HashMap::default(),
@@ -1786,7 +1796,8 @@ impl IncrementalAnalysisService {
             }
         }
 
-        let native_symbol_references = aggregated_result.symbol_references.clone();
+        let native_symbol_references = (!external_symbol_references.is_empty() || !late_symbol_references.is_empty())
+            .then(|| aggregated_result.symbol_references.clone());
         aggregated_result.symbol_references.extend(external_symbol_references.clone());
         aggregated_result.symbol_references.extend(late_symbol_references.clone());
 
@@ -1928,6 +1939,9 @@ mod tests {
     fn assert_borrowed_issues(service: &IncrementalAnalysisService, expected: IssueCollection) {
         let borrowed = IssueCollection::from(service.issue_collections().flat_map(IssueCollection::iter).cloned());
         assert_eq!(borrowed.sorted(), expected.sorted());
+        if service.external_symbol_references.is_empty() && service.late_symbol_references.is_empty() {
+            assert!(service.symbol_references.is_none(), "native references must not have a second owner");
+        }
         if service.late_symbol_references.is_empty() {
             for state in service.file_states.values() {
                 assert!(Arc::ptr_eq(&state.analysis_issues, &state.unreconciled_analysis_issues));
@@ -2028,7 +2042,9 @@ mod tests {
             late.add_file_reference_to_class_member(file, member, false);
             late.add_property_read_reference(ReferenceOrigin::File(file), member);
         }
-        service.symbol_references.extend(late.clone());
+        let mut combined = service.symbol_references().clone();
+        combined.extend(late.clone());
+        service.symbol_references = Some(combined);
         service.late_symbol_references = late;
         service.refresh_late_reference_issues();
         let expected = IssueCollection::from(
