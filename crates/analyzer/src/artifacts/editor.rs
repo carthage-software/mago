@@ -81,6 +81,7 @@ pub struct MethodReference {
 pub struct ExpressionClasses {
     pub span: (u32, u32),
     pub classes: Box<[Word]>,
+    pub uncertain: bool,
 }
 
 #[derive(Debug, Clone, Default)]
@@ -185,7 +186,9 @@ impl EditorArtifacts {
                     match atomic {
                         TAtomic::Scalar(TScalar::ClassLikeString(
                             TClassLikeString::OfType { constraint, .. } | TClassLikeString::Generic { constraint, .. },
-                        )) => collect_classes(constraint, &mut classes),
+                        )) => {
+                            collect_classes(constraint, &mut classes);
+                        }
                         _ => {
                             if let Some(class) = atomic
                                 .get_class_string_value()
@@ -333,14 +336,15 @@ impl AnalysisArtifacts {
         let mut expression_classes = Vec::new();
         for (&span, union) in &self.expression_types {
             let mut classes = Vec::new();
+            let mut uncertain = false;
             for atomic in union.types.iter() {
-                collect_classes(atomic, &mut classes);
+                uncertain |= !collect_classes(atomic, &mut classes);
             }
 
             if !classes.is_empty() {
                 classes.sort_unstable();
                 classes.dedup();
-                expression_classes.push(ExpressionClasses { span, classes: classes.into_boxed_slice() });
+                expression_classes.push(ExpressionClasses { span, classes: classes.into_boxed_slice(), uncertain });
             }
         }
 
@@ -353,21 +357,32 @@ impl AnalysisArtifacts {
     }
 }
 
-fn collect_classes(atomic: &TAtomic, classes: &mut Vec<Word>) {
-    match atomic {
-        TAtomic::Object(TObject::Named(object)) => classes.push(object.get_name()),
-        TAtomic::Object(TObject::Enum(object)) => classes.push(object.get_name()),
-        TAtomic::GenericParameter(parameter) => {
-            for atomic in parameter.constraint.types.iter() {
-                collect_classes(atomic, classes);
-            }
+fn collect_classes(atomic: &TAtomic, classes: &mut Vec<Word>) -> bool {
+    let mut complete = match atomic {
+        TAtomic::Object(TObject::Named(object)) => {
+            classes.push(object.get_name());
+            true
         }
-        _ => {}
-    }
+        TAtomic::Object(TObject::Enum(object)) => {
+            classes.push(object.get_name());
+            true
+        }
+        TAtomic::GenericParameter(parameter) => {
+            let mut complete = true;
+            for atomic in parameter.constraint.types.iter() {
+                complete &= collect_classes(atomic, classes);
+            }
+
+            complete
+        }
+        _ => atomic.is_null(),
+    };
 
     for atomic in atomic.get_intersection_types().unwrap_or_default() {
-        collect_classes(atomic, classes);
+        complete &= collect_classes(atomic, classes);
     }
+
+    complete
 }
 
 #[cfg(test)]
