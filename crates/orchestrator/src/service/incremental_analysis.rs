@@ -310,6 +310,7 @@ impl IncrementalAnalysisService {
 
     /// Merges `new_file_scans` into `merged_codebase` and re-applies patches so member
     /// updates survive the remove/re-add of changed vendor entries.
+    /// Returns declaration spans for ownership checks after population.
     ///
     /// The apply pass only runs when at least one patch file is present in `new_file_scans`.
     /// In the incremental body-only path, that is true exactly when a vendor file changed
@@ -321,18 +322,22 @@ impl IncrementalAnalysisService {
     fn apply_scan_results(
         &self,
         merged_codebase: &mut CodebaseMetadata,
-        new_file_scans: &[(FileId, CodebaseMetadata)],
-    ) {
+        new_file_scans: Vec<(FileId, CodebaseMetadata)>,
+    ) -> Vec<(FileId, CodebaseEntrySpans)> {
         let mut has_patch_in_scans = false;
+        let mut entry_spans = Vec::with_capacity(new_file_scans.len());
         for (fid, codebase) in new_file_scans {
-            merged_codebase.extend_ref(codebase);
-            if !has_patch_in_scans && self.database.get(fid).is_ok_and(|f| f.file_type.is_patch()) {
+            entry_spans.push((fid, codebase.entry_spans()));
+            merged_codebase.extend(codebase);
+            if !has_patch_in_scans && self.database.get(&fid).is_ok_and(|f| f.file_type.is_patch()) {
                 has_patch_in_scans = true;
             }
         }
         if has_patch_in_scans {
             merged_codebase.apply_patches_pass();
         }
+
+        entry_spans
     }
 
     /// Distributes codebase-level issues into per-file caches based on their primary annotation's file ID.
@@ -898,6 +903,20 @@ impl IncrementalAnalysisService {
         }
 
         let body_only = diff.get_changed().is_empty() && deleted_count == 0;
+        let mut changed_symbols = HashSet::default();
+        let mut changed_class_like_names = WordSet::default();
+        for (_, metadata) in &new_file_scans {
+            changed_symbols.extend(metadata.function_likes.keys().copied());
+            changed_symbols.extend(metadata.class_likes.keys().map(|&name| (name, mago_word::empty_word())));
+            changed_symbols.extend(metadata.constants.keys().map(|&name| (name, mago_word::empty_word())));
+            changed_class_like_names.extend(metadata.class_likes.keys().copied());
+
+            if body_only && let Some(sig) = metadata.file_signatures.values().next() {
+                for node in &sig.ast_nodes {
+                    changed_symbols.extend(node.children.iter().map(|child| (node.name, child.name)));
+                }
+            }
+        }
 
         if !body_only {
             for &file_id in &unchanged_file_ids {
@@ -923,35 +942,13 @@ impl IncrementalAnalysisService {
                     merged_codebase.remove_entries_by_keys(&prev_state.entry_keys);
                 }
             }
-            self.apply_scan_results(&mut merged_codebase, &new_file_scans);
+            let scanned_entries = self.apply_scan_results(&mut merged_codebase, new_file_scans);
 
             let files_to_skip: HashSet<FileId> = unchanged_file_ids.iter().copied().collect();
             let mut symbol_references = std::mem::take(&mut self.native_symbol_references);
 
-            let mut changed_symbols: HashSet<(mago_word::Word, mago_word::Word)> = HashSet::default();
             let mut changed_file_names: Vec<mago_word::Word> = Vec::new();
-
-            for (file_id, metadata) in &new_file_scans {
-                for &key in metadata.function_likes.keys() {
-                    changed_symbols.insert(key);
-                }
-
-                for &name in metadata.class_likes.keys() {
-                    changed_symbols.insert((name, mago_word::empty_word()));
-                }
-
-                for &name in metadata.constants.keys() {
-                    changed_symbols.insert((name, mago_word::empty_word()));
-                }
-
-                if let Some(sig) = metadata.file_signatures.values().next() {
-                    for node in &sig.ast_nodes {
-                        for child in &node.children {
-                            changed_symbols.insert((node.name, child.name));
-                        }
-                    }
-                }
-
+            for (file_id, _) in &scanned_entries {
                 // Collect file names for file-level reference cleanup
                 if let Ok(file) = self.database.get(file_id) {
                     changed_file_names.push(mago_word::word(&file.name));
@@ -965,11 +962,8 @@ impl IncrementalAnalysisService {
 
             symbol_references.remove_body_references_for_symbols(&reference_symbols, &changed_file_names);
 
-            // Collect class_like names from changed files so we exclude them from safe_symbols.
             // Changed classes had their old metadata removed and fresh (unpopulated) metadata added,
             // so the populator must repopulate them to rebuild parent resolution, overridden_method_ids, etc.
-            let changed_class_like_names: WordSet =
-                new_file_scans.iter().flat_map(|(_, metadata)| metadata.class_likes.keys().copied()).collect();
             let safe_symbols: WordSet = merged_codebase
                 .class_likes
                 .keys()
@@ -999,7 +993,9 @@ impl IncrementalAnalysisService {
             self.replace_references(&mut analysis_result, native_symbol_references);
             self.lifecycle_issues = Arc::new(std::mem::take(&mut analysis_result.issues));
             self.editor_files.retain(|file_id, _| current_editor_files.contains(file_id));
-            self.editor_files.extend(editor_files);
+            for (file_id, editor_data) in editor_files {
+                self.editor_files.entry(file_id).insert_entry(editor_data);
+            }
             self.analysis_snapshots.retain(|file_id, _| current_file_ids.contains(file_id));
             for snapshot in snapshots {
                 self.analysis_snapshots.insert(snapshot.file_id(), snapshot);
@@ -1007,7 +1003,7 @@ impl IncrementalAnalysisService {
 
             // Drain codebase issues from metadata and distribute to changed files only.
             // Unchanged files keep their cached codebase_issues from previous runs.
-            let changed_file_ids: HashSet<FileId> = new_file_scans.iter().map(|(fid, _)| *fid).collect();
+            let changed_file_ids: HashSet<FileId> = scanned_entries.iter().map(|(fid, _)| *fid).collect();
             let re_analyzed_unchanged: Vec<FileId> = per_file_issues
                 .keys()
                 .filter(|file_id| self.file_states.contains_key(file_id) && !changed_file_ids.contains(file_id))
@@ -1036,12 +1032,12 @@ impl IncrementalAnalysisService {
                 }
             }
 
-            for (file_id, metadata) in new_file_scans {
+            for (file_id, entry_spans) in scanned_entries {
                 let content_hash = file_hashes[&file_id];
                 let analysis_issues = Arc::new(per_file_issues.remove(&file_id).unwrap_or_default());
                 // Owned keys (spans match merged) so a future touch of this file does
                 // not clobber a rival file that won the tiebreak over this one.
-                let entry_keys = metadata.extract_owned_keys(&merged_codebase);
+                let entry_keys = entry_spans.into_owned_keys(&merged_codebase);
                 let codebase_issues =
                     self.file_states.get(&file_id).map(|s| Arc::clone(&s.codebase_issues)).unwrap_or_default();
                 let deferred_pragmas = per_file_pragmas.get(&file_id).cloned();
@@ -1083,7 +1079,7 @@ impl IncrementalAnalysisService {
                 merged_codebase.remove_entries_by_keys(&prev_state.entry_keys);
             }
         }
-        self.apply_scan_results(&mut merged_codebase, &new_file_scans);
+        let scanned_entries = self.apply_scan_results(&mut merged_codebase, new_file_scans);
 
         if merged_codebase.populate_class_like_aliases() {
             return Ok(None);
@@ -1129,20 +1125,8 @@ impl IncrementalAnalysisService {
             }
         }
 
-        let mut dirty_symbols: HashSet<(mago_word::Word, mago_word::Word)> = diff.get_changed().clone();
-        for (_file_id, metadata) in &new_file_scans {
-            for &key in metadata.function_likes.keys() {
-                dirty_symbols.insert(key);
-            }
-
-            for &name in metadata.class_likes.keys() {
-                dirty_symbols.insert((name, mago_word::empty_word()));
-            }
-
-            for &name in metadata.constants.keys() {
-                dirty_symbols.insert((name, mago_word::empty_word()));
-            }
-        }
+        let mut dirty_symbols = changed_symbols;
+        dirty_symbols.extend(diff.get_changed().iter().copied());
 
         let mut symbol_references = std::mem::take(&mut self.native_symbol_references);
         if deleted_count > 0 {
@@ -1177,7 +1161,7 @@ impl IncrementalAnalysisService {
             }
         }
 
-        let reanalyzed_file_names: WordSet = new_file_scans
+        let reanalyzed_file_names: WordSet = scanned_entries
             .iter()
             .map(|(file_id, _)| *file_id)
             .chain(unchanged_file_ids.iter().copied().filter(|file_id| !files_to_skip.contains(file_id)))
@@ -1208,17 +1192,14 @@ impl IncrementalAnalysisService {
             }
 
             // Also clear for changed files (they are always re-analyzed).
-            for (_file_id, metadata) in &new_file_scans {
-                for &name in metadata.class_likes.keys() {
-                    symbols_to_unsafify.push(name);
-                }
-
+            symbols_to_unsafify.extend(changed_class_like_names);
+            for (file_id, _) in &scanned_entries {
                 // Use file signature nodes (not metadata keys) for consistency with
                 // how unchanged files are unsafified. File signature nodes use
                 // (name, empty) for top-level symbols, matching safe_symbols format.
                 // This differs from function_likes keys which use (empty, name) for
                 // standalone functions.
-                for sig in metadata.file_signatures.values() {
+                if let Some(sig) = merged_codebase.get_file_signature(file_id) {
                     for node in &sig.ast_nodes {
                         symbols_to_unsafify.push(node.name);
                         for child in &node.children {
@@ -1253,7 +1234,9 @@ impl IncrementalAnalysisService {
         self.replace_references(&mut analysis_result, native_symbol_references);
         self.lifecycle_issues = Arc::new(std::mem::take(&mut analysis_result.issues));
         self.editor_files.retain(|file_id, _| current_editor_files.contains(file_id));
-        self.editor_files.extend(editor_files);
+        for (file_id, editor_data) in editor_files {
+            self.editor_files.entry(file_id).insert_entry(editor_data);
+        }
         self.analysis_snapshots.retain(|file_id, _| current_file_ids.contains(file_id));
         for snapshot in snapshots {
             self.analysis_snapshots.insert(snapshot.file_id(), snapshot);
@@ -1261,7 +1244,7 @@ impl IncrementalAnalysisService {
 
         self.file_states.retain(|id, _| current_file_ids.contains(id));
 
-        let changed_file_ids: HashSet<FileId> = new_file_scans.iter().map(|(fid, _)| *fid).collect();
+        let changed_file_ids: HashSet<FileId> = scanned_entries.iter().map(|(fid, _)| *fid).collect();
         let re_analyzed_unchanged: Vec<FileId> = per_file_issues
             .keys()
             .filter(|fid| self.file_states.contains_key(fid) && !changed_file_ids.contains(fid))
@@ -1291,12 +1274,12 @@ impl IncrementalAnalysisService {
             }
         }
 
-        for (file_id, metadata) in new_file_scans {
+        for (file_id, entry_spans) in scanned_entries {
             let content_hash = file_hashes[&file_id];
             let analysis_issues = Arc::new(per_file_issues.remove(&file_id).unwrap_or_default());
             // Owned keys (spans match merged) so a future touch of this file does
             // not clobber a rival file that won the tiebreak over this one.
-            let entry_keys = metadata.extract_owned_keys(&merged_codebase);
+            let entry_keys = entry_spans.into_owned_keys(&merged_codebase);
             let codebase_issues =
                 self.file_states.get(&file_id).map(|s| Arc::clone(&s.codebase_issues)).unwrap_or_default();
             let deferred_pragmas = per_file_pragmas.get(&file_id).cloned();
@@ -1934,6 +1917,64 @@ mod tests {
             ParserSettings::default(),
             Arc::clone(&PLUGIN_REGISTRY),
         )
+    }
+
+    #[test]
+    fn incremental_scan_merge_moves_metadata_storage() {
+        let db =
+            make_database(vec![("src/main.php", "<?php function value(int $argument): int { return $argument; }")]);
+        let service = make_service(&db);
+        let file_id = FileId::new(b"src/main.php");
+        let file = service.database.get(&file_id).unwrap();
+        let arena = LocalArena::new();
+        let program = parse_file_with_settings(&arena, &file, service.parser_settings);
+        let names = NameResolver::new(&arena).resolve(program);
+        let mut scanned = scan_program(&arena, &file, program, &names, service.settings.version);
+        scanned.set_file_signature(file_id, signature_builder::build_file_signature(&file, program, &names));
+        let key = (mago_word::empty_word(), mago_word::word("value"));
+        let function = scanned.function_likes.get_mut(&key).unwrap();
+        function.parameters.reserve(8);
+        let function_pointer = std::ptr::from_ref(function.as_ref());
+        let parameters_pointer = function.parameters.as_ptr();
+        let parameters_capacity = function.parameters.capacity();
+
+        let mut merged = CodebaseMetadata::new();
+        let mut entries = service.apply_scan_results(&mut merged, vec![(file_id, scanned)]);
+        let function = merged.function_likes.get(&key).unwrap();
+        assert_eq!(std::ptr::from_ref(function.as_ref()), function_pointer);
+        assert_eq!(function.parameters.as_ptr(), parameters_pointer);
+        assert_eq!(function.parameters.capacity(), parameters_capacity);
+        assert_eq!(entries.len(), 1);
+        let (owner, spans) = entries.pop().unwrap();
+        assert_eq!(owner, file_id);
+        assert_eq!(spans.into_owned_keys(&merged).function_like_keys, vec![key]);
+    }
+
+    #[test]
+    fn replacing_editor_files_keeps_map_capacity() {
+        let names = ["a", "b", "c"];
+        let paths = names.map(|name| format!("src/{name}.php"));
+        let sources = names.map(|name| format!("<?php function {name}(): int {{ return 1; }}"));
+        let mut db =
+            make_database(paths.iter().zip(&sources).map(|(path, source)| (path.as_str(), source.as_str())).collect());
+        let mut service = make_service(&db);
+        service.set_editor_artifacts(true);
+        service.analyze().unwrap();
+        let capacity = service.editor_files.capacity();
+        let file_ids = paths.each_ref().map(|path| FileId::new(path.as_bytes()));
+
+        for (return_type, value) in [("int", "2"), ("float", "2.0"), ("float", "3.0")] {
+            for (name, file_id) in names.iter().zip(file_ids) {
+                db.update(
+                    file_id,
+                    Cow::Owned(format!("<?php function {name}(): {return_type} {{ return {value}; }}").into_bytes()),
+                );
+            }
+            service.update_database(db.read_only());
+            service.analyze_incremental(Some(&file_ids)).unwrap();
+            assert_eq!(service.editor_files.len(), names.len());
+            assert_eq!(service.editor_files.capacity(), capacity);
+        }
     }
 
     fn assert_borrowed_issues(service: &IncrementalAnalysisService, expected: IssueCollection) {
