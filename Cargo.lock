@@ -1522,6 +1522,7 @@ dependencies = [
  "ordered-float",
  "proptest",
  "rayon",
+ "ryu",
  "serde",
  "strum 0.28.0",
  "tracing",

@@ -8,12 +8,12 @@ use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
-use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::{
     TAtomic,
     callable::{TCallable, TCallableSignature},
 };
 use mago_codex::ttype::cast::cast_atomic_to_callable;
+use mago_codex::ttype::display::NameDisplay;
 use mago_codex::ttype::union::TUnion;
 use mago_word::Word;
 
@@ -38,21 +38,21 @@ impl CallableTarget {
 pub struct BoundSignature {
     pub key: FunctionLikeIdentifier,
     pub parameters: Box<[BoundParameter]>,
-    pub return_type: Option<Word>,
+    pub return_type: Option<Box<str>>,
 }
 
 #[derive(Debug, PartialEq, Eq, Hash, PartialOrd, Ord)]
 pub struct BoundParameter {
     /// Includes `$`. Missing names cannot bind named arguments to a declaration.
     pub name: Option<Word>,
-    pub type_name: Option<Word>,
+    pub type_name: Option<Box<str>>,
     pub by_reference: bool,
     pub variadic: bool,
     pub has_default: bool,
 }
 
 impl BoundSignature {
-    fn new(key: FunctionLikeIdentifier, signature: &TCallableSignature) -> Self {
+    fn new(key: FunctionLikeIdentifier, signature: &TCallableSignature, names: &NameDisplay<'_>) -> Self {
         Self {
             key,
             parameters: signature
@@ -60,13 +60,13 @@ impl BoundSignature {
                 .iter()
                 .map(|parameter| BoundParameter {
                     name: parameter.get_name().map(|name| name.0),
-                    type_name: parameter.get_type_signature().map(TType::get_id),
+                    type_name: parameter.get_type_signature().map(|ty| names.union(ty).into_boxed_str()),
                     by_reference: parameter.is_by_reference(),
                     variadic: parameter.is_variadic(),
                     has_default: parameter.has_default(),
                 })
                 .collect(),
-            return_type: signature.get_return_type().map(TType::get_id),
+            return_type: signature.get_return_type().map(|ty| names.union(ty).into_boxed_str()),
         }
     }
 }
@@ -90,8 +90,9 @@ impl CallableTypes {
         for (&span, union) in expressions {
             let mut targets = Vec::new();
             let mut uncertain = false;
+            let mut names = None;
             for atomic in union.types.iter() {
-                if let Some(target) = callable_target(atomic, codebase, &mut signatures) {
+                if let Some(target) = callable_target(atomic, codebase, &mut signatures, union, &mut names) {
                     targets.push(target);
                 } else {
                     uncertain = true;
@@ -128,10 +129,12 @@ impl CallableTypes {
     }
 }
 
-fn callable_target(
+fn callable_target<'code>(
     atomic: &TAtomic,
-    codebase: &CodebaseMetadata,
+    codebase: &'code CodebaseMetadata,
     signatures: &mut HashSet<Arc<BoundSignature>>,
+    union: &TUnion,
+    names: &mut Option<NameDisplay<'code>>,
 ) -> Option<CallableTarget> {
     let callable = cast_atomic_to_callable(atomic, codebase, None)?;
     let target = match callable.as_ref() {
@@ -158,7 +161,8 @@ fn callable_target(
     if let TCallable::Signature(signature) = callable.as_ref()
         && (signature.is_partial || target.is_closure() && closure_types_differ(signature, declaration))
     {
-        let summary = BoundSignature::new(target, signature);
+        let names = names.get_or_insert_with(|| callable_names(codebase, union));
+        let summary = BoundSignature::new(target, signature, names);
         let shared = if let Some(shared) = signatures.get(&summary) {
             Arc::clone(shared)
         } else {
@@ -184,6 +188,41 @@ fn closure_types_differ(signature: &TCallableSignature, declaration: &FunctionLi
                 .as_ref()
                 .is_some_and(|ty| bound.get_type_signature().map(|bound| &bound.types) != Some(&ty.type_union.types))
         })
+}
+
+/// Full targets display declaration types; include them alongside reduced signatures.
+fn callable_names<'code>(codebase: &'code CodebaseMetadata, union: &TUnion) -> NameDisplay<'code> {
+    let mut types = vec![union];
+    for atomic in union.types.iter() {
+        let Some(callable) = cast_atomic_to_callable(atomic, codebase, None) else { continue };
+        let key = match callable.as_ref() {
+            TCallable::Alias(key) => *key,
+            TCallable::Signature(signature) => {
+                let Some(key) = signature.get_source() else { continue };
+                key
+            }
+        };
+
+        let function = match key {
+            FunctionLikeIdentifier::Method(class, method) => {
+                codebase.get_declaring_method(class.as_bytes(), method.as_bytes())
+            }
+            _ => codebase.get_function_like(&key),
+        };
+
+        if let Some(function) = function {
+            types.extend(
+                function
+                    .parameters
+                    .iter()
+                    .filter_map(|parameter| parameter.type_metadata.as_ref().map(|ty| &ty.type_union)),
+            );
+
+            types.extend(function.return_type_metadata.as_ref().map(|ty| &ty.type_union));
+        }
+    }
+
+    NameDisplay::for_types(codebase, types.into_iter())
 }
 
 #[cfg(test)]
@@ -286,7 +325,7 @@ mod tests {
             first.parameters[0],
             BoundParameter {
                 name: Some(word("$value")),
-                type_name: Some(word("int")),
+                type_name: Some("int".into()),
                 by_reference: true,
                 variadic: false,
                 has_default: false,
@@ -302,7 +341,7 @@ mod tests {
                 has_default: true,
             }
         );
-        assert_eq!(first.return_type, Some(word("int")));
+        assert_eq!(first.return_type.as_deref(), Some("int"));
         let (nullable, uncertain) = types.at_end(30).unwrap();
         assert!(uncertain);
         let CallableTarget::Signature(nullable) = &nullable[0] else { panic!("expected a reduced signature") };
@@ -314,6 +353,84 @@ mod tests {
             |target| matches!(target, CallableTarget::Signature(signature) if signature.parameters[0].name.is_none())
         ));
         assert_eq!(types.invocation_targets_at_end(10), types.at_end(10));
+        let summary = Arc::downgrade(first);
+        drop(types);
+        assert!(summary.upgrade().is_none(), "dropping the file must free its shared display text");
+    }
+
+    #[test]
+    fn partial_type_display_keeps_literals_and_collisions_across_alternatives() {
+        use mago_codex::metadata::ttype::TypeMetadata;
+        use mago_codex::ttype::TType;
+        use mago_codex::ttype::atomic::callable::parameter::TCallableParameter;
+        use mago_codex::ttype::atomic::object::{TObject, named::TNamedObject};
+
+        let key = FunctionLikeIdentifier::Function(word("read"));
+        let mut codebase = CodebaseMetadata::default();
+        let mut metadata = FunctionLikeMetadata::new(
+            FunctionLikeKind::Function,
+            word("read"),
+            word("read"),
+            Span::dummy(0, 0),
+            MetadataFlags::empty(),
+        );
+
+        let named = |name| TUnion::from_atomic(TAtomic::Object(TObject::Named(TNamedObject::new(word(name)))));
+        metadata.return_type_metadata = Some(TypeMetadata::new(named("Right\\User"), Span::dummy(0, 0)));
+        codebase.function_likes.insert((word(""), word("read")), Box::new(metadata));
+        let literal = get_literal_string(word("Left\\User'|enum(Right\\User)"));
+        let signature = |name| {
+            TCallableSignature::new(false, true).with_partial_source(Some(key)).with_parameters(vec![
+                TCallableParameter::new(Some(Arc::new(named(name))), false, false, false),
+                TCallableParameter::new(Some(Arc::new(literal.clone())), false, false, false),
+            ])
+        };
+
+        let partial = |name| TAtomic::Callable(TCallable::Signature(signature(name)));
+        let expressions = HashMap::from_iter([
+            ((0, 10), Rc::new(TUnion::from_vec(vec![partial("Left\\User"), partial("Right\\User")]))),
+            (
+                (20, 30),
+                Rc::new(TUnion::from_vec(vec![partial("Left\\User"), TAtomic::Callable(TCallable::Alias(key))])),
+            ),
+            (
+                (40, 50),
+                Rc::new(TUnion::from_vec(vec![
+                    partial("Left\\User"),
+                    TAtomic::Callable(TCallable::Signature(
+                        TCallableSignature::new(false, true).with_source(Some(key)),
+                    )),
+                ])),
+            ),
+        ]);
+
+        let collected = CallableTypes::collect(&expressions, &codebase);
+        let (alternatives, uncertain) = collected.at_end(10).unwrap();
+        assert!(!uncertain);
+        let displayed: Vec<_> = alternatives
+            .iter()
+            .map(|target| {
+                let CallableTarget::Signature(signature) = target else { panic!("expected partial") };
+                assert_eq!(signature.parameters[1].type_name.as_deref(), Some(literal.get_id().as_str().unwrap()));
+                signature.parameters[0].type_name.as_deref().unwrap()
+            })
+            .collect();
+        assert_eq!(displayed.len(), 2, "display spelling must not merge distinct parameter types");
+        assert!(displayed.contains(&"\\Left\\User") && displayed.contains(&"\\Right\\User"));
+        for end in [30, 50] {
+            let (mixed, _) = collected.at_end(end).unwrap();
+            let signature = mixed
+                .iter()
+                .find_map(
+                    |target| if let CallableTarget::Signature(signature) = target { Some(signature) } else { None },
+                )
+                .unwrap();
+            assert_eq!(
+                signature.parameters[0].type_name.as_deref(),
+                Some("\\Left\\User"),
+                "full declaration metadata must share the collision context"
+            );
+        }
     }
 
     #[test]
@@ -350,7 +467,7 @@ mod tests {
         assert!(!uncertain);
         let CallableTarget::Signature(bound) = &targets[0] else { panic!("expected a bound signature") };
         assert_eq!(bound.key, key);
-        assert_eq!(bound.return_type, Some(word("Domain\\Base")));
+        assert_eq!(bound.return_type.as_deref(), Some("Base"));
 
         codebase.function_likes.get_mut(&(word(""), name)).unwrap().return_type_metadata = None;
         let inferred = HashMap::from_iter([((0, 10), Rc::new(TUnion::from_atomic(signature(get_int()))))]);

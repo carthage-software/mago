@@ -97,6 +97,7 @@ pub mod cast;
 pub mod combination;
 pub mod combiner;
 pub mod comparator;
+pub mod display;
 pub mod error;
 pub mod expander;
 pub mod flags;
