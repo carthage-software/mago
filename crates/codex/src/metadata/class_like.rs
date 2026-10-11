@@ -339,7 +339,7 @@ impl ClassLikeMetadata {
         self.used_traits.extend(traits);
     }
 
-    pub(crate) fn direct_trait_names(&self) -> impl Iterator<Item = Word> + '_ {
+    pub fn direct_trait_names(&self) -> impl Iterator<Item = Word> + '_ {
         self.declared_ancestry
             .as_deref()
             .into_iter()
