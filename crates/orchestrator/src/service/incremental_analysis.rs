@@ -529,7 +529,11 @@ impl IncrementalAnalysisService {
         }
 
         match self.try_analyze_incremental(changed_hint) {
-            Ok(Some(result)) => Ok(result),
+            Ok(Some(result)) => {
+                self.codebase.safe_symbols = WordSet::default();
+                self.codebase.safe_symbol_members = HashSet::default();
+                Ok(result)
+            }
             Ok(None) => self.analyze(),
             Err(error) => {
                 self.reset_analysis();
@@ -3456,6 +3460,36 @@ mod tests {
             only_incr.is_empty() && only_full.is_empty(),
             "[{context}] incremental != full.\n  Only in incremental: {only_incr:?}\n  Only in full: {only_full:?}"
         );
+    }
+
+    #[test]
+    fn incremental_updates_release_skip_sets_before_the_next_pass() {
+        let mut database = make_database(vec![
+            ("changed.php", "<?php class Changed { public function run(): int { return 1; } }"),
+            ("stable.php", "<?php class Stable { public function run(): int { return 1; } }"),
+            ("consumer.php", "<?php function consume(Changed $value): int { return $value->run(); }"),
+        ]);
+        let file = FileId::new(b"changed.php");
+        let mut service = make_watch_service(&database);
+        service.analyze().unwrap();
+
+        for contents in [
+            "<?php class Changed { public function run(): int { return 2; } }",
+            "<?php class Changed { public function run(): string { return 'changed'; } }",
+            "<?php class Changed { public function run(): string { return 'again'; } }",
+        ] {
+            database.update(file, Cow::Borrowed(contents.as_bytes()));
+            service.update_database(database.read_only());
+            service.analyze_incremental(Some(&[file])).unwrap();
+            assert_eq!(service.codebase.safe_symbols.capacity(), 0);
+            assert_eq!(service.codebase.safe_symbol_members.capacity(), 0);
+            assert_matches_full(&service, &database, contents);
+        }
+
+        service.analyze_incremental(Some(&[])).unwrap();
+        assert_eq!(service.codebase.safe_symbols.capacity(), 0);
+        assert_eq!(service.codebase.safe_symbol_members.capacity(), 0);
+        assert_matches_full(&service, &database, "unchanged after releasing skip sets");
     }
 
     #[test]
