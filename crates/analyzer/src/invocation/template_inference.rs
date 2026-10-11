@@ -49,7 +49,6 @@ use mago_span::Span;
 
 use crate::code::IssueCode;
 use crate::context::Context;
-use crate::invocation::MethodTargetContext;
 
 #[derive(Debug, Clone, Copy)]
 pub struct InferenceOptions {
@@ -1069,20 +1068,20 @@ fn infer_templates_from_input_and_container_types<A>(
 pub fn infer_templates_for_method_call<'ctx, A>(
     context: &Context<'ctx, '_, A>,
     object_type: &TNamedObject,
-    method_target_context: &MethodTargetContext<'ctx>,
+    calling_class_like_metadata: &'ctx ClassLikeMetadata,
     method_metadata: &'ctx MethodMetadata,
     declaring_class_like_metadata: &'ctx ClassLikeMetadata,
     template_result: &mut TemplateResult,
 ) where
     A: Arena,
 {
-    if declaring_class_like_metadata.name != method_target_context.class_like_metadata.name {
+    if declaring_class_like_metadata.name != calling_class_like_metadata.name {
         for (template_name, _) in &declaring_class_like_metadata.template_types {
             let template_type = get_specialized_template_type(
                 context.codebase,
                 *template_name,
                 declaring_class_like_metadata.name,
-                method_target_context.class_like_metadata,
+                calling_class_like_metadata,
                 object_type.get_type_parameters(),
             );
 
@@ -1101,7 +1100,7 @@ pub fn infer_templates_for_method_call<'ctx, A>(
             context.codebase,
             *template_name,
             declaring_class_like_metadata.name,
-            method_target_context.class_like_metadata,
+            calling_class_like_metadata,
             object_type.get_type_parameters(),
         ) else {
             continue;

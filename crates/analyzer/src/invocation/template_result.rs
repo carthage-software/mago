@@ -72,47 +72,38 @@ pub fn populate_template_result_from_invocation<'ctx, 'arena, A>(
             return;
         };
 
+        if declaring_class_metadata.template_types.is_empty() {
+            return;
+        }
+
         for (template_name, template_details) in &declaring_class_metadata.template_types {
             if !template_result.template_types.contains_key(template_name) {
                 template_result.template_types.entry(*template_name).or_default().push(template_details.clone());
             }
         }
 
-        if declaring_class_metadata.name != method_context.class_like_metadata.name {
+        let instance_type = get_named_static_class_type(&method_context.class_type);
+        let calling_class_metadata = instance_type
+            .and_then(|instance_type| context.codebase.get_class_like_by_name(instance_type.name))
+            .filter(|metadata| {
+                metadata.name == method_context.class_like_metadata.name
+                    || metadata.has_parent(method_context.class_like_metadata.name)
+            });
+
+        let type_parameters = calling_class_metadata
+            .and(instance_type)
+            .and_then(|instance_type| instance_type.type_parameters.as_deref());
+
+        let calling_class_metadata = calling_class_metadata.unwrap_or(method_context.class_like_metadata);
+
+        if declaring_class_metadata.name != calling_class_metadata.name {
             for (template_name, _) in &declaring_class_metadata.template_types {
-                let template_type = get_specialized_template_type(
-                    context.codebase,
-                    *template_name,
-                    declaring_class_metadata.name,
-                    method_context.class_like_metadata,
-                    None,
-                );
-
-                if let Some(template_type) = template_type {
-                    template_result.add_lower_bound(
-                        *template_name,
-                        GenericParent::ClassLike(declaring_class_metadata.name),
-                        template_type,
-                    );
-                }
-            }
-        }
-
-        if let Some(instance_type) = get_named_static_class_type(&method_context.class_type)
-            && !instance_type.name.as_bytes().eq_ignore_ascii_case(declaring_class_metadata.original_name.as_bytes())
-            && let Some(calling_class_metadata) = context.codebase.get_class_like_by_name(instance_type.name)
-        {
-            for (template_name, _) in &declaring_class_metadata.template_types {
-                if template_result.lower_bounds.get(template_name).is_some_and(|m| !m.is_empty()) {
-                    continue;
-                }
-
                 let template_type = get_specialized_template_type(
                     context.codebase,
                     *template_name,
                     declaring_class_metadata.name,
                     calling_class_metadata,
-                    instance_type.type_parameters.as_deref(),
+                    type_parameters,
                 );
 
                 if let Some(template_type) = template_type {
@@ -147,6 +138,9 @@ pub fn populate_template_result_from_invocation<'ctx, 'arena, A>(
     let is_declaring_instance =
         instance_type.name.as_bytes().eq_ignore_ascii_case(method_context.class_like_metadata.original_name.as_bytes());
 
+    let calling_class_metadata =
+        if is_declaring_instance { None } else { context.codebase.get_class_like_by_name(instance_type.name) };
+
     if is_declaring_instance && let Some(type_parameters) = &instance_type.type_parameters {
         for (template_index, template_type) in type_parameters.iter().enumerate() {
             let Some(template_name) = method_context
@@ -173,9 +167,7 @@ pub fn populate_template_result_from_invocation<'ctx, 'arena, A>(
         }
     }
 
-    if !is_declaring_instance
-        && let Some(calling_class_metadata) = context.codebase.get_class_like_by_name(instance_type.name)
-    {
+    if let Some(calling_class_metadata) = calling_class_metadata {
         for (template_name, _) in &method_context.class_like_metadata.template_types {
             if template_result.lower_bounds.get(template_name).is_some_and(|m| !m.is_empty()) {
                 continue;
@@ -207,7 +199,16 @@ pub fn populate_template_result_from_invocation<'ctx, 'arena, A>(
         return;
     };
 
-    infer_templates_for_method_call(context, instance_type, method_context, method_metadata, metadata, template_result);
+    infer_templates_for_method_call(
+        context,
+        instance_type,
+        calling_class_metadata
+            .filter(|metadata| metadata.has_parent(method_context.class_like_metadata.name))
+            .unwrap_or(method_context.class_like_metadata),
+        method_metadata,
+        metadata,
+        template_result,
+    );
 }
 
 fn get_named_static_class_type(class_type: &StaticClassType) -> Option<&TNamedObject> {
