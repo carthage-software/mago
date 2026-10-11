@@ -17,6 +17,7 @@ use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::cst::Node;
 
+use crate::artifacts::editor::EditorArtifacts;
 use crate::context::block::BlockContext;
 use crate::context::block::ReferenceConstraintSource;
 use crate::context::scope::case_scope::CaseScope;
@@ -26,6 +27,7 @@ use crate::readonly::PendingReadonlyPropertyWrite;
 pub(crate) use self::expression_types::CheckpointAction;
 pub(crate) use self::expression_types::ExpressionTypeCheckpoints;
 
+pub mod editor;
 mod expression_types;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
@@ -73,6 +75,7 @@ pub struct AnalysisArtifacts {
     pub method_calls_parent_initializer: HashMap<(Word, Word), Word>,
     pub closure_bind_scope: Option<ClosureBindScope>,
     pub resolved_method_calls: Vec<ResolvedMethodCall>,
+    pub(crate) editor: Option<EditorArtifacts>,
     pub(crate) variable_definedness: HashMap<(u32, u32), WordMap<VariableDefinedness>>,
     variable_definedness_targets: Option<Arc<[bool; u8::MAX as usize + 1]>>,
     pub(crate) pending_readonly_property_writes: Vec<PendingReadonlyPropertyWrite>,
@@ -108,6 +111,7 @@ impl AnalysisArtifacts {
             method_calls_parent_initializer: HashMap::default(),
             closure_bind_scope: None,
             resolved_method_calls: Vec::new(),
+            editor: None,
             variable_definedness: HashMap::default(),
             variable_definedness_targets: None,
             pending_readonly_property_writes: Vec::new(),
@@ -276,6 +280,9 @@ impl AnalysisArtifacts {
 
     pub(crate) fn begin_expression_type_checkpoint(&mut self) {
         self.expression_type_checkpoints.begin_checkpoint();
+        if let Some(editor) = &mut self.editor {
+            editor.begin_checkpoint();
+        }
     }
 
     pub(crate) fn expression_type_checkpoint_matches(&self, same: impl Fn(&TUnion, &TUnion) -> bool) -> bool {
@@ -284,6 +291,9 @@ impl AnalysisArtifacts {
 
     pub(crate) fn finish_expression_type_checkpoint(&mut self, action: CheckpointAction) {
         self.expression_type_checkpoints.finish_checkpoint(&mut self.expression_types, action);
+        if let Some(editor) = &mut self.editor {
+            editor.finish_checkpoint(action);
+        }
     }
 
     pub(crate) fn remove_expression_type(&mut self, range: &(u32, u32)) {

@@ -188,8 +188,9 @@ where
         function_like_metadata.type_resolution_context.clone().unwrap_or_default(),
     );
 
-    let mut artifacts =
-        AnalysisArtifacts::new().with_variable_definedness_targets(parent_artifacts.variable_definedness_targets());
+    let mut artifacts = AnalysisArtifacts::new()
+        .with_variable_definedness_targets(parent_artifacts.variable_definedness_targets())
+        .with_editor_artifacts(parent_artifacts.editor.is_some());
 
     if let Some(return_type) = &function_like_metadata.return_type_metadata {
         add_symbol_references(&return_type.type_union, &block_context.scope, &mut artifacts);
@@ -361,6 +362,12 @@ where
     parent_artifacts.extend_expression_types(std::mem::take(&mut artifacts.expression_types));
     parent_artifacts.variable_definedness.extend(std::mem::take(&mut artifacts.variable_definedness));
     parent_artifacts.resolved_method_calls.append(&mut artifacts.resolved_method_calls);
+    if let Some(editor) = &mut parent_artifacts.editor
+        && let Some(child) = artifacts.editor.take()
+    {
+        editor.methods.extend(child.methods);
+        editor.members.extend(child.members);
+    }
     parent_artifacts.symbol_references.extend(std::mem::take(&mut artifacts.symbol_references));
     parent_artifacts.pending_readonly_property_writes.append(&mut artifacts.pending_readonly_property_writes);
 

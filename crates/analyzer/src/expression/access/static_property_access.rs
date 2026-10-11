@@ -5,6 +5,7 @@ use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::get_null;
+use mago_span::HasSpan;
 use mago_syntax::cst::Expression;
 use mago_syntax::cst::StaticPropertyAccess;
 use mago_syntax::cst::Variable;
@@ -12,6 +13,7 @@ use mago_word::word;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
+use crate::artifacts::editor::MemberReference;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
@@ -47,7 +49,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticPropertyAccess<'arena> {
         }
 
         let resolution_result =
-            resolve_static_properties(context, block_context, artifacts, self.class, &self.property)?;
+            resolve_static_properties(context, block_context, artifacts, self.class, &self.property, false)?;
 
         let mut resulting_expression_type = None;
         if !resolution_result.has_error_path {
@@ -93,7 +95,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticPropertyAccess<'arena> {
 }
 
 /// Adds symbol reference for a memoized static property access.
-fn add_memoized_static_property_reference<'ctx, 'ast, 'arena, A>(
+pub(super) fn add_memoized_static_property_reference<'ctx, 'ast, 'arena, A>(
     context: &Context<'ctx, 'arena, A>,
     block_context: &BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
@@ -109,16 +111,37 @@ where
     };
 
     let class_name = match class.unparenthesized() {
-        Expression::Identifier(ident) => word(context.resolved_names.get(ident)),
-        Expression::Self_(_) | Expression::Parent(_) | Expression::Static(_) => {
-            block_context.scope.get_class_like_name().unwrap_or_else(|| word(""))
-        }
-        _ => return Ok(()),
+        Expression::Identifier(ident) => Some(word(context.resolved_names.get(ident))),
+        Expression::Self_(_) | Expression::Static(_) => block_context.scope.get_class_like_name(),
+        Expression::Parent(_) => block_context.scope.get_class_like().and_then(|class| class.direct_parent_class),
+        _ => None,
     };
+    if artifacts.editor.is_some() {
+        super::record_cached_receiver(context, block_context, artifacts, class)?;
+        let receiver_type = super::saved_receiver_type(context, block_context, artifacts, class);
+        let mut reference = MemberReference::property(
+            block_context.scope.get_reference_origin(),
+            class.span(),
+            property.span(),
+            property_name,
+        );
 
-    if class_name.is_empty() {
-        return Ok(());
+        reference.lookup_class = class_name;
+        reference.static_access = true;
+        reference.uncertain = receiver_type.as_ref().is_some_and(|union| union.can_be_null());
+        if let Some(editor) = &mut artifacts.editor {
+            editor.record_saved_properties(
+                context.codebase,
+                block_context.scope.get_class_like_name(),
+                reference,
+                receiver_type.as_deref(),
+            );
+        }
     }
+
+    let Some(class_name) = class_name else {
+        return Ok(());
+    };
 
     if let Some(declaring_class) =
         context.codebase.get_declaring_property_class(class_name.as_bytes(), property_name.as_bytes())

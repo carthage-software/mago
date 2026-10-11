@@ -17,6 +17,7 @@ use mago_analyzer::Analyzer;
 use mago_analyzer::analysis_result::AnalysisResult;
 use mago_analyzer::analysis_result::LateSymbolReferenceIssueReconciler;
 use mago_analyzer::artifacts::AnalysisArtifacts;
+use mago_analyzer::artifacts::editor::EditorFileData;
 use mago_analyzer::external::AFTER_FILE_ANALYSIS_BATCH_SIZE;
 use mago_analyzer::external::CodebaseScanFile;
 use mago_analyzer::external::CodebaseScanPlan;
@@ -70,6 +71,7 @@ struct SelectiveAnalysisOutput {
     per_file_issues: HashMap<FileId, IssueCollection>,
     per_file_pragmas: HashMap<FileId, DeferredPragmas>,
     snapshots: Vec<Arc<FileAnalysisSnapshot>>,
+    editor_files: HashMap<FileId, Arc<EditorFileData>>,
     codebase_issues: IssueCollection,
 }
 
@@ -105,6 +107,9 @@ pub struct IncrementalAnalysisService {
     codebase_issues: IssueCollection,
     lifecycle_issues: IssueCollection,
     analysis_snapshots: HashMap<FileId, Arc<FileAnalysisSnapshot>>,
+    editor_artifacts: bool,
+    editor_artifacts_need_full: bool,
+    editor_files: HashMap<FileId, Arc<EditorFileData>>,
     codebase_scan_plan: Option<Arc<CodebaseScanPlan>>,
     codebase_scan_files: HashMap<FileId, CodebaseScanFile>,
 }
@@ -129,6 +134,9 @@ impl std::fmt::Debug for IncrementalAnalysisService {
             .field("codebase_issues", &self.codebase_issues.len())
             .field("lifecycle_issues", &self.lifecycle_issues.len())
             .field("analysis_snapshots", &self.analysis_snapshots.len())
+            .field("editor_files", &self.editor_files.len())
+            .field("editor_artifacts", &self.editor_artifacts)
+            .field("editor_artifacts_need_full", &self.editor_artifacts_need_full)
             .field("codebase_scan_plan", &self.codebase_scan_plan.is_some())
             .field("codebase_scan_files", &self.codebase_scan_files.len())
             .finish()
@@ -180,6 +188,9 @@ impl IncrementalAnalysisService {
             codebase_issues: IssueCollection::default(),
             lifecycle_issues: IssueCollection::default(),
             analysis_snapshots: HashMap::default(),
+            editor_artifacts: false,
+            editor_artifacts_need_full: false,
+            editor_files: HashMap::default(),
             codebase_scan_plan: None,
             codebase_scan_files: HashMap::default(),
         }
@@ -191,6 +202,21 @@ impl IncrementalAnalysisService {
     /// updated database that reflects file changes.
     pub fn update_database(&mut self, database: ReadDatabase) {
         self.database = database;
+    }
+
+    /// Enables editor data capture. Enabling it after analysis rebuilds data on the next run.
+    pub fn set_editor_artifacts(&mut self, enabled: bool) {
+        if self.editor_artifacts != enabled {
+            self.editor_artifacts = enabled;
+            self.editor_artifacts_need_full = enabled && self.initialized;
+            self.editor_files.clear();
+        }
+    }
+
+    /// Returns editor data from the last completed analysis of this file.
+    #[must_use]
+    pub fn editor_file(&self, file_id: FileId) -> Option<&Arc<EditorFileData>> {
+        self.editor_files.get(&file_id)
     }
 
     /// Returns whether the service holds a completed analysis. A failed update clears it.
@@ -366,6 +392,7 @@ impl IncrementalAnalysisService {
         self.codebase_issues = IssueCollection::default();
         self.lifecycle_issues = IssueCollection::default();
         self.analysis_snapshots = HashMap::default();
+        self.editor_files = HashMap::default();
         self.codebase_scan_plan = None;
         self.codebase_scan_files = HashMap::default();
     }
@@ -462,6 +489,7 @@ impl IncrementalAnalysisService {
             per_file_issues,
             per_file_pragmas,
             snapshots,
+            editor_files,
             codebase_issues: all_codebase_issues,
         } =
             self.run_analyzer_selective(&mut merged_codebase, symbol_references, &self.settings, &HashSet::default())?;
@@ -470,6 +498,7 @@ impl IncrementalAnalysisService {
         self.native_symbol_references = native_symbol_references;
         self.lifecycle_issues = analysis_result.issues.clone();
         self.analysis_snapshots = snapshots.into_iter().map(|snapshot| (snapshot.file_id(), snapshot)).collect();
+        self.editor_files = editor_files;
 
         // Distribute codebase issues to per-file caches.
         self.file_states = file_states;
@@ -496,6 +525,7 @@ impl IncrementalAnalysisService {
             self.codebase_issues.len(),
         );
         self.initialized = true;
+        self.editor_artifacts_need_full = false;
         self.needs_full_rebuild = false;
 
         Ok(analysis_result)
@@ -518,7 +548,7 @@ impl IncrementalAnalysisService {
         &mut self,
         changed_hint: Option<&[FileId]>,
     ) -> Result<AnalysisResult, OrchestratorError> {
-        if self.needs_full_rebuild {
+        if self.needs_full_rebuild || self.editor_artifacts_need_full {
             return self.analyze();
         }
 
@@ -556,6 +586,11 @@ impl IncrementalAnalysisService {
 
         // Detect deleted files (present in cache but no longer in database)
         let current_file_ids: HashSet<FileId> = source_files.iter().map(|f| f.id).collect();
+        let current_editor_files: HashSet<FileId> = if self.editor_artifacts {
+            source_files.iter().filter(|file| file.file_type == FileType::Host).map(|file| file.id).collect()
+        } else {
+            HashSet::default()
+        };
         let deleted_count = self.file_states.keys().filter(|id| !current_file_ids.contains(id)).count();
         if deleted_count > 0 {
             tracing::debug!("{} file(s) deleted since last run", deleted_count);
@@ -896,12 +931,15 @@ impl IncrementalAnalysisService {
                 mut per_file_issues,
                 per_file_pragmas,
                 snapshots,
+                editor_files,
                 codebase_issues: new_codebase_issues,
             } = self.run_analyzer_selective(&mut merged_codebase, symbol_references, &self.settings, &files_to_skip)?;
             self.external_symbol_references = external_symbol_references;
             self.late_symbol_references = late_symbol_references;
             self.native_symbol_references = native_symbol_references;
             self.lifecycle_issues = std::mem::take(&mut analysis_result.issues);
+            self.editor_files.retain(|file_id, _| current_editor_files.contains(file_id));
+            self.editor_files.extend(editor_files);
             self.analysis_snapshots.retain(|file_id, _| current_file_ids.contains(file_id));
             for snapshot in snapshots {
                 self.analysis_snapshots.insert(snapshot.file_id(), snapshot);
@@ -1145,12 +1183,15 @@ impl IncrementalAnalysisService {
             mut per_file_issues,
             per_file_pragmas,
             snapshots,
+            editor_files,
             codebase_issues: new_codebase_issues,
         } = self.run_analyzer_selective(&mut merged_codebase, symbol_references, &self.settings, &files_to_skip)?;
         self.external_symbol_references = external_symbol_references;
         self.late_symbol_references = late_symbol_references;
         self.native_symbol_references = native_symbol_references;
         self.lifecycle_issues = std::mem::take(&mut analysis_result.issues);
+        self.editor_files.retain(|file_id, _| current_editor_files.contains(file_id));
+        self.editor_files.extend(editor_files);
         self.analysis_snapshots.retain(|file_id, _| current_file_ids.contains(file_id));
         for snapshot in snapshots {
             self.analysis_snapshots.insert(snapshot.file_id(), snapshot);
@@ -1492,7 +1533,7 @@ impl IncrementalAnalysisService {
         #[cfg(not(target_arch = "wasm32"))]
         let analysis_duration_threshold = Duration::from_millis(u64::from(settings.slow_file_warning_threshold_ms));
 
-        let results: Vec<(FileId, AnalysisResult, Option<Arc<FileAnalysisSnapshot>>)> = host_files
+        let results: Vec<_> = host_files
             .into_par_iter()
             .map_init(LocalArena::new, |arena, source_file| {
                 let file_id = source_file.id;
@@ -1508,6 +1549,9 @@ impl IncrementalAnalysisService {
                 let semantics_checker = SemanticsChecker::new(settings.version);
                 let mut analyzer =
                     Analyzer::new(arena, &source_file, &resolved_names, codebase, plugin_registry, settings.clone());
+                if self.editor_artifacts {
+                    analyzer = analyzer.with_editor_artifacts();
+                }
                 if let Some(requirements) = node_analysis_requirements.as_ref() {
                     analyzer = analyzer.with_node_analysis_requirements(requirements);
                 }
@@ -1523,6 +1567,7 @@ impl IncrementalAnalysisService {
 
                 analysis_result.issues.extend(semantics_checker.check(&source_file, program, &resolved_names));
                 let artifacts = analyzer.analyze_with_artifacts(program, &mut analysis_result)?;
+                let editor_data = artifacts.editor_data().map(Arc::new);
                 #[cfg(not(target_arch = "wasm32"))]
                 let snapshot_start = (trace_enabled && (after_file || after_analysis)).then(Instant::now);
                 let snapshot = if after_file || after_analysis {
@@ -1560,7 +1605,7 @@ impl IncrementalAnalysisService {
 
                 arena.reset();
 
-                Ok((file_id, analysis_result, snapshot))
+                Ok((file_id, analysis_result, snapshot, editor_data))
             })
             .collect::<Result<Vec<_>, OrchestratorError>>()?;
 
@@ -1579,8 +1624,9 @@ impl IncrementalAnalysisService {
         let mut per_file_issues: HashMap<FileId, IssueCollection> = HashMap::default();
         let mut per_file_pragmas: HashMap<FileId, DeferredPragmas> = HashMap::default();
         let mut snapshots = Vec::new();
+        let mut editor_files = HashMap::default();
 
-        for (file_id, mut result, snapshot) in results {
+        for (file_id, mut result, snapshot, editor_data) in results {
             let mut deferred_pragmas = result.take_deferred_pragmas();
             aggregated_result.symbol_references.extend(result.symbol_references);
             per_file_issues.insert(file_id, result.issues);
@@ -1592,6 +1638,9 @@ impl IncrementalAnalysisService {
                 "one file analysis must produce at most one deferred pragma state",
             );
             snapshots.extend(snapshot);
+            if let Some(editor_data) = editor_data {
+                editor_files.insert(file_id, editor_data);
+            }
         }
 
         let mut late_symbol_references_by_file = HashMap::<FileId, SymbolReferences>::default();
@@ -1744,6 +1793,7 @@ impl IncrementalAnalysisService {
             per_file_issues,
             per_file_pragmas,
             snapshots,
+            editor_files,
             codebase_issues,
         })
     }
@@ -1801,6 +1851,299 @@ mod tests {
         )
     }
 
+    #[test]
+    fn test_editor_data_retains_resolved_methods_and_replaces_changed_files() {
+        let source = "<?php
+            class Base {
+                public function run(): void {}
+                public function next(): self { return $this; }
+                public static function make(): static { return new static(); }
+            }
+            class Child extends Base {
+                public function probe(): void { self::make(); static::make(); parent::make(); $this->run(); }
+            }
+            class Other { public function run(): void {} }
+            class Magic { public function __call(string $name, array $args): mixed { return null; } }
+            function use_it(Child|Other $item, Magic $magic, Base $base): void {
+                $item->run();
+                $name = 'run'; $item->$name();
+                $magic->missing();
+                $f = fn() => $item->run();
+                $base->next()->run();
+            }
+        ";
+        let file_id = FileId::new(b"src/main.php");
+        let mut db = make_database(vec![("src/main.php", source)]);
+        let mut service = make_service(&db);
+        service.analyze().expect("Initial analysis failed");
+        assert!(service.editor_file(file_id).is_none());
+        service.set_editor_artifacts(true);
+        service.analyze_incremental(None).expect("Editor capture failed");
+        let data = Arc::clone(service.editor_file(file_id).expect("Missing editor data"));
+        let offset = source.find("$item->run()").unwrap() as u32 + 7;
+        let union_targets: Vec<_> = data.methods.iter().filter(|row| row.selector_span.0 == offset).collect();
+        assert_eq!(union_targets.len(), 2);
+        assert!(union_targets.iter().any(|row| {
+            row.receiver_class.as_bytes() == b"Child" && row.method.get_class_name().as_bytes() == b"base"
+        }));
+        assert!(union_targets.iter().all(|row| {
+            let span = row.declaration.expect("Missing declaration");
+            &source.as_bytes()[span.start.offset as usize..span.end.offset as usize] == b"run"
+                && !row.dynamic
+                && !row.magic
+                && !row.uncertain
+        }));
+        assert!(data.methods.iter().any(|row| row.dynamic));
+        assert!(data.methods.iter().any(|row| row.magic && row.method.get_method_name().as_bytes() == b"__call"));
+        assert_eq!(data.methods.iter().filter(|row| row.static_access).count(), 3);
+        let chained = source.find("->next()->run").unwrap() as u32 + 10;
+        assert!(data.methods.iter().any(|row| row.selector_span.0 == chained));
+        let arrow = source.find("fn() => $item->run").unwrap() as u32 + 15;
+        assert_eq!(data.methods.iter().filter(|row| row.selector_span.0 == arrow).count(), 2);
+        assert!(!data.expression_classes.is_empty());
+        service.analyze_incremental(None).expect("Unchanged analysis failed");
+        assert!(Arc::ptr_eq(&data, service.editor_file(file_id).unwrap()));
+        db.update(file_id, Cow::Owned(source.replace("$item->run();", "$item->missing();").into_bytes()));
+        service.update_database(db.read_only());
+        service.analyze_incremental(Some(&[file_id])).expect("Changed analysis failed");
+        let changed = service.editor_file(file_id).unwrap();
+        assert!(!Arc::ptr_eq(&data, changed));
+        assert!(changed.methods.iter().all(|row| row.selector_span.0 != offset));
+        service.update_database(make_database(vec![]).read_only());
+        service.analyze_incremental(None).expect("Deletion analysis failed");
+        assert!(service.editor_file(file_id).is_none());
+        service.set_editor_artifacts(false);
+        assert!(service.editor_files.is_empty());
+    }
+
+    #[test]
+    fn test_editor_members_keep_targets_spans_and_memoized_reads() {
+        use mago_analyzer::artifacts::editor::MemberKind;
+
+        let source = "<?php
+            class Base {
+                public int $value = 1;
+                public static int $shared = 1;
+                public const FLAG = 1, OTHER = 2;
+            }
+            class Child extends Base {
+                public function probe(): void {
+                    self::$shared; static::$shared; parent::$shared; parent::$shared;
+                    self::FLAG; static::FLAG; parent::FLAG;
+                }
+            }
+            class Other { public int $value = 2; }
+            /** @property int $ghost */
+            class Magic {
+                public function __get(string $name): mixed { return null; }
+                public function __set(string $name, mixed $value): void {}
+            }
+            enum Status { case Ready; }
+            function use_it(Child|Other $item, ?Child $nullable, Child $child, Magic $magic, Child|Status $unknown): void {
+                $item->value; $item->value;
+                $unknown->value; $unknown->value;
+                $nullable?->value;
+                $child->value = 3; $child->value;
+                Child::$shared = 4; Child::$shared; Child::$shared;
+                $name = 'value'; $item->$name; $item->$name;
+                $magic->ghost; $magic->ghost; $magic->ghost = 1;
+                $magic->missing; $magic->missing;
+                Child::FLAG; Base::FLAG; Child::OTHER;
+                Child::{'FLAG'}; Status::Ready;
+                $f = fn() => $item->value;
+            }
+        ";
+        let file_id = FileId::new(b"src/main.php");
+        let db = make_database(vec![("src/main.php", source)]);
+        let mut service = make_service(&db);
+        service.set_editor_artifacts(true);
+        service.analyze().expect("Member analysis failed");
+        let data = service.editor_file(file_id).expect("Missing editor data");
+        let rows = |text: &str, selector: &str| {
+            let start = (source.find(text).unwrap() + text.rfind(selector).unwrap()) as u32;
+            data.members.iter().filter(move |row| row.selector_span.0 == start).collect::<Vec<_>>()
+        };
+        for text in ["$item->value", "$item->value; $item->value", "fn() => $item->value"] {
+            let targets = rows(text, "value");
+            assert_eq!(targets.len(), 2, "{text}");
+            assert!(targets.iter().all(|row| row.kind == MemberKind::Property && !row.uncertain && !row.write));
+            assert!(targets.iter().any(|row| row.lookup_class.is_some_and(|class| class.as_bytes() == b"Child")));
+            assert_ne!(targets[0].declaration, targets[1].declaration);
+        }
+        let nullable = rows("$nullable?->value", "value");
+        assert_eq!(nullable.len(), 1);
+        assert!(!nullable[0].uncertain);
+        for text in ["$unknown->value", "$unknown->value; $unknown->value"] {
+            let targets = rows(text, "value");
+            assert!(!targets.is_empty());
+            assert!(targets.iter().all(|row| row.uncertain));
+        }
+        assert!(rows("$child->value =", "value")[0].write);
+        assert!(!rows("$child->value = 3; $child->value", "value")[0].write);
+        for text in [
+            "self::$shared",
+            "static::$shared",
+            "parent::$shared",
+            "parent::$shared; parent::$shared",
+            "Child::$shared; Child::$shared",
+        ] {
+            let targets = rows(text, "$shared");
+            assert_eq!(targets.len(), 1, "{text}");
+            assert!(targets[0].static_access && !targets[0].write && !targets[0].uncertain);
+        }
+        assert!(rows("Child::$shared =", "$shared")[0].write);
+        for text in ["$item->$name", "$item->$name; $item->$name"] {
+            let targets = rows(text, "$name");
+            assert_eq!(targets.len(), 2);
+            assert!(targets.iter().all(|row| row.dynamic));
+        }
+        for text in [
+            "$magic->ghost",
+            "$magic->ghost; $magic->ghost",
+            "$magic->ghost =",
+            "$magic->missing",
+            "$magic->missing; $magic->missing",
+        ] {
+            let selector = if text.contains("ghost") { "ghost" } else { "missing" };
+            let targets = rows(text, selector);
+            assert_eq!(targets.len(), 1, "{text}");
+            assert!(targets[0].magic);
+        }
+        let inherited = rows("Child::FLAG", "FLAG")[0];
+        for text in ["Base::FLAG", "self::FLAG", "static::FLAG", "parent::FLAG"] {
+            assert_eq!(rows(text, "FLAG")[0].declaration, inherited.declaration);
+        }
+        assert_eq!(inherited.kind, MemberKind::ClassConstant);
+        assert!(rows("Child::{'FLAG'}", "{'FLAG'}")[0].dynamic);
+        assert_eq!(rows("Status::Ready", "Ready")[0].kind, MemberKind::EnumCase);
+        for row in data.members.iter().filter(|row| !row.magic && !row.dynamic && !row.uncertain) {
+            let declaration = row.declaration.expect("Missing declaration");
+            assert_eq!(
+                &source.as_bytes()[declaration.start.offset as usize..declaration.end.offset as usize],
+                row.name.as_bytes()
+            );
+            assert!(!source.as_bytes()[row.receiver_span.0 as usize..row.receiver_span.1 as usize].is_empty());
+        }
+        assert!(data.members.is_sorted_by_key(|row| row.selector_span));
+    }
+
+    fn check_editor_member_memoization(source: &str) -> Arc<EditorFileData> {
+        let file_id = FileId::new(b"src/main.php");
+        let db = make_database(vec![("src/main.php", source)]);
+        let mut cached = make_service(&db);
+        cached.set_editor_artifacts(true);
+        let cached_result = cached.analyze().expect("Cached analysis failed");
+        let data = Arc::clone(cached.editor_file(file_id).expect("Missing cached editor data"));
+        let mut fresh = make_service(&db);
+        fresh.set_editor_artifacts(true);
+        fresh.settings.memoize_properties = false;
+        fresh.analyze().expect("Fresh analysis failed");
+        let signature = |data: &EditorFileData| {
+            data.members
+                .iter()
+                .map(|row| {
+                    (
+                        row.selector_span,
+                        row.receiver_span,
+                        row.kind,
+                        row.name,
+                        row.declaration,
+                        row.static_access,
+                        row.dynamic,
+                        row.write,
+                        row.magic,
+                        row.uncertain,
+                    )
+                })
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(signature(&data), signature(fresh.editor_file(file_id).unwrap()));
+        let plain_result = make_service(&db).analyze().expect("Plain analysis failed");
+        assert_eq!(diff_issues(&cached_result.issues, &plain_result.issues), (vec![], vec![]));
+        data
+    }
+
+    #[test]
+    fn test_editor_members_keep_cached_receiver_chains() {
+        let source = "<?php
+            class Leaf { public int $value = 1; public static int $shared = 1; }
+            class OtherLeaf { public int $value = 2; }
+            class Box {
+                public Leaf $child;
+                public static Leaf $one;
+                /** @var list<Leaf> */ public array $items = [];
+                /** @var array{left: Leaf, right: OtherLeaf} */ public array $keyed = [];
+            }
+            function reads(Box $box, ?Box $nullable): void {
+                $box->child->value; $box->child->value;
+                $nullable?->child?->value; $nullable?->child?->value;
+                $box->child::$shared; $box->child::$shared;
+                Box::$one->value; Box::$one->value;
+                $box->items[0]->value; $box->items[0]->value;
+                $box->keyed['left']->value; $box->keyed['left']->value;
+                $box->keyed['right']->value; $box->keyed['right']->value;
+            }
+        ";
+        let data = check_editor_member_memoization(source);
+        for (expression, selector) in [
+            ("$box->child->value", "child"),
+            ("$nullable?->child?->value", "child"),
+            ("$box->child::$shared", "child"),
+            ("Box::$one->value", "$one"),
+            ("$box->items[0]->value", "items"),
+            ("$box->keyed['left']->value", "keyed"),
+            ("$box->keyed['right']->value", "keyed"),
+        ] {
+            for (start, _) in source.match_indices(expression) {
+                let offset = (start + expression.find(selector).unwrap()) as u32;
+                assert_eq!(data.members.iter().filter(|row| row.selector_span.0 == offset).count(), 1, "{expression}");
+            }
+        }
+    }
+
+    #[test]
+    fn test_editor_members_keep_cached_requirement_and_mixin_targets() {
+        let source = "<?php
+            class Base { public int $value = 1; public static int $shared = 1; }
+            interface Contract { public int $contract { get; } }
+            /** @require-extends Base */
+            trait RequiredBase {
+                public function reads(): void {
+                    $this->value; $this->value;
+                    self::$shared; self::$shared;
+                }
+            }
+            /** @require-implements Contract */
+            trait RequiredContract { public function reads(): void { $this->contract; $this->contract; } }
+            class Getter { public function __get(string $name): mixed { return null; } }
+            /** @property-read int $secret */
+            class Source { private string $secret = ''; }
+            /** @mixin Base */
+            class Mixin extends Getter {}
+            /** @mixin Source */
+            class MagicMixin extends Getter {}
+            /**
+             * @template T of object
+             * @mixin T
+             */
+            class GenericMixin extends Getter {}
+            /** @param GenericMixin<Base> $generic */
+            function reads(Mixin $mixin, MagicMixin $magic, GenericMixin $generic): void {
+                $mixin->value; $mixin->value;
+                $magic->secret; $magic->secret;
+                $generic->value; $generic->value;
+            }
+        ";
+        let data = check_editor_member_memoization(source);
+        assert!(!data.members.is_empty());
+        assert!(data.members.iter().filter(|row| !row.magic).all(|row| row.declaration.is_some() && !row.uncertain), "{:?}", data.members);
+        let magic: Vec<_> = data.members.iter().filter(|row| row.magic).collect();
+        assert_eq!(magic.len(), 2);
+        assert!(magic.iter().all(|row| row.name.as_bytes() == b"$secret" && row.declaration.is_none() && row.uncertain));
+        assert_eq!(data.members.iter().filter(|row| row.name.as_bytes() == b"$contract").count(), 2);
+        assert_eq!(data.members.iter().filter(|row| row.static_access).count(), 2);
+    }
+
     fn diff_issues(a: &IssueCollection, b: &IssueCollection) -> (Vec<String>, Vec<String>) {
         let sig = |i: &Issue| -> String {
             let span_info = i
@@ -1825,6 +2168,7 @@ mod tests {
     fn failed_updates_discard_analysis_and_retry_without_new_changes() {
         use std::sync::atomic::AtomicBool;
         use std::sync::atomic::Ordering;
+        use std::sync::{Mutex, Weak};
 
         use mago_analyzer::plugin::PluginError;
         use mago_analyzer::plugin::context::HookContext;
@@ -1834,6 +2178,7 @@ mod tests {
 
         struct FailingHook {
             fail: Arc<AtomicBool>,
+            previous_editor: Arc<Mutex<Option<Weak<EditorFileData>>>>,
         }
 
         impl Provider for FailingHook {
@@ -1850,6 +2195,14 @@ mod tests {
                 _program: &Program<'_>,
                 _context: &mut HookContext<'_, '_>,
             ) -> HookResult<HookAction> {
+                let previous =
+                    self.previous_editor.lock().map_err(|error| PluginError::Internal { reason: error.to_string() })?;
+                if previous.as_ref().is_some_and(|previous| previous.upgrade().is_some()) {
+                    return Err(PluginError::Internal {
+                        reason: "full analysis retained the old generation".to_string(),
+                    });
+                }
+
                 if self.fail.load(Ordering::Relaxed) {
                     return Err(PluginError::Internal { reason: "test failure".to_string() });
                 }
@@ -1866,15 +2219,23 @@ mod tests {
             let mut database =
                 make_database(vec![("a.php", "<?php class Before { function run(): int { return missing(); } }")]);
             let fail = Arc::new(AtomicBool::new(false));
+            let previous_editor = Arc::new(Mutex::new(None));
             let mut plugins = PluginRegistry::with_library_providers();
             plugins.register_program_hook(FailingHook {
                 fail: Arc::clone(&fail),
+                previous_editor: Arc::clone(&previous_editor),
             });
 
             let mut service = make_service(&database);
             service.plugin_registry = Arc::new(plugins);
+            service.set_editor_artifacts(true);
             assert!(!service.analyze().unwrap().issues.is_empty());
             let file = FileId::new(b"a.php");
+            let old_editor = Arc::downgrade(service.editor_file(file).unwrap());
+            if full {
+                *previous_editor.lock().unwrap() = Some(Weak::clone(&old_editor));
+            }
+
             let base = Arc::clone(&service.base_codebase);
             let base_references = Arc::clone(&service.base_symbol_references);
             let plugins = Arc::clone(&service.plugin_registry);
@@ -1898,6 +2259,8 @@ mod tests {
             assert!(service.analysis_snapshots.is_empty());
             assert!(service.codebase_scan_plan.is_none());
             assert!(service.codebase_scan_files.is_empty());
+            assert!(old_editor.upgrade().is_none());
+            assert!(service.editor_artifacts);
             assert!(Arc::ptr_eq(&base, &service.base_codebase));
             assert!(Arc::ptr_eq(&base_references, &service.base_symbol_references));
             assert!(Arc::ptr_eq(&plugins, &service.plugin_registry));
@@ -1909,6 +2272,7 @@ mod tests {
             assert!(service.is_initialized());
             assert!(!service.needs_full_rebuild);
             assert!(service.codebase().get_declaring_method(class.as_bytes(), method.as_bytes()).is_some());
+            assert!(service.editor_file(file).is_some());
         }
     }
 

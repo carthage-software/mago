@@ -35,8 +35,14 @@ pub(crate) fn analyze<'ctx, 'arena, A>(
 where
     A: Arena,
 {
-    let property_resolution =
-        resolve_static_properties(context, block_context, artifacts, property_access.class, &property_access.property)?;
+    let property_resolution = resolve_static_properties(
+        context,
+        block_context,
+        artifacts,
+        property_access.class,
+        &property_access.property,
+        true,
+    )?;
 
     let mut resolved_property_type = None;
     let mut matched_all_properties = true;

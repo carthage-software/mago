@@ -377,6 +377,18 @@ where
         artifacts.symbol_references.add_reference_for_method_call(&block_context.scope, &method_id);
     }
 
+    if let Some(editor) = &mut artifacts.editor {
+        editor.record_methods(
+            context.codebase,
+            block_context.scope.get_reference_origin(),
+            object.span(),
+            selector,
+            access_span,
+            false,
+            &result,
+        );
+    }
+
     Ok(result)
 }
 

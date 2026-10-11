@@ -84,7 +84,7 @@ pub(super) struct Snapshot<'ctx> {
     scope: NamespaceScope,
     statement_span: Span,
     artifacts: AnalysisArtifacts,
-    outputs: [usize; 5],
+    outputs: [usize; 6],
     issues_empty: bool,
 }
 
@@ -169,13 +169,14 @@ impl<'ctx> Snapshot<'ctx> {
     }
 }
 
-fn output_lengths(artifacts: &AnalysisArtifacts) -> [usize; 5] {
+fn output_lengths(artifacts: &AnalysisArtifacts) -> [usize; 6] {
     [
         artifacts.inferred_return_types.len(),
         artifacts.inferred_yield_key_types.len(),
         artifacts.inferred_yield_value_types.len(),
         artifacts.resolved_method_calls.len(),
         artifacts.pending_readonly_property_writes.len(),
+        artifacts.editor.as_ref().map_or(0, |editor| editor.methods.len()),
     ]
 }
 

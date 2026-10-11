@@ -40,6 +40,7 @@ use mago_word::word;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
+use crate::artifacts::editor::MemberReference;
 use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
@@ -58,6 +59,7 @@ use crate::visibility::is_visible_from_scope;
 #[derive(Debug)]
 pub struct ResolvedProperty {
     pub property_name: Word,
+    pub lookup_class: Option<Word>,
     pub declaring_class_id: Option<Word>,
     pub property_span: Option<Span>,
     pub property_type: TUnion,
@@ -202,6 +204,7 @@ where
                 if all_properties_match {
                     for prop_name in &property_names {
                         result.properties.push(ResolvedProperty {
+                            lookup_class: None,
                             property_span: None,
                             property_name: *prop_name,
                             declaring_class_id: None,
@@ -237,6 +240,7 @@ where
                 if all_properties_match {
                     for prop_name in &property_names {
                         result.properties.push(ResolvedProperty {
+                            lookup_class: None,
                             property_span: None,
                             property_name: *prop_name,
                             declaring_class_id: None,
@@ -310,6 +314,7 @@ where
                     }
 
                     let resolved_property = ResolvedProperty {
+                        lookup_class: None,
                         property_span: None,
                         property_name: *prop_name,
                         declaring_class_id: None,
@@ -334,8 +339,9 @@ where
 
         for prop_name in &property_names {
             if let TObject::Enum(enum_type) = object
-                && let Some(resolved) = resolve_enum_builtin_property(context, enum_type, *prop_name)
+                && let Some(mut resolved) = resolve_enum_builtin_property(context, enum_type, *prop_name)
             {
+                resolved.lookup_class = Some(classname);
                 result.properties.push(resolved);
                 continue;
             }
@@ -367,11 +373,12 @@ where
                 ),
             };
 
-            let Some(resolved_property) = resolved_property else {
+            let Some(mut resolved_property) = resolved_property else {
                 result.has_invalid_path = true;
 
                 continue;
             };
+            resolved_property.lookup_class = Some(classname);
 
             if resolved_property.is_magic {
                 if magic_method.is_none() {
@@ -412,6 +419,19 @@ where
 
     result.all_properties_non_nullable =
         !result.properties.is_empty() && result.properties.iter().all(|p| !p.property_type.is_nullable());
+
+    if let Some(editor) = &mut artifacts.editor {
+        let mut reference = MemberReference::property(
+            block_context.scope.get_reference_origin(),
+            object_expression.span(),
+            property_selector.span(),
+            word(""),
+        );
+        reference.dynamic = !matches!(property_selector, ClassLikeMemberSelector::Identifier(_));
+        reference.write = for_assignment;
+        reference.uncertain = result.encountered_null && !is_null_safe;
+        editor.record_properties(reference, &result);
+    }
 
     Ok(result)
 }
@@ -460,6 +480,7 @@ where
 
         result.has_unreadable_property |= effective.read_type.is_none();
         return Ok(Some(ExternalPropertyResolution::Resolved(ResolvedProperty {
+            lookup_class: None,
             property_name: property,
             declaring_class_id: None,
             property_span: None,
@@ -476,6 +497,7 @@ where
     };
 
     Ok(Some(ExternalPropertyResolution::Resolved(ResolvedProperty {
+        lookup_class: None,
         property_name: property,
         declaring_class_id: None,
         property_span: None,
@@ -547,6 +569,7 @@ where
         }
 
         Some(ResolvedProperty {
+            lookup_class: None,
             property_span: None,
             property_name: prop_name,
             declaring_class_id: Some(word(b"UnitEnum")),
@@ -564,6 +587,7 @@ where
         }
 
         Some(ResolvedProperty {
+            lookup_class: None,
             property_span: None,
             property_name: prop_name,
             declaring_class_id: Some(word(b"BackedEnum")),
@@ -754,6 +778,7 @@ fn get_resolved_declared_property(
     let property_metadata = resolution.property;
 
     ResolvedProperty {
+        lookup_class: None,
         property_span: property_metadata.name_span.or(property_metadata.span),
         property_name: prop_name,
         declaring_class_id: Some(resolution.declaring_class.name),
@@ -832,6 +857,7 @@ where
                 let prop_meta = required_resolution.property;
 
                 return Some(ResolvedProperty {
+                    lookup_class: None,
                     property_span: prop_meta.name_span.or(prop_meta.span),
                     property_name: prop_name,
                     declaring_class_id: Some(required_resolution.declaring_class.name),
@@ -849,14 +875,10 @@ where
         // Check mixins.
         if !class_metadata.mixins.is_empty() {
             // Try to find property in mixin types
-            if let Some(resolved) = find_property_in_mixins(
-                context,
-                class_metadata,
-                object,
-                &class_metadata.mixins,
-                prop_name,
-                for_assignment,
-            ) {
+            if let Some(resolution) =
+                find_property_in_mixins(context.codebase, class_metadata, object, &class_metadata.mixins, prop_name)
+            {
+                let resolved = get_resolved_declared_property(context.codebase, &resolution, prop_name, for_assignment);
                 // For an annotation-governed mixin property, the caller reports a missing
                 // `__get`/`__set` on the accessed class; the mixin-specific warnings below
                 // cover real mixin properties only.
@@ -910,6 +932,7 @@ where
             );
 
             return Some(ResolvedProperty {
+                lookup_class: None,
                 property_span: None,
                 property_name: prop_name,
                 declaring_class_id: Some(class_id),
@@ -935,6 +958,7 @@ where
             );
 
             return Some(ResolvedProperty {
+                lookup_class: None,
                 property_span: None,
                 property_name: prop_name,
                 declaring_class_id: None,
@@ -1055,6 +1079,7 @@ where
     }
 
     Some(ResolvedProperty {
+        lookup_class: None,
         property_span: property_metadata.name_span.or(property_metadata.span),
         property_name: prop_name,
         declaring_class_id: Some(declaring_class_id),
@@ -1639,33 +1664,26 @@ fn type_has_property_assertion(intersection_types: Option<&[TAtomic]>, property_
 }
 
 /// Searches for a property in mixin types.
-/// Returns Some(ResolvedProperty) if the property is found in a mixin, None otherwise.
+/// Returns the declaration if the property exists in a mixin.
 /// When the mixin type is a generic parameter (e.g., `@mixin T`), tries to resolve it
 /// using the outer_object's type_parameters.
-fn find_property_in_mixins<A>(
-    context: &Context<'_, '_, A>,
+pub(crate) fn find_property_in_mixins<'ctx>(
+    codebase: &'ctx CodebaseMetadata,
     class_metadata: &ClassLikeMetadata,
     outer_object: &TObject,
     mixins: &[TypeMetadata],
     prop_name: Word,
-    for_assignment: bool,
-) -> Option<ResolvedProperty>
-where
-    A: Arena,
-{
+) -> Option<DeclaredProperty<'ctx>> {
     for mixin_type in mixins {
         for mixin_atomic in mixin_type.type_union.types.as_ref() {
             match mixin_atomic {
                 TAtomic::Object(TObject::Named(named)) => {
-                    if let Some(result) = find_property_in_single_mixin(context, named.name, prop_name, for_assignment)
-                    {
+                    if let Some(result) = find_property_in_single_mixin(codebase, named.name, prop_name) {
                         return Some(result);
                     }
                 }
                 TAtomic::Object(TObject::Enum(enum_type)) => {
-                    if let Some(result) =
-                        find_property_in_single_mixin(context, enum_type.name, prop_name, for_assignment)
-                    {
+                    if let Some(result) = find_property_in_single_mixin(codebase, enum_type.name, prop_name) {
                         return Some(result);
                     }
                 }
@@ -1688,9 +1706,7 @@ where
                                 _ => continue,
                             };
 
-                            if let Some(result) =
-                                find_property_in_single_mixin(context, class_name, prop_name, for_assignment)
-                            {
+                            if let Some(result) = find_property_in_single_mixin(codebase, class_name, prop_name) {
                                 return Some(result);
                             }
                             resolved = true;
@@ -1707,7 +1723,7 @@ where
                             };
 
                             if let Some(result) =
-                                find_property_in_single_mixin(context, constraint_class_name, prop_name, for_assignment)
+                                find_property_in_single_mixin(codebase, constraint_class_name, prop_name)
                             {
                                 return Some(result);
                             }
@@ -1723,21 +1739,15 @@ where
 }
 
 /// Searches for a property in a single mixin class.
-fn find_property_in_single_mixin<A>(
-    context: &Context<'_, '_, A>,
+fn find_property_in_single_mixin(
+    codebase: &CodebaseMetadata,
     mixin_class_name: Word,
     prop_name: Word,
-    for_assignment: bool,
-) -> Option<ResolvedProperty>
-where
-    A: Arena,
-{
-    let mixin_metadata = context.codebase.get_class_like(mixin_class_name.as_bytes())?;
+) -> Option<DeclaredProperty<'_>> {
+    let mixin_metadata = codebase.get_class_like(mixin_class_name.as_bytes())?;
     // Mixin access is always external, so a non-public real property defers to a magic
     // `@property*` annotation when the mixin class documents one.
-    let resolution = resolve_property_for_external_access(context.codebase, mixin_metadata, prop_name)?;
-
-    Some(get_resolved_declared_property(context.codebase, &resolution, prop_name, for_assignment))
+    resolve_property_for_external_access(codebase, mixin_metadata, prop_name)
 }
 
 /// Searches for a property in intersection types of a named object.
@@ -1775,6 +1785,7 @@ where
 
                 if let Some((_optional, property_type)) = shaped.known_properties.get(&key) {
                     return Some(ResolvedProperty {
+                        lookup_class: None,
                         property_span: None,
                         property_name: prop_name,
                         declaring_class_id: None,
