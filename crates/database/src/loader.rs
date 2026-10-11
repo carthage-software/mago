@@ -3,6 +3,7 @@
 use std::borrow::Cow;
 use std::collections::hash_map::Entry;
 use std::ffi::OsString;
+use std::io::ErrorKind;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::Mutex;
@@ -48,13 +49,14 @@ pub struct DatabaseLoader<'config> {
     configuration: DatabaseConfiguration<'config>,
     memory_sources: Vec<(&'static [u8], &'static [u8], FileType)>,
     stdin_override: Option<(Cow<'config, [u8]>, Vec<u8>)>,
+    directory_symlinks: Option<Mutex<HashSet<PathBuf>>>,
 }
 
 impl<'config> DatabaseLoader<'config> {
     #[inline]
     #[must_use]
     pub fn new(configuration: DatabaseConfiguration<'config>) -> Self {
-        Self { configuration, memory_sources: vec![], database: None, stdin_override: None }
+        Self { configuration, memory_sources: vec![], database: None, stdin_override: None, directory_symlinks: None }
     }
 
     #[inline]
@@ -91,6 +93,24 @@ impl<'config> DatabaseLoader<'config> {
     /// - A file exceeds the maximum supported size
     #[inline]
     pub fn load(mut self) -> Result<Database<'config>, DatabaseError> {
+        self.load_inner()
+    }
+
+    /// Load files and retain directory symlinks found during directory walks, including empty ones.
+    /// Links with missing targets are retained too; their target type is not yet known.
+    /// File-only globs expose matching files, so they do not discover empty directory symlinks.
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`Self::load`].
+    pub fn load_with_directory_symlinks(mut self) -> Result<(Database<'config>, Vec<PathBuf>), DatabaseError> {
+        self.directory_symlinks = Some(Mutex::default());
+        let database = self.load_inner()?;
+        let symlinks = self.directory_symlinks.unwrap_or_default().into_inner().unwrap_or_else(PoisonError::into_inner);
+        Ok((database, symlinks.into_iter().collect()))
+    }
+
+    fn load_inner(&mut self) -> Result<Database<'config>, DatabaseError> {
         let mut db = self.database.take().unwrap_or_else(|| Database::new(self.configuration.clone()));
 
         // Update database configuration to use the loader's configuration
@@ -256,13 +276,40 @@ impl<'config> DatabaseLoader<'config> {
             db.add(file);
         }
 
-        for (name, contents, file_type) in self.memory_sources {
+        for (name, contents, file_type) in std::mem::take(&mut self.memory_sources) {
             let file = File::new(Cow::Borrowed(name), file_type, None, Cow::Borrowed(contents));
 
             db.add(file);
         }
 
         Ok(db)
+    }
+
+    #[allow(clippy::set_contains_or_insert, reason = "A duplicate insert can grow a full set.")]
+    fn record_directory_symlink(&self, entry: &walkdir::DirEntry) {
+        if let Some(symlinks) = &self.directory_symlinks
+            && entry.file_type().is_dir()
+            && entry.path_is_symlink()
+        {
+            let mut symlinks = symlinks.lock().unwrap_or_else(PoisonError::into_inner);
+            if !symlinks.contains(entry.path()) {
+                symlinks.insert(entry.path().to_path_buf());
+            }
+        }
+    }
+
+    #[allow(clippy::set_contains_or_insert, reason = "A duplicate insert can grow a full set.")]
+    fn record_missing_symlink(&self, error: &walkdir::Error) {
+        let Some(symlinks) = &self.directory_symlinks else { return };
+        if error.io_error().is_some_and(|error| matches!(error.kind(), ErrorKind::NotFound | ErrorKind::NotADirectory))
+            && let Some(path) = error.path()
+            && path.read_link().is_ok()
+        {
+            let mut symlinks = symlinks.lock().unwrap_or_else(PoisonError::into_inner);
+            if !symlinks.contains(path) {
+                symlinks.insert(path.to_path_buf());
+            }
+        }
     }
 
     /// Discovers and reads all files from a set of root paths or glob patterns in parallel.
@@ -381,13 +428,17 @@ impl<'config> DatabaseLoader<'config> {
                                     &canonical_excludes,
                                     dir_prune_globs,
                                 ) {
+                                    self.record_directory_symlink(&entry);
                                     directory_roots.push((entry.into_path(), specificity));
                                 }
                             } else {
                                 paths_to_process.push((entry.into_path(), specificity, false));
                             }
                         }
-                        Err(err) => warn_walk_error(&err, canonical_root.as_path()),
+                        Err(err) => {
+                            self.record_missing_symlink(&err);
+                            warn_walk_error(&err, canonical_root.as_path());
+                        }
                     }
                 }
             }
@@ -481,20 +532,27 @@ impl<'config> DatabaseLoader<'config> {
                         }
 
                         let walker = WalkDir::new(&root).follow_links(true).into_iter().filter_entry(|entry| {
-                            entry.depth() == 0
+                            let keep = entry.depth() == 0
                                 || !entry.file_type().is_dir()
                                 || !is_pruned_directory(
                                     entry.path(),
                                     canonical_workspace.as_path(),
                                     &canonical_excludes,
                                     dir_prune_globs,
-                                )
+                                );
+
+                            if keep {
+                                self.record_directory_symlink(entry);
+                            }
+
+                            keep
                         });
 
                         let mut paths = walker.filter_map(|entry| match entry {
                             Ok(entry) if !entry.file_type().is_dir() => Some((entry.into_path(), specificity, false)),
                             Ok(_) => None,
                             Err(err) => {
+                                self.record_missing_symlink(&err);
                                 warn_walk_error(&err, root.as_path());
                                 None
                             }
@@ -1213,6 +1271,87 @@ mod tests {
 
         assert!(db.files().any(|f| name_str(&f.name).contains("Foo.php")), "Foo.php inside symlinked dir not found");
         assert!(db.files().any(|f| name_str(&f.name).contains("Bar.php")), "Bar.php inside symlinked dir not found");
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn directory_walks_report_empty_symlinks_without_changing_loaded_files() {
+        let temp_dir = TempDir::new().unwrap();
+        let external = TempDir::new().unwrap();
+        create_test_file(&temp_dir, "vendor/Kept.php", "<?php class Kept {}\n");
+        std::fs::create_dir_all(temp_dir.path().join("vendor/deep")).unwrap();
+        for path in ["vendor/shallow", "vendor/deep/package"] {
+            std::os::unix::fs::symlink(external.path(), temp_dir.path().join(path)).unwrap();
+        }
+        let config = create_test_config(&temp_dir, vec![], vec!["vendor/"]);
+        for threads in [1, 4] {
+            let pool = rayon::ThreadPoolBuilder::new().num_threads(threads).build().unwrap();
+            let (database, mut symlinks) =
+                pool.install(|| DatabaseLoader::new(config.clone()).load_with_directory_symlinks().unwrap());
+            symlinks.sort();
+            let root = temp_dir.path().canonicalize().unwrap();
+            assert_eq!(symlinks, [root.join("vendor/deep/package"), root.join("vendor/shallow")]);
+            let ordinary = pool.install(|| DatabaseLoader::new(config.clone()).load().unwrap());
+            let summarize = |database: &Database<'_>| {
+                database
+                    .files()
+                    .map(|file| (file.name.to_vec(), file.file_type, file.contents.to_vec()))
+                    .collect::<Vec<_>>()
+            };
+            assert_eq!(summarize(&database), summarize(&ordinary));
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn directory_walks_report_dangling_symlinks_without_changing_loaded_files() {
+        let temp_dir = TempDir::new().unwrap();
+        let external = TempDir::new().unwrap();
+        create_test_file(&temp_dir, "vendor/Kept.php", "<?php class Kept {}\n");
+        create_test_file(&external, "blocked", "not a directory");
+        std::fs::create_dir_all(temp_dir.path().join("vendor/deep")).unwrap();
+        for (link, target) in [
+            ("vendor/shallow", external.path().join("missing")),
+            ("vendor/deep/relative", PathBuf::from("../../missing")),
+            ("vendor/deep/blocked", external.path().join("blocked/child")),
+        ] {
+            std::os::unix::fs::symlink(target, temp_dir.path().join(link)).unwrap();
+        }
+        let config = create_test_config(&temp_dir, vec![], vec!["vendor/"]);
+        let root = temp_dir.path().canonicalize().unwrap();
+        for threads in [1, 4] {
+            let pool = rayon::ThreadPoolBuilder::new().num_threads(threads).build().unwrap();
+            let (database, mut symlinks) =
+                pool.install(|| DatabaseLoader::new(config.clone()).load_with_directory_symlinks().unwrap());
+            symlinks.sort();
+            assert_eq!(
+                symlinks,
+                [root.join("vendor/deep/blocked"), root.join("vendor/deep/relative"), root.join("vendor/shallow")]
+            );
+
+            let ordinary = pool.install(|| DatabaseLoader::new(config.clone()).load().unwrap());
+            let summarize = |database: &Database<'_>| {
+                database
+                    .files()
+                    .map(|file| (file.name.to_vec(), file.file_type, file.contents.to_vec()))
+                    .collect::<Vec<_>>()
+            };
+
+            assert_eq!(summarize(&database), summarize(&ordinary));
+        }
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn file_only_globs_do_not_discover_empty_directory_symlinks() {
+        let temp_dir = TempDir::new().unwrap();
+        let external = TempDir::new().unwrap();
+        std::fs::create_dir_all(temp_dir.path().join("vendor")).unwrap();
+        std::os::unix::fs::symlink(external.path(), temp_dir.path().join("vendor/package")).unwrap();
+        let config = create_test_config(&temp_dir, vec![], vec!["vendor/**/*.php"]);
+        let (database, symlinks) = DatabaseLoader::new(config).load_with_directory_symlinks().unwrap();
+        assert!(database.files().next().is_none());
+        assert!(symlinks.is_empty());
     }
 
     #[cfg(unix)]
