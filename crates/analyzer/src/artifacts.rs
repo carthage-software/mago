@@ -81,6 +81,7 @@ pub struct AnalysisArtifacts {
     pub(crate) pending_readonly_property_writes: Vec<PendingReadonlyPropertyWrite>,
     pub(crate) static_local_types: Option<WordMap<Rc<TUnion>>>,
     expression_type_checkpoints: ExpressionTypeCheckpoints,
+    retain_completed_expression_types: bool,
 }
 
 impl Default for AnalysisArtifacts {
@@ -117,7 +118,17 @@ impl AnalysisArtifacts {
             pending_readonly_property_writes: Vec::new(),
             static_local_types: None,
             expression_type_checkpoints: ExpressionTypeCheckpoints::default(),
+            retain_completed_expression_types: true,
         }
+    }
+
+    pub(crate) fn with_retained_expression_types(mut self, retain: bool) -> Self {
+        self.retain_completed_expression_types = retain;
+        self
+    }
+
+    pub(crate) fn should_retain_completed_expression_types(&self) -> bool {
+        self.retain_completed_expression_types || !self.expression_type_checkpoints.is_empty()
     }
 
     pub(crate) fn record_static_local_types(

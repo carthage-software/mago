@@ -190,6 +190,7 @@ where
     );
 
     let mut artifacts = AnalysisArtifacts::new()
+        .with_retained_expression_types(parent_artifacts.should_retain_completed_expression_types())
         .with_variable_definedness_targets(parent_artifacts.variable_definedness_targets())
         .with_editor_artifacts(parent_artifacts.editor.is_some());
 
@@ -364,7 +365,10 @@ where
     check_thrown_types(context, block_context, &mut artifacts, function_like_metadata);
 
     std::mem::swap(&mut context.type_resolution_context, &mut previous_type_resolution_context);
-    parent_artifacts.extend_expression_types(std::mem::take(&mut artifacts.expression_types));
+    let expression_types = std::mem::take(&mut artifacts.expression_types);
+    if parent_artifacts.should_retain_completed_expression_types() {
+        parent_artifacts.extend_expression_types(expression_types);
+    }
     parent_artifacts.variable_definedness.extend(std::mem::take(&mut artifacts.variable_definedness));
     parent_artifacts.resolved_method_calls.append(&mut artifacts.resolved_method_calls);
     if let Some(editor) = &mut parent_artifacts.editor

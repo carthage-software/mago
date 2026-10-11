@@ -148,7 +148,7 @@ where
         program: &'ast Program<'arena>,
         analysis_result: &mut AnalysisResult,
     ) -> Result<(), AnalysisError> {
-        self.analyze_with_artifacts(program, analysis_result).map(|_| ())
+        self.analyze_inner(program, analysis_result, false).map(|_| ())
     }
 
     /// Same as [`Self::analyze`], but returns the [`AnalysisArtifacts`]
@@ -164,8 +164,22 @@ where
         program: &'ast Program<'arena>,
         analysis_result: &mut AnalysisResult,
     ) -> Result<AnalysisArtifacts, AnalysisError> {
+        self.analyze_inner(program, analysis_result, true)
+    }
+
+    fn analyze_inner(
+        &self,
+        program: &'ast Program<'arena>,
+        analysis_result: &mut AnalysisResult,
+        retain_completed_expression_types: bool,
+    ) -> Result<AnalysisArtifacts, AnalysisError> {
         #[cfg(not(target_arch = "wasm32"))]
         let start_time = std::time::Instant::now();
+
+        let retain_completed_expression_types = retain_completed_expression_types
+            || self.editor_artifacts
+            || self.external_analysis_session.is_some()
+            || self.plugin_registry.has_custom_plugins();
 
         if !program.has_script() {
             #[cfg(not(target_arch = "wasm32"))]
@@ -174,6 +188,7 @@ where
             }
 
             return Ok(AnalysisArtifacts::new()
+                .with_retained_expression_types(retain_completed_expression_types)
                 .with_variable_definedness_targets(self.variable_definedness_targets.clone())
                 .with_editor_artifacts(self.editor_artifacts));
         }
@@ -209,6 +224,7 @@ where
             context.settings.register_super_globals,
         );
         let mut artifacts = AnalysisArtifacts::new()
+            .with_retained_expression_types(retain_completed_expression_types)
             .with_variable_definedness_targets(self.variable_definedness_targets.clone())
             .with_editor_artifacts(self.editor_artifacts);
         artifacts.record_variable_definedness(Node::Program(program), &block_context);
