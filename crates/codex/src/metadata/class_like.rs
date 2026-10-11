@@ -130,6 +130,8 @@ pub struct ClassLikeMetadata {
     /// Mixin types from @mixin annotations - these types' methods/properties
     /// can be accessed via magic methods (__call, __get, __set, __callStatic)
     pub mixins: Vec<TypeMetadata>,
+    #[cfg_attr(feature = "serde", serde(default))]
+    declared_mixin_count: Option<usize>,
     pub version_constraint: VersionConstraint,
 }
 
@@ -232,6 +234,7 @@ impl ClassLikeMetadata {
             type_aliases: WordMap::default(),
             imported_type_aliases: WordMap::default(),
             mixins: Vec::default(),
+            declared_mixin_count: None,
             version_constraint: VersionConstraint::unconstrained(),
         }
     }
@@ -349,6 +352,8 @@ impl ClassLikeMetadata {
     }
 
     pub(crate) fn reset_inherited_members(&mut self) {
+        let declared_mixins = *self.declared_mixin_count.get_or_insert(self.mixins.len());
+        self.mixins.truncate(declared_mixins);
         self.properties
             .retain(|name, _| self.declaring_property_ids.get(name).is_none_or(|declaring| *declaring == self.name));
         self.inheritable_method_ids.retain(|_, method| method.get_class_name() == self.name);

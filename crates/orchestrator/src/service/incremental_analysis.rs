@@ -4028,6 +4028,49 @@ mod tests {
         }
     }
 
+    #[test]
+    fn vendor_mixin_cycles_do_not_accumulate_inherited_types() {
+        use mago_codex::ttype::TType;
+
+        let vendor = b"<?php
+            /** @mixin ParentMixin */ class VendorBase {}
+            /** @mixin TraitMixin */ trait VendorTrait {}"
+            .as_slice();
+        let host = b"<?php
+            class ParentMixin {} class TraitMixin {} class OwnTraitMixin {} class OwnHostMixin {}
+            /** @mixin OwnTraitMixin */ trait LocalTrait { use VendorTrait; }
+            /** @mixin OwnHostMixin */ class Host extends VendorBase { use LocalTrait; }
+            class Child extends Host {}";
+        let name = b"vendor/mixins.php".as_slice();
+        let id = FileId::new(name);
+        let mut db =
+            make_db_with_types(vec![(name, FileType::Vendored, vendor), (b"src/Host.php", FileType::Host, host)]);
+        let mut service = make_watch_service(&db);
+        service.analyze().unwrap();
+        assert_matches_full(&service, &db, "initial mixins");
+        for cycle in 0..3 {
+            for restored in [false, true] {
+                if restored {
+                    db.add(File::new(Cow::Borrowed(name), FileType::Vendored, None, Cow::Borrowed(vendor)));
+                } else {
+                    assert!(db.delete(id));
+                }
+                service.update_database(db.read_only());
+                service.analyze_incremental(Some(&[id])).unwrap();
+                assert_matches_full(&service, &db, "vendor mixin cycle");
+                for (class, without_vendor, inherited) in [("localtrait", 1, 1), ("host", 2, 2), ("child", 2, 2)] {
+                    let mixins = &service.codebase.class_likes[&mago_word::word(class)].mixins;
+                    let expected = without_vendor + if restored { inherited } else { 0 };
+                    assert_eq!(mixins.len(), expected, "cycle={cycle}, restored={restored}, class={class}");
+                }
+                for (class, own) in [("localtrait", "OwnTraitMixin"), ("host", "OwnHostMixin")] {
+                    let mixins = &service.codebase.class_likes[&mago_word::word(class)].mixins;
+                    assert_eq!(mixins[0].type_union.get_id(), mago_word::word(own));
+                }
+            }
+        }
+    }
+
     /// Interface method signature changes — implementor becomes incompatible.
     #[test]
     fn test_watch_interface_method_signature_change() {
