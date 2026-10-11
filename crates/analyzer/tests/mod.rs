@@ -2834,6 +2834,7 @@ test_case!(issue_2435);
 test_case!(issue_2440);
 test_case!(simplexml_truthiness);
 test_case!(closure_capture_by_reference_array);
+test_case!(nullable_receiver_method_call);
 
 #[test]
 #[cfg_attr(miri, ignore)]
