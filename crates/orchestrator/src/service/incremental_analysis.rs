@@ -3970,6 +3970,64 @@ mod tests {
         assert_matches_full(&service, &db, "trait method removed");
     }
 
+    #[test]
+    fn vendor_trait_member_removal_and_restore_match_full_analysis() {
+        let vendor = b"<?php /** @property int $dynamic */
+            trait Fields { public int $value = 1; public int $own = 1; public function run(): int { return 1; } }"
+            .as_slice();
+        let host = b"<?php class Holder {
+                use Fields;
+                public int $own = 1;
+                public function own(): int { return $this->own; }
+            }
+            class Child extends Holder {}
+            function value(Child $object): int { return $object->value; }
+            function run(Child $object): int { return $object->run(); }";
+        let name = b"vendor/Fields.php".as_slice();
+        let id = FileId::new(name);
+        let mut db =
+            make_db_with_types(vec![(name, FileType::Vendored, vendor), (b"src/Holder.php", FileType::Host, host)]);
+        let mut service = make_watch_service(&db);
+        service.analyze().unwrap();
+        assert_matches_full(&service, &db, "initial");
+        for (step, contents) in [
+            ("members removed", Some(b"<?php trait Fields {}".as_slice())),
+            ("members restored", Some(vendor)),
+            ("package removed", None),
+            ("package restored", Some(vendor)),
+        ] {
+            if let Some(contents) = contents {
+                db.add(File::new(Cow::Borrowed(name), FileType::Vendored, None, Cow::Owned(contents.to_vec())));
+            } else {
+                assert!(db.delete(id));
+            }
+            service.update_database(db.read_only());
+            service.analyze_incremental(Some(&[id])).unwrap();
+            assert_matches_full(&service, &db, step);
+            for class in ["holder", "child"] {
+                let metadata = &service.codebase.class_likes[&mago_word::word(class)];
+                let restored = contents == Some(vendor);
+                assert_eq!(
+                    metadata.inheritable_method_ids.contains_key(&mago_word::word("run")),
+                    restored,
+                    "{step}: {class}"
+                );
+                assert_eq!(
+                    metadata.inheritable_property_ids.contains_key(&mago_word::word("$value")),
+                    restored,
+                    "{step}: {class}"
+                );
+                assert_eq!(
+                    metadata.magic_property_ids.contains_key(&mago_word::word("$dynamic")),
+                    restored,
+                    "{step}: {class}"
+                );
+                assert!(metadata.inheritable_method_ids.contains_key(&mago_word::word("own")), "{step}: {class}");
+                assert!(metadata.inheritable_property_ids.contains_key(&mago_word::word("$own")), "{step}: {class}");
+            }
+        }
+    }
+
     /// Interface method signature changes — implementor becomes incompatible.
     #[test]
     fn test_watch_interface_method_signature_change() {

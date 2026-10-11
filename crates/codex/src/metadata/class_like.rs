@@ -348,6 +348,18 @@ impl ClassLikeMetadata {
             .chain(self.used_traits.iter().copied().filter(|_| self.declared_ancestry.is_none()))
     }
 
+    pub(crate) fn reset_inherited_members(&mut self) {
+        self.properties
+            .retain(|name, _| self.declaring_property_ids.get(name).is_none_or(|declaring| *declaring == self.name));
+        self.inheritable_method_ids.retain(|_, method| method.get_class_name() == self.name);
+        self.inheritable_property_ids.clear();
+        self.inheritable_property_ids.extend(
+            self.properties.iter().filter(|(_, property)| !property.is_final()).map(|(name, _)| (*name, self.name)),
+        );
+
+        self.magic_property_ids.retain(|_, declaring| *declaring == self.name);
+    }
+
     pub(crate) fn reset_inherited_constants(&mut self) {
         let declared = self.declared_constants.get_or_insert_with(|| {
             let mut names: Box<[_]> = self.constants.keys().copied().collect();
