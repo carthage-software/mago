@@ -21,6 +21,7 @@ use crate::ttype::TypeRef;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::array::TArray;
 use crate::ttype::atomic::array::key::ArrayKey;
+use crate::ttype::atomic::callable::TCallable;
 use crate::ttype::atomic::generic::TGenericParameter;
 use crate::ttype::atomic::mixed::truthiness::TMixedTruthiness;
 use crate::ttype::atomic::object::TObject;
@@ -1195,7 +1196,27 @@ impl TType for TUnion {
     }
 
     fn is_complex(&self) -> bool {
-        self.types.len() > 3 || self.types.iter().any(super::TType::is_complex)
+        let many_shapes = self.types.len() > 3 && {
+            let mut callable_shapes = [None; 3];
+            let mut count = 0;
+            self.types.iter().any(|atomic| {
+                if matches!(atomic, TAtomic::Callable(TCallable::Signature(_))) {
+                    let id = Some(atomic.get_id());
+                    if callable_shapes.contains(&id) {
+                        return false;
+                    }
+
+                    if let Some(slot) = callable_shapes.iter_mut().find(|slot| slot.is_none()) {
+                        *slot = id;
+                    }
+
+                }
+
+                count += 1;
+                count > 3
+            })
+        };
+        many_shapes || self.types.iter().any(super::TType::is_complex)
     }
 
     fn get_id(&self) -> Word {
@@ -1223,6 +1244,7 @@ impl TType for TUnion {
             .collect();
 
         atomic_ids.sort_unstable();
+        atomic_ids.dedup();
         join_words(&atomic_ids, b"|")
     }
 
@@ -1233,20 +1255,27 @@ impl TType for TUnion {
             return self.types.first().map_or_else(empty_word, |atomic| atomic.get_pretty_id_with_indent(indent));
         }
 
-        // Use multiline format for unions with more than 3 types
-        if len > 3 {
+        let render_ids = |multiline| {
             let mut atomic_ids: Vec<Word> = self
                 .types
                 .as_ref()
                 .iter()
                 .map(|atomic| {
-                    let id = atomic.get_pretty_id_with_indent(indent + 2);
+                    let id = atomic.get_pretty_id_with_indent(if multiline { indent + 2 } else { indent });
                     if atomic.has_intersection_types() { concat_word!(b"(", id.as_bytes(), b")") } else { id }
                 })
                 .collect();
-
             atomic_ids.sort_unstable();
+            atomic_ids.dedup();
+            atomic_ids
+        };
 
+        let mut atomic_ids = render_ids(len > 3);
+        if len > 3 && atomic_ids.len() <= 3 {
+            atomic_ids = render_ids(false);
+        }
+
+        if atomic_ids.len() > 3 {
             let mut result: Vec<u8> = Vec::new();
             result.extend_from_slice(atomic_ids[0].as_bytes());
             for id in &atomic_ids[1..] {
@@ -1258,28 +1287,7 @@ impl TType for TUnion {
 
             word(&result)
         } else {
-            // Use inline format for smaller unions
-            let mut atomic_ids: Vec<Word> = self
-                .types
-                .as_ref()
-                .iter()
-                .map(|atomic| {
-                    let id = atomic.get_pretty_id_with_indent(indent);
-                    if atomic.has_intersection_types() && len > 1 {
-                        concat_word!(b"(", id.as_bytes(), b")")
-                    } else {
-                        id
-                    }
-                })
-                .collect();
-
-            atomic_ids.sort_unstable();
-            let mut result = atomic_ids[0];
-            for id in &atomic_ids[1..] {
-                result = concat_word!(result.as_bytes(), b" | ", id.as_bytes());
-            }
-
-            result
+            join_words(&atomic_ids, b" | ")
         }
     }
 }
