@@ -954,9 +954,6 @@ impl IncrementalAnalysisService {
             }
         }
 
-        let safe_symbols = std::mem::take(&mut merged_codebase.safe_symbols);
-        let safe_symbol_members = std::mem::take(&mut merged_codebase.safe_symbol_members);
-
         let mut dirty_symbols: HashSet<(mago_word::Word, mago_word::Word)> = diff.get_changed().clone();
         for (_file_id, metadata) in &new_file_scans {
             for &key in metadata.function_likes.keys() {
@@ -975,6 +972,15 @@ impl IncrementalAnalysisService {
         let mut symbol_references = std::mem::take(&mut self.native_symbol_references);
         symbol_references.retain_references_from_files(&current_file_names);
         symbol_references.remove_dirty_symbol_references(&dirty_symbols);
+        self.clear_invalidated_host_bodies(
+            &mut merged_codebase,
+            &mut symbol_references,
+            &unchanged_file_ids,
+            &invalid_files,
+        );
+
+        let safe_symbols = std::mem::take(&mut merged_codebase.safe_symbols);
+        let safe_symbol_members = std::mem::take(&mut merged_codebase.safe_symbol_members);
 
         populate_codebase_targeted(
             &mut merged_codebase,
@@ -985,29 +991,8 @@ impl IncrementalAnalysisService {
         );
         let mut files_to_skip: HashSet<FileId> = HashSet::default();
         for &file_id in &unchanged_file_ids {
-            let file_invalid = self
-                .database
-                .get(&file_id)
-                .is_ok_and(|file| invalid_files.contains(&mago_word::word(file.name.as_ref())));
-            if let Some(sig) = merged_codebase.get_file_signature(&file_id) {
-                let all_safe = if file_invalid {
-                    false
-                } else if sig.ast_nodes.is_empty() {
-                    true
-                } else {
-                    sig.ast_nodes.iter().all(|node| {
-                        let symbol_safe = node.name.is_empty() || merged_codebase.safe_symbols.contains(&node.name);
-                        let children_safe = node.children.iter().all(|child| {
-                            child.name.is_empty()
-                                || merged_codebase.safe_symbol_members.contains(&(node.name, child.name))
-                        });
-                        symbol_safe && children_safe
-                    })
-                };
-
-                if all_safe {
-                    files_to_skip.insert(file_id);
-                }
+            if self.can_skip_file(&merged_codebase, file_id, &invalid_files) {
+                files_to_skip.insert(file_id);
             }
         }
 
@@ -1151,6 +1136,70 @@ impl IncrementalAnalysisService {
         analysis_result.issues = self.collect_all_issues();
 
         Ok(analysis_result)
+    }
+
+    fn can_skip_file(&self, codebase: &CodebaseMetadata, file_id: FileId, invalid_files: &WordSet) -> bool {
+        if self.database.get(&file_id).is_ok_and(|file| invalid_files.contains(&mago_word::word(file.name.as_ref()))) {
+            return false;
+        }
+
+        codebase.get_file_signature(&file_id).is_some_and(|signature| {
+            signature.ast_nodes.iter().all(|node| {
+                (node.name.is_empty() || codebase.safe_symbols.contains(&node.name))
+                    && node.children.iter().all(|child| {
+                        child.name.is_empty() || codebase.safe_symbol_members.contains(&(node.name, child.name))
+                    })
+            })
+        })
+    }
+
+    fn clear_invalidated_host_bodies(
+        &self,
+        codebase: &mut CodebaseMetadata,
+        references: &mut SymbolReferences,
+        unchanged_files: &[FileId],
+        invalid_files: &WordSet,
+    ) {
+        let mut symbols = HashSet::default();
+        for &file_id in unchanged_files {
+            if self.can_skip_file(codebase, file_id, invalid_files)
+                || !self.database.get(&file_id).is_ok_and(|file| file.file_type == FileType::Host)
+            {
+                continue;
+            }
+
+            let Some(state) = self.file_states.get(&file_id) else { continue };
+            for &name in &state.entry_keys.class_like_names {
+                if codebase.class_likes.get(&name).is_some_and(|metadata| metadata.span.file_id == file_id) {
+                    symbols.insert((name, mago_word::empty_word()));
+                }
+            }
+
+            for &key in &state.entry_keys.function_like_keys {
+                if codebase.function_likes.get(&key).is_some_and(|metadata| metadata.span.file_id == file_id) {
+                    symbols.insert(if key.0.is_empty() { (key.1, mago_word::empty_word()) } else { key });
+                }
+            }
+
+            for &name in &state.entry_keys.constant_names {
+                if codebase.constants.get(&name).is_some_and(|metadata| metadata.span.file_id == file_id) {
+                    symbols.insert((name, mago_word::empty_word()));
+                }
+            }
+        }
+
+        if symbols.is_empty() {
+            return;
+        }
+
+        references.remove_body_references_for_symbols(&symbols, &[]);
+        for (name, member) in symbols {
+            if member.is_empty() {
+                codebase.safe_symbols.remove(&name);
+            } else {
+                codebase.safe_symbol_members.remove(&(name, member));
+            }
+        }
     }
 
     /// Analyzes a single file and returns both its issues and the
@@ -1729,6 +1778,161 @@ mod tests {
             only_incr.is_empty() && only_full.is_empty(),
             "After signature change, incremental != full.\n  Only in incremental: {only_incr:?}\n  Only in full: {only_full:?}"
         );
+    }
+
+    #[test]
+    fn dependency_updates_replace_unchanged_host_body_references() {
+        use mago_codex::reference::{ReferenceOrigin, SymbolReferenceKind};
+        use mago_codex::symbol::SymbolIdentifier;
+        use mago_word::{empty_word, word};
+
+        fn caller_references(
+            references: &SymbolReferences,
+        ) -> Vec<(ReferenceOrigin, SymbolIdentifier, SymbolReferenceKind)> {
+            let mut result = Vec::new();
+            references.for_each_reference(|origin, target, kind| {
+                if matches!(origin, ReferenceOrigin::Symbol((name, _)) if name == word("consumer") || name == word("read_value")) {
+                    result.push((origin, target, kind));
+                }
+            });
+            result.sort_unstable();
+            result
+        }
+
+        let mut database = make_database(vec![
+            (
+                "src/types.php",
+                "<?php
+                class SignatureType {} class ClosureType {} class AbstractType {}
+                class First { public int $value = 0; public function count(): int { return 1; } }
+                class Second { public int $value = 0; public function count(): int { return 2; } }",
+            ),
+            (
+                "src/caller.php",
+                "<?php
+                abstract class Consumer {
+                    abstract public function contract(AbstractType $value): AbstractType;
+                    public function read(SignatureType $value): int {
+                        $callback = static fn (ClosureType $item): ClosureType => $item;
+                        $item = Factory::create();
+                        $item->value = 1;
+                        return $item->value + $item->count();
+                    }
+                }
+                function read_value(SignatureType $value): int { return Factory::create()->count(); }",
+            ),
+        ]);
+
+        let dependency = FileId::new(b"vendor/factory.php");
+        database.add(File::new(
+            Cow::Borrowed(b"vendor/factory.php"),
+            FileType::Vendored,
+            None,
+            Cow::Borrowed(b"<?php class Factory { public static function create(): First { return new First(); } }"),
+        ));
+
+        let mut service = make_service(&database);
+        service.analyze().unwrap();
+
+        for target in ["Second", "First", "Second", "First"] {
+            database.update(
+                dependency,
+                Cow::Owned(format!(
+                    "<?php class Factory {{ public static function create(): {target} {{ return new {target}(); }} }}",
+                ).into_bytes()),
+            );
+
+            service.update_database(database.read_only());
+            service.analyze_incremental(Some(&[dependency])).unwrap();
+            let mut fresh = make_service(&database);
+            fresh.analyze().unwrap();
+
+            let expected = caller_references(&fresh.native_symbol_references);
+            assert!(expected.contains(&(
+                ReferenceOrigin::Symbol((word("consumer"), word("contract"))),
+                (word("abstracttype"), empty_word()),
+                SymbolReferenceKind::Signature,
+            )));
+            assert!(expected.contains(&(
+                ReferenceOrigin::Symbol((word("consumer"), empty_word())),
+                (word("abstracttype"), empty_word()),
+                SymbolReferenceKind::Body,
+            )));
+            assert_eq!(caller_references(&service.native_symbol_references), expected, "returning {target}");
+        }
+    }
+
+    #[test]
+    fn missing_function_lookups_follow_added_declarations() {
+        for call in ["helper()", "(helper(...))()", "(helper(?))(1)"] {
+            for (namespace, declaration_namespace) in
+                [("", ""), ("namespace App;", ""), ("namespace App;", "namespace App;")]
+            {
+                let caller = format!("<?php {namespace} function caller(): int {{ return {call}; }}");
+                let mut database = make_database(vec![("src/caller.php", &caller)]);
+                let mut service = make_watch_service(&database);
+                service.analyze().unwrap();
+                let dependency = FileId::new(b"src/helper.php");
+
+                for definition in [None, Some("int { return 1; }"), None, Some("string { return 'changed'; }")] {
+                    if let Some(definition) = definition {
+                        database.add(File::new(
+                            Cow::Borrowed(b"src/helper.php"),
+                            FileType::Host,
+                            None,
+                            Cow::Owned(
+                                format!("<?php {declaration_namespace} function helper(int $value = 1): {definition}",)
+                                    .into_bytes(),
+                            ),
+                        ));
+                    } else {
+                        database.delete(dependency);
+                    }
+
+                    service.update_database(database.read_only());
+                    service.analyze_incremental(Some(&[dependency])).unwrap();
+                    assert_matches_full(&service, &database, &format!("{namespace} {call}: {definition:?}"));
+                    assert_eq!(
+                        service
+                            .collect_all_issues()
+                            .iter()
+                            .any(|issue| issue.code.as_deref() == Some("non-existent-function")),
+                        definition.is_none(),
+                        "{namespace} {call}: {definition:?}",
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn namespaced_function_addition_replaces_global_fallback() {
+        for call in ["helper()", "(helper(...))()", "(helper(?))(1)"] {
+            let caller = format!("<?php namespace App; function caller(): int {{ return {call}; }}");
+            let mut database = make_database(vec![
+                ("src/caller.php", &caller),
+                ("src/global.php", "<?php function helper(int $value = 1): string { return 'global'; }"),
+            ]);
+
+            let mut service = make_watch_service(&database);
+            service.analyze().unwrap();
+            let local = FileId::new(b"src/local.php");
+            database.add(File::new(
+                Cow::Borrowed(b"src/local.php"),
+                FileType::Host,
+                None,
+                Cow::Borrowed(b"<?php namespace App; function helper(int $value = 1): int { return 1; }"),
+            ));
+
+            service.update_database(database.read_only());
+            service.analyze_incremental(Some(&[local])).unwrap();
+            assert_matches_full(&service, &database, call);
+
+            database.delete(local);
+            service.update_database(database.read_only());
+            service.analyze_incremental(Some(&[local])).unwrap();
+            assert_matches_full(&service, &database, call);
+        }
     }
 
     #[test]

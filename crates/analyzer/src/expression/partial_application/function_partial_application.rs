@@ -183,6 +183,7 @@ where
     if let Expression::Identifier(function_name) = expression {
         let name = word(context.resolved_names.get(function_name));
         let unqualified_name = word(function_name.value());
+        artifacts.symbol_references.add_reference_to_symbol(&block_context.scope, name.to_ascii_lowercase(), false);
 
         let identifier = if context.codebase.function_exists(name.as_bytes()) {
             FunctionLikeIdentifier::Function(name)
@@ -192,6 +193,14 @@ where
         {
             FunctionLikeIdentifier::Function(unqualified_name)
         } else {
+            if !function_name.is_fully_qualified() && unqualified_name != name {
+                artifacts.symbol_references.add_reference_to_symbol(
+                    &block_context.scope,
+                    unqualified_name.to_ascii_lowercase(),
+                    false,
+                );
+            }
+
             let issue = if unqualified_name == name {
                 Issue::error(format!("Function `{name}` could not be found.")).with_annotation(
                     Annotation::primary(expression.span())
