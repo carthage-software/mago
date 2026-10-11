@@ -2837,6 +2837,9 @@ test_case!(simplexml_truthiness);
 test_case!(closure_capture_by_reference_array);
 test_case!(nullable_receiver_method_call);
 test_case!(enum_case_constant_array_isset);
+test_case!(parameter_null_default_native_type);
+test_case!(parameter_null_default_docblock_type);
+test_case!(parameter_null_default_php90, crate::framework::php_90_settings());
 
 #[test]
 #[cfg_attr(miri, ignore)]

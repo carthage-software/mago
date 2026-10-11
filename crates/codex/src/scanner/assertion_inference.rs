@@ -6,7 +6,6 @@ use mago_syntax::cst::Block;
 use mago_syntax::cst::Call;
 use mago_syntax::cst::Expression;
 use mago_syntax::cst::FunctionCall;
-use mago_syntax::cst::Literal;
 use mago_syntax::cst::Statement;
 use mago_syntax::cst::UnaryPrefixOperator;
 use mago_syntax::cst::Variable;
@@ -16,6 +15,8 @@ use mago_word::word;
 
 use crate::assertion::Assertion;
 use crate::metadata::function_like::FunctionLikeMetadata;
+use crate::scanner::inference::is_null_literal;
+use crate::scanner::inference::unwrap_parens;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::object::TObject;
 use crate::ttype::atomic::object::named::TNamedObject;
@@ -157,13 +158,6 @@ fn build_assertions(var: Word, atomic: TAtomic, negated: bool) -> (AssertionMap,
     (if_true, if_false)
 }
 
-fn unwrap_parens<'expr, 'arena>(mut expression: &'expr Expression<'arena>) -> &'expr Expression<'arena> {
-    while let Expression::Parenthesized(p) = expression {
-        expression = p.expression;
-    }
-    expression
-}
-
 fn parameter_var(expression: &Expression<'_>, parameter_names: &WordSet) -> Option<Word> {
     let Expression::Variable(Variable::Direct(direct)) = unwrap_parens(expression) else {
         return None;
@@ -208,10 +202,6 @@ fn parse_null_compare<'arena>(
     }
 
     None
-}
-
-fn is_null_literal(expression: &Expression<'_>) -> bool {
-    matches!(unwrap_parens(expression), Expression::Literal(Literal::Null(_)))
 }
 
 fn parse_type_check_function<'arena>(

@@ -601,6 +601,7 @@ fn apply_inheritance_work(codebase: &mut CodebaseMetadata, mut inheritance_work:
                 && let Some((type_union, span, from_docblock)) = substituted_param
             {
                 child_param.type_metadata = Some(TypeMetadata { type_union, span, from_docblock, inferred: true });
+                child_param.add_null_from_null_default();
             }
         }
 
