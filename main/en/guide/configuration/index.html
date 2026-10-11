@@ -959,6 +959,7 @@ excludes = [
 <li>Method signatures: parameter types, return type, <code>@throws</code>, <code>@template</code>, and <code>@psalm-assert</code>-style assertions. Each field is applied only when the patch specifies it, so a sparsely-typed patch never erases richer information already known.</li>
 <li>Property and constant types.</li>
 <li>Class-level <code>@template</code> declarations (existing ones are refined by name, new ones are appended) and type aliases.</li>
+<li>Generic parent bindings through <code>@extends</code> and <code>@implements</code>. The patch replaces the type arguments for each parent it names and keeps the other bindings.</li>
 <li>Magic members: <code>@method</code>, <code>@property</code>, <code>@property-read</code>, and <code>@property-write</code> annotations may be added even when no such member exists on the original, because they are pure type annotations for <code>__call</code>/<code>__get</code>/<code>__set</code>.</li>
 </ul>
 <p><strong>What a patch may not change</strong></p>
