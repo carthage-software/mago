@@ -15,6 +15,7 @@ use crate::symbol::Symbols;
 use crate::ttype::union::populate_union_type;
 
 mod closures;
+mod descendants;
 mod docblock;
 mod hierarchy;
 mod merge;
@@ -372,7 +373,9 @@ fn populate_codebase_inner(
     }
     trace_phase!("constants");
 
-    if !incremental || !class_likes_to_repopulate.is_empty() {
+    if incremental && dirty_symbols.is_some() {
+        descendants::update(codebase, &class_likes_to_repopulate);
+    } else if !incremental || !class_likes_to_repopulate.is_empty() {
         let mut direct_classlike_descendants: WordMap<WordSet> = WordMap::default();
         let mut all_classlike_descendants: WordMap<WordSet> = WordMap::default();
 
