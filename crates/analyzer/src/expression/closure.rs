@@ -6,16 +6,20 @@ use foldhash::HashMap;
 use mago_allocator::Arena;
 use mago_bytes::BytesDisplay;
 use mago_codex::context::ScopeContext;
+use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::ttype::add_union_type;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
+use mago_codex::ttype::atomic::callable::TCallable;
 use mago_codex::ttype::get_arraykey;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::union::TUnion;
+use mago_database::file::File;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
+use mago_span::Span;
 use mago_syntax::cst::Closure;
 use mago_word::word;
 
@@ -131,11 +135,18 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
                     block_context.locals.get(&variable_atom).cloned().unwrap_or_else(|| Rc::new(get_mixed()));
 
                 if is_by_reference {
-                    let inner_variable_type = Rc::make_mut(&mut variable_type);
-                    inner_variable_type.set_by_reference(true);
-                    widen_by_reference_type(inner_variable_type);
+                    let captures_itself = is_closure_itself(&variable_type, context.source_file, s);
 
+                    Rc::make_mut(&mut variable_type).set_by_reference(true);
                     inner_block_context.references_to_external_scope.insert(variable_atom);
+
+                    // Writes from one call are visible in the next call, the same as for a
+                    // `static` local, so the capture takes part in static local inference.
+                    // Its type is widened after that inference, see `add_captured_types`.
+                    // A closure that captures itself for recursion keeps its own type.
+                    if !captures_itself {
+                        inner_block_context.static_locals.insert(variable_atom);
+                    }
                 }
 
                 inner_block_context.locals.insert(variable_atom, Rc::clone(&variable_type));
@@ -255,7 +266,17 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
     }
 }
 
-fn widen_by_reference_type(union: &mut TUnion) {
+/// Checks if the captured variable holds the closure that is being analyzed,
+/// as in `$fn = function () use (&$fn) { ... }`.
+fn is_closure_itself(variable_type: &TUnion, file: &File, span: Span) -> bool {
+    variable_type.is_single()
+        && matches!(
+            variable_type.get_single(),
+            TAtomic::Callable(TCallable::Alias(identifier)) if *identifier == FunctionLikeIdentifier::for_closure(file, span)
+        )
+}
+
+pub(crate) fn widen_by_reference_type(union: &mut TUnion) {
     union.widen_literals();
 
     for atomic in union.types.to_mut() {
