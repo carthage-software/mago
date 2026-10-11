@@ -684,7 +684,9 @@ where
     let cache_key = (calling_class, function_is_final);
     if cacheable && let Some(property_types) = context.property_types.get(&cache_key) {
         for (expression_id, property_type) in property_types {
-            block_context.locals.insert(*expression_id, Rc::clone(property_type));
+            if !block_context.scope.is_static() || !expression_id.as_bytes().starts_with(b"$this->") {
+                block_context.locals.insert(*expression_id, Rc::clone(property_type));
+            }
         }
 
         return Ok(());
@@ -771,7 +773,10 @@ where
         );
 
         let property_type = Rc::new(property_type);
-        block_context.locals.insert(expression_id, Rc::clone(&property_type));
+        if !block_context.scope.is_static() || property_metadata.flags.is_static() {
+            block_context.locals.insert(expression_id, Rc::clone(&property_type));
+        }
+
         if let Some(property_types) = &mut property_types {
             property_types.push((expression_id, property_type));
         }
