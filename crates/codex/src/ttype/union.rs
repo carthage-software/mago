@@ -1,7 +1,10 @@
 use std::borrow::Cow;
+use std::hash::BuildHasher;
 use std::hash::Hash;
 use std::hash::Hasher;
 use std::sync::Arc;
+
+use foldhash::fast::FixedState;
 
 use mago_word::Word;
 use mago_word::concat_word;
@@ -33,6 +36,9 @@ use crate::ttype::atomic::scalar::string::TStringCasing;
 use crate::ttype::flags::UnionFlags;
 use crate::ttype::get_mixed;
 
+#[cfg(test)]
+mod tests;
+
 #[derive(Debug, Clone, Eq, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub struct TUnion {
@@ -45,9 +51,21 @@ impl Hash for TUnion {
     where
         H: Hasher,
     {
-        for t in self.types.as_ref() {
-            t.hash(state);
+        self.types.len().hash(state);
+        if let [atomic] = self.types.as_ref() {
+            atomic.hash(state);
+            return;
         }
+
+        let hasher = FixedState::default();
+        let mut hash = 0u64;
+        for (index, atomic) in self.types.iter().enumerate() {
+            if !self.types[..index].contains(atomic) {
+                hash = hash.wrapping_add(hasher.hash_one(atomic));
+            }
+        }
+
+        hash.hash(state);
     }
 }
 
