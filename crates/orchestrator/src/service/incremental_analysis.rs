@@ -631,8 +631,6 @@ impl IncrementalAnalysisService {
     ) -> Result<Option<AnalysisResult>, OrchestratorError> {
         let source_files: Vec<_> = self.database.files().filter(|f| f.file_type != FileType::Builtin).collect();
 
-        let current_file_names: WordSet = source_files.iter().map(|file| mago_word::word(file.name.as_ref())).collect();
-
         let mut changed_files = Vec::new();
         let mut unchanged_file_ids = Vec::with_capacity(source_files.len());
         let mut file_hashes: HashMap<FileId, u64> = HashMap::default();
@@ -917,7 +915,6 @@ impl IncrementalAnalysisService {
 
             let files_to_skip: HashSet<FileId> = unchanged_file_ids.iter().copied().collect();
             let mut symbol_references = std::mem::take(&mut self.native_symbol_references);
-            symbol_references.retain_references_from_files(&current_file_names);
 
             let mut changed_symbols: HashSet<(mago_word::Word, mago_word::Word)> = HashSet::default();
             let mut changed_file_names: Vec<mago_word::Word> = Vec::new();
@@ -1137,7 +1134,11 @@ impl IncrementalAnalysisService {
         }
 
         let mut symbol_references = std::mem::take(&mut self.native_symbol_references);
-        symbol_references.retain_references_from_files(&current_file_names);
+        if deleted_count > 0 {
+            let current_file_names = source_files.iter().map(|file| mago_word::word(file.name.as_ref())).collect();
+            symbol_references.retain_references_from_files(&current_file_names);
+        }
+
         symbol_references.remove_dirty_symbol_references(&dirty_symbols);
         if !self.clear_invalidated_host_bodies(
             &mut merged_codebase,
@@ -1579,13 +1580,13 @@ impl IncrementalAnalysisService {
             .map_err(mago_analyzer::error::AnalysisError::from)?;
         let references_changed = before.references != self.external_symbol_references;
         let external_symbol_references = before.references;
-        let effective_skip_files = if references_changed { HashSet::default() } else { skip_files.clone() };
+        let no_skip_files = HashSet::default();
+        let effective_skip_files = if references_changed { &no_skip_files } else { skip_files };
         let host_files: Vec<_> = self
             .database
             .files()
             .filter(|file| file.file_type == FileType::Host && !effective_skip_files.contains(&file.id))
-            .map(|file| self.database.get(&file.id))
-            .collect::<Result<Vec<_>, _>>()?;
+            .collect();
         #[cfg(not(target_arch = "wasm32"))]
         if let Some(start) = before_start {
             tracing::trace!(
@@ -1760,7 +1761,7 @@ impl IncrementalAnalysisService {
         }
 
         let mut late_symbol_references = SymbolReferences::new();
-        for file_id in &effective_skip_files {
+        for file_id in effective_skip_files {
             if let Some(state) = self.file_states.get(file_id) {
                 late_symbol_references.extend(state.late_symbol_references.clone());
             }
