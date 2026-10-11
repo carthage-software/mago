@@ -1117,9 +1117,6 @@ where
                     name.as_bytes().eq_ignore_ascii_case(b"stdClass")
                 });
 
-                // Object to array: properties become key-value pairs.
-                // Keys are strings (property names), values are mixed (property values).
-                // stdClass is a special case where we do not report a warning.
                 if !reported_object_warning && !is_stdclass {
                     context.collector.report_with_code(
                         IssueCode::InvalidTypeCast,
@@ -1136,7 +1133,7 @@ where
                 }
 
                 let mut obj_array = TKeyedArray::new();
-                obj_array.parameters = Some((Arc::new(get_string()), Arc::new(get_mixed())));
+                obj_array.parameters = Some((Arc::new(get_arraykey()), Arc::new(get_mixed())));
 
                 resulting_array_atomics.push(TAtomic::Array(TArray::Keyed(obj_array)));
             }
@@ -2188,7 +2185,7 @@ mod tests {
                 // built-in
             }
 
-            /** @return array<string, mixed> */
+            /** @return array<array-key, mixed> */
             function example(stdClass $obj): array
             {
                 return (array) $obj;
