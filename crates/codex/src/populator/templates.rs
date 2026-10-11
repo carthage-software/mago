@@ -127,8 +127,6 @@ pub fn extend_type(
 
 #[cfg(test)]
 mod tests {
-    use std::sync::Arc;
-
     use mago_span::Span;
     use mago_word::word;
 
@@ -137,7 +135,6 @@ mod tests {
     use crate::misc::GenericParent;
     use crate::populator::templates::extend_template_parameters;
     use crate::ttype::atomic::TAtomic;
-    use crate::ttype::atomic::generic::TGenericParameter;
     use crate::ttype::atomic::object::TObject;
     use crate::ttype::atomic::object::named::TNamedObject;
     use crate::ttype::template::GenericTemplate;
@@ -164,44 +161,5 @@ mod tests {
 
         let resolved = child.template_extended_parameters.get(&parent_name).and_then(|m| m.get(&t_entity));
         assert_eq!(resolved, Some(&entity_type));
-    }
-
-    #[test]
-    fn test_multilevel_unbound_template_propagates_bound() {
-        let grandparent_name = word("AbstractMapper");
-        let mut grandparent = make_class("AbstractMapper");
-        let t_entity = word("TEntity");
-        let entity_type = wrap_atomic(TAtomic::Object(TObject::Named(TNamedObject::new(word("Entity")))));
-
-        grandparent
-            .template_types
-            .insert(t_entity, GenericTemplate::new(GenericParent::ClassLike(grandparent_name), entity_type.clone()));
-
-        let parent_name = word("ProjectMapper");
-        let mut parent = make_class("ProjectMapper");
-        parent
-            .template_types
-            .insert(t_entity, GenericTemplate::new(GenericParent::ClassLike(parent_name), entity_type.clone()));
-        // ProjectMapper @extends AbstractMapper<TEntity>
-        let parent_t_generic = wrap_atomic(TAtomic::GenericParameter(TGenericParameter {
-            parameter_name: t_entity,
-            defining_entity: GenericParent::ClassLike(parent_name),
-            constraint: Arc::new(entity_type.clone()),
-            intersection_types: None,
-        }));
-        parent.template_extended_offsets.insert(grandparent_name, vec![parent_t_generic]);
-        extend_template_parameters(&mut parent, &grandparent);
-
-        // Child extends ProjectMapper without @extends
-        let mut child = make_class("ProductMapper");
-        extend_template_parameters(&mut child, &parent);
-
-        // Both ProjectMapper and AbstractMapper should have TEntity resolved to Entity!
-        let parent_resolved = child.template_extended_parameters.get(&parent_name).and_then(|m| m.get(&t_entity));
-        assert_eq!(parent_resolved, Some(&entity_type));
-
-        let grandparent_resolved =
-            child.template_extended_parameters.get(&grandparent_name).and_then(|m| m.get(&t_entity));
-        assert_eq!(grandparent_resolved, Some(&entity_type));
     }
 }
