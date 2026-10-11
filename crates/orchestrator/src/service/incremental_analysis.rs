@@ -55,9 +55,9 @@ use crate::service::issue_reconciliation::DeferredIssueReconciler;
 struct FileState {
     content_hash: u64,
     entry_keys: CodebaseEntryKeys,
-    unreconciled_analysis_issues: IssueCollection,
-    analysis_issues: IssueCollection,
-    codebase_issues: IssueCollection,
+    unreconciled_analysis_issues: Arc<IssueCollection>,
+    analysis_issues: Arc<IssueCollection>,
+    codebase_issues: Arc<IssueCollection>,
     deferred_pragmas: Option<DeferredPragmas>,
     late_symbol_references: SymbolReferences,
 }
@@ -105,8 +105,8 @@ pub struct IncrementalAnalysisService {
     initialized: bool,
     scan_only: bool,
     needs_full_rebuild: bool,
-    codebase_issues: IssueCollection,
-    lifecycle_issues: IssueCollection,
+    codebase_issues: Arc<IssueCollection>,
+    lifecycle_issues: Arc<IssueCollection>,
     analysis_snapshots: HashMap<FileId, Arc<FileAnalysisSnapshot>>,
     editor_artifacts: bool,
     editor_files: HashMap<FileId, Arc<EditorFileData>>,
@@ -186,8 +186,8 @@ impl IncrementalAnalysisService {
             initialized: false,
             scan_only: false,
             needs_full_rebuild: false,
-            codebase_issues: IssueCollection::default(),
-            lifecycle_issues: IssueCollection::default(),
+            codebase_issues: Arc::default(),
+            lifecycle_issues: Arc::default(),
             analysis_snapshots: HashMap::default(),
             editor_artifacts: false,
             editor_files: HashMap::default(),
@@ -265,6 +265,21 @@ impl IncrementalAnalysisService {
         Some(self.collect_all_issues())
     }
 
+    /// Borrows all cached issues from the last analysis.
+    pub fn issue_collections(&self) -> impl Iterator<Item = &IssueCollection> + '_ {
+        self.shared_issue_collections().map(|(_, _, issues)| issues.as_ref())
+    }
+
+    /// Shares immutable issue sets so clients can skip unchanged diagnostics.
+    /// The key is the owning file (or workspace), followed by whether these are codebase issues.
+    pub fn shared_issue_collections(&self) -> impl Iterator<Item = (Option<FileId>, bool, &Arc<IssueCollection>)> + '_ {
+        [(None, true, &self.codebase_issues), (None, false, &self.lifecycle_issues)].into_iter().chain(
+            self.file_states.iter().flat_map(|(&file, state)| {
+                [(Some(file), false, &state.analysis_issues), (Some(file), true, &state.codebase_issues)]
+            }),
+        )
+    }
+
     /// Returns cached per-file diagnostics for a specific file.
     ///
     /// This returns the issues from the last completed analysis run for the given file,
@@ -272,7 +287,7 @@ impl IncrementalAnalysisService {
     /// has been run yet.
     #[must_use]
     pub fn get_file_diagnostics(&self, file_id: &FileId) -> Option<&IssueCollection> {
-        self.file_states.get(file_id).map(|state| &state.analysis_issues)
+        self.file_states.get(file_id).map(|state| state.analysis_issues.as_ref())
     }
 
     /// Returns the number of tracked source files.
@@ -324,11 +339,11 @@ impl IncrementalAnalysisService {
             if let Some(fid) = file_id
                 && let Some(state) = self.file_states.get_mut(&fid)
             {
-                state.codebase_issues.push(issue);
+                Arc::make_mut(&mut state.codebase_issues).push(issue);
                 continue;
             }
 
-            self.codebase_issues.push(issue);
+            Arc::make_mut(&mut self.codebase_issues).push(issue);
         }
     }
 
@@ -336,38 +351,23 @@ impl IncrementalAnalysisService {
     ///
     /// This avoids storing a separate snapshot by reconstructing on demand.
     fn collect_all_issues(&self) -> IssueCollection {
-        let total: usize = self.codebase_issues.len()
-            + self.lifecycle_issues.len()
-            + self.file_states.values().map(|s| s.analysis_issues.len() + s.codebase_issues.len()).sum::<usize>();
-
         let mut issues = IssueCollection::default();
-        issues.reserve(total);
-        issues.extend(self.codebase_issues.iter().cloned());
-        issues.extend(self.lifecycle_issues.iter().cloned());
-        for state in self.file_states.values() {
-            if !state.analysis_issues.is_empty() {
-                issues.extend(state.analysis_issues.iter().cloned());
-            }
-
-            if !state.codebase_issues.is_empty() {
-                issues.extend(state.codebase_issues.iter().cloned());
-            }
-        }
-
+        issues.reserve(self.issue_collections().map(IssueCollection::len).sum());
+        issues.extend(self.issue_collections().flat_map(IssueCollection::iter).cloned());
         issues
     }
 
     fn refresh_late_reference_issues(&mut self) {
         if self.late_symbol_references.is_empty() {
             for state in self.file_states.values_mut() {
-                state.analysis_issues = state.unreconciled_analysis_issues.clone();
+                state.analysis_issues = Arc::clone(&state.unreconciled_analysis_issues);
             }
             return;
         }
 
         let reconciler = LateSymbolReferenceIssueReconciler::new(&self.codebase, &self.symbol_references);
         for state in self.file_states.values_mut() {
-            state.analysis_issues = reconciler.reconcile(state.unreconciled_analysis_issues.clone());
+            state.analysis_issues = Arc::new(reconciler.reconcile((*state.unreconciled_analysis_issues).clone()));
         }
     }
 
@@ -381,6 +381,23 @@ impl IncrementalAnalysisService {
     /// Returns [`OrchestratorError`] when source scanning, codebase population, or per-file
     /// analysis fails.
     pub fn analyze(&mut self) -> Result<AnalysisResult, OrchestratorError> {
+        let mut result = self.analyze_inner()?;
+        result.issues = self.collect_all_issues();
+        Ok(result)
+    }
+
+    /// Runs a full analysis and keeps its issues in the cache without copying them.
+    ///
+    /// Read the results through [`issue_collections()`](Self::issue_collections).
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`analyze()`](Self::analyze).
+    pub fn analyze_without_collecting(&mut self) -> Result<(), OrchestratorError> {
+        self.analyze_inner().map(drop)
+    }
+
+    fn analyze_inner(&mut self) -> Result<AnalysisResult, OrchestratorError> {
         self.reset_analysis();
         let result = self.run_full_analysis();
         if result.is_err() {
@@ -399,8 +416,8 @@ impl IncrementalAnalysisService {
         self.external_symbol_references = SymbolReferences::new();
         self.late_symbol_references = SymbolReferences::new();
         self.file_states = HashMap::default();
-        self.codebase_issues = IssueCollection::default();
-        self.lifecycle_issues = IssueCollection::default();
+        self.codebase_issues = Arc::default();
+        self.lifecycle_issues = Arc::default();
         self.analysis_snapshots = HashMap::default();
         self.editor_files = HashMap::default();
         self.codebase_scan_plan = None;
@@ -485,9 +502,9 @@ impl IncrementalAnalysisService {
                 FileState {
                     content_hash,
                     entry_keys,
-                    unreconciled_analysis_issues: IssueCollection::default(),
-                    analysis_issues: IssueCollection::default(),
-                    codebase_issues: IssueCollection::default(),
+                    unreconciled_analysis_issues: Arc::default(),
+                    analysis_issues: Arc::default(),
+                    codebase_issues: Arc::default(),
                     deferred_pragmas: None,
                     late_symbol_references: SymbolReferences::new(),
                 },
@@ -510,19 +527,19 @@ impl IncrementalAnalysisService {
         self.external_symbol_references = external_symbol_references;
         self.late_symbol_references = late_symbol_references;
         self.native_symbol_references = native_symbol_references;
-        self.lifecycle_issues = analysis_result.issues.clone();
+        self.lifecycle_issues = Arc::new(std::mem::take(&mut analysis_result.issues));
         self.analysis_snapshots = snapshots.into_iter().map(|snapshot| (snapshot.file_id(), snapshot)).collect();
         self.editor_files = editor_files;
 
         // Distribute codebase issues to per-file caches.
         self.file_states = file_states;
-        self.codebase_issues = IssueCollection::default();
+        self.codebase_issues = Arc::default();
         self.distribute_codebase_issues(all_codebase_issues);
 
         for (file_id, issues) in per_file_issues {
             if let Some(state) = self.file_states.get_mut(&file_id) {
-                state.unreconciled_analysis_issues = issues.clone();
-                state.analysis_issues = issues;
+                state.unreconciled_analysis_issues = Arc::new(issues);
+                state.analysis_issues = Arc::clone(&state.unreconciled_analysis_issues);
                 state.deferred_pragmas = per_file_pragmas.get(&file_id).cloned();
                 state.late_symbol_references =
                     late_symbol_references_by_file.get(&file_id).cloned().unwrap_or_default();
@@ -532,10 +549,9 @@ impl IncrementalAnalysisService {
         self.codebase = merged_codebase;
         self.symbol_references = std::mem::take(&mut analysis_result.symbol_references);
         self.refresh_late_reference_issues();
-        analysis_result.issues = self.collect_all_issues();
         tracing::debug!(
             "Initial analysis: {} total issues ({} codebase-level)",
-            analysis_result.issues.len(),
+            self.issue_collections().map(IssueCollection::len).sum::<usize>(),
             self.codebase_issues.len(),
         );
         self.initialized = true;
@@ -561,8 +577,32 @@ impl IncrementalAnalysisService {
         &mut self,
         changed_hint: Option<&[FileId]>,
     ) -> Result<AnalysisResult, OrchestratorError> {
+        let mut result = self.analyze_incremental_inner(changed_hint)?;
+        result.issues = self.collect_all_issues();
+        Ok(result)
+    }
+
+    /// Runs incremental analysis and keeps its issues in the cache without copying them.
+    ///
+    /// Read the results through [`issue_collections()`](Self::issue_collections).
+    /// `changed_hint` follows [`analyze_incremental()`](Self::analyze_incremental).
+    ///
+    /// # Errors
+    ///
+    /// Returns the same errors as [`analyze_incremental()`](Self::analyze_incremental).
+    pub fn analyze_incremental_without_collecting(
+        &mut self,
+        changed_hint: Option<&[FileId]>,
+    ) -> Result<(), OrchestratorError> {
+        self.analyze_incremental_inner(changed_hint).map(drop)
+    }
+
+    fn analyze_incremental_inner(
+        &mut self,
+        changed_hint: Option<&[FileId]>,
+    ) -> Result<AnalysisResult, OrchestratorError> {
         if self.needs_full_rebuild {
-            return self.analyze();
+            return self.analyze_inner();
         }
 
         if !self.initialized {
@@ -577,7 +617,7 @@ impl IncrementalAnalysisService {
                 self.codebase.safe_symbol_members = HashSet::default();
                 Ok(result)
             }
-            Ok(None) => self.analyze(),
+            Ok(None) => self.analyze_inner(),
             Err(error) => {
                 self.reset_analysis();
                 Err(error)
@@ -686,10 +726,8 @@ impl IncrementalAnalysisService {
         }
 
         if changed_files.is_empty() && deleted_count == 0 {
-            tracing::debug!("No files changed, reconstructing cached issues");
-            let mut result = AnalysisResult::new(SymbolReferences::new());
-            result.issues = self.collect_all_issues();
-            return Ok(Some(result));
+            tracing::debug!("No files changed, keeping cached issues");
+            return Ok(Some(AnalysisResult::new(SymbolReferences::new())));
         }
 
         // When a vendor file changes, patch files that were unchanged by content must still be
@@ -950,7 +988,7 @@ impl IncrementalAnalysisService {
             self.external_symbol_references = external_symbol_references;
             self.late_symbol_references = late_symbol_references;
             self.native_symbol_references = native_symbol_references;
-            self.lifecycle_issues = std::mem::take(&mut analysis_result.issues);
+            self.lifecycle_issues = Arc::new(std::mem::take(&mut analysis_result.issues));
             self.editor_files.retain(|file_id, _| current_editor_files.contains(file_id));
             self.editor_files.extend(editor_files);
             self.analysis_snapshots.retain(|file_id, _| current_file_ids.contains(file_id));
@@ -970,20 +1008,20 @@ impl IncrementalAnalysisService {
             // Clear codebase issues for every file analyzed in this generation.
             for (file_id, state) in self.file_states.iter_mut() {
                 if !files_to_skip.contains(file_id) {
-                    state.codebase_issues = IssueCollection::default();
+                    state.codebase_issues = Arc::default();
                 }
             }
 
             // Keep orphan codebase issues; distribute file-attributable ones.
-            self.codebase_issues = IssueCollection::default();
+            self.codebase_issues = Arc::default();
             self.distribute_codebase_issues(new_codebase_issues);
 
             for file_id in re_analyzed_unchanged {
                 if let Some(issues) = per_file_issues.remove(&file_id)
                     && let Some(state) = self.file_states.get_mut(&file_id)
                 {
-                    state.unreconciled_analysis_issues = issues.clone();
-                    state.analysis_issues = issues;
+                    state.unreconciled_analysis_issues = Arc::new(issues);
+                    state.analysis_issues = Arc::clone(&state.unreconciled_analysis_issues);
                     state.deferred_pragmas = per_file_pragmas.get(&file_id).cloned();
                     state.late_symbol_references = late_symbol_references_by_file.remove(&file_id).unwrap_or_default();
                 }
@@ -991,12 +1029,12 @@ impl IncrementalAnalysisService {
 
             for (file_id, metadata) in new_file_scans {
                 let content_hash = file_hashes[&file_id];
-                let analysis_issues = per_file_issues.remove(&file_id).unwrap_or_default();
+                let analysis_issues = Arc::new(per_file_issues.remove(&file_id).unwrap_or_default());
                 // Owned keys (spans match merged) so a future touch of this file does
                 // not clobber a rival file that won the tiebreak over this one.
                 let entry_keys = metadata.extract_owned_keys(&merged_codebase);
                 let codebase_issues =
-                    self.file_states.get(&file_id).map(|s| s.codebase_issues.clone()).unwrap_or_default();
+                    self.file_states.get(&file_id).map(|s| Arc::clone(&s.codebase_issues)).unwrap_or_default();
                 let deferred_pragmas = per_file_pragmas.get(&file_id).cloned();
                 let late_symbol_references = late_symbol_references_by_file.remove(&file_id).unwrap_or_default();
                 self.file_states.insert(
@@ -1004,7 +1042,7 @@ impl IncrementalAnalysisService {
                     FileState {
                         content_hash,
                         entry_keys,
-                        unreconciled_analysis_issues: analysis_issues.clone(),
+                        unreconciled_analysis_issues: Arc::clone(&analysis_issues),
                         analysis_issues,
                         codebase_issues,
                         deferred_pragmas,
@@ -1016,7 +1054,6 @@ impl IncrementalAnalysisService {
             self.codebase = merged_codebase;
             self.symbol_references = std::mem::take(&mut analysis_result.symbol_references);
             self.refresh_late_reference_issues();
-            analysis_result.issues = self.collect_all_issues();
 
             return Ok(Some(analysis_result));
         }
@@ -1202,7 +1239,7 @@ impl IncrementalAnalysisService {
         self.external_symbol_references = external_symbol_references;
         self.late_symbol_references = late_symbol_references;
         self.native_symbol_references = native_symbol_references;
-        self.lifecycle_issues = std::mem::take(&mut analysis_result.issues);
+        self.lifecycle_issues = Arc::new(std::mem::take(&mut analysis_result.issues));
         self.editor_files.retain(|file_id, _| current_editor_files.contains(file_id));
         self.editor_files.extend(editor_files);
         self.analysis_snapshots.retain(|file_id, _| current_file_ids.contains(file_id));
@@ -1223,20 +1260,20 @@ impl IncrementalAnalysisService {
         // Files in files_to_skip keep their old codebase_issues intact.
         for (file_id, state) in self.file_states.iter_mut() {
             if !files_to_skip.contains(file_id) {
-                state.codebase_issues = IssueCollection::default();
+                state.codebase_issues = Arc::default();
             }
         }
 
         // Distribute new codebase issues (from re-populated symbols) to per-file caches.
-        self.codebase_issues = IssueCollection::default();
+        self.codebase_issues = Arc::default();
         self.distribute_codebase_issues(new_codebase_issues);
 
         for file_id in re_analyzed_unchanged {
             if let Some(issues) = per_file_issues.remove(&file_id)
                 && let Some(state) = self.file_states.get_mut(&file_id)
             {
-                state.unreconciled_analysis_issues = issues.clone();
-                state.analysis_issues = issues;
+                state.unreconciled_analysis_issues = Arc::new(issues);
+                state.analysis_issues = Arc::clone(&state.unreconciled_analysis_issues);
                 state.deferred_pragmas = per_file_pragmas.get(&file_id).cloned();
                 state.late_symbol_references = late_symbol_references_by_file.remove(&file_id).unwrap_or_default();
             }
@@ -1244,11 +1281,12 @@ impl IncrementalAnalysisService {
 
         for (file_id, metadata) in new_file_scans {
             let content_hash = file_hashes[&file_id];
-            let analysis_issues = per_file_issues.remove(&file_id).unwrap_or_default();
+            let analysis_issues = Arc::new(per_file_issues.remove(&file_id).unwrap_or_default());
             // Owned keys (spans match merged) so a future touch of this file does
             // not clobber a rival file that won the tiebreak over this one.
             let entry_keys = metadata.extract_owned_keys(&merged_codebase);
-            let codebase_issues = self.file_states.get(&file_id).map(|s| s.codebase_issues.clone()).unwrap_or_default();
+            let codebase_issues =
+                self.file_states.get(&file_id).map(|s| Arc::clone(&s.codebase_issues)).unwrap_or_default();
             let deferred_pragmas = per_file_pragmas.get(&file_id).cloned();
             let late_symbol_references = late_symbol_references_by_file.remove(&file_id).unwrap_or_default();
             self.file_states.insert(
@@ -1256,7 +1294,7 @@ impl IncrementalAnalysisService {
                 FileState {
                     content_hash,
                     entry_keys,
-                    unreconciled_analysis_issues: analysis_issues.clone(),
+                    unreconciled_analysis_issues: Arc::clone(&analysis_issues),
                     analysis_issues,
                     codebase_issues,
                     deferred_pragmas,
@@ -1268,7 +1306,6 @@ impl IncrementalAnalysisService {
         self.codebase = merged_codebase;
         self.symbol_references = std::mem::take(&mut analysis_result.symbol_references);
         self.refresh_late_reference_issues();
-        analysis_result.issues = self.collect_all_issues();
 
         Ok(Some(analysis_result))
     }
@@ -1782,7 +1819,7 @@ impl IncrementalAnalysisService {
             }
             for (file_id, state) in &self.file_states {
                 if effective_skip_files.contains(file_id) {
-                    let issues = state.unreconciled_analysis_issues.clone();
+                    let issues = (*state.unreconciled_analysis_issues).clone();
                     project_result.issues.extend(match late_reconciler.as_ref() {
                         Some(reconciler) => reconciler.reconcile(issues),
                         None => issues,
@@ -1885,6 +1922,130 @@ mod tests {
             ParserSettings::default(),
             Arc::clone(&PLUGIN_REGISTRY),
         )
+    }
+
+    fn assert_borrowed_issues(service: &IncrementalAnalysisService, expected: IssueCollection) {
+        let borrowed = IssueCollection::from(service.issue_collections().flat_map(IssueCollection::iter).cloned());
+        assert_eq!(borrowed.sorted(), expected.sorted());
+        if service.late_symbol_references.is_empty() {
+            for state in service.file_states.values() {
+                assert!(Arc::ptr_eq(&state.analysis_issues, &state.unreconciled_analysis_issues));
+            }
+        }
+    }
+
+    #[test]
+    fn test_borrowed_issues_match_owned_results_across_edits() {
+        let base = "<?php\nclass Base { public function run(): int { return 1; } }\n";
+        let child = "<?php\nclass Child extends Base {
+            public function run(): string { return 'ok'; }
+            private function unused(): void {}
+        }\n";
+        let ignored = "<?php\n// @mago-ignore analysis:non-existent-function\nmissing_ignored();\n";
+        let missing = "<?php\nmissing_reported();\n";
+        let base_id = FileId::new(b"src/Base.php");
+        let child_id = FileId::new(b"src/Child.php");
+        let ignored_id = FileId::new(b"src/Ignored.php");
+        let missing_id = FileId::new(b"src/Missing.php");
+        let mut db = make_database(vec![
+            ("src/Base.php", base),
+            ("src/Child.php", child),
+            ("src/Ignored.php", ignored),
+            ("src/Missing.php", missing),
+        ]);
+        let mut owned = make_watch_service(&db);
+        let mut borrowed = make_watch_service(&db);
+        assert!(borrowed.last_issues().is_none());
+        borrowed.analyze_without_collecting().unwrap();
+        assert_borrowed_issues(&borrowed, owned.analyze().unwrap().issues);
+        assert!(borrowed.get_file_diagnostics(&ignored_id).unwrap().is_empty());
+        assert!(!borrowed.get_file_diagnostics(&missing_id).unwrap().is_empty());
+
+        let unchanged = Arc::clone(&borrowed.file_states[&missing_id].analysis_issues);
+        borrowed.analyze_incremental_without_collecting(Some(&[])).unwrap();
+        assert_borrowed_issues(&borrowed, owned.analyze_incremental(Some(&[])).unwrap().issues);
+        assert!(Arc::ptr_eq(&unchanged, &borrowed.file_states[&missing_id].analysis_issues));
+
+        for source in [
+            "<?php\nclass Base { public function run(): int { return 2; } }\n",
+            "<?php\nclass Base { public function run(): string { return 'ok'; } }\n",
+        ] {
+            db.update(base_id, Cow::Owned(source.as_bytes().to_vec()));
+            owned.update_database(db.read_only());
+            borrowed.update_database(db.read_only());
+            borrowed.analyze_incremental_without_collecting(Some(&[base_id])).unwrap();
+            assert_borrowed_issues(&borrowed, owned.analyze_incremental(Some(&[base_id])).unwrap().issues);
+            let mut fresh = make_watch_service(&db);
+            assert_borrowed_issues(&borrowed, fresh.analyze().unwrap().issues);
+            assert!(borrowed.get_file_diagnostics(&child_id).is_some());
+        }
+
+        borrowed.set_editor_artifacts(true);
+        owned.set_editor_artifacts(true);
+        borrowed.analyze_incremental_without_collecting(Some(&[])).unwrap();
+        assert_borrowed_issues(&borrowed, owned.analyze_incremental(Some(&[])).unwrap().issues);
+        assert!(borrowed.editor_file(child_id).is_some());
+
+        assert!(db.delete(base_id));
+        assert!(db.delete(missing_id));
+        owned.update_database(db.read_only());
+        borrowed.update_database(db.read_only());
+        borrowed.analyze_incremental_without_collecting(Some(&[base_id, missing_id])).unwrap();
+        assert_borrowed_issues(&borrowed, owned.analyze_incremental(Some(&[base_id, missing_id])).unwrap().issues);
+        assert_borrowed_issues(&borrowed, make_watch_service(&db).analyze().unwrap().issues);
+        assert!(borrowed.get_file_diagnostics(&missing_id).is_none());
+        assert!(borrowed.editor_file(base_id).is_none());
+    }
+
+    #[test]
+    fn test_borrowed_issues_restore_unused_members_after_late_references_clear() {
+        use mago_codex::reference::ReferenceOrigin;
+        use mago_word::word;
+
+        let source = "<?php\nclass Example {
+            private int $unused = 1;
+            private int $written = 1;
+            public function write(): void { $this->written = 2; }
+            private function unused(): void {}
+        }\n";
+        let file_id = FileId::new(b"src/Example.php");
+        let db = make_database(vec![("src/Example.php", source)]);
+        let mut service = make_watch_service(&db);
+        service.analyze_without_collecting().unwrap();
+        let original_issues = service.last_issues().unwrap();
+        let original_references = service.symbol_references.clone();
+        for code in ["unused-method", "unused-property", "write-only-property"] {
+            assert!(original_issues.iter().any(|issue| issue.code.as_deref() == Some(code)), "Missing {code}");
+        }
+        let cached = Arc::clone(&service.file_states[&file_id].unreconciled_analysis_issues);
+
+        let mut late = SymbolReferences::new();
+        let file = word(b"src/Hook.php");
+        late.add_file_reference_to_class_member(file, (word(b"example"), word(b"unused")), false);
+        for property in [b"$unused".as_slice(), b"$written".as_slice()] {
+            let member = (word(b"example"), word(property));
+            late.add_file_reference_to_class_member(file, member, false);
+            late.add_property_read_reference(ReferenceOrigin::File(file), member);
+        }
+        service.symbol_references.extend(late.clone());
+        service.late_symbol_references = late;
+        service.refresh_late_reference_issues();
+        let expected = IssueCollection::from(
+            original_issues
+                .iter()
+                .filter(|issue| {
+                    !matches!(issue.code.as_deref(), Some("unused-method" | "unused-property" | "write-only-property"))
+                })
+                .cloned(),
+        );
+        assert_borrowed_issues(&service, expected);
+        assert!(Arc::ptr_eq(&cached, &service.file_states[&file_id].unreconciled_analysis_issues));
+
+        service.symbol_references = original_references;
+        service.late_symbol_references = SymbolReferences::new();
+        service.refresh_late_reference_issues();
+        assert_borrowed_issues(&service, original_issues);
+        assert!(Arc::ptr_eq(&cached, &service.file_states[&file_id].analysis_issues));
     }
 
     #[test]
@@ -4022,7 +4183,7 @@ mod tests {
             );
         }
 
-        let unchanged = service.file_states[&stable_id].unreconciled_analysis_issues.clone();
+        let unchanged = Arc::clone(&service.file_states[&stable_id].unreconciled_analysis_issues);
         database.update(
             target_id,
             Cow::Borrowed(b"<?php class First { public function value(): string { return 'changed'; } }"),
@@ -4030,7 +4191,7 @@ mod tests {
 
         service.update_database(database.read_only());
         service.analyze_incremental(Some(&[target_id])).unwrap();
-        assert_eq!(unchanged, service.file_states[&stable_id].unreconciled_analysis_issues);
+        assert!(Arc::ptr_eq(&unchanged, &service.file_states[&stable_id].unreconciled_analysis_issues));
         assert_matches_full(&service, &database, "same alias binding after target signature changes");
     }
 
