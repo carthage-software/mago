@@ -146,6 +146,11 @@ fn callable_target(
         target => target,
     };
     let declaration = codebase.get_function_like(&target)?;
+    let target = match target {
+        FunctionLikeIdentifier::Function(_) => FunctionLikeIdentifier::Function(declaration.name),
+        target => target,
+    };
+
     if declaration.flags.is_magic_method() {
         return None;
     }
