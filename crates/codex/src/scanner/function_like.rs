@@ -1,5 +1,4 @@
 use mago_allocator::Arena;
-use mago_names::kind::NameKind;
 use mago_names::scope::NamespaceScope;
 use mago_phpdoc_syntax::cst::AssertPattern;
 use mago_phpdoc_syntax::cst::AssertTagValue;
@@ -70,7 +69,7 @@ pub fn scan_method<'arena, A>(
     method: &'arena Method<'arena>,
     class_like_metadata: &ClassLikeMetadata,
     context: &mut Context<'_, 'arena, A>,
-    scope: &mut NamespaceScope,
+    scope: &NamespaceScope,
     type_resolution_context: Option<TypeResolutionContext>,
 ) -> Option<FunctionLikeMetadata>
 where
@@ -175,7 +174,7 @@ pub fn scan_function<'arena, A>(
     function: &'arena Function<'arena>,
     classname: Option<Word>,
     context: &mut Context<'_, 'arena, A>,
-    scope: &mut NamespaceScope,
+    scope: &NamespaceScope,
     type_resolution_context: TypeResolutionContext,
     constants: Option<&WordMap<ConstantMetadata>>,
 ) -> Option<FunctionLikeMetadata>
@@ -244,7 +243,7 @@ pub fn scan_closure<'arena, A>(
     closure: &'arena Closure<'arena>,
     classname: Option<Word>,
     context: &mut Context<'_, 'arena, A>,
-    scope: &mut NamespaceScope,
+    scope: &NamespaceScope,
     type_resolution_context: TypeResolutionContext,
 ) -> FunctionLikeMetadata
 where
@@ -304,7 +303,7 @@ pub fn scan_arrow_function<'arena, A>(
     arrow_function: &'arena ArrowFunction<'arena>,
     classname: Option<Word>,
     context: &mut Context<'_, 'arena, A>,
-    scope: &mut NamespaceScope,
+    scope: &NamespaceScope,
     type_resolution_context: TypeResolutionContext,
 ) -> FunctionLikeMetadata
 where
@@ -363,7 +362,7 @@ fn scan_function_like_docblock<A>(
     metadata: &mut FunctionLikeMetadata,
     classname: Option<Word>,
     context: &Context<'_, '_, A>,
-    scope: &mut NamespaceScope,
+    scope: &NamespaceScope,
 ) where
     A: Arena,
 {
@@ -448,12 +447,6 @@ fn scan_function_like_docblock<A>(
                 metadata.flags |= MetadataFlags::NO_NAMED_ARGUMENTS;
             }
             _ => {}
-        }
-    }
-
-    for tag in document.tags() {
-        if let TagValue::Template(template) = &tag.value {
-            scope.add(NameKind::Default, template.name.value, &(None as Option<&str>));
         }
     }
 

@@ -90,7 +90,7 @@ pub fn register_anonymous_class<'arena, A>(
     class: &'arena AnonymousClass<'arena>,
     docblock_start: u32,
     context: &mut Context<'_, 'arena, A>,
-    scope: &mut NamespaceScope,
+    scope: &NamespaceScope,
 ) -> ClassLikeRegistration
 where
     A: Arena,
@@ -124,7 +124,7 @@ pub fn register_class<'arena, A>(
     codebase: &mut CodebaseMetadata,
     class: &'arena Class<'arena>,
     context: &mut Context<'_, 'arena, A>,
-    scope: &mut NamespaceScope,
+    scope: &NamespaceScope,
 ) -> ClassLikeRegistration
 where
     A: Arena,
@@ -156,7 +156,7 @@ pub fn register_interface<'arena, A>(
     codebase: &mut CodebaseMetadata,
     interface: &'arena Interface<'arena>,
     context: &mut Context<'_, 'arena, A>,
-    scope: &mut NamespaceScope,
+    scope: &NamespaceScope,
 ) -> ClassLikeRegistration
 where
     A: Arena,
@@ -188,7 +188,7 @@ pub fn register_trait<'arena, A>(
     codebase: &mut CodebaseMetadata,
     r#trait: &'arena Trait<'arena>,
     context: &mut Context<'_, 'arena, A>,
-    scope: &mut NamespaceScope,
+    scope: &NamespaceScope,
 ) -> ClassLikeRegistration
 where
     A: Arena,
@@ -220,7 +220,7 @@ pub fn register_enum<'arena, A>(
     codebase: &mut CodebaseMetadata,
     r#enum: &'arena Enum<'arena>,
     context: &mut Context<'_, 'arena, A>,
-    scope: &mut NamespaceScope,
+    scope: &NamespaceScope,
 ) -> ClassLikeRegistration
 where
     A: Arena,
@@ -287,7 +287,7 @@ fn scan_class_like<'arena, A>(
     implements: Option<&'arena Implements<'arena>>,
     enum_type: Option<&'arena EnumBackingTypeHint<'arena>>,
     context: &mut Context<'_, 'arena, A>,
-    scope: &mut NamespaceScope,
+    scope: &NamespaceScope,
 ) -> Option<ClassLikeMetadata>
 where
     A: Arena,
@@ -473,12 +473,6 @@ where
             };
 
             type_context = type_context.with_type_alias(word(type_alias.alias.value));
-        }
-
-        for tag in document.tags() {
-            if let TagValue::Template(template) = &tag.value {
-                scope.add(NameKind::Default, template.name.value, &(None as Option<&str>));
-            }
         }
 
         let mut template_variance = Vec::new();
