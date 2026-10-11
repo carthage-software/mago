@@ -15,6 +15,19 @@ use mago_formatter::settings::SortOrder;
 use mago_formatter::settings::SortUses;
 use mago_php_version::PHPVersion;
 
+/// Compare the original bytes, but render formatting failures as readable source diffs.
+#[track_caller]
+fn assert_code_eq(expected: &[u8], actual: &[u8], message: &str) {
+    assert!(
+        expected == actual,
+        "{message}\n{}",
+        pretty_assertions::StrComparison::new(
+            &mago_bytes::BytesDisplay(expected).to_string(),
+            &mago_bytes::BytesDisplay(actual).to_string(),
+        ),
+    );
+}
+
 #[macro_export]
 macro_rules! test_case {
     ($name:ident) => {
@@ -32,13 +45,13 @@ macro_rules! test_case {
 
             let formatted_code = formatter.format_code(Cow::Borrowed(b"code.php"), Cow::Borrowed(code)).unwrap();
 
-            pretty_assertions::assert_eq!(expected, formatted_code, "Formatted code does not match expected",);
+            $crate::assert_code_eq(expected, formatted_code, "Formatted code does not match expected");
 
             let reformatted_code = formatter
                 .format_code(Cow::Borrowed(b"formatted_code.php"), Cow::Owned(formatted_code.to_vec()))
                 .unwrap();
 
-            pretty_assertions::assert_eq!(expected, reformatted_code, "Reformatted code does not match expected",);
+            $crate::assert_code_eq(expected, reformatted_code, "Reformatted code does not match expected");
         }
     };
 }
@@ -590,7 +603,7 @@ fn preserves_non_utf8_identifiers() {
     else {
         panic!("second format pass must succeed");
     };
-    assert_eq!(formatted_pass1, reformatted, "formatter is not idempotent on non-UTF-8 identifiers");
+    assert_code_eq(formatted_pass1, reformatted, "formatter is not idempotent on non-UTF-8 identifiers");
 }
 
 #[test]
@@ -616,4 +629,28 @@ fn test_all_test_cases_are_ran() {
             "Directory '{file_name}' was not found as a test case"
         );
     }
+}
+
+#[test]
+fn formatting_diff_shows_source_text() {
+    let failure = std::panic::catch_unwind(|| {
+        assert_code_eq(b"<?php\nfoo();\n", b"<?php\nbar();\n", "Formatting mismatch");
+    })
+    .unwrap_err();
+    let message = failure.downcast_ref::<String>().unwrap();
+    assert!(message.contains("Formatting mismatch"));
+    assert!(message.contains("<?php\n"));
+    assert!(message.contains("foo"));
+    assert!(message.contains("bar"));
+}
+
+#[test]
+fn formatting_diff_preserves_non_utf8_byte_differences() {
+    let failure = std::panic::catch_unwind(|| {
+        assert_code_eq(b"<?php\n$\x80;\n", b"<?php\n$\xFF;\n", "Formatting mismatch");
+    })
+    .unwrap_err();
+    let message = failure.downcast_ref::<String>().unwrap();
+    assert!(message.contains("80"));
+    assert!(message.contains("FF"));
 }
