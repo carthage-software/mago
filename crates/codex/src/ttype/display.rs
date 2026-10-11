@@ -8,9 +8,11 @@ use mago_bytes::BytesDisplay;
 use mago_word::{Word, ascii_lowercase_word};
 
 use crate::metadata::CodebaseMetadata;
+use crate::misc::GenericParent;
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
 use crate::ttype::atomic::TAtomic;
+use crate::ttype::atomic::generic::TGenericParameter;
 use crate::ttype::atomic::object::TObject;
 use crate::ttype::atomic::reference::TReference;
 use crate::ttype::union::TUnion;
@@ -24,43 +26,108 @@ pub struct NameDisplay<'code> {
     codebase: &'code CodebaseMetadata,
     ambiguous: HashSet<Vec<u8>>,
     fully_qualified: bool,
+    templates: HashMap<Word, Option<GenericParent>>,
 }
 
 impl<'code> NameDisplay<'code> {
     /// Use absolute class names when part of the display has already been rendered.
     #[must_use]
     pub fn fully_qualified(codebase: &'code CodebaseMetadata) -> Self {
-        Self { codebase, ambiguous: HashSet::default(), fully_qualified: true }
+        Self { codebase, ambiguous: HashSet::default(), fully_qualified: true, templates: HashMap::default() }
     }
 
     /// Choose short class names unless the displayed types share a name.
     #[must_use]
     pub fn for_types<'ty>(codebase: &'code CodebaseMetadata, types: impl Iterator<Item = &'ty TUnion>) -> Self {
-        let names = types.flat_map(|ty| ty.get_all_child_nodes()).filter_map(type_name);
-        Self::for_names(codebase, names)
+        let mut display = Self::for_names(codebase, std::iter::empty());
+        let mut seen = HashMap::default();
+        for node in types.flat_map(|ty| ty.get_all_child_nodes()) {
+            if let Some(name) = type_name(node) {
+                display.add_class_name(&mut seen, name);
+            }
+
+            if let TypeRef::Atomic(TAtomic::GenericParameter(parameter)) = node {
+                display
+                    .templates
+                    .entry(parameter.parameter_name)
+                    .and_modify(|owner| {
+                        if *owner != Some(parameter.defining_entity) {
+                            *owner = None;
+                        }
+                    })
+                    .or_insert(Some(parameter.defining_entity));
+            }
+        }
+
+        for (name, owner) in &mut display.templates {
+            if seen.contains_key(name.as_bytes().to_ascii_lowercase().as_slice()) {
+                *owner = None;
+            }
+        }
+
+        display
     }
 
     /// Build one spelling context for a group of class names.
     #[must_use]
     pub fn for_names(codebase: &'code CodebaseMetadata, names: impl Iterator<Item = Word>) -> Self {
+        let mut display =
+            Self { codebase, ambiguous: HashSet::default(), fully_qualified: false, templates: HashMap::default() };
         let mut seen = HashMap::default();
-        let mut ambiguous = HashSet::default();
         for name in names {
-            let name = codebase.get_class_like_by_name(name).map_or(name, |class| class.name);
-            let full = ascii_lowercase_word(name.as_bytes());
-            let short =
-                name.as_bytes().rsplit(|byte| *byte == b'\\').next().unwrap_or(name.as_bytes()).to_ascii_lowercase();
-            match seen.entry(short) {
-                Entry::Vacant(entry) => {
-                    entry.insert(full);
-                }
-                Entry::Occupied(entry) if *entry.get() != full => {
-                    ambiguous.insert(entry.key().clone());
-                }
-                Entry::Occupied(_) => {}
-            }
+            display.add_class_name(&mut seen, name);
         }
-        Self { codebase, ambiguous, fully_qualified: false }
+
+        display
+    }
+
+    fn add_class_name(&mut self, seen: &mut HashMap<Vec<u8>, Word>, name: Word) {
+        let name = self.codebase.get_class_like_by_name(name).map_or(name, |class| class.name);
+        let full = ascii_lowercase_word(name.as_bytes());
+        let short =
+            name.as_bytes().rsplit(|byte| *byte == b'\\').next().unwrap_or(name.as_bytes()).to_ascii_lowercase();
+        match seen.entry(short) {
+            Entry::Vacant(entry) => {
+                entry.insert(full);
+            }
+            Entry::Occupied(entry) if *entry.get() != full => {
+                self.ambiguous.insert(entry.key().clone());
+            }
+            Entry::Occupied(_) => {}
+        }
+    }
+
+    fn write_template_name(&self, parameter: &TGenericParameter, output: &mut Vec<u8>) {
+        if self.templates.get(&parameter.parameter_name) != Some(&Some(parameter.defining_entity)) {
+            match parameter.defining_entity {
+                GenericParent::ClassLike(name) => {
+                    let name = self.codebase.get_class_like_by_name(name).map_or(name, |class| class.original_name);
+                    output.push(b'\\');
+                    output.extend_from_slice(name.as_bytes());
+                }
+                GenericParent::FunctionLike((class, name)) => {
+                    if !class.is_empty() {
+                        let class =
+                            self.codebase.get_class_like_by_name(class).map_or(class, |class| class.original_name);
+                        output.push(b'\\');
+                        output.extend_from_slice(class.as_bytes());
+                        output.extend_from_slice(b"::");
+                    }
+
+                    let name = self
+                        .codebase
+                        .function_likes
+                        .get(&(class, name))
+                        .map_or(name, |function| function.original_name);
+                    output.extend_from_slice(name.as_bytes());
+                    output.extend_from_slice(b"()");
+                }
+            }
+
+            output.extend_from_slice(b"::");
+        }
+
+        output.extend_from_slice(parameter.parameter_name.as_bytes());
     }
 
     /// Use the declaration casing and qualify colliding short names.
@@ -92,7 +159,7 @@ pub fn canonical_bytes(ty: &TUnion) -> Vec<u8> {
     render::union(ty, render::Names::Canonical)
 }
 
-/// Keep the full type-id spelling, restoring class names from their declarations.
+/// Render editor types with full class names and readable template parameters.
 #[must_use]
 pub fn qualified_bytes(codebase: &CodebaseMetadata, ty: &TUnion) -> Vec<u8> {
     render::union(ty, render::Names::Qualified(codebase))

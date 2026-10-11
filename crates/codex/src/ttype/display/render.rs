@@ -50,7 +50,7 @@ impl Renderer<'_> {
     fn write_union(&self, ty: &TUnion, output: &mut Vec<u8>) {
         if ty.types.len() <= 1 {
             if let Some(atomic) = ty.types.first() {
-                self.write_wrapped_atomic(atomic, atomic.is_generic_parameter(), output);
+                self.write_wrapped_atomic(atomic, self.wrap_generic(atomic), output);
             }
             return;
         }
@@ -62,7 +62,7 @@ impl Renderer<'_> {
                 let mut part = Vec::new();
                 self.write_wrapped_atomic(
                     atomic,
-                    atomic.is_generic_parameter() || atomic.has_intersection_types(),
+                    self.wrap_generic(atomic) || atomic.has_intersection_types(),
                     &mut part,
                 );
                 part
@@ -76,6 +76,16 @@ impl Renderer<'_> {
             }
             output.extend_from_slice(part);
         }
+    }
+
+    fn wrap_generic(&self, ty: &TAtomic) -> bool {
+        matches!(ty, TAtomic::GenericParameter(parameter)
+            if self.show_template_bound(&parameter.constraint))
+    }
+
+    fn show_template_bound(&self, constraint: &TUnion) -> bool {
+        matches!(self.names, Names::Canonical)
+            || !matches!(constraint.types.as_ref(), [TAtomic::Mixed(mixed)] if mixed.is_vanilla())
     }
 
     fn write_wrapped_atomic(&self, ty: &TAtomic, wrapped: bool, output: &mut Vec<u8>) {
@@ -183,17 +193,37 @@ impl Renderer<'_> {
             TAtomic::Array(array) => self.write_array(array, output),
             TAtomic::Callable(callable) => self.write_callable(callable, output),
             TAtomic::GenericParameter(parameter) => {
-                if parameter.intersection_types.is_some() {
+                let bounded = self.show_template_bound(&parameter.constraint);
+                let wrapped = bounded && parameter.intersection_types.is_some();
+                if wrapped {
                     output.push(b'(');
                 }
 
-                output.push(b'\'');
-                output.extend_from_slice(parameter.parameter_name.as_bytes());
-                output.push(b'.');
-                write_parent(&parameter.defining_entity, output);
-                output.extend_from_slice(b" extends ");
-                self.write_union(&parameter.constraint, output);
-                if parameter.intersection_types.is_some() {
+                match self.names {
+                    Names::Canonical => {
+                        output.push(b'\'');
+                        output.extend_from_slice(parameter.parameter_name.as_bytes());
+                        output.push(b'.');
+                        write_parent(&parameter.defining_entity, output);
+                        output.extend_from_slice(b" extends ");
+                        self.write_union(&parameter.constraint, output);
+                    }
+                    Names::Short(names) => {
+                        names.write_template_name(parameter, output);
+                        if bounded {
+                            output.extend_from_slice(b" of ");
+                            self.write_union(&parameter.constraint, output);
+                        }
+                    }
+                    Names::Qualified(codebase) => {
+                        NameDisplay::fully_qualified(codebase).write_template_name(parameter, output);
+                        if bounded {
+                            output.extend_from_slice(b" of ");
+                            self.write_union(&parameter.constraint, output);
+                        }
+                    }
+                }
+                if wrapped {
                     output.push(b')');
                 }
 

@@ -434,6 +434,57 @@ mod tests {
     }
 
     #[test]
+    fn bound_template_display_shares_origins_with_full_declarations() {
+        use mago_codex::metadata::ttype::TypeMetadata;
+        use mago_codex::misc::GenericParent;
+        use mago_codex::ttype::atomic::generic::TGenericParameter;
+        use mago_codex::ttype::get_mixed;
+
+        let key = FunctionLikeIdentifier::Function(word("read"));
+        let template = |owner| {
+            TUnion::from_atomic(TAtomic::GenericParameter(TGenericParameter::new(
+                word("T"),
+                Arc::new(get_mixed()),
+                GenericParent::ClassLike(word(owner)),
+            )))
+        };
+        let mut declaration = FunctionLikeMetadata::new(
+            FunctionLikeKind::Function,
+            word("read"),
+            word("read"),
+            Span::dummy(0, 0),
+            MetadataFlags::empty(),
+        );
+        declaration.return_type_metadata = Some(TypeMetadata::new(template("Right\\Box"), Span::dummy(0, 0)));
+        let mut codebase = CodebaseMetadata::default();
+        codebase.function_likes.insert((word(""), word("read")), Box::new(declaration));
+        let partial = TCallableSignature::new(false, true)
+            .with_partial_source(Some(key))
+            .with_return_type(Some(Arc::new(template("Left\\Box"))));
+        let expressions = HashMap::from_iter([(
+            (0, 10),
+            Rc::new(TUnion::from_vec(vec![
+                TAtomic::Callable(TCallable::Signature(partial)),
+                TAtomic::Callable(TCallable::Alias(key)),
+            ])),
+        )]);
+        let types = CallableTypes::collect(&expressions, &codebase);
+        let (targets, uncertain) = types.at_end(10).unwrap();
+        assert!(!uncertain);
+        assert!(targets.contains(&CallableTarget::Full(key)));
+        let bound = targets
+            .iter()
+            .find_map(|target| match target {
+                CallableTarget::Signature(bound) => Some(bound),
+                _ => None,
+            })
+            .unwrap();
+        assert_eq!(bound.return_type.as_deref(), Some(r"\Left\Box::T"));
+        let full = &codebase.get_function_like(&key).unwrap().return_type_metadata.as_ref().unwrap().type_union;
+        assert_eq!(NameDisplay::fully_qualified(&codebase).union(full), r"\Right\Box::T");
+    }
+
+    #[test]
     fn full_closures_only_store_signatures_when_declared_types_change() {
         use mago_codex::metadata::ttype::TypeMetadata;
         use mago_codex::ttype::atomic::object::{TObject, named::TNamedObject};

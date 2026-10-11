@@ -75,13 +75,16 @@ fn type_names_do_not_rewrite_shape_keys_or_literal_values() {
 }
 
 #[test]
-fn type_names_keep_template_names_and_origins() {
+fn editor_template_names_keep_bounds_without_internal_markers() {
     let ty = TUnion::from_atomic(TAtomic::GenericParameter(TGenericParameter::new(
-        word("user"),
+        word("T"),
         Arc::new(named("Domain\\User")),
         GenericParent::ClassLike(word("Domain\\Owner")),
     )));
-    assert_eq!(display(&ty), "('user.Domain\\Owner extends User)");
+    let canonical = ty.get_id();
+    assert_eq!(display(&ty), "(T of User)");
+    assert_eq!(qualified_bytes(&CodebaseMetadata::new(), &ty), br"(\Domain\Owner::T of Domain\User)");
+    assert_eq!(canonical_bytes(&ty), canonical.as_bytes());
 }
 
 #[test]
@@ -245,4 +248,125 @@ fn canonical_rendering_keeps_full_names_enum_wrappers_and_raw_bytes() {
     assert_eq!(canonical_bytes(&ty), b"domain\\Box<Left\\User, Right\\User, enum(State\\Mode::Open), string('\xff')>");
     assert_eq!(canonical_bytes(&ty), ty.get_id().as_bytes());
     assert_eq!(display(&ty), "Box<\\Left\\User, \\Right\\User, Mode::Open, string('\\xFF')>");
+}
+
+fn template(owner: GenericParent, constraint: TUnion) -> TAtomic {
+    TAtomic::GenericParameter(TGenericParameter::new(word("T"), Arc::new(constraint), owner))
+}
+
+#[test]
+fn editor_template_names_keep_nested_bounds_intersections_and_canonical_bytes() {
+    use crate::ttype::atomic::mixed::TMixed;
+    use crate::ttype::{get_mixed, get_truthy_mixed};
+    let owner = GenericParent::ClassLike(word("Domain\\Box"));
+    let plain = template(owner, get_mixed());
+    let mut bounded = template(owner, named("Domain\\User"));
+    bounded.add_intersection_type(TAtomic::Object(TObject::new_named(word("Domain\\Other"))));
+    let mut intersected = plain.clone();
+    intersected.add_intersection_type(TAtomic::Object(TObject::new_named(word("Domain\\Other"))));
+    let nested = TAtomic::Object(TObject::Named(TNamedObject::new_with_type_parameters(
+        word("Domain\\Box"),
+        Some(vec![TUnion::from_atomic(plain.clone())]),
+    )));
+    for (atomic, expected) in [
+        (plain, "T"),
+        (nested, "Box<T>"),
+        (bounded, "((T of User)&Other)"),
+        (intersected, "T&Other"),
+        (template(owner, get_truthy_mixed()), "(T of truthy-mixed)"),
+        (template(owner, TUnion::from_atomic(TAtomic::Mixed(TMixed::new().with_is_non_null(true)))), "(T of nonnull)"),
+        (template(owner, TUnion::from_atomic(TAtomic::Mixed(TMixed::new().as_empty()))), "(T of empty-falsy-mixed)"),
+    ] {
+        let ty = TUnion::from_atomic(atomic);
+        let canonical = ty.get_id();
+        assert_eq!(canonical_bytes(&ty), canonical.as_bytes());
+        assert_eq!(display(&ty), expected);
+        assert_eq!(canonical_bytes(&ty), canonical.as_bytes());
+    }
+}
+
+#[test]
+fn editor_template_names_keep_distinct_class_and_method_owners_in_both_orders() {
+    use crate::metadata::function_like::{FunctionLikeKind, FunctionLikeMetadata};
+    use crate::metadata::{class_like::ClassLikeMetadata, flags::MetadataFlags};
+    use crate::ttype::get_mixed;
+    use mago_span::Span;
+
+    let mut codebase = CodebaseMetadata::new();
+    for name in ["Left\\Box", "Right\\Box"] {
+        let key = ascii_lowercase_word(name.as_bytes());
+        codebase.class_likes.insert(
+            key,
+            Box::new(ClassLikeMetadata::new(key, word(name), Span::dummy(0, 0), None, MetadataFlags::empty())),
+        );
+    }
+    for name in ["firstValue", "secondValue"] {
+        let key = ascii_lowercase_word(name.as_bytes());
+        codebase.function_likes.insert(
+            (word("left\\box"), key),
+            Box::new(FunctionLikeMetadata::new(
+                FunctionLikeKind::Method,
+                key,
+                word(name),
+                Span::dummy(0, 0),
+                MetadataFlags::empty(),
+            )),
+        );
+    }
+    for name in [r"Left\firstValue", r"Right\secondValue"] {
+        let key = ascii_lowercase_word(name.as_bytes());
+        codebase.function_likes.insert(
+            (word(""), key),
+            Box::new(FunctionLikeMetadata::new(
+                FunctionLikeKind::Function,
+                key,
+                word(name),
+                Span::dummy(0, 0),
+                MetadataFlags::empty(),
+            )),
+        );
+    }
+    let pairs = [
+        (
+            [GenericParent::ClassLike(word("left\\box")), GenericParent::ClassLike(word("right\\box"))],
+            r"\Left\Box::T|\Right\Box::T",
+        ),
+        (
+            [
+                GenericParent::FunctionLike((word("left\\box"), word("firstvalue"))),
+                GenericParent::FunctionLike((word("left\\box"), word("secondvalue"))),
+            ],
+            r"\Left\Box::firstValue()::T|\Left\Box::secondValue()::T",
+        ),
+        (
+            [
+                GenericParent::FunctionLike((word(""), word(r"left\firstvalue"))),
+                GenericParent::FunctionLike((word(""), word(r"right\secondvalue"))),
+            ],
+            r"Left\firstValue()::T|Right\secondValue()::T",
+        ),
+        (
+            [
+                GenericParent::FunctionLike((word(""), word("{closure:a.php:1:1}"))),
+                GenericParent::FunctionLike((word(""), word("{closure:a.php:2:1}"))),
+            ],
+            "{closure:a.php:1:1}()::T|{closure:a.php:2:1}()::T",
+        ),
+    ];
+    for (owners, expected) in pairs {
+        for owners in [owners, [owners[1], owners[0]]] {
+            let ty = TUnion::from_vec(owners.into_iter().map(|owner| template(owner, get_mixed())).collect());
+            let canonical = ty.get_id();
+            assert_eq!(NameDisplay::for_types(&codebase, std::iter::once(&ty)).union(&ty), expected);
+            assert_eq!(qualified_bytes(&codebase, &ty), expected.as_bytes());
+            assert_eq!(canonical_bytes(&ty), canonical.as_bytes());
+        }
+    }
+    let ty = TUnion::from_vec(vec![
+        template(GenericParent::ClassLike(word("left\\box")), get_mixed()),
+        TAtomic::Object(TObject::new_named(word("Domain\\T"))),
+    ]);
+    assert_eq!(NameDisplay::for_types(&codebase, std::iter::once(&ty)).union(&ty), r"T|\Left\Box::T");
+    let template = TUnion::from_atomic(template(GenericParent::ClassLike(word("left\\box")), get_mixed()));
+    assert_eq!(NameDisplay::fully_qualified(&codebase).union(&template), r"\Left\Box::T");
 }
