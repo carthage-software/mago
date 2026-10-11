@@ -691,6 +691,19 @@ impl IncrementalAnalysisService {
             let mut new_sigs = CodebaseMetadata::new();
 
             for (file_id, metadata) in &new_file_scans {
+                if self.file_has_other_reference_owner(*file_id)
+                    || metadata
+                        .class_likes
+                        .keys()
+                        .chain(metadata.constants.keys())
+                        .chain(
+                            metadata.function_likes.keys().filter(|(owner, _)| owner.is_empty()).map(|(_, name)| name),
+                        )
+                        .any(|&name| Self::reference_origin_has_other_owner(&self.codebase, name, *file_id))
+                {
+                    return self.analyze();
+                }
+
                 if let Some(old_sig) = self.codebase.get_file_signature(file_id) {
                     old_sigs.set_file_signature(*file_id, old_sig.clone());
                 }
@@ -700,10 +713,14 @@ impl IncrementalAnalysisService {
             }
 
             for &file_id in self.file_states.keys() {
-                if !current_file_ids.contains(&file_id)
-                    && let Some(sig) = self.codebase.get_file_signature(&file_id)
-                {
-                    old_sigs.set_file_signature(file_id, sig.clone());
+                if !current_file_ids.contains(&file_id) {
+                    if self.file_has_other_reference_owner(file_id) {
+                        return self.analyze();
+                    }
+
+                    if let Some(sig) = self.codebase.get_file_signature(&file_id) {
+                        old_sigs.set_file_signature(file_id, sig.clone());
+                    }
                 }
             }
 
@@ -793,7 +810,12 @@ impl IncrementalAnalysisService {
                 }
             }
 
-            symbol_references.remove_body_references_for_symbols(&changed_symbols, &changed_file_names);
+            let reference_symbols = changed_symbols
+                .iter()
+                .map(|&key| if key.0.is_empty() { (key.1, mago_word::empty_word()) } else { key })
+                .collect();
+
+            symbol_references.remove_body_references_for_symbols(&reference_symbols, &changed_file_names);
 
             // Collect class_like names from changed files so we exclude them from safe_symbols.
             // Changed classes had their old metadata removed and fresh (unpopulated) metadata added,
@@ -972,12 +994,14 @@ impl IncrementalAnalysisService {
         let mut symbol_references = std::mem::take(&mut self.native_symbol_references);
         symbol_references.retain_references_from_files(&current_file_names);
         symbol_references.remove_dirty_symbol_references(&dirty_symbols);
-        self.clear_invalidated_host_bodies(
+        if !self.clear_invalidated_host_bodies(
             &mut merged_codebase,
             &mut symbol_references,
             &unchanged_file_ids,
             &invalid_files,
-        );
+        ) {
+            return self.analyze();
+        }
 
         let safe_symbols = std::mem::take(&mut merged_codebase.safe_symbols);
         let safe_symbol_members = std::mem::take(&mut merged_codebase.safe_symbol_members);
@@ -1153,13 +1177,41 @@ impl IncrementalAnalysisService {
         })
     }
 
+    fn file_has_other_reference_owner(&self, file_id: FileId) -> bool {
+        self.file_states.get(&file_id).is_some_and(|state| {
+            state
+                .entry_keys
+                .class_like_names
+                .iter()
+                .chain(&state.entry_keys.constant_names)
+                .chain(
+                    state
+                        .entry_keys
+                        .function_like_keys
+                        .iter()
+                        .filter(|(owner, _)| owner.is_empty())
+                        .map(|(_, name)| name),
+                )
+                .any(|&name| Self::reference_origin_has_other_owner(&self.codebase, name, file_id))
+        })
+    }
+
+    fn reference_origin_has_other_owner(codebase: &CodebaseMetadata, name: mago_word::Word, file_id: FileId) -> bool {
+        codebase.class_likes.get(&name).is_some_and(|metadata| metadata.span.file_id != file_id)
+            || codebase
+                .function_likes
+                .get(&(mago_word::empty_word(), name))
+                .is_some_and(|metadata| metadata.span.file_id != file_id)
+            || codebase.constants.get(&name).is_some_and(|metadata| metadata.span.file_id != file_id)
+    }
+
     fn clear_invalidated_host_bodies(
         &self,
         codebase: &mut CodebaseMetadata,
         references: &mut SymbolReferences,
         unchanged_files: &[FileId],
         invalid_files: &WordSet,
-    ) {
+    ) -> bool {
         let mut symbols = HashSet::default();
         for &file_id in unchanged_files {
             if self.can_skip_file(codebase, file_id, invalid_files)
@@ -1171,25 +1223,37 @@ impl IncrementalAnalysisService {
             let Some(state) = self.file_states.get(&file_id) else { continue };
             for &name in &state.entry_keys.class_like_names {
                 if codebase.class_likes.get(&name).is_some_and(|metadata| metadata.span.file_id == file_id) {
+                    if Self::reference_origin_has_other_owner(codebase, name, file_id) {
+                        return false;
+                    }
+
                     symbols.insert((name, mago_word::empty_word()));
                 }
             }
 
             for &key in &state.entry_keys.function_like_keys {
                 if codebase.function_likes.get(&key).is_some_and(|metadata| metadata.span.file_id == file_id) {
+                    if key.0.is_empty() && Self::reference_origin_has_other_owner(codebase, key.1, file_id) {
+                        return false;
+                    }
+
                     symbols.insert(if key.0.is_empty() { (key.1, mago_word::empty_word()) } else { key });
                 }
             }
 
             for &name in &state.entry_keys.constant_names {
                 if codebase.constants.get(&name).is_some_and(|metadata| metadata.span.file_id == file_id) {
+                    if Self::reference_origin_has_other_owner(codebase, name, file_id) {
+                        return false;
+                    }
+
                     symbols.insert((name, mago_word::empty_word()));
                 }
             }
         }
 
         if symbols.is_empty() {
-            return;
+            return true;
         }
 
         references.remove_body_references_for_symbols(&symbols, &[]);
@@ -1200,6 +1264,8 @@ impl IncrementalAnalysisService {
                 codebase.safe_symbol_members.remove(&(name, member));
             }
         }
+
+        true
     }
 
     /// Analyzes a single file and returns both its issues and the
@@ -1778,6 +1844,188 @@ mod tests {
             only_incr.is_empty() && only_full.is_empty(),
             "After signature change, incremental != full.\n  Only in incremental: {only_incr:?}\n  Only in full: {only_full:?}"
         );
+    }
+
+    #[test]
+    fn top_level_body_edits_replace_reference_graph() {
+        let mut database = make_database(vec![
+            ("src/types.php", "<?php class SignatureType {} class First {} class Second {}"),
+            ("src/caller.php", "<?php function read_value(SignatureType $value): object { return new First(); }"),
+        ]);
+
+        let mut service = make_service(&database);
+        service.analyze().unwrap();
+        let caller = FileId::new(b"src/caller.php");
+        for target in ["Second", "First", "Second"] {
+            database.update(
+                caller,
+                Cow::Owned(
+                    format!("<?php function read_value(SignatureType $value): object {{ return new {target}(); }}",)
+                        .into_bytes(),
+                ),
+            );
+
+            service.update_database(database.read_only());
+            service.analyze_incremental(Some(&[caller])).unwrap();
+            let mut fresh = make_service(&database);
+            fresh.analyze().unwrap();
+
+            assert_eq!(service.native_symbol_references, fresh.native_symbol_references, "returning {target}");
+        }
+    }
+
+    #[test]
+    fn body_edits_preserve_other_declarations_with_the_same_reference_origin() {
+        use mago_codex::reference::{ReferenceOrigin, SymbolReferenceKind};
+        use mago_word::{empty_word, word};
+
+        for (edited, untouched) in [
+            (
+                "<?php function same(): object { return new First(); }",
+                "<?php class Same { public function run(): object { return new Target(); } }",
+            ),
+            (
+                "<?php class Same { public function run(): object { return new First(); } }",
+                "<?php function same(): object { return new Target(); }",
+            ),
+            ("<?php function same(): object { return new First(); }", "<?php /** @var Target */ const same = null;"),
+        ] {
+            let mut database = make_database(vec![
+                ("src/types.php", "<?php class First {} class Second {} class Target {}"),
+                ("src/edited.php", edited),
+                ("src/untouched.php", untouched),
+            ]);
+
+            let mut service = make_service(&database);
+            service.analyze().unwrap();
+            let file = FileId::new(b"src/edited.php");
+            for (target, removed) in [("Second", "first"), ("First", "second")] {
+                database.update(file, Cow::Owned(edited.replace("First", target).into_bytes()));
+                service.update_database(database.read_only());
+                service.analyze_incremental(Some(&[file])).unwrap();
+                let mut targets = WordSet::default();
+                service.native_symbol_references.for_each_reference(|origin, target, kind| {
+                    if origin == ReferenceOrigin::Symbol((word("same"), empty_word()))
+                        && matches!(kind, SymbolReferenceKind::Body | SymbolReferenceKind::Signature)
+                    {
+                        targets.insert(target.0);
+                    }
+                });
+
+                assert!(targets.contains(&word("target")), "unchanged declaration: {untouched}");
+                assert!(!targets.contains(&word(removed)), "edited declaration: {edited}");
+                let mut fresh = make_service(&database);
+                fresh.analyze().unwrap();
+                assert_eq!(service.native_symbol_references, fresh.native_symbol_references, "returning {target}");
+            }
+        }
+    }
+
+    #[test]
+    fn dependency_updates_preserve_other_owners_of_unrelated_body_origins() {
+        for (unrelated, other_owner) in [
+            (
+                "function same(): object { return new First(); }",
+                "<?php class Same { public function run(): object { return new Target(); } }",
+            ),
+            (
+                "class Same { public function run(): object { return new First(); } }",
+                "<?php function same(): object { return new Target(); }",
+            ),
+            ("function same(): object { return new First(); }", "<?php /** @var Target */ const same = null;"),
+        ] {
+            let caller = format!("<?php {unrelated} function read_value(): object {{ return Factory::create(); }}");
+            let mut database = make_database(vec![
+                ("src/types.php", "<?php class First {} class Second {} class Target {}"),
+                ("src/caller.php", &caller),
+                ("src/other.php", other_owner),
+            ]);
+
+            let factory = |target: &str| {
+                File::new(
+                    Cow::Borrowed(b"vendor/factory.php"),
+                    FileType::Vendored,
+                    None,
+                    Cow::Owned(format!(
+                        "<?php class Factory {{ public static function create(): {target} {{ return new {target}(); }} }}",
+                    ).into_bytes()),
+                )
+            };
+
+            let file = database.add(factory("First"));
+            let mut service = make_service(&database);
+            service.analyze().unwrap();
+            for target in ["Second", "First"] {
+                database.add(factory(target));
+                service.update_database(database.read_only());
+                service.analyze_incremental(Some(&[file])).unwrap();
+                let mut fresh = make_service(&database);
+                fresh.analyze().unwrap();
+                assert_eq!(service.native_symbol_references, fresh.native_symbol_references, "{unrelated}; {target}");
+            }
+        }
+    }
+
+    #[test]
+    fn function_lifecycle_preserves_shared_builtin_reference_origins() {
+        use mago_word::{empty_word, word};
+
+        let prelude = File::new(
+            Cow::Borrowed(b"prelude.php"),
+            FileType::Builtin,
+            None,
+            Cow::Borrowed(b"<?php interface Ancestor {} interface Same extends Ancestor {}"),
+        );
+
+        let arena = LocalArena::new();
+        let program = parse_file_with_settings(&arena, &prelude, ParserSettings::default());
+        let names = NameResolver::new(&arena).resolve(program);
+        let mut base = scan_program(&arena, &prelude, program, &names, Settings::default().version);
+        let mut base_references = SymbolReferences::new();
+        populate_codebase(&mut base, &mut base_references, WordSet::default(), HashSet::default());
+        let make = |database: &Database<'_>| {
+            IncrementalAnalysisService::new(
+                database.read_only(),
+                base.clone(),
+                base_references.clone(),
+                Settings::default(),
+                ParserSettings::default(),
+                Arc::clone(&PLUGIN_REGISTRY),
+            )
+        };
+
+        let mut database = make_database(vec![("src/caller.php", "<?php function accept(Same $value): void {}")]);
+        database.add(prelude);
+        let mut service = make(&database);
+        service.analyze().unwrap();
+        let function = FileId::new(b"src/function.php");
+
+        for source in [
+            Some("<?php function same(): int { return 1; }"),
+            Some("<?php function same(int $value): int { return $value; }"),
+            None,
+            Some("<?php function same(): int { return 1; }"),
+            Some("<?php function other(): int { return 1; }"),
+        ] {
+            if let Some(source) = source {
+                database.add(File::new(
+                    Cow::Borrowed(b"src/function.php"),
+                    FileType::Host,
+                    None,
+                    Cow::Owned(source.as_bytes().to_vec()),
+                ));
+            } else {
+                assert!(database.delete(function));
+            }
+
+            service.update_database(database.read_only());
+            service.analyze_incremental(Some(&[function])).unwrap();
+            let inherited = service.native_symbol_references.get_references_to_symbol((word("ancestor"), empty_word()));
+            assert!(inherited.iter().any(|&&owner| owner == (word("same"), empty_word())), "{source:?}");
+            let mut fresh = make(&database);
+            fresh.analyze().unwrap();
+            assert_eq!(service.native_symbol_references, fresh.native_symbol_references, "{source:?}");
+        }
     }
 
     #[test]
