@@ -28,7 +28,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Pipe<'arena> {
         block_context.flags.set_inside_pipe_callable(true);
         let result = resolve_targets(context, block_context, artifacts, self.callable, &mut template_result);
         block_context.flags.set_inside_pipe_callable(was_inside_pipe_callable);
-        let (invocation_targets, encountered_invalid_targets) = result?;
+        let (invocation_targets, _) = result?;
 
         analyze_invocation_targets(
             context,
@@ -39,7 +39,6 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Pipe<'arena> {
             InvocationArgumentsSource::PipeInput(self),
             self.span(),
             None,
-            encountered_invalid_targets,
             false,
             false,
             false, // object_has_nullsafe_null - not applicable for pipe expressions
