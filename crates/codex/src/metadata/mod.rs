@@ -653,13 +653,43 @@ impl CodebaseMetadata {
         // It's a regular class constant
         let constant_meta = class_meta.constants.get(&constant_name)?;
 
-        // Prefer the type signature if available
-        if let Some(type_meta) = constant_meta.type_metadata.as_ref() {
-            return Some(Cow::Borrowed(&type_meta.type_union));
-        }
+        Some(Cow::Owned(self.get_expanded_class_constant_type(class_meta, constant_meta)))
+    }
 
-        // Fall back to inferred type
-        constant_meta.inferred_type.as_ref().map(|atomic| Cow::Owned(TUnion::from_atomic(atomic.clone())))
+    /// Computes the type of a class constant the same way the analyzer does for a
+    /// class constant access: the `@var` docblock type wins, otherwise the inferred
+    /// type is preferred over the declared one. References inside the type, such as
+    /// enum cases (`Locale::DeDe`), are expanded.
+    fn get_expanded_class_constant_type(
+        &self,
+        class_meta: &ClassLikeMetadata,
+        constant_meta: &ClassLikeConstantMetadata,
+    ) -> TUnion {
+        let mut constant_type = if let Some(type_metadata) = &constant_meta.type_metadata
+            && type_metadata.from_docblock
+        {
+            type_metadata.type_union.clone()
+        } else {
+            constant_meta
+                .inferred_type
+                .clone()
+                .map(TUnion::from_atomic)
+                .or_else(|| constant_meta.type_metadata.as_ref().map(|type_metadata| type_metadata.type_union.clone()))
+                .unwrap_or_else(crate::ttype::get_mixed)
+        };
+
+        crate::ttype::expander::expand_union(
+            self,
+            &mut constant_type,
+            &crate::ttype::expander::TypeExpansionOptions {
+                self_class: Some(class_meta.name),
+                static_class_type: crate::ttype::expander::StaticClassType::Name(class_meta.name),
+                function_is_final: class_meta.flags.is_final(),
+                ..Default::default()
+            },
+        );
+
+        constant_type
     }
     // Inheritance Queries
 
