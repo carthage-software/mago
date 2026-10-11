@@ -1940,7 +1940,7 @@ mod tests {
 
         let mut merged = CodebaseMetadata::new();
         let mut entries = service.apply_scan_results(&mut merged, vec![(file_id, scanned)]);
-        let function = merged.function_likes.get(&key).unwrap();
+        let function = &merged.function_likes[&key];
         assert_eq!(std::ptr::from_ref(function.as_ref()), function_pointer);
         assert_eq!(function.parameters.as_ptr(), parameters_pointer);
         assert_eq!(function.parameters.capacity(), parameters_capacity);
@@ -2391,10 +2391,16 @@ mod tests {
         ";
         let data = check_editor_member_memoization(source);
         assert!(!data.members.is_empty());
-        assert!(data.members.iter().filter(|row| !row.magic).all(|row| row.declaration.is_some() && !row.uncertain), "{:?}", data.members);
+        assert!(
+            data.members.iter().filter(|row| !row.magic).all(|row| row.declaration.is_some() && !row.uncertain),
+            "{:?}",
+            data.members
+        );
         let magic: Vec<_> = data.members.iter().filter(|row| row.magic).collect();
         assert_eq!(magic.len(), 2);
-        assert!(magic.iter().all(|row| row.name.as_bytes() == b"$secret" && row.declaration.is_none() && row.uncertain));
+        assert!(
+            magic.iter().all(|row| row.name.as_bytes() == b"$secret" && row.declaration.is_none() && row.uncertain)
+        );
         assert_eq!(data.members.iter().filter(|row| row.name.as_bytes() == b"$contract").count(), 2);
         assert_eq!(data.members.iter().filter(|row| row.static_access).count(), 2);
     }

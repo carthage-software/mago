@@ -3208,7 +3208,7 @@ pub(super) mod testing {
         payload[4..8].copy_from_slice(&[0, 1, 0, 1]);
         assert!(matches!(decode_callable_signature_response(&payload, |_| None),
             Err(ExternalAnalyzerError::Protocol(message)) if message.contains("unsupported analyzer protocol major 1")));
-        assert!(message_kind(&payload).is_err());
+        message_kind(&payload).unwrap_err();
     }
 
     #[test]

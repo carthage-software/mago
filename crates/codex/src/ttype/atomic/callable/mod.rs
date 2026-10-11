@@ -64,7 +64,10 @@ impl PartialEq for TCallableSignature {
 impl Eq for TCallableSignature {}
 
 impl Hash for TCallableSignature {
-    fn hash<H: Hasher>(&self, state: &mut H) {
+    fn hash<H>(&self, state: &mut H)
+    where
+        H: Hasher,
+    {
         (
             self.is_pure,
             self.is_closure,
@@ -506,7 +509,7 @@ mod tests {
         assert_ne!(left.cmp(&right), Ordering::Equal);
         assert_eq!(left.cmp(&right), right.cmp(&left).reverse());
         assert_eq!(HashSet::from([left.clone(), right.clone(), left.clone()]).len(), 2);
-        assert_eq!(BTreeSet::from([left.clone(), right.clone(), left]).len(), 2);
+        assert_eq!(BTreeSet::from([left.clone(), right, left]).len(), 2);
     }
 
     #[test]

@@ -86,11 +86,13 @@ fn append_scopes(codebase: &CodebaseMetadata, signature: &FileSignature, entries
 #[cfg(test)]
 #[allow(clippy::unwrap_used)]
 mod tests {
+    use foldhash::HashSet;
     use mago_allocator::LocalArena;
     use mago_database::file::File;
     use mago_names::resolver::NameResolver;
     use mago_php_version::PHPVersion;
     use mago_syntax::parser::parse_file;
+    use mago_word::WordSet;
     use mago_word::word;
 
     use super::*;
@@ -132,10 +134,10 @@ mod tests {
             assert_eq!(source, expected);
         }
         let mut references = SymbolReferences::new();
-        populate_codebase(&mut codebase, &mut references, Default::default(), Default::default());
+        populate_codebase(&mut codebase, &mut references, WordSet::default(), HashSet::default());
         let target = (word("contact"), empty_word());
         assert!(references.has_file_reference_to_symbol(target));
-        references.remove_references_from_files(&[word("callbacks.php")].into_iter().collect());
+        references.remove_references_from_files(&std::iter::once(word("callbacks.php")).collect());
         references.for_each_reference(|origin, _, _| assert!(!matches!(origin, ReferenceOrigin::File(_))));
     }
 
@@ -148,7 +150,7 @@ mod tests {
             function kept() { return fn (Contact $value): int => 0; }",
         );
         codebase.extend(scan(b"edited.php", b"<?php function edited() { return fn (Contact $value): int => 0; }"));
-        populate_codebase(&mut codebase, &mut SymbolReferences::new(), Default::default(), Default::default());
+        populate_codebase(&mut codebase, &mut SymbolReferences::new(), WordSet::default(), HashSet::default());
 
         let fresh = scan(b"edited.php", b"<?php function edited() { return fn (Contact $value): int => 1; }");
         let dirty = fresh.function_likes.keys().copied().collect();
@@ -162,7 +164,7 @@ mod tests {
         populate_codebase_after_body_edit(
             &mut codebase,
             &mut references,
-            [word("contact")].into_iter().collect(),
+            std::iter::once(word("contact")).collect(),
             dirty,
         );
         assert!(codebase.function_likes.values().all(|metadata| metadata.flags.is_populated()));

@@ -45,7 +45,7 @@ fn bound_closure_parameters_preserve_declaration_metadata() {
         span,
     };
     target.bind_closure_parameters(&signature);
-    let parameter = target.get_parameter(0).expect("bound parameter");
+    let Some(parameter) = target.get_parameter(0) else { panic!("missing bound parameter") };
     assert_eq!(parameter.get_type(), Some(&named("Base")));
     assert_eq!(parameter.get_out_type(), Some(&get_int()));
     assert_eq!(parameter.get_default_type(), Some(&get_null()));
@@ -62,7 +62,7 @@ fn bound_closure_parameters_preserve_declaration_metadata() {
             .with_closure_this_type(Some(Arc::new(named("BoundReceiver")))),
     ]);
     target.bind_closure_parameters(&signature);
-    let parameter = target.get_parameter(0).expect("bound effects without a changed input type");
+    let Some(parameter) = target.get_parameter(0) else { panic!("missing parameter with bound effects") };
     assert_eq!(parameter.get_out_type(), Some(&named("Base")));
     assert_eq!(parameter.get_closure_this_type(), Some(&named("BoundReceiver")));
     assert_eq!(parameter.get_default_type(), Some(&get_null()));

@@ -85,7 +85,11 @@ final class InvocationFunctionProvider implements FunctionReturnTypeProvider, Ca
 {
     public function getTargets(): array
     {
-        return [FunctionTarget::exact('external_function'), FunctionTarget::exact('collect'), FunctionTarget::exact('roundtrip_effects')];
+        return [
+            FunctionTarget::exact('external_function'),
+            FunctionTarget::exact('collect'),
+            FunctionTarget::exact('roundtrip_effects'),
+        ];
     }
 
     public function getCallableSignature(CallableSignatureProviderContext $context): ?EffectiveCallableSignature
@@ -123,14 +127,19 @@ final class InvocationFunctionProvider implements FunctionReturnTypeProvider, Ca
 
             InvocationAudit::record('callable-effects');
 
-            return Type::fromAtomic(new CallableType(new CallableSignature(
-                $signature->pure,
-                $signature->closure,
-                $signature->parameters,
-                $signature->returnType,
-                null,
-                $signature->constraints,
-            ), null));
+            return Type::fromAtomic(
+                new CallableType(
+                    new CallableSignature(
+                        $signature->pure,
+                        $signature->closure,
+                        $signature->parameters,
+                        $signature->returnType,
+                        null,
+                        $signature->constraints,
+                    ),
+                    null,
+                ),
+            );
         }
 
         if (

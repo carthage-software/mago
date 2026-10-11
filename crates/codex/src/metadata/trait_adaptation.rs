@@ -152,12 +152,12 @@ impl CodebaseMetadata {
         result
     }
 
-    fn trait_method_sources<'a>(
-        &'a self,
-        owner: &'a ClassLikeMetadata,
+    fn trait_method_sources<'metadata>(
+        &'metadata self,
+        owner: &'metadata ClassLikeMetadata,
         name: Word,
         declaring: MethodIdentifier,
-    ) -> impl Iterator<Item = (&'a ClassLikeMetadata, Word)> + 'a {
+    ) -> impl Iterator<Item = (&'metadata ClassLikeMetadata, Word)> + 'metadata {
         let source_name = owner.trait_alias_map.get(&name).copied().unwrap_or(name);
         owner
             .direct_trait_names()

@@ -74,9 +74,9 @@ mod tests {
 
         let variables = VariableTypes::collect(source, &expressions);
         assert_eq!(variables.entries.len(), 2);
-        assert_eq!(variables.at_offset(0).unwrap().1, &get_nullable_string());
-        assert_eq!(variables.at_offset(5).unwrap().0, (0, 6));
-        assert_eq!(variables.at_offset(8).unwrap().1.get_single_literal_int_value(), Some(3));
+        assert_eq!(variables.at_offset(0).map(|(_, ty)| ty), Some(&get_nullable_string()));
+        assert_eq!(variables.at_offset(5).map(|(span, _)| span), Some((0, 6)));
+        assert_eq!(variables.at_offset(8).and_then(|(_, ty)| ty.get_single_literal_int_value()), Some(3));
         for offset in [6, 13, 14, source.len() as u32] {
             assert!(variables.at_offset(offset).is_none(), "{offset}");
         }
@@ -89,7 +89,11 @@ mod tests {
 
     #[test]
     fn variable_types_share_equal_types_across_repeated_variables() {
-        fn assert_send_sync<T: Send + Sync>() {}
+        fn assert_send_sync<T>()
+        where
+            T: Send + Sync,
+        {
+        }
         assert_send_sync::<VariableTypes>();
         let source = "$value ".repeat(4096);
         let expressions = (0..4096).map(|i| ((i * 7, i * 7 + 6), Rc::new(get_nullable_string()))).collect();

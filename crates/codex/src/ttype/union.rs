@@ -1209,7 +1209,6 @@ impl TType for TUnion {
                     if let Some(slot) = callable_shapes.iter_mut().find(|slot| slot.is_none()) {
                         *slot = id;
                     }
-
                 }
 
                 count += 1;

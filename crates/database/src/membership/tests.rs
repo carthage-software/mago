@@ -187,7 +187,7 @@ fn missing_files_resolve_existing_parent_aliases_without_widening_source_globs()
 fn nested_symlink_packages_keep_the_loaders_source_type_and_exclusions() {
     let dir = fixture(&["src/Main.php"]);
     let package = fixture(&["Service.php", "Hidden.php"]);
-    std::fs::create_dir(dir.path().join("vendor")).unwrap();
+    std::fs::create_dir_all(dir.path().join("vendor")).unwrap();
     std::os::unix::fs::symlink(package.path(), dir.path().join("vendor/package")).unwrap();
     let mut config = configuration(&dir, &["src"], &["vendor"], &[]);
     config.excludes = vec![Exclusion::Pattern(Cow::Borrowed("vendor/package/Hidden.php"))];

@@ -830,7 +830,10 @@ test_case!(partial_origin_preserves_reduced_parameters, mago_analyzer::settings:
 test_case!(nested_partial_keeps_reduced_parameter_order_and_names, mago_analyzer::settings::Settings::default());
 test_case!(partial_conditional_capture_waits_for_its_argument, mago_analyzer::settings::Settings::default());
 test_case!(nested_partial_keeps_captured_argument_constraints, mago_analyzer::settings::Settings::default());
-test_case!(nested_partial_checks_a_capture_when_its_last_dependency_is_bound, mago_analyzer::settings::Settings::default());
+test_case!(
+    nested_partial_checks_a_capture_when_its_last_dependency_is_bound,
+    mago_analyzer::settings::Settings::default()
+);
 test_case!(get_current_closure_keeps_parent_signature, mago_analyzer::settings::Settings::default());
 test_case!(partial_closure_keeps_parameter_dependencies, mago_analyzer::settings::Settings::default());
 test_case!(closure_calls_bind_parent_parameters, mago_analyzer::settings::Settings::default());
@@ -2833,7 +2836,7 @@ test_case!(issue_2440);
 #[test]
 #[cfg_attr(miri, ignore)]
 fn test_all_test_cases_are_ran() {
-    let test_case_file = include_str!("mod.rs");
+    let test_case_file = include_str!("mod.rs").split_whitespace().collect::<String>();
     let test_cases_dir = fs::read_dir(concat!(env!("CARGO_MANIFEST_DIR"), "/tests/cases")).unwrap();
 
     for entry in test_cases_dir {

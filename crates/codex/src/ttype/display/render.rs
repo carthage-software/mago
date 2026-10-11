@@ -25,10 +25,10 @@ pub(super) fn union(ty: &TUnion, names: Names<'_>) -> Vec<u8> {
 }
 
 #[derive(Clone, Copy)]
-pub(super) enum Names<'a> {
+pub(super) enum Names<'names> {
     Canonical,
-    Short(&'a NameDisplay<'a>),
-    Qualified(&'a CodebaseMetadata),
+    Short(&'names NameDisplay<'names>),
+    Qualified(&'names CodebaseMetadata),
 }
 
 struct Renderer<'names> {
