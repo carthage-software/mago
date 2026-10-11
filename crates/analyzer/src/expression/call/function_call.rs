@@ -151,16 +151,17 @@ where
             match callable.as_ref() {
                 TCallable::Signature(callable_signature) => {
                     if let Some(id) = callable_signature.get_source()
-                        && let Some(target) = get_function_like_target(
+                        && let Some(mut target) = get_function_like_target(
                             context,
                             id,
                             None,
                             expression.span(),
-                            if context
-                                .codebase
-                                .get_function_like(&id)
-                                .and_then(|metadata| metadata.return_type_metadata.as_ref())
-                                .is_some_and(|metadata| contains_parameter_variable(&metadata.type_union))
+                            if !id.is_closure()
+                                && context
+                                    .codebase
+                                    .get_function_like(&id)
+                                    .and_then(|metadata| metadata.return_type_metadata.as_ref())
+                                    .is_some_and(|metadata| contains_parameter_variable(&metadata.type_union))
                             {
                                 None
                             } else {
@@ -168,6 +169,7 @@ where
                             },
                         )
                     {
+                        target.bind_closure_parameters(callable_signature);
                         targets.push(target);
                         continue;
                     }

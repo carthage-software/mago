@@ -40,21 +40,9 @@ where
     A: Arena,
 {
     for parameter in signature.get_parameters_mut() {
-        if let Some(parameter_type) = parameter.get_type_signature() {
-            *parameter = parameter.clone().with_type_signature(Some(Arc::new(inferred_type_replacer::replace(
-                parameter_type,
-                template_result,
-                context.codebase,
-            ))));
-        }
-
-        if let Some(closure_this_type) = parameter.get_closure_this_type() {
-            *parameter = parameter.clone().with_closure_this_type(Some(Arc::new(inferred_type_replacer::replace(
-                closure_this_type,
-                template_result,
-                context.codebase,
-            ))));
-        }
+        *parameter = rewrite_parameter_types(parameter.clone(), |ty| {
+            inferred_type_replacer::replace(&ty, template_result, context.codebase)
+        });
     }
 
     if let Some(return_type) = signature.get_return_type_mut() {
@@ -71,6 +59,16 @@ where
     signature.is_closure = true;
 
     TAtomic::Callable(TCallable::Signature(signature))
+}
+
+fn rewrite_parameter_types(
+    parameter: TCallableParameter,
+    mut rewrite: impl FnMut(TUnion) -> TUnion,
+) -> TCallableParameter {
+    let input = parameter.get_type_signature().map(|ty| Arc::new(rewrite(ty.clone())));
+    let output = parameter.get_out_type().map(|ty| Arc::new(rewrite(ty.clone())));
+    let closure_this = parameter.get_closure_this_type().map(|ty| Arc::new(rewrite(ty.clone())));
+    parameter.with_type_signature(input).with_out_type(output).with_closure_this_type(closure_this)
 }
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for PartialApplication<'arena> {
@@ -151,25 +149,17 @@ where
 
     let mut parameter_offset = 0;
     let mut new_parameters = Vec::new();
+    let resolve_parameter = |parameter: TCallableParameter| {
+        rewrite_parameter_types(parameter, |ty| {
+            resolve_invocation_type(context, invocation, template_result, parameter_types, ty)
+        })
+    };
 
     for argument in arguments {
         match argument {
             PartialArgument::Placeholder(_) => {
                 if let Some(param) = parameters.get(parameter_offset) {
-                    let mut new_param = param.clone();
-
-                    if let Some(type_signature) = new_param.get_type_signature() {
-                        let resolved_type = resolve_invocation_type(
-                            context,
-                            invocation,
-                            template_result,
-                            parameter_types,
-                            type_signature.clone(),
-                        );
-                        new_param = new_param.with_type_signature(Some(Arc::new(resolved_type)));
-                    }
-
-                    new_parameters.push(new_param);
+                    new_parameters.push(resolve_parameter(param.clone()));
                     parameter_offset += 1;
                 }
             }
@@ -180,27 +170,14 @@ where
                 if let Some(index) = param_index
                     && let Some(param) = parameters.get(index)
                 {
-                    let mut new_param = param.clone();
-
-                    if let Some(type_signature) = new_param.get_type_signature() {
-                        let resolved_type = resolve_invocation_type(
-                            context,
-                            invocation,
-                            template_result,
-                            parameter_types,
-                            type_signature.clone(),
-                        );
-                        new_param = new_param.with_type_signature(Some(Arc::new(resolved_type)));
-                    }
-
-                    new_parameters.push(new_param);
+                    new_parameters.push(resolve_parameter(param.clone()));
                 }
 
                 parameter_offset += 1;
             }
             PartialArgument::VariadicPlaceholder(_) => {
                 if let Some(last_param) = parameters.get(parameter_offset) {
-                    let mut new_param = if last_param.is_variadic() {
+                    let new_param = if last_param.is_variadic() {
                         last_param.clone()
                     } else {
                         TCallableParameter::new(
@@ -210,20 +187,10 @@ where
                             false,
                         )
                         .with_name(last_param.get_name().copied())
+                        .with_out_type(last_param.get_out_type().map(|ty| Arc::new(ty.clone())))
+                        .with_closure_this_type(last_param.get_closure_this_type().map(|ty| Arc::new(ty.clone())))
                     };
-
-                    if let Some(type_signature) = new_param.get_type_signature() {
-                        let resolved_type = resolve_invocation_type(
-                            context,
-                            invocation,
-                            template_result,
-                            parameter_types,
-                            type_signature.clone(),
-                        );
-                        new_param = new_param.with_type_signature(Some(Arc::new(resolved_type)));
-                    }
-
-                    new_parameters.push(new_param);
+                    new_parameters.push(resolve_parameter(new_param));
                 }
 
                 break;

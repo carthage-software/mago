@@ -9,6 +9,7 @@ use mago_word::Word;
 use mago_word::concat_word;
 use mago_word::word;
 
+use mago_codex::context::ScopeContext;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
@@ -33,6 +34,7 @@ use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::expander;
 use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::expander::TypeExpansionOptions;
+use mago_codex::ttype::expander::contains_parameter_variable;
 use mago_codex::ttype::expander::get_signature_of_function_like_metadata;
 use mago_codex::ttype::get_arraykey;
 use mago_codex::ttype::get_keyed_array;
@@ -93,6 +95,7 @@ pub fn resolve_closure_like_type<A>(
     context: &Context<'_, '_, A>,
     closure_span: Span,
     function_metadata: &FunctionLikeMetadata,
+    scope: &ScopeContext<'_>,
     inner_has_returned: bool,
     inner_artifacts: AnalysisArtifacts,
 ) -> TUnion
@@ -105,10 +108,19 @@ where
         &function_identifier,
         function_metadata,
         context.codebase,
-        &TypeExpansionOptions::default(),
+        &TypeExpansionOptions {
+            self_class: scope.get_class_like_name(),
+            static_class_type: scope.get_class_like_name().map_or(StaticClassType::None, StaticClassType::Name),
+            ..Default::default()
+        },
     );
 
-    if function_metadata.template_types.is_empty() {
+    if function_metadata.template_types.is_empty()
+        && !function_metadata
+            .return_type_metadata
+            .as_ref()
+            .is_some_and(|ty| contains_parameter_variable(&ty.type_union))
+    {
         if function_metadata.flags.has_yield() && function_metadata.return_type_metadata.is_none() {
             let mut key_type = None;
             for k in inner_artifacts.inferred_yield_key_types {

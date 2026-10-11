@@ -82,25 +82,38 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for FunctionPartialApplication<'aren
                     TCallable::Signature(signature) => signature.get_source(),
                 };
                 let (signature, invocation_target) = if let Some(identifier) = identifier {
-                    let Some(signature) =
-                        get_parameter_dependent_signature_of_function_like_identifier(&identifier, context.codebase)
-                    else {
-                        continue;
+                    let signature = match &callable {
+                        TCallable::Signature(signature) if identifier.is_closure() => signature.clone(),
+                        _ => {
+                            let Some(signature) = get_parameter_dependent_signature_of_function_like_identifier(
+                                &identifier,
+                                context.codebase,
+                            ) else {
+                                continue;
+                            };
+
+                            signature
+                        }
                     };
 
                     let Some(metadata) = context.codebase.get_function_like(&identifier) else {
                         continue;
                     };
 
-                    let target = InvocationTarget::FunctionLike {
+                    let mut target = InvocationTarget::FunctionLike {
                         identifier,
                         metadata,
-                        inferred_return_type: None,
+                        inferred_return_type: if identifier.is_closure() {
+                            signature.return_type.clone()
+                        } else {
+                            None
+                        },
                         effective_signature: None,
                         method_context: None,
                         span: self.function.span(),
                     };
 
+                    target.bind_closure_parameters(&signature);
                     (signature, target)
                 } else if let TCallable::Signature(signature) = &callable {
                     let target = InvocationTarget::Callable {

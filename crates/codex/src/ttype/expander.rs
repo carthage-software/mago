@@ -154,7 +154,7 @@ pub enum StaticClassType {
     Generic(TGenericParameter),
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug, Clone, Default)]
 pub struct TypeExpansionOptions {
     pub self_class: Option<Word>,
     pub static_class_type: StaticClassType,
@@ -164,6 +164,8 @@ pub struct TypeExpansionOptions {
     /// to the receiver. Elsewhere the mixin relationship between two class names
     /// says nothing about how a value was obtained, so no rebinding happens.
     pub allow_mixin_static_rebind: bool,
+    /// Keep operators that depend on call arguments while binding their class-relative types.
+    pub preserve_parameter_dependencies: bool,
 }
 
 /// Expands a type union, resolving special types like `self`, `static`, `parent`,
@@ -284,11 +286,21 @@ pub(crate) fn expand_atomic(
                 {
                     expand_union_inner(codebase, param_type, options);
                 }
+
+                if let Some(out_type) = param.get_out_type_mut() {
+                    expand_union(codebase, out_type, options);
+                }
+
+                if let Some(closure_this_type) = param.get_closure_this_type_mut() {
+                    expand_union(codebase, closure_this_type, options);
+                }
             }
 
             for constraint in Arc::make_mut(&mut signature.constraints).iter_mut() {
                 expand_shared_union(codebase, &mut constraint.input_type, options);
-                if !contains_parameter_variable(&constraint.parameter_type) {
+                if options.preserve_parameter_dependencies
+                    || !contains_parameter_variable(constraint.parameter_type.as_ref())
+                {
                     expand_shared_union(codebase, &mut constraint.parameter_type, options);
                 }
             }
@@ -319,6 +331,14 @@ pub(crate) fn expand_atomic(
             }
         }
         TAtomic::Conditional(conditional) => {
+            if options.preserve_parameter_dependencies && contains_parameter_variable(conditional) {
+                expand_shared_union(codebase, &mut conditional.subject, options);
+                expand_shared_union(codebase, &mut conditional.target, options);
+                expand_shared_union(codebase, &mut conditional.then, options);
+                expand_shared_union(codebase, &mut conditional.otherwise, options);
+                return;
+            }
+
             *skip_key = true;
 
             let mut then = (*conditional.then).clone();
@@ -335,6 +355,11 @@ pub(crate) fn expand_atomic(
             new_return_type_parts.extend(expand_alias(alias, codebase, options));
         }
         TAtomic::Derived(derived) => {
+            if options.preserve_parameter_dependencies && contains_parameter_variable(derived) {
+                expand_deferred_derived(derived, codebase, options);
+                return;
+            }
+
             *skip_key = true;
             new_return_type_parts.extend(match derived {
                 TDerived::KeyOf(key_of) => expand_key_of(key_of, codebase, options),
@@ -351,6 +376,38 @@ pub(crate) fn expand_atomic(
         TAtomic::Iterable(iterable) => {
             expand_shared_union(codebase, &mut iterable.key_type, options);
             expand_shared_union(codebase, &mut iterable.value_type, options);
+        }
+        _ => {}
+    }
+}
+
+fn expand_deferred_derived(derived: &mut TDerived, codebase: &CodebaseMetadata, options: &TypeExpansionOptions) {
+    if let Some(target) = derived.get_target_type_mut() {
+        expand_union(codebase, target, options);
+    }
+
+    match derived {
+        TDerived::IndexAccess(access) => expand_union(codebase, access.get_index_type_mut(), options),
+        TDerived::IntMask(mask) => {
+            for value in mask.get_values_mut() {
+                expand_union(codebase, value, options);
+            }
+        }
+        TDerived::TemplateType(template) => {
+            expand_union(codebase, template.get_object_mut(), options);
+            expand_union(codebase, template.get_class_name_mut(), options);
+            expand_union(codebase, template.get_template_name_mut(), options);
+        }
+        TDerived::Intersection(intersection) => {
+            if let Some(types) = intersection.get_intersection_types_mut() {
+                for ty in types {
+                    let mut expanded = TUnion::from_atomic(ty.clone());
+                    expand_union(codebase, &mut expanded, options);
+                    if expanded.types.len() == 1 {
+                        *ty = expanded.types.into_owned().remove(0);
+                    }
+                }
+            }
         }
         _ => {}
     }
@@ -1053,7 +1110,7 @@ pub fn get_signature_of_function_like_metadata(
         function_like_metadata,
         codebase,
         options,
-        false,
+        function_like_identifier.is_closure(),
     )
 }
 
@@ -1064,15 +1121,14 @@ fn get_signature_of_function_like_metadata_with_options(
     options: &TypeExpansionOptions,
     preserve_parameter_dependencies: bool,
 ) -> TCallableSignature {
+    let options = &TypeExpansionOptions { preserve_parameter_dependencies, ..options.clone() };
     let parameters: Vec<_> = function_like_metadata
         .parameters
         .iter()
         .map(|parameter_metadata| {
             let type_signature = if let Some(t) = parameter_metadata.get_type_metadata() {
                 let mut t = t.type_union.clone();
-                if !preserve_parameter_dependencies || !contains_parameter_variable(&t) {
-                    expand_union(codebase, &mut t, options);
-                }
+                expand_union(codebase, &mut t, options);
                 Some(Arc::new(t))
             } else {
                 None
@@ -1085,14 +1141,22 @@ fn get_signature_of_function_like_metadata_with_options(
                 parameter_metadata.flags.has_default(),
             )
             .with_name(Some(*parameter_metadata.get_name()))
+            .with_out_type(parameter_metadata.out_type.as_ref().map(|ty| {
+                let mut ty = ty.type_union.clone();
+                expand_union(codebase, &mut ty, options);
+                Arc::new(ty)
+            }))
+            .with_closure_this_type(parameter_metadata.closure_this_type.as_ref().map(|ty| {
+                let mut ty = ty.type_union.clone();
+                expand_union(codebase, &mut ty, options);
+                Arc::new(ty)
+            }))
         })
         .collect();
 
     let return_type = if let Some(type_metadata) = function_like_metadata.return_type_metadata.as_ref() {
         let mut return_type = type_metadata.type_union.clone();
-        if !preserve_parameter_dependencies || !contains_parameter_variable(&return_type) {
-            expand_union(codebase, &mut return_type, options);
-        }
+        expand_union(codebase, &mut return_type, options);
         Some(Arc::new(return_type))
     } else {
         None
@@ -1106,8 +1170,8 @@ fn get_signature_of_function_like_metadata_with_options(
 }
 
 #[must_use]
-pub fn contains_parameter_variable(union: &TUnion) -> bool {
-    union.any_child_node(|node| {
+pub fn contains_parameter_variable(ttype: &impl TType) -> bool {
+    ttype.any_child_node(|node| {
         matches!(
             node,
             TypeRef::Atomic(TAtomic::Variable(variable))
@@ -2042,6 +2106,37 @@ mod tests {
                 }
             }));
         }
+    }
+
+    #[test]
+    fn closure_effects_bind_to_each_trait_consumer() {
+        let codebase = create_test_codebase(
+            "<?php
+            class FirstBase {}
+            class SecondBase {}
+            trait Factory {
+                public function make(): void {
+                    $write = /**
+                     * @param-out parent $value
+                     * @param-closure-this parent $callback
+                     */
+                    static function (&$value, callable $callback): void {};
+                }
+            }
+            class First extends FirstBase { use Factory; }
+            class Second extends SecondBase { use Factory; }
+        ",
+        );
+        let metadata = codebase.function_likes.values().find(|metadata| metadata.kind.is_closure()).unwrap();
+        let identifier = FunctionLikeIdentifier::Closure(metadata.name);
+        for (class, parent) in [("First", "FirstBase"), ("Second", "SecondBase")] {
+            let signature =
+                get_signature_of_function_like_metadata(&identifier, metadata, &codebase, &options_with_self(class));
+            let expected = codebase.get_class_like_by_name(word(parent)).unwrap().name;
+            assert_eq!(signature.get_parameters()[0].get_out_type().unwrap().get_id(), expected);
+            assert_eq!(signature.get_parameters()[1].get_closure_this_type().unwrap().get_id(), expected);
+        }
+        assert_eq!(metadata.parameters[0].out_type.as_ref().unwrap().type_union.get_id(), word("parent"));
     }
 
     #[test]
@@ -3058,6 +3153,7 @@ mod tests {
             static_class_type: StaticClassType::None,
             function_is_final: false,
             allow_mixin_static_rebind: false,
+            preserve_parameter_dependencies: false,
         };
 
         let mut actual = input;

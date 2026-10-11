@@ -831,6 +831,12 @@ test_case!(nested_partial_keeps_reduced_parameter_order_and_names, mago_analyzer
 test_case!(partial_conditional_capture_waits_for_its_argument, mago_analyzer::settings::Settings::default());
 test_case!(nested_partial_keeps_captured_argument_constraints, mago_analyzer::settings::Settings::default());
 test_case!(nested_partial_checks_a_capture_when_its_last_dependency_is_bound, mago_analyzer::settings::Settings::default());
+test_case!(get_current_closure_keeps_parent_signature, mago_analyzer::settings::Settings::default());
+test_case!(partial_closure_keeps_parameter_dependencies, mago_analyzer::settings::Settings::default());
+test_case!(closure_calls_bind_parent_parameters, mago_analyzer::settings::Settings::default());
+test_case!(closure_conditional_types_bind_class_context, mago_analyzer::settings::Settings::default());
+test_case!(escaped_closure_effects_keep_class_context, mago_analyzer::settings::Settings::default());
+test_case!(trait_closure_parent_types_follow_each_using_class, mago_analyzer::settings::Settings::default());
 test_case!(octal_zero_prefix);
 test_case!(switch_semicolon);
 test_case!(redundant_assert);

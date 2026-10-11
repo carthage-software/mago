@@ -192,7 +192,13 @@ where
         expander::expand_union(
             context.codebase,
             &mut resulting_union,
-            &TypeExpansionOptions { self_class, static_class_type, function_is_final, allow_mixin_static_rebind },
+            &TypeExpansionOptions {
+                self_class,
+                static_class_type,
+                function_is_final,
+                allow_mixin_static_rebind,
+                ..Default::default()
+            },
         );
     }
 
@@ -336,6 +342,21 @@ where
                             template_result,
                             &scoped_parameters,
                             parameter_type.clone(),
+                        );
+                    }
+
+                    if let Some(out_type) = parameter.get_out_type_mut() {
+                        *out_type =
+                            resolve_union(context, invocation, template_result, &scoped_parameters, out_type.clone());
+                    }
+
+                    if let Some(closure_this_type) = parameter.get_closure_this_type_mut() {
+                        *closure_this_type = resolve_union(
+                            context,
+                            invocation,
+                            template_result,
+                            &scoped_parameters,
+                            closure_this_type.clone(),
                         );
                     }
                 }

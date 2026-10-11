@@ -217,6 +217,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
             context,
             s,
             function_metadata,
+            &inner_block_context.scope,
             inner_block_context.flags.has_returned(),
             inner_artifacts,
         );
