@@ -1,8 +1,10 @@
 //! Write display text into owned bytes. Compound spellings must not enter the word interner.
 
 use mago_bytes::BytesDisplay;
+use mago_word::Word;
 
 use crate::identifier::function_like::FunctionLikeIdentifier;
+use crate::metadata::CodebaseMetadata;
 use crate::misc::GenericParent;
 use crate::ttype::TType;
 use crate::ttype::atomic::TAtomic;
@@ -16,8 +18,36 @@ use crate::ttype::union::TUnion;
 
 use super::NameDisplay;
 
-impl NameDisplay<'_> {
-    pub(super) fn write_union(&self, ty: &TUnion, output: &mut Vec<u8>) {
+pub(super) fn union(ty: &TUnion, names: Names<'_>) -> Vec<u8> {
+    let mut output = Vec::new();
+    Renderer { names }.write_union(ty, &mut output);
+    output
+}
+
+#[derive(Clone, Copy)]
+pub(super) enum Names<'a> {
+    Canonical,
+    Short(&'a NameDisplay<'a>),
+    Qualified(&'a CodebaseMetadata),
+}
+
+struct Renderer<'names> {
+    names: Names<'names>,
+}
+
+impl Renderer<'_> {
+    fn write_name(&self, name: Word, output: &mut Vec<u8>) {
+        match self.names {
+            Names::Short(names) => output.extend_from_slice(names.class_name(name).as_bytes()),
+            Names::Qualified(codebase) => {
+                let name = codebase.get_class_like_by_name(name).map_or(name, |class| class.original_name);
+                output.extend_from_slice(name.as_bytes());
+            }
+            Names::Canonical => output.extend_from_slice(name.as_bytes()),
+        }
+    }
+
+    fn write_union(&self, ty: &TUnion, output: &mut Vec<u8>) {
         if ty.types.len() <= 1 {
             if let Some(atomic) = ty.types.first() {
                 self.write_wrapped_atomic(atomic, atomic.is_generic_parameter(), output);
@@ -71,7 +101,7 @@ impl NameDisplay<'_> {
                 if object.is_this {
                     output.extend_from_slice(b"$this(");
                 }
-                output.extend_from_slice(self.class_name(object.name).as_bytes());
+                self.write_name(object.name, output);
                 if let Some(parameters) = object.get_type_parameters() {
                     output.push(b'<');
                     self.write_types(parameters.iter(), output);
@@ -85,10 +115,23 @@ impl NameDisplay<'_> {
                 }
             }
             TAtomic::Object(TObject::Enum(object)) => {
-                output.extend_from_slice(self.class_name(object.name).as_bytes());
+                let shortened = matches!(self.names, Names::Short(_));
+                if !shortened {
+                    output.extend_from_slice(b"enum(");
+                }
+
+                self.write_name(object.name, output);
                 if let Some(case) = object.case {
                     output.extend_from_slice(b"::");
-                    output.extend_from_slice(BytesDisplay(case.as_bytes()).to_string().as_bytes());
+                    if shortened {
+                        output.extend_from_slice(BytesDisplay(case.as_bytes()).to_string().as_bytes());
+                    } else {
+                        output.extend_from_slice(case.as_bytes());
+                    }
+                }
+
+                if !shortened {
+                    output.push(b')');
                 }
             }
             TAtomic::Object(TObject::WithProperties(object)) => {
@@ -132,7 +175,7 @@ impl NameDisplay<'_> {
             TAtomic::Reference(reference) => self.write_reference(reference, output),
             TAtomic::Alias(alias) => {
                 output.push(b'!');
-                output.extend_from_slice(self.class_name(alias.get_class_name()).as_bytes());
+                self.write_name(alias.get_class_name(), output);
                 output.extend_from_slice(b"::");
                 output.extend_from_slice(alias.get_alias_name().as_bytes());
             }
@@ -289,11 +332,11 @@ impl NameDisplay<'_> {
         match reference {
             TReference::Symbol { name, .. } => {
                 output.extend_from_slice(b"unknown-ref(");
-                output.extend_from_slice(self.class_name(*name).as_bytes());
+                self.write_name(*name, output);
             }
             TReference::Member { class_like_name, member_selector } => {
                 output.extend_from_slice(b"unknown-ref(");
-                output.extend_from_slice(self.class_name(*class_like_name).as_bytes());
+                self.write_name(*class_like_name, output);
                 output.extend_from_slice(b"::");
                 match member_selector {
                     TReferenceMemberSelector::Wildcard => output.push(b'*'),

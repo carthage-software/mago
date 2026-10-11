@@ -1,9 +1,10 @@
 use crate::ttype::TType;
 use crate::ttype::atomic::derived::TDerived;
-use crate::ttype::display::NameDisplay;
 use crate::ttype::union::TUnion;
 
-impl NameDisplay<'_> {
+use super::Renderer;
+
+impl Renderer<'_> {
     pub(super) fn write_derived(&self, derived: &TDerived, output: &mut Vec<u8>) {
         match derived {
             TDerived::KeyOf(ty) => self.write_utility(b"key-of", ty.get_target_type(), output),

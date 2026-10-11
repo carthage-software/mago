@@ -71,10 +71,20 @@ impl<'code> NameDisplay<'code> {
     /// Render owned text without interning display spellings or copying shared types.
     #[must_use]
     pub fn union(&self, ty: &TUnion) -> String {
-        let mut bytes = Vec::new();
-        self.write_union(ty, &mut bytes);
-        BytesDisplay(&bytes).to_string()
+        BytesDisplay(&render::union(ty, render::Names::Short(self))).to_string()
     }
+}
+
+/// Render the full type-id spelling without interning it or escaping PHP bytes.
+#[must_use]
+pub fn canonical_bytes(ty: &TUnion) -> Vec<u8> {
+    render::union(ty, render::Names::Canonical)
+}
+
+/// Keep the full type-id spelling, restoring class names from their declarations.
+#[must_use]
+pub fn qualified_bytes(codebase: &CodebaseMetadata, ty: &TUnion) -> Vec<u8> {
+    render::union(ty, render::Names::Qualified(codebase))
 }
 
 mod render;

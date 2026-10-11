@@ -2,9 +2,10 @@ use std::io::Write;
 
 use crate::ttype::atomic::array::TArray;
 use crate::ttype::atomic::array::key::ArrayKey;
-use crate::ttype::display::NameDisplay;
 
-impl NameDisplay<'_> {
+use super::Renderer;
+
+impl Renderer<'_> {
     pub(super) fn write_array(&self, array: &TArray, output: &mut Vec<u8>) {
         match array {
             TArray::List(list) => {

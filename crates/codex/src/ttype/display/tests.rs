@@ -28,6 +28,39 @@ fn display(ty: &TUnion) -> String {
 }
 
 #[test]
+fn qualified_names_restore_class_casing_without_changing_type_syntax_or_literals() {
+    use crate::metadata::class_like::ClassLikeMetadata;
+    use crate::metadata::flags::MetadataFlags;
+    use mago_span::Span;
+
+    let mut codebase = CodebaseMetadata::new();
+    for name in ["Domain\\User", "Domain\\State"] {
+        let key = ascii_lowercase_word(name.as_bytes());
+        codebase.class_likes.insert(
+            key,
+            Box::new(ClassLikeMetadata::new(key, word(name), Span::dummy(0, 0), None, MetadataFlags::empty())),
+        );
+    }
+
+    let ty = TUnion::from_atomic(TAtomic::Object(TObject::Named(TNamedObject::new_with_type_parameters(
+        word("Unknown\\Box"),
+        Some(vec![
+            named("domain\\user"),
+            TUnion::from_atomic(TAtomic::Object(TObject::new_enum_case(word("domain\\state"), word("Ready")))),
+            get_literal_string(word("domain\\user")),
+        ]),
+    ))));
+
+    let before = canonical_bytes(&ty);
+    assert_eq!(
+        qualified_bytes(&codebase, &ty),
+        br"Unknown\Box<Domain\User, enum(Domain\State::Ready), string('domain\user')>",
+    );
+
+    assert_eq!(canonical_bytes(&ty), before);
+}
+
+#[test]
 fn type_names_do_not_rewrite_shape_keys_or_literal_values() {
     let shape = |name: &str| {
         TUnion::from_atomic(TAtomic::Array(TArray::Keyed(TKeyedArray::new().with_known_items(BTreeMap::from([
@@ -172,6 +205,7 @@ fn owned_rendering_keeps_compound_type_spelling() {
 
     for atomic in samples.into_iter().chain(derived.into_iter().map(TAtomic::Derived)) {
         let ty = TUnion::from_vec(vec![TAtomic::Null, atomic.clone(), atomic]);
+        assert_eq!(canonical_bytes(&ty), ty.get_id().as_bytes());
         assert_eq!(display(&ty), BytesDisplay(ty.get_id().as_bytes()).to_string());
     }
 }
@@ -192,6 +226,23 @@ fn owned_rendering_keeps_literal_bytes_and_numbers() {
         TUnion::from_atomic(TAtomic::Scalar(TScalar::Integer(TInteger::To(-4)))),
     ];
     for ty in values {
+        assert_eq!(canonical_bytes(&ty), ty.get_id().as_bytes());
         assert_eq!(display(&ty), BytesDisplay(ty.get_id().as_bytes()).to_string());
     }
+}
+
+#[test]
+fn canonical_rendering_keeps_full_names_enum_wrappers_and_raw_bytes() {
+    let ty = TUnion::from_atomic(TAtomic::Object(TObject::Named(TNamedObject::new_with_type_parameters(
+        word("domain\\Box"),
+        Some(vec![
+            named("Left\\User"),
+            named("Right\\User"),
+            TUnion::from_atomic(TAtomic::Object(TObject::new_enum_case(word("State\\Mode"), word("Open")))),
+            get_literal_string(word(b"\xff")),
+        ]),
+    ))));
+    assert_eq!(canonical_bytes(&ty), b"domain\\Box<Left\\User, Right\\User, enum(State\\Mode::Open), string('\xff')>");
+    assert_eq!(canonical_bytes(&ty), ty.get_id().as_bytes());
+    assert_eq!(display(&ty), "Box<\\Left\\User, \\Right\\User, Mode::Open, string('\\xFF')>");
 }
