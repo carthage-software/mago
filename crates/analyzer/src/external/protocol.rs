@@ -1823,6 +1823,10 @@ fn encode_reference_snapshot<'type_info>(
         TReference::Global { selector } => {
             writer.write_u8(3);
             match selector {
+                TGlobalReferenceSelector::Identifier(name) => {
+                    writer.write_u8(2);
+                    writer.write_bytes(name.as_bytes())?;
+                }
                 TGlobalReferenceSelector::StartsWith(prefix) => {
                     writer.write_u8(3);
                     writer.write_bytes(prefix.as_bytes())?;
@@ -2903,6 +2907,7 @@ fn decode_complete_reference(
         },
         3 => TReference::Global {
             selector: match reader.read_u8("global reference selector")? {
+                2 => TGlobalReferenceSelector::Identifier(word(reader.read_bytes("global reference name")?)),
                 3 => TGlobalReferenceSelector::StartsWith(word(reader.read_bytes("global reference prefix")?)),
                 4 => TGlobalReferenceSelector::EndsWith(word(reader.read_bytes("global reference suffix")?)),
                 unknown => return Err(protocol(format!("unknown global reference selector {unknown}"))),
@@ -3175,6 +3180,20 @@ fn validate_provider_indices(
 #[allow(clippy::unwrap_used)]
 pub(super) mod testing {
     use super::*;
+
+    #[test]
+    fn global_constant_references_roundtrip() {
+        let reference = TReference::Global { selector: TGlobalReferenceSelector::Identifier(word(b"MODE_OBJECT")) };
+        let mut writer = PayloadWriter::new();
+        let mut types = Vec::new();
+        let mut table = SnapshotTypeTable { offset: 0, types: &mut types };
+        encode_reference_snapshot(&mut writer, &reference, &mut table, 0).unwrap();
+
+        let payload = writer.finish();
+        let mut reader = PayloadReader::new(&payload);
+        assert_eq!(decode_complete_reference(&mut reader, 0).unwrap(), reference);
+        reader.finish().unwrap();
+    }
 
     #[test]
     fn complete_snapshots_accept_deep_inferred_types() {

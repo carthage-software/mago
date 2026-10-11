@@ -5,7 +5,9 @@ use std::sync::Arc;
 use std::collections::HashSet;
 
 use foldhash::fast::FixedState;
+
 use mago_word::Word;
+use mago_word::empty_word;
 
 use crate::identifier::function_like::FunctionLikeIdentifier;
 use crate::identifier::method::MethodIdentifier;
@@ -552,10 +554,22 @@ fn expand_global_reference(
     options: &TypeExpansionOptions,
     new_return_type_parts: &mut Vec<TAtomic>,
 ) {
-    for (constant_name, constant) in &codebase.constants {
+    let (constant, constants) = match selector {
+        TGlobalReferenceSelector::Identifier(name) => (codebase.constants.get_key_value(name), None),
+        _ => (None, Some(&codebase.constants)),
+    };
+
+    for (constant_name, constant) in
+        constant.into_iter().chain(constants.into_iter().flat_map(|constants| constants.iter()))
+    {
         if !selector.matches(*constant_name) {
             continue;
         }
+
+        let Some(_guard) = ConstantExpansionGuard::try_new(empty_word(), *constant_name) else {
+            new_return_type_parts.push(TAtomic::Mixed(TMixed::new()));
+            continue;
+        };
 
         if let Some(inferred_type) = constant.inferred_type.as_ref() {
             let mut inferred_type = inferred_type.clone();

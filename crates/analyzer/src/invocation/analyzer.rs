@@ -752,8 +752,12 @@ where
                 method_class_type,
             );
 
-            let default_type =
+            let mut default_type =
                 unused_parameter.get_default_type().map_or_else(|| Cow::Owned(get_mixed()), Cow::Borrowed);
+
+            if default_type.is_expandable() {
+                expander::expand_union(context.codebase, default_type.to_mut(), &TypeExpansionOptions::default());
+            }
 
             infer_parameter_templates_from_default(context, &parameter_type, &default_type, template_result);
 

@@ -35,14 +35,10 @@ impl TReferenceMemberSelector {
 }
 
 /// Selector variants usable for global-constant references.
-///
-/// Unlike class members, a bare `*` already resolves to `Type::Wildcard` (an alias
-/// for `mixed`), so the global-reference form only expresses prefix or suffix
-/// matches. Bare identifiers in type positions remain class-like references —
-/// PHPDoc does not treat them as constant references.
 #[derive(Debug, Copy, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 pub enum TGlobalReferenceSelector {
+    Identifier(Word),
     /// A global constant whose name starts with a given prefix, e.g. `FILTER_FLAG_*`.
     StartsWith(Word),
     /// A global constant whose name ends with a given suffix, e.g. `*_SUFFIX`.
@@ -55,6 +51,7 @@ impl TGlobalReferenceSelector {
     #[must_use]
     pub fn matches(&self, name: Word) -> bool {
         match self {
+            Self::Identifier(identifier) => name == *identifier,
             Self::StartsWith(prefix) => name.as_bytes().starts_with(prefix.as_bytes()),
             Self::EndsWith(suffix) => name.as_bytes().ends_with(suffix.as_bytes()),
         }
@@ -90,11 +87,10 @@ pub enum TReference {
         /// The name of the member being referenced (constant name, case name).
         member_selector: TReferenceMemberSelector,
     },
-    /// A wildcard reference over global constants, e.g. `FILTER_FLAG_*` or `*_SUFFIX`.
-    /// Resolved at expansion time by iterating the codebase's global constants and
-    /// collecting those whose name satisfies the selector.
+    /// A reference to a global constant or a wildcard, e.g. `FILTER_FLAG_*` or `*_SUFFIX`.
+    /// Resolved at expansion time against the codebase's global constants.
     Global {
-        /// The prefix/suffix selector used to match global constant names.
+        /// Selects an exact name, prefix, or suffix.
         selector: TGlobalReferenceSelector,
     },
 }
@@ -193,6 +189,7 @@ impl TType for TReference {
                 }
             },
             TReference::Global { selector } => match selector {
+                TGlobalReferenceSelector::Identifier(name) => concat_word!(b"unknown-global-ref(", name, b")"),
                 TGlobalReferenceSelector::StartsWith(name) => {
                     concat_word!(b"unknown-global-ref(", name, b"*)")
                 }

@@ -23,6 +23,7 @@ use crate::ttype::atomic::mixed::TMixed;
 use crate::ttype::atomic::object::TObject;
 use crate::ttype::atomic::object::r#enum::TEnum;
 use crate::ttype::atomic::object::named::TNamedObject;
+use crate::ttype::atomic::reference::TGlobalReferenceSelector;
 use crate::ttype::atomic::reference::TReference;
 use crate::ttype::atomic::reference::TReferenceMemberSelector;
 use crate::ttype::atomic::resource::TResource;
@@ -981,8 +982,12 @@ pub fn populate_atomic_type(
                     }
                 }
             }
-            TReference::Global { .. } => {
-                // Global-constant wildcards are resolved at expansion time; nothing to populate.
+            TReference::Global { selector } => {
+                if let TGlobalReferenceSelector::Identifier(name) = selector
+                    && let Some(reference_source) = reference_source
+                {
+                    add_symbol_reference(reference_source, symbol_references, *name);
+                }
             }
         },
         TAtomic::GenericParameter(TGenericParameter { constraint, intersection_types, .. }) => {

@@ -1,0 +1,11 @@
+[source]
+paths = ["."]
+
+[linter]
+excludes = ["**/*.php"]
+baseline = "linter.baseline.toml"
+baseline-variant = "strict"
+
+[analyzer]
+baseline = "analyzer.baseline.toml"
+baseline-variant = "strict"
