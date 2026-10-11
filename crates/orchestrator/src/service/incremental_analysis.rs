@@ -101,6 +101,7 @@ pub struct IncrementalAnalysisService {
     file_states: HashMap<FileId, FileState>,
     plugin_registry: Arc<PluginRegistry>,
     initialized: bool,
+    needs_full_rebuild: bool,
     codebase_issues: IssueCollection,
     lifecycle_issues: IssueCollection,
     analysis_snapshots: HashMap<FileId, Arc<FileAnalysisSnapshot>>,
@@ -124,6 +125,7 @@ impl std::fmt::Debug for IncrementalAnalysisService {
             .field("file_states", &format_args!("{} tracked files", self.file_states.len()))
             .field("plugin_registry", &"<Arc<PluginRegistry>>")
             .field("initialized", &self.initialized)
+            .field("needs_full_rebuild", &self.needs_full_rebuild)
             .field("codebase_issues", &self.codebase_issues.len())
             .field("lifecycle_issues", &self.lifecycle_issues.len())
             .field("analysis_snapshots", &self.analysis_snapshots.len())
@@ -174,6 +176,7 @@ impl IncrementalAnalysisService {
             file_states: HashMap::default(),
             plugin_registry,
             initialized: false,
+            needs_full_rebuild: false,
             codebase_issues: IssueCollection::default(),
             lifecycle_issues: IssueCollection::default(),
             analysis_snapshots: HashMap::default(),
@@ -190,7 +193,7 @@ impl IncrementalAnalysisService {
         self.database = database;
     }
 
-    /// Returns whether the service has been initialized (initial full analysis completed).
+    /// Returns whether the service holds a completed analysis. A failed update clears it.
     #[must_use]
     pub fn is_initialized(&self) -> bool {
         self.initialized
@@ -342,6 +345,32 @@ impl IncrementalAnalysisService {
     /// Returns [`OrchestratorError`] when source scanning, codebase population, or per-file
     /// analysis fails.
     pub fn analyze(&mut self) -> Result<AnalysisResult, OrchestratorError> {
+        self.reset_analysis();
+        let result = self.run_full_analysis();
+        if result.is_err() {
+            self.reset_analysis();
+        }
+
+        result
+    }
+
+    fn reset_analysis(&mut self) {
+        self.initialized = false;
+        self.needs_full_rebuild = true;
+        self.codebase = CodebaseMetadata::new();
+        self.symbol_references = SymbolReferences::new();
+        self.native_symbol_references = SymbolReferences::new();
+        self.external_symbol_references = SymbolReferences::new();
+        self.late_symbol_references = SymbolReferences::new();
+        self.file_states = HashMap::default();
+        self.codebase_issues = IssueCollection::default();
+        self.lifecycle_issues = IssueCollection::default();
+        self.analysis_snapshots = HashMap::default();
+        self.codebase_scan_plan = None;
+        self.codebase_scan_files = HashMap::default();
+    }
+
+    fn run_full_analysis(&mut self) -> Result<AnalysisResult, OrchestratorError> {
         self.codebase_scan_plan = self
             .plugin_registry
             .external_codebase_scan_plan()
@@ -467,6 +496,7 @@ impl IncrementalAnalysisService {
             self.codebase_issues.len(),
         );
         self.initialized = true;
+        self.needs_full_rebuild = false;
 
         Ok(analysis_result)
     }
@@ -488,9 +518,23 @@ impl IncrementalAnalysisService {
         &mut self,
         changed_hint: Option<&[FileId]>,
     ) -> Result<AnalysisResult, OrchestratorError> {
-        match self.try_analyze_incremental(changed_hint)? {
-            Some(result) => Ok(result),
-            None => self.analyze(),
+        if self.needs_full_rebuild {
+            return self.analyze();
+        }
+
+        if !self.initialized {
+            return Err(OrchestratorError::General(
+                "analyze() must be called before analyze_incremental()".to_string(),
+            ));
+        }
+
+        match self.try_analyze_incremental(changed_hint) {
+            Ok(Some(result)) => Ok(result),
+            Ok(None) => self.analyze(),
+            Err(error) => {
+                self.reset_analysis();
+                Err(error)
+            }
         }
     }
 
@@ -498,12 +542,6 @@ impl IncrementalAnalysisService {
         &mut self,
         changed_hint: Option<&[FileId]>,
     ) -> Result<Option<AnalysisResult>, OrchestratorError> {
-        if !self.initialized {
-            return Err(OrchestratorError::General(
-                "analyze() must be called before analyze_incremental()".to_string(),
-            ));
-        }
-
         let source_files: Vec<_> = self.database.files().filter(|f| f.file_type != FileType::Builtin).collect();
 
         let current_file_names: WordSet = source_files.iter().map(|file| mago_word::word(file.name.as_ref())).collect();
@@ -1777,6 +1815,97 @@ mod tests {
         let only_b: Vec<_> = sigs_b.difference(&sigs_a).cloned().collect();
 
         (only_a, only_b)
+    }
+
+    #[test]
+    fn failed_updates_discard_analysis_and_retry_without_new_changes() {
+        use std::sync::atomic::AtomicBool;
+        use std::sync::atomic::Ordering;
+
+        use mago_analyzer::plugin::PluginError;
+        use mago_analyzer::plugin::context::HookContext;
+        use mago_analyzer::plugin::hook::{HookAction, HookResult, ProgramHook};
+        use mago_analyzer::plugin::provider::{Provider, ProviderMeta};
+        use mago_syntax::cst::Program;
+
+        struct FailingHook {
+            fail: Arc<AtomicBool>,
+        }
+
+        impl Provider for FailingHook {
+            fn meta() -> &'static ProviderMeta {
+                static META: ProviderMeta = ProviderMeta::new("test::failure", "Failure", "Fail an analysis pass");
+                &META
+            }
+        }
+
+        impl ProgramHook for FailingHook {
+            fn before_program(
+                &self,
+                _file: &File,
+                _program: &Program<'_>,
+                _context: &mut HookContext<'_, '_>,
+            ) -> HookResult<HookAction> {
+                if self.fail.load(Ordering::Relaxed) {
+                    return Err(PluginError::Internal { reason: "test failure".to_string() });
+                }
+
+                Ok(HookAction::Continue)
+            }
+        }
+
+        for (full, contents, class, method) in [
+            (true, "<?php class After { function next(): string { return missing_after(); } }", "After", "next"),
+            (false, "<?php class Before { function run(): int { return missing_after(); } }", "Before", "run"),
+            (false, "<?php class Before { function next(): string { return missing_after(); } }", "Before", "next"),
+        ] {
+            let mut database =
+                make_database(vec![("a.php", "<?php class Before { function run(): int { return missing(); } }")]);
+            let fail = Arc::new(AtomicBool::new(false));
+            let mut plugins = PluginRegistry::with_library_providers();
+            plugins.register_program_hook(FailingHook {
+                fail: Arc::clone(&fail),
+            });
+
+            let mut service = make_service(&database);
+            service.plugin_registry = Arc::new(plugins);
+            assert!(!service.analyze().unwrap().issues.is_empty());
+            let file = FileId::new(b"a.php");
+            let base = Arc::clone(&service.base_codebase);
+            let base_references = Arc::clone(&service.base_symbol_references);
+            let plugins = Arc::clone(&service.plugin_registry);
+
+            database.update(file, Cow::Owned(contents.as_bytes().to_vec()));
+            service.update_database(database.read_only());
+            fail.store(true, Ordering::Relaxed);
+            let error = if full { service.analyze() } else { service.analyze_incremental(Some(&[file])) }.unwrap_err();
+            assert!(error.to_string().contains("test failure"));
+            assert!(!service.is_initialized());
+            assert!(service.needs_full_rebuild);
+            assert!(service.last_issues().is_none());
+            assert!(service.codebase_issues.is_empty());
+            assert!(service.lifecycle_issues.is_empty());
+            assert!(service.file_states.is_empty());
+            assert!(service.codebase().get_class_like(b"Before").is_none());
+            assert!(service.codebase().get_class_like(b"After").is_none());
+            assert!(service.symbol_references().is_empty());
+            assert!(service.external_symbol_references.is_empty());
+            assert!(service.late_symbol_references.is_empty());
+            assert!(service.analysis_snapshots.is_empty());
+            assert!(service.codebase_scan_plan.is_none());
+            assert!(service.codebase_scan_files.is_empty());
+            assert!(Arc::ptr_eq(&base, &service.base_codebase));
+            assert!(Arc::ptr_eq(&base_references, &service.base_symbol_references));
+            assert!(Arc::ptr_eq(&plugins, &service.plugin_registry));
+
+            fail.store(false, Ordering::Relaxed);
+            let retried = service.analyze_incremental(Some(&[])).unwrap();
+            let fresh = make_service(&database).analyze().unwrap();
+            assert_eq!(retried.issues.sorted(), fresh.issues.sorted());
+            assert!(service.is_initialized());
+            assert!(!service.needs_full_rebuild);
+            assert!(service.codebase().get_declaring_method(class.as_bytes(), method.as_bytes()).is_some());
+        }
     }
 
     #[test]
