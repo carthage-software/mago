@@ -103,12 +103,12 @@ pub struct IncrementalAnalysisService {
     file_states: HashMap<FileId, FileState>,
     plugin_registry: Arc<PluginRegistry>,
     initialized: bool,
+    scan_only: bool,
     needs_full_rebuild: bool,
     codebase_issues: IssueCollection,
     lifecycle_issues: IssueCollection,
     analysis_snapshots: HashMap<FileId, Arc<FileAnalysisSnapshot>>,
     editor_artifacts: bool,
-    editor_artifacts_need_full: bool,
     editor_files: HashMap<FileId, Arc<EditorFileData>>,
     codebase_scan_plan: Option<Arc<CodebaseScanPlan>>,
     codebase_scan_files: HashMap<FileId, CodebaseScanFile>,
@@ -130,13 +130,13 @@ impl std::fmt::Debug for IncrementalAnalysisService {
             .field("file_states", &format_args!("{} tracked files", self.file_states.len()))
             .field("plugin_registry", &"<Arc<PluginRegistry>>")
             .field("initialized", &self.initialized)
+            .field("scan_only", &self.scan_only)
             .field("needs_full_rebuild", &self.needs_full_rebuild)
             .field("codebase_issues", &self.codebase_issues.len())
             .field("lifecycle_issues", &self.lifecycle_issues.len())
             .field("analysis_snapshots", &self.analysis_snapshots.len())
             .field("editor_files", &self.editor_files.len())
             .field("editor_artifacts", &self.editor_artifacts)
-            .field("editor_artifacts_need_full", &self.editor_artifacts_need_full)
             .field("codebase_scan_plan", &self.codebase_scan_plan.is_some())
             .field("codebase_scan_files", &self.codebase_scan_files.len())
             .finish()
@@ -184,12 +184,12 @@ impl IncrementalAnalysisService {
             file_states: HashMap::default(),
             plugin_registry,
             initialized: false,
+            scan_only: false,
             needs_full_rebuild: false,
             codebase_issues: IssueCollection::default(),
             lifecycle_issues: IssueCollection::default(),
             analysis_snapshots: HashMap::default(),
             editor_artifacts: false,
-            editor_artifacts_need_full: false,
             editor_files: HashMap::default(),
             codebase_scan_plan: None,
             codebase_scan_files: HashMap::default(),
@@ -204,11 +204,21 @@ impl IncrementalAnalysisService {
         self.database = database;
     }
 
+    /// Keeps declarations and inheritance current without running body analysis or plugins.
+    pub fn set_scan_only(&mut self, scan_only: bool) {
+        if self.scan_only != scan_only {
+            self.scan_only = scan_only;
+            self.needs_full_rebuild |= self.initialized;
+            self.editor_files.clear();
+            self.analysis_snapshots.clear();
+        }
+    }
+
     /// Enables editor data capture. Enabling it after analysis rebuilds data on the next run.
     pub fn set_editor_artifacts(&mut self, enabled: bool) {
         if self.editor_artifacts != enabled {
             self.editor_artifacts = enabled;
-            self.editor_artifacts_need_full = enabled && self.initialized;
+            self.needs_full_rebuild |= enabled && self.initialized;
             self.editor_files.clear();
         }
     }
@@ -398,11 +408,15 @@ impl IncrementalAnalysisService {
     }
 
     fn run_full_analysis(&mut self) -> Result<AnalysisResult, OrchestratorError> {
-        self.codebase_scan_plan = self
-            .plugin_registry
-            .external_codebase_scan_plan()
-            .map_err(mago_analyzer::error::AnalysisError::from)?
-            .map(Arc::new);
+        self.codebase_scan_plan = if self.scan_only {
+            None
+        } else {
+            self.plugin_registry
+                .external_codebase_scan_plan()
+                .map_err(mago_analyzer::error::AnalysisError::from)?
+                .map(Arc::new)
+        };
+
         let source_files: Vec<_> = self.database.files().filter(|f| f.file_type != FileType::Builtin).collect();
 
         let parser_settings = self.parser_settings;
@@ -525,7 +539,6 @@ impl IncrementalAnalysisService {
             self.codebase_issues.len(),
         );
         self.initialized = true;
-        self.editor_artifacts_need_full = false;
         self.needs_full_rebuild = false;
 
         Ok(analysis_result)
@@ -548,7 +561,7 @@ impl IncrementalAnalysisService {
         &mut self,
         changed_hint: Option<&[FileId]>,
     ) -> Result<AnalysisResult, OrchestratorError> {
-        if self.needs_full_rebuild || self.editor_artifacts_need_full {
+        if self.needs_full_rebuild {
             return self.analyze();
         }
 
@@ -1375,6 +1388,10 @@ impl IncrementalAnalysisService {
     /// this to answer "what's the type of `$obj` here?".
     #[must_use]
     pub fn analyze_file_with_artifacts(&self, file_id: FileId) -> Option<(IssueCollection, AnalysisArtifacts)> {
+        if self.scan_only {
+            return None;
+        }
+
         let external_session = self.plugin_registry.create_external_analysis_session(self.database.files());
         let file = self.database.get(&file_id).ok()?;
 
@@ -1426,6 +1443,10 @@ impl IncrementalAnalysisService {
     /// This is useful for LSP single-file analysis. It uses the current codebase
     /// state for type resolution but only reports issues for the specified file.
     pub fn analyze_file(&self, file_id: FileId) -> IssueCollection {
+        if self.scan_only {
+            return IssueCollection::default();
+        }
+
         let external_session = self.plugin_registry.create_external_analysis_session(self.database.files());
         let Ok(file) = self.database.get(&file_id) else {
             tracing::error!("File with ID {:?} not found in database", file_id);
@@ -1482,6 +1503,21 @@ impl IncrementalAnalysisService {
         settings: &Settings,
         skip_files: &HashSet<FileId>,
     ) -> Result<SelectiveAnalysisOutput, OrchestratorError> {
+        if self.scan_only {
+            return Ok(SelectiveAnalysisOutput {
+                result: AnalysisResult::new(current_symbol_references.clone()),
+                native_symbol_references: current_symbol_references,
+                external_symbol_references: SymbolReferences::new(),
+                late_symbol_references: SymbolReferences::new(),
+                late_symbol_references_by_file: HashMap::default(),
+                per_file_issues: HashMap::default(),
+                per_file_pragmas: HashMap::default(),
+                snapshots: Vec::new(),
+                editor_files: HashMap::default(),
+                codebase_issues: codebase.take_issues(true),
+            });
+        }
+
         let plugin_registry = &self.plugin_registry;
         #[cfg(not(target_arch = "wasm32"))]
         let trace_enabled = tracing::enabled!(tracing::Level::TRACE);
@@ -2165,6 +2201,41 @@ mod tests {
     }
 
     #[test]
+    fn scan_only_keeps_metadata_current_and_skips_body_analysis() {
+        let mut database = make_database(vec![
+            ("base.php", "<?php class Base { function run(): int { return missing(); } }"),
+            ("child.php", "<?php class Child extends Base {}"),
+        ]);
+        let mut service = make_service(&database);
+        service.set_scan_only(true);
+        service.set_editor_artifacts(true);
+        let result = service.analyze().unwrap();
+        assert!(result.issues.is_empty());
+        assert!(service.codebase().get_declaring_method(b"Child", b"run").is_some());
+        let file = FileId::new(b"base.php");
+        assert!(service.analyze_file(file).is_empty());
+        assert!(service.analyze_file_with_artifacts(file).is_none());
+        assert!(service.editor_file(file).is_none());
+
+        database.update(file, Cow::Borrowed(b"<?php class Base { function next(): string { return missing(); } }"));
+        service.update_database(database.read_only());
+        assert!(service.analyze_incremental(Some(&[file])).unwrap().issues.is_empty());
+        assert!(service.codebase().get_declaring_method(b"Child", b"run").is_none());
+        assert!(service.codebase().get_declaring_method(b"Child", b"next").is_some());
+
+        service.set_scan_only(false);
+        assert!(
+            service
+                .analyze_incremental(Some(&[]))
+                .unwrap()
+                .issues
+                .iter()
+                .any(|issue| { issue.code.as_deref() == Some("non-existent-function") })
+        );
+        assert!(service.editor_file(file).is_some());
+    }
+
+    #[test]
     fn failed_updates_discard_analysis_and_retry_without_new_changes() {
         use std::sync::atomic::AtomicBool;
         use std::sync::atomic::Ordering;
@@ -2247,6 +2318,7 @@ mod tests {
             assert!(error.to_string().contains("test failure"));
             assert!(!service.is_initialized());
             assert!(service.needs_full_rebuild);
+            assert!(!service.scan_only);
             assert!(service.last_issues().is_none());
             assert!(service.codebase_issues.is_empty());
             assert!(service.lifecycle_issues.is_empty());
