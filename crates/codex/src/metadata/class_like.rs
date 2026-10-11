@@ -111,6 +111,8 @@ pub struct ClassLikeMetadata {
     pub overridden_property_ids: WordMap<WordSet>,
     pub initialized_properties: WordSet,
     pub constants: WordMap<ClassLikeConstantMetadata>,
+    #[cfg_attr(feature = "serde", serde(default))]
+    declared_constants: Option<Box<[Word]>>,
     pub trait_constant_ids: WordMap<Word>,
     pub enum_cases: WordMap<EnumCaseMetadata>,
     pub invalid_dependencies: WordSet,
@@ -172,6 +174,7 @@ impl ClassLikeMetadata {
     ) -> ClassLikeMetadata {
         ClassLikeMetadata {
             constants: WordMap::default(),
+            declared_constants: None,
             trait_constant_ids: WordMap::default(),
             enum_cases: WordMap::default(),
             flags,
@@ -343,6 +346,17 @@ impl ClassLikeMetadata {
                 _ => None,
             })
             .chain(self.used_traits.iter().copied().filter(|_| self.declared_ancestry.is_none()))
+    }
+
+    pub(crate) fn reset_inherited_constants(&mut self) {
+        let declared = self.declared_constants.get_or_insert_with(|| {
+            let mut names: Box<[_]> = self.constants.keys().copied().collect();
+            names.sort_unstable();
+            names
+        });
+
+        self.constants.retain(|name, _| declared.binary_search(name).is_ok());
+        self.trait_constant_ids.clear();
     }
 
     pub(crate) fn reset_ancestry(&mut self) {

@@ -46,6 +46,7 @@ fn check_update(codebase: &mut CodebaseMetadata, source: &str, rescanned: &[&str
         .function_likes
         .extend(scanned.function_likes.into_iter().filter(|((name, _), _)| rescanned.contains(name)));
     codebase.symbols = scanned.symbols;
+    codebase.file_signatures = scanned.file_signatures;
 
     let unsafe_classes: WordSet = invalidated.iter().map(|name| word(*name)).chain(rescanned.iter().copied()).collect();
     let safe = codebase.class_likes.keys().filter(|name| !unsafe_classes.contains(*name)).copied().collect();
@@ -69,6 +70,13 @@ fn check_update(codebase: &mut CodebaseMetadata, source: &str, rescanned: &[&str
         assert_eq!(actual.require_extends, expected.require_extends, "{name}: {source}");
         assert_eq!(actual.require_implements, expected.require_implements, "{name}: {source}");
         assert_eq!(actual.child_class_likes, expected.child_class_likes, "{name}: {source}");
+        assert_eq!(actual.constants.len(), expected.constants.len(), "{name}: {source}");
+        for (constant, expected) in &expected.constants {
+            let actual = &actual.constants[constant];
+            assert_eq!(actual.inferred_type, expected.inferred_type, "{name}::{constant}: {source}");
+            assert_eq!(actual.visibility, expected.visibility, "{name}::{constant}: {source}");
+        }
+        assert_eq!(actual.trait_constant_ids, expected.trait_constant_ids, "{name}: {source}");
     }
 }
 
@@ -112,6 +120,67 @@ fn targeted_population_rebuilds_ancestry_without_rescanning_descendants() {
     for (before, after, rescanned, invalidated) in cases {
         let before = format!("<?php {roots} {before} {descendants}");
         let after = format!("<?php {roots} {after} {descendants}");
+        let mut codebase = scan(&before);
+        populate_full(&mut codebase);
+        check_update(&mut codebase, &after, rescanned, invalidated);
+        check_update(&mut codebase, &before, rescanned, invalidated);
+    }
+}
+
+#[test]
+fn targeted_population_rebuilds_inherited_constants_without_rescanning_descendants() {
+    let descendants =
+        "class Child extends Base { public const KEEP = 99, SECOND = 100; } class Leaf extends Child {} class Safe {}";
+    let cases: &[(&str, &str, &[&str], &[&str])] = &[
+        (
+            "class Base { public const VALUE = 1; public const KEEP = 1; }",
+            "class Base { protected const VALUE = 2; public const KEEP = 2; }",
+            &["base"],
+            &["child", "leaf"],
+        ),
+        (
+            "class Base { public const FIRST = 1; }",
+            "class Base { public const FIRST = 1, ADDED = 2; }",
+            &["base"],
+            &["child", "leaf"],
+        ),
+        ("class base { public const VALUE = 1; }", "class base {}", &["base"], &["child", "leaf"]),
+        (
+            "trait shared { public const VALUE = 1; } class base { use shared; }",
+            "trait shared { public const VALUE = 2; } class base { use shared; }",
+            &["shared"],
+            &["base", "child", "leaf"],
+        ),
+        (
+            "trait shared { public const VALUE = 1; } class base { use shared; }",
+            "trait shared {} class base { use shared; }",
+            &["shared"],
+            &["base", "child", "leaf"],
+        ),
+        (
+            "interface contract { public const VALUE = 1; } class base implements contract {}",
+            "interface contract {} class base implements contract {}",
+            &["contract"],
+            &["base", "child", "leaf"],
+        ),
+        (
+            "class oldroot { public const OLD = 1; } class newroot { public const NEW = 2; } class base extends oldroot {}",
+            "class oldroot { public const OLD = 1; } class newroot { public const NEW = 2; } class base extends newroot {}",
+            &["base"],
+            &["child", "leaf"],
+        ),
+    ];
+    let declared = scan(&format!("<?php class Base {{}} {descendants}"));
+    let mut populated = declared.clone();
+    populate_full(&mut populated);
+    assert_eq!(populated.class_likes[&word("child")].constants.len(), 2);
+    assert_eq!(
+        populated.class_likes[&word("child")].constants[&word("SECOND")].inferred_type,
+        declared.class_likes[&word("child")].constants[&word("SECOND")].inferred_type,
+    );
+    for (before, after, rescanned, invalidated) in cases {
+        let before = format!("<?php {before} {descendants}");
+        let after = format!("<?php {after} {descendants}");
         let mut codebase = scan(&before);
         populate_full(&mut codebase);
         check_update(&mut codebase, &after, rescanned, invalidated);
