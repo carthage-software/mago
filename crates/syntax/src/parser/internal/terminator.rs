@@ -40,7 +40,7 @@ where
         }
 
         let Some(next) = self.stream.lookahead(0)? else {
-            return Err(self.stream.unexpected(None, T![";", "?>"]));
+            return self.recover_at_eof(self.stream.unexpected(None, T![";", "?>"])).map(Terminator::Missing);
         };
 
         self.errors.push(self.stream.unexpected(Some(next), T![";", "?>"]));

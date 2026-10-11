@@ -253,7 +253,7 @@ where
             (T!["("], _) => Expression::Parenthesized(Parenthesized {
                 left_parenthesis: self.stream.eat_span(T!["("])?,
                 expression: self.parse_expression_with_precedence(Precedence::Lowest)?,
-                right_parenthesis: self.stream.eat_span(T![")"])?,
+                right_parenthesis: self.parse_closing_span(T![")"])?,
             }),
             (T!["match"], Some(T!["("])) => Expression::Match(self.parse_match()?),
             (T!["array"], Some(T!["("])) => Expression::LegacyArray(self.parse_legacy_array()?),
