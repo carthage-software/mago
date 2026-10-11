@@ -268,3 +268,14 @@ fn many_class_hierarchy_non_relations() {
         assert!(!atomic_is_contained(&t_named(sub), &t_named(sup), &cb), "{sub} should NOT be a subtype of {sup}");
     }
 }
+
+#[test]
+fn simplexml_truthiness() {
+    assert!(!t_named("SimpleXMLElement").is_truthy());
+    assert!(!t_named("SimpleXMLIterator").is_truthy());
+    assert!(!t_named("SimpleXMLElement").is_falsy());
+    assert!(!t_named("SimpleXMLIterator").is_falsy());
+    assert!(!t_named("simplexmlelement").is_truthy());
+    assert!(t_named("stdClass").is_truthy());
+    assert!(t_object_any().is_truthy());
+}
