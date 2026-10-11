@@ -423,6 +423,46 @@ where
         comments
     }
 
+    /// Include comments already printed beyond a node's syntactic end.
+    pub(crate) fn end_offset_with_printed_comments(&self, range: Span) -> u32 {
+        self.next_comment_index
+            .checked_sub(1)
+            .and_then(|index| self.all_comments.get(index))
+            .map_or(range.end_offset(), |comment| range.end_offset().max(comment.span.end.offset))
+    }
+
+    /// Print own-line comments after a node until the next non-comment token,
+    /// keeping them inside that node's body rather than with the following label.
+    #[must_use]
+    pub(crate) fn print_trailing_own_line_comments(&mut self, range: Span) -> Option<Document<'arena, A>> {
+        let mut end = self.end_offset_with_printed_comments(range);
+        let mut parts = vec_in![self.arena];
+        while let Some(trivia) = self.all_comments.get(self.next_comment_index) {
+            if self.placed_comments.is_consumed(self.next_comment_index) {
+                self.next_comment_index += 1;
+                continue;
+            }
+
+            let comment = Comment::from_trivia(self.file, trivia);
+            if comment.start < end
+                || !self.source_text[end as usize..comment.start as usize].iter().all(u8::is_ascii_whitespace)
+            {
+                break;
+            }
+
+            if self.is_next_line_empty_after_index(end) {
+                parts.push(Document::Line(Line::hard()));
+            }
+            parts.push(Document::Line(Line::hard()));
+            parts.push(self.print_comment(comment));
+            end = comment.end;
+            self.placed_comments.mark_consumed(self.next_comment_index);
+            self.next_comment_index += 1;
+        }
+
+        if parts.is_empty() { None } else { Some(Document::Indent(parts)) }
+    }
+
     #[must_use]
     pub(crate) fn print_inner_comment(&mut self, range: Span) -> Option<Document<'arena, A>> {
         let comments = self.take_comments_while(|_, comment| {
