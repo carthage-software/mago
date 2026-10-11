@@ -1153,7 +1153,10 @@ impl CodebaseMetadata {
             self.direct_classlike_descendants.entry(k).or_default().extend(v);
         }
 
-        self.file_signatures.extend(other.file_signatures);
+        for (file_id, signature) in other.file_signatures {
+            self.file_signatures.entry(file_id).insert_entry(signature);
+        }
+
         self.safe_symbols.extend(other.safe_symbols);
         self.safe_symbol_members.extend(other.safe_symbol_members);
         self.infer_types_from_usage |= other.infer_types_from_usage;
@@ -1774,6 +1777,27 @@ fn should_replace_metadata(
 #[cfg(test)]
 mod should_replace_metadata_tests {
     use super::*;
+
+    #[test]
+    fn replacing_file_signatures_keeps_map_capacity() {
+        let mut codebase = CodebaseMetadata::new();
+        codebase.file_signatures.reserve(3);
+        let capacity = codebase.file_signatures.capacity();
+        for index in 0..capacity {
+            codebase.set_file_signature(FileId::new(format!("{index}.php").as_bytes()), FileSignature::default());
+        }
+
+        let file_id = FileId::new(b"0.php");
+
+        for hash in 1..=3 {
+            let mut incoming = CodebaseMetadata::new();
+            incoming.set_file_signature(file_id, FileSignature { hash, ..FileSignature::default() });
+            codebase.extend(incoming);
+            assert_eq!(codebase.file_signatures.len(), capacity);
+            assert_eq!(codebase.file_signatures.capacity(), capacity);
+            assert_eq!(codebase.file_signatures[&file_id].hash, hash);
+        }
+    }
 
     #[test]
     fn non_polyfill_replaces_polyfill() {
