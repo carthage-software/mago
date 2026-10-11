@@ -6,9 +6,12 @@ use std::borrow::Cow;
 use mago_word::Word;
 use mago_word::word;
 
+use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
+use mago_codex::misc::GenericParent;
 use mago_codex::ttype::TType;
+use mago_codex::ttype::TypeRef;
 use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::add_union_type;
 use mago_codex::ttype::add_union_type_preserving_array_shapes;
@@ -18,12 +21,16 @@ use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::atomic::array::list::TList;
 use mago_codex::ttype::atomic::derived::TDerived;
 use mago_codex::ttype::atomic::object::TObject;
+use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::atomic::scalar::string::TStringLiteral;
 use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator::is_contained_by;
+use mago_codex::ttype::expander::StaticClassType;
+use mago_codex::ttype::expander::TypeExpansionOptions;
+use mago_codex::ttype::expander::expand_union;
 use mago_codex::ttype::get_arraykey;
 use mago_codex::ttype::get_int;
 use mago_codex::ttype::get_mixed;
@@ -35,6 +42,8 @@ use mago_codex::ttype::get_null;
 use mago_codex::ttype::get_specialized_template_type;
 use mago_codex::ttype::get_string;
 use mago_codex::ttype::get_undefined_null;
+use mago_codex::ttype::template::TemplateResult;
+use mago_codex::ttype::template::inferred_type_replacer;
 use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -1319,6 +1328,7 @@ where
     fn get_array_access_classes<'ctx, A>(
         context: &mut Context<'ctx, '_, A>,
         atomic: &TAtomic,
+        for_assignment: bool,
     ) -> Option<(Vec<&'ctx ClassLikeMetadata>, TUnion, TUnion)>
     where
         A: Arena,
@@ -1360,14 +1370,19 @@ where
             )
             .unwrap_or_else(get_mixed);
 
-            let value_type = get_specialized_template_type(
-                context.codebase,
-                value_template_name,
-                array_access,
-                metadata,
-                named_object.get_type_parameters(),
-            )
-            .unwrap_or_else(get_mixed);
+            let value_type = for_assignment
+                .then(|| get_array_access_assignment_value_type(context, metadata, named_object))
+                .flatten()
+                .unwrap_or_else(|| {
+                    get_specialized_template_type(
+                        context.codebase,
+                        value_template_name,
+                        array_access,
+                        metadata,
+                        named_object.get_type_parameters(),
+                    )
+                    .unwrap_or_else(get_mixed)
+                });
 
             parameters.push((key_type, value_type));
 
@@ -1382,7 +1397,7 @@ where
 
         if let Some(intersection_types) = atomic.get_intersection_types() {
             for intersection_type in intersection_types {
-                if let Some(intersections) = get_array_access_classes(context, intersection_type) {
+                if let Some(intersections) = get_array_access_classes(context, intersection_type, for_assignment) {
                     class_likes.extend(intersections.0);
 
                     parameters.push((intersections.1, intersections.2));
@@ -1408,7 +1423,7 @@ where
 
     // TODO: we should analyze calls to `offsetSet` and `offsetGet` here.
     let Some((_array_access_classes, expected_key_type, mut resulting_value_type)) =
-        get_array_access_classes(context, named_object)
+        get_array_access_classes(context, named_object, assign_value_type.is_some())
     else {
         context.collector.report_with_code(
             IssueCode::InvalidArrayAccess,
@@ -1471,13 +1486,62 @@ where
                 .with_note(format!(
                     "The `ArrayAccess` implementation expects values of type `{expected_type_str}`, but `{assigned_type_str}` was provided."
                 ))
-                .with_help("Ensure the assigned value matches the `ArrayAccess` value type parameter."),
+                .with_help("Ensure the assigned value matches the `offsetSet()` value parameter."),
             );
         }
     }
 
     resulting_value_type.set_possibly_undefined(true, None);
     resulting_value_type
+}
+
+fn get_array_access_assignment_value_type<A>(
+    context: &Context<'_, '_, A>,
+    class_metadata: &ClassLikeMetadata,
+    named_object: &TNamedObject,
+) -> Option<TUnion>
+where
+    A: Arena,
+{
+    let method_id =
+        context.codebase.get_declaring_method_identifier(&MethodIdentifier::new(named_object.name, word(b"offsetSet")));
+    let method = context.codebase.get_method_by_id(&method_id)?;
+    let parameter = method.parameters.get(1)?;
+    let mut value_type =
+        parameter.get_type_metadata().map(|metadata| metadata.type_union.clone()).unwrap_or_else(get_mixed);
+
+    if value_type.has_template_types() {
+        let mut template_result = TemplateResult::default();
+        for node in value_type.get_all_child_nodes() {
+            if let TypeRef::Atomic(TAtomic::GenericParameter(parameter)) = node
+                && let GenericParent::ClassLike(class_name) = parameter.defining_entity
+                && let Some(template_type) = get_specialized_template_type(
+                    context.codebase,
+                    parameter.parameter_name,
+                    class_name,
+                    class_metadata,
+                    named_object.get_type_parameters(),
+                )
+            {
+                template_result.add_lower_bound(parameter.parameter_name, parameter.defining_entity, template_type);
+            }
+        }
+
+        value_type = inferred_type_replacer::replace(&value_type, &template_result, context.codebase);
+    }
+
+    expand_union(
+        context.codebase,
+        &mut value_type,
+        &TypeExpansionOptions {
+            self_class: Some(method_id.get_class_name()),
+            static_class_type: StaticClassType::Object(TObject::Named(named_object.clone())),
+            function_is_final: class_metadata.flags.is_final(),
+            ..Default::default()
+        },
+    );
+
+    Some(value_type)
 }
 
 pub(crate) fn handle_array_access_on_string<A>(

@@ -2833,6 +2833,7 @@ test_case!(issue_2434);
 test_case!(issue_2435);
 test_case!(issue_2440);
 test_case!(issue_2463);
+test_case!(issue_2473);
 test_case!(simplexml_truthiness);
 test_case!(closure_capture_by_reference_array);
 test_case!(nullable_receiver_method_call);
