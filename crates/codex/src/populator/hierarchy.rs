@@ -221,7 +221,8 @@ fn populate_class_like_metadata(
         }
     }
 
-    if (metadata.kind.is_class() || metadata.kind.is_enum())
+    if !metadata.kind.is_trait()
+        && metadata.name != word(b"stringable")
         && metadata.appearing_method_ids.contains_key(&word(b"__tostring"))
         && !metadata.all_parent_interfaces.contains(&word(b"stringable"))
     {
