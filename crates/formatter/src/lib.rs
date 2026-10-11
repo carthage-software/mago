@@ -30,7 +30,10 @@ use crate::settings::FormatSettings;
 
 pub mod document;
 pub mod presets;
+mod range;
 pub mod settings;
+
+pub use range::FormattedRange;
 
 mod internal;
 

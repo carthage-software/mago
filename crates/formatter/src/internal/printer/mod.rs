@@ -42,6 +42,8 @@ where
     propagated_breaks: HashMap<'arena, usize, bool, A>,
     new_line: &'static str,
     can_trim: bool,
+    range_start: Option<usize>,
+    range_end: Option<usize>,
 }
 
 impl<'arena, A> Printer<'arena, A>
@@ -76,6 +78,8 @@ where
             ),
             new_line: settings.end_of_line.as_str(),
             can_trim: true,
+            range_start: None,
+            range_end: None,
         }
     }
 
@@ -83,6 +87,11 @@ where
         self.print_doc_to_string();
 
         self.out.leak()
+    }
+
+    pub(crate) fn build_range(mut self) -> Option<(&'arena [u8], std::ops::Range<usize>)> {
+        self.print_doc_to_string();
+        Some((self.out.leak(), self.range_start?..self.range_end?))
     }
 
     /// Turn Doc into a string
@@ -93,6 +102,14 @@ where
 
             match document {
                 Document::String(s) => self.handle_bytes(s),
+                Document::RangeStart => self.range_start = Some(self.out.len()),
+                Document::RangeEnd => {
+                    if self.line_suffix.is_empty() {
+                        self.range_end = Some(self.out.len());
+                    } else {
+                        self.line_suffix.push(Command::new(indentation, mode, Document::RangeEnd));
+                    }
+                }
                 Document::Space(space) => self.handle_space(space),
                 Document::Array(docs) => self.push_docs(indentation, mode, docs),
                 Document::Indent(docs) => self.push_docs(indentation.indented(), mode, docs),
@@ -171,6 +188,8 @@ where
 
             self.out.pop();
         }
+        self.range_start = self.range_start.map(|offset| offset.min(self.out.len()));
+        self.range_end = self.range_end.map(|offset| offset.min(self.out.len()));
     }
 
     fn handle_group(
@@ -440,7 +459,11 @@ where
                         return false;
                     }
                 }
-                Document::BreakParent | Document::Trim(_) | Document::DoNotTrim => {}
+                Document::BreakParent
+                | Document::Trim(_)
+                | Document::DoNotTrim
+                | Document::RangeStart
+                | Document::RangeEnd => {}
             }
 
             if remaining_width < 0 {

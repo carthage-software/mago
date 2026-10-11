@@ -12,6 +12,7 @@ use mago_syntax::cst::Declare;
 use mago_syntax::cst::DeclareBody;
 use mago_syntax::cst::MaybeTypedUseItem;
 use mago_syntax::cst::Node;
+use mago_syntax::cst::NodeKind;
 use mago_syntax::cst::Sequence;
 use mago_syntax::cst::Statement;
 use mago_syntax::cst::Terminator;
@@ -599,6 +600,7 @@ where
     }
 
     let sort_uses = *f.settings.sort_uses;
+    let capture = f.begin_range(stmts[0].span().join(stmts[stmts.len() - 1].span()), NodeKind::Use);
     let should_separate = f.settings.separate_use_types;
     let should_expand = f.settings.expand_use_groups;
 
@@ -702,7 +704,7 @@ where
         }
     }
 
-    result_docs
+    if capture { vec_in![f.arena; f.end_range(capture, Document::Array(result_docs))] } else { result_docs }
 }
 
 fn use_type_order(use_type: Option<&UseType<'_>>) -> u8 {
