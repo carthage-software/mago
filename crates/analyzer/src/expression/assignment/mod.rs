@@ -126,6 +126,7 @@ where
     }
 
     if let (Some(source_expression), Some(target_variable_id)) = (source_expression, &target_variable_id)
+        && assignment_operator.is_none()
         && matches!(target_expression, Expression::Variable(_))
         && is_closure_expression(source_expression)
         && let Some(preliminary_type) = get_closure_expression_type(context.source_file, source_expression)
