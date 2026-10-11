@@ -10,6 +10,7 @@ use mago_syntax::cst::Access;
 use mago_syntax::cst::Call;
 use mago_syntax::cst::Expression;
 use mago_syntax::cst::Literal;
+use mago_syntax::cst::Variable;
 use mago_word::word;
 
 use crate::analyzable::Analyzable;
@@ -39,6 +40,13 @@ where
         return Ok(());
     }
     match expression.unparenthesized() {
+        Expression::Variable(Variable::Direct(variable)) => {
+            if let Some(ty) = block_context.locals.get(&word(variable.name)).cloned() {
+                artifacts.set_rc_expression_type(variable, ty);
+            }
+
+            Ok(())
+        }
         Expression::Access(Access::ClassConstant(access)) => {
             record_cached_receiver(context, block_context, artifacts, access.class)?;
             if let Some((reference, _)) = cached_receiver::constant(context, block_context, access)
