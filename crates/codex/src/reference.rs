@@ -315,10 +315,10 @@ impl SymbolReferences {
         self.add_reference(referencing, property, false);
         match referencing {
             ReferenceOrigin::Symbol(symbol) => {
-                self.property_read_references.entry(symbol).or_default().insert(property);
+                insert_reference(&mut self.property_read_references, symbol, property);
             }
             ReferenceOrigin::File(file) => {
-                self.file_property_read_references.entry(file).or_default().insert(property);
+                insert_reference(&mut self.file_property_read_references, file, property);
             }
         }
     }
@@ -329,10 +329,10 @@ impl SymbolReferences {
         self.add_reference(referencing, property, false);
         match referencing {
             ReferenceOrigin::Symbol(symbol) => {
-                self.property_write_references.entry(symbol).or_default().insert(property);
+                insert_reference(&mut self.property_write_references, symbol, property);
             }
             ReferenceOrigin::File(file) => {
-                self.file_property_write_references.entry(file).or_default().insert(property);
+                insert_reference(&mut self.file_property_write_references, file, property);
             }
         }
     }
@@ -340,7 +340,7 @@ impl SymbolReferences {
     /// Records an explicit reference to an overridden class-like member.
     #[inline]
     pub fn add_overridden_member_reference(&mut self, referencing: SymbolIdentifier, overridden: SymbolIdentifier) {
-        self.symbol_references_to_overridden_members.entry(referencing).or_default().insert(overridden);
+        insert_reference(&mut self.symbol_references_to_overridden_members, referencing, overridden);
     }
 
     /// Records an explicit use of another function-like's return value.
@@ -505,7 +505,7 @@ impl SymbolReferences {
             return;
         };
 
-        self.symbol_references_to_overridden_members.entry(referencing).or_default().insert(class_member);
+        self.add_overridden_member_reference(referencing, class_member);
     }
 
     /// Convenience method to add a reference *from* the current function context *to* a top-level symbol.
@@ -526,10 +526,11 @@ impl SymbolReferences {
             return;
         }
 
-        self.functionlike_references_to_functionlike_returns
-            .entry(referencing_functionlike)
-            .or_default()
-            .insert(referenced_functionlike);
+        insert_reference(
+            &mut self.functionlike_references_to_functionlike_returns,
+            referencing_functionlike,
+            referenced_functionlike,
+        );
     }
 
     /// Merges references from another `SymbolReferences` instance into this one.
@@ -1005,7 +1006,7 @@ fn insert_dependency<K>(
     K: Copy + Eq + Hash,
 {
     if in_signature {
-        signature.entry(origin).or_default().insert(target);
+        insert_reference(signature, origin, target);
         if let Entry::Occupied(mut entry) = body.entry(origin) {
             entry.get_mut().remove(&target);
             if entry.get().is_empty() {
@@ -1013,7 +1014,7 @@ fn insert_dependency<K>(
             }
         }
     } else if signature.get(&origin).is_none_or(|targets| !targets.contains(&target)) {
-        body.entry(origin).or_default().insert(target);
+        insert_reference(body, origin, target);
     }
 }
 
@@ -1049,6 +1050,19 @@ fn extend_dependencies<K>(
     extend_reference_map(body, incoming_body);
 }
 
+#[inline]
+fn insert_reference<K, V>(references: &mut HashMap<K, HashSet<V>>, origin: K, target: V)
+where
+    K: Eq + Hash,
+    V: Eq + Hash,
+{
+    let targets = references.entry(origin).or_default();
+    if targets.len() < targets.capacity() || !targets.contains(&target) {
+        targets.insert(target);
+    }
+}
+
+#[allow(clippy::set_contains_or_insert, reason = "A duplicate insert can grow a full set.")]
 fn extend_reference_map<K, V>(target: &mut HashMap<K, HashSet<V>>, source: HashMap<K, HashSet<V>>)
 where
     K: Eq + Hash,
@@ -1056,7 +1070,14 @@ where
 {
     for (key, references) in source {
         match target.entry(key) {
-            Entry::Occupied(mut entry) => entry.get_mut().extend(references),
+            Entry::Occupied(mut entry) => {
+                let existing = entry.get_mut();
+                for reference in references {
+                    if !existing.contains(&reference) {
+                        existing.insert(reference);
+                    }
+                }
+            }
             Entry::Vacant(entry) => {
                 entry.insert(references);
             }
@@ -1132,6 +1153,115 @@ mod tests {
         references.extend(incoming);
 
         assert_eq!(references, expected);
+    }
+
+    #[test]
+    fn merging_duplicate_references_keeps_set_capacity() {
+        let mut targets = HashSet::default();
+        targets.reserve(3);
+        let capacity = targets.capacity();
+        targets.extend(0..capacity);
+        let mut references = HashMap::default();
+        references.insert(0, targets);
+
+        for _ in 0..3 {
+            let mut incoming = HashMap::default();
+            incoming.insert(0, (0..capacity).collect());
+            extend_reference_map(&mut references, incoming);
+            assert_eq!(references[&0].len(), capacity);
+            assert_eq!(references[&0].capacity(), capacity);
+            assert!((0..capacity).all(|target| references[&0].contains(&target)));
+        }
+
+        let mut incoming = HashMap::default();
+        incoming.insert(0, (capacity..capacity + 2).collect());
+        extend_reference_map(&mut references, incoming);
+        assert_eq!(references[&0].len(), capacity + 2);
+        assert!((0..capacity + 2).all(|target| references[&0].contains(&target)));
+    }
+
+    #[test]
+    fn adding_duplicate_references_keeps_set_capacity() {
+        fn check<T>(add: impl Fn(&mut SymbolReferences, Word), targets: impl Fn(&SymbolReferences) -> &HashSet<T>)
+        where
+            T: Eq + Hash,
+        {
+            let mut references = SymbolReferences::new();
+            add(&mut references, word("target0"));
+            let capacity = targets(&references).capacity();
+            for index in 1..capacity {
+                add(&mut references, word(format!("target{index}")));
+            }
+
+            assert_eq!(targets(&references).len(), capacity);
+            let expected = references.clone();
+
+            for _ in 0..3 {
+                for index in 0..capacity {
+                    add(&mut references, word(format!("target{index}")));
+                }
+                assert_eq!(references, expected);
+                assert_eq!(targets(&references).capacity(), capacity);
+            }
+
+            add(&mut references, word("new_target"));
+            assert_eq!(targets(&references).len(), capacity + 1);
+        }
+
+        let symbol = (word("source"), empty_word());
+        let file = word("file.php");
+        for origin in [
+            ReferenceOrigin::Symbol(symbol),
+            ReferenceOrigin::Symbol((symbol.0, word("method"))),
+            ReferenceOrigin::File(file),
+        ] {
+            for in_signature in [false, true] {
+                check(
+                    |references, target| references.add_reference(origin, (target, empty_word()), in_signature),
+                    |references| match origin {
+                        ReferenceOrigin::Symbol(symbol) if in_signature => {
+                            &references.symbol_references_to_symbols_in_signature[&symbol]
+                        }
+                        ReferenceOrigin::Symbol(symbol) => &references.symbol_references_to_symbols[&symbol],
+                        ReferenceOrigin::File(file) if in_signature => {
+                            &references.file_references_to_symbols_in_signature[&file]
+                        }
+                        ReferenceOrigin::File(file) => &references.file_references_to_symbols[&file],
+                    },
+                );
+            }
+
+            for read in [false, true] {
+                check(
+                    |references, target| {
+                        let property = (target, word("property"));
+                        if read {
+                            references.add_property_read_reference(origin, property);
+                        } else {
+                            references.add_property_write_reference(origin, property);
+                        }
+                    },
+                    |references| match origin {
+                        ReferenceOrigin::Symbol(symbol) if read => &references.property_read_references[&symbol],
+                        ReferenceOrigin::Symbol(symbol) => &references.property_write_references[&symbol],
+                        ReferenceOrigin::File(file) if read => &references.file_property_read_references[&file],
+                        ReferenceOrigin::File(file) => &references.file_property_write_references[&file],
+                    },
+                );
+            }
+        }
+
+        check(
+            |references, target| references.add_overridden_member_reference(symbol, (target, word("method"))),
+            |references| &references.symbol_references_to_overridden_members[&symbol],
+        );
+
+        check(
+            |references, target| references.add_functionlike_return_reference(symbol, (target, empty_word())),
+            |references| {
+                &references.functionlike_references_to_functionlike_returns[&FunctionLikeIdentifier::Function(symbol.0)]
+            },
+        );
     }
 
     #[test]
