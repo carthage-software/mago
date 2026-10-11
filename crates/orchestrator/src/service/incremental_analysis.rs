@@ -347,16 +347,6 @@ impl IncrementalAnalysisService {
             .map(Arc::new);
         let source_files: Vec<_> = self.database.files().filter(|f| f.file_type != FileType::Builtin).collect();
 
-        if source_files.is_empty() {
-            tracing::info!("No source files found for analysis.");
-            self.codebase_scan_files.clear();
-            self.plugin_registry
-                .run_external_codebase_scan(Vec::new())
-                .map_err(mago_analyzer::error::AnalysisError::from)?;
-            self.initialized = true;
-            return Ok(AnalysisResult::new(SymbolReferences::new()));
-        }
-
         let parser_settings = self.parser_settings;
         let php_version = self.settings.version;
         let codebase_scan_plan = self.codebase_scan_plan.clone();
@@ -503,11 +493,6 @@ impl IncrementalAnalysisService {
         }
 
         let source_files: Vec<_> = self.database.files().filter(|f| f.file_type != FileType::Builtin).collect();
-
-        if source_files.is_empty() {
-            tracing::info!("No source files found for analysis.");
-            return Ok(AnalysisResult::new(SymbolReferences::new()));
-        }
 
         let current_file_names: WordSet = source_files.iter().map(|file| mago_word::word(file.name.as_ref())).collect();
 
@@ -1766,6 +1751,41 @@ mod tests {
             only_incr.is_empty() && only_full.is_empty(),
             "After file deletion, incremental != full.\n  Only in incremental: {only_incr:?}\n  Only in full: {only_full:?}"
         );
+    }
+
+    #[test]
+    fn deleting_last_file_clears_analysis_state() {
+        for incremental in [false, true] {
+            let mut db =
+                make_database(vec![("src/a.php", "<?php class Removed {} function gone(): int { return 'bad'; }")]);
+            let mut service = make_service(&db);
+            service.analyze().expect("Initial analysis failed.");
+            assert!(!service.codebase.class_likes.is_empty());
+
+            let id = FileId::new(b"src/a.php");
+            db.delete(id);
+            service.update_database(db.read_only());
+            let result = if incremental { service.analyze_incremental(Some(&[id])) } else { service.analyze() }
+                .expect("Analysis after deletion failed.");
+
+            assert!(result.issues.is_empty());
+            assert!(service.file_states.is_empty());
+            assert!(service.analysis_snapshots.is_empty());
+            assert!(service.codebase.class_likes.is_empty());
+            assert!(service.codebase.function_likes.is_empty());
+            assert!(service.collect_all_issues().is_empty());
+
+            db.add(File::new(
+                Cow::Borrowed(b"src/b.php"),
+                FileType::Host,
+                None,
+                Cow::Borrowed(b"<?php new Removed();"),
+            ));
+            service.update_database(db.read_only());
+            let result = service.analyze_incremental(None).expect("Analysis after addition failed.");
+            assert!(!result.issues.is_empty());
+            assert_matches_full(&service, &db, "last file removed then another added");
+        }
     }
 
     #[test]
