@@ -832,7 +832,9 @@ where
     }
 
     let chain_owns_parens = match chain_base_frame {
-        ChainBaseFrame::BaseHandlesParens => false,
+        ChainBaseFrame::BaseHandlesParens => {
+            matches!(member_access_chain.base, Expression::Instantiation(i) if f.instantiation_needs_parens(i))
+        }
         ChainBaseFrame::None | ChainBaseFrame::ChainHandlesParens => base_needs_parens(f, member_access_chain.base),
     };
 
