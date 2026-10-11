@@ -9,6 +9,7 @@ use mago_formatter::Formatter;
 use mago_formatter::settings::FormatSettings;
 use mago_php_version::PHPVersion;
 use mago_syntax::error::ParseError;
+use mago_syntax::parser::parse_file_borrowed_with_settings;
 use mago_syntax::settings::ParserSettings;
 
 use crate::error::OrchestratorError;
@@ -65,19 +66,13 @@ impl FormatService {
     ///
     /// Returns [`OrchestratorError`] if the formatter fails outside of recoverable parse errors.
     pub fn format_file_in(self, file: &File, arena: &LocalArena) -> Result<FileFormatStatus, OrchestratorError> {
-        let formatter =
-            Formatter::new(arena, self.php_version, self.settings).with_parser_settings(self.parser_settings);
+        let context = FormatContext {
+            php_version: self.php_version,
+            settings: self.settings,
+            parser_settings: self.parser_settings,
+        };
 
-        match formatter.format_file(file) {
-            Ok(formatted_content) => {
-                if file.contents == formatted_content {
-                    Ok(FileFormatStatus::Unchanged)
-                } else {
-                    Ok(FileFormatStatus::Changed(formatted_content.to_vec()))
-                }
-            }
-            Err(parse_error) => Ok(FileFormatStatus::FailedToParse(parse_error)),
-        }
+        Ok(context.format_file(file, arena))
     }
 
     /// Runs the formatter pipeline over every file in the database.
@@ -100,22 +95,7 @@ impl FormatService {
             self.use_progress_bars,
         );
 
-        pipeline.run(|context, arena, file| {
-            let formatter = Formatter::new(arena, context.php_version, context.settings)
-                .with_parser_settings(context.parser_settings);
-            let status = match formatter.format_file(&file) {
-                Ok(formatted_content) => {
-                    if file.contents == formatted_content {
-                        FileFormatStatus::Unchanged
-                    } else {
-                        FileFormatStatus::Changed(formatted_content.to_vec())
-                    }
-                }
-                Err(parse_error) => FileFormatStatus::FailedToParse(parse_error),
-            };
-
-            Ok((file.id, status))
-        })
+        pipeline.run(|context, arena, file| Ok((file.id, context.format_file(&file, arena))))
     }
 
     /// Runs the formatter on a specific subset of files by ID.
@@ -153,22 +133,7 @@ impl FormatService {
             self.use_progress_bars,
         );
 
-        pipeline.run_on_files(file_ids, |context, arena, file| {
-            let formatter = Formatter::new(arena, context.php_version, context.settings)
-                .with_parser_settings(context.parser_settings);
-            let status = match formatter.format_file(&file) {
-                Ok(formatted_content) => {
-                    if file.contents == formatted_content {
-                        FileFormatStatus::Unchanged
-                    } else {
-                        FileFormatStatus::Changed(formatted_content.to_vec())
-                    }
-                }
-                Err(parse_error) => FileFormatStatus::FailedToParse(parse_error),
-            };
-
-            Ok((file.id, status))
-        })
+        pipeline.run_on_files(file_ids, |context, arena, file| Ok((file.id, context.format_file(&file, arena))))
     }
 }
 
@@ -231,6 +196,23 @@ struct FormatContext {
     settings: FormatSettings,
     /// The parser settings.
     parser_settings: ParserSettings,
+}
+
+impl FormatContext {
+    fn format_file(self, file: &File, arena: &LocalArena) -> FileFormatStatus {
+        let program = parse_file_borrowed_with_settings(arena, file, self.parser_settings);
+        if let Some(parse_error) = program.errors.first() {
+            return FileFormatStatus::FailedToParse(parse_error.clone());
+        }
+
+        let formatter = Formatter::new(arena, self.php_version, self.settings);
+        let formatted_content = formatter.format(file, program);
+        if file.contents == formatted_content {
+            FileFormatStatus::Unchanged
+        } else {
+            FileFormatStatus::Changed(formatted_content.to_vec())
+        }
+    }
 }
 
 #[derive(Debug, Clone)]

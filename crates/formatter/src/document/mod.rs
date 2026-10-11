@@ -278,8 +278,10 @@ where
         documents: impl IntoIterator<Item = Document<'arena, A>>,
         separator: Separator,
     ) -> Vec<'arena, Document<'arena, A>, A> {
-        let mut parts = vec_in![arena];
-        for (i, document) in documents.into_iter().enumerate() {
+        let documents = documents.into_iter();
+        let capacity = documents.size_hint().0.saturating_mul(2).saturating_sub(1);
+        let mut parts = Vec::with_capacity_in(capacity, arena);
+        for (i, document) in documents.enumerate() {
             if i != 0 {
                 parts.push(match separator {
                     Separator::Space => Document::String(b" "),

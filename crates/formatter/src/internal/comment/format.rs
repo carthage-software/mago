@@ -143,12 +143,12 @@ where
     #[must_use]
     #[inline]
     pub fn has_inner_comment(&self, range: Span) -> bool {
-        for comment in self.remaining_comments() {
-            if comment.start > range.end_offset() {
+        for trivia in &self.all_comments[self.next_comment_index..] {
+            if trivia.span.start.offset > range.end_offset() {
                 break;
             }
 
-            if comment.start >= range.start_offset() && comment.end <= range.end_offset() {
+            if trivia.span.start.offset >= range.start_offset() && trivia.span.end.offset <= range.end_offset() {
                 return true;
             }
         }
@@ -160,12 +160,12 @@ where
     #[must_use]
     #[inline]
     pub fn has_inner_line_comment_in_range(&self, start: u32, end: u32) -> bool {
-        for comment in self.remaining_comments() {
-            if comment.start > end {
+        for trivia in &self.all_comments[self.next_comment_index..] {
+            if trivia.span.start.offset > end {
                 break;
             }
 
-            if comment.start >= start && comment.end <= end && !comment.is_block {
+            if trivia.span.start.offset >= start && trivia.span.end.offset <= end && !trivia.kind.is_block_comment() {
                 return true;
             }
         }
@@ -195,11 +195,15 @@ where
     /// when the node is a declaration so that attached docblocks always end up
     /// on their own line. Other node kinds preserve the user's spacing as-is.
     #[must_use]
-    pub(crate) fn print_leading_comments_for_node(&mut self, node: Node<'_, '_>) -> Option<Document<'arena, A>> {
+    pub(crate) fn print_leading_comments_for_node(
+        &mut self,
+        node: Node<'_, '_>,
+        span: Span,
+    ) -> Option<Document<'arena, A>> {
         if is_declaration_node(node) {
-            self.print_leading_comments_for_declaration(node.span())
+            self.print_leading_comments_for_declaration(span)
         } else {
-            self.print_leading_comments(node.span())
+            self.print_leading_comments(span)
         }
     }
 
@@ -207,9 +211,7 @@ where
         let mut parts = vec_in![self.arena];
 
         while let Some(trivia) = self.all_comments.get(self.next_comment_index) {
-            let comment = Comment::from_trivia(self.file, trivia);
-
-            if comment.end <= range.start_offset() {
+            if trivia.span.end.offset <= range.start_offset() {
                 if self.placed_comments.is_consumed(self.next_comment_index) {
                     self.next_comment_index += 1;
                     continue;
@@ -221,6 +223,7 @@ where
                     continue;
                 }
 
+                let comment = Comment::from_trivia(self.file, trivia);
                 // Check if comment is in an ignore region - if so, preserve as-is
                 if self.get_ignore_region_for(comment.start).is_some() {
                     let preserved = Document::String(self.get_source_slice(comment.start, comment.end));
@@ -246,19 +249,19 @@ where
         let mut previous_comment: Option<Comment> = None;
 
         while let Some(trivia) = self.all_comments.get(self.next_comment_index) {
-            let comment = Comment::from_trivia(self.file, trivia);
-
             if self.placed_comments.is_consumed(self.next_comment_index) {
                 self.next_comment_index += 1;
                 continue;
             }
 
-            if range.end_offset() < comment.start && self.is_insignificant(range.end_offset(), comment.start) {
-                let gap = &self.source_text[(range.end_offset() as usize)..(comment.start as usize)];
-                if comment.is_block && gap.contains(&b',') {
+            let comment_start = trivia.span.start.offset;
+            if range.end_offset() < comment_start && self.is_insignificant(range.end_offset(), comment_start) {
+                let gap = &self.source_text[(range.end_offset() as usize)..(comment_start as usize)];
+                if trivia.kind.is_block_comment() && gap.contains(&b',') {
                     break;
                 }
 
+                let comment = Comment::from_trivia(self.file, trivia);
                 // Check if comment is in an ignore region - if so, preserve as-is
                 if self.get_ignore_region_for(comment.start).is_some() {
                     self.print_preserved_trailing_comment(&mut parts, comment);
@@ -743,14 +746,10 @@ where
     /// Take placed leading comments as a Document, consuming them.
     #[must_use]
     pub(crate) fn take_placed_leading(&mut self, span: Span) -> Option<Document<'arena, A>> {
-        let comments: std::vec::Vec<_> = self.placed_comments.by_placement(span, Placement::Leading).copied().collect();
-        if comments.is_empty() {
-            return None;
-        }
-
         let mut parts = vec_in![self.arena];
-        for placed in &comments {
-            if self.placed_comments.is_consumed(placed.index) {
+        for index in 0..self.placed_comments.get(span).len() {
+            let placed = self.placed_comments.get(span)[index];
+            if placed.placement != Placement::Leading || self.placed_comments.is_consumed(placed.index) {
                 continue;
             }
 
@@ -779,15 +778,10 @@ where
     /// Take placed trailing comments as a Document, consuming them.
     #[must_use]
     pub(crate) fn take_placed_trailing(&mut self, span: Span) -> Option<Document<'arena, A>> {
-        let comments: std::vec::Vec<_> =
-            self.placed_comments.by_placement(span, Placement::Trailing).copied().collect();
-        if comments.is_empty() {
-            return None;
-        }
-
         let mut parts = vec_in![self.arena];
-        for placed in &comments {
-            if self.placed_comments.is_consumed(placed.index) {
+        for index in 0..self.placed_comments.get(span).len() {
+            let placed = self.placed_comments.get(span)[index];
+            if placed.placement != Placement::Trailing || self.placed_comments.is_consumed(placed.index) {
                 continue;
             }
 
@@ -818,9 +812,10 @@ where
         &mut self,
         document: Document<'arena, A>,
         node: Node<'arena, 'arena>,
+        span: Span,
         has_leading_comments: bool,
     ) -> Document<'arena, A> {
-        let placed = self.take_placed_leading(node.span());
+        let placed = self.take_placed_leading(span);
         let (doc, has_leading) = if let Some(p) = placed {
             (Document::Array(vec_in![self.arena; p, document]), true)
         } else {
@@ -837,6 +832,10 @@ where
         span: Span,
         document: Document<'arena, A>,
     ) -> Document<'arena, A> {
+        if self.placed_comments.get(span).is_empty() {
+            return document;
+        }
+
         // Wrapper nodes such as `Expression` share a span with the node they hold.
         // Leave the comments to the outer node, so any parentheses added to it enclose them too.
         if self.nth_parent_kind(1).is_some_and(|parent| parent.span() == span) {

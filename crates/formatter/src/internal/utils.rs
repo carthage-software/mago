@@ -1,5 +1,4 @@
 use mago_allocator::Arena;
-use mago_allocator::CollectIn;
 use mago_allocator::vec::Vec;
 use mago_syntax::cst::Argument;
 use mago_syntax::cst::ArgumentList;
@@ -186,16 +185,11 @@ pub(crate) fn split_any_newline(text: &[u8]) -> impl Iterator<Item = &[u8]> {
     std::iter::from_fn(move || {
         let text = remaining?;
 
-        for i in 0..text.len() {
-            if text[i] == b'\r' {
-                let line = &text[..i];
-                remaining = Some(if text.get(i + 1) == Some(&b'\n') { &text[i + 2..] } else { &text[i + 1..] });
-                return Some(line);
-            } else if text[i] == b'\n' {
-                let line = &text[..i];
-                remaining = Some(&text[i + 1..]);
-                return Some(line);
-            }
+        if let Some(i) = memchr::memchr2(b'\r', b'\n', text) {
+            let line = &text[..i];
+            remaining =
+                Some(if text[i] == b'\r' && text.get(i + 1) == Some(&b'\n') { &text[i + 2..] } else { &text[i + 1..] });
+            return Some(line);
         }
 
         remaining = None;
@@ -222,11 +216,7 @@ where
         return Document::String(text);
     }
 
-    Document::Array(Document::join(
-        f.arena,
-        split_any_newline(text).map(Document::String).collect_in::<Vec<'arena, _, A>>(f.arena),
-        replacement,
-    ))
+    Document::Array(Document::join(f.arena, split_any_newline(text).map(Document::String), replacement))
 }
 
 #[inline]
@@ -441,7 +431,13 @@ fn get_composite_string_width(composite_string: &CompositeString<'_>) -> Option<
 
 #[inline]
 pub fn string_width(s: &[u8]) -> usize {
-    let line = split_any_newline(s).last().unwrap_or(b"");
+    if s.iter().all(|&byte| (b' '..=b'~').contains(&byte)) {
+        return s.len();
+    }
+    let line = memchr::memrchr2(b'\r', b'\n', s).map_or(s, |offset| &s[offset + 1..]);
+    if line.iter().all(|&byte| (b' '..=b'~').contains(&byte)) {
+        return line.len();
+    }
     let line_str = String::from_utf8_lossy(line);
 
     if line_str.contains("الله") {

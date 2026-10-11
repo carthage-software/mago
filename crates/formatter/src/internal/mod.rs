@@ -306,6 +306,11 @@ where
     }
 
     #[inline]
+    fn needs_comment_span(&self) -> bool {
+        self.next_comment_index != self.all_comments.len() || self.placed_comments.has_placed_comments()
+    }
+
+    #[inline]
     fn enter_node(&mut self, node: Node<'arena, 'arena>) {
         self.stack.push(node);
     }

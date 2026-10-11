@@ -82,17 +82,20 @@ where
             return true;
         }
 
-        self.called_or_accessed_node_needs_parens(node)
-            || self.conditional_needs_parens(node)
-            || self.binary_node_needs_parens(node)
-            || self.unary_node_needs_parens(node)
-            || self.assignment_needs_parens(node)
-            || self.literal_needs_parens(node)
-            || self.pipe_node_needs_parens(node)
-            || self.class_constant_access_needs_parens(node)
-            || self.arrow_function_needs_parens(node)
-            || self.construct_needs_parens(node)
-            || self.yield_needs_parens(node)
+        match node {
+            Node::Expression(_) => self.called_or_accessed_node_needs_parens(node),
+            Node::Conditional(_) => self.conditional_needs_parens(node),
+            Node::Binary(_) => self.binary_node_needs_parens(node),
+            Node::UnaryPrefix(_) | Node::UnaryPostfix(_) => self.unary_node_needs_parens(node),
+            Node::Assignment(_) => self.assignment_needs_parens(node),
+            Node::Literal(_) => self.literal_needs_parens(node),
+            Node::Pipe(_) => self.pipe_node_needs_parens(node),
+            Node::Access(Access::ClassConstant(_)) => self.class_constant_access_needs_parens(node),
+            Node::ArrowFunction(_) => self.arrow_function_needs_parens(node),
+            Node::Construct(_) => self.construct_needs_parens(node),
+            Node::Yield(_) => self.yield_needs_parens(node),
+            _ => false,
+        }
     }
 
     pub(crate) fn should_indent(&self, node: Node<'arena, 'arena>) -> bool {

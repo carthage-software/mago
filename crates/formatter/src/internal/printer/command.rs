@@ -21,7 +21,21 @@ where
 {
     pub indentation: Indentation<'arena>,
     pub mode: Mode,
-    pub document: Document<'arena, A>,
+    pub document: CommandDocument<'arena, A>,
+}
+
+#[derive(Debug, PartialEq, Eq)]
+pub enum CommandDocument<'arena, A: Arena> {
+    Document(&'arena Document<'arena, A>),
+    Array(&'arena [Document<'arena, A>]),
+}
+
+impl<A: Arena> Copy for CommandDocument<'_, A> {}
+
+impl<A: Arena> Clone for CommandDocument<'_, A> {
+    fn clone(&self) -> Self {
+        *self
+    }
 }
 
 impl<'arena> Indentation<'arena> {
@@ -70,7 +84,11 @@ impl<'arena, A> Command<'arena, A>
 where
     A: Arena,
 {
-    pub fn new(indent: Indentation<'arena>, mode: Mode, document: Document<'arena, A>) -> Self {
-        Self { indentation: indent, mode, document }
+    pub fn new(indent: Indentation<'arena>, mode: Mode, document: &'arena Document<'arena, A>) -> Self {
+        Self { indentation: indent, mode, document: CommandDocument::Document(document) }
+    }
+
+    pub fn array(indent: Indentation<'arena>, mode: Mode, documents: &'arena [Document<'arena, A>]) -> Self {
+        Self { indentation: indent, mode, document: CommandDocument::Array(documents) }
     }
 }

@@ -306,40 +306,19 @@ where
     }
 
     let get_printed_arguments = |f: &mut FormatterState<'_, 'arena, A>, should_break: bool, skip_index: isize| {
-        let mut printed_arguments = vec_in![f.arena];
-        let mut length = arguments_count;
         let (arguments_start, arguments_end) = match skip_index {
-            _ if skip_index > 0 => {
-                length -= skip_index as usize;
-                (skip_index as usize, arguments_count)
-            }
-            _ if skip_index < 0 => {
-                length -= (-skip_index) as usize;
-                (0, arguments_count - (-skip_index) as usize)
-            }
+            _ if skip_index > 0 => (skip_index as usize, arguments_count),
+            _ if skip_index < 0 => (0, arguments_count - (-skip_index) as usize),
             _ => (0, arguments_count),
         };
+        let arena = f.arena;
 
-        for (i, arg_idx) in (arguments_start..arguments_end).enumerate() {
-            let element = &argument_list.arguments.as_slice()[arg_idx];
-            let mut argument = vec_in![f.arena; clone_in_arena(f.arena, &formatted_arguments[arg_idx])];
-            if i < (length - 1) {
-                argument.push(Document::String(b","));
-
-                if f.is_next_line_empty(element.span()) {
-                    argument.push(Document::Line(Line::hard()));
-                    argument.push(Document::Line(Line::hard()));
-                } else if should_break {
-                    argument.push(Document::Line(Line::hard()));
-                } else {
-                    argument.push(Document::Line(Line::default()));
-                }
-            }
-
-            printed_arguments.push(Document::Array(argument));
-        }
-
-        printed_arguments
+        print_arguments(
+            f,
+            &argument_list.arguments.as_slice()[arguments_start..arguments_end],
+            formatted_arguments[arguments_start..arguments_end].iter().map(|document| clone_in_arena(arena, document)),
+            should_break,
+        )
     };
 
     let all_arguments_broken_out = |f: &mut FormatterState<'_, 'arena, A>| {
@@ -478,7 +457,7 @@ where
         ]));
     }
 
-    let mut printed_arguments = get_printed_arguments(f, false, 0);
+    let mut printed_arguments = print_arguments(f, argument_list.arguments.as_slice(), formatted_arguments, false);
 
     let group_id = f.next_id();
     printed_arguments.insert(0, Document::Line(Line::soft()));
@@ -489,6 +468,37 @@ where
     contents.push(print_right_parenthesis(f, dangling_comments.as_ref(), &right_parenthesis, None));
 
     Document::Group(Group::new(contents).with_id(group_id))
+}
+
+fn print_arguments<'arena, A>(
+    f: &mut FormatterState<'_, 'arena, A>,
+    arguments: &[PartialArgument<'arena>],
+    documents: impl IntoIterator<Item = Document<'arena, A>>,
+    should_break: bool,
+) -> Vec<'arena, Document<'arena, A>, A>
+where
+    A: Arena,
+{
+    let mut printed_arguments = vec_in![f.arena];
+    for (i, (element, document)) in arguments.iter().zip(documents).enumerate() {
+        let mut argument = vec_in![f.arena; document];
+        if i < arguments.len() - 1 {
+            argument.push(Document::String(b","));
+
+            if f.is_next_line_empty(element.span()) {
+                argument.push(Document::Line(Line::hard()));
+                argument.push(Document::Line(Line::hard()));
+            } else if should_break {
+                argument.push(Document::Line(Line::hard()));
+            } else {
+                argument.push(Document::Line(Line::default()));
+            }
+        }
+
+        printed_arguments.push(Document::Array(argument));
+    }
+
+    printed_arguments
 }
 
 fn should_align_named_arguments<A>(
@@ -564,7 +574,6 @@ where
     A: Arena,
 {
     f.has_comment(argument.span(), CommentFlags::LEADING | CommentFlags::TRAILING)
-        || f.has_comment(argument.span(), CommentFlags::LEADING | CommentFlags::TRAILING)
 }
 
 pub(super) fn print_partial_argument_list<'arena, A>(
