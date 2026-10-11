@@ -143,8 +143,8 @@ final class Protocol
     public const TYPE_COMPARISON_CAN_BE_IDENTICAL = 3;
     private const TYPE_COMPARISON_BATCH_REQUEST = 16;
     private const MAGIC_U32 = 0x4D41_4E41;
-    private const MAJOR = 1;
-    private const MINOR = 1;
+    private const MAJOR = 2;
+    private const MINOR = 0;
     private const VERSION_U32 = (self::MAJOR << 16) | self::MINOR;
     private const DESCRIBE_RESPONSE = 0x8001;
     private const RETURN_TYPE_RESPONSE = 0x8002;
@@ -169,12 +169,12 @@ final class Protocol
     private const MAXIMUM_ISSUE_NOTES = 0x0001_0000;
     private const MAXIMUM_ISSUE_ANNOTATIONS = 0x0001_0000;
     private const MAXIMUM_ISSUE_EDITS = 0x0001_0000;
-    private const RETURN_TYPE_REQUEST_HEADER = "MANA\x00\x01\x00\x01\x00\x02\x00\x00";
-    private const CALLABLE_SIGNATURE_REQUEST_HEADER = "MANA\x00\x01\x00\x01\x00\x0C\x00\x00";
-    private const ASSERTION_REQUEST_HEADER = "MANA\x00\x01\x00\x01\x00\x12\x00\x00";
-    private const UNHANDLED_RETURN_TYPE_RESPONSE = "MANA\x00\x01\x00\x01\x80\x02\x00\x00\x00";
-    private const UNHANDLED_CALLABLE_SIGNATURE_RESPONSE = "MANA\x00\x01\x00\x01\x80\x0C\x00\x00\x00";
-    private const UNHANDLED_ASSERTION_RESPONSE = "MANA\x00\x01\x00\x01\x80\x12\x00\x00\x00";
+    private const RETURN_TYPE_REQUEST_HEADER = "MANA\x00\x02\x00\x00\x00\x02\x00\x00";
+    private const CALLABLE_SIGNATURE_REQUEST_HEADER = "MANA\x00\x02\x00\x00\x00\x0C\x00\x00";
+    private const ASSERTION_REQUEST_HEADER = "MANA\x00\x02\x00\x00\x00\x12\x00\x00";
+    private const UNHANDLED_RETURN_TYPE_RESPONSE = "MANA\x00\x02\x00\x00\x80\x02\x00\x00\x00";
+    private const UNHANDLED_CALLABLE_SIGNATURE_RESPONSE = "MANA\x00\x02\x00\x00\x80\x0C\x00\x00\x00";
+    private const UNHANDLED_ASSERTION_RESPONSE = "MANA\x00\x02\x00\x00\x80\x12\x00\x00\x00";
     private const INVOCATION_FUNCTION = 1;
     private const INVOCATION_INSTANCE_METHOD = 2;
     private const INVOCATION_STATIC_METHOD = 3;
@@ -1118,6 +1118,11 @@ final class Protocol
             $writer->writeBoolean($parameter->closureThisType !== null);
             if ($parameter->closureThisType !== null) {
                 $writer->writeRaw($parameter->closureThisType->encode());
+            }
+
+            $writer->writeBoolean($parameter->outType !== null);
+            if ($parameter->outType !== null) {
+                $writer->writeRaw($parameter->outType->encode());
             }
 
             $flags = 0;

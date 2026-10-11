@@ -298,7 +298,12 @@ impl TType for TCallable {
             }
 
             for parameter in signature.parameters.iter() {
-                if let Some(parameter_type) = parameter.get_type_signature() {
+                for parameter_type in parameter
+                    .get_type_signature()
+                    .into_iter()
+                    .chain(parameter.get_out_type())
+                    .chain(parameter.get_closure_this_type())
+                {
                     children.push(TypeRef::Union(parameter_type));
                 }
             }
@@ -314,10 +319,14 @@ impl TType for TCallable {
         match self {
             TCallable::Signature(signature) => {
                 signature.return_type.as_ref().is_some_and(|ty| ty.needs_population())
-                    || signature
-                        .parameters
-                        .iter()
-                        .any(|param| param.get_type_signature().is_some_and(super::super::TType::needs_population))
+                    || signature.parameters.iter().any(|param| {
+                        param
+                            .get_type_signature()
+                            .into_iter()
+                            .chain(param.get_out_type())
+                            .chain(param.get_closure_this_type())
+                            .any(super::super::TType::needs_population)
+                    })
                     || signature.constraints.iter().any(|constraint| {
                         constraint.input_type.needs_population() || constraint.parameter_type.needs_population()
                     })
@@ -331,10 +340,14 @@ impl TType for TCallable {
             TCallable::Alias(_) => true,
             TCallable::Signature(signature) => {
                 signature.return_type.as_ref().is_some_and(|ty| ty.is_expandable())
-                    || signature
-                        .parameters
-                        .iter()
-                        .any(|param| param.get_type_signature().is_some_and(super::super::TType::is_expandable))
+                    || signature.parameters.iter().any(|param| {
+                        param
+                            .get_type_signature()
+                            .into_iter()
+                            .chain(param.get_out_type())
+                            .chain(param.get_closure_this_type())
+                            .any(super::super::TType::is_expandable)
+                    })
                     || signature.constraints.iter().any(|constraint| {
                         constraint.input_type.is_expandable() || constraint.parameter_type.is_expandable()
                     })
@@ -494,5 +507,81 @@ mod tests {
         assert_eq!(left.cmp(&right), right.cmp(&left).reverse());
         assert_eq!(HashSet::from([left.clone(), right.clone(), left.clone()]).len(), 2);
         assert_eq!(BTreeSet::from([left.clone(), right.clone(), left]).len(), 2);
+    }
+
+    #[test]
+    fn callable_out_types_participate_in_identity_and_traversal() {
+        use crate::metadata::CodebaseMetadata;
+        use crate::reference::SymbolReferences;
+        use crate::symbol::SymbolKind;
+        use crate::ttype::atomic::TAtomic;
+        use crate::ttype::atomic::object::{TObject, named::TNamedObject};
+        use crate::ttype::atomic::populate_atomic_type;
+        use crate::ttype::atomic::reference::TReference;
+
+        let named = |name| TUnion::from_atomic(TAtomic::Object(TObject::Named(TNamedObject::new(word(name)))));
+        let parameter = TCallableParameter::new(None, true, false, false);
+        let left = parameter.clone().with_out_type(Some(Arc::new(named("FirstBase"))));
+        let right = parameter.clone().with_out_type(Some(Arc::new(named("SecondBase"))));
+        assert_ne!(left, right);
+        assert_ne!(left.cmp(&right), Ordering::Equal);
+        assert_eq!(HashSet::from([left.clone(), right.clone(), left.clone()]).len(), 2);
+        assert_eq!(BTreeSet::from([left.clone(), right, left]).len(), 2);
+
+        let reference = TUnion::from_atomic(TAtomic::Reference(TReference::Symbol {
+            name: word("Output"),
+            parameters: None,
+            variances: None,
+            intersection_types: None,
+        }));
+        let parameter =
+            parameter.with_out_type(Some(Arc::new(reference))).with_closure_this_type(Some(Arc::new(named("parent"))));
+        let mut atomic = TAtomic::Callable(TCallable::Signature(
+            TCallableSignature::new(false, true).with_parameters(vec![parameter]),
+        ));
+        assert!(atomic.needs_population());
+        assert!(atomic.is_expandable());
+        assert!(atomic.any_child_node(|node| matches!(node, TypeRef::Atomic(TAtomic::Reference(_)))));
+
+        let mut codebase = CodebaseMetadata::new();
+        codebase.symbols.add_symbol_name(word("output"), SymbolKind::Class);
+        populate_atomic_type(&mut atomic, &codebase.symbols, None, &mut SymbolReferences::new(), false);
+        let TAtomic::Callable(TCallable::Signature(signature)) = atomic else { panic!("callable signature") };
+        assert_eq!(signature.parameters[0].get_out_type(), Some(&named("Output")));
+    }
+
+    #[test]
+    fn callable_effects_follow_inferred_templates() {
+        use crate::metadata::CodebaseMetadata;
+        use crate::misc::GenericParent;
+        use crate::ttype::atomic::TAtomic;
+        use crate::ttype::atomic::generic::TGenericParameter;
+        use crate::ttype::get_int;
+        use crate::ttype::get_mixed;
+        use crate::ttype::template::{TemplateResult, inferred_type_replacer};
+
+        let parent = GenericParent::ClassLike(word("Factory"));
+        let template = Arc::new(TUnion::from_atomic(TAtomic::GenericParameter(TGenericParameter::new(
+            word("T"),
+            Arc::new(get_mixed()),
+            parent,
+        ))));
+        let parameter = TCallableParameter::new(None, true, false, false)
+            .with_out_type(Some(Arc::clone(&template)))
+            .with_closure_this_type(Some(template));
+        let original = TUnion::from_atomic(TAtomic::Callable(TCallable::Signature(
+            TCallableSignature::new(false, true).with_parameters(vec![parameter]),
+        )));
+        assert!(original.has_template_types());
+        let mut templates = TemplateResult::default();
+        templates.add_lower_bound(word("T"), parent, get_int());
+        let replaced = inferred_type_replacer::replace(&original, &templates, &CodebaseMetadata::new());
+        let TAtomic::Callable(TCallable::Signature(signature)) = &replaced.types[0] else {
+            panic!("callable signature")
+        };
+        assert_eq!(signature.parameters[0].get_out_type(), Some(&get_int()));
+        assert_eq!(signature.parameters[0].get_closure_this_type(), Some(&get_int()));
+        assert!(original.has_template_types());
+        assert!(!replaced.has_template_types());
     }
 }

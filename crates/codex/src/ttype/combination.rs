@@ -1,13 +1,12 @@
 use std::collections::BTreeMap;
 
-use foldhash::{HashMap, HashSet};
+use foldhash::HashSet;
 use ordered_float::OrderedFloat;
 
 use mago_word::Word;
 use mago_word::WordMap;
 use mago_word::WordSet;
 
-use crate::identifier::function_like::FunctionLikeIdentifier;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::array::TArray;
 use crate::ttype::atomic::array::key::ArrayKey;
@@ -141,7 +140,7 @@ impl CombinationFlags {
 pub struct TypeCombination {
     pub flags: CombinationFlags,
     pub value_types: WordMap<TAtomic>,
-    pub callable_collisions: HashMap<(Word, Option<FunctionLikeIdentifier>), TAtomic>,
+    pub callable_collisions: WordMap<Vec<TAtomic>>,
     pub enum_names: HashSet<(Word, Option<Word>)>,
     pub object_type_params: WordMap<(Word, Vec<TUnion>)>,
     pub object_static: WordMap<bool>,
@@ -171,7 +170,7 @@ impl TypeCombination {
         Self {
             flags,
             value_types: WordMap::default(),
-            callable_collisions: HashMap::default(),
+            callable_collisions: WordMap::default(),
             object_type_params: WordMap::default(),
             object_static: WordMap::default(),
             keyed_array_entries: BTreeMap::new(),

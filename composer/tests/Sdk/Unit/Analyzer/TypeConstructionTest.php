@@ -31,7 +31,7 @@ use PHPUnit\Framework\TestCase;
 
 final class TypeConstructionTest extends TestCase
 {
-    public function testCallableParameterClosureThisTypeDecodesFromSnapshot(): void
+    public function testCallableParameterEffectsDecodeFromSnapshot(): void
     {
         $writer = new PayloadWriter();
         $writer->writeU32(0);
@@ -47,29 +47,27 @@ final class TypeConstructionTest extends TestCase
         $writer->writeBoolean(false);
         $writer->writeBoolean(true);
         $writer->writeU32(1);
-        $writer->writeU16(0);
-        $writer->writeLength(1);
-        $writer->writeU8(4);
-        $writer->writeU8(2);
-        $writer->writeBytes('ClosureCommand');
-        $writer->writeBoolean(false);
-        $writer->writeBoolean(false);
-        $writer->writeBoolean(false);
-        $writer->writeBoolean(false);
-        $writer->writeBoolean(false);
-        $writer->writeBoolean(false);
-        $writer->writeBoolean(false);
+        TypeCodec::writeComplete($writer, Type::namedObject('ClosureCommand'));
+        $writer->writeBoolean(true);
+        $writer->writeU32(2);
+        TypeCodec::writeComplete($writer, Type::namedObject('Result'));
+        $writer->writeBoolean(true);
         $writer->writeBoolean(false);
         $writer->writeBoolean(false);
         $writer->writeBoolean(false);
         $writer->writeBoolean(false);
         $writer->writeLength(0);
 
-        $decoded = TypeCodec::readComplete(new PayloadReader($writer->finish()));
+        $reader = new PayloadReader($writer->finish());
+        $decoded = TypeCodec::readComplete($reader);
+        $reader->finish();
         $callable = $decoded->atomicTypes[0];
         self::assertInstanceOf(CallableType::class, $callable);
         self::assertNotNull($callable->signature);
-        self::assertSame('ClosureCommand', (string) $callable->signature->parameters[0]->closureThisType);
+        $parameter = $callable->signature->parameters[0];
+        self::assertSame('ClosureCommand', (string) $parameter->closureThisType);
+        self::assertSame('Result', (string) $parameter->outType);
+        self::assertTrue($parameter->byReference);
     }
 
     public function testInvalidStructuredTypesFailBeforeEncoding(): void

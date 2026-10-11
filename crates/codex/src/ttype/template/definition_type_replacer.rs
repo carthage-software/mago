@@ -223,6 +223,17 @@ fn replace_atomic(
                         DefinitionReplacementOptions { add_lower_bound: !opts.add_lower_bound, ..opts },
                     );
                 }
+                if let Some(out_type) = parameter.get_out_type_mut() {
+                    *out_type = self::replace(out_type, template_result, codebase, next_opts);
+                }
+                if let Some(closure_this_type) = parameter.get_closure_this_type_mut() {
+                    *closure_this_type = self::replace(
+                        closure_this_type,
+                        template_result,
+                        codebase,
+                        DefinitionReplacementOptions { add_lower_bound: !opts.add_lower_bound, ..opts },
+                    );
+                }
             }
 
             if let Some(return_type) = signature.get_return_type_mut() {

@@ -875,6 +875,12 @@ pub fn populate_atomic_type(
                 if let Some(param_type) = param.get_type_signature_mut() {
                     populate!(union param_type);
                 }
+                if let Some(out_type) = param.get_out_type_mut() {
+                    populate!(union out_type);
+                }
+                if let Some(closure_this_type) = param.get_closure_this_type_mut() {
+                    populate!(union closure_this_type);
+                }
             }
 
             for constraint in Arc::make_mut(&mut signature.constraints).iter_mut() {
