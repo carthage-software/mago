@@ -44,6 +44,8 @@ use crate::service::telemetry::SlowestFiles;
 #[cfg(not(target_arch = "wasm32"))]
 use crate::service::telemetry::measure;
 
+const LARGE_FILE_SIZE: u32 = 128 * 1024;
+
 // No-op `measure!` stub for wasm so the pipeline body compiles without
 // pulling in the telemetry module. On wasm `trace_enabled` is always
 // `false`, so the body just runs and `$out` is never actually read.
@@ -237,7 +239,8 @@ where
         let source_count = source_files.len();
 
         // Start large files early, then restore database order before merging.
-        if rayon::current_num_threads() > 1 {
+        let parallel = rayon::current_num_threads() > 1;
+        if parallel {
             source_files.sort_unstable_by_key(|(index, file)| (Reverse(file.size), *index));
         }
 
@@ -247,8 +250,13 @@ where
             compile_parallel_duration,
             map_with_priority_queue(
                 &source_files,
-                LocalArena::new,
-                |arena, (index, file)| -> Result<_, OrchestratorError> {
+                || (LocalArena::new(), 0u32),
+                |(arena, previous_size), (index, file)| -> Result<_, OrchestratorError> {
+                    if parallel && *previous_size > LARGE_FILE_SIZE && file.size <= LARGE_FILE_SIZE {
+                        *arena = LocalArena::new();
+                    }
+                    *previous_size = file.size;
+
                     let program = parse_file_borrowed_with_settings(arena, file, parser_settings);
                     if program.has_errors() {
                         tracing::warn!(
@@ -374,35 +382,44 @@ where
         let mut results: Vec<(usize, I)> = measure!(
             trace_enabled,
             analyze_parallel_duration,
-            map_with_priority_queue(&host_files, LocalArena::new, |arena, (index, file)| {
-                let file = Arc::clone(file);
-                let context = self.shared_context.clone();
-                let codebase = Arc::clone(&final_codebase);
+            map_with_priority_queue(
+                &host_files,
+                || (LocalArena::new(), 0u32),
+                |(arena, previous_size), (index, file)| {
+                    if *previous_size > LARGE_FILE_SIZE && file.size <= LARGE_FILE_SIZE {
+                        *arena = LocalArena::new();
+                    }
+                    *previous_size = file.size;
 
-                #[cfg(not(target_arch = "wasm32"))]
-                let file_for_record = trace_enabled.then(|| Arc::clone(&file));
-                #[cfg(not(target_arch = "wasm32"))]
-                let file_start = trace_enabled.then(Instant::now);
+                    let file = Arc::clone(file);
+                    let context = self.shared_context.clone();
+                    let codebase = Arc::clone(&final_codebase);
 
-                #[cfg(not(target_arch = "wasm32"))]
-                let _hang_guard = hang_watcher.as_ref().map(|w| w.track(Arc::clone(&file)));
+                    #[cfg(not(target_arch = "wasm32"))]
+                    let file_for_record = trace_enabled.then(|| Arc::clone(&file));
+                    #[cfg(not(target_arch = "wasm32"))]
+                    let file_start = trace_enabled.then(Instant::now);
 
-                let result = map_function(context, arena, file, codebase);
+                    #[cfg(not(target_arch = "wasm32"))]
+                    let _hang_guard = hang_watcher.as_ref().map(|w| w.track(Arc::clone(&file)));
 
-                #[cfg(not(target_arch = "wasm32"))]
-                if let (Some(sink), Some(start), Some(recorded_file)) =
-                    (slowest_files_for_closure.as_ref(), file_start, file_for_record)
-                {
-                    sink.record(start.elapsed(), recorded_file);
+                    let result = map_function(context, arena, file, codebase);
+
+                    #[cfg(not(target_arch = "wasm32"))]
+                    if let (Some(sink), Some(start), Some(recorded_file)) =
+                        (slowest_files_for_closure.as_ref(), file_start, file_for_record)
+                    {
+                        sink.record(start.elapsed(), recorded_file);
+                    }
+
+                    arena.reset();
+                    if let Some(main_task_bar) = &main_task_bar {
+                        main_task_bar.inc(1);
+                    }
+
+                    result.map(|result| (*index, result))
                 }
-
-                arena.reset();
-                if let Some(main_task_bar) = &main_task_bar {
-                    main_task_bar.inc(1);
-                }
-
-                result.map(|result| (*index, result))
-            })?
+            )?
         );
 
         results.sort_unstable_by_key(|(index, _)| *index);

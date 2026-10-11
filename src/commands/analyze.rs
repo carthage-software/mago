@@ -342,10 +342,9 @@ impl AnalyzeCommand {
 
         let service_run_start = trace_enabled.then(Instant::now);
         let service = orchestrator.get_analysis_service(database.read_only(), metadata, symbol_references);
-        let analysis_result = service.run()?;
+        let mut issues = service.run_issues()?;
         let service_run_duration = service_run_start.map(|s| s.elapsed());
         let report_start = trace_enabled.then(Instant::now);
-        let mut issues = analysis_result.issues;
         let ignore_set = self.compile_ignore_set(&configuration);
 
         issues.filter_out_ignored(&ignore_set, |file_id| {

@@ -238,6 +238,19 @@ impl AnalysisService {
     ///
     /// Returns [`OrchestratorError`] when scanning, codebase population, or per-file analysis fails.
     pub fn run(self) -> Result<AnalysisResult, OrchestratorError> {
+        self.run_inner(true)
+    }
+
+    /// Runs analysis and returns issues, releasing project references when plugins do not need them.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`OrchestratorError`] when scanning, codebase population, or per-file analysis fails.
+    pub fn run_issues(self) -> Result<IssueCollection, OrchestratorError> {
+        self.run_inner(false).map(|result| result.issues)
+    }
+
+    fn run_inner(self, retain_project_references: bool) -> Result<AnalysisResult, OrchestratorError> {
         const ANALYSIS_PROGRESS_PREFIX: &str = "🔬 Analyzing";
 
         #[cfg(not(target_arch = "wasm32"))]
@@ -245,6 +258,8 @@ impl AnalysisService {
             Duration::from_millis(u64::from(self.settings.slow_file_warning_threshold_ms));
         let external_session =
             self.plugin_registry.create_external_analysis_session(self.database.files()).map(Arc::new);
+        let retain_project_references =
+            retain_project_references || self.plugin_registry.has_custom_plugins() || external_session.is_some();
         let codebase_scan_plan =
             self.plugin_registry.external_codebase_scan_plan().map_err(AnalysisError::from)?.map(Arc::new);
         let lifecycle_capabilities = Arc::new(OnceLock::new());
@@ -317,6 +332,9 @@ impl AnalysisService {
                 if !before.references.is_empty() {
                     symbol_references.extend(before.references.clone());
                     let _result = before_additional_symbol_references.set(Arc::new(before.references));
+                }
+                if !retain_project_references {
+                    *symbol_references = SymbolReferences::new();
                 }
                 let issues = before.issues;
 
@@ -399,7 +417,12 @@ impl AnalysisService {
 
                 #[cfg(not(target_arch = "wasm32"))]
                 let analyze_start = trace_enabled.then(Instant::now);
-                let artifacts = analyzer.analyze_with_artifacts(program, &mut analysis_result)?;
+                let artifacts = if after_file || after_analysis {
+                    Some(analyzer.analyze_with_artifacts(program, &mut analysis_result)?)
+                } else {
+                    analyzer.analyze(program, &mut analysis_result)?;
+                    None
+                };
                 #[cfg(not(target_arch = "wasm32"))]
                 if let Some(start) = analyze_start {
                     telemetry_for_closure.analyze_ns.fetch_add(start.elapsed().as_nanos() as u64, Relaxed);
@@ -423,13 +446,13 @@ impl AnalysisService {
 
                 #[cfg(not(target_arch = "wasm32"))]
                 let snapshot_start = (trace_enabled && (after_file || after_analysis)).then(Instant::now);
-                let snapshot = if after_file || after_analysis {
+                let snapshot = if let Some(artifacts) = &artifacts {
                     Some(Arc::new(
                         FileAnalysisSnapshot::new(
                             &source_file,
                             program,
                             &resolved_names,
-                            &artifacts,
+                            artifacts,
                             &codebase,
                             node_analysis_requirements.as_ref(),
                         )
@@ -447,6 +470,9 @@ impl AnalysisService {
                     telemetry_for_closure.snapshots.fetch_add(1, Relaxed);
                 }
 
+                if !retain_project_references {
+                    analysis_result.symbol_references = SymbolReferences::new();
+                }
                 Ok(AnalysisTaskResult { result: analysis_result, snapshot })
             },
         );
