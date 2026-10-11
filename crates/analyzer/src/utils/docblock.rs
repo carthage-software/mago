@@ -444,7 +444,7 @@ pub fn check_docblock_type_incompatibility<A>(
                         .with_message(format!("This docblock asserts the type should be `{docblock_type_str}`...")),
                 )
         } else {
-            Issue::error("Docblock type mismatch for expression.".to_string()).with_annotation(
+            Issue::error("Docblock type mismatch for expression.").with_annotation(
                 Annotation::primary(dockblock_type_span)
                     .with_message(format!("This docblock asserts the type should be `{docblock_type_str}`...")),
             )
@@ -496,7 +496,7 @@ pub fn check_docblock_type_incompatibility<A>(
                     "This docblock asserts the type should be `{docblock_type_str}`, which is identical to the inferred type."
                 )))
         } else {
-            Issue::warning("Redundant docblock type for expression.".to_string()).with_annotation(
+            Issue::warning("Redundant docblock type for expression.").with_annotation(
                 Annotation::primary(dockblock_type_span).with_message(format!(
                     "This docblock asserts the type should be `{docblock_type_str}`, which is identical to the inferred type."
                 )),

@@ -1,3 +1,4 @@
+use std::borrow::Cow;
 use std::collections::hash_map::Entry;
 use std::rc::Rc;
 
@@ -197,6 +198,13 @@ pub fn verify_argument_type<'arena, A>(
     A: Arena,
 {
     let target_kind_str = invocation_target.guess_kind();
+    let call_site_message = || match target_kind_str {
+        "function" => Cow::Borrowed("Arguments to this function are incorrect"),
+        "method" => Cow::Borrowed("Arguments to this method are incorrect"),
+        "closure" => Cow::Borrowed("Arguments to this closure are incorrect"),
+        "callable" => Cow::Borrowed("Arguments to this callable are incorrect"),
+        _ => Cow::Owned(format!("Arguments to this {target_kind_str} are incorrect")),
+    };
     let effective_parameter_name = invocation_target.get_effective_parameter_name(argument_offset);
     let argument_subject = || {
         effective_parameter_name.map_or_else(
@@ -236,8 +244,7 @@ pub fn verify_argument_type<'arena, A>(
             let argument_subject = argument_subject();
             let target_name_str = invocation_target.guess_name(context);
             let parameter_type_str = parameter_type.get_id();
-            let call_site = Annotation::secondary(invocation_target.span())
-                .with_message(format!("Arguments to this {target_kind_str} are incorrect"));
+            let call_site = Annotation::secondary(invocation_target.span()).with_message(call_site_message());
             context.collector.report_with_code(
                 IssueCode::NullArgument,
                 Issue::error(format!(
@@ -258,8 +265,7 @@ pub fn verify_argument_type<'arena, A>(
             let target_name_str = invocation_target.guess_name(context);
             let input_type_str = input_type.get_id();
             let parameter_type_str = parameter_type.get_id();
-            let call_site = Annotation::secondary(invocation_target.span())
-                .with_message(format!("Arguments to this {target_kind_str} are incorrect"));
+            let call_site = Annotation::secondary(invocation_target.span()).with_message(call_site_message());
             context.collector.report_with_code(
                 IssueCode::PossiblyNullArgument,
                 Issue::error(format!(
@@ -280,8 +286,7 @@ pub fn verify_argument_type<'arena, A>(
             let argument_subject = argument_subject();
             let target_name_str = invocation_target.guess_name(context);
             let parameter_type_str = parameter_type.get_id();
-            let call_site = Annotation::secondary(invocation_target.span())
-                .with_message(format!("Arguments to this {target_kind_str} are incorrect"));
+            let call_site = Annotation::secondary(invocation_target.span()).with_message(call_site_message());
             context.collector.report_with_code(
                 IssueCode::FalseArgument,
                 Issue::error(format!(
@@ -302,8 +307,7 @@ pub fn verify_argument_type<'arena, A>(
             let target_name_str = invocation_target.guess_name(context);
             let input_type_str = input_type.get_id();
             let parameter_type_str = parameter_type.get_id();
-            let call_site = Annotation::secondary(invocation_target.span())
-                .with_message(format!("Arguments to this {target_kind_str} are incorrect"));
+            let call_site = Annotation::secondary(invocation_target.span()).with_message(call_site_message());
             context.collector.report_with_code(
                 IssueCode::PossiblyFalseArgument,
                 Issue::error(format!(
@@ -334,8 +338,7 @@ pub fn verify_argument_type<'arena, A>(
     let target_name_str = invocation_target.guess_name(context);
     let input_type_str = input_type.get_id();
     let parameter_type_str = parameter_type.get_id();
-    let call_site = Annotation::secondary(invocation_target.span())
-        .with_message(format!("Arguments to this {target_kind_str} are incorrect"));
+    let call_site = Annotation::secondary(invocation_target.span()).with_message(call_site_message());
 
     if input_type.is_mixed() {
         context.collector.report_with_code(
@@ -348,8 +351,11 @@ pub fn verify_argument_type<'arena, A>(
                 input_type_str
             ))
             .with_annotation(
-                Annotation::primary(input_expression.span())
-                    .with_message(format!("Argument has type `{input_type_str}`")),
+                Annotation::primary(input_expression.span()).with_message(if input_type_str.as_bytes() == b"mixed" {
+                    Cow::Borrowed("Argument has type `mixed`")
+                } else {
+                    Cow::Owned(format!("Argument has type `{input_type_str}`"))
+                }),
             )
             .with_annotation(call_site)
             .with_note(format!(

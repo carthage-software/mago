@@ -1564,9 +1564,7 @@ fn report_impossible_issue<A>(
     context.collector.report_with_code(
         issue_kind,
         Issue::warning(format!("Impossible condition: variable {subject_desc} {main_message_verb}."))
-            .with_annotation(
-                Annotation::primary(*span).with_message("This condition always evaluates to false".to_string()),
-            )
+            .with_annotation(Annotation::primary(*span).with_message("This condition always evaluates to false"))
             .with_note(specific_note)
             .with_help(specific_help),
     );
@@ -1649,9 +1647,7 @@ fn report_redundant_issue<A>(
     context.collector.report_with_code(
         issue_kind,
         Issue::help(format!("Redundant condition: variable {subject_desc} {main_message_verb}."))
-            .with_annotation(
-                Annotation::primary(*span).with_message("This condition always evaluates to true".to_string()),
-            )
+            .with_annotation(Annotation::primary(*span).with_message("This condition always evaluates to true"))
             .with_note(specific_note)
             .with_help(specific_help),
     );

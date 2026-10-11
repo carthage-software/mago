@@ -265,9 +265,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPrefix<'arena> {
                     };
 
                     let mut issue = if is_definitely_invalid {
-                        Issue::error("Invalid operand for negation.".to_string())
+                        Issue::error("Invalid operand for negation.")
                     } else {
-                        Issue::warning("Possibly invalid operand for negation.".to_string())
+                        Issue::warning("Possibly invalid operand for negation.")
                     };
 
                     let mut is_first = true;
@@ -1146,7 +1146,7 @@ where
                     // Reuse flag to avoid spamming for mixed as well
                     context.collector.report_with_code(
                         IssueCode::InvalidTypeCast,
-                        Issue::warning("Casting `mixed` to `array`.".to_string())
+                        Issue::warning("Casting `mixed` to `array`.")
                             .with_annotation(Annotation::primary(cast_expression.operand.span()).with_message("This expression has type `mixed`"))
                             .with_note("The structure and element types of the resulting array cannot be determined statically when casting `mixed`.")
                             .with_help("Ensure the value is an array or use type checks before casting if a specific array structure is expected."),
@@ -1220,7 +1220,7 @@ where
         if atomic_type.is_mixed() {
             context.collector.report_with_code(
                 IssueCode::MixedOperand,
-                Issue::warning("Casting `mixed` to `bool`.".to_string()) // Warning, as it's a valid cast but loses type info
+                Issue::warning("Casting `mixed` to `bool`.") // Warning, as it's a valid cast but loses type info
                     .with_annotation(Annotation::primary(cast_expression.operand.span()).with_message("This expression has type `mixed`"))
                     .with_note("The truthiness of `mixed` cannot be determined statically. The result will be a general `bool`.")
                     .with_help("Consider adding type assertions or checks if a more specific boolean outcome is expected."),
@@ -1328,7 +1328,7 @@ where
                     TScalar::ClassLikeString(_) => {
                         context.collector.report_with_code(
                             IssueCode::InvalidTypeCast,
-                            Issue::warning("Class-like string implicitly cast to float `0.0`.".to_string())
+                            Issue::warning("Class-like string implicitly cast to float `0.0`.")
                                 .with_annotation(
                                     Annotation::primary(cast_expression.operand.span())
                                         .with_message("Class-string cast to float"),
@@ -1372,7 +1372,7 @@ where
             TAtomic::Resource(_) => {
                 context.collector.report_with_code(
                     IssueCode::InvalidTypeCast,
-                    Issue::warning("Implicit conversion of `resource` to `float` (its ID).".to_string())
+                    Issue::warning("Implicit conversion of `resource` to `float` (its ID).")
                         .with_annotation(Annotation::primary(cast_expression.operand.span()).with_message("Resource ID used as float"))
                         .with_note("PHP converts resources to their numeric ID when cast to float. This is rarely the intended behavior.")
                         .with_help("Avoid casting resources directly to float. Use resource-specific functions to get relevant numeric data if needed."),
@@ -1384,7 +1384,7 @@ where
             TAtomic::Mixed(_) => {
                 context.collector.report_with_code(
                     IssueCode::InvalidTypeCast,
-                    Issue::warning("Casting `mixed` to `float`.".to_string())
+                    Issue::warning("Casting `mixed` to `float`.")
                         .with_annotation(Annotation::primary(cast_expression.operand.span()).with_message("This expression has type `mixed`"))
                         .with_note("The float value of `mixed` cannot be determined statically. The result will be a general `float`.")
                         .with_help("Consider adding type assertions or checks if a more specific float outcome is expected."),

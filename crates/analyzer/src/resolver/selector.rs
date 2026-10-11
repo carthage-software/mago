@@ -224,7 +224,7 @@ where
                 issue_kind,
                 Issue::warning(format!("This {kind_str} selector uses a non-literal string type (`{atomic_type_id}`); its specific value cannot be statically determined."))
                     .with_annotation(Annotation::primary(selector_span).with_message(format!("This expression (type `{atomic_type_id}`) provides the {kind_str} name")))
-                    .with_note("While this may work at runtime, its existence and type cannot be checked statically.".to_string())
+                    .with_note("While this may work at runtime, its existence and type cannot be checked statically.")
             );
 
             resolved_selectors.push(ResolvedSelector::GenericString);

@@ -348,7 +348,7 @@ pub fn handle_return_value<'ctx, A>(
                         .with_message("Type inferred as `mixed` here.")
                 )
                 .with_note(
-                    "The analysis could not determine a specific type for the value returned here, resulting in `mixed`. This can happen with complex code paths or unannotated data.".to_string()
+                    "The analysis could not determine a specific type for the value returned here, resulting in `mixed`. This can happen with complex code paths or unannotated data."
                 )
                 .with_help(
                     "Add specific type hints to variables, parameters, or properties involved in calculating the return value. Consider adding a specific return type declaration to the function signature to catch potential mismatches earlier."
@@ -395,7 +395,7 @@ pub fn handle_return_value<'ctx, A>(
                         .with_message(format!("Return type declared as non-nullable `{expected_return_type_str}` here."))
                 )
                 .with_note(
-                    "The declared return type does not permit null, but the analysis indicates that 'null' or a nullable type could be returned from this path.".to_string()
+                    "The declared return type does not permit null, but the analysis indicates that 'null' or a nullable type could be returned from this path."
                 )
                 .with_help(
                     format!(
@@ -531,7 +531,7 @@ pub fn handle_return_value<'ctx, A>(
                     .with_message(format!("Return type declared as `{expected_return_type_str}` here."))
             )
             .with_note(
-                "The declared return type does not permit 'void', but the analysis indicates that this function path does not return a value.".to_string()
+                "The declared return type does not permit 'void', but the analysis indicates that this function path does not return a value."
             )
             .with_help(
                 format!(

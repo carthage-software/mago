@@ -427,9 +427,9 @@ where
             if has_valid_left_operand { IssueCode::PossiblyInvalidOperand } else { IssueCode::InvalidOperand };
 
         let mut issue = if has_valid_left_operand {
-            Issue::warning("Possibly invalid type for left operand.".to_string())
+            Issue::warning("Possibly invalid type for left operand.")
         } else {
-            Issue::error("Invalid type for left operand.".to_string())
+            Issue::error("Invalid type for left operand.")
         };
 
         let mut is_first = true;
@@ -461,9 +461,9 @@ where
             if has_valid_right_operand { IssueCode::PossiblyInvalidOperand } else { IssueCode::InvalidOperand };
 
         let mut issue = if has_valid_right_operand {
-            Issue::warning("Possibly invalid type for right operand.".to_string())
+            Issue::warning("Possibly invalid type for right operand.")
         } else {
-            Issue::error("Invalid type for right operand.".to_string())
+            Issue::error("Invalid type for right operand.")
         };
 
         let mut is_first = true;
