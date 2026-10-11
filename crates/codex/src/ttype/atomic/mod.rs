@@ -4,6 +4,7 @@ use mago_word::Word;
 use mago_word::concat_word;
 use mago_word::word;
 
+use crate::consts::POSSIBLY_FALSY_CLASS_NAMES;
 use crate::metadata::CodebaseMetadata;
 use crate::reference::ReferenceSource;
 use crate::reference::SymbolReferences;
@@ -561,11 +562,11 @@ impl TAtomic {
             TAtomic::Array(array) => array.is_truthy(),
             TAtomic::Mixed(mixed) => mixed.is_truthy(),
             TAtomic::Resource(resource) => resource.closed.is_none_or(|closed| !closed),
-            // An empty `SimpleXMLElement` (or `SimpleXMLIterator`) casts to `false`,
-            // so it is neither always truthy nor always falsy.
+            // Instances of some classes (e.g. an empty `SimpleXMLElement`) can cast to `false`,
+            // so they are neither always truthy nor always falsy.
             TAtomic::Object(TObject::Named(named_object)) => {
                 let name = named_object.name.as_bytes().strip_prefix(b"\\").unwrap_or(named_object.name.as_bytes());
-                if name.eq_ignore_ascii_case(b"SimpleXMLElement") || name.eq_ignore_ascii_case(b"SimpleXMLIterator") {
+                if POSSIBLY_FALSY_CLASS_NAMES.iter().any(|class_name| name.eq_ignore_ascii_case(class_name)) {
                     return false;
                 }
 

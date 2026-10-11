@@ -275,6 +275,7 @@ fn simplexml_truthiness() {
     assert!(!t_named("SimpleXMLIterator").is_truthy());
     assert!(!t_named("SimpleXMLElement").is_falsy());
     assert!(!t_named("SimpleXMLIterator").is_falsy());
+    assert!(!t_named("simplexmlelement").is_truthy());
     assert!(t_named("stdClass").is_truthy());
     assert!(t_object_any().is_truthy());
 }
