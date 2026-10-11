@@ -237,6 +237,7 @@ At most one patch may target a given symbol. If two patches target the same symb
 - Method signatures: parameter types, return type, `@throws`, `@template`, and `@psalm-assert`-style assertions. Each field is applied only when the patch specifies it, so a sparsely-typed patch never erases richer information already known.
 - Property and constant types.
 - Class-level `@template` declarations (existing ones are refined by name, new ones are appended) and type aliases.
+- Generic parent bindings through `@extends` and `@implements`. The patch replaces the type arguments for each parent it names and keeps the other bindings.
 - Magic members: `@method`, `@property`, `@property-read`, and `@property-write` annotations may be added even when no such member exists on the original, because they are pure type annotations for `__call`/`__get`/`__set`.
 
 **What a patch may not change**

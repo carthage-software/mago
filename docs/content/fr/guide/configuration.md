@@ -169,12 +169,13 @@ Pour les épinglages exacts, cela résout directement vers ce tag de release. Po
 
 La section `[source]` contrôle la manière dont Mago découvre et traite les fichiers.
 
-### Trois catégories de chemins
+### Quatre catégories de chemins
 
-Mago distingue votre code, le code tiers et le code à ignorer entièrement :
+Mago distingue votre code, le code tiers, les correctifs de types et le code à ignorer entièrement :
 
 - **`paths`** sont vos fichiers source. Mago les analyse, les linte et les formate.
-- **`includes`** sont les dépendances (généralement `vendor`). Mago les analyse pour pouvoir résoudre les symboles et les types, mais ne les analyse, ne les linte ni ne les réécrit jamais.
+- **`includes`** sont les dépendances (généralement `vendor`). Mago les lit pour résoudre les symboles et les types, mais ne les analyse, ne les linte ni ne les réécrit.
+- **`patches`** sont des fichiers PHP qui corrigent les types du code tiers ou du code intégré. Leurs déclarations de types et leur PHPDoc prennent la priorité, mais Mago ne les analyse, ne les linte ni ne les formate. Voir [Corriger les types du code tiers](#corriger-les-types-du-code-tiers).
 - **`excludes`** sont des chemins ou des globs que Mago ignore entièrement. Ils s'appliquent à chaque outil.
 
 Si un fichier correspond à la fois à `paths` et à `includes`, le motif le plus spécifique l'emporte. Les chemins de fichier exacts sont les plus spécifiques, puis les chemins de répertoires plus profonds, puis les moins profonds, puis les motifs glob. Quand les motifs sont également spécifiques, `includes` l'emporte, ce qui vous permet de marquer explicitement un chemin comme dépendance.
@@ -182,16 +183,18 @@ Si un fichier correspond à la fois à `paths` et à `includes`, le motif le plu
 ```toml
 [source]
 paths     = ["src", "tests"]
+patches   = ["patches"]
 includes  = ["vendor"]
 excludes  = ["cache/**", "build/**", "var/**"]
 extensions = ["php"]
 ```
 
-Les motifs glob fonctionnent dans les trois listes :
+Les motifs glob fonctionnent dans les quatre listes :
 
 ```toml
 [source]
 paths    = ["src/**/*.php"]
+patches  = ["patches/**/*.php"]
 includes = ["vendor/symfony/**/*.php"]   # only Symfony from vendor
 excludes = [
   "**/*_generated.php",
@@ -205,9 +208,24 @@ excludes = [
 | Option | Type | Défaut | Description |
 | :--- | :--- | :--- | :--- |
 | `paths` | liste de strings | `[]` | Répertoires ou globs pour votre code source. Si vide, l'ensemble du workspace est scanné. |
-| `includes` | liste de strings | `[]` | Répertoires ou globs pour le code tiers que Mago doit analyser sans le modifier. |
+| `includes` | liste de strings | `[]` | Répertoires ou globs pour le code tiers que Mago doit lire sans le modifier. |
+| `patches` | liste de strings | `[]` | Répertoires ou globs pour les correctifs de types. Leurs types remplacent ceux de `includes` et du code intégré. Mago ne les analyse, ne les linte ni ne les formate. |
 | `excludes` | liste de strings | `[]` | Globs ou chemins exclus de tous les outils. |
 | `extensions` | liste de strings | `["php"]` | Extensions de fichiers traitées comme du PHP. |
+
+### Corriger les types du code tiers
+
+Un correctif est un fichier PHP qui redéclare un symbole tiers ou intégré avec son nom pleinement qualifié. Mago lit ses types et ignore son corps. Le correctif précise un symbole existant ; il ne le remplace pas et ne peut pas créer un symbole absent du code d'origine.
+
+Un seul correctif peut viser un symbole. Si plusieurs correctifs visent le même symbole, Mago signale le conflit au lieu de choisir l'un d'eux. Regroupez-les ou ne gardez qu'un seul correctif.
+
+**Ce qu'un correctif peut préciser**
+
+- Les signatures de méthodes : types des paramètres et du retour, `@throws`, `@template` et assertions de type `@psalm-assert`. Mago ne change un champ que si le correctif le fournit.
+- Les types des propriétés et des constantes.
+- Les déclarations `@template` de la classe et les alias de types. Mago précise les paramètres existants par leur nom et ajoute les nouveaux.
+- Les paramètres de type des parents avec `@extends` et `@implements`. Le correctif remplace les arguments de chaque parent qu'il nomme et garde les autres.
+- Les membres magiques avec `@method`, `@property`, `@property-read` et `@property-write`, même si le code d'origine ne déclare pas ces membres. Ces annotations décrivent `__call`, `__get` ou `__set`.
 
 ### Réglages des globs
 

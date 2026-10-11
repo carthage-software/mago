@@ -6235,6 +6235,71 @@ mod tests {
         db
     }
 
+    fn make_parent_binding_database() -> Database<'static> {
+        make_db_with_types(vec![
+            (b"vendor/lib.php", FileType::Vendored, include_bytes!("../../tests/fixtures/issue_2469/vendor.php")),
+            (b"patches/lib.php", FileType::Patch, include_bytes!("../../tests/fixtures/issue_2469/patch.php")),
+            (b"src/example.php", FileType::Host, include_bytes!("../../tests/fixtures/issue_2469/source.php")),
+        ])
+    }
+
+    #[test]
+    fn test_watch_patch_parent_bindings_changed_and_deleted() {
+        let mut db = make_parent_binding_database();
+        let mut service = make_watch_service(&db);
+        let initial = service.analyze().expect("Initial analysis failed.");
+        assert!(initial.issues.is_empty(), "{:?}", initial.issues);
+        assert_matches_full(&service, &db, "patched parent bindings");
+
+        let patch_id = FileId::new(b"patches/lib.php");
+        for (contents, expect_issues) in [
+            (include_bytes!("../../tests/fixtures/issue_2469/patch_changed.php").as_slice(), true),
+            (include_bytes!("../../tests/fixtures/issue_2469/patch.php").as_slice(), false),
+        ] {
+            db.update(patch_id, Cow::Borrowed(contents));
+            service.update_database(db.read_only());
+            let result = service.analyze_incremental(Some(&[patch_id])).expect("Incremental analysis failed.");
+            assert_eq!(!result.issues.is_empty(), expect_issues, "{:?}", result.issues);
+            assert_matches_full(&service, &db, "changed parent bindings");
+        }
+
+        db.delete(patch_id);
+        service.update_database(db.read_only());
+        let result = service.analyze_incremental(None).expect("Analysis after patch removal failed.");
+        assert!(!result.issues.is_empty());
+        assert_matches_full(&service, &db, "removed parent bindings patch");
+
+        db.add(File::new(
+            Cow::Borrowed(b"patches/lib.php"),
+            FileType::Patch,
+            None,
+            Cow::Borrowed(include_bytes!("../../tests/fixtures/issue_2469/patch.php")),
+        ));
+        service.update_database(db.read_only());
+        let result = service.analyze_incremental(Some(&[patch_id])).expect("Analysis after patch restore failed.");
+        assert!(result.issues.is_empty(), "{:?}", result.issues);
+        assert_matches_full(&service, &db, "restored parent bindings patch");
+    }
+
+    #[test]
+    fn test_watch_vendor_parent_bindings_reapply_patch() {
+        let mut db = make_parent_binding_database();
+        let mut service = make_watch_service(&db);
+        assert!(service.analyze().expect("Initial analysis failed.").issues.is_empty());
+
+        let vendor_id = FileId::new(b"vendor/lib.php");
+        for contents in [
+            include_bytes!("../../tests/fixtures/issue_2469/vendor_changed.php").as_slice(),
+            include_bytes!("../../tests/fixtures/issue_2469/vendor.php").as_slice(),
+        ] {
+            db.update(vendor_id, Cow::Borrowed(contents));
+            service.update_database(db.read_only());
+            let result = service.analyze_incremental(Some(&[vendor_id])).expect("Incremental analysis failed.");
+            assert!(result.issues.is_empty(), "{:?}", result.issues);
+            assert_matches_full(&service, &db, "vendor parent bindings changed");
+        }
+    }
+
     /// After a patch changes its declared return type, host classes that override
     /// the patched method must be re-analyzed against the new type.
     #[test]

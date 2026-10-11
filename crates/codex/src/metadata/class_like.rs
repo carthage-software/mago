@@ -646,6 +646,20 @@ impl ClassLikeMetadata {
         self.report_trait_usage(patch);
 
         self.patch_templates(patch);
+        self.template_extended_offsets.extend(
+            patch
+                .template_extended_offsets
+                .iter()
+                .filter(|(name, _)| {
+                    patch.template_type_extends_count.contains_key(*name)
+                        || patch.template_type_implements_count.contains_key(*name)
+                })
+                .map(|(name, types)| (*name, types.clone())),
+        );
+        self.template_type_extends_count
+            .extend(patch.template_type_extends_count.iter().map(|(name, count)| (*name, *count)));
+        self.template_type_implements_count
+            .extend(patch.template_type_implements_count.iter().map(|(name, count)| (*name, *count)));
         self.patch_methods(patch, inherited_methods);
         self.patch_properties(patch);
         self.patch_constants(patch);
@@ -1325,6 +1339,85 @@ mod tests {
         assert!(vendored.template_readonly.contains(&t), "T should remain readonly after patch");
         assert!(!vendored.template_readonly.contains(&u), "U was not declared readonly by the patch");
         assert!(issues.is_empty());
+    }
+
+    #[test]
+    fn apply_patch_refines_parent_template_bindings() {
+        let parent = word("Parent");
+        let interface = word("Contract");
+        let untouched = word("OtherContract");
+        let mut vendored = make("VendorClass");
+        vendored.direct_parent_class = Some(parent);
+        vendored.direct_parent_interfaces.extend([interface, untouched]);
+        vendored.template_extended_offsets.insert(parent, vec![ttype::get_int()]);
+        vendored.template_extended_offsets.insert(interface, vec![ttype::get_int()]);
+        vendored.template_extended_offsets.insert(untouched, vec![ttype::get_bool()]);
+        vendored.template_type_extends_count.insert(parent, 1);
+        vendored.template_type_implements_count.extend([(interface, 1), (untouched, 1)]);
+
+        let mut patch = make("VendorClass");
+        patch.direct_parent_class = Some(parent);
+        patch.direct_parent_interfaces.extend([interface, untouched]);
+        patch.template_extended_offsets.insert(parent, vec![ttype::get_string(), ttype::get_int()]);
+        patch.template_extended_offsets.insert(interface, vec![ttype::get_float()]);
+        patch.template_type_extends_count.insert(parent, 2);
+        patch.template_type_implements_count.insert(interface, 1);
+
+        vendored.apply_patch(&mut patch, &WordSet::default());
+
+        assert_eq!(vendored.template_extended_offsets[&parent], [ttype::get_string(), ttype::get_int()]);
+        assert_eq!(vendored.template_extended_offsets[&interface], [ttype::get_float()]);
+        assert_eq!(vendored.template_extended_offsets[&untouched], [ttype::get_bool()]);
+        assert_eq!(vendored.template_type_extends_count[&parent], 2);
+        assert_eq!(vendored.template_type_implements_count[&interface], 1);
+        assert_eq!(vendored.template_type_implements_count[&untouched], 1);
+        assert!(vendored.template_types.is_empty());
+        assert!(patch.issues.is_empty());
+    }
+
+    #[test]
+    fn apply_patch_rejects_parent_template_bindings_on_hierarchy_mismatch() {
+        let parent = word("Parent");
+        let interface = word("Contract");
+        for change_parent in [true, false] {
+            let mut vendored = make("VendorClass");
+            vendored.direct_parent_class = Some(parent);
+            vendored.direct_parent_interfaces.insert(interface);
+            vendored.template_extended_offsets.insert(parent, vec![ttype::get_int()]);
+            vendored.template_extended_offsets.insert(interface, vec![ttype::get_int()]);
+
+            let mut patch = make("VendorClass");
+            patch.direct_parent_class = Some(if change_parent { word("WrongParent") } else { parent });
+            patch.direct_parent_interfaces.insert(if change_parent { interface } else { word("WrongContract") });
+            patch.template_extended_offsets.insert(parent, vec![ttype::get_string()]);
+            patch.template_extended_offsets.insert(interface, vec![ttype::get_string()]);
+            patch.template_type_extends_count.insert(parent, 1);
+            patch.template_type_implements_count.insert(interface, 1);
+
+            vendored.apply_patch(&mut patch, &WordSet::default());
+
+            assert_eq!(vendored.template_extended_offsets[&parent], [ttype::get_int()]);
+            assert_eq!(vendored.template_extended_offsets[&interface], [ttype::get_int()]);
+            assert!(has_code(&patch.issues, ScanningIssueKind::PatchHierarchyMismatch));
+        }
+    }
+
+    #[test]
+    fn apply_patch_does_not_refine_trait_template_bindings() {
+        let trait_name = word("GenericTrait");
+        let mut vendored = make("VendorClass");
+        vendored.used_traits.insert(trait_name);
+        vendored.template_extended_offsets.insert(trait_name, vec![ttype::get_int()]);
+
+        let mut patch = make("VendorClass");
+        patch.used_traits.insert(trait_name);
+        patch.template_extended_offsets.insert(trait_name, vec![ttype::get_string()]);
+        patch.template_type_uses_count.insert(trait_name, 1);
+
+        vendored.apply_patch(&mut patch, &WordSet::default());
+
+        assert_eq!(vendored.template_extended_offsets[&trait_name], [ttype::get_int()]);
+        assert!(has_code(&patch.issues, ScanningIssueKind::PatchDeclaresTrait));
     }
 
     #[test]
