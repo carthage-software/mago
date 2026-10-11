@@ -396,7 +396,7 @@ fn populate_hierarchy_segment(
 
     references.sort_unstable_by_key(|(index, _)| *index);
     for (index, references) in references {
-        symbol_references.extend_from_population(references);
+        symbol_references.extend(references);
         let name = sorted_classes[index];
         if let Some(metadata) = codebase.class_likes.remove(&name) {
             populate_method_type_aliases(name, &metadata, codebase);

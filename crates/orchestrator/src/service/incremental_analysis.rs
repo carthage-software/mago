@@ -1851,6 +1851,52 @@ mod tests {
     }
 
     #[test]
+    fn removing_signature_type_restores_its_remaining_body_reference() {
+        use mago_codex::reference::{ReferenceOrigin, SymbolReferenceKind};
+        use mago_word::{empty_word, word};
+
+        let mut database = make_database(vec![
+            ("src/types.php", "<?php class First {} class Second {}"),
+            (
+                "src/caller.php",
+                "<?php class Caller { public function run(First $value): object { return new First(); } }",
+            ),
+        ]);
+        let mut service = make_service(&database);
+        service.analyze().unwrap();
+        let file = FileId::new(b"src/caller.php");
+
+        for (parameter, body) in [("First", "First"), ("Second", "First"), ("Second", "Second")] {
+            database.update(
+                file,
+                Cow::Owned(
+                    format!(
+                        "<?php class Caller {{ public function run({parameter} $value): object {{ return new {body}(); }} }}",
+                    )
+                    .into_bytes(),
+                ),
+            );
+
+            service.update_database(database.read_only());
+            service.analyze_incremental(Some(&[file])).unwrap();
+            let mut fresh = make_service(&database);
+            fresh.analyze().unwrap();
+            assert_eq!(service.native_symbol_references, fresh.native_symbol_references);
+
+            let mut first_is_body = false;
+            service.native_symbol_references.for_each_reference(|origin, target, kind| {
+                if origin == ReferenceOrigin::Symbol((word("caller"), word("run")))
+                    && target == (word("first"), empty_word())
+                    && kind == SymbolReferenceKind::Body
+                {
+                    first_is_body = true;
+                }
+            });
+            assert_eq!(first_is_body, parameter != "First" && body == "First");
+        }
+    }
+
+    #[test]
     fn top_level_body_edits_replace_reference_graph() {
         let mut database = make_database(vec![
             ("src/types.php", "<?php class SignatureType {} class First {} class Second {}"),

@@ -456,9 +456,8 @@ fn populate_entries<I>(
             references
         })
         .collect::<Vec<_>>();
-    // Earlier signatures suppress later body edges, but never remove earlier ones.
     for references_in_chunk in populated {
-        references.extend_from_population(references_in_chunk);
+        references.extend(references_in_chunk);
     }
 }
 
