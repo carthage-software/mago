@@ -1823,7 +1823,10 @@ fn check_template_parameters<'ctx, A>(
                     &template_type,
                     &mut template_result,
                     context.codebase,
-                    DefinitionReplacementOptions::default(),
+                    DefinitionReplacementOptions {
+                        calling_class: Some(class_like_metadata.name),
+                        ..Default::default()
+                    },
                 );
 
                 expand_union(
