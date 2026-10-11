@@ -95,6 +95,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Binary<'arena> {
 
                 if let Expression::Identifier(identifier) = self.rhs {
                     let class_name = context.resolved_names.get(identifier);
+                    artifacts.symbol_references.add_reference_to_symbol(
+                        &block_context.scope,
+                        mago_word::ascii_lowercase_word(class_name),
+                        false,
+                    );
+
                     if !context.codebase.class_like_exists(class_name) {
                         report_non_existent_class_like(context, identifier.span(), word(class_name));
                     }

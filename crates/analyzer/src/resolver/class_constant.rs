@@ -91,14 +91,9 @@ where
             if let ResolvedSelector::Identifier(const_name) = selector_resolution
                 && const_name.as_bytes().eq_ignore_ascii_case(b"class")
             {
-                if let Some(const_type) = handle_class_magic_constant(
-                    context,
-                    block_context,
-                    artifacts,
-                    class_resolution,
-                    class_expr,
-                    constant_selector,
-                ) {
+                if let Some(const_type) =
+                    handle_class_magic_constant(context, artifacts, class_resolution, class_expr, constant_selector)
+                {
                     result.constants.push(ResolvedConstant { const_type });
                 } else {
                     result.has_invalid_path = true;
@@ -163,10 +158,9 @@ where
 }
 
 /// Specific handler for the `::class` magic constant.
-fn handle_class_magic_constant<'ctx, 'ast, 'arena, A>(
-    context: &mut Context<'ctx, 'arena, A>,
-    block_context: &BlockContext<'ctx>,
-    artifacts: &mut AnalysisArtifacts,
+fn handle_class_magic_constant<'ast, 'arena, A>(
+    context: &mut Context<'_, 'arena, A>,
+    artifacts: &AnalysisArtifacts,
     class_resolution: &ResolvedClassname,
     class_expr: &'ast Expression<'arena>,
     selector: &'ast ClassLikeConstantSelector<'arena>,
@@ -226,8 +220,6 @@ where
             {
                 report_non_existent_class(context, fq_class_id, class_expr.span());
             }
-
-            artifacts.symbol_references.add_reference_to_symbol(&block_context.scope, fq_class_id, false);
 
             if let Some(generic_class_string) = generic_class_string {
                 return Some(generic_class_string);

@@ -194,7 +194,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
         for (i, catch_clause) in self.catch_clauses.iter().enumerate() {
             let mut catch_block_context = original_block_context.clone();
             catch_block_context.flags.set_has_returned(false);
-            let caught_classes = get_caught_classes(context, &catch_clause.hint);
+            let caught_classes = get_caught_classes(context, &catch_block_context, artifacts, &catch_clause.hint);
 
             for (variable_id, variable_type) in &mut catch_block_context.locals {
                 if let Some(old_type) = old_block_context_locals.get(variable_id) {
@@ -446,7 +446,12 @@ fn intersect_definitely_defined_locals(definitely_defined_locals: &mut Option<Wo
     }
 }
 
-fn get_caught_classes<'arena, A>(context: &mut Context<'_, 'arena, A>, hint: &Hint<'arena>) -> WordSet
+fn get_caught_classes<'arena, A>(
+    context: &mut Context<'_, 'arena, A>,
+    block_context: &BlockContext<'_>,
+    artifacts: &mut AnalysisArtifacts,
+    hint: &Hint<'arena>,
+) -> WordSet
 where
     A: Arena,
 {
@@ -511,6 +516,12 @@ where
     let mut caught_classes: WordSet =
         WordSet::with_capacity_and_hasher(caught_identifiers.len(), foldhash::fast::FixedState::default());
     for (caught_type, caught_span) in caught_identifiers {
+        artifacts.symbol_references.add_reference_to_symbol(
+            &block_context.scope,
+            caught_type.to_ascii_lowercase(),
+            false,
+        );
+
         if caught_type.as_bytes().eq_ignore_ascii_case(b"throwable")
             || caught_type.as_bytes().eq_ignore_ascii_case(b"exception")
             || caught_type.as_bytes().eq_ignore_ascii_case(b"error")
