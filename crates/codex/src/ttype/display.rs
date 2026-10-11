@@ -23,9 +23,16 @@ fn short_name(name: &[u8]) -> String {
 pub struct NameDisplay<'code> {
     codebase: &'code CodebaseMetadata,
     ambiguous: HashSet<Vec<u8>>,
+    fully_qualified: bool,
 }
 
 impl<'code> NameDisplay<'code> {
+    /// Use absolute class names when part of the display has already been rendered.
+    #[must_use]
+    pub fn fully_qualified(codebase: &'code CodebaseMetadata) -> Self {
+        Self { codebase, ambiguous: HashSet::default(), fully_qualified: true }
+    }
+
     /// Choose short class names unless the displayed types share a name.
     #[must_use]
     pub fn for_types<'ty>(codebase: &'code CodebaseMetadata, types: impl Iterator<Item = &'ty TUnion>) -> Self {
@@ -53,13 +60,17 @@ impl<'code> NameDisplay<'code> {
                 Entry::Occupied(_) => {}
             }
         }
-        Self { codebase, ambiguous }
+        Self { codebase, ambiguous, fully_qualified: false }
     }
 
     /// Use the declaration casing and qualify colliding short names.
     #[must_use]
     pub fn class_name(&self, name: Word) -> String {
         let name = self.codebase.get_class_like_by_name(name).map_or(name, |class| class.original_name);
+        if self.fully_qualified {
+            return format!("\\{}", BytesDisplay(name.as_bytes()));
+        }
+
         let short = short_name(name.as_bytes());
         if !self.ambiguous.is_empty() && self.ambiguous.contains(short.as_bytes().to_ascii_lowercase().as_slice()) {
             format!("\\{}", BytesDisplay(name.as_bytes()))
