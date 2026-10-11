@@ -39,6 +39,7 @@ pub enum SignatureCompatibilityIssue {
 /// * `child_class_name` - The fully qualified name of the class containing the overriding method
 /// * `child_method` - The overriding method
 /// * `parent_method` - The parent/interface method being overridden/implemented
+/// * `parent_is_final` - Finality added where the parent imports a trait method
 ///
 /// # Returns
 ///
@@ -49,6 +50,7 @@ pub fn validate_method_signature_compatibility(
     child_class_name: Word,
     child_method: &FunctionLikeMetadata,
     parent_method: &FunctionLikeMetadata,
+    parent_is_final: bool,
 ) -> Vec<SignatureCompatibilityIssue> {
     if !child_method.flags.is_user_defined() {
         // The child method is not user-defined; skip validation.
@@ -65,7 +67,7 @@ pub fn validate_method_signature_compatibility(
         return issues;
     };
 
-    if parent_method_meta.is_final {
+    if parent_method_meta.is_final || parent_is_final {
         issues.push(SignatureCompatibilityIssue::FinalMethodOverride);
 
         return issues;

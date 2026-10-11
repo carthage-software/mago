@@ -2107,8 +2107,7 @@ fn check_abstract_method_signatures<'ctx, A>(
         };
 
         let declaring_fqcn = declaring_method_id.get_class_name();
-        let declaring_method_opt =
-            context.codebase.get_method_by_id(&MethodIdentifier::new(declaring_fqcn, *method_name_atom));
+        let declaring_method_opt = context.codebase.get_method_by_id(declaring_method_id);
 
         let (method_fqcn, appearing_method) = if let Some(method) = declaring_method_opt {
             (declaring_fqcn, method)
@@ -2128,13 +2127,11 @@ fn check_abstract_method_signatures<'ctx, A>(
         let overridden_declaring_classes: Vec<Word> =
             overridden_method_ids.values().map(|id| id.get_class_name()).collect();
 
-        for (parent_fqcn, parent_declaring_method_id) in overridden_method_ids.iter() {
-            let parent_fqcn_str = parent_fqcn.as_ref();
-
+        for parent_declaring_method_id in overridden_method_ids.values() {
             let declaring_class_name = parent_declaring_method_id.get_class_name();
             let declaring_class_name_str = declaring_class_name.as_ref();
 
-            if should_skip_same_method(method_fqcn.as_bytes(), parent_fqcn_str) {
+            if declaring_method_id == parent_declaring_method_id {
                 continue;
             }
 
@@ -2149,9 +2146,7 @@ fn check_abstract_method_signatures<'ctx, A>(
                 continue;
             }
 
-            let Some(overridden_method) = context
-                .codebase
-                .get_declaring_method_by_id(&MethodIdentifier::new(declaring_class_name, *method_name_atom))
+            let Some(overridden_method) = context.codebase.get_declaring_method_by_id(parent_declaring_method_id)
             else {
                 continue;
             };
@@ -2178,6 +2173,22 @@ fn check_abstract_method_signatures<'ctx, A>(
                 continue;
             }
 
+            let final_parent_class = class_like_metadata.direct_parent_class.and_then(|parent_name| {
+                let exposed_parent = MethodIdentifier::new(parent_name, *method_name_atom);
+                if context.codebase.get_declaring_method_identifier(&exposed_parent) != *parent_declaring_method_id
+                    || !context.codebase.method_is_final(parent_name.as_bytes(), method_name_atom.as_bytes())
+                {
+                    return None;
+                }
+
+                let parent = context.codebase.get_class_like_by_name(parent_name)?;
+                let appearing_name = parent
+                    .appearing_method_ids
+                    .get(method_name_atom)
+                    .map_or(parent_name, MethodIdentifier::get_class_name);
+                context.codebase.get_class_like_by_name(appearing_name).or(Some(parent))
+            });
+
             let substituted_overridden_method =
                 get_substituted_method(overridden_method, class_like_metadata, declaring_class_name, context.codebase);
 
@@ -2189,6 +2200,7 @@ fn check_abstract_method_signatures<'ctx, A>(
                 class_like_metadata.name,
                 &substituted_appearing_method,
                 &substituted_overridden_method,
+                final_parent_class.is_some(),
             );
 
             if issues.is_empty() {
@@ -2205,7 +2217,7 @@ fn check_abstract_method_signatures<'ctx, A>(
                 report_signature_compatibility_issue(
                     context,
                     class_like_metadata,
-                    overridden_class,
+                    final_parent_class.unwrap_or(overridden_class),
                     *method_name_atom,
                     appearing_method,
                     incompatibility,
@@ -2276,6 +2288,7 @@ fn check_trait_method_conflicts<'ctx, 'ast, 'arena, A>(
                                 class_like_metadata.name,
                                 second_method,
                                 first_method,
+                                false,
                             );
 
                             for incompatibility in issues {
@@ -2333,6 +2346,7 @@ fn check_trait_method_conflicts<'ctx, 'ast, 'arena, A>(
                                     class_like_metadata.name,
                                     second_method,
                                     first_method,
+                                    false,
                                 );
 
                                 for incompatibility in issues {
@@ -2779,6 +2793,7 @@ fn check_interface_method_signatures<'ctx, A>(
             class_like_metadata.name,
             &substituted_class_method,
             &substituted_interface_method,
+            false,
         );
 
         for incompatibility in issues {

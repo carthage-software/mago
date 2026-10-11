@@ -771,6 +771,16 @@ test_case!(trait_constant_conflicts);
 test_case!(trait_constant_direct_access);
 test_case!(trait_constant_access);
 test_case!(trait_override_final_methods);
+test_case!(trait_final_same_source, {
+    let mut settings = default_test_settings();
+    settings.version = mago_php_version::PHPVersion::PHP83;
+    settings
+});
+test_case!(trait_final_alias_adaptations, {
+    let mut settings = default_test_settings();
+    settings.version = mago_php_version::PHPVersion::PHP83;
+    settings
+});
 test_case!(inheritdoc_basic_parent_class);
 test_case!(inheritdoc_multiple_interfaces);
 test_case!(inheritdoc_nested_generics);
