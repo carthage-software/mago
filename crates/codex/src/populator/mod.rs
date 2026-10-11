@@ -139,6 +139,14 @@ fn populate_codebase_inner(
 
     for class_like_name in &class_likes_to_repopulate {
         if let Some(classlike_info) = codebase.class_likes.get_mut(class_like_name) {
+            if classlike_info.flags.is_populated() {
+                for method_name in &classlike_info.methods {
+                    if let Some(method) = codebase.function_likes.get_mut(&(*class_like_name, *method_name)) {
+                        method.thrown_types.retain(|thrown| !thrown.inferred);
+                    }
+                }
+            }
+
             classlike_info.reset_ancestry();
             classlike_info.reset_inherited_constants();
             classlike_info.reset_inherited_members();
