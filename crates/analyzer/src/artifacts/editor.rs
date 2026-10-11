@@ -23,8 +23,10 @@ use crate::resolver::property::find_property_in_mixins;
 use crate::resolver::property::resolve_declared_property;
 
 mod callable_types;
+mod variable_types;
 
 pub use callable_types::{BoundParameter, BoundSignature, CallableTarget, CallableTypes};
+pub use variable_types::VariableTypes;
 
 /// Owned editor data from one completed file analysis.
 #[derive(Debug, Default)]
@@ -35,6 +37,8 @@ pub struct EditorFileData {
     pub members: Box<[MemberReference]>,
     /// Named object types, sorted by expression span. Scalar types are omitted.
     pub expression_classes: Box<[ExpressionClasses]>,
+    /// Full types for direct variables, without analyzer `Rc` ownership.
+    pub variable_types: VariableTypes,
     /// Known callable sources, sorted by the callee expression's end offset.
     pub callable_types: CallableTypes,
 }
@@ -331,9 +335,9 @@ impl AnalysisArtifacts {
         self
     }
 
-    /// Copies the enabled editor data without retaining analyzer types or arenas.
+    /// Copies editor data without retaining analyzer Rc values or arenas.
     #[must_use]
-    pub fn editor_data(&self, codebase: &CodebaseMetadata) -> Option<EditorFileData> {
+    pub fn editor_data(&self, source: &[u8], codebase: &CodebaseMetadata) -> Option<EditorFileData> {
         let editor = self.editor.as_ref()?;
         let mut methods: Vec<_> = editor.methods.iter().copied().collect();
         methods.sort_unstable();
@@ -359,6 +363,7 @@ impl AnalysisArtifacts {
             methods: methods.into_boxed_slice(),
             members: members.into_boxed_slice(),
             expression_classes: expression_classes.into_boxed_slice(),
+            variable_types: VariableTypes::collect(source, &self.expression_types),
             callable_types: CallableTypes::collect(&self.expression_types, codebase),
         })
     }
@@ -435,11 +440,11 @@ mod tests {
 
         artifacts.begin_expression_type_checkpoint();
         artifacts.finish_expression_type_checkpoint(CheckpointAction::Keep);
-        assert_eq!(artifacts.editor_data(&codebase).map(|data| data.methods.len()), Some(1));
-        assert_eq!(artifacts.editor_data(&codebase).map(|data| data.members.len()), Some(1));
+        assert_eq!(artifacts.editor_data(b"", &codebase).map(|data| data.methods.len()), Some(1));
+        assert_eq!(artifacts.editor_data(b"", &codebase).map(|data| data.members.len()), Some(1));
         artifacts.finish_expression_type_checkpoint(CheckpointAction::Rollback);
-        assert_eq!(artifacts.editor_data(&codebase).map(|data| data.methods.len()), Some(0));
-        assert_eq!(artifacts.editor_data(&codebase).map(|data| data.members.len()), Some(0));
-        assert!(AnalysisArtifacts::new().editor_data(&codebase).is_none());
+        assert_eq!(artifacts.editor_data(b"", &codebase).map(|data| data.methods.len()), Some(0));
+        assert_eq!(artifacts.editor_data(b"", &codebase).map(|data| data.members.len()), Some(0));
+        assert!(AnalysisArtifacts::new().editor_data(b"", &codebase).is_none());
     }
 }
