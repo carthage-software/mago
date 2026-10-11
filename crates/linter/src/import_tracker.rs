@@ -25,11 +25,20 @@ use mago_syntax::cst::UseItems;
 use mago_syntax::cst::UseType;
 use mago_text_edit::TextEdit;
 
-#[derive(Debug, Clone, Copy, Eq, PartialEq)]
+#[derive(Debug, Clone, Copy, Eq, PartialEq, Hash)]
 pub enum ImportKind {
     Name,
     Function,
     Constant,
+}
+
+impl ImportKind {
+    fn key(self, fqn: &[u8]) -> Word {
+        match self {
+            Self::Constant => ascii_lowercase_constant_name_word(fqn),
+            Self::Name | Self::Function => ascii_lowercase_word(fqn),
+        }
+    }
 }
 
 /// The answer returned to a rule asking the context to import a fully-qualified name.
@@ -113,6 +122,7 @@ struct ScopeState {
     class_fqn_to_local: HashMap<Word, Word>,
     function_fqn_to_local: HashMap<Word, Word>,
     constant_fqn_to_local: HashMap<Word, Word>,
+    pending_imports: HashMap<(ImportKind, Word), TextEdit>,
     local_classes: HashSet<Word>,
     local_functions: HashSet<Word>,
     local_constants: HashSet<Word>,
@@ -296,17 +306,17 @@ impl ImportTracker {
                 word(last)
             }
         };
+        let fqn_key = kind.key(fqn.as_bytes());
+        self.scope.pending_imports.remove(&(kind, fqn_key));
 
         match kind {
             ImportKind::Name => {
                 let lookup = ascii_lowercase_word(local.as_bytes());
-                let fqn_key = ascii_lowercase_word(fqn.as_bytes());
                 self.scope.class_imports.insert(lookup, fqn);
                 self.scope.class_fqn_to_local.insert(fqn_key, local);
             }
             ImportKind::Function => {
                 let lookup = ascii_lowercase_word(local.as_bytes());
-                let fqn_key = ascii_lowercase_word(fqn.as_bytes());
                 self.scope.function_imports.insert(lookup, fqn);
                 self.scope.function_fqn_to_local.insert(fqn_key, local);
 
@@ -316,7 +326,7 @@ impl ImportTracker {
             }
             ImportKind::Constant => {
                 self.scope.constant_imports.insert(local, fqn);
-                self.scope.constant_fqn_to_local.insert(ascii_lowercase_constant_name_word(fqn.as_bytes()), local);
+                self.scope.constant_fqn_to_local.insert(fqn_key, local);
             }
         }
     }
@@ -387,19 +397,19 @@ impl ImportTracker {
             Some(ns) => concat_word!(ns, b"\\", short_part),
             None => word(short_part),
         };
+        let full_key = kind.key(full.as_bytes());
 
         let existing_reverse = match kind {
-            ImportKind::Name => self.scope.class_fqn_to_local.get(&ascii_lowercase_word(full.as_bytes())).copied(),
-            ImportKind::Function => {
-                self.scope.function_fqn_to_local.get(&ascii_lowercase_word(full.as_bytes())).copied()
-            }
-            ImportKind::Constant => {
-                self.scope.constant_fqn_to_local.get(&ascii_lowercase_constant_name_word(full.as_bytes())).copied()
-            }
+            ImportKind::Name => self.scope.class_fqn_to_local.get(&full_key).copied(),
+            ImportKind::Function => self.scope.function_fqn_to_local.get(&full_key).copied(),
+            ImportKind::Constant => self.scope.constant_fqn_to_local.get(&full_key).copied(),
         };
 
         if let Some(local) = existing_reverse {
-            return Some(ImportResolution { local_name: local, use_statement_edit: None });
+            return Some(ImportResolution {
+                local_name: local,
+                use_statement_edit: self.scope.pending_imports.get(&(kind, full_key)).cloned(),
+            });
         }
 
         let has_conflict = match kind {
@@ -454,21 +464,21 @@ impl ImportTracker {
         match kind {
             ImportKind::Name => {
                 self.scope.class_imports.insert(short_lookup, full);
-                self.scope.class_fqn_to_local.insert(ascii_lowercase_word(full.as_bytes()), short_word);
+                self.scope.class_fqn_to_local.insert(full_key, short_word);
             }
             ImportKind::Function => {
                 self.scope.function_imports.insert(short_lookup, full);
-                self.scope.function_fqn_to_local.insert(ascii_lowercase_word(full.as_bytes()), short_word);
+                self.scope.function_fqn_to_local.insert(full_key, short_word);
             }
             ImportKind::Constant => {
                 self.scope.constant_imports.insert(short_word, full);
-                self.scope
-                    .constant_fqn_to_local
-                    .insert(ascii_lowercase_constant_name_word(full.as_bytes()), short_word);
+                self.scope.constant_fqn_to_local.insert(full_key, short_word);
             }
         }
 
-        Some(ImportResolution { local_name: short_word, use_statement_edit: Some(TextEdit::insert(offset, text)) })
+        let edit = TextEdit::insert(offset, text);
+        self.scope.pending_imports.insert((kind, full_key), edit.clone());
+        Some(ImportResolution { local_name: short_word, use_statement_edit: Some(edit) })
     }
 }
 
@@ -616,13 +626,15 @@ mod tests {
     }
 
     #[test]
-    fn import_same_fqn_twice_only_emits_one_edit() {
+    fn repeated_imports_keep_the_required_edit_for_each_kind() {
         let mut tracker = tracker_with_anchor(Some(b"App"), 42);
-        let first = tracker.import(b"Other\\Thing", ImportKind::Name).unwrap();
-        let second = tracker.import(b"Other\\Thing", ImportKind::Name).unwrap();
-        assert!(first.use_statement_edit.is_some());
-        assert!(second.use_statement_edit.is_none());
-        assert_eq!(first.local_name, second.local_name);
+        for kind in [ImportKind::Name, ImportKind::Function, ImportKind::Constant] {
+            let first = tracker.import(b"Other\\Thing", kind).unwrap();
+            let second = tracker.import(b"Other\\Thing", kind).unwrap();
+            assert!(!first.is_already_available());
+            assert_eq!(first.use_statement_edit, second.use_statement_edit);
+            assert_eq!(first.local_name, second.local_name);
+        }
     }
 
     #[test]
@@ -1214,12 +1226,12 @@ mod tests {
     }
 
     #[test]
-    fn case_variant_of_same_class_fqn_deduplicates() {
+    fn case_variant_of_same_class_fqn_keeps_the_same_import_edit() {
         let mut tracker = tracker_with_anchor(Some(b"App"), 10);
         let a = tracker.import(b"foo\\bar", ImportKind::Name).unwrap();
         let b = tracker.import(b"Foo\\Bar", ImportKind::Name).unwrap();
         assert!(a.use_statement_edit.is_some());
-        assert!(b.use_statement_edit.is_none());
+        assert_eq!(a.use_statement_edit, b.use_statement_edit);
     }
 
     #[test]
@@ -1274,10 +1286,16 @@ mod tests {
         let mut tracker = tracker_with_anchor(Some(b"App"), 10);
         tracker.scope.class_imports.insert(ascii_lowercase_word(b"Baz"), word(b"Foo\\Bar"));
         tracker.scope.class_fqn_to_local.insert(ascii_lowercase_word(b"Foo\\Bar"), word(b"Baz"));
-        for _ in 0..5 {
-            let r = tracker.import(b"Foo\\Bar", ImportKind::Name).unwrap();
-            assert_eq!(r.local_name.as_bytes(), b"Baz");
-            assert!(r.use_statement_edit.is_none());
+        tracker.scope.function_imports.insert(ascii_lowercase_word(b"Baz"), word(b"Foo\\Bar"));
+        tracker.scope.function_fqn_to_local.insert(ascii_lowercase_word(b"Foo\\Bar"), word(b"Baz"));
+        tracker.scope.constant_imports.insert(word(b"Baz"), word(b"Foo\\Bar"));
+        tracker.scope.constant_fqn_to_local.insert(word(b"foo\\Bar"), word(b"Baz"));
+        for kind in [ImportKind::Name, ImportKind::Function, ImportKind::Constant] {
+            for _ in 0..2 {
+                let r = tracker.import(b"Foo\\Bar", kind).unwrap();
+                assert_eq!(r.local_name.as_bytes(), b"Baz");
+                assert!(r.use_statement_edit.is_none());
+            }
         }
     }
 
@@ -1442,15 +1460,6 @@ mod tests {
     }
 
     #[test]
-    fn idempotent_import_does_not_emit_a_second_edit() {
-        let mut tracker = tracker_with_anchor(Some(b"App"), 5);
-        let first = tracker.import(b"A\\A", ImportKind::Name).unwrap();
-        let second = tracker.import(b"A\\A", ImportKind::Name).unwrap();
-        assert!(first.use_statement_edit.is_some());
-        assert!(second.use_statement_edit.is_none());
-    }
-
-    #[test]
     fn hundred_distinct_imports_all_land_at_same_offset_and_stack() {
         let mut tracker = tracker_with_anchor(Some(b"App"), 5);
         for i in 0..100 {
@@ -1551,8 +1560,8 @@ mod tests {
         let b = tracker.import(b"app\\OTHER\\FOO", ImportKind::Constant).unwrap();
         let c = tracker.import(b"APP\\other\\FOO", ImportKind::Constant).unwrap();
         assert!(a.use_statement_edit.is_some());
-        assert!(b.use_statement_edit.is_none());
-        assert!(c.use_statement_edit.is_none());
+        assert_eq!(a.use_statement_edit, b.use_statement_edit);
+        assert_eq!(a.use_statement_edit, c.use_statement_edit);
         assert_eq!(a.local_name, b.local_name);
         assert_eq!(a.local_name, c.local_name);
     }

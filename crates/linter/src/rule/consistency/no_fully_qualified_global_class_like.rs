@@ -229,6 +229,11 @@ impl LintRule for NoFullyQualifiedGlobalClassLikeRule {
 #[cfg(test)]
 mod tests {
     use indoc::indoc;
+    use mago_allocator::LocalArena;
+    use mago_database::file::File;
+    use mago_names::resolver::NameResolver;
+    use mago_syntax::parser::parse_file;
+    use mago_text_edit::{ApplyResult, TextEditor};
 
     use super::NoFullyQualifiedGlobalClassLikeRule;
     use crate::rule::tests::collect_issues;
@@ -236,6 +241,30 @@ mod tests {
     use crate::test_lint_failure;
     use crate::test_lint_fix;
     use crate::test_lint_success;
+
+    #[test]
+    fn repeated_class_import_fixes_work_independently() {
+        let code = r"<?php namespace MagoEditorQa;
+function make_clock(): \DateTimeImmutable { return new \DateTimeImmutable(); }";
+        let issues = collect_issues::<NoFullyQualifiedGlobalClassLikeRule, fn(&mut Settings)>(code, None, None);
+        assert_eq!(issues.len(), 2);
+        for issue in issues {
+            assert!(issue.help.as_deref().is_some_and(|help| help.starts_with("Add `use DateTimeImmutable;`")));
+            let mut editor = TextEditor::new(code.as_bytes());
+            let edits = issue.edits.into_values().flatten().collect();
+            assert_eq!(editor.apply_batch(edits, None::<fn(&[u8]) -> bool>), ApplyResult::Applied);
+            let file = File::ephemeral(b"fixed.php".as_slice().into(), editor.finish().into());
+            let arena = LocalArena::new();
+            let program = parse_file(&arena, &file);
+            assert!(!program.has_errors());
+            let names = NameResolver::new(&arena).resolve(program);
+            let class_names: Vec<_> = names
+                .iter()
+                .filter_map(|(_, _, name, _)| name.ends_with(b"DateTimeImmutable").then_some(name))
+                .collect();
+            assert_eq!(class_names, [b"DateTimeImmutable".as_slice(); 3]);
+        }
+    }
 
     #[test]
     fn issue_2136_does_not_shadow_implicit_imports() {

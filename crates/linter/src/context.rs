@@ -71,13 +71,9 @@ where
     /// current namespace) and the caller should just replace the FQN with
     /// `resolution.local_name`.
     ///
-    /// # Staggering lets multiple imports land in a single run
-    ///
-    /// Each subsequent insert at the same anchor is offset by one byte into
-    /// the run of whitespace that follows the anchor. Two zero-width inserts
-    /// at different offsets don't overlap, so the fixer can apply all of them
-    /// in a single pass. When the whitespace run is exhausted later imports
-    /// fall back to the base offset and conflict with the first.
+    /// Each request for a pending import includes its insert edit, so each
+    /// proposed fix can stand alone. Batch fixers must skip exact edits that
+    /// an earlier batch already accepted.
     pub fn import_name(&mut self, fqn: &[u8]) -> Option<ImportResolution> {
         let scope = self.ancestors.iter().rev().find(|node| matches!(node, Node::Namespace(_) | Node::Program(_)))?;
         self.imports.collect_class_references(*scope);
