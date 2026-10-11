@@ -115,19 +115,14 @@ fn populate_codebase_inner(
         for class_name in &dirty_class_names {
             if let Some(metadata) = codebase.class_likes.get(class_name)
                 && (!metadata.flags.is_populated()
-                    || (metadata.flags.is_user_defined() && !safe_symbols.contains(class_name)))
+                    || (!metadata.flags.is_built_in() && !safe_symbols.contains(class_name)))
             {
                 class_likes_to_repopulate.insert(*class_name);
             }
         }
 
-        // Also repopulate user-defined classes that were invalidated by the
-        // cascade (not in safe_symbols) but are not directly in dirty_symbols.
-        // This handles e.g. a child class whose parent's method was removed:
-        // the child is invalidated (not safe) but its file didn't change,
-        // so it's not in dirty_symbols.
         for (class_name, metadata) in &codebase.class_likes {
-            if metadata.flags.is_user_defined()
+            if !metadata.flags.is_built_in()
                 && !safe_symbols.contains(class_name)
                 && !class_likes_to_repopulate.contains(class_name)
             {
@@ -136,7 +131,7 @@ fn populate_codebase_inner(
         }
     } else {
         for (name, metadata) in &codebase.class_likes {
-            if !metadata.flags.is_populated() || (metadata.flags.is_user_defined() && !safe_symbols.contains(name)) {
+            if !metadata.flags.is_populated() || (!metadata.flags.is_built_in() && !safe_symbols.contains(name)) {
                 class_likes_to_repopulate.insert(*name);
             }
         }
