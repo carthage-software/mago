@@ -622,6 +622,10 @@ impl Issue {
     /// ```
     #[must_use]
     pub fn with_annotation(mut self, annotation: Annotation) -> Self {
+        if self.annotations.is_empty() {
+            self.annotations.reserve_exact(2);
+        }
+
         self.annotations.push(annotation);
 
         self
@@ -659,6 +663,10 @@ impl Issue {
     /// ```
     #[must_use]
     pub fn with_note(mut self, note: impl Into<Cow<'static, str>>) -> Self {
+        if self.notes.is_empty() {
+            self.notes.reserve_exact(1);
+        }
+
         self.notes.push(note.into());
 
         self
