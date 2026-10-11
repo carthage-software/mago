@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
+use mago_codex::ttype::combine_union_types_rc;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
@@ -26,6 +27,7 @@ use crate::context::block::BlockContext;
 use crate::context::block::ReferenceConstraint;
 use crate::context::block::ReferenceConstraintSource;
 use crate::error::AnalysisError;
+use crate::expression::closure::widen_by_reference_type;
 use crate::statement::analyze_statements;
 use crate::utils::docblock::check_docblock_type_incompatibility;
 use crate::utils::docblock::get_type_from_var_docblock;
@@ -152,7 +154,7 @@ where
         finder.walk_statement(statement, &mut ());
     }
 
-    if !finder.0 {
+    if !finder.0 && block_context.static_locals.is_empty() {
         return Ok(None);
     }
 
@@ -161,6 +163,7 @@ where
     let mut previous_types = WordMap::default();
     for _ in 0..8 {
         let mut inferred_context = block_context.clone();
+        add_inferred_captured_types(context, &mut inferred_context, &static_local_types);
         let mut inferred_artifacts = artifacts.clone();
         inferred_artifacts.static_local_types = Some(static_local_types.clone());
 
@@ -196,6 +199,57 @@ where
     }
 
     Ok(Some(static_local_types))
+}
+
+/// Sets the types of the variables a closure captures by reference before its
+/// body is analyzed.
+///
+/// These are the inferred types, widened because the enclosing scope can also
+/// write to the variables between two calls.
+pub(super) fn add_captured_types<A>(
+    context: &Context<'_, '_, A>,
+    block_context: &mut BlockContext<'_>,
+    inferred_types: &WordMap<Rc<TUnion>>,
+) where
+    A: Arena,
+{
+    add_inferred_captured_types(context, block_context, inferred_types);
+
+    for variable in &block_context.static_locals {
+        if let Some(variable_type) = block_context.locals.get_mut(variable) {
+            widen_by_reference_type(Rc::make_mut(variable_type));
+        }
+    }
+}
+
+/// Adds the inferred types to the static locals that are already in scope when
+/// the body starts, which are the variables a closure captures by reference.
+///
+/// The first call sees the type from the enclosing scope, and every later call
+/// also sees what the previous calls wrote.
+fn add_inferred_captured_types<A>(
+    context: &Context<'_, '_, A>,
+    block_context: &mut BlockContext<'_>,
+    inferred_types: &WordMap<Rc<TUnion>>,
+) where
+    A: Arena,
+{
+    for variable in &block_context.static_locals {
+        let (Some(inferred_type), Some(variable_type)) =
+            (inferred_types.get(variable), block_context.locals.get_mut(variable))
+        else {
+            continue;
+        };
+
+        let by_reference = variable_type.by_reference();
+        let mut combined_type =
+            combine_union_types_rc(variable_type, inferred_type, context.codebase, context.settings.combiner_options());
+        if by_reference && !combined_type.by_reference() {
+            Rc::make_mut(&mut combined_type).set_by_reference(true);
+        }
+
+        *variable_type = combined_type;
+    }
 }
 
 fn widen_static_local_type(inferred: &mut TUnion, previous: &TUnion) {
