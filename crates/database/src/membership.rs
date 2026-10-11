@@ -101,15 +101,26 @@ impl WorkspaceMatcher {
     pub fn classify(&self, file: &Path) -> Option<FileType> {
         let canonical = canonical_path(file);
 
-        let extension_ok = canonical.extension().is_some_and(|ext| self.extensions.contains(ext));
-        let host = max_specificity(&self.host_sources, &canonical, extension_ok);
-        let include = max_specificity(&self.include_sources, &canonical, extension_ok);
-        let patch = max_specificity(&self.patch_sources, &canonical, extension_ok);
+        let specificity = |sources: &[SourcePattern]| {
+            let extension_ok = file.extension().is_some_and(|extension| self.extensions.contains(extension));
+            let canonical_extension_ok =
+                canonical.extension().is_some_and(|extension| self.extensions.contains(extension));
+
+            let lexical = (!file.components().any(|part| part == std::path::Component::ParentDir))
+                .then(|| max_specificity(sources, file, extension_ok))
+                .flatten();
+
+            lexical.max(max_specificity(sources, &canonical, canonical_extension_ok))
+        };
+
+        let host = specificity(&self.host_sources);
+        let include = specificity(&self.include_sources);
+        let patch = specificity(&self.patch_sources);
         if host.is_none() && include.is_none() && patch.is_none() {
             return None;
         }
 
-        if self.is_excluded(&canonical) {
+        if self.is_excluded(file) || self.is_excluded(&canonical) {
             return None;
         }
 
@@ -132,12 +143,28 @@ impl WorkspaceMatcher {
             .filter(|root| !self.is_excluded(root))
     }
 
+    /// Whether a directory can contain files from any configured source.
+    #[must_use]
+    pub fn can_contain_files(&self, directory: &Path) -> bool {
+        let canonical = canonical_path(directory);
+        !self.is_excluded(directory)
+            && !self.is_excluded(&canonical)
+            && self.watch_roots().any(|root| {
+                directory.starts_with(root)
+                    || root.starts_with(directory)
+                    || canonical.starts_with(root)
+                    || root.starts_with(&canonical)
+            })
+    }
+
     /// File extensions accepted below the configured roots.
     pub fn extensions(&self) -> impl Iterator<Item = &OsStr> {
         self.extensions.iter().map(OsString::as_os_str)
     }
 
-    fn is_excluded(&self, canonical: &Path) -> bool {
+    /// Check an absolute source path against the configured exclusions.
+    #[must_use]
+    pub fn is_excluded(&self, canonical: &Path) -> bool {
         if !self.glob_excludes.is_empty() {
             if self.glob_excludes.is_match(canonical) {
                 return true;

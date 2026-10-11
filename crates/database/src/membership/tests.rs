@@ -181,3 +181,24 @@ fn missing_files_resolve_existing_parent_aliases_without_widening_source_globs()
     assert_eq!(matcher.classify(&alias.path().join("workspace/src/new/deep/New.txt")), None);
     assert_eq!(matcher.classify(&alias.path().join("workspace/other/New.php")), None);
 }
+
+#[cfg(unix)]
+#[test]
+fn nested_symlink_packages_keep_the_loaders_source_type_and_exclusions() {
+    let dir = fixture(&["src/Main.php"]);
+    let package = fixture(&["Service.php", "Hidden.php"]);
+    std::fs::create_dir(dir.path().join("vendor")).unwrap();
+    std::os::unix::fs::symlink(package.path(), dir.path().join("vendor/package")).unwrap();
+    let mut config = configuration(&dir, &["src"], &["vendor"], &[]);
+    config.excludes = vec![Exclusion::Pattern(Cow::Borrowed("vendor/package/Hidden.php"))];
+    let matcher = WorkspaceMatcher::from_configuration(&config).unwrap();
+    assert_rows(
+        &config,
+        &matcher,
+        &[("vendor/package/Service.php", Some(FileType::Vendored)), ("vendor/package/Hidden.php", None)],
+    );
+
+    assert!(matcher.can_contain_files(&config.workspace.join("vendor/package")));
+    assert!(!matcher.can_contain_files(&config.workspace.join("cache")));
+    assert_eq!(matcher.classify(&config.workspace.join("vendor/../../Outside.php")), None);
+}
