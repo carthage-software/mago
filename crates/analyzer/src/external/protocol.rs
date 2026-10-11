@@ -1651,8 +1651,8 @@ fn encode_callable_snapshot<'type_info>(
                 encode_union_snapshot_inner(writer, return_type, types, depth + 1)?;
             }
 
-            writer.write_bool(signature.source.is_some());
-            if let Some(source) = signature.source {
+            writer.write_bool(signature.get_source().is_some());
+            if let Some(source) = signature.get_source() {
                 encode_function_like_identifier(writer, source)?;
             }
 
@@ -3180,6 +3180,25 @@ fn validate_provider_indices(
 #[allow(clippy::unwrap_used)]
 pub(super) mod testing {
     use super::*;
+
+    #[test]
+    fn partial_callable_origins_do_not_change_snapshot_bytes() {
+        let signature = TCallableSignature::new(false, true)
+            .with_parameters(vec![
+                TCallableParameter::new(Some(Arc::new(get_int())), false, false, false)
+                    .with_name(Some(VariableIdentifier(word("$value")))),
+            ])
+            .with_return_type(Some(Arc::new(get_int())));
+        let partial = signature.clone().with_partial_source(Some(FunctionLikeIdentifier::Function(word("read"))));
+        let encode = |signature| {
+            let ty = TUnion::from_atomic(TAtomic::Callable(TCallable::Signature(signature)));
+            let mut writer = PayloadWriter::new();
+            encode_union_snapshot(&mut writer, &ty, &mut Vec::new(), 0).unwrap();
+            writer.finish()
+        };
+
+        assert_eq!(encode(partial), encode(signature));
+    }
 
     #[test]
     fn global_constant_references_roundtrip() {

@@ -55,8 +55,8 @@ pub(crate) fn is_contained_by(
             TCallable::Alias(identifier) => {
                 codebase.get_function_like(identifier).is_some_and(|m| m.flags.is_built_in())
             }
-            TCallable::Signature(signature) => signature.source.as_ref().is_some_and(|identifier| {
-                codebase.get_function_like(identifier).is_some_and(|m| m.flags.is_built_in())
+            TCallable::Signature(signature) => signature.get_source().is_some_and(|identifier| {
+                codebase.get_function_like(&identifier).is_some_and(|m| m.flags.is_built_in())
             }),
         };
 

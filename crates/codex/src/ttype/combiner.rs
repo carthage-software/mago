@@ -30,6 +30,7 @@ use crate::ttype::atomic::array::TArray;
 use crate::ttype::atomic::array::key::ArrayKey;
 use crate::ttype::atomic::array::keyed::TKeyedArray;
 use crate::ttype::atomic::array::list::TList;
+use crate::ttype::atomic::callable::TCallable;
 use crate::ttype::atomic::mixed::TMixed;
 use crate::ttype::atomic::mixed::truthiness::TMixedTruthiness;
 use crate::ttype::atomic::object::TObject;
@@ -1324,7 +1325,24 @@ fn scrape_type_properties(
         return;
     }
 
-    combination.value_types.insert(atomic.get_id(), atomic);
+    let key = atomic.get_id();
+    let mut atomic = atomic;
+    if let TAtomic::Callable(TCallable::Signature(signature)) = &mut atomic
+        && let Some(TAtomic::Callable(TCallable::Signature(previous))) = combination.value_types.get(&key)
+    {
+        if previous.invocation_target() != signature.invocation_target() {
+            signature.source = None;
+            signature.is_partial = false;
+        } else if signature.is_partial || previous.is_partial {
+            signature.is_partial = true;
+            for (parameter, previous) in signature.parameters.iter_mut().zip(previous.parameters.iter()) {
+                if parameter.get_name() != previous.get_name() {
+                    *parameter = parameter.clone().with_name(None);
+                }
+            }
+        }
+    }
+    combination.value_types.insert(key, atomic);
 }
 
 fn shapes_are_discriminated(
@@ -1644,7 +1662,83 @@ mod tests {
 
     use crate::ttype::atomic::TAtomic;
     use crate::ttype::atomic::array::list::TList;
+    use crate::ttype::atomic::callable::TCallableSignature;
     use crate::ttype::atomic::scalar::TScalar;
+
+    #[test]
+    fn partial_callable_names_survive_union_equality_shortcuts() {
+        use std::rc::Rc;
+
+        use crate::identifier::function_like::FunctionLikeIdentifier;
+        use crate::misc::VariableIdentifier;
+        use crate::ttype::atomic::callable::parameter::TCallableParameter;
+        use crate::ttype::{
+            add_optional_union_type_rc, combine_owned_union_types_rc, combine_union_types, combine_union_types_rc,
+        };
+
+        let key = FunctionLikeIdentifier::Function(word("read"));
+        let signature = |name: Option<&str>, partial: bool| {
+            let mut signature = TCallableSignature::new(false, true).with_source(Some(key)).with_parameters(vec![
+                TCallableParameter::default().with_name(name.map(|name| VariableIdentifier(word(name)))),
+            ]);
+            signature.is_partial = partial;
+            TUnion::from_atomic(TAtomic::Callable(TCallable::Signature(signature)))
+        };
+        let codebase = CodebaseMetadata::default();
+        let options = CombinerOptions::default();
+        let expected = signature(None, true);
+        for (left, right) in [("$value", "$other"), ("$other", "$value")] {
+            for (left_partial, right_partial) in [(true, true), (false, true), (true, false)] {
+                let left = Rc::new(signature(Some(left), left_partial));
+                let right = Rc::new(signature(Some(right), right_partial));
+                let results = [
+                    combine_union_types(&left, &right, &codebase, options),
+                    (*combine_union_types_rc(&left, &right, &codebase, options)).clone(),
+                    (*combine_owned_union_types_rc(Rc::clone(&left), &right, &codebase, options)).clone(),
+                    (*add_optional_union_type_rc(&left, Some(&right), &codebase)).clone(),
+                ];
+                for result in results {
+                    assert_eq!(result, expected);
+                    assert_eq!(combine_union_types(&result, &left, &codebase, options), expected);
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn callable_unions_keep_only_shared_invocation_origins() {
+        use crate::identifier::function_like::FunctionLikeIdentifier;
+
+        let read = FunctionLikeIdentifier::Function(word("read"));
+        let other = FunctionLikeIdentifier::Function(word("other"));
+        let partial = TCallableSignature::new(false, true).with_partial_source(Some(read));
+        assert_eq!(partial.get_source(), None);
+        assert_eq!(partial.invocation_target(), Some(read));
+        let same = combine(
+            vec![TAtomic::Callable(TCallable::Signature(partial.clone())); 2],
+            &CodebaseMetadata::default(),
+            CombinerOptions::default(),
+        );
+        assert_eq!(same, [TAtomic::Callable(TCallable::Signature(partial.clone()))]);
+        for conflict in [partial.clone().with_partial_source(Some(other)), partial.clone().with_source(None)] {
+            for reverse in [false, true] {
+                let mut signatures = [partial.clone(), conflict.clone()];
+                if reverse {
+                    signatures.reverse();
+                }
+                let combined = combine(
+                    signatures
+                        .into_iter()
+                        .chain([partial.clone()])
+                        .map(|sig| TAtomic::Callable(TCallable::Signature(sig)))
+                        .collect(),
+                    &CodebaseMetadata::default(),
+                    CombinerOptions::default(),
+                );
+                assert_eq!(combined, [TAtomic::Callable(TCallable::Signature(partial.clone().with_source(None)))]);
+            }
+        }
+    }
 
     #[test]
     fn first_keyed_shape_keeps_entries_and_empty_predecessor_makes_them_optional() {

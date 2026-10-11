@@ -246,7 +246,35 @@ where
 
     let placeholder_names: Vec<_> =
         new_parameters.iter().filter_map(|parameter| parameter.get_name().map(|name| name.0)).collect();
-    let mut constraints = Vec::new();
+    let mut constraints: Vec<_> = callable_signature
+        .constraints
+        .iter()
+        .filter_map(|constraint| {
+            let names: Vec<_> =
+                constraint.parameter_names.iter().copied().filter(|name| placeholder_names.contains(&name.0)).collect();
+            if names.is_empty() {
+                return None;
+            }
+
+            Some(TCallableConstraint::new(
+                names,
+                Arc::new(resolve_invocation_type(
+                    context,
+                    invocation,
+                    template_result,
+                    parameter_types,
+                    (*constraint.input_type).clone(),
+                )),
+                Arc::new(resolve_invocation_type(
+                    context,
+                    invocation,
+                    template_result,
+                    parameter_types,
+                    (*constraint.parameter_type).clone(),
+                )),
+            ))
+        })
+        .collect();
 
     for (index, original_parameter) in original_parameters.iter().enumerate() {
         let Some(parameter_name) = original_parameter.get_name() else {
@@ -288,6 +316,7 @@ where
     let new_signature = TCallableSignature::new(callable_signature.is_pure(), true)
         .with_parameters(new_parameters)
         .with_return_type(return_type)
+        .with_partial_source(callable_signature.invocation_target())
         .with_constraints(constraints);
 
     TAtomic::Callable(TCallable::Signature(new_signature))

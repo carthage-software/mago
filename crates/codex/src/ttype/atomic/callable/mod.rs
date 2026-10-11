@@ -1,3 +1,5 @@
+use std::cmp::Ordering;
+use std::hash::{Hash, Hasher};
 use std::sync::Arc;
 use std::sync::LazyLock;
 
@@ -24,7 +26,7 @@ static EMPTY_CONSTRAINTS: LazyLock<Arc<Vec<TCallableConstraint>>> = LazyLock::ne
 /// This includes parameter types and flags, return type, and purity information,
 /// often derived from `@param callable(ParamType...): ReturnType` docblock tags
 /// or inferred from usage.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, PartialOrd, Ord)]
+#[derive(Debug, Clone)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
 #[allow(clippy::box_collection, reason = "Keep the collection header off the stack to shrink every TAtomic.")]
 pub struct TCallableSignature {
@@ -32,15 +34,71 @@ pub struct TCallableSignature {
     pub is_pure: bool,
     /// `true` if this signature specifically represents a closure instance.
     pub is_closure: bool,
+    /// The source has bound arguments; its full parameter list must not replace this signature.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub is_partial: bool,
     /// Ordered list of parameters expected by the callable signature.
     pub parameters: Box<Vec<TCallableParameter>>,
     /// The return type of the callable, if specified. `None` implies `mixed` or unknown.
     pub return_type: Option<Arc<TUnion>>,
-    /// The source of the callable, if it is an alias or reference to another function-like construct.
+    /// The invoked declaration. Use `get_source()` when recovering its full signature.
     pub source: Option<FunctionLikeIdentifier>,
     /// Captured arguments whose validity depends on parameters that will be
     /// supplied when this callable is invoked.
     pub constraints: Arc<Vec<TCallableConstraint>>,
+}
+
+impl PartialEq for TCallableSignature {
+    fn eq(&self, other: &Self) -> bool {
+        self.is_pure == other.is_pure
+            && self.is_closure == other.is_closure
+            && self.is_partial == other.is_partial
+            && self.parameters == other.parameters
+            && self.return_type == other.return_type
+            && self.source == other.source
+            && self.constraints == other.constraints
+            && self.partial_parameter_names().eq(other.partial_parameter_names())
+    }
+}
+
+impl Eq for TCallableSignature {}
+
+impl Hash for TCallableSignature {
+    fn hash<H: Hasher>(&self, state: &mut H) {
+        (
+            self.is_pure,
+            self.is_closure,
+            self.is_partial,
+            &self.parameters,
+            &self.return_type,
+            self.source,
+            &self.constraints,
+        )
+            .hash(state);
+        for name in self.partial_parameter_names() {
+            name.hash(state);
+        }
+    }
+}
+
+impl PartialOrd for TCallableSignature {
+    fn partial_cmp(&self, other: &Self) -> Option<Ordering> {
+        Some(self.cmp(other))
+    }
+}
+
+impl Ord for TCallableSignature {
+    fn cmp(&self, other: &Self) -> Ordering {
+        self.is_pure
+            .cmp(&other.is_pure)
+            .then_with(|| self.is_closure.cmp(&other.is_closure))
+            .then_with(|| self.is_partial.cmp(&other.is_partial))
+            .then_with(|| self.parameters.cmp(&other.parameters))
+            .then_with(|| self.return_type.cmp(&other.return_type))
+            .then_with(|| self.source.cmp(&other.source))
+            .then_with(|| self.constraints.cmp(&other.constraints))
+            .then_with(|| self.partial_parameter_names().cmp(other.partial_parameter_names()))
+    }
 }
 
 /// A captured argument check deferred by a partial application.
@@ -77,6 +135,11 @@ pub enum TCallable {
 }
 
 impl TCallableSignature {
+    fn partial_parameter_names(&self) -> impl Iterator<Item = Option<&VariableIdentifier>> {
+        let parameters = if self.is_partial { self.parameters.as_slice() } else { &[] };
+        parameters.iter().map(TCallableParameter::get_name)
+    }
+
     /// Creates a new `CallableSignature` with the specified purity and closure status.
     #[inline]
     #[must_use]
@@ -84,6 +147,7 @@ impl TCallableSignature {
         Self {
             is_pure,
             is_closure,
+            is_partial: false,
             parameters: Box::default(),
             return_type: None,
             source: None,
@@ -138,10 +202,17 @@ impl TCallableSignature {
         self.is_closure
     }
 
-    /// Returns the source of the callable, if it is an alias or reference to another function-like construct.
+    /// Returns the declaration only when its full signature still applies.
     #[inline]
     #[must_use]
     pub fn get_source(&self) -> Option<FunctionLikeIdentifier> {
+        if self.is_partial { None } else { self.source }
+    }
+
+    /// Returns the invoked declaration, including the source of a partial application.
+    #[inline]
+    #[must_use]
+    pub fn invocation_target(&self) -> Option<FunctionLikeIdentifier> {
         self.source
     }
 
@@ -166,6 +237,16 @@ impl TCallableSignature {
     #[must_use]
     pub fn with_source(mut self, source: Option<FunctionLikeIdentifier>) -> Self {
         self.source = source;
+        self.is_partial = false;
+        self
+    }
+
+    /// Retains a partial application's declaration without restoring its bound parameters.
+    #[inline]
+    #[must_use]
+    pub fn with_partial_source(mut self, source: Option<FunctionLikeIdentifier>) -> Self {
+        self.source = source;
+        self.is_partial = source.is_some();
         self
     }
 
@@ -384,5 +465,34 @@ impl TType for TCallable {
             }
             TCallable::Alias(_) => self.get_id(),
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use std::collections::{BTreeSet, HashSet};
+
+    use super::*;
+
+    #[test]
+    fn partial_parameter_names_participate_in_identity_only_for_partials() {
+        let key = FunctionLikeIdentifier::Function(word("read"));
+        let signature = |name| {
+            TCallableSignature::new(false, true)
+                .with_source(Some(key))
+                .with_parameters(vec![TCallableParameter::default().with_name(Some(VariableIdentifier(word(name))))])
+        };
+        let left = signature("$value");
+        let right = signature("$other");
+        assert_eq!(left, right);
+        assert_eq!(left.cmp(&right), Ordering::Equal);
+        assert_eq!(HashSet::from([left.clone(), right.clone()]).len(), 1);
+        let left = left.with_partial_source(Some(key));
+        let right = right.with_partial_source(Some(key));
+        assert_ne!(left, right);
+        assert_ne!(left.cmp(&right), Ordering::Equal);
+        assert_eq!(left.cmp(&right), right.cmp(&left).reverse());
+        assert_eq!(HashSet::from([left.clone(), right.clone(), left.clone()]).len(), 2);
+        assert_eq!(BTreeSet::from([left.clone(), right.clone(), left]).len(), 2);
     }
 }

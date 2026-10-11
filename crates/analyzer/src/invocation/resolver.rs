@@ -568,6 +568,19 @@ where
     let subject = inferred_type_replacer::replace(&subject, template_result, context.codebase);
     let target = inferred_type_replacer::replace(&target, template_result, context.codebase);
 
+    if [&subject, &target]
+        .iter()
+        .any(|union| union.any_child_node(|node| matches!(node, TypeRef::Atomic(TAtomic::Variable(_)))))
+    {
+        return vec![TAtomic::Conditional(TConditional::new(
+            Arc::new(subject),
+            Arc::new(target),
+            Arc::new(then_type),
+            Arc::new(otherwise_type),
+            negated,
+        ))];
+    }
+
     if !subject.is_never() {
         let mut comparison_result = ComparisonResult::new();
         let subject_is_contained = union_comparator::is_contained_by(

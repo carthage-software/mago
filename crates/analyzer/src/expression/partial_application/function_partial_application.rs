@@ -77,48 +77,46 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for FunctionPartialApplication<'aren
         } else {
             let mut closure_types = Vec::new();
             for callable in callables {
-                let (identifier, signature) = match &callable {
-                    TCallable::Alias(id) => {
-                        let Some(sig) =
-                            get_parameter_dependent_signature_of_function_like_identifier(id, context.codebase)
-                        else {
-                            continue;
-                        };
-
-                        (*id, sig)
-                    }
-                    TCallable::Signature(sig) => {
-                        if let Some(source_id) = sig.get_source() {
-                            let Some(signature) = get_parameter_dependent_signature_of_function_like_identifier(
-                                &source_id,
-                                context.codebase,
-                            ) else {
-                                continue;
-                            };
-
-                            (source_id, signature)
-                        } else {
-                            continue;
-                        }
-                    }
+                let identifier = match &callable {
+                    TCallable::Alias(identifier) => Some(*identifier),
+                    TCallable::Signature(signature) => signature.get_source(),
                 };
+                let (signature, invocation_target) = if let Some(identifier) = identifier {
+                    let Some(signature) =
+                        get_parameter_dependent_signature_of_function_like_identifier(&identifier, context.codebase)
+                    else {
+                        continue;
+                    };
 
-                let Some(metadata) = context.codebase.get_function_like(&identifier) else {
+                    let Some(metadata) = context.codebase.get_function_like(&identifier) else {
+                        continue;
+                    };
+
+                    let target = InvocationTarget::FunctionLike {
+                        identifier,
+                        metadata,
+                        inferred_return_type: None,
+                        effective_signature: None,
+                        method_context: None,
+                        span: self.function.span(),
+                    };
+
+                    (signature, target)
+                } else if let TCallable::Signature(signature) = &callable {
+                    let target = InvocationTarget::Callable {
+                        source: None,
+                        signature: signature.clone(),
+                        effective_signature: None,
+                        span: self.function.span(),
+                    };
+
+                    (signature.clone(), target)
+                } else {
                     continue;
                 };
 
-                // Get parameters from metadata before creating InvocationTarget
                 let original_parameters: Vec<_> =
-                    metadata.parameters.iter().map(InvocationTargetParameter::FunctionLike).collect();
-
-                let invocation_target = InvocationTarget::FunctionLike {
-                    identifier,
-                    metadata,
-                    inferred_return_type: None,
-                    effective_signature: None,
-                    method_context: None,
-                    span: self.function.span(),
-                };
+                    signature.get_parameters().iter().map(InvocationTargetParameter::Callable).collect();
 
                 let mut invocation = Invocation::new(
                     invocation_target,
