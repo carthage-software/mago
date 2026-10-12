@@ -1429,30 +1429,15 @@ pub fn get_iterable_parameters(atomic: &TAtomic, codebase: &CodebaseMetadata) ->
                     break 'parameters None;
                 }
 
-                let is_iterator_interface = name == iterator || name == traversable || name == iterator_aggregate;
-                if !is_iterator_interface
-                    && codebase.is_instance_of(class_metadata.name.as_bytes(), iterator.as_bytes())
-                    && let (Some(key_type), Some(value_type)) = (
-                        get_iterator_method_return_type(codebase, name, b"key"),
-                        get_iterator_method_return_type(codebase, name, b"current"),
-                    )
-                {
-                    let contains_generic_param = |t: &TUnion| t.types.iter().any(atomic::TAtomic::is_generic_parameter);
-
-                    if !key_type.is_mixed()
-                        && !value_type.is_mixed()
-                        && !contains_generic_param(&key_type)
-                        && !contains_generic_param(&value_type)
-                    {
-                        return Some((key_type, value_type));
-                    }
-                }
+                let is_iterator_interface = name.as_bytes().eq_ignore_ascii_case(b"iterator")
+                    || name.as_bytes().eq_ignore_ascii_case(b"traversable")
+                    || name.as_bytes().eq_ignore_ascii_case(b"iteratoraggregate");
 
                 let traversable_metadata = codebase.get_class_like(traversable.as_bytes())?;
                 let key_template = traversable_metadata.template_types.get_index(0).map(|(name, _)| *name)?;
                 let value_template = traversable_metadata.template_types.get_index(1).map(|(name, _)| *name)?;
 
-                let key_type = get_specialized_template_type(
+                let mut key_type = get_specialized_template_type(
                     codebase,
                     key_template,
                     traversable,
@@ -1461,7 +1446,7 @@ pub fn get_iterable_parameters(atomic: &TAtomic, codebase: &CodebaseMetadata) ->
                 )
                 .unwrap_or_else(get_mixed);
 
-                let value_type = get_specialized_template_type(
+                let mut value_type = get_specialized_template_type(
                     codebase,
                     value_template,
                     traversable,
@@ -1469,6 +1454,62 @@ pub fn get_iterable_parameters(atomic: &TAtomic, codebase: &CodebaseMetadata) ->
                     object.get_type_parameters(),
                 )
                 .unwrap_or_else(get_mixed);
+
+                resolve_unbound_generic_parameters(codebase, &mut key_type);
+                resolve_unbound_generic_parameters(codebase, &mut value_type);
+
+                if !is_iterator_interface {
+                    if codebase.is_instance_of(class_metadata.name.as_bytes(), iterator.as_bytes()) {
+                        if key_type.is_mixed() {
+                            if let Some(mut method_key) = get_iterator_method_return_type(
+                                codebase,
+                                class_metadata,
+                                object.get_type_parameters(),
+                                b"key",
+                            ) {
+                                resolve_unbound_generic_parameters(codebase, &mut method_key);
+                                if !method_key.is_mixed() {
+                                    key_type = method_key;
+                                }
+                            }
+                        }
+
+                        if value_type.is_mixed() {
+                            if let Some(mut method_val) = get_iterator_method_return_type(
+                                codebase,
+                                class_metadata,
+                                object.get_type_parameters(),
+                                b"current",
+                            ) {
+                                resolve_unbound_generic_parameters(codebase, &mut method_val);
+                                if !method_val.is_mixed() {
+                                    value_type = method_val;
+                                }
+                            }
+                        }
+                    } else if (key_type.is_mixed() || value_type.is_mixed())
+                        && codebase.is_instance_of(class_metadata.name.as_bytes(), iterator_aggregate.as_bytes())
+                    {
+                        if let Some(inner_iter) = get_iterator_method_return_type(
+                            codebase,
+                            class_metadata,
+                            object.get_type_parameters(),
+                            b"getiterator",
+                        ) {
+                            for atomic_inner in inner_iter.types.iter() {
+                                if let Some((inner_k, inner_v)) = get_iterable_parameters(atomic_inner, codebase) {
+                                    if key_type.is_mixed() && !inner_k.is_mixed() {
+                                        key_type = inner_k;
+                                    }
+                                    if value_type.is_mixed() && !inner_v.is_mixed() {
+                                        value_type = inner_v;
+                                    }
+                                    break;
+                                }
+                            }
+                        }
+                    }
+                }
 
                 Some((key_type, value_type))
             }
@@ -1710,14 +1751,59 @@ pub fn get_specialized_template_type(
     Some(template_type)
 }
 
+fn resolve_unbound_generic_parameters(codebase: &CodebaseMetadata, union: &mut TUnion) {
+    if !union.has_template_types() {
+        return;
+    }
+
+    let mut template_result = TemplateResult::default();
+    for node in union.get_all_child_nodes() {
+        if let TypeRef::Atomic(TAtomic::GenericParameter(parameter)) = node {
+            template_result.add_lower_bound(
+                parameter.parameter_name,
+                parameter.defining_entity,
+                (*parameter.constraint).clone(),
+            );
+        }
+    }
+
+    if !template_result.lower_bounds.is_empty() {
+        *union = inferred_type_replacer::replace(union, &template_result, codebase);
+    }
+}
+
 fn get_iterator_method_return_type(
     codebase: &CodebaseMetadata,
-    class_name: Word,
+    class_metadata: &ClassLikeMetadata,
+    type_parameters: Option<&[TUnion]>,
     method_name: &[u8],
 ) -> Option<TUnion> {
-    let method = codebase.get_declaring_method(class_name.as_bytes(), method_name)?;
+    let method = codebase.get_declaring_method(class_metadata.name.as_bytes(), method_name)?;
     let return_type_meta = method.return_type_metadata.as_ref()?;
     let mut return_type = return_type_meta.type_union.clone();
+
+    if return_type.has_template_types() {
+        let mut template_result = TemplateResult::default();
+        for node in return_type.get_all_child_nodes() {
+            if let TypeRef::Atomic(TAtomic::GenericParameter(parameter)) = node
+                && let GenericParent::ClassLike(class_name) = parameter.defining_entity
+                && let Some(template_type) = get_specialized_template_type(
+                    codebase,
+                    parameter.parameter_name,
+                    class_name,
+                    class_metadata,
+                    type_parameters,
+                )
+            {
+                template_result.add_lower_bound(parameter.parameter_name, parameter.defining_entity, template_type);
+            }
+        }
+
+        if !template_result.lower_bounds.is_empty() {
+            return_type = inferred_type_replacer::replace(&return_type, &template_result, codebase);
+        }
+    }
+
     expander::expand_union(codebase, &mut return_type, &TypeExpansionOptions::default());
     Some(return_type)
 }
