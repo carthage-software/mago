@@ -31,12 +31,14 @@ pub struct ComparisonResult {
 }
 
 impl Default for ComparisonResult {
+    #[inline]
     fn default() -> Self {
         Self::new()
     }
 }
 
 impl ComparisonResult {
+    #[inline]
     #[must_use]
     pub fn new() -> Self {
         Self {

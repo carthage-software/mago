@@ -144,3 +144,38 @@ function processUnboundOrders(LegacyOrderList $list): int
 
     return $sum;
 }
+
+final class AggregateItemList implements \IteratorAggregate // @mago-expect analysis:missing-template-parameter
+{
+    public function getIterator(): ItemCollection
+    {
+        return new ItemCollection();
+    }
+}
+
+function processAggregateItems(AggregateItemList $list): int
+{
+    $total = 0;
+    foreach ($list as $item) {
+        $total += $item->getId();
+        $item->unknownMethod(); // @mago-expect analysis:non-existent-method
+    }
+
+    return $total;
+}
+
+final class CyclicAggregate implements \IteratorAggregate // @mago-expect analysis:missing-template-parameter
+{
+    public function getIterator(): self
+    {
+        return $this;
+    }
+}
+
+function processCyclic(CyclicAggregate $cyclic): void
+{
+    foreach ($cyclic as $item) { // @mago-expect analysis:mixed-assignment
+        // Must not crash or overflow stack.
+    }
+}
+

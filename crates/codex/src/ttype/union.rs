@@ -1313,6 +1313,7 @@ impl TType for TUnion {
 }
 
 impl PartialEq for TUnion {
+    #[inline]
     fn eq(&self, other: &TUnion) -> bool {
         if std::ptr::eq(self, other) {
             return true;
@@ -1335,6 +1336,11 @@ impl PartialEq for TUnion {
         let len = self.types.len();
         if len != other.types.len() {
             return false;
+        }
+
+        // Fast path: pointer equality on the underlying types slice (common for shared static types).
+        if std::ptr::eq(self.types.as_ptr(), other.types.as_ptr()) {
+            return true;
         }
 
         // Fast path: unions are commonly constructed in stable type order.

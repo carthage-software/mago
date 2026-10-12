@@ -29,7 +29,7 @@ pub fn is_contained_by(
     inside_assertion: bool,
     union_comparison_result: &mut ComparisonResult,
 ) -> bool {
-    if input_type == container_type {
+    if std::ptr::eq(input_type, container_type) || input_type == container_type {
         return true;
     }
 
