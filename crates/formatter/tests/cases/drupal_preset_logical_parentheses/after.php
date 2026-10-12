@@ -11,8 +11,10 @@ class AccessCheck {
 
     if (
       $this->token === NULL
-      || ($this->lookahead !== NULL
-      && ($this->lookahead->position - $this->token->position) === strlen($this->token->value))
+      || (
+        $this->lookahead !== NULL
+        && ($this->lookahead->position - $this->token->position) === strlen($this->token->value)
+      )
     ) {
       return FALSE;
     }
