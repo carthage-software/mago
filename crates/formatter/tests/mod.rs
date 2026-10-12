@@ -169,6 +169,7 @@ test_case!(inline_control_structures);
 test_case!(aligned_inline_control_structures);
 test_case!(following_clause_on_newline);
 test_case!(switch_case_comments);
+test_case!(dedent_comments_after_case_terminator);
 test_case!(try_catch_trailing_comment);
 test_case!(html_template);
 test_case!(complex_html_template);

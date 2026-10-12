@@ -1245,6 +1245,14 @@ generate_formatter_settings! {
     /// Default: true
     indent_heredoc: bool => "default_true",
 
+    /// Whether to print own-line comments that follow a case body ending in `break`, `continue`,
+    /// `return`, `throw` or `exit` at the indent of the case label instead of the case body.
+    ///
+    /// Comments after a case body that falls through keep the body's indent.
+    ///
+    /// Default: false
+    dedent_comments_after_case_terminator: bool => "default_false",
+
     /// Whether to print boolean and null literals in upper-case (e.g. `TRUE`, `FALSE`, `NULL`).
     /// When enabled these literals are printed in uppercase; when disabled they are printed
     /// in lowercase.

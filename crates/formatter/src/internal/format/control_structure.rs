@@ -2,7 +2,9 @@ use mago_allocator::Arena;
 use mago_allocator::vec::Vec;
 use mago_allocator::vec_in;
 use mago_span::HasSpan;
+use mago_span::Span;
 use mago_syntax::cst::Break;
+use mago_syntax::cst::Construct;
 use mago_syntax::cst::Continue;
 use mago_syntax::cst::DoWhile;
 use mago_syntax::cst::Expression;
@@ -489,6 +491,33 @@ fn push_indented_case_statements<'arena, A>(
     }
 }
 
+/// Print the own-line comments between a case body and the next label.
+fn print_trailing_case_comments<'arena, A>(
+    f: &mut FormatterState<'_, 'arena, A>,
+    span: Span,
+    statements: &'arena Sequence<'arena, Statement<'arena>>,
+) -> Option<Document<'arena, A>>
+where
+    A: Arena,
+{
+    let indent =
+        !f.settings.dedent_comments_after_case_terminator || !statements.last().is_some_and(is_case_terminator);
+
+    f.print_trailing_own_line_comments(span, indent)
+}
+
+/// Whether the statement leaves the case: `break`, `continue`, `return`, `throw`, `exit` or `die`.
+fn is_case_terminator(statement: &Statement<'_>) -> bool {
+    match statement {
+        Statement::Break(_) | Statement::Continue(_) | Statement::Return(_) => true,
+        Statement::Expression(statement) => matches!(
+            statement.expression,
+            Expression::Throw(_) | Expression::Construct(Construct::Exit(_) | Construct::Die(_))
+        ),
+        _ => false,
+    }
+}
+
 impl<'arena, A> Format<'arena, A> for SwitchExpressionCase<'arena>
 where
     A: Arena,
@@ -498,7 +527,7 @@ where
             let mut parts = vec_in![f.arena; self.case.format(f), Document::space(), self.expression.format(f), self.separator.format(f)];
 
             push_indented_case_statements(f, &mut parts, &self.statements);
-            if let Some(comments) = f.print_trailing_own_line_comments(self.span()) {
+            if let Some(comments) = print_trailing_case_comments(f, self.span(), &self.statements) {
                 parts.push(comments);
             }
 
@@ -515,7 +544,7 @@ where
         wrap!(f, self, SwitchDefaultCase, {
             let mut parts = vec_in![f.arena; self.default.format(f), self.separator.format(f)];
             push_indented_case_statements(f, &mut parts, &self.statements);
-            if let Some(comments) = f.print_trailing_own_line_comments(self.span()) {
+            if let Some(comments) = print_trailing_case_comments(f, self.span(), &self.statements) {
                 parts.push(comments);
             }
 

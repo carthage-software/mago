@@ -213,6 +213,7 @@ const DEFAULT_PRESET: FormatSettings = FormatSettings {
     separate_attributes: false,
     separate_trait_use: true,
     indent_heredoc: true,
+    dedent_comments_after_case_terminator: false,
     uppercase_literal_keyword: false,
 };
 
@@ -319,5 +320,6 @@ const DRUPAL_PRESET: FormatSettings = FormatSettings {
     empty_line_before_class_like_close: true,
     separate_trait_use: false,
     uppercase_literal_keyword: true,
+    dedent_comments_after_case_terminator: true,
     ..DEFAULT_PRESET
 };

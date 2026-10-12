@@ -433,8 +433,14 @@ where
 
     /// Print own-line comments after a node until the next non-comment token,
     /// keeping them inside that node's body rather than with the following label.
+    ///
+    /// With `indent` false, the comments are printed at the node's own indent.
     #[must_use]
-    pub(crate) fn print_trailing_own_line_comments(&mut self, range: Span) -> Option<Document<'arena, A>> {
+    pub(crate) fn print_trailing_own_line_comments(
+        &mut self,
+        range: Span,
+        indent: bool,
+    ) -> Option<Document<'arena, A>> {
         let mut end = self.end_offset_with_printed_comments(range);
         let mut parts = vec_in![self.arena];
         while let Some(trivia) = self.all_comments.get(self.next_comment_index) {
@@ -460,7 +466,13 @@ where
             self.next_comment_index += 1;
         }
 
-        if parts.is_empty() { None } else { Some(Document::Indent(parts)) }
+        if parts.is_empty() {
+            None
+        } else if indent {
+            Some(Document::Indent(parts))
+        } else {
+            Some(Document::Array(parts))
+        }
     }
 
     #[must_use]
