@@ -956,7 +956,15 @@ where
     }
 
     let should_break = must_break || member_access_chain.has_breaking_arguments();
-    if should_break && !matches!(f.parent_node(), Node::Binary(_)) {
+    if should_break
+        && match f.parent_node() {
+            Node::Binary(binary) => {
+                f.settings.preserve_breaking_member_access_chain
+                    && (binary.operator.is_logical() || binary.operator.is_comparison())
+            }
+            _ => true,
+        }
+    {
         parts.push(Document::BreakParent);
     }
 

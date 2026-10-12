@@ -800,15 +800,13 @@ where
     A: Arena,
 {
     let was_in_condition = f.in_condition;
-    let was_must_break_condition = f.must_break_condition;
+    let was_condition_group_id = f.condition_group_id.take();
     f.in_condition = true;
 
     let must_break = f.settings.preserve_breaking_condition_expression
         && (has_new_line_in_range(f.source_text, left_parenthesis.end.offset, condition.span().start.offset)
             || (f.settings.preserve_breaking_binary_expression
                 && contains_breaking_binary_expression(f.source_text, condition)));
-
-    f.must_break_condition = must_break;
 
     let has_breaking_concat = match condition {
         Expression::Call(call) => {
@@ -834,6 +832,7 @@ where
         ]))
     } else {
         let group_id = f.next_id();
+        f.condition_group_id = f.settings.preserve_breaking_condition_expression.then_some(group_id);
 
         Document::Group(
             Group::new(vec_in![f.arena;
@@ -852,7 +851,7 @@ where
     };
 
     f.in_condition = was_in_condition;
-    f.must_break_condition = was_must_break_condition;
+    f.condition_group_id = was_condition_group_id;
 
     condition
 }

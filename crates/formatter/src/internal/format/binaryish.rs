@@ -18,6 +18,7 @@ use mago_syntax::token::Precedence;
 use crate::document::BreakMode;
 use crate::document::Document;
 use crate::document::Group;
+use crate::document::IfBreak;
 use crate::document::IndentIfBreak;
 use crate::document::Line;
 use crate::internal::FormatterState;
@@ -576,18 +577,16 @@ fn push_binaryish_operation<'arena, A>(
         || has_placed_leading_comment_in_leftmost(f, operation.right);
     let line_before_operator = f.settings.line_before_binary_operator && !has_leading_comment_on_right;
     let operator_has_leading_comments = f.has_comment(operation.operator.span(), CommentFlags::LEADING);
-    let force_break = f.must_break_condition && line_before_operator && operation.operator.is_logical();
     let mut right_document = vec_in![f.arena];
 
     right_document.push(
-        if force_break || operator_has_leading_comments || (line_before_operator && !operation.should_inline) {
-            Document::Line(if force_break {
-                Line::hard()
-            } else if has_space_around {
-                Line::default()
-            } else {
-                Line::soft()
-            })
+        if let Some(group_id) = f.condition_group_id
+            && line_before_operator
+            && operation.operator.is_logical()
+        {
+            Document::IfBreak(IfBreak::new(f.arena, Document::Line(Line::hard()), Document::space()).with_id(group_id))
+        } else if operator_has_leading_comments || (line_before_operator && !operation.should_inline) {
+            Document::Line(if has_space_around { Line::default() } else { Line::soft() })
         } else {
             Document::String(if has_space_around { b" " } else { b"" })
         },
@@ -622,16 +621,14 @@ fn push_binaryish_operation<'arena, A>(
                 && operation.right.node_kind() != NodeKind::Binary));
 
     if should_group {
-        parts.push(Document::Group(
-            Group::new(right_document).with_break_mode(if force_break || operation.should_break {
-                BreakMode::Force
-            } else {
-                BreakMode::Auto
-            }),
-        ));
+        parts.push(Document::Group(Group::new(right_document).with_break_mode(if operation.should_break {
+            BreakMode::Force
+        } else {
+            BreakMode::Auto
+        })));
     } else {
         parts.extend(right_document);
-        if force_break || (operation.is_nested && operation.should_break) {
+        if operation.is_nested && operation.should_break {
             parts.push(Document::BreakParent);
         }
     }

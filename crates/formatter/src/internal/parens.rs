@@ -19,6 +19,7 @@ use mago_syntax::token::Precedence;
 
 use crate::document::Document;
 use crate::document::Group;
+use crate::document::IfBreak;
 use crate::document::IndentIfBreak;
 use crate::document::Line;
 use crate::internal::FormatterState;
@@ -36,26 +37,32 @@ where
     ) -> Document<'arena, A> {
         if has_leading_comments || self.should_indent(node) {
             let group_id = self.next_id();
+            let condition_group_id = self
+                .condition_group_id
+                .filter(|_| matches!(node, Node::Binary(binary) if binary.operator.is_logical()));
+            let line = if self.settings.space_within_grouping_parenthesis { Line::default() } else { Line::soft() };
+            let wrap_line = || {
+                if let Some(condition_group_id) = condition_group_id {
+                    Document::IfBreak(
+                        IfBreak::new(self.arena, Document::Line(Line::hard()), Document::Line(line))
+                            .with_id(condition_group_id),
+                    )
+                } else {
+                    Document::Line(line)
+                }
+            };
 
             Document::Group(
                 Group::new(vec_in![self.arena;
                     Document::String(b"("),
                     Document::IndentIfBreak(IndentIfBreak::new(
-                        group_id,
+                        condition_group_id.unwrap_or(group_id),
                         vec_in![self.arena;
-                            if self.settings.space_within_grouping_parenthesis {
-                                Document::Line(Line::default())
-                            } else {
-                                Document::Line(Line::soft())
-                            },
+                            wrap_line(),
                             document,
                         ]
                     )),
-                    if self.settings.space_within_grouping_parenthesis {
-                        Document::Line(Line::default())
-                    } else {
-                        Document::Line(Line::soft())
-                    },
+                    wrap_line(),
                     Document::String(b")"),
                 ])
                 .with_id(group_id),
