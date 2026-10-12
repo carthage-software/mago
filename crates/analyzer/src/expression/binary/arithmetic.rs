@@ -11,6 +11,8 @@ use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
 use mago_codex::ttype::atomic::mixed::TMixed;
+use mago_codex::ttype::atomic::object::TObject;
+use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::float::TFloat;
 use mago_codex::ttype::atomic::scalar::int::TInteger;
@@ -28,6 +30,7 @@ use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::cst::Binary;
 use mago_syntax::cst::BinaryOperator;
+use mago_word::word;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -353,6 +356,37 @@ where
                 pair_result_atomics.push(string_bitwise_result(&binary.operator, &left_atomic, &right_atomic));
                 has_valid_left_operand = true;
                 has_valid_right_operand = true;
+            } else if is_bcmath_number_operation(&binary.operator, &left_atomic, &right_atomic) {
+                let left_is_operand = is_bcmath_number_operand(&left_atomic);
+                let right_is_operand = is_bcmath_number_operand(&right_atomic);
+
+                if left_is_operand {
+                    has_valid_left_operand = true;
+                } else {
+                    invalid_left_messages.push((
+                        format!("Cannot use {} as an operand of BcMath\\Number arithmetic", left_atomic.get_id()),
+                        binary.lhs.span(),
+                    ));
+                }
+
+                if !right_is_operand {
+                    invalid_right_messages.push((
+                        format!("Cannot use {} as an operand of BcMath\\Number arithmetic", right_atomic.get_id()),
+                        binary.rhs.span(),
+                    ));
+                } else if is_division_by_literal_zero(&binary.operator, &right_atomic) {
+                    invalid_right_messages.push(("Division or modulo by zero".to_string(), binary.rhs.span()));
+                } else {
+                    has_valid_right_operand = true;
+                }
+
+                if left_is_operand && right_is_operand && !is_division_by_literal_zero(&binary.operator, &right_atomic)
+                {
+                    pair_result_atomics
+                        .push(TAtomic::Object(TObject::Named(TNamedObject::new(word(b"BcMath\\Number")))));
+                } else {
+                    invalid_pair = true;
+                }
             } else if left_atomic.is_numeric() && right_atomic.is_numeric() {
                 if let Some(reason) = definite_arithmetic_runtime_error(&binary.operator, &right_atomic) {
                     invalid_right_messages.push((reason, binary.rhs.span()));
@@ -945,6 +979,69 @@ fn key_could_be_in_param(key: &ArrayKey, param: &TUnion) -> bool {
         ArrayKey::Integer(_) => param.has_int(),
         ArrayKey::String(_) => param.has_string() || param.has_array_key(),
         ArrayKey::ClassLikeConstant { .. } => true,
+    }
+}
+
+/// `BcMath\Number` (PHP 8.4) overloads `+ - * / % **`, so these operators take a `Number` on
+/// either side; the other operand is then checked by [`is_bcmath_number_operand`].
+fn is_bcmath_number_operation(op: &BinaryOperator<'_>, left: &TAtomic, right: &TAtomic) -> bool {
+    matches!(
+        op,
+        BinaryOperator::Addition(_)
+            | BinaryOperator::Subtraction(_)
+            | BinaryOperator::Multiplication(_)
+            | BinaryOperator::Division(_)
+            | BinaryOperator::Modulo(_)
+            | BinaryOperator::Exponentiation(_)
+    ) && (is_bcmath_number(left) || is_bcmath_number(right))
+}
+
+fn is_bcmath_number(atomic: &TAtomic) -> bool {
+    matches!(atomic, TAtomic::Object(TObject::Named(named)) if named.get_name().as_bytes().eq_ignore_ascii_case(b"BcMath\\Number"))
+}
+
+/// What PHP accepts beside a `BcMath\Number`: another `Number`, an `int` (a `bool` reaches here
+/// already turned into one) or a numeric string. A `float` is rejected on purpose, although PHP
+/// only truncates it to `int` with a deprecation notice. A general `numeric-string` is accepted
+/// even though BCMath throws on forms like `'1e3'`; a literal string is checked exactly.
+fn is_bcmath_number_operand(atomic: &TAtomic) -> bool {
+    match atomic {
+        TAtomic::Scalar(TScalar::Integer(_)) => true,
+        TAtomic::Scalar(TScalar::String(string)) => match string.get_known_literal_value() {
+            Some(literal) => is_bcmath_number_literal(literal),
+            None => string.is_numeric,
+        },
+        _ => is_bcmath_number(atomic),
+    }
+}
+
+/// BCMath's string grammar: an optional sign, digits and at most one decimal point. No exponent,
+/// whitespace or digit separators; the empty string reads as zero.
+fn is_bcmath_number_literal(literal: &[u8]) -> bool {
+    let unsigned = literal.strip_prefix(b"+").or_else(|| literal.strip_prefix(b"-")).unwrap_or(literal);
+    let mut seen_decimal_point = false;
+
+    unsigned.iter().all(|byte| match byte {
+        b'0'..=b'9' => true,
+        b'.' if !seen_decimal_point => {
+            seen_decimal_point = true;
+            true
+        }
+        _ => false,
+    })
+}
+
+/// `Number / 0` and `Number % 0` throw `DivisionByZeroError`, for a zero `int` or zero numeric string alike.
+fn is_division_by_literal_zero(op: &BinaryOperator<'_>, right: &TAtomic) -> bool {
+    if !matches!(op, BinaryOperator::Division(_) | BinaryOperator::Modulo(_)) {
+        return false;
+    }
+
+    match right {
+        TAtomic::Scalar(TScalar::String(string)) => string.get_known_literal_value().is_some_and(|literal| {
+            is_bcmath_number_literal(literal) && literal.iter().all(|byte| matches!(byte, b'0' | b'.' | b'+' | b'-'))
+        }),
+        _ => matches!(right.get_literal_int_value(), Some(0)),
     }
 }
 
