@@ -49,8 +49,6 @@ use mago_word::word;
 use crate::identifier::method::MethodIdentifier;
 use crate::metadata::CodebaseMetadata;
 use crate::metadata::flags::MetadataFlags;
-use crate::metadata::function_like::FunctionLikeKind;
-use crate::metadata::function_like::FunctionLikeMetadata;
 use crate::scanner::class_alias::scan_class_like_alias;
 use crate::scanner::class_like::register_anonymous_class;
 use crate::scanner::class_like::register_class;
@@ -826,27 +824,11 @@ where
         return;
     };
 
-    if class_like_metadata.flags.has_consistent_constructor() {
-        let constructor_name = word("__construct");
-
-        class_like_metadata.methods.insert(constructor_name);
-        let constructor_method_id = MethodIdentifier::new(class_like_metadata.name, constructor_name);
-        class_like_metadata.add_declaring_method_id(constructor_name, constructor_method_id);
-        class_like_metadata.inheritable_method_ids.insert(constructor_name, constructor_method_id);
-
-        let mut flags = MetadataFlags::PURE;
-        flags |= MetadataFlags::origin_flags(context.file.file_type);
-
-        scanner.codebase.function_likes.insert(
-            (class_like_metadata.name, constructor_name),
-            Box::new(FunctionLikeMetadata::new(
-                FunctionLikeKind::Method,
-                constructor_name,
-                constructor_name,
-                class_like_metadata.span,
-                flags,
-            )),
-        );
+    if class_like_metadata.flags.has_consistent_constructor()
+        && !context.file.file_type.is_patch()
+        && let Some(constructor) = class_like_metadata.add_implicit_constructor()
+    {
+        scanner.codebase.function_likes.insert((class_like_metadata.name, constructor.name), Box::new(constructor));
     }
 
     scanner.codebase.class_likes.insert(class_like_id, class_like_metadata);

@@ -95,7 +95,7 @@ where
 
             if let Some(document) = document.as_ref() {
                 for tag in document.tags() {
-                    if apply_common_metadata_flag(&mut meta.flags, &tag.value) {
+                    if apply_common_metadata_flag(&mut meta.flags, &mut meta.explicit_docblock_flags, &tag.value) {
                         continue;
                     }
 

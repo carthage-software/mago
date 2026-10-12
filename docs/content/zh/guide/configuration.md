@@ -175,7 +175,7 @@ Mago 区分你的代码、第三方代码、类型补丁,以及完全要忽略�
 
 - **`paths`** 是你的源码文件。Mago 会对它们进行分析、lint 和格式化。
 - **`includes`** 是依赖(通常是 `vendor`)。Mago 会解析它们以解析符号和类型,但绝不会分析、lint 或重写它们。
-- **`patches`** 是为第三方代码或内置代码提供类型补丁的 PHP 文件。Mago 优先使用其中的类型声明和 PHPDoc,但不分析、lint 或格式化这些文件。详见[修补第三方代码的类型](#修补第三方代码的类型)。
+- **`patches`** 是为第三方代码或内置代码提供类型及受支持语义 PHPDoc 标记补丁的 PHP 文件。Mago 优先使用其中的类型声明、PHPDoc 和受支持标记,但不分析、lint 或格式化这些文件。详见[修补第三方代码的类型](#修补第三方代码的类型)。
 - **`excludes`** 是 Mago 完全忽略的路径或 glob。它们对所有工具生效。
 
 如果一个文件同时匹配 `paths` 和 `includes`,更具体的模式胜出。精确文件路径最具体,其次是更深的目录路径,然后是较浅的目录路径,最后是 glob 模式。当模式具体程度相同,`includes` 胜出,这让你可以显式地把某个路径标记为依赖。
@@ -209,13 +209,13 @@ excludes = [
 | :--- | :--- | :--- | :--- |
 | `paths` | string list | `[]` | 你源码的目录或 glob。为空时扫描整个工作区。 |
 | `includes` | string list | `[]` | Mago 应解析但不修改的第三方代码的目录或 glob。 |
-| `patches` | string list | `[]` | 类型补丁的目录或 glob。其类型覆盖 `includes` 和内置代码的类型。不进行分析、lint 或格式化。 |
+| `patches` | string list | `[]` | 类型和语义标记补丁的目录或 glob。其类型及受支持标记覆盖 `includes` 和内置代码。不进行分析、lint 或格式化。 |
 | `excludes` | string list | `[]` | 在所有工具中都被排除的 glob 或路径。 |
 | `extensions` | string list | `["php"]` | 视为 PHP 的文件扩展名。 |
 
 ### 修补第三方代码的类型
 
-补丁是一个 PHP 文件,按完全限定名称重新声明第三方或内置符号。Mago 只读取其中的类型信息,忽略函数体。补丁修正已有符号,不会替换整个符号,也不能创建原代码中不存在的符号。
+补丁是一个 PHP 文件,按完全限定名称重新声明第三方或内置符号。Mago 读取其中的类型信息和受支持的语义 PHPDoc 标记,忽略函数体。补丁修正已有符号,不会替换整个符号,也不能创建原代码中不存在的符号。
 
 每个符号只能有一个补丁。如果多个补丁指向同一符号,Mago 会报告冲突,而不是自行选择。请合并这些补丁,或只保留一个。
 
@@ -223,9 +223,12 @@ excludes = [
 
 - 方法签名:参数类型、返回类型、`@throws`、`@template` 和 `@psalm-assert` 等类型断言。只有补丁明确提供的字段才会改变。
 - 属性和常量的类型。
+- 语义 PHPDoc 标记:通用标签(`@deprecated`、`@not-deprecated`、`@internal`、`@experimental`、`@api`),函数和方法标签(`@pure`、`@impure`、`@mutation-free`、`@external-mutation-free`、`@must-use`、`@no-named-arguments`、`@suspends-fiber`),以及类标签(`@consistent-constructor`、`@consistent-templates`)。扫描器已识别的 PHPStan 和 Psalm 别名同样受支持。只有补丁显式声明的标签才会更改对应标记;未声明的标签保留原值。`@impure` 会清除 `@pure`,`@not-deprecated` 会清除 `@deprecated`。
 - 类级别的 `@template` 声明和类型别名。已有模板按名称更新,新模板追加到末尾。
 - 通过 `@extends` 和 `@implements` 指定父类型的泛型实参。补丁覆盖它明确指定的绑定,保留其他绑定。
 - 通过 `@method`、`@property`、`@property-read` 和 `@property-write` 添加魔术成员,即使原符号没有声明这些成员。这些注解为 `__call`、`__get` 或 `__set` 提供类型信息。
+
+语义标记只会应用于支持相应标签的声明。结构修饰符和分析控制标记(包括 `final`、`readonly`、`static`、抑制标记和从函数体推导的标记)仍由原声明决定。
 
 ### Glob 设置
 

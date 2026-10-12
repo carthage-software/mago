@@ -8,6 +8,8 @@ use mago_word::Word;
 
 use crate::metadata::attribute::AttributeMetadata;
 use crate::metadata::flags::MetadataFlags;
+use crate::metadata::patch::PATCHABLE_COMMON_DOCBLOCK_FLAGS;
+use crate::metadata::patch::merge_explicit_docblock_flags;
 use crate::metadata::ttype::TypeMetadata;
 use crate::metadata::version_constraint::VersionConstraint;
 use crate::ttype::union::TUnion;
@@ -26,6 +28,8 @@ pub struct ConstantMetadata {
     pub type_metadata: Option<TypeMetadata>,
     pub inferred_type: Option<TUnion>,
     pub flags: MetadataFlags,
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub(crate) explicit_docblock_flags: MetadataFlags,
     pub issues: Vec<Issue>,
     pub version_constraint: VersionConstraint,
 }
@@ -45,6 +49,7 @@ impl ConstantMetadata {
             name,
             span,
             flags,
+            explicit_docblock_flags: MetadataFlags::empty(),
             type_metadata: None,
             inferred_type: None,
             issues: Vec::new(),
@@ -73,11 +78,17 @@ impl ConstantMetadata {
         self.version_constraint.allows_version_range(range)
     }
 
-    /// Applies a patch to this entry in place, refining type information.
+    /// Applies a patch to this entry in place, refining type information and supported docblock flags.
     pub fn apply_patch(&mut self, patch: &ConstantMetadata) {
         if patch.type_metadata.is_some() {
             self.type_metadata.clone_from(&patch.type_metadata);
         }
+        merge_explicit_docblock_flags(
+            &mut self.flags,
+            patch.flags,
+            patch.explicit_docblock_flags,
+            PATCHABLE_COMMON_DOCBLOCK_FLAGS,
+        );
     }
 }
 

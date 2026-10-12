@@ -45,7 +45,7 @@ use crate::scanner::Context;
 use crate::scanner::assertion_inference::infer_assertions_from_block_body;
 use crate::scanner::assertion_inference::infer_assertions_from_expression_body;
 use crate::scanner::attribute::scan_attribute_lists;
-use crate::scanner::docblock::apply_common_metadata_flag;
+use crate::scanner::docblock::apply_function_like_metadata_flag;
 use crate::scanner::docblock::assertion_subject_word;
 use crate::scanner::docblock::find_most_trusted_tag;
 use crate::scanner::docblock::for_each_tag_by_ascending_trust;
@@ -408,30 +408,11 @@ fn scan_function_like_docblock<A>(
             Element::Code(_) => continue,
         };
 
-        if apply_common_metadata_flag(&mut metadata.flags, &tag.value) {
+        if apply_function_like_metadata_flag(&mut metadata.flags, &mut metadata.explicit_docblock_flags, &tag.value) {
             continue;
         }
 
         match &tag.value {
-            TagValue::MustUse(_) => {
-                metadata.flags |= MetadataFlags::MUST_USE;
-            }
-            TagValue::Pure(_) => {
-                metadata.flags |= MetadataFlags::PURE;
-            }
-            TagValue::Impure(_) => {
-                metadata.flags.set(MetadataFlags::PURE, false);
-            }
-            TagValue::MutationFree(_) => {
-                metadata.flags |= MetadataFlags::MUTATION_FREE;
-                metadata.flags |= MetadataFlags::EXTERNAL_MUTATION_FREE;
-            }
-            TagValue::ExternalMutationFree(_) => {
-                metadata.flags |= MetadataFlags::EXTERNAL_MUTATION_FREE;
-            }
-            TagValue::SuspendsFiber(_) => {
-                metadata.flags |= MetadataFlags::SUSPENDS_FIBER;
-            }
             TagValue::IgnoreNullableReturn(_) => {
                 metadata.flags |= MetadataFlags::IGNORE_NULLABLE_RETURN;
                 ignore_nullable_return = true;
@@ -442,9 +423,6 @@ fn scan_function_like_docblock<A>(
             }
             TagValue::InheritDoc(_) => {
                 metadata.flags |= MetadataFlags::INHERITS_DOCS;
-            }
-            TagValue::NoNamedArguments(_) => {
-                metadata.flags |= MetadataFlags::NO_NAMED_ARGUMENTS;
             }
             _ => {}
         }

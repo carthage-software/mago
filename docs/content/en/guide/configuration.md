@@ -188,7 +188,7 @@ Mago distinguishes between your code, third-party code, patches to third-party c
 
 - **`paths`** are your source files. Mago analyses, lints, and formats them.
 - **`includes`** are dependencies (typically `vendor`). Mago parses them so it can resolve symbols and types, but never analyses, lints, or rewrites them.
-- **`patches`** are PHP files that override type information for vendored or built-in code. Mago honours their type declarations and PHPDoc — which take precedence over `includes` and built-ins — but never analyses, lints, or formats them. See [Patching vendor types](#patching-vendor-types) for what a patch may change.
+- **`patches`** are PHP files that refine type information and supported semantic PHPDoc flags for vendored or built-in code. Mago honours their type declarations and PHPDoc — which take precedence over `includes` and built-ins — but never analyses, lints, or formats them. See [Patching vendor types](#patching-vendor-types) for what a patch may change.
 - **`excludes`** are paths or globs Mago ignores entirely. They apply to every tool.
 
 If a file matches both `paths` and `includes`, the more specific pattern wins. Exact file paths are most specific, then deeper directory paths, then shallow ones, then glob patterns. When patterns are equally specific, `includes` wins, which lets you explicitly mark a path as a dependency.
@@ -222,13 +222,13 @@ excludes = [
 | :--- | :--- | :--- | :--- |
 | `paths` | string list | `[]` | Directories or globs for your source code. If empty, the entire workspace is scanned. |
 | `includes` | string list | `[]` | Directories or globs for third-party code Mago should parse but not modify. |
-| `patches` | string list | `[]` | Directories or globs for type patches. Their PHPDoc and type declarations override those from `includes` and built-ins. Not analysed, linted, or formatted. |
+| `patches` | string list | `[]` | Directories or globs for type and semantic PHPDoc flag patches. Their PHPDoc and type declarations override those from `includes` and built-ins. Not analysed, linted, or formatted. |
 | `excludes` | string list | `[]` | Globs or paths excluded from every tool. |
 | `extensions` | string list | `["php"]` | File extensions treated as PHP. |
 
 ### Patching vendor types
 
-A patch is a plain PHP file that redeclares a vendored or built-in symbol by its fully-qualified name. Mago reads only the type information from it; the body is ignored. A patch **refines** an existing symbol — it never replaces it, and it can never make a symbol exist that the vendor code does not already declare.
+A patch is a plain PHP file that redeclares a vendored or built-in symbol by its fully-qualified name. Mago reads its type information and supported semantic PHPDoc flags; the body is ignored. A patch **refines** an existing symbol — it never replaces it, and it can never make a symbol exist that the vendor code does not already declare.
 
 At most one patch may target a given symbol. If two patches target the same symbol, Mago reports a diagnostic on the conflicting patches rather than silently picking one — merge them into a single patch or remove all but one.
 
@@ -236,9 +236,12 @@ At most one patch may target a given symbol. If two patches target the same symb
 
 - Method signatures: parameter types, return type, `@throws`, `@template`, and `@psalm-assert`-style assertions. Each field is applied only when the patch specifies it, so a sparsely-typed patch never erases richer information already known.
 - Property and constant types.
+- Semantic PHPDoc flags: common tags (`@deprecated`, `@not-deprecated`, `@internal`, `@experimental`, and `@api`); function and method tags (`@pure`, `@impure`, `@mutation-free`, `@external-mutation-free`, `@must-use`, `@no-named-arguments`, and `@suspends-fiber`); and class tags (`@consistent-constructor` and `@consistent-templates`). Existing PHPStan and Psalm aliases are supported where the scanner recognizes them. A flag changes only when the patch explicitly declares its tag; omitted tags preserve the original flag. `@impure` clears `@pure`, and `@not-deprecated` clears `@deprecated`.
 - Class-level `@template` declarations (existing ones are refined by name, new ones are appended) and type aliases.
 - Generic parent bindings through `@extends` and `@implements`. The patch replaces the type arguments for each parent it names and keeps the other bindings.
 - Magic members: `@method`, `@property`, `@property-read`, and `@property-write` annotations may be added even when no such member exists on the original, because they are pure type annotations for `__call`/`__get`/`__set`.
+
+Semantic flags are applied only to declarations where those tags are supported. Structural modifiers and analysis-control flags, including `final`, `readonly`, `static`, suppression flags, and body-derived flags, remain governed by the original declaration.
 
 **What a patch may not change**
 

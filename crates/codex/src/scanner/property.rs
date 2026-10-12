@@ -567,7 +567,11 @@ fn update_property_metadata_from_docblock(
     allow_param_tag: bool,
 ) {
     for tag in document.tags() {
-        if apply_common_metadata_flag(&mut property_metadata.flags, &tag.value) {
+        if apply_common_metadata_flag(
+            &mut property_metadata.flags,
+            &mut property_metadata.explicit_docblock_flags,
+            &tag.value,
+        ) {
             continue;
         }
 
