@@ -233,7 +233,16 @@ where
         let mut possibly_redefined_vars = self.possibly_redefined_variables.unwrap_or_default();
         if let Some(new_locals) = self.new_locals {
             possibly_redefined_vars.retain(|k, _| !new_locals.contains_key(k));
-            self.block_context.locals.extend(new_locals);
+            if is_exhaustive {
+                self.block_context.locals.extend(new_locals);
+            } else {
+                for (var_id, var_type) in new_locals {
+                    let mut var_type = Rc::unwrap_or_clone(var_type);
+                    var_type.set_possibly_undefined(true, None);
+                    self.block_context.locals.insert(var_id, Rc::new(var_type));
+                    self.block_context.possibly_undefined_variable_ids.insert(var_id);
+                }
+            }
         }
 
         if let Some(redefined_vars) = self.redefined_variables {
@@ -253,6 +262,11 @@ where
                     var_id,
                     combine_union_types_rc(&var_type, &context_type, self.context.codebase, CombinerOptions::default()),
                 );
+            } else {
+                let mut var_type = Rc::unwrap_or_clone(var_type);
+                var_type.set_possibly_undefined(true, None);
+                self.block_context.locals.insert(var_id, Rc::new(var_type));
+                self.block_context.possibly_undefined_variable_ids.insert(var_id);
             }
         }
 
