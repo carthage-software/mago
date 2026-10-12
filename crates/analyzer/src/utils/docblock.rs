@@ -382,9 +382,11 @@ pub fn insert_variable_from_docblock<'ctx, A>(
                     .with_help("You can remove this redundant `@var` docblock tag."),
             );
         }
-    }
 
-    block_context.locals.insert(variable_name, Rc::new(variable_type));
+        block_context.locals.insert(variable_name, Rc::new(variable_type));
+    } else if block_context.scope.get_function_like().is_none() || variable_name.as_bytes() == b"$this" {
+        block_context.locals.insert(variable_name, Rc::new(variable_type));
+    }
 }
 
 pub fn check_docblock_type_incompatibility<A>(
