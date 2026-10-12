@@ -20,7 +20,7 @@ function optional_string_key(array $left, array $right): bool
 {
     $merged = $left + $right;
 
-    if (isset($merged['name'])) {
+    if (isset($merged['name']) && is_string($merged['name'])) {
         return true;
     }
 
