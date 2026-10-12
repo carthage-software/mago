@@ -498,6 +498,10 @@ fn scan_function_like_docblock<A>(
         type_context = type_context.with_template_definition(template_name, vec![definition]);
     }
 
+    // Names of the declared parameters, used to tell Psalm-style parameter links
+    // (`@param $prototype $value`, `@return $value`) apart from typos (`@return $mixed`).
+    let parameter_names: Vec<Word> = metadata.parameters.iter().map(|parameter| parameter.get_name().0).collect();
+
     for_each_tag_by_ascending_trust(&document, |tag| {
         let TagValue::Param(parameter_tag) = &tag.value else {
             return;
@@ -547,7 +551,11 @@ fn scan_function_like_docblock<A>(
             );
         }
 
-        match get_type_metadata_from_type(parameter_tag.r#type, classname, &type_context, scope) {
+        match crate::ttype::builder::reject_unresolvable_tag_variable(parameter_tag.r#type, |name| {
+            parameter_names.contains(&word(name))
+        })
+        .and_then(|()| get_type_metadata_from_type(parameter_tag.r#type, classname, &type_context, scope))
+        {
             Ok(mut provided_type) => {
                 let resulting_type = if !is_variadic
                     && parameter_metadata.flags.is_variadic()
@@ -675,7 +683,11 @@ fn scan_function_like_docblock<A>(
     });
 
     if let Some(return_type) = return_tag.as_ref() {
-        match get_type_metadata_from_type(return_type.r#type, classname, &type_context, scope) {
+        match crate::ttype::builder::reject_unresolvable_tag_variable(return_type.r#type, |name| {
+            parameter_names.contains(&word(name))
+        })
+        .and_then(|()| get_type_metadata_from_type(return_type.r#type, classname, &type_context, scope))
+        {
             Ok(return_type_signature) => {
                 metadata.set_return_type_metadata(Some(return_type_signature));
             }

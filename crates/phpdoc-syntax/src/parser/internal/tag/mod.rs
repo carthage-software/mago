@@ -6,10 +6,12 @@ use crate::cst::tag::Tag;
 use crate::cst::tag::TagValue;
 use crate::cst::tag::TagVendor;
 use crate::cst::tag::TemplateTagValueVariance;
+use crate::cst::r#type::Type;
 use crate::error::ParseError;
 use crate::parser::PHPDocParser;
 use crate::parser::internal::tag::vendor::remainder_after_vendor;
 use crate::token::TokenKind;
+use mago_span::HasSpan;
 
 pub(crate) mod assert;
 pub(crate) mod inheritance;
@@ -51,6 +53,32 @@ where
         let tag = Tag { at: token.span_for(file_id).subspan(0, 1), name, vendor, value };
 
         Ok(tag)
+    }
+
+    /// Rejects a closing bracket that directly abuts a parsed tag type (e.g. `@return array{...}>`).
+    ///
+    /// A description is free text and therefore always separated from the type by whitespace;
+    /// a bracket glued to the type is a typo (usually an unbalanced shape, generic or slice).
+    pub(crate) fn reject_abutting_type_terminator(&mut self, r#type: &Type<'arena>) -> Result<(), ParseError> {
+        let Some(token) = self.stream.lookahead(0) else {
+            return Ok(());
+        };
+
+        if !matches!(
+            token.kind,
+            TokenKind::RightAngleBracket
+                | TokenKind::RightBrace
+                | TokenKind::RightParenthesis
+                | TokenKind::RightBracket
+        ) {
+            return Ok(());
+        }
+
+        if token.start.offset != r#type.span().end.offset {
+            return Ok(());
+        }
+
+        Err(ParseError::UnexpectedToken(token.span_for(self.file_id())))
     }
 
     #[inline]

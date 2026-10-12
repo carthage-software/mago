@@ -137,7 +137,11 @@ fn process_constant_docblock(
     });
 
     if let Some(var) = &var {
-        match get_type_metadata_from_type(var.r#type, classname, type_context, scope) {
+        // Constants have no parameter scope: a bare variable can never link
+        // anything and is always a typo.
+        match crate::ttype::builder::reject_unresolvable_tag_variable(var.r#type, |_| false)
+            .and_then(|()| get_type_metadata_from_type(var.r#type, classname, type_context, scope))
+        {
             Ok(type_metadata) => {
                 metadata.type_metadata = Some(type_metadata);
             }

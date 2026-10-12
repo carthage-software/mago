@@ -113,7 +113,11 @@ where
                 });
 
                 if let Some(var) = &var {
-                    match get_type_metadata_from_type(var.r#type, classname, type_context, scope) {
+                    // Class constants have no parameter scope: a bare variable can never link
+                    // anything and is always a typo.
+                    match crate::ttype::builder::reject_unresolvable_tag_variable(var.r#type, |_| false)
+                        .and_then(|()| get_type_metadata_from_type(var.r#type, classname, type_context, scope))
+                    {
                         Ok(type_metadata) => {
                             let real_type = meta.type_declaration.as_ref();
                             let type_metadata = merge_type_preserving_nullability(type_metadata, real_type);

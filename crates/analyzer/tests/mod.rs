@@ -362,6 +362,7 @@ test_case!(docblock_callable_optional_param);
 test_case!(docblock_callable_variadic);
 test_case!(docblock_deprecated_function);
 test_case!(docblock_deprecated_method);
+test_case!(malformed_phpdoc_tags);
 test_case!(docblock_template_constraint_array_key);
 test_case!(docblock_template_constraint_object);
 test_case!(template_default_class_no_args);

@@ -7,6 +7,7 @@ use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::reference::TReference;
 use mago_codex::ttype::builder::get_union_from_type;
+use mago_codex::ttype::builder::reject_unresolvable_tag_variable;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator::can_expression_types_be_identical;
 use mago_codex::ttype::comparator::union_comparator::is_contained_by;
@@ -23,6 +24,7 @@ use mago_span::Span;
 use mago_syntax::comments::docblock::PrecedingDocblocks;
 use mago_syntax::cst::Expression;
 use mago_word::Word;
+use mago_word::word;
 
 use crate::artifacts::AnalysisArtifacts;
 use crate::code::IssueCode;
@@ -201,12 +203,20 @@ where
 
             let variable_name = var_tag.variable.as_ref().map(|v| mago_word::word(v.value));
 
-            match get_union_from_type(
-                var_tag.r#type,
-                &context.scope,
-                &context.type_resolution_context,
-                block_context.scope.get_class_like_name(),
-            ) {
+            // An inline `@var` has no parameter scope of its own, but it may copy the
+            // type of an enclosing function parameter (`/** @var $x */ $y = ...`).
+            // Anything else (`@var $label Label`) is a typo.
+            let is_parameter_link =
+                |name: &[u8]| block_context.scope.get_function_like().is_some_and(|f| f.get_parameter(word(name)).is_some());
+
+            match reject_unresolvable_tag_variable(var_tag.r#type, is_parameter_link).and_then(|()| {
+                get_union_from_type(
+                    var_tag.r#type,
+                    &context.scope,
+                    &context.type_resolution_context,
+                    block_context.scope.get_class_like_name(),
+                )
+            }) {
                 Ok(mut variable_type) => {
                     populate_union_type(
                         &mut variable_type,
