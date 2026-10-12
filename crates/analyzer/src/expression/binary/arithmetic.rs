@@ -982,8 +982,7 @@ fn key_could_be_in_param(key: &ArrayKey, param: &TUnion) -> bool {
     }
 }
 
-/// `BcMath\Number` (PHP 8.4) overloads `+ - * / % **`, so these operators take a `Number` on
-/// either side; the other operand is then checked by [`is_bcmath_number_operand`].
+/// `BcMath\Number` overloads these operators since PHP 8.4.
 fn is_bcmath_number_operation(op: &BinaryOperator<'_>, left: &TAtomic, right: &TAtomic) -> bool {
     matches!(
         op,
@@ -1000,10 +999,8 @@ fn is_bcmath_number(atomic: &TAtomic) -> bool {
     matches!(atomic, TAtomic::Object(TObject::Named(named)) if named.get_name().as_bytes().eq_ignore_ascii_case(b"BcMath\\Number"))
 }
 
-/// What PHP accepts beside a `BcMath\Number`: another `Number`, an `int` (a `bool` reaches here
-/// already turned into one) or a numeric string. A `float` is rejected on purpose, although PHP
-/// only truncates it to `int` with a deprecation notice. A general `numeric-string` is accepted
-/// even though BCMath throws on forms like `'1e3'`; a literal string is checked exactly.
+/// A `bool` arrives here already turned into `int`. `float` is rejected on purpose: PHP truncates it.
+/// A non-literal `numeric-string` is accepted, although BCMath throws on forms like `'1e3'`.
 fn is_bcmath_number_operand(atomic: &TAtomic) -> bool {
     match atomic {
         TAtomic::Scalar(TScalar::Integer(_)) => true,
@@ -1015,8 +1012,7 @@ fn is_bcmath_number_operand(atomic: &TAtomic) -> bool {
     }
 }
 
-/// BCMath's string grammar: an optional sign, digits and at most one decimal point. No exponent,
-/// whitespace or digit separators; the empty string reads as zero.
+/// The empty string is valid: BCMath reads it as zero.
 fn is_bcmath_number_literal(literal: &[u8]) -> bool {
     let unsigned = literal.strip_prefix(b"+").or_else(|| literal.strip_prefix(b"-")).unwrap_or(literal);
     let mut seen_decimal_point = false;
@@ -1031,7 +1027,6 @@ fn is_bcmath_number_literal(literal: &[u8]) -> bool {
     })
 }
 
-/// `Number / 0` and `Number % 0` throw `DivisionByZeroError`, for a zero `int` or zero numeric string alike.
 fn is_division_by_literal_zero(op: &BinaryOperator<'_>, right: &TAtomic) -> bool {
     if !matches!(op, BinaryOperator::Division(_) | BinaryOperator::Modulo(_)) {
         return false;
