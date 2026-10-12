@@ -58,6 +58,7 @@ use crate::scanner::ttype::merge_type_preserving_nullability;
 use crate::scanner::typing_error_issue;
 use crate::scanner::version_claim::evaluate_version_attributes;
 use crate::ttype::builder;
+use crate::ttype::builder::reject_unresolvable_tag_variable;
 use crate::ttype::get_mixed;
 use crate::ttype::resolution::TypeResolutionContext;
 use crate::ttype::template::GenericTemplate;
@@ -551,10 +552,8 @@ fn scan_function_like_docblock<A>(
             );
         }
 
-        match crate::ttype::builder::reject_unresolvable_tag_variable(parameter_tag.r#type, |name| {
-            parameter_names.contains(&word(name))
-        })
-        .and_then(|()| get_type_metadata_from_type(parameter_tag.r#type, classname, &type_context, scope))
+        match reject_unresolvable_tag_variable(parameter_tag.r#type, |name| parameter_names.contains(&word(name)))
+            .and_then(|()| get_type_metadata_from_type(parameter_tag.r#type, classname, &type_context, scope))
         {
             Ok(mut provided_type) => {
                 let resulting_type = if !is_variadic
@@ -683,10 +682,8 @@ fn scan_function_like_docblock<A>(
     });
 
     if let Some(return_type) = return_tag.as_ref() {
-        match crate::ttype::builder::reject_unresolvable_tag_variable(return_type.r#type, |name| {
-            parameter_names.contains(&word(name))
-        })
-        .and_then(|()| get_type_metadata_from_type(return_type.r#type, classname, &type_context, scope))
+        match reject_unresolvable_tag_variable(return_type.r#type, |name| parameter_names.contains(&word(name)))
+            .and_then(|()| get_type_metadata_from_type(return_type.r#type, classname, &type_context, scope))
         {
             Ok(return_type_signature) => {
                 metadata.set_return_type_metadata(Some(return_type_signature));

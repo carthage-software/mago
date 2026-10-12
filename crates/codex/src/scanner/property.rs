@@ -33,6 +33,7 @@ use crate::scanner::ttype::merge_type_preserving_nullability;
 use crate::scanner::typing_error_issue;
 use crate::scanner::version_claim::TypeOverride;
 use crate::scanner::version_claim::evaluate_version_attributes;
+use crate::ttype::builder::reject_unresolvable_tag_variable;
 use crate::ttype::resolution::TypeResolutionContext;
 use crate::visibility::Visibility;
 
@@ -601,11 +602,7 @@ fn update_property_metadata_from_docblock(
         // A `@var` tag has no parameter scope: a bare variable can never link
         // anything and is always a typo. A `@param` fallback (promoted properties,
         // hooks) keeps its parameter context and is left alone.
-        let validation = if is_var_tag {
-            crate::ttype::builder::reject_unresolvable_tag_variable(docblock_type, |_| false)
-        } else {
-            Ok(())
-        };
+        let validation = if is_var_tag { reject_unresolvable_tag_variable(docblock_type, |_| false) } else { Ok(()) };
 
         match validation.and_then(|()| get_type_metadata_from_type(docblock_type, Some(classname), type_context, scope))
         {

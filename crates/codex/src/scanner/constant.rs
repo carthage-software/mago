@@ -24,6 +24,7 @@ use crate::scanner::inference::infer;
 use crate::scanner::ttype::get_type_metadata_from_type;
 use crate::scanner::typing_error_issue;
 use crate::scanner::version_claim::evaluate_version_attributes;
+use crate::ttype::builder::reject_unresolvable_tag_variable;
 use crate::ttype::resolution::TypeResolutionContext;
 
 #[inline]
@@ -139,7 +140,7 @@ fn process_constant_docblock(
     if let Some(var) = &var {
         // Constants have no parameter scope: a bare variable can never link
         // anything and is always a typo.
-        match crate::ttype::builder::reject_unresolvable_tag_variable(var.r#type, |_| false)
+        match reject_unresolvable_tag_variable(var.r#type, |_| false)
             .and_then(|()| get_type_metadata_from_type(var.r#type, classname, type_context, scope))
         {
             Ok(type_metadata) => {
