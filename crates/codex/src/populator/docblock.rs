@@ -86,7 +86,25 @@ fn should_inherit_docblock_type(
                 &mut ComparisonResult::new(),
             );
 
-            return !child_contained_in_parent_docblock;
+            if child_contained_in_parent_docblock {
+                return false;
+            }
+
+            let docblock_type = if !child_native.accepts_null() && parent_docblock_type.has_null() {
+                Cow::Owned(parent_docblock_type.to_non_nullable())
+            } else {
+                Cow::Borrowed(parent_docblock_type)
+            };
+
+            return union_comparator::is_contained_by(
+                codebase,
+                &docblock_type,
+                child_native,
+                false,
+                false,
+                false,
+                &mut ComparisonResult::new(),
+            );
         }
 
         let parent_docblock_contained_in_child = union_comparator::is_contained_by(

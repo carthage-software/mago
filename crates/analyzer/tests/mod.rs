@@ -2846,6 +2846,7 @@ test_case!(parameter_null_default_docblock_type);
 test_case!(parameter_null_default_php90, crate::framework::php_90_settings());
 test_case!(multilevel_inheritance_unbound_template_bound);
 test_case!(partial_union_method_call);
+test_case!(phpdoc_native_type_merge);
 
 #[test]
 #[cfg_attr(miri, ignore)]
