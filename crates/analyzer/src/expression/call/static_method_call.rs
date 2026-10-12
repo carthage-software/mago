@@ -161,7 +161,6 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticMethodCall<'arena> {
                 InvocationArgumentsSource::ArgumentList(&self.argument_list),
                 self.span(),
                 None,
-                method_resolution.has_invalid_target,
                 method_resolution.encountered_mixed,
                 expression_is_nullsafe(self.class) || method_resolution.encountered_null,
                 class_has_nullsafe_null,

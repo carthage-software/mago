@@ -127,7 +127,6 @@ fn analyze_invocation_targets<'ctx, 'ast, 'arena, A>(
     invocation_arguments: InvocationArgumentsSource<'ast, 'arena>,
     call_span: Span,
     this_variable: Option<Word>,
-    encountered_invalid_targets: bool,
     encountered_mixed_targets: bool,
     should_add_null: bool,
     object_has_nullsafe_null: bool,
@@ -248,9 +247,7 @@ where
     }
 
     let resulting_type = if let Some(resulting_type) = resulting_type {
-        if encountered_invalid_targets {
-            return Ok(());
-        } else if encountered_mixed_targets {
+        if encountered_mixed_targets {
             get_mixed()
         } else if should_add_null {
             let mut result_with_null = add_optional_union_type(get_null(), Some(&resulting_type), context.codebase);

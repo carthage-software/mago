@@ -57,7 +57,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for FunctionCall<'arena> {
         }
 
         let mut template_result = TemplateResult::default();
-        let (invocation_targets, encountered_invalid_targets) =
+        let (invocation_targets, _) =
             resolve_targets(context, block_context, artifacts, self.function, &mut template_result)?;
 
         analyze_invocation_targets(
@@ -69,7 +69,6 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for FunctionCall<'arena> {
             InvocationArgumentsSource::ArgumentList(&self.argument_list),
             self.span(),
             None,
-            encountered_invalid_targets,
             false,
             false,
             false, // object_has_nullsafe_null - not applicable for function calls

@@ -395,7 +395,6 @@ where
             InvocationArgumentsSource::ArgumentList(argument_list),
             span,
             this_variable,
-            method_resolution.has_invalid_target,
             method_resolution.encountered_mixed,
             is_null_safe && method_resolution.encountered_null,
             artifacts.get_expression_type(object).is_some_and(|t| t.has_nullsafe_null()),
