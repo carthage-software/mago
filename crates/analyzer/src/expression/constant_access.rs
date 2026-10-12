@@ -69,7 +69,7 @@ impl<'arena> Analyzable<'_, 'arena> for ConstantAccess<'arena> {
             return Ok(());
         };
 
-        if constant_metadata.flags.is_deprecated() {
+        if constant_metadata.flags.is_deprecated() && !block_context.is_enclosing_scope_deprecated() {
             context.collector.report_with_code(
                 IssueCode::DeprecatedConstant,
                 Issue::warning(format!("Using deprecated constant: `{name}`."))

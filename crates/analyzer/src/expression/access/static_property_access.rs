@@ -165,6 +165,7 @@ where
 
         if let Some(class_metadata) = context.codebase.get_class_like_by_name(declaring_class)
             && let Some(property_metadata) = class_metadata.properties.get(&property_name)
+            && !block_context.is_enclosing_scope_deprecated()
         {
             report_deprecated_property(context, class_metadata, property_metadata, property.span());
         }

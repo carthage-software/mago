@@ -246,6 +246,14 @@ impl<'ctx> BlockContext<'ctx> {
         self.scope.is_global()
     }
 
+    pub fn is_enclosing_scope_deprecated(&self) -> bool {
+        if self.scope.get_function_like().is_some_and(|function_like| function_like.flags.is_deprecated()) {
+            return true;
+        }
+
+        self.scope.get_class_like().is_some_and(|class_like| class_like.flags.is_deprecated())
+    }
+
     pub fn update_references_possibly_from_confusing_scope(&mut self, confusing_scope_context: &BlockContext<'ctx>) {
         let references = confusing_scope_context
             .references_in_scope

@@ -332,12 +332,14 @@ where
                 continue;
             };
 
-            report_deprecated_property(
-                context,
-                resolution.declaring_class,
-                resolution.property,
-                property_selector.span(),
-            );
+            if !block_context.is_enclosing_scope_deprecated() {
+                report_deprecated_property(
+                    context,
+                    resolution.declaring_class,
+                    resolution.property,
+                    property_selector.span(),
+                );
+            }
 
             artifacts.symbol_references.add_reference_for_property_read(
                 &block_context.scope,

@@ -279,6 +279,7 @@ where
 
     if metadata.flags.is_deprecated()
         && block_context.scope.get_class_like_name().is_none_or(|self_id| self_id != metadata.original_name)
+        && !block_context.is_enclosing_scope_deprecated()
     {
         context.collector.report_with_code(
             IssueCode::DeprecatedClass,

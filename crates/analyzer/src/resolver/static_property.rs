@@ -222,7 +222,7 @@ where
                     continue;
                 }
 
-                if check_deprecation {
+                if check_deprecation && !block_context.is_enclosing_scope_deprecated() {
                     report_deprecated_property(context, required_declaring_metadata, prop_meta, variable.span());
                 }
 
@@ -295,7 +295,7 @@ where
         return None;
     }
 
-    if check_deprecation {
+    if check_deprecation && !block_context.is_enclosing_scope_deprecated() {
         report_deprecated_property(context, declaring_class_metadata, property_metadata, variable.span());
     }
 

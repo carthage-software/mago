@@ -95,7 +95,7 @@ where
     };
     let full_callable_name = OnceCell::new();
 
-    if metadata.flags.is_deprecated() {
+    if metadata.flags.is_deprecated() && !block_context.is_enclosing_scope_deprecated() {
         let full_callable_name =
             full_callable_name.get_or_init(|| display_callable_name(context, identifier, metadata.original_name));
         let issue_kind = match identifier {

@@ -1201,7 +1201,7 @@ fn check_class_like_extends<'ctx, 'arena, A>(
             if extended_class_metadata.kind.is_class() || extended_class_metadata.kind.is_trait() { "a" } else { "an" };
         let extended_class_span = extended_class_metadata.name_span.unwrap_or(extended_class_metadata.span);
 
-        if extended_class_metadata.flags.is_deprecated() {
+        if extended_class_metadata.flags.is_deprecated() && !class_like_metadata.flags.is_deprecated() {
             context.collector.report_with_code(
                 IssueCode::DeprecatedClass,
                 Issue::warning(format!("Use of deprecated class `{extended_name}` in `extends` clause"))
@@ -1540,7 +1540,7 @@ fn check_class_like_use<'ctx, 'arena, A>(
             );
         }
 
-        if used_trait_metadata.flags.is_deprecated() {
+        if used_trait_metadata.flags.is_deprecated() && !class_like_metadata.flags.is_deprecated() {
             context.collector.report_with_code(
                 IssueCode::DeprecatedTrait,
                 Issue::error(format!("Use of deprecated trait `{used_name}` in `{using_name}`"))
