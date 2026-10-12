@@ -41,3 +41,11 @@ function optional_int_key(array $left, array $right): bool
 
     return false;
 }
+
+/** @param array<int, int> $ints */
+function string_key_on_int_keys(array $ints): ?string
+{
+    ['name' => $name] = $ints + ['name' => null];
+
+    return $name;
+}
