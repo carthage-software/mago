@@ -154,7 +154,7 @@ fn infer_templates_from_input_and_container_types<A>(
     let top_level = options.is_top_level;
     let options = InferenceOptions { is_top_level: false, ..options };
 
-    if input_type.is_mixed() && !container_type.is_generic_parameter() {
+    if container_type.is_mixed() || (input_type.is_mixed() && !container_type.is_generic_parameter()) {
         return;
     }
 
@@ -168,6 +168,10 @@ fn infer_templates_from_input_and_container_types<A>(
             TAtomic::Object(TObject::Named(named)) => named.type_parameters.as_ref().is_some_and(|p| !p.is_empty()),
             _ => false,
         });
+
+    if generic_container_parts.is_empty() {
+        return;
+    }
 
     let has_generic_class_string = generic_container_parts
         .iter()

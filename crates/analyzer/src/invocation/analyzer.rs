@@ -4,6 +4,7 @@ use std::rc::Rc;
 
 use foldhash::HashMap;
 use foldhash::HashSet;
+use foldhash::fast::RandomState;
 
 use mago_bytes::BytesDisplay;
 use mago_bytes::trim_start_byte;
@@ -105,7 +106,7 @@ where
 {
     // Handle both named arguments and named placeholders
     if let Some(parameter_name) = argument.get_parameter_name() {
-        argument_offset = find_named_parameter_offset(target, parameter_name.into())?;
+        argument_offset = find_named_parameter_offset(target, parameter_name)?;
     }
 
     argument_offset = adjust_offset_for_variadic(target, argument_offset);
@@ -115,12 +116,16 @@ where
 /// Finds the offset of a named parameter in the parameter list.
 fn find_named_parameter_offset<'target, 'ctx>(
     target: &'target InvocationTarget<'ctx>,
-    argument_name: mago_word::Word,
+    argument_name: &[u8],
 ) -> Option<usize>
 where
     'ctx: 'target,
 {
     let argument_variable_name = concat_word!("$", argument_name);
+    if let InvocationTarget::FunctionLike { metadata, effective_signature: None, .. } = target {
+        return metadata.parameters.iter().position(|parameter| parameter.name.0 == argument_variable_name);
+    }
+
     target
         .iter_parameters()
         .position(|parameter| parameter.get_name().is_some_and(|param_name| argument_variable_name == param_name.0))
@@ -186,20 +191,52 @@ where
     let mut analyzed_argument_types = vec![None; arg_count];
 
     let mut non_closure_arguments = Vec::with_capacity(arg_count);
-    let mut closure_arguments = Vec::with_capacity(arg_count);
+    let mut closure_arguments = Vec::new();
     let mut unpacked_arguments = Vec::new();
+
+    // Small calls cost less to scan than to index.
+    let named_parameter_offsets = (arg_count >= 32
+        && invocation.target.parameter_count() >= 32
+        && invocation
+            .arguments_source
+            .iter_arguments()
+            .filter(|argument| argument.get_parameter_name().is_some())
+            .take(32)
+            .count()
+            == 32)
+        .then(|| {
+            let mut offsets =
+                HashMap::with_capacity_and_hasher(invocation.target.parameter_count(), RandomState::default());
+            for (offset, parameter) in invocation.target.iter_parameters().enumerate() {
+                if let Some(name) = parameter.get_name().and_then(|name| name.0.as_bytes().strip_prefix(b"$")) {
+                    offsets.entry(name).or_insert(offset);
+                }
+            }
+            offsets
+        });
 
     for (offset, argument) in invocation.arguments_source.iter_arguments().enumerate() {
         if argument.is_unpacked() {
             unpacked_arguments.push(argument);
-        } else if argument.is_placeholder() {
-            non_closure_arguments.push((offset, argument));
-        } else if matches!(argument.value(), Some(Expression::Closure(_) | Expression::ArrowFunction(_))) {
-            closure_arguments.push((offset, argument));
         } else {
-            non_closure_arguments.push((offset, argument));
+            let parameter = if let Some(offsets) = &named_parameter_offsets
+                && let Some(name) = argument.get_parameter_name()
+            {
+                offsets
+                    .get(name)
+                    .and_then(|offset| invocation.target.get_parameter(*offset).map(|parameter| (*offset, parameter)))
+            } else {
+                get_parameter_of_argument(&invocation.target, &argument, offset)
+            };
+            if matches!(argument.value(), Some(Expression::Closure(_) | Expression::ArrowFunction(_))) {
+                closure_arguments.push((offset, parameter));
+            } else {
+                non_closure_arguments.push((offset, parameter));
+            }
         }
     }
+
+    drop(named_parameter_offsets);
 
     let has_unpacked_arguments = !unpacked_arguments.is_empty();
     // The callee reads its extra arguments through `func_get_args()` and friends.
@@ -213,12 +250,15 @@ where
     let calling_instance_type = calling_class_like.and_then(|(_, atomic)| atomic);
     let method_class_type = method_call_context.map(|ctx| &ctx.class_type);
 
-    for (argument_offset, argument) in &non_closure_arguments {
+    for (argument_offset, parameter) in &non_closure_arguments {
+        let Some(argument) = invocation.arguments_source.get_argument(*argument_offset) else {
+            continue;
+        };
         let Some(argument_expression) = argument.value() else {
             continue;
         };
 
-        let parameter = get_parameter_of_argument(&invocation.target, argument, *argument_offset);
+        let parameter = *parameter;
 
         analyze_and_store_argument_type(
             context,
@@ -272,8 +312,11 @@ where
         }
     }
 
-    for (argument_offset, argument) in &non_closure_arguments {
-        let Some((_, parameter)) = get_parameter_of_argument(&invocation.target, argument, *argument_offset) else {
+    for (argument_offset, parameter) in &non_closure_arguments {
+        let Some(argument) = invocation.arguments_source.get_argument(*argument_offset) else {
+            continue;
+        };
+        let Some((_, parameter)) = *parameter else {
             continue;
         };
 
@@ -295,12 +338,15 @@ where
     let global_closure_bind_scope = detect_closure_bind_scope(context, invocation, &analyzed_argument_types);
     let previous_bind_scope = artifacts.closure_bind_scope.take();
 
-    for (argument_offset, argument) in &closure_arguments {
+    for (argument_offset, parameter) in &closure_arguments {
+        let Some(argument) = invocation.arguments_source.get_argument(*argument_offset) else {
+            continue;
+        };
         let Some(argument_expression) = argument.value() else {
             continue;
         };
 
-        let parameter = get_parameter_of_argument(&invocation.target, argument, *argument_offset);
+        let parameter = *parameter;
         let mut parameter_type_had_template_types = false;
         // Store the original unreplaced type for template inference, so closure return types
         // can contribute bounds even after other arguments have already inferred some bounds.
@@ -416,8 +462,8 @@ where
         }
     }
 
-    for (argument_offset, argument) in &closure_arguments {
-        let Some((_, parameter)) = get_parameter_of_argument(&invocation.target, argument, *argument_offset) else {
+    for (argument_offset, parameter) in &closure_arguments {
+        let Some((_, parameter)) = *parameter else {
             continue;
         };
         let Some(parameter_name) = parameter.get_name() else {
@@ -523,7 +569,7 @@ where
     let mut closure_index = 0;
 
     while non_closure_index < non_closure_arguments.len() || closure_index < closure_arguments.len() {
-        let (argument_offset, argument) =
+        let (argument_offset, parameter_ref) =
             match (non_closure_arguments.get(non_closure_index), closure_arguments.get(closure_index)) {
                 (Some(non_closure), Some(closure)) if non_closure.0 <= closure.0 => {
                     non_closure_index += 1;
@@ -544,6 +590,10 @@ where
                 (None, None) => break,
             };
 
+        let Some(argument) = invocation.arguments_source.get_argument(*argument_offset) else {
+            continue;
+        };
+
         let Some(argument_expression) = argument.value() else {
             continue;
         };
@@ -552,13 +602,12 @@ where
             .clone()
             .unwrap_or_else(|| (Rc::new(get_mixed()), argument_expression.span()));
 
-        let parameter_ref = get_parameter_of_argument(&invocation.target, argument, *argument_offset);
-        if let Some((parameter_offset, parameter_ref)) = parameter_ref {
+        if let Some((parameter_offset, parameter_ref)) = *parameter_ref {
             filled_parameter_offsets.insert(parameter_offset);
 
             if let Some(named_argument) = argument.get_named_argument() {
                 let named_value_display = BytesDisplay(named_argument.name.value);
-                if let Some(previous_span) = assigned_parameters_by_name.get(&named_argument.name.value) {
+                if let Some(previous_span) = assigned_parameters_by_name.get(&parameter_offset) {
                     has_named_argument_anomaly = true;
                     let target_name_str = invocation.target.guess_name(context);
                     context.collector.report_with_code(
@@ -608,9 +657,9 @@ where
                             .with_help("Provide the argument either positionally or by name, but not both."),
                         );
                     }
-                    assigned_parameters_by_name.insert(named_argument.name.value, named_argument.name.span());
+                    assigned_parameters_by_name.insert(parameter_offset, named_argument.name.span());
                 } else {
-                    assigned_parameters_by_name.insert(named_argument.name.value, named_argument.name.span());
+                    assigned_parameters_by_name.insert(parameter_offset, named_argument.name.span());
                 }
             } else {
                 assigned_parameters_by_position.insert(parameter_offset, argument.span());
@@ -1552,7 +1601,7 @@ fn populate_parameter_types_from_unpacked<A>(
                         ArrayKey::Integer(offset) => {
                             usize::try_from(*offset).ok().map(|offset| starting_parameter_position + offset)
                         }
-                        ArrayKey::String(name) => find_named_parameter_offset(invocation_target, *name),
+                        ArrayKey::String(name) => find_named_parameter_offset(invocation_target, name.as_bytes()),
                         ArrayKey::ClassLikeConstant { .. } => None,
                     };
 
