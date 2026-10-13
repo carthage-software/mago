@@ -1234,6 +1234,10 @@ fn handle_assignment_with_boolean_logic<'ctx, 'arena, A>(
     let right_clauses =
         BlockContext::filter_clauses(context, variable_id, right_clauses.into_iter().map(Rc::new).collect(), None);
 
+    if right_clauses.is_empty() {
+        return;
+    }
+
     let mut covered_variable_ids: WordSet = WordSet::default();
     covered_variable_ids.insert(variable_id);
     for clause in &right_clauses {
