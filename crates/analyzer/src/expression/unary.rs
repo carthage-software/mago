@@ -119,26 +119,25 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPrefix<'arena> {
             }
             UnaryPrefixOperator::BitwiseNot(_) => {
                 if let Some(operand_type) = operand_type {
-                    let (rejected_types, accepted_types): (Vec<TAtomic>, Vec<TAtomic>) =
+                    let (classes_without_bitwise_not, other_types): (Vec<TAtomic>, Vec<TAtomic>) =
                         operand_type.types.iter().cloned().partition(|atomic| {
-                            atomic.is_null()
-                                || get_operator_overloading_class(atomic)
-                                    .is_some_and(|class| !class.overloads(OverloadedOperator::BitwiseNot))
+                            get_operator_overloading_class(atomic)
+                                .is_some_and(|class| !class.overloads(OverloadedOperator::BitwiseNot))
                         });
 
-                    if rejected_types.is_empty() {
+                    if classes_without_bitwise_not.is_empty() {
                         artifacts.set_rc_expression_type(self, operand_type);
                     } else {
-                        report_invalid_bitwise_not_operand(
+                        report_bitwise_not_without_overload(
                             context,
                             self.operand.span(),
-                            &rejected_types,
-                            accepted_types.is_empty(),
+                            &classes_without_bitwise_not,
+                            other_types.is_empty(),
                         );
 
                         artifacts.set_expression_type(
                             self,
-                            if accepted_types.is_empty() { get_never() } else { TUnion::from_vec(accepted_types) },
+                            if other_types.is_empty() { get_never() } else { TUnion::from_vec(other_types) },
                         );
                     }
                 } else {
@@ -567,16 +566,16 @@ where
     );
 }
 
-fn report_invalid_bitwise_not_operand<A>(
+fn report_bitwise_not_without_overload<A>(
     context: &mut Context<'_, '_, A>,
     operand_span: Span,
-    rejected_types: &[TAtomic],
+    classes_without_bitwise_not: &[TAtomic],
     is_definitely_invalid: bool,
 ) where
     A: Arena,
 {
-    let rejected_type_names =
-        rejected_types.iter().map(|atomic| atomic.get_id().to_string()).collect::<Vec<_>>().join("|");
+    let class_names =
+        classes_without_bitwise_not.iter().map(|atomic| atomic.get_id().to_string()).collect::<Vec<_>>().join("|");
 
     let (issue_code, issue) = if is_definitely_invalid {
         (IssueCode::InvalidOperand, Issue::error("Invalid operand for bitwise not."))
@@ -588,12 +587,9 @@ fn report_invalid_bitwise_not_operand<A>(
         issue_code,
         issue
             .with_annotation(
-                Annotation::primary(operand_span)
-                    .with_message(format!("`~` cannot be applied to `{rejected_type_names}`")),
+                Annotation::primary(operand_span).with_message(format!("`{class_names}` does not overload `~`")),
             )
-            .with_note(
-                "PHP throws a `TypeError` when `~` is applied to `null` or to an object that does not overload it.",
-            )
+            .with_note("PHP throws a `TypeError` when `~` is applied to an object that does not overload it.")
             .with_help(
                 "Ensure the operand is an `int`, `float` or `string`, or an object that overloads `~` such as `GMP`.",
             ),

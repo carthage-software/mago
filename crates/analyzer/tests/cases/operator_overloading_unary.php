@@ -105,18 +105,6 @@ function gmp_or_number_bitwise_not(GMP|Number $a): GMP
     return ~$a;
 }
 
-function nullable_gmp_bitwise_not(?GMP $a): GMP
-{
-    /** @mago-expect analysis:possibly-invalid-operand */
-    return ~$a;
-}
-
-function nullable_int_bitwise_not(?int $a): int
-{
-    /** @mago-expect analysis:possibly-invalid-operand */
-    return ~$a;
-}
-
 function object_negated(stdClass $a): mixed
 {
     /** @mago-expect analysis:invalid-operand,never-return */
