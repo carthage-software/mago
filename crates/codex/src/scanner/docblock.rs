@@ -88,15 +88,84 @@ pub fn find_most_trusted_tag<'arena, T>(
 ///
 /// Returns whether the tag was handled.
 #[inline]
-pub fn apply_common_metadata_flag(flags: &mut MetadataFlags, value: &TagValue<'_>) -> bool {
-    match value {
-        TagValue::Deprecated(_) => flags.insert(MetadataFlags::DEPRECATED),
-        TagValue::NotDeprecated(_) => flags.remove(MetadataFlags::DEPRECATED),
-        TagValue::Internal(_) => flags.insert(MetadataFlags::INTERNAL),
-        TagValue::Experimental(_) => flags.insert(MetadataFlags::EXPERIMENTAL),
-        TagValue::Api(_) => flags.insert(MetadataFlags::API),
+pub fn apply_docblock_flag(
+    flags: &mut MetadataFlags,
+    explicit_docblock_flags: &mut MetadataFlags,
+    flag: MetadataFlags,
+    value: bool,
+) {
+    flags.set(flag, value);
+    explicit_docblock_flags.insert(flag);
+}
+
+#[inline]
+pub fn apply_common_metadata_flag(
+    flags: &mut MetadataFlags,
+    explicit_docblock_flags: &mut MetadataFlags,
+    value: &TagValue<'_>,
+) -> bool {
+    let (flag, enabled) = match value {
+        TagValue::Deprecated(_) => (MetadataFlags::DEPRECATED, true),
+        TagValue::NotDeprecated(_) => (MetadataFlags::DEPRECATED, false),
+        TagValue::Internal(_) => (MetadataFlags::INTERNAL, true),
+        TagValue::Experimental(_) => (MetadataFlags::EXPERIMENTAL, true),
+        TagValue::Api(_) => (MetadataFlags::API, true),
         _ => return false,
+    };
+
+    apply_docblock_flag(flags, explicit_docblock_flags, flag, enabled);
+
+    true
+}
+
+#[inline]
+pub fn apply_function_like_metadata_flag(
+    flags: &mut MetadataFlags,
+    explicit_docblock_flags: &mut MetadataFlags,
+    value: &TagValue<'_>,
+) -> bool {
+    if apply_common_metadata_flag(flags, explicit_docblock_flags, value) {
+        return true;
     }
+
+    let (flag, enabled) = match value {
+        TagValue::Pure(_) => (MetadataFlags::PURE, true),
+        TagValue::Impure(_) => (MetadataFlags::PURE, false),
+        TagValue::ExternalMutationFree(_) => (MetadataFlags::EXTERNAL_MUTATION_FREE, true),
+        TagValue::MustUse(_) => (MetadataFlags::MUST_USE, true),
+        TagValue::NoNamedArguments(_) => (MetadataFlags::NO_NAMED_ARGUMENTS, true),
+        TagValue::SuspendsFiber(_) => (MetadataFlags::SUSPENDS_FIBER, true),
+        TagValue::MutationFree(_) => {
+            apply_docblock_flag(flags, explicit_docblock_flags, MetadataFlags::MUTATION_FREE, true);
+            apply_docblock_flag(flags, explicit_docblock_flags, MetadataFlags::EXTERNAL_MUTATION_FREE, true);
+
+            return true;
+        }
+        _ => return false,
+    };
+
+    apply_docblock_flag(flags, explicit_docblock_flags, flag, enabled);
+
+    true
+}
+
+#[inline]
+pub fn apply_class_like_metadata_flag(
+    flags: &mut MetadataFlags,
+    explicit_docblock_flags: &mut MetadataFlags,
+    value: &TagValue<'_>,
+) -> bool {
+    if apply_common_metadata_flag(flags, explicit_docblock_flags, value) {
+        return true;
+    }
+
+    let flag = match value {
+        TagValue::ConsistentConstructor(_) => MetadataFlags::CONSISTENT_CONSTRUCTOR,
+        TagValue::ConsistentTemplates(_) => MetadataFlags::CONSISTENT_TEMPLATES,
+        _ => return false,
+    };
+
+    apply_docblock_flag(flags, explicit_docblock_flags, flag, true);
 
     true
 }

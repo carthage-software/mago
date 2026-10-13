@@ -27,6 +27,12 @@ use crate::metadata::constant::ConstantMetadata;
 use crate::metadata::enum_case::EnumCaseMetadata;
 use crate::metadata::flags::MetadataFlags;
 use crate::metadata::function_like::FunctionLikeMetadata;
+use crate::metadata::inherited_methods::collect_inherited_patch_methods;
+use crate::metadata::inherited_methods::reset_patch_methods;
+use crate::metadata::inherited_methods::resolve_inherited_patch_methods;
+use crate::metadata::patch::PATCHABLE_FUNCTION_DOCBLOCK_FLAGS;
+use crate::metadata::patch::merge_explicit_docblock_flags;
+use crate::metadata::patch::propagate_inherited_docblock_flags;
 use crate::metadata::property::PropertyMetadata;
 use crate::metadata::ttype::TypeMetadata;
 use crate::reference::SymbolReferences;
@@ -50,7 +56,9 @@ mod entry_spans;
 pub mod enum_case;
 pub mod flags;
 pub mod function_like;
+mod inherited_methods;
 pub mod parameter;
+mod patch;
 pub mod property;
 pub mod property_hook;
 mod trait_adaptation;
@@ -498,6 +506,14 @@ impl CodebaseMetadata {
         let lowercase_class = method_id.get_class_name().to_ascii_lowercase();
         let lowercase_method = method_id.get_method_name().to_ascii_lowercase();
         self.get_method_by_words(lowercase_class, lowercase_method)
+    }
+
+    pub(crate) fn can_replace_inherited_method(&self, current: MethodIdentifier, parent: Word) -> bool {
+        let Some(method) = self.get_method_by_id(&current) else { return false };
+        method.method_metadata.as_ref().is_some_and(|metadata| metadata.is_abstract)
+            || (method.flags.is_magic_method()
+                && self.class_likes.get(&current.get_class_name()).is_some_and(|class| class.kind.is_trait())
+                && self.class_likes.get(&parent).is_some_and(|class| !class.kind.is_trait()))
     }
 
     /// Retrieves the declaring method metadata, following the inheritance chain.
@@ -1415,10 +1431,13 @@ impl CodebaseMetadata {
     /// Must be called after all partials have been merged so the slots patches target are
     /// present.
     pub fn apply_patches_pass(&mut self) {
+        reset_patch_methods(self);
         // `(class, method)` slots where a patch overrides a method inherited from an ancestor.
         // No function-like exists at these keys yet, so the function loop below materializes
         // them from the patch's own scanned declaration rather than treating them as orphans.
         let mut inherited_overrides: HashSet<(Word, Word)> = HashSet::default();
+        let mut inherited_methods = collect_inherited_patch_methods(self);
+        let mut applied_classes = Vec::new();
 
         let class_keys: Vec<Word> = self.patch_class_likes.keys().copied().collect();
         for fqcn in class_keys {
@@ -1436,48 +1455,78 @@ impl CodebaseMetadata {
             }
 
             let mut working = target.clone();
-            let inherited =
-                collect_inherited_patch_methods(&working, &self.patch_class_likes[&fqcn], &self.class_likes);
+            let inherited = inherited_methods.remove(&fqcn).unwrap_or_default();
             inherited_overrides.extend(inherited.iter().map(|method| (fqcn, *method)));
-            if let Some(patch_entry) = self.patch_class_likes.get_mut(&fqcn) {
-                working.apply_patch(patch_entry, &inherited);
+            let constructor_name = word("__construct");
+            let patch_declares_constructor = self.patch_class_likes[&fqcn].methods.contains(&constructor_name);
+            if let Some(patch_entry) = self.patch_class_likes.get_mut(&fqcn)
+                && working.apply_patch(patch_entry, &inherited)
+            {
+                applied_classes.push(fqcn);
+            }
+            if working.flags.has_consistent_constructor()
+                && !patch_declares_constructor
+                && !inherited.contains(&constructor_name)
+                && let Some(constructor) = working.add_implicit_constructor()
+            {
+                self.function_likes.entry((fqcn, constructor_name)).or_insert_with(|| Box::new(constructor));
             }
             self.class_likes.insert(fqcn, working);
         }
 
+        propagate_inherited_docblock_flags(self, applied_classes);
+
         let func_keys: Vec<(Word, Word)> = self.patch_function_likes.keys().copied().collect();
-        for key in func_keys {
-            let Some(target) = self.function_likes.get(&key) else {
-                if inherited_overrides.contains(&key) {
-                    // The patch overrides a method inherited from an ancestor, so no slot exists
-                    // at `(class, method)` yet. The patch file declares the method in full, so
-                    // promote its scanned function-like as this class's own declaration; the
-                    // class loop has already pointed the declaring/appearing ids at this slot.
-                    if let Some(p) = self.patch_function_likes.get(&key) {
-                        let materialized = p.clone();
-                        self.function_likes.insert(key, materialized);
-                    }
-                    continue;
-                }
-                // Methods of an orphan patch class are covered by the class-level diagnostic;
-                // only free functions need their own orphan diagnostic.
-                if key.0.is_empty()
-                    && let Some(p) = self.patch_function_likes.get_mut(&key)
-                {
-                    let diag = orphan_patch_function_diagnostic(p);
-                    p.issues.push(diag);
-                }
-                continue;
-            };
+        for key in &func_keys {
+            let Some(target) = self.function_likes.get(key) else { continue };
             if target.flags.is_user_defined() {
                 continue;
             }
 
             let mut working = target.clone();
-            if let Some(patch_entry) = self.patch_function_likes.get_mut(&key) {
+            if let Some(patch_entry) = self.patch_function_likes.get_mut(key) {
                 working.apply_patch(patch_entry);
             }
-            self.function_likes.insert(key, working);
+            self.function_likes.insert(*key, working);
+        }
+
+        let inherited_keys: Vec<_> = func_keys
+            .iter()
+            .copied()
+            .filter(|key| inherited_overrides.contains(key) && !self.function_likes.contains_key(key))
+            .map(|(class, method)| MethodIdentifier::new(class, method))
+            .collect();
+
+        for inherited in resolve_inherited_patch_methods(self, inherited_keys) {
+            let key = inherited.target.get_key();
+            let Some(patch) = self.patch_function_likes.get(&key) else { continue };
+            let mut materialized = patch.clone();
+            if let Some(inherited_flags) = inherited
+                .source
+                .and_then(|source| self.function_likes.get(&source.get_key()))
+                .map(|source| source.flags)
+            {
+                let patch_origin_flag = materialized.flags & MetadataFlags::PATCH;
+                materialized.flags = inherited_flags | patch_origin_flag;
+                materialized.flags.remove(MetadataFlags::POPULATED);
+                merge_explicit_docblock_flags(
+                    &mut materialized.flags,
+                    patch.flags,
+                    patch.explicit_docblock_flags,
+                    PATCHABLE_FUNCTION_DOCBLOCK_FLAGS,
+                );
+            }
+            self.function_likes.insert(key, materialized);
+        }
+
+        for key in func_keys {
+            if self.function_likes.contains_key(&key) || !key.0.is_empty() {
+                continue;
+            }
+            if let Some(patch) = self.patch_function_likes.get_mut(&key) {
+                let diag = orphan_patch_function_diagnostic(patch);
+                patch.issues.push(diag);
+            }
         }
 
         let const_keys: Vec<Word> = self.patch_constants.keys().copied().collect();
@@ -1643,22 +1692,6 @@ impl CodebaseMetadata {
     pub fn get_all_file_ids(&self) -> Vec<FileId> {
         self.file_signatures.keys().copied().collect()
     }
-}
-
-/// Returns the subset of methods declared by `patch` that are inherited by `target` from
-/// an ancestor but not declared on `target` itself. Used by `apply_patch` on class-like
-/// metadata to distinguish patch-declared overrides of inherited methods (allowed) from
-/// patch-introduced new methods (disallowed).
-fn collect_inherited_patch_methods(
-    target: &ClassLikeMetadata,
-    patch: &ClassLikeMetadata,
-    class_likes: &WordMap<Box<ClassLikeMetadata>>,
-) -> WordSet {
-    if patch.methods.is_empty() {
-        return WordSet::default();
-    }
-    let ancestor_methods = class_like::collect_ancestor_methods(target, class_likes);
-    patch.methods.iter().filter(|m| ancestor_methods.contains(*m)).copied().collect()
 }
 
 fn duplicate_patch_class_diagnostic(kept: &ClassLikeMetadata, dropped: &ClassLikeMetadata) -> Issue {
@@ -1930,8 +1963,8 @@ mod should_replace_metadata_tests {
     #[test]
     #[allow(clippy::expect_used)]
     fn patch_function_like_leaves_vendor_owning_slot() {
-        // Patches may only refine type information on an existing function-like; they must
-        // never become the slot owner. The non-patch source's span/file id stay put so that
+        // Patches may only refine types and supported flags on an existing function-like; they
+        // must never become the slot owner. The non-patch source's span/file id stay put so that
         // `extract_owned_keys` records vendor-as-owner — otherwise the patch's entry would
         // outlive a vendor deletion in incremental mode (orphan function-like bug).
         use crate::metadata::function_like::FunctionLikeKind;

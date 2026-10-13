@@ -45,7 +45,7 @@ use crate::scanner::Context;
 use crate::scanner::assertion_inference::infer_assertions_from_block_body;
 use crate::scanner::assertion_inference::infer_assertions_from_expression_body;
 use crate::scanner::attribute::scan_attribute_lists;
-use crate::scanner::docblock::apply_common_metadata_flag;
+use crate::scanner::docblock::apply_function_like_metadata_flag;
 use crate::scanner::docblock::assertion_subject_word;
 use crate::scanner::docblock::find_most_trusted_tag;
 use crate::scanner::docblock::for_each_tag_by_ascending_trust;
@@ -58,6 +58,7 @@ use crate::scanner::ttype::merge_type_preserving_nullability;
 use crate::scanner::typing_error_issue;
 use crate::scanner::version_claim::evaluate_version_attributes;
 use crate::ttype::builder;
+use crate::ttype::builder::reject_unresolvable_tag_variable;
 use crate::ttype::get_mixed;
 use crate::ttype::resolution::TypeResolutionContext;
 use crate::ttype::template::GenericTemplate;
@@ -408,30 +409,11 @@ fn scan_function_like_docblock<A>(
             Element::Code(_) => continue,
         };
 
-        if apply_common_metadata_flag(&mut metadata.flags, &tag.value) {
+        if apply_function_like_metadata_flag(&mut metadata.flags, &mut metadata.explicit_docblock_flags, &tag.value) {
             continue;
         }
 
         match &tag.value {
-            TagValue::MustUse(_) => {
-                metadata.flags |= MetadataFlags::MUST_USE;
-            }
-            TagValue::Pure(_) => {
-                metadata.flags |= MetadataFlags::PURE;
-            }
-            TagValue::Impure(_) => {
-                metadata.flags.set(MetadataFlags::PURE, false);
-            }
-            TagValue::MutationFree(_) => {
-                metadata.flags |= MetadataFlags::MUTATION_FREE;
-                metadata.flags |= MetadataFlags::EXTERNAL_MUTATION_FREE;
-            }
-            TagValue::ExternalMutationFree(_) => {
-                metadata.flags |= MetadataFlags::EXTERNAL_MUTATION_FREE;
-            }
-            TagValue::SuspendsFiber(_) => {
-                metadata.flags |= MetadataFlags::SUSPENDS_FIBER;
-            }
             TagValue::IgnoreNullableReturn(_) => {
                 metadata.flags |= MetadataFlags::IGNORE_NULLABLE_RETURN;
                 ignore_nullable_return = true;
@@ -442,9 +424,6 @@ fn scan_function_like_docblock<A>(
             }
             TagValue::InheritDoc(_) => {
                 metadata.flags |= MetadataFlags::INHERITS_DOCS;
-            }
-            TagValue::NoNamedArguments(_) => {
-                metadata.flags |= MetadataFlags::NO_NAMED_ARGUMENTS;
             }
             _ => {}
         }
@@ -498,6 +477,10 @@ fn scan_function_like_docblock<A>(
         type_context = type_context.with_template_definition(template_name, vec![definition]);
     }
 
+    // Names of the declared parameters, used to tell Psalm-style parameter links
+    // (`@param $prototype $value`, `@return $value`) apart from typos (`@return $mixed`).
+    let parameter_names: Vec<Word> = metadata.parameters.iter().map(|parameter| parameter.get_name().0).collect();
+
     for_each_tag_by_ascending_trust(&document, |tag| {
         let TagValue::Param(parameter_tag) = &tag.value else {
             return;
@@ -547,7 +530,9 @@ fn scan_function_like_docblock<A>(
             );
         }
 
-        match get_type_metadata_from_type(parameter_tag.r#type, classname, &type_context, scope) {
+        match reject_unresolvable_tag_variable(parameter_tag.r#type, |name| parameter_names.contains(&word(name)))
+            .and_then(|()| get_type_metadata_from_type(parameter_tag.r#type, classname, &type_context, scope))
+        {
             Ok(mut provided_type) => {
                 let resulting_type = if !is_variadic
                     && parameter_metadata.flags.is_variadic()
@@ -675,8 +660,17 @@ fn scan_function_like_docblock<A>(
     });
 
     if let Some(return_type) = return_tag.as_ref() {
-        match get_type_metadata_from_type(return_type.r#type, classname, &type_context, scope) {
+        match reject_unresolvable_tag_variable(return_type.r#type, |name| parameter_names.contains(&word(name)))
+            .and_then(|()| get_type_metadata_from_type(return_type.r#type, classname, &type_context, scope))
+        {
             Ok(return_type_signature) => {
+                let is_abstract_method = metadata.method_metadata.as_ref().is_some_and(|m| m.is_abstract);
+                let return_type_signature = if is_abstract_method {
+                    return_type_signature
+                } else {
+                    let real_type = metadata.return_type_declaration_metadata.as_ref();
+                    merge_type_preserving_nullability(return_type_signature, real_type)
+                };
                 metadata.set_return_type_metadata(Some(return_type_signature));
             }
             Err(typing_error) => {

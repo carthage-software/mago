@@ -24,6 +24,7 @@ use crate::scanner::inference::infer;
 use crate::scanner::ttype::get_type_metadata_from_type;
 use crate::scanner::typing_error_issue;
 use crate::scanner::version_claim::evaluate_version_attributes;
+use crate::ttype::builder::reject_unresolvable_tag_variable;
 use crate::ttype::resolution::TypeResolutionContext;
 
 #[inline]
@@ -128,7 +129,7 @@ fn process_constant_docblock(
     }
 
     for tag in document.tags() {
-        apply_common_metadata_flag(&mut metadata.flags, &tag.value);
+        apply_common_metadata_flag(&mut metadata.flags, &mut metadata.explicit_docblock_flags, &tag.value);
     }
 
     let var = find_most_trusted_tag(document, |tag| match &tag.value {
@@ -137,7 +138,11 @@ fn process_constant_docblock(
     });
 
     if let Some(var) = &var {
-        match get_type_metadata_from_type(var.r#type, classname, type_context, scope) {
+        // Constants have no parameter scope: a bare variable can never link
+        // anything and is always a typo.
+        match reject_unresolvable_tag_variable(var.r#type, |_| false)
+            .and_then(|()| get_type_metadata_from_type(var.r#type, classname, type_context, scope))
+        {
             Ok(type_metadata) => {
                 metadata.type_metadata = Some(type_metadata);
             }

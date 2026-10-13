@@ -36,8 +36,8 @@ pub enum FileType {
     /// provided as pre-defined stubs for analysis.
     Builtin,
 
-    /// The file is a user-provided patch that overrides type information for vendored or
-    /// built-in code with corrected PHPDoc / type declarations.
+    /// The file is a user-provided patch that overrides type information and supported semantic
+    /// PHPDoc flags for vendored or built-in code.
     /// Like vendored files, patches are not actively analyzed, linted, or formatted,
     /// but their metadata takes precedence over both vendored and built-in definitions.
     Patch,
@@ -224,7 +224,8 @@ impl FileType {
         matches!(self, FileType::Builtin)
     }
 
-    /// Returns `true` if the file is a patch, meaning it overrides type information for vendored or built-in code.
+    /// Returns `true` if the file is a patch, meaning it overrides type information and supported semantic PHPDoc
+    /// flags for vendored or built-in code.
     #[must_use]
     pub const fn is_patch(self) -> bool {
         matches!(self, FileType::Patch)

@@ -126,23 +126,8 @@ pub fn inherit_methods_from_parent(
                 {
                     return;
                 }
-                let implementing_class = implementing_method_id.get_class_name();
-                let implementing_method_name = implementing_method_id.get_method_name();
-
-                let is_existing_pseudo_from_trait = !parent_is_trait
-                    && implementing_class != class_like_name
-                    && codebase.class_likes.get(&implementing_class).is_some_and(|c| c.kind.is_trait())
-                    && codebase
-                        .function_likes
-                        .get(&(implementing_class, implementing_method_name))
-                        .is_some_and(|m| m.flags.is_magic_method());
-
-                if !is_existing_pseudo_from_trait
-                    && (implementing_class == class_like_name
-                        || !codebase
-                            .get_method_by_id(implementing_method_id)
-                            .and_then(|method| method.method_metadata.as_ref())
-                            .is_some_and(|method| method.is_abstract))
+                if implementing_method_id.get_class_name() == class_like_name
+                    || !codebase.can_replace_inherited_method(*implementing_method_id, parent_metadata.name)
                 {
                     return;
                 }

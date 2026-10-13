@@ -362,6 +362,7 @@ test_case!(docblock_callable_optional_param);
 test_case!(docblock_callable_variadic);
 test_case!(docblock_deprecated_function);
 test_case!(docblock_deprecated_method);
+test_case!(malformed_phpdoc_tags);
 test_case!(docblock_template_constraint_array_key);
 test_case!(docblock_template_constraint_object);
 test_case!(template_default_class_no_args);
@@ -2837,6 +2838,7 @@ test_case!(issue_2466);
 test_case!(issue_2467);
 test_case!(issue_2472);
 test_case!(issue_2473);
+test_case!(issue_2485);
 test_case!(simplexml_truthiness);
 test_case!(closure_capture_by_reference_array);
 test_case!(nullable_receiver_method_call);
@@ -2847,6 +2849,9 @@ test_case!(parameter_null_default_php90, crate::framework::php_90_settings());
 test_case!(multilevel_inheritance_unbound_template_bound);
 test_case!(partial_union_method_call);
 test_case!(iterator_foreach_value_type);
+test_case!(possibly_undefined_switch_finally);
+test_case!(inline_var_tag_undefined_variable);
+test_case!(phpdoc_native_type_merge);
 
 #[test]
 #[cfg_attr(miri, ignore)]

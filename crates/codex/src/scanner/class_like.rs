@@ -53,7 +53,7 @@ use crate::scanner::TemplateConstraintList;
 use crate::scanner::attribute::get_attribute_flags;
 use crate::scanner::attribute::scan_attribute_lists;
 use crate::scanner::class_like_constant::scan_class_like_constants;
-use crate::scanner::docblock::apply_common_metadata_flag;
+use crate::scanner::docblock::apply_class_like_metadata_flag;
 use crate::scanner::docblock::parse_docblock;
 use crate::scanner::docblock::parse_docblock_trivia;
 use crate::scanner::enum_case::scan_enum_case;
@@ -415,7 +415,11 @@ where
         }
 
         for tag in document.tags() {
-            if apply_common_metadata_flag(&mut class_like_metadata.flags, &tag.value) {
+            if apply_class_like_metadata_flag(
+                &mut class_like_metadata.flags,
+                &mut class_like_metadata.explicit_docblock_flags,
+                &tag.value,
+            ) {
                 continue;
             }
 
@@ -427,12 +431,6 @@ where
                 }
                 TagValue::Final(_) => {
                     class_like_metadata.flags |= MetadataFlags::FINAL;
-                }
-                TagValue::ConsistentConstructor(_) => {
-                    class_like_metadata.flags |= MetadataFlags::CONSISTENT_CONSTRUCTOR;
-                }
-                TagValue::ConsistentTemplates(_) => {
-                    class_like_metadata.flags |= MetadataFlags::CONSISTENT_TEMPLATES;
                 }
                 TagValue::SealProperties(_) => {
                     class_like_metadata.has_sealed_properties = Some(true);
@@ -1597,6 +1595,7 @@ fn create_enum_method(
         assertions_inferred: false,
         globals_accessed: WordSet::default(),
         has_docblock: false,
+        explicit_docblock_flags: MetadataFlags::empty(),
         flags: MetadataFlags::POPULATED,
         version_constraint: crate::metadata::version_constraint::VersionConstraint::unconstrained(),
     }

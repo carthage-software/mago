@@ -27,6 +27,7 @@ use crate::scanner::version_claim::evaluate_version_attributes;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::reference::TReference;
 use crate::ttype::atomic::reference::TReferenceMemberSelector;
+use crate::ttype::builder::reject_unresolvable_tag_variable;
 use crate::ttype::resolution::TypeResolutionContext;
 use crate::visibility::Visibility;
 
@@ -95,7 +96,7 @@ where
 
             if let Some(document) = document.as_ref() {
                 for tag in document.tags() {
-                    if apply_common_metadata_flag(&mut meta.flags, &tag.value) {
+                    if apply_common_metadata_flag(&mut meta.flags, &mut meta.explicit_docblock_flags, &tag.value) {
                         continue;
                     }
 
@@ -113,7 +114,11 @@ where
                 });
 
                 if let Some(var) = &var {
-                    match get_type_metadata_from_type(var.r#type, classname, type_context, scope) {
+                    // Class constants have no parameter scope: a bare variable can never link
+                    // anything and is always a typo.
+                    match reject_unresolvable_tag_variable(var.r#type, |_| false)
+                        .and_then(|()| get_type_metadata_from_type(var.r#type, classname, type_context, scope))
+                    {
                         Ok(type_metadata) => {
                             let real_type = meta.type_declaration.as_ref();
                             let type_metadata = merge_type_preserving_nullability(type_metadata, real_type);

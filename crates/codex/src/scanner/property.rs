@@ -2,6 +2,7 @@ use mago_allocator::Arena;
 use mago_names::scope::NamespaceScope;
 use mago_phpdoc_syntax::cst::Document;
 use mago_phpdoc_syntax::cst::TagValue;
+use mago_phpdoc_syntax::cst::r#type::Type;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -32,6 +33,7 @@ use crate::scanner::ttype::merge_type_preserving_nullability;
 use crate::scanner::typing_error_issue;
 use crate::scanner::version_claim::TypeOverride;
 use crate::scanner::version_claim::evaluate_version_attributes;
+use crate::ttype::builder::reject_unresolvable_tag_variable;
 use crate::ttype::resolution::TypeResolutionContext;
 use crate::visibility::Visibility;
 
@@ -567,7 +569,11 @@ fn update_property_metadata_from_docblock(
     allow_param_tag: bool,
 ) {
     for tag in document.tags() {
-        if apply_common_metadata_flag(&mut property_metadata.flags, &tag.value) {
+        if apply_common_metadata_flag(
+            &mut property_metadata.flags,
+            &mut property_metadata.explicit_docblock_flags,
+            &tag.value,
+        ) {
             continue;
         }
 
@@ -584,7 +590,7 @@ fn update_property_metadata_from_docblock(
         _ => None,
     });
 
-    let docblock_type = var_type.or_else(|| {
+    let docblock_type: Option<(&Type, bool)> = var_type.map(|r#type| (r#type, true)).or_else(|| {
         if !allow_param_tag {
             return None;
         }
@@ -593,10 +599,17 @@ fn update_property_metadata_from_docblock(
             TagValue::Param(param) => Some(param.r#type),
             _ => None,
         })
+        .map(|r#type| (r#type, false))
     });
 
-    if let Some(docblock_type) = docblock_type {
-        match get_type_metadata_from_type(docblock_type, Some(classname), type_context, scope) {
+    if let Some((docblock_type, is_var_tag)) = docblock_type {
+        // A `@var` tag has no parameter scope: a bare variable can never link
+        // anything and is always a typo. A `@param` fallback (promoted properties,
+        // hooks) keeps its parameter context and is left alone.
+        let validation = if is_var_tag { reject_unresolvable_tag_variable(docblock_type, |_| false) } else { Ok(()) };
+
+        match validation.and_then(|()| get_type_metadata_from_type(docblock_type, Some(classname), type_context, scope))
+        {
             Ok(property_type_metadata) => {
                 let real_type = property_metadata.type_declaration_metadata.as_ref();
                 let property_type_metadata = merge_type_preserving_nullability(property_type_metadata, real_type);

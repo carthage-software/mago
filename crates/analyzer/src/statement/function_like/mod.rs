@@ -325,6 +325,7 @@ where
         && let Some(return_type) = &function_metadata.return_type_metadata
         && !return_type.type_union.is_void()
         && !function_like_metadata.flags.has_yield()
+        && !function_like_metadata.return_type_declaration_metadata.as_ref().is_some_and(|d| d.type_union.is_void())
     {
         let expanded_type =
             expand_type_metadata(context, block_context, &mut artifacts, function_like_metadata, return_type);
@@ -1057,6 +1058,14 @@ fn check_return_type_metadata_width<'ctx, A>(
         .types
         .iter()
         .filter(|declared_atomic| !any_inferred_matches(declared_atomic))
+        .filter(|declared_atomic| {
+            !(return_type_metadata.from_docblock
+                && declared_atomic.is_null()
+                && function_like_metadata
+                    .return_type_declaration_metadata
+                    .as_ref()
+                    .is_some_and(|n| n.type_union.has_null()))
+        })
         .collect::<Vec<_>>();
     if unused_atomics.is_empty() {
         return;

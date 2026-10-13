@@ -1,5 +1,6 @@
 use mago_allocator::Arena;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
+use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::template::TemplateResult;
 use mago_codex::ttype::union::TUnion;
@@ -92,7 +93,33 @@ pub(crate) fn fetch_declared_invocation_return_type<A>(
 where
     A: Arena,
 {
-    let mut resulting_type = if let Some(return_type) = invocation.target.get_return_type().cloned() {
+    let target_return_type = if let Some(function_like_metadata) = invocation.target.get_function_like_metadata()
+        && let Some(docblock_return) = function_like_metadata.return_type_metadata.as_ref()
+        && docblock_return.from_docblock
+        && !docblock_return.type_union.has_template_types()
+        && !docblock_return.type_union.is_generic_parameter()
+        && !docblock_return.type_union.types.iter().any(|t| {
+            t.is_derived()
+                || t.is_conditional()
+                || matches!(t, TAtomic::Alias(_) | TAtomic::Reference(_) | TAtomic::GenericParameter(_))
+        })
+        && let Some(native_return) = function_like_metadata.return_type_declaration_metadata.as_ref()
+        && ((native_return.type_union.has_object_type()
+            && !docblock_return.type_union.has_object_type()
+            && !docblock_return.type_union.has_mixed())
+            || (native_return.type_union.is_void() && !docblock_return.type_union.is_void())
+            || (native_return.type_union.is_array()
+                && !docblock_return.type_union.is_array()
+                && !docblock_return.type_union.is_list()
+                && !docblock_return.type_union.has_iterable()
+                && !docblock_return.type_union.has_mixed()))
+    {
+        Some(native_return.type_union.clone())
+    } else {
+        invocation.target.get_return_type().cloned()
+    };
+
+    let mut resulting_type = if let Some(return_type) = target_return_type {
         resolve_invocation_type(context, invocation, template_result, parameters, return_type)
     } else {
         get_mixed()
