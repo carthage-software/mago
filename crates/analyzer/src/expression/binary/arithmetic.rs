@@ -878,7 +878,7 @@ fn compose_keyed_plus(left: &TKeyedArray, right: &TKeyedArray) -> TKeyedArray {
                         Some(right_value_type),
                         &CodebaseMetadata::default(),
                     );
-                    composed_known.insert(*key, (false, merged_value));
+                    composed_known.insert(*key, (true, merged_value));
                     continue;
                 }
             }
@@ -943,7 +943,7 @@ fn compose_keyed_plus(left: &TKeyedArray, right: &TKeyedArray) -> TKeyedArray {
 fn key_could_be_in_param(key: &ArrayKey, param: &TUnion) -> bool {
     match key {
         ArrayKey::Integer(_) => param.has_int(),
-        ArrayKey::String(_) => param.has_string(),
+        ArrayKey::String(_) => param.has_string() || param.has_array_key(),
         ArrayKey::ClassLikeConstant { .. } => true,
     }
 }
