@@ -341,7 +341,9 @@ where
 
     // Check for a defined constant
     if let Some(constant_metadata) = metadata.constants.get(&const_name) {
-        report_deprecated_class_constant(context, metadata, constant_metadata, const_span);
+        if !block_context.is_enclosing_scope_deprecated() {
+            report_deprecated_class_constant(context, metadata, constant_metadata, const_span);
+        }
 
         check_class_constant_visibility(
             context,
@@ -410,7 +412,9 @@ where
         };
 
         if let Some(constant_metadata) = required_metadata.constants.get(&const_name) {
-            report_deprecated_class_constant(context, required_metadata, constant_metadata, const_span);
+            if !block_context.is_enclosing_scope_deprecated() {
+                report_deprecated_class_constant(context, required_metadata, constant_metadata, const_span);
+            }
 
             check_class_constant_visibility(
                 context,

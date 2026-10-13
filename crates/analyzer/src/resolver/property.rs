@@ -881,7 +881,7 @@ where
             ) {
                 let prop_meta = required_resolution.property;
 
-                if check_deprecation {
+                if check_deprecation && !block_context.is_enclosing_scope_deprecated() {
                     report_deprecated_property(
                         context,
                         required_resolution.declaring_class,
@@ -912,7 +912,7 @@ where
             if let Some(resolution) =
                 find_property_in_mixins(context.codebase, class_metadata, object, &class_metadata.mixins, prop_name)
             {
-                if check_deprecation {
+                if check_deprecation && !block_context.is_enclosing_scope_deprecated() {
                     report_deprecated_property(
                         context,
                         resolution.declaring_class,
@@ -963,7 +963,7 @@ where
                 named_object,
                 prop_name,
                 for_assignment,
-                check_deprecation.then(|| selector.span()),
+                (check_deprecation && !block_context.is_enclosing_scope_deprecated()).then(|| selector.span()),
             )
         {
             return Some(resolved);
@@ -1034,7 +1034,7 @@ where
     let DeclaredProperty { declaring_class: declaring_class_metadata, property: property_metadata, .. } = resolution;
     let declaring_class_id = declaring_class_metadata.name;
 
-    if check_deprecation {
+    if check_deprecation && !block_context.is_enclosing_scope_deprecated() {
         report_deprecated_property(context, declaring_class_metadata, property_metadata, selector.span());
     }
 
