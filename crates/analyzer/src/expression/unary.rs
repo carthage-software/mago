@@ -14,6 +14,7 @@ use mago_bytes::BytesDisplay;
 
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::operator_overloading::OverloadedOperator;
+use mago_codex::operator_overloading::get_class_overloading;
 use mago_codex::operator_overloading::get_operator_overloading_class;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
@@ -254,9 +255,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPrefix<'arena> {
                             invalid_operand_messages.push(("Cannot negate `array`".to_string(), operand_span));
                         }
                         TAtomic::Object(_) => {
-                            if let Some(class) = get_operator_overloading_class(operand_part)
-                                .filter(|class| class.overloads(OverloadedOperator::Negation))
-                            {
+                            if let Some(class) = get_class_overloading(operand_part, OverloadedOperator::Negation) {
                                 resulting_types.push(class.get_instance_atomic());
                             } else {
                                 let type_id = operand_part.get_id();
@@ -799,8 +798,7 @@ where
                 possibilities.push(TAtomic::Mixed(TMixed::new()));
             }
             _ => {
-                if let Some(class) = get_operator_overloading_class(operand_atomic_type)
-                    .filter(|class| class.overloads(OverloadedOperator::IncrementDecrement))
+                if let Some(class) = get_class_overloading(operand_atomic_type, OverloadedOperator::IncrementDecrement)
                 {
                     possibilities.push(class.get_instance_atomic());
                     continue;
@@ -1043,8 +1041,7 @@ where
                 possibilities.push(TAtomic::Mixed(TMixed::new()));
             }
             _ => {
-                if let Some(class) = get_operator_overloading_class(operand_atomic_type)
-                    .filter(|class| class.overloads(OverloadedOperator::IncrementDecrement))
+                if let Some(class) = get_class_overloading(operand_atomic_type, OverloadedOperator::IncrementDecrement)
                 {
                     possibilities.push(class.get_instance_atomic());
                     continue;

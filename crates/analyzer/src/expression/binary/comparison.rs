@@ -531,8 +531,6 @@ fn involves_external_reference(expr: &Expression<'_>, block_context: &BlockConte
     matches!(unwrap_expression(expr), Expression::Variable(Variable::Direct(var)) if block_context.references_to_external_scope.contains(&word(var.name)))
 }
 
-/// Reports the operands that the compare handler of an operator-overloading class (such as `GMP`)
-/// cannot read, and returns whether it reported any.
 pub(super) fn report_operands_rejected_by_comparison_handler<'arena, A>(
     context: &mut Context<'_, 'arena, A>,
     binary: &Binary<'arena>,

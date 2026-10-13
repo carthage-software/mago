@@ -51,62 +51,61 @@ where
     check_spaceship_operand(context, binary.lhs, lhs_type, "Left");
     check_spaceship_operand(context, binary.rhs, rhs_type, "Right");
 
-    let reported_rejected_operand = report_operands_rejected_by_comparison_handler(context, binary, lhs_type, rhs_type);
     let lhs_has_array = lhs_type.has_array() || lhs_type.has_iterable();
     let rhs_has_array = rhs_type.has_array() || rhs_type.has_iterable();
     let lhs_is_only_array = lhs_type.is_array();
     let rhs_is_only_array = rhs_type.is_array();
 
-    if !reported_rejected_operand {
-        if lhs_is_only_array && !rhs_has_array && !rhs_type.is_null() {
-            context.collector.report_with_code(
-                IssueCode::InvalidOperand,
-                Issue::error(format!(
-                    "Comparing an `array` with a non-array type `{}` using `<=>`.",
-                    rhs_type.get_id()
-                ))
-                .with_annotation(Annotation::primary(binary.lhs.span()).with_message("This is an array"))
-                .with_annotation(Annotation::secondary(binary.rhs.span()).with_message(format!("This has type `{}`", rhs_type.get_id())))
-                .with_note("PHP compares arrays as greater than other types (except other arrays and null). This might not be the intended comparison.")
-                .with_help("Ensure both operands are of comparable types or explicitly cast/convert them before comparison."),
-            );
-        } else if !lhs_has_array && rhs_is_only_array && !lhs_type.is_null() {
-            context.collector.report_with_code(
-                IssueCode::InvalidOperand,
-                Issue::error(format!(
-                    "Comparing a non-array type `{}` with an `array` using `<=>`.",
-                    lhs_type.get_id()
-                ))
-                .with_annotation(Annotation::primary(binary.lhs.span()).with_message(format!("This has type `{}`", lhs_type.get_id())))
-                .with_annotation(Annotation::secondary(binary.rhs.span()).with_message("This is an array"))
-                .with_note("PHP compares arrays as greater than other types (except other arrays and null). This might not be the intended comparison.")
-                .with_help("Ensure both operands are of comparable types or explicitly cast/convert them before comparison."),
-            );
-        } else if lhs_has_array && !rhs_has_array && !rhs_type.is_null() {
-            context.collector.report_with_code(
-                IssueCode::PossiblyInvalidOperand,
-                Issue::warning(format!(
-                    "Left operand may be an `array` when compared with non-array type `{}` using `<=>`.",
-                    rhs_type.get_id()
-                ))
-                .with_annotation(Annotation::primary(binary.lhs.span()).with_message(format!("This may be an array (type `{}`)", lhs_type.get_id())))
-                .with_annotation(Annotation::secondary(binary.rhs.span()).with_message(format!("This has type `{}`", rhs_type.get_id())))
-                .with_note("PHP compares arrays as greater than other types (except other arrays and null), so the spaceship result depends on which variant of the union the array side resolves to at runtime.")
-                .with_help("Narrow the array side to a non-array type before comparing, or handle the array case separately."),
-            );
-        } else if !lhs_has_array && rhs_has_array && !lhs_type.is_null() {
-            context.collector.report_with_code(
-                IssueCode::PossiblyInvalidOperand,
-                Issue::warning(format!(
-                    "Right operand may be an `array` when compared with non-array type `{}` using `<=>`.",
-                    lhs_type.get_id()
-                ))
-                .with_annotation(Annotation::primary(binary.lhs.span()).with_message(format!("This has type `{}`", lhs_type.get_id())))
-                .with_annotation(Annotation::secondary(binary.rhs.span()).with_message(format!("This may be an array (type `{}`)", rhs_type.get_id())))
-                .with_note("PHP compares arrays as greater than other types (except other arrays and null), so the spaceship result depends on which variant of the union the array side resolves to at runtime.")
-                .with_help("Narrow the array side to a non-array type before comparing, or handle the array case separately."),
-            );
-        }
+    if lhs_is_only_array && !rhs_has_array && !rhs_type.is_null() {
+        context.collector.report_with_code(
+            IssueCode::InvalidOperand,
+            Issue::error(format!(
+                "Comparing an `array` with a non-array type `{}` using `<=>`.",
+                rhs_type.get_id()
+            ))
+            .with_annotation(Annotation::primary(binary.lhs.span()).with_message("This is an array"))
+            .with_annotation(Annotation::secondary(binary.rhs.span()).with_message(format!("This has type `{}`", rhs_type.get_id())))
+            .with_note("PHP compares arrays as greater than other types (except other arrays and null). This might not be the intended comparison.")
+            .with_help("Ensure both operands are of comparable types or explicitly cast/convert them before comparison."),
+        );
+    } else if !lhs_has_array && rhs_is_only_array && !lhs_type.is_null() {
+        context.collector.report_with_code(
+            IssueCode::InvalidOperand,
+            Issue::error(format!(
+                "Comparing a non-array type `{}` with an `array` using `<=>`.",
+                lhs_type.get_id()
+            ))
+            .with_annotation(Annotation::primary(binary.lhs.span()).with_message(format!("This has type `{}`", lhs_type.get_id())))
+            .with_annotation(Annotation::secondary(binary.rhs.span()).with_message("This is an array"))
+            .with_note("PHP compares arrays as greater than other types (except other arrays and null). This might not be the intended comparison.")
+            .with_help("Ensure both operands are of comparable types or explicitly cast/convert them before comparison."),
+        );
+    } else if lhs_has_array && !rhs_has_array && !rhs_type.is_null() {
+        context.collector.report_with_code(
+            IssueCode::PossiblyInvalidOperand,
+            Issue::warning(format!(
+                "Left operand may be an `array` when compared with non-array type `{}` using `<=>`.",
+                rhs_type.get_id()
+            ))
+            .with_annotation(Annotation::primary(binary.lhs.span()).with_message(format!("This may be an array (type `{}`)", lhs_type.get_id())))
+            .with_annotation(Annotation::secondary(binary.rhs.span()).with_message(format!("This has type `{}`", rhs_type.get_id())))
+            .with_note("PHP compares arrays as greater than other types (except other arrays and null), so the spaceship result depends on which variant of the union the array side resolves to at runtime.")
+            .with_help("Narrow the array side to a non-array type before comparing, or handle the array case separately."),
+        );
+    } else if !lhs_has_array && rhs_has_array && !lhs_type.is_null() {
+        context.collector.report_with_code(
+            IssueCode::PossiblyInvalidOperand,
+            Issue::warning(format!(
+                "Right operand may be an `array` when compared with non-array type `{}` using `<=>`.",
+                lhs_type.get_id()
+            ))
+            .with_annotation(Annotation::primary(binary.lhs.span()).with_message(format!("This has type `{}`", lhs_type.get_id())))
+            .with_annotation(Annotation::secondary(binary.rhs.span()).with_message(format!("This may be an array (type `{}`)", rhs_type.get_id())))
+            .with_note("PHP compares arrays as greater than other types (except other arrays and null), so the spaceship result depends on which variant of the union the array side resolves to at runtime.")
+            .with_help("Narrow the array side to a non-array type before comparing, or handle the array case separately."),
+        );
+    } else {
+        report_operands_rejected_by_comparison_handler(context, binary, lhs_type, rhs_type);
     }
 
     let result_type = if !block_context.flags.inside_loop_expressions() && is_always_greater_than(lhs_type, rhs_type) {
