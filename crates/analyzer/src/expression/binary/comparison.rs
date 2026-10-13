@@ -544,14 +544,23 @@ where
     let mut invalid_right_messages: Vec<String> = Vec::new();
     let mut has_valid_left_operand = false;
     let mut has_valid_right_operand = false;
+    let mut has_float_left_operand = false;
+    let mut has_float_right_operand = false;
 
     for left_operand in lhs_type.types.iter() {
         for right_operand in rhs_type.types.iter() {
             let rejected_side = get_comparison_handler(&binary.operator, left_operand, right_operand).and_then(
                 |(class, instance_side)| {
-                    let (other_operand, other_side, invalid_messages) = match instance_side {
-                        OperandSide::Left => (right_operand, OperandSide::Right, &mut invalid_right_messages),
-                        OperandSide::Right => (left_operand, OperandSide::Left, &mut invalid_left_messages),
+                    let (other_operand, other_side, invalid_messages, has_float_operand) = match instance_side {
+                        OperandSide::Left => (
+                            right_operand,
+                            OperandSide::Right,
+                            &mut invalid_right_messages,
+                            &mut has_float_right_operand,
+                        ),
+                        OperandSide::Right => {
+                            (left_operand, OperandSide::Left, &mut invalid_left_messages, &mut has_float_left_operand)
+                        }
                     };
 
                     if other_operand.is_mixed() {
@@ -563,6 +572,7 @@ where
                         return None;
                     }
 
+                    *has_float_operand |= other_operand.is_float();
                     invalid_messages.push(format!(
                         "Cannot compare {} with {}",
                         class.get_name(),
@@ -581,9 +591,9 @@ where
     let operator = BytesDisplay(binary.operator.as_bytes());
     let mut reported = false;
 
-    for (side, operand, messages, has_valid_operand) in [
-        ("left", binary.lhs, invalid_left_messages, has_valid_left_operand),
-        ("right", binary.rhs, invalid_right_messages, has_valid_right_operand),
+    for (side, operand, messages, has_valid_operand, has_float_operand) in [
+        ("left", binary.lhs, invalid_left_messages, has_valid_left_operand, has_float_left_operand),
+        ("right", binary.rhs, invalid_right_messages, has_valid_right_operand, has_float_right_operand),
     ] {
         if messages.is_empty() {
             continue;
@@ -608,12 +618,21 @@ where
             annotation.with_message(message)
         });
 
+        let mut issue = issue
+            .with_annotations(annotations)
+            .with_note("PHP throws when the class comparing the operands cannot read the other one.");
+
+        if has_float_operand {
+            issue = issue.with_note(
+                "`GMP` truncates a `float` to an `int`, which is deprecated since PHP 8.1, and throws a `TypeError` when called from a `strict_types` file.",
+            );
+        }
+
         context.collector.report_with_code(
             issue_code,
-            issue
-                .with_annotations(annotations)
-                .with_note("PHP throws a `TypeError` when the class that compares the operands cannot read the other one. `GMP` truncates a `float` with a deprecation, or throws when called from a `strict_types` file.")
-                .with_help("Compare with a value the class accepts, such as an `int` or another instance of the same class."),
+            issue.with_help(
+                "Compare with a value the class accepts, such as an `int` or another instance of the same class.",
+            ),
         );
 
         reported = true;
