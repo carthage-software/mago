@@ -5,14 +5,15 @@ use std::sync::Arc;
 
 use mago_codex::assertion::Assertion;
 use mago_codex::metadata::CodebaseMetadata;
+use mago_codex::operator_overloading::OperatorOverloadingClass;
+use mago_codex::operator_overloading::OverloadedOperator;
+use mago_codex::operator_overloading::get_operator_overloading_class;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
 use mago_codex::ttype::atomic::mixed::TMixed;
-use mago_codex::ttype::atomic::object::TObject;
-use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::float::TFloat;
 use mago_codex::ttype::atomic::scalar::int::TInteger;
@@ -30,7 +31,6 @@ use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::cst::Binary;
 use mago_syntax::cst::BinaryOperator;
-use mago_word::word;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -356,34 +356,48 @@ where
                 pair_result_atomics.push(string_bitwise_result(&binary.operator, &left_atomic, &right_atomic));
                 has_valid_left_operand = true;
                 has_valid_right_operand = true;
-            } else if is_bcmath_number_operation(&binary.operator, &left_atomic, &right_atomic) {
-                let left_is_operand = is_bcmath_number_operand(&left_atomic);
-                let right_is_operand = is_bcmath_number_operand(&right_atomic);
+            } else if let Some(class) = get_overloading_class_for_pair(&binary.operator, &left_atomic, &right_atomic) {
+                let name = class.get_name();
+                let left_is_instance = get_operator_overloading_class(&left_atomic).is_some();
+                let left_is_valid = left_is_instance || class.accepts_operand(&left_atomic);
+                let right_is_valid = if left_is_instance && is_exponent_or_shift(&binary.operator) {
+                    class.accepts_exponent_or_shift_amount(&right_atomic)
+                } else {
+                    class.accepts_operand(&right_atomic)
+                };
+                let is_division_by_zero = right_is_valid
+                    && matches!(binary.operator, BinaryOperator::Division(_) | BinaryOperator::Modulo(_))
+                    && class.is_literal_zero(&right_atomic);
 
-                if left_is_operand {
+                if left_is_valid {
                     has_valid_left_operand = true;
                 } else {
                     invalid_left_messages.push((
-                        format!("Cannot use {} as an operand of BcMath\\Number arithmetic", left_atomic.get_id()),
+                        format!("Cannot use {} as an operand of {name} arithmetic", left_atomic.get_id()),
                         binary.lhs.span(),
                     ));
                 }
 
-                if !right_is_operand {
-                    invalid_right_messages.push((
-                        format!("Cannot use {} as an operand of BcMath\\Number arithmetic", right_atomic.get_id()),
-                        binary.rhs.span(),
-                    ));
-                } else if is_division_by_literal_zero(&binary.operator, &right_atomic) {
+                if !right_is_valid {
+                    let message = match binary.operator {
+                        BinaryOperator::Exponentiation(_) if left_is_instance => {
+                            format!("Cannot raise {name} to the power of {}", right_atomic.get_id())
+                        }
+                        BinaryOperator::LeftShift(_) | BinaryOperator::RightShift(_) if left_is_instance => {
+                            format!("Cannot shift {name} by {}", right_atomic.get_id())
+                        }
+                        _ => format!("Cannot use {} as an operand of {name} arithmetic", right_atomic.get_id()),
+                    };
+
+                    invalid_right_messages.push((message, binary.rhs.span()));
+                } else if is_division_by_zero {
                     invalid_right_messages.push(("Division or modulo by zero".to_string(), binary.rhs.span()));
                 } else {
                     has_valid_right_operand = true;
                 }
 
-                if left_is_operand && right_is_operand && !is_division_by_literal_zero(&binary.operator, &right_atomic)
-                {
-                    pair_result_atomics
-                        .push(TAtomic::Object(TObject::Named(TNamedObject::new(word(b"BcMath\\Number")))));
+                if left_is_valid && right_is_valid && !is_division_by_zero {
+                    pair_result_atomics.push(class.get_instance_atomic());
                 } else {
                     invalid_pair = true;
                 }
@@ -982,58 +996,35 @@ fn key_could_be_in_param(key: &ArrayKey, param: &TUnion) -> bool {
     }
 }
 
-fn is_bcmath_number_operation(op: &BinaryOperator<'_>, left: &TAtomic, right: &TAtomic) -> bool {
-    matches!(
-        op,
+/// The class whose operator overload PHP runs for `left operator right`: the left operand's when it
+/// is an instance of a listed class, else the right one's. `None` when that class does not overload
+/// the operator, so the pair is checked like any other.
+fn get_overloading_class_for_pair(
+    operator: &BinaryOperator<'_>,
+    left: &TAtomic,
+    right: &TAtomic,
+) -> Option<&'static OperatorOverloadingClass> {
+    let overloaded_operator = match operator {
         BinaryOperator::Addition(_)
-            | BinaryOperator::Subtraction(_)
-            | BinaryOperator::Multiplication(_)
-            | BinaryOperator::Division(_)
-            | BinaryOperator::Modulo(_)
-            | BinaryOperator::Exponentiation(_)
-    ) && (is_bcmath_number(left) || is_bcmath_number(right))
-}
-
-fn is_bcmath_number(atomic: &TAtomic) -> bool {
-    matches!(atomic, TAtomic::Object(TObject::Named(named)) if named.get_name().as_bytes().eq_ignore_ascii_case(b"BcMath\\Number"))
-}
-
-fn is_bcmath_number_operand(atomic: &TAtomic) -> bool {
-    match atomic {
-        TAtomic::Scalar(TScalar::Integer(_)) => true,
-        TAtomic::Scalar(TScalar::String(string)) => match string.get_known_literal_value() {
-            Some(literal) => is_bcmath_number_literal(literal),
-            None => string.is_numeric,
-        },
-        _ => is_bcmath_number(atomic),
-    }
-}
-
-fn is_bcmath_number_literal(literal: &[u8]) -> bool {
-    let unsigned = literal.strip_prefix(b"+").or_else(|| literal.strip_prefix(b"-")).unwrap_or(literal);
-    let mut seen_decimal_point = false;
-
-    unsigned.iter().all(|byte| match byte {
-        b'0'..=b'9' => true,
-        b'.' if !seen_decimal_point => {
-            seen_decimal_point = true;
-            true
+        | BinaryOperator::Subtraction(_)
+        | BinaryOperator::Multiplication(_)
+        | BinaryOperator::Division(_)
+        | BinaryOperator::Modulo(_)
+        | BinaryOperator::Exponentiation(_) => OverloadedOperator::Arithmetic,
+        BinaryOperator::BitwiseAnd(_) | BinaryOperator::BitwiseOr(_) | BinaryOperator::BitwiseXor(_) => {
+            OverloadedOperator::Bitwise
         }
-        _ => false,
-    })
+        BinaryOperator::LeftShift(_) | BinaryOperator::RightShift(_) => OverloadedOperator::Shift,
+        _ => return None,
+    };
+
+    get_operator_overloading_class(left)
+        .or_else(|| get_operator_overloading_class(right))
+        .filter(|class| class.overloads(overloaded_operator))
 }
 
-fn is_division_by_literal_zero(op: &BinaryOperator<'_>, right: &TAtomic) -> bool {
-    if !matches!(op, BinaryOperator::Division(_) | BinaryOperator::Modulo(_)) {
-        return false;
-    }
-
-    match right {
-        TAtomic::Scalar(TScalar::String(string)) => string.get_known_literal_value().is_some_and(|literal| {
-            is_bcmath_number_literal(literal) && literal.iter().all(|byte| matches!(byte, b'0' | b'.' | b'+' | b'-'))
-        }),
-        _ => matches!(right.get_literal_int_value(), Some(0)),
-    }
+fn is_exponent_or_shift(operator: &BinaryOperator<'_>) -> bool {
+    matches!(operator, BinaryOperator::Exponentiation(_) | BinaryOperator::LeftShift(_) | BinaryOperator::RightShift(_))
 }
 
 /// Detect arithmetic operations that are statically guaranteed to throw at

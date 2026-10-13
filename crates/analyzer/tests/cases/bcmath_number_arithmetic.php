@@ -37,6 +37,11 @@ function number_modulo_and_power(Number $a): Number
     return ($a % 3) ** 2;
 }
 
+function number_to_negative_power(Number $a): Number
+{
+    return $a ** -1;
+}
+
 function number_with_bool(Number $a, bool $b): Number
 {
     return $a + $b;
@@ -132,4 +137,10 @@ function number_bitwise_and(Number $a): mixed
 {
     /** @mago-expect analysis:invalid-operand */
     return $a & 1;
+}
+
+function number_to_fractional_string_power(Number $a): mixed
+{
+    /** @mago-expect analysis:invalid-operand */
+    return $a ** '1.5';
 }

@@ -2857,6 +2857,7 @@ test_case!(possibly_undefined_switch_finally);
 test_case!(inline_var_tag_undefined_variable);
 test_case!(phpdoc_native_type_merge);
 test_case!(bcmath_number_arithmetic);
+test_case!(gmp_arithmetic);
 
 #[test]
 fn issue_2478_without_property_memoization() {
