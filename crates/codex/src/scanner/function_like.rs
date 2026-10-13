@@ -677,6 +677,13 @@ fn scan_function_like_docblock<A>(
     if let Some(return_type) = return_tag.as_ref() {
         match get_type_metadata_from_type(return_type.r#type, classname, &type_context, scope) {
             Ok(return_type_signature) => {
+                let is_abstract_method = metadata.method_metadata.as_ref().is_some_and(|m| m.is_abstract);
+                let return_type_signature = if is_abstract_method {
+                    return_type_signature
+                } else {
+                    let real_type = metadata.return_type_declaration_metadata.as_ref();
+                    merge_type_preserving_nullability(return_type_signature, real_type)
+                };
                 metadata.set_return_type_metadata(Some(return_type_signature));
             }
             Err(typing_error) => {
