@@ -460,6 +460,20 @@ fn add_nullsafe_condition_clauses<A>(
                 add_nullsafe_base_clauses(value, formula, conditional_object_id, creating_object_id, assertion_context);
             }
         }
+        Expression::Call(Call::Function(call))
+            if let Expression::Identifier(name) = call.function
+                && call.argument_list.arguments.len() == 1 =>
+        {
+            let resolved_name = assertion_context.resolved_names.get(name);
+            let is_null = resolved_name.eq_ignore_ascii_case(b"is_null")
+                || (name.is_local()
+                    && name.value().eq_ignore_ascii_case(b"is_null")
+                    && assertion_context.codebase.get_function(resolved_name).is_none());
+
+            if is_null && let Some(argument) = call.argument_list.arguments.first() {
+                add_nullsafe_null_equality_clauses(argument.value(), formula, assertion_context);
+            }
+        }
         _ => {
             add_nullsafe_base_clauses(expression, formula, conditional_object_id, creating_object_id, assertion_context)
         }
