@@ -1366,6 +1366,7 @@ test_case!(stringable_interfaces);
 test_case!(stringable_names);
 test_case!(strings_ucfirst_with_int);
 test_case!(strings_ucwords_with_array);
+test_case!(strings_base64_decode);
 test_case!(strings_bin2hex_with_array);
 test_case!(strings_str_replace_with_int_search);
 test_case!(strings_preg_match_with_int_pattern);
