@@ -982,7 +982,6 @@ fn key_could_be_in_param(key: &ArrayKey, param: &TUnion) -> bool {
     }
 }
 
-/// `BcMath\Number` overloads these operators since PHP 8.4.
 fn is_bcmath_number_operation(op: &BinaryOperator<'_>, left: &TAtomic, right: &TAtomic) -> bool {
     matches!(
         op,
@@ -999,8 +998,6 @@ fn is_bcmath_number(atomic: &TAtomic) -> bool {
     matches!(atomic, TAtomic::Object(TObject::Named(named)) if named.get_name().as_bytes().eq_ignore_ascii_case(b"BcMath\\Number"))
 }
 
-/// A `bool` arrives here already turned into `int`. `float` is rejected on purpose: PHP truncates it.
-/// A non-literal `numeric-string` is accepted, although BCMath throws on forms like `'1e3'`.
 fn is_bcmath_number_operand(atomic: &TAtomic) -> bool {
     match atomic {
         TAtomic::Scalar(TScalar::Integer(_)) => true,
@@ -1012,7 +1009,6 @@ fn is_bcmath_number_operand(atomic: &TAtomic) -> bool {
     }
 }
 
-/// The empty string is valid: BCMath reads it as zero.
 fn is_bcmath_number_literal(literal: &[u8]) -> bool {
     let unsigned = literal.strip_prefix(b"+").or_else(|| literal.strip_prefix(b"-")).unwrap_or(literal);
     let mut seen_decimal_point = false;
