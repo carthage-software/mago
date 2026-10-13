@@ -28,7 +28,7 @@ mod cached_receiver;
 
 /// Captures skipped receivers from saved types without analyzing them again.
 pub(super) fn record_cached_receiver<'ctx, 'arena, A>(
-    context: &Context<'ctx, 'arena, A>,
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     expression: &Expression<'arena>,

@@ -2838,6 +2838,7 @@ test_case!(issue_2466);
 test_case!(issue_2467);
 test_case!(issue_2472);
 test_case!(issue_2473);
+test_case!(issue_2478);
 test_case!(issue_2483);
 test_case!(issue_2484);
 test_case!(issue_2485);
@@ -2854,6 +2855,22 @@ test_case!(iterator_foreach_value_type);
 test_case!(possibly_undefined_switch_finally);
 test_case!(inline_var_tag_undefined_variable);
 test_case!(phpdoc_native_type_merge);
+
+#[test]
+fn issue_2478_without_property_memoization() {
+    let mut settings = default_test_settings();
+    settings.memoize_properties = false;
+
+    framework::TestCase::new("issue_2478", include_bytes!("cases/issue_2478.php")).settings(settings).run();
+}
+
+#[test]
+fn issue_2478_php84() {
+    let mut settings = default_test_settings();
+    settings.version = mago_php_version::PHPVersion::PHP84;
+
+    framework::TestCase::new("issue_2478", include_bytes!("cases/issue_2478.php")).settings(settings).run();
+}
 
 #[test]
 #[cfg_attr(miri, ignore)]

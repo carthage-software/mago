@@ -846,6 +846,9 @@ fn find_property_in_class<'ctx, 'ast, 'arena, A>(
 where
     A: Arena,
 {
+    let check_deprecation =
+        !for_assignment || artifacts.get_expression_type(&object_expr.span().join(selector.span())).is_none();
+
     let Some(class_metadata) = context.codebase.get_class_like(class_id.as_bytes()) else {
         report_non_existent_class_like(context, object_expr.span(), class_id);
 
@@ -878,6 +881,15 @@ where
             ) {
                 let prop_meta = required_resolution.property;
 
+                if check_deprecation {
+                    report_deprecated_property(
+                        context,
+                        required_resolution.declaring_class,
+                        prop_meta,
+                        selector.span(),
+                    );
+                }
+
                 return Some(ResolvedProperty {
                     lookup_class: None,
                     property_span: prop_meta.name_span.or(prop_meta.span),
@@ -900,6 +912,15 @@ where
             if let Some(resolution) =
                 find_property_in_mixins(context.codebase, class_metadata, object, &class_metadata.mixins, prop_name)
             {
+                if check_deprecation {
+                    report_deprecated_property(
+                        context,
+                        resolution.declaring_class,
+                        resolution.property,
+                        selector.span(),
+                    );
+                }
+
                 let resolved = get_resolved_declared_property(context.codebase, &resolution, prop_name, for_assignment);
                 // For an annotation-governed mixin property, the caller reports a missing
                 // `__get`/`__set` on the accessed class; the mixin-specific warnings below
@@ -937,8 +958,13 @@ where
         }
 
         if let TObject::Named(named_object) = object
-            && let Some(resolved) =
-                find_property_in_intersection_types(context, named_object, prop_name, for_assignment)
+            && let Some(resolved) = find_property_in_intersection_types(
+                context,
+                named_object,
+                prop_name,
+                for_assignment,
+                check_deprecation.then(|| selector.span()),
+            )
         {
             return Some(resolved);
         }
@@ -1007,6 +1033,10 @@ where
 
     let DeclaredProperty { declaring_class: declaring_class_metadata, property: property_metadata, .. } = resolution;
     let declaring_class_id = declaring_class_metadata.name;
+
+    if check_deprecation {
+        report_deprecated_property(context, declaring_class_metadata, property_metadata, selector.span());
+    }
 
     let property_display_name = format!("{}::{}", declaring_class_metadata.original_name, prop_name);
     crate::utils::availability::check_property_availability(
@@ -1109,6 +1139,27 @@ where
         is_magic: resolution.is_magic(),
         read_type,
     })
+}
+
+pub(crate) fn report_deprecated_property<A>(
+    context: &mut Context<'_, '_, A>,
+    class_metadata: &ClassLikeMetadata,
+    property_metadata: &PropertyMetadata,
+    span: Span,
+) where
+    A: Arena,
+{
+    if !property_metadata.flags.is_deprecated() {
+        return;
+    }
+
+    let name = format!("{}::{}", class_metadata.original_name, property_metadata.name.0);
+    context.collector.report_with_code(
+        IssueCode::DeprecatedProperty,
+        Issue::warning(format!("Use of deprecated property `{name}`."))
+            .with_annotation(Annotation::primary(span).with_message("This property is deprecated"))
+            .with_help(format!("Check the documentation for `{name}` for a replacement.")),
+    );
 }
 
 /// Records references to child properties that can satisfy a `property_exists()` assertion.
@@ -1784,10 +1835,11 @@ fn find_property_in_single_mixin(
 /// Searches for a property in intersection types of a named object.
 /// For example, if the type is `Foo&Baz`, this will look for the property on `Baz`.
 fn find_property_in_intersection_types<A>(
-    context: &Context<'_, '_, A>,
+    context: &mut Context<'_, '_, A>,
     named_object: &TNamedObject,
     prop_name: Word,
     for_assignment: bool,
+    deprecation_span: Option<Span>,
 ) -> Option<ResolvedProperty>
 where
     A: Arena,
@@ -1808,6 +1860,10 @@ where
                 else {
                     continue;
                 };
+
+                if let Some(span) = deprecation_span {
+                    report_deprecated_property(context, resolution.declaring_class, resolution.property, span);
+                }
 
                 return Some(get_resolved_declared_property(context.codebase, &resolution, prop_name, for_assignment));
             }

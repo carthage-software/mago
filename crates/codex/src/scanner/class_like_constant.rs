@@ -57,6 +57,9 @@ where
     let mut flags = if is_final { MetadataFlags::FINAL } else { MetadataFlags::empty() };
     flags |= MetadataFlags::origin_flags(context.file.file_type);
 
+    let is_deprecated =
+        attributes.iter().any(|attribute| attribute.name.as_bytes().eq_ignore_ascii_case(b"Deprecated"));
+
     let document = parse_docblock(context, constant);
 
     if let Some(document) = document.as_ref() {
@@ -132,6 +135,10 @@ where
                         )),
                     }
                 }
+            }
+
+            if is_deprecated {
+                meta.flags |= MetadataFlags::DEPRECATED;
             }
 
             meta

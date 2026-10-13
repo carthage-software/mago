@@ -25,6 +25,7 @@ use crate::expression::unary::cast_type_to_string;
 use crate::resolver::class_name::resolve_classnames_from_expression;
 use crate::resolver::property::PropertyResolutionResult;
 use crate::resolver::property::ResolvedProperty;
+use crate::resolver::property::report_deprecated_property;
 use crate::utils::expression::get_block_expression_id;
 use crate::utils::expression::get_variable_id;
 use crate::visibility::check_static_property_read_visibility;
@@ -112,6 +113,9 @@ where
         }
     };
 
+    let check_deprecation = !for_assignment
+        || artifacts.get_expression_type(&class_expression.span().join(property_variable.span())).is_none();
+
     for resolved_classname in classnames {
         if resolved_classname.is_from_mixed() {
             result.encountered_mixed = true;
@@ -137,6 +141,7 @@ where
                 property_variable,
                 class_expression,
                 &mut result,
+                check_deprecation,
             ) {
                 result.properties.push(resolved_property);
             }
@@ -169,6 +174,7 @@ fn find_static_property_in_class<'ctx, 'ast, 'arena, A>(
     variable: &'ast Variable<'arena>,
     class_expr: &'ast Expression<'arena>,
     result: &mut PropertyResolutionResult,
+    check_deprecation: bool,
 ) -> Option<ResolvedProperty>
 where
     A: Arena,
@@ -214,6 +220,10 @@ where
             if let Some(prop_meta) = required_declaring_metadata.properties.get(&property_name) {
                 if !prop_meta.flags.is_static() {
                     continue;
+                }
+
+                if check_deprecation {
+                    report_deprecated_property(context, required_declaring_metadata, prop_meta, variable.span());
                 }
 
                 let mut property_type =
@@ -283,6 +293,10 @@ where
     ) {
         result.has_error_path = true;
         return None;
+    }
+
+    if check_deprecation {
+        report_deprecated_property(context, declaring_class_metadata, property_metadata, variable.span());
     }
 
     let mut property_type =

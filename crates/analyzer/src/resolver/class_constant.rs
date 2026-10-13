@@ -2,6 +2,7 @@ use mago_allocator::Arena;
 use mago_word::Word;
 
 use mago_codex::metadata::class_like::ClassLikeMetadata;
+use mago_codex::metadata::class_like_constant::ClassLikeConstantMetadata;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::generic::TGenericParameter;
 use mago_codex::ttype::atomic::object::TObject;
@@ -340,6 +341,8 @@ where
 
     // Check for a defined constant
     if let Some(constant_metadata) = metadata.constants.get(&const_name) {
+        report_deprecated_class_constant(context, metadata, constant_metadata, const_span);
+
         check_class_constant_visibility(
             context,
             block_context,
@@ -407,6 +410,8 @@ where
         };
 
         if let Some(constant_metadata) = required_metadata.constants.get(&const_name) {
+            report_deprecated_class_constant(context, required_metadata, constant_metadata, const_span);
+
             check_class_constant_visibility(
                 context,
                 block_context,
@@ -471,6 +476,27 @@ where
     // Not found, report error.
     report_non_existent_constant(context, metadata, const_name, class_span, const_span);
     None
+}
+
+fn report_deprecated_class_constant<A>(
+    context: &mut Context<'_, '_, A>,
+    class_metadata: &ClassLikeMetadata,
+    constant_metadata: &ClassLikeConstantMetadata,
+    span: Span,
+) where
+    A: Arena,
+{
+    if !constant_metadata.flags.is_deprecated() {
+        return;
+    }
+
+    let name = format!("{}::{}", class_metadata.original_name, constant_metadata.name);
+    context.collector.report_with_code(
+        IssueCode::DeprecatedClassConstant,
+        Issue::warning(format!("Use of deprecated class constant `{name}`."))
+            .with_annotation(Annotation::primary(span).with_message("This class constant is deprecated"))
+            .with_help(format!("Check the documentation for `{name}` for a replacement.")),
+    );
 }
 
 /// Reports an error for a class-like that cannot be found in the codebase.

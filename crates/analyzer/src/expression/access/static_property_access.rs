@@ -17,7 +17,10 @@ use crate::artifacts::editor::MemberReference;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
+use crate::resolver::class_name::get_class_name_from_atomic;
+use crate::resolver::property::report_deprecated_property;
 use crate::resolver::static_property::resolve_static_properties;
+use crate::utils::expression::get_block_expression_id;
 use crate::utils::expression::get_static_property_access_expression_id;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticPropertyAccess<'arena> {
@@ -96,7 +99,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticPropertyAccess<'arena> {
 
 /// Adds symbol reference for a memoized static property access.
 pub(super) fn add_memoized_static_property_reference<'ctx, 'ast, 'arena, A>(
-    context: &Context<'ctx, 'arena, A>,
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     class: &'ast Expression<'arena>,
@@ -139,13 +142,33 @@ where
         }
     }
 
-    let Some(class_name) = class_name else {
-        return Ok(());
+    let class_type = if class_name.is_none() {
+        artifacts.get_rc_expression_type(class).cloned().or_else(|| {
+            get_block_expression_id(class, context, block_context).and_then(|id| block_context.locals.get(&id).cloned())
+        })
+    } else {
+        None
     };
 
-    if let Some(declaring_class) =
-        context.codebase.get_declaring_property_class(class_name.as_bytes(), property_name.as_bytes())
-    {
+    let codebase = context.codebase;
+    for class_name in class_name.into_iter().chain(
+        class_type
+            .iter()
+            .flat_map(|union| union.types.iter())
+            .filter_map(|atomic| get_class_name_from_atomic(codebase, atomic).and_then(|name| name.fqcn)),
+    ) {
+        let Some(declaring_class) =
+            codebase.get_declaring_property_class(class_name.as_bytes(), property_name.as_bytes())
+        else {
+            continue;
+        };
+
+        if let Some(class_metadata) = context.codebase.get_class_like_by_name(declaring_class)
+            && let Some(property_metadata) = class_metadata.properties.get(&property_name)
+        {
+            report_deprecated_property(context, class_metadata, property_metadata, property.span());
+        }
+
         artifacts.symbol_references.add_reference_for_property_read(
             &block_context.scope,
             declaring_class,
