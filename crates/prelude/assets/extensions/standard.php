@@ -1977,6 +1977,8 @@ function getlastmod(): int|false {}
 
 /**
  * @pure
+ *
+ * @return ($strict is false ? string : string|false)
  */
 function base64_decode(string $string, bool $strict = false): string|false {}
 
