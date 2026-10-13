@@ -1249,6 +1249,7 @@ test_case!(callables_variadic_int_basic);
 test_case!(callables_variadic_wrong_type);
 test_case!(callables_variadic_strict_default_is_not_a_list);
 test_case!(callables_variadic_no_named_arguments_is_list);
+test_case!(class_level_no_named_arguments);
 test_case!(callables_spread_array_into_args);
 test_case!(callables_spread_assoc_as_named);
 test_case!(callables_spread_assoc_unknown_name);
