@@ -120,15 +120,17 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPrefix<'arena> {
             }
             UnaryPrefixOperator::BitwiseNot(_) => {
                 if let Some(operand_type) = operand_type {
-                    let (classes_without_bitwise_not, other_types): (Vec<&TAtomic>, Vec<&TAtomic>) =
-                        operand_type.types.iter().partition(|atomic| {
-                            get_operator_overloading_class(atomic)
-                                .is_some_and(|class| !class.overloads(OverloadedOperator::BitwiseNot))
-                        });
+                    let is_class_without_bitwise_not = |atomic: &TAtomic| {
+                        get_operator_overloading_class(atomic)
+                            .is_some_and(|class| !class.overloads(OverloadedOperator::BitwiseNot))
+                    };
 
-                    if classes_without_bitwise_not.is_empty() {
+                    if !operand_type.types.iter().any(is_class_without_bitwise_not) {
                         artifacts.set_rc_expression_type(self, operand_type);
                     } else {
+                        let (classes_without_bitwise_not, other_types): (Vec<&TAtomic>, Vec<&TAtomic>) =
+                            operand_type.types.iter().partition(|atomic| is_class_without_bitwise_not(atomic));
+
                         report_bitwise_not_without_overload(
                             context,
                             self.operand.span(),
