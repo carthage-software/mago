@@ -62,6 +62,11 @@ fn check_update(codebase: &mut CodebaseMetadata, source: &str, rescanned: &[&str
     assert_eq!(codebase.all_class_like_descendants, expected.all_class_like_descendants, "{source}");
     for (name, expected) in &expected.class_likes {
         let actual = &codebase.class_likes[name];
+        assert_eq!(
+            actual.flags.allows_dynamic_properties(),
+            expected.flags.allows_dynamic_properties(),
+            "{name}: {source}",
+        );
         assert_eq!(actual.direct_parent_class, expected.direct_parent_class, "{name}: {source}");
         assert_eq!(actual.direct_parent_interfaces, expected.direct_parent_interfaces, "{name}: {source}");
         assert_eq!(actual.all_parent_classes, expected.all_parent_classes, "{name}: {source}");
@@ -78,6 +83,32 @@ fn check_update(codebase: &mut CodebaseMetadata, source: &str, rescanned: &[&str
         }
         assert_eq!(actual.trait_constant_ids, expected.trait_constant_ids, "{name}: {source}");
     }
+}
+
+#[test]
+fn dynamic_properties_flags_follow_class_inheritance_and_updates() {
+    let before = include_str!("../../tests/fixtures/allow_dynamic_properties/before.php");
+    let after = include_str!("../../tests/fixtures/allow_dynamic_properties/after.php");
+    let mut codebase = scan(before);
+
+    for name in ["base", "own"] {
+        assert!(codebase.class_likes[&word(name)].flags.allows_dynamic_properties());
+    }
+
+    for name in ["child", "leaf", "unrelated"] {
+        assert!(!codebase.class_likes[&word(name)].flags.allows_dynamic_properties());
+    }
+
+    populate_full(&mut codebase);
+
+    for name in ["base", "child", "leaf", "own"] {
+        assert!(codebase.class_likes[&word(name)].flags.allows_dynamic_properties());
+    }
+
+    assert!(!codebase.class_likes[&word("unrelated")].flags.allows_dynamic_properties());
+
+    check_update(&mut codebase, after, &["base"], &["child", "leaf", "own"]);
+    check_update(&mut codebase, before, &["base"], &["child", "leaf", "own"]);
 }
 
 #[test]

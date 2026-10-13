@@ -1645,6 +1645,15 @@ pub(super) fn report_magic_property_without_get_set_method<A>(
 ) where
     A: Arena,
 {
+    if let Some(class_metadata) = context.codebase.get_class_like_by_name(classname)
+        && class_metadata.kind.is_class()
+        && !class_metadata.flags.is_readonly()
+        && class_metadata.flags.allows_dynamic_properties()
+        && !class_metadata.declaring_property_ids.contains_key(&property_name)
+    {
+        return;
+    }
+
     let magic_method_name = if for_assignment { "__set" } else { "__get" };
     let access_type = if for_assignment { "write to" } else { "read from" };
     let classname = display_class_like_name(context, classname);

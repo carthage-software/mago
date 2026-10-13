@@ -410,6 +410,15 @@ impl ClassLikeMetadata {
     }
 
     pub(crate) fn reset_ancestry(&mut self) {
+        if self.flags.allows_dynamic_properties() {
+            self.flags.set(
+                MetadataFlags::ALLOWS_DYNAMIC_PROPERTIES,
+                self.attributes
+                    .iter()
+                    .any(|attribute| attribute.name.as_bytes().eq_ignore_ascii_case(b"AllowDynamicProperties")),
+            );
+        }
+
         if self.declared_ancestry.is_none() {
             self.declared_ancestry = Some(
                 self.direct_parent_class

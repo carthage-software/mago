@@ -2838,6 +2838,7 @@ test_case!(issue_2466);
 test_case!(issue_2467);
 test_case!(issue_2472);
 test_case!(issue_2473);
+test_case!(issue_2483);
 test_case!(issue_2484);
 test_case!(issue_2485);
 test_case!(simplexml_truthiness);

@@ -142,6 +142,10 @@ pub fn merge_metadata_from_parent_class_like(
     if parent_metadata.flags.has_consistent_templates() {
         metadata.flags |= MetadataFlags::CONSISTENT_TEMPLATES;
     }
+
+    if parent_metadata.flags.allows_dynamic_properties() {
+        metadata.flags |= MetadataFlags::ALLOWS_DYNAMIC_PROPERTIES;
+    }
 }
 
 /// Merges class-like data inherited from a required class.

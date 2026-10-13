@@ -1484,8 +1484,13 @@ where
         }
     }
 
-    if class_like_metadata.attributes.iter().any(|attr| attr.name.as_bytes().eq_ignore_ascii_case(b"Deprecated")) {
-        class_like_metadata.flags |= MetadataFlags::DEPRECATED;
+    for attribute in &class_like_metadata.attributes {
+        let bytes = attribute.name.as_bytes();
+        if bytes.eq_ignore_ascii_case(b"Deprecated") {
+            class_like_metadata.flags |= MetadataFlags::DEPRECATED;
+        } else if bytes.eq_ignore_ascii_case(b"AllowDynamicProperties") {
+            class_like_metadata.flags |= MetadataFlags::ALLOWS_DYNAMIC_PROPERTIES;
+        }
     }
 
     Some(class_like_metadata)
