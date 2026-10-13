@@ -1,5 +1,6 @@
 use mago_allocator::Arena;
 use mago_allocator::collections::HashMap;
+use mago_allocator::collections::HashSet;
 use mago_allocator::vec::Vec;
 use mago_allocator::vec_in;
 
@@ -43,7 +44,7 @@ where
     commands: Vec<'arena, Command<'arena, A>, A>,
     line_suffix: Vec<'arena, Command<'arena, A>, A>,
     group_mode_map: HashMap<'arena, GroupIdentifier, Mode, A>,
-    propagated_breaks: HashMap<'arena, usize, bool, A>,
+    propagated_breaks: HashSet<'arena, usize, A>,
     new_line: &'static str,
     can_trim: bool,
     range_start: Option<usize>,
@@ -76,7 +77,7 @@ where
             commands: cmds,
             line_suffix: vec_in![arena],
             group_mode_map: HashMap::with_capacity_in(estimated_map_capacity(GROUP_MODE_CAPACITY_DIVISOR), arena),
-            propagated_breaks: HashMap::with_capacity_in(
+            propagated_breaks: HashSet::with_capacity_in(
                 estimated_map_capacity(PROPAGATED_BREAK_CAPACITY_DIVISOR),
                 arena,
             ),
@@ -502,7 +503,7 @@ where
     }
 
     #[inline]
-    fn propagate_breaks(propagated_breaks: &mut HashMap<'arena, usize, bool, A>, mut doc: &Document<'_, A>) -> bool {
+    fn propagate_breaks(propagated_breaks: &mut HashSet<'arena, usize, A>, mut doc: &Document<'_, A>) -> bool {
         loop {
             match doc {
                 Document::BreakParent => return true,
@@ -520,13 +521,13 @@ where
     }
 
     fn propagate_slice_breaks(
-        propagated_breaks: &mut HashMap<'arena, usize, bool, A>,
+        propagated_breaks: &mut HashSet<'arena, usize, A>,
         documents: &[Document<'_, A>],
     ) -> bool {
         documents.iter().rev().any(|doc| Self::propagate_breaks(propagated_breaks, doc))
     }
 
-    fn propagate_group_breaks(propagated_breaks: &mut HashMap<'arena, usize, bool, A>, group: &Group<'_, A>) -> bool {
+    fn propagate_group_breaks(propagated_breaks: &mut HashSet<'arena, usize, A>, group: &Group<'_, A>) -> bool {
         if *group.break_mode.borrow() == BreakMode::Force {
             return true;
         }
@@ -538,10 +539,11 @@ where
                 .and_then(|states| states.first())
                 .map(|document| std::ptr::from_ref(document).addr())
         });
+        // The printer only changes break mode to Force, which returns above.
         if let Some(cache_key) = cache_key
-            && let Some(should_break) = propagated_breaks.get(&cache_key)
+            && propagated_breaks.contains(&cache_key)
         {
-            return *should_break;
+            return false;
         }
 
         let mut should_break = false;
@@ -557,8 +559,8 @@ where
         }
 
         let should_break = *group.break_mode.borrow() == BreakMode::Force;
-        if let Some(cache_key) = cache_key {
-            propagated_breaks.insert(cache_key, should_break);
+        if !should_break && let Some(cache_key) = cache_key {
+            propagated_breaks.insert(cache_key);
         }
 
         should_break

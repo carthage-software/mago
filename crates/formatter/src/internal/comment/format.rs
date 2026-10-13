@@ -40,11 +40,6 @@ where
         }
     }
 
-    /// Returns an iterator over the remaining, unconsumed comments.
-    fn remaining_comments(&self) -> impl Iterator<Item = Comment> {
-        self.all_comments[self.next_comment_index..].iter().map(|trivia| Comment::from_trivia(self.file, trivia))
-    }
-
     /// Checks if a node is followed by a comment on its own line.
     ///
     /// # Arguments
@@ -108,28 +103,39 @@ where
     }
 
     pub(crate) fn has_comment(&self, range: Span, flags: CommentFlags) -> bool {
-        self.has_comment_with_filter(range, flags, |_| true)
+        self.has_comment_with_trivia_filter(range, flags, |_| true)
     }
 
     pub(crate) fn has_comment_with_filter<F>(&self, range: Span, flags: CommentFlags, filter: F) -> bool
     where
         F: Fn(&Comment) -> bool,
     {
-        for comment in self.remaining_comments() {
-            if !filter(&comment) {
+        self.has_comment_with_trivia_filter(range, flags, |trivia| filter(&Comment::from_trivia(self.file, trivia)))
+    }
+
+    fn has_comment_with_trivia_filter<F>(&self, range: Span, flags: CommentFlags, filter: F) -> bool
+    where
+        F: Fn(&Trivia<'arena>) -> bool,
+    {
+        for trivia in &self.all_comments[self.next_comment_index..] {
+            if !filter(trivia) {
                 break;
             }
 
-            if comment.end <= range.start_offset() {
-                if flags.contains(CommentFlags::LEADING) && comment.matches_flags(flags) {
+            let matches_flags = (!flags.contains(CommentFlags::BLOCK) || trivia.kind.is_block_comment())
+                && (!flags.contains(CommentFlags::LINE) || !trivia.kind.is_block_comment());
+            let start = trivia.span.start.offset;
+            let end = trivia.span.end.offset;
+            if end <= range.start_offset() {
+                if flags.contains(CommentFlags::LEADING) && matches_flags {
                     return true;
                 }
-            } else if range.end_offset() < comment.start && self.is_insignificant(range.end_offset(), comment.start) {
-                if flags.contains(CommentFlags::TRAILING) && comment.matches_flags(flags) {
+            } else if range.end_offset() < start && self.is_insignificant(range.end_offset(), start) {
+                if flags.contains(CommentFlags::TRAILING) && matches_flags {
                     return true;
                 }
-            } else if comment.end <= range.end_offset() {
-                if flags.contains(CommentFlags::DANGLING) && comment.matches_flags(flags) {
+            } else if end <= range.end_offset() {
+                if flags.contains(CommentFlags::DANGLING) && matches_flags {
                     return true;
                 }
             } else {

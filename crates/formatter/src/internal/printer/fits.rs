@@ -36,8 +36,18 @@ impl<'doc, 'arena, A: Arena> FitsStack<'doc, 'arena, A> {
                 if self.depth <= INLINE_DEPTH { &mut self.inline[self.depth - 1] } else { self.overflow.last_mut()? };
 
             if let Some((document, remaining)) = frame.1.split_first() {
-                frame.1 = remaining;
-                return Some((frame.0, document));
+                let mode = frame.0;
+                if remaining.is_empty() {
+                    if self.depth > INLINE_DEPTH {
+                        self.overflow.pop();
+                    }
+
+                    self.depth -= 1;
+                } else {
+                    frame.1 = remaining;
+                }
+
+                return Some((mode, document));
             }
 
             if self.depth > INLINE_DEPTH {

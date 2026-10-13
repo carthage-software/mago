@@ -243,7 +243,15 @@ where
         return Document::Array(vec_in![f.arena; left_parenthesis, argument_doc, right_parenthesis]);
     }
 
-    let mut contents = vec_in![f.arena; clone_in_arena(f.arena, &left_parenthesis)];
+    if argument_list.arguments.is_empty() {
+        let dangling_comments = f.print_dangling_comments(argument_list.span(), true);
+        let right_parenthesis = format_token(f, argument_list.right_parenthesis, b")");
+
+        return Document::Array(vec_in![f.arena;
+            left_parenthesis,
+            print_right_parenthesis(f, dangling_comments.as_ref(), &right_parenthesis, Some(false)),
+        ]);
+    }
 
     // First, run all the decision functions with unformatted arguments
     let should_break_all = force_break || should_break_all_arguments(f, argument_list, for_attribute);
@@ -299,10 +307,15 @@ where
     let dangling_comments = f.print_dangling_comments(argument_list.span(), true);
     let right_parenthesis = format_token(f, argument_list.right_parenthesis, b")");
 
-    if arguments_count == 0 {
-        contents.push(print_right_parenthesis(f, dangling_comments.as_ref(), &right_parenthesis, Some(false)));
-
-        return Document::Array(contents);
+    if should_break_all {
+        return print_broken_out_arguments(
+            f,
+            argument_list.arguments.as_slice(),
+            formatted_arguments,
+            left_parenthesis,
+            dangling_comments.as_ref(),
+            &right_parenthesis,
+        );
     }
 
     let get_printed_arguments = |f: &mut FormatterState<'_, 'arena, A>, should_break: bool, skip_index: isize| {
@@ -322,26 +335,17 @@ where
     };
 
     let all_arguments_broken_out = |f: &mut FormatterState<'_, 'arena, A>| {
-        let mut parts = vec_in![f.arena];
-        parts.push(clone_in_arena(f.arena, &left_parenthesis));
-        parts.push(Document::Indent(vec_in![f.arena;
-            Document::Line(Line::hard()),
-            Document::Group(Group::new(get_printed_arguments(f, true, 0))),
-            if f.trailing_comma_for(Feature::TrailingCommaInFunctionCalls) {
-                Document::String(b",")
-            } else {
-                Document::empty()
-            },
-        ]));
+        let arena = f.arena;
 
-        parts.push(print_right_parenthesis(f, dangling_comments.as_ref(), &right_parenthesis, Some(true)));
-
-        Document::Group(Group::new(parts).with_break_mode(BreakMode::Force))
+        print_broken_out_arguments(
+            f,
+            argument_list.arguments.as_slice(),
+            formatted_arguments.iter().map(|document| clone_in_arena(arena, document)),
+            clone_in_arena(arena, &left_parenthesis),
+            dangling_comments.as_ref(),
+            &right_parenthesis,
+        )
     };
-
-    if should_break_all {
-        return all_arguments_broken_out(f);
-    }
 
     if is_single_late_breaking_argument {
         let single_argument = formatted_arguments.remove(0);
@@ -384,7 +388,14 @@ where
         && let Some(last_argument) = formatted_arguments.last()
     {
         if will_break(last_argument) {
-            return all_arguments_broken_out(f);
+            return print_broken_out_arguments(
+                f,
+                argument_list.arguments.as_slice(),
+                formatted_arguments,
+                left_parenthesis,
+                dangling_comments.as_ref(),
+                &right_parenthesis,
+            );
         }
 
         let first_argument = clone_in_arena(f.arena, first_argument);
@@ -431,7 +442,14 @@ where
     if should_expand_last {
         let mut first_arguments = get_printed_arguments(f, false, -1);
         if first_arguments.iter().any(will_break) {
-            return all_arguments_broken_out(f);
+            return print_broken_out_arguments(
+                f,
+                argument_list.arguments.as_slice(),
+                formatted_arguments,
+                left_parenthesis,
+                dangling_comments.as_ref(),
+                &right_parenthesis,
+            );
         }
 
         if !first_arguments.is_empty() {
@@ -460,6 +478,7 @@ where
     let mut printed_arguments = print_arguments(f, argument_list.arguments.as_slice(), formatted_arguments, false);
 
     let group_id = f.next_id();
+    let mut contents = vec_in![f.arena; left_parenthesis];
     printed_arguments.insert(0, Document::Line(Line::soft()));
     contents.push(Document::IndentIfBreak(IndentIfBreak::new(group_id, printed_arguments)));
     if f.trailing_comma_for(Feature::TrailingCommaInFunctionCalls) {
@@ -468,6 +487,34 @@ where
     contents.push(print_right_parenthesis(f, dangling_comments.as_ref(), &right_parenthesis, None));
 
     Document::Group(Group::new(contents).with_id(group_id))
+}
+
+fn print_broken_out_arguments<'arena, A>(
+    f: &mut FormatterState<'_, 'arena, A>,
+    arguments: &[PartialArgument<'arena>],
+    documents: impl IntoIterator<Item = Document<'arena, A>>,
+    left_parenthesis: Document<'arena, A>,
+    dangling_comments: Option<&Document<'arena, A>>,
+    right_parenthesis: &Document<'arena, A>,
+) -> Document<'arena, A>
+where
+    A: Arena,
+{
+    let parts = vec_in![f.arena;
+        left_parenthesis,
+        Document::Indent(vec_in![f.arena;
+            Document::Line(Line::hard()),
+            Document::Group(Group::new(print_arguments(f, arguments, documents, true))),
+            if f.trailing_comma_for(Feature::TrailingCommaInFunctionCalls) {
+                Document::String(b",")
+            } else {
+                Document::empty()
+            },
+        ]),
+        print_right_parenthesis(f, dangling_comments, right_parenthesis, Some(true)),
+    ];
+
+    Document::Group(Group::new(parts).with_break_mode(BreakMode::Force))
 }
 
 fn print_arguments<'arena, A>(
@@ -479,9 +526,10 @@ fn print_arguments<'arena, A>(
 where
     A: Arena,
 {
-    let mut printed_arguments = vec_in![f.arena];
+    let mut printed_arguments = Vec::with_capacity_in(arguments.len() + usize::from(!should_break), f.arena);
     for (i, (element, document)) in arguments.iter().zip(documents).enumerate() {
-        let mut argument = vec_in![f.arena; document];
+        let mut argument = Vec::with_capacity_in(if i < arguments.len() - 1 { 4 } else { 1 }, f.arena);
+        argument.push(document);
         if i < arguments.len() - 1 {
             argument.push(Document::String(b","));
 

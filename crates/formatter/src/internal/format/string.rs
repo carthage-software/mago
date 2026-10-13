@@ -12,7 +12,7 @@ pub(super) fn print_lowercase_keyword<'arena, A>(
 where
     A: Arena,
 {
-    if keyword.iter().all(u8::is_ascii_lowercase) {
+    if !keyword.iter().any(u8::is_ascii_uppercase) {
         return keyword;
     }
 
@@ -31,7 +31,7 @@ pub(super) fn print_uppercase_keyword<'arena, A>(
 where
     A: Arena,
 {
-    if keyword.iter().all(u8::is_ascii_uppercase) {
+    if !keyword.iter().any(u8::is_ascii_lowercase) {
         return keyword;
     }
 

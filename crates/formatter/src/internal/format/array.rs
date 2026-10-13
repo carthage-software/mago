@@ -1,5 +1,4 @@
 use mago_allocator::Arena;
-use mago_allocator::CollectIn;
 use mago_allocator::vec::Vec;
 use mago_allocator::vec_in;
 
@@ -45,21 +44,15 @@ pub enum ArrayLike<'arena> {
 
 impl<'arena> ArrayLike<'arena> {
     #[inline]
-    fn elements<A>(&self, arena: &'arena A) -> Vec<'arena, &'arena ArrayElement<'arena>, A>
-    where
-        A: Arena,
-    {
-        let elements_sequence = match self {
-            Self::Array(array) => &array.elements,
-            Self::LegacyArray(array) => &array.elements,
-            Self::List(list) => &list.elements,
+    fn elements(&self) -> &'arena [ArrayElement<'arena>] {
+        let mut elements = match self {
+            Self::Array(array) => array.elements.nodes,
+            Self::LegacyArray(array) => array.elements.nodes,
+            Self::List(list) => list.elements.nodes,
         };
 
-        let mut elements: Vec<'arena, &'arena ArrayElement<'arena>, A> =
-            elements_sequence.iter().collect_in::<Vec<'arena, _, A>>(arena);
-
         while let Some(ArrayElement::Missing(_)) = elements.last() {
-            elements.pop();
+            elements = &elements[..elements.len() - 1];
         }
 
         elements
@@ -148,7 +141,7 @@ where
     };
 
     let mut parts = vec_in![f.arena;left_delimiter];
-    let elements = array_like.elements(f.arena);
+    let elements = array_like.elements();
 
     if elements.is_empty() {
         if let Some(dangling_comments) = f.print_dangling_comments(array_like.span(), true) {
@@ -186,7 +179,7 @@ where
         indent_parts.push(Document::Line(Line::soft()));
 
         if let Some(widths) = column_widths {
-            for (i, element) in elements.into_iter().enumerate() {
+            for (i, element) in elements.iter().enumerate() {
                 let element_span = element.span();
                 let formatted_element = element.format(f);
                 if i == len - 1 {
@@ -202,10 +195,10 @@ where
                 }
             }
         } else {
-            let kv_alignment_runs = detect_array_element_alignment_runs(f, &elements);
+            let kv_alignment_runs = detect_array_element_alignment_runs(f, elements);
 
             // Standard formatting with optional key-value alignment
-            for (i, element) in elements.into_iter().enumerate() {
+            for (i, element) in elements.iter().enumerate() {
                 let element_span = element.span();
 
                 // Set alignment context if this element is in an alignment run
@@ -273,7 +266,7 @@ where
         f.has_inner_comment(Span::new(prev.span().file_id, prev.end_position(), next.start_position()))
     };
 
-    for element in array_like.elements(f.arena).windows(2) {
+    for element in array_like.elements().windows(2) {
         let [prev, next] = element else { continue };
         if has_comments(prev, next) {
             return true;
@@ -291,12 +284,12 @@ fn inline_single_element<'arena, A>(
 where
     A: Arena,
 {
-    let elements = array_like.elements(f.arena);
+    let elements = array_like.elements();
     if elements.len() != 1 {
         return None; // Only inline single-element arrays
     }
 
-    match elements[0] {
+    match &elements[0] {
         ArrayElement::KeyValue(element) => {
             if !((element.key.is_literal() || is_string_word_type(element.key))
                 && is_expandable_expression(element.value, true))
@@ -537,7 +530,7 @@ where
     // Arbitrary limit to prevent excessive column width
     const WIGGLE_ROOM: usize = 20;
 
-    let elements = array_like.elements(f.arena);
+    let elements = array_like.elements();
     if elements.len() < 2 {
         return None; // Need at least two rows for table style to make sense
     }
@@ -612,7 +605,7 @@ where
 /// Detect alignment runs in array elements for key-value pairs.
 fn detect_array_element_alignment_runs<'arena, A>(
     f: &FormatterState<'_, 'arena, A>,
-    elements: &[&'arena ArrayElement<'arena>],
+    elements: &'arena [ArrayElement<'arena>],
 ) -> std::vec::Vec<AlignmentRun>
 where
     A: Arena,
@@ -640,7 +633,7 @@ where
 
 fn calculate_array_element_widths<A>(
     f: &FormatterState<'_, '_, A>,
-    elements: &[&ArrayElement<'_>],
+    elements: &[ArrayElement<'_>],
 ) -> Option<AlignmentWidths>
 where
     A: Arena,
@@ -661,7 +654,7 @@ where
 
 fn array_element_alignment_fits<A>(
     f: &FormatterState<'_, '_, A>,
-    elements: &[&ArrayElement<'_>],
+    elements: &[ArrayElement<'_>],
     widths: &AlignmentWidths,
 ) -> bool
 where

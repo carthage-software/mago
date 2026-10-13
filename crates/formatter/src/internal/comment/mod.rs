@@ -50,8 +50,10 @@ impl Comment {
         debug_assert!(trivia.kind.is_comment(), "Comment::from_trivia received non-comment trivia");
 
         let is_block = trivia.kind.is_block_comment();
-        let is_single_line =
-            !is_block || (file.line_number(trivia.span.start.offset) == file.line_number(trivia.span.end.offset));
+        let is_single_line = !is_block
+            || file
+                .get_line_start_offset(file.line_number(trivia.span.start.offset) + 1)
+                .is_none_or(|next_line| trivia.span.end.offset < next_line);
         let is_shell_comment = matches!(trivia.kind, TriviaKind::HashComment);
 
         Self::new(trivia.span.start.offset, trivia.span.end.offset, is_block, is_shell_comment, is_single_line)
@@ -60,18 +62,6 @@ impl Comment {
     pub fn with_line_suffix(mut self, yes: bool) -> Self {
         self.has_line_suffix = yes;
         self
-    }
-
-    pub fn matches_flags(self, flags: CommentFlags) -> bool {
-        if flags.contains(CommentFlags::BLOCK) && !self.is_block {
-            return false;
-        }
-
-        if flags.contains(CommentFlags::LINE) && self.is_block {
-            return false;
-        }
-
-        true
     }
 
     pub fn is_inline_comment(&self) -> bool {
