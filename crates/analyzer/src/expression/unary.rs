@@ -13,6 +13,8 @@ use mago_word::word;
 use mago_bytes::BytesDisplay;
 
 use mago_codex::identifier::method::MethodIdentifier;
+use mago_codex::operator_overloading::OverloadedOperator;
+use mago_codex::operator_overloading::get_operator_overloading_class;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
@@ -108,11 +110,40 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPrefix<'arena> {
 
                 artifacts.set_rc_expression_type(self, Rc::new(referenced_type));
             }
-            UnaryPrefixOperator::ErrorControl(_) | UnaryPrefixOperator::BitwiseNot(_) => {
+            UnaryPrefixOperator::ErrorControl(_) => {
                 if let Some(operand_type) = operand_type {
                     artifacts.set_rc_expression_type(self, operand_type);
                 } else {
                     artifacts.set_expression_type(self, get_mixed());
+                }
+            }
+            UnaryPrefixOperator::BitwiseNot(_) => {
+                let Some(operand_type) = operand_type else {
+                    artifacts.set_expression_type(self, get_mixed());
+
+                    return Ok(());
+                };
+
+                let (classes_without_bitwise_not, other_types): (Vec<TAtomic>, Vec<TAtomic>) =
+                    operand_type.types.iter().cloned().partition(|atomic| {
+                        get_operator_overloading_class(atomic)
+                            .is_some_and(|class| !class.overloads(OverloadedOperator::BitwiseNot))
+                    });
+
+                if classes_without_bitwise_not.is_empty() {
+                    artifacts.set_rc_expression_type(self, operand_type);
+                } else {
+                    report_bitwise_not_without_overload(
+                        context,
+                        self.operand.span(),
+                        &classes_without_bitwise_not,
+                        other_types.is_empty(),
+                    );
+
+                    artifacts.set_expression_type(
+                        self,
+                        if other_types.is_empty() { get_never() } else { TUnion::from_vec(other_types) },
+                    );
                 }
             }
             UnaryPrefixOperator::Plus(_) => {
@@ -225,9 +256,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPrefix<'arena> {
                             invalid_operand_messages.push(("Cannot negate `array`".to_string(), operand_span));
                         }
                         TAtomic::Object(_) => {
-                            let type_id = operand_part.get_id();
-                            invalid_operand_messages
-                                .push((format!("Cannot negate object of type `{type_id}`"), operand_span));
+                            if let Some(class) = get_operator_overloading_class(operand_part)
+                                .filter(|class| class.overloads(OverloadedOperator::Negation))
+                            {
+                                resulting_types.push(class.get_instance_atomic());
+                            } else {
+                                let type_id = operand_part.get_id();
+                                invalid_operand_messages
+                                    .push((format!("Cannot negate object of type `{type_id}`"), operand_span));
+                            }
                         }
                         TAtomic::Resource(_) => {
                             invalid_operand_messages.push(("Cannot negate `resource`".to_string(), operand_span));
@@ -531,6 +568,36 @@ where
     );
 }
 
+fn report_bitwise_not_without_overload<A>(
+    context: &mut Context<'_, '_, A>,
+    operand_span: Span,
+    classes_without_bitwise_not: &[TAtomic],
+    is_definitely_invalid: bool,
+) where
+    A: Arena,
+{
+    let class_names =
+        classes_without_bitwise_not.iter().map(|atomic| atomic.get_id().to_string()).collect::<Vec<_>>().join("|");
+
+    let (issue_code, issue) = if is_definitely_invalid {
+        (IssueCode::InvalidOperand, Issue::error("Invalid operand for bitwise not."))
+    } else {
+        (IssueCode::PossiblyInvalidOperand, Issue::warning("Possibly invalid operand for bitwise not."))
+    };
+
+    context.collector.report_with_code(
+        issue_code,
+        issue
+            .with_annotation(
+                Annotation::primary(operand_span).with_message(format!("`{class_names}` does not overload `~`")),
+            )
+            .with_note("PHP throws a `TypeError` when `~` is applied to an object that does not overload it.")
+            .with_help(
+                "Ensure the operand is an `int`, `float` or `string`, or an object that overloads `~` such as `GMP`.",
+            ),
+    );
+}
+
 fn report_ineffective_increment_or_decrement<A>(
     context: &mut Context<'_, '_, A>,
     operand_span: Span,
@@ -732,6 +799,11 @@ where
                 );
 
                 possibilities.push(TAtomic::Mixed(TMixed::new()));
+            }
+            _ if let Some(class) = get_operator_overloading_class(operand_atomic_type)
+                .filter(|class| class.overloads(OverloadedOperator::IncrementDecrement)) =>
+            {
+                possibilities.push(class.get_instance_atomic());
             }
             _ => {
                 if !reported_invalid {
@@ -969,6 +1041,11 @@ where
                 );
 
                 possibilities.push(TAtomic::Mixed(TMixed::new()));
+            }
+            _ if let Some(class) = get_operator_overloading_class(operand_atomic_type)
+                .filter(|class| class.overloads(OverloadedOperator::IncrementDecrement)) =>
+            {
+                possibilities.push(class.get_instance_atomic());
             }
             _ => {
                 let type_name = operand_atomic_type.get_id();
