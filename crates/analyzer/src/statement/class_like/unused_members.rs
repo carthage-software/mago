@@ -218,7 +218,6 @@ fn find_unused_members(
         }
     }
 
-    let checkable_set: HashSet<SymbolIdentifier> = checkable_members.iter().map(|member| member.symbol_id).collect();
     loop {
         let mut newly_unused: HashSet<SymbolIdentifier> = HashSet::default();
 
@@ -232,7 +231,6 @@ fn find_unused_members(
                 additional_symbol_references,
                 &member.symbol_id,
                 &unused_members,
-                &checkable_set,
             ) {
                 newly_unused.insert(member.symbol_id);
             }
@@ -307,7 +305,6 @@ fn find_unused_members_from_index(
     referencing_symbols: &HashMap<SymbolIdentifier, HashSet<SymbolIdentifier>>,
     externally_referenced: &HashSet<SymbolIdentifier>,
 ) -> HashSet<SymbolIdentifier> {
-    let checkable_set = checkable_members.iter().map(|member| member.symbol_id).collect::<HashSet<_>>();
     let mut unused_members = checkable_members
         .iter()
         .filter(|member| {
@@ -324,9 +321,9 @@ fn find_unused_members_from_index(
                 continue;
             }
 
-            let all_references_are_unused = referencing_symbols.get(&member.symbol_id).is_none_or(|references| {
-                references.iter().all(|source| checkable_set.contains(source) && unused_members.contains(source))
-            });
+            let all_references_are_unused = referencing_symbols
+                .get(&member.symbol_id)
+                .is_none_or(|references| references.iter().all(|source| unused_members.contains(source)));
 
             if all_references_are_unused {
                 newly_unused.insert(member.symbol_id);
@@ -353,41 +350,22 @@ fn all_references_from_unused(
     additional_symbol_references: Option<&SymbolReferences>,
     symbol_id: &SymbolIdentifier,
     unused_members: &HashSet<SymbolIdentifier>,
-    checkable_set: &HashSet<SymbolIdentifier>,
 ) -> bool {
-    all_references_from_unused_in(symbol_references, symbol_id, unused_members, checkable_set)
-        && additional_symbol_references.is_none_or(|references| {
-            all_references_from_unused_in(references, symbol_id, unused_members, checkable_set)
-        })
+    all_references_from_unused_in(symbol_references, symbol_id, unused_members)
+        && additional_symbol_references
+            .is_none_or(|references| all_references_from_unused_in(references, symbol_id, unused_members))
 }
 
 fn all_references_from_unused_in(
     symbol_references: &SymbolReferences,
     symbol_id: &SymbolIdentifier,
     unused_members: &HashSet<SymbolIdentifier>,
-    checkable_set: &HashSet<SymbolIdentifier>,
 ) -> bool {
     if symbol_references.has_file_reference_to_symbol(*symbol_id) {
         return false;
     }
 
-    let referencing_symbols = symbol_references.get_references_to_symbol(*symbol_id);
-
-    if referencing_symbols.is_empty() {
-        return true;
-    }
-
-    for referencing in referencing_symbols {
-        if checkable_set.contains(referencing) {
-            if !unused_members.contains(referencing) {
-                return false;
-            }
-        } else {
-            return false;
-        }
-    }
-
-    true
+    symbol_references.referencing_symbols(*symbol_id).all(|source| unused_members.contains(source))
 }
 
 /// Check for write-only properties in a class-like.
@@ -457,10 +435,10 @@ pub fn check_write_only_properties<A>(
             continue;
         }
 
-        let has_reads = symbol_references.count_property_reads(&symbol_id) > 0
-            || additional_symbol_references.is_some_and(|references| references.count_property_reads(&symbol_id) > 0);
-        let has_writes = symbol_references.count_property_writes(&symbol_id) > 0
-            || additional_symbol_references.is_some_and(|references| references.count_property_writes(&symbol_id) > 0);
+        let has_reads = symbol_references.has_property_read(&symbol_id)
+            || additional_symbol_references.is_some_and(|references| references.has_property_read(&symbol_id));
+        let has_writes = symbol_references.has_property_write(&symbol_id)
+            || additional_symbol_references.is_some_and(|references| references.has_property_write(&symbol_id));
 
         if has_writes
             && !has_reads
@@ -484,8 +462,7 @@ fn is_member_referenced(
 
 #[inline(always)]
 fn is_member_referenced_in(symbol_references: &SymbolReferences, symbol_id: &SymbolIdentifier) -> bool {
-    symbol_references.count_referencing_symbols(symbol_id, false) > 0
-        || symbol_references.count_referencing_symbols(symbol_id, true) > 0
+    symbol_references.has_reference_to_symbol(*symbol_id)
 }
 
 /// Reports an unused property.
