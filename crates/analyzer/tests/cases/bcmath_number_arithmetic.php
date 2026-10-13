@@ -42,9 +42,16 @@ function number_to_negative_power(Number $a): Number
     return $a ** -1;
 }
 
-function number_with_bool(Number $a, bool $b): Number
+function number_with_bool(Number $a, bool $b): mixed
 {
+    /** @mago-expect analysis:invalid-operand */
     return $a + $b;
+}
+
+function number_to_the_power_of_true(Number $a): mixed
+{
+    /** @mago-expect analysis:invalid-operand */
+    return $a ** true;
 }
 
 function number_or_int_with_int(Number|int $a): Number|int
@@ -117,13 +124,13 @@ function number_with_null(Number $a): mixed
 
 function number_divided_by_zero(Number $a): mixed
 {
-    /** @mago-expect analysis:invalid-operand */
+    /** @mago-expect analysis:invalid-operand,never-return */
     return $a / 0;
 }
 
 function number_modulo_zero_string(Number $a): mixed
 {
-    /** @mago-expect analysis:invalid-operand */
+    /** @mago-expect analysis:invalid-operand,never-return */
     return $a % '0';
 }
 

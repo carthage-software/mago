@@ -24,6 +24,13 @@ pub enum OverloadedOperator {
     Comparison,
 }
 
+/// The operand of a binary operator whose class's handler PHP runs.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OperandSide {
+    Left,
+    Right,
+}
+
 /// A class whose instances PHP lets you use with operators, and which operands it accepts.
 #[derive(Debug)]
 pub struct OperatorOverloadingClass {
@@ -100,31 +107,63 @@ pub fn get_operator_overloading_class(atomic: &TAtomic) -> Option<&'static Opera
     OPERATOR_OVERLOADING_CLASSES.iter().copied().find(|class| name.eq_ignore_ascii_case(class.name.as_bytes()))
 }
 
+/// Returns the class whose operation handler PHP runs for an arithmetic, bitwise or shift
+/// `left operator right`, with the operand that is its instance, or `None` when no listed class's
+/// handler runs.
+///
+/// PHP runs the handler of the first operand, and that of the second when the first's does not
+/// overload the operator.
+#[must_use]
+pub fn get_operation_handler(
+    operator: &BinaryOperator<'_>,
+    left: &TAtomic,
+    right: &TAtomic,
+) -> Option<(&'static OperatorOverloadingClass, OperandSide)> {
+    let overloaded_operator = if operator.is_arithmetic() {
+        OverloadedOperator::Arithmetic
+    } else if operator.is_bit_shift() {
+        OverloadedOperator::Shift
+    } else if operator.is_bitwise() {
+        OverloadedOperator::Bitwise
+    } else {
+        return None;
+    };
+
+    let overloading_class =
+        |atomic| get_operator_overloading_class(atomic).filter(|class| class.overloads(overloaded_operator));
+
+    overloading_class(left)
+        .map(|class| (class, OperandSide::Left))
+        .or_else(|| overloading_class(right).map(|class| (class, OperandSide::Right)))
+}
+
 /// Returns the class whose compare handler PHP runs for `left operator right`, with the operand that
-/// handler has to accept, or `None` when no listed class's handler runs.
+/// is its instance, or `None` when no listed class's handler runs.
 ///
 /// PHP runs the handler of the first operand when it is an object, else that of the second, and
 /// compiles `>` and `>=` as `<` and `<=` with the operands swapped.
 #[must_use]
-pub fn get_comparison_handler<'operand>(
+pub fn get_comparison_handler(
     operator: &BinaryOperator<'_>,
-    left: &'operand TAtomic,
-    right: &'operand TAtomic,
-) -> Option<(&'static OperatorOverloadingClass, &'operand TAtomic)> {
+    left: &TAtomic,
+    right: &TAtomic,
+) -> Option<(&'static OperatorOverloadingClass, OperandSide)> {
     if !operator.is_comparison() || operator.is_identity() {
         return None;
     }
 
-    let (first, second) = match operator {
-        BinaryOperator::GreaterThan(_) | BinaryOperator::GreaterThanOrEqual(_) => (right, left),
-        _ => (left, right),
+    let ((first, first_side), (second, second_side)) = match operator {
+        BinaryOperator::GreaterThan(_) | BinaryOperator::GreaterThanOrEqual(_) => {
+            ((right, OperandSide::Right), (left, OperandSide::Left))
+        }
+        _ => ((left, OperandSide::Left), (right, OperandSide::Right)),
     };
 
     if first.is_object_type() {
-        return get_operator_overloading_class(first).map(|class| (class, second));
+        return get_operator_overloading_class(first).map(|class| (class, first_side));
     }
 
-    get_operator_overloading_class(second).map(|class| (class, first))
+    get_operator_overloading_class(second).map(|class| (class, second_side))
 }
 
 impl OperatorOverloadingClass {
@@ -141,11 +180,12 @@ impl OperatorOverloadingClass {
     /// Whether `atomic` can be the other operand of an operator this class overloads, except the right
     /// operand of `**`, `<<` and `>>` after an instance, which [`Self::accepts_exponent_or_shift_amount`] checks.
     ///
-    /// `float` is rejected: PHP truncates it to `int` with a deprecation.
+    /// `float` and `bool` are rejected: PHP converts them to `int` unless the function running the
+    /// operator was called from a `strict_types` file, where it throws a `TypeError`.
     #[must_use]
     pub fn accepts_operand(&self, atomic: &TAtomic) -> bool {
         match atomic {
-            TAtomic::Scalar(TScalar::Integer(_) | TScalar::Bool(_)) => true,
+            TAtomic::Scalar(TScalar::Integer(_)) => true,
             TAtomic::Scalar(TScalar::String(string)) => match string.get_known_literal_value() {
                 Some(value) => self.string_grammar.parse(value).is_some(),
                 None => string.is_numeric,
@@ -156,7 +196,8 @@ impl OperatorOverloadingClass {
 
     /// Whether `atomic` can be the right operand of `**`, `<<` or `>>` when the left one is an instance.
     ///
-    /// `float` is rejected: GMP truncates it to `int` silently, BCMath with a deprecation.
+    /// `float` is rejected: BCMath reads it as any other operand, and GMP truncates it to `int`
+    /// silently, even for strict callers.
     #[must_use]
     pub fn accepts_exponent_or_shift_amount(&self, atomic: &TAtomic) -> bool {
         match self.exponent_or_shift_amount {
@@ -185,7 +226,7 @@ impl OperatorOverloadingClass {
     pub fn accepts_comparison_operand(&self, atomic: &TAtomic) -> bool {
         match atomic {
             TAtomic::Scalar(TScalar::Float(_)) => false,
-            TAtomic::Null => true,
+            TAtomic::Null | TAtomic::Scalar(TScalar::Bool(_)) => true,
             _ => self.compares_with_any_value || self.accepts_operand(atomic),
         }
     }
@@ -324,7 +365,7 @@ mod tests {
         &GMP
     }
 
-    fn comparison_operator(operator: &str) -> BinaryOperator<'static> {
+    fn binary_operator(operator: &str) -> BinaryOperator<'static> {
         let span = Span::dummy(0, 1);
 
         match operator {
@@ -337,12 +378,20 @@ mod tests {
             "<=>" => BinaryOperator::Spaceship(span),
             "===" => BinaryOperator::Identical(span),
             "+" => BinaryOperator::Addition(span),
+            "**" => BinaryOperator::Exponentiation(span),
+            "&" => BinaryOperator::BitwiseAnd(span),
+            "<<" => BinaryOperator::LeftShift(span),
+            "." => BinaryOperator::StringConcat(span),
             _ => unreachable!("no test uses {operator}"),
         }
     }
 
     fn comparison_handler_name(operator: &str, left: &TAtomic, right: &TAtomic) -> Option<&'static str> {
-        get_comparison_handler(&comparison_operator(operator), left, right).map(|(class, _)| class.get_name())
+        get_comparison_handler(&binary_operator(operator), left, right).map(|(class, _)| class.get_name())
+    }
+
+    fn operation_handler(operator: &str, left: &TAtomic, right: &TAtomic) -> Option<(&'static str, OperandSide)> {
+        get_operation_handler(&binary_operator(operator), left, right).map(|(class, side)| (class.get_name(), side))
     }
 
     #[test]
@@ -414,11 +463,10 @@ mod tests {
     }
 
     #[test]
-    fn accepts_integers_bools_and_numeric_strings_of_unknown_value() {
+    fn accepts_integers_and_numeric_strings_of_unknown_value() {
         for class in [bcmath_number(), gmp()] {
             assert!(class.accepts_operand(&TAtomic::Scalar(TScalar::int())));
             assert!(class.accepts_operand(&literal_int(-3)));
-            assert!(class.accepts_operand(&TAtomic::Scalar(TScalar::bool())));
             assert!(class.accepts_operand(&TAtomic::Scalar(TScalar::numeric_string())));
             assert!(!class.accepts_operand(&TAtomic::Scalar(TScalar::string())));
             assert!(!class.accepts_operand(&TAtomic::Scalar(TScalar::String(TString::non_empty()))));
@@ -432,6 +480,17 @@ mod tests {
                 assert!(!class.accepts_operand(&float));
                 assert!(!class.accepts_exponent_or_shift_amount(&float));
                 assert!(!class.accepts_comparison_operand(&float));
+            }
+        }
+    }
+
+    #[test]
+    fn rejects_bools_as_operands_but_compares_with_them() {
+        for class in [bcmath_number(), gmp()] {
+            for bool in [TAtomic::Scalar(TScalar::bool()), TAtomic::Scalar(TScalar::r#true())] {
+                assert!(!class.accepts_operand(&bool));
+                assert!(!class.accepts_exponent_or_shift_amount(&bool));
+                assert!(class.accepts_comparison_operand(&bool));
             }
         }
     }
@@ -486,13 +545,7 @@ mod tests {
 
     #[test]
     fn bcmath_number_takes_negative_exponents_but_not_fractional_strings() {
-        for atomic in [
-            literal_int(-1),
-            literal_string("-1"),
-            literal_string("2.0"),
-            TAtomic::Scalar(TScalar::r#true()),
-            named("BcMath\\Number"),
-        ] {
+        for atomic in [literal_int(-1), literal_string("-1"), literal_string("2.0"), named("BcMath\\Number")] {
             assert!(bcmath_number().accepts_exponent_or_shift_amount(&atomic), "should accept {atomic:?}");
         }
 
@@ -502,6 +555,7 @@ mod tests {
             literal_string("0x2"),
             literal_string(" 2"),
             TAtomic::Scalar(TScalar::literal_float(1.5)),
+            TAtomic::Scalar(TScalar::r#true()),
             named("GMP"),
         ] {
             assert!(!bcmath_number().accepts_exponent_or_shift_amount(&atomic), "should reject {atomic:?}");
@@ -604,11 +658,43 @@ mod tests {
         ];
 
         for (left, operator, right, throws) in cases {
-            let rejects = get_comparison_handler(&comparison_operator(operator), left, right)
-                .is_some_and(|(class, operand)| !class.accepts_comparison_operand(operand));
+            let rejects =
+                get_comparison_handler(&binary_operator(operator), left, right).is_some_and(|(class, side)| {
+                    let other_operand = match side {
+                        OperandSide::Left => right,
+                        OperandSide::Right => left,
+                    };
+
+                    !class.accepts_comparison_operand(other_operand)
+                });
 
             assert_eq!(rejects, throws, "{left:?} {operator} {right:?}");
         }
+    }
+
+    #[test]
+    fn operations_run_the_first_operands_handler_unless_it_does_not_overload_the_operator() {
+        let gmp = named("GMP");
+        let number = named("BcMath\\Number");
+        let int = literal_int(5);
+
+        assert_eq!(operation_handler("+", &gmp, &int), Some(("GMP", OperandSide::Left)));
+        assert_eq!(operation_handler("**", &int, &gmp), Some(("GMP", OperandSide::Right)));
+        assert_eq!(operation_handler("+", &number, &gmp), Some(("BcMath\\Number", OperandSide::Left)));
+        assert_eq!(operation_handler("&", &gmp, &number), Some(("GMP", OperandSide::Left)));
+        assert_eq!(operation_handler("&", &number, &gmp), Some(("GMP", OperandSide::Right)));
+        assert_eq!(operation_handler("<<", &number, &gmp), Some(("GMP", OperandSide::Right)));
+        assert_eq!(operation_handler("&", &number, &int), None);
+        assert_eq!(operation_handler("+", &int, &int), None);
+    }
+
+    #[test]
+    fn concatenation_and_comparisons_run_no_operation_handler() {
+        let gmp = named("GMP");
+        let int = literal_int(5);
+
+        assert_eq!(operation_handler(".", &gmp, &int), None);
+        assert_eq!(operation_handler("<", &gmp, &int), None);
     }
 
     #[test]

@@ -800,12 +800,14 @@ where
 
                 possibilities.push(TAtomic::Mixed(TMixed::new()));
             }
-            _ if let Some(class) = get_operator_overloading_class(operand_atomic_type)
-                .filter(|class| class.overloads(OverloadedOperator::IncrementDecrement)) =>
-            {
-                possibilities.push(class.get_instance_atomic());
-            }
             _ => {
+                if let Some(class) = get_operator_overloading_class(operand_atomic_type)
+                    .filter(|class| class.overloads(OverloadedOperator::IncrementDecrement))
+                {
+                    possibilities.push(class.get_instance_atomic());
+                    continue;
+                }
+
                 if !reported_invalid {
                     reported_invalid = true;
                     let type_name = operand_type.get_id();
@@ -1042,12 +1044,14 @@ where
 
                 possibilities.push(TAtomic::Mixed(TMixed::new()));
             }
-            _ if let Some(class) = get_operator_overloading_class(operand_atomic_type)
-                .filter(|class| class.overloads(OverloadedOperator::IncrementDecrement)) =>
-            {
-                possibilities.push(class.get_instance_atomic());
-            }
             _ => {
+                if let Some(class) = get_operator_overloading_class(operand_atomic_type)
+                    .filter(|class| class.overloads(OverloadedOperator::IncrementDecrement))
+                {
+                    possibilities.push(class.get_instance_atomic());
+                    continue;
+                }
+
                 let type_name = operand_atomic_type.get_id();
                 context.collector.report_with_code(
                         IssueCode::InvalidOperand,

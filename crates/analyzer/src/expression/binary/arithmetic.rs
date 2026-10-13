@@ -5,9 +5,8 @@ use std::sync::Arc;
 
 use mago_codex::assertion::Assertion;
 use mago_codex::metadata::CodebaseMetadata;
-use mago_codex::operator_overloading::OperatorOverloadingClass;
-use mago_codex::operator_overloading::OverloadedOperator;
-use mago_codex::operator_overloading::get_operator_overloading_class;
+use mago_codex::operator_overloading::OperandSide;
+use mago_codex::operator_overloading::get_operation_handler;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
@@ -242,23 +241,19 @@ where
         })
         .collect::<Vec<_>>();
 
-    for mut left_atomic in left_atomic_types {
-        left_atomic = match left_atomic {
-            TAtomic::Scalar(TScalar::Bool(bool)) if bool.is_false() => TAtomic::Scalar(TScalar::literal_int(0)),
-            TAtomic::Scalar(TScalar::Bool(bool)) if bool.is_true() => TAtomic::Scalar(TScalar::literal_int(1)),
-            TAtomic::Scalar(TScalar::Bool(_)) => TAtomic::Scalar(TScalar::int()),
-            TAtomic::Null => continue,
-            atomic => atomic,
-        };
+    for left_operand in &left_atomic_types {
+        if left_operand.is_null() {
+            continue;
+        }
 
-        for right_atomic in &right_atomic_types {
-            let right_atomic = match right_atomic {
-                TAtomic::Scalar(TScalar::Bool(bool)) if bool.is_false() => TAtomic::Scalar(TScalar::literal_int(0)),
-                TAtomic::Scalar(TScalar::Bool(bool)) if bool.is_true() => TAtomic::Scalar(TScalar::literal_int(1)),
-                TAtomic::Scalar(TScalar::Bool(_)) => TAtomic::Scalar(TScalar::int()),
-                TAtomic::Null => continue,
-                atomic => atomic.clone(),
-            };
+        let left_atomic = bool_as_int(left_operand);
+
+        for right_operand in &right_atomic_types {
+            if right_operand.is_null() {
+                continue;
+            }
+
+            let right_atomic = bool_as_int(right_operand);
 
             let mut pair_result_atomics: Vec<TAtomic> = Vec::new();
             let mut invalid_pair = false;
@@ -356,24 +351,26 @@ where
                 pair_result_atomics.push(string_bitwise_result(&binary.operator, &left_atomic, &right_atomic));
                 has_valid_left_operand = true;
                 has_valid_right_operand = true;
-            } else if let Some(class) = get_overloading_class_for_pair(&binary.operator, &left_atomic, &right_atomic) {
+            } else if let Some((class, instance_side)) =
+                get_operation_handler(&binary.operator, left_operand, right_operand)
+            {
                 let name = class.get_name();
-                let left_is_instance = get_operator_overloading_class(&left_atomic).is_some();
-                let left_is_valid = left_is_instance || class.accepts_operand(&left_atomic);
+                let left_is_instance = instance_side == OperandSide::Left;
+                let left_is_valid = left_is_instance || class.accepts_operand(left_operand);
                 let right_is_valid = if left_is_instance && is_exponent_or_shift(&binary.operator) {
-                    class.accepts_exponent_or_shift_amount(&right_atomic)
+                    class.accepts_exponent_or_shift_amount(right_operand)
                 } else {
-                    class.accepts_operand(&right_atomic)
+                    class.accepts_operand(right_operand)
                 };
                 let is_division_by_zero = right_is_valid
                     && matches!(binary.operator, BinaryOperator::Division(_) | BinaryOperator::Modulo(_))
-                    && class.is_literal_zero(&right_atomic);
+                    && class.is_literal_zero(right_operand);
 
                 if left_is_valid {
                     has_valid_left_operand = true;
                 } else {
                     invalid_left_messages.push((
-                        format!("Cannot use {} as an operand of {name} arithmetic", left_atomic.get_id()),
+                        format!("Cannot use {} as an operand with {name}", left_operand.get_id()),
                         binary.lhs.span(),
                     ));
                 }
@@ -381,17 +378,18 @@ where
                 if !right_is_valid {
                     let message = match binary.operator {
                         BinaryOperator::Exponentiation(_) if left_is_instance => {
-                            format!("Cannot raise {name} to the power of {}", right_atomic.get_id())
+                            format!("Cannot raise {name} to the power of {}", right_operand.get_id())
                         }
                         BinaryOperator::LeftShift(_) | BinaryOperator::RightShift(_) if left_is_instance => {
-                            format!("Cannot shift {name} by {}", right_atomic.get_id())
+                            format!("Cannot shift {name} by {}", right_operand.get_id())
                         }
-                        _ => format!("Cannot use {} as an operand of {name} arithmetic", right_atomic.get_id()),
+                        _ => format!("Cannot use {} as an operand with {name}", right_operand.get_id()),
                     };
 
                     invalid_right_messages.push((message, binary.rhs.span()));
                 } else if is_division_by_zero {
                     invalid_right_messages.push(("Division or modulo by zero".to_string(), binary.rhs.span()));
+                    result_atomic_types.push(TAtomic::Never);
                 } else {
                     has_valid_right_operand = true;
                 }
@@ -996,31 +994,13 @@ fn key_could_be_in_param(key: &ArrayKey, param: &TUnion) -> bool {
     }
 }
 
-/// The class whose operator overload PHP runs for `left operator right`: the left operand's when it
-/// is an instance of a listed class, else the right one's. `None` when that class does not overload
-/// the operator, so the pair is checked like any other.
-fn get_overloading_class_for_pair(
-    operator: &BinaryOperator<'_>,
-    left: &TAtomic,
-    right: &TAtomic,
-) -> Option<&'static OperatorOverloadingClass> {
-    let overloaded_operator = match operator {
-        BinaryOperator::Addition(_)
-        | BinaryOperator::Subtraction(_)
-        | BinaryOperator::Multiplication(_)
-        | BinaryOperator::Division(_)
-        | BinaryOperator::Modulo(_)
-        | BinaryOperator::Exponentiation(_) => OverloadedOperator::Arithmetic,
-        BinaryOperator::BitwiseAnd(_) | BinaryOperator::BitwiseOr(_) | BinaryOperator::BitwiseXor(_) => {
-            OverloadedOperator::Bitwise
-        }
-        BinaryOperator::LeftShift(_) | BinaryOperator::RightShift(_) => OverloadedOperator::Shift,
-        _ => return None,
-    };
-
-    get_operator_overloading_class(left)
-        .or_else(|| get_operator_overloading_class(right))
-        .filter(|class| class.overloads(overloaded_operator))
+fn bool_as_int(atomic: &TAtomic) -> TAtomic {
+    match atomic {
+        TAtomic::Scalar(TScalar::Bool(bool)) if bool.is_false() => TAtomic::Scalar(TScalar::literal_int(0)),
+        TAtomic::Scalar(TScalar::Bool(bool)) if bool.is_true() => TAtomic::Scalar(TScalar::literal_int(1)),
+        TAtomic::Scalar(TScalar::Bool(_)) => TAtomic::Scalar(TScalar::int()),
+        atomic => atomic.clone(),
+    }
 }
 
 fn is_exponent_or_shift(operator: &BinaryOperator<'_>) -> bool {
