@@ -191,6 +191,13 @@ impl SymbolReferences {
             + files.values().filter(|referenced_set| referenced_set.contains(symbol)).count()
     }
 
+    /// Returns whether a symbol or file references the target in a body or signature.
+    #[inline]
+    #[must_use]
+    pub fn has_reference_to_symbol(&self, target_symbol: SymbolIdentifier) -> bool {
+        self.referencing_symbols(target_symbol).next().is_some() || self.has_file_reference_to_symbol(target_symbol)
+    }
+
     /// Counts how many symbols have a *read* reference to the given property.
     ///
     /// # Arguments
@@ -207,6 +214,14 @@ impl SymbolReferences {
             + self.file_property_read_references.values().filter(|read_set| read_set.contains(property)).count()
     }
 
+    /// Returns whether any symbol or file reads the property.
+    #[inline]
+    #[must_use]
+    pub fn has_property_read(&self, property: &SymbolIdentifier) -> bool {
+        self.property_read_references.values().any(|references| references.contains(property))
+            || self.file_property_read_references.values().any(|references| references.contains(property))
+    }
+
     /// Counts how many symbols have a *write* reference to the given property.
     ///
     /// # Arguments
@@ -221,6 +236,14 @@ impl SymbolReferences {
     pub fn count_property_writes(&self, property: &SymbolIdentifier) -> usize {
         self.property_write_references.values().filter(|write_set| write_set.contains(property)).count()
             + self.file_property_write_references.values().filter(|write_set| write_set.contains(property)).count()
+    }
+
+    /// Returns whether any symbol or file writes the property.
+    #[inline]
+    #[must_use]
+    pub fn has_property_write(&self, property: &SymbolIdentifier) -> bool {
+        self.property_write_references.values().any(|references| references.contains(property))
+            || self.file_property_write_references.values().any(|references| references.contains(property))
     }
 
     /// Records that a top-level symbol (e.g., a function) references a class member.
@@ -636,18 +659,17 @@ impl SymbolReferences {
     #[inline]
     #[must_use]
     pub fn get_references_to_symbol(&self, target_symbol: SymbolIdentifier) -> HashSet<&SymbolIdentifier> {
-        let mut referencing_items = HashSet::default();
-        for (referencing_item, referenced_items) in &self.symbol_references_to_symbols {
-            if referenced_items.contains(&target_symbol) {
-                referencing_items.insert(referencing_item);
-            }
-        }
-        for (referencing_item, referenced_items) in &self.symbol_references_to_symbols_in_signature {
-            if referenced_items.contains(&target_symbol) {
-                referencing_items.insert(referencing_item);
-            }
-        }
-        referencing_items
+        self.referencing_symbols(target_symbol).collect()
+    }
+
+    /// Iterates over symbols that reference a target in a body or signature without allocating a set.
+    /// A source appears twice if both roles reference the target.
+    #[inline]
+    pub fn referencing_symbols(&self, target_symbol: SymbolIdentifier) -> impl Iterator<Item = &SymbolIdentifier> {
+        self.symbol_references_to_symbols
+            .iter()
+            .chain(&self.symbol_references_to_symbols_in_signature)
+            .filter_map(move |(source, targets)| targets.contains(&target_symbol).then_some(source))
     }
 
     /// Returns whether a body or signature reference to a symbol originates from top-level file code.
@@ -1068,6 +1090,15 @@ where
     K: Eq + Hash,
     V: Eq + Hash,
 {
+    if source.is_empty() {
+        return;
+    }
+
+    if target.is_empty() {
+        *target = source;
+        return;
+    }
+
     for (key, references) in source {
         match target.entry(key) {
             Entry::Occupied(mut entry) => {

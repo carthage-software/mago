@@ -76,7 +76,7 @@ fn abutting_bracket_after_return_type_is_reported() {
     let codes = issue_codes(metadata);
 
     assert_eq!(codes.get("malformed-docblock-comment"), Some(&1));
-    assert!(codes.get("invalid-return-tag").is_none());
+    assert!(!codes.contains_key("invalid-return-tag"));
 }
 
 #[test]
