@@ -24,6 +24,7 @@ use crate::ttype::atomic::scalar::string::TStringCasing;
 use crate::ttype::atomic::scalar::string::TStringLiteral;
 use crate::ttype::comparator::ComparisonResult;
 use crate::ttype::comparator::union_comparator;
+use crate::ttype::expander::StaticClassType;
 use crate::ttype::expander::TypeExpansionOptions;
 use crate::ttype::flags::UnionFlags;
 use crate::ttype::resolution::TypeResolutionContext;
@@ -1388,7 +1389,16 @@ fn intersect_atomic_types(
     None
 }
 
+#[must_use]
 pub fn get_iterable_parameters(atomic: &TAtomic, codebase: &CodebaseMetadata) -> Option<(TUnion, TUnion)> {
+    get_iterable_parameters_impl(atomic, codebase, &[])
+}
+
+fn get_iterable_parameters_impl(
+    atomic: &TAtomic,
+    codebase: &CodebaseMetadata,
+    visited_aggregates: &[Word],
+) -> Option<(TUnion, TUnion)> {
     if let Some(generator_parameters) = atomic.get_generator_parameters() {
         let mut key_type = generator_parameters.0;
         let mut value_type = generator_parameters.1;
@@ -1399,82 +1409,124 @@ pub fn get_iterable_parameters(atomic: &TAtomic, codebase: &CodebaseMetadata) ->
         return Some((key_type, value_type));
     }
 
-    let parameters = 'parameters: {
-        match atomic {
-            TAtomic::Iterable(iterable) => {
-                let mut key_type = iterable.get_key_type().clone();
-                let mut value_type = iterable.get_value_type().clone();
+    let parameters =
+        'parameters: {
+            match atomic {
+                TAtomic::Iterable(iterable) => {
+                    let mut key_type = iterable.get_key_type().clone();
+                    let mut value_type = iterable.get_value_type().clone();
 
-                expander::expand_union(codebase, &mut key_type, &TypeExpansionOptions::default());
-                expander::expand_union(codebase, &mut value_type, &TypeExpansionOptions::default());
+                    expander::expand_union(codebase, &mut key_type, &TypeExpansionOptions::default());
+                    expander::expand_union(codebase, &mut value_type, &TypeExpansionOptions::default());
 
-                Some((key_type, value_type))
-            }
-            TAtomic::Array(array_type) => {
-                let (mut key_type, mut value_type) = get_array_parameters(array_type, codebase);
-
-                expander::expand_union(codebase, &mut key_type, &TypeExpansionOptions::default());
-                expander::expand_union(codebase, &mut value_type, &TypeExpansionOptions::default());
-
-                Some((key_type, value_type))
-            }
-            TAtomic::Object(object) => {
-                let name = object.get_name()?;
-                let traversable = word("traversable");
-                let iterator = word("iterator");
-                let iterator_aggregate = word("iteratoraggregate");
-
-                let class_metadata = codebase.get_class_like(name.as_bytes())?;
-                if !codebase.is_instance_of(class_metadata.name.as_bytes(), traversable.as_bytes()) {
-                    break 'parameters None;
+                    Some((key_type, value_type))
                 }
+                TAtomic::Array(array_type) => {
+                    let (mut key_type, mut value_type) = get_array_parameters(array_type, codebase);
 
-                let is_iterator_interface = name == iterator || name == traversable || name == iterator_aggregate;
-                if !is_iterator_interface
-                    && codebase.is_instance_of(class_metadata.name.as_bytes(), iterator.as_bytes())
-                    && let (Some(key_type), Some(value_type)) = (
-                        get_iterator_method_return_type(codebase, name, b"key"),
-                        get_iterator_method_return_type(codebase, name, b"current"),
+                    expander::expand_union(codebase, &mut key_type, &TypeExpansionOptions::default());
+                    expander::expand_union(codebase, &mut value_type, &TypeExpansionOptions::default());
+
+                    Some((key_type, value_type))
+                }
+                TAtomic::Object(object) => {
+                    let name = object.get_name()?;
+                    let traversable = word("traversable");
+                    let iterator = word("iterator");
+                    let iterator_aggregate = word("iteratoraggregate");
+
+                    let class_metadata = codebase.get_class_like(name.as_bytes())?;
+                    let is_iterator_interface = class_metadata.name == iterator
+                        || class_metadata.name == traversable
+                        || class_metadata.name == iterator_aggregate;
+
+                    if !is_iterator_interface && !class_metadata.all_parent_interfaces.contains(&traversable) {
+                        break 'parameters None;
+                    }
+
+                    let traversable_metadata = codebase.get_class_like(traversable.as_bytes())?;
+                    let key_template = traversable_metadata.template_types.get_index(0).map(|(name, _)| *name)?;
+                    let value_template = traversable_metadata.template_types.get_index(1).map(|(name, _)| *name)?;
+
+                    let mut key_type = get_specialized_template_type(
+                        codebase,
+                        key_template,
+                        traversable,
+                        class_metadata,
+                        object.get_type_parameters(),
                     )
-                {
-                    let contains_generic_param = |t: &TUnion| t.types.iter().any(atomic::TAtomic::is_generic_parameter);
+                    .unwrap_or_else(get_mixed);
 
-                    if !key_type.is_mixed()
-                        && !value_type.is_mixed()
-                        && !contains_generic_param(&key_type)
-                        && !contains_generic_param(&value_type)
-                    {
+                    let mut value_type = get_specialized_template_type(
+                        codebase,
+                        value_template,
+                        traversable,
+                        class_metadata,
+                        object.get_type_parameters(),
+                    )
+                    .unwrap_or_else(get_mixed);
+
+                    resolve_unbound_generic_parameters(codebase, &mut key_type);
+                    resolve_unbound_generic_parameters(codebase, &mut value_type);
+
+                    if is_iterator_interface || (!key_type.is_mixed() && !value_type.is_mixed()) {
                         return Some((key_type, value_type));
                     }
+
+                    if class_metadata.all_parent_interfaces.contains(&iterator) {
+                        if key_type.is_mixed()
+                            && let Some(method_key) = get_iterator_method_return_type(
+                                codebase,
+                                class_metadata,
+                                object.get_type_parameters(),
+                                b"key",
+                            )
+                            && !method_key.is_mixed()
+                        {
+                            key_type = method_key;
+                        }
+
+                        if value_type.is_mixed()
+                            && let Some(method_val) = get_iterator_method_return_type(
+                                codebase,
+                                class_metadata,
+                                object.get_type_parameters(),
+                                b"current",
+                            )
+                            && !method_val.is_mixed()
+                        {
+                            value_type = method_val;
+                        }
+                    } else if class_metadata.all_parent_interfaces.contains(&iterator_aggregate)
+                        && !visited_aggregates.contains(&class_metadata.name)
+                        && let Some(inner_iter) = get_iterator_method_return_type(
+                            codebase,
+                            class_metadata,
+                            object.get_type_parameters(),
+                            b"getiterator",
+                        )
+                    {
+                        let mut next_visited = Vec::with_capacity(visited_aggregates.len() + 1);
+                        next_visited.extend_from_slice(visited_aggregates);
+                        next_visited.push(class_metadata.name);
+
+                        if let Some((inner_k, inner_v)) = inner_iter.types.iter().find_map(|atomic_inner| {
+                            get_iterable_parameters_impl(atomic_inner, codebase, &next_visited)
+                        }) {
+                            if key_type.is_mixed() && !inner_k.is_mixed() {
+                                key_type = inner_k;
+                            }
+                            if value_type.is_mixed() && !inner_v.is_mixed() {
+                                value_type = inner_v;
+                            }
+                        }
+                    }
+
+                    Some((key_type, value_type))
                 }
-
-                let traversable_metadata = codebase.get_class_like(traversable.as_bytes())?;
-                let key_template = traversable_metadata.template_types.get_index(0).map(|(name, _)| *name)?;
-                let value_template = traversable_metadata.template_types.get_index(1).map(|(name, _)| *name)?;
-
-                let key_type = get_specialized_template_type(
-                    codebase,
-                    key_template,
-                    traversable,
-                    class_metadata,
-                    object.get_type_parameters(),
-                )
-                .unwrap_or_else(get_mixed);
-
-                let value_type = get_specialized_template_type(
-                    codebase,
-                    value_template,
-                    traversable,
-                    class_metadata,
-                    object.get_type_parameters(),
-                )
-                .unwrap_or_else(get_mixed);
-
-                Some((key_type, value_type))
+                _ => None,
             }
-            _ => None,
-        }
-    };
+        };
 
     if let Some((key_type, value_type)) = parameters {
         return Some((key_type, value_type));
@@ -1482,7 +1534,9 @@ pub fn get_iterable_parameters(atomic: &TAtomic, codebase: &CodebaseMetadata) ->
 
     if let Some(intersection_types) = atomic.get_intersection_types() {
         for intersection_type in intersection_types {
-            if let Some((key_type, value_type)) = get_iterable_parameters(intersection_type, codebase) {
+            if let Some((key_type, value_type)) =
+                get_iterable_parameters_impl(intersection_type, codebase, visited_aggregates)
+            {
                 return Some((key_type, value_type));
             }
         }
@@ -1710,15 +1764,67 @@ pub fn get_specialized_template_type(
     Some(template_type)
 }
 
+fn resolve_unbound_generic_parameters(codebase: &CodebaseMetadata, union: &mut TUnion) {
+    if !union.has_template_types() {
+        return;
+    }
+
+    let mut template_result = TemplateResult::default();
+    for node in union.get_all_child_nodes() {
+        if let TypeRef::Atomic(TAtomic::GenericParameter(parameter)) = node {
+            template_result.add_lower_bound(
+                parameter.parameter_name,
+                parameter.defining_entity,
+                (*parameter.constraint).clone(),
+            );
+        }
+    }
+
+    if !template_result.lower_bounds.is_empty() {
+        *union = inferred_type_replacer::replace(union, &template_result, codebase);
+    }
+}
+
 fn get_iterator_method_return_type(
     codebase: &CodebaseMetadata,
-    class_name: Word,
+    class_metadata: &ClassLikeMetadata,
+    type_parameters: Option<&[TUnion]>,
     method_name: &[u8],
 ) -> Option<TUnion> {
-    let method = codebase.get_declaring_method(class_name.as_bytes(), method_name)?;
+    let method = codebase.get_declaring_method(class_metadata.name.as_bytes(), method_name)?;
     let return_type_meta = method.return_type_metadata.as_ref()?;
     let mut return_type = return_type_meta.type_union.clone();
-    expander::expand_union(codebase, &mut return_type, &TypeExpansionOptions::default());
+
+    if return_type.has_template_types() {
+        let mut template_result = TemplateResult::default();
+        for node in return_type.get_all_child_nodes() {
+            if let TypeRef::Atomic(TAtomic::GenericParameter(parameter)) = node
+                && let GenericParent::ClassLike(class_name) = parameter.defining_entity
+                && let Some(template_type) = get_specialized_template_type(
+                    codebase,
+                    parameter.parameter_name,
+                    class_name,
+                    class_metadata,
+                    type_parameters,
+                )
+            {
+                template_result.add_lower_bound(parameter.parameter_name, parameter.defining_entity, template_type);
+            }
+        }
+
+        if !template_result.lower_bounds.is_empty() {
+            return_type = inferred_type_replacer::replace(&return_type, &template_result, codebase);
+        }
+
+        resolve_unbound_generic_parameters(codebase, &mut return_type);
+    }
+
+    let expansion_options = TypeExpansionOptions {
+        self_class: Some(class_metadata.name),
+        static_class_type: StaticClassType::Name(class_metadata.name),
+        ..Default::default()
+    };
+    expander::expand_union(codebase, &mut return_type, &expansion_options);
     Some(return_type)
 }
 

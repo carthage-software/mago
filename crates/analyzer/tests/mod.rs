@@ -2848,6 +2848,7 @@ test_case!(parameter_null_default_docblock_type);
 test_case!(parameter_null_default_php90, crate::framework::php_90_settings());
 test_case!(multilevel_inheritance_unbound_template_bound);
 test_case!(partial_union_method_call);
+test_case!(iterator_foreach_value_type);
 test_case!(possibly_undefined_switch_finally);
 test_case!(inline_var_tag_undefined_variable);
 test_case!(phpdoc_native_type_merge);
