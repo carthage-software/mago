@@ -99,7 +99,19 @@ function number_bitwise_not(Number $a): mixed
     return ~$a;
 }
 
-function gmp_or_number_bitwise_not(GMP|Number $a): mixed
+function gmp_or_number_bitwise_not(GMP|Number $a): GMP
+{
+    /** @mago-expect analysis:possibly-invalid-operand */
+    return ~$a;
+}
+
+function nullable_gmp_bitwise_not(?GMP $a): GMP
+{
+    /** @mago-expect analysis:possibly-invalid-operand */
+    return ~$a;
+}
+
+function nullable_int_bitwise_not(?int $a): int
 {
     /** @mago-expect analysis:possibly-invalid-operand */
     return ~$a;

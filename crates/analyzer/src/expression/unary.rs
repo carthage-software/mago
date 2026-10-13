@@ -118,32 +118,31 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPrefix<'arena> {
                 }
             }
             UnaryPrefixOperator::BitwiseNot(_) => {
-                let Some(operand_type) = operand_type else {
-                    artifacts.set_expression_type(self, get_mixed());
+                if let Some(operand_type) = operand_type {
+                    let (rejected_types, accepted_types): (Vec<TAtomic>, Vec<TAtomic>) =
+                        operand_type.types.iter().cloned().partition(|atomic| {
+                            atomic.is_null()
+                                || get_operator_overloading_class(atomic)
+                                    .is_some_and(|class| !class.overloads(OverloadedOperator::BitwiseNot))
+                        });
 
-                    return Ok(());
-                };
+                    if rejected_types.is_empty() {
+                        artifacts.set_rc_expression_type(self, operand_type);
+                    } else {
+                        report_invalid_bitwise_not_operand(
+                            context,
+                            self.operand.span(),
+                            &rejected_types,
+                            accepted_types.is_empty(),
+                        );
 
-                let (classes_without_bitwise_not, other_types): (Vec<TAtomic>, Vec<TAtomic>) =
-                    operand_type.types.iter().cloned().partition(|atomic| {
-                        get_operator_overloading_class(atomic)
-                            .is_some_and(|class| !class.overloads(OverloadedOperator::BitwiseNot))
-                    });
-
-                if classes_without_bitwise_not.is_empty() {
-                    artifacts.set_rc_expression_type(self, operand_type);
+                        artifacts.set_expression_type(
+                            self,
+                            if accepted_types.is_empty() { get_never() } else { TUnion::from_vec(accepted_types) },
+                        );
+                    }
                 } else {
-                    report_bitwise_not_without_overload(
-                        context,
-                        self.operand.span(),
-                        &classes_without_bitwise_not,
-                        other_types.is_empty(),
-                    );
-
-                    artifacts.set_expression_type(
-                        self,
-                        if other_types.is_empty() { get_never() } else { TUnion::from_vec(other_types) },
-                    );
+                    artifacts.set_expression_type(self, get_mixed());
                 }
             }
             UnaryPrefixOperator::Plus(_) => {
@@ -568,16 +567,16 @@ where
     );
 }
 
-fn report_bitwise_not_without_overload<A>(
+fn report_invalid_bitwise_not_operand<A>(
     context: &mut Context<'_, '_, A>,
     operand_span: Span,
-    classes_without_bitwise_not: &[TAtomic],
+    rejected_types: &[TAtomic],
     is_definitely_invalid: bool,
 ) where
     A: Arena,
 {
-    let class_names =
-        classes_without_bitwise_not.iter().map(|atomic| atomic.get_id().to_string()).collect::<Vec<_>>().join("|");
+    let rejected_type_names =
+        rejected_types.iter().map(|atomic| atomic.get_id().to_string()).collect::<Vec<_>>().join("|");
 
     let (issue_code, issue) = if is_definitely_invalid {
         (IssueCode::InvalidOperand, Issue::error("Invalid operand for bitwise not."))
@@ -589,9 +588,12 @@ fn report_bitwise_not_without_overload<A>(
         issue_code,
         issue
             .with_annotation(
-                Annotation::primary(operand_span).with_message(format!("`{class_names}` does not overload `~`")),
+                Annotation::primary(operand_span)
+                    .with_message(format!("`~` cannot be applied to `{rejected_type_names}`")),
             )
-            .with_note("PHP throws a `TypeError` when `~` is applied to an object that does not overload it.")
+            .with_note(
+                "PHP throws a `TypeError` when `~` is applied to `null` or to an object that does not overload it.",
+            )
             .with_help(
                 "Ensure the operand is an `int`, `float` or `string`, or an object that overloads `~` such as `GMP`.",
             ),
