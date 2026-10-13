@@ -255,6 +255,13 @@ fn subtract_complex_type<A>(
                     Arc::clone(&iterable.value_type),
                 ))));
             }
+            (_, TAtomic::Iterable(_)) if existing_atomic.is_array_or_traversable(context.codebase) => {
+                // An array or a traversable can hold what an iterable assertion asks for
+                // without either type containing the other, as `array<array-key, mixed>`
+                // and `iterable<mixed, string>` do, so its negation is not redundant.
+                *can_be_disjunct = true;
+                acceptable_types.push(existing_atomic);
+            }
             _ => {
                 acceptable_types.push(existing_atomic);
             }
