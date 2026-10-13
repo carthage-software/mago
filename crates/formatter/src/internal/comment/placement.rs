@@ -274,6 +274,7 @@ fn place_comment<'ast, 'arena>(comment: DecoratedComment<'ast, 'arena>) -> Comme
         Node::Expression(expr) => match unwrap_parenthesized(expr) {
             Expression::Binary(binary) => Node::Binary(binary),
             Expression::Conditional(cond) => Node::Conditional(cond),
+            Expression::ArrowFunction(arrow) => Node::ArrowFunction(arrow),
             _ => comment.enclosing,
         },
         other => other,
@@ -283,6 +284,15 @@ fn place_comment<'ast, 'arena>(comment: DecoratedComment<'ast, 'arena>) -> Comme
     match comment.enclosing {
         Node::Binary(_) => place_binary(comment),
         Node::Conditional(_) => place_conditional(comment),
+        Node::ArrowFunction(arrow)
+            if comment.trivia_start >= arrow.arrow.end.offset
+                && comment.trivia_start < unwrap_parenthesized(arrow.expression).span().start.offset =>
+        {
+            CommentPlacement::Leading {
+                node: Node::Expression(unwrap_parenthesized(arrow.expression)),
+                comment_index: comment.comment_index,
+            }
+        }
         _ => CommentPlacement::Default,
     }
 }

@@ -31,11 +31,13 @@ $longestCommandName = max(
         ->toArray(),
 ) + 4;
 
-$content .= PHP_EOL . arr($validationErrors)
-    ->map(fn(string $error) => "  <style=\"fg-yellow\">{$error}</style>")
-    ->implode(PHP_EOL)
-    ->append(PHP_EOL)
-    ->toString();
+$content .=
+    PHP_EOL
+    . arr($validationErrors)
+        ->map(fn(string $error) => "  <style=\"fg-yellow\">{$error}</style>")
+        ->implode(PHP_EOL)
+        ->append(PHP_EOL)
+        ->toString();
 
 $content .= arr($validationErrors)
     ->map(fn(string $error) => "  <style=\"fg-yellow\">{$error}</style>")

@@ -34,6 +34,7 @@ use crate::internal::format::call_arguments::promote_argument_list_to_partial;
 use crate::internal::format::call_arguments::should_break_all_arguments;
 use crate::internal::format::misc;
 use crate::internal::format::misc::is_breaking_expression;
+use crate::internal::format::misc::is_expandable_expression;
 use crate::internal::format::misc::is_simple_call_argument;
 use crate::internal::format::misc::is_simple_expression;
 use crate::internal::format::misc::is_string_word_type;
@@ -126,6 +127,12 @@ where
         let mut score: i32 = 0;
         let mut account_for_simple_calls = true;
         let mut always_account_for_simple_calls = false;
+        let is_breaking_argument = |expression, arrow_function_recursion| {
+            (!f.settings.preserve_breaking_argument_list
+                || !matches!(unwrap_parenthesized(expression), Expression::Call(_) | Expression::Instantiation(_))
+                || is_expandable_expression(expression, false))
+                && is_breaking_expression(f, expression, arrow_function_recursion)
+        };
 
         match self.base {
             Expression::Instantiation(instantiation) => {
@@ -145,7 +152,7 @@ where
                         Some(argument_list) => !argument_list
                             .arguments
                             .iter()
-                            .any(|argument| is_breaking_expression(f, argument.value(), false)),
+                            .any(|argument| is_breaking_argument(argument.value(), false)),
                         None => true,
                     });
 
@@ -158,7 +165,7 @@ where
             {
                 let (is_breaking_argument, is_string_word_type) = match argument_list.arguments.first() {
                     Some(argument) => {
-                        (is_breaking_expression(f, argument.value(), true), is_string_word_type(argument.value()))
+                        (is_breaking_argument(argument.value(), true), is_string_word_type(argument.value()))
                     }
                     None => (false, false),
                 };
@@ -210,10 +217,10 @@ where
             }
 
             let breaking_arguments = if argument_list.arguments.len() == 1 {
-                argument_list.arguments.first().map(Argument::value).is_some_and(|e| is_breaking_expression(f, e, true))
+                argument_list.arguments.first().map(Argument::value).is_some_and(|e| is_breaking_argument(e, true))
             } else {
                 argument_list.arguments.iter().all(|arg| !arg.is_positional())
-                    && argument_list.arguments.iter().any(|arg| is_breaking_expression(f, arg.value(), false))
+                    && argument_list.arguments.iter().any(|arg| is_breaking_argument(arg.value(), false))
             };
 
             if breaking_arguments {
@@ -956,14 +963,7 @@ where
     }
 
     let should_break = must_break || member_access_chain.has_breaking_arguments();
-    if should_break
-        && match f.parent_node() {
-            Node::Binary(binary) => {
-                f.settings.preserve_breaking_member_access_chain
-                    && (binary.operator.is_logical() || binary.operator.is_comparison())
-            }
-            _ => true,
-        }
+    if should_break && (!matches!(f.parent_node(), Node::Binary(_)) || f.settings.preserve_breaking_member_access_chain)
     {
         parts.push(Document::BreakParent);
     }

@@ -74,11 +74,15 @@ fn return_argument_has_leading_comment<'arena, A>(
 where
     A: Arena,
 {
-    if f.has_leading_own_line_comment(argument.span())
-        || f.has_comment_with_filter(argument.span(), CommentFlags::LEADING, |comment| {
-            has_new_line_in_range(f.source_text, comment.start, comment.end)
+    let has_wrapping_comment = |span| {
+        f.has_comment_with_filter(span, CommentFlags::LEADING, |comment| {
+            (!comment.is_block && f.has_newline(comment.end, false))
+                || f.has_newline(comment.start, true)
+                || has_new_line_in_range(f.source_text, comment.start, comment.end)
         })
-    {
+    };
+
+    if has_wrapping_comment(argument.span()) {
         return true;
     }
 
@@ -87,7 +91,7 @@ where
         while let Some(new_left_most) = get_left_side(left_most) {
             left_most = new_left_most;
 
-            if f.has_leading_own_line_comment(left_most.span()) {
+            if has_wrapping_comment(left_most.span()) {
                 return true;
             }
         }

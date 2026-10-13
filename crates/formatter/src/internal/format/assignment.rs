@@ -267,7 +267,10 @@ where
         // chain itself stays on one line and just its tail breaks. Once the left-hand side is
         // another binary, the chain breaks at its own operators too, and its continuation lines
         // end up flush with the assignment instead of indented under it.
-        if !binary.lhs.is_binary() && is_breaking_expression(f, binary.rhs, false) {
+        if !binary.lhs.is_binary()
+            && (!binary.operator.is_logical() || should_inline_binary_expression(f, rhs_expression))
+            && is_breaking_expression(f, binary.rhs, false)
+        {
             return Layout::NeverBreakAfterOperator;
         }
     }
