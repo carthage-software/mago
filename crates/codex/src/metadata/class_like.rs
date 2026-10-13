@@ -12,6 +12,7 @@ use mago_span::Span;
 use mago_word::Word;
 use mago_word::WordMap;
 use mago_word::WordSet;
+use mago_word::word;
 
 use crate::flags::attribute::AttributeFlags;
 use crate::identifier::method::MethodIdentifier;
@@ -20,6 +21,11 @@ use crate::metadata::attribute::AttributeMetadata;
 use crate::metadata::class_like_constant::ClassLikeConstantMetadata;
 use crate::metadata::enum_case::EnumCaseMetadata;
 use crate::metadata::flags::MetadataFlags;
+use crate::metadata::function_like::FunctionLikeKind;
+use crate::metadata::function_like::FunctionLikeMetadata;
+use crate::metadata::patch::PATCHABLE_CLASS_DOCBLOCK_FLAGS;
+use crate::metadata::patch::PATCHABLE_COMMON_DOCBLOCK_FLAGS;
+use crate::metadata::patch::merge_explicit_docblock_flags;
 use crate::metadata::property::PropertyMetadata;
 use crate::metadata::trait_adaptation::TraitMethodAdaptations;
 use crate::metadata::ttype::TypeMetadata;
@@ -124,6 +130,8 @@ pub struct ClassLikeMetadata {
     pub issues: Vec<Issue>,
     pub attribute_flags: Option<AttributeFlags>,
     pub flags: MetadataFlags,
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub(crate) explicit_docblock_flags: MetadataFlags,
     pub type_aliases: WordMap<TypeMetadata>,
     /// Imported type aliases in the form of (`from_fqcn`, `type_name`, span)
     pub imported_type_aliases: WordMap<(Word, Word, Span)>,
@@ -180,6 +188,7 @@ impl ClassLikeMetadata {
             trait_constant_ids: WordMap::default(),
             enum_cases: WordMap::default(),
             flags,
+            explicit_docblock_flags: MetadataFlags::empty(),
             kind: SymbolKind::Class,
             direct_parent_interfaces: WordSet::default(),
             all_parent_classes: WordSet::default(),
@@ -337,6 +346,26 @@ impl ClassLikeMetadata {
     #[inline]
     pub fn add_used_traits(&mut self, traits: impl IntoIterator<Item = Word>) {
         self.used_traits.extend(traits);
+    }
+
+    pub(crate) fn add_implicit_constructor(&mut self) -> Option<FunctionLikeMetadata> {
+        let name = word("__construct");
+        if !self.methods.insert(name) {
+            return None;
+        }
+
+        let method = MethodIdentifier::new(self.name, name);
+        self.add_declaring_method_id(name, method);
+        self.inheritable_method_ids.insert(name, method);
+        let origin_flags = self.flags
+            & (MetadataFlags::USER_DEFINED | MetadataFlags::BUILTIN | MetadataFlags::PATCH | MetadataFlags::EXTERNAL);
+        Some(FunctionLikeMetadata::new(
+            FunctionLikeKind::Method,
+            name,
+            name,
+            self.span,
+            MetadataFlags::PURE | origin_flags,
+        ))
     }
 
     pub fn direct_trait_names(&self) -> impl Iterator<Item = Word> + '_ {
@@ -624,14 +653,15 @@ impl ClassLikeMetadata {
         self.shrink_to_fit();
     }
 
-    /// Applies a patch to this class in place, refining member type information while leaving
-    /// structure (hierarchy, override chains, initialization state, enum cases) untouched.
+    /// Applies a patch to this class in place, refining member type information and supported
+    /// semantic docblock flags while leaving structure (hierarchy, override chains, initialization
+    /// state, enum cases) untouched.
     ///
     /// At most one patch targets a given symbol, so there is no accumulation to worry about.
     /// Diagnostics about the patch are appended to `patch.issues`, where scan-time diagnostics
     /// also live, so they flow out through `take_issues`. The full set of rules a patch must
     /// obey is documented in the `[source]` patching guide.
-    pub fn apply_patch(&mut self, patch: &mut ClassLikeMetadata, inherited_methods: &WordSet) {
+    pub fn apply_patch(&mut self, patch: &mut ClassLikeMetadata, inherited_methods: &WordSet) -> bool {
         // Patches redeclare the same class by name, so their member identifiers
         // already carry the correct class name and merge cleanly.
         debug_assert_eq!(self.name, patch.name, "patch class name must match the patched class");
@@ -639,11 +669,18 @@ impl ClassLikeMetadata {
         // A kind or hierarchy mismatch means the patch targets a different symbol; reject
         // it wholesale rather than refining members against the wrong class.
         if self.report_kind_mismatch(patch) || self.report_hierarchy_mismatch(patch) {
-            return;
+            return false;
         }
 
         self.report_readonly_mismatch(patch);
         self.report_trait_usage(patch);
+
+        merge_explicit_docblock_flags(
+            &mut self.flags,
+            patch.flags,
+            patch.explicit_docblock_flags,
+            PATCHABLE_CLASS_DOCBLOCK_FLAGS,
+        );
 
         self.patch_templates(patch);
         self.template_extended_offsets.extend(
@@ -667,6 +704,7 @@ impl ClassLikeMetadata {
 
         // Type aliases
         self.type_aliases.extend(patch.type_aliases.iter().map(|(k, v)| (*k, v.clone())));
+        true
     }
 
     /// Reports a `kind` mismatch between the patch and the original symbol.
@@ -759,7 +797,8 @@ impl ClassLikeMetadata {
 
     /// Reports `use` trait declarations on the patch, which are never valid.
     ///
-    /// Patches refine member type information only; trait usage declarations are ignored.
+    /// Patches refine member type information and supported semantic docblock flags; trait usage
+    /// declarations are ignored.
     fn report_trait_usage(&self, patch: &mut ClassLikeMetadata) {
         if patch.used_traits.is_empty() {
             return;
@@ -767,14 +806,15 @@ impl ClassLikeMetadata {
 
         patch.issues.push(
             Issue::warning(format!(
-                "Patch for `{}` declares `use` traits; patches refine member type information only and trait usage declarations are ignored.",
+                "Patch for `{}` declares `use` traits; patches refine member metadata only and trait usage declarations are ignored.",
                 patch.original_name,
             ))
             .with_code(ScanningIssueKind::PatchDeclaresTrait)
             .with_annotation(Annotation::primary(patch.span))
             .with_help(
-                "Remove the `use` trait statement from the patch. To refine the type information \
-                 of members the trait contributes, patch those members on the class directly.",
+                "Remove the `use` trait statement from the patch. To refine the types and supported \
+                 semantic docblock flags of members the trait contributes, patch those members on \
+                 the class directly.",
             ),
         );
     }
@@ -893,8 +933,8 @@ impl ClassLikeMetadata {
         let patch_name = patch.original_name;
         for (name, prop_metadata) in &patch.properties {
             if let Some(slot) = self.properties.get_mut(name) {
-                // Patches can only refine type annotations. Structural attributes
-                // (visibility, modifiers, hooks) must match the original exactly;
+                // Patches can refine type annotations and supported docblock flags. Structural
+                // attributes (visibility, modifiers, hooks) must match the original exactly;
                 // if they differ the patch is wrong and we should say so rather than
                 // silently discarding the mismatch.
                 let visibility_mismatch = prop_metadata.read_visibility != slot.read_visibility
@@ -914,7 +954,8 @@ impl ClassLikeMetadata {
                     patch.issues.push(
                         Issue::error(format!(
                             "Patch for `{}::{}` declares structural attributes (visibility, modifiers, \
-                             or hooks) that differ from the original; only type annotations are applied.",
+                             or hooks) that differ from the original; only type annotations and supported \
+                             docblock flags are applied.",
                             patch_name, name,
                         ))
                         .with_code(ScanningIssueKind::PatchPropertyStructuralMismatch)
@@ -922,7 +963,7 @@ impl ClassLikeMetadata {
                         .with_help(format!(
                             "Declare `{patch_name}::{name}` with the same visibility and modifiers as \
                              the original and drop any property hooks; a patch may only refine the \
-                             property's type.",
+                             property's type and supported docblock flags.",
                         )),
                     );
                 }
@@ -930,6 +971,12 @@ impl ClassLikeMetadata {
                 slot.type_declaration_metadata.clone_from(&prop_metadata.type_declaration_metadata);
                 slot.type_metadata.clone_from(&prop_metadata.type_metadata);
                 slot.write_type_metadata.clone_from(&prop_metadata.write_type_metadata);
+                merge_explicit_docblock_flags(
+                    &mut slot.flags,
+                    prop_metadata.flags,
+                    prop_metadata.explicit_docblock_flags,
+                    PATCHABLE_COMMON_DOCBLOCK_FLAGS,
+                );
             } else {
                 patch.issues.push(
                     Issue::error(format!(
@@ -990,6 +1037,12 @@ impl ClassLikeMetadata {
 
                 slot.type_declaration.clone_from(&const_metadata.type_declaration);
                 slot.type_metadata.clone_from(&const_metadata.type_metadata);
+                merge_explicit_docblock_flags(
+                    &mut slot.flags,
+                    const_metadata.flags,
+                    const_metadata.explicit_docblock_flags,
+                    PATCHABLE_COMMON_DOCBLOCK_FLAGS,
+                );
             } else {
                 patch.issues.push(
                     Issue::error(format!(

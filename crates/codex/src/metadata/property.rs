@@ -75,6 +75,9 @@ pub struct PropertyMetadata {
     /// Flags indicating various properties of the property.
     pub flags: MetadataFlags,
 
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub(crate) explicit_docblock_flags: MetadataFlags,
+
     /// Attributes attached to the property declaration.
     pub attributes: Vec<AttributeMetadata>,
 
@@ -107,6 +110,7 @@ impl PropertyMetadata {
             write_type_metadata: None,
             default_type_metadata: None,
             flags,
+            explicit_docblock_flags: MetadataFlags::empty(),
             attributes: Vec::new(),
             hooks: WordMap::default(),
             version_constraint: VersionConstraint::unconstrained(),

@@ -16,6 +16,8 @@ use crate::metadata::attribute::AttributeMetadata;
 use crate::metadata::class_like::TemplateTypes;
 use crate::metadata::flags::MetadataFlags;
 use crate::metadata::parameter::FunctionLikeParameterMetadata;
+use crate::metadata::patch::PATCHABLE_FUNCTION_DOCBLOCK_FLAGS;
+use crate::metadata::patch::merge_explicit_docblock_flags;
 use crate::metadata::ttype::TypeMetadata;
 use crate::metadata::version_constraint::VersionConstraint;
 use crate::ttype::resolution::TypeResolutionContext;
@@ -163,6 +165,9 @@ pub struct FunctionLikeMetadata {
 
     pub flags: MetadataFlags,
 
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub(crate) explicit_docblock_flags: MetadataFlags,
+
     /// PHP version range in which this function-like is available, derived
     /// from `Mago\AvailableSince` / `Mago\AvailableUntil` attributes during
     /// scanning.
@@ -231,6 +236,7 @@ impl FunctionLikeMetadata {
             assertions_inferred: false,
             globals_accessed: WordSet::default(),
             has_docblock: false,
+            explicit_docblock_flags: MetadataFlags::empty(),
             issues: vec![],
             version_constraint: VersionConstraint::unconstrained(),
         }
@@ -331,7 +337,7 @@ impl FunctionLikeMetadata {
         self.template_types.insert(name, constraint);
     }
 
-    /// Applies a patch to this entry in place, refining type information only.
+    /// Applies a patch to this entry in place, refining type information and supported docblock flags.
     ///
     /// Refined fields — return type, per-parameter types, `@param-out`, default-value types,
     /// `@throws`, `@template`, and assertions — are each copied only when the patch specifies
@@ -352,6 +358,12 @@ impl FunctionLikeMetadata {
         self.patch_parameters(patch);
         self.patch_templates(patch);
         self.patch_throws_and_assertions(patch);
+        merge_explicit_docblock_flags(
+            &mut self.flags,
+            patch.flags,
+            patch.explicit_docblock_flags,
+            PATCHABLE_FUNCTION_DOCBLOCK_FLAGS,
+        );
     }
 
     /// Reports a parameter count mismatch between the patch and the original.
@@ -418,7 +430,7 @@ impl FunctionLikeMetadata {
     ///
     /// For methods, visibility, static, and removing final are all structural changes a patch
     /// may not make. Adding final is allowed. This is reported as an error but does not abort
-    /// the patch — type annotations are still applied.
+    /// the patch — type annotations and supported docblock flags are still applied.
     ///
     /// `abstract` is deliberately excluded: it is implied by writing the method with a trailing
     /// `;` instead of a `{}` body — the idiomatic form for a signature-only type patch — rather

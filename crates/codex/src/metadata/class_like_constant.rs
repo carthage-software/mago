@@ -24,6 +24,8 @@ pub struct ClassLikeConstantMetadata {
     pub type_metadata: Option<TypeMetadata>,
     pub inferred_type: Option<TAtomic>,
     pub flags: MetadataFlags,
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub(crate) explicit_docblock_flags: MetadataFlags,
     pub version_constraint: VersionConstraint,
 }
 
@@ -39,6 +41,7 @@ impl ClassLikeConstantMetadata {
             type_metadata: None,
             inferred_type: None,
             flags,
+            explicit_docblock_flags: MetadataFlags::empty(),
             version_constraint: VersionConstraint::unconstrained(),
         }
     }

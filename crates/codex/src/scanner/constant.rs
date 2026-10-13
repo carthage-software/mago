@@ -129,7 +129,7 @@ fn process_constant_docblock(
     }
 
     for tag in document.tags() {
-        apply_common_metadata_flag(&mut metadata.flags, &tag.value);
+        apply_common_metadata_flag(&mut metadata.flags, &mut metadata.explicit_docblock_flags, &tag.value);
     }
 
     let var = find_most_trusted_tag(document, |tag| match &tag.value {
