@@ -120,8 +120,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPrefix<'arena> {
             }
             UnaryPrefixOperator::BitwiseNot(_) => {
                 if let Some(operand_type) = operand_type {
-                    let (classes_without_bitwise_not, other_types): (Vec<TAtomic>, Vec<TAtomic>) =
-                        operand_type.types.iter().cloned().partition(|atomic| {
+                    let (classes_without_bitwise_not, other_types): (Vec<&TAtomic>, Vec<&TAtomic>) =
+                        operand_type.types.iter().partition(|atomic| {
                             get_operator_overloading_class(atomic)
                                 .is_some_and(|class| !class.overloads(OverloadedOperator::BitwiseNot))
                         });
@@ -138,7 +138,11 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPrefix<'arena> {
 
                         artifacts.set_expression_type(
                             self,
-                            if other_types.is_empty() { get_never() } else { TUnion::from_vec(other_types) },
+                            if other_types.is_empty() {
+                                get_never()
+                            } else {
+                                TUnion::from_vec(other_types.into_iter().cloned().collect())
+                            },
                         );
                     }
                 } else {
@@ -568,7 +572,7 @@ where
 fn report_bitwise_not_without_overload<A>(
     context: &mut Context<'_, '_, A>,
     operand_span: Span,
-    classes_without_bitwise_not: &[TAtomic],
+    classes_without_bitwise_not: &[&TAtomic],
     is_definitely_invalid: bool,
 ) where
     A: Arena,

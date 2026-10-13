@@ -24,6 +24,9 @@ use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::get_non_negative_int;
 use mago_codex::ttype::get_positive_int;
+use mago_codex::ttype::shared::INT_ATOMIC;
+use mago_codex::ttype::shared::ONE_INT_ATOMIC;
+use mago_codex::ttype::shared::ZERO_INT_ATOMIC;
 use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -317,7 +320,7 @@ where
             if matches!(binary.operator, BinaryOperator::Addition(_))
                 && (left_atomic.is_array() || right_atomic.is_array())
             {
-                if let (TAtomic::Array(left_array), TAtomic::Array(right_array)) = (&left_atomic, &right_atomic) {
+                if let (TAtomic::Array(left_array), TAtomic::Array(right_array)) = (left_atomic, right_atomic) {
                     let combined = compose_array_plus(left_array, right_array, context);
 
                     pair_result_atomics.extend(combined);
@@ -349,7 +352,7 @@ where
                 && left_atomic.is_string()
                 && right_atomic.is_string()
             {
-                pair_result_atomics.push(string_bitwise_result(&binary.operator, &left_atomic, &right_atomic));
+                pair_result_atomics.push(string_bitwise_result(&binary.operator, left_atomic, right_atomic));
                 has_valid_left_operand = true;
                 has_valid_right_operand = true;
             } else if let Some((class, instance_side)) =
@@ -368,7 +371,7 @@ where
                 let right_is_valid = right_acceptance != OperandAcceptance::Rejected;
                 let is_division_by_zero = right_is_valid
                     && matches!(binary.operator, BinaryOperator::Division(_) | BinaryOperator::Modulo(_))
-                    && class.is_literal_zero(&right_atomic);
+                    && class.is_literal_zero(right_atomic);
 
                 if left_is_valid {
                     has_valid_left_operand = true;
@@ -408,7 +411,7 @@ where
                     invalid_pair = true;
                 }
             } else if left_atomic.is_numeric() && right_atomic.is_numeric() {
-                if let Some(reason) = definite_arithmetic_runtime_error(&binary.operator, &right_atomic) {
+                if let Some(reason) = definite_arithmetic_runtime_error(&binary.operator, right_atomic) {
                     invalid_right_messages.push((reason, binary.rhs.span()));
                     pair_result_atomics.push(TAtomic::Never);
                     result_atomic_types.extend(pair_result_atomics);
@@ -417,8 +420,8 @@ where
 
                 let numeric_results = determine_numeric_result(
                     &binary.operator,
-                    &left_atomic,
-                    &right_atomic,
+                    left_atomic,
+                    right_atomic,
                     block_context.flags.inside_loop(),
                 );
 
@@ -1002,12 +1005,12 @@ fn key_could_be_in_param(key: &ArrayKey, param: &TUnion) -> bool {
     }
 }
 
-fn bool_as_int(atomic: &TAtomic) -> TAtomic {
+fn bool_as_int(atomic: &TAtomic) -> &TAtomic {
     match atomic {
-        TAtomic::Scalar(TScalar::Bool(bool)) if bool.is_false() => TAtomic::Scalar(TScalar::literal_int(0)),
-        TAtomic::Scalar(TScalar::Bool(bool)) if bool.is_true() => TAtomic::Scalar(TScalar::literal_int(1)),
-        TAtomic::Scalar(TScalar::Bool(_)) => TAtomic::Scalar(TScalar::int()),
-        atomic => atomic.clone(),
+        TAtomic::Scalar(TScalar::Bool(bool)) if bool.is_false() => ZERO_INT_ATOMIC,
+        TAtomic::Scalar(TScalar::Bool(bool)) if bool.is_true() => ONE_INT_ATOMIC,
+        TAtomic::Scalar(TScalar::Bool(_)) => INT_ATOMIC,
+        atomic => atomic,
     }
 }
 
