@@ -5,6 +5,7 @@ use std::sync::Arc;
 
 use mago_codex::assertion::Assertion;
 use mago_codex::metadata::CodebaseMetadata;
+use mago_codex::operator_overloading::OperandAcceptance;
 use mago_codex::operator_overloading::OperandSide;
 use mago_codex::operator_overloading::get_operation_handler;
 use mago_codex::ttype::TType;
@@ -356,26 +357,31 @@ where
             {
                 let name = class.get_name();
                 let left_is_instance = instance_side == OperandSide::Left;
-                let left_is_valid = left_is_instance || class.accepts_operand(left_operand);
-                let right_is_valid = if left_is_instance && is_exponent_or_shift(&binary.operator) {
+                let left_acceptance =
+                    if left_is_instance { OperandAcceptance::Accepted } else { class.accepts_operand(left_operand) };
+                let right_acceptance = if left_is_instance && is_exponent_or_shift(&binary.operator) {
                     class.accepts_exponent_or_shift_amount(right_operand)
                 } else {
                     class.accepts_operand(right_operand)
                 };
+                let left_is_valid = left_acceptance != OperandAcceptance::Rejected;
+                let right_is_valid = right_acceptance != OperandAcceptance::Rejected;
                 let is_division_by_zero = right_is_valid
                     && matches!(binary.operator, BinaryOperator::Division(_) | BinaryOperator::Modulo(_))
                     && class.is_literal_zero(right_operand);
 
                 if left_is_valid {
                     has_valid_left_operand = true;
-                } else {
+                }
+
+                if left_acceptance != OperandAcceptance::Accepted {
                     invalid_left_messages.push((
                         format!("Cannot use {} as an operand with {name}", left_operand.get_id()),
                         binary.lhs.span(),
                     ));
                 }
 
-                if !right_is_valid {
+                if right_acceptance != OperandAcceptance::Accepted {
                     let message = match binary.operator {
                         BinaryOperator::Exponentiation(_) if left_is_instance => {
                             format!("Cannot raise {name} to the power of {}", right_operand.get_id())
@@ -387,10 +393,12 @@ where
                     };
 
                     invalid_right_messages.push((message, binary.rhs.span()));
-                } else if is_division_by_zero {
+                }
+
+                if is_division_by_zero {
                     invalid_right_messages.push(("Division or modulo by zero".to_string(), binary.rhs.span()));
                     result_atomic_types.push(TAtomic::Never);
-                } else {
+                } else if right_is_valid {
                     has_valid_right_operand = true;
                 }
 

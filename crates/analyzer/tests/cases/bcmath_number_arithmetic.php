@@ -92,9 +92,9 @@ function number_or_float_with_number(Number|float $a, Number $b): mixed
 /**
  * @param numeric $b
  */
-function number_with_numeric(Number $a, mixed $b): mixed
+function number_with_numeric(Number $a, mixed $b): Number
 {
-    /** @mago-expect analysis:invalid-operand */
+    /** @mago-expect analysis:possibly-invalid-operand */
     return $a + $b;
 }
 
@@ -150,4 +150,10 @@ function number_to_fractional_string_power(Number $a): mixed
 {
     /** @mago-expect analysis:invalid-operand */
     return $a ** '1.5';
+}
+
+function number_with_any_object(Number $a, object $b): Number
+{
+    /** @mago-expect analysis:possibly-invalid-operand */
+    return $a / $b;
 }

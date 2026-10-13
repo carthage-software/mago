@@ -2,6 +2,7 @@ use std::rc::Rc;
 
 use mago_allocator::Arena;
 use mago_bytes::BytesDisplay;
+use mago_codex::operator_overloading::OperandAcceptance;
 use mago_codex::operator_overloading::OperandSide;
 use mago_codex::operator_overloading::get_comparison_handler;
 use mago_codex::ttype::TType;
@@ -555,7 +556,12 @@ where
                         OperandSide::Right => (left_operand, OperandSide::Left, &mut invalid_left_messages),
                     };
 
-                    if other_operand.is_mixed() || class.accepts_comparison_operand(other_operand) {
+                    if other_operand.is_mixed() {
+                        return None;
+                    }
+
+                    let acceptance = class.accepts_comparison_operand(other_operand);
+                    if acceptance == OperandAcceptance::Accepted {
                         return None;
                     }
 
@@ -565,7 +571,7 @@ where
                         other_operand.get_id()
                     ));
 
-                    Some(other_side)
+                    (acceptance == OperandAcceptance::Rejected).then_some(other_side)
                 },
             );
 
@@ -608,7 +614,7 @@ where
             issue_code,
             issue
                 .with_annotations(annotations)
-                .with_note("PHP throws an error when the class that compares the operands cannot read the other one, and truncates a `float` with a deprecation.")
+                .with_note("PHP throws a `TypeError` when the class that compares the operands cannot read the other one. `GMP` truncates a `float` with a deprecation, or throws when called from a `strict_types` file.")
                 .with_help("Compare with a value the class accepts, such as an `int` or another instance of the same class."),
         );
 

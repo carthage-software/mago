@@ -198,6 +198,57 @@ function gmp_with_object(GMP $a, stdClass $b): mixed
     return $a + $b;
 }
 
+/**
+ * @param numeric $b
+ */
+function gmp_with_numeric(GMP $a, mixed $b): GMP
+{
+    /** @mago-expect analysis:possibly-invalid-operand */
+    return $a + $b;
+}
+
+/**
+ * @param numeric $a
+ */
+function numeric_with_gmp(mixed $a, GMP $b): GMP
+{
+    /** @mago-expect analysis:possibly-invalid-operand */
+    return $a * $b;
+}
+
+/**
+ * @param array-key $b
+ */
+function gmp_with_array_key(GMP $a, int|string $b): GMP
+{
+    /** @mago-expect analysis:possibly-invalid-operand */
+    return $a - $b;
+}
+
+/**
+ * @param scalar $b
+ */
+function gmp_with_scalar(GMP $a, int|float|string|bool $b): GMP
+{
+    /** @mago-expect analysis:possibly-invalid-operand */
+    return $a % $b;
+}
+
+function gmp_with_any_object(GMP $a, object $b): GMP
+{
+    /** @mago-expect analysis:possibly-invalid-operand */
+    return $a & $b;
+}
+
+/**
+ * @param numeric $b
+ */
+function gmp_to_the_power_of_numeric(GMP $a, mixed $b): GMP
+{
+    /** @mago-expect analysis:possibly-invalid-operand */
+    return $a ** $b;
+}
+
 function gmp_divided_by_zero(GMP $a): mixed
 {
     /** @mago-expect analysis:invalid-operand,never-return */

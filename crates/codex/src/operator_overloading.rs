@@ -31,6 +31,15 @@ pub enum OperandSide {
     Right,
 }
 
+/// Whether a class accepts every value of an operand's type, only some of them, or none.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum OperandAcceptance {
+    Accepted,
+    /// The type holds values the class rejects next to ones it accepts, such as the `int`s in `numeric`.
+    PartlyAccepted,
+    Rejected,
+}
+
 /// A class whose instances PHP lets you use with operators, and which operands it accepts.
 #[derive(Debug)]
 pub struct OperatorOverloadingClass {
@@ -141,7 +150,9 @@ pub fn get_operation_handler(
 /// is its instance, or `None` when no listed class's handler runs.
 ///
 /// PHP runs the handler of the first operand when it is an object, else that of the second, and
-/// compiles `>` and `>=` as `<` and `<=` with the operands swapped.
+/// compiles `>` and `>=` as `<` and `<=` with the operands swapped. It may also swap the operands of
+/// `==`, `!=` and `<>`, depending on whether each is a temporary value, so with two objects there
+/// is no telling whose handler runs.
 #[must_use]
 pub fn get_comparison_handler(
     operator: &BinaryOperator<'_>,
@@ -149,6 +160,13 @@ pub fn get_comparison_handler(
     right: &TAtomic,
 ) -> Option<(&'static OperatorOverloadingClass, OperandSide)> {
     if !operator.is_comparison() || operator.is_identity() {
+        return None;
+    }
+
+    if matches!(operator, BinaryOperator::Equal(_) | BinaryOperator::NotEqual(_) | BinaryOperator::AngledNotEqual(_))
+        && left.is_object_type()
+        && right.is_object_type()
+    {
         return None;
     }
 
@@ -183,15 +201,18 @@ impl OperatorOverloadingClass {
     /// `float` and `bool` are rejected: PHP converts them to `int` unless the function running the
     /// operator was called from a `strict_types` file, where it throws a `TypeError`.
     #[must_use]
-    pub fn accepts_operand(&self, atomic: &TAtomic) -> bool {
-        match atomic {
+    pub fn accepts_operand(&self, atomic: &TAtomic) -> OperandAcceptance {
+        let accepted = match atomic {
             TAtomic::Scalar(TScalar::Integer(_)) => true,
             TAtomic::Scalar(TScalar::String(string)) => match string.get_known_literal_value() {
                 Some(value) => self.string_grammar.parse(value).is_some(),
                 None => string.is_numeric,
             },
+            _ if includes_ints_or_any_object(atomic) => return OperandAcceptance::PartlyAccepted,
             _ => self.is_class_of(atomic),
-        }
+        };
+
+        OperandAcceptance::from(accepted)
     }
 
     /// Whether `atomic` can be the right operand of `**`, `<<` or `>>` when the left one is an instance.
@@ -199,35 +220,46 @@ impl OperatorOverloadingClass {
     /// `float` is rejected: BCMath reads it as any other operand, and GMP truncates it to `int`
     /// silently, even for strict callers.
     #[must_use]
-    pub fn accepts_exponent_or_shift_amount(&self, atomic: &TAtomic) -> bool {
+    pub fn accepts_exponent_or_shift_amount(&self, atomic: &TAtomic) -> OperandAcceptance {
         match self.exponent_or_shift_amount {
             ExponentOrShiftAmount::WholeOperand => {
-                self.accepts_operand(atomic)
-                    && !atomic
-                        .get_literal_string_value()
-                        .and_then(|value| self.string_grammar.parse(value))
-                        .is_some_and(|literal| literal.has_fractional_part)
+                let has_fractional_part = atomic
+                    .get_literal_string_value()
+                    .and_then(|value| self.string_grammar.parse(value))
+                    .is_some_and(|literal| literal.has_fractional_part);
+
+                if has_fractional_part { OperandAcceptance::Rejected } else { self.accepts_operand(atomic) }
             }
-            ExponentOrShiftAmount::NonNegativeInt => match atomic {
-                TAtomic::Scalar(TScalar::Integer(integer)) => !integer.is_negative(),
-                TAtomic::Scalar(TScalar::String(string)) => match string.get_known_literal_value() {
-                    Some(value) => parse_php_integer(value).is_some_and(|value| value >= 0),
-                    None => string.is_numeric,
-                },
-                _ => self.is_class_of(atomic),
-            },
+            ExponentOrShiftAmount::NonNegativeInt => {
+                let accepted = match atomic {
+                    TAtomic::Scalar(TScalar::Integer(integer)) => !integer.is_negative(),
+                    TAtomic::Scalar(TScalar::String(string)) => match string.get_known_literal_value() {
+                        Some(value) => parse_php_integer(value).is_some_and(|value| value >= 0),
+                        None => string.is_numeric,
+                    },
+                    _ if includes_ints_or_any_object(atomic) => return OperandAcceptance::PartlyAccepted,
+                    _ => self.is_class_of(atomic),
+                };
+
+                OperandAcceptance::from(accepted)
+            }
         }
     }
 
     /// Whether `atomic` can be the other operand of a comparison this class's compare handler runs.
     ///
-    /// `float` is rejected: PHP truncates it to `int` with a deprecation here too.
+    /// `GMP` rejects `float`: it truncates it to `int` with a deprecation, and throws a `TypeError`
+    /// when called from a `strict_types` file.
     #[must_use]
-    pub fn accepts_comparison_operand(&self, atomic: &TAtomic) -> bool {
+    pub fn accepts_comparison_operand(&self, atomic: &TAtomic) -> OperandAcceptance {
+        if self.compares_with_any_value {
+            return OperandAcceptance::Accepted;
+        }
+
         match atomic {
-            TAtomic::Scalar(TScalar::Float(_)) => false,
-            TAtomic::Null | TAtomic::Scalar(TScalar::Bool(_)) => true,
-            _ => self.compares_with_any_value || self.accepts_operand(atomic),
+            TAtomic::Null | TAtomic::Scalar(TScalar::Bool(_)) => OperandAcceptance::Accepted,
+            TAtomic::Scalar(TScalar::Float(_)) => OperandAcceptance::Rejected,
+            _ => self.accepts_operand(atomic),
         }
     }
 
@@ -248,6 +280,20 @@ impl OperatorOverloadingClass {
     fn is_class_of(&self, atomic: &TAtomic) -> bool {
         get_operator_overloading_class(atomic).is_some_and(|class| std::ptr::eq(class, self))
     }
+}
+
+impl From<bool> for OperandAcceptance {
+    fn from(accepted: bool) -> Self {
+        if accepted { OperandAcceptance::Accepted } else { OperandAcceptance::Rejected }
+    }
+}
+
+/// Every class accepts some `int`s and its own instances, so it accepts some values of these types.
+fn includes_ints_or_any_object(atomic: &TAtomic) -> bool {
+    matches!(
+        atomic,
+        TAtomic::Scalar(TScalar::Generic | TScalar::Numeric | TScalar::ArrayKey) | TAtomic::Object(TObject::Any)
+    )
 }
 
 impl StringOperandGrammar {
@@ -375,6 +421,7 @@ mod tests {
             ">=" => BinaryOperator::GreaterThanOrEqual(span),
             "==" => BinaryOperator::Equal(span),
             "!=" => BinaryOperator::NotEqual(span),
+            "<>" => BinaryOperator::AngledNotEqual(span),
             "<=>" => BinaryOperator::Spaceship(span),
             "===" => BinaryOperator::Identical(span),
             "+" => BinaryOperator::Addition(span),
@@ -424,7 +471,7 @@ mod tests {
     #[test]
     fn instance_atomic_is_the_class_itself() {
         for class in [bcmath_number(), gmp()] {
-            assert!(class.accepts_operand(&class.get_instance_atomic()));
+            assert_eq!(class.accepts_operand(&class.get_instance_atomic()), OperandAcceptance::Accepted);
             assert!(
                 get_operator_overloading_class(&class.get_instance_atomic())
                     .is_some_and(|found| std::ptr::eq(found, class))
@@ -435,14 +482,22 @@ mod tests {
     #[test]
     fn bcmath_number_accepts_decimal_strings() {
         for value in ["10", "-1.5", "+2", "", ".5", "1.", "007", "-", "."] {
-            assert!(bcmath_number().accepts_operand(&literal_string(value)), "should accept {value:?}");
+            assert_eq!(
+                bcmath_number().accepts_operand(&literal_string(value)),
+                OperandAcceptance::Accepted,
+                "should accept {value:?}"
+            );
         }
     }
 
     #[test]
     fn bcmath_number_rejects_strings_outside_its_grammar() {
         for value in [" 5", "5 ", "1e3", "abc", "--1", "+-1", "1.2.3", "0x10"] {
-            assert!(!bcmath_number().accepts_operand(&literal_string(value)), "should reject {value:?}");
+            assert_eq!(
+                bcmath_number().accepts_operand(&literal_string(value)),
+                OperandAcceptance::Rejected,
+                "should reject {value:?}"
+            );
         }
     }
 
@@ -451,36 +506,67 @@ mod tests {
         for value in
             ["10", "-0x10", "0X1F", "0b101", "0o17", "010", " 5 ", "-0b1", "\t5\n", "0 5", "0x 1", " -5", "\u{b}5"]
         {
-            assert!(gmp().accepts_operand(&literal_string(value)), "should accept {value:?}");
+            assert_eq!(
+                gmp().accepts_operand(&literal_string(value)),
+                OperandAcceptance::Accepted,
+                "should accept {value:?}"
+            );
         }
     }
 
     #[test]
     fn gmp_rejects_strings_outside_its_grammar() {
         for value in ["+5", "", " ", "1.5", "1e3", "0xZZ", "08", "-0o7", "- 5", "0x", "0b102", "1_000", "-"] {
-            assert!(!gmp().accepts_operand(&literal_string(value)), "should reject {value:?}");
+            assert_eq!(
+                gmp().accepts_operand(&literal_string(value)),
+                OperandAcceptance::Rejected,
+                "should reject {value:?}"
+            );
         }
     }
 
     #[test]
     fn accepts_integers_and_numeric_strings_of_unknown_value() {
         for class in [bcmath_number(), gmp()] {
-            assert!(class.accepts_operand(&TAtomic::Scalar(TScalar::int())));
-            assert!(class.accepts_operand(&literal_int(-3)));
-            assert!(class.accepts_operand(&TAtomic::Scalar(TScalar::numeric_string())));
-            assert!(!class.accepts_operand(&TAtomic::Scalar(TScalar::string())));
-            assert!(!class.accepts_operand(&TAtomic::Scalar(TScalar::String(TString::non_empty()))));
+            assert_eq!(class.accepts_operand(&TAtomic::Scalar(TScalar::int())), OperandAcceptance::Accepted);
+            assert_eq!(class.accepts_operand(&literal_int(-3)), OperandAcceptance::Accepted);
+            assert_eq!(class.accepts_operand(&TAtomic::Scalar(TScalar::numeric_string())), OperandAcceptance::Accepted);
+            assert_eq!(class.accepts_operand(&TAtomic::Scalar(TScalar::string())), OperandAcceptance::Rejected);
+            assert_eq!(
+                class.accepts_operand(&TAtomic::Scalar(TScalar::String(TString::non_empty()))),
+                OperandAcceptance::Rejected
+            );
         }
     }
 
     #[test]
-    fn rejects_floats() {
-        for class in [bcmath_number(), gmp()] {
-            for float in [TAtomic::Scalar(TScalar::float()), TAtomic::Scalar(TScalar::literal_float(1.0))] {
-                assert!(!class.accepts_operand(&float));
-                assert!(!class.accepts_exponent_or_shift_amount(&float));
-                assert!(!class.accepts_comparison_operand(&float));
+    fn rejects_floats_except_in_bcmath_number_comparisons() {
+        for float in [TAtomic::Scalar(TScalar::float()), TAtomic::Scalar(TScalar::literal_float(1.0))] {
+            for class in [bcmath_number(), gmp()] {
+                assert_eq!(class.accepts_operand(&float), OperandAcceptance::Rejected);
+                assert_eq!(class.accepts_exponent_or_shift_amount(&float), OperandAcceptance::Rejected);
             }
+
+            assert_eq!(gmp().accepts_comparison_operand(&float), OperandAcceptance::Rejected);
+            assert_eq!(bcmath_number().accepts_comparison_operand(&float), OperandAcceptance::Accepted);
+        }
+    }
+
+    #[test]
+    fn partly_accepts_types_that_include_ints_or_instances() {
+        for atomic in [
+            TAtomic::Scalar(TScalar::Numeric),
+            TAtomic::Scalar(TScalar::ArrayKey),
+            TAtomic::Scalar(TScalar::Generic),
+            TAtomic::Object(TObject::Any),
+        ] {
+            for class in [bcmath_number(), gmp()] {
+                assert_eq!(class.accepts_operand(&atomic), OperandAcceptance::PartlyAccepted, "{atomic:?}");
+                assert_eq!(class.accepts_exponent_or_shift_amount(&atomic), OperandAcceptance::PartlyAccepted);
+            }
+
+            assert_eq!(gmp().accepts_comparison_operand(&atomic), OperandAcceptance::PartlyAccepted);
+            assert_eq!(bcmath_number().accepts_comparison_operand(&atomic), OperandAcceptance::Accepted);
         }
     }
 
@@ -488,21 +574,21 @@ mod tests {
     fn rejects_bools_as_operands_but_compares_with_them() {
         for class in [bcmath_number(), gmp()] {
             for bool in [TAtomic::Scalar(TScalar::bool()), TAtomic::Scalar(TScalar::r#true())] {
-                assert!(!class.accepts_operand(&bool));
-                assert!(!class.accepts_exponent_or_shift_amount(&bool));
-                assert!(class.accepts_comparison_operand(&bool));
+                assert_eq!(class.accepts_operand(&bool), OperandAcceptance::Rejected);
+                assert_eq!(class.accepts_exponent_or_shift_amount(&bool), OperandAcceptance::Rejected);
+                assert_eq!(class.accepts_comparison_operand(&bool), OperandAcceptance::Accepted);
             }
         }
     }
 
     #[test]
     fn accepts_its_own_instances_and_rejects_the_other_class() {
-        assert!(bcmath_number().accepts_operand(&named("\\bcmath\\number")));
-        assert!(gmp().accepts_operand(&named("GMP")));
-        assert!(!bcmath_number().accepts_operand(&named("GMP")));
-        assert!(!gmp().accepts_operand(&named("BcMath\\Number")));
-        assert!(!gmp().accepts_operand(&named("stdClass")));
-        assert!(!gmp().accepts_operand(&TAtomic::Null));
+        assert_eq!(bcmath_number().accepts_operand(&named("\\bcmath\\number")), OperandAcceptance::Accepted);
+        assert_eq!(gmp().accepts_operand(&named("GMP")), OperandAcceptance::Accepted);
+        assert_eq!(bcmath_number().accepts_operand(&named("GMP")), OperandAcceptance::Rejected);
+        assert_eq!(gmp().accepts_operand(&named("BcMath\\Number")), OperandAcceptance::Rejected);
+        assert_eq!(gmp().accepts_operand(&named("stdClass")), OperandAcceptance::Rejected);
+        assert_eq!(gmp().accepts_operand(&TAtomic::Null), OperandAcceptance::Rejected);
     }
 
     #[test]
@@ -519,7 +605,11 @@ mod tests {
             literal_string("+2"),
             literal_string("-0"),
         ] {
-            assert!(gmp().accepts_exponent_or_shift_amount(&atomic), "should accept {atomic:?}");
+            assert_eq!(
+                gmp().accepts_exponent_or_shift_amount(&atomic),
+                OperandAcceptance::Accepted,
+                "should accept {atomic:?}"
+            );
         }
 
         for atomic in [
@@ -539,14 +629,22 @@ mod tests {
             TAtomic::Null,
             named("BcMath\\Number"),
         ] {
-            assert!(!gmp().accepts_exponent_or_shift_amount(&atomic), "should reject {atomic:?}");
+            assert_eq!(
+                gmp().accepts_exponent_or_shift_amount(&atomic),
+                OperandAcceptance::Rejected,
+                "should reject {atomic:?}"
+            );
         }
     }
 
     #[test]
     fn bcmath_number_takes_negative_exponents_but_not_fractional_strings() {
         for atomic in [literal_int(-1), literal_string("-1"), literal_string("2.0"), named("BcMath\\Number")] {
-            assert!(bcmath_number().accepts_exponent_or_shift_amount(&atomic), "should accept {atomic:?}");
+            assert_eq!(
+                bcmath_number().accepts_exponent_or_shift_amount(&atomic),
+                OperandAcceptance::Accepted,
+                "should accept {atomic:?}"
+            );
         }
 
         for atomic in [
@@ -558,20 +656,29 @@ mod tests {
             TAtomic::Scalar(TScalar::r#true()),
             named("GMP"),
         ] {
-            assert!(!bcmath_number().accepts_exponent_or_shift_amount(&atomic), "should reject {atomic:?}");
+            assert_eq!(
+                bcmath_number().accepts_exponent_or_shift_amount(&atomic),
+                OperandAcceptance::Rejected,
+                "should reject {atomic:?}"
+            );
         }
     }
 
     #[test]
-    fn bcmath_number_compares_with_anything_but_floats() {
+    fn bcmath_number_compares_with_anything() {
         for atomic in [
+            TAtomic::Scalar(TScalar::float()),
             named("GMP"),
             named("stdClass"),
             literal_string("abc"),
             get_mixed_keyed_array().get_single().clone(),
             TAtomic::Null,
         ] {
-            assert!(bcmath_number().accepts_comparison_operand(&atomic), "should accept {atomic:?}");
+            assert_eq!(
+                bcmath_number().accepts_comparison_operand(&atomic),
+                OperandAcceptance::Accepted,
+                "should accept {atomic:?}"
+            );
         }
     }
 
@@ -585,7 +692,11 @@ mod tests {
             literal_string(" 5 "),
             literal_string("0x10"),
         ] {
-            assert!(gmp().accepts_comparison_operand(&atomic), "should accept {atomic:?}");
+            assert_eq!(
+                gmp().accepts_comparison_operand(&atomic),
+                OperandAcceptance::Accepted,
+                "should accept {atomic:?}"
+            );
         }
 
         for atomic in [
@@ -596,7 +707,11 @@ mod tests {
             literal_string("1.5"),
             literal_string("08"),
         ] {
-            assert!(!gmp().accepts_comparison_operand(&atomic), "should reject {atomic:?}");
+            assert_eq!(
+                gmp().accepts_comparison_operand(&atomic),
+                OperandAcceptance::Rejected,
+                "should reject {atomic:?}"
+            );
         }
     }
 
@@ -607,9 +722,8 @@ mod tests {
         let std_class = named("stdClass");
         let int = literal_int(5);
 
-        assert_eq!(comparison_handler_name("==", &gmp, &number), Some("GMP"));
-        assert_eq!(comparison_handler_name("==", &number, &gmp), Some("BcMath\\Number"));
         assert_eq!(comparison_handler_name("<", &gmp, &number), Some("GMP"));
+        assert_eq!(comparison_handler_name("<", &number, &gmp), Some("BcMath\\Number"));
         assert_eq!(comparison_handler_name(">", &gmp, &number), Some("BcMath\\Number"));
         assert_eq!(comparison_handler_name(">=", &number, &gmp), Some("GMP"));
         assert_eq!(comparison_handler_name("<=>", &number, &gmp), Some("BcMath\\Number"));
@@ -619,6 +733,24 @@ mod tests {
         assert_eq!(comparison_handler_name("<", &int, &gmp), Some("GMP"));
         assert_eq!(comparison_handler_name(">", &int, &gmp), Some("GMP"));
         assert_eq!(comparison_handler_name("<", &int, &int), None);
+    }
+
+    #[test]
+    fn equality_between_two_objects_has_no_known_compare_handler() {
+        let gmp = named("GMP");
+        let number = named("BcMath\\Number");
+        let std_class = named("stdClass");
+        let any_object = TAtomic::Object(TObject::Any);
+        let abc = literal_string("abc");
+
+        for operator in ["==", "!=", "<>"] {
+            assert_eq!(comparison_handler_name(operator, &gmp, &number), None);
+            assert_eq!(comparison_handler_name(operator, &number, &gmp), None);
+            assert_eq!(comparison_handler_name(operator, &std_class, &gmp), None);
+            assert_eq!(comparison_handler_name(operator, &gmp, &any_object), None);
+            assert_eq!(comparison_handler_name(operator, &gmp, &abc), Some("GMP"));
+            assert_eq!(comparison_handler_name(operator, &abc, &gmp), Some("GMP"));
+        }
     }
 
     #[test]
@@ -640,9 +772,7 @@ mod tests {
         let int = literal_int(5);
         let null = TAtomic::Null;
 
-        let cases: [(&TAtomic, &str, &TAtomic, bool); 14] = [
-            (&gmp, "==", &number, true),
-            (&number, "==", &gmp, false),
+        let cases: [(&TAtomic, &str, &TAtomic, bool); 12] = [
             (&gmp, "<", &number, true),
             (&gmp, ">", &number, false),
             (&number, ">", &gmp, true),
@@ -665,7 +795,7 @@ mod tests {
                         OperandSide::Right => left,
                     };
 
-                    !class.accepts_comparison_operand(other_operand)
+                    class.accepts_comparison_operand(other_operand) == OperandAcceptance::Rejected
                 });
 
             assert_eq!(rejects, throws, "{left:?} {operator} {right:?}");
