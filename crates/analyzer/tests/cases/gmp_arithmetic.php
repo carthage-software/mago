@@ -102,34 +102,58 @@ function gmp_compound_assignment(GMP $a): GMP
     return $a;
 }
 
-function gmp_with_float(GMP $a, float $b): mixed
+function gmp_with_float(GMP $a, float $b): GMP
 {
-    /** @mago-expect analysis:invalid-operand */
+    /** @mago-expect analysis:possibly-invalid-operand */
     return $a + $b;
 }
 
-function float_with_gmp(float $a, GMP $b): mixed
+function float_with_gmp(float $a, GMP $b): GMP
 {
-    /** @mago-expect analysis:invalid-operand */
+    /** @mago-expect analysis:possibly-invalid-operand */
     return $a - $b;
 }
 
-function gmp_or_float_with_gmp(GMP|float $a, GMP $b): mixed
+function gmp_or_float_with_gmp(GMP|float $a, GMP $b): GMP
 {
     /** @mago-expect analysis:possibly-invalid-operand */
     return $a * $b;
 }
 
-function gmp_with_bool(GMP $a, bool $b): mixed
+function gmp_with_bool(GMP $a, bool $b): GMP
 {
-    /** @mago-expect analysis:invalid-operand */
+    /** @mago-expect analysis:possibly-invalid-operand */
     return $a * $b;
 }
 
-function bool_with_gmp(bool $a, GMP $b): mixed
+function bool_with_gmp(bool $a, GMP $b): GMP
 {
-    /** @mago-expect analysis:invalid-operand */
+    /** @mago-expect analysis:possibly-invalid-operand */
     return $a - $b;
+}
+
+function true_to_the_power_of_gmp(GMP $a): GMP
+{
+    /** @mago-expect analysis:possibly-invalid-operand */
+    return true ** $a;
+}
+
+function gmp_to_the_power_of_float(GMP $a, float $b): GMP
+{
+    /** @mago-expect analysis:possibly-invalid-operand */
+    return $a ** $b;
+}
+
+function gmp_shifted_by_float(GMP $a): GMP
+{
+    /** @mago-expect analysis:possibly-invalid-operand */
+    return $a >> 1.5;
+}
+
+function gmp_divided_by_false(GMP $a): mixed
+{
+    /** @mago-expect analysis:false-operand,invalid-operand,never-return */
+    return $a / false;
 }
 
 function gmp_to_the_power_of_true(GMP $a): mixed

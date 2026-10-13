@@ -170,7 +170,7 @@ function gmp_not_equal_to_decimal_string(GMP $a): bool
 
 function gmp_less_than_float(GMP $a): bool
 {
-    /** @mago-expect analysis:invalid-operand */
+    /** @mago-expect analysis:possibly-invalid-operand */
     return $a < 1.5;
 }
 

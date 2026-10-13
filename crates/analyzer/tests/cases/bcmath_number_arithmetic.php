@@ -42,16 +42,22 @@ function number_to_negative_power(Number $a): Number
     return $a ** -1;
 }
 
-function number_with_bool(Number $a, bool $b): mixed
+function number_with_bool(Number $a, bool $b): Number
 {
-    /** @mago-expect analysis:invalid-operand */
+    /** @mago-expect analysis:possibly-invalid-operand */
     return $a + $b;
 }
 
-function number_to_the_power_of_true(Number $a): mixed
+function number_to_the_power_of_true(Number $a): Number
 {
-    /** @mago-expect analysis:invalid-operand */
+    /** @mago-expect analysis:possibly-invalid-operand */
     return $a ** true;
+}
+
+function number_divided_by_false(Number $a): mixed
+{
+    /** @mago-expect analysis:false-operand,invalid-operand,never-return */
+    return $a / false;
 }
 
 function number_or_int_with_int(Number|int $a): Number|int
@@ -77,13 +83,13 @@ function compound_assignment(Number $a): Number
     return $a;
 }
 
-function number_with_float(Number $a, float $b): mixed
+function number_with_float(Number $a, float $b): Number
 {
-    /** @mago-expect analysis:invalid-operand */
+    /** @mago-expect analysis:possibly-invalid-operand */
     return $a * $b;
 }
 
-function number_or_float_with_number(Number|float $a, Number $b): mixed
+function number_or_float_with_number(Number|float $a, Number $b): Number
 {
     /** @mago-expect analysis:possibly-invalid-operand */
     return $a * $b;

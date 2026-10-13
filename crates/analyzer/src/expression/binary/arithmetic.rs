@@ -368,7 +368,7 @@ where
                 let right_is_valid = right_acceptance != OperandAcceptance::Rejected;
                 let is_division_by_zero = right_is_valid
                     && matches!(binary.operator, BinaryOperator::Division(_) | BinaryOperator::Modulo(_))
-                    && class.is_literal_zero(right_operand);
+                    && class.is_literal_zero(&right_atomic);
 
                 if left_is_valid {
                     has_valid_left_operand = true;
