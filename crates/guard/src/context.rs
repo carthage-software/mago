@@ -58,8 +58,7 @@ impl<'ctx, 'arena> GuardContext<'ctx, 'arena> {
     ///
     /// Returns `None` if no name is found at the specified position.
     pub fn try_lookup_name(&self, position: &impl HasPosition) -> Option<&'arena [u8]> {
-        let pos = position.position();
-        if self.resolved_names.contains(&pos) { Some(self.resolved_names.get(&pos)) } else { None }
+        self.resolved_names.resolve(position)
     }
 
     /// Consumes the context and generates a `FortressReport` containing all collected issues.

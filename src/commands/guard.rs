@@ -38,6 +38,7 @@
 //! - Ensuring presentation layer doesn't access data layer directly
 //! - Maintaining module boundaries in modular monoliths
 
+use std::path::Path;
 use std::path::PathBuf;
 use std::process::ExitCode;
 use std::time::Instant;
@@ -220,8 +221,23 @@ impl GuardCommand {
         let orchestrator_init_duration = orchestrator_init_start.map(|s| s.elapsed());
 
         let load_database_start = trace_enabled.then(Instant::now);
-        let mut database =
-            orchestrator.load_database(&configuration.source.workspace, true, Some(database), stdin_override)?;
+        let include_externals = !self.path.is_empty()
+            || self.stdin_input
+            || !substitutions.is_empty()
+            || !orchestrator.config.patches.is_empty()
+            || !has_disjoint_includes(
+                &configuration.source.workspace,
+                &orchestrator.config.paths,
+                &orchestrator.config.includes,
+            );
+
+        let mut database = orchestrator.load_database(
+            &configuration.source.workspace,
+            include_externals,
+            Some(database),
+            stdin_override,
+        )?;
+
         let load_database_duration = load_database_start.map(|s| s.elapsed());
 
         if !database.files().any(|f| f.file_type == FileType::Host) {
@@ -283,4 +299,22 @@ impl GuardCommand {
 
         Ok(outcome)
     }
+}
+
+fn has_disjoint_includes(workspace: &Path, paths: &[String], includes: &[String]) -> bool {
+    if includes.is_empty() {
+        return true;
+    }
+
+    if paths.is_empty() || paths.iter().chain(includes).any(|path| path.contains(['*', '?', '[', '{'])) {
+        return false;
+    }
+
+    let resolve =
+        |roots: &[String]| roots.iter().map(|root| workspace.join(root).canonicalize()).collect::<Result<Vec<_>, _>>();
+    let (Ok(paths), Ok(includes)) = (resolve(paths), resolve(includes)) else {
+        return false;
+    };
+
+    paths.iter().all(|path| includes.iter().all(|include| !path.starts_with(include) && !include.starts_with(path)))
 }

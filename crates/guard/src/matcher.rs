@@ -73,10 +73,7 @@ pub fn matches(fqcn: &[u8], pattern: &[u8], is_constant: bool, treat_as_namespac
         return fqcn == pattern;
     }
 
-    let fqcn_parts: Vec<&[u8]> = split_separator(fqcn);
-    let pattern_parts: Vec<&[u8]> = split_separator(pattern);
-
-    do_match(&fqcn_parts, &pattern_parts, is_constant)
+    do_match(Some(fqcn), Some(pattern), is_constant)
 }
 
 fn trim_separator(s: &[u8]) -> &[u8] {
@@ -91,8 +88,11 @@ fn trim_separator(s: &[u8]) -> &[u8] {
     &s[start..end]
 }
 
-fn split_separator(s: &[u8]) -> Vec<&[u8]> {
-    s.split(|&b| b == SEPARATOR).collect()
+fn split_first_separator(s: &[u8]) -> (&[u8], Option<&[u8]>) {
+    match s.iter().position(|&b| b == SEPARATOR) {
+        Some(position) => (&s[..position], Some(&s[position + 1..])),
+        None => (s, None),
+    }
 }
 
 fn rsplit_once_separator(s: &[u8]) -> Option<(&[u8], &[u8])> {
@@ -101,30 +101,27 @@ fn rsplit_once_separator(s: &[u8]) -> Option<(&[u8], &[u8])> {
 }
 
 /// The recursive matching engine.
-fn do_match(fqcn_parts: &[&[u8]], pattern_parts: &[&[u8]], is_constant: bool) -> bool {
-    match (fqcn_parts.first(), pattern_parts.first()) {
+fn do_match(fqcn: Option<&[u8]>, pattern: Option<&[u8]>, is_constant: bool) -> bool {
+    match (fqcn.map(split_first_separator), pattern.map(split_first_separator)) {
         (None, None) => true,
-        (_, Some(p)) if *p == b"**" => {
-            if pattern_parts.len() == 1 {
+        (_, Some((b"**", pattern_rest))) => {
+            if pattern_rest.is_none() {
                 return true;
             }
-            if fqcn_parts.is_empty() {
-                return do_match(fqcn_parts, &pattern_parts[1..], is_constant);
-            }
-            do_match(fqcn_parts, &pattern_parts[1..], is_constant)
-                || do_match(&fqcn_parts[1..], pattern_parts, is_constant)
+
+            do_match(fqcn, pattern_rest, is_constant)
+                || fqcn.is_some_and(|fqcn| do_match(split_first_separator(fqcn).1, pattern, is_constant))
         }
-        (Some(f_part), Some(p_part)) => {
-            let is_last = fqcn_parts.len() == 1 && pattern_parts.len() == 1;
+        (Some((f_part, fqcn_rest)), Some((p_part, pattern_rest))) => {
+            let is_last = fqcn_rest.is_none() && pattern_rest.is_none();
             let case_sensitive = is_constant && is_last;
 
             if segment_matches(f_part, p_part, case_sensitive) {
-                do_match(&fqcn_parts[1..], &pattern_parts[1..], is_constant)
+                do_match(fqcn_rest, pattern_rest, is_constant)
             } else {
                 false
             }
         }
-        (None, Some(_)) => pattern_parts.len() == 1 && pattern_parts[0] == b"**",
         _ => false,
     }
 }
@@ -139,26 +136,23 @@ fn segment_matches(fqcn_part: &[u8], pattern_part: &[u8], case_sensitive: bool) 
         return if case_sensitive { fqcn_part == pattern_part } else { fqcn_part.eq_ignore_ascii_case(pattern_part) };
     }
 
-    let p_chunks: Vec<&[u8]> = pattern_part.split(|&b| b == b'*').collect();
+    let mut chunks = pattern_part.split(|&b| b == b'*');
+    let first_chunk = chunks.next().unwrap_or_default();
+    let last_chunk = chunks.next_back().unwrap_or_default();
     let mut remainder: &[u8] = fqcn_part;
 
-    if !p_chunks[0].is_empty() {
-        if remainder.len() < p_chunks[0].len() {
+    if !first_chunk.is_empty() {
+        if remainder.len() < first_chunk.len() {
             return false;
         }
 
-        let prefix = &remainder[..p_chunks[0].len()];
-        if !(if case_sensitive { prefix == p_chunks[0] } else { prefix.eq_ignore_ascii_case(p_chunks[0]) }) {
+        let prefix = &remainder[..first_chunk.len()];
+        if !(if case_sensitive { prefix == first_chunk } else { prefix.eq_ignore_ascii_case(first_chunk) }) {
             return false;
         }
 
-        remainder = &remainder[p_chunks[0].len()..];
+        remainder = &remainder[first_chunk.len()..];
     }
-
-    let last_chunk = match p_chunks.last() {
-        Some(chunk) => *chunk,
-        None => return false,
-    };
 
     if !last_chunk.is_empty() {
         if remainder.len() < last_chunk.len() {
@@ -173,7 +167,7 @@ fn segment_matches(fqcn_part: &[u8], pattern_part: &[u8], case_sensitive: bool) 
         remainder = &remainder[..remainder.len() - last_chunk.len()];
     }
 
-    for chunk in &p_chunks[1..p_chunks.len() - 1] {
+    for chunk in chunks {
         if chunk.is_empty() {
             continue;
         }
@@ -359,6 +353,25 @@ mod tests {
         assert!(matches(b"A", b"A", false, false));
         assert!(matches(b"\\App\\User\\", b"App\\User", false, false));
         assert!(matches(b"App\\User", b"\\App\\User\\", false, false));
+    }
+
+    #[test]
+    fn test_empty_segments_and_repeated_wildcards() {
+        for (name, pattern, is_constant, expected) in [
+            (b"A\\\\B".as_slice(), b"A\\*\\B".as_slice(), false, true),
+            (b"A\\\\B", b"A\\B", false, false),
+            (b"A\\B", b"A\\**\\**\\B", false, true),
+            (b"A\\B\\C\\B", b"A\\**\\B", false, true),
+            (b"A\\B\\C", b"A\\**\\B", false, false),
+            (b"A\\USER", b"a\\**\\USER", true, true),
+            (b"A\\USER", b"a\\**\\User", true, false),
+            (b"PrefixMiddleSuffix", b"Prefix**Middle***Suffix", false, true),
+            (b"PrefixSuffixMiddle", b"Prefix**Middle***Suffix", false, false),
+            (b"PrefixSuffix", b"Prefix**Suffix", false, true),
+            (b"Prefix", b"Prefix*Prefix", false, false),
+        ] {
+            assert_eq!(matches(name, pattern, is_constant, false), expected, "{name:?} against {pattern:?}");
+        }
     }
 
     #[test]

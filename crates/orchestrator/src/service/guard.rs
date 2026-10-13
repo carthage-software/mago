@@ -7,7 +7,7 @@ use mago_guard::settings::Settings;
 use mago_names::resolver::NameResolver;
 use mago_reporting::Issue;
 use mago_reporting::IssueCollection;
-use mago_syntax::parser::parse_file_with_settings;
+use mago_syntax::parser::parse_file_borrowed_with_settings;
 use mago_syntax::settings::ParserSettings;
 
 use crate::error::OrchestratorError;
@@ -89,21 +89,20 @@ impl GuardService {
         let pipeline = StatelessParallelPipeline::new(
             GUARD_PROGRESS_PREFIX,
             self.database,
-            (Arc::new(self.codebase), self.settings, self.parser_settings),
+            (Arc::new(self.codebase), Arc::new(ArchitecturalGuard::new(self.settings)), self.parser_settings),
             Box::new(GuardResultReducer),
             self.use_progress_bars,
         );
 
-        let issues = pipeline.run(|(codebase, guard_settings, parser_settings), arena, source_file| {
+        let issues = pipeline.run(|(codebase, guard, parser_settings), arena, source_file| {
             let mut issues = IssueCollection::new();
 
-            let program = parse_file_with_settings(arena, &source_file, parser_settings);
+            let program = parse_file_borrowed_with_settings(arena, &source_file, parser_settings);
             if program.has_errors() {
                 issues.extend(program.errors.iter().map(Issue::from));
             }
 
             let resolved_names = NameResolver::new(arena).resolve(program);
-            let guard = ArchitecturalGuard::new(guard_settings);
             let report = guard.check(&codebase, program, &resolved_names);
 
             issues.extend(
