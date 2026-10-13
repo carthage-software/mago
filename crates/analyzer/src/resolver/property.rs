@@ -686,10 +686,32 @@ impl DeclaredProperty<'_> {
             }
         }
 
-        annotation_type_metadata(self.property, for_write)
-            .or(self.property.type_declaration_metadata.as_ref())
-            .map(|tm| Cow::Borrowed(&tm.type_union))
-            .unwrap_or_else(|| Cow::Owned(get_mixed()))
+        let effective_metadata = if let Some(docblock_meta) = annotation_type_metadata(self.property, for_write)
+            && docblock_meta.from_docblock
+            && !docblock_meta.type_union.has_template_types()
+            && !docblock_meta.type_union.is_generic_parameter()
+            && !docblock_meta.type_union.types.iter().any(|t| {
+                t.is_derived()
+                    || t.is_conditional()
+                    || matches!(t, TAtomic::Alias(_) | TAtomic::Reference(_) | TAtomic::GenericParameter(_))
+            })
+            && let Some(native_meta) = self.property.type_declaration_metadata.as_ref()
+            && ((native_meta.type_union.has_object_type()
+                && !docblock_meta.type_union.has_object_type()
+                && !docblock_meta.type_union.has_mixed())
+                || (native_meta.type_union.is_void() && !docblock_meta.type_union.is_void())
+                || (native_meta.type_union.is_array()
+                    && !docblock_meta.type_union.is_array()
+                    && !docblock_meta.type_union.is_list()
+                    && !docblock_meta.type_union.has_iterable()
+                    && !docblock_meta.type_union.has_mixed()))
+        {
+            Some(native_meta)
+        } else {
+            annotation_type_metadata(self.property, for_write).or(self.property.type_declaration_metadata.as_ref())
+        };
+
+        effective_metadata.map(|tm| Cow::Borrowed(&tm.type_union)).unwrap_or_else(|| Cow::Owned(get_mixed()))
     }
 }
 
