@@ -2,6 +2,8 @@ use std::rc::Rc;
 
 use mago_allocator::Arena;
 use mago_bytes::BytesDisplay;
+use mago_codex::operator_overloading::OperandSide;
+use mago_codex::operator_overloading::get_comparison_handler;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::get_bool;
 use mago_codex::ttype::get_false;
@@ -128,9 +130,10 @@ where
         });
     }
 
-    let mut reported_general_invalid_operand = false;
+    let mut reported_general_invalid_operand =
+        report_operands_rejected_by_comparison_handler(context, binary, lhs_type, rhs_type);
 
-    if !lhs_type.is_mixed() && !rhs_type.is_mixed() {
+    if !reported_general_invalid_operand && !lhs_type.is_mixed() && !rhs_type.is_mixed() {
         let op_str = BytesDisplay(binary.operator.as_bytes());
         let is_relational = binary.operator.is_comparison() && !binary.operator.is_equality();
         let lhs_has_array = lhs_type.has_array() || lhs_type.has_iterable();
@@ -525,6 +528,94 @@ fn involves_static_variable(expr: &Expression<'_>, block_context: &BlockContext<
 /// Checks if an expression involves a variable captured by reference from an outer scope.
 fn involves_external_reference(expr: &Expression<'_>, block_context: &BlockContext<'_>) -> bool {
     matches!(unwrap_expression(expr), Expression::Variable(Variable::Direct(var)) if block_context.references_to_external_scope.contains(&word(var.name)))
+}
+
+/// Reports the operands that the compare handler of an operator-overloading class (such as `GMP`)
+/// cannot read, and returns whether it reported any.
+pub(super) fn report_operands_rejected_by_comparison_handler<'arena, A>(
+    context: &mut Context<'_, 'arena, A>,
+    binary: &Binary<'arena>,
+    lhs_type: &TUnion,
+    rhs_type: &TUnion,
+) -> bool
+where
+    A: Arena,
+{
+    let mut invalid_left_messages: Vec<String> = Vec::new();
+    let mut invalid_right_messages: Vec<String> = Vec::new();
+    let mut has_valid_left_operand = false;
+    let mut has_valid_right_operand = false;
+
+    for left_operand in lhs_type.types.iter() {
+        for right_operand in rhs_type.types.iter() {
+            let rejected_side = get_comparison_handler(&binary.operator, left_operand, right_operand).and_then(
+                |(class, instance_side)| {
+                    let (other_operand, other_side, invalid_messages) = match instance_side {
+                        OperandSide::Left => (right_operand, OperandSide::Right, &mut invalid_right_messages),
+                        OperandSide::Right => (left_operand, OperandSide::Left, &mut invalid_left_messages),
+                    };
+
+                    if other_operand.is_mixed() || class.accepts_comparison_operand(other_operand) {
+                        return None;
+                    }
+
+                    invalid_messages.push(format!(
+                        "Cannot compare {} with {}",
+                        class.get_name(),
+                        other_operand.get_id()
+                    ));
+
+                    Some(other_side)
+                },
+            );
+
+            has_valid_left_operand |= rejected_side != Some(OperandSide::Left);
+            has_valid_right_operand |= rejected_side != Some(OperandSide::Right);
+        }
+    }
+
+    let operator = BytesDisplay(binary.operator.as_bytes());
+    let mut reported = false;
+
+    for (side, operand, messages, has_valid_operand) in [
+        ("left", binary.lhs, invalid_left_messages, has_valid_left_operand),
+        ("right", binary.rhs, invalid_right_messages, has_valid_right_operand),
+    ] {
+        if messages.is_empty() {
+            continue;
+        }
+
+        let (issue_code, issue) = if has_valid_operand {
+            (
+                IssueCode::PossiblyInvalidOperand,
+                Issue::warning(format!("Possibly invalid type for {side} operand in `{operator}` comparison.")),
+            )
+        } else {
+            (
+                IssueCode::InvalidOperand,
+                Issue::error(format!("Invalid type for {side} operand in `{operator}` comparison.")),
+            )
+        };
+
+        let annotations = messages.into_iter().enumerate().map(|(index, message)| {
+            let annotation =
+                if index == 0 { Annotation::primary(operand.span()) } else { Annotation::secondary(operand.span()) };
+
+            annotation.with_message(message)
+        });
+
+        context.collector.report_with_code(
+            issue_code,
+            issue
+                .with_annotations(annotations)
+                .with_note("PHP throws an error when the class that compares the operands cannot read the other one, and truncates a `float` with a deprecation.")
+                .with_help("Compare with a value the class accepts, such as an `int` or another instance of the same class."),
+        );
+
+        reported = true;
+    }
+
+    reported
 }
 
 /// Checks a single operand of a comparison operation for problematic types.

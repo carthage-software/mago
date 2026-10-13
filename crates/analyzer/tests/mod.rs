@@ -2859,6 +2859,7 @@ test_case!(phpdoc_native_type_merge);
 test_case!(bcmath_number_arithmetic);
 test_case!(gmp_arithmetic);
 test_case!(operator_overloading_unary);
+test_case!(operator_overloading_comparison);
 
 #[test]
 fn issue_2478_without_property_memoization() {

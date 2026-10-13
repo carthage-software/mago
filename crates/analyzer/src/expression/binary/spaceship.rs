@@ -20,6 +20,7 @@ use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
+use crate::expression::binary::comparison::report_operands_rejected_by_comparison_handler;
 use crate::expression::binary::utils::is_always_greater_than;
 use crate::expression::binary::utils::is_always_identical_to;
 use crate::expression::binary::utils::is_always_less_than;
@@ -50,12 +51,15 @@ where
     check_spaceship_operand(context, binary.lhs, lhs_type, "Left");
     check_spaceship_operand(context, binary.rhs, rhs_type, "Right");
 
+    let reported_rejected_operand = report_operands_rejected_by_comparison_handler(context, binary, lhs_type, rhs_type);
     let lhs_has_array = lhs_type.has_array() || lhs_type.has_iterable();
     let rhs_has_array = rhs_type.has_array() || rhs_type.has_iterable();
     let lhs_is_only_array = lhs_type.is_array();
     let rhs_is_only_array = rhs_type.is_array();
 
-    if lhs_is_only_array && !rhs_has_array && !rhs_type.is_null() {
+    if reported_rejected_operand {
+        // The rejected operand already explains why this comparison fails.
+    } else if lhs_is_only_array && !rhs_has_array && !rhs_type.is_null() {
         context.collector.report_with_code(
             IssueCode::InvalidOperand,
             Issue::error(format!(
