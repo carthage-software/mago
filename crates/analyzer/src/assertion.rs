@@ -164,7 +164,7 @@ where
                 {
                     if_types.insert(value_id, vec![vec![Assertion::Falsy]]);
                 } else {
-                    if_types.insert(value_id, vec![vec![Assertion::Empty]]);
+                    if_types.insert(value_id, vec![vec![Assertion::IsNotIsset, Assertion::Falsy]]);
                 }
             }
             Construct::Isset(isset_construct) => {
