@@ -921,7 +921,7 @@ editor-url = "phpstorm://open?file=%file%&amp;line=%line%&amp;column=%column%"
 <ul>
 <li><strong><code>paths</code></strong> are your source files. Mago analyses, lints, and formats them.</li>
 <li><strong><code>includes</code></strong> are dependencies (typically <code>vendor</code>). Mago parses them so it can resolve symbols and types, but never analyses, lints, or rewrites them.</li>
-<li><strong><code>patches</code></strong> are PHP files that override type information for vendored or built-in code. Mago honours their type declarations and PHPDoc — which take precedence over <code>includes</code> and built-ins — but never analyses, lints, or formats them. See <a href="#patching-vendor-types">Patching vendor types</a> for what a patch may change.</li>
+<li><strong><code>patches</code></strong> are PHP files that refine type information and supported semantic PHPDoc flags for vendored or built-in code. Mago honours their type declarations and PHPDoc — which take precedence over <code>includes</code> and built-ins — but never analyses, lints, or formats them. See <a href="#patching-vendor-types">Patching vendor types</a> for what a patch may change.</li>
 <li><strong><code>excludes</code></strong> are paths or globs Mago ignores entirely. They apply to every tool.</li>
 </ul>
 <p>If a file matches both <code>paths</code> and <code>includes</code>, the more specific pattern wins. Exact file paths are most specific, then deeper directory paths, then shallow ones, then glob patterns. When patterns are equally specific, <code>includes</code> wins, which lets you explicitly mark a path as a dependency.</p>
@@ -947,21 +947,23 @@ excludes = [
 <table><thead><tr><th style="text-align: left">Option</th><th style="text-align: left">Type</th><th style="text-align: left">Default</th><th style="text-align: left">Description</th></tr></thead><tbody>
 <tr><td style="text-align: left"><code>paths</code></td><td style="text-align: left">string list</td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">Directories or globs for your source code. If empty, the entire workspace is scanned.</td></tr>
 <tr><td style="text-align: left"><code>includes</code></td><td style="text-align: left">string list</td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">Directories or globs for third-party code Mago should parse but not modify.</td></tr>
-<tr><td style="text-align: left"><code>patches</code></td><td style="text-align: left">string list</td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">Directories or globs for type patches. Their PHPDoc and type declarations override those from <code>includes</code> and built-ins. Not analysed, linted, or formatted.</td></tr>
+<tr><td style="text-align: left"><code>patches</code></td><td style="text-align: left">string list</td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">Directories or globs for type and semantic PHPDoc flag patches. Their PHPDoc and type declarations override those from <code>includes</code> and built-ins. Not analysed, linted, or formatted.</td></tr>
 <tr><td style="text-align: left"><code>excludes</code></td><td style="text-align: left">string list</td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">Globs or paths excluded from every tool.</td></tr>
 <tr><td style="text-align: left"><code>extensions</code></td><td style="text-align: left">string list</td><td style="text-align: left"><code>["php"]</code></td><td style="text-align: left">File extensions treated as PHP.</td></tr>
 </tbody></table>
 <h3 id="patching-vendor-types">Patching vendor types</h3>
-<p>A patch is a plain PHP file that redeclares a vendored or built-in symbol by its fully-qualified name. Mago reads only the type information from it; the body is ignored. A patch <strong>refines</strong> an existing symbol — it never replaces it, and it can never make a symbol exist that the vendor code does not already declare.</p>
+<p>A patch is a plain PHP file that redeclares a vendored or built-in symbol by its fully-qualified name. Mago reads its type information and supported semantic PHPDoc flags; the body is ignored. A patch <strong>refines</strong> an existing symbol — it never replaces it, and it can never make a symbol exist that the vendor code does not already declare.</p>
 <p>At most one patch may target a given symbol. If two patches target the same symbol, Mago reports a diagnostic on the conflicting patches rather than silently picking one — merge them into a single patch or remove all but one.</p>
 <p><strong>What a patch may refine</strong></p>
 <ul>
 <li>Method signatures: parameter types, return type, <code>@throws</code>, <code>@template</code>, and <code>@psalm-assert</code>-style assertions. Each field is applied only when the patch specifies it, so a sparsely-typed patch never erases richer information already known.</li>
 <li>Property and constant types.</li>
+<li>Semantic PHPDoc flags: common tags (<code>@deprecated</code>, <code>@not-deprecated</code>, <code>@internal</code>, <code>@experimental</code>, and <code>@api</code>); function and method tags (<code>@pure</code>, <code>@impure</code>, <code>@mutation-free</code>, <code>@external-mutation-free</code>, <code>@must-use</code>, <code>@no-named-arguments</code>, and <code>@suspends-fiber</code>); and class tags (<code>@consistent-constructor</code> and <code>@consistent-templates</code>). Existing PHPStan and Psalm aliases are supported where the scanner recognizes them. A flag changes only when the patch explicitly declares its tag; omitted tags preserve the original flag. <code>@impure</code> clears <code>@pure</code>, and <code>@not-deprecated</code> clears <code>@deprecated</code>.</li>
 <li>Class-level <code>@template</code> declarations (existing ones are refined by name, new ones are appended) and type aliases.</li>
 <li>Generic parent bindings through <code>@extends</code> and <code>@implements</code>. The patch replaces the type arguments for each parent it names and keeps the other bindings.</li>
 <li>Magic members: <code>@method</code>, <code>@property</code>, <code>@property-read</code>, and <code>@property-write</code> annotations may be added even when no such member exists on the original, because they are pure type annotations for <code>__call</code>/<code>__get</code>/<code>__set</code>.</li>
 </ul>
+<p>Semantic flags are applied only to declarations where those tags are supported. Structural modifiers and analysis-control flags, including <code>final</code>, <code>readonly</code>, <code>static</code>, suppression flags, and body-derived flags, remain governed by the original declaration.</p>
 <p><strong>What a patch may not change</strong></p>
 <p>Each of these is reported as a diagnostic on the patch file:</p>
 <ul>

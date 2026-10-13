@@ -707,7 +707,7 @@ editor-url = "phpstorm://open?file=%file%&amp;line=%line%&amp;column=%column%"
 <ul>
 <li><strong><code>paths</code></strong> 是你的源码文件。Mago 会对它们进行分析、lint 和格式化。</li>
 <li><strong><code>includes</code></strong> 是依赖(通常是 <code>vendor</code>)。Mago 会解析它们以解析符号和类型,但绝不会分析、lint 或重写它们。</li>
-<li><strong><code>patches</code></strong> 是为第三方代码或内置代码提供类型补丁的 PHP 文件。Mago 优先使用其中的类型声明和 PHPDoc,但不分析、lint 或格式化这些文件。详见<a href="#%E4%BF%AE%E8%A1%A5%E7%AC%AC%E4%B8%89%E6%96%B9%E4%BB%A3%E7%A0%81%E7%9A%84%E7%B1%BB%E5%9E%8B">修补第三方代码的类型</a>。</li>
+<li><strong><code>patches</code></strong> 是为第三方代码或内置代码提供类型及受支持语义 PHPDoc 标记补丁的 PHP 文件。Mago 优先使用其中的类型声明、PHPDoc 和受支持标记,但不分析、lint 或格式化这些文件。详见<a href="#%E4%BF%AE%E8%A1%A5%E7%AC%AC%E4%B8%89%E6%96%B9%E4%BB%A3%E7%A0%81%E7%9A%84%E7%B1%BB%E5%9E%8B">修补第三方代码的类型</a>。</li>
 <li><strong><code>excludes</code></strong> 是 Mago 完全忽略的路径或 glob。它们对所有工具生效。</li>
 </ul>
 <p>如果一个文件同时匹配 <code>paths</code> 和 <code>includes</code>,更具体的模式胜出。精确文件路径最具体,其次是更深的目录路径,然后是较浅的目录路径,最后是 glob 模式。当模式具体程度相同,<code>includes</code> 胜出,这让你可以显式地把某个路径标记为依赖。</p>
@@ -733,21 +733,23 @@ excludes = [
 <table><thead><tr><th style="text-align: left">选项</th><th style="text-align: left">类型</th><th style="text-align: left">默认值</th><th style="text-align: left">说明</th></tr></thead><tbody>
 <tr><td style="text-align: left"><code>paths</code></td><td style="text-align: left">string list</td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">你源码的目录或 glob。为空时扫描整个工作区。</td></tr>
 <tr><td style="text-align: left"><code>includes</code></td><td style="text-align: left">string list</td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">Mago 应解析但不修改的第三方代码的目录或 glob。</td></tr>
-<tr><td style="text-align: left"><code>patches</code></td><td style="text-align: left">string list</td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">类型补丁的目录或 glob。其类型覆盖 <code>includes</code> 和内置代码的类型。不进行分析、lint 或格式化。</td></tr>
+<tr><td style="text-align: left"><code>patches</code></td><td style="text-align: left">string list</td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">类型和语义标记补丁的目录或 glob。其类型及受支持标记覆盖 <code>includes</code> 和内置代码。不进行分析、lint 或格式化。</td></tr>
 <tr><td style="text-align: left"><code>excludes</code></td><td style="text-align: left">string list</td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">在所有工具中都被排除的 glob 或路径。</td></tr>
 <tr><td style="text-align: left"><code>extensions</code></td><td style="text-align: left">string list</td><td style="text-align: left"><code>["php"]</code></td><td style="text-align: left">视为 PHP 的文件扩展名。</td></tr>
 </tbody></table>
 <h3 id="reference">修补第三方代码的类型</h3>
-<p>补丁是一个 PHP 文件,按完全限定名称重新声明第三方或内置符号。Mago 只读取其中的类型信息,忽略函数体。补丁修正已有符号,不会替换整个符号,也不能创建原代码中不存在的符号。</p>
+<p>补丁是一个 PHP 文件,按完全限定名称重新声明第三方或内置符号。Mago 读取其中的类型信息和受支持的语义 PHPDoc 标记,忽略函数体。补丁修正已有符号,不会替换整个符号,也不能创建原代码中不存在的符号。</p>
 <p>每个符号只能有一个补丁。如果多个补丁指向同一符号,Mago 会报告冲突,而不是自行选择。请合并这些补丁,或只保留一个。</p>
 <p><strong>补丁可以修正的内容</strong></p>
 <ul>
 <li>方法签名:参数类型、返回类型、<code>@throws</code>、<code>@template</code> 和 <code>@psalm-assert</code> 等类型断言。只有补丁明确提供的字段才会改变。</li>
 <li>属性和常量的类型。</li>
+<li>语义 PHPDoc 标记:通用标签(<code>@deprecated</code>、<code>@not-deprecated</code>、<code>@internal</code>、<code>@experimental</code>、<code>@api</code>),函数和方法标签(<code>@pure</code>、<code>@impure</code>、<code>@mutation-free</code>、<code>@external-mutation-free</code>、<code>@must-use</code>、<code>@no-named-arguments</code>、<code>@suspends-fiber</code>),以及类标签(<code>@consistent-constructor</code>、<code>@consistent-templates</code>)。扫描器已识别的 PHPStan 和 Psalm 别名同样受支持。只有补丁显式声明的标签才会更改对应标记;未声明的标签保留原值。<code>@impure</code> 会清除 <code>@pure</code>,<code>@not-deprecated</code> 会清除 <code>@deprecated</code>。</li>
 <li>类级别的 <code>@template</code> 声明和类型别名。已有模板按名称更新,新模板追加到末尾。</li>
 <li>通过 <code>@extends</code> 和 <code>@implements</code> 指定父类型的泛型实参。补丁覆盖它明确指定的绑定,保留其他绑定。</li>
 <li>通过 <code>@method</code>、<code>@property</code>、<code>@property-read</code> 和 <code>@property-write</code> 添加魔术成员,即使原符号没有声明这些成员。这些注解为 <code>__call</code>、<code>__get</code> 或 <code>__set</code> 提供类型信息。</li>
 </ul>
+<p>语义标记只会应用于支持相应标签的声明。结构修饰符和分析控制标记(包括 <code>final</code>、<code>readonly</code>、<code>static</code>、抑制标记和从函数体推导的标记)仍由原声明决定。</p>
 <h3 id="patching-vendor-types">Glob 设置</h3>
 <p><code>[source.glob]</code> 用于调整 glob 的匹配方式。自 1.19 起可用。</p>
 <pre><code class="language-toml">[source.glob]
