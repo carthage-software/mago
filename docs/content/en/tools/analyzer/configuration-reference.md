@@ -102,6 +102,7 @@ These flags toggle individual analyses. Defaults are tuned for everyday use; fli
 | `strict-list-index-checks` | `false` | Require any integer used as a list index to be provably non-negative. |
 | `strict-array-index-existence` | `false` | Treat array/list reads whose key is not provably present as `T\|null` and emit a `possibly-undefined-{int,string}-array-index` warning. Replaces `allow-possibly-undefined-array-keys = false`. |
 | `allow-array-truthy-operand` | `false` | Accept arrays as operands of `&&`, `\|\|`, and `xor` without `invalid-operand`. Standalone `if ($array)` is unaffected and never warns. |
+| `allow-operator-overloading` | `false` | Accept operators that `BcMath\Number` and `GMP` overload (arithmetic, bitwise, shifts, `-`, `+`, `~`, `++`, `--`) without `invalid-operand`. The result type is inferred either way; comparisons are unaffected. |
 | `no-boolean-literal-comparison` | `false` | Disallow direct comparisons to boolean literals like `$a === true`. |
 | `check-missing-type-hints` | `false` | Report missing type hints on parameters, properties, and return types. |
 | `check-closure-missing-type-hints` | `false` | Extend the type-hint check to closures (requires `check-missing-type-hints`). |
@@ -340,6 +341,8 @@ Turn it off and the call requires an explicit type guarantee instead.
 `allow-possibly-undefined-array-keys = false` is deprecated. It only warned on `array<K, V>` reads with a single literal key and never widened the type to `T|null`, so `=== null` after the read was reported as redundant. Replace it with `strict-array-index-existence = true`, which warns more thoroughly and reflects the runtime semantics in the type. Setting `allow-possibly-undefined-array-keys = false` will emit a deprecation warning on the CLI.
 
 `allow-array-truthy-operand` controls whether arrays are accepted as operands of `&&`, `||`, and `xor`. PHP coerces empty arrays to `false` and non-empty arrays to `true` — the same truthiness used by a standalone `if ($array)`. By default the analyzer flags array operands of logical operators with `invalid-operand` to call out the implicit `bool` coercion; turning the option on suppresses that warning so codebases that rely on the coercion can keep their style. Standalone `if ($array)` is never affected.
+
+`allow-operator-overloading` controls whether operators are accepted on classes that overload them, such as `BcMath\Number` and `GMP`. PHP runs `$a + $b` on these objects through the class rather than as plain arithmetic, which a reader cannot tell from the expression alone. By default the analyzer reports these operations with `invalid-operand`, while still inferring the result as an instance of the class so no follow-on `mixed` issues appear; turning the option on accepts them. Comparisons and `<=>` are not affected by this option, and operands the class rejects at runtime are reported either way.
 
 ## Performance tuning
 

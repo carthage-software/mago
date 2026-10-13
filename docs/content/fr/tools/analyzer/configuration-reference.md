@@ -102,6 +102,7 @@ Ces indicateurs activent ou désactivent des analyses individuelles. Les valeurs
 | `strict-list-index-checks` | `false` | Exige que tout entier utilisé comme index de liste soit prouvé non négatif. |
 | `strict-array-index-existence` | `false` | Traite les lectures de tableau ou de liste dont la clé n'est pas prouvée présente comme `T\|null` et émet un avertissement `possibly-undefined-{int,string}-array-index`. Remplace `allow-possibly-undefined-array-keys = false`. |
 | `allow-array-truthy-operand` | `false` | Accepte les tableaux comme opérandes de `&&`, `\|\|` et `xor` sans déclencher `invalid-operand`. Un `if ($array)` autonome n'est pas affecté et n'émet jamais d'avertissement. |
+| `allow-operator-overloading` | `false` | Accepte les opérateurs que `BcMath\Number` et `GMP` surchargent (arithmétique, opérations bit à bit, décalages, `-`, `+`, `~`, `++`, `--`) sans déclencher `invalid-operand`. Le type du résultat est inféré dans tous les cas ; les comparaisons ne sont pas affectées. |
 | `no-boolean-literal-comparison` | `false` | Interdit les comparaisons directes aux littéraux booléens comme `$a === true`. |
 | `check-missing-type-hints` | `false` | Signale les indications de types manquantes sur les paramètres, propriétés et types de retour. |
 | `check-closure-missing-type-hints` | `false` | Étend la vérification d'indications de types aux closures (nécessite `check-missing-type-hints`). |
@@ -340,6 +341,8 @@ Désactivez-le et l'appel exige une garantie de type explicite à la place.
 `allow-possibly-undefined-array-keys = false` est déprécié. Il signalait uniquement les lectures de `array<K, V>` avec une clé littérale unique et n'élargissait jamais le type à `T|null`, donc une comparaison `=== null` après la lecture était signalée comme redondante. Remplacez-le par `strict-array-index-existence = true`, qui signale plus largement et reflète la sémantique d'exécution dans le type. Définir `allow-possibly-undefined-array-keys = false` émet un avertissement de dépréciation sur la CLI.
 
 `allow-array-truthy-operand` contrôle si les tableaux sont acceptés comme opérandes de `&&`, `||` et `xor`. PHP convertit les tableaux vides en `false` et les tableaux non vides en `true`, exactement la même véracité utilisée par un `if ($array)` autonome. Par défaut, l'analyseur signale les opérandes de type tableau dans les opérateurs logiques avec `invalid-operand` pour mettre en évidence la coercition implicite vers `bool` ; activer l'option supprime cet avertissement, ce qui permet aux bases de code qui s'appuient sur cette coercition de conserver leur style. Un `if ($array)` autonome n'est jamais affecté.
+
+`allow-operator-overloading` contrôle si les opérateurs sont acceptés sur les classes qui les surchargent, comme `BcMath\Number` et `GMP`. Sur ces objets, PHP exécute `$a + $b` via la classe plutôt que comme une simple opération arithmétique, ce que l'expression seule ne permet pas de voir. Par défaut, l'analyseur signale ces opérations avec `invalid-operand`, tout en inférant le résultat comme une instance de la classe afin qu'aucun problème `mixed` n'en découle ; activer l'option les accepte. Les comparaisons et `<=>` ne sont pas affectés par cette option, et les opérandes que la classe rejette à l'exécution sont signalés dans tous les cas.
 
 ## Réglage des performances
 

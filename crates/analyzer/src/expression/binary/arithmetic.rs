@@ -41,6 +41,7 @@ use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
+use crate::expression::operator_overloading::report_disabled_operator_overloading;
 
 #[inline]
 pub fn analyze_arithmetic_operation<'ctx, 'arena, A>(
@@ -218,6 +219,8 @@ where
     let mut invalid_right_messages: Vec<(String, Span)> = Vec::new();
     let mut has_valid_left_operand = false;
     let mut has_valid_right_operand = false;
+    let mut overloading_class_names: Vec<&'static str> = Vec::new();
+    let mut has_pair_without_overloading = false;
 
     let left_atomic_types = left_type
         .types
@@ -261,6 +264,7 @@ where
 
             let mut pair_result_atomics: Vec<TAtomic> = Vec::new();
             let mut invalid_pair = false;
+            let mut is_overloaded_pair = false;
 
             if left_atomic.is_mixed() {
                 context.collector.report_with_code(
@@ -407,6 +411,10 @@ where
 
                 if left_is_valid && right_is_valid && !is_division_by_zero {
                     pair_result_atomics.push(class.get_instance_atomic());
+                    is_overloaded_pair = true;
+                    if !overloading_class_names.contains(&name) {
+                        overloading_class_names.push(name);
+                    }
                 } else {
                     invalid_pair = true;
                 }
@@ -474,9 +482,20 @@ where
             }
 
             if !invalid_pair {
+                has_pair_without_overloading |= !is_overloaded_pair;
                 result_atomic_types.extend(pair_result_atomics);
             }
         }
+    }
+
+    if invalid_left_messages.is_empty() && invalid_right_messages.is_empty() {
+        report_disabled_operator_overloading(
+            context,
+            binary.span(),
+            binary.operator.as_bytes(),
+            &overloading_class_names,
+            !has_pair_without_overloading,
+        );
     }
 
     if !invalid_left_messages.is_empty() {

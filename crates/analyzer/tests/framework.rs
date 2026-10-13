@@ -114,6 +114,11 @@ pub fn check_name_casing_settings() -> Settings {
 }
 
 #[must_use]
+pub fn operator_overloading_settings() -> Settings {
+    Settings { allow_operator_overloading: true, ..default_test_settings() }
+}
+
+#[must_use]
 pub fn check_missing_type_hints_settings() -> Settings {
     Settings { check_missing_type_hints: true, ..Default::default() }
 }

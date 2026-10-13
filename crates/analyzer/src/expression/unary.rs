@@ -67,6 +67,7 @@ use crate::error::AnalysisError;
 use crate::expression::assignment::PropertyWriteKind;
 use crate::expression::assignment::assign_to_expression;
 use crate::expression::call::method_call::analyze_implicit_method_call;
+use crate::expression::operator_overloading::report_overloaded_operator_on_operand;
 use crate::utils::expression::get_block_expression_id;
 use crate::utils::php_emulation::str_increment_bytes;
 use crate::utils::php_emulation::str_is_numeric_bytes;
@@ -126,6 +127,14 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPrefix<'arena> {
                     };
 
                     if !operand_type.types.iter().any(is_class_without_bitwise_not) {
+                        report_overloaded_operator_on_operand(
+                            context,
+                            self.span(),
+                            self.operator.as_bytes(),
+                            &operand_type,
+                            OverloadedOperator::BitwiseNot,
+                        );
+
                         artifacts.set_rc_expression_type(self, operand_type);
                     } else {
                         let (classes_without_bitwise_not, other_types): (Vec<&TAtomic>, Vec<&TAtomic>) =
@@ -153,6 +162,14 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPrefix<'arena> {
             }
             UnaryPrefixOperator::Plus(_) => {
                 if let Some(operand_type) = operand_type {
+                    report_overloaded_operator_on_operand(
+                        context,
+                        self.span(),
+                        self.operator.as_bytes(),
+                        &operand_type,
+                        OverloadedOperator::Arithmetic,
+                    );
+
                     if operand_type.is_numeric() && !operand_type.is_int_or_float() {
                         artifacts.set_expression_type(self, get_int_or_float());
                     } else {
@@ -326,6 +343,14 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPrefix<'arena> {
                         .with_help("Ensure the operand is a numeric type.");
 
                     context.collector.report_with_code(issue_code, issue);
+                } else if let Some(operand_type) = &operand_type {
+                    report_overloaded_operator_on_operand(
+                        context,
+                        self.span(),
+                        self.operator.as_bytes(),
+                        operand_type,
+                        OverloadedOperator::Negation,
+                    );
                 }
 
                 if resulting_types.is_empty() {
@@ -834,6 +859,14 @@ where
         }
     }
 
+    report_overloaded_operator_on_operand(
+        context,
+        operation_span,
+        b"++",
+        operand_type,
+        OverloadedOperator::IncrementDecrement,
+    );
+
     let resulting_type_union = Rc::new(if possibilities.is_empty() {
         if operand_type.is_never() { get_never() } else { get_mixed() }
     } else {
@@ -1073,6 +1106,14 @@ where
             }
         }
     }
+
+    report_overloaded_operator_on_operand(
+        context,
+        operation_span,
+        b"--",
+        operand_type,
+        OverloadedOperator::IncrementDecrement,
+    );
 
     let resulting_type_union = Rc::new(if possibilities.is_empty() {
         if operand_type.is_never() { get_never() } else { get_mixed() }
