@@ -47,6 +47,7 @@ where
         }
 
         let r#type = self.parse_type()?;
+        self.reject_abutting_type_terminator(&r#type)?;
         let r#type = self.alloc(r#type);
         let ampersand = if self.stream.is_at(TokenKind::Ampersand) { Some(self.stream.consume_span()?) } else { None };
         let ellipsis = if self.stream.is_at(TokenKind::Ellipsis) { Some(self.stream.consume_span()?) } else { None };

@@ -75,3 +75,30 @@ fn import_type_without_from_is_recorded() {
     assert_eq!(document.errors, [ParseError::UnexpectedEndOfInput(span(20, 20))].as_slice());
     assert_eq!(invalid_tag_count(&document), 1);
 }
+
+#[test]
+fn bracket_abutting_return_type_is_recorded() {
+    let arena = LocalArena::new();
+    let document = parse(&arena, b"/** @return array{a: string}> */");
+
+    assert_eq!(document.errors, [ParseError::UnexpectedToken(span(28, 29))].as_slice());
+    assert_eq!(invalid_tag_count(&document), 1);
+}
+
+#[test]
+fn bracket_abutting_param_type_is_recorded() {
+    let arena = LocalArena::new();
+    let document = parse(&arena, b"/** @param int> $x */");
+
+    assert_eq!(document.errors, [ParseError::UnexpectedToken(span(14, 15))].as_slice());
+    assert_eq!(invalid_tag_count(&document), 1);
+}
+
+#[test]
+fn spaced_description_after_type_is_valid() {
+    let arena = LocalArena::new();
+    let document = parse(&arena, b"/** @return array{a: string} carries on */");
+
+    assert!(!document.has_errors());
+    assert_eq!(invalid_tag_count(&document), 0);
+}
