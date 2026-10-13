@@ -8,39 +8,28 @@ use crate::ttype::atomic::scalar::TScalar;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
 pub enum OverloadedOperator {
-    /// `+`, `-`, `*`, `/`, `%` and `**`.
     Arithmetic,
-    /// `&`, `|` and `^`.
     Bitwise,
-    /// `<<` and `>>`.
     Shift,
-    /// Unary `~`.
     BitwiseNot,
-    /// Unary `-` and `+`.
     Negation,
-    /// `++` and `--`.
     IncrementDecrement,
-    /// `<`, `<=`, `>`, `>=`, `<=>`, `==`, `!=` and `<>`.
     Comparison,
 }
 
-/// The operand of a binary operator whose class's handler PHP runs.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OperandSide {
     Left,
     Right,
 }
 
-/// Whether a class accepts every value of an operand's type, only some of them, or none.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum OperandAcceptance {
     Accepted,
-    /// The type holds values the class rejects next to ones it accepts, such as the `int`s in `numeric`.
     PartlyAccepted,
     Rejected,
 }
 
-/// A class whose instances PHP lets you use with operators, and which operands it accepts.
 #[derive(Debug)]
 pub struct OperatorOverloadingClass {
     name: &'static str,
@@ -50,21 +39,15 @@ pub struct OperatorOverloadingClass {
     compares_with_any_value: bool,
 }
 
-/// How a class reads a string operand, which is stricter than PHP's own numeric strings.
 #[derive(Debug)]
 enum StringOperandGrammar {
-    /// BCMath: an optional sign, then digits with at most one `.`; no whitespace, no exponent.
     Decimal,
-    /// GMP's `mpz_set_str` after PHP strips `0x`, `0o` and `0b` prefixes.
     GmpInteger,
 }
 
-/// How a class reads the right operand of `**`, `<<` and `>>`.
 #[derive(Debug)]
 enum ExponentOrShiftAmount {
-    /// Like any other operand, as long as it has no fractional part.
     WholeOperand,
-    /// As a PHP `int` that is not negative: PHP's own integer strings rather than GMP's, and no `bool`.
     NonNegativeInt,
 }
 
@@ -123,8 +106,6 @@ pub fn get_class_overloading(
     get_operator_overloading_class(atomic).filter(|class| class.overloads(operator))
 }
 
-/// PHP runs the handler of the first operand, and that of the second when the first's does not
-/// overload the operator.
 #[must_use]
 pub fn get_operation_handler(
     operator: &BinaryOperator<'_>,
@@ -146,11 +127,6 @@ pub fn get_operation_handler(
         .or_else(|| get_class_overloading(right, overloaded_operator).map(|class| (class, OperandSide::Right)))
 }
 
-/// PHP runs the handler of the first operand when it is an object, else that of the second.
-///
-/// It compiles `>` and `>=` as `<` and `<=` with the operands swapped. It may also swap the operands
-/// of `==`, `!=` and `<>`, depending on whether each is a temporary value, so with two objects there
-/// is no telling whose handler runs.
 #[must_use]
 pub fn get_comparison_handler(
     operator: &BinaryOperator<'_>,
@@ -193,11 +169,6 @@ impl OperatorOverloadingClass {
         self.operators.contains(&operator)
     }
 
-    /// Whether `atomic` can be the other operand of an operator this class overloads, except the right
-    /// operand of `**`, `<<` and `>>` after an instance, which [`Self::accepts_exponent_or_shift_amount`] checks.
-    ///
-    /// `float` and `bool` are only partly accepted: PHP converts them to `int`, but throws a
-    /// `TypeError` when the code running the operator is in a `strict_types` file, which is not tracked.
     #[must_use]
     pub fn accepts_operand(&self, atomic: &TAtomic) -> OperandAcceptance {
         let accepted = match atomic {
@@ -214,9 +185,6 @@ impl OperatorOverloadingClass {
         OperandAcceptance::from(accepted)
     }
 
-    /// Whether `atomic` can be the right operand of `**`, `<<` or `>>` when the left one is an instance.
-    ///
-    /// GMP throws on a `bool` there in every mode, and truncates a `float` silently.
     #[must_use]
     pub fn accepts_exponent_or_shift_amount(&self, atomic: &TAtomic) -> OperandAcceptance {
         match self.exponent_or_shift_amount {
@@ -245,7 +213,6 @@ impl OperatorOverloadingClass {
         }
     }
 
-    /// GMP compares with `null` and `bool` in every mode.
     #[must_use]
     pub fn accepts_comparison_operand(&self, atomic: &TAtomic) -> OperandAcceptance {
         if self.compares_with_any_value {
@@ -263,7 +230,6 @@ impl OperatorOverloadingClass {
         TAtomic::Object(TObject::Named(TNamedObject::new(word(self.name))))
     }
 
-    /// Whether `atomic` is a literal this class reads as zero, so dividing by it throws.
     #[must_use]
     pub fn is_literal_zero(&self, atomic: &TAtomic) -> bool {
         match atomic.get_literal_string_value() {
@@ -283,7 +249,6 @@ impl From<bool> for OperandAcceptance {
     }
 }
 
-/// Every class accepts some `int`s and its own instances, so it accepts some values of these types.
 fn includes_ints_or_any_object(atomic: &TAtomic) -> bool {
     matches!(
         atomic,
@@ -300,7 +265,6 @@ impl StringOperandGrammar {
     }
 }
 
-/// An empty string, a lone sign or a lone `.` is valid and reads as zero.
 fn parse_decimal(value: &[u8]) -> Option<NumericLiteral> {
     let unsigned = value.strip_prefix(b"-").or_else(|| value.strip_prefix(b"+")).unwrap_or(value);
 
@@ -330,8 +294,6 @@ fn parse_gmp_integer(value: &[u8]) -> Option<NumericLiteral> {
     }
 }
 
-/// Mirrors GMP's `mpz_set_str`: no `+` sign, whitespace allowed after the first digit, and without
-/// an explicit radix a `0x`, `0b` or `0` prefix picks hexadecimal, binary or octal.
 fn parse_mpz_string(value: &[u8], radix: Option<u32>) -> Option<NumericLiteral> {
     let trimmed = trim_c_whitespace_start(value);
     let unsigned = trimmed.strip_prefix(b"-").unwrap_or(trimmed);
@@ -358,7 +320,6 @@ fn parse_mpz_string(value: &[u8], radix: Option<u32>) -> Option<NumericLiteral> 
     Some(NumericLiteral { is_zero, has_fractional_part: false })
 }
 
-/// PHP's integer strings: whitespace around an optional sign and decimal digits that fit in an `int`.
 fn parse_php_integer(value: &[u8]) -> Option<i64> {
     let start = value.iter().position(|byte| !is_c_whitespace(*byte))?;
     let end = value.iter().rposition(|byte| !is_c_whitespace(*byte))?;
@@ -372,7 +333,6 @@ fn trim_c_whitespace_start(value: &[u8]) -> &[u8] {
     &value[start..]
 }
 
-/// C's `isspace`, which unlike [`u8::is_ascii_whitespace`] includes the vertical tab.
 const fn is_c_whitespace(byte: u8) -> bool {
     matches!(byte, b' ' | b'\t' | b'\n' | 0x0B | 0x0C | b'\r')
 }
