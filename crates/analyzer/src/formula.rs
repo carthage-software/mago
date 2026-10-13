@@ -430,7 +430,9 @@ fn add_nullsafe_condition_clauses<A>(
 
             add_nullsafe_null_equality_clauses(operand, formula, assertion_context);
         }
-        Expression::Binary(binary) if matches!(binary.operator, BinaryOperator::Identical(_)) => {
+        Expression::Binary(binary)
+            if matches!(binary.operator, BinaryOperator::Identical(_) | BinaryOperator::NotIdentical(_)) =>
+        {
             let nullsafe_operand = if expression_is_nullsafe(binary.lhs)
                 && !expression_is_nullsafe(binary.rhs)
                 && artifacts.get_expression_type(binary.rhs).is_some_and(|ty| !ty.can_be_null())
@@ -446,13 +448,19 @@ fn add_nullsafe_condition_clauses<A>(
             };
 
             if let Some(operand) = nullsafe_operand {
-                add_nullsafe_base_clauses(
-                    operand,
-                    formula,
-                    conditional_object_id,
-                    creating_object_id,
-                    assertion_context,
-                );
+                // `!==` holds with a null receiver too, so the true branch keeps the
+                // nullable bases; `===` establishes a non-null receiver directly.
+                if matches!(binary.operator, BinaryOperator::NotIdentical(_)) {
+                    add_nullsafe_null_equality_clauses(operand, formula, assertion_context);
+                } else {
+                    add_nullsafe_base_clauses(
+                        operand,
+                        formula,
+                        conditional_object_id,
+                        creating_object_id,
+                        assertion_context,
+                    );
+                }
             }
         }
         Expression::Construct(Construct::Isset(isset)) => {

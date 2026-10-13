@@ -79,3 +79,72 @@ function shadowed_predicate(?\NullChecks\NullCheckNode $node): void
         \NullChecks\require_node($node);
     }
 }
+
+namespace StrictGuard;
+
+final class Page
+{
+    public function __construct(public int $number, public int $total)
+    {
+    }
+}
+
+final class Response
+{
+    public function __construct(public ?Page $page)
+    {
+    }
+}
+
+function require_page(Page $page): int
+{
+    return $page->total;
+}
+
+function total_after_strict_guard(Response $response, int $page): int
+{
+    if ($response->page?->number !== $page) {
+        return 0;
+    }
+
+    return $response->page->total;
+}
+
+function total_after_reversed_guard(Response $response, int $page): int
+{
+    if ($page !== $response->page?->number) {
+        return 0;
+    }
+
+    return $response->page->total;
+}
+
+function strict_guard_true_branch(Response $response, int $page): void
+{
+    if ($response->page?->number !== $page) {
+        // @mago-expect analysis:possibly-null-argument
+        require_page($response->page);
+    }
+}
+
+function nullable_value_no_narrow(Response $response, ?int $page): ?int
+{
+    if ($response->page?->number !== $page) {
+        return 0;
+    }
+
+    /** @mago-expect analysis:possibly-null-property-access */
+    return $response->page->total;
+}
+
+function loose_comparison_no_narrow(Response $response, int $page): ?int
+{
+    // Loose `!=` on a nullable operand stays suspicious even without narrowing.
+    /** @mago-expect analysis:possibly-null-operand */
+    if ($response->page?->number != $page) {
+        return 0;
+    }
+
+    /** @mago-expect analysis:possibly-null-property-access */
+    return $response->page->total;
+}
