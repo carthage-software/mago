@@ -38,10 +38,16 @@ final class RuleDefinition
     public readonly array $targets;
 
     /**
+     * @var list<RuleOption>
+     */
+    public readonly array $options;
+
+    /**
      * @param string $code Globally unique issue code.
      * @param string $name Human-readable rule name.
      * @param string $description Concise rule description.
      * @param list<NodeKind> $targets
+     * @param list<RuleOption> $options
      * @mago-expect lint:excessive-parameter-list
      */
     public function __construct(
@@ -51,6 +57,7 @@ final class RuleDefinition
         public readonly Level $defaultLevel,
         public readonly bool $defaultEnabled,
         array $targets,
+        array $options = [],
     ) {
         if ($code === '' || $name === '' || $description === '') {
             throw new InvalidArgumentException('Rule code, name, and description cannot be empty.');
@@ -71,9 +78,21 @@ final class RuleDefinition
             $seen[$target->value] = true;
         }
 
+        $seenOptions = [];
+        foreach ($options as $option) {
+            if (array_key_exists($option->name, $seenOptions)) {
+                throw new InvalidArgumentException(
+                    "Linter rule `{$code}` declares option `{$option->name}` more than once.",
+                );
+            }
+
+            $seenOptions[$option->name] = true;
+        }
+
         $this->code = $code;
         $this->name = $name;
         $this->description = $description;
         $this->targets = $targets;
+        $this->options = $options;
     }
 }

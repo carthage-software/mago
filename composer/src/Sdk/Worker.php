@@ -57,6 +57,7 @@ use Mago\Sdk\Internal\Io\ResourceReader;
 use Mago\Sdk\Internal\Io\ResourceWriter;
 use Mago\Sdk\Internal\Linter\Protocol as LinterProtocol;
 use Mago\Sdk\Internal\Linter\RegisteredRule;
+use Mago\Sdk\Internal\Linter\RuleOptions;
 use Mago\Sdk\Internal\Protocol\Frame;
 use Mago\Sdk\Internal\Protocol\FrameCodec;
 use Mago\Sdk\Internal\Protocol\FrameKind;
@@ -673,13 +674,18 @@ final class Worker
 
         $reportedIssues = [];
         $targetIndex = 0;
+        /** @var array<int<0, 65535>, array<string, string|int|float|bool|null>> $ruleOptions */
+        $ruleOptions = [];
         foreach ($request->file->getTargetNodes() as $node) {
             if (($targetIndex++ & 63) === 0) {
                 $cancellation->throwIfCancelled();
             }
 
-            $context = new LintContext($request->file, $node, $cancellation);
             foreach ($this->activeRulesByNodeKind[$node->kind->value] ?? [] as $registeredRule) {
+                $options = $ruleOptions[$registeredRule->index] ??= RuleOptions::resolve(
+                    $registeredRule->definition,
+                );
+                $context = new LintContext($request->file, $node, $cancellation, $options);
                 try {
                     $registeredRule->rule->lint($context);
                 } catch (Throwable $throwable) {
@@ -695,8 +701,6 @@ final class Worker
                     $reportedIssues[] = $registeredRule->index;
                     $reportedIssues[] = $issue;
                 }
-
-                $context->issues = [];
             }
         }
 

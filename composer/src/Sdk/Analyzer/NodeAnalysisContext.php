@@ -52,6 +52,16 @@ final class NodeAnalysisContext extends LifecycleContext
         parent::__construct($context->phpVersion, $context->codebase, $context->types, $context->cancellation);
     }
 
+    public function getEnclosingFunction(): ?Node
+    {
+        return $this->source->getEnclosingFunction($this->node);
+    }
+
+    public function getEnclosingClassLike(): ?Node
+    {
+        return $this->source->getEnclosingClassLike($this->node);
+    }
+
     /**
      * Returns whether a local variable exists immediately before the target node executes.
      *

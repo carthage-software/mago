@@ -93,6 +93,63 @@ final class SourceFile
     }
 
     /**
+     * Returns the nearest enclosing function-like declaration, if any.
+     *
+     * The node itself is included: asking for the enclosing function of a
+     * function declaration returns that declaration.
+     */
+    public function getEnclosingFunction(Node $node): ?Node
+    {
+        $current = $node;
+        do {
+            $isFunctionLike = match ($current->kind) {
+                NodeKind::Function,
+                NodeKind::Method,
+                NodeKind::Closure,
+                NodeKind::ArrowFunction => true,
+                default => false,
+            };
+
+            if ($isFunctionLike) {
+                return $current;
+            }
+
+            $current = $this->getParent($current);
+        } while ($current !== null);
+
+        return null;
+    }
+
+    /**
+     * Returns the nearest enclosing class-like declaration, if any.
+     *
+     * The node itself is included: asking for the enclosing class of a class
+     * declaration returns that declaration.
+     */
+    public function getEnclosingClassLike(Node $node): ?Node
+    {
+        $current = $node;
+        do {
+            $isClassLike = match ($current->kind) {
+                NodeKind::Class_,
+                NodeKind::Interface,
+                NodeKind::Trait,
+                NodeKind::Enum,
+                NodeKind::AnonymousClass => true,
+                default => false,
+            };
+
+            if ($isClassLike) {
+                return $current;
+            }
+
+            $current = $this->getParent($current);
+        } while ($current !== null);
+
+        return null;
+    }
+
+    /**
      * @return list<Node>
      */
     public function getChildren(Node $node): array

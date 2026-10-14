@@ -60,10 +60,18 @@ See [Reporting issues and suggested edits](/extensions/sdk/reporting/).
 | Type | Purpose |
 | :--- | :--- |
 | `Linter\Rule` | Custom linter rule contract |
-| `Linter\RuleDefinition` | Code, name, description, level, activation, and syntax targets |
-| `Linter\LintContext` | Current source, target node, traversal, names, cancellation, and reporting |
+| `Linter\RuleDefinition` | Code, name, description, level, activation, options, and syntax targets |
+| `Linter\RuleOption` | One scalar rule option with its default |
+| `Linter\LintContext` | Current source, target node, traversal, names, options, scopes, cancellation, and reporting |
 
 See [Writing linter rules](/extensions/linter/rules/).
+
+## Testing
+
+| Type | Purpose |
+| :--- | :--- |
+| `Testing\SourceFileBuilder` | Synthetic syntax snapshots for rule tests |
+| `Testing\RuleRunner` | Worker-free rule execution with option overrides |
 
 ## Analyzer plugin registration
 

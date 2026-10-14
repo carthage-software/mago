@@ -42,6 +42,7 @@ public function getDefinition(): RuleDefinition
 | `defaultLevel` | `Note`, `Help`, `Warning`, or `Error`. Applied to every issue from this rule unless the project sets `level`. |
 | `defaultEnabled` | Whether normal lint runs activate the rule unless the project sets `enabled`. `--only` can select it explicitly. |
 | `targets` | Non-empty, duplicate-free list of exact `NodeKind` cases. |
+| `options` | Optional list of `RuleOption` declarations (scalar defaults). Read via `$context->getOption()`. |
 
 Projects can override `defaultLevel` and `defaultEnabled`, and exclude paths, under `[linter.rules]` using the rule's code. See [extension rules](/tools/linter/configuration-reference/#extension-rules).
 
@@ -61,8 +62,31 @@ For each matching node, `lint()` receives:
 | `getChildren()` | Direct children of the target. |
 | `getText()` | Exact target source text. |
 | `getResolvedName()` | Resolved name beginning at the target, when one exists. |
+| `getOption(name)` | Resolved value of one declared rule option. Unknown names throw. |
+| `getEnclosingFunction()` | Nearest enclosing `Function`, `Method`, `Closure`, or `ArrowFunction`, if any. |
+| `getEnclosingClassLike()` | Nearest enclosing class, interface, trait, enum, or anonymous class, if any. |
 
 Do not retain a `LintContext` after `lint()` returns. Retaining immutable values for a process-local cache is possible, but account for memory use and changing in-memory file contents.
+
+## Rule options
+
+Declare user-configurable scalar options alongside the definition:
+
+```php
+use Mago\Sdk\Linter\RuleOption;
+
+options: [new RuleOption('maxDepth', 'Maximum nesting depth.', 3)],
+```
+
+Read the resolved value inside `lint()`:
+
+```php
+$maxDepth = $context->getOption('maxDepth');
+```
+
+`getOption()` returns the declared default until Mago forwards explicit
+configuration; unknown names throw. Overrides passed to the test runner
+below are validated against the schema the same way.
 
 ## Complete call rule
 
@@ -119,6 +143,29 @@ final class PreferArrayAnyRule implements Rule
 ```
 
 The rule uses Mago's resolved name rather than comparing raw source, so imported and fully qualified calls are handled consistently. The edit replaces only the name span, preserving the original arguments and formatting.
+
+## Testing rules
+
+`Mago\Sdk\Testing\RuleRunner` runs a rule against a synthetic snapshot
+without a worker or host. Build the snapshot with `SourceFileBuilder`,
+mark lint targets, and attach resolved names as needed:
+
+```php
+use Mago\Sdk\Testing\RuleRunner;
+use Mago\Sdk\Testing\SourceFileBuilder;
+
+$builder = new SourceFileBuilder(contents: '<?php array_any($items, $fn);');
+$program = $builder->addNode(NodeKind::Program, 0, 29);
+$call = $builder->addNode(NodeKind::FunctionCall, 6, 28, $program);
+$builder->addTarget($call);
+$builder->addResolvedName(6, 15, 'array_any');
+
+$issues = RuleRunner::run(new PreferArrayAnyRule(), $builder->build());
+self::assertCount(1, $issues);
+```
+
+`RuleRunner::run()` accepts option overrides as its third argument and
+rejects unknown names and mismatched types, mirroring worker behavior.
 
 ## Choosing targets
 
