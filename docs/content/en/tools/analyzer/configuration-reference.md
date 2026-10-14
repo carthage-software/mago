@@ -95,6 +95,7 @@ These flags toggle individual analyses. Defaults are tuned for everyday use; fli
 | `find-overly-wide-return-types` | `false` | Warn when a declared return type contains a branch the body never produces, like `: string\|false` on a function that always returns a string. Available since 1.20.0. |
 | `analyze-dead-code` | `false` | Analyse code that appears unreachable. |
 | `memoize-properties` | `true` | Track literal property values for sharper inference, at the cost of some memory. |
+| `remember-method-call-results` | `false` | Remember the narrowed result of a (possibly impure) method call after it is checked, e.g. `if ($a->getB() !== null) { $a->getB()->c(); }`. Narrowings are keyed by the exact call and discarded on any later possibly-impure call or assignment to the receiver. Only enable this when repeated zero-argument getters are known to return a stable value between checks. |
 | `allow-possibly-undefined-array-keys` | `true` | **Deprecated.** Allow accessing keys that may be missing without flagging it. Setting this to `false` warns on `array<K, V>` reads with a single literal key but does not widen the type to `T\|null`. Use `strict-array-index-existence` instead. |
 | `check-throws` | `false` | Report exceptions that are not caught and not declared with `@throws`. |
 | `check-dead-catch` | `false` | Report catch clauses that match no known exception from their `try` block. Requires `check-throws`; undocumented code may still throw exceptions the analyzer cannot see. |

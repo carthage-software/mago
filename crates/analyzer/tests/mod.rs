@@ -953,6 +953,8 @@ test_case!(duplicate_definition);
 test_case!(method_call_assertions);
 test_case!(stable_method_call_narrowing);
 test_case!(stable_method_call_narrowing_logical_and);
+test_case!(remember_method_call_results, crate::framework::remember_method_call_results_settings());
+test_case!(remember_method_call_results_disabled);
 test_case!(invalid_default_values);
 test_case!(class_must_be_final, {
     let mut s = crate::framework::default_test_settings();

@@ -48,6 +48,20 @@ pub struct Settings {
     /// This improves type inference but may increase memory usage. Defaults to `true`.
     pub memoize_properties: bool,
 
+    /// Remember the narrowed result of a (possibly impure) method call after it is checked.
+    ///
+    /// When enabled, a check like `if ($a->getB() !== null)` also narrows a repeated
+    /// `$a->getB()` call within the guarded branch, even if the method is not annotated
+    /// `@pure` or `@mutation-free`. Narrowings are keyed by the exact call expression
+    /// (receiver plus method, zero-argument calls only) and are invalidated conservatively:
+    /// any subsequent possibly-impure call or assignment to the receiver discards them,
+    /// exactly like narrowings of `@pure` methods.
+    ///
+    /// This is unsound for methods whose return value changes between calls, so it
+    /// stays disabled by default (`false`). Upstream intentionally keeps the default
+    /// off: purity must be annotated (see issue #2267).
+    pub remember_method_call_results: bool,
+
     /// Allow accessing array keys that may not be defined without reporting an issue. Defaults to `true`.
     pub allow_possibly_undefined_array_keys: bool,
 
@@ -423,6 +437,7 @@ impl Settings {
             find_overly_wide_return_types: false,
             analyze_dead_code: false,
             memoize_properties: true,
+            remember_method_call_results: false,
             allow_possibly_undefined_array_keys: true,
             check_throws: false,
             check_dead_catch: false,

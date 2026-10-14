@@ -482,12 +482,20 @@ fn clear_object_property_narrowings<'ctx, 'arena, A>(
 {
     let metadata = invocation.target.get_function_like_metadata();
     let suspends_fiber = metadata.is_some_and(|metadata| metadata.flags.suspends_fiber());
+    let is_zero_arg_method_call = invocation.target.get_method_context().is_some()
+        && matches!(
+            invocation.arguments_source,
+            InvocationArgumentsSource::ArgumentList(arguments) if arguments.arguments.is_empty()
+        );
     let preserves_stable_method_results = metadata
-        .is_some_and(|metadata| (metadata.flags.is_pure() || metadata.flags.is_mutation_free()) && !suspends_fiber);
+        .is_some_and(|metadata| (metadata.flags.is_pure() || metadata.flags.is_mutation_free()) && !suspends_fiber)
+        || (context.settings.remember_method_call_results && is_zero_arg_method_call && !suspends_fiber);
     let preserves_property_narrowings = metadata.is_some_and(|metadata| {
         (metadata.flags.is_pure() || metadata.flags.is_mutation_free() || metadata.flags.is_external_mutation_free())
             && !suspends_fiber
-    });
+    }) || (context.settings.remember_method_call_results
+        && is_zero_arg_method_call
+        && !suspends_fiber);
 
     if !preserves_stable_method_results {
         block_context.stable_method_call_assertions.clear();

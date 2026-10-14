@@ -94,6 +94,7 @@ fn build_analyzer_settings(settings: &WasmAnalyzerSettings, version: PHPVersion)
         find_overly_wide_return_types: settings.find_overly_wide_return_types,
         analyze_dead_code: settings.analyze_dead_code,
         memoize_properties: settings.memoize_properties,
+        remember_method_call_results: settings.remember_method_call_results,
         allow_possibly_undefined_array_keys: settings.allow_possibly_undefined_array_keys,
         check_throws: settings.check_throws,
         check_dead_catch: settings.check_dead_catch,

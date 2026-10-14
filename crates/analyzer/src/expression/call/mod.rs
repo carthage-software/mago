@@ -152,13 +152,14 @@ where
         invocation_arguments,
         InvocationArgumentsSource::ArgumentList(arguments) if arguments.arguments.is_empty()
     ) && !invocation_targets.is_empty()
-        && invocation_targets.iter().all(|target| {
-            let InvocationTarget::FunctionLike { metadata, method_context: Some(_), .. } = target else {
-                return false;
-            };
+        && (context.settings.remember_method_call_results
+            || invocation_targets.iter().all(|target| {
+                let InvocationTarget::FunctionLike { metadata, method_context: Some(_), .. } = target else {
+                    return false;
+                };
 
-            (metadata.flags.is_pure() || metadata.flags.is_mutation_free()) && !metadata.flags.suspends_fiber()
-        });
+                (metadata.flags.is_pure() || metadata.flags.is_mutation_free()) && !metadata.flags.suspends_fiber()
+            }));
 
     let class_related_argument_variables = this_variable
         .map(|receiver| block_context.get_class_type_relation_sources(receiver))

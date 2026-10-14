@@ -123,6 +123,11 @@ pub fn check_missing_type_hints_settings() -> Settings {
     Settings { check_missing_type_hints: true, ..Default::default() }
 }
 
+#[must_use]
+pub fn remember_method_call_results_settings() -> Settings {
+    Settings { remember_method_call_results: true, ..default_test_settings() }
+}
+
 fn run_test_case_inner(config: TestCase) {
     let Prelude { mut database, mut metadata, mut symbol_references } = PRELUDE.clone();
 

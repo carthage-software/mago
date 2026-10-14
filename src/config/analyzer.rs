@@ -95,6 +95,16 @@ pub struct AnalyzerConfiguration {
     /// Whether to memoize properties.
     pub memoize_properties: bool,
 
+    /// Remember the narrowed result of a (possibly impure) method call after it is checked.
+    ///
+    /// When enabled, a check like `if ($a->getB() !== null)` also narrows a repeated
+    /// `$a->getB()` call within the guarded branch, even if the method is not annotated
+    /// `@pure` or `@mutation-free`. Narrowings are invalidated conservatively on any
+    /// subsequent possibly-impure call or assignment to the receiver.
+    ///
+    /// Defaults to `false`.
+    pub remember_method_call_results: bool,
+
     /// Allow accessing array keys that may not be defined without reporting an issue.
     ///
     /// **Deprecated:** prefer `strict_array_index_existence` for new configurations.
@@ -478,6 +488,7 @@ impl AnalyzerConfiguration {
             find_overly_wide_return_types: self.find_overly_wide_return_types,
             find_unused_expressions: self.find_unused_expressions,
             memoize_properties: self.memoize_properties,
+            remember_method_call_results: self.remember_method_call_results,
             allow_possibly_undefined_array_keys: self.allow_possibly_undefined_array_keys,
             check_throws: self.check_throws,
             check_dead_catch: self.check_dead_catch,
@@ -541,6 +552,7 @@ impl Default for AnalyzerConfiguration {
             find_overly_wide_return_types: defaults.find_overly_wide_return_types,
             analyze_dead_code: defaults.analyze_dead_code,
             memoize_properties: defaults.memoize_properties,
+            remember_method_call_results: defaults.remember_method_call_results,
             allow_possibly_undefined_array_keys: defaults.allow_possibly_undefined_array_keys,
             check_throws: defaults.check_throws,
             check_dead_catch: defaults.check_dead_catch,
