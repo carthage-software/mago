@@ -302,7 +302,7 @@ where
             access_span,
         )
     {
-        if !magic_call_methods.is_empty() {
+        if !magic_call_methods.is_empty() || class_metadata.kind.is_trait() {
             resolved_methods.push(resolved_method);
         } else {
             if class_metadata.flags.is_final() {
@@ -422,6 +422,24 @@ where
                 if let Some(fl) = context.codebase.get_method_by_id(&req_declaring_id) {
                     found = Some((req_declaring_id, fl));
                     break;
+                }
+            }
+
+            if found.is_none() && defining_class_metadata.kind.is_trait() {
+                if let Some(descendants) =
+                    context.codebase.all_class_like_descendants.get(&defining_class_metadata.name)
+                {
+                    for descendant in descendants {
+                        let Some(desc_metadata) = context.codebase.get_class_like_by_name(*descendant) else {
+                            continue;
+                        };
+                        let desc_method_id = MethodIdentifier::new(desc_metadata.original_name, method_name);
+                        let desc_declaring_id = context.codebase.get_declaring_method_identifier(&desc_method_id);
+                        if let Some(fl) = context.codebase.get_method_by_id(&desc_declaring_id) {
+                            found = Some((desc_declaring_id, fl));
+                            break;
+                        }
+                    }
                 }
             }
 
@@ -881,9 +899,10 @@ where
     let declaring_method_id = context.codebase.get_declaring_method_identifier(&method_id);
     let function_like = context.codebase.get_method_by_id(&declaring_method_id)?;
 
-    // Mixin methods should only be accessible if public
+    // Mixin methods should only be accessible if public (unless called from within a trait)
     if let Some(method_metadata) = &function_like.method_metadata
         && !method_metadata.visibility.is_public()
+        && !block_context.scope.get_class_like().is_some_and(|c| c.kind.is_trait())
     {
         return None;
     }

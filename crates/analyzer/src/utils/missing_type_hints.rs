@@ -462,6 +462,17 @@ where
         return false;
     }
 
+    if class_like_metadata.kind.is_trait() {
+        if let Some(descendants) = context.codebase.all_class_like_descendants.get(&class_like_metadata.name) {
+            for descendant in descendants {
+                if context.codebase.method_is_overriding(descendant.as_bytes(), function_like_metadata.name.as_bytes())
+                {
+                    return false;
+                }
+            }
+        }
+    }
+
     true
 }
 
@@ -489,6 +500,17 @@ where
     {
         // If overriding, we need to be conservative and not report
         return false;
+    }
+
+    if class_like_metadata.kind.is_trait() {
+        if let Some(descendants) = context.codebase.all_class_like_descendants.get(&class_like_metadata.name) {
+            for descendant in descendants {
+                if context.codebase.method_is_overriding(descendant.as_bytes(), function_like_metadata.name.as_bytes())
+                {
+                    return false;
+                }
+            }
+        }
     }
 
     true

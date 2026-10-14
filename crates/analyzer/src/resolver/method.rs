@@ -710,12 +710,13 @@ where
 
                 if let Some(method_metadata) = &function_like_metadata.method_metadata
                     && !method_metadata.visibility.is_public()
+                    && !class_metadata.kind.is_trait()
                 {
                     continue;
                 }
 
                 // Track if this method was found without magic call support
-                let mixin_info = if has_magic_call {
+                let mixin_info = if has_magic_call || class_metadata.kind.is_trait() {
                     None
                 } else {
                     Some(MixinWithoutMagicMethod { mixin_class_name, target_is_final: class_metadata.flags.is_final() })
@@ -731,6 +732,43 @@ where
                     classname: mixin_class_name,
                     mixin_without_magic_method: mixin_info,
                     receiver_object: Some(outer_object.clone()),
+                });
+            }
+        }
+    } else if class_metadata.kind.is_trait() {
+        if let Some(descendants) = context.codebase.all_class_like_descendants.get(&class_metadata.name) {
+            let mut all_have = !descendants.is_empty();
+            let mut first_candidate = None;
+            for descendant in descendants {
+                let Some(descendant_metadata) = context.codebase.get_class_like_by_name(*descendant) else {
+                    all_have = false;
+                    break;
+                };
+
+                let mut desc_method_id = MethodIdentifier::new(descendant_metadata.original_name, method_name);
+                let method_meta = context.codebase.get_method_by_id(&desc_method_id).or_else(|| {
+                    desc_method_id = context.codebase.get_declaring_method_identifier(&desc_method_id);
+                    context.codebase.get_method_by_id(&desc_method_id)
+                });
+
+                if method_meta.is_some() {
+                    if first_candidate.is_none() {
+                        first_candidate = Some((descendant_metadata, desc_method_id));
+                    }
+                } else {
+                    all_have = false;
+                    break;
+                }
+            }
+
+            if all_have && let Some((descendant_metadata, desc_method_id)) = first_candidate {
+                candidates.push(MethodCandidate {
+                    metadata: descendant_metadata,
+                    method_identifier: desc_method_id,
+                    object: outer_object.clone(),
+                    classname: descendant_metadata.name,
+                    mixin_without_magic_method: None,
+                    receiver_object: None,
                 });
             }
         }

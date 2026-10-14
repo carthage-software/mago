@@ -534,6 +534,7 @@ pub(crate) fn is_visible_from_scope(
                     || codebase.is_instance_of(current_class_id.as_bytes(), declaring_class_id)
                     || codebase.is_instance_of(declaring_class_id, current_class_id.as_bytes())
                     || is_visible_via_required_extends(codebase, current_class_id.as_bytes(), declaring_class_id)
+                    || is_visible_via_mixins(codebase, current_class_id.as_bytes(), declaring_class_id)
             } else {
                 false
             }
@@ -573,6 +574,32 @@ fn is_visible_via_required_extends(
             || codebase.class_uses_trait(required_class.as_bytes(), declaring_class_id)
         {
             return true;
+        }
+    }
+
+    false
+}
+
+fn is_visible_via_mixins(codebase: &CodebaseMetadata, current_class_id: &[u8], declaring_class_id: &[u8]) -> bool {
+    let current_class_id_lc = mago_word::ascii_lowercase_word(current_class_id);
+
+    let Some(current_metadata) = codebase.get_class_like(current_class_id_lc.as_bytes()) else {
+        return false;
+    };
+
+    if current_metadata.mixins.is_empty() {
+        return false;
+    }
+
+    for mixin in &current_metadata.mixins {
+        for atomic in mixin.type_union.types.as_ref() {
+            if let Some(mixin_name) = atomic.get_object_or_enum_name() {
+                if codebase.is_instance_of(mixin_name.as_bytes(), declaring_class_id)
+                    || codebase.is_instance_of(declaring_class_id, mixin_name.as_bytes())
+                {
+                    return true;
+                }
+            }
         }
     }
 

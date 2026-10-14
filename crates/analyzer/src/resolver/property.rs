@@ -925,7 +925,7 @@ where
                 // For an annotation-governed mixin property, the caller reports a missing
                 // `__get`/`__set` on the accessed class; the mixin-specific warnings below
                 // cover real mixin properties only.
-                if has_magic_method || resolved.is_magic {
+                if has_magic_method || resolved.is_magic || class_metadata.kind.is_trait() {
                     return Some(resolved);
                 }
 
@@ -954,6 +954,59 @@ where
                 }
 
                 return Some(resolved);
+            }
+        }
+
+        if class_metadata.kind.is_trait() {
+            if let Some(descendants) = context.codebase.all_class_like_descendants.get(&class_metadata.name) {
+                let mut all_have = !descendants.is_empty();
+                let mut first_resolution = None;
+                for descendant in descendants {
+                    if let Some(descendant_metadata) = context.codebase.get_class_like(descendant.as_bytes()) {
+                        if let Some(desc_res) = resolve_declared_property(
+                            context.codebase,
+                            descendant_metadata,
+                            prop_name,
+                            true,
+                            Some(*descendant),
+                        ) {
+                            if first_resolution.is_none() {
+                                first_resolution = Some(desc_res);
+                            }
+                        } else {
+                            all_have = false;
+                            break;
+                        }
+                    } else {
+                        all_have = false;
+                        break;
+                    }
+                }
+
+                if all_have && let Some(resolution) = first_resolution {
+                    for descendant in descendants {
+                        artifacts.symbol_references.add_reference_for_property_read(
+                            &block_context.scope,
+                            *descendant,
+                            prop_name,
+                        );
+                    }
+
+                    let prop_meta = resolution.property;
+                    return Some(ResolvedProperty {
+                        lookup_class: None,
+                        property_span: prop_meta.name_span.or(prop_meta.span),
+                        property_name: prop_name,
+                        declaring_class_id: Some(resolution.declaring_class.name),
+                        property_type: resolution.declared_type_for(context.codebase, for_assignment),
+                        is_magic: false,
+                        read_type: if for_assignment && resolution.is_magic() {
+                            Some(resolution.declared_type(context.codebase))
+                        } else {
+                            None
+                        },
+                    });
+                }
             }
         }
 
@@ -1827,9 +1880,7 @@ fn find_property_in_single_mixin(
     prop_name: Word,
 ) -> Option<DeclaredProperty<'_>> {
     let mixin_metadata = codebase.get_class_like(mixin_class_name.as_bytes())?;
-    // Mixin access is always external, so a non-public real property defers to a magic
-    // `@property*` annotation when the mixin class documents one.
-    resolve_property_for_external_access(codebase, mixin_metadata, prop_name)
+    resolve_declared_property(codebase, mixin_metadata, prop_name, true, None)
 }
 
 /// Searches for a property in intersection types of a named object.

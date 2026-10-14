@@ -877,6 +877,29 @@ where
         }
     }
 
+    if class_like_metadata.kind.is_trait() {
+        for mixin in &class_like_metadata.mixins {
+            for atomic in mixin.type_union.types.as_ref() {
+                if let Some(mixin_name) = atomic.get_object_or_enum_name() {
+                    if let Some(mixin_metadata) = context.codebase.get_class_like_by_name(mixin_name) {
+                        let TObject::Named(mut named_mixin) =
+                            get_this_type(context, mixin_metadata, function_like_metadata)
+                        else {
+                            continue;
+                        };
+                        let mixin_intersections = std::mem::take(&mut named_mixin.intersection_types);
+                        named_mixin.is_static = false;
+                        named_mixin.is_this = false;
+                        intersections.push(TAtomic::Object(TObject::Named(named_mixin)));
+                        if let Some(mixin_intersections) = mixin_intersections {
+                            intersections.extend(*mixin_intersections);
+                        }
+                    }
+                }
+            }
+        }
+    }
+
     let mut type_parameters = vec![];
     for (template_name, template) in &class_like_metadata.template_types {
         // Check for method-level where constraints if function_like_metadata is provided
