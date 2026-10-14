@@ -80,6 +80,7 @@ glob 匹配会遵循 `[source.glob]` 下的项目级设置,因此像 `literal-se
 | `memoize-properties` | `true` | 跟踪字面量属性值以获得更精准的推断,代价是占用一些额外内存。 |
 | `allow-possibly-undefined-array-keys` | `true` | **已弃用。**允许访问可能不存在的键,而不报告。设为 `false` 时仅对带有单个字面量键的 `array<K, V>` 读取发出警告,且不会将类型扩展为 `T\|null`。请改用 `strict-array-index-existence`。 |
 | `check-throws` | `false` | 报告未被捕获且未通过 `@throws` 声明的异常。 |
+| `check-dead-catch` | `false` | 报告与 `try` 块中任何已知异常都不匹配的 `catch` 子句。需要启用 `check-throws`;未记录的代码仍可能抛出分析器无法发现的异常。 |
 | `check-missing-override` | `false` | 报告重写方法上缺失的 `#[Override]` attribute(PHP 8.3+)。 |
 | `find-unused-parameters` | `false` | 报告从未被读取的参数。 |
 | `strict-list-index-checks` | `false` | 要求作为列表下标使用的整数必须可被证明非负。 |
@@ -261,6 +262,7 @@ find-unused-definitions = true
 find-overly-wide-return-types = true
 analyze-dead-code = true
 check-throws = true
+check-dead-catch = true
 check-missing-override = true
 find-unused-parameters = true
 check-missing-type-hints = true
@@ -274,6 +276,8 @@ strict-array-index-existence = true
 no-boolean-literal-comparison = true
 trust-existence-checks = false
 ```
+
+`check-dead-catch` 默认关闭,因为 PHP 运行时可能抛出函数类型或 `@throws` 文档未描述的异常,例如 `TypeError`。如果代码库的异常文档足够完整,可启用此选项进行更严格的检查。
 
 ### 宽松模式
 

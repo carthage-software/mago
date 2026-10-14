@@ -3,6 +3,10 @@ use std::cell::RefCell;
 use std::collections::hash_map::Entry;
 use std::rc::Rc;
 
+use foldhash::HashSet;
+use mago_codex::identifier::method::MethodIdentifier;
+use mago_codex::metadata::CodebaseMetadata;
+use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_word::Word;
 use mago_word::WordMap;
 use mago_word::WordSet;
@@ -18,7 +22,9 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
+use mago_syntax::cst::Expression;
 use mago_syntax::cst::Hint;
+use mago_syntax::cst::Node;
 use mago_syntax::cst::Try;
 
 use crate::analyzable::Analyzable;
@@ -176,6 +182,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
 
         try_block_context.possibly_thrown_exceptions = block_context.possibly_thrown_exceptions.clone();
         try_block_context.variables_possibly_in_scope = block_context.variables_possibly_in_scope.clone();
+        let has_untracked_throw_source = context.settings.check_throws
+            && has_untracked_throw_source(context, &self.block, &try_block_context.possibly_thrown_exceptions);
 
         let try_leaves_loop = artifacts
             .loop_scope
@@ -194,11 +202,13 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
 
         let mut original_block_context = try_block_context.clone();
         let mut definitely_newly_assigned_var_ids = newly_assigned_variable_ids;
+        let mut previously_caught_types = WordSet::default();
 
         for (i, catch_clause) in self.catch_clauses.iter().enumerate() {
             let mut catch_block_context = original_block_context.clone();
             catch_block_context.flags.set_has_returned(false);
-            let caught_classes = get_caught_classes(context, &catch_block_context, artifacts, &catch_clause.hint);
+            let (caught_classes, has_valid_caught_classes) =
+                get_caught_classes(context, &catch_block_context, artifacts, &catch_clause.hint);
 
             for (variable_id, variable_type) in &mut catch_block_context.locals {
                 if let Some(old_type) = old_block_context_locals.get(variable_id) {
@@ -235,6 +245,39 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
             }
 
             let possibly_thrown_exceptions = std::mem::take(&mut catch_block_context.possibly_thrown_exceptions);
+            let is_covered_by_previous_catch = caught_classes.iter().all(|caught| {
+                previously_caught_types
+                    .iter()
+                    .any(|previous| context.codebase.is_instance_of(caught.as_bytes(), previous.as_bytes()))
+            });
+            if context.settings.check_throws
+                && context.settings.check_dead_catch
+                && has_valid_caught_classes
+                && (is_covered_by_previous_catch
+                    || (!has_untracked_throw_source
+                        && !possibly_thrown_exceptions.keys().any(|thrown| {
+                            caught_classes.iter().any(|caught| could_be_caught(context, *thrown, *caught))
+                        })))
+            {
+                context.collector.report_with_code(
+                    IssueCode::DeadCatch,
+                    Issue::warning(
+                        "This `catch` clause cannot catch any exception thrown in its associated `try` block.",
+                    )
+                    .with_annotation(
+                        Annotation::primary(catch_clause.hint.span())
+                            .with_message("No possible thrown exception matches this caught type."),
+                    )
+                    .with_annotation(
+                        Annotation::secondary(self.block.span())
+                            .with_message("The associated `try` block has no matching thrown exception."),
+                    )
+                    .with_help(
+                        "Remove the unreachable `catch` clause or make the `try` body throw a compatible exception.",
+                    ),
+                );
+            }
+
             let mut caught_exception_types = WordSet::default();
             let mut definitely_defined_locals: Option<WordSet> = None;
             for caught_class in &caught_classes {
@@ -369,6 +412,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                     finally_scope.locals.insert(*variable_id, Rc::new(resulting_type));
                 }
             }
+
+            if has_valid_caught_classes {
+                previously_caught_types.extend(caught_classes.iter().copied());
+            }
         }
 
         if !try_leaves_loop && let Some(loop_scope) = artifacts.loop_scope.as_mut() {
@@ -466,7 +513,7 @@ fn get_caught_classes<'arena, A>(
     block_context: &BlockContext<'_>,
     artifacts: &mut AnalysisArtifacts,
     hint: &Hint<'arena>,
-) -> WordSet
+) -> (WordSet, bool)
 where
     A: Arena,
 {
@@ -614,7 +661,8 @@ where
         caught_classes.insert(caught_type);
     }
 
-    if caught_classes.is_empty() {
+    let has_valid_caught_classes = !caught_classes.is_empty();
+    if !has_valid_caught_classes {
         context.collector.report_with_code(
             IssueCode::NoValidCatchTypeFound,
             Issue::error(
@@ -638,5 +686,216 @@ where
         caught_classes.insert(throwable);
     }
 
-    caught_classes
+    (caught_classes, has_valid_caught_classes)
+}
+
+/// Returns whether an exception represented by `thrown` could match `caught`.
+///
+/// The throw set stores declared types, which may include subclasses. Incomplete metadata and
+/// interface intersections therefore need conservative handling to avoid false unreachable-catch
+/// reports.
+fn could_be_caught<A>(context: &Context<'_, '_, A>, thrown: Word, caught: Word) -> bool
+where
+    A: Arena,
+{
+    let thrown_name = thrown.as_bytes();
+    let caught_name = caught.as_bytes();
+
+    if thrown_name.eq_ignore_ascii_case(caught_name)
+        || context.codebase.is_instance_of(thrown_name, caught_name)
+        || context.codebase.is_instance_of(caught_name, thrown_name)
+    {
+        return true;
+    }
+
+    let Some(thrown_metadata) = context.codebase.get_class_like(thrown_name) else {
+        return true;
+    };
+    let Some(caught_metadata) = context.codebase.get_class_like(caught_name) else {
+        return true;
+    };
+
+    let thrown_is_interface = thrown_metadata.kind.is_interface();
+    let caught_is_interface = caught_metadata.kind.is_interface();
+    if thrown_is_interface && caught_is_interface {
+        return true;
+    }
+
+    if thrown_is_interface && caught_metadata.kind.is_class() {
+        return !caught_metadata.flags.is_final();
+    }
+
+    if caught_is_interface && thrown_metadata.kind.is_class() {
+        return !thrown_metadata.flags.is_final();
+    }
+
+    false
+}
+
+fn has_untracked_throw_source<'arena, A>(
+    context: &Context<'_, 'arena, A>,
+    block: &mago_syntax::cst::Block<'arena>,
+    possibly_thrown_exceptions: &WordMap<HashSet<Span>>,
+) -> bool
+where
+    A: Arena,
+{
+    Node::Block(block)
+        .filter_map(|node| match node {
+            Node::Call(call) => {
+                let span = call.span();
+                if has_tracked_throw_span(possibly_thrown_exceptions, span) {
+                    return None;
+                }
+
+                match call {
+                    mago_syntax::cst::Call::Function(function_call) => {
+                        let Expression::Identifier(identifier) = function_call.function else {
+                            return Some(());
+                        };
+
+                        if identifier.last_segment().eq_ignore_ascii_case(b"json_decode") {
+                            return Some(());
+                        }
+
+                        let Some(function) = context.codebase.get_function(identifier.value()) else {
+                            return Some(());
+                        };
+
+                        let has_untracked_thrown_types = if function.flags.is_internal() {
+                            !function.thrown_types.is_empty()
+                        } else {
+                            function.thrown_types.is_empty()
+                        };
+
+                        has_untracked_thrown_types.then_some(())
+                    }
+                    _ => Some(()),
+                }
+            }
+            Node::Instantiation(instantiation) => {
+                let span = instantiation.span();
+                if has_tracked_throw_span(possibly_thrown_exceptions, span) {
+                    return None;
+                }
+
+                let Expression::Identifier(identifier) = instantiation.class else {
+                    return Some(());
+                };
+
+                let class_name = identifier.value().strip_prefix(b"\\").unwrap_or(identifier.value());
+                if !context.codebase.is_instance_of(class_name, b"Throwable") {
+                    return Some(());
+                }
+
+                has_untracked_throwable_constructor(context.codebase, class_name).then_some(())
+            }
+            Node::Foreach(_)
+            | Node::Clone(_)
+            | Node::ArrayAccess(_)
+            | Node::PropertyAccess(_)
+            | Node::NullSafePropertyAccess(_) => Some(()),
+            _ => None,
+        })
+        .into_iter()
+        .any(|_| true)
+}
+
+fn has_tracked_throw_span(possibly_thrown_exceptions: &WordMap<HashSet<Span>>, span: Span) -> bool {
+    possibly_thrown_exceptions.values().any(|spans| spans.contains(&span))
+}
+
+fn has_untracked_throwable_constructor(codebase: &CodebaseMetadata, class_name: &[u8]) -> bool {
+    let Some(class_metadata) = codebase.get_class_like(class_name) else {
+        return true;
+    };
+
+    let constructor_name = word("__construct");
+    let mut pending = vec![class_metadata.name];
+    let mut visited = WordSet::default();
+
+    while let Some(class_name) = pending.pop() {
+        if !visited.insert(class_name) {
+            continue;
+        }
+
+        let Some(class_metadata) = codebase.get_class_like_by_name(class_name) else {
+            return true;
+        };
+
+        if let Some(aliased_method_name) = class_metadata.trait_alias_map.get(&constructor_name).copied() {
+            return has_untracked_trait_alias_constructor(
+                codebase,
+                class_metadata,
+                constructor_name,
+                aliased_method_name,
+            );
+        }
+
+        let constructor_id = get_declared_method_identifier(class_metadata, constructor_name);
+
+        if let Some(constructor_id) = constructor_id {
+            let Some(constructor) = codebase.get_method_by_id(&constructor_id) else {
+                return true;
+            };
+
+            let is_implicit = constructor.name_span.is_none()
+                && codebase
+                    .get_class_like_by_name(constructor_id.get_class_name())
+                    .is_some_and(|declaring_class| constructor.span == declaring_class.span);
+            if !is_implicit {
+                return !constructor.flags.is_built_in();
+            }
+        }
+
+        if let Some(parent_class) = class_metadata.direct_parent_class {
+            pending.push(parent_class);
+        }
+
+        pending.extend(class_metadata.used_traits.iter().copied());
+    }
+
+    false
+}
+
+fn has_untracked_trait_alias_constructor(
+    codebase: &CodebaseMetadata,
+    class_metadata: &ClassLikeMetadata,
+    constructor_name: Word,
+    aliased_method_name: Word,
+) -> bool {
+    if let Some(declaring_method_id) = class_metadata.declaring_method_ids.get(&constructor_name).copied()
+        && codebase
+            .get_class_like_by_name(declaring_method_id.get_class_name())
+            .is_some_and(|declaring_class| declaring_class.kind.is_trait())
+    {
+        return codebase.get_method_by_id(&declaring_method_id).is_none_or(|method| !method.flags.is_built_in());
+    }
+
+    let mut found_method = false;
+
+    for trait_name in class_metadata.direct_trait_names() {
+        let Some(trait_metadata) = codebase.get_class_like_by_name(trait_name) else {
+            return true;
+        };
+
+        let method_id = get_declared_method_identifier(trait_metadata, aliased_method_name);
+
+        let Some(method_id) = method_id else {
+            continue;
+        };
+
+        found_method = true;
+        if codebase.get_method_by_id(&method_id).is_none_or(|method| !method.flags.is_built_in()) {
+            return true;
+        }
+    }
+
+    !found_method
+}
+
+fn get_declared_method_identifier(class_metadata: &ClassLikeMetadata, method_name: Word) -> Option<MethodIdentifier> {
+    class_metadata.declaring_method_ids.get(&method_name).copied().or_else(|| {
+        class_metadata.methods.contains(&method_name).then(|| MethodIdentifier::new(class_metadata.name, method_name))
+    })
 }

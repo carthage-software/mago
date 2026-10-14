@@ -96,6 +96,7 @@ fn build_analyzer_settings(settings: &WasmAnalyzerSettings, version: PHPVersion)
         memoize_properties: settings.memoize_properties,
         allow_possibly_undefined_array_keys: settings.allow_possibly_undefined_array_keys,
         check_throws: settings.check_throws,
+        check_dead_catch: settings.check_dead_catch,
         unchecked_exceptions: settings.unchecked_exceptions.iter().map(|e| mago_word::word(e.as_bytes())).collect(),
         unchecked_exception_classes: settings
             .unchecked_exception_classes
@@ -303,6 +304,7 @@ pub fn analyze(code: String, php_version: &str) -> Result<JsValue, JsValue> {
         find_unused_definitions: true,
         analyze_dead_code: true,
         check_throws: true,
+        check_dead_catch: false,
         check_missing_override: false,
         find_unused_parameters: false,
         check_missing_type_hints: true,

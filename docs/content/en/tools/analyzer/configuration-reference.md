@@ -97,6 +97,7 @@ These flags toggle individual analyses. Defaults are tuned for everyday use; fli
 | `memoize-properties` | `true` | Track literal property values for sharper inference, at the cost of some memory. |
 | `allow-possibly-undefined-array-keys` | `true` | **Deprecated.** Allow accessing keys that may be missing without flagging it. Setting this to `false` warns on `array<K, V>` reads with a single literal key but does not widen the type to `T\|null`. Use `strict-array-index-existence` instead. |
 | `check-throws` | `false` | Report exceptions that are not caught and not declared with `@throws`. |
+| `check-dead-catch` | `false` | Report catch clauses that match no known exception from their `try` block. Requires `check-throws`; undocumented code may still throw exceptions the analyzer cannot see. |
 | `check-missing-override` | `false` | Report missing `#[Override]` attributes on overriding methods (PHP 8.3+). |
 | `find-unused-parameters` | `false` | Report parameters that are never read. |
 | `strict-list-index-checks` | `false` | Require any integer used as a list index to be provably non-negative. |
@@ -287,6 +288,7 @@ find-unused-definitions = true
 find-overly-wide-return-types = true
 analyze-dead-code = true
 check-throws = true
+check-dead-catch = true
 check-missing-override = true
 find-unused-parameters = true
 check-missing-type-hints = true
@@ -300,6 +302,8 @@ strict-array-index-existence = true
 no-boolean-literal-comparison = true
 trust-existence-checks = false
 ```
+
+`check-dead-catch` is off by default because PHP can throw exceptions at runtime that a function's type or `@throws` documentation does not describe, such as `TypeError`. Enable it when you want stricter checks and your codebase has sufficiently complete exception documentation.
 
 ### Lenient mode
 
