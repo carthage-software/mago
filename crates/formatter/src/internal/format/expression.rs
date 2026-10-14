@@ -1295,7 +1295,7 @@ fn detect_match_arm_alignment_runs<'arena, A>(
 where
     A: Arena,
 {
-    if !f.settings.align_assignment_like || arms.is_empty() {
+    if !f.settings.align_double_arrows || arms.is_empty() {
         return std::vec::Vec::new();
     }
 

@@ -170,7 +170,8 @@ public function bar(
 | `align-parameters` | boolean | `false` | Column-align multi-line parameter lists by the variable. |
 | `align-named-arguments` | boolean | `false` | Column-align named arguments in multi-line calls and attributes. |
 | `array-table-style-alignment` | boolean | `true` | Use table-style alignment for arrays. |
-| `align-assignment-like` | boolean | `false` | Column-align consecutive assignment-like constructs (variables, multi-line array key/value pairs, properties, constants, enum cases, match arms). Compact inline arrays stay unaligned. |
+| `align-assignment-like` | boolean | `false` | Column-align consecutive assignment-like constructs (variables, properties, constants, enum cases). |
+| `align-double-arrows` | boolean | `false` | Column-align `=>` in consecutive multi-line array key/value pairs and match arms. Compact inline arrays stay unaligned. |
 
 ## `use` statements
 
