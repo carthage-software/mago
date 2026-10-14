@@ -430,7 +430,9 @@ fn add_nullsafe_condition_clauses<A>(
 
             add_nullsafe_null_equality_clauses(operand, formula, assertion_context);
         }
-        Expression::Binary(binary) if matches!(binary.operator, BinaryOperator::Identical(_)) => {
+        Expression::Binary(binary)
+            if matches!(binary.operator, BinaryOperator::Identical(_) | BinaryOperator::NotIdentical(_)) =>
+        {
             let nullsafe_operand = if expression_is_nullsafe(binary.lhs)
                 && !expression_is_nullsafe(binary.rhs)
                 && artifacts.get_expression_type(binary.rhs).is_some_and(|ty| !ty.can_be_null())
@@ -446,18 +448,38 @@ fn add_nullsafe_condition_clauses<A>(
             };
 
             if let Some(operand) = nullsafe_operand {
-                add_nullsafe_base_clauses(
-                    operand,
-                    formula,
-                    conditional_object_id,
-                    creating_object_id,
-                    assertion_context,
-                );
+                // `!==` holds with a null receiver too, so the true branch keeps the
+                // nullable bases; `===` establishes a non-null receiver directly.
+                if matches!(binary.operator, BinaryOperator::NotIdentical(_)) {
+                    add_nullsafe_null_equality_clauses(operand, formula, assertion_context);
+                } else {
+                    add_nullsafe_base_clauses(
+                        operand,
+                        formula,
+                        conditional_object_id,
+                        creating_object_id,
+                        assertion_context,
+                    );
+                }
             }
         }
         Expression::Construct(Construct::Isset(isset)) => {
             for value in isset.values.iter() {
                 add_nullsafe_base_clauses(value, formula, conditional_object_id, creating_object_id, assertion_context);
+            }
+        }
+        Expression::Call(Call::Function(call))
+            if let Expression::Identifier(name) = call.function
+                && call.argument_list.arguments.len() == 1 =>
+        {
+            let resolved_name = assertion_context.resolved_names.get(name);
+            let is_null = resolved_name.eq_ignore_ascii_case(b"is_null")
+                || (name.is_local()
+                    && name.value().eq_ignore_ascii_case(b"is_null")
+                    && assertion_context.codebase.get_function(resolved_name).is_none());
+
+            if is_null && let Some(argument) = call.argument_list.arguments.first() {
+                add_nullsafe_null_equality_clauses(argument.value(), formula, assertion_context);
             }
         }
         _ => {
