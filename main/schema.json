@@ -998,6 +998,7 @@
         "strict-list-index-checks": false,
         "strict-array-index-existence": false,
         "allow-array-truthy-operand": false,
+        "allow-operator-overloading": false,
         "no-boolean-literal-comparison": false,
         "check-missing-type-hints": false,
         "check-closure-missing-type-hints": false,
@@ -8735,6 +8736,11 @@
         },
         "allow-array-truthy-operand": {
           "description": "Allow arrays as operands of logical operators (`&&`, `||`, `xor`).\n\nWhen `true`, the analyzer accepts arrays on either side of a logical operator\nwithout emitting `invalid-operand`. Defaults to `false`, which mirrors the\nlong-standing behavior of flagging implicit `bool` coercion of arrays. Standalone\n`if ($array)` is unaffected and never warns.",
+          "type": "boolean",
+          "default": false
+        },
+        "allow-operator-overloading": {
+          "description": "Allow operators on classes that overload them, such as `BcMath\\Number` and `GMP`.\n\nWhen `true`, the analyzer accepts these operators without emitting `invalid-operand`.\nDefaults to `false`, which reports them while still inferring the result as an instance\nof the class. Comparisons and `<=>` are unaffected.",
           "type": "boolean",
           "default": false
         },
