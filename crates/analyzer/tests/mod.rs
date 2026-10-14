@@ -982,6 +982,7 @@ test_case!(pipe_callable_implicit_types_outside_pipe_warns, {
     s
 });
 test_case!(spread_list);
+test_case!(spl_class_implements_object);
 test_case!(or_never);
 test_case!(abstract_method_inheritance);
 test_case!(variadic_array_type);

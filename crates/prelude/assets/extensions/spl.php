@@ -2227,7 +2227,7 @@ function class_uses($object_or_class, bool $autoload = true): array|false {}
 /**
  * @param object|class-string $object_or_class
  *
- * @return list<interface-string>|false
+ * @return ($object_or_class is object ? list<interface-string> : list<interface-string>|false)
  *
  * @pure
  */
