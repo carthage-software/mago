@@ -818,6 +818,19 @@ where
                     result?;
                 }
 
+                if is_do {
+                    for (variable_id, parent_type) in &original_parent_context.locals {
+                        if let Some(continue_type) = continue_context.locals.get_mut(variable_id) {
+                            *continue_type = combine_union_types_rc(
+                                continue_type,
+                                parent_type,
+                                codebase,
+                                CombinerOptions::default(),
+                            );
+                        }
+                    }
+                }
+
                 pre_conditions_applied = true;
 
                 for variable_id in &always_assigned_before_loop_body_variables {
