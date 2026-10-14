@@ -438,6 +438,29 @@ where
         }
     }
 
+    if in_assignment
+        && index_type.is_mixed()
+        && has_valid_expected_index
+        && (array_like_type.has_array() || array_like_type.is_null() || array_like_type.is_mixed())
+    {
+        let index_type_str = index_type.get_id();
+        let array_like_type_str = array_like_type.get_id();
+
+        context.collector.report_with_code(
+            IssueCode::MixedArrayIndex,
+            Issue::error(format!(
+                "Invalid index type `{index_type_str}` used in array assignment on `{array_like_type_str}`."
+            ))
+            .with_annotation(Annotation::primary(access_index_span).with_message(format!(
+                "This index has type `{index_type_str}` which is not guaranteed to be a valid key."
+            )))
+            .with_note(
+                "In PHP, array keys must be strings or integers. A `mixed` index may hold a value that cannot be used as an array key at runtime.",
+            )
+            .with_help("Ensure the index expression evaluates to a string or an integer."),
+        );
+    }
+
     if !has_valid_expected_index {
         let index_type_str = index_type.get_id();
         let array_like_type_str = array_like_type.get_id();

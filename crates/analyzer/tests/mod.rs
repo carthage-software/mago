@@ -131,6 +131,7 @@ test_case!(arrays_array_map_multi);
 test_case!(arrays_array_merge_two_lists);
 test_case!(arrays_max_on_possibly_empty);
 test_case!(arrays_min_on_possibly_empty);
+test_case!(arrays_mixed_key_literal_and_write);
 test_case!(arrays_array_pop);
 test_case!(arrays_array_pop_empty);
 test_case!(arrays_array_product);
