@@ -120,14 +120,6 @@ fn bench_cases(c: &mut Criterion) {
         });
     }
 
-    let dead_catch_path =
-        Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("cases").join("issue_2503_dead_catch.php");
-    let dead_catch_content = std::fs::read_to_string(&dead_catch_path)
-        .unwrap_or_else(|e| panic!("failed to read {}: {e}", dead_catch_path.display()));
-    group.bench_function("issue_2503_dead_catch", |b| {
-        b.iter(|| analyze_file(&dead_catch_path, &dead_catch_content));
-    });
-
     group.finish();
 }
 
