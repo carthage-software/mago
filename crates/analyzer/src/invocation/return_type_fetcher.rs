@@ -131,5 +131,19 @@ where
         resulting_type.set_by_reference(true);
     }
 
+    if !context.settings.treat_phpdoc_types_as_certain
+        && let Some(function_like_metadata) = invocation.target.get_function_like_metadata()
+        && let Some(native_return) = function_like_metadata.return_type_declaration_metadata.as_ref()
+        && native_return.type_union.can_be_null()
+        && !resulting_type.can_be_null()
+    {
+        resulting_type = mago_codex::ttype::add_union_type(
+            resulting_type,
+            &mago_codex::ttype::wrap_atomic(TAtomic::Null),
+            context.codebase,
+            mago_codex::ttype::combiner::CombinerOptions::default(),
+        );
+    }
+
     resulting_type
 }

@@ -48,6 +48,14 @@ pub struct Settings {
     /// This improves type inference but may increase memory usage. Defaults to `true`.
     pub memoize_properties: bool,
 
+    /// Whether to treat PHPDoc types as certain during body analysis. Defaults to `true`.
+    ///
+    /// When `false`, parameters without native types (or with wider native types)
+    /// retain their native types inside the function body so defensive runtime checks
+    /// (such as `is_int($x)`) are not flagged as impossible or redundant. Callers of
+    /// the function are still checked against the documented PHPDoc types.
+    pub treat_phpdoc_types_as_certain: bool,
+
     /// Allow accessing array keys that may not be defined without reporting an issue. Defaults to `true`.
     pub allow_possibly_undefined_array_keys: bool,
 
@@ -423,6 +431,7 @@ impl Settings {
             find_overly_wide_return_types: false,
             analyze_dead_code: false,
             memoize_properties: true,
+            treat_phpdoc_types_as_certain: true,
             allow_possibly_undefined_array_keys: true,
             check_throws: false,
             check_dead_catch: false,

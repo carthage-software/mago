@@ -123,6 +123,11 @@ pub fn check_missing_type_hints_settings() -> Settings {
     Settings { check_missing_type_hints: true, ..Default::default() }
 }
 
+#[must_use]
+pub fn phpdoc_types_not_certain_settings() -> Settings {
+    Settings { treat_phpdoc_types_as_certain: false, check_throws: false, ..default_test_settings() }
+}
+
 fn run_test_case_inner(config: TestCase) {
     let Prelude { mut database, mut metadata, mut symbol_references } = PRELUDE.clone();
 

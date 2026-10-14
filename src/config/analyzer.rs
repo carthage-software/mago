@@ -95,6 +95,9 @@ pub struct AnalyzerConfiguration {
     /// Whether to memoize properties.
     pub memoize_properties: bool,
 
+    /// Whether to treat PHPDoc types as certain during body analysis. Defaults to `true`.
+    pub treat_phpdoc_types_as_certain: bool,
+
     /// Allow accessing array keys that may not be defined without reporting an issue.
     ///
     /// **Deprecated:** prefer `strict_array_index_existence` for new configurations.
@@ -478,6 +481,7 @@ impl AnalyzerConfiguration {
             find_overly_wide_return_types: self.find_overly_wide_return_types,
             find_unused_expressions: self.find_unused_expressions,
             memoize_properties: self.memoize_properties,
+            treat_phpdoc_types_as_certain: self.treat_phpdoc_types_as_certain,
             allow_possibly_undefined_array_keys: self.allow_possibly_undefined_array_keys,
             check_throws: self.check_throws,
             check_dead_catch: self.check_dead_catch,
@@ -541,6 +545,7 @@ impl Default for AnalyzerConfiguration {
             find_overly_wide_return_types: defaults.find_overly_wide_return_types,
             analyze_dead_code: defaults.analyze_dead_code,
             memoize_properties: defaults.memoize_properties,
+            treat_phpdoc_types_as_certain: defaults.treat_phpdoc_types_as_certain,
             allow_possibly_undefined_array_keys: defaults.allow_possibly_undefined_array_keys,
             check_throws: defaults.check_throws,
             check_dead_catch: defaults.check_dead_catch,

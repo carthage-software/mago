@@ -512,7 +512,15 @@ where
                 }
             }
 
-            effective_type
+            if !context.settings.treat_phpdoc_types_as_certain && parameter_type.from_docblock {
+                if let Some(native_type) = parameter_metadata.get_type_declaration_metadata() {
+                    expand_type_metadata(context, block_context, artifacts, function_like_metadata, native_type)
+                } else {
+                    get_mixed()
+                }
+            } else {
+                effective_type
+            }
         } else {
             get_mixed()
         };
@@ -520,6 +528,13 @@ where
         // TODO(azjezz): consider comparing declared and inferred types instead
         // and choosing the more specific one, this current solution is a bit naive.
         let declared_type_is_specific = parameter_metadata.get_type_metadata().is_some_and(|tm| {
+            if !context.settings.treat_phpdoc_types_as_certain
+                && tm.from_docblock
+                && parameter_metadata.get_type_declaration_metadata().is_none()
+            {
+                return false;
+            }
+
             let union = &tm.type_union;
 
             !union.is_vanilla_array() && !union.is_vanilla_mixed()
