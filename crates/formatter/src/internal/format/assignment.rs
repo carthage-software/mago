@@ -268,7 +268,8 @@ where
         // another binary, the chain breaks at its own operators too, and its continuation lines
         // end up flush with the assignment instead of indented under it.
         if !binary.lhs.is_binary()
-            && (!binary.operator.is_logical() || should_inline_binary_expression(f, rhs_expression))
+            && (should_inline_binary_expression(f, rhs_expression)
+                || (!binary.operator.is_logical() && !is_call_like_tail(binary.rhs)))
             && is_breaking_expression(f, binary.rhs, false)
         {
             return Layout::NeverBreakAfterOperator;
@@ -302,6 +303,16 @@ where
     }
 
     Layout::Fluid
+}
+
+fn is_call_like_tail(expression: &Expression<'_>) -> bool {
+    match expression {
+        Expression::Parenthesized(inner) => is_call_like_tail(inner.expression),
+        Expression::UnaryPrefix(operation) => is_call_like_tail(operation.operand),
+        Expression::ArrowFunction(arrow_function) => is_call_like_tail(arrow_function.expression),
+        Expression::Call(_) | Expression::Instantiation(_) => true,
+        _ => false,
+    }
 }
 
 #[inline]

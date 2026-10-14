@@ -552,6 +552,8 @@ test_case!(issue_2491_concat_arrow);
 test_case!(issue_2491_concat_rhs);
 test_case!(issue_2491_arrow_comment);
 test_case!(issue_2491_logical_assignment);
+test_case!(issue_2524_argument_list);
+test_case!(issue_2524_binary_expression);
 test_case!(idempotency_docblock_before_parameter);
 test_case!(idempotency_html_echo_ternary_break);
 test_case!(idempotency_inline_echo_mid_line_call);
@@ -572,7 +574,7 @@ test_case!(idempotency_corpus_apiplatform_type_factory);
 test_case!(idempotency_corpus_symfony_json_streamer);
 
 #[test]
-fn issue_2475_and_2491_settings() {
+fn issue_2475_2491_and_2524_settings() {
     let cases: &[(&str, &[u8])] = &[
         ("condition", include_bytes!("cases/issue_2475_condition/before.php")),
         ("condition_controls", include_bytes!("cases/issue_2475_condition_controls/before.php")),
@@ -581,6 +583,8 @@ fn issue_2475_and_2491_settings() {
         ("concat_rhs", include_bytes!("cases/issue_2491_concat_rhs/before.php")),
         ("arrow_comment", include_bytes!("cases/issue_2491_arrow_comment/before.php")),
         ("logical_assignment", include_bytes!("cases/issue_2491_logical_assignment/before.php")),
+        ("argument_list", include_bytes!("cases/issue_2524_argument_list/before.php")),
+        ("binary_expression", include_bytes!("cases/issue_2524_binary_expression/before.php")),
     ];
 
     for print_width in [80, 120, 160] {

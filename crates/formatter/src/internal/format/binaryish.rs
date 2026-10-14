@@ -298,10 +298,11 @@ where
     // context, operators like ?? that would normally skip indentation (because
     // their RHS is "inlined") should still get indented.
     let preserve_breaking_continuation = preserves_breaking_layout
-        && misc::has_new_line_in_range(f.source_text, left.end_offset(), original_right.start_offset())
         && (should_indent_if_inlining
             || f.is_wrapped_in_parens
-            || matches!(grandparent, Some(Node::Return(_) | Node::Throw(_))));
+            || matches!(grandparent, Some(Node::Return(_) | Node::Throw(_))))
+        && ((!f.is_in_inlined_binary_chain && is_lassoc_subchain(&operator, right))
+            || misc::has_new_line_in_range(f.source_text, left.end_offset(), original_right.start_offset()));
 
     let indent_assignment_continuation =
         f.settings.indent_binary_expression_continuation || f.is_in_aligned_assignment_rhs;
@@ -381,14 +382,7 @@ where
         || (f.settings.preserve_breaking_binary_expression
             && misc::has_new_line_in_range(f.source_text, original_left.end_offset(), original_right.start_offset()));
 
-    let rhs_is_parenthesized_lassoc_subchain = match right {
-        Expression::Binary(binary) => {
-            should_flatten(&operator, &BinaryishOperator::Binary(&binary.operator))
-                && (operator.is_logical() || operator.is_comparison())
-        }
-        _ => false,
-    };
-
+    let rhs_is_parenthesized_lassoc_subchain = is_lassoc_subchain(&operator, right);
     let mut should_inline_this_level = !should_break
         && !rhs_is_parenthesized_lassoc_subchain
         && should_inline_binary_rhs_expression(f, right, &operator);
@@ -693,6 +687,15 @@ where
         ),
         _ => false,
     }
+}
+
+fn is_lassoc_subchain(operator: &BinaryishOperator<'_>, right: &Expression<'_>) -> bool {
+    matches!(
+        right,
+        Expression::Binary(binary)
+            if should_flatten(operator, &BinaryishOperator::Binary(&binary.operator))
+                && (operator.is_logical() || operator.is_comparison())
+    )
 }
 
 fn should_flatten<'arena>(operator: &BinaryishOperator<'arena>, parent_op: &BinaryishOperator<'arena>) -> bool {
