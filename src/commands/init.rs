@@ -137,6 +137,7 @@ impl AnalyzerStrictnessPreset {
                 strict_list_index_checks: false,
                 strict_array_index_existence: false,
                 allow_array_truthy_operand: false,
+                allow_operator_overloading: false,
                 no_boolean_literal_comparison: false,
                 check_missing_type_hints: false,
                 register_super_globals: true,
@@ -154,6 +155,7 @@ impl AnalyzerStrictnessPreset {
                 strict_list_index_checks: false,
                 strict_array_index_existence: false,
                 allow_array_truthy_operand: false,
+                allow_operator_overloading: false,
                 no_boolean_literal_comparison: false,
                 check_missing_type_hints: false,
                 register_super_globals: true,
@@ -171,6 +173,7 @@ impl AnalyzerStrictnessPreset {
                 strict_list_index_checks: true,
                 strict_array_index_existence: false,
                 allow_array_truthy_operand: false,
+                allow_operator_overloading: false,
                 no_boolean_literal_comparison: false,
                 check_missing_type_hints: false,
                 register_super_globals: true,
@@ -188,6 +191,7 @@ impl AnalyzerStrictnessPreset {
                 strict_list_index_checks: true,
                 strict_array_index_existence: true,
                 allow_array_truthy_operand: false,
+                allow_operator_overloading: false,
                 no_boolean_literal_comparison: true,
                 check_missing_type_hints: true,
                 register_super_globals: true,
@@ -416,6 +420,8 @@ struct InitializationAnalyzerSettings {
     strict_array_index_existence: bool,
     /// Whether to allow arrays as operands of `&&`, `||`, and `xor` without `invalid-operand`
     allow_array_truthy_operand: bool,
+    /// Whether to allow operators on classes that overload them, such as `BcMath\Number` and `GMP`
+    allow_operator_overloading: bool,
     /// Whether to disallow comparisons with boolean literals
     no_boolean_literal_comparison: bool,
     /// Whether to check for missing type hints
@@ -700,6 +706,10 @@ fn setup_analyzer(theme: &ColorfulTheme) -> Result<InitializationAnalyzerSetting
             .with_prompt(" │  Track literal values of class properties?")
             .default(settings.memoize_properties)
             .interact()?;
+        settings.allow_operator_overloading = Confirm::with_theme(theme)
+            .with_prompt(" │  Allow operators on classes that overload them, such as `BcMath\\Number` and `GMP`?")
+            .default(settings.allow_operator_overloading)
+            .interact()?;
         settings.register_super_globals = Confirm::with_theme(theme)
             .with_prompt(" │  Register superglobals ($_GET, $_POST, etc.)?")
             .default(settings.register_super_globals)
@@ -963,6 +973,7 @@ fn build_analyzer_settings_string(settings: &InitializationAnalyzerSettings) -> 
     lines.push(format!("strict-list-index-checks = {}", settings.strict_list_index_checks));
     lines.push(format!("strict-array-index-existence = {}", settings.strict_array_index_existence));
     lines.push(format!("allow-array-truthy-operand = {}", settings.allow_array_truthy_operand));
+    lines.push(format!("allow-operator-overloading = {}", settings.allow_operator_overloading));
     lines.push(format!("no-boolean-literal-comparison = {}", settings.no_boolean_literal_comparison));
     lines.push(format!("check-missing-type-hints = {}", settings.check_missing_type_hints));
     lines.push(format!("register-super-globals = {}", settings.register_super_globals));
@@ -990,6 +1001,7 @@ mod tests {
             strict_list_index_checks: false,
             strict_array_index_existence: false,
             allow_array_truthy_operand: false,
+            allow_operator_overloading: false,
             no_boolean_literal_comparison: false,
             check_missing_type_hints: false,
             register_super_globals: true,
@@ -1078,6 +1090,7 @@ mod tests {
             strict_list_index_checks: true,
             strict_array_index_existence: true,
             allow_array_truthy_operand: true,
+            allow_operator_overloading: true,
             no_boolean_literal_comparison: true,
             check_missing_type_hints: true,
             register_super_globals: false,

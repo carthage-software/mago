@@ -21,6 +21,7 @@ pub mod identifier;
 pub mod issue;
 pub mod metadata;
 pub mod misc;
+pub mod operator_overloading;
 pub mod populator;
 pub mod reference;
 pub mod scanner;

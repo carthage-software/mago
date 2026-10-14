@@ -157,6 +157,13 @@ pub struct AnalyzerConfiguration {
     /// `if ($array)` is unaffected and never warns.
     pub allow_array_truthy_operand: bool,
 
+    /// Allow operators on classes that overload them, such as `BcMath\Number` and `GMP`.
+    ///
+    /// When `true`, the analyzer accepts these operators without emitting `invalid-operand`.
+    /// Defaults to `false`, which reports them while still inferring the result as an instance
+    /// of the class. Comparisons and `<=>` are unaffected.
+    pub allow_operator_overloading: bool,
+
     /// Disallow comparisons where a boolean literal is used as an operand.
     ///
     /// Defaults to `false`.
@@ -478,6 +485,7 @@ impl AnalyzerConfiguration {
             strict_list_index_checks: self.strict_list_index_checks,
             strict_array_index_existence: self.strict_array_index_existence,
             allow_array_truthy_operand: self.allow_array_truthy_operand,
+            allow_operator_overloading: self.allow_operator_overloading,
             no_boolean_literal_comparison: self.no_boolean_literal_comparison,
             enforce_class_finality: self.enforce_class_finality,
             require_api_or_internal: self.require_api_or_internal,
@@ -535,6 +543,7 @@ impl Default for AnalyzerConfiguration {
             strict_list_index_checks: defaults.strict_list_index_checks,
             strict_array_index_existence: defaults.strict_array_index_existence,
             allow_array_truthy_operand: defaults.allow_array_truthy_operand,
+            allow_operator_overloading: defaults.allow_operator_overloading,
             no_boolean_literal_comparison: defaults.no_boolean_literal_comparison,
             enforce_class_finality: defaults.enforce_class_finality,
             require_api_or_internal: defaults.require_api_or_internal,

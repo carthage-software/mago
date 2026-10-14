@@ -51,6 +51,7 @@ pub mod instantiation;
 pub mod literal;
 pub mod magic_constant;
 pub mod r#match;
+pub mod operator_overloading;
 pub mod partial_application;
 pub mod throw;
 pub mod unary;

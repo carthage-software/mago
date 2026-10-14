@@ -107,6 +107,7 @@ fn build_analyzer_settings(settings: &WasmAnalyzerSettings, version: PHPVersion)
         strict_list_index_checks: settings.strict_list_index_checks,
         strict_array_index_existence: settings.strict_array_index_existence,
         allow_array_truthy_operand: settings.allow_array_truthy_operand,
+        allow_operator_overloading: settings.allow_operator_overloading,
         no_boolean_literal_comparison: settings.no_boolean_literal_comparison,
         check_missing_type_hints: settings.check_missing_type_hints,
         check_closure_missing_type_hints: settings.check_closure_missing_type_hints,

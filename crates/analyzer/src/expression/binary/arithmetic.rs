@@ -5,6 +5,9 @@ use std::sync::Arc;
 
 use mago_codex::assertion::Assertion;
 use mago_codex::metadata::CodebaseMetadata;
+use mago_codex::operator_overloading::OperandAcceptance;
+use mago_codex::operator_overloading::OperandSide;
+use mago_codex::operator_overloading::get_operation_handler;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
@@ -21,6 +24,9 @@ use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::get_non_negative_int;
 use mago_codex::ttype::get_positive_int;
+use mago_codex::ttype::shared::INT_ATOMIC;
+use mago_codex::ttype::shared::ONE_INT_ATOMIC;
+use mago_codex::ttype::shared::ZERO_INT_ATOMIC;
 use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -35,6 +41,7 @@ use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
+use crate::expression::operator_overloading::report_disabled_operator_overloading;
 
 #[inline]
 pub fn analyze_arithmetic_operation<'ctx, 'arena, A>(
@@ -212,6 +219,8 @@ where
     let mut invalid_right_messages: Vec<(String, Span)> = Vec::new();
     let mut has_valid_left_operand = false;
     let mut has_valid_right_operand = false;
+    let mut overloading_class_names: Vec<&'static str> = Vec::new();
+    let mut has_pair_without_overloading = false;
 
     let left_atomic_types = left_type
         .types
@@ -239,26 +248,23 @@ where
         })
         .collect::<Vec<_>>();
 
-    for mut left_atomic in left_atomic_types {
-        left_atomic = match left_atomic {
-            TAtomic::Scalar(TScalar::Bool(bool)) if bool.is_false() => TAtomic::Scalar(TScalar::literal_int(0)),
-            TAtomic::Scalar(TScalar::Bool(bool)) if bool.is_true() => TAtomic::Scalar(TScalar::literal_int(1)),
-            TAtomic::Scalar(TScalar::Bool(_)) => TAtomic::Scalar(TScalar::int()),
-            TAtomic::Null => continue,
-            atomic => atomic,
-        };
+    for left_operand in &left_atomic_types {
+        if left_operand.is_null() {
+            continue;
+        }
 
-        for right_atomic in &right_atomic_types {
-            let right_atomic = match right_atomic {
-                TAtomic::Scalar(TScalar::Bool(bool)) if bool.is_false() => TAtomic::Scalar(TScalar::literal_int(0)),
-                TAtomic::Scalar(TScalar::Bool(bool)) if bool.is_true() => TAtomic::Scalar(TScalar::literal_int(1)),
-                TAtomic::Scalar(TScalar::Bool(_)) => TAtomic::Scalar(TScalar::int()),
-                TAtomic::Null => continue,
-                atomic => atomic.clone(),
-            };
+        let left_atomic = bool_as_int(left_operand);
+
+        for right_operand in &right_atomic_types {
+            if right_operand.is_null() {
+                continue;
+            }
+
+            let right_atomic = bool_as_int(right_operand);
 
             let mut pair_result_atomics: Vec<TAtomic> = Vec::new();
             let mut invalid_pair = false;
+            let mut is_overloaded_pair = false;
 
             if left_atomic.is_mixed() {
                 context.collector.report_with_code(
@@ -318,7 +324,7 @@ where
             if matches!(binary.operator, BinaryOperator::Addition(_))
                 && (left_atomic.is_array() || right_atomic.is_array())
             {
-                if let (TAtomic::Array(left_array), TAtomic::Array(right_array)) = (&left_atomic, &right_atomic) {
+                if let (TAtomic::Array(left_array), TAtomic::Array(right_array)) = (left_atomic, right_atomic) {
                     let combined = compose_array_plus(left_array, right_array, context);
 
                     pair_result_atomics.extend(combined);
@@ -350,11 +356,70 @@ where
                 && left_atomic.is_string()
                 && right_atomic.is_string()
             {
-                pair_result_atomics.push(string_bitwise_result(&binary.operator, &left_atomic, &right_atomic));
+                pair_result_atomics.push(string_bitwise_result(&binary.operator, left_atomic, right_atomic));
                 has_valid_left_operand = true;
                 has_valid_right_operand = true;
+            } else if let Some((class, instance_side)) =
+                get_operation_handler(&binary.operator, left_operand, right_operand)
+            {
+                let name = class.get_name();
+                let left_is_instance = instance_side == OperandSide::Left;
+                let left_acceptance =
+                    if left_is_instance { OperandAcceptance::Accepted } else { class.accepts_operand(left_operand) };
+                let right_acceptance = if left_is_instance && is_exponent_or_shift(&binary.operator) {
+                    class.accepts_exponent_or_shift_amount(right_operand)
+                } else {
+                    class.accepts_operand(right_operand)
+                };
+                let left_is_valid = left_acceptance != OperandAcceptance::Rejected;
+                let right_is_valid = right_acceptance != OperandAcceptance::Rejected;
+                let is_division_by_zero = right_is_valid
+                    && matches!(binary.operator, BinaryOperator::Division(_) | BinaryOperator::Modulo(_))
+                    && class.is_literal_zero(right_atomic);
+
+                if left_is_valid {
+                    has_valid_left_operand = true;
+                }
+
+                if left_acceptance != OperandAcceptance::Accepted {
+                    invalid_left_messages.push((
+                        format!("Cannot use {} as an operand with {name}", left_operand.get_id()),
+                        binary.lhs.span(),
+                    ));
+                }
+
+                if right_acceptance != OperandAcceptance::Accepted {
+                    let message = match binary.operator {
+                        BinaryOperator::Exponentiation(_) if left_is_instance => {
+                            format!("Cannot raise {name} to the power of {}", right_operand.get_id())
+                        }
+                        BinaryOperator::LeftShift(_) | BinaryOperator::RightShift(_) if left_is_instance => {
+                            format!("Cannot shift {name} by {}", right_operand.get_id())
+                        }
+                        _ => format!("Cannot use {} as an operand with {name}", right_operand.get_id()),
+                    };
+
+                    invalid_right_messages.push((message, binary.rhs.span()));
+                }
+
+                if is_division_by_zero {
+                    invalid_right_messages.push(("Division or modulo by zero".to_string(), binary.rhs.span()));
+                    result_atomic_types.push(TAtomic::Never);
+                } else if right_is_valid {
+                    has_valid_right_operand = true;
+                }
+
+                if left_is_valid && right_is_valid && !is_division_by_zero {
+                    pair_result_atomics.push(class.get_instance_atomic());
+                    is_overloaded_pair = true;
+                    if !overloading_class_names.contains(&name) {
+                        overloading_class_names.push(name);
+                    }
+                } else {
+                    invalid_pair = true;
+                }
             } else if left_atomic.is_numeric() && right_atomic.is_numeric() {
-                if let Some(reason) = definite_arithmetic_runtime_error(&binary.operator, &right_atomic) {
+                if let Some(reason) = definite_arithmetic_runtime_error(&binary.operator, right_atomic) {
                     invalid_right_messages.push((reason, binary.rhs.span()));
                     pair_result_atomics.push(TAtomic::Never);
                     result_atomic_types.extend(pair_result_atomics);
@@ -363,8 +428,8 @@ where
 
                 let numeric_results = determine_numeric_result(
                     &binary.operator,
-                    &left_atomic,
-                    &right_atomic,
+                    left_atomic,
+                    right_atomic,
                     block_context.flags.inside_loop(),
                 );
 
@@ -417,9 +482,20 @@ where
             }
 
             if !invalid_pair {
+                has_pair_without_overloading |= !is_overloaded_pair;
                 result_atomic_types.extend(pair_result_atomics);
             }
         }
+    }
+
+    if invalid_left_messages.is_empty() && invalid_right_messages.is_empty() {
+        report_disabled_operator_overloading(
+            context,
+            binary.span(),
+            binary.operator.as_bytes(),
+            &overloading_class_names,
+            !has_pair_without_overloading,
+        );
     }
 
     if !invalid_left_messages.is_empty() {
@@ -946,6 +1022,19 @@ fn key_could_be_in_param(key: &ArrayKey, param: &TUnion) -> bool {
         ArrayKey::String(_) => param.has_string() || param.has_array_key(),
         ArrayKey::ClassLikeConstant { .. } => true,
     }
+}
+
+fn bool_as_int(atomic: &TAtomic) -> &TAtomic {
+    match atomic {
+        TAtomic::Scalar(TScalar::Bool(bool)) if bool.is_false() => ZERO_INT_ATOMIC,
+        TAtomic::Scalar(TScalar::Bool(bool)) if bool.is_true() => ONE_INT_ATOMIC,
+        TAtomic::Scalar(TScalar::Bool(_)) => INT_ATOMIC,
+        atomic => atomic,
+    }
+}
+
+fn is_exponent_or_shift(operator: &BinaryOperator<'_>) -> bool {
+    matches!(operator, BinaryOperator::Exponentiation(_) | BinaryOperator::LeftShift(_) | BinaryOperator::RightShift(_))
 }
 
 /// Detect arithmetic operations that are statically guaranteed to throw at
