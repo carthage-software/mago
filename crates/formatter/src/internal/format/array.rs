@@ -188,7 +188,7 @@ where
                 }
             }
         } else {
-            let mut alignment = f.settings.align_assignment_like.then(|| Alignment::new(f.next_id(), false));
+            let mut alignment = f.settings.align_double_arrows.then(|| Alignment::new(f.next_id(), false));
 
             for (i, element) in elements.iter().enumerate() {
                 let element_span = element.span();
