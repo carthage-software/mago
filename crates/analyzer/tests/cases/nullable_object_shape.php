@@ -7,6 +7,7 @@ declare(strict_types=1);
  */
 function suffix_null(?object $obj): string
 {
+    // @mago-expect analysis:redundant-nullsafe-operator
     return $obj?->meta ?? '';
 }
 
@@ -15,6 +16,7 @@ function suffix_null(?object $obj): string
  */
 function prefix_null(?object $obj): string
 {
+    // @mago-expect analysis:redundant-nullsafe-operator
     return $obj?->meta ?? '';
 }
 
@@ -23,11 +25,13 @@ function prefix_null(?object $obj): string
  */
 function shorthand_null(?object $obj): string
 {
+    // @mago-expect analysis:redundant-nullsafe-operator
     return $obj?->meta ?? '';
 }
 
 function var_annotation(?object $obj): string
 {
     /** @var object{meta: string}|null $obj */
+    // @mago-expect analysis:redundant-nullsafe-operator
     return $obj?->meta ?? '';
 }

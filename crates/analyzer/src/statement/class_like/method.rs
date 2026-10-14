@@ -21,6 +21,7 @@ use crate::statement::function_like::FunctionLikeBody;
 use crate::statement::function_like::analyze_function_like;
 use crate::statement::function_like::check_unused_function_template_parameters;
 use crate::statement::function_like::unused_parameter;
+use crate::statement::function_like::validate_thrown_types;
 use crate::utils::missing_type_hints;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Method<'arena> {
@@ -123,6 +124,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Method<'arena> {
                     context,
                 );
             }
+        }
+
+        if !matches!(self.body, MethodBody::Concrete(_)) {
+            // Abstract and interface methods have no body, so `analyze_function_like`
+            // never runs for them; validate their `@throws` tags here instead.
+            validate_thrown_types(context, method_metadata);
         }
 
         check_unused_function_template_parameters(context, method_metadata, self.name.span(), "method", || {

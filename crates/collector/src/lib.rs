@@ -714,11 +714,11 @@ where
 
             let is_applicable = if pragma.is_consumed() && resolved_pragma_code != "all" {
                 false
-            } else if let Some(scope_span) = pragma.scope_span {
-                scope_span.contains(&issue_span) || issue_span.contains(&scope_span)
             } else if pragma.trivia_span.contains(&issue_span) || issue_span.contains(&pragma.trivia_span) {
                 // The issue is inside the same comment as the pragma!
                 true
+            } else if let Some(scope_span) = pragma.scope_span {
+                scope_span.contains(&issue_span) || issue_span.contains(&scope_span)
             } else if pragma.own_line {
                 pragma.start_line < issue_start_line
             } else {

@@ -365,6 +365,7 @@ where
 
     check_return_type_width(context, block_context, &mut artifacts, function_like_metadata);
     check_thrown_types(context, block_context, &mut artifacts, function_like_metadata);
+    validate_thrown_types(context, function_like_metadata);
 
     std::mem::swap(&mut context.type_resolution_context, &mut previous_type_resolution_context);
     let expression_types = std::mem::take(&mut artifacts.expression_types);
@@ -1309,6 +1310,80 @@ fn check_thrown_types<'ctx, A>(
             ));
 
         context.collector.report_with_code(IssueCode::UnhandledThrownType, issue);
+    }
+}
+
+/// Validates the types declared in `@throws` tags.
+///
+/// Unlike [`check_thrown_types`], which matches thrown exceptions against the declared
+/// types during `check_throws` analysis, this runs unconditionally: a `@throws` type
+/// that is not a subtype of `Throwable` can never be thrown or caught in a type-safe
+/// way, so the tag itself is defective.
+pub fn validate_thrown_types<A>(context: &mut Context<'_, '_, A>, function_like_metadata: &FunctionLikeMetadata)
+where
+    A: Arena,
+{
+    for thrown_type in &function_like_metadata.thrown_types {
+        if thrown_type.inferred {
+            // Inherited from a parent declaration; the tag itself is validated there.
+            continue;
+        }
+
+        for atomic in thrown_type.type_union.types.iter() {
+            if atomic.is_mixed() {
+                continue;
+            }
+
+            if atomic.extends_or_implements(context.codebase, b"Throwable") {
+                continue;
+            }
+
+            let mut object_names = atomic.get_all_object_names();
+            if let TAtomic::Reference(TReference::Symbol { name, .. }) = atomic {
+                object_names.push(*name);
+            }
+
+            if matches!(atomic, TAtomic::Reference(_)) && object_names.is_empty() {
+                // Unresolved reference; cannot prove it is not `Throwable`.
+                continue;
+            }
+
+            if matches!(atomic, TAtomic::Object(_) | TAtomic::Reference(_))
+                && !object_names.is_empty()
+                && object_names.iter().all(|name| {
+                    matches!(name.as_bytes(), b"self" | b"static" | b"parent" | b"$this")
+                        || context.codebase.get_class_like(name.as_bytes()).is_none()
+                })
+            {
+                // Unknown or late-bound class-like; cannot prove it is not `Throwable`.
+                continue;
+            }
+
+            let atomic_id = atomic.get_id();
+            let mut issue = Issue::error(format!(
+                "The type `{atomic_id}` declared in a `@throws` tag must be a subtype of `Throwable`.",
+            ))
+            .with_annotation(
+                Annotation::primary(thrown_type.span)
+                    .with_message(format!("`{atomic_id}` is not an instance of `Throwable`")),
+            );
+
+            if let Some(class_like) =
+                object_names.iter().find_map(|name| context.codebase.get_class_like(name.as_bytes()))
+            {
+                issue = issue.with_annotation(
+                    Annotation::secondary(class_like.name_span.unwrap_or(class_like.span))
+                        .with_message(format!("`{atomic_id}` defined here does not implement `Throwable`")),
+                );
+            }
+
+            context.collector.report_with_code(
+                IssueCode::ThrowsTypeNotThrowable,
+                issue
+                    .with_note("In PHP, only objects that implement the `Throwable` interface (this includes `Exception` and `Error` classes and their children) can be thrown or caught.")
+                    .with_help(format!("Ensure that `{atomic_id}` implements the `Throwable` interface, or remove it from the `@throws` tag.")),
+            );
+        }
     }
 }
 

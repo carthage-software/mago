@@ -37,6 +37,7 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::resolver::class_name::report_non_existent_class_like;
+use crate::resolver::property::report_redundant_nullsafe;
 use crate::resolver::selector::resolve_member_selector;
 use crate::utils::names::display_class_like_name;
 use crate::utils::names::display_method_name;
@@ -165,6 +166,7 @@ pub fn resolve_method_targets<'ctx, 'ast, 'arena, A>(
     object: &'ast Expression<'arena>,
     selector: &'ast ClassLikeMemberSelector<'arena>,
     is_null_safe: bool,
+    operator_span: Span,
     access_span: Span,
 ) -> Result<MethodResolutionResult, AnalysisError>
 where
@@ -194,6 +196,13 @@ where
     }
 
     if let Some(object_type) = artifacts.get_expression_type(object) {
+        let is_nullable = object_type.can_be_null() || object_type.possibly_undefined();
+        let is_all_null = object_type.is_null() || object_type.is_void();
+
+        if is_null_safe && !is_nullable && !is_all_null && !object_type.has_nullsafe_null() {
+            report_redundant_nullsafe(context, operator_span, object, object_type, "method call");
+        }
+
         let mut object_atomics = object_type.types.iter().collect::<Vec<_>>();
 
         while let Some(object_atomic) = object_atomics.pop() {

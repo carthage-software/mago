@@ -207,8 +207,13 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
         for (i, catch_clause) in self.catch_clauses.iter().enumerate() {
             let mut catch_block_context = original_block_context.clone();
             catch_block_context.flags.set_has_returned(false);
-            let (caught_classes, has_valid_caught_classes) =
-                get_caught_classes(context, &catch_block_context, artifacts, &catch_clause.hint);
+            let (caught_classes, has_valid_caught_classes) = get_caught_classes(
+                context,
+                &catch_block_context,
+                artifacts,
+                &catch_clause.hint,
+                &previously_caught_types,
+            );
 
             for (variable_id, variable_type) in &mut catch_block_context.locals {
                 if let Some(old_type) = old_block_context_locals.get(variable_id) {
@@ -513,6 +518,7 @@ fn get_caught_classes<'arena, A>(
     block_context: &BlockContext<'_>,
     artifacts: &mut AnalysisArtifacts,
     hint: &Hint<'arena>,
+    previously_caught_types: &WordSet,
 ) -> (WordSet, bool)
 where
     A: Arena,
@@ -577,7 +583,7 @@ where
     let throwable = word(b"Throwable");
     let mut caught_classes: WordSet =
         WordSet::with_capacity_and_hasher(caught_identifiers.len(), foldhash::fast::FixedState::default());
-    for (caught_type, caught_span) in caught_identifiers {
+    for (&caught_type, &caught_span) in &caught_identifiers {
         artifacts.symbol_references.add_reference_to_symbol(
             &block_context.scope,
             caught_type.to_ascii_lowercase(),
@@ -660,6 +666,8 @@ where
 
         caught_classes.insert(caught_type);
     }
+
+    report_redundant_caught_types(context, &caught_identifiers, &caught_classes, previously_caught_types);
 
     let has_valid_caught_classes = !caught_classes.is_empty();
     if !has_valid_caught_classes {
@@ -898,4 +906,75 @@ fn get_declared_method_identifier(class_metadata: &ClassLikeMetadata, method_nam
     class_metadata.declaring_method_ids.get(&method_name).copied().or_else(|| {
         class_metadata.methods.contains(&method_name).then(|| MethodIdentifier::new(class_metadata.name, method_name))
     })
+}
+
+/// Reports catch types that can never match because they are covered by another
+/// type in the same `catch` clause, or by a type caught in an earlier clause.
+///
+/// This needs no throw analysis: a covered alternative is redundant regardless
+/// of what the `try` block throws.
+fn report_redundant_caught_types<A>(
+    context: &mut Context<'_, '_, A>,
+    caught_identifiers: &WordMap<Span>,
+    caught_classes: &WordSet,
+    previously_caught_classes: &WordSet,
+) where
+    A: Arena,
+{
+    for (caught_type, caught_span) in caught_identifiers {
+        if !caught_classes.contains(caught_type) {
+            continue;
+        }
+
+        if let Some(covering) = caught_classes.iter().find(|other| {
+            !other.as_bytes().eq_ignore_ascii_case(caught_type.as_bytes())
+                && context.codebase.is_instance_of(caught_type.as_bytes(), other.as_bytes())
+        }) {
+            context.collector.report_with_code(
+                IssueCode::RedundantCaughtType,
+                Issue::error(format!(
+                    "Type `{caught_type}` is redundant in this `catch` clause, as `{covering}` already catches all of its instances.",
+                ))
+                .with_annotation(
+                    Annotation::primary(*caught_span).with_message("This type can never match here"),
+                )
+                .with_annotation(
+                    Annotation::secondary(caught_identifiers.get(covering).copied().unwrap_or(*caught_span))
+                        .with_message(format!("`{covering}` already catches these instances")),
+                )
+                .with_help("Remove the redundant type from the `catch` union. Each exception type should only be listed once."),
+            );
+
+            continue;
+        }
+
+        if context.settings.check_dead_catch
+            && caught_classes.iter().all(|caught| {
+                previously_caught_classes
+                    .iter()
+                    .any(|previous| context.codebase.is_instance_of(caught.as_bytes(), previous.as_bytes()))
+            })
+        {
+            continue;
+        }
+
+        if let Some(covering) = previously_caught_classes.iter().find(|previous| {
+            !previous.as_bytes().eq_ignore_ascii_case(caught_type.as_bytes())
+                && context.codebase.is_instance_of(caught_type.as_bytes(), previous.as_bytes())
+        }) {
+            context.collector.report_with_code(
+                IssueCode::RedundantCaughtType,
+                Issue::error(format!(
+                    "Type `{caught_type}` is redundant, as it is already caught by an earlier `catch` clause for `{covering}`.",
+                ))
+                .with_annotation(
+                    Annotation::primary(*caught_span).with_message("This `catch` type is unreachable"),
+                )
+                .with_note(format!(
+                    "An earlier `catch` clause already catches all instances of `{covering}`, so this type can never match here.",
+                ))
+                .with_help("Remove the redundant type, or reorder the `catch` clauses so the more specific type comes first."),
+            );
+        }
+    }
 }
