@@ -146,6 +146,7 @@ use crate::rule::PreferFakeHelperConfig;
 use crate::rule::PreferFirstClassCallableConfig;
 use crate::rule::PreferInterfaceConfig;
 use crate::rule::PreferPreIncrementConfig;
+use crate::rule::PreferSelfConfig;
 use crate::rule::PreferSelfReturnTypeConfig;
 use crate::rule::PreferStaticClosureConfig;
 use crate::rule::PreferTestAttributeConfig;
@@ -408,6 +409,7 @@ pub struct RulesSettings {
     pub no_alternative_syntax: RuleSettings<NoAlternativeSyntaxConfig>,
     pub prefer_pre_increment: RuleSettings<PreferPreIncrementConfig>,
     pub prefer_self_return_type: RuleSettings<PreferSelfReturnTypeConfig>,
+    pub prefer_self: RuleSettings<PreferSelfConfig>,
     pub switch_continue_to_break: RuleSettings<SwitchContinueToBreakConfig>,
     pub no_null_property_init: RuleSettings<NoNullPropertyInitConfig>,
     pub use_wp_functions: RuleSettings<UseWpFunctionsConfig>,
