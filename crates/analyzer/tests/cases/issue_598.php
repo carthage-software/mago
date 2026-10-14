@@ -7,6 +7,7 @@ function a(): never
     die();
 }
 
+/** @mago-expect analysis:dead-catch */
 function xxx(): int
 {
     try {

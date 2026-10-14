@@ -143,6 +143,7 @@ final class AnalyzerCodeModuleGenerator
         'deprecated-closure',
         'deprecated-property',
         'deprecated-class-constant',
+        'dead-catch',
         'named-argument-not-allowed',
         'duplicate-named-argument',
         'named-argument-overrides-positional',
