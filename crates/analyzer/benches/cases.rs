@@ -6,6 +6,7 @@ use std::borrow::Cow;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::LazyLock;
+use std::time::Duration;
 
 use criterion::BenchmarkId;
 use criterion::Criterion;
@@ -33,6 +34,10 @@ static PRELUDE: LazyLock<Prelude> = LazyLock::new(Prelude::build);
 static PLUGIN_REGISTRY: LazyLock<PluginRegistry> = LazyLock::new(PluginRegistry::with_library_providers);
 
 fn analyze_file(path: &Path, content: &str) {
+    analyze_file_with_settings(path, content, false);
+}
+
+fn analyze_file_with_settings(path: &Path, content: &str, check_dead_catch: bool) {
     let Prelude { mut database, mut metadata, mut symbol_references } = PRELUDE.clone();
 
     let file = File::ephemeral(
@@ -55,6 +60,7 @@ fn analyze_file(path: &Path, content: &str) {
         find_unused_expressions: true,
         find_unused_definitions: true,
         check_throws: true,
+        check_dead_catch,
         allow_possibly_undefined_array_keys: false,
         strict_list_index_checks: true,
         check_property_initialization: true,
@@ -72,7 +78,17 @@ fn analyze_file(path: &Path, content: &str) {
     }
 }
 
-const BENCHMARKED_PREFIXES: &[&str] = &["issue_", "psl_", "sealed_class_", "trait_", "conditional_"];
+const BENCHMARKED_PREFIXES: &[&str] = &["issue_", "psl_", "sealed_class_", "trait_", "conditional_", "too_wide_throws"];
+const GENERIC_THROW_FIXTURES: &[&str] = &[
+    "generic_iterator_aggregate_union_bindings",
+    "generic_method_throw_dead_catch",
+    "generic_throw_template_bound_chain",
+    "generic_throw_unused_detection",
+    "generic_throwing_iterator_foreach",
+    "recursive_generic_throw_resolution",
+    "too_wide_generic_throw",
+    "unresolved_recursive_generic_throw",
+];
 
 fn discover_cases_by_prefix() -> Vec<(&'static str, Vec<(PathBuf, String)>)> {
     let cases_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("cases");
@@ -118,6 +134,27 @@ fn bench_cases(c: &mut Criterion) {
                     analyze_file(p, c);
                 }
             });
+        });
+    }
+
+    group.finish();
+}
+
+fn bench_generic_throw_fixtures(c: &mut Criterion) {
+    let cases_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("cases");
+    let mut group = c.benchmark_group("analyzer_generic_throw_fixture");
+    group.sample_size(10);
+    group.warm_up_time(Duration::from_millis(500));
+    group.measurement_time(Duration::from_secs(1));
+
+    for fixture in GENERIC_THROW_FIXTURES {
+        let path = cases_dir.join(format!("{fixture}.php"));
+        let content =
+            std::fs::read_to_string(&path).unwrap_or_else(|error| panic!("failed to read {}: {error}", path.display()));
+        let check_dead_catch = *fixture == "generic_method_throw_dead_catch";
+
+        group.bench_function(*fixture, |b| {
+            b.iter(|| analyze_file_with_settings(&path, &content, check_dead_catch));
         });
     }
 
@@ -255,5 +292,5 @@ fn bench_nested_attribute_group(c: &mut Criterion, group_name: &str, cases: &[(&
     group.finish();
 }
 
-criterion_group!(benches, bench_cases, bench_parameter_attribute_defaults);
+criterion_group!(benches, bench_cases, bench_generic_throw_fixtures, bench_parameter_attribute_defaults);
 criterion_main!(benches);

@@ -17,6 +17,8 @@ use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
+use mago_codex::ttype::atomic::callable::TCallable;
+use mago_codex::ttype::atomic::generic::TGenericParameter;
 use mago_codex::ttype::atomic::resource::TResource;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::bool::TBool;
@@ -28,10 +30,13 @@ use mago_codex::ttype::expander::expand_union;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::template::TemplateResult;
+use mago_codex::ttype::template::bounds::get_most_specific_type_from_bounds;
+use mago_codex::ttype::template::bounds::get_relevant_bounds;
 use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
+use mago_span::Span;
 use mago_syntax::cst::Argument;
 use mago_syntax::cst::BinaryOperator;
 use mago_syntax::cst::Expression;
@@ -46,6 +51,7 @@ use crate::artifacts::AnalysisArtifacts;
 use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
+use crate::context::block::PossiblyThrownGenericException;
 use crate::context::block::ReferenceConstraint;
 use crate::context::block::ReferenceConstraintSource;
 use crate::error::AnalysisError;
@@ -63,6 +69,8 @@ use crate::invocation::resolver::resolve_invocation_type;
 use crate::plugin::provider::assertion::InvocationAssertions;
 use crate::reconciler;
 use crate::reconciler::assertion_reconciler::intersect_union_with_union;
+use crate::utils::exception::get_throw_type_atomics;
+use crate::utils::exception::get_throw_type_object_names;
 use crate::utils::expression::get_block_expression_id;
 use crate::utils::expression::get_non_nullsafe_expression_id;
 use crate::utils::expression::get_nullsafe_base_expressions;
@@ -146,7 +154,7 @@ where
         }
     }
 
-    if context.settings.check_throws {
+    if context.settings.check_throws || context.settings.find_overly_wide_throw_types {
         let external_throw_types = match identifier {
             FunctionLikeIdentifier::Function(name) => context.plugin_registry.get_external_function_thrown_exceptions(
                 context.codebase,
@@ -169,6 +177,7 @@ where
             }
             FunctionLikeIdentifier::Closure(_) => None,
         };
+
         if let Some(exceptions) = external_throw_types {
             for exception in exceptions {
                 block_context.possibly_thrown_exceptions.entry(exception).or_default().insert(invoication.span);
@@ -180,30 +189,88 @@ where
                 invoication.target.get_method_context().map(|context| context.class_like_metadata),
                 metadata,
             );
-            for thrown_exception_type in thrown_types {
-                let resolved_exception_type = resolve_invocation_type(
-                    context,
-                    invoication,
-                    template_result,
-                    parameters,
-                    thrown_exception_type.type_union.clone(),
-                );
+            let is_recursive_call = block_context.scope.get_function_like().is_some_and(|function_like| {
+                function_like.name == metadata.name && function_like.span == metadata.span
+            });
 
-                for exception_atomic in resolved_exception_type.types.into_owned() {
-                    for exception in exception_atomic.get_all_object_names() {
-                        if backed_enum_from_argument_is_valid
-                            && exception.as_bytes().eq_ignore_ascii_case(b"valueerror")
+            for thrown_exception_type in thrown_types {
+                let mut thrown_type_union = thrown_exception_type.type_union.clone();
+                let mut unresolved_generic_throw_types = Vec::new();
+                if is_recursive_call {
+                    let mut resolved_throw_types = Vec::new();
+                    for exception_atomic in thrown_type_union.types.iter() {
+                        let TAtomic::GenericParameter(parameter) = exception_atomic else {
+                            resolved_throw_types.push(exception_atomic.clone());
+                            continue;
+                        };
+
+                        if !exception_atomic.extends_or_implements(context.codebase, b"Throwable")
+                            || has_template_binding_within_constraint(context, parameter, template_result)
                         {
+                            resolved_throw_types.push(exception_atomic.clone());
                             continue;
                         }
 
-                        block_context.possibly_thrown_exceptions.entry(exception).or_default().insert(invoication.span);
+                        unresolved_generic_throw_types.push(exception_atomic.clone());
+                    }
+
+                    thrown_type_union.types = resolved_throw_types.into();
+                }
+
+                let mut resolved_exception_types = Vec::new();
+                if !thrown_type_union.types.is_empty() {
+                    resolved_exception_types.push(resolve_invocation_type(
+                        context,
+                        invoication,
+                        template_result,
+                        parameters,
+                        thrown_type_union,
+                    ));
+                }
+
+                for exception_atomic in unresolved_generic_throw_types {
+                    for thrown_atomic in get_throw_type_atomics(&exception_atomic) {
+                        resolved_exception_types.push(TUnion::from_atomic(thrown_atomic));
+                    }
+                }
+
+                for resolved_exception_type in resolved_exception_types {
+                    for exception_atomic in resolved_exception_type.types.into_owned() {
+                        for thrown_atomic in get_throw_type_atomics(&exception_atomic) {
+                            if matches!(&thrown_atomic, TAtomic::GenericParameter(_))
+                                && thrown_atomic.extends_or_implements(context.codebase, b"Throwable")
+                            {
+                                let object_names = get_throw_type_object_names(context.codebase, &thrown_atomic);
+                                let thrown_generic = PossiblyThrownGenericException {
+                                    object_names,
+                                    atomic_type: thrown_atomic,
+                                    span: invoication.span,
+                                };
+                                block_context.possibly_thrown_generic_exceptions.insert(thrown_generic);
+                            } else {
+                                for exception in thrown_atomic.get_all_object_names() {
+                                    if backed_enum_from_argument_is_valid
+                                        && exception.as_bytes().eq_ignore_ascii_case(b"valueerror")
+                                    {
+                                        continue;
+                                    }
+
+                                    block_context
+                                        .possibly_thrown_exceptions
+                                        .entry(exception)
+                                        .or_default()
+                                        .insert(invoication.span);
+                                }
+                            }
+                        }
                     }
                 }
             }
 
             collect_plugin_throw_types(context, block_context, artifacts, invoication, identifier);
         }
+
+        record_immediate_callback_throw_types(context, block_context, artifacts, invoication, identifier);
     }
 
     if !apply_assertions {
@@ -352,6 +419,281 @@ where
         false,
         &mut ComparisonResult::default(),
     )
+}
+
+fn record_immediate_callback_throw_types<'ctx, 'arena, A>(
+    context: &Context<'ctx, 'arena, A>,
+    block_context: &mut BlockContext<'ctx>,
+    artifacts: &AnalysisArtifacts,
+    invocation: &Invocation<'ctx, '_, 'arena>,
+    identifier: &FunctionLikeIdentifier,
+) where
+    A: Arena,
+{
+    let Some(callback_parameter_offset) = immediate_callback_parameter_offset(identifier) else {
+        return;
+    };
+
+    let (Some(callback_expression), _) =
+        get_argument_for_parameter(context, block_context, invocation, Some(callback_parameter_offset), None)
+    else {
+        return;
+    };
+
+    let Some(callback_type) = artifacts.get_expression_type(callback_expression) else {
+        return;
+    };
+
+    let array_map_callback_will_not_run = context.settings.find_overly_wide_throw_types
+        && array_map_callback_is_definitely_not_invoked(artifacts, invocation, identifier);
+
+    if !array_map_callback_will_not_run {
+        for callable in callback_type.types.iter().filter_map(|atomic| match atomic {
+            TAtomic::Callable(TCallable::Alias(identifier)) => Some(*identifier),
+            TAtomic::Callable(TCallable::Signature(signature)) => signature.source,
+            _ => None,
+        }) {
+            record_callback_throw_types(context, block_context, callable, invocation.span);
+        }
+    }
+
+    if !matches!(identifier, FunctionLikeIdentifier::Function(name) if name.as_bytes() == b"preg_replace_callback_array")
+    {
+        return;
+    }
+
+    for atomic in callback_type.types.iter() {
+        let TAtomic::Array(array) = atomic else {
+            continue;
+        };
+
+        let callback_types = match array {
+            TArray::List(list) => {
+                let mut unions = vec![list.element_type.as_ref()];
+                if let Some(known_elements) = &list.known_elements {
+                    unions.extend(known_elements.values().map(|(_, element)| element));
+                }
+                unions
+            }
+            TArray::Keyed(keyed) => {
+                let mut unions = Vec::new();
+                if let Some((_, value_type)) = &keyed.parameters {
+                    unions.push(value_type.as_ref());
+                }
+                if let Some(known_items) = &keyed.known_items {
+                    unions.extend(known_items.values().map(|(_, item)| item));
+                }
+                unions
+            }
+        };
+
+        for callback_type in callback_types {
+            for callable in callback_type.types.iter().filter_map(|atomic| match atomic {
+                TAtomic::Callable(TCallable::Alias(identifier)) => Some(*identifier),
+                TAtomic::Callable(TCallable::Signature(signature)) => signature.source,
+                _ => None,
+            }) {
+                record_callback_throw_types(context, block_context, callable, invocation.span);
+            }
+        }
+    }
+}
+
+fn array_map_callback_is_definitely_not_invoked(
+    artifacts: &AnalysisArtifacts,
+    invocation: &Invocation<'_, '_, '_>,
+    identifier: &FunctionLikeIdentifier,
+) -> bool {
+    if !matches!(identifier, FunctionLikeIdentifier::Function(name) if name.as_bytes().eq_ignore_ascii_case(b"array_map"))
+    {
+        return false;
+    }
+
+    let mut array_arguments = Vec::new();
+    let mut positional_parameter_index = 0;
+    let mut saw_named_argument = false;
+
+    for argument in invocation.arguments_source.iter_arguments() {
+        if argument.is_unpacked() {
+            return false;
+        }
+
+        match argument.get_parameter_name() {
+            Some(b"callback") => saw_named_argument = true,
+            Some(b"array") | Some(b"arrays") => {
+                saw_named_argument = true;
+                let Some(expression) = argument.value() else {
+                    return false;
+                };
+                array_arguments.push(expression);
+            }
+            Some(_) => return false,
+            None => {
+                if saw_named_argument || !argument.is_positional() {
+                    return false;
+                }
+
+                if positional_parameter_index == 0 {
+                    positional_parameter_index = 1;
+                    continue;
+                }
+
+                positional_parameter_index += 1;
+                let Some(expression) = argument.value() else {
+                    return false;
+                };
+                array_arguments.push(expression);
+            }
+        }
+    }
+
+    !array_arguments.is_empty()
+        && array_arguments.iter().all(|expression| {
+            artifacts.get_expression_type(expression).is_some_and(|array_type| {
+                !array_type.types.is_empty()
+                    && array_type.types.iter().all(|atomic| matches!(atomic, TAtomic::Array(array) if array.is_empty()))
+            })
+        })
+}
+
+fn record_callback_throw_types<'ctx, A>(
+    context: &Context<'ctx, '_, A>,
+    block_context: &mut BlockContext<'ctx>,
+    callable: FunctionLikeIdentifier,
+    span: Span,
+) where
+    A: Arena,
+{
+    let Some(callback_metadata) = context.codebase.get_function_like(&callable) else {
+        return;
+    };
+
+    let class_like = match callable {
+        FunctionLikeIdentifier::Method(class_name, _) => context.codebase.get_class_like(class_name.as_bytes()),
+        FunctionLikeIdentifier::Function(_) | FunctionLikeIdentifier::Closure(_) => None,
+    };
+
+    for thrown_type in context.codebase.get_function_like_thrown_types(class_like, callback_metadata) {
+        for atomic_type in thrown_type.type_union.types.iter() {
+            if !atomic_type.extends_or_implements(context.codebase, b"Throwable") {
+                continue;
+            }
+
+            for thrown_atomic in get_throw_type_atomics(atomic_type) {
+                if matches!(&thrown_atomic, TAtomic::GenericParameter(_))
+                    && thrown_atomic.extends_or_implements(context.codebase, b"Throwable")
+                {
+                    let thrown_generic = PossiblyThrownGenericException {
+                        object_names: get_throw_type_object_names(context.codebase, &thrown_atomic),
+                        atomic_type: thrown_atomic,
+                        span,
+                    };
+                    block_context.possibly_thrown_generic_exceptions.insert(thrown_generic);
+                } else {
+                    for exception in thrown_atomic.get_all_object_names() {
+                        block_context.possibly_thrown_exceptions.entry(exception).or_default().insert(span);
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn immediate_callback_parameter_offset(identifier: &FunctionLikeIdentifier) -> Option<usize> {
+    let FunctionLikeIdentifier::Function(name) = identifier else {
+        return None;
+    };
+
+    match name.as_bytes() {
+        b"array_all"
+        | b"array_any"
+        | b"array_filter"
+        | b"array_find"
+        | b"array_find_key"
+        | b"array_reduce"
+        | b"array_walk"
+        | b"array_walk_recursive"
+        | b"iterator_apply"
+        | b"preg_replace_callback"
+        | b"uasort"
+        | b"uksort"
+        | b"usort" => Some(1),
+        b"array_map" | b"preg_replace_callback_array" => Some(0),
+        b"call_user_func" | b"call_user_func_array" | b"forward_static_call" | b"forward_static_call_array" => Some(0),
+        _ => None,
+    }
+}
+
+fn has_template_binding_within_constraint<A>(
+    context: &Context<'_, '_, A>,
+    parameter: &TGenericParameter,
+    template_result: &TemplateResult,
+) -> bool
+where
+    A: Arena,
+{
+    let Some(bounds) = template_result
+        .lower_bounds
+        .get(&parameter.parameter_name)
+        .and_then(|bounds| bounds.get(&parameter.defining_entity))
+    else {
+        return false;
+    };
+
+    let bound_type = get_most_specific_type_from_bounds(bounds, context.codebase);
+
+    if bound_type.is_never() {
+        return false;
+    }
+
+    if !bound_type.types.is_empty()
+        && bound_type.types.iter().all(|atomic| {
+            matches!(
+                atomic,
+                TAtomic::GenericParameter(bound_parameter)
+                    if bound_parameter.parameter_name == parameter.parameter_name
+                        && bound_parameter.defining_entity == parameter.defining_entity
+            )
+        })
+    {
+        return false;
+    }
+
+    let bound_is_within_constraint = is_contained_by(
+        context.codebase,
+        &bound_type,
+        &parameter.constraint,
+        false,
+        false,
+        false,
+        &mut ComparisonResult::default(),
+    );
+    if !bound_is_within_constraint {
+        return false;
+    }
+
+    let constraint_is_within_bound = is_contained_by(
+        context.codebase,
+        &parameter.constraint,
+        &bound_type,
+        false,
+        false,
+        false,
+        &mut ComparisonResult::default(),
+    );
+
+    if !constraint_is_within_bound {
+        return true;
+    }
+
+    let has_explicit_inference = get_relevant_bounds(bounds).iter().any(|bound| bound.argument_offset.is_some());
+    let has_explicit_default = template_result.template_types.get(&parameter.parameter_name).is_some_and(|templates| {
+        templates
+            .iter()
+            .any(|template| template.defining_entity == parameter.defining_entity && template.default.is_some())
+    });
+
+    !bound_type.has_template_types() && (has_explicit_inference || has_explicit_default)
 }
 
 fn display_callable_name<A>(

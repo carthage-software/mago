@@ -93,10 +93,11 @@ Ces indicateurs activent ou désactivent des analyses individuelles. Les valeurs
 | `find-unused-expressions` | `true` | Signale les expressions dont le résultat est ignoré, comme `$a + $b;`. |
 | `find-unused-definitions` | `true` | Signale les définitions privées qui ne sont jamais référencées. |
 | `find-overly-wide-return-types` | `false` | Avertit lorsqu'un type de retour déclaré contient une branche que le corps ne produit jamais, comme `: string\|false` sur une fonction qui retourne toujours une chaîne. Disponible depuis 1.20.0. |
+| `find-overly-wide-throw-types` | `false` | Avertit lorsqu'un type `@throws` documenté ne peut pas s'échapper de la fonction ou de la méthode. |
 | `analyze-dead-code` | `false` | Analyse le code qui semble inaccessible. |
 | `memoize-properties` | `true` | Suit les valeurs littérales de propriété pour une inférence plus précise, au prix d'un peu de mémoire. |
 | `allow-possibly-undefined-array-keys` | `true` | **Déprécié.** Autorise l'accès aux clés qui peuvent manquer sans le signaler. Le passer à `false` signale uniquement les lectures de `array<K, V>` avec une clé littérale unique et n'élargit pas le type à `T\|null`. Préférez `strict-array-index-existence`. |
-| `check-throws` | `false` | Signale les exceptions non capturées et non déclarées avec `@throws`. |
+| `check-throws` | `false` | Signale les exceptions non capturées absentes de `@throws`. |
 | `check-dead-catch` | `false` | Signale les clauses `catch` qui ne correspondent à aucune exception connue du bloc `try`. Nécessite `check-throws` ; du code non documenté peut malgré tout lancer des exceptions invisibles pour l'analyseur. |
 | `check-missing-override` | `false` | Signale les attributs `#[Override]` manquants sur les méthodes redéfinissantes (PHP 8.3+). |
 | `find-unused-parameters` | `false` | Signale les paramètres qui ne sont jamais lus. |
@@ -163,7 +164,7 @@ Une entrée simple comme `boot` accepte une méthode correspondante sur n'import
 
 ## Filtrage d'exceptions
 
-Lorsque `check-throws` est activé, deux options vous permettent d'ignorer des exceptions spécifiques.
+Lorsque `check-throws` ou `find-overly-wide-throw-types` est activé, deux options vous permettent d'ignorer des exceptions spécifiques.
 
 | Option | Type | Défaut | Description |
 | :--- | :--- | :--- | :--- |
@@ -286,6 +287,7 @@ L'analyseur s'exécute à une rigueur modérée par défaut. Augmentez-la en act
 find-unused-expressions = true
 find-unused-definitions = true
 find-overly-wide-return-types = true
+find-overly-wide-throw-types = true
 analyze-dead-code = true
 check-throws = true
 check-dead-catch = true

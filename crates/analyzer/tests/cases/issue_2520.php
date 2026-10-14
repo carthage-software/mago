@@ -8,6 +8,7 @@ declare(strict_types=1);
  * @param IteratorAggregate<T> $items
  *
  * @return T|null
+ * @throws Exception
  */
 function first_of_aggregate(IteratorAggregate $items): ?object
 {
@@ -73,7 +74,10 @@ final class Collection implements IteratorAggregate
         return new ArrayIterator($this->items);
     }
 
-    /** @return T|null */
+    /**
+     * @return T|null
+     * @throws Exception
+     */
     public function first(): ?Entity
     {
         foreach ($this as $item) {
@@ -136,6 +140,7 @@ function first_of_array_iterator(ArrayIterator $items): ?Entity
  * @param Collection<T> $items
  *
  * @return T|null
+ * @throws Exception
  */
 function first_of_collection(Collection $items): ?Entity
 {

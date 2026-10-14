@@ -76,6 +76,7 @@ use crate::statement::class_like::property::analyze_property_hook;
 use crate::statement::r#return::handle_return_value;
 use crate::statement::r#static::add_captured_types;
 use crate::statement::r#static::infer_static_local_types;
+use crate::utils::exception::get_throw_type_object_names;
 use crate::utils::expression::get_variable_id;
 use crate::utils::template::check_template_arguments;
 use crate::utils::template::check_template_definitions;
@@ -1215,13 +1216,8 @@ fn check_thrown_types<'ctx, A>(
 ) where
     A: Arena,
 {
-    if !context.settings.check_throws {
+    if !context.settings.check_throws && !context.settings.find_overly_wide_throw_types {
         // If the setting is disabled, we skip the check.
-        return;
-    }
-
-    if block_context.possibly_thrown_exceptions.is_empty() {
-        // No exceptions are thrown in this block, so we can skip the check.
         return;
     }
 
@@ -1246,12 +1242,32 @@ fn check_thrown_types<'ctx, A>(
         })
     };
 
+    if context.settings.find_overly_wide_throw_types {
+        check_too_wide_throw_types(context, block_context, artifacts, function_like_metadata, function_kind, || {
+            function_name()
+        });
+    }
+
+    if !context.settings.check_throws {
+        return;
+    }
+
+    if block_context.possibly_thrown_exceptions.is_empty()
+        && block_context.possibly_thrown_generic_exceptions.is_empty()
+    {
+        // No exceptions are thrown in this block, so there is nothing to check for missing declarations.
+        return;
+    }
+
     let expected_throw_types = context
         .codebase
         .get_function_like_thrown_types(block_context.scope.get_class_like(), function_like_metadata)
         .iter()
         .map(|thrown_type| expand_type_metadata(context, block_context, artifacts, function_like_metadata, thrown_type))
+        .map(|thrown_type| TUnion::from_vec(thrown_type.types.iter().map(erase_throw_type_parameters).collect()))
         .collect::<Vec<_>>();
+
+    let mut unhandled_thrown_exceptions = HashMap::<Word, Vec<Span>>::default();
 
     for (thrown_type, thrown_spans) in &block_context.possibly_thrown_exceptions {
         // Skip if exception is in unchecked lists
@@ -1277,15 +1293,39 @@ fn check_thrown_types<'ctx, A>(
             }
         }
 
+        if !is_expected {
+            unhandled_thrown_exceptions.insert(*thrown_type, thrown_spans.iter().copied().collect());
+        }
+    }
+
+    for generic_throw in &block_context.possibly_thrown_generic_exceptions {
+        let is_expected = expected_throw_types
+            .iter()
+            .flat_map(|expected_type| expected_type.types.iter())
+            .any(|expected_atomic| throw_atomic_is_contained_by(context, &generic_throw.atomic_type, expected_atomic));
+
         if is_expected {
             continue;
         }
 
+        for object_name in &generic_throw.object_names {
+            if is_exception_unchecked(context, *object_name) {
+                continue;
+            }
+
+            let spans = unhandled_thrown_exceptions.entry(*object_name).or_default();
+            if !spans.contains(&generic_throw.span) {
+                spans.push(generic_throw.span);
+            }
+        }
+    }
+
+    for (thrown_type, thrown_spans) in unhandled_thrown_exceptions {
         let mut issue =
             Issue::error(format!("Potentially unhandled exception `{thrown_type}` in `{}`.", function_name()));
 
         for span in thrown_spans {
-            issue = issue.with_annotation(Annotation::primary(*span).with_message("Exception may be thrown here"));
+            issue = issue.with_annotation(Annotation::primary(span).with_message("Exception may be thrown here"));
         }
 
         issue = issue
@@ -1302,6 +1342,178 @@ fn check_thrown_types<'ctx, A>(
 
         context.collector.report_with_code(IssueCode::UnhandledThrownType, issue);
     }
+}
+
+fn check_too_wide_throw_types<'ctx, A, F>(
+    context: &mut Context<'ctx, '_, A>,
+    block_context: &BlockContext<'ctx>,
+    artifacts: &mut AnalysisArtifacts,
+    function_like_metadata: &'ctx FunctionLikeMetadata,
+    function_kind: &str,
+    function_name: F,
+) where
+    A: Arena,
+    F: Fn() -> Word,
+{
+    let mut inherited_class_throw_spans = Vec::new();
+    if let Some(class_like_metadata) = block_context.scope.get_class_like() {
+        let mut parent_class_name = class_like_metadata.direct_parent_class;
+        while let Some(parent_name) = parent_class_name {
+            if let Some(parent_method) =
+                context.codebase.function_likes.get(&(parent_name, function_like_metadata.name))
+            {
+                inherited_class_throw_spans.extend(
+                    parent_method
+                        .thrown_types
+                        .iter()
+                        .filter(|thrown_type| thrown_type.from_docblock && !thrown_type.inferred)
+                        .map(|thrown_type| thrown_type.span),
+                );
+            }
+
+            parent_class_name =
+                context.codebase.class_likes.get(&parent_name).and_then(|parent| parent.direct_parent_class);
+        }
+    }
+
+    let declared_types = function_like_metadata
+        .thrown_types
+        .iter()
+        .filter(|thrown_type| {
+            thrown_type.from_docblock
+                && (!thrown_type.inferred || inherited_class_throw_spans.contains(&thrown_type.span))
+        })
+        .collect::<Vec<_>>();
+
+    for declared_type in declared_types {
+        let expanded_type =
+            expand_type_metadata(context, block_context, artifacts, function_like_metadata, declared_type);
+
+        for atomic_type in expanded_type.types.iter() {
+            match atomic_type {
+                TAtomic::Object(_) => {}
+                TAtomic::GenericParameter(_) if atomic_type.extends_or_implements(context.codebase, b"Throwable") => {}
+                _ => continue,
+            }
+
+            let exception_names = get_throw_type_object_names(context.codebase, atomic_type);
+            if !exception_names.is_empty()
+                && exception_names.iter().all(|exception_name| is_exception_unchecked(context, *exception_name))
+            {
+                continue;
+            }
+
+            let erased_atomic_type = erase_throw_type_parameters(atomic_type);
+            let declared_exception = TUnion::from_atomic(erased_atomic_type);
+            let is_thrown_by_name = block_context.possibly_thrown_exceptions.keys().any(|thrown_type| {
+                let thrown_exception = TUnion::from_atomic(TAtomic::Object(TObject::new_named(*thrown_type)));
+
+                union_comparator::is_contained_by(
+                    context.codebase,
+                    &thrown_exception,
+                    &declared_exception,
+                    false,
+                    false,
+                    false,
+                    &mut ComparisonResult::default(),
+                )
+            });
+
+            let is_thrown_as_generic = block_context.possibly_thrown_generic_exceptions.iter().any(|generic_throw| {
+                if generic_throw.object_names.is_empty()
+                    || generic_throw.object_names.iter().all(|name| is_exception_unchecked(context, *name))
+                {
+                    return false;
+                }
+
+                throw_atomic_is_contained_by(context, &generic_throw.atomic_type, atomic_type)
+            });
+
+            let is_thrown = is_thrown_by_name || is_thrown_as_generic;
+
+            if is_thrown {
+                continue;
+            }
+
+            let exception_name = atomic_type.get_id();
+            let issue = Issue::error(format!(
+                "Declared exception `{exception_name}` in `{}` is never thrown.",
+                function_name()
+            ))
+            .with_annotation(
+                Annotation::primary(declared_type.span)
+                    .with_message(format!("`{exception_name}` is not thrown from this {function_kind}")),
+            )
+            .with_annotation(
+                Annotation::secondary(function_like_metadata.span)
+                    .with_message(format!("This {function_kind} does not throw `{exception_name}`")),
+            )
+            .with_note("An exception documented with `@throws` should be able to escape this function or method.")
+            .with_help(format!("Remove `@throws {exception_name}` or add a reachable path that throws it."));
+
+            context.collector.report_with_code(IssueCode::TooWideThrowType, issue);
+        }
+    }
+}
+
+fn throw_atomic_is_contained_by<A>(context: &Context<'_, '_, A>, thrown_type: &TAtomic, expected_type: &TAtomic) -> bool
+where
+    A: Arena,
+{
+    if let (TAtomic::GenericParameter(thrown_parameter), TAtomic::GenericParameter(expected_parameter)) =
+        (thrown_type, expected_type)
+        && !generic_parameter_is_same_or_extends(thrown_parameter, expected_parameter, &mut Vec::new())
+    {
+        return false;
+    }
+
+    union_comparator::is_contained_by(
+        context.codebase,
+        &TUnion::from_atomic(thrown_type.clone()),
+        &TUnion::from_atomic(expected_type.clone()),
+        false,
+        false,
+        false,
+        &mut ComparisonResult::default(),
+    )
+}
+
+fn generic_parameter_is_same_or_extends(
+    thrown_parameter: &TGenericParameter,
+    expected_parameter: &TGenericParameter,
+    visited: &mut Vec<(Word, GenericParent)>,
+) -> bool {
+    if thrown_parameter.parameter_name == expected_parameter.parameter_name
+        && thrown_parameter.defining_entity == expected_parameter.defining_entity
+    {
+        return true;
+    }
+
+    let identity = (thrown_parameter.parameter_name, thrown_parameter.defining_entity);
+    if visited.contains(&identity) {
+        return false;
+    }
+
+    visited.push(identity);
+
+    thrown_parameter.constraint.types.iter().chain(thrown_parameter.intersection_types.iter().flatten()).any(|bound| {
+        match bound {
+            TAtomic::GenericParameter(bound_parameter) => {
+                generic_parameter_is_same_or_extends(bound_parameter, expected_parameter, visited)
+            }
+            _ => false,
+        }
+    })
+}
+
+fn erase_throw_type_parameters(atomic_type: &TAtomic) -> TAtomic {
+    // The tracked exception set stores class names without generic arguments.
+    let mut erased = atomic_type.clone();
+    if let TAtomic::Object(TObject::Named(named_object)) = &mut erased {
+        named_object.type_parameters = None;
+    }
+
+    erased
 }
 
 /// Checks if an exception should be ignored based on the unchecked exception settings.
