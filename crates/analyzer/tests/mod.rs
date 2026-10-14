@@ -2868,6 +2868,7 @@ test_case!(gmp_arithmetic, crate::framework::operator_overloading_settings());
 test_case!(operator_overloading_unary, crate::framework::operator_overloading_settings());
 test_case!(operator_overloading_comparison, crate::framework::operator_overloading_settings());
 test_case!(operator_overloading_disabled);
+test_case!(large_constant_map_unknown_ref);
 
 #[test]
 fn issue_2478_without_property_memoization() {
