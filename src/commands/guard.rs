@@ -59,6 +59,7 @@ use crate::config::Configuration;
 use crate::consts::PRELUDE_BYTES;
 use crate::error::Error;
 use crate::utils::create_orchestrator;
+use crate::utils::drop_in_background;
 
 /// Command for enforcing architectural rules and layer dependencies.
 ///
@@ -279,7 +280,7 @@ impl GuardCommand {
         let report_duration = report_start.map(|s| s.elapsed());
 
         let drop_database_start = trace_enabled.then(Instant::now);
-        drop(database);
+        drop_in_background(database.into_static());
         let drop_database_duration = drop_database_start.map(|s| s.elapsed());
 
         let drop_orchestrator_start = trace_enabled.then(Instant::now);

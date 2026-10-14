@@ -20,6 +20,11 @@ pub mod logger;
 pub mod progress;
 pub mod version;
 
+/// Drops `value` on a background thread, or inline when no thread can be spawned.
+pub fn drop_in_background<T: Send + 'static>(value: T) {
+    let _ = std::thread::Builder::new().name("mago-drop".to_owned()).spawn(move || drop(value));
+}
+
 /// Determines whether colors should be used based on the color choice and environment.
 ///
 /// This function considers:

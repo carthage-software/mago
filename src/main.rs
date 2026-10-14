@@ -149,7 +149,27 @@ pub fn main() -> ExitCode {
         trace!("total process time: {:?}", main_start.elapsed());
     }
 
+    #[cfg(all(unix, not(feature = "dhat-heap")))]
+    exit_without_teardown(code);
+
     code
+}
+
+/// Exits right away, leaving memory and other process resources for the OS to reclaim.
+#[cfg(all(unix, not(feature = "dhat-heap")))]
+fn exit_without_teardown(code: ExitCode) {
+    use std::io::Write;
+
+    let Some(status) = (0..=u8::MAX).find(|status| ExitCode::from(*status) == code) else {
+        return;
+    };
+
+    if std::io::stdout().flush().is_err() || std::io::stderr().flush().is_err() {
+        return;
+    }
+
+    // SAFETY: standard streams are flushed and no other state needs to outlive the process.
+    unsafe { libc::_exit(i32::from(status)) }
 }
 
 /// Core application logic for the Mago CLI.

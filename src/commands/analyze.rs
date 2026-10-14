@@ -70,6 +70,7 @@ use crate::error::Error;
 use crate::extensions::initialize_external_analyzer;
 use crate::extensions::start_external_analyzer;
 use crate::utils::create_orchestrator;
+use crate::utils::drop_in_background;
 use crate::utils::git;
 
 /// The outcome of a watch mode session.
@@ -371,7 +372,7 @@ impl AnalyzeCommand {
         }
 
         let drop_database_start = trace_enabled.then(Instant::now);
-        drop(database);
+        drop_in_background(database.into_static());
         let drop_database_duration = drop_database_start.map(|s| s.elapsed());
 
         let drop_orchestrator_start = trace_enabled.then(Instant::now);

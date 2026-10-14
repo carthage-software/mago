@@ -51,6 +51,7 @@ use crate::config::Configuration;
 use crate::error::Error;
 use crate::extensions::initialize_external_linter;
 use crate::utils::create_orchestrator;
+use crate::utils::drop_in_background;
 use crate::utils::git;
 
 /// Command for linting PHP source code.
@@ -351,7 +352,7 @@ impl LintCommand {
         }
 
         let drop_database_start = trace_enabled.then(Instant::now);
-        drop(database);
+        drop_in_background(database.into_static());
         let drop_database_duration = drop_database_start.map(|s| s.elapsed());
 
         let drop_orchestrator_start = trace_enabled.then(Instant::now);
