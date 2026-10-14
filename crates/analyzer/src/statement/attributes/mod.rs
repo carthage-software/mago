@@ -16,6 +16,7 @@ use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_syntax::cst::Attribute;
 use mago_syntax::cst::AttributeList;
+use mago_syntax::cst::PartialArgument;
 use mago_word::WordMap;
 use mago_word::word;
 
@@ -343,6 +344,28 @@ where
         &mut template_result,
         &mut argument_types,
     )?;
+
+    // Attribute constructors bypass the post-invocation checks.
+    if constructor.flags.forbids_named_arguments()
+        && let Some(argument_list) = &attribute.argument_list
+    {
+        for argument in &argument_list.arguments {
+            let PartialArgument::Named(named_argument) = argument else {
+                continue;
+            };
+
+            context.collector.report_with_code(
+                IssueCode::NamedArgumentNotAllowed,
+                Issue::error(format!(
+                    "Named arguments are not allowed for `{class_name}::{method_name}`.",
+                    class_name = declaring_constructor_id.get_class_name(),
+                    method_name = declaring_constructor_id.get_method_name(),
+                ))
+                .with_annotation(Annotation::primary(named_argument.span()).with_message("Named argument used here"))
+                .with_help("Convert this named argument to a positional argument."),
+            );
+        }
+    }
 
     // Attributes are instantiated by reflection, never from the annotated declaration, so
     // the constructor must be reachable from the global scope.

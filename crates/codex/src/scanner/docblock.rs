@@ -162,6 +162,7 @@ pub fn apply_class_like_metadata_flag(
     let flag = match value {
         TagValue::ConsistentConstructor(_) => MetadataFlags::CONSISTENT_CONSTRUCTOR,
         TagValue::ConsistentTemplates(_) => MetadataFlags::CONSISTENT_TEMPLATES,
+        TagValue::NoNamedArguments(_) => MetadataFlags::NO_NAMED_ARGUMENTS,
         _ => return false,
     };
 

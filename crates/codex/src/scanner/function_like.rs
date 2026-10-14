@@ -166,6 +166,10 @@ where
         metadata.flags |= MetadataFlags::SUSPENDS_FIBER;
     }
 
+    if class_like_metadata.flags.forbids_named_arguments() {
+        metadata.flags |= MetadataFlags::NO_NAMED_ARGUMENTS;
+    }
+
     Some(metadata)
 }
 
