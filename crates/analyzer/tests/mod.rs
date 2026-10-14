@@ -19,6 +19,15 @@ mod framework;
 /// 2. Read the content from the file `cases/my_test.php`.
 /// 3. Create and run a `TestCase` with that content and the specified settings.
 macro_rules! test_case {
+    ($test_name:ident, expected_issue_counts = [$(($code:literal, $count:literal)),+ $(,)?]) => {
+        #[test]
+        fn $test_name() {
+            let content = include_bytes!(concat!("cases/", stringify!($test_name), ".php"));
+            let test = $crate::framework::TestCase::new(stringify!($test_name), content);
+            $(let test = test.expect_issue_code_count($code, $count);)+
+            test.run();
+        }
+    };
     ($test_name:ident, references = [$(($class:literal, $member:literal, $count:literal)),+ $(,)?]) => {
         #[test]
         fn $test_name() {
@@ -1010,7 +1019,7 @@ test_case!(or_never);
 test_case!(abstract_method_inheritance);
 test_case!(variadic_array_type);
 test_case!(parse_str);
-test_case!(assertion_after_side_effect);
+test_case!(assertion_after_side_effect, expected_issue_counts = [("too-wide-throw-type", 1)]);
 test_case!(undefined_string_key_in_union);
 test_case!(possibly_undefined_string_key_in_union, {
     let mut s = crate::framework::default_test_settings();
@@ -2494,7 +2503,7 @@ test_case!(issue_1365);
 test_case!(issue_1368);
 test_case!(issue_1372);
 test_case!(issue_1374);
-test_case!(issue_1375);
+test_case!(issue_1375, expected_issue_counts = [("unhandled-thrown-type", 1)]);
 test_case!(issue_1387);
 test_case!(issue_1410);
 test_case!(issue_1411);
@@ -2525,7 +2534,7 @@ test_case!(issue_2005);
 test_case!(issue_2014);
 test_case!(issue_2015);
 test_case!(issue_2018);
-test_case!(issue_2019);
+test_case!(issue_2019, expected_issue_counts = [("unhandled-thrown-type", 1)]);
 test_case!(issue_2025);
 test_case!(call_site_variance);
 test_case!(call_site_variance_projection);
@@ -2882,6 +2891,17 @@ test_case!(issue_2499);
 test_case!(issue_2508);
 test_case!(issue_2520);
 test_case!(issue_2523);
+test_case!(too_wide_throws, expected_issue_counts = [("too-wide-throw-type", 7), ("unhandled-thrown-type", 1)]);
+test_case!(check_throws_disabled, {
+    let mut settings = default_test_settings();
+    settings.check_throws = false;
+    settings
+});
+test_case!(check_throws_unchecked, {
+    let mut settings = default_test_settings();
+    settings.unchecked_exceptions.insert(mago_word::word("RuntimeException"));
+    settings
+});
 test_case!(simplexml_truthiness);
 test_case!(closure_capture_by_reference_array);
 test_case!(nullable_receiver_method_call);

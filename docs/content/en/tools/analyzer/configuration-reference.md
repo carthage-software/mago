@@ -96,7 +96,7 @@ These flags toggle individual analyses. Defaults are tuned for everyday use; fli
 | `analyze-dead-code` | `false` | Analyse code that appears unreachable. |
 | `memoize-properties` | `true` | Track literal property values for sharper inference, at the cost of some memory. |
 | `allow-possibly-undefined-array-keys` | `true` | **Deprecated.** Allow accessing keys that may be missing without flagging it. Setting this to `false` warns on `array<K, V>` reads with a single literal key but does not widen the type to `T\|null`. Use `strict-array-index-existence` instead. |
-| `check-throws` | `false` | Report exceptions that are not caught and not declared with `@throws`. |
+| `check-throws` | `false` | Report uncaught exceptions missing from `@throws` and explicit `@throws` types that cannot escape the function or method. |
 | `check-dead-catch` | `false` | Report catch clauses that match no known exception from their `try` block. Requires `check-throws`; undocumented code may still throw exceptions the analyzer cannot see. |
 | `check-missing-override` | `false` | Report missing `#[Override]` attributes on overriding methods (PHP 8.3+). |
 | `find-unused-parameters` | `false` | Report parameters that are never read. |

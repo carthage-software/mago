@@ -1228,11 +1228,6 @@ fn check_thrown_types<'ctx, A>(
         return;
     }
 
-    if block_context.possibly_thrown_exceptions.is_empty() {
-        // No exceptions are thrown in this block, so we can skip the check.
-        return;
-    }
-
     let class_like_metadata = if function_like_metadata.kind.is_method() {
         let Some(class_like_metadata) = block_context.scope.get_class_like() else {
             return;
@@ -1254,11 +1249,26 @@ fn check_thrown_types<'ctx, A>(
         })
     };
 
+    check_too_wide_throw_types(
+        context,
+        block_context,
+        artifacts,
+        function_like_metadata,
+        function_kind,
+        function_name(),
+    );
+
+    if block_context.possibly_thrown_exceptions.is_empty() {
+        // No exceptions are thrown in this block, so there is nothing to check for missing declarations.
+        return;
+    }
+
     let expected_throw_types = context
         .codebase
         .get_function_like_thrown_types(block_context.scope.get_class_like(), function_like_metadata)
         .iter()
         .map(|thrown_type| expand_type_metadata(context, block_context, artifacts, function_like_metadata, thrown_type))
+        .map(|thrown_type| TUnion::from_vec(thrown_type.types.iter().map(erase_throw_type_parameters).collect()))
         .collect::<Vec<_>>();
 
     for (thrown_type, thrown_spans) in &block_context.possibly_thrown_exceptions {
@@ -1310,6 +1320,127 @@ fn check_thrown_types<'ctx, A>(
 
         context.collector.report_with_code(IssueCode::UnhandledThrownType, issue);
     }
+}
+
+fn check_too_wide_throw_types<'ctx, A>(
+    context: &mut Context<'ctx, '_, A>,
+    block_context: &BlockContext<'ctx>,
+    artifacts: &mut AnalysisArtifacts,
+    function_like_metadata: &'ctx FunctionLikeMetadata,
+    function_kind: &str,
+    function_name: Word,
+) where
+    A: Arena,
+{
+    let declared_types = function_like_metadata
+        .thrown_types
+        .iter()
+        .filter(|thrown_type| {
+            thrown_type.from_docblock
+                && (!thrown_type.inferred
+                    || has_class_docblock_throw_origin(context, block_context, function_like_metadata, thrown_type))
+        })
+        .collect::<Vec<_>>();
+
+    for declared_type in declared_types {
+        let expanded_type =
+            expand_type_metadata(context, block_context, artifacts, function_like_metadata, declared_type);
+
+        for atomic_type in expanded_type.types.iter() {
+            if !matches!(atomic_type, TAtomic::Object(_)) {
+                continue;
+            }
+
+            if atomic_type
+                .get_all_object_names()
+                .iter()
+                .any(|exception_name| is_exception_unchecked(context, *exception_name))
+            {
+                continue;
+            }
+
+            let declared_exception = TUnion::from_atomic(erase_throw_type_parameters(atomic_type));
+            let is_thrown = block_context.possibly_thrown_exceptions.keys().any(|thrown_type| {
+                let thrown_exception = TUnion::from_atomic(TAtomic::Object(TObject::new_named(*thrown_type)));
+
+                union_comparator::is_contained_by(
+                    context.codebase,
+                    &thrown_exception,
+                    &declared_exception,
+                    false,
+                    false,
+                    false,
+                    &mut ComparisonResult::default(),
+                )
+            });
+
+            if is_thrown {
+                continue;
+            }
+
+            let exception_name = atomic_type.get_id();
+            let issue =
+                Issue::error(format!("Declared exception `{exception_name}` in `{function_name}` is never thrown."))
+                    .with_annotation(
+                        Annotation::primary(declared_type.span)
+                            .with_message(format!("`{exception_name}` is not thrown from this {function_kind}")),
+                    )
+                    .with_annotation(
+                        Annotation::secondary(function_like_metadata.span)
+                            .with_message(format!("This {function_kind} does not throw `{exception_name}`")),
+                    )
+                    .with_note(
+                        "An exception documented with `@throws` should be able to escape this function or method.",
+                    )
+                    .with_help(format!("Remove `@throws {exception_name}` or add a reachable path that throws it."));
+
+            context.collector.report_with_code(IssueCode::TooWideThrowType, issue);
+        }
+    }
+}
+
+fn has_class_docblock_throw_origin<'ctx, A>(
+    context: &Context<'ctx, '_, A>,
+    block_context: &BlockContext<'ctx>,
+    function_like_metadata: &FunctionLikeMetadata,
+    thrown_type: &TypeMetadata,
+) -> bool
+where
+    A: Arena,
+{
+    let Some(class_like_metadata) = block_context.scope.get_class_like() else {
+        return false;
+    };
+
+    let Some(overridden_methods) = class_like_metadata.overridden_method_ids.get(&function_like_metadata.name) else {
+        return false;
+    };
+
+    overridden_methods.iter().any(|(parent_name, method_id)| {
+        let Some(parent_method) = context.codebase.function_likes.get(&method_id.get_key()) else {
+            return false;
+        };
+
+        let has_explicit_throw = parent_method.thrown_types.iter().any(|parent_throw| {
+            parent_throw.from_docblock && !parent_throw.inferred && parent_throw.span == thrown_type.span
+        });
+
+        has_explicit_throw
+            && context
+                .codebase
+                .get_class_like(parent_name.as_bytes())
+                .is_some_and(|parent_class| !parent_class.kind.is_interface())
+    })
+}
+
+fn erase_throw_type_parameters(atomic_type: &TAtomic) -> TAtomic {
+    // The tracked exception set stores class names without generic arguments.
+    let mut erased = atomic_type.clone();
+    if let TAtomic::Object(TObject::Named(named_object)) = &mut erased {
+        named_object.type_parameters = None;
+    }
+
+    erased
 }
 
 /// Checks if an exception should be ignored based on the unchecked exception settings.

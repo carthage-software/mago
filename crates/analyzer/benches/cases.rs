@@ -72,7 +72,7 @@ fn analyze_file(path: &Path, content: &str) {
     }
 }
 
-const BENCHMARKED_PREFIXES: &[&str] = &["issue_", "psl_", "sealed_class_", "trait_", "conditional_"];
+const BENCHMARKED_PREFIXES: &[&str] = &["issue_", "psl_", "sealed_class_", "trait_", "conditional_", "too_wide_throws"];
 
 fn discover_cases_by_prefix() -> Vec<(&'static str, Vec<(PathBuf, String)>)> {
     let cases_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("cases");

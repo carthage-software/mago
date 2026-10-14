@@ -809,6 +809,17 @@ where
     fn merge_match_contexts(&mut self, arm_exit_contexts: &[BlockContext<'ctx>]) {
         let reachable_contexts: Vec<_> = arm_exit_contexts.iter().filter(|c| !c.flags.has_returned()).collect();
 
+        // Terminal arms are excluded below, but their thrown exceptions still escape the match.
+        for context in arm_exit_contexts {
+            for (exception, spans) in &context.possibly_thrown_exceptions {
+                self.block_context
+                    .possibly_thrown_exceptions
+                    .entry(*exception)
+                    .or_default()
+                    .extend(spans.iter().copied());
+            }
+        }
+
         if reachable_contexts.is_empty() {
             self.block_context.flags.set_has_returned(true);
             return;
