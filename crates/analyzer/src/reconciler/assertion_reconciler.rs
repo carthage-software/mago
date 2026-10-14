@@ -6,6 +6,9 @@ use ryu::Buffer as FloatBuffer;
 
 use mago_allocator::Arena;
 use mago_codex::assertion::Assertion;
+use mago_codex::metadata::CodebaseMetadata;
+use mago_codex::metadata::class_like::ClassLikeMetadata;
+use mago_codex::misc::GenericParent;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
@@ -14,6 +17,7 @@ use mago_codex::ttype::atomic::array::list::TList;
 use mago_codex::ttype::atomic::derived::TDerived;
 use mago_codex::ttype::atomic::derived::intersection::TDerivedIntersection;
 use mago_codex::ttype::atomic::generic::TGenericParameter;
+use mago_codex::ttype::atomic::iterable::TIterable;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::object::r#enum::TEnum;
 use mago_codex::ttype::atomic::object::named::TNamedObject;
@@ -31,8 +35,11 @@ use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::atomic_comparator;
 use mago_codex::ttype::comparator::atomic_comparator::is_contained_by;
+use mago_codex::ttype::comparator::union_comparator::can_expression_types_be_identical;
 use mago_codex::ttype::expander;
 use mago_codex::ttype::expander::TypeExpansionOptions;
+use mago_codex::ttype::get_int;
+use mago_codex::ttype::get_iterable_parameters;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_mixed_callable;
 use mago_codex::ttype::get_mixed_maybe_from_loop;
@@ -444,20 +451,9 @@ where
         }
         (TAtomic::Iterable(iterable), object @ TAtomic::Object(TObject::Named(named_object)))
         | (object @ TAtomic::Object(TObject::Named(named_object)), TAtomic::Iterable(iterable))
-            if object.is_traversable(context.codebase)
-                && (named_object.name.as_bytes().eq_ignore_ascii_case(b"Iterator")
-                    || named_object.name.as_bytes().eq_ignore_ascii_case(b"IteratorAggregate")
-                    || named_object.name.as_bytes().eq_ignore_ascii_case(b"Traversable")) =>
+            if object.is_traversable(context.codebase) =>
         {
-            let mut object = named_object.clone();
-            if object.get_type_parameters().is_none() {
-                object = object.with_type_parameters(Some(vec![
-                    iterable.get_key_type().clone(),
-                    iterable.get_value_type().clone(),
-                ]));
-            }
-
-            return Some(TAtomic::Object(TObject::Named(object)));
+            return intersect_traversable_with_iterable(context.codebase, named_object, iterable);
         }
         (TAtomic::Array(array), TAtomic::Iterable(iterable)) | (TAtomic::Iterable(iterable), TAtomic::Array(array)) => {
             let iter_key = iterable.get_key_type();
@@ -489,6 +485,162 @@ where
     }
 
     None
+}
+
+pub(crate) fn can_iterate_as(codebase: &CodebaseMetadata, atomic: &TAtomic, iterable: &TIterable) -> bool {
+    let key_type = iterable.get_key_type();
+    let value_type = iterable.get_value_type();
+    if key_type.is_mixed() && value_type.is_mixed() {
+        return true;
+    }
+
+    match atomic {
+        TAtomic::Iterable(existing) => {
+            can_expression_types_be_identical(codebase, existing.get_key_type(), key_type, true, false)
+                && can_expression_types_be_identical(codebase, existing.get_value_type(), value_type, true, false)
+        }
+        TAtomic::Array(TArray::List(list)) if list.known_elements.is_none() => {
+            can_expression_types_be_identical(codebase, &get_int(), key_type, true, false)
+                && can_expression_types_be_identical(codebase, &list.element_type, value_type, true, false)
+        }
+        TAtomic::Array(TArray::Keyed(keyed)) if keyed.known_items.is_none() => {
+            keyed.parameters.as_ref().is_none_or(|(existing_key_type, existing_value_type)| {
+                can_expression_types_be_identical(codebase, existing_key_type, key_type, true, false)
+                    && can_expression_types_be_identical(codebase, existing_value_type, value_type, true, false)
+            })
+        }
+        TAtomic::Array(_) => {
+            let Some((existing_key_type, existing_value_type)) = get_iterable_parameters(atomic, codebase) else {
+                return true;
+            };
+
+            (existing_key_type.is_never() && existing_value_type.is_never())
+                || (can_expression_types_be_identical(codebase, &existing_key_type, key_type, true, false)
+                    && can_expression_types_be_identical(codebase, &existing_value_type, value_type, true, false))
+        }
+        TAtomic::Object(TObject::Named(object)) => {
+            let Some(class_metadata) = codebase.get_class_like(object.name.as_bytes()) else {
+                return true;
+            };
+
+            let traversable = word("traversable");
+            [key_type, value_type].into_iter().enumerate().all(|(slot, iterated_type)| {
+                iterated_type.is_mixed()
+                    || get_iteration_type(object, class_metadata, traversable, slot).1.is_none_or(|existing_type| {
+                        can_expression_types_be_identical(codebase, existing_type, iterated_type, true, false)
+                    })
+            })
+        }
+        _ => true,
+    }
+}
+
+fn intersect_traversable_with_iterable(
+    codebase: &CodebaseMetadata,
+    object: &TNamedObject,
+    iterable: &TIterable,
+) -> Option<TAtomic> {
+    let Some(class_metadata) = codebase.get_class_like(object.name.as_bytes()) else {
+        return Some(TAtomic::Object(TObject::Named(object.clone())));
+    };
+
+    let traversable = word("traversable");
+    let mut narrowed_parameters: Option<Vec<TUnion>> = None;
+    for (slot, iterated_type) in [iterable.get_key_type(), iterable.get_value_type()].into_iter().enumerate() {
+        if iterated_type.is_mixed() {
+            continue;
+        }
+
+        let (index, existing_type) = get_iteration_type(object, class_metadata, traversable, slot);
+        let Some(existing_type) = existing_type else {
+            continue;
+        };
+
+        let Some(index) = index else {
+            if !can_expression_types_be_identical(codebase, existing_type, iterated_type, true, false) {
+                return None;
+            }
+
+            continue;
+        };
+
+        let existing_type =
+            narrowed_parameters.as_ref().and_then(|parameters| parameters.get(index)).unwrap_or(existing_type);
+        let narrowed_type = intersect_union_types(existing_type, iterated_type, codebase)?;
+        let parameters = narrowed_parameters.get_or_insert_with(|| match object.get_type_parameters() {
+            Some(type_parameters) => type_parameters.to_vec(),
+            None => class_metadata.template_types.values().map(|template| template.constraint.clone()).collect(),
+        });
+
+        parameters[index] = narrowed_type;
+    }
+
+    let Some(narrowed_parameters) = narrowed_parameters else {
+        return Some(TAtomic::Object(TObject::Named(object.clone())));
+    };
+
+    Some(TAtomic::Object(TObject::Named(TNamedObject {
+        name: object.name,
+        type_parameters: Some(narrowed_parameters.into_boxed_slice()),
+        variances: object.variances.clone(),
+        is_static: object.is_static,
+        is_this: object.is_this,
+        intersection_types: object.intersection_types.clone(),
+        remapped_parameters: object.remapped_parameters,
+    })))
+}
+
+fn get_iteration_type<'meta>(
+    object: &'meta TNamedObject,
+    class_metadata: &'meta ClassLikeMetadata,
+    traversable: Word,
+    slot: usize,
+) -> (Option<usize>, Option<&'meta TUnion>) {
+    let index = if class_metadata.name == traversable {
+        slot
+    } else {
+        let Some((_, bound_type)) = class_metadata
+            .template_extended_parameters
+            .get(&traversable)
+            .and_then(|parameters| parameters.get_index(slot))
+        else {
+            return (None, None);
+        };
+
+        let Some(index) = get_bound_template_index(class_metadata, bound_type) else {
+            return (None, (!bound_type.has_template()).then_some(bound_type));
+        };
+
+        index
+    };
+
+    let parameter = match object.get_type_parameters() {
+        Some(type_parameters) => type_parameters.get(index),
+        None => class_metadata.template_types.get_index(index).map(|(_, template)| &template.constraint),
+    };
+
+    (Some(index), parameter)
+}
+
+fn get_bound_template_index(class_metadata: &ClassLikeMetadata, bound_type: &TUnion) -> Option<usize> {
+    if !bound_type.is_single() {
+        return None;
+    }
+
+    let TAtomic::GenericParameter(TGenericParameter {
+        parameter_name,
+        defining_entity: GenericParent::ClassLike(defining_class),
+        ..
+    }) = bound_type.get_single()
+    else {
+        return None;
+    };
+
+    if *defining_class != class_metadata.name {
+        return None;
+    }
+
+    class_metadata.get_template_index_for_name(*parameter_name)
 }
 
 fn intersect_atomic_with_callable<A>(context: &Context<'_, '_, A>, atomic: &TAtomic) -> Option<TAtomic>

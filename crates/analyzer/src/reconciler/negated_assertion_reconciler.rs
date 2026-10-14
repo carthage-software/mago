@@ -29,6 +29,7 @@ use mago_codex::ttype::wrap_atomic;
 use mago_span::Span;
 
 use crate::reconciler::Context;
+use crate::reconciler::assertion_reconciler::can_iterate_as;
 use crate::reconciler::assertion_reconciler::intersect_atomic_with_atomic;
 use crate::reconciler::simple_negated_assertion_reconciler;
 use crate::reconciler::trigger_issue_for_impossible;
@@ -254,6 +255,13 @@ fn subtract_complex_type<A>(
                     key_type,
                     Arc::clone(&iterable.value_type),
                 ))));
+            }
+            (_, TAtomic::Iterable(assertion_iterable)) if existing_atomic.is_array_or_traversable(context.codebase) => {
+                if !*can_be_disjunct && can_iterate_as(context.codebase, &existing_atomic, assertion_iterable) {
+                    *can_be_disjunct = true;
+                }
+
+                acceptable_types.push(existing_atomic);
             }
             _ => {
                 acceptable_types.push(existing_atomic);

@@ -2846,6 +2846,7 @@ test_case!(issue_2483);
 test_case!(issue_2484);
 test_case!(issue_2485);
 test_case!(issue_2499);
+test_case!(issue_2508);
 test_case!(simplexml_truthiness);
 test_case!(closure_capture_by_reference_array);
 test_case!(nullable_receiver_method_call);
