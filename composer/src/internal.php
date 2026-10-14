@@ -28,6 +28,7 @@ use function fopen;
 use function fprintf;
 use function fwrite;
 use function getenv;
+use function hrtime;
 use function implode;
 use function ini_get;
 use function is_dir;
@@ -40,6 +41,7 @@ use function proc_close;
 use function proc_get_status;
 use function proc_open;
 use function shell_exec;
+use function sprintf;
 use function str_contains;
 use function stream_context_create;
 use function stream_get_contents;
@@ -406,6 +408,42 @@ function download(string $url, string $destination): void
     );
 }
 
+const PROGRESS_INTERVAL_NS = 1_000_000_000;
+
+/**
+ * Format one known-size download sample as the progress line.
+ *
+ * @param array{total: positive-int, downloaded: int<0, max>} $sample Bytes transferred and the expected total.
+ *
+ * @return string The carriage-return progress line.
+ *
+ * @internal
+ */
+function format_progress(array $sample): string
+{
+    return sprintf(
+        "\r  %s / %s MB (%d%%)",
+        number_format($sample['downloaded'] / 1_048_576, 1),
+        number_format($sample['total'] / 1_048_576, 1),
+        (int) (($sample['downloaded'] / $sample['total']) * 100),
+    );
+}
+
+/**
+ * Decide whether a progress sample is due to be printed.
+ *
+ * @param int|float|null $lastEmitNs Previous emit time, or null when nothing has been emitted.
+ * @param int|float $nowNs Current monotonic time from hrtime(true).
+ *
+ * @return bool True for the first sample or once the interval has elapsed.
+ *
+ * @internal
+ */
+function progress_due(int|float|null $lastEmitNs, int|float $nowNs): bool
+{
+    return $lastEmitNs === null || ($nowNs - $lastEmitNs) >= PROGRESS_INTERVAL_NS;
+}
+
 /**
  * Download a file using the curl extension with a progress bar.
  *
@@ -427,12 +465,28 @@ function download_with_curl(string $url, string $destination): void
         curl_setopt($ch, CURLOPT_HTTPHEADER, ['Authorization: Bearer ' . $token]);
     }
 
-    curl_setopt($ch, CURLOPT_PROGRESSFUNCTION, function (mixed $_resource, int $dlSize, int $dlNow): int {
-        if ($dlSize > 0) {
-            $pct = (int) (($dlNow / $dlSize) * 100);
-            $dlMb = number_format($dlNow / 1_048_576, 1);
-            $totalMb = number_format($dlSize / 1_048_576, 1);
-            fprintf(STDERR, "\r  %s / %s MB (%d%%)", $dlMb, $totalMb, $pct);
+    $latest = null;
+    // Null rather than 0: hrtime's origin makes 0 a real reading.
+    $lastEmitNs = null;
+
+    curl_setopt($ch, CURLOPT_PROGRESSFUNCTION, function (mixed $_resource, int $dlSize, int $dlNow) use (
+        &$latest,
+        &$lastEmitNs,
+    ): int {
+        if ($dlSize <= 0) {
+            // Unknown total: a redirect's previous size must not become the final line.
+            $latest = null;
+
+            return 0;
+        }
+
+        /** @var array{total: positive-int, downloaded: int<0, max>} */
+        $latest = ['total' => $dlSize, 'downloaded' => $dlNow];
+        /** @var int|float $now */
+        $now = hrtime(true);
+        if (namespace\progress_due($lastEmitNs, $now)) {
+            fwrite(STDERR, namespace\format_progress($latest));
+            $lastEmitNs = $now;
         }
 
         return 0;
@@ -448,6 +502,10 @@ function download_with_curl(string $url, string $destination): void
         unlink($destination);
 
         throw new RuntimeException("Failed to download mago binary (HTTP {$statusCode}): {$error}\nURL: {$url}");
+    }
+
+    if ($latest !== null) {
+        fwrite(STDERR, namespace\format_progress($latest));
     }
 
     fprintf(STDERR, "\n");
