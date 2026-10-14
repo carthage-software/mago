@@ -17,3 +17,8 @@ function takeAnimalBW(string $cls): void
 }
 
 takeAnimalBW(DogBW::class);
+takeAnimalBW('DogBW');
+takeAnimalBW('\DogBW');
+
+/** @mago-expect analysis:invalid-argument */
+takeAnimalBW(stdClass::class);
