@@ -230,6 +230,7 @@ pub(super) fn decode_lint_response(
     payload: &[u8],
     file: &File,
     rules: &[ExternalRule],
+    levels: &[Level],
     active_rules: &[u16],
 ) -> Result<IssueCollection, ExternalLintError> {
     let mut reader = message_reader(payload, LINT_FILE_RESPONSE)?;
@@ -246,7 +247,7 @@ pub(super) fn decode_lint_response(
             .get(rule_index as usize)
             .ok_or_else(|| protocol(format!("worker reported unregistered rule index `{rule_index}`")))?;
         let code = &rule.code;
-        let level = rule.default_level;
+        let level = levels[rule_index as usize];
         let message = reader.read_string("issue message")?;
         if message.is_empty() {
             return Err(protocol(format!("rule `{code}` reported an empty issue message")));

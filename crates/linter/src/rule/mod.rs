@@ -198,6 +198,13 @@ macro_rules! define_rules {
                     }
                 }
             )*
+
+            for (code, settings) in &rules.extensions {
+                if let Ok(value) = serde_json::to_value(settings) {
+                    map.insert(code.clone(), value);
+                }
+            }
+
             map
         }
     }

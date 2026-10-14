@@ -1,7 +1,10 @@
+use std::collections::BTreeMap;
+
 use schemars::JsonSchema;
 
 use mago_database::GlobSettings;
 use mago_php_version::PHPVersion;
+use mago_reporting::Level;
 
 use crate::integration::IntegrationSet;
 use crate::rule::AmbiguousConstantAccessConfig;
@@ -225,9 +228,24 @@ pub struct RuleSettings<C: Config> {
     pub config: C,
 }
 
+#[derive(Debug, Clone, Default, PartialEq, Eq, JsonSchema)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[cfg_attr(feature = "serde", serde(default, deny_unknown_fields))]
+pub struct ExternalRuleSettings {
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+    pub enabled: Option<bool>,
+
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Option::is_none"))]
+    pub level: Option<Level>,
+
+    #[cfg_attr(feature = "serde", serde(skip_serializing_if = "Vec::is_empty"))]
+    pub exclude: Vec<String>,
+}
+
 #[derive(Debug, Clone, Default, JsonSchema)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
-#[cfg_attr(feature = "serde", serde(default, rename_all = "kebab-case", deny_unknown_fields))]
+#[cfg_attr(feature = "serde", serde(remote = "Self", default, rename_all = "kebab-case", deny_unknown_fields))]
+#[cfg_attr(feature = "serde", schemars(transform = external_rules_schema))]
 pub struct RulesSettings {
     pub ambiguous_constant_access: RuleSettings<AmbiguousConstantAccessConfig>,
     pub ambiguous_function_call: RuleSettings<AmbiguousFunctionCallConfig>,
@@ -420,6 +438,71 @@ pub struct RulesSettings {
     pub no_roles_as_capabilities: RuleSettings<NoRolesAsCapabilitiesConfig>,
     pub missing_docs: RuleSettings<MissingDocsConfig>,
     pub no_literal_namespace_string: RuleSettings<NoLiteralNamespaceStringConfig>,
+    #[cfg_attr(feature = "serde", serde(skip))]
+    #[schemars(skip)]
+    pub extensions: BTreeMap<String, ExternalRuleSettings>,
+}
+
+#[cfg(feature = "serde")]
+impl<'de> serde::Deserialize<'de> for RulesSettings {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        use serde::de::Error;
+
+        let table = serde_json::Map::<String, serde_json::Value>::deserialize(deserializer)?;
+        let mut native = serde_json::Map::new();
+        let mut extensions = BTreeMap::new();
+        for (code, value) in table {
+            if !code.contains('/') {
+                native.insert(code, value);
+                continue;
+            }
+
+            let settings = ExternalRuleSettings::deserialize(value)
+                .map_err(|error| D::Error::custom(format_args!("invalid settings for rule `{code}`: {error}")))?;
+            extensions.insert(code, settings);
+        }
+
+        let mut settings = Self::deserialize(serde_json::Value::Object(native)).map_err(D::Error::custom)?;
+        settings.extensions = extensions;
+
+        Ok(settings)
+    }
+}
+
+#[cfg(feature = "serde")]
+impl serde::Serialize for RulesSettings {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        use serde::ser::Error;
+
+        if self.extensions.is_empty() {
+            return Self::serialize(self, serializer);
+        }
+
+        let mut value = Self::serialize(self, serde_json::value::Serializer).map_err(S::Error::custom)?;
+        if let serde_json::Value::Object(table) = &mut value {
+            for (code, settings) in &self.extensions {
+                table.insert(code.clone(), serde_json::to_value(settings).map_err(S::Error::custom)?);
+            }
+        }
+
+        serde::Serialize::serialize(&value, serializer)
+    }
+}
+
+#[cfg(feature = "serde")]
+fn external_rules_schema(schema: &mut schemars::Schema) {
+    let mut generator = schemars::generate::SchemaSettings::default()
+        .with(|settings| settings.inline_subschemas = true)
+        .into_generator();
+    let rule_schema = generator.subschema_for::<ExternalRuleSettings>();
+
+    schema.insert("patternProperties".to_owned(), serde_json::json!({ "/": rule_schema }));
 }
 
 impl<C: Config> RuleSettings<C> {

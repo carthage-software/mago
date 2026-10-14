@@ -91,6 +91,17 @@ Each host has its own command, limits, environment, and worker pool. One worker 
 
 Across all enabled hosts, extension identifiers, linter issue codes, and analyzer plugin selectors must remain unique. Extension identifiers and analyzer plugin selectors are compared ASCII case-insensitively; linter rule codes are case-sensitive. External linter codes and analyzer selectors must not collide with their native counterparts. Every process in one pool must advertise identical registration metadata.
 
+## Linter rule settings
+
+Extension linter rules are configured under `[linter.rules]` by their code, with the same `enabled`, `level`, and `exclude` options as built-in rules:
+
+```toml
+[linter.rules]
+"acme/no-eval" = { level = "warning", exclude = ["tests/"] }
+```
+
+See [extension rules](/tools/linter/configuration-reference/#extension-rules) for details.
+
 ## Analyzer plugin selection
 
 Analyzer plugins declare whether they are enabled by default. Explicitly enable plugins by identifier or alias under `[analyzer]`:

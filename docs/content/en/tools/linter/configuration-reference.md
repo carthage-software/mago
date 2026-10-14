@@ -101,3 +101,19 @@ mago lint --explain cyclomatic-complexity
 ```
 
 The full per-rule reference is on the [rules page](/tools/linter/rules/).
+
+### Extension rules
+
+Rules registered by [extensions](/extensions/overview/) accept the common options under their vendor-qualified code. Quote the code, because it contains a `/`:
+
+```toml
+[linter.rules]
+"acme/no-eval" = { level = "warning", exclude = ["tests/"] }
+
+[linter.rules."acme/prefer-array-any"]
+enabled = false
+```
+
+When `enabled` or `level` is omitted, the rule keeps the default its extension registered. A code without a `/` is always treated as a built-in rule, so only vendor-qualified extension codes can be configured here. `mago lint` and the `mago extension` commands warn about configured codes that no enabled extension registers.
+
+Extension rule settings require Mago 1.58 or later.

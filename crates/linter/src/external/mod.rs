@@ -5,6 +5,7 @@
 //! stable flat syntax tree, comments, and resolved names. Node callbacks are
 //! dispatched inside the worker rather than crossing IPC one node at a time.
 
+use std::collections::BTreeMap;
 use std::collections::HashSet;
 use std::sync::Arc;
 use std::sync::atomic::AtomicU64;
@@ -12,7 +13,9 @@ use std::sync::atomic::Ordering;
 use std::time::Duration;
 use std::time::Instant;
 
+use mago_database::GlobSettings;
 use mago_database::file::File;
+use mago_database::matcher::ExclusionMatcher;
 use mago_extension::WorkerError;
 use mago_extension::WorkerPool;
 use mago_names::ResolvedNames;
@@ -23,6 +26,7 @@ use mago_syntax::cst::NodeKind;
 use mago_syntax::cst::Program;
 
 use crate::rule::AnyRule;
+use crate::settings::ExternalRuleSettings;
 use crate::settings::Settings;
 
 pub use error::ExternalLintError;
@@ -103,6 +107,26 @@ struct Backend<T> {
     transport: Arc<T>,
     registration: Registration,
     default_plan: ActiveRulePlan,
+    levels: Box<[Level]>,
+    excludes: Box<[(u16, ExclusionMatcher<String>)]>,
+}
+
+impl<T> Backend<T> {
+    fn excluded_rules(&self, plan: &ActiveRulePlan, file: &File) -> Vec<u16> {
+        if self.excludes.is_empty() {
+            return Vec::new();
+        }
+
+        let Ok(file_name) = std::str::from_utf8(file.name.as_ref()) else {
+            return Vec::new();
+        };
+
+        self.excludes
+            .iter()
+            .filter(|(index, matcher)| plan.indices.contains(index) && matcher.is_match(file_name))
+            .map(|(index, _)| *index)
+            .collect()
+    }
 }
 
 #[derive(Debug)]
@@ -126,6 +150,23 @@ impl ActiveRulePlan {
         }
 
         Ok(Self { indices: indices.into_boxed_slice(), targets })
+    }
+
+    fn without(&self, rules: &[ExternalRule], excluded: &[u16]) -> Self {
+        let mut indices = Vec::with_capacity(self.indices.len());
+        let mut targets = [false; u8::MAX as usize + 1];
+        for &index in &self.indices {
+            if excluded.contains(&index) {
+                continue;
+            }
+
+            indices.push(index);
+            for target in &rules[index as usize].targets {
+                targets[*target as usize] = true;
+            }
+        }
+
+        Self { indices: indices.into_boxed_slice(), targets }
     }
 }
 
@@ -176,6 +217,57 @@ impl<T> ExternalLinter<T> {
     pub fn contains_rule(&self, code: &str) -> bool {
         self.extensions.iter().any(|extension| extension.rules.iter().any(|rule| rule.code == code))
     }
+
+    /// Applies `[linter.rules]` settings to the registered rules they name.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if the enabled rules cannot be addressed by the wire protocol.
+    pub fn configure(
+        &mut self,
+        settings: &BTreeMap<String, ExternalRuleSettings>,
+        glob: GlobSettings,
+    ) -> Result<(), ExternalLintError> {
+        if settings.is_empty() {
+            return Ok(());
+        }
+
+        for backend in &mut self.backends {
+            let mut excludes = Vec::new();
+            for (index, rule) in backend.registration.rules.iter().enumerate() {
+                let Some(rule_settings) = settings.get(&rule.code) else {
+                    continue;
+                };
+
+                if let Some(level) = rule_settings.level {
+                    backend.levels[index] = level;
+                }
+
+                if rule_settings.exclude.is_empty() {
+                    continue;
+                }
+
+                let Ok(index) = u16::try_from(index) else {
+                    continue;
+                };
+
+                match ExclusionMatcher::compile(rule_settings.exclude.iter().cloned(), glob) {
+                    Ok(matcher) => excludes.push((index, matcher)),
+                    Err(error) => tracing::error!(
+                        "Failed to compile exclude patterns for rule `{}`: {error}. Patterns will be ignored.",
+                        rule.code
+                    ),
+                }
+            }
+
+            backend.excludes = excludes.into_boxed_slice();
+            backend.default_plan = ActiveRulePlan::build(&backend.registration.rules, |rule| {
+                settings.get(&rule.code).and_then(|rule_settings| rule_settings.enabled).unwrap_or(rule.default_enabled)
+            })?;
+        }
+
+        Ok(())
+    }
 }
 
 impl<T> ExternalLinter<T> {
@@ -214,6 +306,10 @@ impl<T> ExternalLinter<T> {
                 })
                 .transpose()?;
             let plan = selected_plan.as_ref().unwrap_or(&backend.default_plan);
+            let excluded_rules = backend.excluded_rules(plan, file);
+            let file_plan =
+                (!excluded_rules.is_empty()).then(|| plan.without(&backend.registration.rules, &excluded_rules));
+            let plan = file_plan.as_ref().unwrap_or(plan);
             let active_rule_indices = &plan.indices;
 
             if active_rule_indices.is_empty() {
@@ -278,13 +374,18 @@ impl<T> ExternalLinter<T> {
                 self.telemetry.response_bytes.fetch_add(response.len() as u64, Ordering::Relaxed);
             }
             let decode_start = self.trace_enabled.then(Instant::now);
-            let backend_issues =
-                protocol::decode_lint_response(&response, file, &backend.registration.rules, active_rule_indices)
-                    .inspect_err(|_| {
-                        if self.trace_enabled {
-                            self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
-                        }
-                    })?;
+            let backend_issues = protocol::decode_lint_response(
+                &response,
+                file,
+                &backend.registration.rules,
+                &backend.levels,
+                active_rule_indices,
+            )
+            .inspect_err(|_| {
+                if self.trace_enabled {
+                    self.telemetry.errors.fetch_add(1, Ordering::Relaxed);
+                }
+            })?;
             if let Some(start) = decode_start {
                 let elapsed = duration_nanos(start.elapsed());
                 file_decode_ns = file_decode_ns.saturating_add(elapsed);
@@ -383,7 +484,8 @@ impl<T> ExternalLinter<T> {
                 );
             }
             let default_plan = ActiveRulePlan::build(&registration.rules, |rule| rule.default_enabled)?;
-            backends.push(Backend { transport, registration, default_plan });
+            let levels = registration.rules.iter().map(|rule| rule.default_level).collect();
+            backends.push(Backend { transport, registration, default_plan, levels, excludes: Box::default() });
         }
 
         let linter = Self {
@@ -764,5 +866,88 @@ mod tests {
         assert_eq!(external.extensions()[1].identifier, "acme/architecture");
         assert!(external.contains_rule("acme/prefer-array-any"));
         assert!(external.contains_rule("acme/no-interface"));
+    }
+
+    fn two_call_rules_transport(response: Vec<u8>) -> Arc<MockTransport> {
+        let targets = [NodeKind::FunctionCall];
+        let rules = [
+            ("acme/no-run", "No run", "Disallows run.", Level::Warning, true, targets.as_slice()),
+            ("acme/no-call", "No calls", "Disallows calls.", Level::Warning, false, targets.as_slice()),
+        ];
+
+        Arc::new(MockTransport {
+            registration: testing::describe_response("acme/tools", "Acme Tools", "1.0.0", &rules),
+            response,
+            request: Mutex::new(None),
+            workers: 1,
+        })
+    }
+
+    #[test]
+    fn configured_settings_override_registered_defaults() {
+        let source = b"<?php\nrun();\n";
+        let arena = LocalArena::new();
+        let file = File::ephemeral(Cow::Borrowed(b"src/test.php"), Cow::Borrowed(source));
+        let program = parse_file(&arena, &file);
+        let resolved_names = NameResolver::new(&arena).resolve(program);
+        let issue = Issue::warning("Do not call functions").with_code("acme/no-call").with_annotation(
+            Annotation::primary(Span::new(file.id, mago_span::Position::new(6), mago_span::Position::new(11))),
+        );
+        let transport = two_call_rules_transport(testing::lint_response(&[(1, issue)]));
+        let mut external = ExternalLinter::initialize_transports([Arc::clone(&transport)], PHPVersion::PHP85)
+            .expect("registration should succeed");
+        let settings = BTreeMap::from([
+            (
+                "acme/no-run".to_string(),
+                ExternalRuleSettings { enabled: Some(false), ..ExternalRuleSettings::default() },
+            ),
+            (
+                "acme/no-call".to_string(),
+                ExternalRuleSettings {
+                    enabled: Some(true),
+                    level: Some(Level::Error),
+                    ..ExternalRuleSettings::default()
+                },
+            ),
+        ]);
+        external.configure(&settings, GlobSettings::default()).expect("configuration should succeed");
+
+        let issues = external.lint(&file, program, &resolved_names, None).expect("external lint should succeed");
+
+        let request = transport.request.lock().unwrap();
+        assert_eq!(request.as_ref().expect("one request should be captured").active_rules, [1]);
+        assert_eq!(issues.len(), 1);
+        assert_eq!(issues.iter().next().expect("the external issue should exist").level, Level::Error);
+    }
+
+    #[test]
+    fn configured_excludes_skip_matching_files() {
+        let source = b"<?php\nrun();\n";
+        let arena = LocalArena::new();
+        let transport = two_call_rules_transport(testing::lint_response(&[]));
+        let mut external = ExternalLinter::initialize_transports([Arc::clone(&transport)], PHPVersion::PHP85)
+            .expect("registration should succeed");
+        let settings = BTreeMap::from([
+            (
+                "acme/no-run".to_string(),
+                ExternalRuleSettings { exclude: vec!["tests/".to_string()], ..ExternalRuleSettings::default() },
+            ),
+            (
+                "acme/no-call".to_string(),
+                ExternalRuleSettings { enabled: Some(true), ..ExternalRuleSettings::default() },
+            ),
+        ]);
+        external.configure(&settings, GlobSettings::default()).expect("configuration should succeed");
+
+        for (name, active_rules) in [(&b"tests/test.php"[..], &[1][..]), (&b"src/test.php"[..], &[0, 1][..])] {
+            let file = File::ephemeral(Cow::Borrowed(name), Cow::Borrowed(source));
+            let program = parse_file(&arena, &file);
+            let resolved_names = NameResolver::new(&arena).resolve(program);
+
+            external.lint(&file, program, &resolved_names, None).expect("external lint should succeed");
+
+            let request = transport.request.lock().unwrap().take().expect("one request should be captured");
+            assert_eq!(request.active_rules, active_rules);
+        }
     }
 }

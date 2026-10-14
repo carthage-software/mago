@@ -780,6 +780,9 @@ mod tests {
     use core::str;
     use std::fs;
 
+    use mago_linter::settings::ExternalRuleSettings;
+    use mago_linter::settings::RulesSettings;
+    use mago_reporting::Level;
     use pretty_assertions::assert_eq;
     use tempfile::env::temp_dir;
 
@@ -896,6 +899,75 @@ environment = { APP_ENV = "test" }
         assert!(!host.enabled);
         assert_eq!(host.command, ["php", "worker.php"]);
         assert_eq!(host.workers, 2);
+    }
+
+    #[test]
+    fn extension_rules_are_configured_by_their_codes() {
+        let directory = temp_dir().join("extension-rule-configuration");
+        let _ = fs::remove_dir_all(&directory);
+        let configuration_file = directory.join("mago.toml");
+        write_file(
+            &configuration_file,
+            r#"
+[linter.rules]
+no-eval = { exclude = ["tests/"] }
+"acme/no-eval" = { enabled = false, level = "warning", exclude = ["tests/"] }
+
+[linter.rules."acme/no-exit"]
+level = "error"
+"#,
+        );
+
+        let configuration = load_isolated(&configuration_file);
+        let rules = &configuration.linter.rules;
+
+        assert_eq!(rules.no_eval.exclude, ["tests/"]);
+        assert_eq!(
+            rules.extensions["acme/no-eval"],
+            ExternalRuleSettings {
+                enabled: Some(false),
+                level: Some(Level::Warning),
+                exclude: vec!["tests/".to_string()]
+            }
+        );
+        assert_eq!(
+            rules.extensions["acme/no-exit"],
+            ExternalRuleSettings { level: Some(Level::Error), ..ExternalRuleSettings::default() }
+        );
+
+        let serialized = serde_json::to_value(rules).unwrap();
+        assert_eq!(serialized["no-eval"]["exclude"], serde_json::json!(["tests/"]));
+        assert_eq!(
+            serialized["acme/no-eval"],
+            serde_json::json!({ "enabled": false, "level": "Warning", "exclude": ["tests/"] })
+        );
+        assert_eq!(serde_json::from_value::<RulesSettings>(serialized).unwrap().extensions, rules.extensions);
+    }
+
+    #[test]
+    fn unknown_built_in_rule_codes_are_rejected() {
+        let directory = temp_dir().join("unknown-built-in-rule");
+        let _ = fs::remove_dir_all(&directory);
+        let configuration_file = directory.join("mago.toml");
+        write_file(&configuration_file, "[linter.rules]\nno-evl = { enabled = false }\n");
+
+        let error = Configuration::load(None, Some(&configuration_file), None, None, false, false)
+            .expect_err("a misspelled built-in rule should fail");
+
+        assert!(error.to_string().contains("unknown field `no-evl`"));
+    }
+
+    #[test]
+    fn invalid_extension_rule_settings_are_rejected() {
+        let directory = temp_dir().join("invalid-extension-rule");
+        let _ = fs::remove_dir_all(&directory);
+        let configuration_file = directory.join("mago.toml");
+        write_file(&configuration_file, "[linter.rules]\n\"acme/no-eval\" = { threshold = 3 }\n");
+
+        let error = Configuration::load(None, Some(&configuration_file), None, None, false, false)
+            .expect_err("an unknown extension rule option should fail");
+
+        assert!(error.to_string().contains("invalid settings for rule `acme/no-eval`: unknown field `threshold`"));
     }
 
     #[test]
@@ -1186,6 +1258,16 @@ environment = { APP_ENV = "test" }
 
         assert_eq!(host.command, vec!["php", "vendor/acme/worker.php"]);
         assert_eq!(host.workers, 3);
+    }
+
+    #[test]
+    fn test_schema_accepts_extension_rule_codes() {
+        let schema = serde_json::to_value(schemars::schema_for!(Configuration)).unwrap();
+        let rules = &schema["$defs"]["RulesSettings"];
+
+        assert_eq!(rules["additionalProperties"], serde_json::json!(false));
+        assert_eq!(rules["patternProperties"]["/"]["additionalProperties"], serde_json::json!(false));
+        assert!(!rules["patternProperties"]["/"]["properties"]["exclude"].is_null());
     }
 
     #[test]

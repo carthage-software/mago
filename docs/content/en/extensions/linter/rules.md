@@ -39,9 +39,11 @@ public function getDefinition(): RuleDefinition
 | `code` | Globally unique, non-empty issue code. It must not collide with a native rule or another external rule. A vendor-qualified code is recommended. |
 | `name` | Non-empty human-readable rule name. |
 | `description` | Non-empty concise description shown by extension inspection. |
-| `defaultLevel` | `Note`, `Help`, `Warning`, or `Error`. Applied to every issue from this rule. |
-| `defaultEnabled` | Whether normal lint runs activate the rule. `--only` can select it explicitly. |
+| `defaultLevel` | `Note`, `Help`, `Warning`, or `Error`. Applied to every issue from this rule unless the project sets `level`. |
+| `defaultEnabled` | Whether normal lint runs activate the rule unless the project sets `enabled`. `--only` can select it explicitly. |
 | `targets` | Non-empty, duplicate-free list of exact `NodeKind` cases. |
+
+Projects can override `defaultLevel` and `defaultEnabled`, and exclude paths, under `[linter.rules]` using the rule's code. See [extension rules](/tools/linter/configuration-reference/#extension-rules).
 
 `getDefinition()` runs during worker construction and registration. Return stable metadata; do not derive it from the current source file.
 

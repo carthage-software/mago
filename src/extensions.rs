@@ -8,6 +8,7 @@ use mago_analyzer::external::ExternalAnalyzerHandle;
 use mago_extension::WorkerPool;
 use mago_linter::external::ExternalLintError;
 use mago_linter::external::ExternalLinter;
+use mago_linter::settings::RulesSettings;
 use mago_php_version::PHPVersion;
 
 use crate::config::extension::ExtensionHostConfiguration;
@@ -77,6 +78,17 @@ pub(crate) fn initialize_external_linter(
     }
 
     Ok(Some(linter))
+}
+
+/// Warns about `[linter.rules]` entries that no enabled extension registers.
+pub(crate) fn warn_about_unregistered_rules(rules: &RulesSettings, external_linter: Option<&ExternalLinter>) {
+    for code in rules.extensions.keys() {
+        if !external_linter.is_some_and(|linter| linter.contains_rule(code)) {
+            tracing::warn!(
+                "Linter rule `{code}` is configured in `[linter.rules]`, but no enabled extension registers it."
+            );
+        }
+    }
 }
 
 /// Starts every enabled extension host and validates its analyzer registration.

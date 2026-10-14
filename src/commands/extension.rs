@@ -8,6 +8,7 @@ use clap::Subcommand;
 use crate::config::Configuration;
 use crate::error::Error;
 use crate::extensions::initialize_external_linter;
+use crate::extensions::warn_about_unregistered_rules;
 
 /// Manage external extensions configured for this workspace.
 #[derive(Parser, Debug)]
@@ -39,6 +40,8 @@ impl ExtensionCommand {
             configuration.threads,
         )
         .map_err(mago_orchestrator::OrchestratorError::from)?;
+
+        warn_about_unregistered_rules(&configuration.linter.rules, external.as_ref());
 
         match self.command {
             ExtensionSubcommand::List { json } => {
