@@ -309,7 +309,11 @@ test_case!(docblock_param_basic);
 test_case!(docblock_return_basic);
 test_case!(docblock_throws_exception);
 test_case!(docblock_throws_unhandled);
-test_case!(issue_2503_dead_catch);
+test_case!(issue_2503_dead_catch, {
+    let mut settings = default_test_settings();
+    settings.check_dead_catch = true;
+    settings
+});
 test_case!(issue_2503_check_throws_disabled, {
     let mut settings = default_test_settings();
     settings.check_throws = false;
@@ -2218,7 +2222,11 @@ test_case!(issue_583);
 test_case!(issue_586);
 test_case!(issue_588);
 test_case!(issue_596);
-test_case!(issue_598);
+test_case!(issue_598, {
+    let mut settings = default_test_settings();
+    settings.check_dead_catch = true;
+    settings
+});
 test_case!(issue_606);
 test_case!(issue_607);
 test_case!(issue_617);

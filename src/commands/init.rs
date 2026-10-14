@@ -130,6 +130,7 @@ impl AnalyzerStrictnessPreset {
                 find_unused_expressions: false,
                 analyze_dead_code: false,
                 check_throws: false,
+                check_dead_catch: false,
                 allow_possibly_undefined_array_keys: true,
                 check_missing_override: false,
                 find_unused_parameters: false,
@@ -147,6 +148,7 @@ impl AnalyzerStrictnessPreset {
                 find_unused_expressions: false,
                 analyze_dead_code: false,
                 check_throws: false,
+                check_dead_catch: false,
                 allow_possibly_undefined_array_keys: true,
                 check_missing_override: false,
                 find_unused_parameters: false,
@@ -164,6 +166,7 @@ impl AnalyzerStrictnessPreset {
                 find_unused_expressions: true,
                 analyze_dead_code: false,
                 check_throws: true,
+                check_dead_catch: false,
                 allow_possibly_undefined_array_keys: false,
                 check_missing_override: true,
                 find_unused_parameters: true,
@@ -181,6 +184,7 @@ impl AnalyzerStrictnessPreset {
                 find_unused_expressions: true,
                 analyze_dead_code: true,
                 check_throws: true,
+                check_dead_catch: false,
                 allow_possibly_undefined_array_keys: false,
                 check_missing_override: true,
                 find_unused_parameters: true,
@@ -402,6 +406,8 @@ struct InitializationAnalyzerSettings {
     analyze_dead_code: bool,
     /// Whether to check for unhandled thrown exceptions
     check_throws: bool,
+    /// Whether to report catch clauses that cannot catch a known exception
+    check_dead_catch: bool,
     /// Whether to allow access to potentially undefined array keys
     allow_possibly_undefined_array_keys: bool,
     /// Whether to check for missing #[Override] attributes
@@ -657,6 +663,10 @@ fn setup_analyzer(theme: &ColorfulTheme) -> Result<InitializationAnalyzerSetting
         settings.check_throws = Confirm::with_theme(theme)
             .with_prompt(" │  Check for unhandled thrown exceptions?")
             .default(settings.check_throws)
+            .interact()?;
+        settings.check_dead_catch = Confirm::with_theme(theme)
+            .with_prompt(" │  Check catch clauses with no known matching exception? (requires check-throws)")
+            .default(settings.check_dead_catch)
             .interact()?;
         settings.check_missing_type_hints = Confirm::with_theme(theme)
             .with_prompt(" │  Check for missing type hints?")
@@ -956,6 +966,7 @@ fn build_analyzer_settings_string(settings: &InitializationAnalyzerSettings) -> 
     lines.push(format!("memoize-properties = {}", settings.memoize_properties));
     lines.push(format!("allow-possibly-undefined-array-keys = {}", settings.allow_possibly_undefined_array_keys));
     lines.push(format!("check-throws = {}", settings.check_throws));
+    lines.push(format!("check-dead-catch = {}", settings.check_dead_catch));
     lines.push("unchecked-exceptions = [\"Error\", \"LogicException\"]".to_string());
     lines.push("unchecked-exception-classes = []".to_string());
     lines.push(format!("check-missing-override = {}", settings.check_missing_override));
@@ -983,6 +994,7 @@ mod tests {
             find_unused_expressions: false,
             analyze_dead_code: false,
             check_throws: false,
+            check_dead_catch: false,
             allow_possibly_undefined_array_keys: true,
             check_missing_override: false,
             find_unused_parameters: false,
@@ -1071,6 +1083,7 @@ mod tests {
             find_unused_expressions: true,
             analyze_dead_code: true,
             check_throws: true,
+            check_dead_catch: false,
             allow_possibly_undefined_array_keys: false,
             check_missing_override: false,
             find_unused_parameters: false,

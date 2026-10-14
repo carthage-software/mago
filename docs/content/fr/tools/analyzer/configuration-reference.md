@@ -97,6 +97,7 @@ Ces indicateurs activent ou désactivent des analyses individuelles. Les valeurs
 | `memoize-properties` | `true` | Suit les valeurs littérales de propriété pour une inférence plus précise, au prix d'un peu de mémoire. |
 | `allow-possibly-undefined-array-keys` | `true` | **Déprécié.** Autorise l'accès aux clés qui peuvent manquer sans le signaler. Le passer à `false` signale uniquement les lectures de `array<K, V>` avec une clé littérale unique et n'élargit pas le type à `T\|null`. Préférez `strict-array-index-existence`. |
 | `check-throws` | `false` | Signale les exceptions non capturées et non déclarées avec `@throws`. |
+| `check-dead-catch` | `false` | Signale les clauses `catch` qui ne correspondent à aucune exception connue du bloc `try`. Nécessite `check-throws` ; du code non documenté peut malgré tout lancer des exceptions invisibles pour l'analyseur. |
 | `check-missing-override` | `false` | Signale les attributs `#[Override]` manquants sur les méthodes redéfinissantes (PHP 8.3+). |
 | `find-unused-parameters` | `false` | Signale les paramètres qui ne sont jamais lus. |
 | `strict-list-index-checks` | `false` | Exige que tout entier utilisé comme index de liste soit prouvé non négatif. |
@@ -286,6 +287,7 @@ find-unused-definitions = true
 find-overly-wide-return-types = true
 analyze-dead-code = true
 check-throws = true
+check-dead-catch = true
 check-missing-override = true
 find-unused-parameters = true
 check-missing-type-hints = true
@@ -299,6 +301,8 @@ strict-array-index-existence = true
 no-boolean-literal-comparison = true
 trust-existence-checks = false
 ```
+
+`check-dead-catch` est désactivé par défaut, car PHP peut lancer à l'exécution des exceptions absentes du type ou de la documentation `@throws` d'une fonction, comme `TypeError`. Activez-le pour des vérifications plus strictes si la documentation des exceptions de votre code est suffisamment complète.
 
 ### Mode indulgent
 

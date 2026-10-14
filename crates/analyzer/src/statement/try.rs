@@ -5,8 +5,8 @@ use std::rc::Rc;
 
 use foldhash::HashSet;
 use mago_codex::identifier::method::MethodIdentifier;
-use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::metadata::CodebaseMetadata;
+use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_word::Word;
 use mago_word::WordMap;
 use mago_word::WordSet;
@@ -251,6 +251,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                     .any(|previous| context.codebase.is_instance_of(caught.as_bytes(), previous.as_bytes()))
             });
             if context.settings.check_throws
+                && context.settings.check_dead_catch
                 && has_valid_caught_classes
                 && (is_covered_by_previous_catch
                     || (!has_untracked_throw_source
@@ -868,9 +869,7 @@ fn has_untracked_trait_alias_constructor(
             .get_class_like_by_name(declaring_method_id.get_class_name())
             .is_some_and(|declaring_class| declaring_class.kind.is_trait())
     {
-        return codebase
-            .get_method_by_id(&declaring_method_id)
-            .is_none_or(|method| !method.flags.is_built_in());
+        return codebase.get_method_by_id(&declaring_method_id).is_none_or(|method| !method.flags.is_built_in());
     }
 
     let mut found_method = false;
@@ -895,18 +894,8 @@ fn has_untracked_trait_alias_constructor(
     !found_method
 }
 
-fn get_declared_method_identifier(
-    class_metadata: &ClassLikeMetadata,
-    method_name: Word,
-) -> Option<MethodIdentifier> {
-    class_metadata
-        .declaring_method_ids
-        .get(&method_name)
-        .copied()
-        .or_else(|| {
-            class_metadata
-                .methods
-                .contains(&method_name)
-                .then(|| MethodIdentifier::new(class_metadata.name, method_name))
-        })
+fn get_declared_method_identifier(class_metadata: &ClassLikeMetadata, method_name: Word) -> Option<MethodIdentifier> {
+    class_metadata.declaring_method_ids.get(&method_name).copied().or_else(|| {
+        class_metadata.methods.contains(&method_name).then(|| MethodIdentifier::new(class_metadata.name, method_name))
+    })
 }

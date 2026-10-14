@@ -59,6 +59,12 @@ pub struct Settings {
     /// This check is disabled by default (`false`) as it can be computationally expensive.
     pub check_throws: bool,
 
+    /// Check whether each catch clause can catch a known exception from its try block.
+    ///
+    /// This check only runs when `check_throws` is enabled. It is disabled by default
+    /// because exceptions from undocumented code cannot be ruled out statically.
+    pub check_dead_catch: bool,
+
     /// Exceptions to ignore including all subclasses (hierarchy-aware).
     ///
     /// When an exception class is in this set, any exception of that class or any of its
@@ -408,6 +414,7 @@ impl Settings {
             memoize_properties: true,
             allow_possibly_undefined_array_keys: true,
             check_throws: false,
+            check_dead_catch: false,
             unchecked_exceptions: WordSet::default(),
             unchecked_exception_classes: WordSet::default(),
             use_colors: true,
