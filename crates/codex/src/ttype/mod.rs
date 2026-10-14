@@ -1466,8 +1466,18 @@ fn get_iterable_parameters_impl(
                     )
                     .unwrap_or_else(get_mixed);
 
-                    resolve_unbound_generic_parameters(codebase, &mut key_type);
-                    resolve_unbound_generic_parameters(codebase, &mut value_type);
+                    resolve_unbound_generic_parameters(
+                        codebase,
+                        class_metadata,
+                        object.get_type_parameters(),
+                        &mut key_type,
+                    );
+                    resolve_unbound_generic_parameters(
+                        codebase,
+                        class_metadata,
+                        object.get_type_parameters(),
+                        &mut value_type,
+                    );
 
                     if is_iterator_interface || (!key_type.is_mixed() && !value_type.is_mixed()) {
                         return Some((key_type, value_type));
@@ -1764,14 +1774,21 @@ pub fn get_specialized_template_type(
     Some(template_type)
 }
 
-fn resolve_unbound_generic_parameters(codebase: &CodebaseMetadata, union: &mut TUnion) {
+fn resolve_unbound_generic_parameters(
+    codebase: &CodebaseMetadata,
+    class_metadata: &ClassLikeMetadata,
+    type_parameters: Option<&[TUnion]>,
+    union: &mut TUnion,
+) {
     if !union.has_template_types() {
         return;
     }
 
     let mut template_result = TemplateResult::default();
     for node in union.get_all_child_nodes() {
-        if let TypeRef::Atomic(TAtomic::GenericParameter(parameter)) = node {
+        if let TypeRef::Atomic(TAtomic::GenericParameter(parameter)) = node
+            && is_unbound_class_template(class_metadata, type_parameters, parameter)
+        {
             template_result.add_lower_bound(
                 parameter.parameter_name,
                 parameter.defining_entity,
@@ -1783,6 +1800,31 @@ fn resolve_unbound_generic_parameters(codebase: &CodebaseMetadata, union: &mut T
     if !template_result.lower_bounds.is_empty() {
         *union = inferred_type_replacer::replace(union, &template_result, codebase);
     }
+}
+
+fn is_unbound_class_template(
+    class_metadata: &ClassLikeMetadata,
+    type_parameters: Option<&[TUnion]>,
+    parameter: &TGenericParameter,
+) -> bool {
+    let GenericParent::ClassLike(defining_class) = parameter.defining_entity else {
+        return false;
+    };
+
+    if defining_class == class_metadata.name {
+        return type_parameters.is_none_or(|type_parameters| {
+            class_metadata
+                .get_template_index_for_name(parameter.parameter_name)
+                .is_none_or(|index| index >= type_parameters.len())
+        });
+    }
+
+    (class_metadata.all_parent_classes.contains(&defining_class)
+        || class_metadata.all_parent_interfaces.contains(&defining_class))
+        && !class_metadata
+            .template_extended_parameters
+            .get(&defining_class)
+            .is_some_and(|parameters| parameters.contains_key(&parameter.parameter_name))
 }
 
 fn get_iterator_method_return_type(
@@ -1816,7 +1858,7 @@ fn get_iterator_method_return_type(
             return_type = inferred_type_replacer::replace(&return_type, &template_result, codebase);
         }
 
-        resolve_unbound_generic_parameters(codebase, &mut return_type);
+        resolve_unbound_generic_parameters(codebase, class_metadata, type_parameters, &mut return_type);
     }
 
     let expansion_options = TypeExpansionOptions {
