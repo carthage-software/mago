@@ -1,5 +1,6 @@
 use mago_allocator::Arena;
 use std::borrow::Cow;
+use std::cell::OnceCell;
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -1232,18 +1233,25 @@ fn check_thrown_types<'ctx, A>(
         return;
     }
 
-    let function_name = &function_like_metadata.original_name;
-
-    let (function_kind, function_name) = if function_like_metadata.kind.is_method() {
+    let class_like_metadata = if function_like_metadata.kind.is_method() {
         let Some(class_like_metadata) = block_context.scope.get_class_like() else {
             return;
         };
 
-        let name = concat_word!(&class_like_metadata.original_name, "::", function_name);
-
-        ("method", name)
+        Some(class_like_metadata)
     } else {
-        ("function", *function_name)
+        None
+    };
+
+    let function_kind = if class_like_metadata.is_some() { "method" } else { "function" };
+    let function_name = OnceCell::new();
+    let function_name = || {
+        *function_name.get_or_init(|| match class_like_metadata {
+            Some(class_like_metadata) => {
+                concat_word!(&class_like_metadata.original_name, "::", &function_like_metadata.original_name)
+            }
+            None => function_like_metadata.original_name,
+        })
     };
 
     let expected_throw_types = context
@@ -1281,7 +1289,8 @@ fn check_thrown_types<'ctx, A>(
             continue;
         }
 
-        let mut issue = Issue::error(format!("Potentially unhandled exception `{thrown_type}` in `{function_name}`."));
+        let mut issue =
+            Issue::error(format!("Potentially unhandled exception `{thrown_type}` in `{}`.", function_name()));
 
         for span in thrown_spans {
             issue = issue.with_annotation(Annotation::primary(*span).with_message("Exception may be thrown here"));
@@ -1384,7 +1393,7 @@ pub fn check_unused_function_template_parameters<'ctx, A>(
     function_like_metadata: &'ctx FunctionLikeMetadata,
     name_span: Span,
     kind_str: &str,
-    display_name: Word,
+    display_name: impl Fn() -> Word,
 ) where
     A: Arena,
 {
@@ -1430,7 +1439,8 @@ pub fn check_unused_function_template_parameters<'ctx, A>(
         context.collector.report_with_code(
             IssueCode::UnusedTemplateParameter,
             Issue::warning(format!(
-                "Template parameter `{template_name}` is never used in {kind_str} `{display_name}`."
+                "Template parameter `{template_name}` is never used in {kind_str} `{}`.",
+                display_name()
             ))
             .with_annotation(
                 Annotation::primary(name_span)
@@ -1518,7 +1528,7 @@ where
             TypeRef::Atomic(TAtomic::Reference(TReference::Symbol { name, .. })) => name,
             TypeRef::Atomic(TAtomic::Object(TObject::Named(TNamedObject { name, .. }) | TObject::Enum(TEnum { name, .. })))
                 if !matches!(name.as_bytes(), b"self" | b"static" | b"parent" | b"$this")
-                    && context.codebase.get_class_like(name.as_bytes()).is_none() => name,
+                    && context.codebase.get_class_like_by_name(*name).is_none() => name,
             _ => return false,
         };
 

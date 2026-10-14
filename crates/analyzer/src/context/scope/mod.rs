@@ -27,6 +27,9 @@ pub fn var_has_root(var_id: Word, root_var_id: Word) -> bool {
 pub fn var_references_dynamic(var_id: Word, referenced_var_id: Word) -> bool {
     let var_bytes = var_id.as_bytes();
     let ref_bytes = referenced_var_id.as_bytes();
+    if ref_bytes.len() >= var_bytes.len() {
+        return false;
+    }
 
     let mut start = 1;
     while start <= var_bytes.len() {

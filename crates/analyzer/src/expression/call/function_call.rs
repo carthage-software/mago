@@ -97,15 +97,12 @@ where
     A: Arena,
 {
     if let Expression::Identifier(function_name) = expression {
-        let name = word(context.resolved_names.get(function_name));
-        let unqualified_name = word(function_name.value());
+        let resolved_name = context.resolved_names.get(function_name);
+        let name = word(resolved_name);
 
         let identifier = FunctionLikeIdentifier::Function(name);
-        let alternative = if function_name.is_local() && unqualified_name != name {
-            Some(FunctionLikeIdentifier::Function(unqualified_name))
-        } else {
-            None
-        };
+        let alternative = (function_name.is_local() && function_name.value() != resolved_name)
+            .then(|| FunctionLikeIdentifier::Function(word(function_name.value())));
 
         let lowercased_name = name.to_ascii_lowercase();
         artifacts.symbol_references.add_reference_to_symbol(&block_context.scope, lowercased_name, false);

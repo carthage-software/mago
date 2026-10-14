@@ -234,7 +234,10 @@ where
             possible_types.push(ResolvedClassname::new(
                 Some(fqcn),
                 ResolutionOrigin::Named { is_parent: false, is_self: false },
-                context.codebase.is_enum_or_final_class(fqcn.as_bytes()),
+                context
+                    .codebase
+                    .get_class_like_by_name(fqcn)
+                    .is_some_and(|metadata| metadata.kind.is_enum() || metadata.flags.is_final()),
             ));
         }
         Expression::Self_(self_keyword) => {

@@ -116,13 +116,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Function<'arena> {
             }
         }
 
-        check_unused_function_template_parameters(
-            context,
-            function_metadata,
-            self.name.span(),
-            "function",
-            function_name,
-        );
+        check_unused_function_template_parameters(context, function_metadata, self.name.span(), "function", || {
+            function_name
+        });
 
         if context.settings.find_unused_parameters {
             unused_parameter::check_unused_params(

@@ -2,10 +2,8 @@ use std::borrow::Cow;
 use std::collections::BTreeMap;
 use std::rc::Rc;
 use std::sync::Arc;
-use std::sync::LazyLock;
 
 use foldhash::HashSet;
-use regex::Regex;
 
 use mago_algebra::AssertionMap;
 use mago_algebra::assertion_set::AssertionSet;
@@ -872,11 +870,6 @@ fn refine_array_key(key_type: &TUnion) -> TUnion {
     refine_array_key_inner(key_type).unwrap_or_else(|| key_type.clone())
 }
 
-static INTEGER_REGEX: LazyLock<Regex> = LazyLock::new(|| unsafe {
-    // SAFETY: `unwrap_unchecked` is safe here because the regex is valid and will not panic.
-    Regex::new("^[0-9]+$").unwrap_unchecked()
-});
-
 #[allow(clippy::multiple_unsafe_ops_per_block)]
 #[allow(clippy::semicolon_inside_block)]
 fn add_nested_assertions(
@@ -1191,9 +1184,11 @@ where
 
             key_parts.pop();
 
-            let array_key_offset = std::str::from_utf8(array_key)
-                .ok()
-                .and_then(|s| if INTEGER_REGEX.is_match(s) { s.parse::<usize>().ok() } else { None });
+            let array_key_offset = if !array_key.is_empty() && array_key.iter().all(u8::is_ascii_digit) {
+                std::str::from_utf8(array_key).ok().and_then(|s| s.parse::<usize>().ok())
+            } else {
+                None
+            };
 
             let array_key_type = if let Some(array_key_offset) = array_key_offset {
                 ArrayKey::Integer(array_key_offset as i64)
