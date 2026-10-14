@@ -60,25 +60,17 @@ pub fn block_has_throws(block: &Block<'_>) -> bool {
 #[inline]
 #[must_use]
 pub fn statement_has_throws(statement: &Statement<'_>) -> bool {
-    for control_flow in control_flow::find_control_flows_in_statement(statement) {
-        if let ControlFlow::Throw(_) = control_flow {
-            return true;
-        }
-    }
-
-    false
+    !control_flow::visit_control_flows_in_statement(statement, &mut |control_flow| {
+        !matches!(control_flow, ControlFlow::Throw(_))
+    })
 }
 
 #[inline]
 #[must_use]
 pub fn expression_has_throws(expression: &Expression<'_>) -> bool {
-    for control_flow in control_flow::find_control_flows_in_expression(expression) {
-        if let ControlFlow::Throw(_) = control_flow {
-            return true;
-        }
-    }
-
-    false
+    !control_flow::visit_control_flows_in_expression(expression, &mut |control_flow| {
+        !matches!(control_flow, ControlFlow::Throw(_))
+    })
 }
 
 #[inline]

@@ -18,6 +18,9 @@ pub struct ParserSettings {
     /// Keep unfinished bodies and lists at EOF for editor queries.
     /// Missing delimiters still produce parse errors.
     pub recover_incomplete: bool,
+    /// Drop whitespace trivia that no comment precedes within the same token gap.
+    /// Docblock and pragma lookups only ever read whitespace that follows a comment.
+    pub elide_detached_whitespace: bool,
 }
 
 impl Default for LexerSettings {

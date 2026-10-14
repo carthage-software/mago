@@ -65,7 +65,7 @@ where
     pub fn new(arena: &'arena A, file_id: FileId, content: &'input [u8], settings: ParserSettings) -> Self {
         let input = Input::new(file_id, content);
         let lexer = Lexer::new(input, settings.lexer);
-        let stream = TokenStream::new(arena, lexer);
+        let stream = TokenStream::new(arena, lexer, settings.elide_detached_whitespace);
 
         let end = Position::new(content.len() as u32);
         let recovery_end = settings.recover_incomplete.then_some(Span::new(file_id, end, end));

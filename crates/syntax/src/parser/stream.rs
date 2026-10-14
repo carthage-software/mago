@@ -30,13 +30,19 @@ where
     trivia: Vec<'arena, Trivia<'input>, A>,
     position: Position,
     file_id: FileId,
+    elide_detached_whitespace: bool,
+    after_comment: bool,
 }
 
 impl<'input, 'arena, A> TokenStream<'input, 'arena, A>
 where
     A: Arena,
 {
-    pub fn new(arena: &'arena A, lexer: Lexer<'input>) -> TokenStream<'input, 'arena, A> {
+    pub fn new(
+        arena: &'arena A,
+        lexer: Lexer<'input>,
+        elide_detached_whitespace: bool,
+    ) -> TokenStream<'input, 'arena, A> {
         let position = lexer.current_position();
         let file_id_cached = lexer.file_id();
 
@@ -47,6 +53,8 @@ where
             trivia: Vec::new_in(arena),
             position,
             file_id: file_id_cached,
+            elide_detached_whitespace,
+            after_comment: false,
         }
     }
 
@@ -287,10 +295,23 @@ where
                     };
 
                     if let Some(kind) = trivia_kind {
-                        self.trivia.push(Trivia { kind, span: token.span_for(self.file_id), value: token.value });
+                        if kind == TriviaKind::WhiteSpace {
+                            if self.after_comment || !self.elide_detached_whitespace {
+                                self.trivia.push(Trivia {
+                                    kind,
+                                    span: token.span_for(self.file_id),
+                                    value: token.value,
+                                });
+                            }
+                        } else {
+                            self.after_comment = true;
+                            self.trivia.push(Trivia { kind, span: token.span_for(self.file_id), value: token.value });
+                        }
+
                         continue;
                     }
 
+                    self.after_comment = false;
                     self.buffer.push_back(token);
                 }
                 None => return Ok(None),

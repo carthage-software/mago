@@ -136,7 +136,7 @@ impl<'arena> PartialArgumentList<'arena> {
     {
         debug_assert!(!self.has_placeholders(), "Cannot convert PartialArgumentList with placeholders to ArgumentList");
 
-        let mut arguments = Vec::new_in(arena);
+        let mut arguments = Vec::with_capacity_in(self.arguments.nodes.len(), arena);
         for arg in self.arguments.nodes {
             match arg {
                 PartialArgument::Positional(p) => arguments.push(Argument::Positional(p.clone())),

@@ -262,6 +262,12 @@ impl AnalysisService {
             retain_project_references || self.plugin_registry.has_custom_plugins() || external_session.is_some();
         let codebase_scan_plan =
             self.plugin_registry.external_codebase_scan_plan().map_err(AnalysisError::from)?.map(Arc::new);
+        let parser_settings = ParserSettings {
+            elide_detached_whitespace: !self.plugin_registry.has_custom_plugins()
+                && external_session.is_none()
+                && codebase_scan_plan.is_none(),
+            ..self.parser_settings
+        };
         let lifecycle_capabilities = Arc::new(OnceLock::new());
         let additional_symbol_references = Arc::new(OnceLock::new());
         let reducer = AnalysisResultReducer {
@@ -279,8 +285,8 @@ impl AnalysisService {
             self.database,
             self.codebase,
             self.symbol_references,
-            (self.settings.clone(), self.parser_settings),
-            self.parser_settings,
+            (self.settings.clone(), parser_settings),
+            parser_settings,
             self.settings.version,
             Box::new(reducer),
             self.use_progress_bars,
