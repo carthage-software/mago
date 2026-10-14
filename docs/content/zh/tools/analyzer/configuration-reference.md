@@ -76,6 +76,7 @@ glob 匹配会遵循 `[source.glob]` 下的项目级设置,因此像 `literal-se
 | `find-unused-expressions` | `true` | 报告其结果被丢弃的表达式,例如 `$a + $b;`。 |
 | `find-unused-definitions` | `true` | 报告从未被引用的私有定义。 |
 | `find-overly-wide-return-types` | `false` | 当声明的返回类型包含主体永远不会产生的分支时发出警告,例如总是返回字符串的函数声明为 `: string\|false`。自 1.20.0 起可用。 |
+| `find-overly-wide-throw-types` | `false` | 当文档中的 `@throws` 类型无法从函数或方法中逸出时发出警告。 |
 | `analyze-dead-code` | `false` | 分析看似不可达的代码。 |
 | `memoize-properties` | `true` | 跟踪字面量属性值以获得更精准的推断,代价是占用一些额外内存。 |
 | `allow-possibly-undefined-array-keys` | `true` | **已弃用。**允许访问可能不存在的键,而不报告。设为 `false` 时仅对带有单个字面量键的 `array<K, V>` 读取发出警告,且不会将类型扩展为 `T\|null`。请改用 `strict-array-index-existence`。 |
@@ -138,7 +139,7 @@ class MyTest extends TestCase
 
 ## 异常过滤
 
-启用 `check-throws` 时,有两个选项可以让你跳过特定异常。
+启用 `check-throws` 或 `find-overly-wide-throw-types` 时,有两个选项可以让你跳过特定异常。
 
 | 选项 | 类型 | 默认值 | 说明 |
 | :--- | :--- | :--- | :--- |
@@ -261,6 +262,7 @@ plugins = ["psl"]
 find-unused-expressions = true
 find-unused-definitions = true
 find-overly-wide-return-types = true
+find-overly-wide-throw-types = true
 analyze-dead-code = true
 check-throws = true
 check-dead-catch = true
