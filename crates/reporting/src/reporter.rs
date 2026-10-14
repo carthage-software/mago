@@ -10,9 +10,6 @@
 
 use std::io::Write;
 
-#[cfg(not(target_arch = "wasm32"))]
-use rayon::prelude::*;
-
 use mago_database::ReadDatabase;
 
 use crate::IssueCollection;
@@ -117,9 +114,9 @@ impl Reporter {
         self.report_with_cleanup(issues, baseline, false)
     }
 
-    /// Reports issues, then frees large issue collections using Rayon.
+    /// Reports issues, then frees large issue collections on a background thread.
     ///
-    /// Cleanup stays serial on WebAssembly and in one-thread pools.
+    /// Cleanup stays inline on WebAssembly.
     ///
     /// # Errors
     ///
@@ -296,8 +293,8 @@ fn issue_levels(issues: &IssueCollection) -> (Option<Level>, Option<Level>) {
 
 fn drop_issues(issues: IssueCollection) {
     #[cfg(not(target_arch = "wasm32"))]
-    if issues.len() >= 4096 && rayon::current_num_threads() > 1 {
-        issues.issues.into_par_iter().with_min_len(1024).for_each(drop);
+    if issues.len() >= 4096 {
+        let _ = std::thread::Builder::new().name("mago-drop".to_owned()).spawn(move || drop(issues));
         return;
     }
 

@@ -16,8 +16,6 @@ use codespan_reporting::term;
 use codespan_reporting::term::Config;
 use codespan_reporting::term::DisplayStyle;
 use foldhash::HashMap;
-#[cfg(not(target_arch = "wasm32"))]
-use rayon::prelude::*;
 use termcolor::Ansi;
 use termcolor::NoColor;
 
@@ -35,6 +33,8 @@ use crate::error::ReportingError;
 use crate::formatter::Formatter;
 use crate::formatter::FormatterConfig;
 use crate::formatter::utils::osc8_file_hyperlink;
+#[cfg(not(target_arch = "wasm32"))]
+use crate::formatter::utils::render_chunks_in_order;
 use crate::formatter::utils::utf8_preserving_byte_offsets;
 
 /// Formatter that outputs issues in rich diagnostic format with full context.
@@ -104,25 +104,7 @@ pub(super) fn codespan_format_with_config(
         }
     }
 
-    for batch in issues.chunks(1024) {
-        #[cfg(not(target_arch = "wasm32"))]
-        if matches!(codespan_config.display_style, DisplayStyle::Rich)
-            && batch.len() >= 256
-            && rayon::current_num_threads() > 1
-        {
-            let chunks: Vec<_> = batch
-                .par_chunks(64)
-                .map(|chunk| render_issues(chunk, database, &sources, editor_url, use_colors, codespan_config))
-                .collect();
-            for chunk in chunks {
-                writer.write_all(&chunk?)?;
-            }
-
-            continue;
-        }
-
-        writer.write_all(&render_issues(batch, database, &sources, editor_url, use_colors, codespan_config)?)?;
-    }
+    write_issues(writer, &issues, database, &sources, editor_url, use_colors, codespan_config)?;
 
     if let Some(highest_level) = highest_level {
         let total_issues = errors + warnings + notes + help;
@@ -160,6 +142,36 @@ pub(super) fn codespan_format_with_config(
         let mut renderer = term::Renderer::new(styled, codespan_config);
         emit_diagnostic(&mut renderer, codespan_config, &files, &diagnostic)?;
         writer.write_all(if use_colors { ansi.get_ref() } else { plain.get_ref() })?;
+    }
+
+    Ok(())
+}
+
+fn write_issues(
+    writer: &mut dyn Write,
+    issues: &[&Issue],
+    database: &ReadDatabase,
+    sources: &HashMap<FileId, Cow<'_, str>>,
+    editor_url: Option<&str>,
+    use_colors: bool,
+    config: &Config,
+) -> Result<(), ReportingError> {
+    #[cfg(not(target_arch = "wasm32"))]
+    if issues.len() >= 256 && rayon::current_num_threads() > 1 {
+        return render_chunks_in_order(
+            issues,
+            32,
+            4 * rayon::current_num_threads(),
+            |chunk| render_issues(chunk, database, sources, editor_url, use_colors, config),
+            |chunk| -> Result<(), ReportingError> {
+                writer.write_all(&chunk?)?;
+                Ok(())
+            },
+        );
+    }
+
+    for batch in issues.chunks(1024) {
+        writer.write_all(&render_issues(batch, database, sources, editor_url, use_colors, config)?)?;
     }
 
     Ok(())

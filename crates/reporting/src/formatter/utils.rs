@@ -68,22 +68,122 @@ impl<'issues> Iterator for LazyFilteredIssues<'issues> {
 
     #[inline]
     fn next(&mut self) -> Option<&'issues Issue> {
-        for issue in self.iter.by_ref() {
-            if let Some(min) = self.min_level
-                && issue.level < min
-            {
-                continue;
-            }
+        let (min_level, filter_fixable) = (self.min_level, self.filter_fixable);
 
-            if self.filter_fixable && issue.edits.is_empty() {
-                continue;
-            }
+        self.iter.by_ref().find(|issue| passes_filters(issue, min_level, filter_fixable))
+    }
+}
 
-            return Some(issue);
+#[inline]
+pub(crate) fn passes_filters(issue: &Issue, min_level: Option<Level>, filter_fixable: bool) -> bool {
+    min_level.is_none_or(|min| issue.level >= min) && (!filter_fixable || !issue.edits.is_empty())
+}
+
+/// Renders chunks of `items` on the Rayon pool and consumes them on the calling thread in input order.
+#[cfg(not(target_arch = "wasm32"))]
+pub(crate) fn render_chunks_in_order<T, R, E>(
+    items: &[T],
+    chunk_size: usize,
+    window: usize,
+    render: impl Fn(&[T]) -> R + Sync,
+    mut consume: impl FnMut(R) -> Result<(), E>,
+) -> Result<(), E>
+where
+    T: Sync,
+    R: Send,
+{
+    use std::collections::BTreeMap;
+    use std::sync::Condvar;
+    use std::sync::Mutex;
+    use std::sync::PoisonError;
+    use std::sync::atomic::AtomicUsize;
+    use std::sync::atomic::Ordering;
+
+    struct Progress<R> {
+        consumed: usize,
+        cancelled: bool,
+        panicked: bool,
+        ready: BTreeMap<usize, R>,
+    }
+
+    struct PanicGuard<'state, R> {
+        progress: &'state Mutex<Progress<R>>,
+        rendered: &'state Condvar,
+    }
+
+    impl<R> Drop for PanicGuard<'_, R> {
+        fn drop(&mut self) {
+            if std::thread::panicking() {
+                let mut state = self.progress.lock().unwrap_or_else(PoisonError::into_inner);
+                state.cancelled = true;
+                state.panicked = true;
+                drop(state);
+                self.rendered.notify_all();
+            }
+        }
+    }
+
+    let chunk_count = items.len().div_ceil(chunk_size);
+    let next = AtomicUsize::new(0);
+    let progress = Mutex::new(Progress { consumed: 0, cancelled: false, panicked: false, ready: BTreeMap::new() });
+    let rendered = Condvar::new();
+    let advanced = Condvar::new();
+
+    rayon::in_place_scope(|scope| {
+        for _ in 0..rayon::current_num_threads().min(chunk_count) {
+            scope.spawn(|_| {
+                let _guard = PanicGuard { progress: &progress, rendered: &rendered };
+                loop {
+                    let index = next.fetch_add(1, Ordering::Relaxed);
+                    if index >= chunk_count {
+                        break;
+                    }
+
+                    let mut state = progress.lock().unwrap_or_else(PoisonError::into_inner);
+                    while !state.cancelled && index >= state.consumed + window {
+                        state = advanced.wait(state).unwrap_or_else(PoisonError::into_inner);
+                    }
+
+                    if state.cancelled {
+                        break;
+                    }
+
+                    drop(state);
+                    let start = index * chunk_size;
+                    let output = render(&items[start..items.len().min(start + chunk_size)]);
+                    progress.lock().unwrap_or_else(PoisonError::into_inner).ready.insert(index, output);
+                    rendered.notify_one();
+                }
+            });
         }
 
-        None
-    }
+        for index in 0..chunk_count {
+            let mut state = progress.lock().unwrap_or_else(PoisonError::into_inner);
+            let output = loop {
+                if let Some(output) = state.ready.remove(&index) {
+                    break output;
+                }
+
+                if state.panicked {
+                    return Ok(());
+                }
+
+                state = rendered.wait(state).unwrap_or_else(PoisonError::into_inner);
+            };
+
+            drop(state);
+
+            let result = consume(output);
+            let mut state = progress.lock().unwrap_or_else(PoisonError::into_inner);
+            state.consumed = index + 1;
+            state.cancelled = result.is_err();
+            drop(state);
+            advanced.notify_all();
+            result?;
+        }
+
+        Ok(())
+    })
 }
 
 impl<'issues> Iterator for FilteredIssues<'issues> {

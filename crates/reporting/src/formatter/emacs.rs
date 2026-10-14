@@ -7,12 +7,16 @@ use mago_database::ReadDatabase;
 use mago_database::file::File;
 use mago_database::file::HasFileId;
 
+use crate::Issue;
 use crate::IssueCollection;
 use crate::Level;
 use crate::error::ReportingError;
 use crate::formatter::Formatter;
 use crate::formatter::FormatterConfig;
 use crate::formatter::utils::osc8_file_hyperlink;
+use crate::formatter::utils::passes_filters;
+#[cfg(not(target_arch = "wasm32"))]
+use crate::formatter::utils::render_chunks_in_order;
 
 /// Formatter that outputs issues in Emacs compilation mode format.
 pub(crate) struct EmacsFormatter;
@@ -48,6 +52,10 @@ fn escape_owned_record_field(input: String) -> String {
     }
 }
 
+const RECORDS_PER_CHUNK: usize = 256;
+#[cfg(not(target_arch = "wasm32"))]
+const PARALLEL_THRESHOLD: usize = 4096;
+
 impl Formatter for EmacsFormatter {
     fn format(
         &self,
@@ -58,17 +66,67 @@ impl Formatter for EmacsFormatter {
     ) -> Result<(), ReportingError> {
         let use_colors = config.color_choice.should_use_colors(std::io::stdout().is_terminal());
         let editor_url = if use_colors { config.editor_url.as_deref() } else { None };
+        let records = RecordWriter {
+            database,
+            editor_url,
+            min_level: config.minimum_level,
+            filter_fixable: config.filter_fixable,
+        };
+
+        #[cfg(not(target_arch = "wasm32"))]
+        if issues.issues.len() >= PARALLEL_THRESHOLD && rayon::current_num_threads() > 1 {
+            return render_chunks_in_order(
+                &issues.issues,
+                RECORDS_PER_CHUNK,
+                2 * rayon::current_num_threads(),
+                |chunk| records.render(chunk),
+                |(output, result)| {
+                    writer.write_all(&output)?;
+                    result
+                },
+            );
+        }
+
+        let mut output = Vec::new();
+        for chunk in issues.issues.chunks(RECORDS_PER_CHUNK) {
+            let result = records.render_into(chunk, &mut output);
+            writer.write_all(&output)?;
+            result?;
+            output.clear();
+        }
+
+        Ok(())
+    }
+}
+
+struct RecordWriter<'database, 'config> {
+    database: &'database ReadDatabase,
+    editor_url: Option<&'config str>,
+    min_level: Option<Level>,
+    filter_fixable: bool,
+}
+
+impl RecordWriter<'_, '_> {
+    #[cfg(not(target_arch = "wasm32"))]
+    fn render(&self, issues: &[Issue]) -> (Vec<u8>, Result<(), ReportingError>) {
+        let mut output = Vec::new();
+        let result = self.render_into(issues, &mut output);
+
+        (output, result)
+    }
+
+    fn render_into(&self, issues: &[Issue], output: &mut Vec<u8>) -> Result<(), ReportingError> {
         let mut cached_file: Option<(&File, Cow<'_, str>)> = None;
         let mut number = itoa::Buffer::new();
 
-        for issue in crate::formatter::utils::filter_issues(issues, config, false) {
+        for issue in issues.iter().filter(|issue| passes_filters(issue, self.min_level, self.filter_fixable)) {
             let (file_display, line, column) = match issue.primary_annotation() {
                 Some(annotation) => {
                     let file_id = annotation.span.file_id();
                     let cached = match &mut cached_file {
                         Some(cached) if cached.0.id == file_id => cached,
                         cache => {
-                            let file = database.get_ref(&file_id)?;
+                            let file = self.database.get_ref(&file_id)?;
                             cache.insert((file, escaped_file_name(file)))
                         }
                     };
@@ -77,7 +135,7 @@ impl Formatter for EmacsFormatter {
                     let column = annotation.span.start.offset - file.lines[line as usize] + 1;
                     let line = line + 1;
 
-                    let display = if let (Some(template), Some(path)) = (editor_url, file.path.as_ref()) {
+                    let display = if let (Some(template), Some(path)) = (self.editor_url, file.path.as_ref()) {
                         let name = String::from_utf8_lossy(&file.name);
                         let display =
                             osc8_file_hyperlink(template, &path.display().to_string(), &name, line, column, &name);
@@ -91,33 +149,32 @@ impl Formatter for EmacsFormatter {
                 None => (Cow::Borrowed("<unknown>"), 0, 0),
             };
 
-            let severity = match issue.level {
-                Level::Error => "error",
-                Level::Warning | Level::Note | Level::Help => "warning",
+            let severity: &[u8] = match issue.level {
+                Level::Error => b"error",
+                Level::Warning | Level::Note | Level::Help => b"warning",
             };
 
             let message = escape_record_field(&issue.message);
-            let issue_type = issue.code.as_deref().unwrap_or("other");
-            let issue_type = escape_record_field(issue_type);
+            let issue_type = escape_record_field(issue.code.as_deref().unwrap_or("other"));
 
-            writer.write_all(file_display.as_bytes())?;
-            writer.write_all(b":")?;
-            writer.write_all(number.format(line).as_bytes())?;
-            writer.write_all(b":")?;
-            writer.write_all(number.format(column).as_bytes())?;
-            writer.write_all(b":")?;
-            writer.write_all(severity.as_bytes())?;
-            writer.write_all(b" - ")?;
-            writer.write_all(issue_type.as_bytes())?;
-            writer.write_all(b": ")?;
-            writer.write_all(message.as_bytes())?;
+            output.extend_from_slice(file_display.as_bytes());
+            output.push(b':');
+            output.extend_from_slice(number.format(line).as_bytes());
+            output.push(b':');
+            output.extend_from_slice(number.format(column).as_bytes());
+            output.push(b':');
+            output.extend_from_slice(severity);
+            output.extend_from_slice(b" - ");
+            output.extend_from_slice(issue_type.as_bytes());
+            output.extend_from_slice(b": ");
+            output.extend_from_slice(message.as_bytes());
             if let Some(link) = issue.link.as_deref() {
-                writer.write_all(b" (see ")?;
-                writer.write_all(escape_record_field(link).as_bytes())?;
-                writer.write_all(b")")?;
+                output.extend_from_slice(b" (see ");
+                output.extend_from_slice(escape_record_field(link).as_bytes());
+                output.push(b')');
             }
 
-            writer.write_all(b"\n")?;
+            output.push(b'\n');
         }
 
         Ok(())
