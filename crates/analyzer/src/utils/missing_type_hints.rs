@@ -85,6 +85,15 @@ pub fn check_property_type_hint<'arena, A>(
             continue;
         }
 
+        // A docblock type without native equivalent (`resource`, `callable`) cannot
+        // satisfy this check: `callable` and `resource` are not allowed as property types.
+        if let Some(property_metadata) = class_like_metadata.properties.get(&mago_word::word(variable.name))
+            && let Some(type_metadata) = property_metadata.type_metadata.as_ref()
+            && (type_metadata.type_union.is_resource() || type_metadata.type_union.is_callable())
+        {
+            continue;
+        }
+
         // Check if it's safe to add a type hint by verifying no parent class/trait has
         // the same property without a type hint
         if is_safe_to_add_property_type_hint(context, class_like_metadata, variable.name) {
@@ -204,6 +213,11 @@ pub fn check_return_type_hint<'arena, A>(
 
     // Skip constructors and destructors
     if function_name == b"__construct" || function_name == b"__destruct" {
+        return;
+    }
+
+    // The engine adds `: string` to `__toString` implicitly since PHP 8.0.
+    if function_name.eq_ignore_ascii_case(b"__toString") && class_like_metadata.is_some() {
         return;
     }
 
