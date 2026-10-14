@@ -181,6 +181,24 @@ where
                             get_literal_int(f.trunc() as i64)
                         } else if item_key_type.is_float() {
                             get_int()
+                        } else if item_key_type.is_mixed() {
+                            let item_key_type_id = item_key_type.get_id();
+
+                            context.collector.report_with_code(
+                                IssueCode::MixedArrayIndex,
+                                Issue::error("Possibly invalid array key type.")
+                                    .with_annotation(
+                                        Annotation::primary(key_value_array_element.key.span()).with_message(format!(
+                                            "This has type `{item_key_type_id}`, which is not guaranteed to be a string or an integer.",
+                                        )),
+                                    )
+                                    .with_note(
+                                        "In PHP, array keys must be strings or integers. A `mixed` key may hold a value that cannot be used as an array key at runtime.",
+                                    )
+                                    .with_help("Ensure the array key is either a string or an integer."),
+                            );
+
+                            get_arraykey()
                         } else if !item_key_type.is_always_array_key(true) {
                             let item_key_type_id = item_key_type.get_id();
 
