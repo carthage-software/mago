@@ -187,25 +187,21 @@ fn expand_shared_union(codebase: &CodebaseMetadata, return_type: &mut Arc<TUnion
 fn expand_union_inner(codebase: &CodebaseMetadata, return_type: &mut TUnion, options: &TypeExpansionOptions) {
     let mut types = std::mem::take(&mut return_type.types).into_owned();
     let mut new_return_type_parts: Vec<TAtomic> = Vec::new();
-    let mut skip_mask: u64 = 0;
+    let mut has_skipped = false;
 
-    for (i, return_type_part) in types.iter_mut().enumerate() {
+    types.retain_mut(|return_type_part| {
         let mut skip_key = false;
         expand_atomic(return_type_part, codebase, options, &mut skip_key, &mut new_return_type_parts);
 
-        if skip_key && i < 64 {
-            skip_mask |= 1u64 << i;
+        if skip_key {
+            has_skipped = true;
+            false
+        } else {
+            true
         }
-    }
+    });
 
-    if skip_mask != 0 {
-        let mut idx = 0usize;
-        types.retain(|_| {
-            let retain = idx >= 64 || (skip_mask & (1u64 << idx)) == 0;
-            idx += 1;
-            retain
-        });
-
+    if has_skipped {
         new_return_type_parts.append(&mut types);
 
         if new_return_type_parts.is_empty() {
