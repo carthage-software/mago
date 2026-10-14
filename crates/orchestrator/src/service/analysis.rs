@@ -588,13 +588,8 @@ impl Reducer<AnalysisTaskResult, AnalysisResult> for AnalysisResultReducer {
         aggregated_result.issues.extend(pragma_reconciler.finish()?);
 
         #[cfg(not(target_arch = "wasm32"))]
-        if codebase.class_likes.len() + codebase.function_likes.len() >= 4096 && rayon::current_num_threads() > 1 {
-            let class_likes = std::mem::take(&mut codebase.class_likes);
-            let function_likes = std::mem::take(&mut codebase.function_likes);
-            rayon::join(
-                || class_likes.into_par_iter().for_each(drop),
-                || rayon::join(|| function_likes.into_par_iter().for_each(drop), || drop(codebase)),
-            );
+        if codebase.class_likes.len() + codebase.function_likes.len() >= 4096 {
+            let _ = std::thread::Builder::new().name("mago-drop".to_owned()).spawn(move || drop(codebase));
         }
 
         Ok(aggregated_result)

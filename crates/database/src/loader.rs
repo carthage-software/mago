@@ -201,7 +201,8 @@ impl<'config> DatabaseLoader<'config> {
         // best specificity score that tier could offer, scored by `calculate_pattern_specificity`.
         type TierSpecs = (Option<usize>, Option<usize>, Option<usize>);
         let file_count = host_files_with_spec.len() + vendored_files_with_spec.len() + patch_files_with_spec.len();
-        let mut all_files: HashMap<FileId, (File, TierSpecs)> =
+        let mut files: Vec<(File, TierSpecs)> = Vec::with_capacity(file_count);
+        let mut slots: HashMap<FileId, usize> =
             HashMap::with_capacity_and_hasher(file_count, foldhash::fast::RandomState::default());
 
         // Process host files (from paths)
@@ -209,12 +210,13 @@ impl<'config> DatabaseLoader<'config> {
             let file_id = file_with_spec.file.id;
             let specificity = file_with_spec.specificity;
 
-            match all_files.entry(file_id) {
+            match slots.entry(file_id) {
                 Entry::Vacant(entry) => {
-                    entry.insert((file_with_spec.file, (Some(specificity), None, None)));
+                    entry.insert(files.len());
+                    files.push((file_with_spec.file, (Some(specificity), None, None)));
                 }
-                Entry::Occupied(mut entry) => {
-                    let (file, specs) = entry.get_mut();
+                Entry::Occupied(entry) => {
+                    let (file, specs) = &mut files[*entry.get()];
                     *file = file_with_spec.file;
                     bump_spec(&mut specs.0, specificity);
                 }
@@ -250,8 +252,9 @@ impl<'config> DatabaseLoader<'config> {
             if !matched_glob && !matched_path {
                 let file = File::ephemeral(Cow::Owned(name.as_ref().to_vec()), Cow::Owned(content.clone()));
                 let file_id = file.id;
-                if let Entry::Vacant(e) = all_files.entry(file_id) {
-                    e.insert((file, (Some(usize::MAX), None, None)));
+                if let Entry::Vacant(entry) = slots.entry(file_id) {
+                    entry.insert(files.len());
+                    files.push((file, (Some(usize::MAX), None, None)));
                 }
             }
         }
@@ -259,19 +262,25 @@ impl<'config> DatabaseLoader<'config> {
         for file_with_spec in vendored_files_with_spec {
             let file_id = file_with_spec.file.id;
             let vendored_specificity = file_with_spec.specificity;
-            let (_, specs) = all_files.entry(file_id).or_insert((file_with_spec.file, (None, None, None)));
-            bump_spec(&mut specs.1, vendored_specificity);
+            let slot = *slots.entry(file_id).or_insert_with(|| {
+                files.push((file_with_spec.file, (None, None, None)));
+                files.len() - 1
+            });
+            bump_spec(&mut files[slot].1.1, vendored_specificity);
         }
 
         for file_with_spec in patch_files_with_spec {
             let file_id = file_with_spec.file.id;
             let specificity = file_with_spec.specificity;
-            let (_, specs) = all_files.entry(file_id).or_insert((file_with_spec.file, (None, None, None)));
-            bump_spec(&mut specs.2, specificity);
+            let slot = *slots.entry(file_id).or_insert_with(|| {
+                files.push((file_with_spec.file, (None, None, None)));
+                files.len() - 1
+            });
+            bump_spec(&mut files[slot].1.2, specificity);
         }
 
-        db.reserve(all_files.len() + self.memory_sources.len());
-        for (_, (mut file, (host_spec, vendored_spec, patch_spec))) in all_files {
+        db.reserve(files.len() + self.memory_sources.len());
+        for (mut file, (host_spec, vendored_spec, patch_spec)) in files {
             file.file_type = resolve_file_type(host_spec, vendored_spec, patch_spec);
             db.add(file);
         }

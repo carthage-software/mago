@@ -246,6 +246,13 @@ impl<'config> Database<'config> {
         db
     }
 
+    /// Converts this database into one that owns its configuration.
+    #[inline]
+    #[must_use]
+    pub fn into_static(self) -> Database<'static> {
+        Database { files: self.files, id_to_name: self.id_to_name, configuration: self.configuration.into_static() }
+    }
+
     /// Reserves capacity for at least `additional` more files.
     #[inline]
     pub fn reserve(&mut self, additional: usize) {
@@ -391,15 +398,17 @@ impl<'config> Database<'config> {
     #[inline]
     #[must_use]
     pub fn read_only(&self) -> ReadDatabase {
-        let mut files_vec: Vec<Arc<File>> = self.files.values().cloned().collect();
-        files_vec.sort_unstable_by_key(|f| f.id);
+        let mut entries: Vec<(FileId, &Arc<File>)> = self.files.values().map(|file| (file.id, file)).collect();
+        entries.sort_unstable_by_key(|(id, _)| *id);
 
-        let mut id_to_index = HashMap::with_capacity(files_vec.len());
-        for (index, file) in files_vec.iter().enumerate() {
-            id_to_index.insert(file.id, index);
+        let mut files = Vec::with_capacity(entries.len());
+        let mut id_to_index = HashMap::with_capacity(entries.len());
+        for (index, (id, file)) in entries.into_iter().enumerate() {
+            files.push(Arc::clone(file));
+            id_to_index.insert(id, index);
         }
 
-        ReadDatabase { files: files_vec, id_to_index, name_to_index: OnceLock::new(), path_to_index: OnceLock::new() }
+        ReadDatabase { files, id_to_index, name_to_index: OnceLock::new(), path_to_index: OnceLock::new() }
     }
 }
 

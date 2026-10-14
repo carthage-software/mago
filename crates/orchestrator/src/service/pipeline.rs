@@ -10,6 +10,7 @@ use std::time::Duration;
 #[cfg(not(target_arch = "wasm32"))]
 use std::time::Instant;
 
+use foldhash::HashSet;
 use mago_allocator::LocalArena;
 use mago_php_version::PHPVersion;
 use rayon::prelude::*;
@@ -19,6 +20,7 @@ use mago_codex::populator::populate_codebase_parallel;
 use mago_codex::reference::SymbolReferences;
 use mago_codex::scanner::scan_program;
 use mago_codex::signature_builder;
+use mago_word::Word;
 use mago_word::WordSet;
 
 use mago_database::DatabaseReader;
@@ -235,6 +237,10 @@ where
         let parser_settings = self.parser_settings;
         let php_version = self.php_version;
         let build_file_signatures = self.build_file_signatures;
+        let mut merged_codex = self.codebase;
+        let mut safe_symbols = std::mem::take(&mut merged_codex.safe_symbols);
+        let mut safe_symbol_members = std::mem::take(&mut merged_codex.safe_symbol_members);
+        let track_replaced_classes = !safe_symbol_members.is_empty();
         #[cfg(not(target_arch = "wasm32"))]
         let source_count = source_files.len();
 
@@ -245,7 +251,7 @@ where
         }
 
         let mut compile_parallel_duration = Duration::ZERO;
-        let mut compiled: Vec<(usize, (CodebaseMetadata, Option<S>))> = measure!(
+        let mut compiled: Vec<CompiledSource<S>> = measure!(
             trace_enabled,
             compile_parallel_duration,
             map_with_priority_queue(
@@ -281,47 +287,47 @@ where
                         metadata.convert_partial_to_patch();
                     }
 
+                    let invalidated = invalidated_safe_symbols(
+                        &metadata,
+                        &safe_symbols,
+                        &safe_symbol_members,
+                        track_replaced_classes,
+                    );
                     let record = capture(file, program, &resolved_names)?;
                     arena.reset();
                     if let Some(compiling_bar) = &compiling_bar {
                         compiling_bar.inc(1);
                     }
 
-                    Ok((*index, (metadata, record)))
+                    Ok((*index, (metadata, record, invalidated)))
                 }
             )?
         );
-        compiled.sort_unstable_by_key(|(index, _)| *index);
+        compiled.par_sort_unstable_by_key(|(index, _)| *index);
         drop(source_files);
 
-        let mut merged_codex = self.codebase;
         let mut captures = Vec::new();
-        let mut safe_symbols = std::mem::take(&mut merged_codex.safe_symbols);
-        let mut safe_symbol_members = std::mem::take(&mut merged_codex.safe_symbol_members);
-        let mut replaced_classes = (!safe_symbol_members.is_empty()).then(WordSet::default);
+        let mut replaced_classes = track_replaced_classes.then(WordSet::default);
         let mut merge_duration = Duration::ZERO;
         measure!(trace_enabled, merge_duration, {
             let partials = compiled
                 .into_iter()
-                .map(|(_, (partial, record))| {
+                .map(|(_, (partial, record, invalidated))| {
                     captures.extend(record);
-                    for name in partial.class_likes.keys().chain(partial.patch_class_likes.keys()) {
-                        safe_symbols.remove(name);
-                        if let Some(replaced_classes) = &mut replaced_classes {
-                            replaced_classes.insert(*name);
+                    for invalidation in invalidated {
+                        match invalidation {
+                            SafeSymbolInvalidation::Symbol(name) => {
+                                safe_symbols.remove(&name);
+                            }
+                            SafeSymbolInvalidation::Member(member) => {
+                                safe_symbol_members.remove(&member);
+                            }
+                            SafeSymbolInvalidation::Class(name) => {
+                                if let Some(replaced_classes) = &mut replaced_classes {
+                                    replaced_classes.insert(name);
+                                }
+                            }
                         }
-                    }
-
-                    for (scope, member) in partial.function_likes.keys().chain(partial.patch_function_likes.keys()) {
-                        if member.is_empty() {
-                            safe_symbols.remove(scope);
-                        } else {
-                            safe_symbol_members.remove(&(*scope, *member));
-                        }
-                    }
-
-                    for name in partial.constants.keys().chain(partial.patch_constants.keys()) {
-                        safe_symbols.remove(name);
                     }
 
                     partial
@@ -422,7 +428,7 @@ where
             )?
         );
 
-        results.sort_unstable_by_key(|(index, _)| *index);
+        results.par_sort_unstable_by_key(|(index, _)| *index);
         let mut results = results.into_iter().map(|(_, result)| result).collect::<Vec<_>>();
 
         if let Some(result) = before_map_result {
@@ -692,6 +698,50 @@ where
 }
 
 /// Claims inputs in slice order, with one reusable state per worker.
+type CompiledSource<S> = (usize, (CodebaseMetadata, Option<S>, Vec<SafeSymbolInvalidation>));
+
+enum SafeSymbolInvalidation {
+    Symbol(Word),
+    Member((Word, Word)),
+    Class(Word),
+}
+
+fn invalidated_safe_symbols(
+    partial: &CodebaseMetadata,
+    safe_symbols: &WordSet,
+    safe_symbol_members: &HashSet<(Word, Word)>,
+    track_classes: bool,
+) -> Vec<SafeSymbolInvalidation> {
+    let mut invalidated = Vec::new();
+    for name in partial.class_likes.keys().chain(partial.patch_class_likes.keys()) {
+        if safe_symbols.contains(name) {
+            invalidated.push(SafeSymbolInvalidation::Symbol(*name));
+        }
+
+        if track_classes {
+            invalidated.push(SafeSymbolInvalidation::Class(*name));
+        }
+    }
+
+    for (scope, member) in partial.function_likes.keys().chain(partial.patch_function_likes.keys()) {
+        if member.is_empty() {
+            if safe_symbols.contains(scope) {
+                invalidated.push(SafeSymbolInvalidation::Symbol(*scope));
+            }
+        } else if safe_symbol_members.contains(&(*scope, *member)) {
+            invalidated.push(SafeSymbolInvalidation::Member((*scope, *member)));
+        }
+    }
+
+    for name in partial.constants.keys().chain(partial.patch_constants.keys()) {
+        if safe_symbols.contains(name) {
+            invalidated.push(SafeSymbolInvalidation::Symbol(*name));
+        }
+    }
+
+    invalidated
+}
+
 fn map_with_priority_queue<T, S, I, E, F, C>(items: &[T], initialize: C, map: F) -> Result<Vec<I>, E>
 where
     T: Sync,
@@ -727,7 +777,12 @@ where
         })
         .collect::<Result<Vec<_>, E>>()?;
 
-    Ok(batches.into_iter().flatten().collect())
+    let mut results = Vec::with_capacity(batches.iter().map(Vec::len).sum());
+    for batch in batches {
+        results.extend(batch);
+    }
+
+    Ok(results)
 }
 
 #[cfg(test)]
