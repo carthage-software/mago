@@ -438,11 +438,6 @@ where
         }
     }
 
-    // Only fire when the base can actually receive an array write: real arrays, `null`
-    // (PHP auto-vivifies `$null[$k] = $v` to an array), or `mixed` (whose arm reports no
-    // index diagnostic, so exactly one issue fires). Scalar bases already reported
-    // `invalid-array-access` above via the sentinel and must not gain a secondary issue;
-    // string offsets and `ArrayAccess` objects keep their existing behavior.
     if in_assignment
         && index_type.is_mixed()
         && has_valid_expected_index
