@@ -814,10 +814,11 @@
 <tr><td style="text-align: left"><code>code</code></td><td style="text-align: left">Globally unique, non-empty issue code. It must not collide with a native rule or another external rule. A vendor-qualified code is recommended.</td></tr>
 <tr><td style="text-align: left"><code>name</code></td><td style="text-align: left">Non-empty human-readable rule name.</td></tr>
 <tr><td style="text-align: left"><code>description</code></td><td style="text-align: left">Non-empty concise description shown by extension inspection.</td></tr>
-<tr><td style="text-align: left"><code>defaultLevel</code></td><td style="text-align: left"><code>Note</code>, <code>Help</code>, <code>Warning</code>, or <code>Error</code>. Applied to every issue from this rule.</td></tr>
-<tr><td style="text-align: left"><code>defaultEnabled</code></td><td style="text-align: left">Whether normal lint runs activate the rule. <code>--only</code> can select it explicitly.</td></tr>
+<tr><td style="text-align: left"><code>defaultLevel</code></td><td style="text-align: left"><code>Note</code>, <code>Help</code>, <code>Warning</code>, or <code>Error</code>. Applied to every issue from this rule unless the project sets <code>level</code>.</td></tr>
+<tr><td style="text-align: left"><code>defaultEnabled</code></td><td style="text-align: left">Whether normal lint runs activate the rule unless the project sets <code>enabled</code>. <code>--only</code> can select it explicitly.</td></tr>
 <tr><td style="text-align: left"><code>targets</code></td><td style="text-align: left">Non-empty, duplicate-free list of exact <code>NodeKind</code> cases.</td></tr>
 </tbody></table>
+<p>Projects can override <code>defaultLevel</code> and <code>defaultEnabled</code>, and exclude paths, under <code>[linter.rules]</code> using the rule's code. See <a href="../../../../../main/en/tools/linter/configuration-reference#extension-rules">extension rules</a>.</p>
 <p><code>getDefinition()</code> runs during worker construction and registration. Return stable metadata; do not derive it from the current source file.</p>
 <h2 id="lint-context">Lint context</h2>
 <p>For each matching node, <code>lint()</code> receives:</p>

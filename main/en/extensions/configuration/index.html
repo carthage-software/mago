@@ -848,6 +848,12 @@ environment = {
 ))-&gt;run();
 </code></pre>
 <p>Across all enabled hosts, extension identifiers, linter issue codes, and analyzer plugin selectors must remain unique. Extension identifiers and analyzer plugin selectors are compared ASCII case-insensitively; linter rule codes are case-sensitive. External linter codes and analyzer selectors must not collide with their native counterparts. Every process in one pool must advertise identical registration metadata.</p>
+<h2 id="linter-rule-settings">Linter rule settings</h2>
+<p>Extension linter rules are configured under <code>[linter.rules]</code> by their code, with the same <code>enabled</code>, <code>level</code>, and <code>exclude</code> options as built-in rules:</p>
+<pre><code class="language-toml">[linter.rules]
+"acme/no-eval" = { level = "warning", exclude = ["tests/"] }
+</code></pre>
+<p>See <a href="../../../../main/en/tools/linter/configuration-reference#extension-rules">extension rules</a> for details.</p>
 <h2 id="analyzer-plugin-selection">Analyzer plugin selection</h2>
 <p>Analyzer plugins declare whether they are enabled by default. Explicitly enable plugins by identifier or alias under <code>[analyzer]</code>:</p>
 <pre><code class="language-toml">[analyzer]
@@ -892,6 +898,10 @@ enabled = false
     
     <li class="doc-toc__item doc-toc__item--lvl2">
       <a class="doc-toc__link" href="#multiple-hosts-and-extensions">Multiple hosts and extensions</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#linter-rule-settings">Linter rule settings</a>
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl2">

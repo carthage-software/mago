@@ -3617,7 +3617,59 @@
           }
         }
       },
-      "additionalProperties": false
+      "additionalProperties": false,
+      "patternProperties": {
+        "/": {
+          "type": "object",
+          "properties": {
+            "enabled": {
+              "type": [
+                "boolean",
+                "null"
+              ]
+            },
+            "level": {
+              "anyOf": [
+                {
+                  "description": "Represents the severity level of an issue.",
+                  "oneOf": [
+                    {
+                      "description": "A note, providing additional information or context.",
+                      "type": "string",
+                      "const": "Note"
+                    },
+                    {
+                      "description": "A help message, suggesting possible solutions or further actions.",
+                      "type": "string",
+                      "const": "Help"
+                    },
+                    {
+                      "description": "A warning, indicating a potential problem that may need attention.",
+                      "type": "string",
+                      "const": "Warning"
+                    },
+                    {
+                      "description": "An error, indicating a problem that prevents the code from functioning correctly.",
+                      "type": "string",
+                      "const": "Error"
+                    }
+                  ]
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "exclude": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              }
+            }
+          },
+          "additionalProperties": false
+        }
+      }
     },
     "RuleSettings": {
       "type": "object",
