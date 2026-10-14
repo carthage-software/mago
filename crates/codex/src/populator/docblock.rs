@@ -228,7 +228,7 @@ pub fn inherit_method_docblocks(
     dirty_classes: Option<&WordSet>,
     parallel: bool,
 ) {
-    let mut inheritance_work: Vec<(Word, Word, Word, Word)> = Vec::new();
+    let mut inheritance_work: Vec<(usize, Word, Word, Word, Word)> = Vec::new();
 
     // When dirty_classes is provided, expand to include descendants,
     // then use targeted lookups instead of iterating all class_likes.
@@ -298,8 +298,9 @@ fn collect_inheritance_work(
     class_name: Word,
     class_metadata: &crate::metadata::class_like::ClassLikeMetadata,
     codebase: &CodebaseMetadata,
-    inheritance_work: &mut Vec<(Word, Word, Word, Word)>,
+    inheritance_work: &mut Vec<(usize, Word, Word, Word, Word)>,
 ) {
+    let depth = class_metadata.all_parent_classes.len() + class_metadata.all_parent_interfaces.len();
     for (method_name, method_ids) in &class_metadata.overridden_method_ids {
         if !codebase.function_likes.contains_key(&(class_name, *method_name)) {
             continue;
@@ -341,18 +342,16 @@ fn collect_inheritance_work(
         }
 
         if let Some((parent_class, parent_method)) = parent_method_id {
-            inheritance_work.push((class_name, *method_name, parent_class, parent_method));
+            inheritance_work.push((depth, class_name, *method_name, parent_class, parent_method));
         }
     }
 }
 
 /// Sorts and applies docblock inheritance work items.
-fn apply_inheritance_work(codebase: &mut CodebaseMetadata, mut inheritance_work: Vec<(Word, Word, Word, Word)>) {
-    inheritance_work.sort_by_cached_key(|(class_name, _, _, _)| {
-        codebase.class_likes.get(class_name).map_or(0, |m| m.all_parent_classes.len() + m.all_parent_interfaces.len())
-    });
+fn apply_inheritance_work(codebase: &mut CodebaseMetadata, mut inheritance_work: Vec<(usize, Word, Word, Word, Word)>) {
+    inheritance_work.sort_by_key(|work| work.0);
 
-    for (class_name, method_name, parent_class, parent_method) in inheritance_work {
+    for (_, class_name, method_name, parent_class, parent_method) in inheritance_work {
         let child_method_id = (class_name, method_name);
         let parent_method_id = (parent_class, parent_method);
 
@@ -658,7 +657,7 @@ pub fn inherit_property_docblocks(
     dirty_classes: Option<&WordSet>,
     parallel: bool,
 ) {
-    let mut inheritance_work: Vec<(Word, Word, Word)> = Vec::new();
+    let mut inheritance_work: Vec<(usize, Word, Word, Word)> = Vec::new();
 
     if let Some(dirty) = dirty_classes {
         let mut targets = dirty.clone();
@@ -701,9 +700,7 @@ pub fn inherit_property_docblocks(
         }
     }
 
-    inheritance_work.sort_by_key(|(class_name, _, _)| {
-        codebase.class_likes.get(class_name).map_or(0, |m| m.all_parent_classes.len() + m.all_parent_interfaces.len())
-    });
+    inheritance_work.sort_by_key(|work| work.0);
 
     apply_property_inheritance_work(codebase, inheritance_work);
 }
@@ -712,8 +709,9 @@ fn collect_property_inheritance_work(
     class_name: Word,
     class_metadata: &crate::metadata::class_like::ClassLikeMetadata,
     class_likes: &WordMap<Box<crate::metadata::class_like::ClassLikeMetadata>>,
-    inheritance_work: &mut Vec<(Word, Word, Word)>,
+    inheritance_work: &mut Vec<(usize, Word, Word, Word)>,
 ) {
+    let depth = class_metadata.all_parent_classes.len() + class_metadata.all_parent_interfaces.len();
     for (property_name, parent_ids) in &class_metadata.overridden_property_ids {
         let mut parent_class = None;
         let mut current = class_metadata.direct_parent_class;
@@ -739,13 +737,13 @@ fn collect_property_inheritance_work(
         }
 
         if let Some(parent_class) = parent_class {
-            inheritance_work.push((class_name, *property_name, parent_class));
+            inheritance_work.push((depth, class_name, *property_name, parent_class));
         }
     }
 }
 
-fn apply_property_inheritance_work(codebase: &mut CodebaseMetadata, inheritance_work: Vec<(Word, Word, Word)>) {
-    for (class_name, property_name, parent_class) in inheritance_work {
+fn apply_property_inheritance_work(codebase: &mut CodebaseMetadata, inheritance_work: Vec<(usize, Word, Word, Word)>) {
+    for (_, class_name, property_name, parent_class) in inheritance_work {
         let Some(parent_metadata) = codebase.class_likes.get(&parent_class) else { continue };
         let Some(parent_property) = parent_metadata.properties.get(&property_name) else { continue };
 
@@ -757,6 +755,10 @@ fn apply_property_inheritance_work(codebase: &mut CodebaseMetadata, inheritance_
 
         let Some(child_metadata) = codebase.class_likes.get(&class_name) else { continue };
         let Some(child_property) = child_metadata.properties.get(&property_name) else { continue };
+        if child_property.type_metadata.as_ref().is_some_and(|metadata| metadata.from_docblock && !metadata.inferred) {
+            continue;
+        }
+
         let parent_template_params = child_metadata.template_extended_parameters.get(&parent_class);
 
         let template_result = parent_template_params.filter(|parameters| !parameters.is_empty()).map(|parameters| {

@@ -3,6 +3,7 @@ use mago_word::Word;
 use crate::metadata::CodebaseMetadata;
 use crate::metadata::class_like::ClassLikeMetadata;
 use crate::metadata::flags::MetadataFlags;
+use crate::populator::methods::OverrideSeeds;
 use crate::populator::methods::inherit_methods_from_parent;
 use crate::populator::properties::inherit_properties_from_parent;
 use crate::populator::templates::extend_template_parameters;
@@ -38,8 +39,9 @@ pub fn merge_interface_metadata_from_parent_interface(
     codebase: &CodebaseMetadata,
     parent_interface: Word,
     symbol_references: &mut SymbolReferences,
+    seeds: &mut OverrideSeeds,
 ) {
-    merge_interface_metadata(metadata, codebase, parent_interface, symbol_references, true);
+    merge_interface_metadata(metadata, codebase, parent_interface, symbol_references, true, seeds);
 }
 
 pub fn merge_metadata_from_required_interface(
@@ -47,8 +49,9 @@ pub fn merge_metadata_from_required_interface(
     codebase: &CodebaseMetadata,
     required_interface: Word,
     symbol_references: &mut SymbolReferences,
+    seeds: &mut OverrideSeeds,
 ) {
-    merge_interface_metadata(metadata, codebase, required_interface, symbol_references, false);
+    merge_interface_metadata(metadata, codebase, required_interface, symbol_references, false, seeds);
 }
 
 fn merge_interface_metadata(
@@ -57,6 +60,7 @@ fn merge_interface_metadata(
     interface: Word,
     symbol_references: &mut SymbolReferences,
     inherit_constants: bool,
+    seeds: &mut OverrideSeeds,
 ) {
     symbol_references.add_symbol_reference_to_symbol(metadata.name, interface, true);
 
@@ -92,7 +96,7 @@ fn merge_interface_metadata(
     }
 
     extend_template_parameters(metadata, parent_interface_metadata);
-    inherit_methods_from_parent(metadata, parent_interface_metadata, codebase);
+    inherit_methods_from_parent(metadata, parent_interface_metadata, codebase, seeds);
     inherit_properties_from_parent(metadata, parent_interface_metadata);
 }
 
@@ -103,6 +107,7 @@ pub fn merge_metadata_from_parent_class_like(
     codebase: &CodebaseMetadata,
     parent_class: Word,
     symbol_references: &mut SymbolReferences,
+    seeds: &mut OverrideSeeds,
 ) {
     symbol_references.add_symbol_reference_to_symbol(metadata.name, parent_class, true);
 
@@ -128,7 +133,7 @@ pub fn merge_metadata_from_parent_class_like(
 
     extend_template_parameters(metadata, parent_metadata);
 
-    inherit_methods_from_parent(metadata, parent_metadata, codebase);
+    inherit_methods_from_parent(metadata, parent_metadata, codebase, seeds);
     inherit_properties_from_parent(metadata, parent_metadata);
 
     for (parent_constant_name, parent_constant_metadata) in &parent_metadata.constants {
@@ -178,6 +183,7 @@ pub fn merge_metadata_from_trait(
     codebase: &CodebaseMetadata,
     trait_name: Word,
     symbol_references: &mut SymbolReferences,
+    seeds: &mut OverrideSeeds,
 ) {
     symbol_references.add_symbol_reference_to_symbol(metadata.name, trait_name, true);
 
@@ -206,7 +212,7 @@ pub fn merge_metadata_from_trait(
     extend_template_parameters(metadata, trait_metadata);
     remove_trait_requirement_template_parameters(metadata, trait_metadata, codebase);
 
-    inherit_methods_from_parent(metadata, trait_metadata, codebase);
+    inherit_methods_from_parent(metadata, trait_metadata, codebase, seeds);
     inherit_properties_from_parent(metadata, trait_metadata);
 }
 

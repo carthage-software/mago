@@ -33,6 +33,10 @@ pub fn str_is_numeric(input: &[u8]) -> bool {
         return true;
     }
 
+    if !matches!(maybe_numeric[0], b'0'..=b'9' | b'.' | b'+' | b'-' | b'i' | b'I' | b'n' | b'N') {
+        return false;
+    }
+
     std::str::from_utf8(maybe_numeric).ok().and_then(|s| s.parse::<f64>().ok()).is_some()
 }
 

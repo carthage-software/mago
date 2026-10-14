@@ -9,7 +9,6 @@ use mago_database::file::File;
 use mago_span::Span;
 use mago_word::Word;
 use mago_word::concat_word;
-use mago_word::u32_word;
 
 pub mod assertion;
 pub mod consts;
@@ -44,7 +43,20 @@ pub fn build_synthetic_name(prefix: &str, file: &File, span: Span) -> Word {
     let line = file.line_number(span.start.offset).saturating_add(1);
     let column = file.column_number(span.start.offset).saturating_add(1);
 
-    concat_word!(b"{", prefix.as_bytes(), b":", file.name.as_ref(), b":", u32_word(line), b":", u32_word(column), b"}",)
+    let mut line_buffer = itoa::Buffer::new();
+    let mut column_buffer = itoa::Buffer::new();
+
+    concat_word!(
+        b"{",
+        prefix.as_bytes(),
+        b":",
+        file.name.as_ref(),
+        b":",
+        line_buffer.format(line).as_bytes(),
+        b":",
+        column_buffer.format(column).as_bytes(),
+        b"}",
+    )
 }
 
 #[must_use]

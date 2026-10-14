@@ -2,6 +2,9 @@ use std::borrow::Cow;
 
 use foldhash::HashMap;
 use mago_allocator::Arena;
+use mago_word::Word;
+use mago_word::concat_word;
+use mago_word::word;
 
 use mago_syntax::cst::Use;
 use mago_syntax::cst::UseItems;
@@ -21,6 +24,14 @@ impl<'name> NameParts<'_, 'name> {
             Self::Input(name) => Cow::Borrowed(name),
             Self::Alias(name) => Cow::Owned(name.to_vec()),
             Self::Qualified(prefix, name) => Cow::Owned(concat_with_sep(&[prefix, name], b'\\')),
+        }
+    }
+
+    pub(crate) fn into_word(self) -> Word {
+        match self {
+            Self::Input(name) => word(name),
+            Self::Alias(name) => word(name),
+            Self::Qualified(prefix, name) => concat_word!(prefix, b"\\", name),
         }
     }
 
@@ -337,6 +348,13 @@ impl NamespaceScope {
         let (cow, imported) = self.resolve_str(kind, name.as_ref());
 
         (cow.into_owned(), imported)
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn resolve_word(&self, kind: NameKind, name: &[u8]) -> (Word, bool) {
+        let (parts, imported) = self.resolve_parts(kind, name);
+        (parts.into_word(), imported)
     }
 
     /// non-generic version of `resolve` that takes a string slice.

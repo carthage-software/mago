@@ -384,6 +384,20 @@ impl ClassLikeMetadata {
         self.declared_mixin_count.unwrap_or(self.mixins.len())
     }
 
+    pub(crate) fn reset_for_population(&mut self) {
+        self.reset_ancestry();
+        self.reset_inherited_constants();
+        self.reset_inherited_members();
+        self.flags &= !MetadataFlags::POPULATED;
+        self.declaring_property_ids.clear();
+        self.appearing_property_ids.clear();
+        self.declaring_method_ids.clear();
+        self.appearing_method_ids.clear();
+        self.overridden_method_ids.clear();
+        self.overridden_property_ids.clear();
+        self.invalid_dependencies.clear();
+    }
+
     pub(crate) fn reset_inherited_members(&mut self) {
         let declared_mixins = *self.declared_mixin_count.get_or_insert(self.mixins.len());
         self.mixins.truncate(declared_mixins);

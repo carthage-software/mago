@@ -111,7 +111,9 @@ where
             let left = get_union_from_hint(union_hint.left, classname, context);
             let right = get_union_from_hint(union_hint.right, classname, context);
 
-            let combined_types: Vec<TAtomic> = left.types.iter().chain(right.types.iter()).cloned().collect();
+            let mut combined_types = Vec::with_capacity(left.types.len() + right.types.len());
+            combined_types.extend(left.types.into_owned());
+            combined_types.extend(right.types.into_owned());
 
             TUnion::from_vec(combined_types)
         }

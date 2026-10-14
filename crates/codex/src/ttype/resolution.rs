@@ -66,6 +66,18 @@ impl TypeResolutionContext {
         &mut self.template_definitions
     }
 
+    #[inline]
+    #[must_use]
+    pub fn has_template_definitions(&self) -> bool {
+        !self.template_definitions.is_empty()
+    }
+
+    #[inline]
+    #[must_use]
+    pub fn has_type_aliases(&self) -> bool {
+        !self.type_aliases.is_empty() || !self.imported_type_aliases.is_empty()
+    }
+
     /// Looks up the constraints for a specific template parameter defined in this context.
     ///
     /// # Arguments

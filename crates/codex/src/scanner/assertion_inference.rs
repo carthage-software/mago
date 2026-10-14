@@ -57,14 +57,14 @@ pub(super) fn infer_assertions_from_block_body<'arena>(
         return;
     }
 
+    let Some(return_expression) = single_return_expression(body) else {
+        return;
+    };
+
     let parameter_names = collect_parameter_names(metadata);
     if parameter_names.is_empty() {
         return;
     }
-
-    let Some(return_expression) = single_return_expression(body) else {
-        return;
-    };
 
     let (if_true, if_false) = infer_from_expression(return_expression, &parameter_names, resolved_names, false);
 

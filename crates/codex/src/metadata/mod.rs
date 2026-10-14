@@ -17,6 +17,7 @@ use mago_word::ascii_lowercase_constant_name_word;
 use mago_word::ascii_lowercase_word;
 use mago_word::empty_word;
 use mago_word::word;
+use rayon::prelude::*;
 
 use crate::diff::CodebaseDiff;
 use crate::identifier::method::MethodIdentifier;
@@ -1225,20 +1226,36 @@ impl CodebaseMetadata {
         }
 
         let mut function_likes = std::mem::take(&mut self.function_likes);
-        let functions: Vec<_> = others.iter_mut().map(|other| std::mem::take(&mut other.function_likes)).collect();
+        let mut symbols = std::mem::take(&mut self.symbols);
+        let (functions, partial_symbols): (Vec<_>, Vec<_>) = others
+            .par_iter_mut()
+            .map(|other| (std::mem::take(&mut other.function_likes), std::mem::take(&mut other.symbols)))
+            .unzip();
         rayon::join(
             || {
+                function_likes.reserve(functions.iter().map(HashMap::len).sum());
                 for incoming in functions {
                     merge_function_likes(&mut function_likes, incoming);
                 }
+                function_likes.shrink_to_fit();
             },
             || {
-                for other in others {
-                    self.extend(other);
-                }
+                rayon::join(
+                    || {
+                        for incoming in partial_symbols {
+                            symbols.extend(incoming);
+                        }
+                    },
+                    || {
+                        for other in others {
+                            self.extend(other);
+                        }
+                    },
+                );
             },
         );
         self.function_likes = function_likes;
+        self.symbols = symbols;
     }
 
     /// Extends this codebase with another by reference, cloning only individual entries.

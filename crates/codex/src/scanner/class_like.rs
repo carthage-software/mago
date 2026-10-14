@@ -969,12 +969,23 @@ where
             }
         }
 
+        let mut method_tags = Vec::new();
+        let mut last_method_tags = WordMap::default();
         for tag in document.tags() {
             let TagValue::Method(method_tag) = &tag.value else {
                 continue;
             };
 
             let method_name = ascii_lowercase_word(method_tag.name.value);
+            method_tags.push(method_name);
+            last_method_tags.insert(method_name, method_tag);
+        }
+
+        for method_name in method_tags {
+            let Some(method_tag) = last_method_tags.remove(&method_name) else {
+                continue;
+            };
+
             class_like_metadata.methods.insert(method_name);
             class_like_metadata.pseudo_methods.insert(method_name);
             class_like_metadata

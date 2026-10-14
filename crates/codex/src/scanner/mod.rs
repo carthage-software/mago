@@ -44,7 +44,6 @@ use mago_word::WordMap;
 use mago_word::WordSet;
 use mago_word::ascii_lowercase_word;
 use mago_word::empty_word;
-use mago_word::word;
 
 use crate::identifier::method::MethodIdentifier;
 use crate::metadata::CodebaseMetadata;
@@ -722,7 +721,7 @@ where
                 class_like_metadata.add_property_metadata(property_metadata);
             }
         } else {
-            is_clone = name == word("__clone");
+            is_clone = name.as_bytes() == b"__clone";
         }
 
         class_like_metadata.methods.insert(name);

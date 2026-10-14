@@ -85,7 +85,11 @@ impl Symbols {
     /// Adds or updates a symbol name identified as the given kind.
     #[inline]
     pub fn add_symbol_name(&mut self, name: Word, kind: SymbolKind) {
-        self.namespaces.extend(get_symbol_namespaces(name));
+        let bytes = name.as_bytes();
+        for index in memchr::memchr_iter(b'\\', bytes) {
+            self.namespaces.insert(word(&bytes[..index]));
+        }
+
         self.all.insert(name, kind);
     }
 
@@ -174,16 +178,4 @@ impl Symbols {
     pub fn remove(&mut self, name: Word) {
         self.all.remove(&name);
     }
-}
-
-/// Returns an iterator that yields all parent namespaces of a given symbol.
-///
-/// For example, if the symbol is `Foo\Bar\Baz\Qux`, the iterator yields:
-/// 1. `Foo`
-/// 2. `Foo\Bar`
-/// 3. `Foo\Bar\Baz`
-pub(super) fn get_symbol_namespaces(symbol_name: Word) -> impl Iterator<Item = Word> {
-    let bytes: Vec<u8> = symbol_name.as_bytes().to_vec();
-
-    (0..bytes.len()).filter_map(move |i| if bytes[i] == b'\\' { Some(word(&bytes[..i])) } else { None })
 }
