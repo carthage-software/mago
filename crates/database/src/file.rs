@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::cell::RefCell;
 use std::hash::DefaultHasher;
 use std::hash::Hash;
 use std::hash::Hasher;
@@ -283,33 +284,34 @@ impl std::fmt::Display for FileId {
 /// Returns a vec over the starting byte offsets of each line in `source`.
 #[inline]
 pub(crate) fn line_starts(source: &[u8]) -> Vec<u32> {
-    // Heuristic: On the test corpus, the mean length is about 30 bytes, the median is 23.
-    // Since the whole vec will be small, we prefer slight over-allocation to avoid re-allocations
-    // in the common case
-    const LINE_WIDTH_HEURISTIC: usize = 20;
-
-    // Pre-allocate to avoid calling `realloc` thousands of times per file.
-    let mut lines = Vec::with_capacity(source.len() / LINE_WIDTH_HEURISTIC);
-    lines.push(0);
-
-    // Detect line ending style from the first \r or \n.  Real files use one
-    // convention throughout, so we never need to handle mixed \r\n / bare \r.
-    match memchr::memchr2(b'\r', b'\n', source) {
-        // No line endings: single-line file, nothing more to push.
-        None => {}
-        // Old Mac (\r only): first line-ending char is a bare \r.
-        Some(cr) if source[cr] == b'\r' && source.get(cr + 1) != Some(&b'\n') => {
-            for pos in memchr::memchr_iter(b'\r', source) {
-                lines.push((pos + 1) as u32);
-            }
-        }
-        // Unix (\n only) or Windows (\r\n): \n marks every line start.
-        _ => {
-            for pos in memchr::memchr_iter(b'\n', source) {
-                lines.push((pos + 1) as u32);
-            }
-        }
+    thread_local! {
+        static SCRATCH: RefCell<Vec<u32>> = const { RefCell::new(Vec::new()) };
     }
 
-    lines
+    SCRATCH.with(|scratch| {
+        let mut lines = scratch.borrow_mut();
+        lines.clear();
+        lines.push(0);
+
+        // Detect line ending style from the first \r or \n.  Real files use one
+        // convention throughout, so we never need to handle mixed \r\n / bare \r.
+        match memchr::memchr2(b'\r', b'\n', source) {
+            // No line endings: single-line file, nothing more to push.
+            None => {}
+            // Old Mac (\r only): first line-ending char is a bare \r.
+            Some(cr) if source[cr] == b'\r' && source.get(cr + 1) != Some(&b'\n') => {
+                for pos in memchr::memchr_iter(b'\r', source) {
+                    lines.push((pos + 1) as u32);
+                }
+            }
+            // Unix (\n only) or Windows (\r\n): \n marks every line start.
+            _ => {
+                for pos in memchr::memchr_iter(b'\n', source) {
+                    lines.push((pos + 1) as u32);
+                }
+            }
+        }
+
+        lines.as_slice().to_vec()
+    })
 }
