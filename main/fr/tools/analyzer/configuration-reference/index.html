@@ -619,6 +619,7 @@ ignore = [
 <tr><td style="text-align: left"><code>memoize-properties</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">Suit les valeurs littérales de propriété pour une inférence plus précise, au prix d'un peu de mémoire.</td></tr>
 <tr><td style="text-align: left"><code>allow-possibly-undefined-array-keys</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left"><strong>Déprécié.</strong> Autorise l'accès aux clés qui peuvent manquer sans le signaler. Le passer à <code>false</code> signale uniquement les lectures de <code>array&lt;K, V&gt;</code> avec une clé littérale unique et n'élargit pas le type à <code>T|null</code>. Préférez <code>strict-array-index-existence</code>.</td></tr>
 <tr><td style="text-align: left"><code>check-throws</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Signale les exceptions non capturées et non déclarées avec <code>@throws</code>.</td></tr>
+<tr><td style="text-align: left"><code>check-dead-catch</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Signale les clauses <code>catch</code> qui ne correspondent à aucune exception connue du bloc <code>try</code>. Nécessite <code>check-throws</code> ; du code non documenté peut malgré tout lancer des exceptions invisibles pour l'analyseur.</td></tr>
 <tr><td style="text-align: left"><code>check-missing-override</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Signale les attributs <code>#[Override]</code> manquants sur les méthodes redéfinissantes (PHP 8.3+).</td></tr>
 <tr><td style="text-align: left"><code>find-unused-parameters</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Signale les paramètres qui ne sont jamais lus.</td></tr>
 <tr><td style="text-align: left"><code>strict-list-index-checks</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Exige que tout entier utilisé comme index de liste soit prouvé non négatif.</td></tr>
@@ -759,6 +760,7 @@ find-unused-definitions = true
 find-overly-wide-return-types = true
 analyze-dead-code = true
 check-throws = true
+check-dead-catch = true
 check-missing-override = true
 find-unused-parameters = true
 check-missing-type-hints = true
@@ -772,6 +774,7 @@ strict-array-index-existence = true
 no-boolean-literal-comparison = true
 trust-existence-checks = false
 </code></pre>
+<p><code>check-dead-catch</code> est désactivé par défaut, car PHP peut lancer à l'exécution des exceptions absentes du type ou de la documentation <code>@throws</code> d'une fonction, comme <code>TypeError</code>. Activez-le pour des vérifications plus strictes si la documentation des exceptions de votre code est suffisamment complète.</p>
 <h3 id="lenient-mode">Mode indulgent</h3>
 <pre><code class="language-toml">[analyzer]
 check-missing-type-hints = false

@@ -852,6 +852,7 @@ ignore = [
 <tr><td style="text-align: left"><code>memoize-properties</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">Track literal property values for sharper inference, at the cost of some memory.</td></tr>
 <tr><td style="text-align: left"><code>allow-possibly-undefined-array-keys</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left"><strong>Deprecated.</strong> Allow accessing keys that may be missing without flagging it. Setting this to <code>false</code> warns on <code>array&lt;K, V&gt;</code> reads with a single literal key but does not widen the type to <code>T|null</code>. Use <code>strict-array-index-existence</code> instead.</td></tr>
 <tr><td style="text-align: left"><code>check-throws</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Report exceptions that are not caught and not declared with <code>@throws</code>.</td></tr>
+<tr><td style="text-align: left"><code>check-dead-catch</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Report catch clauses that match no known exception from their <code>try</code> block. Requires <code>check-throws</code>; undocumented code may still throw exceptions the analyzer cannot see.</td></tr>
 <tr><td style="text-align: left"><code>check-missing-override</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Report missing <code>#[Override]</code> attributes on overriding methods (PHP 8.3+).</td></tr>
 <tr><td style="text-align: left"><code>find-unused-parameters</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Report parameters that are never read.</td></tr>
 <tr><td style="text-align: left"><code>strict-list-index-checks</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">Require any integer used as a list index to be provably non-negative.</td></tr>
@@ -992,6 +993,7 @@ find-unused-definitions = true
 find-overly-wide-return-types = true
 analyze-dead-code = true
 check-throws = true
+check-dead-catch = true
 check-missing-override = true
 find-unused-parameters = true
 check-missing-type-hints = true
@@ -1005,6 +1007,7 @@ strict-array-index-existence = true
 no-boolean-literal-comparison = true
 trust-existence-checks = false
 </code></pre>
+<p><code>check-dead-catch</code> is off by default because PHP can throw exceptions at runtime that a function's type or <code>@throws</code> documentation does not describe, such as <code>TypeError</code>. Enable it when you want stricter checks and your codebase has sufficiently complete exception documentation.</p>
 <h3 id="lenient-mode">Lenient mode</h3>
 <pre><code class="language-toml">[analyzer]
 check-missing-type-hints = false

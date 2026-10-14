@@ -635,6 +635,7 @@ ignore = [
 <tr><td style="text-align: left"><code>memoize-properties</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">跟踪字面量属性值以获得更精准的推断,代价是占用一些额外内存。</td></tr>
 <tr><td style="text-align: left"><code>allow-possibly-undefined-array-keys</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">**已弃用。**允许访问可能不存在的键,而不报告。设为 <code>false</code> 时仅对带有单个字面量键的 <code>array&lt;K, V&gt;</code> 读取发出警告,且不会将类型扩展为 <code>T|null</code>。请改用 <code>strict-array-index-existence</code>。</td></tr>
 <tr><td style="text-align: left"><code>check-throws</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">报告未被捕获且未通过 <code>@throws</code> 声明的异常。</td></tr>
+<tr><td style="text-align: left"><code>check-dead-catch</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">报告与 <code>try</code> 块中任何已知异常都不匹配的 <code>catch</code> 子句。需要启用 <code>check-throws</code>;未记录的代码仍可能抛出分析器无法发现的异常。</td></tr>
 <tr><td style="text-align: left"><code>check-missing-override</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">报告重写方法上缺失的 <code>#[Override]</code> attribute(PHP 8.3+)。</td></tr>
 <tr><td style="text-align: left"><code>find-unused-parameters</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">报告从未被读取的参数。</td></tr>
 <tr><td style="text-align: left"><code>strict-list-index-checks</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">要求作为列表下标使用的整数必须可被证明非负。</td></tr>
@@ -768,6 +769,7 @@ find-unused-definitions = true
 find-overly-wide-return-types = true
 analyze-dead-code = true
 check-throws = true
+check-dead-catch = true
 check-missing-override = true
 find-unused-parameters = true
 check-missing-type-hints = true
@@ -781,6 +783,7 @@ strict-array-index-existence = true
 no-boolean-literal-comparison = true
 trust-existence-checks = false
 </code></pre>
+<p><code>check-dead-catch</code> 默认关闭,因为 PHP 运行时可能抛出函数类型或 <code>@throws</code> 文档未描述的异常,例如 <code>TypeError</code>。如果代码库的异常文档足够完整,可启用此选项进行更严格的检查。</p>
 <h3 id="maximum-strictness">宽松模式</h3>
 <pre><code class="language-toml">[analyzer]
 check-missing-type-hints = false
