@@ -70,7 +70,7 @@ namespace {
         public function __construct(
             mixed $data,
             ?int $encoding,
-            ?string $typeName,
+            ?string $typeName = null,
             ?string $typeNamespace = null,
             ?string $nodeName = null,
             ?string $nodeNamespace = null,
