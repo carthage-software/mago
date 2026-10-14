@@ -84,7 +84,9 @@ where
                     self.parse_conditional_type(subject)?
                 }
                 TokenKind::LeftBracket
-                    if min_precedence <= TypePrecedence::Postfix && token.start.offset == inner.span().end.offset =>
+                    if min_precedence <= TypePrecedence::Postfix
+                        && (token.start.offset == inner.span().end.offset
+                            || self.stream.lookahead(1).is_some_and(|next| next.kind == TokenKind::RightBracket)) =>
                 {
                     let left_bracket = self.stream.consume_span()?;
 

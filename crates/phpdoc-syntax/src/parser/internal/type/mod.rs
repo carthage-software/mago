@@ -163,6 +163,7 @@ where
             TypeKeyword::String => Type::String(self.parse_keyword()?),
             TypeKeyword::Scalar => Type::Scalar(self.parse_keyword()?),
             TypeKeyword::Numeric => Type::Numeric(self.parse_keyword()?),
+            TypeKeyword::Number => Type::Number(self.parse_keyword()?),
             TypeKeyword::ArrayKey => Type::ArrayKey(self.parse_keyword()?),
             TypeKeyword::StringableObject => Type::StringableObject(self.parse_keyword()?),
             TypeKeyword::CallableString => Type::CallableString(self.parse_keyword()?),

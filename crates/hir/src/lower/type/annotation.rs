@@ -126,6 +126,10 @@ where
             Type::StringableObject(_) => TypeAnnotationKind::StringableObject,
             Type::ArrayKey(_) => self.array_key_kind(),
             Type::Numeric(_) => TypeAnnotationKind::Numeric,
+            Type::Number(_) => TypeAnnotationKind::Union(self.arena.alloc_slice_copy(&[
+                TypeAnnotation { span: ty.span(), kind: TypeAnnotationKind::Int(None) },
+                TypeAnnotation { span: ty.span(), kind: TypeAnnotationKind::Float(None) },
+            ])),
             Type::Scalar(_) => self.scalar_kind(),
             Type::Empty(_) => TypeAnnotationKind::Empty,
             Type::EmptyScalar(_) => TypeAnnotationKind::EmptyScalar,

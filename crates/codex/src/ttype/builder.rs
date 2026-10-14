@@ -144,6 +144,10 @@ pub fn get_union_from_type(
             get_nullable_union_from_type(left, scope, type_context, classname)?
         }
         Type::Union(union_type) => {
+            if let Some(specific) = collapse_bare_array_union(union_type.left, union_type.right) {
+                return get_union_from_type(specific, scope, type_context, classname);
+            }
+
             let left = get_union_from_type(union_type.left, scope, type_context, classname)?;
             let right = get_union_from_type(union_type.right, scope, type_context, classname)?;
 
@@ -387,6 +391,12 @@ pub fn get_union_from_type(
         Type::String(_) => get_string(),
         Type::ArrayKey(_) => get_arraykey(),
         Type::Numeric(_) => get_numeric(),
+        Type::Number(_) => {
+            let mut atomics = get_int().types.into_owned();
+            atomics.extend(get_float().types.into_owned());
+
+            TUnion::from_vec(atomics)
+        }
         Type::Scalar(_) => get_scalar(),
         Type::Empty(_) => get_empty(),
         Type::EmptyScalar(_) => get_empty_scalar(),
@@ -425,12 +435,21 @@ pub fn get_union_from_type(
 
                     wrap_atomic(TAtomic::Iterable(TIterable::of_value(Arc::new(value_type))))
                 }
-                _ => {
+                2 => {
+                    // Unlike true arrays, iterables (e.g. generators) may yield
+                    // non-array-key keys, so an explicit `mixed` key is preserved.
                     let key_type = get_union_from_type(&parameters.entries[0].inner, scope, type_context, classname)?;
 
                     let value_type = get_union_from_type(&parameters.entries[1].inner, scope, type_context, classname)?;
 
                     wrap_atomic(TAtomic::Iterable(TIterable::new(Arc::new(key_type), Arc::new(value_type))))
+                }
+                len => {
+                    return Err(TypeError::InvalidType(
+                        ttype.to_string(),
+                        format!("`iterable<K, V>` expects at most 2 parameters (key, value), got {len}"),
+                        ttype.span(),
+                    ));
                 }
             },
             None => wrap_atomic(TAtomic::Iterable(TIterable::mixed())),
@@ -999,6 +1018,28 @@ fn get_reference_from_kind(
 }
 
 #[inline]
+fn collapse_bare_array_union<'arena>(
+    left: &'arena Type<'arena>,
+    right: &'arena Type<'arena>,
+) -> Option<&'arena Type<'arena>> {
+    fn is_bare_array(ttype: &Type<'_>) -> bool {
+        matches!(ttype, Type::Array(array) if array.parameters.is_none())
+    }
+
+    fn is_typed_array(ttype: &Type<'_>) -> bool {
+        matches!(ttype, Type::Slice(_))
+    }
+
+    if is_bare_array(left) && is_typed_array(right) {
+        Some(right)
+    } else if is_bare_array(right) && is_typed_array(left) {
+        Some(left)
+    } else {
+        None
+    }
+}
+
+#[inline]
 fn get_array_type<'src>(
     mut key: Option<&'src Type<'src>>,
     mut value: Option<&'src Type<'src>>,
@@ -1013,7 +1054,13 @@ fn get_array_type<'src>(
 
     let mut array = TKeyedArray::new_with_parameters(
         Arc::new(if let Some(k) = key {
-            get_union_from_type(k, scope, type_context, classname)?
+            // PHP array keys can only be `int|string`: an explicit `mixed` key (a popular
+            // legacy spelling, e.g. `array<mixed, Group>`) means `array-key`, like PHPStan.
+            if matches!(k, Type::Mixed(_)) {
+                get_arraykey()
+            } else {
+                get_union_from_type(k, scope, type_context, classname)?
+            }
         } else {
             get_arraykey()
         }),
