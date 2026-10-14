@@ -777,6 +777,14 @@ where
         }
     }
 
+    let can_infer_templates_from_default = !matches!(
+        &invocation.target,
+        InvocationTarget::FunctionLike { metadata, effective_signature: None, .. }
+            if metadata.template_types.is_empty()
+                && !template_result.has_template_types()
+                && template_result.lower_bounds.is_empty()
+    );
+
     if !has_too_many_arguments {
         loop {
             last_argument_offset += 1;
@@ -792,15 +800,6 @@ where
                 continue;
             }
 
-            let parameter_type = get_parameter_type(
-                context,
-                Some(unused_parameter),
-                base_class_metadata,
-                calling_class_like_metadata,
-                calling_instance_type,
-                method_class_type,
-            );
-
             let mut default_type =
                 unused_parameter.get_default_type().map_or_else(|| Cow::Owned(get_mixed()), Cow::Borrowed);
 
@@ -808,7 +807,21 @@ where
                 expander::expand_union(context.codebase, default_type.to_mut(), &TypeExpansionOptions::default());
             }
 
-            infer_parameter_templates_from_default(context, &parameter_type, &default_type, template_result);
+            if can_infer_templates_from_default {
+                // Resolving a declared parameter type can expand combinatorial types such as `int-mask-of`.
+                // A non-generic static target cannot infer templates from omitted defaults, so skip this
+                // expansion while still resolving and storing the default value type below.
+                let parameter_type = get_parameter_type(
+                    context,
+                    Some(unused_parameter),
+                    base_class_metadata,
+                    calling_class_like_metadata,
+                    calling_instance_type,
+                    method_class_type,
+                );
+
+                infer_parameter_templates_from_default(context, &parameter_type, &default_type, template_result);
+            }
 
             let Some(parameter_name) = unused_parameter.get_name() else {
                 continue;

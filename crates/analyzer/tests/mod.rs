@@ -1243,6 +1243,7 @@ test_case!(callables_null_argument_to_non_null);
 test_case!(callables_false_argument_to_non_false);
 test_case!(callables_named_argument_basic);
 test_case!(issue_2498_named_arguments);
+test_case!(invocation_default_type_expansion);
 test_case!(callables_named_argument_unknown);
 test_case!(callables_named_argument_overrides_positional);
 test_case!(callables_variadic_int_basic);
