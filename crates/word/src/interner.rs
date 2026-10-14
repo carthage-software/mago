@@ -2,8 +2,9 @@ use std::cell::Cell;
 use std::hash::BuildHasher;
 use std::hash::Hasher;
 use std::ptr::NonNull;
-use std::sync::Mutex;
 use std::sync::OnceLock;
+
+use parking_lot::Mutex;
 
 use foldhash::fast::FixedState;
 
@@ -284,9 +285,7 @@ pub(crate) fn intern(bytes: &[u8]) -> NonNull<Entry> {
     }
 
     let shard_idx = (hash >> (u64::BITS as usize - SHARD_BITS)) as usize;
-    // `expect` is acceptable here: a poisoned mutex means another thread panicked while
-    // holding the interner lock, which is an unrecoverable invariant violation.
-    let mut shard = interner.shards[shard_idx].lock().expect("interner shard mutex poisoned");
+    let mut shard = interner.shards[shard_idx].lock();
     let entry = shard.intern(bytes, hash);
     drop(shard);
     INTERN_CACHE.with(|cache| {

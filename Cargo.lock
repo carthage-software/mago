@@ -1507,6 +1507,7 @@ dependencies = [
  "codspeed-criterion-compat",
  "foldhash",
  "indexmap",
+ "itoa",
  "mago-allocator",
  "mago-bytes",
  "mago-database",
@@ -1928,6 +1929,7 @@ dependencies = [
  "foldhash",
  "itoa",
  "mago-bytes",
+ "parking_lot",
  "ryu",
  "serde",
 ]
