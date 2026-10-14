@@ -144,10 +144,6 @@ pub fn get_union_from_type(
             get_nullable_union_from_type(left, scope, type_context, classname)?
         }
         Type::Union(union_type) => {
-            if let Some(specific) = collapse_bare_array_union(union_type.left, union_type.right) {
-                return get_union_from_type(specific, scope, type_context, classname);
-            }
-
             let left = get_union_from_type(union_type.left, scope, type_context, classname)?;
             let right = get_union_from_type(union_type.right, scope, type_context, classname)?;
 
@@ -1008,28 +1004,6 @@ fn get_reference_from_kind(
             variances: type_parameter_variances.map(Box::new),
             intersection_types: None,
         }))
-    }
-}
-
-#[inline]
-fn collapse_bare_array_union<'arena>(
-    left: &'arena Type<'arena>,
-    right: &'arena Type<'arena>,
-) -> Option<&'arena Type<'arena>> {
-    fn is_bare_array(ttype: &Type<'_>) -> bool {
-        matches!(ttype, Type::Array(array) if array.parameters.is_none())
-    }
-
-    fn is_typed_array(ttype: &Type<'_>) -> bool {
-        matches!(ttype, Type::Slice(_))
-    }
-
-    if is_bare_array(left) && is_typed_array(right) {
-        Some(right)
-    } else if is_bare_array(right) && is_typed_array(left) {
-        Some(left)
-    } else {
-        None
     }
 }
 

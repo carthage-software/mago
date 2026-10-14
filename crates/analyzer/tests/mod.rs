@@ -402,7 +402,6 @@ test_case!(docblock_array_shape_optional_key);
 test_case!(docblock_array_list_param);
 test_case!(docblock_array_mixed_key);
 test_case!(docblock_spaced_array_shorthand);
-test_case!(docblock_array_or_typed_array);
 test_case!(docblock_template_in_method);
 test_case!(docblock_param_class_string_template);
 test_case!(docblock_double_intersection_chain);
