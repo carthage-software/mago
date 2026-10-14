@@ -391,12 +391,6 @@ pub fn get_union_from_type(
         Type::String(_) => get_string(),
         Type::ArrayKey(_) => get_arraykey(),
         Type::Numeric(_) => get_numeric(),
-        Type::Number(_) => {
-            let mut atomics = get_int().types.into_owned();
-            atomics.extend(get_float().types.into_owned());
-
-            TUnion::from_vec(atomics)
-        }
         Type::Scalar(_) => get_scalar(),
         Type::Empty(_) => get_empty(),
         Type::EmptyScalar(_) => get_empty_scalar(),

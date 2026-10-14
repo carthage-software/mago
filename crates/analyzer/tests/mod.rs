@@ -352,7 +352,6 @@ test_case!(docblock_numeric_string_invalid);
 test_case!(docblock_lowercase_string);
 test_case!(docblock_array_key_type);
 test_case!(docblock_scalar_type);
-test_case!(docblock_number_keyword);
 test_case!(docblock_mixed_type);
 test_case!(docblock_void_return);
 test_case!(docblock_never_return);

@@ -31,7 +31,6 @@ pub enum TypeKeyword {
     Integer,
     Nothing,
     Numeric,
-    Number,
     Callable,
     IntMask,
     Iterable,
@@ -210,7 +209,6 @@ fn lookup_len6(bytes: &[u8]) -> Option<TypeKeyword> {
             }
         }
         b'p' if eq(bytes, b"parent") => Some(TypeKeyword::Parent),
-        b'n' if eq(bytes, b"number") => Some(TypeKeyword::Number),
         _ => None,
     }
 }
