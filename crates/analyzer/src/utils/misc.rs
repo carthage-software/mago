@@ -52,7 +52,19 @@ pub fn check_for_paradox<A>(
         return;
     }
 
-    let Some(negated_formula_2) = negate_formula(formula_2.to_vec(), algebra_thresholds) else {
+    if !formula_1.iter().any(|clause_1| {
+        clause_1.reconcilable
+            && !clause_1.wedge
+            && !clause_1.possibilities.is_empty()
+            && clause_1
+                .possibilities
+                .keys()
+                .all(|key| formula_2.iter().any(|clause_2| clause_2.possibilities.contains_key(key)))
+    }) {
+        return;
+    }
+
+    let Some(negated_formula_2) = negate_formula(formula_2, algebra_thresholds) else {
         return;
     };
 
@@ -124,7 +136,8 @@ fn report_paradoxical_condition<A>(
 ) where
     A: Arena,
 {
-    let Some(conflicting_clause) = negate_formula(vec![negated_conflicting_clause.clone()], algebra_thresholds) else {
+    let Some(conflicting_clause) = negate_formula(std::slice::from_ref(negated_conflicting_clause), algebra_thresholds)
+    else {
         return;
     };
 

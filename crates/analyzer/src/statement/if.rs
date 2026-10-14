@@ -200,15 +200,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
         }
 
         if_scope.reasonable_clauses.clone_from(&if_block_context.clauses);
-        let mut saved_if_clauses = if_clauses.clone();
         if_scope.negated_clauses = negate_or_synthesize(
-            if_clauses,
+            &if_clauses,
             self.condition,
             context.get_assertion_context_from_block(block_context),
             artifacts,
             &context.settings.algebra_thresholds(),
             context.settings.formula_size_threshold,
         );
+        let mut saved_if_clauses = if_clauses;
 
         let all_negated_clauses = saturate_clauses(
             block_context.clauses.iter().map(Rc::deref).chain(if_scope.negated_clauses.iter()),
@@ -866,7 +866,7 @@ where
     );
 
     let negated_if_clauses = negate_or_synthesize(
-        else_if_clauses.clone(),
+        &else_if_clauses,
         else_if_clause.0,
         context.get_assertion_context_from_block(&else_if_block_context),
         artifacts,
@@ -1028,7 +1028,7 @@ where
     }
 
     let negated_formula = negate_or_synthesize(
-        else_if_clauses,
+        &else_if_clauses,
         else_if_clause.0,
         context.get_assertion_context_from_block(&else_if_block_context),
         artifacts,

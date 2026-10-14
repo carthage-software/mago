@@ -616,7 +616,7 @@ where
 
         arm_exit_contexts.push(arm_body_context);
         let mut negated_arm_clauses = negate_or_synthesize(
-            arm_clauses,
+            &arm_clauses,
             &arm_condition,
             self.context.get_assertion_context_from_block(running_else_context),
             self.artifacts,
@@ -626,7 +626,7 @@ where
 
         if let Some(original_arm_condition) = original_arm_condition {
             negated_arm_clauses.extend(negate_or_synthesize(
-                original_arm_clauses,
+                &original_arm_clauses,
                 &original_arm_condition,
                 self.context.get_assertion_context_from_block(running_else_context),
                 self.artifacts,

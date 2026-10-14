@@ -1144,7 +1144,7 @@ where
                         )
                         .map(|clauses| {
                             negate_or_synthesize(
-                                clauses,
+                                &clauses,
                                 assertion_expression,
                                 context.get_assertion_context_from_block(block_context),
                                 artifacts,

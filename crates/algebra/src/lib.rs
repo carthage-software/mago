@@ -782,12 +782,15 @@ pub fn disjoin_clauses(
 /// or `None` if the negation is not possible due to complexity or other constraints.
 #[inline]
 #[must_use]
-pub fn negate_formula(mut clauses: Vec<Clause>, thresholds: &AlgebraThresholds) -> Option<Vec<Clause>> {
-    clauses.retain(|clause| clause.reconcilable);
-
-    clauses.retain(|clause| {
-        clause.wedge || clause.possibilities.values().all(|assertions| assertions.values().all(Assertion::is_negatable))
-    });
+pub fn negate_formula(clauses: &[Clause], thresholds: &AlgebraThresholds) -> Option<Vec<Clause>> {
+    let clauses: Vec<&Clause> = clauses
+        .iter()
+        .filter(|clause| {
+            clause.reconcilable
+                && (clause.wedge
+                    || clause.possibilities.values().all(|assertions| assertions.values().all(Assertion::is_negatable)))
+        })
+        .collect();
 
     if clauses.is_empty() {
         return Some(vec![]);
@@ -804,7 +807,7 @@ pub fn negate_formula(mut clauses: Vec<Clause>, thresholds: &AlgebraThresholds) 
 }
 
 #[inline]
-fn group_impossibilities(mut clauses: Vec<Clause>, max_complexity: usize) -> Option<Vec<Clause>> {
+fn group_impossibilities(mut clauses: Vec<&Clause>, max_complexity: usize) -> Option<Vec<Clause>> {
     let mut seed_clauses = Vec::new();
     let mut complexity = 1usize;
 

@@ -112,7 +112,7 @@ where
     )?;
 
     let should_negate = if is_identical { !literal_is_true } else { literal_is_true };
-    if should_negate { negate_formula(formula, algebra_thresholds) } else { Some(formula) }
+    if should_negate { negate_formula(&formula, algebra_thresholds) } else { Some(formula) }
 }
 
 pub fn get_formula<A>(
@@ -293,7 +293,7 @@ where
                 }
             }
 
-            return negate_formula(clauses, algebra_thresholds);
+            return negate_formula(&clauses, algebra_thresholds);
         }
 
         if let Expression::Binary(binary_expression) = unwrap_expression(unary_prefix.operand) {
@@ -336,7 +336,7 @@ where
 
         let unary_operand_span = unary_prefix.operand.span();
         let negated = negate_formula(
-            get_base_formula(
+            &get_base_formula(
                 conditional_object_id,
                 unary_operand_span,
                 unary_prefix.operand,
@@ -916,7 +916,7 @@ fn get_formula_from_assertions(
 }
 
 pub fn negate_or_synthesize<A>(
-    clauses: Vec<Clause>,
+    clauses: &[Clause],
     conditional: &Expression,
     assertion_context: AssertionContext<'_, '_, A>,
     artifacts: &AnalysisArtifacts,
@@ -939,7 +939,7 @@ where
                 algebra_thresholds,
                 formula_size_threshold,
             )
-            .and_then(|formula| negate_formula(formula, algebra_thresholds))
+            .and_then(|formula| negate_formula(&formula, algebra_thresholds))
         };
 
     match negated_clauses {

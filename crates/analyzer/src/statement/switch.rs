@@ -612,7 +612,7 @@ where
             let assertion_context = self.context.get_assertion_context_from_block(self.block_context);
 
             self.negated_clauses.extend(negate_or_synthesize(
-                case_clauses,
+                &case_clauses,
                 case_equality_expr,
                 assertion_context,
                 self.artifacts,

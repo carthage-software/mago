@@ -171,7 +171,7 @@ where
     extract_function_constant_existence(condition, artifacts, &mut if_block_context, false);
 
     if_scope.negated_clauses = negate_or_synthesize(
-        if_clauses,
+        &if_clauses,
         condition,
         context.get_assertion_context_from_block(block_context),
         artifacts,

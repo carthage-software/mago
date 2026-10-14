@@ -422,7 +422,7 @@ where
     .unwrap_or_default();
 
     let mut negated_left_clauses = negate_or_synthesize(
-        left_clauses,
+        &left_clauses,
         binary.lhs,
         context.get_assertion_context_from_block(block_context),
         artifacts,

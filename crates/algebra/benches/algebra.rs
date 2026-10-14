@@ -192,7 +192,7 @@ fn bench_negate(c: &mut Criterion) {
     let small = small_formula();
     c.bench_function("negate/small", |b| {
         b.iter(|| {
-            let result = negate_formula(small.clone(), &thresholds);
+            let result = negate_formula(&small, &thresholds);
             std::hint::black_box(result)
         });
     });
@@ -200,7 +200,7 @@ fn bench_negate(c: &mut Criterion) {
     let medium = medium_formula();
     c.bench_function("negate/medium", |b| {
         b.iter(|| {
-            let result = negate_formula(medium.clone(), &thresholds);
+            let result = negate_formula(&medium, &thresholds);
             std::hint::black_box(result)
         });
     });
@@ -208,7 +208,7 @@ fn bench_negate(c: &mut Criterion) {
     let pathological = pathological_formula();
     c.bench_function("negate/pathological", |b| {
         b.iter(|| {
-            let result = negate_formula(pathological.clone(), &thresholds);
+            let result = negate_formula(&pathological, &thresholds);
             std::hint::black_box(result)
         });
     });
@@ -285,7 +285,7 @@ fn bench_pipelines(c: &mut Criterion) {
     c.bench_function("pipeline/saturate_then_negate", |b| {
         b.iter(|| {
             let saturated = saturate_clauses(formula.iter(), &thresholds);
-            let negated = negate_formula(saturated, &thresholds);
+            let negated = negate_formula(&saturated, &thresholds);
             std::hint::black_box(negated)
         });
     });

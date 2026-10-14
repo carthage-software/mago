@@ -115,7 +115,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for DoWhile<'arena> {
         let clauses_to_simplify = {
             let mut c = block_context.clauses.iter().map(|v| (**v).clone()).collect::<Vec<_>>();
             c.extend(negate_or_synthesize(
-                while_clauses,
+                &while_clauses,
                 self.condition,
                 context.get_assertion_context_from_block(&inner_loop_block_context),
                 artifacts,
