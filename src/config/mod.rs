@@ -104,6 +104,7 @@ use crate::config::analyzer::AnalyzerConfiguration;
 use crate::config::extension::ExtensionHostConfiguration;
 use crate::config::formatter::FormatterConfiguration;
 use crate::config::guard::GuardConfiguration;
+use crate::config::language_server::LanguageServerConfiguration;
 use crate::config::linter::LinterConfiguration;
 use crate::config::parser::ParserConfiguration;
 use crate::config::source::SourceConfiguration;
@@ -115,6 +116,7 @@ pub mod analyzer;
 pub mod extension;
 pub mod formatter;
 pub mod guard;
+pub mod language_server;
 pub mod linter;
 pub mod parser;
 pub mod source;
@@ -295,6 +297,10 @@ pub struct Configuration {
     /// advertises the same logical extensions to Mago.
     #[serde(default)]
     pub extension_hosts: BTreeMap<String, ExtensionHostConfiguration>,
+
+    /// Language server settings for this workspace.
+    #[serde(default)]
+    pub language_server: LanguageServerConfiguration,
 
     /// Linter service configuration.
     ///
@@ -628,6 +634,7 @@ impl Configuration {
             version_drift_fail_level: VersionDriftFailLevel::Major,
             source: SourceConfiguration::from_workspace(workspace),
             extension_hosts: BTreeMap::new(),
+            language_server: LanguageServerConfiguration::default(),
             linter: LinterConfiguration::default(),
             parser: ParserConfiguration::default(),
             formatter: FormatterConfiguration::default(),
@@ -657,6 +664,7 @@ impl Configuration {
             "version-drift-fail-level": self.version_drift_fail_level,
             "source": self.source,
             "extension-hosts": self.extension_hosts,
+            "language-server": self.language_server,
             "linter": self.linter.to_filtered_value(self.php_version),
             "parser": self.parser,
             "formatter": self.formatter.to_value(),

@@ -70,8 +70,11 @@ mod config;
 mod consts;
 mod error;
 mod extensions;
+mod language_server;
 mod macros;
 mod prelude;
+#[cfg(all(target_os = "macos", not(feature = "dhat-heap")))]
+mod memory;
 mod service;
 mod updater;
 mod utils;
@@ -79,10 +82,15 @@ mod version_check;
 
 #[cfg(all(
     not(feature = "dhat-heap"),
-    any(target_os = "macos", target_os = "windows", target_env = "musl", target_env = "gnu")
+    not(target_os = "macos"),
+    any(target_os = "windows", target_env = "musl", target_env = "gnu")
 ))]
 #[global_allocator]
 static ALLOC: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
+#[cfg(all(target_os = "macos", not(feature = "dhat-heap")))]
+#[global_allocator]
+static ALLOC: memory::Allocator = memory::Allocator::new();
 
 #[cfg(feature = "dhat-heap")]
 #[global_allocator]
@@ -209,6 +217,11 @@ pub fn run(main_start: Instant) -> Result<ExitCode, Error> {
 
     let clap_start = Instant::now();
     let arguments = CliArguments::parse();
+    #[cfg(all(target_os = "macos", not(feature = "dhat-heap")))]
+    if matches!(arguments.command, MagoCommand::LanguageServer(_)) {
+        ALLOC.enable_language_server();
+    }
+
     let clap_duration = clap_start.elapsed();
 
     if matches!(arguments.command, MagoCommand::Version) {
@@ -246,6 +259,7 @@ pub fn run(main_start: Instant) -> Result<ExitCode, Error> {
         command,
         ..
     } = arguments;
+    let workspace_override = workspace.clone();
 
     let config_load_start = trace_enabled.then(Instant::now);
     let mut configuration = Configuration::load(
@@ -308,6 +322,7 @@ pub fn run(main_start: Instant) -> Result<ExitCode, Error> {
         MagoCommand::Guard(cmd) => cmd.execute(configuration, arguments.colors).map(|outcome| outcome.exit_code),
         MagoCommand::InspectBaseline(cmd) => cmd.execute(configuration, arguments.colors),
         MagoCommand::GenerateCompletions(cmd) => cmd.execute(),
+        MagoCommand::LanguageServer(cmd) => cmd.execute(configuration, workspace_override),
         MagoCommand::SelfUpdate(_) => {
             unreachable!("The self-update command should have been handled before this point.")
         }
