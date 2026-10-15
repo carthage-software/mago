@@ -1216,9 +1216,12 @@ final class Protocol
         $writer->writeBoolean(true);
         $writer->writeCount($exceptions);
         foreach ($exceptions as $exception) {
+            // @mago-expect analysis:redundant-type-comparison,redundant-type-comparison,redundant-type-comparison
+            // @mago-expect analysis:redundant-logical-operation,redundant-comparison,redundant-logical-operation
             if (!is_string($exception) || $exception === '' || str_contains($exception, "\0")) {
                 throw new ProtocolException('Throw-type providers must return non-empty class names without NUL.');
             }
+
             $writer->writeBytes($exception);
         }
 
