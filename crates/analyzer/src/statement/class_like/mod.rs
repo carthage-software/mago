@@ -1184,7 +1184,7 @@ fn check_class_like_extends<'ctx, 'arena, A>(
 
         // Case: The extended type does not exist.
         let Some(extended_class_metadata) = extended_class_metadata else {
-            let extended_name = BytesDisplay(extended_type.value());
+            let extended_name = BytesDisplay(extended_type_str);
 
             context.collector.report_with_code(
                 IssueCode::NonExistentClassLike,
@@ -1452,7 +1452,8 @@ fn check_class_like_implements<'ctx, 'arena, A>(
 
             check_interface_method_signatures(context, class_like_metadata, implemented_metadata, checked_signatures);
         } else {
-            let implemented_name = BytesDisplay(implemented_type.value());
+            let implemented_type_str = context.resolved_names.get(&implemented_type);
+            let implemented_name = BytesDisplay(implemented_type_str);
 
             context.collector.report_with_code(
                 IssueCode::NonExistentClassLike,
@@ -1484,7 +1485,7 @@ fn check_class_like_use<'ctx, 'arena, A>(
         let used_trait_metadata = context.codebase.get_class_like(used_type_str);
 
         let Some(used_trait_metadata) = used_trait_metadata else {
-            let used_name = BytesDisplay(used_type.value());
+            let used_name = BytesDisplay(used_type_str);
 
             context.collector.report_with_code(
                 IssueCode::NonExistentClassLike,

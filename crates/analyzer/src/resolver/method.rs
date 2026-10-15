@@ -1,5 +1,6 @@
 use foldhash::HashSet;
 use mago_allocator::Arena;
+use mago_bytes::BytesDisplay;
 
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::identifier::method::MethodIdentifier;
@@ -244,7 +245,7 @@ where
                         result.has_invalid_target = true;
                     }
 
-                    report_call_on_non_object(context, object_atomic, object.span(), selector.span());
+                    report_call_on_non_object(context, object_atomic, object.span(), selector);
                     continue;
                 }
             };
@@ -372,7 +373,7 @@ where
     } else {
         result.has_invalid_target = true;
         result.encountered_mixed = true;
-        report_call_on_non_object(context, &TAtomic::Mixed(TMixed::new()), object.span(), selector.span());
+        report_call_on_non_object(context, &TAtomic::Mixed(TMixed::new()), object.span(), selector);
     }
 
     for method_id in asserted_descendant_method_references {
@@ -873,16 +874,22 @@ fn report_call_on_non_object<A>(
     context: &mut Context<'_, '_, A>,
     atomic_type: &TAtomic,
     obj_span: Span,
-    selector_span: Span,
+    selector: &ClassLikeMemberSelector,
 ) where
     A: Arena,
 {
     let type_str = atomic_type.get_id();
+    let issue_msg = match selector {
+        ClassLikeMemberSelector::Identifier(id) => {
+            format!("Attempting to call method `{}()` on a non-object type (`{type_str}`).", BytesDisplay(id.value))
+        }
+        _ => format!("Attempting to access a method on a non-object type (`{type_str}`)."),
+    };
 
     context.collector.report_with_code(
         if atomic_type.is_mixed() { IssueCode::MixedMethodAccess } else { IssueCode::InvalidMethodAccess },
-        Issue::error(format!("Attempting to access a method on a non-object type (`{type_str}`)."))
-            .with_annotation(Annotation::primary(selector_span).with_message("Cannot call method here"))
+        Issue::error(issue_msg)
+            .with_annotation(Annotation::primary(selector.span()).with_message("Cannot call method here"))
             .with_annotation(
                 Annotation::secondary(obj_span).with_message(format!("This expression has type `{type_str}`")),
             ),

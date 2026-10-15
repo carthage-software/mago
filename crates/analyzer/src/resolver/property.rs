@@ -3,6 +3,7 @@ use std::borrow::Cow;
 use foldhash::HashMap;
 use indexmap::IndexMap;
 use mago_allocator::Arena;
+use mago_bytes::BytesDisplay;
 use mago_bytes::trim_start_byte;
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::metadata::CodebaseMetadata;
@@ -1493,9 +1494,15 @@ fn report_access_on_non_object<A>(
     A: Arena,
 {
     let type_str = atomic_type.get_id();
+    let issue_msg = match selector {
+        ClassLikeMemberSelector::Identifier(id) => {
+            format!("Attempting to access property `${}` on a non-object type (`{type_str}`).", BytesDisplay(id.value))
+        }
+        _ => format!("Attempting to access a property on a non-object type (`{type_str}`)."),
+    };
     context.collector.report_with_code(
         if atomic_type.is_mixed() { IssueCode::MixedPropertyAccess } else { IssueCode::InvalidPropertyAccess },
-        Issue::error(format!("Attempting to access a property on a non-object type (`{type_str}`)."))
+        Issue::error(issue_msg)
             .with_annotation(Annotation::primary(selector.span()).with_message("Cannot access property here"))
             .with_annotation(
                 Annotation::secondary(object_span).with_message(format!("This expression has type `{type_str}`")),
