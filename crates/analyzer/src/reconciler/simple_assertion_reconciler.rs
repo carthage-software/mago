@@ -578,6 +578,13 @@ where
             }) {
                 object_types.push(atomic);
             }
+        } else if let TAtomic::Iterable(iterable) = atomic {
+            did_remove_type = true;
+
+            object_types.push(TAtomic::Object(TObject::Named(
+                TNamedObject::new(word("Traversable"))
+                    .with_type_parameters(Some(vec![(*iterable.key_type).clone(), (*iterable.value_type).clone()])),
+            )));
         } else {
             did_remove_type = true;
         }

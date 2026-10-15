@@ -441,6 +441,7 @@ test_case!(intersection_stringable);
 test_case!(iterable_array_comparison);
 test_case!(iterable_count);
 test_case!(iterable_reconciliation);
+test_case!(iterable_type_reconciliation);
 test_case!(non_empty_string_magic_constant);
 test_case!(non_utf8_method_names);
 test_case!(non_utf8_class_names);
