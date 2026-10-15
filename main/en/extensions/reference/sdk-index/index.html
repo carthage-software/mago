@@ -593,6 +593,12 @@
         </li>
         
         <li>
+          <a href="../../../../../main/en/extensions/analyzer/throw-type-providers">
+            <span>Throw type providers</span>
+          </a>
+        </li>
+        
+        <li>
           <a href="../../../../../main/en/extensions/analyzer/assertion-providers">
             <span>Assertion providers</span>
           </a>
@@ -866,6 +872,15 @@
 <tr><td style="text-align: left"><code>Argument</code></td><td style="text-align: left">Named/positional source argument and optional inferred type</td></tr>
 </tbody></table>
 <p>Targets are <code>FunctionTarget</code> with <code>FunctionTargetKind</code>, or <code>MethodTarget</code>. See <a href="../../../../../main/en/extensions/analyzer/return-types-and-callable-signatures">Return types and callable signatures</a>.</p>
+<h2 id="throw-types">Throw types</h2>
+<table><thead><tr><th style="text-align: left">Type</th><th style="text-align: left">Purpose</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>FunctionThrowTypeProvider</code></td><td style="text-align: left">Supplies thrown exceptions for selected function calls</td></tr>
+<tr><td style="text-align: left"><code>MethodThrowTypeProvider</code></td><td style="text-align: left">Supplies thrown exceptions for selected method calls</td></tr>
+<tr><td style="text-align: left"><code>ExpressionThrowTypeProvider</code></td><td style="text-align: left">Supplies thrown exceptions for an expression</td></tr>
+<tr><td style="text-align: left"><code>ThrowTypeProviderContext</code></td><td style="text-align: left">Invocation with inferred arguments and semantic services</td></tr>
+<tr><td style="text-align: left"><code>ExpressionThrowTypeProviderContext</code></td><td style="text-align: left">Expression source, span, inferred type, and semantic services</td></tr>
+</tbody></table>
+<p>See <a href="../../../../../main/en/extensions/analyzer/throw-type-providers">Throw type providers</a>.</p>
 <h2 id="assertions">Assertions</h2>
 <p><code>FunctionAssertionProvider</code>, <code>MethodAssertionProvider</code>, and <code>AssertionProviderContext</code> produce <code>InvocationAssertions</code>. Method providers can use <code>InvocationAssertions::RECEIVER</code> to assert facts about the called object.</p>
 <p>The assertion value families are:</p>
@@ -991,6 +1006,10 @@
     
     <li class="doc-toc__item doc-toc__item--lvl2">
       <a class="doc-toc__link" href="#return-types-and-call-signatures">Return types and call signatures</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#throw-types">Throw types</a>
     </li>
     
     <li class="doc-toc__item doc-toc__item--lvl2">

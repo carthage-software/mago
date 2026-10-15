@@ -17,6 +17,7 @@
                 "extensions/analyzer/properties-and-initialization",
                 "extensions/analyzer/return-types-and-callable-signatures",
                 "extensions/analyzer/targeted-analysis-hooks",
+                "extensions/analyzer/throw-type-providers",
                 "extensions/analyzer/types-and-comparisons",
                 "extensions/architecture",
                 "extensions/configuration",
