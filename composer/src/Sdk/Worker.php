@@ -18,10 +18,12 @@ use Mago\Sdk\Analyzer\ClassTarget;
 use Mago\Sdk\Analyzer\Codebase;
 use Mago\Sdk\Analyzer\CodebaseScanContext;
 use Mago\Sdk\Analyzer\CodebaseScanHook;
+use Mago\Sdk\Analyzer\ExpressionThrowTypeProviderContext;
 use Mago\Sdk\Analyzer\FileAnalysis;
 use Mago\Sdk\Analyzer\FunctionAssertionProvider;
 use Mago\Sdk\Analyzer\FunctionReturnTypeProvider;
 use Mago\Sdk\Analyzer\FunctionTarget;
+use Mago\Sdk\Analyzer\FunctionThrowTypeProvider;
 use Mago\Sdk\Analyzer\InitializationContext;
 use Mago\Sdk\Analyzer\InvocationKind;
 use Mago\Sdk\Analyzer\IssueFilterContext;
@@ -30,6 +32,7 @@ use Mago\Sdk\Analyzer\IssueFilterHook;
 use Mago\Sdk\Analyzer\MethodAssertionProvider;
 use Mago\Sdk\Analyzer\MethodReturnTypeProvider;
 use Mago\Sdk\Analyzer\MethodTarget;
+use Mago\Sdk\Analyzer\MethodThrowTypeProvider;
 use Mago\Sdk\Analyzer\NodeAnalysisContext;
 use Mago\Sdk\Analyzer\PluginRegistry as AnalyzerPluginRegistry;
 use Mago\Sdk\Analyzer\ProjectAnalysis;
@@ -41,6 +44,7 @@ use Mago\Sdk\Analyzer\PropertyTypeProviderContext;
 use Mago\Sdk\Analyzer\ReturnTypeProviderContext;
 use Mago\Sdk\Analyzer\TargetedAnalysisHook;
 use Mago\Sdk\Analyzer\TargetedProvider;
+use Mago\Sdk\Analyzer\ThrowTypeProviderContext;
 use Mago\Sdk\Analyzer\TypeComparator;
 use Mago\Sdk\Exception\CancelledException;
 use Mago\Sdk\Exception\InvalidArgumentException;
@@ -48,6 +52,7 @@ use Mago\Sdk\Exception\ProtocolException;
 use Mago\Sdk\Internal\Analyzer\DefinitionName;
 use Mago\Sdk\Internal\Analyzer\MetadataCache;
 use Mago\Sdk\Internal\Analyzer\Protocol as AnalyzerProtocol;
+use Mago\Sdk\Internal\Analyzer\RegisteredExpressionThrowTypeProvider;
 use Mago\Sdk\Internal\Analyzer\RegisteredPlugin;
 use Mago\Sdk\Internal\Analyzer\RegisteredTargetedCallback;
 use Mago\Sdk\Internal\Analyzer\ReportedIssue;
@@ -120,6 +125,15 @@ final class Worker
     /** @var list<RegisteredTargetedCallback<MethodReturnTypeProvider, MethodTarget>> */
     private readonly array $methodReturnTypeProviders;
 
+    /** @var list<RegisteredTargetedCallback<FunctionThrowTypeProvider, FunctionTarget>> */
+    private readonly array $functionThrowTypeProviders;
+
+    /** @var list<RegisteredTargetedCallback<MethodThrowTypeProvider, MethodTarget>> */
+    private readonly array $methodThrowTypeProviders;
+
+    /** @var list<RegisteredExpressionThrowTypeProvider> */
+    private readonly array $expressionThrowTypeProviders;
+
     /** @var list<RegisteredTargetedCallback<FunctionAssertionProvider, FunctionTarget>> */
     private readonly array $functionAssertionProviders;
 
@@ -173,6 +187,9 @@ final class Worker
         $registeredPlugins = [];
         $functionProviders = [];
         $methodProviders = [];
+        $functionThrowTypeProviders = [];
+        $methodThrowTypeProviders = [];
+        $expressionThrowTypeProviders = [];
         $functionAssertionProviders = [];
         $methodAssertionProviders = [];
         $propertyProviders = [];
@@ -241,6 +258,35 @@ final class Worker
                     $definition->identifier,
                     'method return-type provider',
                 );
+                $registeredFunctionThrowTypeProviders = self::registerTargetedCallbacks(
+                    $registry->getFunctionThrowTypeProviders(),
+                    $functionThrowTypeProviders,
+                    $definition->identifier,
+                    'function throw-type provider',
+                );
+                $registeredMethodThrowTypeProviders = self::registerTargetedCallbacks(
+                    $registry->getMethodThrowTypeProviders(),
+                    $methodThrowTypeProviders,
+                    $definition->identifier,
+                    'method throw-type provider',
+                );
+                $registeredExpressionThrowTypeProviders = [];
+                foreach ($registry->getExpressionThrowTypeProviders() as $provider) {
+                    $providerIndex = count($expressionThrowTypeProviders);
+                    if ($providerIndex > 65_535) {
+                        throw new InvalidArgumentException(
+                            'A worker cannot register more than 65,536 analyzer expression throw-type providers.',
+                        );
+                    }
+
+                    $registeredProvider = new RegisteredExpressionThrowTypeProvider(
+                        $providerIndex,
+                        $definition->identifier,
+                        $provider,
+                    );
+                    $expressionThrowTypeProviders[] = $registeredProvider;
+                    $registeredExpressionThrowTypeProviders[] = $registeredProvider;
+                }
                 $registeredFunctionAssertionProviders = self::registerTargetedCallbacks(
                     $registry->getFunctionAssertionProviders(),
                     $functionAssertionProviders,
@@ -370,6 +416,9 @@ final class Worker
                     $definition,
                     $registeredFunctionProviders,
                     $registeredMethodProviders,
+                    $registeredFunctionThrowTypeProviders,
+                    $registeredMethodThrowTypeProviders,
+                    $registeredExpressionThrowTypeProviders,
                     $registeredFunctionAssertionProviders,
                     $registeredMethodAssertionProviders,
                     $registeredPropertyProviders,
@@ -400,6 +449,9 @@ final class Worker
         $this->workerReducerIndices = $workerReducerIndices;
         $this->functionReturnTypeProviders = $functionProviders;
         $this->methodReturnTypeProviders = $methodProviders;
+        $this->functionThrowTypeProviders = $functionThrowTypeProviders;
+        $this->methodThrowTypeProviders = $methodThrowTypeProviders;
+        $this->expressionThrowTypeProviders = $expressionThrowTypeProviders;
         $this->functionAssertionProviders = $functionAssertionProviders;
         $this->methodAssertionProviders = $methodAssertionProviders;
         $this->propertyTypeProviders = $propertyProviders;
@@ -729,6 +781,51 @@ final class Worker
             return $this->handleCodebaseScanRequest($reader, $cancellation);
         }
 
+        if ($kind === AnalyzerProtocol::EXPRESSION_THROW_TYPE_REQUEST) {
+            $request = AnalyzerProtocol::readExpressionThrowTypeRequest($reader);
+            if ($this->metadataCache === null || $this->metadataCache->generation !== $request->generation) {
+                $this->metadataCache = new MetadataCache($request->generation);
+            }
+
+            $codebase = new Codebase($host, $requestId, $cancellation, $this->metadataCache);
+            $types = new TypeComparator($host, $requestId, $cancellation, $this->metadataCache);
+            $context = new ExpressionThrowTypeProviderContext(
+                $this->phpVersion,
+                $codebase,
+                $types,
+                $cancellation,
+                $request->sourceFilePath,
+                $request->span,
+                $request->expression,
+                $request->expressionType,
+            );
+            foreach ($request->providerIndices as $providerIndex) {
+                $registered = $this->expressionThrowTypeProviders[$providerIndex] ?? null;
+                if ($registered === null) {
+                    throw new ProtocolException(
+                        "Mago requested unregistered analyzer expression throw-type provider index {$providerIndex}.",
+                    );
+                }
+
+                $cancellation->throwIfCancelled();
+                try {
+                    $exceptions = $registered->callback->getThrownExceptions($context);
+                } catch (Throwable $throwable) {
+                    throw new ProtocolException(
+                        "Analyzer expression throw-type provider in `{$registered->plugin}` failed: {$throwable->getMessage()}",
+                        0,
+                        $throwable,
+                    );
+                }
+
+                if ($exceptions !== null) {
+                    return AnalyzerProtocol::writeThrowTypeResponse($exceptions);
+                }
+            }
+
+            return AnalyzerProtocol::writeThrowTypeResponse(null);
+        }
+
         if (
             $kind === AnalyzerProtocol::BEFORE_ANALYSIS_REQUEST
             || $kind === AnalyzerProtocol::AFTER_FILE_ANALYSIS_REQUEST
@@ -927,6 +1024,7 @@ final class Worker
             $kind !== AnalyzerProtocol::RETURN_TYPE_REQUEST
             && $kind !== AnalyzerProtocol::CALLABLE_SIGNATURE_REQUEST
             && $kind !== AnalyzerProtocol::ASSERTION_REQUEST
+            && $kind !== AnalyzerProtocol::THROW_TYPE_REQUEST
         ) {
             throw new ProtocolException("Unknown analyzer request kind {$kind}.");
         }
@@ -973,6 +1071,44 @@ final class Worker
             }
 
             return AnalyzerProtocol::writeAssertionResponse(null);
+        }
+
+        if ($kind === AnalyzerProtocol::THROW_TYPE_REQUEST) {
+            $providers = $request->invocation->kind === InvocationKind::Function
+                ? $this->functionThrowTypeProviders
+                : $this->methodThrowTypeProviders;
+            $context = new ThrowTypeProviderContext(
+                $this->phpVersion,
+                $codebase,
+                $request->invocation,
+                $types,
+                $cancellation,
+            );
+            foreach ($request->providerIndices as $providerIndex) {
+                $registered = $providers[$providerIndex] ?? null;
+                if ($registered === null) {
+                    throw new ProtocolException(
+                        "Mago requested unregistered analyzer throw-type provider index {$providerIndex}.",
+                    );
+                }
+
+                $cancellation->throwIfCancelled();
+                try {
+                    $exceptions = $registered->callback->getThrownExceptions($context);
+                } catch (Throwable $throwable) {
+                    throw new ProtocolException(
+                        "Analyzer throw-type provider in `{$registered->plugin}` failed: {$throwable->getMessage()}",
+                        0,
+                        $throwable,
+                    );
+                }
+
+                if ($exceptions !== null) {
+                    return AnalyzerProtocol::writeThrowTypeResponse($exceptions);
+                }
+            }
+
+            return AnalyzerProtocol::writeThrowTypeResponse(null);
         }
 
         $providers = $request->invocation->kind === InvocationKind::Function

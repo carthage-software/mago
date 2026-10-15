@@ -143,28 +143,55 @@ where
     }
 
     if context.settings.check_throws {
-        let thrown_types = context.codebase.get_function_like_thrown_types(
-            invoication.target.get_method_context().map(|context| context.class_like_metadata),
-            metadata,
-        );
-
-        for thrown_exception_type in thrown_types {
-            let resolved_exception_type = resolve_invocation_type(
-                context,
+        let external_throw_types = match identifier {
+            FunctionLikeIdentifier::Function(name) => context.plugin_registry.get_external_function_thrown_exceptions(
+                context.codebase,
+                context.source_file,
+                artifacts,
+                name.as_bytes(),
                 invoication,
-                template_result,
-                parameters,
-                thrown_exception_type.type_union.clone(),
+                context.external_analysis_session,
+            ),
+            FunctionLikeIdentifier::Method(class_name, method_name) => {
+                context.plugin_registry.get_external_method_thrown_exceptions(
+                    context.codebase,
+                    context.source_file,
+                    artifacts,
+                    class_name.as_bytes(),
+                    method_name.as_bytes(),
+                    invoication,
+                    context.external_analysis_session,
+                )
+            }
+            FunctionLikeIdentifier::Closure(_) => None,
+        };
+        if let Some(exceptions) = external_throw_types {
+            for exception in exceptions {
+                block_context.possibly_thrown_exceptions.entry(exception).or_default().insert(invoication.span);
+            }
+        } else {
+            let thrown_types = context.codebase.get_function_like_thrown_types(
+                invoication.target.get_method_context().map(|context| context.class_like_metadata),
+                metadata,
             );
+            for thrown_exception_type in thrown_types {
+                let resolved_exception_type = resolve_invocation_type(
+                    context,
+                    invoication,
+                    template_result,
+                    parameters,
+                    thrown_exception_type.type_union.clone(),
+                );
 
-            for exception_atomic in resolved_exception_type.types.into_owned() {
-                for exception in exception_atomic.get_all_object_names() {
-                    block_context.possibly_thrown_exceptions.entry(exception).or_default().insert(invoication.span);
+                for exception_atomic in resolved_exception_type.types.into_owned() {
+                    for exception in exception_atomic.get_all_object_names() {
+                        block_context.possibly_thrown_exceptions.entry(exception).or_default().insert(invoication.span);
+                    }
                 }
             }
-        }
 
-        collect_plugin_throw_types(context, block_context, artifacts, invoication, identifier);
+            collect_plugin_throw_types(context, block_context, artifacts, invoication, identifier);
+        }
     }
 
     if !apply_assertions {

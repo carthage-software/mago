@@ -92,6 +92,7 @@ use mago_reporting::AnnotationKind;
 use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
+use mago_syntax::cst::Expression;
 use mago_syntax::cst::NodeKind;
 use mago_text_edit::Safety;
 use mago_word::Word;
@@ -132,7 +133,7 @@ use crate::invocation::MethodTargetContext;
 
 pub const ANALYZER_PROTOCOL_MAGIC: [u8; 4] = *b"MANA";
 pub const ANALYZER_PROTOCOL_MAJOR: u16 = 2;
-pub const ANALYZER_PROTOCOL_MINOR: u16 = 0;
+pub const ANALYZER_PROTOCOL_MINOR: u16 = 1;
 
 const HEADER_LENGTH: usize = 12;
 const INITIAL_MESSAGE_CAPACITY: usize = 256;
@@ -148,6 +149,8 @@ const TYPE_COMPARISON_BATCH_REQUEST: u16 = 16;
 const CLASS_INITIALIZER_REQUEST: u16 = 17;
 const ASSERTION_REQUEST: u16 = 18;
 pub(super) const CODEBASE_SCAN_REQUEST: u16 = 19;
+const THROW_TYPE_REQUEST: u16 = 20;
+const EXPRESSION_THROW_TYPE_REQUEST: u16 = 21;
 const DESCRIBE_RESPONSE: u16 = 0x8001;
 const RETURN_TYPE_RESPONSE: u16 = 0x8002;
 const TYPE_COMPARISON_RESPONSE: u16 = 0x8003;
@@ -160,6 +163,7 @@ const TYPE_COMPARISON_BATCH_RESPONSE: u16 = 0x8010;
 const CLASS_INITIALIZER_RESPONSE: u16 = 0x8011;
 const ASSERTION_RESPONSE: u16 = 0x8012;
 const CODEBASE_SCAN_RESPONSE: u16 = 0x8013;
+const THROW_TYPE_RESPONSE: u16 = 0x8014;
 const MAXIMUM_EXTENSIONS: usize = 0x4000;
 const MAXIMUM_PLUGINS: usize = 0x4000;
 const MAXIMUM_PROVIDERS: usize = 0x0001_0000;
@@ -232,6 +236,9 @@ pub(super) struct Registration {
     pub has_worker_reducer: bool,
     pub function_providers: Vec<FunctionProvider>,
     pub method_providers: Vec<MethodProvider>,
+    pub function_throw_type_providers: Vec<FunctionProvider>,
+    pub method_throw_type_providers: Vec<MethodProvider>,
+    pub expression_throw_type_providers: Vec<ExpressionThrowTypeProviderRegistration>,
     pub function_assertion_providers: Vec<FunctionProvider>,
     pub method_assertion_providers: Vec<MethodProvider>,
     pub property_providers: Vec<PropertyProvider>,
@@ -249,6 +256,12 @@ pub(super) struct Registration {
     pub after_file_analysis_plugins: Vec<u16>,
     pub node_analysis_plugins: Vec<u16>,
     pub after_analysis_plugins: Vec<u16>,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(super) struct ExpressionThrowTypeProviderRegistration {
+    pub plugin: u16,
+    pub index: u16,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq)]
@@ -273,6 +286,12 @@ pub(super) struct PropertyTypeRequest<'type_info> {
     pub payload: Vec<u8>,
     pub types: Vec<Cow<'type_info, TUnion>>,
     pub snapshotted_types: usize,
+    pub type_snapshot_duration: Duration,
+}
+
+pub(super) struct ExpressionThrowTypeRequest<'type_info> {
+    pub payload: Vec<u8>,
+    pub types: Vec<Cow<'type_info, TUnion>>,
     pub type_snapshot_duration: Duration,
 }
 
@@ -371,6 +390,9 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
     let mut plugins = Vec::new();
     let mut function_providers = Vec::new();
     let mut method_providers = Vec::new();
+    let mut function_throw_type_providers = Vec::new();
+    let mut method_throw_type_providers = Vec::new();
+    let mut expression_throw_type_providers = Vec::new();
     let mut function_assertion_providers = Vec::new();
     let mut method_assertion_providers = Vec::new();
     let mut property_providers = Vec::new();
@@ -443,6 +465,29 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
                 read_capabilities,
                 read_method_target,
             )?);
+            function_throw_type_providers.extend(read_providers(
+                &mut reader,
+                index,
+                "function throw-type providers",
+                "function throw-type provider",
+                no_capabilities,
+                read_function_target,
+            )?);
+            method_throw_type_providers.extend(read_providers(
+                &mut reader,
+                index,
+                "method throw-type providers",
+                "method throw-type provider",
+                no_capabilities,
+                read_method_target,
+            )?);
+            let expression_provider_count = reader.read_count("expression throw-type providers", MAXIMUM_PROVIDERS)?;
+            for _ in 0..expression_provider_count {
+                expression_throw_type_providers.push(ExpressionThrowTypeProviderRegistration {
+                    plugin: index,
+                    index: reader.read_u16("expression throw-type provider index")?,
+                });
+            }
             property_providers.extend(read_providers(
                 &mut reader,
                 index,
@@ -615,6 +660,18 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
     )?;
 
     validate_provider_indices(method_providers.iter().map(|provider| provider.index), "method return-type provider")?;
+    validate_provider_indices(
+        function_throw_type_providers.iter().map(|provider| provider.index),
+        "function throw-type provider",
+    )?;
+    validate_provider_indices(
+        method_throw_type_providers.iter().map(|provider| provider.index),
+        "method throw-type provider",
+    )?;
+    validate_provider_indices(
+        expression_throw_type_providers.iter().map(|provider| provider.index),
+        "expression throw-type provider",
+    )?;
     validate_provider_indices(property_providers.iter().map(|provider| provider.index), "property type provider")?;
     validate_provider_indices(
         property_initialization_providers.iter().map(|provider| provider.index),
@@ -643,6 +700,9 @@ pub(super) fn decode_registration(payload: &[u8]) -> Result<Registration, Extern
         has_worker_reducer,
         function_providers,
         method_providers,
+        function_throw_type_providers,
+        method_throw_type_providers,
+        expression_throw_type_providers,
         function_assertion_providers,
         method_assertion_providers,
         property_providers,
@@ -851,6 +911,7 @@ pub(super) enum ProviderRequestKind {
     ReturnType,
     CallableSignature,
     Assertion,
+    ThrowType,
 }
 
 #[derive(Clone, Copy)]
@@ -875,6 +936,7 @@ pub(super) fn encode_provider_request<'type_info>(
         ProviderRequestKind::ReturnType => RETURN_TYPE_REQUEST,
         ProviderRequestKind::CallableSignature => CALLABLE_SIGNATURE_REQUEST,
         ProviderRequestKind::Assertion => ASSERTION_REQUEST,
+        ProviderRequestKind::ThrowType => THROW_TYPE_REQUEST,
     };
     let mut receiver_type = None;
     let (invocation_kind, class, name) = match target {
@@ -945,6 +1007,54 @@ pub(super) fn encode_property_type_request<'type_info>(
         payload: writer.finish(),
         snapshotted_types: references.len(),
         types: references.into_iter().map(Cow::Borrowed).collect(),
+        type_snapshot_duration,
+    })
+}
+
+pub(super) fn encode_expression_throw_type_request<'type_info>(
+    provider_indices: &[u16],
+    expression: &Expression<'_>,
+    artifacts: &'type_info AnalysisArtifacts,
+    source_file: &File,
+    generation: u64,
+    trace_enabled: bool,
+) -> Result<ExpressionThrowTypeRequest<'type_info>, ExternalAnalyzerError> {
+    if provider_indices.is_empty() {
+        return Err(protocol("an expression throw-type request must contain at least one provider"));
+    }
+
+    let mut writer = message_writer(EXPRESSION_THROW_TYPE_REQUEST);
+    writer.write_u64(generation);
+    writer.write_u16(
+        u16::try_from(provider_indices.len())
+            .map_err(|_| protocol("more than u16::MAX expression providers matched"))?,
+    );
+    for index in provider_indices {
+        writer.write_u16(*index);
+    }
+
+    writer.write_bytes(&source_file.name)?;
+    let span = expression.span();
+    writer.write_u32(span.start.offset);
+    writer.write_u32(span.end.offset);
+    let source = source_file.contents.get(span.start.offset as usize..span.end.offset as usize).unwrap_or_default();
+    writer.write_bytes(source)?;
+
+    let expression_type = artifacts.get_expression_type(expression);
+    writer.write_bool(expression_type.is_some());
+    let mut types = Vec::new();
+    let type_snapshot_duration = if let Some(expression_type) = expression_type {
+        writer.write_bytes(expression_type.get_id().as_bytes())?;
+        let snapshot_start = trace_enabled.then(Instant::now);
+        encode_union_snapshot(&mut writer, expression_type, &mut types, 0)?;
+        snapshot_start.map_or(Duration::ZERO, |start| start.elapsed())
+    } else {
+        Duration::ZERO
+    };
+
+    Ok(ExpressionThrowTypeRequest {
+        payload: writer.finish(),
+        types: types.into_iter().map(Cow::Borrowed).collect(),
         type_snapshot_duration,
     })
 }
@@ -1212,7 +1322,8 @@ fn encode_return_type_request<'type_info>(
     trace_enabled: bool,
 ) -> Result<ReturnTypeRequest<'type_info>, ExternalAnalyzerError> {
     let mut writer = message_writer(message_kind);
-    let include_argument_types = message_kind == RETURN_TYPE_REQUEST || message_kind == ASSERTION_REQUEST;
+    let include_argument_types =
+        message_kind == RETURN_TYPE_REQUEST || message_kind == ASSERTION_REQUEST || message_kind == THROW_TYPE_REQUEST;
     let mut type_snapshot_duration = Duration::ZERO;
     writer.write_u64(generation);
     writer.write_u8(invocation_kind);
@@ -2070,6 +2181,31 @@ where
         if reader.read_bool("handled flag")? { Some(decode_type(&mut reader, &argument_type, 0)?) } else { None };
     reader.finish()?;
     Ok(result)
+}
+
+pub(super) fn decode_throw_type_response(payload: &[u8]) -> Result<Option<WordSet>, ExternalAnalyzerError> {
+    let mut reader = message_reader(payload, THROW_TYPE_RESPONSE)?;
+    if !reader.read_bool("throw-type handled flag")? {
+        reader.finish()?;
+        return Ok(None);
+    }
+
+    let count = reader.read_count("thrown exception types", MAXIMUM_TARGETS)?;
+    let mut exceptions = WordSet::default();
+    for _ in 0..count {
+        let name = non_empty(reader.read_bytes("thrown exception class name")?, "thrown exception class name")?;
+        let name = name.strip_prefix(b"\\").unwrap_or(name);
+        if name.contains(&0) {
+            return Err(protocol("thrown exception class name contains NUL"));
+        }
+        if !is_valid_symbol_name(name) {
+            return Err(protocol("thrown exception class name is not a valid PHP class name"));
+        }
+        exceptions.insert(word(name));
+    }
+
+    reader.finish()?;
+    Ok(Some(exceptions))
 }
 
 pub(super) fn decode_callable_signature_response<'type_info, F>(
@@ -3484,6 +3620,9 @@ pub(super) mod testing {
         writer.write_u32(0);
         writer.write_u32(0);
         writer.write_u32(0);
+        writer.write_u32(0);
+        writer.write_u32(0);
+        writer.write_u32(0);
         writer.write_u32(1);
         writer.write_bytes(b"FrameworkTestCase").unwrap();
         writer.write_bytes(b"test*").unwrap();
@@ -3566,6 +3705,9 @@ pub(super) mod testing {
         writer.write_u32(0);
         writer.write_u32(0);
         writer.write_u32(0);
+        writer.write_u32(0);
+        writer.write_u32(0);
+        writer.write_u32(0);
         writer.finish()
     }
 
@@ -3594,6 +3736,9 @@ pub(super) mod testing {
         writer.write_u32(1);
         writer.write_u8(TARGET_EXACT);
         writer.write_bytes(b"demo_service").unwrap();
+        writer.write_u32(0);
+        writer.write_u32(0);
+        writer.write_u32(0);
         writer.write_u32(0);
         writer.write_u32(0);
         writer.write_u32(0);

@@ -790,6 +790,11 @@ struct Backend<T> {
     method_signature_wildcard: Vec<(u16, Vec<MethodTarget>)>,
     method_assertion_exact: WordMap<Vec<u16>>,
     method_assertion_wildcard: Vec<(u16, Vec<MethodTarget>)>,
+    function_throw_type_exact: ProviderExactIndex,
+    function_throw_type_wildcard: ProviderWildcardIndex<FunctionTarget>,
+    method_throw_type_exact: ProviderExactIndex,
+    method_throw_type_wildcard: ProviderWildcardIndex<MethodTarget>,
+    expression_throw_type_indices: Box<[u16]>,
     property_exact: ProviderExactIndex,
     property_wildcard: ProviderWildcardIndex<PropertyTarget>,
     property_initialization_exact: ProviderExactIndex,
@@ -860,6 +865,12 @@ impl<T> Backend<T> {
         );
         let (method_assertion_exact, method_assertion_wildcard) =
             index_method_providers(&registration.method_assertion_providers);
+        let (function_throw_type_exact, function_throw_type_wildcard) =
+            index_function_providers(&registration.function_throw_type_providers);
+        let (method_throw_type_exact, method_throw_type_wildcard) =
+            index_method_providers(&registration.method_throw_type_providers);
+        let expression_throw_type_indices =
+            registration.expression_throw_type_providers.iter().map(|provider| provider.index).collect::<Box<[_]>>();
 
         let (property_exact, property_wildcard) = index_property_providers(&registration.property_providers);
         let (property_initialization_exact, property_initialization_wildcard) =
@@ -894,6 +905,11 @@ impl<T> Backend<T> {
             method_signature_wildcard,
             method_assertion_exact,
             method_assertion_wildcard,
+            function_throw_type_exact,
+            function_throw_type_wildcard,
+            method_throw_type_exact,
+            method_throw_type_wildcard,
+            expression_throw_type_indices,
             property_exact,
             property_wildcard,
             property_initialization_exact,
@@ -1124,6 +1140,31 @@ impl<T> Backend<T> {
         }
 
         matches
+    }
+
+    fn matching_function_throw_type_providers(&self, function: &[u8]) -> Option<ProviderIndices> {
+        matching_function_provider_indices(
+            &self.function_throw_type_exact,
+            &self.function_throw_type_wildcard,
+            function,
+        )
+        .0
+    }
+
+    fn matching_method_throw_type_providers(
+        &self,
+        codebase: &CodebaseMetadata,
+        class: &[u8],
+        method: &[u8],
+    ) -> Option<ProviderIndices> {
+        matching_method_provider_indices(
+            &self.method_throw_type_exact,
+            &self.method_throw_type_wildcard,
+            codebase,
+            class,
+            method,
+        )
+        .0
     }
 }
 
@@ -1397,6 +1438,9 @@ pub struct ExternalAnalyzer<T = WorkerPool> {
 pub(crate) struct ExternalAnalyzerCapabilities {
     pub function_return_types: bool,
     pub method_return_types: bool,
+    pub function_throw_types: bool,
+    pub method_throw_types: bool,
+    pub expression_throw_types: bool,
     pub function_signatures: bool,
     pub method_signatures: bool,
     pub function_assertions: bool,
@@ -1590,6 +1634,9 @@ impl<T> ExternalAnalyzer<T> {
         ExternalAnalyzerCapabilities {
             function_return_types: any(|backend| !backend.registration.function_providers.is_empty()),
             method_return_types: any(|backend| !backend.registration.method_providers.is_empty()),
+            function_throw_types: any(|backend| !backend.registration.function_throw_type_providers.is_empty()),
+            method_throw_types: any(|backend| !backend.registration.method_throw_type_providers.is_empty()),
+            expression_throw_types: any(|backend| !backend.expression_throw_type_indices.is_empty()),
             function_signatures: any(|backend| {
                 backend
                     .registration
@@ -2566,6 +2613,142 @@ where
         Ok(None)
     }
 
+    pub(crate) fn get_expression_thrown_exceptions(
+        &self,
+        expression: &mago_syntax::cst::Expression<'_>,
+        artifacts: &AnalysisArtifacts,
+        source_file: &File,
+        codebase: &CodebaseMetadata,
+        session: &ExternalAnalysisSession,
+    ) -> Result<Option<WordSet>, ExternalAnalyzerError> {
+        for backend in &self.backends {
+            let indices = backend.expression_throw_type_indices.as_ref();
+            if indices.is_empty() {
+                continue;
+            }
+
+            let mut request = protocol::encode_expression_throw_type_request(
+                indices,
+                expression,
+                artifacts,
+                source_file,
+                session.generation(),
+                self.trace_enabled,
+            )?;
+            if self.trace_enabled {
+                self.telemetry.requests.fetch_add(1, Ordering::Relaxed);
+                self.telemetry.snapshotted_types.fetch_add(request.types.len() as u64, Ordering::Relaxed);
+                self.telemetry
+                    .type_snapshot_ns
+                    .fetch_add(duration_nanos(request.type_snapshot_duration), Ordering::Relaxed);
+                self.telemetry.request_bytes.fetch_add(request.payload.len() as u64, Ordering::Relaxed);
+            }
+
+            let types = request.types.as_slice();
+            let response = self.exchange_provider_payload(
+                backend,
+                std::mem::take(&mut request.payload),
+                source_file.name.as_ref(),
+                codebase,
+                session,
+                |handle| protocol::resolve_type_handle(types, handle),
+            )?;
+            let exceptions = self.decode_provider_response(|| protocol::decode_throw_type_response(&response))?;
+            if exceptions.is_some() {
+                return Ok(exceptions);
+            }
+        }
+
+        Ok(None)
+    }
+
+    pub(crate) fn get_function_thrown_exceptions(
+        &self,
+        function: &[u8],
+        invocation: &Invocation<'_, '_, '_>,
+        artifacts: &AnalysisArtifacts,
+        source_file: &File,
+        codebase: &CodebaseMetadata,
+        session: &ExternalAnalysisSession,
+    ) -> Result<Option<WordSet>, ExternalAnalyzerError> {
+        self.get_thrown_exceptions(
+            CallableTarget::Function(function),
+            invocation,
+            artifacts,
+            source_file,
+            codebase,
+            session,
+        )
+    }
+
+    pub(crate) fn get_method_thrown_exceptions(
+        &self,
+        class: &[u8],
+        method: &[u8],
+        invocation: &Invocation<'_, '_, '_>,
+        artifacts: &AnalysisArtifacts,
+        source_file: &File,
+        codebase: &CodebaseMetadata,
+        session: &ExternalAnalysisSession,
+    ) -> Result<Option<WordSet>, ExternalAnalyzerError> {
+        self.get_thrown_exceptions(
+            CallableTarget::Method { class, method },
+            invocation,
+            artifacts,
+            source_file,
+            codebase,
+            session,
+        )
+    }
+
+    fn get_thrown_exceptions(
+        &self,
+        target: CallableTarget<'_>,
+        invocation: &Invocation<'_, '_, '_>,
+        artifacts: &AnalysisArtifacts,
+        source_file: &File,
+        codebase: &CodebaseMetadata,
+        session: &ExternalAnalysisSession,
+    ) -> Result<Option<WordSet>, ExternalAnalyzerError> {
+        for backend in &self.backends {
+            let indices = match target {
+                CallableTarget::Function(function) => backend.matching_function_throw_type_providers(function),
+                CallableTarget::Method { class, method } => {
+                    backend.matching_method_throw_type_providers(codebase, class, method)
+                }
+            };
+            let Some(indices) = indices else {
+                continue;
+            };
+            let protocol_target = match target {
+                CallableTarget::Function(function) => protocol::ProviderTarget::Function(function),
+                CallableTarget::Method { class, method } => protocol::ProviderTarget::Method {
+                    class: codebase.get_class_like(class).map_or(class, |metadata| metadata.original_name.as_bytes()),
+                    method,
+                },
+            };
+            let mut request = protocol::encode_provider_request(
+                protocol::ProviderRequestKind::ThrowType,
+                indices.as_slice(),
+                protocol_target,
+                invocation,
+                artifacts,
+                source_file,
+                session.generation(),
+                false,
+                self.trace_enabled,
+            )?;
+            let response =
+                self.exchange_provider_request(backend, &mut request, target.affinity(), codebase, session)?;
+            let exceptions = protocol::decode_throw_type_response(&response)?;
+            if exceptions.is_some() {
+                return Ok(exceptions);
+            }
+        }
+
+        Ok(None)
+    }
+
     pub(crate) fn get_function_return_type(
         &self,
         function: &[u8],
@@ -3113,6 +3296,9 @@ where
             let advertised_codebase_scan_hooks = registration.codebase_scan_hooks.len();
             registration.function_providers.retain(|provider| enabled.contains(&provider.plugin));
             registration.method_providers.retain(|provider| enabled.contains(&provider.plugin));
+            registration.function_throw_type_providers.retain(|provider| enabled.contains(&provider.plugin));
+            registration.method_throw_type_providers.retain(|provider| enabled.contains(&provider.plugin));
+            registration.expression_throw_type_providers.retain(|provider| enabled.contains(&provider.plugin));
             registration.function_assertion_providers.retain(|provider| enabled.contains(&provider.plugin));
             registration.method_assertion_providers.retain(|provider| enabled.contains(&provider.plugin));
             registration.property_providers.retain(|provider| enabled.contains(&provider.plugin));

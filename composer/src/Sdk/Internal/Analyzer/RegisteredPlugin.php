@@ -16,12 +16,14 @@ use Mago\Sdk\Analyzer\CodebaseScanHook;
 use Mago\Sdk\Analyzer\FunctionAssertionProvider;
 use Mago\Sdk\Analyzer\FunctionReturnTypeProvider;
 use Mago\Sdk\Analyzer\FunctionTarget;
+use Mago\Sdk\Analyzer\FunctionThrowTypeProvider;
 use Mago\Sdk\Analyzer\InitializationHook;
 use Mago\Sdk\Analyzer\IssueFilterHook;
 use Mago\Sdk\Analyzer\MethodAssertionProvider;
 use Mago\Sdk\Analyzer\MethodCallAnalysisHook;
 use Mago\Sdk\Analyzer\MethodReturnTypeProvider;
 use Mago\Sdk\Analyzer\MethodTarget;
+use Mago\Sdk\Analyzer\MethodThrowTypeProvider;
 use Mago\Sdk\Analyzer\NodeAnalysisHook;
 use Mago\Sdk\Analyzer\Plugin;
 use Mago\Sdk\Analyzer\PluginDefinition;
@@ -40,6 +42,9 @@ final class RegisteredPlugin
      * @param non-empty-string $extension
      * @param list<RegisteredTargetedCallback<FunctionReturnTypeProvider, FunctionTarget>> $functionProviders
      * @param list<RegisteredTargetedCallback<MethodReturnTypeProvider, MethodTarget>> $methodProviders
+     * @param list<RegisteredTargetedCallback<FunctionThrowTypeProvider, FunctionTarget>> $functionThrowTypeProviders
+     * @param list<RegisteredTargetedCallback<MethodThrowTypeProvider, MethodTarget>> $methodThrowTypeProviders
+     * @param list<RegisteredExpressionThrowTypeProvider> $expressionThrowTypeProviders
      * @param list<RegisteredTargetedCallback<FunctionAssertionProvider, FunctionTarget>> $functionAssertionProviders
      * @param list<RegisteredTargetedCallback<MethodAssertionProvider, MethodTarget>> $methodAssertionProviders
      * @param list<RegisteredTargetedCallback<PropertyTypeProvider, PropertyTarget>> $propertyProviders
@@ -67,6 +72,9 @@ final class RegisteredPlugin
         public readonly PluginDefinition $definition,
         public readonly array $functionProviders,
         public readonly array $methodProviders,
+        public readonly array $functionThrowTypeProviders,
+        public readonly array $methodThrowTypeProviders,
+        public readonly array $expressionThrowTypeProviders,
         public readonly array $functionAssertionProviders,
         public readonly array $methodAssertionProviders,
         public readonly array $propertyProviders,

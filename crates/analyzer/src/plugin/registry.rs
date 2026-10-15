@@ -828,6 +828,7 @@ impl PluginRegistry {
     #[must_use]
     pub fn has_expression_throw_providers(&self) -> bool {
         !self.expression_throw_providers.is_empty()
+            || self.has_external_capability(|capabilities| capabilities.expression_throw_types)
     }
 
     #[inline]
@@ -1905,6 +1906,28 @@ impl PluginRegistry {
         exceptions
     }
 
+    /// Returns an external expression throw contract when a worker provider handles the expression.
+    pub fn get_external_expression_thrown_exceptions(
+        &self,
+        codebase: &CodebaseMetadata,
+        source_file: &File,
+        artifacts: &AnalysisArtifacts,
+        expression: &mago_syntax::cst::Expression<'_>,
+        external_session: Option<&ExternalAnalysisSession>,
+    ) -> Option<WordSet> {
+        if !self.has_external_capability(|capabilities| capabilities.expression_throw_types) {
+            return None;
+        }
+
+        let (analyzer, session) = self.external_analyzer.as_deref().zip(external_session)?;
+        optional_external_hint(
+            "expression throw-type provider",
+            analyzer.with(|analyzer| {
+                analyzer.get_expression_thrown_exceptions(expression, artifacts, source_file, codebase, session)
+            }),
+        )
+    }
+
     /// Get thrown exception class names for a function invocation from registered providers.
     #[must_use]
     pub fn get_function_thrown_exceptions<'ctx>(
@@ -1956,6 +1979,68 @@ impl PluginRegistry {
         }
 
         exceptions
+    }
+
+    /// Returns an external function throw contract when a worker provider handles the call.
+    pub fn get_external_function_thrown_exceptions(
+        &self,
+        codebase: &CodebaseMetadata,
+        source_file: &File,
+        artifacts: &AnalysisArtifacts,
+        function_name: &[u8],
+        invocation: &Invocation<'_, '_, '_>,
+        external_session: Option<&ExternalAnalysisSession>,
+    ) -> Option<WordSet> {
+        if !self.has_external_capability(|capabilities| capabilities.function_throw_types) {
+            return None;
+        }
+
+        let (analyzer, session) = self.external_analyzer.as_deref().zip(external_session)?;
+        optional_external_hint(
+            "function throw-type provider",
+            analyzer.with(|analyzer| {
+                analyzer.get_function_thrown_exceptions(
+                    function_name,
+                    invocation,
+                    artifacts,
+                    source_file,
+                    codebase,
+                    session,
+                )
+            }),
+        )
+    }
+
+    /// Returns an external method throw contract when a worker provider handles the call.
+    pub fn get_external_method_thrown_exceptions(
+        &self,
+        codebase: &CodebaseMetadata,
+        source_file: &File,
+        artifacts: &AnalysisArtifacts,
+        class_name: &[u8],
+        method_name: &[u8],
+        invocation: &Invocation<'_, '_, '_>,
+        external_session: Option<&ExternalAnalysisSession>,
+    ) -> Option<WordSet> {
+        if !self.has_external_capability(|capabilities| capabilities.method_throw_types) {
+            return None;
+        }
+
+        let (analyzer, session) = self.external_analyzer.as_deref().zip(external_session)?;
+        optional_external_hint(
+            "method throw-type provider",
+            analyzer.with(|analyzer| {
+                analyzer.get_method_thrown_exceptions(
+                    class_name,
+                    method_name,
+                    invocation,
+                    artifacts,
+                    source_file,
+                    codebase,
+                    session,
+                )
+            }),
+        )
     }
 
     /// Filter issues through all registered issue filter hooks.
