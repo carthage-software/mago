@@ -123,8 +123,8 @@ where
     let is_nullable = object_type.can_be_null() || object_type.possibly_undefined();
     let is_all_null = object_type.is_null() || object_type.is_void();
 
-    if is_null_safe && !is_nullable && !is_all_null {
-        report_redundant_nullsafe(context, operator_span, object_expression, &object_type);
+    if is_null_safe && !is_nullable && !is_all_null && !object_type.has_nullsafe_null() {
+        report_redundant_nullsafe(context, operator_span, object_expression, &object_type, false);
     }
 
     let mut property_names = Vec::new();
@@ -1457,15 +1457,22 @@ fn report_access_on_null<'ctx, A>(
     }
 }
 
-fn report_redundant_nullsafe<'arena, A>(
+pub(crate) fn report_redundant_nullsafe<'arena, A>(
     context: &mut Context<'_, 'arena, A>,
     operator_span: Span,
     object_expr: &Expression<'arena>,
     object_type: &TUnion,
+    is_method_call: bool,
 ) where
     A: Arena,
 {
     let object_type_str = object_type.get_id();
+
+    let help = if is_method_call {
+        "Consider using the direct method call operator (`->`) for clarity."
+    } else {
+        "Consider using the direct property access operator (`->`) for clarity."
+    };
 
     context.collector.propose_with_code(
         IssueCode::RedundantNullsafeOperator,
@@ -1478,7 +1485,7 @@ fn report_redundant_nullsafe<'arena, A>(
                     .with_message(format!("This expression (type `{object_type_str}`) is never `null`")),
             )
             .with_note("The nullsafe operator (`?->`) short-circuits the access if the object is `null`. Since this expression is guaranteed not to be `null`, this check is unnecessary.")
-            .with_help("Consider using the direct property access operator (`->`) for clarity."),
+            .with_help(help),
         |edits| {
             edits.push(TextEdit::replace(operator_span.to_range(), "->"));
         },
