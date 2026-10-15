@@ -12,5 +12,6 @@ final class Item
 
 function flow_nullsafe_on_nonnull(Item $i): null|string
 {
+    // @mago-expect analysis:redundant-nullsafe-operator
     return $i?->name();
 }

@@ -39,8 +39,16 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for MethodPartialApplication<'arena>
     where
         A: Arena,
     {
-        let method_resolution =
-            resolve_method_targets(context, block_context, artifacts, self.object, &self.method, false, self.span())?;
+        let method_resolution = resolve_method_targets(
+            context,
+            block_context,
+            artifacts,
+            self.object,
+            &self.method,
+            false,
+            self.arrow.span(),
+            self.span(),
+        )?;
 
         for resolved_method in &method_resolution.resolved_methods {
             let class_name = ascii_lowercase_word(resolved_method.method_identifier.get_class_name().as_ref());

@@ -93,6 +93,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for MethodCall<'arena> {
             &self.method,
             &self.argument_list,
             false, // is_nullsafe
+            self.arrow.span(),
             self.span(),
         )?;
 
@@ -145,6 +146,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for NullSafeMethodCall<'arena> {
             &self.method,
             &self.argument_list,
             true, // is_nullsafe
+            self.question_mark_arrow.span(),
             self.span(),
         )?;
 
@@ -277,6 +279,7 @@ fn analyze_method_call<'ctx, 'ast, 'arena, A>(
     selector: &'ast ClassLikeMemberSelector<'arena>,
     argument_list: &'ast ArgumentList<'arena>,
     is_null_safe: bool,
+    operator_span: Span,
     span: Span,
 ) -> Result<(), AnalysisError>
 where
@@ -292,7 +295,7 @@ where
     }
 
     let mut method_resolution =
-        resolve_method_targets(context, block_context, artifacts, object, selector, is_null_safe, span)?;
+        resolve_method_targets(context, block_context, artifacts, object, selector, is_null_safe, operator_span, span)?;
 
     if artifacts.get_expression_type(object).is_some_and(|ty| ty.is_null() && (is_null_safe || ty.has_nullsafe_null()))
     {
