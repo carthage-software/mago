@@ -1330,7 +1330,7 @@ where
         }
 
         for atomic in thrown_type.type_union.types.iter() {
-            if atomic.is_mixed() {
+            if atomic.is_mixed() || atomic.is_void() || atomic.is_never() {
                 continue;
             }
 

@@ -932,7 +932,7 @@ fn report_redundant_caught_types<A>(
         }) {
             context.collector.report_with_code(
                 IssueCode::RedundantCaughtType,
-                Issue::error(format!(
+                Issue::help(format!(
                     "Type `{caught_type}` is redundant in this `catch` clause, as `{covering}` already catches all of its instances.",
                 ))
                 .with_annotation(
@@ -964,7 +964,7 @@ fn report_redundant_caught_types<A>(
         }) {
             context.collector.report_with_code(
                 IssueCode::RedundantCaughtType,
-                Issue::error(format!(
+                Issue::help(format!(
                     "Type `{caught_type}` is redundant, as it is already caught by an earlier `catch` clause for `{covering}`.",
                 ))
                 .with_annotation(
