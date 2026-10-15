@@ -1,5 +1,6 @@
 use mago_allocator::prelude::*;
 use mago_database::file::HasFileId;
+use mago_span::Span;
 
 use crate::T;
 use crate::cst::cst::Statement;
@@ -20,21 +21,35 @@ where
     A: Arena,
 {
     pub(crate) fn parse_switch(&mut self) -> Result<Switch<'arena>, ParseError> {
+        let switch = self.expect_keyword(T!["switch"])?;
+        let left_parenthesis = self.stream.eat_span(T!["("])?;
+        let expression = self.parse_expression()?;
+        let right_parenthesis = self.parse_condition_closing_span()?;
+
         Ok(Switch {
-            switch: self.expect_keyword(T!["switch"])?,
-            left_parenthesis: self.stream.eat_span(T!["("])?,
-            expression: self.parse_expression()?,
-            right_parenthesis: self.stream.eat_span(T![")"])?,
-            body: self.parse_switch_body()?,
+            switch,
+            left_parenthesis,
+            expression,
+            right_parenthesis,
+            body: self.parse_switch_body(right_parenthesis)?,
         })
     }
 
-    fn parse_switch_body(&mut self) -> Result<SwitchBody<'arena>, ParseError> {
-        let token = self.stream.lookahead(0)?.ok_or_else(|| self.stream.unexpected(None, &[]))?;
+    fn parse_switch_body(&mut self, right_parenthesis: Span) -> Result<SwitchBody<'arena>, ParseError> {
+        let token = match self.stream.lookahead(0)? {
+            Some(token) => token,
+            None if right_parenthesis.length() == 0 => return Ok(missing_switch_body(right_parenthesis)),
+            None => return Ok(missing_switch_body(self.recover_at_eof(self.stream.unexpected(None, &[]))?)),
+        };
 
         Ok(match token.kind {
             T![":"] => SwitchBody::ColonDelimited(self.parse_switch_colon_delimited_body()?),
             T!["{"] => SwitchBody::BraceDelimited(self.parse_switch_brace_delimited_body()?),
+            _ if right_parenthesis.length() == 0 => missing_switch_body(right_parenthesis),
+            _ if self.recovery_end.is_some() => {
+                self.errors.push(self.stream.unexpected(Some(token), T![":", "{"]));
+                missing_switch_body(self.empty_span())
+            }
             _ => {
                 return Err(self.stream.unexpected(Some(token), T![":", "{"]));
             }
@@ -128,4 +143,13 @@ where
             _ => return Err(self.stream.unexpected(Some(token), T![":", ";"])),
         })
     }
+}
+
+fn missing_switch_body<'arena>(span: Span) -> SwitchBody<'arena> {
+    SwitchBody::BraceDelimited(SwitchBraceDelimitedBody {
+        left_brace: span,
+        optional_terminator: None,
+        cases: Sequence::empty(),
+        right_brace: span,
+    })
 }

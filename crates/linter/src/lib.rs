@@ -14,10 +14,19 @@ use mago_collector::Collector;
 use mago_database::file::File;
 use mago_names::ResolvedNames;
 use mago_php_version::PHPVersion;
+use mago_reporting::Issue;
 use mago_reporting::IssueCollection;
+use mago_span::HasSpan;
+use mago_span::Span;
+use mago_syntax::cst::ForBody;
+use mago_syntax::cst::ForeachBody;
+use mago_syntax::cst::IfBody;
 use mago_syntax::cst::Node;
 use mago_syntax::cst::NodeKind;
 use mago_syntax::cst::Program;
+use mago_syntax::cst::Statement;
+use mago_syntax::cst::SwitchBody;
+use mago_syntax::cst::WhileBody;
 
 use crate::context::LintContext;
 use crate::external::ExternalLintError;
@@ -150,15 +159,105 @@ where
         let mut context =
             LintContext::new(self.php_version, self.arena, &self.registry, source_file, resolved_names, collector);
 
-        walk(Node::Program(program), &mut context, excluded_rules.as_slice());
+        let recovered = walk(Node::Program(program), &mut context, excluded_rules.as_slice());
 
         if let Some(external) = external {
             let external_issues = external.lint(source_file, program, resolved_names, self.registry.only.as_deref())?;
             context.collector.extend(external_issues);
         }
 
-        Ok(context.collector.finish())
+        let issues = context.collector.finish();
+        if recovered.is_empty() {
+            return Ok(issues);
+        }
+
+        Ok(issues.into_iter().filter(|issue| !is_within(issue, &recovered)).collect())
     }
+}
+
+fn is_within(issue: &Issue, recovered: &[(Span, Span)]) -> bool {
+    issue.annotations.iter().find(|annotation| annotation.is_primary()).is_some_and(|primary| {
+        recovered.iter().any(|&(statement, part)| {
+            encloses(part, primary.span) || (encloses(primary.span, part) && encloses(statement, primary.span))
+        })
+    })
+}
+
+fn encloses(outer: Span, inner: Span) -> bool {
+    outer.start.offset <= inner.start.offset && inner.end.offset <= outer.end.offset
+}
+
+fn collect_recovered<A>(statement: &Statement<'_>, recovered: &mut Vec<'_, (Span, Span), A>)
+where
+    A: Arena,
+{
+    let mut push = |part: Option<Span>| {
+        if let Some(part) = part {
+            recovered.push((statement.span(), part));
+        }
+    };
+
+    match statement {
+        Statement::If(r#if) => match &r#if.body {
+            IfBody::Statement(body) => {
+                push(recovered_head(r#if.r#if.span, r#if.right_parenthesis, Some(body.statement)));
+                for clause in &body.else_if_clauses {
+                    push(recovered_head(clause.elseif.span, clause.right_parenthesis, Some(clause.statement)));
+                }
+
+                if let Some(clause) = &body.else_clause {
+                    push(missing_body(clause.r#else.span, clause.statement));
+                }
+            }
+            IfBody::ColonDelimited(body) => {
+                push(recovered_head(r#if.r#if.span, r#if.right_parenthesis, None));
+                for clause in &body.else_if_clauses {
+                    push(recovered_head(clause.elseif.span, clause.right_parenthesis, None));
+                }
+            }
+        },
+        Statement::While(r#while) => {
+            let body = match r#while.body {
+                WhileBody::Statement(body) => Some(body),
+                WhileBody::ColonDelimited(_) => None,
+            };
+
+            push(recovered_head(r#while.r#while.span, r#while.right_parenthesis, body));
+        }
+        Statement::DoWhile(do_while) if do_while.right_parenthesis.length() == 0 => {
+            push(Some(do_while.r#while.span.join(do_while.terminator.span())));
+        }
+        Statement::Switch(switch) => match &switch.body {
+            SwitchBody::BraceDelimited(body) if body.left_brace.length() == 0 => {
+                push(Some(switch.switch.span.join(body.span())));
+            }
+            _ => push(recovered_head(switch.switch.span, switch.right_parenthesis, None)),
+        },
+        Statement::For(r#for) => {
+            if let ForBody::Statement(body) = r#for.body {
+                push(missing_body(r#for.r#for.span, body));
+            }
+        }
+        Statement::Foreach(foreach) => {
+            if let ForeachBody::Statement(body) = foreach.body {
+                push(missing_body(foreach.foreach.span, body));
+            }
+        }
+        _ => {}
+    }
+}
+
+fn recovered_head(keyword: Span, right_parenthesis: Span, body: Option<&Statement<'_>>) -> Option<Span> {
+    body.and_then(|body| missing_body(keyword, body))
+        .or_else(|| (right_parenthesis.length() == 0).then(|| keyword.join(right_parenthesis)))
+}
+
+fn missing_body(keyword: Span, body: &Statement<'_>) -> Option<Span> {
+    is_missing(body).then(|| keyword.join(body.span()))
+}
+
+fn is_missing(statement: &Statement<'_>) -> bool {
+    matches!(statement, Statement::Noop(span) if span.length() == 0)
 }
 
 fn is_constant_expression_context(kind: NodeKind) -> bool {
@@ -172,7 +271,11 @@ fn is_constant_expression_context(kind: NodeKind) -> bool {
     )
 }
 
-fn walk<'ctx, 'arena, A>(root: Node<'ctx, 'arena>, ctx: &mut LintContext<'ctx, 'arena, A>, excluded_rules: &[usize])
+fn walk<'ctx, 'arena, A>(
+    root: Node<'ctx, 'arena>,
+    ctx: &mut LintContext<'ctx, 'arena, A>,
+    excluded_rules: &[usize],
+) -> Vec<'arena, (Span, Span), A>
 where
     A: Arena,
 {
@@ -181,12 +284,17 @@ where
         Exit { in_scope: bool, in_constant_expression: bool },
     }
 
+    let mut recovered = Vec::new_in(ctx.arena);
     let mut stack = Vec::with_capacity_in(64, ctx.arena);
     stack.push(Op::Enter(root));
 
     while let Some(op) = stack.pop() {
         match op {
             Op::Enter(node) => {
+                if let Node::Statement(statement) = node {
+                    collect_recovered(statement, &mut recovered);
+                }
+
                 ctx.push_ancestor(node);
 
                 let in_scope = if let Some(scope) = Scope::for_node(ctx, node) {
@@ -231,4 +339,6 @@ where
             }
         }
     }
+
+    recovered
 }

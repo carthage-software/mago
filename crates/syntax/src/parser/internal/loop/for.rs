@@ -92,7 +92,7 @@ where
     fn parse_for_body(&mut self) -> Result<ForBody<'arena>, ParseError> {
         Ok(match self.stream.peek_kind(0)? {
             Some(T![":"]) => ForBody::ColonDelimited(self.parse_for_colon_delimited_body()?),
-            _ => ForBody::Statement(self.arena.alloc(self.parse_statement()?)),
+            _ => ForBody::Statement(self.arena.alloc(self.parse_recovered_body()?)),
         })
     }
 

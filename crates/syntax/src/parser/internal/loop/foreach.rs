@@ -42,7 +42,7 @@ where
     fn parse_foreach_body(&mut self) -> Result<ForeachBody<'arena>, ParseError> {
         Ok(match self.stream.peek_kind(0)? {
             Some(T![":"]) => ForeachBody::ColonDelimited(self.parse_foreach_colon_delimited_body()?),
-            _ => ForeachBody::Statement(self.arena.alloc(self.parse_statement()?)),
+            _ => ForeachBody::Statement(self.arena.alloc(self.parse_recovered_body()?)),
         })
     }
 

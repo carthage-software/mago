@@ -3,10 +3,11 @@ use mago_allocator::prelude::*;
 use mago_database::file::File;
 use mago_database::file::FileId;
 use mago_database::file::HasFileId;
-use mago_span::{Position, Span};
+use mago_span::{HasSpan, Position, Span};
 use mago_syntax_core::input::Input;
 
 use crate::cst::Program;
+use crate::cst::Statement;
 use crate::cst::sequence::Sequence;
 use crate::error::ParseError;
 use crate::lexer::Lexer;
@@ -88,6 +89,61 @@ where
             Ok(span) => Ok(span),
             Err(error) => self.recover_at_eof(error),
         }
+    }
+
+    fn parse_condition_closing_span(&mut self) -> Result<Span, ParseError> {
+        let error = match self.stream.eat_span(TokenKind::RightParenthesis) {
+            Ok(span) => return Ok(span),
+            Err(error) => error,
+        };
+
+        let span = match (&error, self.recovery_end) {
+            (ParseError::UnexpectedToken(..), Some(_)) => self.empty_span(),
+            (ParseError::UnexpectedEndOfFile(..), Some(end)) => end,
+            _ => return Err(error),
+        };
+
+        self.push_recovered_error(error);
+
+        Ok(span)
+    }
+
+    fn parse_condition_body(&mut self, right_parenthesis: Span) -> Result<Statement<'arena>, ParseError> {
+        if right_parenthesis.length() == 0 && self.stream.peek_kind(0)? != Some(TokenKind::LeftBrace) {
+            return Ok(Statement::Noop(right_parenthesis));
+        }
+
+        self.parse_recovered_body()
+    }
+
+    fn parse_recovered_body(&mut self) -> Result<Statement<'arena>, ParseError> {
+        if let Some(end) = self.recovery_end {
+            match self.stream.lookahead(0)? {
+                None => {
+                    self.push_recovered_error(self.stream.unexpected(None, &[]));
+                    return Ok(Statement::Noop(end));
+                }
+                Some(token) if token.kind == TokenKind::RightBrace => {
+                    self.push_recovered_error(self.stream.unexpected(Some(token), &[]));
+                    return Ok(Statement::Noop(self.empty_span()));
+                }
+                Some(_) => {}
+            }
+        }
+
+        self.parse_statement()
+    }
+
+    fn push_recovered_error(&mut self, error: ParseError) {
+        let offset = error.span().start.offset;
+        if self.errors.last().is_none_or(|last| last.span().start.offset != offset) {
+            self.errors.push(error);
+        }
+    }
+
+    fn empty_span(&self) -> Span {
+        let position = self.stream.current_position();
+        Span::new(self.stream.file_id(), position, position)
     }
 
     /// Creates a new parser for the given file.

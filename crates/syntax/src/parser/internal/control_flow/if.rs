@@ -11,31 +11,31 @@ use crate::cst::sequence::Sequence;
 use crate::error::ParseError;
 use crate::parser::Parser;
 use mago_allocator::prelude::*;
+use mago_span::Span;
 
 impl<'arena, A> Parser<'_, 'arena, A>
 where
     A: Arena,
 {
     pub(crate) fn parse_if(&mut self) -> Result<If<'arena>, ParseError> {
-        Ok(If {
-            r#if: self.expect_keyword(T!["if"])?,
-            left_parenthesis: self.stream.eat_span(T!["("])?,
-            condition: self.parse_expression()?,
-            right_parenthesis: self.stream.eat_span(T![")"])?,
-            body: self.parse_if_body()?,
-        })
+        let r#if = self.expect_keyword(T!["if"])?;
+        let left_parenthesis = self.stream.eat_span(T!["("])?;
+        let condition = self.parse_expression()?;
+        let right_parenthesis = self.parse_condition_closing_span()?;
+
+        Ok(If { r#if, left_parenthesis, condition, right_parenthesis, body: self.parse_if_body(right_parenthesis)? })
     }
 
-    fn parse_if_body(&mut self) -> Result<IfBody<'arena>, ParseError> {
+    fn parse_if_body(&mut self, right_parenthesis: Span) -> Result<IfBody<'arena>, ParseError> {
         Ok(match self.stream.peek_kind(0)? {
             Some(T![":"]) => IfBody::ColonDelimited(self.parse_if_colon_delimited_body()?),
-            _ => IfBody::Statement(self.parse_if_statement_body()?),
+            _ => IfBody::Statement(self.parse_if_statement_body(right_parenthesis)?),
         })
     }
 
-    fn parse_if_statement_body(&mut self) -> Result<IfStatementBody<'arena>, ParseError> {
+    fn parse_if_statement_body(&mut self, right_parenthesis: Span) -> Result<IfStatementBody<'arena>, ParseError> {
         Ok(IfStatementBody {
-            statement: self.arena.alloc(self.parse_statement()?),
+            statement: self.arena.alloc(self.parse_condition_body(right_parenthesis)?),
             else_if_clauses: {
                 let mut else_if_clauses = self.new_vec();
                 while let Some(else_if_clause) = self.parse_optional_if_statement_body_else_if_clause()? {
@@ -58,12 +58,17 @@ where
     }
 
     fn parse_if_statement_body_else_if_clause(&mut self) -> Result<IfStatementBodyElseIfClause<'arena>, ParseError> {
+        let elseif = self.expect_keyword(T!["elseif"])?;
+        let left_parenthesis = self.stream.eat_span(T!["("])?;
+        let condition = self.parse_expression()?;
+        let right_parenthesis = self.parse_condition_closing_span()?;
+
         Ok(IfStatementBodyElseIfClause {
-            elseif: self.expect_keyword(T!["elseif"])?,
-            left_parenthesis: self.stream.eat_span(T!["("])?,
-            condition: self.parse_expression()?,
-            right_parenthesis: self.stream.eat_span(T![")"])?,
-            statement: self.arena.alloc(self.parse_statement()?),
+            elseif,
+            left_parenthesis,
+            condition,
+            right_parenthesis,
+            statement: self.arena.alloc(self.parse_condition_body(right_parenthesis)?),
         })
     }
 
@@ -79,7 +84,7 @@ where
     fn parse_if_statement_body_else_clause(&mut self) -> Result<IfStatementBodyElseClause<'arena>, ParseError> {
         Ok(IfStatementBodyElseClause {
             r#else: self.expect_keyword(T!["else"])?,
-            statement: self.arena.alloc(self.parse_statement()?),
+            statement: self.arena.alloc(self.parse_recovered_body()?),
         })
     }
 
@@ -136,7 +141,7 @@ where
             r#elseif: self.expect_keyword(T!["elseif"])?,
             left_parenthesis: self.stream.eat_span(T!["("])?,
             condition: self.parse_expression()?,
-            right_parenthesis: self.stream.eat_span(T![")"])?,
+            right_parenthesis: self.parse_condition_closing_span()?,
             colon: self.stream.eat_span(T![":"])?,
             statements: {
                 let mut statements = self.new_vec();
