@@ -103,10 +103,7 @@ final class SourceFile
         $current = $node;
         do {
             $isFunctionLike = match ($current->kind) {
-                NodeKind::Function,
-                NodeKind::Method,
-                NodeKind::Closure,
-                NodeKind::ArrowFunction => true,
+                NodeKind::Function, NodeKind::Method, NodeKind::Closure, NodeKind::ArrowFunction => true,
                 default => false,
             };
 
@@ -135,7 +132,8 @@ final class SourceFile
                 NodeKind::Interface,
                 NodeKind::Trait,
                 NodeKind::Enum,
-                NodeKind::AnonymousClass => true,
+                NodeKind::AnonymousClass,
+                    => true,
                 default => false,
             };
 

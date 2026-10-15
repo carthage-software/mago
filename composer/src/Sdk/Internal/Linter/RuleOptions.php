@@ -33,9 +33,7 @@ final class RuleOptions
 
         foreach ($overrides as $name => $value) {
             if (!array_key_exists($name, $resolved)) {
-                throw new InvalidArgumentException(
-                    "Linter rule `{$definition->code}` has no option named `{$name}`.",
-                );
+                throw new InvalidArgumentException("Linter rule `{$definition->code}` has no option named `{$name}`.");
             }
 
             $default = $resolved[$name];

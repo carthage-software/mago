@@ -682,9 +682,7 @@ final class Worker
             }
 
             foreach ($this->activeRulesByNodeKind[$node->kind->value] ?? [] as $registeredRule) {
-                $options = $ruleOptions[$registeredRule->index] ??= RuleOptions::resolve(
-                    $registeredRule->definition,
-                );
+                $options = $ruleOptions[$registeredRule->index] ??= RuleOptions::resolve($registeredRule->definition);
                 $context = new LintContext($request->file, $node, $cancellation, $options);
                 try {
                     $registeredRule->rule->lint($context);

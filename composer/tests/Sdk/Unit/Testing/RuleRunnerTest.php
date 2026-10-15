@@ -107,16 +107,14 @@ final class EnclosingScopeRule implements Rule
         $function = $context->getEnclosingFunction();
         $classLike = $context->getEnclosingClassLike();
 
-        $context->report(
-            Issue::new(
-                sprintf(
-                    '%s:%s:%s',
-                    (string) $context->getOption('greeting'),
-                    $function === null ? 'none' : $function->kind->value,
-                    $classLike === null ? 'none' : $classLike->kind->value,
-                ),
-                $context->node->span,
+        $context->report(Issue::new(
+            sprintf(
+                '%s:%s:%s',
+                (string) $context->getOption('greeting'),
+                $function === null ? 'none' : $function->kind->value,
+                $classLike === null ? 'none' : $classLike->kind->value,
             ),
-        );
+            $context->node->span,
+        ));
     }
 }
