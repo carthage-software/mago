@@ -76,6 +76,10 @@ function disabled_expression_fallback(): void { 2 + 2; }
 ";
 
 #[test]
+#[allow(
+    clippy::panic_in_result_fn,
+    reason = "Assertions are the test's failure mechanism while setup errors are propagated."
+)]
 fn external_throw_type_providers_override_and_fall_back_to_native_contracts() -> Result<(), Box<dyn std::error::Error>>
 {
     let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");

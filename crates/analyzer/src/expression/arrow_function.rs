@@ -9,9 +9,11 @@ use mago_word::word;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
+use crate::artifacts::CallableEffectSummary;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
+use crate::invocation::callbacks::record_callable_effects;
 use crate::statement::function_like::FunctionLikeBody;
 use crate::statement::function_like::analyze_function_like;
 use crate::statement::function_like::resolve_closure_like_type;
@@ -30,6 +32,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
         A: Arena,
     {
         let s = self.span();
+        let is_immediate_callback = artifacts.get_callback_callsite(s).is_some_and(|callsite| {
+            callsite.invocation_kind == Some(mago_codex::metadata::parameter::CallableInvocationKind::Immediately)
+        });
 
         let Some(function_metadata) = context.codebase.get_closure_at(context.source_file, s) else {
             return Err(AnalysisError::InternalError(
@@ -123,7 +128,21 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
             &self.parameter_list,
             FunctionLikeBody::Expression(self.expression),
             inferred_parameter_types,
+            is_immediate_callback,
         )?;
+
+        let effects = CallableEffectSummary {
+            possibly_thrown_exceptions: inner_block_context.possibly_thrown_exceptions.clone(),
+        };
+        record_callable_effects(
+            s,
+            effects,
+            is_immediate_callback,
+            context.settings.check_throws,
+            block_context,
+            artifacts,
+            context.codebase,
+        );
 
         let resulting_closure = resolve_closure_like_type(
             context,

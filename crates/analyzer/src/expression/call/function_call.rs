@@ -1,5 +1,6 @@
 use mago_allocator::Arena;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
+use mago_codex::metadata::parameter::CallableExceptionCatchSummary;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::callable::TCallable;
 use mago_codex::ttype::atomic::callable::TCallableSignature;
@@ -24,6 +25,7 @@ use crate::expression::call::get_function_like_target;
 use crate::expression::call::get_function_like_target_with_skip;
 use crate::invocation::InvocationArgumentsSource;
 use crate::invocation::InvocationTarget;
+use crate::invocation::callbacks::immediate_callable_parameter_offset;
 use crate::plugin::ExpressionHookResult;
 use crate::plugin::context::HookContext;
 
@@ -73,6 +75,16 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for FunctionCall<'arena> {
             false,
             false, // object_has_nullsafe_null - not applicable for function calls
         )?;
+
+        if context.settings.check_throws
+            && let Some(parameter_offset) = immediate_callable_parameter_offset(block_context, self.function)
+        {
+            artifacts.record_callback_parameter_invocation(
+                self.span(),
+                parameter_offset,
+                vec![CallableExceptionCatchSummary { catch_groups: Vec::new() }],
+            );
+        }
 
         if context.plugin_registry.has_function_call_hooks() {
             let mut hook_context = HookContext::new(context.codebase, context.source_file, block_context, artifacts);

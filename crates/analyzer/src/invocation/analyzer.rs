@@ -10,6 +10,7 @@ use mago_bytes::BytesDisplay;
 use mago_bytes::trim_start_byte;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
+use mago_codex::metadata::parameter::CallableExceptionCatchSummary;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::TypeRef;
 use mago_codex::ttype::add_union_type;
@@ -24,6 +25,7 @@ use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::class_like_string::TClassLikeString;
 use mago_codex::ttype::atomic::scalar::string::TString;
 use mago_codex::ttype::atomic::scalar::string::TStringLiteral;
+use mago_codex::ttype::cast::cast_atomic_to_callable;
 use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::expander;
 use mago_codex::ttype::expander::StaticClassType;
@@ -44,6 +46,7 @@ use mago_word::WordSet;
 use mago_word::concat_word;
 
 use crate::artifacts::AnalysisArtifacts;
+use crate::artifacts::CallbackCallsiteContext;
 use crate::artifacts::ClosureBindScope;
 use crate::code::IssueCode;
 use crate::context::Context;
@@ -57,6 +60,10 @@ use crate::invocation::InvocationTargetParameter;
 use crate::invocation::arguments::analyze_and_store_argument_type;
 use crate::invocation::arguments::get_unpacked_argument_type;
 use crate::invocation::arguments::verify_argument_type;
+use crate::invocation::callbacks::callback_catch_filters;
+use crate::invocation::callbacks::callback_exception_escapes_filters;
+use crate::invocation::callbacks::classify_callback;
+use crate::invocation::callbacks::immediate_callable_parameter_offset;
 use crate::invocation::resolver::resolve_invocation_type;
 use crate::invocation::template_inference::infer_parameter_templates_from_argument;
 use crate::invocation::template_inference::infer_parameter_templates_from_default;
@@ -64,6 +71,7 @@ use crate::invocation::template_result::get_class_template_parameters_from_resul
 use crate::invocation::template_result::populate_template_result_from_invocation;
 use crate::invocation::template_result::refine_template_result_for_function_like;
 use crate::utils::expression::get_block_expression_id;
+use mago_syntax::utils::unparenthesized_expression;
 
 fn narrow_class_related_argument<A>(
     context: &Context<'_, '_, A>,
@@ -142,6 +150,24 @@ fn adjust_offset_for_variadic(target: &InvocationTarget<'_>, argument_offset: us
     } else {
         argument_offset
     }
+}
+
+fn is_callable_array_type(type_union: &TUnion) -> bool {
+    type_union.types.iter().any(|atomic| match atomic {
+        TAtomic::Array(TArray::Keyed(array)) => {
+            array.get_generic_parameters().is_some_and(|(_, value_type)| value_type.has_callable())
+                || array
+                    .get_known_items()
+                    .is_some_and(|items| items.values().any(|(_, value_type)| value_type.has_callable()))
+        }
+        TAtomic::Array(TArray::List(array)) => {
+            array.get_element_type().has_callable()
+                || array
+                    .get_known_elements()
+                    .is_some_and(|items| items.values().any(|(_, value_type)| value_type.has_callable()))
+        }
+        _ => false,
+    })
 }
 
 /// Analyzes and verifies arguments passed to a function, method, or callable.
@@ -228,10 +254,67 @@ where
             } else {
                 get_parameter_of_argument(&invocation.target, &argument, offset)
             };
-            if matches!(argument.value(), Some(Expression::Closure(_) | Expression::ArrowFunction(_))) {
+            if argument.value().is_some_and(|value| {
+                matches!(unparenthesized_expression(value), Expression::Closure(_) | Expression::ArrowFunction(_))
+            }) {
+                if let Some((parameter_offset, _)) = parameter
+                    && let Some(callback) = argument.value().map(unparenthesized_expression)
+                {
+                    artifacts.record_callback_callsite(
+                        callback.span(),
+                        CallbackCallsiteContext {
+                            invocation_kind: classify_callback(
+                                &invocation.target,
+                                parameter_offset,
+                                offset,
+                                arg_count,
+                                argument.is_unpacked(),
+                            ),
+                            caught_exceptions: callback_catch_filters(
+                                &invocation.target,
+                                parameter_offset,
+                                artifacts,
+                                context.codebase,
+                            ),
+                        },
+                    );
+                }
+
                 closure_arguments.push((offset, parameter));
             } else {
                 non_closure_arguments.push((offset, parameter));
+            }
+
+            if let Some((parameter_offset, _)) = parameter
+                && classify_callback(&invocation.target, parameter_offset, offset, arg_count, argument.is_unpacked())
+                    == Some(mago_codex::metadata::parameter::CallableInvocationKind::Immediately)
+                && parameter.and_then(|(_, parameter)| parameter.get_type()).is_some_and(is_callable_array_type)
+                && let Some(elements) =
+                    argument.value().map(unparenthesized_expression).and_then(Expression::get_array_like_elements)
+            {
+                let caught_exceptions =
+                    callback_catch_filters(&invocation.target, parameter_offset, artifacts, context.codebase);
+
+                for callback in elements.iter().filter_map(|element| element.get_value()) {
+                    let callback = unparenthesized_expression(callback);
+                    if !matches!(callback, Expression::Closure(_) | Expression::ArrowFunction(_)) {
+                        continue;
+                    }
+
+                    artifacts.record_callback_callsite(
+                        callback.span(),
+                        CallbackCallsiteContext {
+                            invocation_kind: classify_callback(
+                                &invocation.target,
+                                parameter_offset,
+                                offset,
+                                arg_count,
+                                argument.is_unpacked(),
+                            ),
+                            caught_exceptions: caught_exceptions.clone(),
+                        },
+                    );
+                }
             }
         }
     }
@@ -250,15 +333,13 @@ where
     let calling_instance_type = calling_class_like.and_then(|(_, atomic)| atomic);
     let method_class_type = method_call_context.map(|ctx| &ctx.class_type);
 
-    for (argument_offset, parameter) in &non_closure_arguments {
-        let Some(argument) = invocation.arguments_source.get_argument(*argument_offset) else {
+    for (argument_offset, parameter) in non_closure_arguments.iter().copied() {
+        let Some(argument) = invocation.arguments_source.get_argument(argument_offset) else {
             continue;
         };
         let Some(argument_expression) = argument.value() else {
             continue;
         };
-
-        let parameter = *parameter;
 
         analyze_and_store_argument_type(
             context,
@@ -266,13 +347,69 @@ where
             artifacts,
             &invocation.target,
             argument_expression,
-            *argument_offset,
+            argument_offset,
             &mut analyzed_argument_types,
             parameter.is_some_and(|p| p.1.is_by_reference()),
             None,
         )?;
 
-        if let Some((argument_type, _)) = &mut analyzed_argument_types[*argument_offset]
+        if context.settings.check_throws
+            && let Some((parameter_offset, _)) = parameter
+            && classify_callback(
+                &invocation.target,
+                parameter_offset,
+                argument_offset,
+                arg_count,
+                argument.is_unpacked(),
+            ) == Some(mago_codex::metadata::parameter::CallableInvocationKind::Immediately)
+        {
+            let callback_parameter_offset = immediate_callable_parameter_offset(block_context, argument_expression);
+            let argument_type =
+                analyzed_argument_types[argument_offset].as_ref().map(|(argument_type, _)| argument_type);
+
+            if callback_parameter_offset.is_some() || argument_type.is_some() {
+                let caught_exceptions =
+                    callback_catch_filters(&invocation.target, parameter_offset, artifacts, context.codebase);
+
+                if let Some(callback_parameter_offset) = callback_parameter_offset {
+                    let invocation_catches = caught_exceptions
+                        .clone()
+                        .unwrap_or_else(|| vec![CallableExceptionCatchSummary { catch_groups: Vec::new() }]);
+                    artifacts.record_callback_parameter_invocation(
+                        argument_expression.span(),
+                        callback_parameter_offset,
+                        invocation_catches,
+                    );
+                }
+
+                if let Some(argument_type) = argument_type {
+                    let is_callable_array =
+                        parameter.and_then(|(_, parameter)| parameter.get_type()).is_some_and(is_callable_array_type);
+
+                    if is_callable_array {
+                        propagate_callback_array_argument_exceptions(
+                            context,
+                            block_context,
+                            artifacts,
+                            argument_type,
+                            argument_expression.span(),
+                            caught_exceptions.as_deref(),
+                        );
+                    } else {
+                        propagate_callback_argument_exceptions(
+                            context,
+                            block_context,
+                            artifacts,
+                            argument_type,
+                            argument_expression.span(),
+                            caught_exceptions.as_deref(),
+                        );
+                    }
+                }
+            }
+        }
+
+        if let Some((argument_type, _)) = &mut analyzed_argument_types[argument_offset]
             && let Some(narrowed_type) = narrow_class_related_argument(
                 context,
                 block_context,
@@ -285,7 +422,7 @@ where
             *argument_type = Rc::new(narrowed_type);
         }
 
-        if let Some(argument_type) = &analyzed_argument_types[*argument_offset]
+        if let Some(argument_type) = &analyzed_argument_types[argument_offset]
             && let Some((_, parameter_ref)) = parameter
             && parameter_ref.get_type().is_some_and(|ty| ty.is_expandable() || ty.has_template_types())
         {
@@ -304,7 +441,7 @@ where
                     &parameter_type,
                     &argument_type.0,
                     template_result,
-                    *argument_offset,
+                    argument_offset,
                     argument_type.1,
                     false,
                 );
@@ -312,11 +449,11 @@ where
         }
     }
 
-    for (argument_offset, parameter) in &non_closure_arguments {
-        let Some(argument) = invocation.arguments_source.get_argument(*argument_offset) else {
+    for (argument_offset, parameter) in non_closure_arguments.iter().copied() {
+        let Some(argument) = invocation.arguments_source.get_argument(argument_offset) else {
             continue;
         };
-        let Some((_, parameter)) = *parameter else {
+        let Some((_, parameter)) = parameter else {
             continue;
         };
 
@@ -324,7 +461,7 @@ where
             continue;
         };
 
-        let argument_type = if let Some((argument_type, _)) = &analyzed_argument_types[*argument_offset] {
+        let argument_type = if let Some((argument_type, _)) = &analyzed_argument_types[argument_offset] {
             (**argument_type).clone()
         } else if argument.is_placeholder() {
             TUnion::from_atomic(TAtomic::Variable(parameter_name.0))
@@ -338,15 +475,14 @@ where
     let global_closure_bind_scope = detect_closure_bind_scope(context, invocation, &analyzed_argument_types);
     let previous_bind_scope = artifacts.closure_bind_scope.take();
 
-    for (argument_offset, parameter) in &closure_arguments {
-        let Some(argument) = invocation.arguments_source.get_argument(*argument_offset) else {
+    for (argument_offset, parameter) in closure_arguments.iter().copied() {
+        let Some(argument) = invocation.arguments_source.get_argument(argument_offset) else {
             continue;
         };
         let Some(argument_expression) = argument.value() else {
             continue;
         };
 
-        let parameter = *parameter;
         let mut parameter_type_had_template_types = false;
         // Store the original unreplaced type for template inference, so closure return types
         // can contribute bounds even after other arguments have already inferred some bounds.
@@ -438,7 +574,7 @@ where
             artifacts,
             &invocation.target,
             argument_expression,
-            *argument_offset,
+            argument_offset,
             &mut analyzed_argument_types,
             parameter.is_some_and(|p| p.1.is_by_reference()),
             parameter_type.as_ref(),
@@ -447,7 +583,7 @@ where
         // Use the original unreplaced type for inference to allow closure return types
         // to contribute bounds that can widen literal types from other arguments.
         if parameter_type_had_template_types
-            && let Some(argument_type) = &analyzed_argument_types[*argument_offset]
+            && let Some(argument_type) = &analyzed_argument_types[argument_offset]
             && let Some(base_type) = &base_parameter_type_for_inference
         {
             infer_parameter_templates_from_argument(
@@ -455,21 +591,21 @@ where
                 base_type,
                 &argument_type.0,
                 template_result,
-                *argument_offset,
+                argument_offset,
                 argument_type.1,
                 true,
             );
         }
     }
 
-    for (argument_offset, parameter) in &closure_arguments {
-        let Some((_, parameter)) = *parameter else {
+    for (argument_offset, parameter) in closure_arguments.iter().copied() {
+        let Some((_, parameter)) = parameter else {
             continue;
         };
         let Some(parameter_name) = parameter.get_name() else {
             continue;
         };
-        let Some((argument_type, _)) = &analyzed_argument_types[*argument_offset] else {
+        let Some((argument_type, _)) = &analyzed_argument_types[argument_offset] else {
             continue;
         };
 
@@ -1393,6 +1529,129 @@ fn infer_generic_callable_arguments<'ctx, 'arena, A>(
                     );
                 }
             }
+        }
+    }
+}
+
+fn propagate_callback_argument_exceptions<A>(
+    context: &Context<'_, '_, A>,
+    block_context: &mut BlockContext<'_>,
+    artifacts: &AnalysisArtifacts,
+    argument_type: &TUnion,
+    callsite_span: Span,
+    caught_exceptions: Option<&[CallableExceptionCatchSummary]>,
+) where
+    A: Arena,
+{
+    let mut targets = HashSet::default();
+    for atomic in argument_type.types.iter() {
+        let Some(callable) = cast_atomic_to_callable(atomic, context.codebase, None) else {
+            continue;
+        };
+
+        let identifier = match callable.as_ref() {
+            TCallable::Alias(identifier) => Some(*identifier),
+            TCallable::Signature(signature) => signature.get_source(),
+        };
+        let Some(identifier) = identifier else {
+            continue;
+        };
+        if !targets.insert(identifier) {
+            continue;
+        }
+
+        let Some(metadata) = context.codebase.get_function_like(&identifier) else {
+            continue;
+        };
+
+        if identifier.is_closure()
+            && let Some(effects) = artifacts.get_callable_effects(metadata.span)
+        {
+            for (exception, spans) in &effects.possibly_thrown_exceptions {
+                if callback_exception_escapes_filters(*exception, caught_exceptions, context.codebase) {
+                    block_context.possibly_thrown_exceptions.entry(*exception).or_default().extend(spans);
+                }
+            }
+
+            continue;
+        }
+
+        let class_like = identifier
+            .as_method_identifier()
+            .and_then(|method| context.codebase.get_class_like(method.get_class_name().as_bytes()));
+        for thrown_type in context.codebase.get_function_like_thrown_types(class_like, metadata) {
+            for atomic in thrown_type.type_union.types.iter() {
+                for exception in atomic.get_all_object_names() {
+                    if callback_exception_escapes_filters(exception, caught_exceptions, context.codebase) {
+                        block_context.possibly_thrown_exceptions.entry(exception).or_default().insert(callsite_span);
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn propagate_callback_array_argument_exceptions<A>(
+    context: &Context<'_, '_, A>,
+    block_context: &mut BlockContext<'_>,
+    artifacts: &AnalysisArtifacts,
+    argument_type: &TUnion,
+    callsite_span: Span,
+    caught_exceptions: Option<&[CallableExceptionCatchSummary]>,
+) where
+    A: Arena,
+{
+    for atomic in argument_type.types.iter() {
+        match atomic {
+            TAtomic::Array(TArray::Keyed(array)) => {
+                if let Some(known_items) = array.get_known_items() {
+                    for (_, value_type) in known_items.values() {
+                        propagate_callback_argument_exceptions(
+                            context,
+                            block_context,
+                            artifacts,
+                            value_type,
+                            callsite_span,
+                            caught_exceptions,
+                        );
+                    }
+                }
+
+                if let Some((_, value_type)) = array.get_generic_parameters() {
+                    propagate_callback_argument_exceptions(
+                        context,
+                        block_context,
+                        artifacts,
+                        value_type,
+                        callsite_span,
+                        caught_exceptions,
+                    );
+                }
+            }
+            TAtomic::Array(TArray::List(array)) => {
+                if let Some(known_elements) = array.get_known_elements() {
+                    for (_, value_type) in known_elements.values() {
+                        propagate_callback_argument_exceptions(
+                            context,
+                            block_context,
+                            artifacts,
+                            value_type,
+                            callsite_span,
+                            caught_exceptions,
+                        );
+                    }
+                }
+
+                propagate_callback_argument_exceptions(
+                    context,
+                    block_context,
+                    artifacts,
+                    array.get_element_type(),
+                    callsite_span,
+                    caught_exceptions,
+                );
+            }
+            _ => {}
         }
     }
 }

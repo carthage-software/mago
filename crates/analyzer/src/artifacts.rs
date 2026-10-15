@@ -8,7 +8,11 @@ use mago_word::WordMap;
 use mago_word::WordSet;
 
 use mago_algebra::assertion_set::AssertionSet;
+use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::metadata::CodebaseMetadata;
+use mago_codex::metadata::parameter::CallableExceptionCatchGroup;
+use mago_codex::metadata::parameter::CallableExceptionCatchSummary;
+use mago_codex::metadata::parameter::CallableInvocationKind;
 use mago_codex::reference::SymbolReferences;
 use mago_codex::ttype::combine_owned_union_types_rc;
 use mago_codex::ttype::combiner::CombinerOptions;
@@ -47,6 +51,42 @@ pub struct ClosureBindScope {
     pub has_this: bool,
 }
 
+/// Exceptions a callable may throw after its local `try`/`catch` handling.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct CallableEffectSummary {
+    /// Exception class names mapped to the source spans that may throw them.
+    pub possibly_thrown_exceptions: WordMap<HashSet<Span>>,
+}
+
+fn merge_callable_effect_summary(target: &mut CallableEffectSummary, source: CallableEffectSummary) {
+    for (exception, spans) in source.possibly_thrown_exceptions {
+        target.possibly_thrown_exceptions.entry(exception).or_default().extend(spans);
+    }
+}
+
+fn merge_callback_parameter_effects(
+    target: &mut HashMap<usize, Vec<CallableExceptionCatchSummary>>,
+    source: HashMap<usize, Vec<CallableExceptionCatchSummary>>,
+) {
+    for (parameter_offset, invocation_catches) in source {
+        let stored = target.entry(parameter_offset).or_default();
+        for invocation_catch in invocation_catches {
+            if !stored.contains(&invocation_catch) {
+                stored.push(invocation_catch);
+            }
+        }
+    }
+}
+
+/// The resolved callsite where a closure is supplied as a callback argument.
+#[derive(Debug, Clone)]
+pub(crate) struct CallbackCallsiteContext {
+    /// The invocation contract from the parameter metadata, when declared.
+    pub invocation_kind: Option<CallableInvocationKind>,
+    /// Catch types surrounding the callee's callback invocation sites, if known.
+    pub caught_exceptions: Option<Vec<CallableExceptionCatchSummary>>,
+}
+
 /// One semantic receiver and method target retained for a source-level call.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ResolvedMethodCall {
@@ -74,6 +114,12 @@ pub struct AnalysisArtifacts {
     pub method_calls_parent_constructor: HashMap<(Word, Word), bool>,
     pub method_calls_parent_initializer: HashMap<(Word, Word), Word>,
     pub closure_bind_scope: Option<ClosureBindScope>,
+    pub(crate) callable_effects: HashMap<(u32, u32), CallableEffectSummary>,
+    pub(crate) callback_callsites: HashMap<(u32, u32), CallbackCallsiteContext>,
+    pub(crate) callback_parameter_invocations: HashMap<(u32, u32), (usize, Vec<CallableExceptionCatchSummary>)>,
+    pub(crate) callback_parameter_catches: HashMap<(u32, u32), Vec<(u32, CallableExceptionCatchGroup)>>,
+    pub(crate) callback_parameter_effects:
+        HashMap<FunctionLikeIdentifier, HashMap<usize, Vec<CallableExceptionCatchSummary>>>,
     pub resolved_method_calls: Vec<ResolvedMethodCall>,
     pub(crate) editor: Option<EditorArtifacts>,
     pub(crate) variable_definedness: HashMap<(u32, u32), WordMap<VariableDefinedness>>,
@@ -111,6 +157,11 @@ impl AnalysisArtifacts {
             method_calls_parent_constructor: HashMap::default(),
             method_calls_parent_initializer: HashMap::default(),
             closure_bind_scope: None,
+            callable_effects: HashMap::default(),
+            callback_callsites: HashMap::default(),
+            callback_parameter_invocations: HashMap::default(),
+            callback_parameter_catches: HashMap::default(),
+            callback_parameter_effects: HashMap::default(),
             resolved_method_calls: Vec::new(),
             editor: None,
             variable_definedness: HashMap::default(),
@@ -119,6 +170,85 @@ impl AnalysisArtifacts {
             static_local_types: None,
             expression_type_checkpoints: ExpressionTypeCheckpoints::default(),
             retain_completed_expression_types: true,
+        }
+    }
+
+    /// Records the post-catch effects of a closure or arrow function.
+    pub(crate) fn record_callable_effects(&mut self, span: Span, effects: CallableEffectSummary) {
+        let entry = self.callable_effects.entry((span.start.offset, span.end.offset)).or_default();
+        merge_callable_effect_summary(entry, effects);
+    }
+
+    /// Returns the post-catch effects recorded for a closure or arrow function.
+    #[must_use]
+    pub(crate) fn get_callable_effects(&self, span: Span) -> Option<&CallableEffectSummary> {
+        self.callable_effects.get(&(span.start.offset, span.end.offset))
+    }
+
+    pub(crate) fn record_callback_callsite(&mut self, span: Span, callsite: CallbackCallsiteContext) {
+        self.callback_callsites.insert((span.start.offset, span.end.offset), callsite);
+    }
+
+    /// Returns the resolved callsite where a closure was supplied as a callback argument.
+    #[must_use]
+    pub(crate) fn get_callback_callsite(&self, span: Span) -> Option<&CallbackCallsiteContext> {
+        self.callback_callsites.get(&(span.start.offset, span.end.offset))
+    }
+
+    pub(crate) fn record_callback_parameter_invocation(
+        &mut self,
+        span: Span,
+        parameter_offset: usize,
+        invocation_catches: Vec<CallableExceptionCatchSummary>,
+    ) {
+        self.callback_parameter_invocations
+            .insert((span.start.offset, span.end.offset), (parameter_offset, invocation_catches));
+    }
+
+    pub(crate) fn record_callback_parameter_catches(
+        &mut self,
+        range: (u32, u32),
+        try_span: Span,
+        catch_group: CallableExceptionCatchGroup,
+    ) {
+        let try_size = try_span.end.offset.saturating_sub(try_span.start.offset);
+        let groups = self.callback_parameter_catches.entry(range).or_default();
+        let entry = (try_size, catch_group);
+        if !groups.contains(&entry) {
+            groups.push(entry);
+        }
+    }
+
+    pub(crate) fn record_callback_parameter_effects(
+        &mut self,
+        identifier: FunctionLikeIdentifier,
+        effects: HashMap<usize, Vec<CallableExceptionCatchSummary>>,
+    ) {
+        let entry = self.callback_parameter_effects.entry(identifier).or_default();
+        merge_callback_parameter_effects(entry, effects);
+    }
+
+    #[must_use]
+    pub(crate) fn get_callback_parameter_effects(
+        &self,
+        identifier: &FunctionLikeIdentifier,
+        parameter_offset: usize,
+    ) -> Option<&[CallableExceptionCatchSummary]> {
+        self.callback_parameter_effects.get(identifier)?.get(&parameter_offset).map(Vec::as_slice)
+    }
+
+    pub(crate) fn absorb_callback_callsites(&mut self, other: &mut Self) {
+        self.callback_callsites.extend(std::mem::take(&mut other.callback_callsites));
+    }
+
+    pub(crate) fn absorb_callable_effects(&mut self, other: &mut Self) {
+        for (span, effects) in std::mem::take(&mut other.callable_effects) {
+            let entry = self.callable_effects.entry(span).or_default();
+            merge_callable_effect_summary(entry, effects);
+        }
+        for (identifier, effects) in std::mem::take(&mut other.callback_parameter_effects) {
+            let entry = self.callback_parameter_effects.entry(identifier).or_default();
+            merge_callback_parameter_effects(entry, effects);
         }
     }
 

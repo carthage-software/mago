@@ -181,6 +181,7 @@ pub fn analyze_function_like<'ctx, 'ast, 'arena, A>(
     parameter_list: &'ast FunctionLikeParameterList<'arena>,
     body: FunctionLikeBody<'ast, 'arena>,
     inferred_parameter_types: Option<HashMap<usize, TUnion>>,
+    defer_thrown_check: bool,
 ) -> Result<AnalysisArtifacts, AnalysisError>
 where
     A: Arena,
@@ -194,6 +195,7 @@ where
         .with_retained_expression_types(parent_artifacts.should_retain_completed_expression_types())
         .with_variable_definedness_targets(parent_artifacts.variable_definedness_targets())
         .with_editor_artifacts(parent_artifacts.editor.is_some());
+    artifacts.callback_parameter_effects.clone_from(&parent_artifacts.callback_parameter_effects);
 
     if let Some(return_type) = &function_like_metadata.return_type_metadata {
         add_symbol_references(&return_type.type_union, &block_context.scope, &mut artifacts);
@@ -364,7 +366,30 @@ where
     }
 
     check_return_type_width(context, block_context, &mut artifacts, function_like_metadata);
-    check_thrown_types(context, block_context, &mut artifacts, function_like_metadata);
+
+    if let Some(identifier) = block_context.scope.get_function_like_identifier() {
+        let mut callback_parameter_effects = HashMap::default();
+        for (range, (parameter_offset, invocation_catches)) in &artifacts.callback_parameter_invocations {
+            let mut outer_catches = artifacts.callback_parameter_catches.get(range).cloned().unwrap_or_default();
+            outer_catches.sort_by_key(|(try_size, _)| *try_size);
+            let effects = callback_parameter_effects.entry(*parameter_offset).or_insert_with(Vec::new);
+            for invocation_catch in invocation_catches {
+                let mut summary = invocation_catch.clone();
+                summary.catch_groups.extend(outer_catches.iter().map(|(_, catch_group)| catch_group.clone()));
+                if !effects.contains(&summary) {
+                    effects.push(summary);
+                }
+            }
+        }
+
+        if !callback_parameter_effects.is_empty() {
+            parent_artifacts.record_callback_parameter_effects(identifier, callback_parameter_effects);
+        }
+    }
+
+    if !defer_thrown_check {
+        check_thrown_types(context, block_context, &mut artifacts, function_like_metadata);
+    }
 
     std::mem::swap(&mut context.type_resolution_context, &mut previous_type_resolution_context);
     let expression_types = std::mem::take(&mut artifacts.expression_types);
@@ -381,6 +406,8 @@ where
     }
     parent_artifacts.symbol_references.extend(std::mem::take(&mut artifacts.symbol_references));
     parent_artifacts.pending_readonly_property_writes.append(&mut artifacts.pending_readonly_property_writes);
+    parent_artifacts.absorb_callback_callsites(&mut artifacts);
+    parent_artifacts.absorb_callable_effects(&mut artifacts);
 
     Ok(artifacts)
 }

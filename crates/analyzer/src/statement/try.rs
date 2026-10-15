@@ -12,6 +12,8 @@ use mago_word::WordMap;
 use mago_word::WordSet;
 use mago_word::word;
 
+use mago_codex::metadata::parameter::CallableExceptionCatchArm;
+use mago_codex::metadata::parameter::CallableExceptionCatchGroup;
 use mago_codex::ttype;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::object::TObject;
@@ -22,10 +24,29 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
+use mago_syntax::cst::ArrowFunction;
+use mago_syntax::cst::Block;
+use mago_syntax::cst::Closure;
+use mago_syntax::cst::DeclareColonDelimitedBody;
 use mago_syntax::cst::Expression;
+use mago_syntax::cst::ForColonDelimitedBody;
+use mago_syntax::cst::ForeachColonDelimitedBody;
+use mago_syntax::cst::Function;
+use mago_syntax::cst::Goto;
 use mago_syntax::cst::Hint;
+use mago_syntax::cst::IfColonDelimitedBody;
+use mago_syntax::cst::Literal;
+use mago_syntax::cst::Method;
 use mago_syntax::cst::Node;
+use mago_syntax::cst::Statement;
+use mago_syntax::cst::Switch;
+use mago_syntax::cst::SwitchCase;
+use mago_syntax::cst::SwitchDefaultCase;
+use mago_syntax::cst::SwitchExpressionCase;
 use mago_syntax::cst::Try;
+use mago_syntax::cst::WhileColonDelimitedBody;
+use mago_syntax::utils::known_integer_switch_start;
+use mago_syntax::walker::Walker;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -63,6 +84,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
             catch_actions.push(actions);
         }
 
+        let callback_invocations_before_try =
+            artifacts.callback_parameter_invocations.keys().copied().collect::<foldhash::HashSet<_>>();
         let existing_thrown_exceptions = std::mem::take(&mut block_context.possibly_thrown_exceptions);
         let old_block_context_locals = block_context.locals.clone();
         let mut try_block_context = block_context.clone();
@@ -105,6 +128,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                 }
             }
         }
+        let callback_invocations_in_try = artifacts
+            .callback_parameter_invocations
+            .keys()
+            .filter(|range| !callback_invocations_before_try.contains(range))
+            .copied()
+            .collect::<Vec<_>>();
         block_context.flags.set_inside_try(was_inside_try);
         if !self.catch_clauses.is_empty() {
             block_context.flags.set_has_returned(false);
@@ -203,6 +232,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
         let mut original_block_context = try_block_context.clone();
         let mut definitely_newly_assigned_var_ids = newly_assigned_variable_ids;
         let mut previously_caught_types = WordSet::default();
+        let mut callback_catch_arms = Vec::new();
 
         for (i, catch_clause) in self.catch_clauses.iter().enumerate() {
             let mut catch_block_context = original_block_context.clone();
@@ -302,6 +332,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                 }
             }
 
+            let thrown_exceptions_before_catch = catch_block_context.possibly_thrown_exceptions.clone();
+
             if let Some(definitely_defined_locals) = definitely_defined_locals {
                 for variable_id in definitely_defined_locals {
                     let Some(variable_type) = catch_block_context.locals.get_mut(&variable_id) else {
@@ -336,6 +368,29 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
             let old_catch_assigned_variable_ids = std::mem::take(&mut catch_block_context.assigned_variable_ids);
 
             analyze_statements(catch_clause.block.statements.as_slice(), context, &mut catch_block_context, artifacts)?;
+
+            let rethrows_types = catch_block_context
+                .possibly_thrown_exceptions
+                .iter()
+                .filter_map(|(exception, spans)| {
+                    spans
+                        .iter()
+                        .any(|span| {
+                            !thrown_exceptions_before_catch
+                                .get(exception)
+                                .is_some_and(|previous_spans| previous_spans.contains(span))
+                        })
+                        .then_some(*exception)
+                })
+                .collect();
+
+            callback_catch_arms.push(CallableExceptionCatchArm {
+                exception_types: caught_classes.iter().copied().collect(),
+                rethrows: false,
+                rethrows_types,
+                rethrows_caught_types: Vec::new(),
+                rethrows_with_catches: Vec::new(),
+            });
 
             // recalculate in case there's a no-return clause
             if let Some(actions) = catch_actions.get_mut(i) {
@@ -423,6 +478,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
         }
 
         let mut finally_has_returned = false;
+        let mut finally_overrides_pending_exceptions = false;
+        let mut finally_thrown_types = WordSet::default();
         if let Some(finally_clause) = self.finally_clause.as_ref() {
             // SAFETY: when a try statement has a `finally_clause`, the finally scope is always
             // initialized on `try_block_context` before reaching this point, so the `Option` is
@@ -446,6 +503,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                 }
             }
             finally_block_context.flags.set_has_returned(false);
+            let thrown_before_finally = block_context.possibly_thrown_exceptions.clone();
 
             analyze_statements(
                 finally_clause.block.statements.as_slice(),
@@ -453,6 +511,27 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                 &mut finally_block_context,
                 artifacts,
             )?;
+
+            let finally_actions = ControlAction::from_statements(
+                finally_clause.block.statements.iter().collect::<Vec<_>>(),
+                vec![],
+                Some(artifacts),
+                true,
+            );
+            let has_goto =
+                !finally_actions.contains(ControlAction::None) || finally_block_contains_goto(&finally_clause.block);
+            finally_overrides_pending_exceptions =
+                has_goto && !finally_goto_can_complete_normally(&finally_clause.block, artifacts);
+            let finally_new_exceptions =
+                newly_thrown_exceptions(&finally_block_context.possibly_thrown_exceptions, &thrown_before_finally);
+            finally_thrown_types.extend(finally_new_exceptions.keys().copied());
+            if finally_overrides_pending_exceptions {
+                block_context.possibly_thrown_exceptions = finally_new_exceptions;
+            } else {
+                for (exception, spans) in finally_new_exceptions {
+                    block_context.possibly_thrown_exceptions.entry(exception).or_default().extend(spans);
+                }
+            }
 
             finally_has_returned = finally_block_context.flags.has_returned();
             block_context.possibly_undefined_variable_ids.extend(finally_block_context.possibly_undefined_variable_ids);
@@ -462,6 +541,27 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                 if let Some(finally_variable_type) = finally_variable_type {
                     block_context.locals.insert(variable_id, finally_variable_type);
                 }
+            }
+        }
+
+        if finally_overrides_pending_exceptions {
+            for arm in &mut callback_catch_arms {
+                arm.rethrows = false;
+                arm.rethrows_types = finally_thrown_types.iter().copied().collect();
+                arm.rethrows_caught_types.clear();
+                arm.rethrows_with_catches.clear();
+            }
+        }
+
+        if !callback_invocations_in_try.is_empty()
+            && (!callback_catch_arms.is_empty() || finally_overrides_pending_exceptions)
+        {
+            let catch_group = CallableExceptionCatchGroup {
+                arms: callback_catch_arms,
+                overrides_pending_exceptions: finally_overrides_pending_exceptions,
+            };
+            for range in callback_invocations_in_try {
+                artifacts.record_callback_parameter_catches(range, self.span(), catch_group.clone());
             }
         }
 
@@ -494,6 +594,334 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
 
         Ok(())
     }
+}
+
+struct GotoScanner;
+
+struct GotoPresenceScanner;
+
+impl<'ast, 'arena> Walker<'ast, 'arena, bool> for GotoPresenceScanner {
+    fn walk_goto(&self, _: &'ast Goto<'arena>, contains_goto: &mut bool) {
+        *contains_goto = true;
+    }
+
+    fn walk_function(&self, _: &'ast Function<'arena>, _: &mut bool) {}
+
+    fn walk_closure(&self, _: &'ast Closure<'arena>, _: &mut bool) {}
+
+    fn walk_arrow_function(&self, _: &'ast ArrowFunction<'arena>, _: &mut bool) {}
+
+    fn walk_method(&self, _: &'ast Method<'arena>, _: &mut bool) {}
+}
+
+fn finally_block_contains_goto(block: &Block<'_>) -> bool {
+    let mut contains_goto = false;
+    GotoPresenceScanner.walk_block(block, &mut contains_goto);
+    contains_goto
+}
+
+struct GotoScan<'ctx> {
+    artifacts: &'ctx AnalysisArtifacts,
+    goto_targets: WordSet,
+}
+
+impl<'ast, 'arena, 'ctx> Walker<'ast, 'arena, GotoScan<'ctx>> for GotoScanner {
+    fn walk_block(&self, block: &'ast Block<'arena>, context: &mut GotoScan<'ctx>) {
+        walk_reachable_statements(self, block.statements.as_slice(), context);
+    }
+
+    fn walk_declare_colon_delimited_body(
+        &self,
+        body: &'ast DeclareColonDelimitedBody<'arena>,
+        context: &mut GotoScan<'ctx>,
+    ) {
+        walk_reachable_statements(self, body.statements.as_slice(), context);
+    }
+
+    fn walk_foreach_colon_delimited_body(
+        &self,
+        body: &'ast ForeachColonDelimitedBody<'arena>,
+        context: &mut GotoScan<'ctx>,
+    ) {
+        walk_reachable_statements(self, body.statements.as_slice(), context);
+    }
+
+    fn walk_for_colon_delimited_body(&self, body: &'ast ForColonDelimitedBody<'arena>, context: &mut GotoScan<'ctx>) {
+        walk_reachable_statements(self, body.statements.as_slice(), context);
+    }
+
+    fn walk_while_colon_delimited_body(
+        &self,
+        body: &'ast WhileColonDelimitedBody<'arena>,
+        context: &mut GotoScan<'ctx>,
+    ) {
+        walk_reachable_statements(self, body.statements.as_slice(), context);
+    }
+
+    fn walk_switch(&self, switch: &'ast Switch<'arena>, context: &mut GotoScan<'ctx>) {
+        let cases = switch.body.cases();
+        let Some(start_index) = known_integer_switch_start(switch) else {
+            for case in cases {
+                self.walk_switch_case_contents(case, context);
+            }
+
+            return;
+        };
+
+        let Some(start_index) = start_index else {
+            return;
+        };
+
+        for case in &cases[start_index..] {
+            self.walk_switch_case_contents(case, context);
+
+            let actions = ControlAction::from_statements(
+                case.statements().iter().collect(),
+                vec![],
+                Some(context.artifacts),
+                true,
+            );
+            if !actions.contains(ControlAction::None) {
+                break;
+            }
+        }
+    }
+
+    fn walk_switch_expression_case(&self, case: &'ast SwitchExpressionCase<'arena>, context: &mut GotoScan<'ctx>) {
+        walk_reachable_statements(self, case.statements.as_slice(), context);
+    }
+
+    fn walk_switch_default_case(&self, case: &'ast SwitchDefaultCase<'arena>, context: &mut GotoScan<'ctx>) {
+        walk_reachable_statements(self, case.statements.as_slice(), context);
+    }
+
+    fn walk_if_colon_delimited_body(&self, body: &'ast IfColonDelimitedBody<'arena>, context: &mut GotoScan<'ctx>) {
+        walk_reachable_statements(self, body.statements.as_slice(), context);
+
+        for clause in &body.else_if_clauses {
+            walk_reachable_statements(self, clause.statements.as_slice(), context);
+        }
+
+        if let Some(clause) = &body.else_clause {
+            walk_reachable_statements(self, clause.statements.as_slice(), context);
+        }
+    }
+
+    fn walk_goto(&self, goto: &'ast Goto<'arena>, context: &mut GotoScan<'ctx>) {
+        context.goto_targets.insert(word(goto.label.value));
+    }
+
+    fn walk_function(&self, _: &'ast Function<'arena>, _: &mut GotoScan<'ctx>) {}
+
+    fn walk_closure(&self, _: &'ast Closure<'arena>, _: &mut GotoScan<'ctx>) {}
+
+    fn walk_arrow_function(&self, _: &'ast ArrowFunction<'arena>, _: &mut GotoScan<'ctx>) {}
+
+    fn walk_method(&self, _: &'ast Method<'arena>, _: &mut GotoScan<'ctx>) {}
+}
+
+impl GotoScanner {
+    fn walk_switch_case_contents(&self, case: &SwitchCase<'_>, context: &mut GotoScan<'_>) {
+        match case {
+            SwitchCase::Expression(case) => self.walk_switch_expression_case(case, context),
+            SwitchCase::Default(case) => self.walk_switch_default_case(case, context),
+        }
+    }
+}
+
+fn walk_reachable_statements(walker: &GotoScanner, statements: &[Statement<'_>], context: &mut GotoScan<'_>) {
+    let mut falls_through = true;
+    for statement in statements {
+        if !falls_through && !statement_is_goto_target(statement, &context.goto_targets) {
+            continue;
+        }
+
+        walker.walk_statement(statement, context);
+
+        let actions = ControlAction::from_statements(vec![statement], vec![], Some(context.artifacts), true);
+        falls_through = !matches!(statement, Statement::Goto(_)) && actions.contains(ControlAction::None);
+    }
+}
+
+fn statement_is_goto_target(statement: &Statement<'_>, goto_targets: &WordSet) -> bool {
+    matches!(statement, Statement::Label(label) if goto_targets.contains(&word(label.name.value)))
+}
+
+fn finally_goto_can_complete_normally(block: &Block<'_>, artifacts: &AnalysisArtifacts) -> bool {
+    let label_indices = block
+        .statements
+        .iter()
+        .enumerate()
+        .filter_map(|(index, statement)| match statement {
+            Statement::Label(label) => Some((word(label.name.value), index)),
+            _ => None,
+        })
+        .collect::<WordMap<_>>();
+    let mut pending_indices = vec![0];
+    let mut visited_indices = HashSet::default();
+
+    while let Some(index) = pending_indices.pop() {
+        if index == block.statements.len() {
+            return true;
+        }
+
+        if !visited_indices.insert(index) {
+            continue;
+        }
+
+        for flow in finally_statement_flows(&block.statements[index], artifacts) {
+            match flow {
+                FinallyFlow::Continue => pending_indices.push(index + 1),
+                FinallyFlow::Goto(label) => {
+                    let Some(target) = label_indices.get(&label) else {
+                        return true;
+                    };
+
+                    pending_indices.push(*target);
+                }
+                FinallyFlow::Abrupt | FinallyFlow::Break(_) | FinallyFlow::SwitchExit => {}
+                FinallyFlow::Unknown => return true,
+            }
+        }
+    }
+
+    false
+}
+
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+enum FinallyFlow {
+    Continue,
+    Goto(Word),
+    Break(usize),
+    SwitchExit,
+    Abrupt,
+    Unknown,
+}
+
+fn finally_statement_flows(statement: &Statement<'_>, artifacts: &AnalysisArtifacts) -> HashSet<FinallyFlow> {
+    match statement {
+        Statement::Goto(goto) => HashSet::from_iter([FinallyFlow::Goto(word(goto.label.value))]),
+        Statement::Break(break_statement) => HashSet::from_iter([finally_break_flow(break_statement.level)]),
+        Statement::Block(block) => finally_statement_list_flows(block.statements.as_slice(), artifacts),
+        Statement::Switch(switch) => finally_switch_flows(switch, artifacts),
+        Statement::If(if_statement) => {
+            let mut flows = finally_statement_list_flows(if_statement.body.statements(), artifacts);
+            for statements in if_statement.body.else_if_statements() {
+                flows.extend(finally_statement_list_flows(statements, artifacts));
+            }
+            if let Some(statements) = if_statement.body.else_statements() {
+                flows.extend(finally_statement_list_flows(statements, artifacts));
+            } else {
+                flows.insert(FinallyFlow::Continue);
+            }
+            flows
+        }
+        _ => {
+            let mut scan = GotoScan { artifacts, goto_targets: WordSet::default() };
+            GotoScanner.walk_statement(statement, &mut scan);
+            if !scan.goto_targets.is_empty() {
+                return HashSet::from_iter([FinallyFlow::Unknown]);
+            }
+
+            let actions = ControlAction::from_statements(vec![statement], vec![], Some(artifacts), true);
+            let mut flows = HashSet::default();
+            if actions.contains(ControlAction::None) {
+                flows.insert(FinallyFlow::Continue);
+            }
+            if actions.iter().any(|action| action != ControlAction::None) {
+                flows.insert(FinallyFlow::Abrupt);
+            }
+            flows
+        }
+    }
+}
+
+fn finally_break_flow(level: Option<&Expression<'_>>) -> FinallyFlow {
+    let Some(level) = level else {
+        return FinallyFlow::Break(1);
+    };
+
+    let Expression::Literal(Literal::Integer(literal)) = mago_syntax::utils::unparenthesized_expression(level) else {
+        return FinallyFlow::Unknown;
+    };
+
+    let Some(level) = literal.value.and_then(|level| usize::try_from(level).ok()).filter(|level| *level > 0) else {
+        return FinallyFlow::Unknown;
+    };
+
+    FinallyFlow::Break(level)
+}
+
+fn finally_switch_flows(switch: &Switch<'_>, artifacts: &AnalysisArtifacts) -> HashSet<FinallyFlow> {
+    let cases = switch.body.cases();
+    let start_index = match known_integer_switch_start(switch) {
+        Some(Some(start_index)) => vec![start_index],
+        Some(None) => return HashSet::from_iter([FinallyFlow::Continue]),
+        None => (0..cases.len()).collect(),
+    };
+    let mut flows = HashSet::default();
+    if !switch.body.has_default_case() && known_integer_switch_start(switch).is_none() {
+        flows.insert(FinallyFlow::Continue);
+    }
+
+    for start_index in start_index {
+        let mut case_flows = HashSet::from_iter([FinallyFlow::Continue]);
+        for case in &cases[start_index..] {
+            if !case_flows.contains(&FinallyFlow::Continue) {
+                break;
+            }
+
+            case_flows.remove(&FinallyFlow::Continue);
+            let next_flows = finally_statement_list_flows(case.statements(), artifacts);
+            case_flows.extend(next_flows.into_iter().map(|flow| match flow {
+                FinallyFlow::Break(1) => FinallyFlow::SwitchExit,
+                FinallyFlow::Break(level) => FinallyFlow::Break(level - 1),
+                flow => flow,
+            }));
+        }
+
+        if case_flows.remove(&FinallyFlow::SwitchExit) {
+            case_flows.insert(FinallyFlow::Continue);
+        }
+        flows.extend(case_flows);
+    }
+
+    flows
+}
+
+fn finally_statement_list_flows(statements: &[Statement<'_>], artifacts: &AnalysisArtifacts) -> HashSet<FinallyFlow> {
+    let mut flows = HashSet::from_iter([FinallyFlow::Continue]);
+    for statement in statements {
+        if !flows.contains(&FinallyFlow::Continue) {
+            break;
+        }
+
+        flows.remove(&FinallyFlow::Continue);
+        flows.extend(finally_statement_flows(statement, artifacts));
+    }
+
+    flows
+}
+
+fn newly_thrown_exceptions(
+    current: &WordMap<HashSet<Span>>,
+    previous: &WordMap<HashSet<Span>>,
+) -> WordMap<HashSet<Span>> {
+    let mut added = WordMap::default();
+    for (exception, spans) in current {
+        let previous_spans = previous.get(exception);
+        let new_spans = spans
+            .iter()
+            .filter(|span| !previous_spans.is_some_and(|previous_spans| previous_spans.contains(span)))
+            .copied()
+            .collect::<HashSet<_>>();
+
+        if !new_spans.is_empty() {
+            added.insert(*exception, new_spans);
+        }
+    }
+
+    added
 }
 
 /// Intersects definitely defined locals from paths that can enter the same catch clause.

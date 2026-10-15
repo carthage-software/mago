@@ -1,11 +1,74 @@
 use mago_span::HasSpan;
 use mago_span::Span;
+use mago_word::Word;
 
 use crate::metadata::attribute::AttributeMetadata;
 use crate::metadata::flags::MetadataFlags;
 use crate::metadata::ttype::TypeMetadata;
 use crate::misc::VariableIdentifier;
 use crate::ttype::atomic::TAtomic;
+
+/// Describes when a callable passed to a parameter is invoked.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub enum CallableInvocationKind {
+    /// The callable is invoked before the function returns.
+    Immediately,
+    /// The callable may be stored or invoked after the function returns.
+    Later,
+}
+
+/// A statically known throw from a catch body, with nested catches that may handle it.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct CallableExceptionRethrow {
+    /// The exception type thrown by the catch body.
+    pub exception_type: Word,
+    /// Exception types from nested catch clauses surrounding this throw.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub caught_types: Vec<Word>,
+    /// Whether the thrown type came from a caught exception variable.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub caught_variable: bool,
+}
+
+/// One catch arm surrounding an immediately invoked callable.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct CallableExceptionCatchArm {
+    /// Exception types matched by this catch arm.
+    pub exception_types: Vec<Word>,
+    /// Whether the original callback exception may be rethrown through an unknown expression.
+    pub rethrows: bool,
+    /// Statically known exception types thrown by this catch arm.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub rethrows_types: Vec<Word>,
+    /// Types of caught exceptions rethrown by this catch arm.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub rethrows_caught_types: Vec<Word>,
+    /// Statically known throws that may be caught by nested catch clauses.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub rethrows_with_catches: Vec<CallableExceptionRethrow>,
+}
+
+/// The ordered catch arms of one try statement surrounding a callback invocation.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct CallableExceptionCatchGroup {
+    /// Catch arms in source order.
+    pub arms: Vec<CallableExceptionCatchArm>,
+    /// Whether a `finally` block replaces exceptions from the associated try/catch paths.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub overrides_pending_exceptions: bool,
+}
+
+/// Nested try/catch handling surrounding one invocation of an immediately invoked callable.
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+pub struct CallableExceptionCatchSummary {
+    /// Catch groups ordered from the innermost try statement to the outermost.
+    pub catch_groups: Vec<CallableExceptionCatchGroup>,
+}
 
 /// Contains metadata associated with a single parameter within a function, method, or closure signature.
 ///
@@ -44,6 +107,19 @@ pub struct FunctionLikeParameterMetadata {
     /// When this parameter receives a closure, that closure is invoked with `$this` bound to an
     /// instance of this type. A closure literal passed here is analyzed with `$this` set accordingly.
     pub closure_this_type: Option<TypeMetadata>,
+
+    /// Whether a callable passed to this parameter is invoked immediately or later.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub callable_invocation_kind: Option<CallableInvocationKind>,
+
+    /// Catch and conservative escape summaries for each statically recognized callback invocation in the function body.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub callable_exception_catches: Option<Vec<CallableExceptionCatchSummary>>,
+
+    /// Namespaced function names whose absence is required for the corresponding catch summary to apply.
+    /// Each index refers to an entry in `callable_exception_catches`.
+    #[cfg_attr(feature = "serde", serde(default))]
+    pub callable_exception_catch_global_fallbacks: Vec<(usize, Word)>,
 
     /// The inferred type of the parameter's default value, if `has_default` is true and the
     /// type could be determined.
@@ -86,6 +162,9 @@ impl FunctionLikeParameterMetadata {
             type_metadata: None,
             out_type: None,
             closure_this_type: None,
+            callable_invocation_kind: None,
+            callable_exception_catches: None,
+            callable_exception_catch_global_fallbacks: Vec::new(),
             default_type: None,
         }
     }
