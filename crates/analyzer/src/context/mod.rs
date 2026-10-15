@@ -169,26 +169,7 @@ where
     /// Function names in PHP are case-insensitive; they are stored and looked up in lowercase
     /// within the codebase metadata.
     pub fn resolve_function_name<'ast>(&self, identifier: &'ast Identifier<'arena>) -> &'arena [u8] {
-        if self.resolved_names.is_imported(identifier) {
-            return self.resolved_names.get(identifier);
-        }
-
-        let name = identifier.value();
-
-        if let Some(stripped) = name.strip_prefix(b"\\") {
-            return stripped;
-        }
-
-        let fqfn = self.resolved_names.get(&identifier);
-        if self.codebase.function_exists(fqfn) {
-            return fqfn;
-        }
-
-        if !name.contains(&b'\\') && self.codebase.function_exists(name) {
-            return name;
-        }
-
-        fqfn
+        crate::resolver::function::resolve_function_name(identifier, self.resolved_names, self.codebase)
     }
 
     pub fn get_assertion_context_from_block(

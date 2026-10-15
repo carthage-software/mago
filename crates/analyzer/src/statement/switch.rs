@@ -17,7 +17,6 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
-use mago_syntax::cst::Call;
 use mago_syntax::cst::Expression;
 use mago_syntax::cst::Statement;
 use mago_syntax::cst::Switch;
@@ -49,6 +48,7 @@ use crate::expression::binary::utils::is_always_identical_to;
 use crate::formula::get_formula;
 use crate::formula::negate_or_synthesize;
 use crate::reconciler::reconcile_keyed_types;
+use crate::resolver::function::get_builtin_get_class_or_gettype_call;
 use crate::statement::analyze_statements;
 use crate::utils::expression::get_expression_id;
 use crate::utils::expression::get_root_expression_id;
@@ -916,7 +916,9 @@ where
         let subject_id = mago_word::word(&subject_id_str);
         self.block_context.locals.insert(subject_id, Rc::clone(subject_type));
 
-        if Self::is_get_class_or_gettype_call(switch.expression) {
+        if get_builtin_get_class_or_gettype_call(switch.expression, self.context.resolved_names, self.context.codebase)
+            .is_some()
+        {
             (true, subject_id, None, switch.expression.clone())
         } else {
             let subject_for_conditions =
@@ -924,22 +926,6 @@ where
 
             (true, subject_id, None, subject_for_conditions)
         }
-    }
-
-    fn is_get_class_or_gettype_call(expression: &Expression<'arena>) -> bool {
-        let Expression::Call(Call::Function(function_call)) = expression else {
-            return false;
-        };
-
-        if function_call.argument_list.arguments.len() != 1 {
-            return false;
-        }
-
-        let Expression::Identifier(name) = function_call.function else {
-            return false;
-        };
-
-        name.value().eq_ignore_ascii_case(b"get_class") || name.value().eq_ignore_ascii_case(b"gettype")
     }
 
     fn update_case_exit_map(&mut self, case: &SwitchCase, case_index: usize) {

@@ -52,6 +52,7 @@ use crate::context::scope::var_references_dynamic;
 use crate::error::AnalysisError;
 use crate::expression::find_expression_logic_issues;
 use crate::formula::get_formula;
+use crate::resolver::function::is_builtin_function_call;
 use crate::utils::docblock::check_docblock_type_incompatibility;
 use crate::utils::docblock::get_type_from_var_docblock;
 use crate::utils::expression::array::get_array_target_type_given_index;
@@ -731,6 +732,9 @@ pub fn analyze_assignment_to_variable<'ctx, 'arena, A>(
     block_context.locals.retain(|var_id, _| !var_references_dynamic(*var_id, variable_id));
     block_context.derived_local_sources.remove(&variable_id);
     block_context.possibly_undefined_variable_ids.remove(&variable_id);
+    block_context.class_string_sources.retain(|holder, source| {
+        *holder != variable_id && !var_has_root(*source, variable_id) && !var_references_dynamic(*source, variable_id)
+    });
 
     if artifacts.editor.is_some() {
         artifacts.set_rc_expression_type(&variable_span, Rc::clone(&assigned_type));
@@ -740,10 +744,9 @@ pub fn analyze_assignment_to_variable<'ctx, 'arena, A>(
     block_context.variables_possibly_in_scope.insert(variable_id);
 
     if let Some(source) = source_expression
-        && let Expression::Call(Call::Function(function_call)) = source
+        && let Expression::Call(Call::Function(function_call)) = unwrap_expression(source)
         && function_call.argument_list.arguments.len() == 1
-        && let Expression::Identifier(name) = function_call.function
-        && name.value().eq_ignore_ascii_case(b"get_class")
+        && is_builtin_function_call(function_call, b"get_class", context.resolved_names, context.codebase)
     {
         let argument = function_call.argument_list.arguments.first();
         if let Some(argument) = argument
@@ -753,13 +756,10 @@ pub fn analyze_assignment_to_variable<'ctx, 'arena, A>(
                 context.resolved_names,
                 Some(context.codebase),
             )
+            && variable_id != source_id
         {
             block_context.class_string_sources.insert(variable_id, source_id);
-        } else {
-            block_context.class_string_sources.remove(&variable_id);
         }
-    } else {
-        block_context.class_string_sources.remove(&variable_id);
     }
 }
 

@@ -51,6 +51,8 @@ use mago_word::word;
 use crate::artifacts::AnalysisArtifacts;
 use crate::context::assertion::AssertionContext;
 use crate::resolver::class_name::get_class_name_from_atomic;
+use crate::resolver::function::BuiltinNarrowingFunction;
+use crate::resolver::function::get_builtin_get_class_or_gettype_call;
 use crate::utils::expression::get_expression_id;
 use crate::utils::expression::get_index_id;
 use crate::utils::expression::get_non_nullsafe_expression_id;
@@ -979,71 +981,63 @@ fn scrape_get_class_or_gettype_equality_assertions<A>(
 where
     A: Arena,
 {
-    let (call, compared) = match (get_get_class_or_gettype_call(left), get_get_class_or_gettype_call(right)) {
-        (Some((call, _)), None) => (Some(call), Some(right)),
-        (None, Some((call, _))) => (Some(call), Some(left)),
+    let (target, compared) = match (
+        get_builtin_get_class_or_gettype_call(left, assertion_context.resolved_names, assertion_context.codebase),
+        get_builtin_get_class_or_gettype_call(right, assertion_context.resolved_names, assertion_context.codebase),
+    ) {
+        (Some(target), None) => (Some(target), Some(right)),
+        (None, Some(target)) => (Some(target), Some(left)),
         _ => (None, None),
     };
 
-    let Some(call) = call else {
+    let Some((kind, argument)) = target else {
         return scrape_class_constant_vs_string_variable(left, right, artifacts, assertion_context, negated);
     };
     let compared = compared?;
-
-    let FunctionCall { function, argument_list } = call;
-    if argument_list.arguments.len() != 1 {
-        return scrape_class_constant_vs_string_variable(left, right, artifacts, assertion_context, negated);
-    }
-    let Expression::Identifier(name) = function else {
-        return scrape_class_constant_vs_string_variable(left, right, artifacts, assertion_context, negated);
-    };
-    let name_bytes = name.value();
-    if !name_bytes.eq_ignore_ascii_case(b"get_class") && !name_bytes.eq_ignore_ascii_case(b"gettype") {
-        return scrape_class_constant_vs_string_variable(left, right, artifacts, assertion_context, negated);
-    }
-    let argument = argument_list.arguments.first()?.value();
-    let function_name = name_bytes;
 
     let variable_id = assertion_context.get_expression_id(argument)?;
     let compared_type = artifacts.get_expression_type(compared)?;
 
     let mut assertions = Vec::new();
 
-    if function_name.eq_ignore_ascii_case(b"get_class") {
-        for atomic in compared_type.types.as_ref() {
-            if let Some(resolved) = get_class_name_from_atomic(assertion_context.codebase, atomic) {
-                if resolved.is_invalid() || resolved.is_possibly_invalid() {
-                    continue;
-                }
-                let object_type = resolved.get_object_type(assertion_context.codebase);
-                let assertion = if resolved.is_final {
-                    Assertion::IsType(object_type)
-                } else {
-                    Assertion::IsIdentical(object_type)
-                };
-                assertions.push(if negated {
-                    match assertion {
-                        Assertion::IsType(t) => Assertion::IsNotType(t),
-                        Assertion::IsIdentical(t) => Assertion::IsNotIdentical(t),
-                        other => other,
+    match kind {
+        BuiltinNarrowingFunction::GetClass => {
+            for atomic in compared_type.types.as_ref() {
+                if let Some(resolved) = get_class_name_from_atomic(assertion_context.codebase, atomic) {
+                    if resolved.is_invalid() || resolved.is_possibly_invalid() {
+                        continue;
                     }
-                } else {
-                    assertion
-                });
+                    let object_type = resolved.get_object_type(assertion_context.codebase);
+                    let assertion = if resolved.is_final {
+                        Assertion::IsType(object_type)
+                    } else {
+                        Assertion::IsIdentical(object_type)
+                    };
+                    assertions.push(if negated {
+                        match assertion {
+                            Assertion::IsType(t) => Assertion::IsNotType(t),
+                            Assertion::IsIdentical(t) => Assertion::IsNotIdentical(t),
+                            other => other,
+                        }
+                    } else {
+                        assertion
+                    });
+                }
             }
         }
-    } else {
-        for atomic in compared_type.types.as_ref() {
-            if let Some(scalar) = gettype_literal_to_scalar(atomic) {
-                let assertion = Assertion::IsType(scalar);
-                assertions.push(if negated {
-                    Assertion::IsNotType(match assertion {
-                        Assertion::IsType(t) => t,
-                        _ => unreachable!(),
-                    })
-                } else {
-                    assertion
-                });
+        BuiltinNarrowingFunction::GetType => {
+            for atomic in compared_type.types.as_ref() {
+                if let Some(scalar) = gettype_literal_to_scalar(atomic) {
+                    let assertion = Assertion::IsType(scalar);
+                    assertions.push(if negated {
+                        Assertion::IsNotType(match assertion {
+                            Assertion::IsType(t) => t,
+                            _ => unreachable!(),
+                        })
+                    } else {
+                        assertion
+                    });
+                }
             }
         }
     }
@@ -1055,25 +1049,6 @@ where
     }
 
     scrape_class_constant_vs_string_variable(left, right, artifacts, assertion_context, negated)
-}
-
-fn get_get_class_or_gettype_call<'arena>(
-    expression: &'arena Expression<'arena>,
-) -> Option<(&'arena FunctionCall<'arena>, &'arena Expression<'arena>)> {
-    let Expression::Call(Call::Function(function_call)) = expression else {
-        return None;
-    };
-    if function_call.argument_list.arguments.len() != 1 {
-        return None;
-    }
-    let Expression::Identifier(name) = function_call.function else {
-        return None;
-    };
-    let name_bytes = name.value();
-    if !name_bytes.eq_ignore_ascii_case(b"get_class") && !name_bytes.eq_ignore_ascii_case(b"gettype") {
-        return None;
-    }
-    Some((function_call, function_call.argument_list.arguments.first()?.value()))
 }
 
 fn gettype_literal_to_scalar(atomic: &TAtomic) -> Option<TAtomic> {
