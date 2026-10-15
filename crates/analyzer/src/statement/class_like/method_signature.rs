@@ -31,9 +31,9 @@ pub enum SignatureCompatibilityIssue {
 
 /// Validates that a child method's throw contract is covariant with its parent method.
 ///
-/// An absent `@throws` tag means `Throwable`, matching PHPStan's default
-/// `exceptions.implicitThrows = true` behavior. `@throws void` is represented
-/// as an empty throw set. Lexical `self` is already bound to the declaring class by the scanner.
+/// Without an effective `@throws` declaration, the contract is `Throwable`. An
+/// explicit `@throws void` is represented as an empty throw set. Lexical `self`
+/// is already bound to the declaring class by the scanner.
 /// Relative `parent` types are expanded in the method's lexical class context. Late-static parent
 /// annotations are expanded in their declaring class context, while late-static child annotations
 /// are expanded in the implementation context.
