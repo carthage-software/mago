@@ -87,3 +87,32 @@ fn well_formed_tags_are_silent() {
 
     assert!(issue_codes(metadata).is_empty());
 }
+
+#[test]
+fn well_formed_iterable_forms_are_silent() {
+    let metadata = scan(
+        "<?php\n/** @return iterable */\nfunction a(): iterable { return []; }\n/** @return iterable<string> */\nfunction b(): iterable { return []; }\n/** @param iterable<int, string> $x */\nfunction c(iterable $x): void {}\n/** @param iterable<mixed, string> $y */\nfunction d(iterable $y): void {}\n/** @return iterable<int, string> */\nfunction e(): iterable { return []; }\n",
+    );
+
+    assert!(issue_codes(metadata).is_empty());
+}
+
+#[test]
+fn iterable_with_too_many_type_arguments_is_reported_once() {
+    let metadata =
+        scan("<?php\n/** @return iterable<string, string, string> */\nfunction g(): iterable { return []; }\n");
+    let codes = issue_codes(metadata);
+
+    assert_eq!(codes.get("invalid-return-tag"), Some(&1));
+    assert_eq!(codes.len(), 1);
+}
+
+#[test]
+fn iterable_with_too_many_type_arguments_in_param_is_reported_once() {
+    let metadata =
+        scan("<?php\n/** @param iterable<string, string, string> $rows */\nfunction g(iterable $rows): void {}\n");
+    let codes = issue_codes(metadata);
+
+    assert_eq!(codes.get("invalid-param-tag"), Some(&1));
+    assert_eq!(codes.len(), 1);
+}
