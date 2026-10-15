@@ -429,12 +429,19 @@ pub fn get_union_from_type(
 
                     wrap_atomic(TAtomic::Iterable(TIterable::of_value(Arc::new(value_type))))
                 }
-                _ => {
+                2 => {
                     let key_type = get_union_from_type(&parameters.entries[0].inner, scope, type_context, classname)?;
 
                     let value_type = get_union_from_type(&parameters.entries[1].inner, scope, type_context, classname)?;
 
                     wrap_atomic(TAtomic::Iterable(TIterable::new(Arc::new(key_type), Arc::new(value_type))))
+                }
+                len => {
+                    return Err(TypeError::InvalidType(
+                        ttype.to_string(),
+                        format!("`iterable<K, V>` expects at most 2 parameters (key, value), got {len}"),
+                        ttype.span(),
+                    ));
                 }
             },
             None => wrap_atomic(TAtomic::Iterable(TIterable::mixed())),
