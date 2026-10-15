@@ -20,6 +20,7 @@ use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_never;
+use mago_codex::ttype::get_null;
 use mago_codex::ttype::get_undefined_null;
 use mago_codex::ttype::intersect_union_types;
 use mago_codex::ttype::union::TUnion;
@@ -1328,6 +1329,10 @@ where
         }
 
         return get_never();
+    }
+
+    if existing_var_type.can_be_null() {
+        return get_null();
     }
 
     get_undefined_null()
