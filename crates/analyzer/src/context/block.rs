@@ -62,6 +62,10 @@ pub struct BlockContext<'ctx> {
     pub assigned_variable_ids: WordMap<u32>,
     pub possibly_assigned_variable_ids: WordSet,
     pub derived_local_sources: WordMap<Word>,
+
+    /// Maps a variable holding the result of `get_class($source)` to `$source`, so that
+    /// `get_class()` case narrowing on the holder propagates back to the tested variable.
+    pub class_string_sources: WordMap<Word>,
     pub possibly_undefined_variable_ids: WordSet,
 
     /// Maps variable names to the number of times they have been referenced in the current scope.
@@ -211,6 +215,7 @@ impl<'ctx> BlockContext<'ctx> {
             assigned_variable_ids: WordMap::default(),
             possibly_assigned_variable_ids: WordSet::default(),
             derived_local_sources: WordMap::default(),
+            class_string_sources: WordMap::default(),
             possibly_undefined_variable_ids: WordSet::default(),
             referenced_counts: WordMap::default(),
             references_in_scope: WordMap::default(),

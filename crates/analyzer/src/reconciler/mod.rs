@@ -48,6 +48,7 @@ use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::context::scope::var_has_root;
+use crate::resolver::class_name::get_class_name_from_atomic;
 use crate::resolver::property::resolve_declared_property;
 
 pub mod assertion_reconciler;
@@ -430,6 +431,29 @@ pub fn reconcile_keyed_types<'ctx, A>(
         }
 
         if !has_object_array_access {
+            if let Some(source_id) = block_context.class_string_sources.get(key).copied() {
+                if let Some(resolved) = result_type
+                    .types
+                    .iter()
+                    .find_map(|atomic| get_class_name_from_atomic(context.codebase, atomic))
+                    .filter(|resolved| !resolved.is_invalid() && !resolved.is_possibly_invalid())
+                {
+                    let object_type = resolved.get_object_type(context.codebase);
+                    let object_union = TUnion::from_single(Cow::Owned(object_type));
+                    let narrowed = block_context
+                        .locals
+                        .get(&source_id)
+                        .and_then(|current| intersect_union_types(current, &object_union, context.codebase));
+                    if let Some(narrowed) = narrowed.filter(|t| !t.is_never()) {
+                        let changed = block_context.locals.get(&source_id).is_none_or(|current| **current != narrowed);
+                        if changed {
+                            block_context.locals.insert(source_id, Rc::new(narrowed));
+                            changed_var_ids.insert(source_id);
+                        }
+                    }
+                }
+            }
+
             block_context.locals.insert(*key, Rc::new(result_type));
         }
 

@@ -12,6 +12,7 @@ use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
+use mago_codex::ttype::atomic::scalar::class_like_string::TClassLikeString;
 use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::atomic::scalar::string::TString;
 use mago_codex::ttype::atomic::scalar::string::TStringCasing;
@@ -39,6 +40,7 @@ use mago_syntax::cst::Literal;
 use mago_syntax::cst::LocalIdentifier;
 use mago_syntax::cst::UnaryPrefix;
 use mago_syntax::cst::UnaryPrefixOperator;
+use mago_syntax::cst::Variable;
 use mago_word::Word;
 use mago_word::WordMap;
 use mago_word::ascii_lowercase_word;
@@ -718,13 +720,15 @@ pub(super) fn scrape_equality_assertions<A>(
 where
     A: Arena,
 {
-    if let Some(assertions) = scrape_class_constant_equality_assertions(
-        left,
-        right,
-        artifacts,
-        assertion_context,
-        false, // negated = false
-    ) {
+    if let Some(assertions) =
+        scrape_get_class_or_gettype_equality_assertions(left, right, artifacts, assertion_context, false)
+    {
+        return assertions;
+    }
+
+    if let Some(assertions) =
+        scrape_class_constant_equality_assertions(left, right, artifacts, assertion_context, false)
+    {
         return assertions;
     }
 
@@ -804,13 +808,14 @@ fn scrape_inequality_assertions<A>(
 where
     A: Arena,
 {
-    if let Some(assertions) = scrape_class_constant_equality_assertions(
-        left,
-        right,
-        artifacts,
-        assertion_context,
-        true, // negated = true
-    ) {
+    if let Some(assertions) =
+        scrape_get_class_or_gettype_equality_assertions(left, right, artifacts, assertion_context, true)
+    {
+        return assertions;
+    }
+
+    if let Some(assertions) = scrape_class_constant_equality_assertions(left, right, artifacts, assertion_context, true)
+    {
         return assertions;
     }
 
@@ -957,6 +962,198 @@ where
     let mut if_types = WordMap::default();
     if_types.insert(variable_id, vec![assertions]);
     Some(vec![if_types])
+}
+
+/// Scrapes assertions for comparisons like `get_class($var) === Class::class`,
+/// `gettype($var) === "string"`, or `$var === Class::class`.
+///
+/// Treated as equivalent to an `instanceof` check: inside the matching branch,
+/// `$var` is narrowed to the class (or scalar type) named on the other side.
+fn scrape_get_class_or_gettype_equality_assertions<A>(
+    left: &Expression,
+    right: &Expression,
+    artifacts: &AnalysisArtifacts,
+    assertion_context: AssertionContext<'_, '_, A>,
+    negated: bool,
+) -> Option<Vec<WordMap<AssertionSet>>>
+where
+    A: Arena,
+{
+    let (call, compared) = match (get_get_class_or_gettype_call(left), get_get_class_or_gettype_call(right)) {
+        (Some((call, _)), None) => (Some(call), Some(right)),
+        (None, Some((call, _))) => (Some(call), Some(left)),
+        _ => (None, None),
+    };
+
+    let Some(call) = call else {
+        return scrape_class_constant_vs_string_variable(left, right, artifacts, assertion_context, negated);
+    };
+    let compared = compared?;
+
+    let FunctionCall { function, argument_list } = call;
+    if argument_list.arguments.len() != 1 {
+        return scrape_class_constant_vs_string_variable(left, right, artifacts, assertion_context, negated);
+    }
+    let Expression::Identifier(name) = function else {
+        return scrape_class_constant_vs_string_variable(left, right, artifacts, assertion_context, negated);
+    };
+    let name_bytes = name.value();
+    if !name_bytes.eq_ignore_ascii_case(b"get_class") && !name_bytes.eq_ignore_ascii_case(b"gettype") {
+        return scrape_class_constant_vs_string_variable(left, right, artifacts, assertion_context, negated);
+    }
+    let argument = argument_list.arguments.first()?.value();
+    let function_name = name_bytes;
+
+    let variable_id = assertion_context.get_expression_id(argument)?;
+    let compared_type = artifacts.get_expression_type(compared)?;
+
+    let mut assertions = Vec::new();
+
+    if function_name.eq_ignore_ascii_case(b"get_class") {
+        for atomic in compared_type.types.as_ref() {
+            if let Some(resolved) = get_class_name_from_atomic(assertion_context.codebase, atomic) {
+                if resolved.is_invalid() || resolved.is_possibly_invalid() {
+                    continue;
+                }
+                let object_type = resolved.get_object_type(assertion_context.codebase);
+                let assertion = if resolved.is_final {
+                    Assertion::IsType(object_type)
+                } else {
+                    Assertion::IsIdentical(object_type)
+                };
+                assertions.push(if negated {
+                    match assertion {
+                        Assertion::IsType(t) => Assertion::IsNotType(t),
+                        Assertion::IsIdentical(t) => Assertion::IsNotIdentical(t),
+                        other => other,
+                    }
+                } else {
+                    assertion
+                });
+            }
+        }
+    } else {
+        for atomic in compared_type.types.as_ref() {
+            if let Some(scalar) = gettype_literal_to_scalar(atomic) {
+                let assertion = Assertion::IsType(scalar);
+                assertions.push(if negated {
+                    Assertion::IsNotType(match assertion {
+                        Assertion::IsType(t) => t,
+                        _ => unreachable!(),
+                    })
+                } else {
+                    assertion
+                });
+            }
+        }
+    }
+
+    if !assertions.is_empty() {
+        let mut if_types = WordMap::default();
+        if_types.insert(variable_id, vec![assertions]);
+        return Some(vec![if_types]);
+    }
+
+    scrape_class_constant_vs_string_variable(left, right, artifacts, assertion_context, negated)
+}
+
+fn get_get_class_or_gettype_call<'arena>(
+    expression: &'arena Expression<'arena>,
+) -> Option<(&'arena FunctionCall<'arena>, &'arena Expression<'arena>)> {
+    let Expression::Call(Call::Function(function_call)) = expression else {
+        return None;
+    };
+    if function_call.argument_list.arguments.len() != 1 {
+        return None;
+    }
+    let Expression::Identifier(name) = function_call.function else {
+        return None;
+    };
+    let name_bytes = name.value();
+    if !name_bytes.eq_ignore_ascii_case(b"get_class") && !name_bytes.eq_ignore_ascii_case(b"gettype") {
+        return None;
+    }
+    Some((function_call, function_call.argument_list.arguments.first()?.value()))
+}
+
+fn gettype_literal_to_scalar(atomic: &TAtomic) -> Option<TAtomic> {
+    let TAtomic::Scalar(TScalar::String(string)) = atomic else {
+        return None;
+    };
+    let value = string.get_known_literal_value()?;
+    match value {
+        b"string" => Some(TAtomic::Scalar(TScalar::string())),
+        b"integer" => Some(TAtomic::Scalar(TScalar::int())),
+        b"double" => Some(TAtomic::Scalar(TScalar::float())),
+        b"boolean" => Some(TAtomic::Scalar(TScalar::bool())),
+        b"object" => Some(TAtomic::Object(TObject::Any)),
+        b"NULL" => Some(TAtomic::Null),
+        _ => None,
+    }
+}
+
+/// Scrapes assertions for comparisons like `$var === Class::class` where `$var` is a
+/// string-typed variable, narrowing `$var` to `class-string<Class>`.
+fn scrape_class_constant_vs_string_variable<A>(
+    left: &Expression,
+    right: &Expression,
+    artifacts: &AnalysisArtifacts,
+    assertion_context: AssertionContext<'_, '_, A>,
+    negated: bool,
+) -> Option<Vec<WordMap<AssertionSet>>>
+where
+    A: Arena,
+{
+    let (class_expr, variable_expr) = match (is_bare_class_constant_access(left), is_bare_class_constant_access(right))
+    {
+        (Some(class_expr), None) => (class_expr, right),
+        (None, Some(class_expr)) => (class_expr, left),
+        _ => return None,
+    };
+
+    let variable_id = assertion_context.get_expression_id(variable_expr)?;
+    let variable_type = artifacts.get_expression_type(variable_expr)?;
+    if !matches!(variable_expr, Expression::Variable(Variable::Direct(_)))
+        || !variable_type.types.iter().any(|atomic| matches!(atomic, TAtomic::Scalar(TScalar::String(_))))
+    {
+        return None;
+    }
+
+    let class_name = match class_expr {
+        Expression::Identifier(name) => assertion_context.resolved_names.get(name),
+        _ => return None,
+    };
+
+    let class_string = TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::literal(word(class_name))));
+    let assertion = Assertion::IsType(class_string);
+    let assertion = if negated {
+        Assertion::IsNotType(match assertion {
+            Assertion::IsType(t) => t,
+            _ => unreachable!(),
+        })
+    } else {
+        assertion
+    };
+
+    let mut if_types = WordMap::default();
+    if_types.insert(variable_id, vec![vec![assertion]]);
+    Some(vec![if_types])
+}
+
+fn is_bare_class_constant_access<'arena>(expression: &'arena Expression<'arena>) -> Option<&'arena Expression<'arena>> {
+    if let Expression::Access(Access::ClassConstant(ClassConstantAccess {
+        class,
+        constant: ClassLikeConstantSelector::Identifier(LocalIdentifier { value: b"class", .. }),
+        ..
+    })) = unwrap_expression(expression)
+    {
+        match &**class {
+            Expression::Identifier(_) => Some(class),
+            _ => None,
+        }
+    } else {
+        None
+    }
 }
 
 /// Helper to check if an expression is a `::class` constant access.

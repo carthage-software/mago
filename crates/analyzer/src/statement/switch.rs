@@ -17,6 +17,7 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
+use mago_syntax::cst::Call;
 use mago_syntax::cst::Expression;
 use mago_syntax::cst::Statement;
 use mago_syntax::cst::Switch;
@@ -908,17 +909,37 @@ where
             self.context.resolved_names,
             Some(self.context.codebase),
         ) {
-            (false, id, get_root_expression_id(switch.expression), switch.expression.clone())
+            return (false, id, get_root_expression_id(switch.expression), switch.expression.clone());
+        }
+
+        let subject_id_str = format!("{}{}", Self::SYNTHETIC_SWITCH_VAR_PREFIX, switch.expression.span().start.offset);
+        let subject_id = mago_word::word(&subject_id_str);
+        self.block_context.locals.insert(subject_id, Rc::clone(subject_type));
+
+        if Self::is_get_class_or_gettype_call(switch.expression) {
+            (true, subject_id, None, switch.expression.clone())
         } else {
-            let subject_id_str =
-                format!("{}{}", Self::SYNTHETIC_SWITCH_VAR_PREFIX, switch.expression.span().start.offset);
-            let subject_id = mago_word::word(&subject_id_str);
-            self.block_context.locals.insert(subject_id, Rc::clone(subject_type));
             let subject_for_conditions =
                 new_synthetic_variable(self.context.arena, subject_id_str.as_bytes(), switch.expression.span());
 
             (true, subject_id, None, subject_for_conditions)
         }
+    }
+
+    fn is_get_class_or_gettype_call(expression: &Expression<'arena>) -> bool {
+        let Expression::Call(Call::Function(function_call)) = expression else {
+            return false;
+        };
+
+        if function_call.argument_list.arguments.len() != 1 {
+            return false;
+        }
+
+        let Expression::Identifier(name) = function_call.function else {
+            return false;
+        };
+
+        name.value().eq_ignore_ascii_case(b"get_class") || name.value().eq_ignore_ascii_case(b"gettype")
     }
 
     fn update_case_exit_map(&mut self, case: &SwitchCase, case_index: usize) {

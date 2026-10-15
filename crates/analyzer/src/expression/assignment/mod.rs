@@ -31,6 +31,7 @@ use mago_syntax::cst::Assignment;
 use mago_syntax::cst::AssignmentOperator;
 use mago_syntax::cst::Binary;
 use mago_syntax::cst::BinaryOperator;
+use mago_syntax::cst::Call;
 use mago_syntax::cst::Expression;
 use mago_syntax::cst::List;
 use mago_syntax::cst::UnaryPrefix;
@@ -56,6 +57,7 @@ use crate::utils::docblock::get_type_from_var_docblock;
 use crate::utils::expression::array::get_array_target_type_given_index;
 use crate::utils::expression::expression_has_logic;
 use crate::utils::expression::get_block_expression_id;
+use crate::utils::expression::get_expression_id;
 use crate::utils::expression::get_non_nullsafe_expression_id;
 use crate::utils::expression::get_nullsafe_base_expressions;
 use crate::utils::expression::get_root_expression_id;
@@ -736,6 +738,29 @@ pub fn analyze_assignment_to_variable<'ctx, 'arena, A>(
 
     block_context.locals.insert(variable_id, assigned_type);
     block_context.variables_possibly_in_scope.insert(variable_id);
+
+    if let Some(source) = source_expression
+        && let Expression::Call(Call::Function(function_call)) = source
+        && function_call.argument_list.arguments.len() == 1
+        && let Expression::Identifier(name) = function_call.function
+        && name.value().eq_ignore_ascii_case(b"get_class")
+    {
+        let argument = function_call.argument_list.arguments.first();
+        if let Some(argument) = argument
+            && let Some(source_id) = get_expression_id(
+                argument.value(),
+                block_context.scope.get_class_like_name(),
+                context.resolved_names,
+                Some(context.codebase),
+            )
+        {
+            block_context.class_string_sources.insert(variable_id, source_id);
+        } else {
+            block_context.class_string_sources.remove(&variable_id);
+        }
+    } else {
+        block_context.class_string_sources.remove(&variable_id);
+    }
 }
 
 fn analyze_destructuring<'ctx, 'ast, 'arena, A>(
