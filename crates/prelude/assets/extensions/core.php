@@ -904,7 +904,6 @@ function get_included_files(): array {}
 function get_required_files(): array {}
 
 /**
- * @param object|string $object_or_class
  * @param class-string $class
  *
  * @return ($allow_string is false ? ($object_or_class is object ? bool : false) : bool)
@@ -914,7 +913,6 @@ function get_required_files(): array {}
 function is_subclass_of(mixed $object_or_class, string $class, bool $allow_string = true): bool {}
 
 /**
- * @param object|string $object_or_class
  * @param class-string $class
  *
  * @return ($allow_string is false ? ($object_or_class is object ? bool : false) : bool)

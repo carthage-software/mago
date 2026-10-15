@@ -2888,6 +2888,7 @@ test_case!(operator_overloading_unary, crate::framework::operator_overloading_se
 test_case!(operator_overloading_comparison, crate::framework::operator_overloading_settings());
 test_case!(operator_overloading_disabled);
 test_case!(large_constant_map_unknown_ref);
+test_case!(is_a_mixed_parameter_stub);
 
 #[test]
 fn issue_2478_without_property_memoization() {
