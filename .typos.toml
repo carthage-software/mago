@@ -16,6 +16,7 @@ extend-ignore-re = [
     # Typo in cruet
     "has_seperator: false",
     '"k" \. "nown"',
+    'ContextC\|onstant',
     '"abd00?"\.to_string',
     "<<<FOF",
     "FOF;",
