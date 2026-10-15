@@ -47,7 +47,6 @@ function narrow_not_null(Dto $dto): void
 
 function narrow_isset(Dto $dto): void
 {
-    // @mago-expect analysis:redundant-nullsafe-operator
     if (isset($dto->terms?->duration)) {
         take_terms($dto->terms);
     }
