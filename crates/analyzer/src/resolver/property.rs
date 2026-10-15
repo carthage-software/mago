@@ -124,16 +124,6 @@ where
 
     if is_null_safe && !is_nullable && !is_all_null && !object_type.has_nullsafe_null() {
         report_redundant_nullsafe(context, operator_span, object_expression, &object_type, "property access");
-    } else if is_null_safe && block_context.flags.inside_isset() {
-        // `isset()`, `empty()`, and the left-hand side of `??` already suppress
-        // null-access issues, so `?->` has no effect here, even on a nullable receiver.
-        report_redundant_nullsafe_in_suppressing_context(
-            context,
-            operator_span,
-            object_expression,
-            &object_type,
-            "property access",
-        );
     }
 
     let mut property_names = Vec::new();
@@ -1488,43 +1478,6 @@ pub(crate) fn report_redundant_nullsafe<'arena, A>(
                     .with_message(format!("This expression (type `{object_type_str}`) is never `null`")),
             )
             .with_note("The nullsafe operator (`?->`) short-circuits the access if the object is `null`. Since this expression is guaranteed not to be `null`, this check is unnecessary.")
-            .with_help(format!("Consider using the direct {access_kind} operator (`->`) for clarity.")),
-        |edits| {
-            edits.push(TextEdit::replace(operator_span.to_range(), "->"));
-        },
-    );
-}
-
-/// Reports a nullsafe property access that is redundant because it sits in a
-/// context that already handles `null`: `isset()`, `empty()`, or the left-hand
-/// side of `??`.
-///
-/// Unlike property access, method calls still need `?->` in these positions
-/// (calling a method on `null` is a fatal `Error`, not a suppressed warning),
-/// so this is only reported for property access.
-pub(crate) fn report_redundant_nullsafe_in_suppressing_context<'arena, A>(
-    context: &mut Context<'_, 'arena, A>,
-    operator_span: Span,
-    object_expr: &Expression<'arena>,
-    object_type: &TUnion,
-    access_kind: &str,
-) where
-    A: Arena,
-{
-    let object_type_str = object_type.get_id();
-
-    context.collector.propose_with_code(
-        IssueCode::RedundantNullsafeOperator,
-        Issue::help("Redundant nullsafe operator (`?->`) used in a context that already handles `null`.")
-            .with_annotation(
-                Annotation::primary(operator_span).with_message("Nullsafe operator `?->` is unnecessary here"),
-            )
-            .with_annotation(
-                Annotation::secondary(object_expr.span()).with_message(format!(
-                    "This expression (type `{object_type_str}`) is already null-checked by the enclosing construct"
-                )),
-            )
-            .with_note("`isset()`, `empty()`, and the left-hand side of `??` suppress null-access issues, so short-circuiting with `?->` has no effect here.")
             .with_help(format!("Consider using the direct {access_kind} operator (`->`) for clarity.")),
         |edits| {
             edits.push(TextEdit::replace(operator_span.to_range(), "->"));

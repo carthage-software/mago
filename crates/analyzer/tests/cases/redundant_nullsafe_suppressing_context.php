@@ -20,22 +20,21 @@ final class SuppressItem
 /**
  * @mago-expect analysis:redundant-nullsafe-operator
  */
+function property_on_non_null(SuppressProfile $profile): string
+{
+    return $profile?->firstName;
+}
+
 function coalesce_left(?SuppressProfile $profile): string
 {
     return $profile?->firstName ?? '';
 }
 
-/**
- * @mago-expect analysis:redundant-nullsafe-operator
- */
 function inside_isset(?SuppressProfile $profile): bool
 {
     return isset($profile?->firstName);
 }
 
-/**
- * @mago-expect analysis:redundant-nullsafe-operator
- */
 function inside_empty(?SuppressProfile $profile): bool
 {
     return empty($profile?->firstName);
