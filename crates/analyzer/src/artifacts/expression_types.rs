@@ -97,6 +97,34 @@ impl ExpressionTypeCheckpoints {
         }
     }
 
+    pub(crate) fn finish_recording(&mut self, types: &TypeMap) -> Vec<(ExpressionRange, Rc<TUnion>)> {
+        let Some(checkpoint) = self.checkpoints.pop() else {
+            unreachable!("expression type checkpoint must exist");
+        };
+
+        match checkpoint {
+            Checkpoint::Changes(changes) => {
+                let mut recorded = Vec::with_capacity(changes.len());
+                for (range, previous_type) in changes {
+                    if let Some(current_type) = types.get(&range) {
+                        recorded.push((range, Rc::clone(current_type)));
+                    }
+
+                    if let Some(Checkpoint::Changes(parent)) = self.checkpoints.last_mut() {
+                        parent.entry(range).or_insert(previous_type);
+                    }
+                }
+
+                recorded
+            }
+            Checkpoint::Snapshot(snapshot) => types
+                .iter()
+                .filter(|(range, current)| snapshot.get(*range).is_none_or(|previous| !Rc::ptr_eq(previous, current)))
+                .map(|(range, current)| (*range, Rc::clone(current)))
+                .collect(),
+        }
+    }
+
     /// Preserve complete maps before a hook makes untracked changes.
     pub(crate) fn detach(&mut self, types: &TypeMap) -> Self {
         let mut previous_types = types.clone();
@@ -383,6 +411,51 @@ mod tests {
         types.finish_checkpoint(CheckpointAction::Rollback);
         assert_same_types(&types, &HashMap::from_iter([((0, 1), original_type)]));
         assert!(types.checkpoints.is_empty());
+    }
+
+    #[test]
+    fn recording_returns_current_types_and_keeps_parent_rollback_exact() {
+        let mut types = ExpressionTypes::default();
+        types.insert((0, 1), Rc::new(get_literal_int(1)));
+        let expected = types.types.clone();
+        types.begin_checkpoint();
+        types.begin_checkpoint();
+        let changed_type = Rc::new(get_literal_int(2));
+        let added_type = Rc::new(get_literal_int(3));
+        types.insert((0, 1), Rc::clone(&changed_type));
+        types.insert((2, 3), Rc::new(get_literal_int(9)));
+        types.insert((2, 3), Rc::clone(&added_type));
+        let mut recorded = types.checkpoints.finish_recording(&types.types);
+        recorded.sort_unstable_by_key(|(range, _)| *range);
+        assert_eq!(recorded.len(), 2);
+        assert!(Rc::ptr_eq(&recorded[0].1, &changed_type) && Rc::ptr_eq(&recorded[1].1, &added_type));
+        types.insert((0, 1), Rc::new(get_literal_int(4)));
+        types.extend(recorded);
+        assert!(types.get(&(0, 1)).is_some_and(|ty| Rc::ptr_eq(ty, &changed_type)));
+        types.finish_checkpoint(CheckpointAction::Rollback);
+        assert_same_types(&types, &expected);
+        assert!(types.checkpoints.is_empty());
+    }
+
+    #[test]
+    fn recording_across_detached_checkpoints_returns_changed_types() {
+        let mut artifacts = AnalysisArtifacts::new();
+        artifacts.extend_expression_types((0..2).map(|key| ((key, key + 1), Rc::new(get_literal_int(i64::from(key))))));
+        artifacts.begin_expression_type_recording();
+        let Some(checkpoints) = artifacts.detach_expression_type_checkpoints() else {
+            unreachable!("recording checkpoint must exist");
+        };
+        let changed_type = Rc::new(get_literal_int(10));
+        let added_type = Rc::new(get_literal_int(20));
+        artifacts.expression_types.insert((1, 2), Rc::clone(&changed_type));
+        artifacts.expression_types.insert((5, 6), Rc::clone(&added_type));
+        artifacts.restore_expression_type_checkpoints(checkpoints);
+        let mut recorded = artifacts.finish_expression_type_recording();
+        recorded.sort_unstable_by_key(|(range, _)| *range);
+        assert_eq!(recorded.len(), 2);
+        assert!(recorded[0].0 == (1, 2) && Rc::ptr_eq(&recorded[0].1, &changed_type));
+        assert!(recorded[1].0 == (5, 6) && Rc::ptr_eq(&recorded[1].1, &added_type));
+        assert!(artifacts.expression_type_checkpoints.is_empty());
     }
 
     #[derive(Clone, Copy, Debug)]

@@ -131,6 +131,10 @@ impl AnalysisArtifacts {
         self.retain_completed_expression_types || !self.expression_type_checkpoints.is_empty()
     }
 
+    pub(crate) fn retains_completed_expression_types(&self) -> bool {
+        self.retain_completed_expression_types
+    }
+
     pub(crate) fn record_static_local_types(
         &mut self,
         block_context: &BlockContext<'_>,
@@ -294,6 +298,14 @@ impl AnalysisArtifacts {
         if let Some(editor) = &mut self.editor {
             editor.begin_checkpoint();
         }
+    }
+
+    pub(crate) fn begin_expression_type_recording(&mut self) {
+        self.expression_type_checkpoints.begin_checkpoint();
+    }
+
+    pub(crate) fn finish_expression_type_recording(&mut self) -> Vec<((u32, u32), Rc<TUnion>)> {
+        self.expression_type_checkpoints.finish_recording(&self.expression_types)
     }
 
     pub(crate) fn expression_type_checkpoint_matches(&self, same: impl Fn(&TUnion, &TUnion) -> bool) -> bool {

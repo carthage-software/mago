@@ -1,5 +1,6 @@
 use foldhash::fast::RandomState;
 use indexmap::IndexSet;
+
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::reference::ReferenceOrigin;
@@ -87,11 +88,31 @@ pub struct MethodReference {
     pub uncertain: bool,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ExpressionClasses {
     pub span: (u32, u32),
     pub classes: Box<[Word]>,
     pub uncertain: bool,
+}
+
+impl ExpressionClasses {
+    /// The named object classes of `union`, or `None` when it names none.
+    #[must_use]
+    pub fn from_union(span: (u32, u32), union: &TUnion) -> Option<Self> {
+        let mut classes = Vec::new();
+        let mut uncertain = false;
+        for atomic in union.types.iter() {
+            uncertain |= !collect_classes(atomic, &mut classes);
+        }
+
+        if classes.is_empty() {
+            return None;
+        }
+
+        classes.sort_unstable();
+        classes.dedup();
+        Some(Self { span, classes: classes.into_boxed_slice(), uncertain })
+    }
 }
 
 #[derive(Debug, Clone, Default)]
@@ -343,21 +364,11 @@ impl AnalysisArtifacts {
         methods.sort_unstable();
         let mut members: Vec<_> = editor.members.iter().copied().collect();
         members.sort_unstable();
-        let mut expression_classes = Vec::new();
-        for (&span, union) in &self.expression_types {
-            let mut classes = Vec::new();
-            let mut uncertain = false;
-            for atomic in union.types.iter() {
-                uncertain |= !collect_classes(atomic, &mut classes);
-            }
-
-            if !classes.is_empty() {
-                classes.sort_unstable();
-                classes.dedup();
-                expression_classes.push(ExpressionClasses { span, classes: classes.into_boxed_slice(), uncertain });
-            }
-        }
-
+        let mut expression_classes: Vec<_> = self
+            .expression_types
+            .iter()
+            .filter_map(|(&span, union)| ExpressionClasses::from_union(span, union))
+            .collect();
         expression_classes.sort_unstable_by_key(|types| types.span);
         Some(EditorFileData {
             methods: methods.into_boxed_slice(),

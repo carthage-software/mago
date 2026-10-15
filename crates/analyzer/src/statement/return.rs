@@ -493,11 +493,6 @@ pub fn handle_return_value<'ctx, A>(
                 Annotation::primary(return_value.span())
                     .with_message(format!("This has type `{inferred_return_type_str}`"))
             )
-            .with_note(
-                format!(
-                    "The type `{inferred_return_type_str}` returned here is not compatible with the declared return type `{expected_return_type_str}`."
-                )
-            )
             .with_help(
                 format!(
                     "Change the return value to match `{expected_return_type_str}`, or update the function's return type declaration."
