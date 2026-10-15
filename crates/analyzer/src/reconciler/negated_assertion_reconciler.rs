@@ -6,6 +6,7 @@ use mago_codex::assertion::Assertion;
 use mago_codex::consts::MAX_ENUM_CASES_FOR_ANALYSIS;
 use mago_word::Word;
 use mago_word::WordSet;
+use mago_word::word;
 
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
@@ -255,6 +256,37 @@ fn subtract_complex_type<A>(
                     key_type,
                     Arc::clone(&iterable.value_type),
                 ))));
+            }
+            (TAtomic::Iterable(iterable), TAtomic::Array(_)) => {
+                let key_type = if iterable.key_type.is_always_array_key(false) {
+                    Arc::clone(&iterable.key_type)
+                } else {
+                    Arc::new(get_arraykey())
+                };
+
+                let array_part = TAtomic::Array(TArray::Keyed(TKeyedArray::new_with_parameters(
+                    key_type,
+                    Arc::clone(&iterable.value_type),
+                )));
+
+                if atomic_comparator::is_contained_by(
+                    context.codebase,
+                    &array_part,
+                    assertion_type,
+                    true,
+                    &mut ComparisonResult::new(),
+                ) {
+                    *can_be_disjunct = true;
+
+                    acceptable_types.push(TAtomic::Object(TObject::Named(
+                        TNamedObject::new(word("Traversable")).with_type_parameters(Some(vec![
+                            (*iterable.key_type).clone(),
+                            (*iterable.value_type).clone(),
+                        ])),
+                    )));
+                } else {
+                    acceptable_types.push(existing_atomic);
+                }
             }
             (_, TAtomic::Iterable(assertion_iterable)) if existing_atomic.is_array_or_traversable(context.codebase) => {
                 if !*can_be_disjunct && can_iterate_as(context.codebase, &existing_atomic, assertion_iterable) {
