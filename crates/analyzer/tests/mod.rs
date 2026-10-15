@@ -412,6 +412,7 @@ test_case!(docblock_key_of_literal_union);
 test_case!(docblock_array_shape_required_key);
 test_case!(docblock_array_shape_optional_key);
 test_case!(docblock_array_list_param);
+test_case!(docblock_array_mixed_key);
 test_case!(docblock_template_in_method);
 test_case!(docblock_param_class_string_template);
 test_case!(docblock_double_intersection_chain);

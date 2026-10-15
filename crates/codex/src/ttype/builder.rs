@@ -1023,7 +1023,11 @@ fn get_array_type<'src>(
 
     let mut array = TKeyedArray::new_with_parameters(
         Arc::new(if let Some(k) = key {
-            get_union_from_type(k, scope, type_context, classname)?
+            if matches!(k, Type::Mixed(_)) {
+                get_arraykey()
+            } else {
+                get_union_from_type(k, scope, type_context, classname)?
+            }
         } else {
             get_arraykey()
         }),
