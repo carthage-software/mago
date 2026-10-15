@@ -87,6 +87,7 @@ final class RuleRunnerTest extends TestCase
     }
 }
 
+/** @mago-expect lint:single-class-per-file */
 final class EnclosingScopeRule implements Rule
 {
     public function getDefinition(): RuleDefinition

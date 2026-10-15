@@ -22,6 +22,7 @@ use function substr;
  *
  * @api
  * @mago-expect lint:cyclomatic-complexity
+ * @mago-expect lint:kan-defect
  * @mago-expect lint:too-many-methods
  */
 final class SourceFile

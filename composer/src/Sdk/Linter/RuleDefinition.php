@@ -14,6 +14,7 @@ use function array_key_exists;
  * Immutable metadata describing a custom linter rule.
  *
  * @api
+ * @mago-expect lint:cyclomatic-complexity
  */
 final class RuleDefinition
 {

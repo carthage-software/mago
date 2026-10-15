@@ -25,6 +25,7 @@ use function strlen;
  * parenting, text, and resolved-name behavior without a worker or host.
  *
  * @api
+ * @mago-expect lint:cyclomatic-complexity
  */
 final class SourceFileBuilder
 {
@@ -133,10 +134,11 @@ final class SourceFileBuilder
 
             if ($firstChild[$parent] === self::NO_NODE) {
                 $firstChild[$parent] = $id;
-            } else {
-                $nextSibling[$lastChild[$parent]] = $id;
+                $lastChild[$parent] = $id;
+                continue;
             }
 
+            $nextSibling[$lastChild[$parent]] = $id;
             $lastChild[$parent] = $id;
         }
 
