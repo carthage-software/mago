@@ -56,6 +56,7 @@ macro_rules! test_case {
 test_case!(accessing_undefined_class_constant);
 test_case!(generic_docblock_native_return);
 test_case!(phpdoc_types_not_certain, crate::framework::phpdoc_types_not_certain_settings());
+test_case!(message_quality);
 test_case!(ds_map_defaults);
 test_case!(ds_map_default_type_errors);
 test_case!(rdkafka_producer);

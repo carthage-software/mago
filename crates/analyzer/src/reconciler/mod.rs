@@ -1526,7 +1526,7 @@ fn report_impossible_issue<A>(
         ),
         Assertion::IsNotType(TAtomic::Null) => (
             IssueCode::ImpossibleNullTypeComparison,
-            "will always be `null`".to_owned(),
+            "can never be non-`null`".to_owned(),
             format!("Variable {subject_desc} is already known to be `null`, so asserting it's not `null` is impossible."),
             format!("The condition checking if `{key}` is not `null` will always be false. Review the variable's state or condition."),
         ),
@@ -1538,7 +1538,7 @@ fn report_impossible_issue<A>(
         ),
         Assertion::DoesNotHaveArrayKey(array_key_assertion) => (
             IssueCode::ImpossibleKeyCheck,
-            format!("will always have the key `{array_key_assertion}`"),
+            format!("can never lack the key `{array_key_assertion}`"),
             format!("Variable {subject_desc} is known to always contain the key `{array_key_assertion}`. Asserting it doesn't have this key will always be false."),
             "Review the logic; this negative key check will always fail.".to_owned(),
         ),
