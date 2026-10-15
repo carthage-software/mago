@@ -109,6 +109,18 @@ See [Lifecycle hooks](/extensions/analyzer/lifecycle-hooks/).
 
 Targets are `FunctionTarget` with `FunctionTargetKind`, or `MethodTarget`. See [Return types and callable signatures](/extensions/analyzer/return-types-and-callable-signatures/).
 
+## Throw types
+
+| Type | Purpose |
+| :--- | :--- |
+| `FunctionThrowTypeProvider` | Supplies thrown exceptions for selected function calls |
+| `MethodThrowTypeProvider` | Supplies thrown exceptions for selected method calls |
+| `ExpressionThrowTypeProvider` | Supplies thrown exceptions for an expression |
+| `ThrowTypeProviderContext` | Invocation with inferred arguments and semantic services |
+| `ExpressionThrowTypeProviderContext` | Expression source, span, inferred type, and semantic services |
+
+See [Throw type providers](/extensions/analyzer/throw-type-providers/).
+
 ## Assertions
 
 `FunctionAssertionProvider`, `MethodAssertionProvider`, and `AssertionProviderContext` produce `InvocationAssertions`. Method providers can use `InvocationAssertions::RECEIVER` to assert facts about the called object.

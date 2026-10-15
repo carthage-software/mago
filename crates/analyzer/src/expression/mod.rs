@@ -250,13 +250,24 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Expression<'arena> {
         }
 
         if context.settings.check_throws && context.plugin_registry.has_expression_throw_providers() {
-            let exceptions = context.plugin_registry.get_expression_thrown_exceptions(
-                context.codebase,
-                context.source_file,
-                block_context,
-                artifacts,
-                self,
-            );
+            let exceptions = context
+                .plugin_registry
+                .get_external_expression_thrown_exceptions(
+                    context.codebase,
+                    context.source_file,
+                    artifacts,
+                    self,
+                    context.external_analysis_session,
+                )
+                .unwrap_or_else(|| {
+                    context.plugin_registry.get_expression_thrown_exceptions(
+                        context.codebase,
+                        context.source_file,
+                        block_context,
+                        artifacts,
+                        self,
+                    )
+                });
 
             for exception in exceptions {
                 block_context.possibly_thrown_exceptions.entry(exception).or_default().insert(self.span());

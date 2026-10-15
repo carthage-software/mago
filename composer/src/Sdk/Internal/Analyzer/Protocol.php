@@ -58,6 +58,7 @@ use function count;
 use function intdiv;
 use function is_string;
 use function pack;
+use function str_contains;
 use function strncmp;
 use function unpack;
 
@@ -88,6 +89,8 @@ final class Protocol
     public const CLASS_INITIALIZER_REQUEST = 17;
     public const ASSERTION_REQUEST = 18;
     public const CODEBASE_SCAN_REQUEST = 19;
+    public const THROW_TYPE_REQUEST = 20;
+    public const EXPRESSION_THROW_TYPE_REQUEST = 21;
     public const GET_EXPRESSION_TYPES = 1;
     public const GET_ALL_EXPRESSION_TYPES = 2;
     public const GET_INFERRED_RETURN_TYPES = 3;
@@ -144,7 +147,7 @@ final class Protocol
     private const TYPE_COMPARISON_BATCH_REQUEST = 16;
     private const MAGIC_U32 = 0x4D41_4E41;
     private const MAJOR = 2;
-    private const MINOR = 0;
+    private const MINOR = 1;
     private const VERSION_U32 = (self::MAJOR << 16) | self::MINOR;
     private const DESCRIBE_RESPONSE = 0x8001;
     private const RETURN_TYPE_RESPONSE = 0x8002;
@@ -165,16 +168,20 @@ final class Protocol
     private const CLASS_INITIALIZER_RESPONSE = 0x8011;
     private const ASSERTION_RESPONSE = 0x8012;
     private const CODEBASE_SCAN_RESPONSE = 0x8013;
+    private const THROW_TYPE_RESPONSE = 0x8014;
     private const MAXIMUM_ISSUES = 1_000_000;
     private const MAXIMUM_ISSUE_NOTES = 0x0001_0000;
     private const MAXIMUM_ISSUE_ANNOTATIONS = 0x0001_0000;
     private const MAXIMUM_ISSUE_EDITS = 0x0001_0000;
-    private const RETURN_TYPE_REQUEST_HEADER = "MANA\x00\x02\x00\x00\x00\x02\x00\x00";
-    private const CALLABLE_SIGNATURE_REQUEST_HEADER = "MANA\x00\x02\x00\x00\x00\x0C\x00\x00";
-    private const ASSERTION_REQUEST_HEADER = "MANA\x00\x02\x00\x00\x00\x12\x00\x00";
-    private const UNHANDLED_RETURN_TYPE_RESPONSE = "MANA\x00\x02\x00\x00\x80\x02\x00\x00\x00";
-    private const UNHANDLED_CALLABLE_SIGNATURE_RESPONSE = "MANA\x00\x02\x00\x00\x80\x0C\x00\x00\x00";
-    private const UNHANDLED_ASSERTION_RESPONSE = "MANA\x00\x02\x00\x00\x80\x12\x00\x00\x00";
+    private const RETURN_TYPE_REQUEST_HEADER = "MANA\x00\x02\x00\x01\x00\x02\x00\x00";
+    private const CALLABLE_SIGNATURE_REQUEST_HEADER = "MANA\x00\x02\x00\x01\x00\x0C\x00\x00";
+    private const ASSERTION_REQUEST_HEADER = "MANA\x00\x02\x00\x01\x00\x12\x00\x00";
+    private const THROW_TYPE_REQUEST_HEADER = "MANA\x00\x02\x00\x01\x00\x14\x00\x00";
+    private const EXPRESSION_THROW_TYPE_REQUEST_HEADER = "MANA\x00\x02\x00\x01\x00\x15\x00\x00";
+    private const UNHANDLED_RETURN_TYPE_RESPONSE = "MANA\x00\x02\x00\x01\x80\x02\x00\x00\x00";
+    private const UNHANDLED_CALLABLE_SIGNATURE_RESPONSE = "MANA\x00\x02\x00\x01\x80\x0C\x00\x00\x00";
+    private const UNHANDLED_ASSERTION_RESPONSE = "MANA\x00\x02\x00\x01\x80\x12\x00\x00\x00";
+    private const UNHANDLED_THROW_TYPE_RESPONSE = "MANA\x00\x02\x00\x01\x80\x14\x00\x00\x00";
     private const INVOCATION_FUNCTION = 1;
     private const INVOCATION_INSTANCE_METHOD = 2;
     private const INVOCATION_STATIC_METHOD = 3;
@@ -197,6 +204,14 @@ final class Protocol
 
         if (strncmp($payload, self::ASSERTION_REQUEST_HEADER, 12) === 0) {
             return [self::ASSERTION_REQUEST, new PayloadReader($payload, 12)];
+        }
+
+        if (strncmp($payload, self::THROW_TYPE_REQUEST_HEADER, 12) === 0) {
+            return [self::THROW_TYPE_REQUEST, new PayloadReader($payload, 12)];
+        }
+
+        if (strncmp($payload, self::EXPRESSION_THROW_TYPE_REQUEST_HEADER, 12) === 0) {
+            return [self::EXPRESSION_THROW_TYPE_REQUEST, new PayloadReader($payload, 12)];
         }
 
         /** @var array{1: int<0, 4294967295>, 2: int<0, 4294967295>, 3: int<0, 4294967295>} $header */
@@ -319,6 +334,12 @@ final class Protocol
                     self::REGISTRATION_CAPABILITIES,
                     $plugin->memoizeProviders,
                 );
+                self::writeTargetRegistrations($writer, $plugin->functionThrowTypeProviders);
+                self::writeTargetRegistrations($writer, $plugin->methodThrowTypeProviders);
+                $writer->writeCount($plugin->expressionThrowTypeProviders);
+                foreach ($plugin->expressionThrowTypeProviders as $provider) {
+                    $writer->writeU16($provider->index);
+                }
                 self::writeTargetRegistrations($writer, $plugin->propertyProviders);
                 self::writeTargetRegistrations($writer, $plugin->propertyInitializationProviders);
                 self::writeTargetRegistrations($writer, $plugin->classInitializerProviders);
@@ -1087,6 +1108,40 @@ final class Protocol
         );
     }
 
+    public static function readExpressionThrowTypeRequest(PayloadReader $reader): ExpressionThrowTypeRequest
+    {
+        $generation = $reader->readU64();
+        $providerCount = $reader->readU16();
+        if ($providerCount === 0) {
+            throw new ProtocolException('An expression throw-type request contains no providers.');
+        }
+
+        $providerIndices = [];
+        for ($index = 0; $index < $providerCount; ++$index) {
+            $providerIndices[] = $reader->readU16();
+        }
+
+        $sourceFilePath = $reader->readBytes();
+        $span = new Span($reader->readU32(), $reader->readU32());
+        $expression = $reader->readBytes();
+        $expressionType = null;
+        if ($reader->readBoolean()) {
+            $description = $reader->readBytes();
+            $expressionType = TypeCodec::read($reader, $description);
+        }
+
+        $reader->finish();
+
+        return new ExpressionThrowTypeRequest(
+            $generation,
+            $providerIndices,
+            $sourceFilePath,
+            $span,
+            $expression,
+            $expressionType,
+        );
+    }
+
     public static function writeReturnTypeResponse(?Type $type): string
     {
         if ($type === null) {
@@ -1144,6 +1199,28 @@ final class Protocol
         $writer = self::createMessage(self::ASSERTION_RESPONSE);
         $writer->writeBoolean(true);
         AssertionCodec::write($writer, $assertions);
+
+        return $writer->finish();
+    }
+
+    /**
+     * @param list<non-empty-string>|null $exceptions
+     */
+    public static function writeThrowTypeResponse(?array $exceptions): string
+    {
+        if ($exceptions === null) {
+            return self::UNHANDLED_THROW_TYPE_RESPONSE;
+        }
+
+        $writer = self::createMessage(self::THROW_TYPE_RESPONSE);
+        $writer->writeBoolean(true);
+        $writer->writeCount($exceptions);
+        foreach ($exceptions as $exception) {
+            if (!is_string($exception) || $exception === '' || str_contains($exception, "\0")) {
+                throw new ProtocolException('Throw-type providers must return non-empty class names without NUL.');
+            }
+            $writer->writeBytes($exception);
+        }
 
         return $writer->finish();
     }

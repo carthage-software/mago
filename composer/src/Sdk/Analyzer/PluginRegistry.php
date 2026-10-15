@@ -36,6 +36,21 @@ final class PluginRegistry
     private array $methodReturnTypeProviders = [];
 
     /**
+     * @var list<FunctionThrowTypeProvider>
+     */
+    private array $functionThrowTypeProviders = [];
+
+    /**
+     * @var list<MethodThrowTypeProvider>
+     */
+    private array $methodThrowTypeProviders = [];
+
+    /**
+     * @var list<ExpressionThrowTypeProvider>
+     */
+    private array $expressionThrowTypeProviders = [];
+
+    /**
      * @var list<FunctionAssertionProvider>
      */
     private array $functionAssertionProviders = [];
@@ -123,6 +138,21 @@ final class PluginRegistry
     public function registerMethodReturnTypeProvider(MethodReturnTypeProvider $provider): void
     {
         $this->methodReturnTypeProviders[] = $provider;
+    }
+
+    public function registerFunctionThrowTypeProvider(FunctionThrowTypeProvider $provider): void
+    {
+        $this->functionThrowTypeProviders[] = $provider;
+    }
+
+    public function registerMethodThrowTypeProvider(MethodThrowTypeProvider $provider): void
+    {
+        $this->methodThrowTypeProviders[] = $provider;
+    }
+
+    public function registerExpressionThrowTypeProvider(ExpressionThrowTypeProvider $provider): void
+    {
+        $this->expressionThrowTypeProviders[] = $provider;
     }
 
     public function registerFunctionAssertionProvider(FunctionAssertionProvider $provider): void
@@ -239,6 +269,33 @@ final class PluginRegistry
     public function getMethodReturnTypeProviders(): array
     {
         return $this->methodReturnTypeProviders;
+    }
+
+    /**
+     * @internal
+     * @return list<FunctionThrowTypeProvider>
+     */
+    public function getFunctionThrowTypeProviders(): array
+    {
+        return $this->functionThrowTypeProviders;
+    }
+
+    /**
+     * @internal
+     * @return list<MethodThrowTypeProvider>
+     */
+    public function getMethodThrowTypeProviders(): array
+    {
+        return $this->methodThrowTypeProviders;
+    }
+
+    /**
+     * @internal
+     * @return list<ExpressionThrowTypeProvider>
+     */
+    public function getExpressionThrowTypeProviders(): array
+    {
+        return $this->expressionThrowTypeProviders;
     }
 
     /**
