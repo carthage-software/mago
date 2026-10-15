@@ -1488,6 +1488,10 @@ where
                         if known_item.0 {
                             Arc::make_mut(known_items).remove(key_name);
                             did_remove_type = true;
+                        } else {
+                            did_remove_type = true;
+
+                            continue;
                         }
                     } else if let Some((key_parameter, _)) = parameters
                         && union_comparator::can_expression_types_be_identical(
