@@ -11,6 +11,8 @@ use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
 use mago_codex::ttype::atomic::array::list::TList;
+use mago_codex::ttype::atomic::derived::TDerived;
+use mago_codex::ttype::atomic::derived::intersection::TDerivedIntersection;
 use mago_codex::ttype::atomic::generic::TGenericParameter;
 use mago_codex::ttype::atomic::iterable::TIterable;
 use mago_codex::ttype::atomic::mixed::truthiness::TMixedTruthiness;
@@ -585,6 +587,12 @@ where
                 TNamedObject::new(word("Traversable"))
                     .with_type_parameters(Some(vec![(*iterable.key_type).clone(), (*iterable.value_type).clone()])),
             )));
+        } else if let TAtomic::Callable(_) = atomic {
+            did_remove_type = true;
+
+            let mut intersection = TDerivedIntersection::new(get_object());
+            intersection.add_intersection_type(atomic.clone());
+            object_types.push(TAtomic::Derived(TDerived::Intersection(intersection)));
         } else {
             did_remove_type = true;
         }
@@ -1110,6 +1118,17 @@ where
             TAtomic::Variable(_) => {
                 acceptable_types.push(atomic.clone());
                 did_remove_type = true;
+            }
+            TAtomic::Callable(callable) => {
+                did_remove_type = true;
+
+                if !callable.is_closure() {
+                    let mut intersection = TDerivedIntersection::new(TUnion::from_atomic(
+                        get_string_with_props(is_numeric, true, true, true, casing).get_single_owned(),
+                    ));
+                    intersection.add_intersection_type(atomic.clone());
+                    acceptable_types.push(TAtomic::Derived(TDerived::Intersection(intersection)));
+                }
             }
             TAtomic::Object(_) => {
                 did_remove_type = true;

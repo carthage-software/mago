@@ -121,7 +121,9 @@ pub fn can_atomic_be_callable(atomic: &TAtomic, codebase: &CodebaseMetadata) -> 
     }
 
     match atomic {
-        TAtomic::Scalar(TScalar::String(_)) | TAtomic::Array(TArray::List(_) | TArray::Keyed(_)) => true,
+        TAtomic::Object(TObject::Any)
+        | TAtomic::Scalar(TScalar::String(_))
+        | TAtomic::Array(TArray::List(_) | TArray::Keyed(_)) => true,
         TAtomic::Object(TObject::Named(named_object)) => codebase.is_inheritable(named_object.get_name().as_bytes()),
         TAtomic::Reference(TReference::Symbol { .. }) => true,
         TAtomic::GenericParameter(generic_parameter) => {
