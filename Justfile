@@ -129,6 +129,7 @@ publish $CARGO_RESOLVER_INCOMPATIBLE_PUBLISH_AGE="allow":
     cargo publish -p mago-twig-linter
     cargo publish -p mago-orchestrator
     cargo publish -p mago-wasm
+    cargo publish -p mago-server
     cargo publish
 
 # Cleans all build artifacts from the workspace.
