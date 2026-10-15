@@ -1,6 +1,7 @@
 use std::borrow::Cow;
 
 use mago_word::Word;
+use mago_word::word;
 
 use crate::metadata::CodebaseMetadata;
 use crate::ttype::atomic::TAtomic;
@@ -77,6 +78,8 @@ pub fn is_contained_by(
 }
 
 fn class_name_object(codebase: &CodebaseMetadata, name: Word) -> TAtomic {
+    let name = name.as_bytes().strip_prefix(b"\\").map_or(name, word);
+
     if codebase.enum_exists(name.as_bytes()) {
         TAtomic::Object(TObject::Enum(TEnum::new(name)))
     } else {
