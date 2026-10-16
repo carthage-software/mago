@@ -819,29 +819,36 @@ where
         && let (Some(left_type), Some(right_type)) =
             (artifacts.get_expression_type(&left.span()), artifacts.get_expression_type(&right.span()))
     {
+        let left_var_name = assertion_context.get_expression_id(left);
+        let right_var_name = assertion_context.get_expression_id(right);
+
+        if left_var_name.is_none() && right_var_name.is_none() {
+            return vec![];
+        }
+
+        if left_type == right_type {
+            return vec![];
+        }
+
         let (left_overlap, right_overlap) =
             union_comparator::strict_equality_overlap(assertion_context.codebase, left_type, right_type);
 
         if !left_overlap.is_never() && !right_overlap.is_never() {
             let mut if_types = WordMap::default();
 
-            let left_var_name = assertion_context.get_expression_id(left);
-            let right_var_name = assertion_context.get_expression_id(right);
-
-            let left_assertions: Vec<Assertion> =
-                left_overlap.types.iter().cloned().map(Assertion::IsIdentical).collect();
-            let right_assertions: Vec<Assertion> =
-                right_overlap.types.iter().cloned().map(Assertion::IsIdentical).collect();
-
             if let Some(left_var_name) = left_var_name
                 && left_type != &left_overlap
             {
+                let left_assertions: Vec<Assertion> =
+                    left_overlap.types.iter().cloned().map(Assertion::IsIdenticalFromEquality).collect();
                 if_types.insert(left_var_name, vec![left_assertions]);
             }
 
             if let Some(right_var_name) = right_var_name
                 && right_type != &right_overlap
             {
+                let right_assertions: Vec<Assertion> =
+                    right_overlap.types.iter().cloned().map(Assertion::IsIdenticalFromEquality).collect();
                 if_types.insert(right_var_name, vec![right_assertions]);
             }
 

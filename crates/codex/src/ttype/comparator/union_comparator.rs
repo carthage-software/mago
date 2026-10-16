@@ -456,12 +456,6 @@ pub fn can_expression_types_be_identical(
     false
 }
 
-/// Returns the variants of `left` and `right` that can be strictly identical
-/// (`===`) to at least one variant of the other union.
-///
-/// Variants that can never be identical to any variant on the other side
-/// (e.g. `int` in `int|string` compared against `float|string`, since
-/// `1 === 1.0` is `false`) are eliminated from both sides.
 #[must_use]
 pub fn strict_equality_overlap(codebase: &CodebaseMetadata, left: &TUnion, right: &TUnion) -> (TUnion, TUnion) {
     let mut left_types = Vec::new();
