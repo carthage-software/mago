@@ -33,3 +33,18 @@ function test_low_and(): string {
 
     return $bar;
 }
+
+function takes_string(string $s): string {
+    return $s;
+}
+
+/**
+ * @mago-expect analysis:possibly-null-argument
+ */
+function test_and_keeps_unassigned_variable(): string {
+    $nullable = maybe_string();
+    $other = "constant";
+    ($nullable === null) && ($other = "assigned");
+
+    return takes_string($nullable);
+}

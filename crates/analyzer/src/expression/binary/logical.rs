@@ -370,8 +370,6 @@ where
 
         let left_locals = left_locals_for_join.as_ref().unwrap_or(&left_block_context.locals);
 
-        block_context.locals.extend(left_locals.iter().map(|(var_id, var_type)| (*var_id, Rc::clone(var_type))));
-
         merge_short_circuited_assignments(
             context,
             block_context,
@@ -614,16 +612,14 @@ where
             &mut right_referenced_var_ids,
         );
 
-        // Truthiness assertions synthesized from the right-hand operand's formula (e.g. an assignment
-        // such as `$foo = ""`) describe the right operand's truthiness, not the variable's type after
-        // it was (re)assigned. Skip them so they are not reconciled against the variable's actual type.
         right_type_assertions.retain(|var_id, assertions| {
             if right_block_context.locals.contains_key(var_id) {
                 for conjunction in assertions.iter_mut() {
                     conjunction.retain(|a| !matches!(a, Assertion::Truthy | Assertion::Falsy));
                 }
+                assertions.retain(|conjunction| !conjunction.is_empty());
             }
-            assertions.iter().any(|conjunction| !conjunction.is_empty())
+            !assertions.is_empty()
         });
 
         if !right_type_assertions.is_empty() {
