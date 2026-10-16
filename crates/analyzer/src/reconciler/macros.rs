@@ -24,6 +24,38 @@ macro_rules! intersect_simple {
                 } else if let TAtomic::Variable(_) = atomic {
                     did_remove_type = true;
                     acceptable_types.push(atomic.clone());
+                } else if let TAtomic::Derived(TDerived::Intersection(intersection)) = atomic {
+                    let matching_base_types: Vec<_> = intersection
+                        .get_base_type()
+                        .types
+                        .iter()
+                        .filter(|base_atomic| matches!(base_atomic, $( $subtype_pattern )|+ $( if $subtype_guard )?))
+                        .cloned()
+                        .collect();
+
+                    if matching_base_types.len() == intersection.get_base_type().types.len() {
+                        acceptable_types.push(atomic.clone());
+                    } else if !matching_base_types.is_empty() {
+                        did_remove_type = true;
+                        let mut new_intersection = TDerivedIntersection::new(TUnion::from_vec(matching_base_types));
+                        for it in intersection.get_intersection_types().unwrap_or_default() {
+                            new_intersection.add_intersection_type(it.clone());
+                        }
+                        acceptable_types.push(TAtomic::Derived(TDerived::Intersection(new_intersection)));
+                    } else {
+                        did_remove_type = true;
+                    }
+                } else if let TAtomic::Callable(callable) = atomic {
+                    did_remove_type = true;
+
+                    if !callable.is_closure() {
+                        let sample_string = get_string_with_props(false, true, true, true, TStringCasing::Unspecified).get_single_owned();
+                        if matches!(&sample_string, $( $subtype_pattern )|+ $( if $subtype_guard )?) {
+                            let mut intersection = TDerivedIntersection::new(TUnion::from_atomic(sample_string));
+                            intersection.add_intersection_type(atomic.clone());
+                            acceptable_types.push(TAtomic::Derived(TDerived::Intersection(intersection)));
+                        }
+                    }
                 } else {
                     did_remove_type = true;
                 }
@@ -31,6 +63,7 @@ macro_rules! intersect_simple {
 
             if acceptable_types.is_empty() || (!did_remove_type && !$is_equality) {
                 if let Some(k) = $key {
+
                     if let Some(span) = $span {
                         trigger_issue_for_impossible(
                             $context,

@@ -16,6 +16,7 @@ use crate::ttype::atomic::array::keyed::TKeyedArray;
 use crate::ttype::atomic::array::list::TList;
 use crate::ttype::atomic::callable::TCallable;
 use crate::ttype::atomic::callable::TCallableSignature;
+use crate::ttype::atomic::derived::TDerived;
 use crate::ttype::atomic::object::TObject;
 use crate::ttype::atomic::reference::TReference;
 use crate::ttype::atomic::scalar::TScalar;
@@ -121,11 +122,16 @@ pub fn can_atomic_be_callable(atomic: &TAtomic, codebase: &CodebaseMetadata) -> 
     }
 
     match atomic {
-        TAtomic::Scalar(TScalar::String(_)) | TAtomic::Array(TArray::List(_) | TArray::Keyed(_)) => true,
+        TAtomic::Object(TObject::Any)
+        | TAtomic::Scalar(TScalar::String(_) | TScalar::Generic | TScalar::ArrayKey)
+        | TAtomic::Array(TArray::List(_) | TArray::Keyed(_)) => true,
         TAtomic::Object(TObject::Named(named_object)) => codebase.is_inheritable(named_object.get_name().as_bytes()),
         TAtomic::Reference(TReference::Symbol { .. }) => true,
         TAtomic::GenericParameter(generic_parameter) => {
             generic_parameter.constraint.types.iter().any(|atomic| can_atomic_be_callable(atomic, codebase))
+        }
+        TAtomic::Derived(TDerived::Intersection(intersection)) => {
+            intersection.get_base_type().types.iter().any(|atomic| can_atomic_be_callable(atomic, codebase))
         }
         _ => false,
     }

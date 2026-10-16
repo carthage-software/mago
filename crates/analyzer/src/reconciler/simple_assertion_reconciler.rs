@@ -11,6 +11,8 @@ use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
 use mago_codex::ttype::atomic::array::list::TList;
+use mago_codex::ttype::atomic::derived::TDerived;
+use mago_codex::ttype::atomic::derived::intersection::TDerivedIntersection;
 use mago_codex::ttype::atomic::generic::TGenericParameter;
 use mago_codex::ttype::atomic::iterable::TIterable;
 use mago_codex::ttype::atomic::mixed::truthiness::TMixedTruthiness;
@@ -585,6 +587,29 @@ where
                 TNamedObject::new(word("Traversable"))
                     .with_type_parameters(Some(vec![(*iterable.key_type).clone(), (*iterable.value_type).clone()])),
             )));
+        } else if let TAtomic::Callable(_) = atomic {
+            did_remove_type = true;
+
+            let mut intersection = TDerivedIntersection::new(get_object());
+            intersection.add_intersection_type(atomic.clone());
+            object_types.push(TAtomic::Derived(TDerived::Intersection(intersection)));
+        } else if let TAtomic::Derived(TDerived::Intersection(intersection)) = atomic {
+            let new_base =
+                intersect_object(context, assertion, intersection.get_base_type(), None, false, None, is_equality);
+            if !new_base.is_never() {
+                if &new_base == intersection.get_base_type() {
+                    object_types.push(atomic.clone());
+                } else {
+                    did_remove_type = true;
+                    let mut new_intersection = TDerivedIntersection::new(new_base);
+                    for it in intersection.get_intersection_types().unwrap_or_default() {
+                        new_intersection.add_intersection_type(it.clone());
+                    }
+                    object_types.push(TAtomic::Derived(TDerived::Intersection(new_intersection)));
+                }
+            } else {
+                did_remove_type = true;
+            }
         } else {
             did_remove_type = true;
         }
@@ -1110,6 +1135,47 @@ where
             TAtomic::Variable(_) => {
                 acceptable_types.push(atomic.clone());
                 did_remove_type = true;
+            }
+            TAtomic::Callable(callable) => {
+                did_remove_type = true;
+
+                if !callable.is_closure() {
+                    let mut intersection = TDerivedIntersection::new(TUnion::from_atomic(
+                        get_string_with_props(is_numeric, true, true, true, casing).get_single_owned(),
+                    ));
+                    intersection.add_intersection_type(atomic.clone());
+                    acceptable_types.push(TAtomic::Derived(TDerived::Intersection(intersection)));
+                }
+            }
+            TAtomic::Derived(TDerived::Intersection(intersection)) => {
+                let new_base = intersect_string(
+                    context,
+                    assertion,
+                    intersection.get_base_type(),
+                    None,
+                    false,
+                    None,
+                    is_equality,
+                    is_non_empty,
+                    is_truthy,
+                    is_numeric,
+                    is_callable,
+                    casing,
+                );
+                if !new_base.is_never() {
+                    if &new_base == intersection.get_base_type() {
+                        acceptable_types.push(atomic.clone());
+                    } else {
+                        did_remove_type = true;
+                        let mut new_intersection = TDerivedIntersection::new(new_base);
+                        for it in intersection.get_intersection_types().unwrap_or_default() {
+                            new_intersection.add_intersection_type(it.clone());
+                        }
+                        acceptable_types.push(TAtomic::Derived(TDerived::Intersection(new_intersection)));
+                    }
+                } else {
+                    did_remove_type = true;
+                }
             }
             TAtomic::Object(_) => {
                 did_remove_type = true;
