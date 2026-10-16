@@ -16,7 +16,7 @@ jobs:
   pr:
     name: Miri (parser core)
     if: github.event_name != 'schedule'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 60
 
     permissions:
@@ -50,7 +50,7 @@ jobs:
   nightly:
     name: Miri (full suites)
     if: github.event_name == 'schedule' || github.event_name == 'workflow_dispatch'
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 360
 
     permissions:

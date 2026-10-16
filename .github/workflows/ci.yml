@@ -10,7 +10,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        os: [ubuntu-latest, macos-latest, windows-latest]
+        os: [ubuntu-24.04, macos-latest, windows-latest]
         rust: [stable, nightly]
         exclude:
           - { os: windows-latest, rust: nightly }
@@ -78,7 +78,7 @@ jobs:
         run: cargo test --workspace --locked
 
       - name: cargo test (property)
-        if: matrix.rust == 'stable' && matrix.os == 'ubuntu-latest'
+        if: matrix.rust == 'stable' && matrix.os == 'ubuntu-24.04'
         run: cargo test -p mago-codex --features property-tests --locked
 
       - name: cargo build
@@ -86,19 +86,19 @@ jobs:
         run: cargo build --release --locked
 
       - name: Validate composer code format
-        if: matrix.rust == 'stable' && matrix.os == 'ubuntu-latest'
+        if: matrix.rust == 'stable' && matrix.os == 'ubuntu-24.04'
         run: ./target/release/mago format --dry-run
 
       - name: Lint composer code
-        if: matrix.rust == 'stable' && matrix.os == 'ubuntu-latest'
+        if: matrix.rust == 'stable' && matrix.os == 'ubuntu-24.04'
         run: ./target/release/mago lint --reporting-format=github
 
       - name: Analyze composer code
-        if: matrix.rust == 'stable' && matrix.os == 'ubuntu-latest'
+        if: matrix.rust == 'stable' && matrix.os == 'ubuntu-24.04'
         run: ./target/release/mago analyze --reporting-format=github
 
   typos-check:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     permissions:
       contents: read
     steps:
