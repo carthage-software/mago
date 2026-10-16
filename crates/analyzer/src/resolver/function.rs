@@ -7,20 +7,12 @@ use mago_syntax::cst::Identifier;
 
 use crate::utils::misc::unwrap_expression;
 
-/// Identifies supported built-in functions used for narrowing expressions.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum BuiltinNarrowingFunction {
     GetClass,
     GetType,
 }
 
-/// Resolves a function identifier to its fully qualified or unqualified name,
-/// following PHP's resolution rules:
-/// 1. If imported via a `use function` statement, use the imported name.
-/// 2. If fully qualified (starts with `\`), use the name without the leading `\`.
-/// 3. If a namespaced function exists in the codebase under the current namespace, use that.
-/// 4. If an unqualified global function exists in the codebase, fallback to that.
-/// 5. Otherwise, default to the namespaced name.
 pub fn resolve_function_name<'arena>(
     identifier: &Identifier<'arena>,
     resolved_names: &ResolvedNames<'arena>,
@@ -48,7 +40,6 @@ pub fn resolve_function_name<'arena>(
     fqfn
 }
 
-/// Checks whether a function call refers to a genuine built-in function with the given name.
 pub fn is_builtin_function_call<'arena>(
     call: &FunctionCall<'arena>,
     builtin_name: &[u8],
@@ -67,10 +58,6 @@ pub fn is_builtin_function_call<'arena>(
     codebase.get_function(resolved).is_some_and(|f| f.flags.is_built_in())
 }
 
-/// Inspects an expression to determine if it is a single-argument call to the built-in
-/// `get_class` or `gettype` function.
-///
-/// Returns the narrowing function kind and the single argument expression if so.
 pub fn get_builtin_get_class_or_gettype_call<'arena>(
     expression: &'arena Expression<'arena>,
     resolved_names: &ResolvedNames<'arena>,

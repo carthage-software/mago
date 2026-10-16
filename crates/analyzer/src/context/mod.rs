@@ -33,6 +33,7 @@ use crate::context::assertion::AssertionContext;
 use crate::context::block::BlockContext;
 use crate::external::ExternalAnalysisSession;
 use crate::plugin::PluginRegistry;
+use crate::resolver::function::resolve_function_name;
 use crate::settings::Settings;
 
 type PropertyTypes = Vec<(Word, Rc<TUnion>)>;
@@ -169,7 +170,7 @@ where
     /// Function names in PHP are case-insensitive; they are stored and looked up in lowercase
     /// within the codebase metadata.
     pub fn resolve_function_name<'ast>(&self, identifier: &'ast Identifier<'arena>) -> &'arena [u8] {
-        crate::resolver::function::resolve_function_name(identifier, self.resolved_names, self.codebase)
+        resolve_function_name(identifier, self.resolved_names, self.codebase)
     }
 
     pub fn get_assertion_context_from_block(
