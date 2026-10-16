@@ -88,6 +88,7 @@ where
     last_case_exit_type: ControlAction,
     case_exit_types: HashMap<usize, ControlAction>,
     case_actions: HashMap<usize, ControlActionSet>,
+    reachable_case_statements: Vec<bool>,
     seen_case_condition_types: Vec<(Rc<TUnion>, Span)>,
     has_default_case: bool,
 }
@@ -119,6 +120,7 @@ where
             last_case_exit_type: ControlAction::Break,
             case_exit_types: HashMap::default(),
             case_actions: HashMap::default(),
+            reachable_case_statements: vec![],
             seen_case_condition_types: vec![],
             has_default_case: false,
         }
@@ -149,6 +151,7 @@ where
         }
 
         let last_case_index = cases.len() - 1;
+        self.reachable_case_statements = vec![false; cases.len()];
         for case in cases {
             if case.is_default() {
                 self.has_default_case = true;
@@ -200,7 +203,31 @@ where
             previous_empty_cases = vec![];
         }
 
-        let all_options_returned = self.case_exit_types.values().all(|t| *t == ControlAction::Return);
+        let mut fallthrough_exits = false;
+        let mut all_options_exit = true;
+        for case_index in (0..self.case_actions.len()).rev() {
+            if !self.reachable_case_statements[case_index] {
+                continue;
+            }
+
+            let Some(case_actions) = self.case_actions.get(&case_index) else {
+                fallthrough_exits = false;
+                all_options_exit = false;
+                continue;
+            };
+
+            fallthrough_exits = !case_actions.is_empty()
+                && case_actions.iter().all(|action| match action {
+                    ControlAction::None => fallthrough_exits,
+                    ControlAction::End
+                    | ControlAction::Break
+                    | ControlAction::BreakImmediateLoop
+                    | ControlAction::Continue
+                    | ControlAction::Return => true,
+                    ControlAction::LeaveSwitch | ControlAction::BreakTargetSwitch => false,
+                });
+            all_options_exit &= fallthrough_exits;
+        }
         let is_exhaustive = self.has_default_case || {
             let mut final_else_context = original_context.clone();
             let final_else_clauses: Vec<_> =
@@ -272,7 +299,7 @@ where
 
         self.artifacts.fully_matched_switch_offsets.insert(switch.start_position().offset);
         self.block_context.assigned_variable_ids.extend(self.new_assigned_variable_ids);
-        self.block_context.flags.set_has_returned(all_options_returned && is_exhaustive);
+        self.block_context.flags.set_has_returned(all_options_exit && is_exhaustive);
 
         Ok(())
     }
@@ -485,6 +512,8 @@ where
         } else if result.is_none() {
             result = Some(true);
         }
+
+        self.reachable_case_statements[case_index] = case_statements_are_reachable;
 
         if !has_leaving_statements && !is_last {
             if let Some(case_equality_expression) = case_equality_expression {
@@ -922,12 +951,24 @@ where
     }
 
     fn update_case_exit_map(&mut self, case: &SwitchCase, case_index: usize) {
-        let actions_set = ControlAction::from_statements(
+        let mut break_types = self
+            .block_context
+            .break_types
+            .iter()
+            .map(|break_context| if break_context.is_switch() { BreakType::Switch } else { BreakType::Loop })
+            .collect::<Vec<_>>();
+        break_types.push(BreakType::Switch);
+
+        let mut actions_set = ControlAction::from_switch_case_statements(
             case.statements().iter().collect(),
-            vec![BreakType::Switch],
+            break_types,
             Some(self.artifacts),
             true,
         );
+        if actions_set.contains(ControlAction::BreakTargetSwitch) {
+            actions_set.retain(|action| action != ControlAction::BreakTargetSwitch);
+            actions_set.insert(ControlAction::LeaveSwitch);
+        }
 
         let effective_action = if actions_set.contains(ControlAction::None)
             && matches!(self.last_case_exit_type, ControlAction::Return)
@@ -950,6 +991,14 @@ where
     }
 
     fn get_last_action(case_actions: &ControlActionSet) -> Option<ControlAction> {
+        if case_actions.len() == 1 && case_actions.contains(ControlAction::BreakImmediateLoop) {
+            return Some(ControlAction::BreakImmediateLoop);
+        }
+
+        if case_actions.len() == 1 && case_actions.contains(ControlAction::Break) {
+            return Some(ControlAction::Break);
+        }
+
         match (
             case_actions.len(),
             case_actions.contains(ControlAction::None),

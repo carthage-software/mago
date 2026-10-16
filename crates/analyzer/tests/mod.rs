@@ -1576,6 +1576,7 @@ test_case!(flow_match_no_default_int);
 test_case!(flow_match_no_match_throws);
 test_case!(flow_switch_basic_narrow);
 test_case!(flow_switch_default_narrow);
+test_case!(flow_switch_nested_transfers);
 test_case!(flow_try_catch_throwable);
 test_case!(flow_try_catch_specific);
 test_case!(flow_try_multi_catch_pipe);

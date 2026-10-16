@@ -19,6 +19,8 @@ pub enum ControlAction {
     LeaveSwitch = 0b001_0000,
     None = 0b010_0000,
     Return = 0b100_0000,
+    /// A numbered break or continue that exits the switch whose case is being analyzed.
+    BreakTargetSwitch = 0b1000_0000,
 }
 
 /// A compact bitfield set for ControlAction values.
@@ -35,7 +37,7 @@ pub enum BreakType {
 }
 
 impl ControlAction {
-    pub const ALL: [ControlAction; 7] = [
+    pub const ALL: [ControlAction; 8] = [
         ControlAction::End,
         ControlAction::Break,
         ControlAction::BreakImmediateLoop,
@@ -43,6 +45,7 @@ impl ControlAction {
         ControlAction::LeaveSwitch,
         ControlAction::None,
         ControlAction::Return,
+        ControlAction::BreakTargetSwitch,
     ];
 
     pub fn from_statements(
@@ -50,6 +53,29 @@ impl ControlAction {
         break_type: Vec<BreakType>,
         artifacts: Option<&AnalysisArtifacts>,
         return_is_exit: bool,
+    ) -> ControlActionSet {
+        Self::from_statements_with_switch_target(statements, break_type, artifacts, return_is_exit, None)
+    }
+
+    /// Analyzes a case body while preserving the switch that owns the case as a transfer target.
+    pub(crate) fn from_switch_case_statements(
+        statements: Vec<&Statement>,
+        break_type: Vec<BreakType>,
+        artifacts: Option<&AnalysisArtifacts>,
+        return_is_exit: bool,
+    ) -> ControlActionSet {
+        let target_switch_index = break_type.len().checked_sub(1);
+
+        Self::from_statements_with_switch_target(statements, break_type, artifacts, return_is_exit, target_switch_index)
+    }
+
+    fn from_statements_with_switch_target(
+        statements: Vec<&Statement>,
+        break_type: Vec<BreakType>,
+        artifacts: Option<&AnalysisArtifacts>,
+        return_is_exit: bool,
+        // Keeps transfers aimed at the enclosing case's switch from being consumed by nested switches.
+        target_switch_index: Option<usize>,
     ) -> ControlActionSet {
         let statements_len = statements.len();
         if 0 == statements_len {
@@ -59,16 +85,17 @@ impl ControlAction {
         if 1 == statements_len
             && let Some(Statement::Block(block)) = statements.first()
         {
-            return ControlAction::from_statements(
+            return ControlAction::from_statements_with_switch_target(
                 block.statements.iter().collect::<Vec<_>>(),
                 break_type,
                 artifacts,
                 return_is_exit,
+                target_switch_index,
             );
         }
 
         let mut control_actions = ControlActionSet::new();
-        'statements_loop: for statement in statements {
+        for statement in statements {
             match statement {
                 _ if is_return_or_throw_or_exit(statement) => {
                     if let Statement::Return(return_statement) = statement
@@ -131,8 +158,13 @@ impl ControlAction {
                     let mut loop_break_types = break_type.clone();
                     loop_break_types.push(BreakType::Loop);
 
-                    let mut loop_actions =
-                        ControlAction::from_statements(inner_statements, loop_break_types, artifacts, return_is_exit);
+                    let mut loop_actions = ControlAction::from_statements_with_switch_target(
+                        inner_statements,
+                        loop_break_types,
+                        artifacts,
+                        return_is_exit,
+                        target_switch_index,
+                    );
                     loop_actions.retain(|action| !action.is_none());
 
                     control_actions.extend(loop_actions);
@@ -177,11 +209,12 @@ impl ControlAction {
                     }
                 }
                 Statement::Block(block) => {
-                    let mut block_actions = ControlAction::from_statements(
+                    let mut block_actions = ControlAction::from_statements_with_switch_target(
                         block.statements.iter().collect::<Vec<_>>(),
                         break_type.clone(),
                         artifacts,
                         return_is_exit,
+                        target_switch_index,
                     );
 
                     if !block_actions.contains(ControlAction::None) {
@@ -218,8 +251,16 @@ impl ControlAction {
                         if let Some(count) = maybe_count
                             && break_type_len >= count
                         {
-                            if matches!(break_type.get(break_type_len - count), Some(BreakType::Switch)) {
-                                control_actions.insert(ControlAction::LeaveSwitch);
+                            let target = break_type_len - count;
+                            // A continue targeting the analyzed switch exits the case instead of continuing locally.
+                            match break_type.get(target) {
+                                Some(BreakType::Switch) => {
+                                    control_actions.insert(Self::get_action_for_switch_target(target_switch_index, target));
+                                }
+                                _ if count > 1 => {
+                                    control_actions.insert(ControlAction::Continue);
+                                }
+                                _ => {}
                             }
 
                             return control_actions;
@@ -245,10 +286,28 @@ impl ControlAction {
                             && break_type_len >= count
                         {
                             if count > 1 {
-                                control_actions.insert(ControlAction::Break);
+                                let target = break_type_len - count;
+                                // Preserve transfers to the analyzed switch so its caller can resolve the exit.
+                                match break_type.get(target) {
+                                    Some(BreakType::Switch) => {
+                                        control_actions.insert(Self::get_action_for_switch_target(target_switch_index, target))
+                                    }
+                                    Some(BreakType::Loop) => {
+                                        let target_is_immediate_loop =
+                                            !break_type[target + 1..].contains(&BreakType::Loop);
+
+                                        control_actions.insert(if target_is_immediate_loop {
+                                            ControlAction::BreakImmediateLoop
+                                        } else {
+                                            ControlAction::Break
+                                        });
+                                    }
+                                    None => control_actions.insert(ControlAction::Break),
+                                }
                             } else if let Some(b) = break_type.get(break_type_len - count) {
                                 if b.is_switch() {
-                                    control_actions.insert(ControlAction::LeaveSwitch);
+                                    let target = break_type_len - count;
+                                    control_actions.insert(Self::get_action_for_switch_target(target_switch_index, target));
                                 } else {
                                     control_actions.insert(ControlAction::BreakImmediateLoop);
                                 }
@@ -263,64 +322,65 @@ impl ControlAction {
                     return control_actions;
                 }
                 Statement::Switch(switch) => {
-                    let mut has_ended = false;
-                    let mut has_non_breaking_default = false;
-                    let mut has_default_terminator = false;
                     let mut all_case_actions = ControlActionSet::new();
+                    let cases = switch.body.cases();
+                    let has_default_case = cases.iter().any(|case| case.is_default());
+                    let mut fallthrough_actions = ControlActionSet::from_single(ControlAction::None);
+                    let is_local_switch_target = target_switch_index.is_none();
+                    let switch_target_index = target_switch_index.or(Some(break_type.len()));
 
-                    for case in switch.body.cases().iter().rev() {
+                    // Resolve cases backwards so each case's fallthrough inherits the next case's possible actions.
+                    for case in cases.iter().rev() {
                         let mut case_break_type = break_type.clone();
                         case_break_type.push(BreakType::Switch);
 
-                        let case_actions = ControlAction::from_statements(
+                        let case_actions = ControlAction::from_statements_with_switch_target(
                             case.statements().iter().collect(),
                             case_break_type,
                             artifacts,
                             return_is_exit,
+                            switch_target_index,
                         );
 
-                        if case_actions.iter().any(|c| c.is_break_or_continue() || c.is_leave_switch()) {
-                            continue 'statements_loop;
+                        let mut resolved_case_actions = ControlActionSet::new();
+                        for action in case_actions.iter() {
+                            match action {
+                                ControlAction::None => resolved_case_actions.extend(fallthrough_actions),
+                                ControlAction::LeaveSwitch => resolved_case_actions.insert(ControlAction::None),
+                                ControlAction::BreakTargetSwitch if is_local_switch_target => {
+                                    resolved_case_actions.insert(ControlAction::None)
+                                }
+                                _ => resolved_case_actions.insert(action),
+                            }
                         }
 
-                        if case.is_default() {
-                            has_non_breaking_default = true;
-                        }
-
-                        let case_does_end = case_actions.iter().any(|c| c.is_exit_path());
-                        if case_does_end {
-                            has_ended = true;
-                        }
-
-                        all_case_actions.extend(case_actions);
-
-                        if !case_does_end && !has_ended {
-                            continue 'statements_loop;
-                        }
-
-                        if has_non_breaking_default && case_does_end {
-                            has_default_terminator = true;
-                        }
+                        all_case_actions.extend(resolved_case_actions);
+                        fallthrough_actions = resolved_case_actions;
                     }
 
-                    all_case_actions.retain(|c| !c.is_none());
-
-                    control_actions.extend(all_case_actions);
-
-                    if has_default_terminator
-                        || artifacts.is_some_and(|artifacts| {
+                    if !has_default_case
+                        && !artifacts.is_some_and(|artifacts| {
                             artifacts.fully_matched_switch_offsets.contains(&switch.span().start.offset)
                         })
                     {
+                        all_case_actions.insert(ControlAction::None);
+                    }
+
+                    let can_complete_normally = all_case_actions.contains(ControlAction::None);
+                    all_case_actions.retain(|action| !action.is_none());
+                    control_actions.extend(all_case_actions);
+
+                    if !can_complete_normally {
                         return control_actions;
                     }
                 }
                 Statement::If(if_statement) => {
-                    let if_statement_actions = ControlAction::from_statements(
+                    let if_statement_actions = ControlAction::from_statements_with_switch_target(
                         if_statement.body.statements().iter().collect(),
                         break_type.clone(),
                         artifacts,
                         return_is_exit,
+                        target_switch_index,
                     );
 
                     let mut all_leave = !if_statement_actions.contains(ControlAction::None);
@@ -330,11 +390,12 @@ impl ControlAction {
                         Some(statements) => {
                             has_else_actions = true;
 
-                            let else_statement_actions = ControlAction::from_statements(
+                            let else_statement_actions = ControlAction::from_statements_with_switch_target(
                                 statements.iter().collect(),
                                 break_type.clone(),
                                 artifacts,
                                 return_is_exit,
+                                target_switch_index,
                             );
 
                             all_leave = all_leave && !else_statement_actions.contains(ControlAction::None);
@@ -348,11 +409,12 @@ impl ControlAction {
 
                     let mut all_elseif_actions = ControlActionSet::new();
                     for else_if_statements in if_statement.body.else_if_statements() {
-                        let elseif_control_actions = ControlAction::from_statements(
+                        let elseif_control_actions = ControlAction::from_statements_with_switch_target(
                             else_if_statements.iter().collect(),
                             break_type.clone(),
                             artifacts,
                             return_is_exit,
+                            target_switch_index,
                         );
 
                         all_leave = all_leave && !elseif_control_actions.contains(ControlAction::None);
@@ -371,67 +433,62 @@ impl ControlAction {
                     control_actions.retain(|action| action != ControlAction::None);
                 }
                 Statement::Try(try_catch) => {
-                    let try_statement_actions = ControlAction::from_statements(
+                    let try_statement_actions = ControlAction::from_statements_with_switch_target(
                         try_catch.block.statements.iter().collect::<Vec<_>>(),
                         break_type.clone(),
                         artifacts,
                         return_is_exit,
+                        target_switch_index,
                     );
 
-                    let try_leaves = !try_statement_actions.contains(ControlAction::None);
-
-                    let mut all_catch_actions = ControlActionSet::new();
-                    if !try_catch.catch_clauses.is_empty() {
-                        let mut all_catches_leave = try_leaves;
-                        for catch in &try_catch.catch_clauses {
-                            let catch_actions = ControlAction::from_statements(
-                                catch.block.statements.iter().collect::<Vec<_>>(),
-                                break_type.clone(),
-                                artifacts,
-                                return_is_exit,
-                            );
-
-                            all_catches_leave = all_catches_leave && !catch_actions.contains(ControlAction::None);
-
-                            if all_catches_leave {
-                                all_catch_actions.extend(catch_actions);
-                            } else {
-                                control_actions.extend(catch_actions);
-                            }
-                        }
-
-                        if all_catches_leave && !try_statement_actions.iter().all(|c| c.is_none()) {
-                            control_actions.extend(try_statement_actions);
-                            control_actions.extend(all_catch_actions);
-
-                            return control_actions;
-                        }
-                    } else if try_leaves {
-                        control_actions.extend(try_statement_actions);
-
-                        return control_actions;
+                    let mut try_catch_actions = try_statement_actions;
+                    for catch in &try_catch.catch_clauses {
+                        try_catch_actions.extend(ControlAction::from_statements_with_switch_target(
+                            catch.block.statements.iter().collect::<Vec<_>>(),
+                            break_type.clone(),
+                            artifacts,
+                            return_is_exit,
+                            target_switch_index,
+                        ));
                     }
 
                     if let Some(finally_clause) = try_catch.finally_clause.as_ref()
                         && !finally_clause.block.statements.is_empty()
                     {
-                        let finally_statement_actions = ControlAction::from_statements(
+                        let mut finally_statement_actions = ControlAction::from_statements_with_switch_target(
                             finally_clause.block.statements.iter().collect::<Vec<_>>(),
                             break_type.clone(),
                             artifacts,
                             return_is_exit,
+                            target_switch_index,
                         );
 
-                        if !finally_statement_actions.contains(ControlAction::None) {
-                            control_actions.retain(|c| !c.is_none());
-                            control_actions.extend(finally_statement_actions);
+                        let finally_can_complete_normally = finally_statement_actions.contains(ControlAction::None);
+                        let try_catch_can_complete_normally = try_catch_actions.contains(ControlAction::None);
 
+                        finally_statement_actions.retain(|action| !action.is_none());
+                        control_actions.extend(finally_statement_actions);
+
+                        // An abrupt finally replaces pending actions; a normal finally preserves them.
+                        if finally_can_complete_normally {
+                            control_actions.extend(try_catch_actions);
+                        }
+
+                        if !finally_can_complete_normally || !try_catch_can_complete_normally {
                             return control_actions;
                         }
+
+                        control_actions.retain(|action| !action.is_none());
+                        continue;
                     }
 
-                    control_actions.extend(try_statement_actions);
-                    control_actions.retain(|c| !c.is_none());
+                    let try_catch_can_complete_normally = try_catch_actions.contains(ControlAction::None);
+                    control_actions.extend(try_catch_actions);
+                    control_actions.retain(|action| !action.is_none());
+
+                    if !try_catch_can_complete_normally {
+                        return control_actions;
+                    }
                 }
                 _ => {}
             }
@@ -465,6 +522,16 @@ impl ControlAction {
     #[inline]
     pub const fn is_break_or_continue(self) -> bool {
         matches!(self, ControlAction::Break | ControlAction::Continue)
+    }
+
+    fn get_action_for_switch_target(target_switch_index: Option<usize>, target: usize) -> ControlAction {
+        if target_switch_index == Some(target) {
+            ControlAction::BreakTargetSwitch
+        } else if target_switch_index.is_some_and(|switch_index| target < switch_index) {
+            ControlAction::Break
+        } else {
+            ControlAction::LeaveSwitch
+        }
     }
 }
 
