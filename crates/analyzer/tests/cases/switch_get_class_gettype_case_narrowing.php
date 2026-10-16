@@ -198,3 +198,36 @@ namespace ImportedCase {
         }
     }
 }
+
+namespace StackedCasePreserveUnion {
+    final class A { public function onlyA(): void {} }
+    final class B {}
+    final class C {}
+
+    function example(A|B|C $value): void
+    {
+        $class = get_class($value);
+
+        switch ($class) {
+            case A::class:
+            case B::class:
+                // @mago-expect analysis:non-existent-method
+                $value->onlyA();
+                break;
+        }
+    }
+}
+
+namespace UnionComparisonTargetNegation {
+    function takesBool(bool $_): void {}
+
+    function example(int|string|bool $value, bool $pickInteger): void
+    {
+        if (gettype($value) === ($pickInteger ? 'integer' : 'string')) {
+            return;
+        }
+
+        // @mago-expect analysis:possibly-invalid-argument
+        takesBool($value);
+    }
+}

@@ -998,57 +998,38 @@ where
     let variable_id = assertion_context.get_expression_id(argument)?;
     let compared_type = artifacts.get_expression_type(compared)?;
 
-    let mut assertions = Vec::new();
+    let [atomic] = compared_type.types.as_ref() else {
+        return None;
+    };
 
-    match kind {
+    let assertion = match kind {
         BuiltinNarrowingFunction::GetClass => {
-            for atomic in compared_type.types.as_ref() {
-                if let Some(resolved) = get_class_name_from_atomic(assertion_context.codebase, atomic) {
-                    if resolved.is_invalid() || resolved.is_possibly_invalid() {
-                        continue;
-                    }
-                    let object_type = resolved.get_object_type(assertion_context.codebase);
-                    let assertion = if resolved.is_final {
-                        Assertion::IsType(object_type)
-                    } else {
-                        Assertion::IsIdentical(object_type)
-                    };
-                    assertions.push(if negated {
-                        match assertion {
-                            Assertion::IsType(t) => Assertion::IsNotType(t),
-                            Assertion::IsIdentical(t) => Assertion::IsNotIdentical(t),
-                            other => other,
-                        }
-                    } else {
-                        assertion
-                    });
-                }
+            let resolved = get_class_name_from_atomic(assertion_context.codebase, atomic)?;
+            if resolved.is_invalid() || resolved.is_possibly_invalid() {
+                return None;
             }
+            let object_type = resolved.get_object_type(assertion_context.codebase);
+            if resolved.is_final { Assertion::IsType(object_type) } else { Assertion::IsIdentical(object_type) }
         }
         BuiltinNarrowingFunction::GetType => {
-            for atomic in compared_type.types.as_ref() {
-                if let Some(scalar) = gettype_literal_to_scalar(atomic) {
-                    let assertion = Assertion::IsType(scalar);
-                    assertions.push(if negated {
-                        Assertion::IsNotType(match assertion {
-                            Assertion::IsType(t) => t,
-                            _ => unreachable!(),
-                        })
-                    } else {
-                        assertion
-                    });
-                }
-            }
+            let scalar = gettype_literal_to_scalar(atomic)?;
+            Assertion::IsType(scalar)
         }
-    }
+    };
 
-    if !assertions.is_empty() {
-        let mut if_types = WordMap::default();
-        if_types.insert(variable_id, vec![assertions]);
-        return Some(vec![if_types]);
-    }
+    let assertion = if negated {
+        match assertion {
+            Assertion::IsType(t) => Assertion::IsNotType(t),
+            Assertion::IsIdentical(t) => Assertion::IsNotIdentical(t),
+            other => other,
+        }
+    } else {
+        assertion
+    };
 
-    scrape_class_constant_vs_string_variable(left, right, artifacts, assertion_context, negated)
+    let mut if_types = WordMap::default();
+    if_types.insert(variable_id, vec![vec![assertion]]);
+    Some(vec![if_types])
 }
 
 fn gettype_literal_to_scalar(atomic: &TAtomic) -> Option<TAtomic> {

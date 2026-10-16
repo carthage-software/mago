@@ -432,14 +432,21 @@ pub fn reconcile_keyed_types<'ctx, A>(
 
         if !has_object_array_access {
             if let Some(source_id) = block_context.class_string_sources.get(key).copied() {
-                if let Some(resolved) = result_type
-                    .types
-                    .iter()
-                    .find_map(|atomic| get_class_name_from_atomic(context.codebase, atomic))
-                    .filter(|resolved| !resolved.is_invalid() && !resolved.is_possibly_invalid())
-                {
-                    let object_type = resolved.get_object_type(context.codebase);
-                    let object_union = TUnion::from_single(Cow::Owned(object_type));
+                let mut object_types = Vec::new();
+                let mut all_resolved = true;
+                for atomic in result_type.types.iter() {
+                    if let Some(resolved) = get_class_name_from_atomic(context.codebase, atomic)
+                        .filter(|resolved| !resolved.is_invalid() && !resolved.is_possibly_invalid())
+                    {
+                        object_types.push(resolved.get_object_type(context.codebase));
+                    } else {
+                        all_resolved = false;
+                        break;
+                    }
+                }
+
+                if all_resolved && !object_types.is_empty() {
+                    let object_union = TUnion::from_vec(object_types);
                     let narrowed = block_context
                         .locals
                         .get(&source_id)
