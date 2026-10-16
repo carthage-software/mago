@@ -2911,6 +2911,7 @@ test_case!(loose_null_equality_narrowing_drops_falsy_strings);
 test_case!(in_array_possible_and_required_values);
 test_case!(negated_isset_nullable_array_keys);
 test_case!(nested_isset_array_shapes);
+test_case!(unset_dynamic_key_widens_array_type);
 
 #[test]
 fn issue_2478_without_property_memoization() {
