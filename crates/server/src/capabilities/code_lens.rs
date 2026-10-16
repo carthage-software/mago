@@ -1,22 +1,51 @@
 //! Code-lens anchors for named class, function, and constant declarations.
 
+use std::sync::Arc;
+
 use foldhash::HashMap;
 use mago_database::DatabaseReader;
 use mago_database::file::FileId;
 use mago_database::file::FileType;
 
 use crate::Server;
-use crate::domain::CodeLensItem;
-use crate::semantic_index::{Occurrence, SemanticIndex, SymbolKey, SymbolKind};
+use crate::domain::{CodeLensItem, CodeLensKind};
+use crate::file_analysis::FileAnalysis;
+use crate::semantic_index::{SemanticIndex, SymbolKey, SymbolKind};
 use crate::symbol_resolution::{may_refer_to, resolved_symbol_name, short_name};
 
 impl Server {
     /// Find declarations without collecting references until the client resolves a lens.
     pub fn get_lens(&mut self, file_id: FileId) -> Vec<CodeLensItem> {
-        let Some(analysis) = self.file_analysis_for(file_id) else { return Vec::new() };
-        declarations(analysis.semantic())
-            .map(|(entry, _)| CodeLensItem { offset: entry.selection_range.start })
-            .collect()
+        let Some((analysis, length)) = self.lens_file(file_id) else { return Vec::new() };
+        lenses(analysis.semantic(), length).map(|(item, _)| item).collect()
+    }
+
+    /// Find where a lens listed before its file changed is anchored now.
+    ///
+    /// A lens keeps its rank among the declarations of its name while their number is unchanged;
+    /// otherwise the declaration nearest its listed offset, counted from either end of the file, wins.
+    /// Returns `None` once the file no longer declares the name.
+    pub fn locate_lens(&mut self, file_id: FileId, item: CodeLensItem) -> Option<CodeLensItem> {
+        let (analysis, length) = self.lens_file(file_id)?;
+        let index = analysis.semantic();
+        let symbol = index.symbols.iter().position(|symbol| {
+            *symbol.name == *item.name && lens_kind(symbol.kind).is_some_and(|kind| kind == item.kind)
+        })?;
+        let declarations = || {
+            index
+                .occurrences
+                .iter()
+                .filter(move |entry| entry.declaration && entry.symbol as usize == symbol)
+                .map(|entry| entry.selection_range.start)
+                .enumerate()
+        };
+        let siblings = declarations().count() as u32;
+        let ranked = if siblings == item.siblings { declarations().nth(item.ordinal as usize) } else { None };
+        let (ordinal, offset) = ranked.or_else(|| {
+            declarations()
+                .min_by_key(|(_, offset)| offset.abs_diff(item.offset).min((length - offset).abs_diff(item.from_end)))
+        })?;
+        Some(CodeLensItem { offset, from_end: length - offset, ordinal: ordinal as u32, siblings, ..item })
     }
 
     /// Count the references of every lens in one pass over the host files.
@@ -24,15 +53,12 @@ impl Server {
     /// Each count equals the number of [`get_references`](Self::get_references) results
     /// for that lens without its declaration.
     pub fn get_lens_counts(&mut self, file_id: FileId) -> Vec<(CodeLensItem, usize)> {
-        let Some(analysis) = self.file_analysis_for(file_id) else { return Vec::new() };
+        let Some((analysis, length)) = self.lens_file(file_id) else { return Vec::new() };
         let mut slots: HashMap<(SymbolKind, &[u8]), usize> = HashMap::default();
-        let lenses: Vec<_> = declarations(analysis.semantic())
-            .map(|(entry, symbol)| {
+        let lenses: Vec<_> = lenses(analysis.semantic(), length)
+            .map(|(item, symbol)| {
                 let next = slots.len();
-                (
-                    CodeLensItem { offset: entry.selection_range.start },
-                    *slots.entry((symbol.kind, &symbol.name)).or_insert(next),
-                )
+                (item, *slots.entry((symbol.kind, &symbol.name)).or_insert(next))
             })
             .collect();
         let mut counts = vec![0; slots.len()];
@@ -46,7 +72,7 @@ impl Server {
                 let index = analysis.semantic();
                 candidates.clear();
                 candidates.extend(index.symbols.iter().map(|symbol| {
-                    is_lens_kind(symbol.kind)
+                    lens_kind(symbol.kind).is_some()
                         && (slots.contains_key(&(symbol.kind, &*symbol.name))
                             || (matches!(symbol.kind, SymbolKind::Function | SymbolKind::Constant)
                                 && slots.contains_key(&(symbol.kind, short_name(&symbol.name)))))
@@ -75,17 +101,44 @@ impl Server {
         }
         lenses.into_iter().map(|(item, slot)| (item, counts[slot])).collect()
     }
+
+    fn lens_file(&mut self, file_id: FileId) -> Option<(Arc<FileAnalysis>, u32)> {
+        let length = self.database().get(&file_id).ok()?.contents.len() as u32;
+        Some((self.file_analysis_for(file_id)?, length))
+    }
 }
 
-fn declarations(index: &SemanticIndex) -> impl Iterator<Item = (&Occurrence, &SymbolKey)> {
-    index.occurrences.iter().filter(|entry| entry.declaration).filter_map(|entry| {
+fn lenses(index: &SemanticIndex, length: u32) -> impl Iterator<Item = (CodeLensItem, &SymbolKey)> {
+    let declarations = || index.occurrences.iter().filter(|entry| entry.declaration);
+    let mut ranks = vec![(0, 0); index.symbols.len()];
+    for entry in declarations() {
+        ranks[entry.symbol as usize].1 += 1;
+    }
+    declarations().filter_map(move |entry| {
         let symbol = &index.symbols[entry.symbol as usize];
-        is_lens_kind(symbol.kind).then_some((entry, symbol))
+        let kind = lens_kind(symbol.kind)?;
+        let (ordinal, siblings) = &mut ranks[entry.symbol as usize];
+        let offset = entry.selection_range.start;
+        let item = CodeLensItem {
+            offset,
+            from_end: length - offset,
+            kind,
+            name: symbol.name.to_vec(),
+            ordinal: *ordinal,
+            siblings: *siblings,
+        };
+        *ordinal += 1;
+        Some((item, symbol))
     })
 }
 
-fn is_lens_kind(kind: SymbolKind) -> bool {
-    matches!(kind, SymbolKind::ClassLike | SymbolKind::Function | SymbolKind::Constant)
+fn lens_kind(kind: SymbolKind) -> Option<CodeLensKind> {
+    match kind {
+        SymbolKind::ClassLike => Some(CodeLensKind::ClassLike),
+        SymbolKind::Function => Some(CodeLensKind::Function),
+        SymbolKind::Constant => Some(CodeLensKind::Constant),
+        SymbolKind::Namespace | SymbolKind::Variable => None,
+    }
 }
 
 #[cfg(test)]

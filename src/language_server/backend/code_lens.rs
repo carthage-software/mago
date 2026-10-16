@@ -4,27 +4,25 @@ use tower_lsp_server::gen_lsp_types::LspErrorCodes;
 use tower_lsp_server::gen_lsp_types::{CodeLens, Location, Uri};
 use tower_lsp_server::jsonrpc::{Error, ErrorCode, Result};
 
+use mago_server::CodeLensItem;
+
 use crate::config::language_server::Provider;
 use crate::language_server::codec;
-use crate::language_server::codec::CodeLensData;
 
 use super::Backend;
 use super::query::DocumentQuery;
 
 impl Backend {
-    pub(super) fn resolve_lens(&self, lens: CodeLens) -> Result<CodeLens> {
-        let data: CodeLensData =
-            serde_json::from_value(lens.data.clone().ok_or_else(|| Error::invalid_params("Missing code-lens data"))?)
-                .map_err(|_| Error::invalid_params("Invalid code-lens data"))?;
-        self.query(Provider::CodeLens, &data.uri, |document| Some(document.resolve_lens(lens, &data)))?.unwrap_or_else(
-            || {
-                Err(Error {
-                    code: ErrorCode::ServerError(i32::from(LspErrorCodes::RequestFailed).into()),
-                    message: "Code lenses are unavailable for this document".into(),
-                    data: None,
-                })
-            },
-        )
+    pub(super) fn resolve_lens(&self, mut lens: CodeLens) -> Result<CodeLens> {
+        let data = lens.data.take().ok_or_else(|| Error::invalid_params("Missing code-lens data"))?;
+        let (uri, item) = codec::lens_target(data).ok_or_else(|| Error::invalid_params("Invalid code-lens data"))?;
+        self.query(Provider::CodeLens, &uri, |document| Some(document.resolve_lens(&uri, item)))?.unwrap_or_else(|| {
+            Err(Error {
+                code: ErrorCode::ServerError(i32::from(LspErrorCodes::RequestFailed).into()),
+                message: "Code lenses are unavailable for this document".into(),
+                data: None,
+            })
+        })
     }
 }
 
@@ -38,22 +36,18 @@ impl DocumentQuery<'_> {
         codec::code_lens(&self.file, uri, counted.into_iter().filter(|(_, count)| *count > 0).map(|(item, _)| item))
     }
 
-    fn resolve_lens(mut self, mut lens: CodeLens, data: &CodeLensData) -> Result<CodeLens> {
-        if !data.matches(&self.file) {
+    fn resolve_lens(mut self, uri: &Uri, item: CodeLensItem) -> Result<CodeLens> {
+        let Some(item) = self.workspace.core.server.locate_lens(self.file.id, item) else {
             return Err(Error {
                 code: ErrorCode::ServerError(i32::from(LspErrorCodes::ContentModified).into()),
-                message: "Code-lens document changed".into(),
+                message: "Code-lens declaration no longer exists".into(),
                 data: None,
             });
-        }
-        let Some(offset) = self.checked_offset(lens.range.start).filter(|offset| {
-            lens.range.start == lens.range.end
-                && self.workspace.core.server.get_lens(self.file.id).iter().any(|item| item.offset == *offset)
-        }) else {
-            return Err(Error::invalid_params("Code lens must point to a declaration"));
         };
+        let offset = item.offset;
+        let mut lens = codec::unresolved_lens(&self.file, uri, item);
         let locations = self.lens_references(offset);
-        lens.command = Some(codec::reference_command(&data.uri, lens.range.start, locations));
+        lens.command = Some(codec::reference_command(uri, lens.range.start, locations));
         Ok(lens)
     }
 

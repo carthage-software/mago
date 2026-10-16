@@ -81,6 +81,7 @@ pub fn signature_help(
 }
 
 /// Convert a domain [`CompletionList`] to an LSP [`CompletionResponse`].
+/// A plain-text qualified insertion keeps the list incomplete: clients filter it by the inserted text.
 #[allow(clippy::too_many_arguments)]
 pub fn completion(
     file: &MagoFile,
@@ -93,6 +94,7 @@ pub fn completion(
     supports_deprecated_tag: bool,
 ) -> CompletionResponse {
     let width = list.items.len().saturating_sub(1).checked_ilog10().map_or(1, |digits| digits as usize + 1);
+    let is_incomplete = list.is_incomplete || list.items.iter().any(|entry| inserts_qualified_text(entry, snippets));
     let items = list
         .items
         .into_iter()
@@ -112,11 +114,14 @@ pub fn completion(
             )
         })
         .collect();
-    CompletionResponse::CompletionList(LspCompletionList {
-        is_incomplete: list.is_incomplete,
-        items,
-        ..LspCompletionList::default()
-    })
+    CompletionResponse::CompletionList(LspCompletionList { is_incomplete, items, ..LspCompletionList::default() })
+}
+
+fn inserts_qualified_text(entry: &CompletionEntry, snippets: bool) -> bool {
+    matches!(
+        (&entry.insert, snippets),
+        (Some(CompletionInsert::Text(text)), _) | (Some(CompletionInsert::Call(text)), false) if text.starts_with('\\')
+    )
 }
 
 #[allow(clippy::too_many_arguments)]

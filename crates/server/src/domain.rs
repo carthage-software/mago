@@ -9,6 +9,7 @@ use foldhash::HashMap;
 
 use mago_bytes::BytesDisplay;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
+use mago_codex::identifier::method::MethodIdentifier;
 use mago_database::file::FileId;
 use mago_span::Span;
 use mago_word::Word;
@@ -239,6 +240,8 @@ pub struct CompletionEntry {
     pub kind: CompletionKind,
     /// Extra detail shown beside the label (e.g. a signature).
     pub detail: Option<String>,
+    /// Render the detail after ranking and limiting candidates.
+    pub(crate) detail_source: Option<CompletionDetail>,
     /// Namespace shown beside a class-like name; `\` means the global namespace.
     pub namespace: Option<String>,
     /// Source PHPDoc shown in the detail pane.
@@ -268,6 +271,7 @@ impl CompletionEntry {
             label,
             kind,
             detail: None,
+            detail_source: None,
             namespace: None,
             documentation: None,
             documentation_source: None,
@@ -287,6 +291,15 @@ pub struct CompletionAlternative {
     /// The declaring class, signature, and source docs.
     pub description: HoverEntry,
     pub(crate) documentation_source: Option<CompletionDocumentation>,
+    pub(crate) detail_source: Option<CompletionDetail>,
+}
+
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum CompletionDetail {
+    Function { name: Word },
+    Method { method: MethodIdentifier, name: Word },
+    Property { class: Word, name: Word },
+    MagicProperty { class: Word, name: Word },
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -372,10 +385,28 @@ pub struct SymbolRank {
 }
 
 /// A declaration whose code lens can resolve its references on demand.
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct CodeLensItem {
     /// Byte offset the lens is anchored at.
     pub offset: u32,
+    /// Bytes from the anchor to the end of the file.
+    pub from_end: u32,
+    /// What kind of symbol the declaration names.
+    pub kind: CodeLensKind,
+    /// The declared name as the semantic index keys it.
+    pub name: Vec<u8>,
+    /// Rank of the declaration among the file's declarations of the same kind and name, in source order.
+    pub ordinal: u32,
+    /// How many declarations of the same kind and name the file has.
+    pub siblings: u32,
+}
+
+/// The kind of symbol a code lens declaration names.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum CodeLensKind {
+    ClassLike,
+    Function,
+    Constant,
 }
 
 /// What an [`InlayHintItem`] annotates.

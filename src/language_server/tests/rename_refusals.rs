@@ -235,10 +235,11 @@ async fn named_arguments_of_builtin_methods_are_builtin() {
 
 #[tokio::test]
 async fn runtime_declared_constants_and_class_aliases_are_refused_at_prepare() {
-    let source = "<?php define('ZZ_PROBE_A', 1); echo ZZ_PROBE_A; class ZzProbeTarget {} class_alias(ZzProbeTarget::class, 'ZzProbeAlias'); new ZzProbeAlias();";
+    let source = "<?php define('ZZ_PROBE_A', 1); echo ZZ_PROBE_A; define('de', 2); echo de; class ZzProbeTarget {} class_alias(ZzProbeTarget::class, 'ZzProbeAlias'); new ZzProbeAlias();";
     let mut h = Harness::start(&[("a.php", source)]).await;
     for (needle, call) in [
         ("ZZ_PROBE_A;", "define('ZZ_PROBE_A', 1)"),
+        ("de;", "define('de', 2)"),
         ("ZzProbeAlias()", "class_alias(ZzProbeTarget::class, 'ZzProbeAlias')"),
     ] {
         let expected = format!("the name is declared at runtime by {call} at a.php:1.");

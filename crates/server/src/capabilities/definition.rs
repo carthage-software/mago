@@ -8,7 +8,9 @@ use crate::Server;
 use crate::domain::Range;
 use crate::domain::SymbolLocation;
 use crate::semantic_index::SymbolKind;
-use crate::symbol_resolution::{declared_member_at, members_at, methods_at, resolved_symbol_name, same_name};
+use crate::symbol_resolution::{
+    constant_name_span, declared_member_at, members_at, methods_at, resolved_symbol_name, same_name,
+};
 
 impl Server {
     /// The declaration location of the symbol whose identifier covers `offset`
@@ -62,7 +64,9 @@ impl Server {
                 self.codebase().get_class_like(name).map(|meta| meta.name_span.unwrap_or(meta.span))
             }
             SymbolKind::Function => self.codebase().get_function(name).map(|meta| meta.name_span.unwrap_or(meta.span)),
-            SymbolKind::Constant => self.codebase().get_constant(name).map(|meta| meta.span),
+            SymbolKind::Constant => {
+                self.codebase().get_constant(name).map(|meta| constant_name_span(self.database(), meta))
+            }
             _ => None,
         };
         let Some(span) = span else { return Vec::new() };

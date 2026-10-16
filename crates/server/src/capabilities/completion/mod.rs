@@ -34,10 +34,12 @@ use crate::domain::{CompletionEntry, CompletionList};
 use self::site::CompletionSite;
 
 const MAX_RESULTS: usize = 50;
+const CANDIDATE_LIMIT: usize = MAX_RESULTS + 1;
 
 impl Server {
     /// Completion candidates for the cursor at `offset` in `file_id`.
     /// A typed space offers only declaration templates unless a name keyword precedes it.
+    /// The list is incomplete when it was cut at the result limit or when further typing can widen it.
     pub fn get_completion(&mut self, file_id: FileId, offset: u32, after_space: bool) -> CompletionList {
         let Ok(file) = self.database().get(&file_id) else { return CompletionList::default() };
         let tokens = self.lex(&file);
@@ -51,10 +53,11 @@ impl Server {
             };
         }
 
-        let mut named = named_arguments::complete(self, file_id, &tokens, offset);
+        let named = named_arguments::complete(self, file_id, &tokens, offset);
         if named.labels_only {
-            items::document(self, &mut named.items);
-            return CompletionList { is_incomplete: true, items: named.items };
+            let mut list = limit(named.items);
+            items::document(self, &mut list.items);
+            return list;
         }
         let Some(analysis) = self.file_analysis_for(file_id) else { return CompletionList::default() };
         let Some(site) = CompletionSite::resolve(self, &file, &tokens, &analysis, offset) else {
@@ -66,22 +69,29 @@ impl Server {
         let mut preferred = site.native_types(self);
         preferred.extend(named.items);
         preferred.extend(snippets::complete(&tokens, offset, self.php_version));
-        let mut items = prioritize(items, preferred);
-        items::document(self, &mut items);
-        CompletionList { is_incomplete: true, items }
+        let mut list = prioritize(items, preferred);
+        list.is_incomplete |= site.widens_with_typing();
+        items::document(self, &mut list.items);
+        list
     }
 }
 
-fn prioritize(items: Vec<CompletionEntry>, mut preferred: Vec<CompletionEntry>) -> Vec<CompletionEntry> {
+fn prioritize(items: Vec<CompletionEntry>, mut preferred: Vec<CompletionEntry>) -> CompletionList {
     if preferred.is_empty() {
-        return items;
+        return limit(items);
     }
     preferred.extend(items);
-    preferred.truncate(MAX_RESULTS);
-    if !preferred[0].preselect || preferred[1..].iter().any(|entry| entry.preselect) {
-        for entry in &mut preferred {
+    let mut list = limit(preferred);
+    if !list.items[0].preselect || list.items[1..].iter().any(|entry| entry.preselect) {
+        for entry in &mut list.items {
             entry.preselect = false;
         }
     }
-    preferred
+    list
+}
+
+fn limit(mut items: Vec<CompletionEntry>) -> CompletionList {
+    let is_incomplete = items.len() > MAX_RESULTS;
+    items.truncate(MAX_RESULTS);
+    CompletionList { items, is_incomplete }
 }

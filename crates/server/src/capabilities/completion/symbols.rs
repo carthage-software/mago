@@ -1,7 +1,7 @@
 //! Global and qualified symbol candidates, imports, and namespace ranking.
 //!
 //! Candidates borrow their metadata while they are ranked. Entries are built
-//! only for the best [`MAX_RESULTS`] of them.
+//! only for the best [`CANDIDATE_LIMIT`] of them.
 
 use std::cmp::Ordering;
 
@@ -10,7 +10,6 @@ use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::metadata::constant::ConstantMetadata;
 use mago_codex::metadata::function_like::FunctionLikeKind;
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
-use mago_database::Database;
 use mago_names::is_never_namespaced_function;
 use mago_names::kind::NameKind;
 use mago_names::scope::NamespaceScope;
@@ -26,7 +25,7 @@ use crate::semantic_index::SemanticIndex;
 use crate::semantic_index::SymbolKind;
 use crate::symbol_resolution::is_hidden_class_like;
 
-use super::MAX_RESULTS;
+use super::CANDIDATE_LIMIT;
 use super::context::NameIntent;
 use super::items::class_item;
 use super::items::finish;
@@ -74,7 +73,6 @@ impl Candidate<'_> {
 }
 
 pub(super) fn bare_items(
-    database: &Database<'_>,
     codebase: &CodebaseMetadata,
     version: PHPVersion,
     scope: &NamespaceScope,
@@ -181,13 +179,12 @@ pub(super) fn bare_items(
 
     let candidates = best(candidates);
     let mut entries: Vec<_> =
-        candidates.iter().map(|candidate| bare_entry(database, codebase, scope, &imports, candidate)).collect();
+        candidates.iter().map(|candidate| bare_entry(codebase, scope, &imports, candidate)).collect();
     finish(&mut entries, preselected(&candidates));
     entries
 }
 
 fn bare_entry(
-    database: &Database<'_>,
     codebase: &CodebaseMetadata,
     scope: &NamespaceScope,
     imports: &[&ImportBinding],
@@ -201,15 +198,15 @@ fn bare_entry(
             let resolves_here = imported || scope.resolve_str(NameKind::Default, name).0.eq_ignore_ascii_case(fqn);
             class_item(meta, name, resolves_here)
         }
-        Source::Function(meta) if imported => function_item(database, codebase, meta, name, name),
+        Source::Function(meta) if imported => function_item(meta, name, name),
         Source::Function(meta) => {
             let (resolved, aliased) = scope.resolve_str(NameKind::Function, name);
             let resolves_here = resolved.eq_ignore_ascii_case(fqn)
                 || (!aliased && !fqn.contains(&b'\\') && codebase.get_function(&resolved).is_none());
             if resolves_here {
-                function_item(database, codebase, meta, name, name)
+                function_item(meta, name, name)
             } else {
-                function_item(database, codebase, meta, name, &[b"\\".as_slice(), fqn].concat())
+                function_item(meta, name, &[b"\\".as_slice(), fqn].concat())
             }
         }
         Source::Constant(meta) => {
@@ -236,7 +233,6 @@ fn bare_entry(
 }
 
 pub(super) fn qualified_items(
-    database: &Database<'_>,
     codebase: &CodebaseMetadata,
     version: PHPVersion,
     scope: &NamespaceScope,
@@ -323,7 +319,7 @@ pub(super) fn qualified_items(
         .map(|candidate| match candidate.source {
             Source::Class(meta) => qualified_class_item(meta, candidate.name),
             Source::Function(meta) => {
-                let mut item = function_item(database, codebase, meta, candidate.name, candidate.name);
+                let mut item = function_item(meta, candidate.name, candidate.name);
                 if import {
                     item.insert = Some(CompletionInsert::Text(String::from_utf8_lossy(candidate.name).into_owned()));
                 }
@@ -341,9 +337,9 @@ pub(super) fn qualified_items(
 }
 
 fn best(mut candidates: Vec<Candidate<'_>>) -> Vec<Candidate<'_>> {
-    if candidates.len() > MAX_RESULTS {
-        candidates.select_nth_unstable_by(MAX_RESULTS, Candidate::order);
-        candidates.truncate(MAX_RESULTS);
+    if candidates.len() > CANDIDATE_LIMIT {
+        candidates.select_nth_unstable_by(CANDIDATE_LIMIT, Candidate::order);
+        candidates.truncate(CANDIDATE_LIMIT);
     }
     candidates.sort_unstable_by(Candidate::order);
     candidates
@@ -372,7 +368,7 @@ fn accepts_class(
     access_class: Option<&ClassLikeMetadata>,
 ) -> bool {
     match intent {
-        NameIntent::Declaration => false,
+        NameIntent::Declaration | NameIntent::DeclarationKeyword => false,
         NameIntent::Instantiation => {
             meta.kind.is_class() && !meta.flags.is_abstract() && constructor_visible(codebase, meta, access_class)
         }

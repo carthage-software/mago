@@ -1,6 +1,5 @@
 //! Match parameter bindings and named argument labels to their metadata.
 
-use mago_codex::ttype::display::NameDisplay;
 use mago_database::file::File;
 use mago_syntax::token::TokenKind;
 
@@ -30,20 +29,7 @@ pub(super) fn argument(server: &mut Server, file: &File, offset: u32) -> Option<
     if targets.iter().any(|target| target.uncertain) {
         return None;
     }
-    let names = if targets.iter().any(|target| target.bound.is_some()) {
-        NameDisplay::fully_qualified(server.codebase())
-    } else {
-        NameDisplay::for_types(
-            server.codebase(),
-            targets
-                .iter()
-                .filter(|target| target.bound.is_none())
-                .filter_map(|target| target.signature(server.codebase()))
-                .filter_map(|signature| signature.parameter(label.value))
-                .filter_map(|parameter| parameter.declaration.type_metadata.as_ref())
-                .map(|metadata| &metadata.type_union),
-        )
-    };
+    let names = crate::capabilities::signature::call_type_names(server.codebase(), &targets);
     let mut documentation = Documentation::new(server);
     let mut entries = Vec::new();
     for target in targets {

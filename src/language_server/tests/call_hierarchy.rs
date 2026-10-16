@@ -54,6 +54,32 @@ async fn functions_methods_unions_and_constructors_keep_exact_calls() {
 }
 
 #[tokio::test]
+async fn call_hierarchy_items_cover_declarations_and_select_names() {
+    let service = "<?php\nfinal class Service\n{\n    /**\n     * Doc.\n     */\n    #[Mark]\n    public static function make(): static { return new static(); }\n}\n";
+    let source = "<?php\n/** Doc. */\n#[Mark]\nfunction helper(): Service { return Service::make(); }\n";
+    let mut h = Harness::start(&[("a.php", source), ("b.php", service)]).await;
+    let make = prepare(&mut h, "b.php", service, "make(").await[0].clone();
+    assert_eq!(make["uri"], h.url("b.php"));
+    assert_eq!(text_at(service, &make["selectionRange"]), "make");
+    assert_eq!(
+        text_at(service, &make["range"]),
+        "#[Mark]\n    public static function make(): static { return new static(); }"
+    );
+    let incoming = h.request("callHierarchy/incomingCalls", json!({"item": make})).await;
+    let caller = &incoming[0]["from"];
+    assert_eq!(caller["uri"], h.url("a.php"));
+    assert_eq!(text_at(source, &caller["selectionRange"]), "helper");
+    assert_eq!(text_at(source, &caller["range"]), "#[Mark]\nfunction helper(): Service { return Service::make(); }");
+    let call = &incoming[0]["fromRanges"][0];
+    assert_eq!(text_at(source, call), "make");
+    let file = File::ephemeral(b"a.php".as_slice().into(), source.as_bytes().to_vec().into());
+    assert_eq!(call["start"], json!(position_at_offset(&file, source.find("make()").unwrap() as u32)));
+    let outgoing = h.request("callHierarchy/outgoingCalls", json!({"item": caller})).await;
+    assert_eq!(outgoing[0]["to"], make);
+    assert_eq!(outgoing[0]["fromRanges"], incoming[0]["fromRanges"]);
+}
+
+#[tokio::test]
 async fn callable_invocations_keep_exact_calls_without_counting_creation() {
     let source = "<?php
 function read(int $value, int $other = 0): int { return $value + $other; }
