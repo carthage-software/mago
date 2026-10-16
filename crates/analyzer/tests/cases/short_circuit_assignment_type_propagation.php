@@ -48,3 +48,40 @@ function test_and_keeps_unassigned_variable(): string {
 
     return takes_string($nullable);
 }
+
+function consume(bool $b): bool {
+    return $b;
+}
+
+/**
+ * @assert string $value
+ * @throws InvalidArgumentException
+ */
+function require_string(?string $value): bool
+{
+    if ($value === null) {
+        throw new InvalidArgumentException();
+    }
+
+    return rand(0, 1) === 1;
+}
+
+/**
+ * @throws InvalidArgumentException
+ */
+function test_and_preserves_unconditional_assertion(?string $value, bool $flag): string
+{
+    require_string($value) && consume($flag);
+
+    return $value;
+}
+
+/**
+ * @throws InvalidArgumentException
+ */
+function test_or_preserves_unconditional_assertion(?string $value, bool $flag): string
+{
+    require_string($value) || consume($flag);
+
+    return $value;
+}
