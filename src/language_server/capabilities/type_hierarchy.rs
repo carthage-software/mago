@@ -7,9 +7,9 @@ use tower_lsp_server::gen_lsp_types::Uri;
 use mago_database::DatabaseReader;
 use mago_server::capabilities::type_hierarchy::TypeHierarchyItem as Item;
 
-use crate::language_server::uri::UriFilePath;
 use crate::language_server::position::range_at_offsets;
 use crate::language_server::state::WorkspaceState;
+use crate::language_server::uri::UriFilePath;
 
 #[derive(Deserialize, Serialize)]
 #[serde(deny_unknown_fields)]
