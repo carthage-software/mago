@@ -10,7 +10,7 @@ use crate::file_analysis::FileAnalysis;
 use crate::semantic_index::ScopeKind;
 use crate::semantic_index::SymbolKind;
 
-use super::MAX_RESULTS;
+use super::CANDIDATE_LIMIT;
 use super::rank::compare_names;
 
 const LOCAL: u8 = 0;
@@ -92,7 +92,7 @@ pub(super) fn variable_items(
             .then(left.order.cmp(&right.order))
             .then_with(|| compare_names(left.name, right.name))
     });
-    found.truncate(MAX_RESULTS);
+    found.truncate(CANDIDATE_LIMIT);
     let preselect = found.first().is_some_and(|local| local.name == prefix);
     let mut out: Vec<_> = found
         .into_iter()

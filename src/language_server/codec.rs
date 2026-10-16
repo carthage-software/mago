@@ -8,7 +8,7 @@ mod documentation;
 mod hover;
 
 pub use actions::{APPLY_CODE_ACTION, ActionDocument, CodeActionSource, code_actions};
-pub use code_lens::{CodeLensData, code_lens, reference_command};
+pub use code_lens::{code_lens, lens_target, reference_command, unresolved_lens};
 pub use completion::{completion, signature_help};
 pub use hover::{HoverCodeLanguage, hover};
 

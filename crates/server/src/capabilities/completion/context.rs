@@ -15,6 +15,7 @@ use super::native_type_context;
 #[derive(Debug, Clone, Copy)]
 pub(super) enum NameIntent {
     Declaration,
+    DeclarationKeyword,
     Expression,
     Type,
     NativeType(native_type_context::NativeTypeContext),
@@ -28,7 +29,7 @@ pub(super) enum NameIntent {
 impl NameIntent {
     pub(super) fn includes(self, kind: NameKind) -> bool {
         match self {
-            Self::Declaration => false,
+            Self::Declaration | Self::DeclarationKeyword => false,
             Self::Expression => true,
             Self::Import(import) => import == kind,
             _ => kind == NameKind::Default,
@@ -144,7 +145,7 @@ pub(super) fn classify<'a>(
         | TokenKind::Case
             if super::snippets::has_declaration(tokens, offset, version) =>
         {
-            Context::Bare { prefix: typed, intent: NameIntent::Declaration }
+            Context::Bare { prefix: typed, intent: NameIntent::DeclarationKeyword }
         }
         kind if kind.is_identifier_maybe_reserved() => {
             Context::Bare { prefix: typed, intent: name_intent(tokens, current_idx, version) }

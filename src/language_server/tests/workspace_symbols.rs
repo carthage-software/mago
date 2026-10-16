@@ -42,7 +42,7 @@ async fn workspace_symbol_finds_constants_with_case_insensitive_queries() {
         let result = h.request("workspace/symbol", json!({ "query": query })).await;
         let symbols = result.as_array().unwrap();
         assert_eq!(symbols.len(), 1, "query {query}: {result}");
-        check_symbol(&symbols[0], &h.url("a.php"), "ReviewFlag", 14, "ReviewFlag = 1");
+        check_symbol(&symbols[0], &h.url("a.php"), "ReviewFlag", 14, "ReviewFlag");
     }
     assert_eq!(h.request("workspace/symbol", json!({ "query": "ReviewMissing" })).await, json!([]));
 }
@@ -60,7 +60,7 @@ async fn workspace_symbol_targets_names_after_attributes_and_modifiers() {
             ("ReviewTrait", 5, "ReviewTrait"),
             ("ReviewEnum", 10, "ReviewEnum"),
             ("ReviewFunction", 12, "ReviewFunction"),
-            ("ReviewFlag", 14, "ReviewFlag = 1"),
+            ("ReviewFlag", 14, "ReviewFlag"),
         ] {
             let symbol = symbols.iter().find(|symbol| symbol["name"] == name).unwrap_or_else(|| panic!("{result}"));
             check_symbol(symbol, &h.url("a.php"), name, kind, declaration);
@@ -79,7 +79,7 @@ async fn check_shared_symbol_rows(h: &mut Harness, uris: &[String]) {
         for (kind, declaration, selection) in [
             (5, "class SharedRow {}", "SharedRow"),
             (12, "function SharedRow(): void {}", "SharedRow"),
-            (14, "SharedRow = 1", "SharedRow = 1"),
+            (14, "SharedRow = 1", "SharedRow"),
         ] {
             let start = SHARED_SYMBOL_SOURCE.find(declaration).unwrap() + declaration.find(selection).unwrap();
             let expected = json!({
@@ -198,6 +198,75 @@ enum Status { case RouteOpen; }
     assert_eq!(symbol_names(&mut h, "Responder::red").await, [r"App\Responder::redirectToRoute"]);
     assert_eq!(symbol_names(&mut h, r"\App\Status::").await, [r"App\Status::RouteOpen"]);
     assert_eq!(symbol_names(&mut h, r"App\red").await, [r"App\Responder"]);
+}
+
+#[tokio::test]
+async fn workspace_symbols_point_members_and_runtime_constants_at_their_names() {
+    let source = r#"<?php
+namespace App;
+final class Invoice
+{
+    /** Doc. */
+    #[Mark]
+    final public const string LIMIT = 'x', OTHER = 'y';
+
+    /** Doc. */
+    #[Mark]
+    public readonly string $currency;
+
+    /**
+     * Doc.
+     */
+    #[Mark]
+    public function __construct(#[Mark] public readonly int $promoted = 1) {}
+
+    /**
+     * Doc.
+     */
+    #[Mark]
+    final public static function getCurrency(): string { return ''; }
+}
+enum Status: string
+{
+    /** Doc. */
+    #[Mark]
+    case Open = 'o';
+}
+/** Doc. */
+define('LEGACY_LIMIT', 2);
+define('de', 3);
+"#;
+    let mut h = Harness::start(&[("a.php", source)]).await;
+    let file = File::ephemeral(b"a.php".as_slice().into(), source.as_bytes().to_vec().into());
+    for (query, name, kind, anchor, selection) in [
+        ("Invoice::getCurrency", r"App\Invoice::getCurrency", 6, "getCurrency(", "getCurrency"),
+        ("Invoice::__construct", r"App\Invoice::__construct", 9, "__construct(", "__construct"),
+        ("Invoice::LIMIT", r"App\Invoice::LIMIT", 14, "LIMIT = 'x'", "LIMIT"),
+        ("Invoice::OTHER", r"App\Invoice::OTHER", 14, "OTHER = 'y'", "OTHER"),
+        ("Invoice::$currency", r"App\Invoice::$currency", 7, "$currency;", "$currency"),
+        ("Invoice::$promoted", r"App\Invoice::$promoted", 7, "$promoted =", "$promoted"),
+        ("Status::Open", r"App\Status::Open", 22, "Open = 'o'", "Open"),
+        ("LEGACY_LIMIT", "LEGACY_LIMIT", 14, "LEGACY_LIMIT'", "LEGACY_LIMIT"),
+        ("de", "de", 14, "de'", "de"),
+    ] {
+        let result = h.request("workspace/symbol", json!({ "query": query })).await;
+        let symbol = result
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|symbol| symbol["name"] == name)
+            .unwrap_or_else(|| panic!("{query}: {result}"));
+        let start = source.find(anchor).unwrap();
+        assert_eq!(symbol["kind"], kind, "{query}");
+        assert_eq!(
+            symbol["location"]["range"],
+            json!({
+                "start": position_at_offset(&file, start as u32),
+                "end": position_at_offset(&file, (start + selection.len()) as u32)
+            }),
+            "{query}"
+        );
+    }
 }
 
 #[tokio::test]

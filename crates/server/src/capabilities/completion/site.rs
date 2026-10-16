@@ -77,7 +77,6 @@ impl<'a> CompletionSite<'a> {
         let access_class = self.access_class.and_then(|name| server.codebase().get_class_like_by_name(name));
         if let Some(import) = &self.import {
             return symbols::qualified_items(
-                server.database(),
                 server.codebase(),
                 server.php_version,
                 &self.scope,
@@ -106,7 +105,6 @@ impl<'a> CompletionSite<'a> {
                 crate::call_analysis::binds_this(self.analysis, self.offset.saturating_sub(1)),
             ),
             Context::Qualified { qualifier, prefix, intent } => symbols::qualified_items(
-                server.database(),
                 server.codebase(),
                 server.php_version,
                 &self.scope,
@@ -117,7 +115,6 @@ impl<'a> CompletionSite<'a> {
                 &RankContext::new(self.file, &self.scope),
             ),
             Context::Bare { prefix, intent } => symbols::bare_items(
-                server.database(),
                 server.codebase(),
                 server.php_version,
                 &self.scope,
@@ -176,6 +173,10 @@ impl<'a> CompletionSite<'a> {
                 item.insert = Some(CompletionInsert::Text(text));
             }
         }
+    }
+
+    pub(super) fn widens_with_typing(&self) -> bool {
+        matches!(self.context, Context::Bare { intent: NameIntent::DeclarationKeyword, .. })
     }
 
     pub(super) fn native_types(&self, server: &Server) -> Vec<CompletionEntry> {

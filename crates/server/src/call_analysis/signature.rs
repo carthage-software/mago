@@ -7,7 +7,7 @@ use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::metadata::flags::MetadataFlags;
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
 use mago_codex::metadata::parameter::FunctionLikeParameterMetadata;
-use mago_codex::ttype::display::{NameDisplay, canonical_bytes, qualified_bytes};
+use mago_codex::ttype::display::{NameDisplay, canonical_bytes};
 
 use super::targets::SignatureTarget;
 
@@ -70,13 +70,6 @@ impl<'a> CallSignature<'a> {
 }
 
 impl<'a> CallParameter<'a> {
-    pub(crate) fn qualified_type_name(self, codebase: &CodebaseMetadata) -> Option<Cow<'a, [u8]>> {
-        self.bound.map_or_else(
-            || self.declaration.type_metadata.as_ref().map(|ty| Cow::Owned(qualified_bytes(codebase, &ty.type_union))),
-            |bound| bound.type_name.as_deref().map(|text| Cow::Borrowed(text.as_bytes())),
-        )
-    }
-
     pub(crate) fn type_name(self, names: Option<&NameDisplay<'_>>) -> Option<Cow<'a, [u8]>> {
         self.bound.map_or_else(
             || {
@@ -160,10 +153,6 @@ mod tests {
         };
         let parameter = CallParameter { declaration: &function.parameters[0], bound: Some(&bound) };
         assert!(matches!(parameter.type_name(None), Some(Cow::Borrowed(b"Box<State::Ready>"))));
-        assert!(matches!(
-            parameter.qualified_type_name(&CodebaseMetadata::new()),
-            Some(Cow::Borrowed(b"Box<State::Ready>")),
-        ));
         drop(function);
         assert_eq!(return_type, parameter_type, "owned text must outlive the declaration");
     }

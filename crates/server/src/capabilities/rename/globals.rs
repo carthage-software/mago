@@ -8,6 +8,7 @@ use mago_word::ascii_lowercase_word;
 
 use crate::resolved_symbol_name;
 use crate::semantic_index::{Occurrence, SemanticIndex, SymbolKind};
+use crate::symbol_resolution::is_define_call;
 use crate::{Range, RefusalReason, RenameRefusal, Server, SymbolLocation};
 
 use super::{STALE, aliases, bound_elsewhere, declared_outside, phpdoc};
@@ -221,7 +222,10 @@ fn alias_declaration(server: &Server, name: &[u8]) -> Option<Span> {
 fn named(file: &MagoFile, kind: SymbolKind, name: &[u8], span: Span) -> Span {
     let short = name.rsplit(|byte| *byte == b'\\').next().unwrap_or(name);
     if kind == SymbolKind::Constant
-        && file.contents.get(span.start.offset as usize..).is_some_and(|rest| rest.starts_with(short))
+        && file
+            .contents
+            .get(span.start.offset as usize..)
+            .is_some_and(|rest| !is_define_call(rest) && rest.starts_with(short))
     {
         span.subspan(0, short.len() as u32)
     } else {

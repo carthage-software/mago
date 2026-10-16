@@ -22,6 +22,7 @@ use crate::domain::SymbolRank;
 use crate::domain::WorkspaceSymbolItem;
 use crate::matcher;
 use crate::matcher::is_test_namespace;
+use crate::symbol_resolution::constant_name_span;
 use crate::symbol_resolution::is_hidden_class_like;
 
 /// The most symbols one search returns.
@@ -113,7 +114,7 @@ impl Server {
         }
         for meta in codebase.constants.values() {
             if !meta.flags.is_built_in() && !hits.excludes(!meta.flags.is_user_defined()) {
-                let site = || (SymbolKind::Constant, meta.span);
+                let site = || (SymbolKind::Constant, constant_name_span(self.database(), meta));
                 hits.add(query.top_level(meta.flags, meta.name.as_bytes(), CONSTANT, site));
             }
         }

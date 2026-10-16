@@ -130,3 +130,33 @@ async fn fallback_references_change_when_a_namespaced_declaration_appears() {
         assert_eq!(at(&mut h, "textDocument/references", "a.php", global, needle).await.as_array().unwrap().len(), 2);
     }
 }
+
+#[tokio::test]
+async fn runtime_defined_constants_navigate_to_their_names() {
+    let declarations = "<?php\n/** Doc. */\ndefine('LEGACY_LIMIT', 2);\ndefine( \"Lib\\\\LEVEL\" , 3);\ndefine('de', 4);\ndefine(\"Lib\\\\de\", 5);\nconst define = 6;\n";
+    let source = "<?php\nnamespace App;\nuse const Lib\\LEVEL;\nuse const Lib\\de;\necho \\LEGACY_LIMIT, LEVEL, \\de, de, \\define;\n";
+    let mut h = Harness::start(&[("a.php", declarations), ("b.php", source)]).await;
+    let file = File::ephemeral(b"a.php".as_slice().into(), declarations.as_bytes().to_vec().into());
+    for (needle, anchor, name) in [
+        ("LEGACY_LIMIT,", "LEGACY_LIMIT", "LEGACY_LIMIT"),
+        ("LEVEL;", "Lib\\\\LEVEL", "Lib\\\\LEVEL"),
+        ("de, ", "de'", "de"),
+        ("de;\necho", "Lib\\\\de", "Lib\\\\de"),
+        ("define;", "define =", "define"),
+    ] {
+        let definition = at(&mut h, "textDocument/definition", "b.php", source, needle).await;
+        assert_eq!(definition["uri"], h.url("a.php"));
+        let start = position_at_offset(&file, declarations.find(anchor).unwrap() as u32);
+        assert_eq!(definition["range"]["start"], json!(start), "{needle}");
+        assert_eq!(selected(declarations, &definition["range"]), name, "{needle}");
+    }
+    let links = h.for_doc("textDocument/documentLink", "b.php").await;
+    for (index, anchor) in ["Lib\\\\LEVEL", "Lib\\\\de"].into_iter().enumerate() {
+        let position = position_at_offset(&file, declarations.find(anchor).unwrap() as u32);
+        assert_eq!(
+            links[index]["target"],
+            format!("{}#{},{}", h.url("a.php"), position.line + 1, position.character + 1).as_str(),
+            "{anchor}"
+        );
+    }
+}

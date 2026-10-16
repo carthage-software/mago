@@ -105,11 +105,78 @@ async fn inlay_hints_skip_nested_commas_named_arguments_and_unpacking() {
             ("5)", "right:"),
             ("match (6)", "second:"),
             ("10", "head:"),
-            ("11", "values:"),
-            ("12", "values:"),
+            ("11", "...values:"),
             ("15", "head:"),
             ("fn($a", "first:"),
             ("null", "second:"),
+        ],
+    );
+}
+
+#[tokio::test]
+async fn inlay_hints_label_only_the_first_variadic_argument() {
+    let source = r"<?php
+function tagged(string $name, int $count, string ...$tags): void {}
+final class Command {}
+final class Bus { public function dispatch(object ...$commands): void {} }
+function send(Bus $bus, array $list, array $more): void {
+    $bus->dispatch(new Command());
+    $bus->dispatch(new Command(), new Command(), new Command());
+    $bus->dispatch(...$list);
+    $bus->dispatch(...$list, ...$more);
+    tagged('one', 401);
+    tagged('two', 402, 'tag-a');
+    tagged('three', 403, 'tag-b', 'tag-c', 'tag-d');
+    tagged('four', 404, ...$list);
+    tagged('five', ...$list);
+}
+";
+    let mut h = Harness::start(&[("a.php", source)]).await;
+    check(
+        source,
+        &hints(&mut h, source, 0, source.len()).await,
+        &[
+            ("new Command());", "...commands:"),
+            ("new Command(), new", "...commands:"),
+            ("'one'", "name:"),
+            ("401", "count:"),
+            ("'two'", "name:"),
+            ("402", "count:"),
+            ("'tag-a'", "...tags:"),
+            ("'three'", "name:"),
+            ("403", "count:"),
+            ("'tag-b'", "...tags:"),
+            ("'four'", "name:"),
+            ("404", "count:"),
+            ("'five'", "name:"),
+        ],
+    );
+}
+
+#[tokio::test]
+async fn inlay_hints_require_union_agreement_on_variadic_parameters() {
+    let source = r"<?php
+class Stack { public function push(int ...$items): void {} public function tag(string $name, string ...$tags): void {} }
+class Queue { public function push(int ...$items): void {} public function tag(string $name, string ...$tags): void {} }
+class Fixed { public function push(int $items, int $more = 0): void {} public function tag(string $name, string $tags = ''): void {} }
+function fill(Stack|Queue $agreeing, Stack|Fixed $mixed): void {
+    $agreeing->push(501, 502, 503);
+    $agreeing->tag('agree', 'tag-a', 'tag-b');
+    $mixed->push(504, 505);
+    $mixed->tag('mixed', 'tag-c');
+}
+";
+    let mut h = Harness::start(&[("a.php", source)]).await;
+    check(
+        source,
+        &hints(&mut h, source, 0, source.len()).await,
+        &[
+            ("501", "...items:"),
+            ("'agree'", "name:"),
+            ("'tag-a'", "...tags:"),
+            ("504", "items:"),
+            ("'mixed'", "name:"),
+            ("'tag-c'", "tags:"),
         ],
     );
 }
@@ -181,11 +248,9 @@ $partial(...[212]);
             ("204", "left:"),
             ("205", "left:"),
             ("206", "right:"),
-            ("207", "values:"),
-            ("208", "values:"),
+            ("207", "...values:"),
             ("209", "head:"),
-            ("210", "values:"),
-            ("211", "values:"),
+            ("210", "...values:"),
         ],
     );
 }

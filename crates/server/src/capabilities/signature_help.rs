@@ -28,25 +28,7 @@ impl Server {
         let tokens: Vec<_> = self.lex(&file).into_iter().filter(|token| !lookup::is_trivia(token.kind)).collect();
         let Some(call) = enclosing_call(&tokens, offset) else { return Vec::new() };
         let targets = resolve_signature_targets(self, file_id, &tokens, &call);
-        let names = if targets.iter().any(|target| target.bound.is_some()) {
-            NameDisplay::fully_qualified(self.codebase())
-        } else {
-            NameDisplay::for_types(
-                self.codebase(),
-                targets
-                    .iter()
-                    .filter(|target| target.bound.is_none())
-                    .filter_map(|target| self.codebase().get_function_like(&target.key))
-                    .flat_map(|metadata| {
-                        metadata
-                            .parameters
-                            .iter()
-                            .filter_map(|parameter| parameter.type_metadata.as_ref())
-                            .chain(metadata.return_type_metadata.as_ref())
-                            .map(|ty| &ty.type_union)
-                    }),
-            )
-        };
+        let names = super::signature::call_type_names(self.codebase(), &targets);
         let mut documentation = Documentation::new(self);
         let mut signatures: Vec<_> = targets
             .into_iter()

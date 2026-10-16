@@ -7,6 +7,7 @@ use crate::domain::DocumentLinkItem;
 use crate::domain::Range;
 use crate::domain::SymbolLocation;
 use crate::semantic_index::SymbolKind;
+use crate::symbol_resolution::constant_name_span;
 
 impl Server {
     /// Links for class, function, and constant imports, including grouped imports.
@@ -25,7 +26,9 @@ impl Server {
                     SymbolKind::Function => {
                         codebase.get_function(&binding.target).map(|meta| meta.name_span.unwrap_or(meta.span))
                     }
-                    SymbolKind::Constant => codebase.get_constant(&binding.target).map(|meta| meta.span),
+                    SymbolKind::Constant => {
+                        codebase.get_constant(&binding.target).map(|meta| constant_name_span(self.database(), meta))
+                    }
                     _ => None,
                 }?;
                 Some(DocumentLinkItem {

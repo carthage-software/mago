@@ -1,6 +1,7 @@
 use serde_json::Value;
 use serde_json::json;
 use tower_lsp_server::gen_lsp_types::Location;
+use tower_lsp_server::gen_lsp_types::Range;
 use tower_lsp_server::gen_lsp_types::TypeHierarchyItem;
 
 use mago_database::file::File;
@@ -50,6 +51,36 @@ async fn type_hierarchy_returns_direct_edges_and_exact_selection() {
     let consumers = at(&mut h, "textDocument/implementation", source, "Helper").await;
     assert_eq!(consumers.as_array().unwrap().len(), 1);
     assert!(at(&mut h, "textDocument/prepareTypeHierarchy", source, "<?php").await.is_null());
+}
+
+#[tokio::test]
+async fn type_hierarchy_items_start_at_declared_names() {
+    let source = "<?php\n/** Doc. */\n#[Mark]\ninterface Root {}\n/**\n * Doc.\n */\n#[Mark]\nabstract class Base implements Root {}\n#[Mark]\nfinal readonly class Leaf extends Base {}\n/** Doc. */\n#[Mark]\nenum Flag: string implements Root { case On = 'on'; }\n";
+    let mut h = Harness::start(&[("a.php", source)]).await;
+    let file = File::ephemeral(b"a.php".as_slice().into(), source.as_bytes().to_vec().into());
+    let span = |item: &Value, field: &str| {
+        let range: Range = serde_json::from_value(item[field].clone()).unwrap();
+        &source[offset_at_position(&file, range.start) as usize..offset_at_position(&file, range.end) as usize]
+    };
+    let leaf = prepare(&mut h, source, "Leaf").await;
+    assert_eq!(span(&leaf, "selectionRange"), "Leaf");
+    assert_eq!(span(&leaf, "range"), "Leaf extends Base {}");
+    let parents = h.request("typeHierarchy/supertypes", json!({ "item": leaf })).await;
+    assert_eq!(span(&parents[0], "range"), "Base implements Root {}");
+    let roots = h.request("typeHierarchy/supertypes", json!({ "item": parents[0] })).await;
+    assert_eq!(span(&roots[0], "selectionRange"), "Root");
+    assert_eq!(span(&roots[0], "range"), "Root {}");
+    let children = h.request("typeHierarchy/subtypes", json!({ "item": roots[0] })).await;
+    assert_eq!(names(&children), ["Base", "Flag"]);
+    assert_eq!(span(&children[1], "range"), "Flag: string implements Root { case On = 'on'; }");
+    let flag = prepare(&mut h, source, "Flag").await;
+    assert_eq!(flag, children[1]);
+    let builtins = h.request("typeHierarchy/supertypes", json!({ "item": flag })).await;
+    let backed = builtins.as_array().unwrap().iter().find(|item| item["name"] == "BackedEnum").unwrap();
+    let item: TypeHierarchyItem = serde_json::from_value(backed.clone()).unwrap();
+    assert_eq!(item.range.start, item.selection_range.start);
+    assert_eq!(item.selection_range.end.character - item.selection_range.start.character, "BackedEnum".len() as u32);
+    assert!(item.selection_range.end < item.range.end);
 }
 
 #[tokio::test]

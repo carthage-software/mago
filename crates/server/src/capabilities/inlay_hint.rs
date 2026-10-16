@@ -135,9 +135,10 @@ fn emit_argument_hints(
         if !named
             && requested.start <= first.start.offset
             && first.start.offset < requested.end
-            && let Some(name) = agreed_parameter(signatures, argument)
+            && let Some((name, variadic)) = agreed_parameter(signatures, argument)
         {
-            let label = format!("{}:", BytesDisplay(name.strip_prefix(b"$").unwrap_or(name)));
+            let name = BytesDisplay(name.strip_prefix(b"$").unwrap_or(name));
+            let label = if variadic { format!("...{name}:") } else { format!("{name}:") };
             out.push(InlayHintItem { offset: first.start.offset, label, kind: HintKind::Parameter });
         }
         let mut cursor = start;
@@ -150,14 +151,16 @@ fn emit_argument_hints(
     }
 }
 
-fn agreed_parameter<'a>(signatures: &[CallSignature<'a>], index: usize) -> Option<&'a [u8]> {
+fn agreed_parameter<'a>(signatures: &[CallSignature<'a>], index: usize) -> Option<(&'a [u8], bool)> {
     let parameter = |signature: CallSignature<'a>| {
         signature
             .parameters()
             .nth(index)
-            .or_else(|| signature.parameters().last().filter(|parameter| parameter.flags().is_variadic()))
-            .map(|parameter| parameter.declaration.name.0.as_bytes())
+            .map(|parameter| (parameter.declaration.name.0.as_bytes(), parameter.flags().is_variadic()))
     };
-    let name = parameter(*signatures.first()?)?;
-    signatures.iter().skip(1).all(|signature| parameter(*signature) == Some(name)).then_some(name)
+    let (first, rest) = signatures.split_first()?;
+    rest.iter().try_fold(parameter(*first)?, |(name, variadic), signature| {
+        let (other, flag) = parameter(*signature)?;
+        (other == name).then_some((name, variadic && flag))
+    })
 }

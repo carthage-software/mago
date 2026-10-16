@@ -7,7 +7,6 @@ use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::metadata::class_like_constant::ClassLikeConstantMetadata;
 use mago_codex::metadata::property::PropertyMetadata;
-use mago_codex::ttype::display::qualified_bytes;
 use mago_codex::visibility::Visibility;
 use mago_names::kind::NameKind;
 use mago_names::scope::NamespaceScope;
@@ -16,6 +15,7 @@ use mago_word::Word;
 
 use crate::Server;
 use crate::domain::CompletionAlternative;
+use crate::domain::CompletionDetail;
 use crate::domain::CompletionDocumentation;
 use crate::domain::CompletionEntry;
 use crate::domain::CompletionInsert;
@@ -26,7 +26,6 @@ use crate::matcher::Match;
 use crate::method_presentation::MethodPresentation;
 
 use super::items::finalize;
-use super::items::render_signature;
 use super::rank::Rank;
 
 const CASE: u8 = 0;
@@ -42,15 +41,15 @@ struct MemberCandidate {
 
 impl MemberCandidate {
     fn alternative(&self) -> CompletionAlternative {
-        let declaration = if self.entry.kind == CompletionKind::Method {
-            format!("function {}", self.entry.detail.as_deref().unwrap_or(&self.entry.label))
+        let declaration = if self.entry.detail_source.is_some() {
+            String::new()
         } else {
-            let name = self.entry.label.trim_start_matches('$');
-            self.entry.detail.as_ref().map_or_else(|| format!("${name}"), |ty| format!("{ty} ${name}"))
+            format!("${}", self.entry.label.trim_start_matches('$'))
         };
         CompletionAlternative {
             description: HoverEntry::in_class(self.owner.as_bytes(), declaration),
             documentation_source: self.entry.documentation_source,
+            detail_source: self.entry.detail_source,
         }
     }
 
@@ -227,10 +226,6 @@ fn collect_class_members(
             continue;
         }
 
-        let detail = property
-            .type_metadata
-            .as_ref()
-            .map(|t| String::from_utf8_lossy(&qualified_bytes(codebase, &t.type_union)).into_owned());
         let label = if static_access {
             format!("${}", String::from_utf8_lossy(name_bytes))
         } else {
@@ -241,7 +236,7 @@ fn collect_class_members(
             rank: rank(matched, name_bytes, MEMBER, *declaring_class != meta.name, deprecated),
             owner: owner.original_name,
             entry: CompletionEntry {
-                detail,
+                detail_source: Some(CompletionDetail::Property { class: meta.name, name: *name }),
                 documentation_source: Some(CompletionDocumentation::Property { class: meta.name, name: *name }),
                 deprecated,
                 ..CompletionEntry::new(label, CompletionKind::Field)
@@ -275,10 +270,7 @@ fn collect_class_members(
                         class: declaring.name,
                         name: *name,
                     }),
-                    detail: property
-                        .type_metadata
-                        .as_ref()
-                        .map(|ty| String::from_utf8_lossy(&qualified_bytes(codebase, &ty.type_union)).into_owned()),
+                    detail_source: Some(CompletionDetail::MagicProperty { class: meta.name, name: *name }),
                     deprecated,
                     ..CompletionEntry::new(String::from_utf8_lossy(name_bytes).into_owned(), CompletionKind::Field)
                 },
@@ -316,14 +308,16 @@ fn collect_class_members(
         presentation.restore_alias_case(server);
         let display = presentation.name.as_bytes();
         let Some(matched) = matcher::score(prefix, display) else { continue };
-        let Some(method) = server.codebase().get_method_by_id(&presentation.declaring) else { continue };
         let ranked = rank(matched, display, MEMBER, inherited, deprecated);
         let display_str = String::from_utf8_lossy(display).into_owned();
         out.push(MemberCandidate {
             rank: ranked,
             owner: presentation.owner,
             entry: CompletionEntry {
-                detail: Some(render_signature(server.database(), server.codebase(), method, display)),
+                detail_source: Some(CompletionDetail::Method {
+                    method: presentation.declaring,
+                    name: presentation.name,
+                }),
                 documentation_source: Some(CompletionDocumentation::Callable(presentation.declaring.into())),
                 insert: Some(CompletionInsert::Call(display_str.clone())),
                 deprecated: ranked.discouraged,

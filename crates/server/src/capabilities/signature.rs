@@ -3,8 +3,12 @@
 use std::fmt::Write;
 
 use mago_bytes::BytesDisplay;
+use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::metadata::flags::MetadataFlags;
+use mago_codex::metadata::function_like::FunctionLikeMetadata;
 use mago_codex::metadata::parameter::FunctionLikeParameterMetadata;
+use mago_codex::ttype::display::NameDisplay;
+use mago_codex::ttype::union::TUnion;
 use mago_database::Database;
 use mago_database::DatabaseReader;
 use mago_syntax::lexer::Lexer;
@@ -13,6 +17,36 @@ use mago_syntax::token::TokenKind;
 use mago_syntax_core::input::Input;
 
 use crate::Range;
+use crate::call_analysis::targets::SignatureTarget;
+
+pub(super) fn signature_types(function: &FunctionLikeMetadata) -> impl Iterator<Item = &TUnion> {
+    function
+        .parameters
+        .iter()
+        .filter_map(|parameter| parameter.type_metadata.as_ref())
+        .chain(function.return_type_metadata.as_ref())
+        .map(|ty| &ty.type_union)
+}
+
+pub(super) fn type_names<'code>(
+    codebase: &'code CodebaseMetadata,
+    function: &FunctionLikeMetadata,
+) -> NameDisplay<'code> {
+    NameDisplay::for_types(codebase, signature_types(function))
+}
+
+pub(super) fn call_type_names<'code>(
+    codebase: &'code CodebaseMetadata,
+    targets: &[SignatureTarget],
+) -> NameDisplay<'code> {
+    if targets.iter().any(|target| target.bound.is_some()) {
+        return NameDisplay::fully_qualified(codebase);
+    }
+    NameDisplay::for_types(
+        codebase,
+        targets.iter().filter_map(|target| codebase.get_function_like(&target.key)).flat_map(signature_types),
+    )
+}
 
 pub(super) fn append_parameter(
     output: &mut String,

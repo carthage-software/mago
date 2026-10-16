@@ -5,8 +5,10 @@ use mago_analyzer::artifacts::editor::MemberReference;
 use mago_analyzer::artifacts::editor::MethodReference;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::metadata::CodebaseMetadata;
+use mago_codex::metadata::constant::ConstantMetadata;
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
 use mago_codex::metadata::parameter::FunctionLikeParameterMetadata;
+use mago_database::DatabaseReader;
 use mago_database::file::File;
 use mago_database::file::FileId;
 use mago_span::Position;
@@ -73,6 +75,30 @@ pub(crate) fn may_refer_to(kind: SymbolKind, candidate: &[u8], name: &[u8]) -> b
 
 pub(crate) fn short_name(name: &[u8]) -> &[u8] {
     name.rsplit(|byte| *byte == b'\\').next().unwrap_or_default()
+}
+
+/// The name of a global constant: the identifier of its `const` item, or the
+/// string contents of the `define()` call that declares it.
+pub(crate) fn constant_name_span(database: &impl DatabaseReader, constant: &ConstantMetadata) -> Span {
+    let span = constant.span;
+    let Some(source) = database
+        .get_ref(&span.file_id)
+        .ok()
+        .and_then(|file| file.contents.get(span.start.offset as usize..span.end.offset as usize))
+    else {
+        return span;
+    };
+    if is_define_call(source) {
+        let Some(open) = memchr::memchr2(b'\'', b'"', source) else { return span };
+        let Some(length) = memchr::memchr(source[open], &source[open + 1..]) else { return span };
+        return span.subspan(open as u32 + 1, (open + 1 + length) as u32);
+    }
+    let name = short_name(constant.name.as_bytes());
+    if source.starts_with(name) { span.subspan(0, name.len() as u32) } else { span }
+}
+
+pub(crate) fn is_define_call(source: &[u8]) -> bool {
+    source.strip_prefix(b"define").is_some_and(|rest| rest.trim_ascii_start().starts_with(b"("))
 }
 
 pub(crate) fn declared_member_at(codebase: &CodebaseMetadata, file: FileId, offset: u32) -> Option<Span> {
