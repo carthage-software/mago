@@ -1806,6 +1806,7 @@ test_case!(callables_invalid_yield_outside_function);
 test_case!(callables_invoke_int_as_function);
 test_case!(callables_is_callable_narrowing);
 test_case!(callables_is_callable_narrowing_string);
+test_case!(callables_is_callable_negative_string);
 test_case!(callables_missing_return_statement);
 test_case!(callables_named_argument_repeated);
 test_case!(callables_nested_closure);

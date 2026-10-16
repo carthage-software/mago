@@ -4,6 +4,7 @@ use std::sync::Arc;
 
 use mago_codex::assertion::Assertion;
 use mago_codex::consts::MAX_ENUM_CASES_FOR_ANALYSIS;
+use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_word::Word;
 use mago_word::WordSet;
 use mago_word::word;
@@ -11,6 +12,7 @@ use mago_word::word;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
+use mago_codex::ttype::atomic::callable::TCallable;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::object::r#enum::TEnum;
 use mago_codex::ttype::atomic::object::named::TNamedObject;
@@ -291,6 +293,22 @@ fn subtract_complex_type<A>(
             (_, TAtomic::Iterable(assertion_iterable)) if existing_atomic.is_array_or_traversable(context.codebase) => {
                 if !*can_be_disjunct && can_iterate_as(context.codebase, &existing_atomic, assertion_iterable) {
                     *can_be_disjunct = true;
+                }
+
+                acceptable_types.push(existing_atomic);
+            }
+            (TAtomic::Scalar(TScalar::String(existing_string)), TAtomic::Callable(assertion_callable)) => {
+                if let TCallable::Alias(FunctionLikeIdentifier::Function(callable_name)) = assertion_callable
+                    && let Some(literal) = existing_string.get_known_literal_value()
+                {
+                    let literal = literal.strip_prefix(b"\\").unwrap_or(literal);
+                    if literal.eq_ignore_ascii_case(callable_name.as_bytes())
+                        && context.codebase.function_exists(literal)
+                    {
+                        *can_be_disjunct = true;
+
+                        continue;
+                    }
                 }
 
                 acceptable_types.push(existing_atomic);
