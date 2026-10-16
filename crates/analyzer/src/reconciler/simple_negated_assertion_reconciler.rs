@@ -1247,11 +1247,21 @@ where
                 TAtomic::Variable { .. } => {
                     acceptable_types.push(atomic);
                 }
-                TAtomic::Array(TArray::List(_)) => {
-                    acceptable_types.push(TAtomic::Array(TArray::List(TList::new(Arc::new(get_never())))));
+                TAtomic::Array(TArray::List(list)) => {
+                    acceptable_types.push(TAtomic::Array(TArray::List(TList {
+                        element_type: Arc::clone(&list.element_type),
+                        known_elements: None,
+                        known_count: Some(0),
+                        non_empty: false,
+                    })));
                 }
-                TAtomic::Array(TArray::Keyed(_)) => {
-                    acceptable_types.push(TAtomic::Array(TArray::Keyed(TKeyedArray::new())));
+                TAtomic::Array(TArray::Keyed(keyed)) => {
+                    acceptable_types.push(TAtomic::Array(TArray::Keyed(TKeyedArray {
+                        known_items: None,
+                        parameters: keyed.parameters.clone(),
+                        non_empty: false,
+                        known_non_list: keyed.known_non_list,
+                    })));
                 }
                 TAtomic::Mixed(mixed) => {
                     if is_empty_assertion {

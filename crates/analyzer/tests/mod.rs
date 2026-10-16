@@ -2904,6 +2904,7 @@ test_case!(large_constant_map_unknown_ref);
 test_case!(is_a_mixed_parameter_stub);
 test_case!(strict_in_array_int_haystack_string_coercion);
 test_case!(short_circuit_assignment_type_propagation);
+test_case!(unset_dynamic_key_widens_array_type);
 
 #[test]
 fn issue_2478_without_property_memoization() {
