@@ -32,6 +32,7 @@ fn server_with_features(source: &'static str, features: Features) -> (Server, Fi
             linter: mago_linter::settings::Settings { php_version, ..Default::default() },
             formatter: FormatSettings::default(),
             plugin_registry: Arc::new(mago_analyzer::plugin::PluginRegistry::new()),
+            excludes: crate::Excludes::default(),
         },
     );
     (server, id)

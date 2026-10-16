@@ -354,6 +354,7 @@ mod tests {
                 linter: mago_linter::settings::Settings::default(),
                 formatter: mago_formatter::settings::FormatSettings::default(),
                 plugin_registry: Arc::new(mago_analyzer::plugin::PluginRegistry::new()),
+                excludes: crate::Excludes::default(),
             },
         );
         server.analyze().unwrap();

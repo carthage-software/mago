@@ -29,7 +29,10 @@ impl Server {
             return Vec::new();
         }
         let mut actions: Vec<_> = if CodeActionKind::QuickFix.requested(only) {
-            self.analyzer_issues()
+            let analyzer = (!self.excludes_analyzer_issues(file_id)).then(|| self.analyzer_issues());
+            analyzer
+                .into_iter()
+                .flatten()
                 .chain(self.lint_issues())
                 .flat_map(|issues| issues.iter())
                 .filter_map(|issue| action_for(issue, file_id, start, end))

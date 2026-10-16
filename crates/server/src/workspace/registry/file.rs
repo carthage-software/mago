@@ -30,13 +30,7 @@ impl FileTarget {
             return (!file.file_type.is_builtin()).then_some(Self::Loaded(file));
         }
         let file_type = workspace.matcher.classify(path.requested())?;
-        let source_path = if !path.requested().components().any(|part| part == std::path::Component::ParentDir)
-            && workspace.matcher.watch_roots().any(|root| path.requested().starts_with(root))
-        {
-            path.requested()
-        } else {
-            path.resolved()
-        };
+        let source_path = workspace.matcher.source_path(path.requested(), path.resolved());
         Some(Self::New { path: source_path.to_path_buf(), file_type })
     }
 
