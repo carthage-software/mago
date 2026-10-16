@@ -181,6 +181,26 @@ where
                             if_types.entry(value_id).or_insert_with(|| vec![vec![Assertion::IsIsset]]);
                         }
                     }
+
+                    if let Expression::ArrayAccess(array_access) = value
+                        && matches!(unwrap_expression(array_access.index), Expression::Variable(_))
+                        && let Some(key_id) = assertion_context.get_expression_id(array_access.index)
+                        && let Some(array_type) = artifacts.get_expression_type(array_access.array)
+                        && array_type.types.as_ref().iter().all(|atomic| matches!(atomic, TAtomic::Array(_)))
+                        && let Some(input_key_type) = artifacts.get_expression_type(array_access.index)
+                        && input_key_type
+                            .types
+                            .as_ref()
+                            .iter()
+                            .all(|atomic| matches!(atomic, TAtomic::Scalar(TScalar::String(_) | TScalar::Integer(_))))
+                        && let Some(key_type) =
+                            get_possible_array_key_argument_type(array_type, input_key_type, assertion_context.codebase)
+                    {
+                        let key_assertions = if_types.entry(key_id).or_insert_with(|| vec![vec![]]);
+                        for assertion_set in key_assertions {
+                            assertion_set.push(Assertion::InArray(key_type.clone()));
+                        }
+                    }
                 }
             }
             _ => {}

@@ -311,6 +311,7 @@ test_case!(docblock_param_basic);
 test_case!(docblock_return_basic);
 test_case!(docblock_throws_exception);
 test_case!(docblock_throws_unhandled);
+test_case!(issue_2544_backed_enum_from_throws);
 test_case!(issue_2503_dead_catch, {
     let mut settings = default_test_settings();
     settings.check_dead_catch = true;
