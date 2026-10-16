@@ -126,6 +126,7 @@ where
         if_conditional_context.if_body_context = Some(Rc::new(RefCell::new(if_body_context)));
         if_conditional_context.assigned_variable_ids = WordMap::default();
         if_conditional_context.conditionally_referenced_variable_ids.clear();
+        if_conditional_context.locals.clone_from(&pre_condition_locals);
 
         let was_inside_conditional = if_conditional_context.flags.inside_conditional();
         if_conditional_context.flags.set_inside_conditional(true);

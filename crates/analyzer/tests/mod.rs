@@ -604,6 +604,7 @@ test_case!(conditional_always_falsy);
 test_case!(conditional_mixed_types);
 test_case!(conditional_with_assignment);
 test_case!(conditional_nested);
+test_case!(conditional_reanalysis_assigned_var_pollution);
 test_case!(elvis_operator_with_null);
 test_case!(elvis_operator_with_falsy_string);
 test_case!(error_suppressed_condition_narrowing);
