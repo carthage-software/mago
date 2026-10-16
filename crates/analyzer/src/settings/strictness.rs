@@ -25,6 +25,7 @@ pub struct AnalyzerStrictnessPresetSettings {
 
 impl AnalyzerStrictnessPresetSettings {
     /// Returns the TOML assignment for this setting.
+    #[must_use]
     pub fn to_toml_assignment(self) -> String {
         format!("find-overly-wide-throw-types = {}", self.find_overly_wide_throw_types)
     }
@@ -43,6 +44,7 @@ impl Display for AnalyzerStrictnessPreset {
 
 impl AnalyzerStrictnessPreset {
     /// Returns the analyzer settings selected by this preset.
+    #[must_use]
     pub const fn settings(self) -> AnalyzerStrictnessPresetSettings {
         AnalyzerStrictnessPresetSettings { find_overly_wide_throw_types: matches!(self, Self::Strict | Self::Maximum) }
     }

@@ -1,3 +1,5 @@
+#![allow(clippy::unwrap_used)]
+
 use mago_php_version::PHPVersion;
 use mago_wasm::WasmAnalyzerSettings;
 use mago_wasm::build_analyzer_settings;

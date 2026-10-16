@@ -88,6 +88,7 @@ fn issue_key(issue: &WasmIssue) -> Option<(String, u32, u32)> {
 }
 
 #[doc(hidden)]
+#[must_use]
 pub fn build_analyzer_settings(settings: &WasmAnalyzerSettings, version: PHPVersion) -> AnalyzerSettings {
     AnalyzerSettings {
         version,

@@ -2902,21 +2902,16 @@ test_case!(issue_2484);
 test_case!(issue_2485);
 test_case!(issue_2499);
 test_case!(issue_2508);
-test_case!(issue_2520);
+test_case!(issue_2520, expected_issue_counts = [("too-wide-throw-type", 2)]);
 test_case!(issue_2523);
-test_case!(too_wide_throws, expected_issue_counts = [("too-wide-throw-type", 8), ("unhandled-thrown-type", 1)]);
-test_case!(overly_wide_throw_types_disabled, {
-    let mut settings = mago_analyzer::settings::Settings::default();
-    settings.check_throws = true;
-    settings
-});
+test_case!(too_wide_throws, expected_issue_counts = [("too-wide-throw-type", 10), ("unhandled-thrown-type", 1)]);
+test_case!(
+    overly_wide_throw_types_disabled,
+    mago_analyzer::settings::Settings { check_throws: true, ..Default::default() }
+);
 test_case!(
     overly_wide_throw_types_enabled_without_unhandled_check,
-    {
-        let mut settings = mago_analyzer::settings::Settings::default();
-        settings.find_overly_wide_throw_types = true;
-        settings
-    },
+    mago_analyzer::settings::Settings { find_overly_wide_throw_types: true, ..Default::default() },
     expected_issue_counts = [("too-wide-throw-type", 1)]
 );
 test_case!(generic_throw_template_bound_chain);
@@ -2942,11 +2937,15 @@ test_case!(
         ("avoid-catching-error", 2),
     ]
 );
-test_case!(check_throws_disabled, {
-    let mut settings = default_test_settings();
-    settings.check_throws = false;
-    settings
-});
+test_case!(
+    check_throws_disabled,
+    {
+        let mut settings = default_test_settings();
+        settings.check_throws = false;
+        settings
+    },
+    expected_issue_counts = [("too-wide-throw-type", 1)]
+);
 test_case!(check_throws_unchecked, {
     let mut settings = default_test_settings();
     settings.unchecked_exceptions.insert(mago_word::word("RuntimeException"));
@@ -2961,7 +2960,8 @@ test_case!(parameter_null_default_docblock_type);
 test_case!(parameter_null_default_php90, crate::framework::php_90_settings());
 test_case!(multilevel_inheritance_unbound_template_bound);
 test_case!(partial_union_method_call);
-test_case!(iterator_foreach_value_type);
+test_case!(iterator_foreach_value_type, expected_issue_counts = [("too-wide-throw-type", 2)]);
+test_case!(inherited_too_wide_throw_type, expected_issue_counts = [("too-wide-throw-type", 1)]);
 test_case!(possibly_undefined_switch_finally);
 test_case!(inline_var_tag_undefined_variable);
 test_case!(phpdoc_native_type_merge);

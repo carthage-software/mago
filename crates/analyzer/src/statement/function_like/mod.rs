@@ -1363,10 +1363,34 @@ fn check_too_wide_throw_types<'ctx, A, F>(
     A: Arena,
     F: Fn() -> Word,
 {
+    let mut inherited_class_throw_spans = Vec::new();
+    if let Some(class_like_metadata) = block_context.scope.get_class_like() {
+        let mut parent_class_name = class_like_metadata.direct_parent_class;
+        while let Some(parent_name) = parent_class_name {
+            if let Some(parent_method) =
+                context.codebase.function_likes.get(&(parent_name, function_like_metadata.name))
+            {
+                inherited_class_throw_spans.extend(
+                    parent_method
+                        .thrown_types
+                        .iter()
+                        .filter(|thrown_type| thrown_type.from_docblock && !thrown_type.inferred)
+                        .map(|thrown_type| thrown_type.span),
+                );
+            }
+
+            parent_class_name =
+                context.codebase.class_likes.get(&parent_name).and_then(|parent| parent.direct_parent_class);
+        }
+    }
+
     let declared_types = function_like_metadata
         .thrown_types
         .iter()
-        .filter(|thrown_type| thrown_type.from_docblock && !thrown_type.inferred)
+        .filter(|thrown_type| {
+            thrown_type.from_docblock
+                && (!thrown_type.inferred || inherited_class_throw_spans.contains(&thrown_type.span))
+        })
         .collect::<Vec<_>>();
 
     for declared_type in declared_types {
