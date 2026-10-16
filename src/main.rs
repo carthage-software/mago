@@ -55,6 +55,7 @@ use tracing::trace;
 use crate::commands::CliArguments;
 use crate::commands::MagoCommand;
 use crate::config::Configuration;
+use crate::config::LoadOptions;
 use crate::consts::MAXIMUM_PHP_VERSION;
 use crate::consts::MINIMUM_PHP_VERSION;
 use crate::consts::VERSION;
@@ -257,21 +258,19 @@ pub fn run(main_start: Instant) -> Result<ExitCode, Error> {
         command,
         ..
     } = arguments;
-    let workspace_override = workspace.clone();
 
-    let config_load_start = trace_enabled.then(Instant::now);
-    let mut configuration = Configuration::load(
+    let options = LoadOptions {
         workspace,
-        config.as_deref(),
+        file: config,
         php_version,
         threads,
         allow_unsupported_php_version,
         no_version_check,
-    )?;
+        no_extensions,
+    };
 
-    if no_extensions {
-        configuration.extension_hosts.clear();
-    }
+    let config_load_start = trace_enabled.then(Instant::now);
+    let configuration = options.load()?;
     let config_load_duration = config_load_start.map(|s| s.elapsed()).unwrap_or_default();
 
     if let MagoCommand::SelfUpdate(cmd) = command {
@@ -320,7 +319,7 @@ pub fn run(main_start: Instant) -> Result<ExitCode, Error> {
         MagoCommand::Guard(cmd) => cmd.execute(configuration, arguments.colors).map(|outcome| outcome.exit_code),
         MagoCommand::InspectBaseline(cmd) => cmd.execute(configuration, arguments.colors),
         MagoCommand::GenerateCompletions(cmd) => cmd.execute(),
-        MagoCommand::LanguageServer(cmd) => cmd.execute(configuration, workspace_override),
+        MagoCommand::LanguageServer(cmd) => cmd.execute(configuration, options),
         MagoCommand::SelfUpdate(_) => {
             unreachable!("The self-update command should have been handled before this point.")
         }

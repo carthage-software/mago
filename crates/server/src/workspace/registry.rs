@@ -21,6 +21,7 @@ pub enum FileChange {
     Deleted,
 }
 
+#[derive(Clone, Debug)]
 pub struct FileEvent {
     pub path: PathBuf,
     pub kind: FileChange,
@@ -63,6 +64,29 @@ where
         sort_by_root_len(&mut self.workspaces);
         self.rebind_buffer_snapshots();
         Ok(changed.len())
+    }
+
+    /// Swap in a workspace rebuilt from the same folder, replaying accepted buffers first.
+    ///
+    /// Returns `None`, and keeps nothing, when no workspace was loaded from that folder.
+    ///
+    /// # Errors
+    ///
+    /// Returns an error if analysis fails after replaying the buffers; the current workspace stays.
+    pub fn replace(&mut self, mut entry: W) -> Result<Option<usize>, WorkspaceError> {
+        let Some(index) = self.root_index(&entry.as_ref().folder) else {
+            return Ok(None);
+        };
+        let workspace = entry.as_mut();
+        let changed = self.replay_buffers(workspace);
+        workspace
+            .server
+            .refresh_changed_files(&changed)
+            .map_err(|cause| WorkspaceError { root: workspace.root.clone(), cause })?;
+        self.workspaces[index] = entry;
+        sort_by_root_len(&mut self.workspaces);
+        self.rebind_buffer_snapshots();
+        Ok(Some(changed.len()))
     }
 
     /// Buffers survive removal and can be replayed into a new owner.

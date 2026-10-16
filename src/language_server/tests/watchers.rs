@@ -10,6 +10,7 @@ use serde_json::Value;
 use serde_json::json;
 
 use super::harness::{Harness, url};
+use crate::config::LoadOptions;
 use crate::language_server::ServerConfig;
 
 async fn watchers_matching(h: &mut Harness, path: &Path, watched: bool) -> GlobSet {
@@ -123,7 +124,11 @@ async fn watchers_discover_targets_missing_at_startup() {
     let source = "<?php function target(): LaterTarget { return new LaterTarget(); }";
     std::fs::write(root.join("a.php"), source).unwrap();
     std::fs::write(root.join("mago.toml"), "[source]\npaths = ['a.php']\nincludes = ['vendor']\n").unwrap();
-    let config = ServerConfig { linter: false, workspace_override: Some(root.clone()), ..ServerConfig::default() };
+    let config = ServerConfig {
+        linter: false,
+        launch: LoadOptions { workspace: Some(root.clone()), ..LoadOptions::default() },
+        ..ServerConfig::default()
+    };
     let mut h = Harness::start_with(
         &[],
         config,
@@ -172,7 +177,11 @@ async fn watchers_follow_empty_directory_symlinks_and_their_current_targets() {
     std::os::unix::fs::symlink(&first, &link).unwrap();
     std::fs::write(root.join("a.php"), "<?php").unwrap();
     std::fs::write(root.join("mago.toml"), "[source]\npaths = ['a.php']\nincludes = ['vendor']\n").unwrap();
-    let config = ServerConfig { linter: false, workspace_override: Some(root.clone()), ..ServerConfig::default() };
+    let config = ServerConfig {
+        linter: false,
+        launch: LoadOptions { workspace: Some(root.clone()), ..LoadOptions::default() },
+        ..ServerConfig::default()
+    };
     let mut h = Harness::start_with(
         &[],
         config,

@@ -23,12 +23,24 @@ use walkdir::WalkDir;
 #[derive(Debug)]
 pub struct GitIgnores {
     root: PathBuf,
+    workspace: PathBuf,
     /// Every directory the rules were read from: the work tree root, the
     /// ancestors of the workspace, and the workspace directories Git does not ignore.
     directories: HashMap<PathBuf, Directory>,
     rules: Vec<Gitignore>,
     /// Each repository's `info/exclude`, then its excludes file, in descending precedence.
     repositories: Vec<Vec<Gitignore>>,
+    /// The exclude files each repository reads, whether or not they exist.
+    excludes: Vec<PathBuf>,
+    configs: Vec<RepositoryConfig>,
+}
+
+/// A repository configuration and the excludes file it named.
+#[derive(Debug)]
+struct RepositoryConfig {
+    root: PathBuf,
+    path: PathBuf,
+    excludes: Option<PathBuf>,
 }
 
 /// The rules that apply to a directory's entries.
@@ -51,7 +63,16 @@ impl GitIgnores {
     pub(crate) fn discover_with_global(workspace: &Path, global: Option<&Path>) -> Option<Self> {
         let workspace = workspace.canonicalize().ok()?;
         let root = workspace.ancestors().find(|directory| directory.join(".git").exists())?.to_path_buf();
-        let mut ignores = Self { root, directories: HashMap::default(), rules: Vec::new(), repositories: Vec::new() };
+        let mut ignores = Self {
+            root,
+            workspace: workspace.clone(),
+            directories: HashMap::default(),
+            rules: Vec::new(),
+            repositories: Vec::new(),
+            excludes: Vec::new(),
+            configs: Vec::new(),
+        };
+
         let chain: Vec<_> =
             workspace.ancestors().take_while(|directory| directory.starts_with(&ignores.root)).collect();
         let mut parent = None;
@@ -61,6 +82,7 @@ impl GitIgnores {
             {
                 return None;
             }
+
             parent = Some(ignores.visit(directory, parent.as_ref(), global));
         }
 
@@ -68,18 +90,23 @@ impl GitIgnores {
             if entry.depth() == 0 {
                 return true;
             }
+
             if !entry.file_type().is_dir() || entry.file_name() == ".git" {
                 return false;
             }
+
             let Some(parent) = entry.path().parent().and_then(|parent| ignores.directories.get(parent)).cloned() else {
                 return false;
             };
+
             if ignores.decide(entry.path(), true, &parent) {
                 return false;
             }
+
             ignores.visit(entry.path(), Some(&parent), global);
             true
         });
+
         for _ in walker {}
 
         Some(ignores)
@@ -92,9 +119,11 @@ impl GitIgnores {
         if relative.as_os_str().is_empty() {
             return false;
         }
+
         if relative.components().any(|component| component.as_os_str() == ".git") {
             return true;
         }
+
         let Some((read, directory)) =
             path.ancestors().skip(1).find_map(|directory| Some((directory, self.directories.get(directory)?)))
         else {
@@ -105,6 +134,37 @@ impl GitIgnores {
             .take_while(|level| *level != read)
             .enumerate()
             .any(|(depth, level)| self.decide(level, depth > 0 || is_dir, directory))
+    }
+
+    /// Whether a change at `path` can change these rules: a `.gitignore` Git reads for the
+    /// workspace, an exclude file, or a repository configuration that now names another one.
+    #[must_use]
+    pub fn depends_on(&self, path: &Path) -> bool {
+        if self.excludes.iter().any(|file| file == path) {
+            return true;
+        }
+
+        if let Some(config) = self.configs.iter().find(|config| config.path == path) {
+            return configured_excludes_file(&config.root, &config.path) != config.excludes;
+        }
+
+        path.file_name().is_some_and(|name| name == ".gitignore")
+            && path.parent().is_some_and(|directory| {
+                self.directories.contains_key(directory)
+                    || (directory.starts_with(&self.workspace) && !self.is_ignored(directory, true))
+            })
+    }
+
+    /// The files the rules depend on outside the workspace directory.
+    pub fn sources_outside(&self) -> impl Iterator<Item = PathBuf> + '_ {
+        let ancestors = self
+            .workspace
+            .ancestors()
+            .skip(1)
+            .take_while(|directory| directory.starts_with(&self.root))
+            .map(|directory| directory.join(".gitignore"));
+        let files = self.excludes.iter().chain(self.configs.iter().map(|config| &config.path)).cloned();
+        ancestors.chain(files.filter(|file| !file.starts_with(&self.workspace)))
     }
 
     /// Match `path` against the rules that apply inside `directory`, an already read
@@ -130,7 +190,8 @@ impl GitIgnores {
         let repository = match nested {
             Some(parent) => parent.repository,
             None => {
-                self.repositories.push(repository_excludes(directory, global));
+                let excludes = self.repository_excludes(directory, global);
+                self.repositories.push(excludes);
                 (self.repositories.len() - 1) as u32
             }
         };
@@ -148,25 +209,52 @@ impl GitIgnores {
         self.directories.insert(directory.to_path_buf(), entry.clone());
         entry
     }
+
+    /// A repository's own `core.excludesFile` takes precedence over the global one.
+    fn repository_excludes(&mut self, root: &Path, global: Option<&Path>) -> Vec<Gitignore> {
+        let common = git_directory(root).map(|git| resolved(&common_directory(&git)));
+        let config = common.as_ref().map(|common| common.join("config"));
+        let configured = config.as_deref().and_then(|config| configured_excludes_file(root, config));
+        let info = common.map(|common| common.join("info").join("exclude"));
+        let file = configured.as_deref().or(global).filter(|file| !file.as_os_str().is_empty()).map(Path::to_path_buf);
+        let mut excludes = Vec::new();
+        excludes.extend(info.as_deref().and_then(|info| read(root, info)));
+        excludes.extend(file.as_deref().and_then(|file| read(root, file)));
+        for source in info.into_iter().chain(file) {
+            let target = resolved(&source);
+            if target != source {
+                self.excludes.push(target);
+            }
+            self.excludes.push(source);
+        }
+        if let Some(path) = config {
+            self.configs.push(RepositoryConfig { root: root.to_path_buf(), path, excludes: configured });
+        }
+
+        excludes
+    }
+}
+
+/// A file's target, resolved through its directory when the file does not exist yet.
+fn resolved(path: &Path) -> PathBuf {
+    if let Ok(path) = path.canonicalize() {
+        return path;
+    }
+
+    match (path.parent().and_then(|parent| parent.canonicalize().ok()), path.file_name()) {
+        (Some(parent), Some(name)) => parent.join(name),
+        _ => path.to_path_buf(),
+    }
 }
 
 fn read(root: &Path, file: &Path) -> Option<Gitignore> {
     if !file.is_file() {
         return None;
     }
+
     let mut builder = GitignoreBuilder::new(root);
     builder.add(file);
     builder.build().ok().filter(|rules| !rules.is_empty())
-}
-
-/// A repository's own `core.excludesFile` takes precedence over the global one.
-fn repository_excludes(root: &Path, global: Option<&Path>) -> Vec<Gitignore> {
-    let common = git_directory(root).map(|git| common_directory(&git));
-    let configured = common.as_deref().and_then(|common| configured_excludes_file(root, &common.join("config")));
-    let mut excludes = Vec::new();
-    excludes.extend(common.and_then(|common| read(root, &common.join("info").join("exclude"))));
-    excludes.extend(configured.as_deref().or(global).and_then(|file| read(root, file)));
-    excludes
 }
 
 /// The repository directory: `.git` itself, or the target of a worktree's `.git` file.
@@ -175,6 +263,7 @@ fn git_directory(root: &Path) -> Option<PathBuf> {
     if dot_git.is_dir() {
         return Some(dot_git);
     }
+
     let contents = fs::read_to_string(&dot_git).ok()?;
     let target = Path::new(contents.strip_prefix("gitdir:")?.trim());
     Some(if target.is_absolute() { target.to_path_buf() } else { root.join(target) })
@@ -391,6 +480,44 @@ mod tests {
     }
 
     #[test]
+    fn rules_depend_on_read_gitignores_new_ones_git_would_read_and_exclude_sources() {
+        let directory = repository(&[
+            (".gitignore", "/vendor/\n"),
+            (".git/config", "[core]\n\texcludesFile = repository-ignore\n"),
+            ("app/.gitignore", "/var/\n"),
+            ("app/src/Service.php", "<?php"),
+            ("other/.gitignore", "*.php\n"),
+        ]);
+        let root = directory.path().canonicalize().unwrap();
+        let ignores = GitIgnores::discover_with_global(&root.join("app"), Some(&root.join("global-ignore"))).unwrap();
+        for (relative, expected) in [
+            (".gitignore", true),
+            ("app/.gitignore", true),
+            ("app/src/.gitignore", true),
+            ("app/new/deep/.gitignore", true),
+            ("app/var/.gitignore", false),
+            ("other/.gitignore", false),
+            ("vendor/.gitignore", false),
+            (".git/info/exclude", true),
+            ("repository-ignore", true),
+            ("global-ignore", false),
+            ("app/src/Service.php", false),
+        ] {
+            assert_eq!(ignores.depends_on(&root.join(relative)), expected, "{relative}");
+        }
+
+        let config = root.join(".git/config");
+        assert!(!ignores.depends_on(&config));
+        fs::write(&config, "[core]\n\texcludesFile = other-ignore\n").unwrap();
+        assert!(ignores.depends_on(&config));
+
+        let mut sources: Vec<_> = ignores.sources_outside().collect();
+        sources.sort_unstable();
+        let expected = [".git/config", ".git/info/exclude", ".gitignore", "repository-ignore"];
+        assert_eq!(sources, expected.map(|relative| root.join(relative)));
+    }
+
+    #[test]
     fn config_values_follow_git_quoting_and_comments() {
         for (raw, expected) in [
             (" plain ", "plain"),
@@ -431,6 +558,36 @@ mod tests {
         let ignores = GitIgnores::discover_with_global(worktree.path(), None).unwrap();
         assert!(ignored(&ignores, worktree.path(), "scratch/Notes.php"));
         assert!(!ignored(&ignores, worktree.path(), "src/Service.php"));
+        let exclude = main.canonicalize().unwrap().join(".git/info/exclude");
+        assert!(ignores.depends_on(&exclude));
+        assert!(ignores.sources_outside().any(|source| source == exclude));
+    }
+
+    #[cfg(unix)]
+    #[test]
+    fn symlinked_excludes_files_depend_on_the_link_and_its_target() {
+        let directory = repository(&[]);
+        let home = TempDir::new().unwrap();
+        let home = home.path().canonicalize().unwrap();
+        let target = home.join("dotfiles/ignore");
+        fs::create_dir_all(target.parent().unwrap()).unwrap();
+        fs::write(&target, "*.log\n").unwrap();
+        let link = home.join(".gitignore_global");
+        std::os::unix::fs::symlink(&target, &link).unwrap();
+        let ignores = GitIgnores::discover_with_global(directory.path(), Some(&link)).unwrap();
+        assert!(ignores.depends_on(&link));
+        assert!(ignores.depends_on(&target));
+    }
+
+    #[test]
+    fn excludes_files_named_gitignore_outside_the_workspace_are_sources() {
+        let directory = repository(&[]);
+        let home = TempDir::new().unwrap();
+        let global = home.path().canonicalize().unwrap().join(".gitignore");
+        fs::write(&global, "*.log\n").unwrap();
+        let ignores = GitIgnores::discover_with_global(directory.path(), Some(&global)).unwrap();
+        assert!(ignores.depends_on(&global));
+        assert!(ignores.sources_outside().any(|source| source == global));
     }
 
     #[test]

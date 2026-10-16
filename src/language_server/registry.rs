@@ -4,6 +4,7 @@ use crate::language_server::uri::UriFilePath;
 use foldhash::HashMap;
 use mago_server::workspace::registry::{FileChange, FileEvent as NativeFileEvent, Workspaces};
 use std::path::Path;
+use std::path::PathBuf;
 use tower_lsp_server::gen_lsp_types::{FileChangeType, FileEvent, Uri};
 
 use super::diagnostic_publication::{DiagnosticPublication, PublishedDiagnostics};
@@ -17,6 +18,23 @@ pub use updates::WorkspaceUpdate;
 pub struct WorkspaceRegistry {
     core: Workspaces<Uri, WorkspaceState>,
     pub publication: DiagnosticPublication,
+}
+
+/// Read the file changes the client reported, dropping those outside the file system.
+pub fn disk_events(events: Vec<FileEvent>) -> Vec<NativeFileEvent> {
+    events
+        .into_iter()
+        .filter_map(|event| {
+            let path = event.uri.to_file_path()?.into_owned();
+            let kind = match event.kind {
+                FileChangeType::Created => FileChange::Created,
+                FileChangeType::Changed => FileChange::Changed,
+                FileChangeType::Deleted => FileChange::Deleted,
+                _ => return None,
+            };
+            Some(NativeFileEvent { path, kind })
+        })
+        .collect()
 }
 
 impl WorkspaceRegistry {
@@ -42,6 +60,40 @@ impl WorkspaceRegistry {
             }
             Err(error) => WorkspaceUpdate { errors: vec![error.to_string()], ..WorkspaceUpdate::default() },
         }
+    }
+
+    /// Swap in a workspace rebuilt from the folder of a loaded one, publishing once for both.
+    /// If the swap fails, the loaded workspace stays and applies the changes `held` back from it.
+    pub fn replace(&mut self, workspace: WorkspaceState, held: Vec<NativeFileEvent>) -> WorkspaceUpdate {
+        let affected = self.diagnostic_uris();
+        let folder = workspace.core.folder.clone();
+        match self.core.replace(workspace) {
+            Ok(Some(changed_files)) => WorkspaceUpdate {
+                changed_files,
+                refresh_code_lenses: true,
+                diagnostics: self.reconcile_diagnostics(&affected),
+                ..WorkspaceUpdate::default()
+            },
+            Ok(None) => WorkspaceUpdate {
+                errors: vec![format!("{} is no longer a workspace folder", folder.display())],
+                ..WorkspaceUpdate::default()
+            },
+            Err(error) => {
+                let mut update = self.change_disk_files(held, |candidate| candidate == folder);
+                update.errors.insert(0, error.to_string());
+                update
+            }
+        }
+    }
+
+    /// The folders whose restart triggers these changes touch, each with the first path that did.
+    pub fn restart_causes(&self, events: &[NativeFileEvent]) -> Vec<(PathBuf, PathBuf)> {
+        self.iter()
+            .filter_map(|workspace| {
+                let cause = events.iter().find(|event| workspace.restart.matches(&event.path))?;
+                Some((workspace.core.folder.clone(), cause.path.clone()))
+            })
+            .collect()
     }
 
     pub fn remove(&mut self, root: &Path) -> Vec<(Uri, PublishedDiagnostics)> {
@@ -86,21 +138,13 @@ impl WorkspaceRegistry {
         update
     }
 
-    pub fn change_disk_files(&mut self, events: Vec<FileEvent>) -> WorkspaceUpdate {
-        let events = events
-            .into_iter()
-            .filter_map(|event| {
-                let path = event.uri.to_file_path()?.into_owned();
-                let kind = match event.kind {
-                    FileChangeType::Created => FileChange::Created,
-                    FileChangeType::Changed => FileChange::Changed,
-                    FileChangeType::Deleted => FileChange::Deleted,
-                    _ => return None,
-                };
-                Some(NativeFileEvent { path, kind })
-            })
-            .collect();
-        let update = self.core.change_disk_files(events);
+    /// Apply file changes to the workspaces loaded from folders `include` accepts.
+    pub fn change_disk_files(
+        &mut self,
+        events: Vec<NativeFileEvent>,
+        include: impl Fn(&Path) -> bool,
+    ) -> WorkspaceUpdate {
+        let update = self.core.change_disk_files_where(events, |workspace| include(&workspace.folder));
         self.adapt_update(update)
     }
 

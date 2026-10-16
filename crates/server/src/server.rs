@@ -4,6 +4,8 @@
 
 use std::sync::Arc;
 
+use foldhash::HashMap;
+
 use mago_analyzer::analysis_result::AnalysisResult;
 use mago_analyzer::artifacts::editor::EditorFileData;
 use mago_codex::metadata::CodebaseMetadata;
@@ -18,6 +20,7 @@ use mago_php_version::PHPVersion;
 use mago_reporting::IssueCollection;
 
 use crate::capabilities::call_hierarchy::CallGraph;
+use crate::capabilities::code_lens::LensReferences;
 use crate::error::ServerError;
 use crate::file_analysis::FileAnalysis;
 use crate::file_analysis::cache::FileAnalyses;
@@ -45,6 +48,7 @@ pub struct Server {
     pub(crate) formatter_excludes: PathExclusions,
     file_analyses: FileAnalyses,
     pub(crate) call_graph: Option<CallGraph>,
+    pub(crate) lens_references: HashMap<FileId, LensReferences>,
 }
 
 impl Server {
@@ -90,6 +94,7 @@ impl Server {
             formatter_excludes: excludes.formatter,
             file_analyses,
             call_graph: None,
+            lens_references: HashMap::default(),
         }
     }
 
@@ -97,6 +102,11 @@ impl Server {
     #[must_use]
     pub fn database(&self) -> &Database<'static> {
         &self.database
+    }
+
+    fn clear_query_caches(&mut self) {
+        self.call_graph = None;
+        self.lens_references.clear();
     }
 
     /// Builtin and plugin-owned sources are read-only; host buffers need no disk path.
@@ -116,7 +126,7 @@ impl Server {
     /// Mutably borrow the workspace file database (to add / update / delete
     /// files as the editor's buffers change).
     pub fn database_mut(&mut self) -> &mut Database<'static> {
-        self.call_graph = None;
+        self.clear_query_caches();
         &mut self.database
     }
 
@@ -212,7 +222,7 @@ impl Server {
     }
 
     fn prepare_analysis(&mut self) {
-        self.call_graph = None;
+        self.clear_query_caches();
         self.service.update_database(self.database.read_only());
     }
 
@@ -236,7 +246,7 @@ impl Server {
 
     /// Drop cached derived data for the given files.
     pub fn invalidate_artifacts(&mut self, files: &[FileId]) {
-        self.call_graph = None;
+        self.clear_query_caches();
         self.file_analyses.invalidate(files);
     }
 
@@ -249,13 +259,13 @@ impl Server {
 
     /// Build (or rebuild) the analysis for every changed host file.
     pub fn refresh_analyses(&mut self, file_ids: &[FileId]) {
-        self.call_graph = None;
+        self.clear_query_caches();
         self.file_analyses.refresh(&self.database, file_ids);
     }
 
     /// Build analyses for every host file whose diagnostics come from the file pass.
     pub fn refresh_all_host_analyses(&mut self) {
-        self.call_graph = None;
+        self.clear_query_caches();
         self.file_analyses.refresh_all(&self.database);
     }
 

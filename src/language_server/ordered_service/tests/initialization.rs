@@ -36,7 +36,7 @@ async fn a_pending_initialize_rejects_another_initialize() {
         fail_first: false,
     };
     let (inner, _socket) = LspService::new(move |_| backend);
-    let mut service = OrderedService::new(inner).unwrap();
+    let mut service = OrderedService::new(inner, Worker::new().unwrap());
     let initialize = |id| Request::build("initialize").params(json!({"capabilities": {}})).id(id).finish();
     assert!(
         service
@@ -63,7 +63,7 @@ async fn initialize_can_retry_after_an_error() {
     release.notify_one();
     let backend = InitializingServer { calls: Arc::clone(&calls), started: Arc::default(), release, fail_first: true };
     let (inner, _socket) = LspService::new(move |_| backend);
-    let mut service = OrderedService::new(inner).unwrap();
+    let mut service = OrderedService::new(inner, Worker::new().unwrap());
     let initialize = |id| Request::build("initialize").params(json!({"capabilities": {}})).id(id).finish();
     let response = timeout(DEADLINE, service.call(initialize(1))).await.unwrap().unwrap().unwrap();
     assert_eq!(response.error().unwrap().code, ErrorCode::InternalError);
@@ -80,9 +80,9 @@ async fn dropping_a_queued_initialize_reply_still_initializes_and_frees_its_id()
     release.notify_one();
     let backend = InitializingServer { calls: Arc::clone(&calls), started: Arc::default(), release, fail_first: false };
     let (inner, _socket) = LspService::new(move |_| backend);
-    let mut service = OrderedService::new(inner).unwrap();
+    let mut service = OrderedService::new(inner, Worker::new().unwrap());
     let (release, wait) = oneshot::channel();
-    let (_, blocker) = service
+    let (_, blocker, _) = service
         .queue
         .enqueue(
             None,
@@ -115,10 +115,10 @@ async fn dropping_a_queued_request_reply_frees_its_id() {
     release.notify_one();
     let backend = InitializingServer { calls: Arc::default(), started: Arc::default(), release, fail_first: false };
     let (inner, _socket) = LspService::new(move |_| backend);
-    let mut service = OrderedService::new(inner).unwrap();
+    let mut service = OrderedService::new(inner, Worker::new().unwrap());
     service.call(Request::build("initialize").params(json!({"capabilities": {}})).id(1).finish()).await.unwrap();
     let (release, wait) = oneshot::channel();
-    let (_, blocker) = service
+    let (_, blocker, _) = service
         .queue
         .enqueue(
             None,
@@ -156,7 +156,7 @@ async fn cancelled_initialization_allows_retry() {
             fail_first: false,
         };
         let (inner, _socket) = LspService::new(move |_| backend);
-        let mut service = OrderedService::new(inner).unwrap();
+        let mut service = OrderedService::new(inner, Worker::new().unwrap());
         let (unblock, wait) = oneshot::channel();
         let blocker = queued.then(|| {
             service

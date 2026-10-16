@@ -27,18 +27,40 @@ use mago_server::workspace::directory_aliases::DirectoryAliases;
 
 use crate::config::Configuration;
 use crate::consts::PRELUDE_BYTES;
+use crate::error::Error;
 use crate::language_server::ServerConfig;
 use crate::language_server::diagnostic_cache::DiagnosticCache;
 use crate::language_server::sources::SourceFiles;
 use crate::language_server::state::WorkspaceState;
+use crate::language_server::workspace::RestartTriggers;
 
 pub fn build_workspace(folder: PathBuf, server_config: Arc<ServerConfig>) -> Result<WorkspaceState, String> {
+    build(folder, &server_config, false)
+}
+
+/// Load a workspace again. An invalid configuration fails instead of falling back to the launch one.
+pub fn rebuild_workspace(folder: PathBuf, server_config: Arc<ServerConfig>) -> Result<WorkspaceState, String> {
+    build(folder, &server_config, true)
+}
+
+fn build(folder: PathBuf, server_config: &ServerConfig, strict: bool) -> Result<WorkspaceState, String> {
     let root = folder.canonicalize().unwrap_or_else(|_| folder.clone());
     let root = SourceFiles::workspace_for_cached_path(&root)?.unwrap_or(root);
+    let config_file = find_workspace_config_file(&root);
+    let configuration = match resolve_workspace_configuration(&root, config_file.as_deref(), server_config) {
+        Ok(configuration) => configuration,
+        Err(err) if strict => return Err(format!("load configuration: {err}")),
+        Err(err) => {
+            tracing::warn!(
+                root = %root.display(),
+                error = %err,
+                "failed to load workspace configuration; inheriting launch defaults",
+            );
+            server_config.configuration.clone()
+        }
+    };
     let prelude = Prelude::decode(PRELUDE_BYTES).map_err(|e| format!("decode prelude: {e}"))?;
     let Prelude { database: prelude_db, metadata, symbol_references } = prelude;
-
-    let configuration = resolve_workspace_configuration(&root, &server_config);
 
     let parser_settings = configuration.parser.to_settings();
     let analyzer_settings = configuration.analyzer.to_settings(configuration.php_version, ColorChoice::Never, false);
@@ -54,9 +76,11 @@ pub fn build_workspace(folder: PathBuf, server_config: Arc<ServerConfig>) -> Res
     let mut matcher = WorkspaceMatcher::from_configuration(&db_configuration)
         .map_err(|err| format!("compile source matcher: {err}"))?;
     let mut loader = DatabaseLoader::new(db_configuration).with_database(prelude_db);
-    if let Some(ignores) = git_ignores(&root, &configuration) {
-        matcher = matcher.with_git_ignores(Arc::clone(&ignores));
-        loader = loader.with_git_ignores(ignores);
+    let uses_git = config_file.is_none() && uses_git_ignores(&configuration);
+    let git = if uses_git { GitIgnores::discover(&root).map(Arc::new) } else { None };
+    if let Some(ignores) = &git {
+        matcher = matcher.with_git_ignores(Arc::clone(ignores));
+        loader = loader.with_git_ignores(Arc::clone(ignores));
     }
     let (database, directory_symlinks) =
         loader.load_with_directory_symlinks().map_err(|err| format!("load database: {err}"))?;
@@ -94,10 +118,11 @@ pub fn build_workspace(folder: PathBuf, server_config: Arc<ServerConfig>) -> Res
     let analyzer_ignores = CompiledIgnoreSet::compile(&configuration.analyzer.ignore, glob);
 
     let sources = SourceFiles::new(&root);
+    let restart = RestartTriggers::new(&root, &configuration, git, uses_git);
     let mut core = Workspace::new(folder, root, server, matcher, analyzer_ignores);
     core.directory_aliases = directory_aliases;
     core.set_source_root(sources.root().to_path_buf());
-    let workspace = WorkspaceState { core, sources, configuration, diagnostics: DiagnosticCache::default() };
+    let workspace = WorkspaceState { core, sources, configuration, diagnostics: DiagnosticCache::default(), restart };
 
     Ok(workspace)
 }
@@ -128,44 +153,31 @@ fn analyze_workspace(server: &mut Server) -> Result<(), String> {
 ///
 /// If the folder has its own `mago.{toml,json,yaml,yml}`, that file is loaded
 /// directly (no global `~/.config` fallback search, so the result depends only
-/// on the workspace). Otherwise the launch-time configuration is inherited.
-fn resolve_workspace_configuration(root: &Path, server_config: &ServerConfig) -> Configuration {
-    let Some(file) = find_workspace_config_file(root) else {
-        return server_config.configuration.clone();
-    };
-
-    match Configuration::load(
-        Some(root.to_path_buf()),
-        Some(&file),
-        None,
-        None,
-        server_config.configuration.allow_unsupported_php_version,
-        true,
-    ) {
-        Ok(configuration) => configuration,
-        Err(err) => {
-            tracing::warn!(
-                root = %root.display(),
-                error = %err,
-                "failed to load workspace configuration; inheriting launch defaults",
-            );
-            server_config.configuration.clone()
-        }
+/// on the workspace). Otherwise the launch-time configuration is inherited,
+/// read again from its file when it has one.
+fn resolve_workspace_configuration(
+    root: &Path,
+    config_file: Option<&Path>,
+    server_config: &ServerConfig,
+) -> Result<Configuration, Error> {
+    match config_file {
+        Some(file) => Configuration::load(
+            Some(root.to_path_buf()),
+            Some(file),
+            None,
+            None,
+            server_config.configuration.allow_unsupported_php_version,
+            true,
+        ),
+        None if server_config.configuration.config_file.is_some() => server_config.launch.load(),
+        None => Ok(server_config.configuration.clone()),
     }
 }
 
 /// Without a project configuration, sources Git ignores load as dependencies.
-fn git_ignores(root: &Path, configuration: &Configuration) -> Option<Arc<GitIgnores>> {
+fn uses_git_ignores(configuration: &Configuration) -> bool {
     let source = &configuration.source;
-    if configuration.config_file_is_explicit
-        || find_workspace_config_file(root).is_some()
-        || !source.paths.is_empty()
-        || !source.includes.is_empty()
-    {
-        return None;
-    }
-
-    GitIgnores::discover(root).map(Arc::new)
+    !configuration.config_file_is_explicit && source.paths.is_empty() && source.includes.is_empty()
 }
 
 /// The workspace's own configuration file, found the way `mago` finds a project's.

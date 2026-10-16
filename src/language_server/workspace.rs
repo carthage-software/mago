@@ -6,8 +6,11 @@ use std::path::PathBuf;
 use tower_lsp_server::gen_lsp_types::{InitializeParams, RootPath, WorkspaceFolders};
 
 mod loading;
+mod restart_triggers;
 
 pub use loading::build_workspace;
+pub use loading::rebuild_workspace;
+pub use restart_triggers::RestartTriggers;
 
 /// Resolve every workspace root from `initialize` params, in the order the
 /// LSP spec recommends: all `workspaceFolders`, then the deprecated single

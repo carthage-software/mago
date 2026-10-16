@@ -70,6 +70,9 @@ impl Backend {
 
     /// Remove a folder and publish diagnostics from the remaining owners.
     pub(super) async fn remove_workspace_folder(&self, root: PathBuf) {
+        if let Some(session) = self.session.get() {
+            session.restarts.lock().unwrap().cancel(&root);
+        }
         self.apply_registry_update(move |registry| {
             let refresh_code_lenses = registry.contains_root(&root);
             WorkspaceUpdate { diagnostics: registry.remove(&root), refresh_code_lenses, ..WorkspaceUpdate::default() }

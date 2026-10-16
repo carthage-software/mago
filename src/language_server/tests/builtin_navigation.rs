@@ -5,6 +5,7 @@ use mago_database::file::File;
 
 use super::harness::{Harness, client_capabilities};
 use super::references::{READ_ONLY_STUBS, refusable};
+use crate::config::LoadOptions;
 use crate::language_server::ServerConfig;
 use crate::language_server::position::{offset_at_position, position_at_offset};
 use crate::language_server::uri::UriFilePath;
@@ -95,7 +96,10 @@ async fn builtin_sources_keep_workspace_routing_after_server_restart() {
     first.request("shutdown", json!(null)).await;
     first.client.send_notification("exit", json!(null)).await;
 
-    let config = ServerConfig { workspace_override: Some(first.workspace.clone()), ..Default::default() };
+    let config = ServerConfig {
+        launch: LoadOptions { workspace: Some(first.workspace.clone()), ..LoadOptions::default() },
+        ..Default::default()
+    };
     let mut restarted = Harness::start_with(&[], config, client_capabilities()).await;
     let params = json!({ "textDocument": { "uri": location.uri }, "position": location.range.start });
     let hover = restarted.request("textDocument/hover", params.clone()).await;

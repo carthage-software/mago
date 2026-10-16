@@ -66,13 +66,7 @@ impl DirectoryAliases {
                 if path.starts_with(link) {
                     continue;
                 }
-                let alias = if let Ok(relative) = document.resolved().strip_prefix(target.resolved()) {
-                    link.join(relative)
-                } else if target.resolved().starts_with(document.resolved()) {
-                    link.clone()
-                } else {
-                    continue;
-                };
+                let Some(alias) = alias(link, target.resolved(), document.resolved()) else { continue };
                 if deleted.contains(path) && !deleted.contains(&alias) {
                     deleted.to_mut().insert(alias.clone());
                 }
@@ -84,6 +78,26 @@ impl DirectoryAliases {
             paths.to_mut().extend(translated);
             paths.to_mut().sort_unstable_by_key(|path| path.components().count());
         }
+    }
+
+    /// Add the paths that reach each root through a live link.
+    pub fn translate_roots(&self, roots: &mut HashSet<PathBuf>) {
+        let mut aliases = Vec::new();
+        for link in &self.links {
+            let target = DocumentPath::new(link);
+            aliases.extend(roots.iter().filter_map(|root| alias(link, target.resolved(), root)));
+        }
+        roots.extend(aliases);
+    }
+}
+
+fn alias(link: &Path, target: &Path, path: &Path) -> Option<PathBuf> {
+    if let Ok(relative) = path.strip_prefix(target) {
+        Some(link.join(relative))
+    } else if target.starts_with(path) {
+        Some(link.to_path_buf())
+    } else {
+        None
     }
 }
 

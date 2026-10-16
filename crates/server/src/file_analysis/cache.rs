@@ -1,6 +1,7 @@
 //! Owns per-file editor data and the settings used to build it.
 
 use std::sync::Arc;
+use std::sync::Weak;
 
 use foldhash::HashMap;
 use mago_database::DatabaseReader;
@@ -10,7 +11,6 @@ use mago_database::file::FileType;
 use mago_database::membership::PathExclusions;
 use mago_syntax::settings::ParserSettings;
 use rayon::prelude::*;
-use xxhash_rust::xxh3::xxh3_64;
 
 use super::FileAnalysis;
 use crate::linter::LinterContext;
@@ -28,7 +28,9 @@ pub(crate) struct FileAnalyses {
 }
 
 struct CachedAnalysis {
-    contents_hash: u64,
+    /// The database file it was built from. While this handle lives, a database
+    /// update cannot edit that file in place, so a new contents always has a new address.
+    source: Weak<File>,
     analysis: Arc<FileAnalysis>,
 }
 
@@ -47,17 +49,16 @@ impl FileAnalyses {
         }
     }
 
-    /// Query paths accept any file type. Content checks keep direct database
+    /// Query paths accept any file type. Identity checks keep direct database
     /// updates from serving stale data, even before an explicit refresh.
-    pub(crate) fn get_or_build(&mut self, file: &File) -> Arc<FileAnalysis> {
-        let contents_hash = xxh3_64(&file.contents);
+    pub(crate) fn get_or_build(&mut self, file: &Arc<File>) -> Arc<FileAnalysis> {
         if let Some(cached) = self.entries.get(&file.id)
-            && cached.contents_hash == contents_hash
+            && std::ptr::eq(cached.source.as_ptr(), Arc::as_ptr(file))
         {
             return Arc::clone(&cached.analysis);
         }
 
-        let entry = self.build(file, contents_hash);
+        let entry = self.build(file);
         let analysis = Arc::clone(&entry.analysis);
         self.entries.insert(file.id, entry);
         analysis
@@ -69,13 +70,15 @@ impl FileAnalyses {
         if !self.reports_any() {
             return;
         }
+
         for &id in files {
             let Ok(file) = database.get(&id) else {
                 self.entries.remove(&id);
                 continue;
             };
+
             if file.file_type == FileType::Host && self.reports(&file) {
-                let entry = self.build(&file, xxh3_64(&file.contents));
+                let entry = self.build(&file);
                 self.entries.insert(id, entry);
             }
         }
@@ -102,7 +105,7 @@ impl FileAnalyses {
                 continue;
             };
             if file.file_type == FileType::Host {
-                let entry = self.build(&file, xxh3_64(&file.contents));
+                let entry = self.build(&file);
                 self.entries.insert(id, entry);
             }
         }
@@ -110,8 +113,7 @@ impl FileAnalyses {
 
     pub(crate) fn refresh_all(&mut self, database: &impl DatabaseReader) {
         let files: Vec<_> = database.files_with_type(FileType::Host).filter(|file| self.reports(file)).collect();
-        let entries: Vec<_> =
-            files.into_par_iter().map(|file| (file.id, self.build(&file, xxh3_64(&file.contents)))).collect();
+        let entries: Vec<_> = files.into_par_iter().map(|file| (file.id, self.build(&file))).collect();
         self.entries.extend(entries);
     }
 
@@ -123,8 +125,8 @@ impl FileAnalyses {
         self.entries.values().map(|entry| &entry.analysis)
     }
 
-    fn build(&self, file: &File, contents_hash: u64) -> CachedAnalysis {
+    fn build(&self, file: &Arc<File>) -> CachedAnalysis {
         let analysis = super::build(file, &self.linter, self.with_semantics(file));
-        CachedAnalysis { contents_hash, analysis: Arc::new(analysis) }
+        CachedAnalysis { source: Arc::downgrade(file), analysis: Arc::new(analysis) }
     }
 }
