@@ -95,3 +95,79 @@ function test_invoke_object_not_closure(callable $fn): void
         accept_closure($fn);
     }
 }
+
+/** @param callable(int): string $fn */
+function checkObject(callable $fn): void
+{
+    if (is_object($fn)) {
+        // @mago-expect analysis:redundant-type-comparison
+        // @mago-expect analysis:redundant-condition
+        if (is_object($fn)) {
+            $fn(42);
+        }
+    }
+}
+
+/** @param callable(int): string $fn */
+function checkString(callable $fn): void
+{
+    if (is_string($fn)) {
+        // @mago-expect analysis:redundant-type-comparison
+        // @mago-expect analysis:redundant-condition
+        if (is_scalar($fn)) {
+            $fn(42);
+        }
+    }
+}
+
+/** @param callable(int): string $fn */
+function checkStringTwice(callable $fn): void
+{
+    if (is_string($fn)) {
+        // @mago-expect analysis:redundant-type-comparison
+        // @mago-expect analysis:redundant-condition
+        if (is_string($fn)) {
+            $fn(42);
+        }
+    }
+}
+
+/** @param callable(int): string $fn */
+function checkScalarDirect(callable $fn): string
+{
+    if (is_scalar($fn)) {
+        return $fn(42);
+    }
+    return $fn(42);
+}
+
+/** @param callable(int): string $fn */
+function test_is_scalar_invalid_argument(callable $fn): void
+{
+    if (is_scalar($fn)) {
+        // @mago-expect analysis:invalid-argument
+        $fn('not-an-int');
+    }
+}
+
+/** @param callable(int): string $fn */
+function test_object_then_string(callable $fn): void
+{
+    if (is_object($fn)) {
+        // @mago-expect analysis:impossible-type-comparison
+        // @mago-expect analysis:impossible-condition
+        if (is_string($fn)) {
+        }
+    }
+}
+
+/** @param callable(int): string $fn */
+function test_string_then_object(callable $fn): void
+{
+    if (is_string($fn)) {
+        // @mago-expect analysis:impossible-type-comparison
+        // @mago-expect analysis:impossible-condition
+        if (is_object($fn)) {
+        }
+    }
+}
