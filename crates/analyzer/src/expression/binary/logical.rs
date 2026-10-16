@@ -17,26 +17,21 @@ use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
-use mago_span::Span;
-use mago_syntax::cst::ArrowFunction;
-use mago_syntax::cst::Assignment;
-use mago_syntax::cst::AssignmentOperator;
 use mago_syntax::cst::Binary;
 use mago_syntax::cst::BinaryOperator;
-use mago_syntax::cst::Closure;
 use mago_syntax::cst::Expression;
-use mago_syntax::cst::Variable;
-use mago_syntax::walker::MutWalker;
 use mago_text_edit::Safety;
 use mago_text_edit::TextEdit;
 use mago_word::WordMap;
 use mago_word::WordSet;
-use mago_word::word;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
+use crate::artifacts::CheckpointAction;
 use crate::assertion::get_class_type_relations;
 use crate::code::IssueCode;
+use crate::common::synthetic::new_synthetic_call;
+use crate::common::synthetic::new_synthetic_negation;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::context::scope::if_scope::IfScope;
@@ -46,7 +41,6 @@ use crate::formula::negate_or_synthesize;
 use crate::reconciler;
 use crate::utils::conditional;
 use crate::utils::expression::expression_has_observable_side_effect;
-use crate::utils::misc::unwrap_expression;
 use crate::utils::symbol_existence::extract_function_constant_existence;
 
 /// Merges variables assigned by a short-circuiting right-hand side back into the
@@ -344,42 +338,73 @@ where
     Ok(())
 }
 
-#[derive(Debug, Default)]
-struct AssignmentFinder {
-    assignments: WordMap<(usize, Span, Span, u32)>,
-}
-
-impl<'ast, 'arena> MutWalker<'ast, 'arena, usize> for AssignmentFinder {
-    fn walk_assignment(&mut self, assignment: &'ast Assignment<'arena>, op_index: &mut usize) {
-        self.walk_expression(assignment.rhs, op_index);
-        if !matches!(assignment.operator, AssignmentOperator::Assign(_)) {
-            return;
-        }
-
-        if let Expression::Variable(Variable::Direct(variable)) = unwrap_expression(assignment.lhs) {
-            let var_id = word(variable.name);
-            self.assignments
-                .insert(var_id, (*op_index, assignment.span(), assignment.rhs.span(), assignment.span().start.offset));
-        }
-    }
-
-    fn walk_closure(&mut self, _: &'ast Closure<'arena>, _: &mut usize) {}
-
-    fn walk_arrow_function(&mut self, _: &'ast ArrowFunction<'arena>, _: &mut usize) {}
-}
-
-fn collect_logical_or_operands<'ast, 'arena>(
+fn collect_definitely_evaluated_ored_expressions<'ast, 'arena>(
     expression: &'ast Expression<'arena>,
-    operands: &mut Vec<&'ast Expression<'arena>>,
+    expressions: &mut Vec<&'ast Expression<'arena>>,
 ) {
     match expression {
-        Expression::Parenthesized(p) => collect_logical_or_operands(p.expression, operands),
-        Expression::Binary(b) if matches!(b.operator, BinaryOperator::Or(_) | BinaryOperator::LowOr(_)) => {
-            collect_logical_or_operands(b.lhs, operands);
-            collect_logical_or_operands(b.rhs, operands);
+        Expression::Parenthesized(p) => collect_definitely_evaluated_ored_expressions(p.expression, expressions),
+        Expression::Binary(Binary { lhs, operator: BinaryOperator::Or(_) | BinaryOperator::LowOr(_), rhs }) => {
+            collect_definitely_evaluated_ored_expressions(lhs, expressions);
+            collect_definitely_evaluated_ored_expressions(rhs, expressions);
         }
-        _ => operands.push(expression),
+        _ => expressions.push(expression),
     }
+}
+
+fn propagate_conditionally_assigned_variables<'ctx, 'arena, A>(
+    context: &mut Context<'ctx, 'arena, A>,
+    artifacts: &mut AnalysisArtifacts,
+    block_context: &BlockContext<'ctx>,
+    right_block_context: &mut BlockContext<'ctx>,
+    left_assigned_var_ids: &WordMap<u32>,
+    left_referenced_var_ids: &mut WordSet,
+    condition: &'arena Expression<'arena>,
+) -> Result<WordSet, AnalysisError>
+where
+    A: Arena,
+{
+    let mut lhs_false_context = block_context.clone();
+    let mut expressions = Vec::new();
+    collect_definitely_evaluated_ored_expressions(condition, &mut expressions);
+
+    artifacts.begin_expression_type_checkpoint();
+    let (result, _) = context.record(|context| {
+        for expression in expressions {
+            let negated_expression = new_synthetic_negation(context.arena, expression);
+            let assertion = new_synthetic_call(context.arena, "assert", negated_expression);
+
+            let was_inside_negation = lhs_false_context.flags.inside_negation();
+            lhs_false_context.flags.set_inside_negation(true);
+
+            assertion.analyze(context, &mut lhs_false_context, artifacts)?;
+
+            lhs_false_context.flags.set_inside_negation(was_inside_negation);
+        }
+
+        Result::<_, AnalysisError>::Ok(())
+    });
+
+    artifacts.finish_expression_type_checkpoint(if result.is_ok() {
+        CheckpointAction::Rollback
+    } else {
+        CheckpointAction::Keep
+    });
+    result?;
+
+    let mut reassigned_vars = WordSet::default();
+    for variable_id in left_assigned_var_ids.keys() {
+        if let Some(variable_type) = lhs_false_context.locals.get(variable_id) {
+            right_block_context.locals.insert(*variable_id, Rc::clone(variable_type));
+            reassigned_vars.insert(*variable_id);
+        }
+        if let Some(offset) = lhs_false_context.assigned_variable_ids.get(variable_id) {
+            right_block_context.assigned_variable_ids.insert(*variable_id, *offset);
+        }
+        left_referenced_var_ids.remove(variable_id);
+    }
+
+    Ok(reassigned_vars)
 }
 
 #[inline]
@@ -396,7 +421,7 @@ where
     let mut left_referenced_var_ids;
     let left_assigned_var_ids;
 
-    if is_logical_or_operation(binary.lhs) {
+    if is_logical_or_operation(binary.lhs, 3) {
         let pre_referenced_var_ids = block_context.conditionally_referenced_variable_ids.clone();
         block_context.conditionally_referenced_variable_ids.clear();
 
@@ -446,6 +471,7 @@ where
 
         left_block_context = if_conditional_scope.if_body_context;
         left_referenced_var_ids = if_conditional_scope.conditionally_referenced_variable_ids;
+        left_assigned_var_ids = if_conditional_scope.assigned_in_conditional_variable_ids;
     }
 
     let lhs_type = match artifacts.get_rc_expression_type(&binary.lhs).cloned() {
@@ -457,78 +483,25 @@ where
         None => Rc::new(get_mixed()),
     };
 
-    let mut left_operands = Vec::new();
-    collect_logical_or_operands(binary.lhs, &mut left_operands);
+    let left_clauses = get_formula(
+        binary.lhs.span(),
+        binary.lhs.span(),
+        binary.lhs,
+        context.get_assertion_context_from_block(block_context),
+        artifacts,
+        &context.settings.algebra_thresholds(),
+        context.settings.formula_size_threshold,
+    )
+    .unwrap_or_default();
 
-    let mut assignment_finder = AssignmentFinder::default();
-    for (op_index, op) in left_operands.iter().enumerate() {
-        let mut idx = op_index;
-        assignment_finder.walk_expression(op, &mut idx);
-    }
-
-    let mut negated_left_clauses = if !assignment_finder.assignments.is_empty() && left_operands.len() > 1 {
-        let mut clauses = Vec::new();
-        for (op_index, op) in left_operands.iter().enumerate() {
-            let op_clauses = get_formula(
-                op.span(),
-                op.span(),
-                op,
-                context.get_assertion_context_from_block(block_context),
-                artifacts,
-                &context.settings.algebra_thresholds(),
-                context.settings.formula_size_threshold,
-            )
-            .unwrap_or_default();
-
-            let mut negated_op_clauses = negate_or_synthesize(
-                &op_clauses,
-                op,
-                context.get_assertion_context_from_block(block_context),
-                artifacts,
-                &context.settings.algebra_thresholds(),
-                context.settings.formula_size_threshold,
-            );
-
-            negated_op_clauses.retain(|c| {
-                if c.wedge {
-                    return true;
-                }
-
-                for key in c.possibilities.keys() {
-                    if let Some((latest_op_index, _, _, _)) = assignment_finder.assignments.get(key) {
-                        if *latest_op_index > op_index {
-                            return false;
-                        }
-                    }
-                }
-
-                true
-            });
-
-            clauses.extend(negated_op_clauses);
-        }
-        clauses
-    } else {
-        let left_clauses = get_formula(
-            binary.lhs.span(),
-            binary.lhs.span(),
-            binary.lhs,
-            context.get_assertion_context_from_block(block_context),
-            artifacts,
-            &context.settings.algebra_thresholds(),
-            context.settings.formula_size_threshold,
-        )
-        .unwrap_or_default();
-
-        negate_or_synthesize(
-            &left_clauses,
-            binary.lhs,
-            context.get_assertion_context_from_block(block_context),
-            artifacts,
-            &context.settings.algebra_thresholds(),
-            context.settings.formula_size_threshold,
-        )
-    };
+    let mut negated_left_clauses = negate_or_synthesize(
+        &left_clauses,
+        binary.lhs,
+        context.get_assertion_context_from_block(block_context),
+        artifacts,
+        &context.settings.algebra_thresholds(),
+        context.settings.formula_size_threshold,
+    );
 
     if !left_block_context.reconciled_expression_clauses.is_empty() {
         let left_reconciled_clauses_hashed =
@@ -544,10 +517,29 @@ where
         }
     }
 
-    let clauses_for_right_analysis = saturate_shared_clauses(
+    let mut clauses_for_right_analysis = saturate_shared_clauses(
         block_context.clauses.iter().cloned().chain(negated_left_clauses.into_iter().map(Rc::new)),
         &context.settings.algebra_thresholds(),
     );
+
+    let mut right_block_context = block_context.clone();
+
+    if !left_assigned_var_ids.is_empty() {
+        let reassigned_vars = propagate_conditionally_assigned_variables(
+            context,
+            artifacts,
+            block_context,
+            &mut right_block_context,
+            &left_assigned_var_ids,
+            &mut left_referenced_var_ids,
+            binary.lhs,
+        )?;
+
+        if !reassigned_vars.is_empty() {
+            clauses_for_right_analysis =
+                BlockContext::remove_reconciled_clause_refs(&clauses_for_right_analysis, &reassigned_vars).0;
+        }
+    }
 
     let (negated_type_assertions, active_negated_type_assertions) = find_satisfying_assignments_iter(
         clauses_for_right_analysis.iter().map(Rc::as_ref),
@@ -556,19 +548,6 @@ where
     );
 
     let mut changed_var_ids = WordSet::default();
-    let mut right_block_context = block_context.clone();
-    for (var_id, (_, assignment_span, rhs_span, offset)) in &assignment_finder.assignments {
-        if let Some(ty) =
-            artifacts.get_rc_expression_type(assignment_span).or_else(|| artifacts.get_rc_expression_type(rhs_span))
-        {
-            right_block_context.locals.insert(*var_id, Rc::clone(ty));
-            right_block_context.assigned_variable_ids.insert(*var_id, *offset);
-        }
-    }
-
-    for var_id in assignment_finder.assignments.keys() {
-        left_referenced_var_ids.remove(var_id);
-    }
 
     let result_type: TUnion;
 
@@ -954,10 +933,17 @@ fn report_redundant_logical_operation<'arena, A>(
 }
 
 #[inline]
-const fn is_logical_or_operation(expression: &Expression<'_>) -> bool {
+const fn is_logical_or_operation(expression: &Expression<'_>, max_nesting: usize) -> bool {
+    if max_nesting == 0 {
+        return true;
+    }
+
     match expression {
-        Expression::Parenthesized(p) => is_logical_or_operation(p.expression),
-        Expression::Binary(b) => matches!(b.operator, BinaryOperator::Or(_) | BinaryOperator::LowOr(_)),
+        Expression::Parenthesized(p) => is_logical_or_operation(p.expression, max_nesting),
+        Expression::Binary(b) => match b.operator {
+            BinaryOperator::Or(_) | BinaryOperator::LowOr(_) => is_logical_or_operation(b.lhs, max_nesting - 1),
+            _ => false,
+        },
         _ => false,
     }
 }
