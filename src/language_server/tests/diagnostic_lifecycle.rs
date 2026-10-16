@@ -5,6 +5,7 @@ use std::collections::BTreeMap;
 use serde_json::Value;
 
 use super::harness::{Harness, client_capabilities};
+use crate::config::LoadOptions;
 use crate::language_server::ServerConfig;
 
 async fn collect(h: &mut Harness, current: &mut BTreeMap<String, Value>) {
@@ -589,7 +590,7 @@ async fn physical_package_events_use_startup_aliases_without_open_documents() {
     std::fs::write(package.join("Contact.php"), "<?php class Contact {}").unwrap();
     let config = ServerConfig {
         linter: false,
-        workspace_override: Some(workspace.path().to_path_buf()),
+        launch: LoadOptions { workspace: Some(workspace.path().to_path_buf()), ..LoadOptions::default() },
         ..ServerConfig::default()
     };
     let mut h = Harness::start_with(&[], config, client_capabilities()).await;

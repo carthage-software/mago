@@ -15,7 +15,12 @@ pub(super) fn for_matcher(matcher: &WorkspaceMatcher) -> Vec<String> {
             patterns.push(format!("{}/**", pattern.trim_end_matches('/')));
         }
     }
+
     patterns
+}
+
+pub(super) fn for_file(path: &Path) -> String {
+    path_pattern(path)
 }
 
 pub(super) fn for_directory(root: &Path) -> [String; 2] {
@@ -33,6 +38,7 @@ fn path_pattern(path: &Path) -> String {
         path.strip_prefix(r"\\?\").unwrap_or(&path).to_owned()
     }
     .replace('\\', "/");
+
     escape_glob(&path)
 }
 
@@ -49,6 +55,7 @@ fn escape_glob(value: &str) -> String {
             _ => escaped.push(character),
         }
     }
+
     escaped
 }
 

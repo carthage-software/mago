@@ -20,6 +20,15 @@ where
     W: AsRef<Workspace<K>> + AsMut<Workspace<K>>,
 {
     pub fn change_disk_files(&mut self, events: Vec<FileEvent>) -> WorkspaceUpdate {
+        self.change_disk_files_where(events, |_| true)
+    }
+
+    /// Apply file changes to the workspaces `include` accepts.
+    pub fn change_disk_files_where(
+        &mut self,
+        events: Vec<FileEvent>,
+        include: impl Fn(&Workspace<K>) -> bool,
+    ) -> WorkspaceUpdate {
         let deleted: HashSet<_> =
             events.iter().filter(|event| event.kind == FileChange::Deleted).map(|event| event.path.clone()).collect();
         let mut paths: Vec<_> = events.into_iter().map(|event| event.path).collect();
@@ -39,6 +48,9 @@ where
         let mut changes = Vec::new();
         for (index, entry) in self.workspaces.iter_mut().enumerate() {
             let workspace = entry.as_mut();
+            if !include(workspace) {
+                continue;
+            }
             let mut paths = Cow::Borrowed(paths.as_slice());
             let mut deleted = Cow::Borrowed(&deleted);
             workspace.directory_aliases.translate_events(&workspace.matcher, &mut paths, &mut deleted);
@@ -70,8 +82,7 @@ fn prepare_paths<K>(
     changed: &mut Vec<FileId>,
 ) -> Vec<PathBuf> {
     let mut covered = HashSet::default();
-    let mut missing_roots = HashSet::default();
-    let mut matched = HashSet::default();
+    let mut roots = HashSet::default();
     let mut readable = Vec::new();
     for path in paths {
         let document = DocumentPath::new(path);
@@ -82,33 +93,26 @@ fn prepare_paths<K>(
         if is_missing(path) {
             if let Some(file) = loaded {
                 remove_file(workspace, &file, open, changed);
+            } else if workspace.matcher.excludes_directory(path)
+                || workspace.matcher.excludes_directory(document.resolved())
+            {
+                continue;
             } else {
-                match missing_path(workspace, path, document.resolved()) {
-                    MissingPath::Root => {
-                        // A missing external target may still belong to a loaded package symlink.
-                        missing_roots.insert(path.clone());
-                        missing_roots.insert(document.resolved().to_path_buf());
-                    }
-                    MissingPath::Matched => {
-                        matched.insert(path.clone());
-                        matched.insert(document.resolved().to_path_buf());
-                        continue;
-                    }
-                    MissingPath::Excluded => continue,
-                }
+                roots.insert(path.clone());
+                roots.insert(document.resolved().to_path_buf());
             }
         } else if path.is_dir() {
             if !workspace.matcher.can_contain_files(path) {
                 continue;
             }
-            missing_roots.insert(path.clone());
-            missing_roots.insert(document.resolved().to_path_buf());
+            roots.insert(path.clone());
+            roots.insert(document.resolved().to_path_buf());
             readable.push(path.clone());
         } else {
             if loaded.is_none() && deleted.contains(path) && workspace.matcher.can_contain_files(path) {
                 // A deleted directory may already have been replaced by a regular file.
-                missing_roots.insert(path.clone());
-                missing_roots.insert(document.resolved().to_path_buf());
+                roots.insert(path.clone());
+                roots.insert(document.resolved().to_path_buf());
             }
             if loaded.is_none() && !workspace.matcher.contains(path) {
                 continue;
@@ -118,28 +122,24 @@ fn prepare_paths<K>(
         covered.insert(path.clone());
         covered.insert(document.resolved().to_path_buf());
     }
-    if !matched.is_empty() {
-        for file in workspace.database().files() {
-            let Some(path) = file.path.as_deref() else { continue };
-            missing_roots
-                .extend(path.ancestors().skip(1).filter(|ancestor| matched.contains(*ancestor)).map(Path::to_path_buf));
-        }
-    }
-    if !missing_roots.is_empty() {
-        // Deleted unknown paths may be directories. Check loaded children once for the whole batch.
+    if !roots.is_empty() {
+        workspace.directory_aliases.translate_roots(&mut roots);
+        let (shallow, deep) = roots.iter().fold((usize::MAX, 0), |(shallow, deep), root| {
+            let depth = root.components().count();
+            (shallow.min(depth), deep.max(depth))
+        });
         let missing: Vec<_> = workspace
             .database()
             .files()
             .filter(|file| {
-                !file.file_type.is_builtin()
-                    && file.path.as_ref().is_some_and(|path| {
-                        is_missing(path)
-                            && (path.ancestors().any(|ancestor| missing_roots.contains(ancestor))
-                                || DocumentPath::new(path)
-                                    .resolved()
-                                    .ancestors()
-                                    .any(|ancestor| missing_roots.contains(ancestor)))
-                    })
+                let Some(path) = file.path.as_deref().filter(|_| !file.file_type.is_builtin()) else { return false };
+                let depth = path.components().count();
+                let skip = depth.saturating_sub(deep);
+                path.ancestors()
+                    .skip(skip)
+                    .take((depth + 1).saturating_sub(shallow).saturating_sub(skip))
+                    .any(|ancestor| roots.contains(ancestor))
+                    && is_missing(path)
             })
             .collect();
         for file in missing {
@@ -147,28 +147,6 @@ fn prepare_paths<K>(
         }
     }
     readable
-}
-
-/// How a missing path that was not loaded itself takes part in cleanup.
-enum MissingPath {
-    /// It may have been a directory or a package symlink target with loaded files.
-    Root,
-    /// A file glob matches it. A glob never excludes a directory, so it was one only
-    /// if loaded files lie below it, which one pass over loaded paths decides per batch.
-    Matched,
-    /// A path exclusion covers it, so nothing below it was loaded.
-    Excluded,
-}
-
-fn missing_path<K>(workspace: &Workspace<K>, path: &Path, resolved: &Path) -> MissingPath {
-    let matcher = &workspace.matcher;
-    if matcher.excludes_directory(path) || matcher.excludes_directory(resolved) {
-        MissingPath::Excluded
-    } else if matcher.is_excluded(path) || matcher.is_excluded(resolved) {
-        MissingPath::Matched
-    } else {
-        MissingPath::Root
-    }
 }
 
 fn is_missing(path: &Path) -> bool {

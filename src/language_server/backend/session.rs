@@ -2,6 +2,7 @@
 
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicBool, Ordering};
+use std::time::Duration;
 
 use tower_lsp_server::Client;
 use tower_lsp_server::gen_lsp_types::{
@@ -16,8 +17,11 @@ use crate::language_server::workspace::workspace_roots;
 
 use super::Backend;
 use super::client::ClientPreferences;
-use super::code_lens_refresh::CodeLensRefresh;
+use super::debounce::Debounced;
+use super::restarts::Restarts;
 use super::watchers::Watchers;
+
+const CODE_LENS_QUIET_PERIOD: Duration = Duration::from_millis(150);
 
 /// Publish these fields together after workspace loading succeeds.
 pub(super) struct Session {
@@ -26,7 +30,8 @@ pub(super) struct Session {
     restart_notified: AtomicBool,
     registry: Mutex<WorkspaceRegistry>,
     watchers: Mutex<Option<Watchers>>,
-    code_lenses: Mutex<Option<CodeLensRefresh>>,
+    code_lenses: Mutex<Option<Debounced>>,
+    pub(super) restarts: Mutex<Restarts>,
 }
 
 impl Session {
@@ -38,6 +43,7 @@ impl Session {
             registry: Mutex::new(registry),
             watchers: Mutex::new(None),
             code_lenses: Mutex::new(None),
+            restarts: Mutex::default(),
         }
     }
 
@@ -59,16 +65,36 @@ impl Session {
 
     pub(super) fn refresh_code_lenses(&self, client: &Client) {
         if self.preferences.code_lens_refresh {
-            self.code_lenses.lock().unwrap().get_or_insert_with(|| CodeLensRefresh::start(client.clone())).schedule();
+            self.code_lenses
+                .lock()
+                .unwrap()
+                .get_or_insert_with(|| {
+                    let client = client.clone();
+                    Debounced::start(CODE_LENS_QUIET_PERIOD, move |_| {
+                        let client = client.clone();
+                        async move {
+                            if let Err(error) = client.code_lens_refresh().await {
+                                tracing::debug!(%error, "code-lens refresh failed");
+                            }
+                        }
+                    })
+                })
+                .schedule(0);
         }
     }
 
     async fn stop(&self) {
         let watchers = self.watchers.lock().unwrap().take();
         let code_lenses = self.code_lenses.lock().unwrap().take();
+        let restarts = self.restarts.lock().unwrap().stop();
+        for restart in restarts {
+            restart.stop().await;
+        }
+
         if let Some(code_lenses) = code_lenses {
             code_lenses.stop().await;
         }
+
         if let Some(watchers) = watchers {
             watchers.stop().await;
         }
@@ -82,10 +108,11 @@ impl Backend {
 
     pub(super) async fn start_session(&self, params: InitializeParams) -> JsonRpcResult<InitializeResult> {
         let preferences = ClientPreferences::from(&params);
-        let roots = match &self.config.workspace_override {
+        let roots = match &self.config.launch.workspace {
             Some(root) => vec![root.clone()],
             None => workspace_roots(&params),
         };
+
         if roots.is_empty() {
             self.client.log_message(MessageType::Warning, "mago-server: no workspace root provided").await;
         } else {
@@ -95,6 +122,7 @@ impl Backend {
                     .await;
             }
         }
+
         let registry = self.bootstrap(roots).await;
         // Observe cancellation after loading, before making the session visible.
         tokio::task::yield_now().await;
@@ -119,6 +147,7 @@ impl Backend {
         if session.restart_notified.load(Ordering::Relaxed) {
             return;
         }
+
         let mut config = (*self.config).clone();
         config.configuration.language_server = self.providers();
         if session.preferences.server_capabilities(&config) != session.capabilities
@@ -127,7 +156,7 @@ impl Backend {
             self.client
                 .show_message(
                     MessageType::Warning,
-                    "Workspace folders changed which Mago features are enabled. Restart the Mago language server to update the editor.",
+                    "The enabled Mago features changed. Restart the Mago language server to update the editor.",
                 )
                 .await;
         }
@@ -137,6 +166,7 @@ impl Backend {
         if let Some(session) = self.session.get() {
             session.stop().await;
         }
+
         Ok(())
     }
 }
@@ -147,6 +177,7 @@ pub(super) fn providers(registry: &WorkspaceRegistry, config: &ServerConfig) -> 
     providers.disable.retain(|provider| {
         registry.iter().all(|workspace| !workspace.configuration.language_server.is_enabled(*provider))
     });
+
     providers
 }
 
@@ -163,7 +194,13 @@ mod tests {
 
     #[tokio::test]
     async fn cancelled_session_setup_does_not_install_partial_state() {
-        let (service, socket) = LspService::new(|client| Backend::new(client, Arc::new(ServerConfig::default())));
+        let (service, socket) = LspService::new(|client| {
+            Backend::new(
+                client,
+                Arc::new(ServerConfig::default()),
+                crate::language_server::ordered_service::Tasks::default(),
+            )
+        });
         let backend = service.inner();
         // Let logging finish at once so the first pause follows registry construction.
         drop(socket);

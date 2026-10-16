@@ -2,6 +2,7 @@
 
 use std::collections::HashMap;
 use std::collections::VecDeque;
+use std::future::Future;
 use std::io;
 use std::sync::Arc;
 use std::sync::Condvar;
@@ -76,6 +77,8 @@ impl PendingRequests {
 #[derive(Default)]
 struct Waiting {
     jobs: VecDeque<Arc<Slot>>,
+    requests: usize,
+    pushed: u64,
     closed: bool,
 }
 
@@ -86,24 +89,32 @@ struct WorkerQueue {
 }
 
 impl WorkerQueue {
-    fn push(&self, slot: Arc<Slot>) -> io::Result<()> {
+    fn push(&self, slot: Arc<Slot>) -> io::Result<u64> {
         let mut waiting = self.waiting.lock().unwrap();
         if waiting.closed {
             return Err(io::Error::other("language server worker stopped"));
         }
-        if waiting.jobs.len() >= self.capacity {
-            return Err(io::Error::other("language server request queue is full"));
+        if slot.id.is_some() {
+            if waiting.requests >= self.capacity {
+                return Err(io::Error::other("language server request queue is full"));
+            }
+            waiting.requests += 1;
         }
         waiting.jobs.push_back(slot);
+        waiting.pushed += 1;
+        let pushed = waiting.pushed;
         drop(waiting);
         self.ready.notify_one();
-        Ok(())
+        Ok(pushed)
     }
 
     fn pop(&self) -> Option<Arc<Slot>> {
         let mut waiting = self.waiting.lock().unwrap();
         loop {
             if let Some(slot) = waiting.jobs.pop_front() {
+                if slot.id.is_some() {
+                    waiting.requests -= 1;
+                }
                 return Some(slot);
             }
             if waiting.closed {
@@ -114,12 +125,18 @@ impl WorkerQueue {
     }
 
     fn remove(&self, slot: &Arc<Slot>) {
-        self.waiting.lock().unwrap().jobs.retain(|queued| !Arc::ptr_eq(queued, slot));
+        let mut waiting = self.waiting.lock().unwrap();
+        let queued = waiting.jobs.len();
+        waiting.jobs.retain(|queued| !Arc::ptr_eq(queued, slot));
+        if waiting.jobs.len() < queued && slot.id.is_some() {
+            waiting.requests -= 1;
+        }
     }
 
     fn close(&self) {
         let mut waiting = self.waiting.lock().unwrap();
         waiting.closed = true;
+        waiting.requests = 0;
         let jobs = std::mem::take(&mut waiting.jobs);
         drop(waiting);
         self.ready.notify_all();
@@ -130,6 +147,30 @@ impl WorkerQueue {
 pub(super) struct Queue {
     jobs: Arc<WorkerQueue>,
     pending: PendingRequests,
+    session: Weak<Mutex<SessionState>>,
+}
+
+/// Queue the server's own work on the worker, behind the messages already waiting.
+/// A task runs only while the session is running.
+#[derive(Clone, Default)]
+pub(in crate::language_server) struct Tasks {
+    jobs: Weak<WorkerQueue>,
+    session: Weak<Mutex<SessionState>>,
+}
+
+impl Tasks {
+    pub(in crate::language_server) fn spawn(&self, task: impl Future<Output = ()> + Send + 'static) {
+        let Some(jobs) = self.jobs.upgrade() else { return };
+        let session = self.session.clone();
+        let (reply, _) = oneshot::channel();
+        let handler: Handler = Box::pin(async move {
+            if session.upgrade().is_some_and(|session| matches!(*session.lock().unwrap(), SessionState::Running)) {
+                task.await;
+            }
+            Ok(None)
+        });
+        let _ = jobs.push(Arc::new(Slot { id: None, job: Mutex::new(Some(Job { handler, reply })) }));
+    }
 }
 
 impl Queue {
@@ -139,6 +180,7 @@ impl Queue {
         session: Arc<Mutex<SessionState>>,
     ) -> io::Result<Self> {
         let jobs = Arc::new(WorkerQueue { waiting: Mutex::default(), ready: Condvar::new(), capacity });
+        let tasks_session = Arc::downgrade(&session);
         let worker_jobs = Arc::clone(&jobs);
         let pending = PendingRequests::default();
         let worker_pending = pending.clone();
@@ -169,22 +211,46 @@ impl Queue {
                     let _ = job.reply.send(result);
                 }
             }));
+
             if outcome.is_err() {
                 *session.lock().unwrap() = SessionState::Failed("language server worker panicked".into());
                 tracing::error!("language server worker panicked");
             }
+
             stopped.send_replace(true);
             worker_jobs.close();
         })?;
-        Ok(Self { jobs, pending })
+
+        Ok(Self { jobs, pending, session: tasks_session })
     }
 
     pub(super) fn find(&self, id: &Id) -> Option<Arc<Slot>> {
         self.pending.find(id)
     }
 
+    pub(super) fn tasks(&self) -> Tasks {
+        Tasks { jobs: Arc::downgrade(&self.jobs), session: self.session.clone() }
+    }
+
+    /// Replace a queued notification only if nothing was queued after the push numbered `pushed`.
+    pub(super) fn replace_queued(
+        &self,
+        slot: &Slot,
+        pushed: u64,
+        request: Request,
+        prepare: impl FnOnce(Request) -> io::Result<Handler>,
+    ) -> io::Result<Option<Request>> {
+        let waiting = self.jobs.waiting.lock().unwrap();
+        if waiting.pushed != pushed {
+            return Ok(Some(request));
+        }
+        let replaced = slot.replace_queued(request, prepare);
+        drop(waiting);
+        replaced
+    }
+
     pub(super) fn is_full(&self) -> bool {
-        self.jobs.waiting.lock().unwrap().jobs.len() >= self.jobs.capacity
+        self.jobs.waiting.lock().unwrap().requests >= self.jobs.capacity
     }
 
     pub(super) fn cancel(&self, handler: Handler, cancelled: Option<Arc<Slot>>) -> Handler {
@@ -215,14 +281,23 @@ impl Queue {
         id: Option<Id>,
         handler: Handler,
         mut stop: watch::Receiver<bool>,
-    ) -> io::Result<(Weak<Slot>, Handler)> {
+    ) -> io::Result<(Weak<Slot>, Handler, u64)> {
         let (reply, response) = oneshot::channel();
+        let notification = id.is_none();
         let slot = Arc::new(Slot { id, job: Mutex::new(Some(Job { handler, reply })) });
         self.pending.insert(&slot);
-        if let Err(error) = self.jobs.push(Arc::clone(&slot)) {
-            self.pending.remove(&slot);
-            return Err(error);
+        let pushed = match self.jobs.push(Arc::clone(&slot)) {
+            Ok(pushed) => pushed,
+            Err(error) => {
+                self.pending.remove(&slot);
+                return Err(error);
+            }
+        };
+
+        if notification {
+            return Ok((Arc::downgrade(&slot), Box::pin(std::future::ready(Ok(None))), pushed));
         }
+
         let reply = Box::pin(async move {
             if *stop.borrow() {
                 return Ok(None);
@@ -232,7 +307,8 @@ impl Queue {
                 _ = stop.changed() => Ok(None),
             }
         });
-        Ok((Arc::downgrade(&slot), reply))
+
+        Ok((Arc::downgrade(&slot), reply, pushed))
     }
 }
 

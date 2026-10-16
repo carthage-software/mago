@@ -8,10 +8,13 @@ use mago_database::file::FileId;
 use mago_database::file::FileType;
 
 use crate::Server;
-use crate::domain::{CodeLensItem, CodeLensKind};
+use crate::domain::{CodeLensItem, CodeLensKind, SymbolLocation};
 use crate::file_analysis::FileAnalysis;
 use crate::semantic_index::{SemanticIndex, SymbolKey, SymbolKind};
 use crate::symbol_resolution::{may_refer_to, resolved_symbol_name, short_name};
+
+/// Each lens of a file with the references found for it.
+pub(crate) type LensReferences = Vec<(CodeLensItem, Arc<[SymbolLocation]>)>;
 
 impl Server {
     /// Find declarations without collecting references until the client resolves a lens.
@@ -53,6 +56,31 @@ impl Server {
     /// Each count equals the number of [`get_references`](Self::get_references) results
     /// for that lens without its declaration.
     pub fn get_lens_counts(&mut self, file_id: FileId) -> Vec<(CodeLensItem, usize)> {
+        self.lens_references(file_id).iter().map(|(item, locations)| (item.clone(), locations.len())).collect()
+    }
+
+    /// The references of a lens listed before its file changed, at its current declaration.
+    pub fn get_lens_references(
+        &mut self,
+        file_id: FileId,
+        item: CodeLensItem,
+    ) -> Option<(CodeLensItem, Arc<[SymbolLocation]>)> {
+        let item = self.locate_lens(file_id, item)?;
+        let (_, locations) = self.lens_references(file_id).iter().find(|(lens, _)| lens.offset == item.offset)?;
+        Some((item, Arc::clone(locations)))
+    }
+
+    /// Every lens of a file with its references, kept until the workspace changes.
+    fn lens_references(&mut self, file_id: FileId) -> &[(CodeLensItem, Arc<[SymbolLocation]>)] {
+        if !self.lens_references.contains_key(&file_id) {
+            let lenses = self.find_lens_references(file_id);
+            self.lens_references.insert(file_id, lenses);
+        }
+
+        &self.lens_references[&file_id]
+    }
+
+    fn find_lens_references(&mut self, file_id: FileId) -> LensReferences {
         let Some((analysis, length)) = self.lens_file(file_id) else { return Vec::new() };
         let mut slots: HashMap<(SymbolKind, &[u8]), usize> = HashMap::default();
         let lenses: Vec<_> = lenses(analysis.semantic(), length)
@@ -61,7 +89,7 @@ impl Server {
                 (item, *slots.entry((symbol.kind, &symbol.name)).or_insert(next))
             })
             .collect();
-        let mut counts = vec![0; slots.len()];
+        let mut locations = vec![Vec::new(); slots.len()];
         if !slots.is_empty() {
             let hosts: Vec<_> =
                 self.database().files().filter(|file| file.file_type == FileType::Host).map(|file| file.id).collect();
@@ -94,12 +122,20 @@ impl Server {
                     if let Some(&slot) = slots.get(&(symbol.kind, name))
                         && may_refer_to(symbol.kind, &symbol.name, name)
                     {
-                        counts[slot] += 1;
+                        locations[slot].push(SymbolLocation { file: id, range: entry.range });
                     }
                 }
             }
         }
-        lenses.into_iter().map(|(item, slot)| (item, counts[slot])).collect()
+
+        let locations: Vec<Arc<[SymbolLocation]>> = locations
+            .into_iter()
+            .map(|mut found: Vec<SymbolLocation>| {
+                found.sort_unstable_by_key(|location| (location.file, location.range.start, location.range.end));
+                Arc::from(found)
+            })
+            .collect();
+        lenses.into_iter().map(|(item, slot)| (item, Arc::clone(&locations[slot]))).collect()
     }
 
     fn lens_file(&mut self, file_id: FileId) -> Option<(Arc<FileAnalysis>, u32)> {
@@ -229,12 +265,22 @@ mod tests {
         ] {
             let file = server.database().get_id(name.as_bytes()).unwrap();
             let counts = server.get_lens_counts(file);
-            let offsets: Vec<_> = server.get_lens(file).iter().map(|item| item.offset).collect();
+            let lenses = server.get_lens(file);
+            let offsets: Vec<_> = lenses.iter().map(|item| item.offset).collect();
             assert_eq!(counts.iter().map(|(item, _)| item.offset).collect::<Vec<_>>(), offsets, "{name}");
-            let references: Vec<_> =
-                offsets.iter().map(|offset| server.get_references(file, *offset, false).len()).collect();
-            assert_eq!(counts.iter().map(|(_, count)| *count).collect::<Vec<_>>(), references, "{name}");
-            assert_eq!(references, expected, "{name}");
+            let references: Vec<_> = offsets.iter().map(|offset| server.get_references(file, *offset, false)).collect();
+            assert_eq!(
+                counts.iter().map(|(_, count)| *count).collect::<Vec<_>>(),
+                references.iter().map(Vec::len).collect::<Vec<_>>(),
+                "{name}"
+            );
+
+            assert_eq!(references.iter().map(Vec::len).collect::<Vec<_>>(), expected, "{name}");
+            server.invalidate_artifacts(&[]);
+            for (item, references) in lenses.into_iter().zip(&references) {
+                let (_, locations) = server.get_lens_references(file, item).unwrap();
+                assert_eq!(&*locations, references.as_slice(), "{name}");
+            }
         }
     }
 }

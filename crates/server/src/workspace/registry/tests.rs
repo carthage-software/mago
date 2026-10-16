@@ -110,6 +110,27 @@ fn buffers_survive_root_changes_and_share_a_live_database_snapshot() {
 }
 
 #[test]
+fn replaced_workspaces_reload_disk_and_keep_accepted_buffers() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().canonicalize().unwrap();
+    let path = root.join("source.php");
+    std::fs::write(&path, "<?php class Disk {}").unwrap();
+    let mut workspaces = Workspaces::new(vec![workspace(&root)]);
+    workspaces.open_buffer(1, path.clone(), b"<?php class Buffer {}".to_vec(), 1);
+    std::fs::write(root.join("added.php"), "<?php class Added {}").unwrap();
+    assert_eq!(workspaces.replace(workspace(&root)).unwrap(), Some(1));
+    let server = &workspaces.entries()[0].server;
+    assert_eq!(server.get_symbols("Buffer").len(), 1);
+    assert_eq!(server.get_symbols("Added").len(), 1);
+    assert!(server.get_symbols("Disk").is_empty());
+    assert!(Arc::ptr_eq(&workspaces.documents()[&1].snapshot, &file(&workspaces, &path)));
+
+    let elsewhere = tempfile::tempdir().unwrap();
+    assert!(workspaces.replace(workspace(elsewhere.path())).unwrap().is_none());
+    assert_eq!(workspaces.entries().len(), 1);
+}
+
+#[test]
 fn directory_deletion_keeps_buffers_and_releases_deleted_analysis() {
     let directory = tempfile::tempdir().unwrap();
     let root = directory.path().canonicalize().unwrap();
@@ -186,6 +207,33 @@ fn created_directories_below_a_source_root_follow_the_loaders_pruning() {
     batch.extend(event(&deep, FileChange::Deleted));
     assert_eq!(workspaces.change_disk_files(batch).changed_files, 1);
     assert!(workspaces.entries()[0].database().files().next().is_none());
+}
+
+#[test]
+fn deletions_at_mixed_depths_release_only_files_below_them() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().canonicalize().unwrap();
+    let deep = root.join("shallow/a/b/Deep.php");
+    let near = root.join("nested/c/d/Near.php");
+    let keep = root.join("nested/Keep.php");
+    for path in [&deep, &near, &keep] {
+        std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+        std::fs::write(path, "<?php").unwrap();
+    }
+    let mut workspaces = Workspaces::new(vec![workspace(&root)]);
+    std::fs::remove_dir_all(root.join("shallow")).unwrap();
+    std::fs::remove_dir_all(root.join("nested/c")).unwrap();
+    let batch = [root.join("shallow"), root.join("nested/c/d"), root.join("x/y/z/w/v/Unknown.tmp")]
+        .into_iter()
+        .map(|path| FileEvent { path, kind: FileChange::Deleted })
+        .collect();
+    assert_eq!(workspaces.change_disk_files(batch).changed_files, 2);
+    let paths: Vec<_> = workspaces.entries()[0]
+        .database()
+        .files()
+        .filter_map(|file| file.path.as_deref().map(Path::to_path_buf))
+        .collect();
+    assert_eq!(paths, [keep]);
 }
 
 #[cfg(unix)]

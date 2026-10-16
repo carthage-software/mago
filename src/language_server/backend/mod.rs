@@ -20,20 +20,22 @@ use crate::config::language_server::Provider;
 use crate::language_server::ServerConfig;
 use crate::language_server::capabilities::type_hierarchy;
 use crate::language_server::codec;
+use crate::language_server::ordered_service::Tasks;
 use crate::language_server::uri::UriFilePath;
 
 mod buffers;
 mod client;
 mod code_lens;
-mod code_lens_refresh;
 mod commands;
 mod completion;
+mod debounce;
 mod editing;
 mod hierarchy;
 mod lifecycle;
 mod navigation;
 mod publication;
 mod query;
+mod restarts;
 mod routing;
 mod session;
 mod structure;
@@ -44,16 +46,18 @@ mod workspace_edit;
 use routing::traced;
 use session::Session;
 
+#[derive(Clone)]
 pub struct Backend {
     client: Client,
     config: Arc<ServerConfig>,
-    session: OnceLock<Session>,
+    session: Arc<OnceLock<Session>>,
+    tasks: Tasks,
 }
 
 impl Backend {
     #[must_use]
-    pub fn new(client: Client, config: Arc<ServerConfig>) -> Self {
-        Self { client, config, session: OnceLock::new() }
+    pub(super) fn new(client: Client, config: Arc<ServerConfig>, tasks: Tasks) -> Self {
+        Self { client, config, session: Arc::default(), tasks }
     }
 
     /// Advertise a provider if at least one loaded workspace enables it.

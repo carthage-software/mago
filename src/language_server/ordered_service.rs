@@ -9,6 +9,7 @@ use std::sync::Weak;
 use std::task::Context;
 use std::task::Poll;
 
+use foldhash::HashMap;
 use serde::Deserialize;
 use tokio::sync::watch;
 use tower_lsp_server::gen_lsp_types::CancelParams;
@@ -27,6 +28,7 @@ use self::lifecycle::Initialization;
 use self::lifecycle::SessionState;
 use self::queue::Queue;
 use self::queue::Slot;
+pub(super) use self::queue::Tasks;
 
 mod input;
 mod lifecycle;
@@ -56,25 +58,44 @@ fn full_change(request: &Request) -> Option<(Uri, i32)> {
     Some((Uri::deserialize(document.get("uri")?).ok()?, version))
 }
 
+/// The ordered worker, started before the service it runs so the service can queue its own work.
+pub(super) struct Worker {
+    queue: Queue,
+    stopped: watch::Sender<bool>,
+    session: Arc<Mutex<SessionState>>,
+}
+
+impl Worker {
+    pub(super) fn new() -> io::Result<Self> {
+        Self::with_capacity(QUEUE_CAPACITY)
+    }
+
+    fn with_capacity(capacity: usize) -> io::Result<Self> {
+        let (stopped, _) = watch::channel(false);
+        let session = Arc::new(Mutex::new(SessionState::default()));
+        let queue = Queue::new(capacity, stopped.clone(), Arc::clone(&session))?;
+        Ok(Self { queue, stopped, session })
+    }
+
+    pub(super) fn tasks(&self) -> Tasks {
+        self.queue.tasks()
+    }
+}
+
 pub(super) struct OrderedService<S> {
     inner: S,
     queue: Queue,
-    last_change: Option<(Uri, i32, Weak<Slot>)>,
+    changes: HashMap<Uri, (i32, Weak<Slot>)>,
+    pushed: u64,
     input: InputBudget,
     stopped: watch::Sender<bool>,
     session: Arc<Mutex<SessionState>>,
 }
 
 impl<S> OrderedService<S> {
-    pub(super) fn new(inner: S) -> io::Result<Self> {
-        Self::with_capacity(inner, QUEUE_CAPACITY)
-    }
-
-    fn with_capacity(inner: S, capacity: usize) -> io::Result<Self> {
-        let (stopped, _) = watch::channel(false);
-        let session = Arc::new(Mutex::new(SessionState::default()));
-        let queue = Queue::new(capacity, stopped.clone(), Arc::clone(&session))?;
-        Ok(Self { inner, queue, stopped, session, last_change: None, input: InputBudget::default() })
+    pub(super) fn new(inner: S, worker: Worker) -> Self {
+        let Worker { queue, stopped, session } = worker;
+        Self { inner, queue, stopped, session, changes: HashMap::default(), pushed: 0, input: InputBudget::default() }
     }
 
     pub(super) fn stopped(&self) -> watch::Receiver<bool> {
@@ -99,20 +120,36 @@ where
     S::Future: Send + 'static,
     S::Error: std::error::Error + Send + Sync + 'static,
 {
-    fn prepare_handler(&mut self, request: Request, bytes: usize, control: bool) -> io::Result<Handler> {
-        let permit = self.input.reserve(bytes, control)?;
-        let initialize = (request.method() == "initialize").then(|| Initialization::start(Arc::clone(&self.session)));
-        // Reserve before tower converts the payload and registers the request ID.
-        let handler = self.inner.call(request);
-        Ok(Box::pin(async move {
-            let _permit = permit;
-            let result = handler.await.map_err(io::Error::other);
-            if let Some(initialize) = initialize {
-                initialize.complete(&result);
-            }
-            result
-        }))
+    fn prepare_handler(&mut self, request: Request, bytes: usize, bounded: bool) -> io::Result<Handler> {
+        prepare(&mut self.inner, &self.input, &self.session, request, bytes, bounded)
     }
+}
+
+fn prepare<S>(
+    inner: &mut S,
+    input: &InputBudget,
+    session: &Arc<Mutex<SessionState>>,
+    request: Request,
+    bytes: usize,
+    bounded: bool,
+) -> io::Result<Handler>
+where
+    S: Service<Request, Response = Option<Response>>,
+    S::Future: Send + 'static,
+    S::Error: std::error::Error + Send + Sync + 'static,
+{
+    let permit = if bounded { input.reserve(bytes)? } else { input.retain(bytes) };
+    let initialize = (request.method() == "initialize").then(|| Initialization::start(Arc::clone(session)));
+    // Reserve before tower converts the payload and registers the request ID.
+    let handler = inner.call(request);
+    Ok(Box::pin(async move {
+        let _permit = permit;
+        let result = handler.await.map_err(io::Error::other);
+        if let Some(initialize) = initialize {
+            initialize.complete(&result);
+        }
+        result
+    }))
 }
 
 impl<S> Drop for OrderedService<S> {
@@ -147,19 +184,25 @@ where
             Err(error) => return self.fail(error),
         };
         let change = full_change(&request);
-        let previous = self.last_change.take();
+        if change.is_none() {
+            self.changes.clear();
+        }
         let request = if let Some((uri, version)) = &change
-            && let Some((previous_uri, previous_version, previous_slot)) = previous
-            && *uri == previous_uri
-            && *version > previous_version
-            && let Some(slot) = previous_slot.upgrade()
+            && let Some(slot) =
+                self.changes.get(uri).filter(|(previous, _)| version > previous).and_then(|(_, slot)| slot.upgrade())
         {
-            match slot.replace_queued(request, |request| self.prepare_handler(request, bytes, false)) {
+            let (inner, input, session) = (&mut self.inner, &self.input, &self.session);
+            match self.queue.replace_queued(&slot, self.pushed, request, |request| {
+                prepare(inner, input, session, request, bytes, false)
+            }) {
                 Ok(None) => {
-                    self.last_change = Some((uri.clone(), *version, Arc::downgrade(&slot)));
+                    self.changes.insert(uri.clone(), (*version, Arc::downgrade(&slot)));
                     return Box::pin(std::future::ready(Ok(None)));
                 }
-                Ok(Some(request)) => request,
+                Ok(Some(request)) => {
+                    self.changes.clear();
+                    request
+                }
                 Err(error) => return self.fail(error),
             }
         } else {
@@ -185,7 +228,7 @@ where
             }
         }
         // Tower must register request IDs and check lifecycle state at arrival.
-        let handler = match self.prepare_handler(request, bytes, exit || cancel) {
+        let handler = match self.prepare_handler(request, bytes, id.is_some() && !exit && !cancel) {
             Ok(handler) => handler,
             Err(error) => return self.fail(error),
         };
@@ -197,12 +240,17 @@ where
             return self.queue.cancel(handler, cancelled);
         }
 
-        let (slot, reply) = match self.queue.enqueue(id, handler, self.stopped()) {
+        let (slot, reply, pushed) = match self.queue.enqueue(id, handler, self.stopped()) {
             Ok(queued) => queued,
-            // Stop rather than lose a document change and serve stale text.
             Err(error) => return self.fail(error),
         };
-        self.last_change = change.map(|(uri, version)| (uri, version, slot));
+        if let Some((uri, version)) = change {
+            if pushed != self.pushed + 1 {
+                self.changes.clear();
+            }
+            self.changes.insert(uri, (version, slot));
+        }
+        self.pushed = pushed;
         reply
     }
 }

@@ -24,6 +24,7 @@ use super::*;
 use crate::config::language_server::Provider;
 use crate::language_server::ServerConfig;
 use crate::language_server::diagnostic_cache::DiagnosticCache;
+use crate::language_server::registry::disk_events;
 use crate::language_server::sources::SourceFiles;
 use crate::language_server::state::WorkspaceState;
 use crate::language_server::uri::UriFilePath;
@@ -105,6 +106,7 @@ async fn failed_analysis_clears_diagnostics_and_retries_unchanged_save() {
                 ),
                 configuration: crate::config::Configuration::from_workspace(root.clone()),
                 diagnostics: DiagnosticCache::default(),
+                restart: crate::language_server::workspace::RestartTriggers::default(),
             };
             let mut registry = WorkspaceRegistry::new(vec![workspace]);
             let old_uri = Uri::from_file_path(root.join("old.php")).unwrap();
@@ -133,7 +135,7 @@ async fn failed_analysis_clears_diagnostics_and_retries_unchanged_save() {
                     FileEvent { uri: deleted_uri.clone(), kind: FileChangeType::Deleted },
                 ]
             };
-            let update = registry.change_disk_files(events);
+            let update = registry.change_disk_files(disk_events(events), |_| true);
             assert_eq!(update.errors.len(), 1);
             assert_eq!(update.changed_files, if empty_hint { 0 } else { 2 });
             assert!(update.refresh_code_lenses);
@@ -159,7 +161,13 @@ async fn failed_analysis_clears_diagnostics_and_retries_unchanged_save() {
                         .any(|(uri, payload)| *uri == deleted_uri && payload.diagnostics.is_empty())
                 );
             }
-            let (service, socket) = LspService::new(|client| Backend::new(client, Arc::new(ServerConfig::default())));
+            let (service, socket) = LspService::new(|client| {
+                Backend::new(
+                    client,
+                    Arc::new(ServerConfig::default()),
+                    crate::language_server::ordered_service::Tasks::default(),
+                )
+            });
             drop(socket);
             let backend = service.inner();
             let capabilities = ClientPreferences::default().server_capabilities(&backend.config);
@@ -177,8 +185,10 @@ async fn failed_analysis_clears_diagnostics_and_retries_unchanged_save() {
             fail.store(false, Ordering::Relaxed);
             let update = backend
                 .with_registry_mut(|registry| {
-                    registry
-                        .change_disk_files(vec![FileEvent { uri: changed_uri.clone(), kind: FileChangeType::Changed }])
+                    registry.change_disk_files(
+                        disk_events(vec![FileEvent { uri: changed_uri.clone(), kind: FileChangeType::Changed }]),
+                        |_| true,
+                    )
                 })
                 .unwrap();
             assert!(update.errors.is_empty(), "{:?}", update.errors);
@@ -189,4 +199,67 @@ async fn failed_analysis_clears_diagnostics_and_retries_unchanged_save() {
             assert!(update.diagnostics.iter().any(|(uri, payload)| *uri == old_uri && !payload.diagnostics.is_empty()));
         }
     }
+}
+
+fn hooked_workspace(root: &std::path::Path, fail: &Arc<AtomicBool>) -> WorkspaceState {
+    let configuration = DatabaseConfiguration::new(root, vec![b"."], vec![], vec![], vec![b"php"]);
+    let matcher = WorkspaceMatcher::from_configuration(&configuration).unwrap();
+    let (database, _) =
+        mago_database::loader::DatabaseLoader::new(configuration.into_static()).load_with_directory_symlinks().unwrap();
+    let mut plugins = PluginRegistry::new();
+    plugins.register_program_hook(FailingHook(Arc::clone(fail)));
+    let mut server = Server::new(
+        database,
+        CodebaseMetadata::new(),
+        SymbolReferences::new(),
+        Settings {
+            php_version: Default::default(),
+            features: Features { analyzer: true, linter: false, formatter: true },
+            parser: Default::default(),
+            analyzer: Default::default(),
+            linter: Default::default(),
+            formatter: Default::default(),
+            plugin_registry: Arc::new(plugins),
+            excludes: mago_server::Excludes::default(),
+        },
+    );
+
+    server.analyze_without_collecting().unwrap();
+    WorkspaceState {
+        sources: SourceFiles::new(root),
+        core: mago_server::workspace::Workspace::new(
+            root.to_path_buf(),
+            root.to_path_buf(),
+            server,
+            matcher,
+            CompiledIgnoreSet::compile(&[], Default::default()),
+        ),
+        configuration: crate::config::Configuration::from_workspace(root.to_path_buf()),
+        diagnostics: DiagnosticCache::default(),
+        restart: crate::language_server::workspace::RestartTriggers::default(),
+    }
+}
+
+#[test]
+fn failed_replacements_keep_the_workspace_and_apply_held_changes() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().canonicalize().unwrap();
+    std::fs::write(root.join("a.php"), "<?php class Disk {}").unwrap();
+    let mut registry = WorkspaceRegistry::new(vec![hooked_workspace(&root, &Arc::new(AtomicBool::new(false)))]);
+    let uri = Uri::from_file_path(root.join("a.php")).unwrap();
+    registry.open_buffer(uri, "<?php class Buffer {}".into(), 1);
+
+    let fail = Arc::new(AtomicBool::new(false));
+    let rebuilt = hooked_workspace(&root, &fail);
+    fail.store(true, Ordering::Relaxed);
+    std::fs::write(root.join("b.php"), "<?php class Later {}").unwrap();
+    let held = vec![mago_server::workspace::registry::FileEvent {
+        path: root.join("b.php"),
+        kind: mago_server::workspace::registry::FileChange::Created,
+    }];
+    let update = registry.replace(rebuilt, held);
+    assert!(update.errors.first().is_some_and(|error| error.contains("test failure")), "{:?}", update.errors);
+    let server = &registry.iter().next().unwrap().core.server;
+    assert_eq!(server.get_symbols("Later").len(), 1);
+    assert_eq!(server.get_symbols("Buffer").len(), 1);
 }

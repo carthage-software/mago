@@ -62,7 +62,7 @@ async fn busy_admission_keeps_lifecycle_errors_and_initialize_retry() {
         (SessionState::Shutdown, ErrorCode::InvalidRequest),
     ] {
         let inner = MockService { calls: Arc::default(), gate: None };
-        let mut service = OrderedService::with_capacity(inner, 0).unwrap();
+        let mut service = OrderedService::new(inner, Worker::with_capacity(0).unwrap());
         *service.session.lock().unwrap() = state;
         let response = service.call(Request::build("query").id(1).finish()).await.unwrap().unwrap();
         assert_eq!(response.error().unwrap().code, code);
@@ -70,7 +70,7 @@ async fn busy_admission_keeps_lifecycle_errors_and_initialize_retry() {
         assert!(!*service.stopped.borrow());
     }
     let inner = MockService { calls: Arc::default(), gate: None };
-    let mut service = OrderedService::new(inner).unwrap();
+    let mut service = OrderedService::new(inner, Worker::new().unwrap());
     service.input = InputBudget::new(0);
     let initialize = || Request::build("initialize").id(1).finish();
     let response = service.call(initialize()).await.unwrap().unwrap();

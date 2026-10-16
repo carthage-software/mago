@@ -63,11 +63,16 @@ impl Backend {
                         patterns.extend(
                             workspace.core.directory_aliases.targets().flat_map(|path| patterns::for_directory(&path)),
                         );
+                        patterns.extend(workspace.restart.watched_files().map(|path| patterns::for_file(&path)));
+                        patterns.extend(
+                            workspace.restart.watched_paths().iter().flat_map(|path| patterns::for_directory(path)),
+                        );
                         patterns
                     })
                     .collect::<Vec<_>>()
             })
             .unwrap_or_default();
+
         patterns.sort_unstable();
         patterns.dedup();
 
@@ -84,6 +89,7 @@ async fn update_registrations(client: Client, mut updates: watch::Receiver<Vec<S
         if let Err(error) = registered.replace(&client, &patterns).await {
             client.log_message(MessageType::Error, format!("mago-server: update file watchers: {error}")).await;
         }
+
         if updates.changed().await.is_err() {
             return;
         }
@@ -97,6 +103,7 @@ impl Registrations {
         if self.patterns == patterns {
             return Ok(());
         }
+
         let next = if patterns.is_empty() {
             None
         } else {
@@ -105,6 +112,7 @@ impl Registrations {
                 .iter()
                 .map(|pattern| FileSystemWatcher { glob_pattern: pattern.clone().into(), kind: None })
                 .collect();
+
             // Keep the current watchers until the client accepts their replacement.
             client
                 .register_capability(vec![Registration {
@@ -117,6 +125,7 @@ impl Registrations {
                 .await?;
             Some(id)
         };
+
         self.retired = std::mem::replace(&mut self.current, next);
         self.patterns = patterns.to_vec();
         self.remove_retired(client).await
@@ -127,6 +136,7 @@ impl Registrations {
             client.unregister_capability(vec![Unregistration { id: id.into(), method: METHOD.into() }]).await?;
             self.retired = None;
         }
+
         Ok(())
     }
 }

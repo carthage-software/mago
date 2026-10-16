@@ -266,7 +266,7 @@ async fn folder_provider_changes_warn_once_after_the_whole_batch() {
         assert_eq!(messages[0]["type"], 2);
         assert_eq!(
             messages[0]["message"],
-            "Workspace folders changed which Mago features are enabled. Restart the Mago language server to update the editor."
+            "The enabled Mago features changed. Restart the Mago language server to update the editor."
         );
         let uri = url(&root.join("changed/a.php"));
         let hover = request(

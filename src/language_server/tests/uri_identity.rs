@@ -10,6 +10,7 @@ use tower_lsp_server::gen_lsp_types::Location;
 
 use super::harness::{Harness, client_capabilities, url};
 use super::references::{READ_ONLY_STUBS, refusable};
+use crate::config::LoadOptions;
 use crate::language_server::ServerConfig;
 use crate::language_server::uri::UriFilePath;
 
@@ -189,7 +190,10 @@ async fn loaded_symlink_descendants_accept_buffer_changes() {
     std::fs::write(workspace.path().join("caller.php"), caller).unwrap();
     std::fs::write(workspace.path().join("mago.toml"), "[source]\npaths = ['caller.php']\nincludes = ['vendor']\n")
         .unwrap();
-    let config = ServerConfig { workspace_override: Some(workspace.path().to_path_buf()), ..ServerConfig::default() };
+    let config = ServerConfig {
+        launch: LoadOptions { workspace: Some(workspace.path().to_path_buf()), ..LoadOptions::default() },
+        ..ServerConfig::default()
+    };
     let mut h = Harness::start_with(&[], config, client_capabilities()).await;
     let caller_uri = url(&workspace.path().canonicalize().unwrap().join("caller.php"));
     let definition = h.at_uri("textDocument/definition", &caller_uri, 0, 10).await;
@@ -217,7 +221,10 @@ async fn renamed_file_symlinks_resolve_from_the_physical_source_uri() {
     std::fs::write(workspace.path().join("caller.php"), caller).unwrap();
     std::fs::write(workspace.path().join("mago.toml"), "[source]\npaths = ['caller.php']\nincludes = ['vendor']\n")
         .unwrap();
-    let config = ServerConfig { workspace_override: Some(workspace.path().to_path_buf()), ..ServerConfig::default() };
+    let config = ServerConfig {
+        launch: LoadOptions { workspace: Some(workspace.path().to_path_buf()), ..LoadOptions::default() },
+        ..ServerConfig::default()
+    };
     let mut h = Harness::start_with(&[], config, client_capabilities()).await;
     let caller_uri = url(&workspace.path().canonicalize().unwrap().join("caller.php"));
     let before = h.at_uri("textDocument/signatureHelp", &caller_uri, 0, caller.find("null").unwrap() as u32).await;
@@ -242,7 +249,10 @@ async fn open_renamed_link_keeps_its_buffer_after_the_target_is_deleted() {
     std::fs::write(workspace.path().join("caller.php"), caller).unwrap();
     std::fs::write(workspace.path().join("mago.toml"), "[source]\npaths = ['caller.php']\nincludes = ['vendor']\n")
         .unwrap();
-    let config = ServerConfig { workspace_override: Some(workspace.path().to_path_buf()), ..ServerConfig::default() };
+    let config = ServerConfig {
+        launch: LoadOptions { workspace: Some(workspace.path().to_path_buf()), ..LoadOptions::default() },
+        ..ServerConfig::default()
+    };
     let mut h = Harness::start_with(&[], config, client_capabilities()).await;
     let caller_uri = url(&workspace.path().canonicalize().unwrap().join("caller.php"));
     let physical_uri = url(&physical_path.canonicalize().unwrap());

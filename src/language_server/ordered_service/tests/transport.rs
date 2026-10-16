@@ -32,7 +32,7 @@ async fn read_message(stream: &mut DuplexStream) -> serde_json::Value {
 async fn shutdown_response_flushes_before_exit() {
     let (mut client, server) = tokio::io::duplex(4096);
     let (inner, socket) = LspService::new(|_| TestServer(Arc::new(Notify::new()), Arc::default()));
-    let service = OrderedService::new(inner).unwrap();
+    let service = OrderedService::new(inner, Worker::new().unwrap());
     let mut stopped = service.stopped();
     let server = tokio::spawn(async move {
         let (reader, writer) = tokio::io::split(server);
@@ -99,7 +99,7 @@ async fn shutdown_preserves_admitted_publications_and_rejects_later_changes() {
         release: Arc::clone(&release),
         calls: Arc::clone(&calls),
     });
-    let service = OrderedService::new(inner).unwrap();
+    let service = OrderedService::new(inner, Worker::new().unwrap());
     let session = service.session();
     let mut stopped = service.stopped();
     let server = tokio::spawn(async move {
@@ -167,7 +167,7 @@ async fn cancel_queued_through_transport(queued: usize) {
     let calls = Arc::new(AtomicUsize::new(0));
     let backend = TestServer(Arc::clone(&started), Arc::clone(&calls));
     let (inner, socket) = LspService::new(move |_| backend);
-    let service = OrderedService::new(inner).unwrap();
+    let service = OrderedService::new(inner, Worker::new().unwrap());
     let mut stopped = service.stopped();
     let server = tokio::spawn(async move {
         let (reader, writer) = tokio::io::split(server);
@@ -296,7 +296,7 @@ async fn typing_bursts_keep_latest_text_and_do_not_cross_other_messages() {
         text: Mutex::default(),
     };
     let (inner, socket) = LspService::new(move |_| backend);
-    let service = OrderedService::new(inner).unwrap();
+    let service = OrderedService::new(inner, Worker::new().unwrap());
     let retained = service.input.counter();
     let mut stopped = service.stopped();
     let server = tokio::spawn(async move {
@@ -358,9 +358,8 @@ async fn typing_bursts_keep_latest_text_and_do_not_cross_other_messages() {
             "hover:500",
             "change:file:///test.php:1000:1000",
             "save:1000",
-            "change:file:///test.php:1100:1100",
-            "change:file:///other.php:1:other",
             "change:file:///test.php:1101:1101",
+            "change:file:///other.php:1:other",
         ]
     );
     assert_eq!(retained.load(Ordering::Relaxed), 0);
@@ -398,7 +397,7 @@ async fn request_overflow_keeps_cancellation_client_replies_and_reused_ids_alive
     let calls = Arc::new(AtomicUsize::new(0));
     let server_calls = Arc::clone(&calls);
     let (inner, socket) = LspService::new(move |client| ClientReplyServer { client, calls: server_calls });
-    let service = OrderedService::new(inner).unwrap();
+    let service = OrderedService::new(inner, Worker::new().unwrap());
     let mut stopped = service.stopped();
     let server = tokio::spawn(async move {
         let (reader, writer) = tokio::io::split(server);
@@ -460,6 +459,52 @@ async fn request_overflow_keeps_cancellation_client_replies_and_reused_ids_alive
         assert_eq!(response.error().unwrap().code, ErrorCode::RequestCancelled);
     }
     write_request(&mut client, Request::build("shutdown").id(1004).finish()).await;
+    assert!(timeout(DEADLINE, read_response(&mut client)).await.unwrap().is_ok());
+    write_request(&mut client, Request::build("exit").finish()).await;
+    timeout(DEADLINE, server).await.unwrap().unwrap();
+}
+
+#[tokio::test(flavor = "current_thread")]
+async fn client_replies_reach_a_waiting_handler_behind_notification_bursts() {
+    let (mut client, server) = tokio::io::duplex(65536);
+    let calls = Arc::new(AtomicUsize::new(0));
+    let server_calls = Arc::clone(&calls);
+    let (inner, socket) = LspService::new(move |client| ClientReplyServer { client, calls: server_calls });
+    let service = OrderedService::new(inner, Worker::new().unwrap());
+    let session = service.session();
+    let mut stopped = service.stopped();
+    let server = tokio::spawn(async move {
+        let (reader, writer) = tokio::io::split(server);
+        tokio::select! {
+            _ = tower_lsp_server::Server::new(reader, writer, socket)
+                .concurrency_level(REPLY_CONCURRENCY).serve(service) => {}
+            _ = stopped.changed() => {}
+        }
+    });
+    write_request(&mut client, Request::build("initialize").params(json!({"capabilities": {}})).id(1).finish()).await;
+    assert!(timeout(DEADLINE, read_response(&mut client)).await.unwrap().is_ok());
+    let hover = Request::build("textDocument/hover")
+        .params(json!({"textDocument": {"uri": "file:///test.php"}, "position": {"line": 0, "character": 0}}))
+        .id(2)
+        .finish();
+    write_request(&mut client, hover).await;
+    let configuration = timeout(DEADLINE, read_message(&mut client)).await.unwrap();
+    assert_eq!(configuration["method"], "workspace/configuration");
+    timeout(DEADLINE, async {
+        for index in 0..QUEUE_CAPACITY * 4 {
+            write_request(&mut client, change(&format!("file:///{index}.php"), 1, "<?php")).await;
+        }
+    })
+    .await
+    .unwrap();
+    let body = serde_json::to_vec(&json!({"jsonrpc": "2.0", "id": configuration["id"], "result": []})).unwrap();
+    client.write_all(format!("Content-Length: {}\r\n\r\n", body.len()).as_bytes()).await.unwrap();
+    client.write_all(&body).await.unwrap();
+    let response = timeout(DEADLINE, read_response(&mut client)).await.unwrap();
+    assert_eq!(response.id(), &2.into());
+    assert!(response.is_ok());
+    assert!(matches!(*session.lock().unwrap(), SessionState::Running));
+    write_request(&mut client, Request::build("shutdown").id(3).finish()).await;
     assert!(timeout(DEADLINE, read_response(&mut client)).await.unwrap().is_ok());
     write_request(&mut client, Request::build("exit").finish()).await;
     timeout(DEADLINE, server).await.unwrap().unwrap();

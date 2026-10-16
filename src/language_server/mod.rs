@@ -53,11 +53,13 @@ where
     W: AsyncWrite + Unpin,
 {
     let config = Arc::new(config);
-    let service = LspService::build(move |client| Backend::new(client, Arc::clone(&config)));
+    let worker = ordered_service::Worker::new()?;
+    let tasks = worker.tasks();
+    let service = LspService::build(move |client| Backend::new(client, config, tasks));
     #[cfg(test)]
     let service = service.custom_method("mago/testBarrier", Backend::test_barrier);
     let (service, socket) = service.finish();
-    let service = ordered_service::OrderedService::new(service)?;
+    let service = ordered_service::OrderedService::new(service, worker);
     let mut stopped = service.stopped();
     let session = service.session();
     let (failure, mut failed) = tokio::sync::watch::channel(None);

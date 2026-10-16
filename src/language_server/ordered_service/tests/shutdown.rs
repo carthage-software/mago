@@ -5,7 +5,7 @@ async fn tower_cancellation_and_shutdown_still_work() {
     let started = Arc::new(Notify::new());
     let signal = Arc::clone(&started);
     let (inner, _socket) = LspService::new(move |_| TestServer(signal, Arc::default()));
-    let mut service = OrderedService::new(inner).unwrap();
+    let mut service = OrderedService::new(inner, Worker::new().unwrap());
     let initialize = Request::build("initialize").params(json!({"capabilities": {}})).id(1).finish();
     assert!(service.call(initialize).await.unwrap().unwrap().is_ok());
     let request = Request::build("textDocument/hover")
@@ -29,7 +29,7 @@ async fn tower_cancellation_and_shutdown_still_work() {
 async fn exit_without_an_accepted_shutdown_fails() {
     for initialize in [false, true] {
         let (inner, _socket) = LspService::new(|_| TestServer(Arc::default(), Arc::default()));
-        let mut service = OrderedService::new(inner).unwrap();
+        let mut service = OrderedService::new(inner, Worker::new().unwrap());
         if initialize {
             let request = Request::build("initialize").params(json!({"capabilities": {}})).id(1).finish();
             assert!(service.call(request).await.unwrap().unwrap().is_ok());
@@ -46,7 +46,7 @@ async fn bad_shutdown_requests_do_not_change_the_session() {
     let started = Arc::new(Notify::new());
     let signal = Arc::clone(&started);
     let (inner, _socket) = LspService::new(move |_| TestServer(signal, Arc::default()));
-    let mut service = OrderedService::new(inner).unwrap();
+    let mut service = OrderedService::new(inner, Worker::new().unwrap());
     let initialize = Request::build("initialize").params(json!({"capabilities": {}})).id(1).finish();
     assert!(service.call(initialize).await.unwrap().unwrap().is_ok());
     assert!(service.call(Request::build("shutdown").finish()).await.unwrap().is_none());
@@ -96,7 +96,7 @@ async fn malformed_exit_after_shutdown_fails() {
         Request::build("exit").params(json!(false)).finish(),
     ] {
         let (inner, _socket) = LspService::new(|_| TestServer(Arc::default(), Arc::default()));
-        let mut service = OrderedService::new(inner).unwrap();
+        let mut service = OrderedService::new(inner, Worker::new().unwrap());
         let initialize = Request::build("initialize").params(json!({"capabilities": {}})).id(1).finish();
         service.call(initialize).await.unwrap();
         service.call(Request::build("shutdown").id(2).finish()).await.unwrap();
@@ -109,7 +109,7 @@ async fn malformed_exit_after_shutdown_fails() {
 async fn worker_errors_and_panics_fail_the_session() {
     for method in ["error", "panic"] {
         let inner = MockService { calls: Arc::default(), gate: None };
-        let mut service = OrderedService::new(inner).unwrap();
+        let mut service = OrderedService::new(inner, Worker::new().unwrap());
         let mut stopped = service.stopped();
         let reply = service.call(Request::build(method).id(1).finish());
         timeout(DEADLINE, stopped.changed()).await.unwrap().unwrap();

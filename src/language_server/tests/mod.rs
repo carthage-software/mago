@@ -65,6 +65,7 @@ mod rename_parameters;
 mod rename_phpdoc;
 mod rename_positions;
 mod rename_refusals;
+mod restarts;
 mod selection;
 mod signature_positions;
 mod signature_rendering;

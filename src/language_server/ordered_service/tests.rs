@@ -77,7 +77,7 @@ fn blocked_service(capacity: usize) -> (OrderedService<MockService>, oneshot::Re
     let (started, ready) = oneshot::channel();
     let (release, wait) = mpsc::channel();
     let inner = MockService { calls: Arc::new(Calls::default()), gate: Some((started, wait)) };
-    (OrderedService::with_capacity(inner, capacity).unwrap(), ready, release)
+    (OrderedService::new(inner, Worker::with_capacity(capacity).unwrap()), ready, release)
 }
 
 struct TestServer(Arc<Notify>, Arc<AtomicUsize>);
@@ -96,6 +96,17 @@ impl LanguageServer for TestServer {
         self.0.notify_one();
         std::future::pending().await
     }
+}
+
+/// Wait until the worker has run `count` handlers; notification replies do not wait for it.
+async fn processed(service: &OrderedService<MockService>, count: usize) {
+    timeout(DEADLINE, async {
+        while service.inner.calls.methods.lock().unwrap().len() < count {
+            tokio::task::yield_now().await;
+        }
+    })
+    .await
+    .unwrap();
 }
 
 fn change(uri: &str, version: i32, text: &str) -> Request {
