@@ -372,6 +372,47 @@ pub struct Configuration {
     #[serde(default, skip_serializing)]
     #[schemars(skip)]
     pub config_file_is_explicit: bool,
+
+    /// The canonical path of every loaded layer: the configuration file and each file it extends.
+    #[serde(default, skip_serializing)]
+    #[schemars(skip)]
+    pub config_layers: Vec<PathBuf>,
+}
+
+/// The command-line options a configuration is loaded with, kept so it can be loaded again.
+#[derive(Debug, Clone, Default)]
+pub struct LoadOptions {
+    pub workspace: Option<PathBuf>,
+    pub file: Option<PathBuf>,
+    pub php_version: Option<PHPVersion>,
+    pub threads: Option<usize>,
+    pub allow_unsupported_php_version: bool,
+    pub no_version_check: bool,
+    pub no_extensions: bool,
+}
+
+impl LoadOptions {
+    /// Load the configuration as [`Configuration::load`] does, without extension hosts when they are disabled.
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors of [`Configuration::load`].
+    pub fn load(&self) -> Result<Configuration, Error> {
+        let mut configuration = Configuration::load(
+            self.workspace.clone(),
+            self.file.as_deref(),
+            self.php_version,
+            self.threads,
+            self.allow_unsupported_php_version,
+            self.no_version_check,
+        )?;
+
+        if self.no_extensions {
+            configuration.extension_hosts.clear();
+        }
+
+        Ok(configuration)
+    }
 }
 
 impl Configuration {
@@ -445,9 +486,9 @@ impl Configuration {
             config_file_is_explicit = false;
         }
 
+        let mut layers: HashSet<PathBuf> = HashSet::new();
         let mut configuration: Configuration = if let Some((path, format)) = &resolved_config_file {
-            let mut visited: HashSet<PathBuf> = HashSet::new();
-            let merged = load_layer(path, *format, &mut visited)?;
+            let merged = load_layer(path, *format, &mut layers)?;
             serde_json::from_value::<Configuration>(merged)
                 .map_err(|e| Error::ParseConfigFile { path: path.clone(), source: Box::new(e) })?
         } else {
@@ -458,6 +499,7 @@ impl Configuration {
 
         configuration.config_file = resolved_config_file.as_ref().map(|(p, _)| p.clone());
         configuration.config_file_is_explicit = config_file_is_explicit;
+        configuration.config_layers = layers.into_iter().collect();
 
         if allow_unsupported_php_version && !configuration.allow_unsupported_php_version {
             tracing::warn!("Allowing unsupported PHP versions.");
@@ -547,18 +589,16 @@ impl Configuration {
 
     /// The project's own `mago.<ext>`, or else its `mago.dist.<ext>`, in `root_dir`.
     pub(crate) fn find_project_config_file(root_dir: &Path) -> Option<(PathBuf, ConfigFormat)> {
-        for name in [CONFIGURATION_FILE_NAME, CONFIGURATION_DIST_FILE_NAME] {
-            for format in ConfigFormat::ALL {
-                for ext in format.extensions() {
-                    let candidate = root_dir.join(format!("{name}.{ext}"));
-                    if candidate.exists() {
-                        return Some((candidate, *format));
-                    }
-                }
-            }
-        }
+        Self::project_config_candidates(root_dir).find(|(candidate, _)| candidate.exists())
+    }
 
-        None
+    /// Every path [`find_project_config_file`](Self::find_project_config_file) checks, in order.
+    pub(crate) fn project_config_candidates(root_dir: &Path) -> impl Iterator<Item = (PathBuf, ConfigFormat)> + '_ {
+        [CONFIGURATION_FILE_NAME, CONFIGURATION_DIST_FILE_NAME].into_iter().flat_map(move |name| {
+            ConfigFormat::ALL.iter().flat_map(move |format| {
+                format.extensions().iter().map(move |ext| (root_dir.join(format!("{name}.{ext}")), *format))
+            })
+        })
     }
 
     /// Apply environment-variable overrides for the small set of documented top-level
@@ -650,6 +690,7 @@ impl Configuration {
             editor_url: None,
             config_file: None,
             config_file_is_explicit: false,
+            config_layers: Vec::new(),
         }
     }
 }

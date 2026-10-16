@@ -16,6 +16,7 @@ use crate::config::Configuration;
 use crate::language_server::diagnostic_cache::DiagnosticCache;
 use crate::language_server::position::range_at_offsets;
 use crate::language_server::sources::SourceFiles;
+use crate::language_server::workspace::RestartTriggers;
 
 pub struct WorkspaceState {
     pub core: Workspace<Uri>,
@@ -25,6 +26,7 @@ pub struct WorkspaceState {
     /// none). Drives ignore patterns, globs, and formatter settings.
     pub configuration: Configuration,
     pub diagnostics: DiagnosticCache,
+    pub restart: RestartTriggers,
 }
 
 impl WorkspaceState {

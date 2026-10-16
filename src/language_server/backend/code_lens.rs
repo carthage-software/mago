@@ -1,7 +1,7 @@
 //! List reference lenses and resolve them against the current workspace.
 
 use tower_lsp_server::gen_lsp_types::LspErrorCodes;
-use tower_lsp_server::gen_lsp_types::{CodeLens, Location, Uri};
+use tower_lsp_server::gen_lsp_types::{CodeLens, Uri};
 use tower_lsp_server::jsonrpc::{Error, ErrorCode, Result};
 
 use mago_server::CodeLensItem;
@@ -36,23 +36,17 @@ impl DocumentQuery<'_> {
         codec::code_lens(&self.file, uri, counted.into_iter().filter(|(_, count)| *count > 0).map(|(item, _)| item))
     }
 
-    fn resolve_lens(mut self, uri: &Uri, item: CodeLensItem) -> Result<CodeLens> {
-        let Some(item) = self.workspace.core.server.locate_lens(self.file.id, item) else {
+    fn resolve_lens(self, uri: &Uri, item: CodeLensItem) -> Result<CodeLens> {
+        let Some((item, references)) = self.workspace.core.server.get_lens_references(self.file.id, item) else {
             return Err(Error {
                 code: ErrorCode::ServerError(i32::from(LspErrorCodes::ContentModified).into()),
                 message: "Code-lens declaration no longer exists".into(),
                 data: None,
             });
         };
-        let offset = item.offset;
         let mut lens = codec::unresolved_lens(&self.file, uri, item);
-        let locations = self.lens_references(offset);
+        let locations = self.workspace.locations(&references);
         lens.command = Some(codec::reference_command(uri, lens.range.start, locations));
         Ok(lens)
-    }
-
-    fn lens_references(&mut self, offset: u32) -> Vec<Location> {
-        let references = self.workspace.core.server.get_references(self.file.id, offset, false);
-        self.workspace.locations(&references)
     }
 }

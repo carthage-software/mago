@@ -25,13 +25,15 @@ where
         self.documents.get(key).map(|document| document.version)
     }
 
+    /// Track a buffer even when no workspace admits its path, so a workspace that admits it later replays it.
     pub fn open_buffer(&mut self, key: K, path: PathBuf, contents: Vec<u8>, version: i32) -> WorkspaceUpdate {
-        let Some(owner) = self.owner_index(&path) else { return WorkspaceUpdate::default() };
+        let owner = self.owner_index(&path);
         let path = DocumentPath::new(&path);
         if self.documents.contains_key(&key)
             || self.is_open_path(path.resolved())
-            || path.file(self.workspaces[owner].as_ref()).is_some_and(|file| file.file_type.is_builtin())
-            || !self.workspaces.iter().any(|workspace| FileTarget::resolve(workspace.as_ref(), &path).is_some())
+            || owner.is_some_and(|owner| {
+                path.file(self.workspaces[owner].as_ref()).is_some_and(|file| file.file_type.is_builtin())
+            })
         {
             return WorkspaceUpdate::default();
         }

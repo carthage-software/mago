@@ -5,9 +5,8 @@
 //! and which `mago.toml` settings drive the analyzer, linter, and
 //! formatter.
 
-use std::path::PathBuf;
-
 use crate::config::Configuration;
+use crate::config::LoadOptions;
 use crate::config::language_server::Provider;
 
 /// Runtime feature switches plus the user's `mago.toml`. Subsystem
@@ -36,11 +35,10 @@ pub struct ServerConfig {
     /// patterns the LSP feeds into the database loader.
     pub configuration: Configuration,
 
-    /// Workspace directory from an explicit `--workspace` flag. When set it
-    /// takes precedence over the client's `rootUri`, so the bootstrap honours
-    /// the same root as `mago lint` / `mago analyze`. `None` when the flag was
-    /// omitted, in which case the client-provided root is used.
-    pub workspace_override: Option<PathBuf>,
+    /// The options `configuration` was loaded with, to reload it when its files change.
+    /// An explicit `--workspace` takes precedence over the client's `rootUri`, so the
+    /// bootstrap honours the same root as `mago lint` / `mago analyze`.
+    pub launch: LoadOptions,
 }
 
 impl ServerConfig {
@@ -67,7 +65,7 @@ impl Default for ServerConfig {
             linter: true,
             formatter: true,
             configuration: Configuration::from_workspace(std::env::current_dir().unwrap_or_default()),
-            workspace_override: None,
+            launch: LoadOptions::default(),
         }
     }
 }
