@@ -63,6 +63,7 @@ pub struct ComposerPackage {
     /// A list of directories which should get added to PHP's include path.
     #[serde(rename = "include-path", default, skip_serializing_if = "Vec::is_empty")]
     #[deprecated(
+        since = "0.0.1",
         note = "This is only present to support legacy projects, and all new code should preferably use autoloading"
     )]
     pub include_path: Vec<String>,
@@ -142,7 +143,7 @@ pub struct ComposerPackage {
     /// Forces the package to be installed into the given subdirectory path. This is used for autoloading PSR-0 packages that do not contain their full path.
     /// Use forward slashes for cross-platform compatibility
     #[serde(rename = "target-dir", default, skip_serializing_if = "Option::is_none")]
-    #[deprecated]
+    #[deprecated(since = "0.0.1", note = "Use PSR-4 autoloading without target-dir instead.")]
     pub target_dir: Option<String>,
 
     /// Package release date, in 'YYYY-MM-DD', 'YYYY-MM-DD HH:MM:SS' or 'YYYY-MM-DDTHH:MM:SSZ' format
@@ -993,6 +994,7 @@ pub struct InlinePackage {
     /// A list of directories which should get added to PHP's include path.
     #[serde(rename = "include-path", default, skip_serializing_if = "Vec::is_empty")]
     #[deprecated(
+        since = "0.0.1",
         note = "this is only present to support legacy projects, and all new code should preferably use autoloading"
     )]
     pub include_path: Vec<String>,
@@ -1022,7 +1024,7 @@ pub struct InlinePackage {
     pub suggest: HashMap<String, String>,
 
     #[serde(rename = "target-dir", default, skip_serializing_if = "Option::is_none")]
-    #[deprecated]
+    #[deprecated(since = "0.0.1", note = "Use PSR-4 autoloading without target-dir instead.")]
     pub target_dir: Option<String>,
 
     #[serde(default, skip_serializing_if = "Option::is_none")]
