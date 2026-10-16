@@ -17,6 +17,7 @@ use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
+use mago_codex::ttype::atomic::callable::TCallable;
 use mago_codex::ttype::atomic::generic::TGenericParameter;
 use mago_codex::ttype::atomic::resource::TResource;
 use mago_codex::ttype::atomic::scalar::TScalar;
@@ -267,6 +268,8 @@ where
 
             collect_plugin_throw_types(context, block_context, artifacts, invoication, identifier);
         }
+
+        record_immediate_callback_throw_types(context, block_context, artifacts, invoication, identifier);
     }
 
     if !apply_assertions {
@@ -415,6 +418,99 @@ where
         false,
         &mut ComparisonResult::default(),
     )
+}
+
+fn record_immediate_callback_throw_types<'ctx, 'arena, A>(
+    context: &Context<'ctx, 'arena, A>,
+    block_context: &mut BlockContext<'ctx>,
+    artifacts: &AnalysisArtifacts,
+    invocation: &Invocation<'ctx, '_, 'arena>,
+    identifier: &FunctionLikeIdentifier,
+) where
+    A: Arena,
+{
+    let Some(callback_parameter_offset) = immediate_callback_parameter_offset(identifier) else {
+        return;
+    };
+
+    let (Some(callback_expression), _) =
+        get_argument_for_parameter(context, block_context, invocation, Some(callback_parameter_offset), None)
+    else {
+        return;
+    };
+
+    let Some(callback_type) = artifacts.get_expression_type(callback_expression) else {
+        return;
+    };
+
+    for callable in callback_type.types.iter().filter_map(|atomic| match atomic {
+        TAtomic::Callable(TCallable::Alias(identifier)) => Some(*identifier),
+        TAtomic::Callable(TCallable::Signature(signature)) => signature.source,
+        _ => None,
+    }) {
+        let Some(callback_metadata) = context.codebase.get_function_like(&callable) else {
+            continue;
+        };
+
+        let class_like = match callable {
+            FunctionLikeIdentifier::Method(class_name, _) => context.codebase.get_class_like(class_name.as_bytes()),
+            FunctionLikeIdentifier::Function(_) | FunctionLikeIdentifier::Closure(_) => None,
+        };
+
+        for thrown_type in context.codebase.get_function_like_thrown_types(class_like, callback_metadata) {
+            for atomic_type in thrown_type.type_union.types.iter() {
+                if !atomic_type.extends_or_implements(context.codebase, b"Throwable") {
+                    continue;
+                }
+
+                for thrown_atomic in get_throw_type_atomics(atomic_type) {
+                    if matches!(&thrown_atomic, TAtomic::GenericParameter(_))
+                        && thrown_atomic.extends_or_implements(context.codebase, b"Throwable")
+                    {
+                        let thrown_generic = PossiblyThrownGenericException {
+                            object_names: get_throw_type_object_names(context.codebase, &thrown_atomic),
+                            atomic_type: thrown_atomic,
+                            span: invocation.span,
+                        };
+                        block_context.possibly_thrown_generic_exceptions.insert(thrown_generic);
+                    } else {
+                        for exception in thrown_atomic.get_all_object_names() {
+                            block_context
+                                .possibly_thrown_exceptions
+                                .entry(exception)
+                                .or_default()
+                                .insert(invocation.span);
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn immediate_callback_parameter_offset(identifier: &FunctionLikeIdentifier) -> Option<usize> {
+    let FunctionLikeIdentifier::Function(name) = identifier else {
+        return None;
+    };
+
+    match name.as_bytes() {
+        b"array_all"
+        | b"array_any"
+        | b"array_filter"
+        | b"array_find"
+        | b"array_find_key"
+        | b"array_reduce"
+        | b"array_walk"
+        | b"array_walk_recursive"
+        | b"iterator_apply"
+        | b"preg_replace_callback"
+        | b"uasort"
+        | b"uksort"
+        | b"usort" => Some(1),
+        b"array_map" => Some(0),
+        b"call_user_func" | b"call_user_func_array" | b"forward_static_call" | b"forward_static_call_array" => Some(0),
+        _ => None,
+    }
 }
 
 fn has_template_binding_within_constraint<A>(

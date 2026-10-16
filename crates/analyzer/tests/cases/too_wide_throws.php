@@ -461,3 +461,49 @@ class TooWideThrowsChild extends TooWideThrowsParent
     {
     }
 }
+
+/**
+ * @throws TooWideOtherFailure
+ */
+function too_wide_throws_from_immediate_callback(): void
+{
+    array_any([1], /** @throws TooWideOtherFailure */ static fn(int $value): bool => throw new TooWideOtherFailure());
+}
+
+/**
+ * @throws TooWideOtherFailure
+ */
+function too_wide_throws_from_named_callback(): void
+{
+    array_any(
+        callback: /** @throws TooWideOtherFailure */ static fn(int $value): bool => throw new TooWideOtherFailure(),
+        array: [1],
+    );
+}
+
+/**
+ * @throws TooWideOtherFailure
+ */
+function too_wide_throws_from_callback_variable(): void
+{
+    $comparator = /** @throws TooWideOtherFailure */ static function (int $left, int $right): int {
+        throw new TooWideOtherFailure();
+    };
+
+    $values = [];
+    usort($values, $comparator);
+}
+
+/**
+ * @throws TooWideOtherFailure
+ */
+function too_wide_throws_from_array_map_callback(): void
+{
+    array_map(
+        /** @throws TooWideOtherFailure */
+        static function (mixed $value): int {
+            throw new TooWideOtherFailure();
+        },
+        [1],
+    );
+}
