@@ -48,6 +48,7 @@ use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::context::scope::var_has_root;
+use crate::resolver::class_name::get_class_name_from_atomic;
 use crate::resolver::property::resolve_declared_property;
 
 pub mod assertion_reconciler;
@@ -430,6 +431,36 @@ pub fn reconcile_keyed_types<'ctx, A>(
         }
 
         if !has_object_array_access {
+            if let Some(source_id) = block_context.class_string_sources.get(key).copied() {
+                let mut object_types = Vec::new();
+                let mut all_resolved = true;
+                for atomic in result_type.types.iter() {
+                    if let Some(resolved) = get_class_name_from_atomic(context.codebase, atomic)
+                        .filter(|resolved| !resolved.is_invalid() && !resolved.is_possibly_invalid())
+                    {
+                        object_types.push(resolved.get_object_type(context.codebase));
+                    } else {
+                        all_resolved = false;
+                        break;
+                    }
+                }
+
+                if all_resolved && !object_types.is_empty() {
+                    let object_union = TUnion::from_vec(object_types);
+                    let narrowed = block_context
+                        .locals
+                        .get(&source_id)
+                        .and_then(|current| intersect_union_types(current, &object_union, context.codebase));
+                    if let Some(narrowed) = narrowed.filter(|t| !t.is_never()) {
+                        let changed = block_context.locals.get(&source_id).is_none_or(|current| **current != narrowed);
+                        if changed {
+                            block_context.locals.insert(source_id, Rc::new(narrowed));
+                            changed_var_ids.insert(source_id);
+                        }
+                    }
+                }
+            }
+
             block_context.locals.insert(*key, Rc::new(result_type));
         }
 

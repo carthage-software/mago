@@ -601,6 +601,7 @@ test_case!(switch_case_after_default_is_unreachable);
 test_case!(switch_logically_unreachable_case);
 test_case!(switch_on_literal);
 test_case!(switch_redundant_condition);
+test_case!(switch_get_class_gettype_case_narrowing);
 test_case!(conditional_always_truthy);
 test_case!(conditional_always_falsy);
 test_case!(conditional_mixed_types);

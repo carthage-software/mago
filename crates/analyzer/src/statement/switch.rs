@@ -48,6 +48,7 @@ use crate::expression::binary::utils::is_always_identical_to;
 use crate::formula::get_formula;
 use crate::formula::negate_or_synthesize;
 use crate::reconciler::reconcile_keyed_types;
+use crate::resolver::function::get_builtin_get_class_or_gettype_call;
 use crate::statement::analyze_statements;
 use crate::utils::expression::get_expression_id;
 use crate::utils::expression::get_root_expression_id;
@@ -908,12 +909,18 @@ where
             self.context.resolved_names,
             Some(self.context.codebase),
         ) {
-            (false, id, get_root_expression_id(switch.expression), switch.expression.clone())
+            return (false, id, get_root_expression_id(switch.expression), switch.expression.clone());
+        }
+
+        let subject_id_str = format!("{}{}", Self::SYNTHETIC_SWITCH_VAR_PREFIX, switch.expression.span().start.offset);
+        let subject_id = mago_word::word(&subject_id_str);
+        self.block_context.locals.insert(subject_id, Rc::clone(subject_type));
+
+        if get_builtin_get_class_or_gettype_call(switch.expression, self.context.resolved_names, self.context.codebase)
+            .is_some()
+        {
+            (true, subject_id, None, switch.expression.clone())
         } else {
-            let subject_id_str =
-                format!("{}{}", Self::SYNTHETIC_SWITCH_VAR_PREFIX, switch.expression.span().start.offset);
-            let subject_id = mago_word::word(&subject_id_str);
-            self.block_context.locals.insert(subject_id, Rc::clone(subject_type));
             let subject_for_conditions =
                 new_synthetic_variable(self.context.arena, subject_id_str.as_bytes(), switch.expression.span());
 

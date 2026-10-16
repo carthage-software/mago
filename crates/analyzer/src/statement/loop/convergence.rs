@@ -390,6 +390,7 @@ fn same_flow(left: &BlockContext<'_>, right: &BlockContext<'_>) -> bool {
         && left.assigned_variable_ids == right.assigned_variable_ids
         && left.possibly_assigned_variable_ids == right.possibly_assigned_variable_ids
         && left.derived_local_sources == right.derived_local_sources
+        && left.class_string_sources == right.class_string_sources
         && left.possibly_undefined_variable_ids == right.possibly_undefined_variable_ids
         && same_clauses(&left.clauses, &right.clauses)
         && same_clauses(&left.reconciled_expression_clauses, &right.reconciled_expression_clauses)

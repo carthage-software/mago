@@ -62,6 +62,10 @@ pub struct BlockContext<'ctx> {
     pub assigned_variable_ids: WordMap<u32>,
     pub possibly_assigned_variable_ids: WordSet,
     pub derived_local_sources: WordMap<Word>,
+
+    /// Maps a variable holding the result of `get_class($source)` to `$source`, so that
+    /// `get_class()` case narrowing on the holder propagates back to the tested variable.
+    pub class_string_sources: WordMap<Word>,
     pub possibly_undefined_variable_ids: WordSet,
 
     /// Maps variable names to the number of times they have been referenced in the current scope.
@@ -211,6 +215,7 @@ impl<'ctx> BlockContext<'ctx> {
             assigned_variable_ids: WordMap::default(),
             possibly_assigned_variable_ids: WordSet::default(),
             derived_local_sources: WordMap::default(),
+            class_string_sources: WordMap::default(),
             possibly_undefined_variable_ids: WordSet::default(),
             referenced_counts: WordMap::default(),
             references_in_scope: WordMap::default(),
@@ -477,6 +482,9 @@ impl<'ctx> BlockContext<'ctx> {
             !targets.is_empty()
         });
 
+        self.class_string_sources
+            .retain(|holder, source| !var_has_root(*holder, remove_var_id) && !var_has_root(*source, remove_var_id));
+
         self.parent_conflicting_clause_variables.insert(remove_var_id);
     }
 
@@ -586,6 +594,7 @@ impl<'ctx> BlockContext<'ctx> {
         self.possibly_assigned_variable_ids.remove(&var_atom);
         self.conditionally_referenced_variable_ids.remove(&var_atom);
         self.derived_local_sources.remove(&var_atom);
+        self.class_string_sources.retain(|holder, source| *holder != var_atom && !var_has_root(*source, var_atom));
         self.possibly_undefined_variable_ids.remove(&var_atom);
     }
 
@@ -645,6 +654,8 @@ impl<'ctx> BlockContext<'ctx> {
         self.possibly_assigned_variable_ids.remove(&remove_var_atom);
         self.conditionally_referenced_variable_ids.remove(&remove_var_atom);
         self.derived_local_sources.remove(&remove_var_atom);
+        self.class_string_sources
+            .retain(|holder, source| *holder != remove_var_atom && !var_has_root(*source, remove_var_atom));
         self.possibly_undefined_variable_ids.remove(&remove_var_atom);
     }
 
@@ -667,6 +678,11 @@ impl<'ctx> BlockContext<'ctx> {
             vars_to_update,
             updated_vars,
         );
+
+        for updated_var in updated_vars.iter() {
+            self.class_string_sources
+                .retain(|holder, source| *holder != *updated_var && !var_has_root(*source, *updated_var));
+        }
     }
 
     pub(crate) fn update_locals<A>(

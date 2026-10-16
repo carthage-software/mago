@@ -31,6 +31,7 @@ use mago_syntax::cst::Assignment;
 use mago_syntax::cst::AssignmentOperator;
 use mago_syntax::cst::Binary;
 use mago_syntax::cst::BinaryOperator;
+use mago_syntax::cst::Call;
 use mago_syntax::cst::Expression;
 use mago_syntax::cst::List;
 use mago_syntax::cst::UnaryPrefix;
@@ -51,11 +52,13 @@ use crate::context::scope::var_references_dynamic;
 use crate::error::AnalysisError;
 use crate::expression::find_expression_logic_issues;
 use crate::formula::get_formula;
+use crate::resolver::function::is_builtin_function_call;
 use crate::utils::docblock::check_docblock_type_incompatibility;
 use crate::utils::docblock::get_type_from_var_docblock;
 use crate::utils::expression::array::get_array_target_type_given_index;
 use crate::utils::expression::expression_has_logic;
 use crate::utils::expression::get_block_expression_id;
+use crate::utils::expression::get_expression_id;
 use crate::utils::expression::get_non_nullsafe_expression_id;
 use crate::utils::expression::get_nullsafe_base_expressions;
 use crate::utils::expression::get_root_expression_id;
@@ -729,6 +732,9 @@ pub fn analyze_assignment_to_variable<'ctx, 'arena, A>(
     block_context.locals.retain(|var_id, _| !var_references_dynamic(*var_id, variable_id));
     block_context.derived_local_sources.remove(&variable_id);
     block_context.possibly_undefined_variable_ids.remove(&variable_id);
+    block_context.class_string_sources.retain(|holder, source| {
+        *holder != variable_id && !var_has_root(*source, variable_id) && !var_references_dynamic(*source, variable_id)
+    });
 
     if artifacts.editor.is_some() {
         artifacts.set_rc_expression_type(&variable_span, Rc::clone(&assigned_type));
@@ -736,6 +742,25 @@ pub fn analyze_assignment_to_variable<'ctx, 'arena, A>(
 
     block_context.locals.insert(variable_id, assigned_type);
     block_context.variables_possibly_in_scope.insert(variable_id);
+
+    if let Some(source) = source_expression
+        && let Expression::Call(Call::Function(function_call)) = unwrap_expression(source)
+        && function_call.argument_list.arguments.len() == 1
+        && is_builtin_function_call(function_call, b"get_class", context.resolved_names, context.codebase)
+    {
+        let argument = function_call.argument_list.arguments.first();
+        if let Some(argument) = argument
+            && let Some(source_id) = get_expression_id(
+                argument.value(),
+                block_context.scope.get_class_like_name(),
+                context.resolved_names,
+                Some(context.codebase),
+            )
+            && variable_id != source_id
+        {
+            block_context.class_string_sources.insert(variable_id, source_id);
+        }
+    }
 }
 
 fn analyze_destructuring<'ctx, 'ast, 'arena, A>(
