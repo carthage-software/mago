@@ -5,8 +5,11 @@
 use std::borrow::Cow;
 use std::path::Path;
 use std::path::PathBuf;
+use std::sync::Arc;
 use std::sync::LazyLock;
+use std::time::Duration;
 
+use criterion::BatchSize;
 use criterion::BenchmarkId;
 use criterion::Criterion;
 use criterion::criterion_group;
@@ -19,20 +22,40 @@ use mago_analyzer::Analyzer;
 use mago_analyzer::analysis_result::AnalysisResult;
 use mago_analyzer::plugin::PluginRegistry;
 use mago_analyzer::settings::Settings;
+use mago_codex::misc::GenericParent;
 use mago_codex::populator::populate_codebase;
 use mago_codex::reference::SymbolReferences;
 use mago_codex::scanner::scan_program;
+use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::atomic::generic::TGenericParameter;
+use mago_codex::ttype::atomic::object::TObject;
+use mago_codex::ttype::atomic::object::named::TNamedObject;
+use mago_codex::ttype::union::TUnion;
 use mago_database::DatabaseReader;
 use mago_database::file::File;
 use mago_names::resolver::NameResolver;
 use mago_prelude::Prelude;
+use mago_span::Span;
 use mago_syntax::parser::parse_file;
+use mago_word::Word;
 use mago_word::WordSet;
+use mago_word::word;
 
 static PRELUDE: LazyLock<Prelude> = LazyLock::new(Prelude::build);
 static PLUGIN_REGISTRY: LazyLock<PluginRegistry> = LazyLock::new(PluginRegistry::with_library_providers);
 
+#[derive(Clone, Debug, Eq, Hash, PartialEq)]
+struct BenchmarkThrownGenericException {
+    atomic_type: TAtomic,
+    span: Span,
+    object_names: Vec<Word>,
+}
+
 fn analyze_file(path: &Path, content: &str) {
+    analyze_file_with_settings(path, content, false);
+}
+
+fn analyze_file_with_settings(path: &Path, content: &str, check_dead_catch: bool) {
     let Prelude { mut database, mut metadata, mut symbol_references } = PRELUDE.clone();
 
     let file = File::ephemeral(
@@ -55,6 +78,7 @@ fn analyze_file(path: &Path, content: &str) {
         find_unused_expressions: true,
         find_unused_definitions: true,
         check_throws: true,
+        check_dead_catch,
         allow_possibly_undefined_array_keys: false,
         strict_list_index_checks: true,
         check_property_initialization: true,
@@ -73,6 +97,16 @@ fn analyze_file(path: &Path, content: &str) {
 }
 
 const BENCHMARKED_PREFIXES: &[&str] = &["issue_", "psl_", "sealed_class_", "trait_", "conditional_", "too_wide_throws"];
+const GENERIC_THROW_FIXTURES: &[&str] = &[
+    "generic_iterator_aggregate_union_bindings",
+    "generic_method_throw_dead_catch",
+    "generic_throw_template_bound_chain",
+    "generic_throw_unused_detection",
+    "generic_throwing_iterator_foreach",
+    "recursive_generic_throw_resolution",
+    "too_wide_generic_throw",
+    "unresolved_recursive_generic_throw",
+];
 
 fn discover_cases_by_prefix() -> Vec<(&'static str, Vec<(PathBuf, String)>)> {
     let cases_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("cases");
@@ -118,6 +152,27 @@ fn bench_cases(c: &mut Criterion) {
                     analyze_file(p, c);
                 }
             });
+        });
+    }
+
+    group.finish();
+}
+
+fn bench_generic_throw_fixtures(c: &mut Criterion) {
+    let cases_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("cases");
+    let mut group = c.benchmark_group("analyzer_generic_throw_fixture");
+    group.sample_size(10);
+    group.warm_up_time(Duration::from_millis(500));
+    group.measurement_time(Duration::from_secs(1));
+
+    for fixture in GENERIC_THROW_FIXTURES {
+        let path = cases_dir.join(format!("{fixture}.php"));
+        let content =
+            std::fs::read_to_string(&path).unwrap_or_else(|error| panic!("failed to read {}: {error}", path.display()));
+        let check_dead_catch = *fixture == "generic_method_throw_dead_catch";
+
+        group.bench_function(*fixture, |b| {
+            b.iter(|| analyze_file_with_settings(&path, &content, check_dead_catch));
         });
     }
 
@@ -255,5 +310,123 @@ fn bench_nested_attribute_group(c: &mut Criterion, group_name: &str, cases: &[(&
     group.finish();
 }
 
-criterion_group!(benches, bench_cases, bench_parameter_attribute_defaults);
+fn generic_exceptions(
+    cardinality: usize,
+    constraint_width: usize,
+    distinct_parameters: bool,
+) -> Vec<BenchmarkThrownGenericException> {
+    let constraint = Arc::new(TUnion::from_vec(
+        (0..constraint_width)
+            .map(|index| TAtomic::Object(TObject::Named(TNamedObject::new(word(format!("Bound{index}").as_bytes())))))
+            .collect(),
+    ));
+    let entity = GenericParent::FunctionLike((word(b"benchmark"), word(b"throws")));
+
+    (0..cardinality)
+        .map(|index| {
+            let parameter_name =
+                if distinct_parameters { word(format!("TFailure{index}").as_bytes()) } else { word(b"TFailure") };
+            let atomic_type =
+                TAtomic::GenericParameter(TGenericParameter::new(parameter_name, Arc::clone(&constraint), entity));
+
+            BenchmarkThrownGenericException {
+                atomic_type,
+                span: Span::dummy(index as u32, index as u32 + 1),
+                object_names: vec![word(b"Exception")],
+            }
+        })
+        .collect()
+}
+
+fn merge_generic_exceptions_with_vec(
+    mut destination: Vec<BenchmarkThrownGenericException>,
+    source: &[BenchmarkThrownGenericException],
+) -> Vec<BenchmarkThrownGenericException> {
+    for thrown in source {
+        if !destination.contains(thrown) {
+            destination.push(thrown.clone());
+        }
+    }
+
+    destination
+}
+
+fn merge_generic_exceptions_with_hashset(
+    mut destination: HashSet<BenchmarkThrownGenericException>,
+    source: &[BenchmarkThrownGenericException],
+) -> HashSet<BenchmarkThrownGenericException> {
+    destination.extend(source.iter().cloned());
+    destination
+}
+
+fn generic_exception_vecs_are_equal(
+    left: &[BenchmarkThrownGenericException],
+    right: &[BenchmarkThrownGenericException],
+) -> bool {
+    left.len() == right.len() && left.iter().all(|exception| right.contains(exception))
+}
+
+fn bench_generic_exception_set_merges(c: &mut Criterion) {
+    let mut group = c.benchmark_group("generic_exception_set_merge");
+    group.sample_size(10);
+    group.warm_up_time(Duration::from_millis(200));
+    group.measurement_time(Duration::from_millis(500));
+
+    for cardinality in [4, 32] {
+        for constraint_width in [1, 8] {
+            for distinct_parameters in [false, true] {
+                let pattern = if distinct_parameters { "distinct" } else { "repeated" };
+                let all = generic_exceptions(cardinality + cardinality / 2, constraint_width, distinct_parameters);
+                let destination_vec = all[..cardinality].to_vec();
+                let destination_set = destination_vec.iter().cloned().collect::<HashSet<_>>();
+                let mut source = all[..cardinality / 2].to_vec();
+                source.extend_from_slice(&all[cardinality..]);
+                let merged_vec = merge_generic_exceptions_with_vec(destination_vec.clone(), &source);
+                let merged_set = merge_generic_exceptions_with_hashset(destination_set.clone(), &source);
+                assert_eq!(merged_vec.len(), merged_set.len());
+                assert!(merged_vec.iter().all(|exception| merged_set.contains(exception)));
+
+                let parameters = format!("n{cardinality}_w{constraint_width}_{pattern}");
+                group.bench_function(BenchmarkId::new("vec", &parameters), |b| {
+                    b.iter_batched(
+                        || destination_vec.clone(),
+                        |destination| {
+                            std::hint::black_box(merge_generic_exceptions_with_vec(destination, &source));
+                        },
+                        BatchSize::SmallInput,
+                    );
+                });
+                group.bench_function(BenchmarkId::new("hashset", parameters), |b| {
+                    b.iter_batched(
+                        || destination_set.clone(),
+                        |destination| {
+                            std::hint::black_box(merge_generic_exceptions_with_hashset(destination, &source));
+                        },
+                        BatchSize::SmallInput,
+                    );
+                });
+
+                let reordered_vec = merged_vec.iter().rev().cloned().collect::<Vec<_>>();
+                let reordered_set = reordered_vec.iter().cloned().collect::<HashSet<_>>();
+                let equality_parameters = format!("n{cardinality}_w{constraint_width}_{pattern}");
+                group.bench_function(BenchmarkId::new("vec_set_equality", &equality_parameters), |b| {
+                    b.iter(|| std::hint::black_box(generic_exception_vecs_are_equal(&merged_vec, &reordered_vec)));
+                });
+                group.bench_function(BenchmarkId::new("hashset_equality", equality_parameters), |b| {
+                    b.iter(|| std::hint::black_box(merged_set == reordered_set));
+                });
+            }
+        }
+    }
+
+    group.finish();
+}
+
+criterion_group!(
+    benches,
+    bench_cases,
+    bench_generic_throw_fixtures,
+    bench_parameter_attribute_defaults,
+    bench_generic_exception_set_merges
+);
 criterion_main!(benches);

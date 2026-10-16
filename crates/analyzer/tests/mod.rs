@@ -19,6 +19,15 @@ mod framework;
 /// 2. Read the content from the file `cases/my_test.php`.
 /// 3. Create and run a `TestCase` with that content and the specified settings.
 macro_rules! test_case {
+    ($test_name:ident, $settings:expr, expected_issue_counts = [$(($code:literal, $count:literal)),+ $(,)?]) => {
+        #[test]
+        fn $test_name() {
+            let content = include_bytes!(concat!("cases/", stringify!($test_name), ".php"));
+            let test = $crate::framework::TestCase::new(stringify!($test_name), content).settings($settings);
+            $(let test = test.expect_issue_code_count($code, $count);)+
+            test.run();
+        }
+    };
     ($test_name:ident, expected_issue_counts = [$(($code:literal, $count:literal)),+ $(,)?]) => {
         #[test]
         fn $test_name() {
@@ -322,11 +331,15 @@ test_case!(docblock_return_basic);
 test_case!(docblock_throws_exception);
 test_case!(docblock_throws_unhandled);
 test_case!(issue_2544_backed_enum_from_throws);
-test_case!(issue_2503_dead_catch, {
-    let mut settings = default_test_settings();
-    settings.check_dead_catch = true;
-    settings
-});
+test_case!(
+    issue_2503_dead_catch,
+    {
+        let mut settings = default_test_settings();
+        settings.check_dead_catch = true;
+        settings
+    },
+    expected_issue_counts = [("too-wide-throw-type", 1)]
+);
 test_case!(issue_2503_check_throws_disabled, {
     let mut settings = default_test_settings();
     settings.check_throws = false;
@@ -2891,7 +2904,30 @@ test_case!(issue_2499);
 test_case!(issue_2508);
 test_case!(issue_2520);
 test_case!(issue_2523);
-test_case!(too_wide_throws, expected_issue_counts = [("too-wide-throw-type", 7), ("unhandled-thrown-type", 1)]);
+test_case!(too_wide_throws, expected_issue_counts = [("too-wide-throw-type", 8), ("unhandled-thrown-type", 1)]);
+test_case!(generic_throw_template_bound_chain);
+test_case!(generic_method_throw_dead_catch, {
+    let mut settings = default_test_settings();
+    settings.check_dead_catch = true;
+    settings
+});
+test_case!(generic_throw_unused_detection, expected_issue_counts = [("too-wide-throw-type", 1)]);
+test_case!(generic_iterator_aggregate_union_bindings);
+test_case!(generic_throwing_iterator_foreach);
+test_case!(
+    recursive_generic_throw_resolution,
+    expected_issue_counts = [("too-wide-throw-type", 2), ("unhandled-thrown-type", 2)]
+);
+test_case!(unresolved_recursive_generic_throw);
+test_case!(
+    too_wide_generic_throw,
+    expected_issue_counts = [
+        ("too-wide-throw-type", 6),
+        ("unhandled-thrown-type", 2),
+        ("unused-template-parameter", 1),
+        ("avoid-catching-error", 2),
+    ]
+);
 test_case!(check_throws_disabled, {
     let mut settings = default_test_settings();
     settings.check_throws = false;

@@ -13,7 +13,7 @@ use crate::context::block::BlockContext;
 ///
 /// This function is responsible for merging:
 /// 1. `by_reference_constraints`: Checks for and reports conflicting constraints.
-/// 2. `possibly_thrown_exceptions`: Merges the sets of exceptions that can be thrown.
+/// 2. `possibly_thrown_exceptions` and `possibly_thrown_generic_exceptions`: Merge the exceptions that can be thrown.
 ///
 /// # Arguments
 ///
@@ -91,5 +91,9 @@ pub(crate) fn inherit_branch_context_properties<'ctx, A>(
         for (exception, spans) in &source_context.possibly_thrown_exceptions {
             destination_context.possibly_thrown_exceptions.entry(*exception).or_default().extend(spans);
         }
+
+        destination_context
+            .possibly_thrown_generic_exceptions
+            .extend(source_context.possibly_thrown_generic_exceptions.iter().cloned());
     }
 }

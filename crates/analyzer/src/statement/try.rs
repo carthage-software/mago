@@ -17,6 +17,8 @@ use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::combiner::CombinerOptions;
+use mago_codex::ttype::comparator::ComparisonResult;
+use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -32,6 +34,7 @@ use crate::artifacts::AnalysisArtifacts;
 use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
+use crate::context::block::PossiblyThrownGenericException;
 use crate::context::scope::control_action::ControlAction;
 use crate::context::scope::finally_scope::FinallyScope;
 use crate::context::utils::inherit_branch_context_properties;
@@ -64,6 +67,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
         }
 
         let existing_thrown_exceptions = std::mem::take(&mut block_context.possibly_thrown_exceptions);
+        let existing_thrown_generic_exceptions = std::mem::take(&mut block_context.possibly_thrown_generic_exceptions);
         let old_block_context_locals = block_context.locals.clone();
         let mut try_block_context = block_context.clone();
 
@@ -76,6 +80,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
         let was_inside_try = block_context.flags.inside_try();
         block_context.flags.set_inside_try(true);
         let mut exception_entry_locals: WordMap<Vec<WordSet>> = WordMap::default();
+        let mut generic_exception_entry_locals: Vec<(PossiblyThrownGenericException, WordSet)> = Vec::new();
         if self.catch_clauses.is_empty() || !context.settings.check_throws {
             analyze_statements(self.block.statements.as_slice(), context, block_context, artifacts)?;
         } else {
@@ -90,6 +95,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                         })
                     })
                     .collect::<WordSet>();
+                let thrown_generic_exceptions = block_context.possibly_thrown_generic_exceptions.clone();
                 let thrown_exception_counts = block_context
                     .possibly_thrown_exceptions
                     .iter()
@@ -101,6 +107,13 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                 for (exception, spans) in &block_context.possibly_thrown_exceptions {
                     if spans.len() > thrown_exception_counts.get(exception).copied().unwrap_or_default() {
                         exception_entry_locals.entry(*exception).or_default().push(definitely_defined_locals.clone());
+                    }
+                }
+
+                for thrown_generic in &block_context.possibly_thrown_generic_exceptions {
+                    if !thrown_generic_exceptions.contains(thrown_generic) {
+                        generic_exception_entry_locals
+                            .push((thrown_generic.clone(), definitely_defined_locals.clone()));
                     }
                 }
             }
@@ -181,9 +194,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
         }
 
         try_block_context.possibly_thrown_exceptions = block_context.possibly_thrown_exceptions.clone();
+        try_block_context.possibly_thrown_generic_exceptions = block_context.possibly_thrown_generic_exceptions.clone();
         try_block_context.variables_possibly_in_scope = block_context.variables_possibly_in_scope.clone();
         let has_untracked_throw_source = context.settings.check_throws
-            && has_untracked_throw_source(context, &self.block, &try_block_context.possibly_thrown_exceptions);
+            && has_untracked_throw_source(
+                context,
+                &self.block,
+                &try_block_context.possibly_thrown_exceptions,
+                &try_block_context.possibly_thrown_generic_exceptions,
+            );
 
         let try_leaves_loop = artifacts
             .loop_scope
@@ -202,7 +221,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
 
         let mut original_block_context = try_block_context.clone();
         let mut definitely_newly_assigned_var_ids = newly_assigned_variable_ids;
-        let mut previously_caught_types = WordSet::default();
+        let mut previously_caught_classes = WordSet::default();
 
         for (i, catch_clause) in self.catch_clauses.iter().enumerate() {
             let mut catch_block_context = original_block_context.clone();
@@ -246,10 +265,14 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
 
             let possibly_thrown_exceptions = std::mem::take(&mut catch_block_context.possibly_thrown_exceptions);
             let is_covered_by_previous_catch = caught_classes.iter().all(|caught| {
-                previously_caught_types
+                previously_caught_classes
                     .iter()
                     .any(|previous| context.codebase.is_instance_of(caught.as_bytes(), previous.as_bytes()))
             });
+            let catches_generic_throw = catch_block_context
+                .possibly_thrown_generic_exceptions
+                .iter()
+                .any(|generic_throw| generic_throw_is_caught(context, generic_throw, &caught_classes));
             if context.settings.check_throws
                 && context.settings.check_dead_catch
                 && has_valid_caught_classes
@@ -257,7 +280,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                     || (!has_untracked_throw_source
                         && !possibly_thrown_exceptions.keys().any(|thrown| {
                             caught_classes.iter().any(|caught| could_be_caught(context, *thrown, *caught))
-                        })))
+                        })
+                        && !catches_generic_throw))
             {
                 context.collector.report_with_code(
                     IssueCode::DeadCatch,
@@ -300,6 +324,41 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                         catch_block_context.possibly_thrown_exceptions.remove(possibly_thrown_exception);
                     }
                 }
+            }
+
+            let mut fully_caught_classes = previously_caught_classes.clone();
+            fully_caught_classes.extend(caught_classes.iter().copied());
+            let caught_type = TUnion::new(
+                fully_caught_classes
+                    .iter()
+                    .map(|caught_class| TAtomic::Object(TObject::new_named(*caught_class)))
+                    .collect(),
+            );
+            let caught_generic_exceptions = catch_block_context
+                .possibly_thrown_generic_exceptions
+                .iter()
+                .filter(|generic_throw| {
+                    generic_throw_is_contained_by(context, generic_throw, &caught_type, &fully_caught_classes)
+                })
+                .cloned()
+                .collect::<Vec<_>>();
+
+            for generic_throw in caught_generic_exceptions {
+                for (_, entry_locals) in
+                    generic_exception_entry_locals.iter().filter(|(thrown_generic, _)| thrown_generic == &generic_throw)
+                {
+                    intersect_definitely_defined_locals(&mut definitely_defined_locals, entry_locals);
+                }
+
+                original_block_context
+                    .possibly_thrown_generic_exceptions
+                    .retain(|thrown_generic| thrown_generic != &generic_throw);
+                block_context
+                    .possibly_thrown_generic_exceptions
+                    .retain(|thrown_generic| thrown_generic != &generic_throw);
+                catch_block_context
+                    .possibly_thrown_generic_exceptions
+                    .retain(|thrown_generic| thrown_generic != &generic_throw);
             }
 
             if let Some(definitely_defined_locals) = definitely_defined_locals {
@@ -414,7 +473,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
             }
 
             if has_valid_caught_classes {
-                previously_caught_types.extend(caught_classes.iter().copied());
+                previously_caught_classes.extend(caught_classes.iter().copied());
             }
         }
 
@@ -482,6 +541,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
 
         for (possibly_thrown_exception, throw_spans) in existing_thrown_exceptions {
             block_context.possibly_thrown_exceptions.entry(possibly_thrown_exception).or_default().extend(throw_spans);
+        }
+
+        for thrown_generic in existing_thrown_generic_exceptions {
+            block_context.possibly_thrown_generic_exceptions.insert(thrown_generic);
         }
 
         block_context.flags.set_has_returned(if finally_has_returned {
@@ -732,10 +795,77 @@ where
     false
 }
 
+fn generic_throw_is_caught<A>(
+    context: &Context<'_, '_, A>,
+    generic_throw: &PossiblyThrownGenericException,
+    caught_classes: &WordSet,
+) -> bool
+where
+    A: Arena,
+{
+    let caught_type = TUnion::new(
+        caught_classes.iter().map(|caught_class| TAtomic::Object(TObject::new_named(*caught_class))).collect(),
+    );
+
+    generic_throw_is_contained_by(context, generic_throw, &caught_type, caught_classes)
+        || generic_throw.object_names.iter().any(|thrown_name| {
+            caught_classes.iter().any(|caught_class| could_be_caught(context, *thrown_name, *caught_class))
+        })
+}
+
+fn generic_throw_is_contained_by<A>(
+    context: &Context<'_, '_, A>,
+    generic_throw: &PossiblyThrownGenericException,
+    caught_type: &TUnion,
+    caught_classes: &WordSet,
+) -> bool
+where
+    A: Arena,
+{
+    let thrown_type = TUnion::from_atomic(generic_throw.atomic_type.clone());
+    if union_comparator::is_contained_by(
+        context.codebase,
+        &thrown_type,
+        caught_type,
+        false,
+        false,
+        false,
+        &mut ComparisonResult::default(),
+    ) {
+        return true;
+    }
+
+    !generic_throw.object_names.is_empty()
+        && generic_throw.object_names.iter().all(|thrown_name| {
+            if thrown_name.as_bytes().eq_ignore_ascii_case(b"Throwable") {
+                return caught_classes_cover_throwable(context, caught_classes);
+            }
+
+            caught_classes
+                .iter()
+                .any(|caught_class| context.codebase.is_instance_of(thrown_name.as_bytes(), caught_class.as_bytes()))
+        })
+}
+
+fn caught_classes_cover_throwable<A>(context: &Context<'_, '_, A>, caught_classes: &WordSet) -> bool
+where
+    A: Arena,
+{
+    let catches_supertype = |supertype: &[u8]| {
+        caught_classes.iter().any(|caught_class| {
+            supertype.eq_ignore_ascii_case(caught_class.as_bytes())
+                || context.codebase.is_instance_of(supertype, caught_class.as_bytes())
+        })
+    };
+
+    catches_supertype(b"Throwable") || (catches_supertype(b"Exception") && catches_supertype(b"Error"))
+}
+
 fn has_untracked_throw_source<'arena, A>(
     context: &Context<'_, 'arena, A>,
     block: &mago_syntax::cst::Block<'arena>,
     possibly_thrown_exceptions: &WordMap<HashSet<Span>>,
+    possibly_thrown_generic_exceptions: &HashSet<PossiblyThrownGenericException>,
 ) -> bool
 where
     A: Arena,
@@ -744,7 +874,7 @@ where
         .filter_map(|node| match node {
             Node::Call(call) => {
                 let span = call.span();
-                if has_tracked_throw_span(possibly_thrown_exceptions, span) {
+                if has_tracked_throw_span(possibly_thrown_exceptions, possibly_thrown_generic_exceptions, span) {
                     return None;
                 }
 
@@ -775,7 +905,7 @@ where
             }
             Node::Instantiation(instantiation) => {
                 let span = instantiation.span();
-                if has_tracked_throw_span(possibly_thrown_exceptions, span) {
+                if has_tracked_throw_span(possibly_thrown_exceptions, possibly_thrown_generic_exceptions, span) {
                     return None;
                 }
 
@@ -801,8 +931,13 @@ where
         .any(|_| true)
 }
 
-fn has_tracked_throw_span(possibly_thrown_exceptions: &WordMap<HashSet<Span>>, span: Span) -> bool {
+fn has_tracked_throw_span(
+    possibly_thrown_exceptions: &WordMap<HashSet<Span>>,
+    possibly_thrown_generic_exceptions: &HashSet<PossiblyThrownGenericException>,
+    span: Span,
+) -> bool {
     possibly_thrown_exceptions.values().any(|spans| spans.contains(&span))
+        || possibly_thrown_generic_exceptions.iter().any(|generic_throw| generic_throw.span == span)
 }
 
 fn has_untracked_throwable_constructor(codebase: &CodebaseMetadata, class_name: &[u8]) -> bool {

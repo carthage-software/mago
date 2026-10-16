@@ -401,6 +401,7 @@ fn same_flow(left: &BlockContext<'_>, right: &BlockContext<'_>) -> bool {
         && left.parent_conflicting_clause_variables == right.parent_conflicting_clause_variables
         && left.control_actions == right.control_actions
         && left.possibly_thrown_exceptions == right.possibly_thrown_exceptions
+        && left.possibly_thrown_generic_exceptions == right.possibly_thrown_generic_exceptions
         && left.definitely_initialized_properties == right.definitely_initialized_properties
         && left.possibly_initialized_properties == right.possibly_initialized_properties
         && left.definitely_uninitialized_property_ids == right.definitely_uninitialized_property_ids

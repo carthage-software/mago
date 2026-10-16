@@ -818,6 +818,10 @@ where
                     .or_default()
                     .extend(spans.iter().copied());
             }
+
+            self.block_context
+                .possibly_thrown_generic_exceptions
+                .extend(context.possibly_thrown_generic_exceptions.iter().cloned());
         }
 
         if reachable_contexts.is_empty() {

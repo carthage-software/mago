@@ -70,6 +70,7 @@ use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::context::block::BreakContext;
+use crate::context::block::PossiblyThrownGenericException;
 use crate::context::scope::control_action::ControlAction;
 use crate::context::scope::loop_scope::LoopScope;
 use crate::context::scope::var_has_root;
@@ -80,6 +81,8 @@ use crate::formula::negate_or_synthesize;
 use crate::reconciler::reconcile_keyed_types;
 use crate::statement::r#loop::assignment_map_visitor::get_assignment_map;
 use crate::statement::r#loop::cleaner::clean_nodes;
+use crate::utils::exception::get_throw_type_atomics;
+use crate::utils::exception::get_throw_type_object_names;
 
 mod assignment_map_visitor;
 mod cleaner;
@@ -91,6 +94,8 @@ pub mod r#do;
 pub mod r#for;
 pub mod foreach;
 pub mod r#while;
+
+const MAX_ITERATOR_PROTOCOL_RECURSION_DEPTH: usize = 64;
 
 pub fn parse_control_flow_level<'ctx, 'arena, A>(
     level: Option<&Expression<'arena>>,
@@ -1821,7 +1826,7 @@ fn record_iterator_protocol_throws<'ctx, A>(
 ) where
     A: Arena,
 {
-    let mut visited_classes = WordSet::default();
+    let mut visited_classes = Vec::new();
     record_iterator_protocol_throws_recursive(
         context,
         block_context,
@@ -1840,7 +1845,7 @@ fn record_iterator_protocol_throws_recursive<'ctx, A>(
     type_parameters: Option<&[TUnion]>,
     span: Span,
     include_key: bool,
-    visited_classes: &mut WordSet,
+    visited_classes: &mut Vec<(Word, Option<Vec<TUnion>>)>,
 ) where
     A: Arena,
 {
@@ -1848,16 +1853,24 @@ fn record_iterator_protocol_throws_recursive<'ctx, A>(
         return;
     };
 
-    if !visited_classes.insert(class_metadata.name) {
+    let type_parameters_key = type_parameters.map(|types| types.to_vec());
+    if visited_classes.len() >= MAX_ITERATOR_PROTOCOL_RECURSION_DEPTH
+        || visited_classes.iter().any(|(visited_class, visited_type_parameters)| {
+            visited_class == &class_metadata.name && visited_type_parameters == &type_parameters_key
+        })
+    {
         return;
     }
+    visited_classes.push((class_metadata.name, type_parameters_key));
 
     if context.codebase.is_instance_of(class_name.as_bytes(), b"Iterator") {
         record_iterator_method_throws(context, block_context, class_name, type_parameters, span, include_key);
+        let _ = visited_classes.pop();
         return;
     }
 
     if !context.codebase.is_instance_of(class_name.as_bytes(), b"IteratorAggregate") {
+        let _ = visited_classes.pop();
         return;
     }
 
@@ -1866,6 +1879,7 @@ fn record_iterator_protocol_throws_recursive<'ctx, A>(
     let Some(return_type) =
         get_iterator_method_return_type(context.codebase, class_metadata, type_parameters, b"getiterator")
     else {
+        let _ = visited_classes.pop();
         return;
     };
 
@@ -1895,6 +1909,8 @@ fn record_iterator_protocol_throws_recursive<'ctx, A>(
             );
         }
     }
+
+    let _ = visited_classes.pop();
 }
 
 fn record_iterator_method_throws<'ctx, A>(
@@ -1966,8 +1982,21 @@ fn record_method_throws<'ctx, A>(
                 continue;
             }
 
-            for exception_name in atomic_type.get_all_object_names() {
-                block_context.possibly_thrown_exceptions.entry(exception_name).or_default().insert(span);
+            for thrown_atomic in get_throw_type_atomics(atomic_type) {
+                if matches!(&thrown_atomic, TAtomic::GenericParameter(_))
+                    && thrown_atomic.extends_or_implements(context.codebase, b"Throwable")
+                {
+                    let thrown_generic = PossiblyThrownGenericException {
+                        object_names: get_throw_type_object_names(context.codebase, &thrown_atomic),
+                        atomic_type: thrown_atomic,
+                        span,
+                    };
+                    block_context.possibly_thrown_generic_exceptions.insert(thrown_generic);
+                } else {
+                    for exception_name in thrown_atomic.get_all_object_names() {
+                        block_context.possibly_thrown_exceptions.entry(exception_name).or_default().insert(span);
+                    }
+                }
             }
         }
     }
