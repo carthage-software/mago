@@ -130,6 +130,7 @@ impl<'arena> ResolvedNames<'arena> {
 
     /// Returns a `HashSet` containing every resolution result as `(&start, (fqn, imported))`.
     #[deprecated(
+        since = "1.21.0",
         note = "Allocates a HashSet for no good reason. Prefer `iter()` for allocation-free iteration, or `at_offset()` for cursor lookups."
     )]
     #[must_use]
