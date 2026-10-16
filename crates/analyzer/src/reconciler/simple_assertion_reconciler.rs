@@ -1284,7 +1284,7 @@ where
                     did_remove_type = true;
                 }
             }
-            TAtomic::Scalar(TScalar::String(string)) if is_equality => {
+            TAtomic::Scalar(TScalar::String(string)) if matches!(assertion, Assertion::IsEqual(_)) => {
                 if context.settings.version < PHPVersion::PHP80 {
                     acceptable_types.push(TAtomic::Scalar(TScalar::String(*string)));
                     continue;
