@@ -2917,6 +2917,7 @@ test_case!(foreach_empty_array_analyze_dead_code, {
     settings.analyze_dead_code = true;
     settings
 });
+test_case!(equality_type_reconciliation_unions);
 
 #[test]
 fn issue_2478_without_property_memoization() {
