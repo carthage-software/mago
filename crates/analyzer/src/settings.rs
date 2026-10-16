@@ -6,6 +6,8 @@ use mago_word::Word;
 use mago_word::WordSet;
 use mago_word::ascii_lowercase_word;
 
+pub mod strictness;
+
 /// Default maximum logical formula size during conditional analysis.
 pub const DEFAULT_FORMULA_SIZE_THRESHOLD: u16 = 512;
 

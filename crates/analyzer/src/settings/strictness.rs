@@ -16,6 +16,20 @@ pub enum AnalyzerStrictnessPreset {
     Maximum,
 }
 
+/// Analyzer settings selected by an initialization strictness preset.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
+pub struct AnalyzerStrictnessPresetSettings {
+    /// Whether the preset enables checking whether documented `@throws` types can escape.
+    pub find_overly_wide_throw_types: bool,
+}
+
+impl AnalyzerStrictnessPresetSettings {
+    /// Returns the TOML assignment for this setting.
+    pub fn to_toml_assignment(self) -> String {
+        format!("find-overly-wide-throw-types = {}", self.find_overly_wide_throw_types)
+    }
+}
+
 impl Display for AnalyzerStrictnessPreset {
     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
         match self {
@@ -28,8 +42,8 @@ impl Display for AnalyzerStrictnessPreset {
 }
 
 impl AnalyzerStrictnessPreset {
-    /// Whether this preset enables the overly wide `@throws` check by default.
-    pub const fn find_overly_wide_throw_types(self) -> bool {
-        matches!(self, Self::Strict | Self::Maximum)
+    /// Returns the analyzer settings selected by this preset.
+    pub const fn settings(self) -> AnalyzerStrictnessPresetSettings {
+        AnalyzerStrictnessPresetSettings { find_overly_wide_throw_types: matches!(self, Self::Strict | Self::Maximum) }
     }
 }

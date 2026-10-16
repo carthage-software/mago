@@ -452,7 +452,8 @@ fn record_immediate_callback_throw_types<'ctx, 'arena, A>(
         record_callback_throw_types(context, block_context, callable, invocation.span);
     }
 
-    if !matches!(identifier, FunctionLikeIdentifier::Function(name) if name.as_bytes() == b"preg_replace_callback_array") {
+    if !matches!(identifier, FunctionLikeIdentifier::Function(name) if name.as_bytes() == b"preg_replace_callback_array")
+    {
         return;
     }
 

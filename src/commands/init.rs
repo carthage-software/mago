@@ -43,7 +43,8 @@ use dialoguer::Select;
 use dialoguer::console::style;
 use dialoguer::theme::ColorfulTheme;
 
-use mago::init_presets::AnalyzerStrictnessPreset;
+use mago_analyzer::settings::strictness::AnalyzerStrictnessPreset;
+use mago_analyzer::settings::strictness::AnalyzerStrictnessPresetSettings;
 use mago_composer::AutoloadPsr4value;
 use mago_composer::ComposerPackage;
 use mago_composer::ComposerPackageAutoloadDevPsr4value;
@@ -104,7 +105,7 @@ fn analyzer_settings_for_preset(
             find_unused_expressions: false,
             analyze_dead_code: false,
             check_throws: false,
-            find_overly_wide_throw_types: preset.find_overly_wide_throw_types(),
+            throw_type_settings: preset.settings(),
             check_dead_catch: false,
             allow_possibly_undefined_array_keys: true,
             check_missing_override: false,
@@ -124,7 +125,7 @@ fn analyzer_settings_for_preset(
             find_unused_expressions: false,
             analyze_dead_code: false,
             check_throws: false,
-            find_overly_wide_throw_types: preset.find_overly_wide_throw_types(),
+            throw_type_settings: preset.settings(),
             check_dead_catch: false,
             allow_possibly_undefined_array_keys: true,
             check_missing_override: false,
@@ -144,7 +145,7 @@ fn analyzer_settings_for_preset(
             find_unused_expressions: true,
             analyze_dead_code: false,
             check_throws: true,
-            find_overly_wide_throw_types: preset.find_overly_wide_throw_types(),
+            throw_type_settings: preset.settings(),
             check_dead_catch: false,
             allow_possibly_undefined_array_keys: false,
             check_missing_override: true,
@@ -164,7 +165,7 @@ fn analyzer_settings_for_preset(
             find_unused_expressions: true,
             analyze_dead_code: true,
             check_throws: true,
-            find_overly_wide_throw_types: preset.find_overly_wide_throw_types(),
+            throw_type_settings: preset.settings(),
             check_dead_catch: false,
             allow_possibly_undefined_array_keys: false,
             check_missing_override: true,
@@ -387,8 +388,8 @@ struct InitializationAnalyzerSettings {
     analyze_dead_code: bool,
     /// Whether to check for unhandled thrown exceptions
     check_throws: bool,
-    /// Whether to check whether documented @throws types can escape
-    find_overly_wide_throw_types: bool,
+    /// Settings for documented @throws types.
+    throw_type_settings: AnalyzerStrictnessPresetSettings,
     /// Whether to report catch clauses that cannot catch a known exception
     check_dead_catch: bool,
     /// Whether to allow access to potentially undefined array keys
@@ -649,9 +650,9 @@ fn setup_analyzer(theme: &ColorfulTheme) -> Result<InitializationAnalyzerSetting
             .with_prompt(" │  Check for unhandled thrown exceptions?")
             .default(settings.check_throws)
             .interact()?;
-        settings.find_overly_wide_throw_types = Confirm::with_theme(theme)
+        settings.throw_type_settings.find_overly_wide_throw_types = Confirm::with_theme(theme)
             .with_prompt(" │  Check whether documented @throws types can escape?")
-            .default(settings.find_overly_wide_throw_types)
+            .default(settings.throw_type_settings.find_overly_wide_throw_types)
             .interact()?;
         settings.check_dead_catch = Confirm::with_theme(theme)
             .with_prompt(" │  Check catch clauses with no known matching exception? (requires check-throws)")
@@ -959,7 +960,7 @@ fn build_analyzer_settings_string(settings: &InitializationAnalyzerSettings) -> 
     lines.push(format!("memoize-properties = {}", settings.memoize_properties));
     lines.push(format!("allow-possibly-undefined-array-keys = {}", settings.allow_possibly_undefined_array_keys));
     lines.push(format!("check-throws = {}", settings.check_throws));
-    lines.push(format!("find-overly-wide-throw-types = {}", settings.find_overly_wide_throw_types));
+    lines.push(settings.throw_type_settings.to_toml_assignment());
     lines.push(format!("check-dead-catch = {}", settings.check_dead_catch));
     lines.push("unchecked-exceptions = [\"Error\", \"LogicException\"]".to_string());
     lines.push("unchecked-exception-classes = []".to_string());
@@ -989,7 +990,7 @@ mod tests {
             find_unused_expressions: false,
             analyze_dead_code: false,
             check_throws: false,
-            find_overly_wide_throw_types: false,
+            throw_type_settings: AnalyzerStrictnessPresetSettings::default(),
             check_dead_catch: false,
             allow_possibly_undefined_array_keys: true,
             check_missing_override: false,
@@ -1080,7 +1081,7 @@ mod tests {
             find_unused_expressions: true,
             analyze_dead_code: true,
             check_throws: true,
-            find_overly_wide_throw_types: true,
+            throw_type_settings: AnalyzerStrictnessPresetSettings { find_overly_wide_throw_types: true },
             check_dead_catch: false,
             allow_possibly_undefined_array_keys: false,
             check_missing_override: false,

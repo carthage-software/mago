@@ -2910,11 +2910,15 @@ test_case!(overly_wide_throw_types_disabled, {
     settings.check_throws = true;
     settings
 });
-test_case!(overly_wide_throw_types_enabled_without_unhandled_check, {
-    let mut settings = mago_analyzer::settings::Settings::default();
-    settings.find_overly_wide_throw_types = true;
-    settings
-}, expected_issue_counts = [("too-wide-throw-type", 1)]);
+test_case!(
+    overly_wide_throw_types_enabled_without_unhandled_check,
+    {
+        let mut settings = mago_analyzer::settings::Settings::default();
+        settings.find_overly_wide_throw_types = true;
+        settings
+    },
+    expected_issue_counts = [("too-wide-throw-type", 1)]
+);
 test_case!(generic_throw_template_bound_chain);
 test_case!(generic_method_throw_dead_catch, {
     let mut settings = default_test_settings();
