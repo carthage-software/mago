@@ -47,7 +47,9 @@ impl Harness {
         let dir = tempfile::tempdir().expect("tempdir");
         let workspace = dir.path().to_path_buf();
         for (name, contents) in files {
-            std::fs::write(workspace.join(name), contents).unwrap();
+            let path = workspace.join(name);
+            std::fs::create_dir_all(path.parent().unwrap()).unwrap();
+            std::fs::write(path, contents).unwrap();
         }
 
         let (client_stream, server_stream) = tokio::io::duplex(256 * 1024);

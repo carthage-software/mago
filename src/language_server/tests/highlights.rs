@@ -75,3 +75,25 @@ async fn aliases_keep_their_namespace_binding_and_exact_utf16_prefix() {
     let mut h = Harness::start_with(&[("a.php", source)], config, json!({})).await;
     assert!(at(&mut h, source, "Item; new").await.is_null());
 }
+
+#[tokio::test]
+async fn constructor_and_invoke_highlights_include_certain_implicit_calls() {
+    let source = "<?php\nclass Base { public function __construct() {} }\nclass Child extends Base {}\nfinal class Handler { public function __invoke(): void {} }\nfunction make(Handler $handler, ?Handler $maybe): void { new Base(); new Child(); $handler(); $maybe(); }\n";
+    let mut h = Harness::start(&[("a.php", source)]).await;
+    let file = File::ephemeral(b"a.php".as_slice().into(), source.as_bytes().to_vec().into());
+    for (needle, expected) in [
+        ("__construct", vec![("__construct", 1), ("Base(); new", 2), ("Child(); $handler", 2)]),
+        ("__invoke", vec![("__invoke", 1), ("$handler(); $maybe", 2)]),
+    ] {
+        let result = at(&mut h, source, needle).await;
+        let highlights: Vec<DocumentHighlight> = serde_json::from_value(result).unwrap();
+        let found: Vec<_> = highlights
+            .iter()
+            .map(|item| {
+                (offset_at_position(&file, item.range.start) as usize, serde_json::to_value(item.kind).unwrap())
+            })
+            .collect();
+        let expected: Vec<_> = expected.into_iter().map(|(at, kind)| (source.find(at).unwrap(), json!(kind))).collect();
+        assert_eq!(found, expected, "{needle}");
+    }
+}

@@ -97,6 +97,7 @@ pub use error::ServerError;
 pub use file_analysis::FileAnalysis;
 pub use linter::LinterContext;
 pub use server::Server;
+pub use settings::Excludes;
 pub use settings::Features;
 pub use settings::Settings;
 pub use symbol_resolution::resolved_symbol_name;

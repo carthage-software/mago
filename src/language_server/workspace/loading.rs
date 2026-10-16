@@ -11,12 +11,14 @@ use clap::ColorChoice;
 use mago_analyzer::plugin::create_registry_with_plugins;
 use mago_database::DatabaseConfiguration;
 use mago_database::exclusion::Exclusion;
+use mago_database::git::GitIgnores;
 use mago_database::loader::DatabaseLoader;
 use mago_database::membership::WorkspaceMatcher;
 use mago_linter::integration::IntegrationSet;
 use mago_linter::settings::Settings as LinterSettings;
 use mago_prelude::Prelude;
 use mago_reporting::CompiledIgnoreSet;
+use mago_server::Excludes;
 use mago_server::Features;
 use mago_server::Server;
 use mago_server::Settings as ServerSettings;
@@ -49,12 +51,15 @@ pub fn build_workspace(folder: PathBuf, server_config: Arc<ServerConfig>) -> Res
     };
 
     let db_configuration = build_database_configuration(&root, &configuration);
-    let matcher = WorkspaceMatcher::from_configuration(&db_configuration)
+    let mut matcher = WorkspaceMatcher::from_configuration(&db_configuration)
         .map_err(|err| format!("compile source matcher: {err}"))?;
-    let (database, directory_symlinks) = DatabaseLoader::new(db_configuration)
-        .with_database(prelude_db)
-        .load_with_directory_symlinks()
-        .map_err(|err| format!("load database: {err}"))?;
+    let mut loader = DatabaseLoader::new(db_configuration).with_database(prelude_db);
+    if let Some(ignores) = git_ignores(&root, &configuration) {
+        matcher = matcher.with_git_ignores(Arc::clone(&ignores));
+        loader = loader.with_git_ignores(ignores);
+    }
+    let (database, directory_symlinks) =
+        loader.load_with_directory_symlinks().map_err(|err| format!("load database: {err}"))?;
     let directory_aliases = DirectoryAliases::new(directory_symlinks, &matcher);
 
     let features =
@@ -64,6 +69,15 @@ pub fn build_workspace(folder: PathBuf, server_config: Arc<ServerConfig>) -> Res
         configuration.analyzer.disable_default_plugins,
     ));
 
+    let tool_excludes = |patterns: &[String]| {
+        matcher.exclusions(&exclusions(&root, patterns), glob).map_err(|err| format!("compile excludes: {err}"))
+    };
+    let excludes = Excludes {
+        analyzer: tool_excludes(&configuration.analyzer.excludes)?,
+        linter: tool_excludes(&configuration.linter.excludes)?,
+        formatter: tool_excludes(&configuration.formatter.excludes)?,
+    };
+
     let settings = ServerSettings {
         php_version: configuration.php_version,
         features,
@@ -72,10 +86,11 @@ pub fn build_workspace(folder: PathBuf, server_config: Arc<ServerConfig>) -> Res
         linter: linter_settings,
         formatter: configuration.formatter.settings,
         plugin_registry,
+        excludes,
     };
 
     let mut server = Server::new(database, metadata, symbol_references, settings);
-    analyze_workspace(&mut server, features)?;
+    analyze_workspace(&mut server)?;
     let analyzer_ignores = CompiledIgnoreSet::compile(&configuration.analyzer.ignore, glob);
 
     let sources = SourceFiles::new(&root);
@@ -88,7 +103,7 @@ pub fn build_workspace(folder: PathBuf, server_config: Arc<ServerConfig>) -> Res
 }
 
 /// Finish all initial analysis before the workspace reaches the async backend.
-fn analyze_workspace(server: &mut Server, features: Features) -> Result<(), String> {
+fn analyze_workspace(server: &mut Server) -> Result<(), String> {
     let started = Instant::now();
     server.analyze_without_collecting().map_err(|err| format!("initial analyze: {err}"))?;
     tracing::info!(
@@ -96,7 +111,7 @@ fn analyze_workspace(server: &mut Server, features: Features) -> Result<(), Stri
         issues = server.analyzer_issues().map(|issues| issues.len()).sum::<usize>(),
         "analyzer pass complete",
     );
-    if features.linter || !features.analyzer {
+    if server.reports_file_diagnostics() {
         let started = Instant::now();
         server.refresh_all_host_analyses();
         tracing::info!(
@@ -139,9 +154,23 @@ fn resolve_workspace_configuration(root: &Path, server_config: &ServerConfig) ->
     }
 }
 
-/// First `mago.{toml,json,yaml,yml}` directly under `root`, if any.
+/// Without a project configuration, sources Git ignores load as dependencies.
+fn git_ignores(root: &Path, configuration: &Configuration) -> Option<Arc<GitIgnores>> {
+    let source = &configuration.source;
+    if configuration.config_file_is_explicit
+        || find_workspace_config_file(root).is_some()
+        || !source.paths.is_empty()
+        || !source.includes.is_empty()
+    {
+        return None;
+    }
+
+    GitIgnores::discover(root).map(Arc::new)
+}
+
+/// The workspace's own configuration file, found the way `mago` finds a project's.
 fn find_workspace_config_file(root: &Path) -> Option<PathBuf> {
-    ["mago.toml", "mago.json", "mago.yaml", "mago.yml"].into_iter().map(|name| root.join(name)).find(|p| p.is_file())
+    Configuration::find_project_config_file(root).map(|(file, _)| file)
 }
 
 /// Build the [`DatabaseConfiguration`] the LSP uses to scan the workspace,
@@ -167,8 +196,20 @@ fn build_database_configuration(root: &Path, configuration: &Configuration) -> D
         source.extensions.iter().cloned().map(|s| Cow::<'static, [u8]>::Owned(s.into_bytes())).collect()
     };
 
-    let excludes: Vec<Exclusion<'static>> = source
-        .excludes
+    DatabaseConfiguration {
+        workspace,
+        paths,
+        includes,
+        excludes: exclusions(root, &source.excludes),
+        extensions,
+        patches: source.patches.iter().cloned().map(|path| Cow::Owned(path.into_bytes())).collect(),
+        glob: source.glob.to_database_settings(),
+    }
+}
+
+/// Read exclude patterns the way `mago lint` and `mago analyze` do.
+fn exclusions(root: &Path, patterns: &[String]) -> Vec<Exclusion<'static>> {
+    patterns
         .iter()
         .map(|pattern| {
             if pattern.contains('*') {
@@ -178,20 +219,10 @@ fn build_database_configuration(root: &Path, configuration: &Configuration) -> D
                     Exclusion::Pattern(Cow::Owned(pattern.clone()))
                 }
             } else {
-                let path = std::path::PathBuf::from(pattern);
+                let path = PathBuf::from(pattern);
                 let path = if path.is_absolute() { path } else { root.join(path) };
                 Exclusion::Path(Cow::Owned(path.canonicalize().unwrap_or(path)))
             }
         })
-        .collect();
-
-    DatabaseConfiguration {
-        workspace,
-        paths,
-        includes,
-        excludes,
-        extensions,
-        patches: source.patches.iter().cloned().map(|path| Cow::Owned(path.into_bytes())).collect(),
-        glob: source.glob.to_database_settings(),
-    }
+        .collect()
 }

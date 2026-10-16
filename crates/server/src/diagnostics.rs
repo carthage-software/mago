@@ -39,6 +39,8 @@ pub struct DiagnosticCache {
 pub struct DiagnosticUpdate {
     pub files: HashSet<FileId>,
     sources: Vec<(SourceKey, Source)>,
+    /// Files whose analyzer issues stay unpublished.
+    unanalyzed: HashSet<FileId>,
 }
 
 impl DiagnosticCache {
@@ -55,7 +57,10 @@ impl DiagnosticCache {
                     .map(|(file, analysis)| (SourceKey::Linter(file), Source::Linter(Arc::clone(analysis)))),
             );
         let files = self.update(sources, changed);
-        self.select(files)
+        let mut update = self.select(files);
+        update.unanalyzed =
+            update.files.iter().copied().filter(|file| server.excludes_analyzer_issues(*file)).collect();
+        update
     }
 
     fn select(&self, files: HashSet<FileId>) -> DiagnosticUpdate {
@@ -67,7 +72,7 @@ impl DiagnosticCache {
             .collect();
         // Hash table growth must not change issue order.
         sources.sort_unstable_by_key(|(key, _)| *key);
-        DiagnosticUpdate { files, sources }
+        DiagnosticUpdate { files, sources, unanalyzed: HashSet::default() }
     }
 }
 
@@ -81,9 +86,10 @@ impl DiagnosticUpdate {
     ) -> impl Iterator<Item = &'a Issue> {
         let visible = |key: SourceKey, issue: &Issue| {
             !matches!(key, SourceKey::Analyzer(..))
-                || !ignores.is_ignored(issue, |file| {
-                    database.get_ref(&file).ok().map(|file| String::from_utf8_lossy(&file.name).into_owned())
-                })
+                || (!primary_annotation(issue).is_some_and(|primary| self.unanalyzed.contains(&primary.span.file_id))
+                    && !ignores.is_ignored(issue, |file| {
+                        database.get_ref(&file).ok().map(|file| String::from_utf8_lossy(&file.name).into_owned())
+                    }))
         };
         // Keep recovery data for queries, but hide a file's analyzer diagnostics while parser errors are visible.
         let parse_errors: HashSet<_> = self

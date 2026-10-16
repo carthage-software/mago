@@ -87,6 +87,7 @@ async fn failed_analysis_clears_diagnostics_and_retries_unchanged_save() {
                     linter: Default::default(),
                     formatter: Default::default(),
                     plugin_registry: Arc::new(plugins),
+                    excludes: mago_server::Excludes::default(),
                 },
             );
             server.analyze_without_collecting().unwrap();

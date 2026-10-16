@@ -7,6 +7,7 @@ use mago_database::DatabaseReader;
 use mago_database::file::File;
 use mago_database::file::FileId;
 use mago_database::file::FileType;
+use mago_database::membership::PathExclusions;
 use mago_syntax::settings::ParserSettings;
 use rayon::prelude::*;
 use xxhash_rust::xxh3::xxh3_64;
@@ -19,9 +20,11 @@ use crate::linter::LinterContext;
 pub(crate) struct FileAnalyses {
     entries: HashMap<FileId, CachedAnalysis>,
     linter: LinterContext,
-    /// The analyzer reports syntax and semantic issues when enabled. Otherwise
-    /// the file pass owns those checks, even when lint rules are disabled.
-    with_semantics: bool,
+    /// The analyzer reports syntax and semantic issues for the files it covers.
+    /// The file pass owns those checks for the rest, even when lint rules are
+    /// disabled, unless a file is excluded from both the analyzer and the linter.
+    analyzer: bool,
+    analyzer_excludes: PathExclusions,
 }
 
 struct CachedAnalysis {
@@ -30,8 +33,8 @@ struct CachedAnalysis {
 }
 
 impl FileAnalyses {
-    pub(crate) fn new(linter: LinterContext, with_semantics: bool) -> Self {
-        Self { entries: HashMap::default(), linter, with_semantics }
+    pub(crate) fn new(linter: LinterContext, analyzer: bool, analyzer_excludes: PathExclusions) -> Self {
+        Self { entries: HashMap::default(), linter, analyzer, analyzer_excludes }
     }
 
     pub(crate) fn parser_settings(&self) -> ParserSettings {
@@ -63,9 +66,33 @@ impl FileAnalyses {
     /// Query-only data stays lazy. Diagnostic providers need fresh host results
     /// before the caller publishes issues.
     pub(crate) fn refresh_diagnostics(&mut self, database: &impl DatabaseReader, files: &[FileId]) {
-        if self.linter.registry.is_some() || self.with_semantics {
-            self.refresh(database, files);
+        if !self.reports_any() {
+            return;
         }
+        for &id in files {
+            let Ok(file) = database.get(&id) else {
+                self.entries.remove(&id);
+                continue;
+            };
+            if file.file_type == FileType::Host && self.reports(&file) {
+                let entry = self.build(&file, xxh3_64(&file.contents));
+                self.entries.insert(id, entry);
+            }
+        }
+    }
+
+    /// Whether any host file can have file-pass diagnostics.
+    pub(crate) fn reports_any(&self) -> bool {
+        self.linter.registry.is_some() || !self.analyzer || !self.analyzer_excludes.is_empty()
+    }
+
+    fn reports(&self, file: &File) -> bool {
+        self.linter.registry_for(file).is_some() || self.with_semantics(file)
+    }
+
+    fn with_semantics(&self, file: &File) -> bool {
+        let unanalyzed = self.analyzer_excludes.excludes_file(file);
+        (!self.analyzer || unanalyzed) && !(unanalyzed && self.linter.excludes.excludes_file(file))
     }
 
     pub(crate) fn refresh(&mut self, database: &impl DatabaseReader, files: &[FileId]) {
@@ -82,7 +109,7 @@ impl FileAnalyses {
     }
 
     pub(crate) fn refresh_all(&mut self, database: &impl DatabaseReader) {
-        let files: Vec<_> = database.files_with_type(FileType::Host).collect();
+        let files: Vec<_> = database.files_with_type(FileType::Host).filter(|file| self.reports(file)).collect();
         let entries: Vec<_> =
             files.into_par_iter().map(|file| (file.id, self.build(&file, xxh3_64(&file.contents)))).collect();
         self.entries.extend(entries);
@@ -97,6 +124,7 @@ impl FileAnalyses {
     }
 
     fn build(&self, file: &File, contents_hash: u64) -> CachedAnalysis {
-        CachedAnalysis { contents_hash, analysis: Arc::new(super::build(file, &self.linter, self.with_semantics)) }
+        let analysis = super::build(file, &self.linter, self.with_semantics(file));
+        CachedAnalysis { contents_hash, analysis: Arc::new(analysis) }
     }
 }

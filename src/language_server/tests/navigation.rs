@@ -190,3 +190,76 @@ async fn member_references_work_from_calls_and_declarations_across_files() {
         }
     }
 }
+
+#[tokio::test]
+async fn constructor_and_invoke_references_include_implicit_calls() {
+    let declarations = "<?php\nclass Base { public function __construct(int $value) {} }\nclass Child extends Base {}\nclass Own extends Base { public function __construct() { parent::__construct(1); } }\nfinal class Handler { public function __invoke(int $value): int { return $value; } }\nfinal class Other { public function __invoke(): void {} }\n";
+    let calls = "<?php\nfunction make(Handler $handler, ?Handler $maybe, Other $other): void {\n    new Base(1);\n    new Child(2);\n    new Own();\n    $handler(3);\n    $handler->__invoke(4);\n    $maybe(5);\n    $other();\n}\n";
+    let mut h = Harness::start(&[("defs.php", declarations), ("calls.php", calls)]).await;
+    let at = |source: &str, needle: &str| {
+        let offset = source.find(needle).unwrap();
+        let line = source[..offset].matches('\n').count();
+        (line as u32, (offset - source[..offset].rfind('\n').map_or(0, |newline| newline + 1)) as u32)
+    };
+    for (file, source, needle, expected) in [
+        (
+            "defs.php",
+            declarations,
+            "__construct(int",
+            vec![
+                ("defs.php", at(declarations, "__construct(int")),
+                ("defs.php", at(declarations, "__construct(1)")),
+                ("calls.php", at(calls, "Base(1)")),
+                ("calls.php", at(calls, "Child(2)")),
+            ],
+        ),
+        (
+            "defs.php",
+            declarations,
+            "__construct() {",
+            vec![("defs.php", at(declarations, "__construct() {")), ("calls.php", at(calls, "Own()"))],
+        ),
+        (
+            "calls.php",
+            calls,
+            "__invoke(4)",
+            vec![
+                ("defs.php", at(declarations, "__invoke(int")),
+                ("calls.php", at(calls, "$handler(3)")),
+                ("calls.php", at(calls, "__invoke(4)")),
+                ("calls.php", at(calls, "$maybe(5)")),
+            ],
+        ),
+    ] {
+        let (line, character) = at(source, needle);
+        let result = h
+            .request(
+                "textDocument/references",
+                json!({
+                    "textDocument": { "uri": h.url(file) }, "position": { "line": line, "character": character },
+                    "context": { "includeDeclaration": true }
+                }),
+            )
+            .await;
+        let mut found: Vec<_> = result
+            .as_array()
+            .unwrap()
+            .iter()
+            .map(|location| {
+                let start = &location["range"]["start"];
+                (
+                    location["uri"].as_str().unwrap().to_owned(),
+                    start["line"].as_u64().unwrap(),
+                    start["character"].as_u64().unwrap(),
+                )
+            })
+            .collect();
+        found.sort_unstable();
+        let mut expected: Vec<_> = expected
+            .into_iter()
+            .map(|(file, (line, character))| (h.url(file), u64::from(line), u64::from(character)))
+            .collect();
+        expected.sort_unstable();
+        assert_eq!(found, expected, "{needle}: {result}");
+    }
+}

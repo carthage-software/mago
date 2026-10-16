@@ -11,6 +11,7 @@ use mago_codex::reference::SymbolReferences;
 use mago_database::Database;
 use mago_database::DatabaseReader;
 use mago_database::file::{File, FileId};
+use mago_database::membership::PathExclusions;
 use mago_formatter::settings::FormatSettings;
 use mago_orchestrator::service::incremental_analysis::IncrementalAnalysisService;
 use mago_php_version::PHPVersion;
@@ -40,6 +41,8 @@ pub struct Server {
     pub(crate) formatter: FormatSettings,
     pub(crate) formatter_enabled: bool,
     analyzer_enabled: bool,
+    analyzer_excludes: PathExclusions,
+    pub(crate) formatter_excludes: PathExclusions,
     file_analyses: FileAnalyses,
     pub(crate) call_graph: Option<CallGraph>,
 }
@@ -57,7 +60,8 @@ impl Server {
         symbol_references: SymbolReferences,
         settings: Settings,
     ) -> Self {
-        let Settings { php_version, features, mut parser, analyzer, linter, formatter, plugin_registry } = settings;
+        let Settings { php_version, features, mut parser, analyzer, linter, formatter, plugin_registry, excludes } =
+            settings;
         parser.recover_incomplete = true;
 
         let mut service = IncrementalAnalysisService::new(
@@ -71,7 +75,8 @@ impl Server {
         service.set_editor_artifacts(features.analyzer);
         service.set_scan_only(!features.analyzer);
 
-        let file_analyses = FileAnalyses::new(LinterContext::new(linter, parser, features.linter), !features.analyzer);
+        let linter = LinterContext::new(linter, parser, features.linter).with_excludes(excludes.linter);
+        let file_analyses = FileAnalyses::new(linter, features.analyzer, excludes.analyzer.clone());
 
         Self {
             database,
@@ -81,6 +86,8 @@ impl Server {
             formatter,
             formatter_enabled: features.formatter,
             analyzer_enabled: features.analyzer,
+            analyzer_excludes: excludes.analyzer,
+            formatter_excludes: excludes.formatter,
             file_analyses,
             call_graph: None,
         }
@@ -134,6 +141,19 @@ impl Server {
     /// Borrows cached analyzer issues from the last analysis pass.
     pub fn analyzer_issues(&self) -> impl Iterator<Item = &IssueCollection> + '_ {
         self.service.issue_collections().filter(|_| self.analyzer_enabled)
+    }
+
+    /// Whether analyzer diagnostics and fixes are withheld from `file`.
+    #[must_use]
+    pub fn excludes_analyzer_issues(&self, file: FileId) -> bool {
+        !self.analyzer_excludes.is_empty()
+            && self.database.get_ref(&file).is_ok_and(|file| self.analyzer_excludes.excludes_file(file))
+    }
+
+    /// Whether host files need a file pass to publish diagnostics.
+    #[must_use]
+    pub fn reports_file_diagnostics(&self) -> bool {
+        self.file_analyses.reports_any()
     }
 
     /// Shares analyzer issue sets, keyed by owning file and issue source.
@@ -233,7 +253,7 @@ impl Server {
         self.file_analyses.refresh(&self.database, file_ids);
     }
 
-    /// Build analyses for every host file in the database.
+    /// Build analyses for every host file whose diagnostics come from the file pass.
     pub fn refresh_all_host_analyses(&mut self) {
         self.call_graph = None;
         self.file_analyses.refresh_all(&self.database);

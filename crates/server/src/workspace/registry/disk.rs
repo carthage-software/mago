@@ -71,6 +71,7 @@ fn prepare_paths<K>(
 ) -> Vec<PathBuf> {
     let mut covered = HashSet::default();
     let mut missing_roots = HashSet::default();
+    let mut matched = HashSet::default();
     let mut readable = Vec::new();
     for path in paths {
         let document = DocumentPath::new(path);
@@ -81,10 +82,20 @@ fn prepare_paths<K>(
         if is_missing(path) {
             if let Some(file) = loaded {
                 remove_file(workspace, &file, open, changed);
-            } else if !workspace.matcher.is_excluded(path) && !workspace.matcher.is_excluded(document.resolved()) {
-                // A missing external target may still belong to a loaded package symlink.
-                missing_roots.insert(path.clone());
-                missing_roots.insert(document.resolved().to_path_buf());
+            } else {
+                match missing_path(workspace, path, document.resolved()) {
+                    MissingPath::Root => {
+                        // A missing external target may still belong to a loaded package symlink.
+                        missing_roots.insert(path.clone());
+                        missing_roots.insert(document.resolved().to_path_buf());
+                    }
+                    MissingPath::Matched => {
+                        matched.insert(path.clone());
+                        matched.insert(document.resolved().to_path_buf());
+                        continue;
+                    }
+                    MissingPath::Excluded => continue,
+                }
             }
         } else if path.is_dir() {
             if !workspace.matcher.can_contain_files(path) {
@@ -106,6 +117,13 @@ fn prepare_paths<K>(
         }
         covered.insert(path.clone());
         covered.insert(document.resolved().to_path_buf());
+    }
+    if !matched.is_empty() {
+        for file in workspace.database().files() {
+            let Some(path) = file.path.as_deref() else { continue };
+            missing_roots
+                .extend(path.ancestors().skip(1).filter(|ancestor| matched.contains(*ancestor)).map(Path::to_path_buf));
+        }
     }
     if !missing_roots.is_empty() {
         // Deleted unknown paths may be directories. Check loaded children once for the whole batch.
@@ -129,6 +147,28 @@ fn prepare_paths<K>(
         }
     }
     readable
+}
+
+/// How a missing path that was not loaded itself takes part in cleanup.
+enum MissingPath {
+    /// It may have been a directory or a package symlink target with loaded files.
+    Root,
+    /// A file glob matches it. A glob never excludes a directory, so it was one only
+    /// if loaded files lie below it, which one pass over loaded paths decides per batch.
+    Matched,
+    /// A path exclusion covers it, so nothing below it was loaded.
+    Excluded,
+}
+
+fn missing_path<K>(workspace: &Workspace<K>, path: &Path, resolved: &Path) -> MissingPath {
+    let matcher = &workspace.matcher;
+    if matcher.excludes_directory(path) || matcher.excludes_directory(resolved) {
+        MissingPath::Excluded
+    } else if matcher.is_excluded(path) || matcher.is_excluded(resolved) {
+        MissingPath::Matched
+    } else {
+        MissingPath::Root
+    }
 }
 
 fn is_missing(path: &Path) -> bool {

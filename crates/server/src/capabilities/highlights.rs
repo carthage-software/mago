@@ -1,9 +1,11 @@
 //! Highlights for one file's lexical binding or known member declaration.
 
+use mago_database::DatabaseReader;
 use mago_database::file::FileId;
 
 use crate::Range;
 use crate::Server;
+use crate::call_analysis::ImplicitCalls;
 use crate::semantic_index::SymbolKind;
 use crate::symbol_resolution::{declared_member_at, members_at, methods_at};
 
@@ -61,6 +63,17 @@ impl Server {
                         kind: if row.write { HighlightKind::Write } else { HighlightKind::Read },
                     });
                 }
+            }
+            let implicit = ImplicitCalls::of(self.database(), &targets);
+            if !implicit.is_empty()
+                && let Some(analysis) = self.file_analysis_for(file)
+                && let Ok(source) = self.database().get(&file)
+            {
+                out.extend(
+                    implicit
+                        .ranges(self.codebase(), &source, &analysis, Some(&editor), &targets, true)
+                        .map(|range| Highlight { range, kind: HighlightKind::Read }),
+                );
             }
         }
         if !targets.is_empty() {

@@ -9,6 +9,7 @@ use std::sync::Arc;
 
 use mago_analyzer::plugin::PluginRegistry;
 use mago_analyzer::settings::Settings as AnalyzerSettings;
+use mago_database::membership::PathExclusions;
 use mago_formatter::settings::FormatSettings;
 use mago_linter::settings::Settings as LinterSettings;
 use mago_php_version::PHPVersion;
@@ -54,4 +55,20 @@ pub struct Settings {
     /// The analyzer plugin registry, built once by the caller. Shared so it can
     /// be reused across workspaces.
     pub plugin_registry: Arc<PluginRegistry>,
+    /// Files each subsystem leaves alone.
+    pub excludes: Excludes,
+}
+
+/// Host files kept out of one subsystem, like the CLI's per-tool `excludes`.
+///
+/// Excluded files stay in the workspace: queries still navigate them, and the
+/// analyzer still infers their types. Only that subsystem's output is withheld.
+#[derive(Debug, Clone, Default)]
+pub struct Excludes {
+    /// No analyzer diagnostics or fixes.
+    pub analyzer: PathExclusions,
+    /// No lint rules or fixes.
+    pub linter: PathExclusions,
+    /// No formatting edits.
+    pub formatter: PathExclusions,
 }

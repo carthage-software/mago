@@ -33,7 +33,7 @@ impl DirectoryAliases {
             && path.is_symlink()
             && matcher.watch_roots().any(|root| path.starts_with(root))
             && matcher.can_contain_files(path)
-            && !matcher.is_excluded(DocumentPath::new(path).resolved())
+            && !matcher.excludes_directory(DocumentPath::new(path).resolved())
         {
             self.links.insert(path.to_path_buf());
         }
@@ -53,12 +53,12 @@ impl DirectoryAliases {
         self.links.retain(|link| {
             if !link.is_symlink()
                 || !matcher.watch_roots().any(|root| link.starts_with(root))
-                || matcher.is_excluded(link)
+                || !matcher.can_contain_files(link)
             {
                 return false;
             }
             let target = DocumentPath::new(link);
-            if matcher.is_excluded(target.resolved()) {
+            if matcher.excludes_directory(target.resolved()) {
                 return false;
             }
             for document in &documents {

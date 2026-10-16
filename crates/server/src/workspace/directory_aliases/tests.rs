@@ -49,6 +49,30 @@ fn aliases_follow_current_targets_and_release_removed_or_excluded_links() {
 }
 
 #[test]
+fn file_globs_never_release_directory_aliases() {
+    let workspace = tempfile::tempdir().unwrap();
+    let external = tempfile::tempdir().unwrap();
+    let root = workspace.path().canonicalize().unwrap();
+    let target = external.path().canonicalize().unwrap();
+    std::fs::create_dir_all(root.join("vendor")).unwrap();
+    let link = root.join("vendor/package");
+    std::os::unix::fs::symlink(&target, &link).unwrap();
+    let mut configuration = DatabaseConfiguration::new(&root, vec![b"src"], vec![b"vendor"], vec![], vec![]);
+    configuration.excludes.push(Exclusion::Pattern(Cow::Borrowed("**/package")));
+    let matcher = WorkspaceMatcher::from_configuration(&configuration).unwrap();
+    let mut aliases = DirectoryAliases::default();
+    aliases.observe_directory(&link, &matcher);
+    assert_eq!(aliases.links.len(), 1);
+
+    let created = target.join("New.php");
+    let mut paths = Cow::Owned(vec![created]);
+    aliases.translate_events(&matcher, &mut paths, &mut Cow::Owned(HashSet::default()));
+    assert!(paths.contains(&link.join("New.php")));
+    assert_eq!(aliases.links.len(), 1);
+    assert_eq!(matcher.classify(&link.join("New.php")), Some(mago_database::file::FileType::Vendored));
+}
+
+#[test]
 fn dangling_aliases_respect_lexical_and_resolved_exclusions() {
     let workspace = tempfile::tempdir().unwrap();
     let external = tempfile::tempdir().unwrap();

@@ -6,6 +6,7 @@ use mago_database::file::FileType;
 
 use crate::Range;
 use crate::Server;
+use crate::call_analysis::ImplicitCalls;
 use crate::domain::SymbolLocation;
 use crate::semantic_index::SymbolKind;
 use crate::symbol_resolution::{
@@ -31,8 +32,19 @@ impl Server {
                     range: Range::new(span.start.offset, span.end.offset),
                 }));
             }
-            for file in self.database().files().filter(|file| file.file_type == FileType::Host) {
+            let implicit = ImplicitCalls::of(self.database(), &targets);
+            let files: Vec<_> = self.database().files().filter(|file| file.file_type == FileType::Host).collect();
+            for file in files {
                 let Some(editor) = self.editor_file(file.id) else { continue };
+                if !implicit.is_empty()
+                    && let Some(analysis) = self.file_analysis_for(file.id)
+                {
+                    locations.extend(
+                        implicit
+                            .ranges(self.codebase(), &file, &analysis, Some(&editor), &targets, false)
+                            .map(|range| SymbolLocation { file: file.id, range }),
+                    );
+                }
                 locations.extend(
                     editor
                         .methods
