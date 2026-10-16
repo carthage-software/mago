@@ -1954,13 +1954,8 @@ fn record_method_throws<'ctx, A>(
 
     let has_only_inherited_throws = method_metadata.thrown_types.iter().all(|thrown_type| thrown_type.inferred);
     // A final class fixes this implementation, so inherited throw contracts do not apply here.
-    let is_final_local_implementation = class_metadata.flags.is_final()
-        && context
-            .codebase
-            .get_declaring_method_class(class_name.as_bytes(), method_name)
-            .is_some_and(|declaring_class| declaring_class == class_metadata.name)
-        && has_only_inherited_throws;
-    let thrown_types: &[_] = if is_final_local_implementation {
+    let is_final_implementation = class_metadata.flags.is_final() && has_only_inherited_throws;
+    let thrown_types: &[_] = if is_final_implementation {
         &[]
     } else {
         context.codebase.get_function_like_thrown_types(Some(class_metadata), method_metadata)

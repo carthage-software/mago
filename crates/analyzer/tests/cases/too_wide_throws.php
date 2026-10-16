@@ -296,6 +296,19 @@ final class TooWideFinalNonThrowingAggregate implements IteratorAggregate
     }
 }
 
+/** @implements IteratorAggregate<int, string> */
+class TooWideBaseNonThrowingAggregate implements IteratorAggregate
+{
+    public function getIterator(): TooWideNonThrowingIterator
+    {
+        return new TooWideNonThrowingIterator();
+    }
+}
+
+final class TooWideFinalInheritedNonThrowingAggregate extends TooWideBaseNonThrowingAggregate
+{
+}
+
 /**
  * @throws TooWideChildFailure
  */
@@ -418,6 +431,14 @@ function too_wide_throws_from_final_non_throwing_iterator_aggregate(TooWideFinal
     }
 }
 
+/** @throws Exception */
+function too_wide_throws_from_final_inherited_non_throwing_iterator_aggregate(
+    TooWideFinalInheritedNonThrowingAggregate $aggregate,
+): void {
+    foreach ($aggregate as $value) {
+    }
+}
+
 /**
  * @throws TooWideKeyFailure
  */
@@ -521,7 +542,7 @@ function too_wide_throws_from_callback_variable(): void
         throw new TooWideOtherFailure();
     };
 
-    $values = [];
+    $values = [1, 2];
     usort($values, $comparator);
 }
 
@@ -536,5 +557,18 @@ function too_wide_throws_from_array_map_callback(): void
             throw new TooWideOtherFailure();
         },
         [1],
+    );
+}
+
+/** @throws TooWideOtherFailure */
+function too_wide_throws_from_preg_replace_callback_array(): void
+{
+    preg_replace_callback_array(
+        [
+            '/.*/' => /** @throws TooWideOtherFailure */ static function (array $matches): string {
+                throw new TooWideOtherFailure();
+            },
+        ],
+        'value',
     );
 }

@@ -36,6 +36,7 @@ use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
+use mago_span::Span;
 use mago_syntax::cst::Argument;
 use mago_syntax::cst::BinaryOperator;
 use mago_syntax::cst::Expression;
@@ -448,39 +449,86 @@ fn record_immediate_callback_throw_types<'ctx, 'arena, A>(
         TAtomic::Callable(TCallable::Signature(signature)) => signature.source,
         _ => None,
     }) {
-        let Some(callback_metadata) = context.codebase.get_function_like(&callable) else {
+        record_callback_throw_types(context, block_context, callable, invocation.span);
+    }
+
+    if !matches!(identifier, FunctionLikeIdentifier::Function(name) if name.as_bytes() == b"preg_replace_callback_array") {
+        return;
+    }
+
+    for atomic in callback_type.types.iter() {
+        let TAtomic::Array(array) = atomic else {
             continue;
         };
 
-        let class_like = match callable {
-            FunctionLikeIdentifier::Method(class_name, _) => context.codebase.get_class_like(class_name.as_bytes()),
-            FunctionLikeIdentifier::Function(_) | FunctionLikeIdentifier::Closure(_) => None,
+        let callback_types = match array {
+            TArray::List(list) => {
+                let mut unions = vec![list.element_type.as_ref()];
+                if let Some(known_elements) = &list.known_elements {
+                    unions.extend(known_elements.values().map(|(_, element)| element));
+                }
+                unions
+            }
+            TArray::Keyed(keyed) => {
+                let mut unions = Vec::new();
+                if let Some((_, value_type)) = &keyed.parameters {
+                    unions.push(value_type.as_ref());
+                }
+                if let Some(known_items) = &keyed.known_items {
+                    unions.extend(known_items.values().map(|(_, item)| item));
+                }
+                unions
+            }
         };
 
-        for thrown_type in context.codebase.get_function_like_thrown_types(class_like, callback_metadata) {
-            for atomic_type in thrown_type.type_union.types.iter() {
-                if !atomic_type.extends_or_implements(context.codebase, b"Throwable") {
-                    continue;
-                }
+        for callback_type in callback_types {
+            for callable in callback_type.types.iter().filter_map(|atomic| match atomic {
+                TAtomic::Callable(TCallable::Alias(identifier)) => Some(*identifier),
+                TAtomic::Callable(TCallable::Signature(signature)) => signature.source,
+                _ => None,
+            }) {
+                record_callback_throw_types(context, block_context, callable, invocation.span);
+            }
+        }
+    }
+}
 
-                for thrown_atomic in get_throw_type_atomics(atomic_type) {
-                    if matches!(&thrown_atomic, TAtomic::GenericParameter(_))
-                        && thrown_atomic.extends_or_implements(context.codebase, b"Throwable")
-                    {
-                        let thrown_generic = PossiblyThrownGenericException {
-                            object_names: get_throw_type_object_names(context.codebase, &thrown_atomic),
-                            atomic_type: thrown_atomic,
-                            span: invocation.span,
-                        };
-                        block_context.possibly_thrown_generic_exceptions.insert(thrown_generic);
-                    } else {
-                        for exception in thrown_atomic.get_all_object_names() {
-                            block_context
-                                .possibly_thrown_exceptions
-                                .entry(exception)
-                                .or_default()
-                                .insert(invocation.span);
-                        }
+fn record_callback_throw_types<'ctx, A>(
+    context: &Context<'ctx, '_, A>,
+    block_context: &mut BlockContext<'ctx>,
+    callable: FunctionLikeIdentifier,
+    span: Span,
+) where
+    A: Arena,
+{
+    let Some(callback_metadata) = context.codebase.get_function_like(&callable) else {
+        return;
+    };
+
+    let class_like = match callable {
+        FunctionLikeIdentifier::Method(class_name, _) => context.codebase.get_class_like(class_name.as_bytes()),
+        FunctionLikeIdentifier::Function(_) | FunctionLikeIdentifier::Closure(_) => None,
+    };
+
+    for thrown_type in context.codebase.get_function_like_thrown_types(class_like, callback_metadata) {
+        for atomic_type in thrown_type.type_union.types.iter() {
+            if !atomic_type.extends_or_implements(context.codebase, b"Throwable") {
+                continue;
+            }
+
+            for thrown_atomic in get_throw_type_atomics(atomic_type) {
+                if matches!(&thrown_atomic, TAtomic::GenericParameter(_))
+                    && thrown_atomic.extends_or_implements(context.codebase, b"Throwable")
+                {
+                    let thrown_generic = PossiblyThrownGenericException {
+                        object_names: get_throw_type_object_names(context.codebase, &thrown_atomic),
+                        atomic_type: thrown_atomic,
+                        span,
+                    };
+                    block_context.possibly_thrown_generic_exceptions.insert(thrown_generic);
+                } else {
+                    for exception in thrown_atomic.get_all_object_names() {
+                        block_context.possibly_thrown_exceptions.entry(exception).or_default().insert(span);
                     }
                 }
             }
@@ -507,7 +555,7 @@ fn immediate_callback_parameter_offset(identifier: &FunctionLikeIdentifier) -> O
         | b"uasort"
         | b"uksort"
         | b"usort" => Some(1),
-        b"array_map" => Some(0),
+        b"array_map" | b"preg_replace_callback_array" => Some(0),
         b"call_user_func" | b"call_user_func_array" | b"forward_static_call" | b"forward_static_call_array" => Some(0),
         _ => None,
     }

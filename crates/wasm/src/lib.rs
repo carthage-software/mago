@@ -32,7 +32,8 @@ use mago_syntax::parser::parse_file;
 use mago_syntax::settings::ParserSettings;
 
 use crate::types::IssueSource;
-use crate::types::WasmAnalyzerSettings;
+#[doc(hidden)]
+pub use crate::types::WasmAnalyzerSettings;
 use crate::types::WasmIntegrationInfo;
 use crate::types::WasmIssue;
 use crate::types::WasmPluginInfo;
@@ -86,7 +87,8 @@ fn issue_key(issue: &WasmIssue) -> Option<(String, u32, u32)> {
     Some((code.clone(), ann.start_line, ann.start_column))
 }
 
-fn build_analyzer_settings(settings: &WasmAnalyzerSettings, version: PHPVersion) -> AnalyzerSettings {
+#[doc(hidden)]
+pub fn build_analyzer_settings(settings: &WasmAnalyzerSettings, version: PHPVersion) -> AnalyzerSettings {
     AnalyzerSettings {
         version,
         find_unused_expressions: settings.find_unused_expressions,
@@ -510,7 +512,6 @@ mod tests {
             r#"{
                 "analyzer": {
                     "findOverlyWideReturnTypes": true,
-                    "findOverlyWideThrowTypes": true,
                     "allowImplicitPipeCallableTypes": true,
                     "allowSideEffectsInConditions": false
                 }
@@ -523,7 +524,6 @@ mod tests {
         let analyzer_settings = build_analyzer_settings(&settings.analyzer, PHPVersion::PHP85);
 
         assert!(analyzer_settings.find_overly_wide_return_types);
-        assert!(analyzer_settings.find_overly_wide_throw_types);
         assert!(analyzer_settings.allow_implicit_pipe_callable_types);
         assert!(!analyzer_settings.allow_side_effects_in_conditions);
     }

@@ -580,8 +580,6 @@ impl Default for AnalyzerConfiguration {
 
 #[cfg(test)]
 mod tests {
-    use clap::ColorChoice;
-    use mago_php_version::PHPVersion;
     use mago_reporting::IgnoreEntry;
 
     use super::AnalyzerConfiguration;
@@ -611,19 +609,4 @@ ignore = [
         );
     }
 
-    #[test]
-    fn overly_wide_throw_types_defaults_to_false() {
-        let configuration: AnalyzerConfiguration = toml::from_str("").unwrap();
-
-        assert!(!configuration.find_overly_wide_throw_types);
-        assert!(!configuration.to_settings(PHPVersion::PHP85, ColorChoice::Never, false).find_overly_wide_throw_types);
-    }
-
-    #[test]
-    fn overly_wide_throw_types_can_be_enabled_in_configuration() {
-        let configuration: AnalyzerConfiguration = toml::from_str("find-overly-wide-throw-types = true").unwrap();
-
-        assert!(configuration.find_overly_wide_throw_types);
-        assert!(configuration.to_settings(PHPVersion::PHP85, ColorChoice::Never, false).find_overly_wide_throw_types);
-    }
 }

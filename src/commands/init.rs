@@ -43,6 +43,7 @@ use dialoguer::Select;
 use dialoguer::console::style;
 use dialoguer::theme::ColorfulTheme;
 
+use mago::init_presets::AnalyzerStrictnessPreset;
 use mago_composer::AutoloadPsr4value;
 use mago_composer::ComposerPackage;
 use mago_composer::ComposerPackageAutoloadDevPsr4value;
@@ -92,119 +93,91 @@ impl AnalyzerPlugin {
     }
 }
 
-/// Strictness presets for the analyzer configuration.
-///
-/// These presets provide pre-configured sets of analyzer settings ranging from
-/// minimal checks (suitable for legacy codebases) to maximum strictness.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
-enum AnalyzerStrictnessPreset {
-    /// Minimal checks, good for legacy codebases or gradual adoption
-    Relaxed,
-    /// Sensible defaults for most projects (default)
-    #[default]
-    Balanced,
-    /// Enable most checks for clean, well-maintained codebases
-    Strict,
-    /// All checks enabled, strictest possible settings
-    Maximum,
-}
-
-impl std::fmt::Display for AnalyzerStrictnessPreset {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Self::Relaxed => write!(f, "Relaxed - Minimal checks, good for legacy codebases"),
-            Self::Balanced => write!(f, "Balanced - Sensible defaults for most projects"),
-            Self::Strict => write!(f, "Strict - Enable most checks for clean codebases"),
-            Self::Maximum => write!(f, "Maximum - All checks enabled, strictest settings"),
-        }
-    }
-}
-
-impl AnalyzerStrictnessPreset {
-    /// Converts this preset to concrete analyzer settings.
-    fn to_settings(self, plugins: Vec<AnalyzerPlugin>) -> InitializationAnalyzerSettings {
-        match self {
-            Self::Relaxed => InitializationAnalyzerSettings {
-                plugins,
-                find_unused_definitions: false,
-                find_unused_expressions: false,
-                analyze_dead_code: false,
-                check_throws: false,
-                find_overly_wide_throw_types: false,
-                check_dead_catch: false,
-                allow_possibly_undefined_array_keys: true,
-                check_missing_override: false,
-                find_unused_parameters: false,
-                memoize_properties: true,
-                strict_list_index_checks: false,
-                strict_array_index_existence: false,
-                allow_array_truthy_operand: false,
-                allow_operator_overloading: false,
-                no_boolean_literal_comparison: false,
-                check_missing_type_hints: false,
-                register_super_globals: true,
-            },
-            Self::Balanced => InitializationAnalyzerSettings {
-                plugins,
-                find_unused_definitions: true,
-                find_unused_expressions: false,
-                analyze_dead_code: false,
-                check_throws: false,
-                find_overly_wide_throw_types: false,
-                check_dead_catch: false,
-                allow_possibly_undefined_array_keys: true,
-                check_missing_override: false,
-                find_unused_parameters: false,
-                memoize_properties: true,
-                strict_list_index_checks: false,
-                strict_array_index_existence: false,
-                allow_array_truthy_operand: false,
-                allow_operator_overloading: false,
-                no_boolean_literal_comparison: false,
-                check_missing_type_hints: false,
-                register_super_globals: true,
-            },
-            Self::Strict => InitializationAnalyzerSettings {
-                plugins,
-                find_unused_definitions: true,
-                find_unused_expressions: true,
-                analyze_dead_code: false,
-                check_throws: true,
-                find_overly_wide_throw_types: true,
-                check_dead_catch: false,
-                allow_possibly_undefined_array_keys: false,
-                check_missing_override: true,
-                find_unused_parameters: true,
-                memoize_properties: true,
-                strict_list_index_checks: true,
-                strict_array_index_existence: false,
-                allow_array_truthy_operand: false,
-                allow_operator_overloading: false,
-                no_boolean_literal_comparison: false,
-                check_missing_type_hints: false,
-                register_super_globals: true,
-            },
-            Self::Maximum => InitializationAnalyzerSettings {
-                plugins,
-                find_unused_definitions: true,
-                find_unused_expressions: true,
-                analyze_dead_code: true,
-                check_throws: true,
-                find_overly_wide_throw_types: true,
-                check_dead_catch: false,
-                allow_possibly_undefined_array_keys: false,
-                check_missing_override: true,
-                find_unused_parameters: true,
-                memoize_properties: true,
-                strict_list_index_checks: true,
-                strict_array_index_existence: true,
-                allow_array_truthy_operand: false,
-                allow_operator_overloading: false,
-                no_boolean_literal_comparison: true,
-                check_missing_type_hints: true,
-                register_super_globals: true,
-            },
-        }
+fn analyzer_settings_for_preset(
+    preset: AnalyzerStrictnessPreset,
+    plugins: Vec<AnalyzerPlugin>,
+) -> InitializationAnalyzerSettings {
+    match preset {
+        AnalyzerStrictnessPreset::Relaxed => InitializationAnalyzerSettings {
+            plugins,
+            find_unused_definitions: false,
+            find_unused_expressions: false,
+            analyze_dead_code: false,
+            check_throws: false,
+            find_overly_wide_throw_types: preset.find_overly_wide_throw_types(),
+            check_dead_catch: false,
+            allow_possibly_undefined_array_keys: true,
+            check_missing_override: false,
+            find_unused_parameters: false,
+            memoize_properties: true,
+            strict_list_index_checks: false,
+            strict_array_index_existence: false,
+            allow_array_truthy_operand: false,
+            allow_operator_overloading: false,
+            no_boolean_literal_comparison: false,
+            check_missing_type_hints: false,
+            register_super_globals: true,
+        },
+        AnalyzerStrictnessPreset::Balanced => InitializationAnalyzerSettings {
+            plugins,
+            find_unused_definitions: true,
+            find_unused_expressions: false,
+            analyze_dead_code: false,
+            check_throws: false,
+            find_overly_wide_throw_types: preset.find_overly_wide_throw_types(),
+            check_dead_catch: false,
+            allow_possibly_undefined_array_keys: true,
+            check_missing_override: false,
+            find_unused_parameters: false,
+            memoize_properties: true,
+            strict_list_index_checks: false,
+            strict_array_index_existence: false,
+            allow_array_truthy_operand: false,
+            allow_operator_overloading: false,
+            no_boolean_literal_comparison: false,
+            check_missing_type_hints: false,
+            register_super_globals: true,
+        },
+        AnalyzerStrictnessPreset::Strict => InitializationAnalyzerSettings {
+            plugins,
+            find_unused_definitions: true,
+            find_unused_expressions: true,
+            analyze_dead_code: false,
+            check_throws: true,
+            find_overly_wide_throw_types: preset.find_overly_wide_throw_types(),
+            check_dead_catch: false,
+            allow_possibly_undefined_array_keys: false,
+            check_missing_override: true,
+            find_unused_parameters: true,
+            memoize_properties: true,
+            strict_list_index_checks: true,
+            strict_array_index_existence: false,
+            allow_array_truthy_operand: false,
+            allow_operator_overloading: false,
+            no_boolean_literal_comparison: false,
+            check_missing_type_hints: false,
+            register_super_globals: true,
+        },
+        AnalyzerStrictnessPreset::Maximum => InitializationAnalyzerSettings {
+            plugins,
+            find_unused_definitions: true,
+            find_unused_expressions: true,
+            analyze_dead_code: true,
+            check_throws: true,
+            find_overly_wide_throw_types: preset.find_overly_wide_throw_types(),
+            check_dead_catch: false,
+            allow_possibly_undefined_array_keys: false,
+            check_missing_override: true,
+            find_unused_parameters: true,
+            memoize_properties: true,
+            strict_list_index_checks: true,
+            strict_array_index_existence: true,
+            allow_array_truthy_operand: false,
+            allow_operator_overloading: false,
+            no_boolean_literal_comparison: true,
+            check_missing_type_hints: true,
+            register_super_globals: true,
+        },
     }
 }
 
@@ -646,7 +619,7 @@ fn setup_analyzer(theme: &ColorfulTheme) -> Result<InitializationAnalyzerSetting
         .interact()?;
 
     let preset = presets[selection];
-    let mut settings = preset.to_settings(plugins);
+    let mut settings = analyzer_settings_for_preset(preset, plugins);
 
     // Step 3: Optional customization
     println!("  │");
@@ -1165,7 +1138,6 @@ mod tests {
         assert!(output.contains("memoize-properties = true"));
         assert!(output.contains("allow-possibly-undefined-array-keys = true"));
         assert!(output.contains("check-throws = false"));
-        assert!(output.contains("find-overly-wide-throw-types = false"));
         assert!(output.contains("unchecked-exceptions = [\"Error\", \"LogicException\"]"));
         assert!(output.contains("unchecked-exception-classes = []"));
         assert!(output.contains("check-missing-override = false"));
@@ -1179,7 +1151,7 @@ mod tests {
     #[test]
     fn test_analyzer_strictness_presets() {
         // Test Relaxed preset
-        let relaxed = AnalyzerStrictnessPreset::Relaxed.to_settings(vec![]);
+        let relaxed = analyzer_settings_for_preset(AnalyzerStrictnessPreset::Relaxed, vec![]);
         assert!(!relaxed.find_unused_definitions);
         assert!(!relaxed.find_unused_expressions);
         assert!(!relaxed.analyze_dead_code);
@@ -1187,29 +1159,27 @@ mod tests {
         assert!(relaxed.allow_possibly_undefined_array_keys);
 
         // Test Balanced preset
-        let balanced = AnalyzerStrictnessPreset::Balanced.to_settings(vec![]);
+        let balanced = analyzer_settings_for_preset(AnalyzerStrictnessPreset::Balanced, vec![]);
         assert!(balanced.find_unused_definitions);
         assert!(!balanced.find_unused_expressions);
         assert!(!balanced.check_throws);
         assert!(balanced.allow_possibly_undefined_array_keys);
 
         // Test Strict preset
-        let strict = AnalyzerStrictnessPreset::Strict.to_settings(vec![]);
+        let strict = analyzer_settings_for_preset(AnalyzerStrictnessPreset::Strict, vec![]);
         assert!(strict.find_unused_definitions);
         assert!(strict.find_unused_expressions);
         assert!(strict.check_throws);
-        assert!(strict.find_overly_wide_throw_types);
         assert!(!strict.allow_possibly_undefined_array_keys);
         assert!(strict.check_missing_override);
         assert!(strict.find_unused_parameters);
 
         // Test Maximum preset
-        let maximum = AnalyzerStrictnessPreset::Maximum.to_settings(vec![]);
+        let maximum = analyzer_settings_for_preset(AnalyzerStrictnessPreset::Maximum, vec![]);
         assert!(maximum.find_unused_definitions);
         assert!(maximum.find_unused_expressions);
         assert!(maximum.analyze_dead_code);
         assert!(maximum.check_throws);
-        assert!(maximum.find_overly_wide_throw_types);
         assert!(!maximum.allow_possibly_undefined_array_keys);
         assert!(maximum.check_missing_type_hints);
         assert!(maximum.no_boolean_literal_comparison);

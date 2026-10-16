@@ -2904,7 +2904,7 @@ test_case!(issue_2499);
 test_case!(issue_2508);
 test_case!(issue_2520);
 test_case!(issue_2523);
-test_case!(too_wide_throws, expected_issue_counts = [("too-wide-throw-type", 7), ("unhandled-thrown-type", 1)]);
+test_case!(too_wide_throws, expected_issue_counts = [("too-wide-throw-type", 8), ("unhandled-thrown-type", 1)]);
 test_case!(overly_wide_throw_types_disabled, {
     let mut settings = mago_analyzer::settings::Settings::default();
     settings.check_throws = true;
