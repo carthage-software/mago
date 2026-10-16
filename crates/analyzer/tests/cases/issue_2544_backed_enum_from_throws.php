@@ -41,6 +41,14 @@ function fromStatusValueOf(string $value): Issue2544Status
 }
 
 /**
+ * @param value-of<Issue2544Status> $value
+ */
+function fromStatusValueOfNamedArgument(string $value): Issue2544Status
+{
+    return Issue2544Status::from(value: $value);
+}
+
+/**
  * @param value-of<Issue2544Level> $value
  */
 function fromLevelValueOf(int $value): Issue2544Level
@@ -66,6 +74,19 @@ function fromStatusArrayKey(array $counts, string $key): ?Issue2544Status
     }
 
     return Issue2544Status::from($key);
+}
+
+/**
+ * @param array<'open'|'closed', int> $first
+ * @param array<'open'|'other', int> $second
+ */
+function fromStatusMultipleArrayKeys(array $first, array $second, string $key): ?Issue2544Status
+{
+    if (isset($first[$key], $second[$key])) {
+        return Issue2544Status::from($key);
+    }
+
+    return null;
 }
 
 /** @implements ArrayAccess<string, int> */

@@ -196,10 +196,7 @@ where
                         && let Some(key_type) =
                             get_possible_array_key_argument_type(array_type, input_key_type, assertion_context.codebase)
                     {
-                        let key_assertions = if_types.entry(key_id).or_insert_with(|| vec![vec![]]);
-                        for assertion_set in key_assertions {
-                            assertion_set.push(Assertion::InArray(key_type.clone()));
-                        }
+                        if_types.entry(key_id).or_default().push(vec![Assertion::InArray(key_type)]);
                     }
                 }
             }
