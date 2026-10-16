@@ -61,6 +61,7 @@ pub mod workspace;
 pub use domain::CodeActionItem;
 pub use domain::CodeActionKind;
 pub use domain::CodeLensItem;
+pub use domain::CodeLensKind;
 pub use domain::CompletionAlternative;
 pub use domain::CompletionEntry;
 pub use domain::CompletionInsert;

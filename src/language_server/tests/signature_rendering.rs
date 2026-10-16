@@ -23,7 +23,6 @@ async fn parameter_rendering_preserves_each_features_names_and_type_style() {
     let mut h = Harness::start(&[("a.php", &source)]).await;
     let displayed = parameters.replace("array $options", "array<array-key, mixed> $options");
     let hover_parameters = "Item &$名,\n    string $suffix = '😀',\n    array<array-key, mixed> $options = [1, /* keep */ 2],\n    int &...$rest";
-    let qualified = displayed.replacen("Item", "Demo\\Item", 1);
     for (call, hover_prefix, signature_name) in [
         ("inspect($item", "function &inspect", "Demo\\inspect"),
         ("Service::inspect($item", "final public static function &inspect", "Demo\\Service::inspect"),
@@ -39,7 +38,7 @@ async fn parameter_rendering_preserves_each_features_names_and_type_style() {
         );
         let completion = at(&mut h, &source, start + "inspe".len(), "textDocument/completion").await;
         let item = completion["items"].as_array().unwrap().iter().find(|item| item["label"] == "inspect").unwrap();
-        assert_eq!(item["detail"], format!("&inspect({qualified}): Demo\\Item"));
+        assert_eq!(item["detail"], format!("&inspect({displayed}): Item"));
 
         let signature = at(&mut h, &source, start + "inspect($item, ".len(), "textDocument/signatureHelp").await;
         let info = &signature["signatures"][0];
@@ -165,16 +164,17 @@ namespace MagoEditorQa {
         assert_eq!(signature["activeParameter"], 0);
     }
     for (call, prefix, label, expected) in [
-        ("take(value:", "ta", "take", r"take(MagoEditorQa\ChildValue $value): MagoEditorQa\ChildValue"),
+        ("take(value:", "ta", "take", "take(ChildValue $value): ChildValue"),
+        ("Service::send(value:", "Service::se", "send", "send(ChildValue $value): ChildValue"),
+        ("take(value:", "take(va", "value:", "ChildValue $value"),
+        ("Service::send(value:", "Service::send(va", "value:", "ChildValue $value"),
+        ("new Holder(value:", "new Holder(va", "value:", "ChildValue $value"),
         (
-            "Service::send(value:",
-            "Service::se",
-            "send",
-            r"send(MagoEditorQa\ChildValue $value): MagoEditorQa\ChildValue",
+            "compare(left:",
+            "compa",
+            "compare",
+            r"compare(\LeftSide\SharedValue $left, \RightSide\SharedValue $right): \LeftSide\SharedValue",
         ),
-        ("take(value:", "take(va", "value:", r"MagoEditorQa\ChildValue $value"),
-        ("Service::send(value:", "Service::send(va", "value:", r"MagoEditorQa\ChildValue $value"),
-        ("new Holder(value:", "new Holder(va", "value:", r"MagoEditorQa\ChildValue $value"),
     ] {
         let offset = source.find(call).unwrap() + prefix.len();
         let completion = at(&mut h, source, offset, "textDocument/completion").await;
@@ -201,7 +201,7 @@ function inspect(Holder $holder): void {
         let offset = source.find(prefix).unwrap() + prefix.len();
         let completion = at(&mut h, source, offset, "textDocument/completion").await;
         let item = completion["items"].as_array().unwrap().iter().find(|item| item["label"] == label).unwrap();
-        assert_eq!(item["detail"], r"MagoEditorQa\ChildValue", "{prefix}: {item}");
+        assert_eq!(item["detail"], "ChildValue", "{prefix}: {item}");
         assert_eq!(item["textEdit"]["newText"], label, "{prefix}: {item}");
     }
 }

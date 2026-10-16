@@ -151,16 +151,16 @@ async fn code_lenses_resolve_current_references_and_reject_stale_or_invalid_data
     let repeated = h.request("codeLens/resolve", resolved).await;
     assert_eq!(repeated["command"]["title"], "2 references");
 
-    let mut invalid = lens.clone();
-    invalid["data"] = json!({"uri":42});
-    expect_resolve_error(&mut h, invalid, -32602).await;
-    let mut invalid = lens.clone();
-    invalid["range"]["start"]["line"] = json!(u32::MAX);
-    invalid["range"]["end"]["line"] = json!(u32::MAX);
-    expect_resolve_error(&mut h, invalid, -32602).await;
-    let mut invalid = lens.clone();
-    invalid["range"] = json!({"start":{"line":0,"character":0},"end":{"line":0,"character":0}});
-    expect_resolve_error(&mut h, invalid, -32602).await;
+    for data in [json!({"uri":42}), json!({"uri":h.url("a.php"),"content_hash":"0"})] {
+        let mut invalid = lens.clone();
+        invalid["data"] = data;
+        expect_resolve_error(&mut h, invalid, -32602).await;
+    }
+    for start in [json!({"line":u32::MAX,"character":0}), json!({"line":0,"character":0})] {
+        let mut moved = lens.clone();
+        moved["range"] = json!({"start":start,"end":start});
+        assert_eq!(h.request("codeLens/resolve", moved).await, repeated);
+    }
 
     let outside = tempfile::NamedTempFile::new().unwrap();
     for uri in ["https://example.com/a.php".to_owned(), super::harness::url(outside.path())] {
@@ -170,6 +170,82 @@ async fn code_lenses_resolve_current_references_and_reject_stale_or_invalid_data
     }
     h.open("a.php", "<?php class Renamed {}").await;
     expect_resolve_error(&mut h, lens, -32801).await;
+}
+
+#[tokio::test]
+async fn code_lenses_resolve_against_the_current_declaration_after_edits() {
+    let source =
+        "<?php\nclass Target {}\nfunction work(): void {}\nconst LIMIT = 1;\nnew Target(); work(); echo LIMIT;";
+    let edited = "<?php\n// 😀 moved\n\ninterface Other {}\nclass Target {}\nfunction work(): void { echo 1; }\nconst LIMIT = 2;\nnew Target(); new Target(); work(); echo LIMIT, LIMIT;";
+    for hide in [false, true] {
+        let mut config = ServerConfig { linter: false, ..ServerConfig::default() };
+        config.configuration.language_server.hide_zero_reference_code_lenses = hide;
+        let files = [("a.php", source), ("b.php", "<?php new Target(); work();")];
+        let mut h = Harness::start_with(&files, config, json!({})).await;
+        h.open("a.php", source).await;
+        let lenses = h.for_doc("textDocument/codeLens", "a.php").await;
+        let lenses = lenses.as_array().unwrap();
+        assert_eq!(lenses.len(), 3, "{lenses:?}");
+        h.change("a.php", edited, 2).await;
+        for (lens, (needle, count)) in lenses.iter().zip([("Target {}", 3), ("work()", 2), ("LIMIT =", 2)]) {
+            resolve_at(&mut h, "a.php", lens, position_of(edited, needle, 0), count).await;
+        }
+    }
+}
+
+#[tokio::test]
+async fn code_lenses_reject_resolving_renamed_deleted_or_retyped_declarations() {
+    let source = "<?php class Target {} function work(): void {} const LIMIT = 1;";
+    let mut h = Harness::start(&[("a.php", source)]).await;
+    h.open("a.php", source).await;
+    let lenses = h.for_doc("textDocument/codeLens", "a.php").await;
+    let lenses = lenses.as_array().unwrap();
+    assert_eq!(lenses.len(), 3, "{lenses:?}");
+    h.change("a.php", "<?php class Renamed {} const work = 1;", 2).await;
+    for lens in lenses {
+        expect_resolve_error(&mut h, lens.clone(), -32801).await;
+    }
+    h.change("a.php", source, 3).await;
+    for (lens, needle) in lenses.iter().zip(["Target", "work", "LIMIT"]) {
+        resolve_at(&mut h, "a.php", lens, position_of(source, needle, 0), 0).await;
+    }
+}
+
+#[tokio::test]
+async fn code_lenses_resolve_duplicate_declarations_to_their_own_position() {
+    let source = "<?php\nif (A) { function twice(): void {} }\nif (B) { function twice(): void {} }\nif (C) { function twice(): void {} }\ntwice();\n";
+    let gap = source.match_indices("twice()").nth(1).unwrap().0 - source.find("twice()").unwrap();
+    let above = |line: String| source.replacen("<?php\n", &format!("<?php\n{line}\n"), 1);
+    let shifted = above(format!("// {}", "x".repeat(200)));
+    let aligned = above(format!("//{}", "x".repeat(gap - 3)));
+    let surrounded = above(format!("//{}", "x".repeat(97))) + &format!("//{}\n", "x".repeat(57));
+    let pruned = source.replacen("function twice(): void {} ", "", 1);
+    let mut h = Harness::start(&[("a.php", source)]).await;
+    h.open("a.php", source).await;
+    let lenses = h.for_doc("textDocument/codeLens", "a.php").await;
+    let lenses = lenses.as_array().unwrap();
+    assert_eq!(lenses.len(), 3, "{lenses:?}");
+    for (version, edited) in [(2, &shifted), (3, &aligned), (4, &surrounded)] {
+        h.change("a.php", edited, version).await;
+        for (nth, lens) in lenses.iter().enumerate() {
+            resolve_at(&mut h, "a.php", lens, position_of(edited, "twice()", nth), 1).await;
+        }
+    }
+    h.change("a.php", &pruned, 5).await;
+    for (lens, nth) in lenses.iter().zip([0, 0, 1]) {
+        resolve_at(&mut h, "a.php", lens, position_of(&pruned, "twice()", nth), 1).await;
+    }
+}
+
+fn position_of(source: &str, needle: &str, nth: usize) -> Position {
+    let file = File::ephemeral(b"a.php".as_slice().into(), source.as_bytes().to_vec().into());
+    position_at_offset(&file, source.match_indices(needle).nth(nth).unwrap().0 as u32)
+}
+
+async fn resolve_at(h: &mut Harness, path: &str, lens: &Value, position: Position, count: usize) {
+    let resolved = h.request("codeLens/resolve", lens.clone()).await;
+    assert_eq!(resolved["range"], json!({"start":position,"end":position}));
+    check_command(h, path, position, &resolved["command"], count).await;
 }
 
 async fn expect_resolve_error(h: &mut Harness, lens: Value, code: i32) {

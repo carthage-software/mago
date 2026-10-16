@@ -1,6 +1,7 @@
 //! Parameter names at an empty argument slot or within its label.
 
 use mago_bytes::BytesDisplay;
+use mago_codex::ttype::display::NameDisplay;
 use mago_database::file::FileId;
 use mago_php_version::feature::Feature;
 use mago_syntax::token::Token;
@@ -58,6 +59,7 @@ pub(super) fn complete(server: &mut Server, file_id: FileId, lexed: &[Token<'_>]
     {
         return result;
     }
+    let mut call_names = None;
     let mut scored = Vec::new();
     for (index, parameter) in signatures[0].parameters().skip(slot.positional).enumerate() {
         let Some(name) = parameter.declaration.name.0.as_bytes().strip_prefix(b"$") else { continue };
@@ -73,13 +75,15 @@ pub(super) fn complete(server: &mut Server, file_id: FileId, lexed: &[Token<'_>]
             continue;
         }
         let Some(matched) = matcher::score(slot.prefix, name) else { continue };
+        let names =
+            &*call_names.get_or_insert_with(|| super::super::signature::call_type_names(server.codebase(), &targets));
         let alternatives = (signatures.len() > 1).then(|| {
             targets
                 .iter()
                 .zip(&signatures)
                 .filter_map(|(target, signature)| {
                     let parameter = signature.parameter(name)?;
-                    Some(parameter_alternative(server, target, *signature, parameter))
+                    Some(parameter_alternative(server, names, target, *signature, parameter))
                 })
                 .collect::<Vec<_>>()
                 .into_boxed_slice()
@@ -88,7 +92,7 @@ pub(super) fn complete(server: &mut Server, file_id: FileId, lexed: &[Token<'_>]
         let label = format!("{name}:");
         let insert = if slot.colon { name.into_owned() } else { format!("{name}: ") };
         let detail = alternatives.as_ref().and_then(|alternatives| alternatives.first()).map_or_else(
-            || parameter_detail(server, parameter),
+            || parameter_detail(server, names, parameter),
             |alternative| alternative.description.declaration.clone(),
         );
         scored.push((
@@ -110,9 +114,9 @@ pub(super) fn complete(server: &mut Server, file_id: FileId, lexed: &[Token<'_>]
     result
 }
 
-fn parameter_detail(server: &Server, parameter: CallParameter<'_>) -> String {
+fn parameter_detail(server: &Server, names: &NameDisplay<'_>, parameter: CallParameter<'_>) -> String {
     let mut detail = String::new();
-    let displayed_type = parameter.qualified_type_name(server.codebase());
+    let displayed_type = parameter.type_name(Some(names));
     super::super::signature::append_parameter_with_flags(
         &mut detail,
         server.database(),
@@ -125,6 +129,7 @@ fn parameter_detail(server: &Server, parameter: CallParameter<'_>) -> String {
 
 fn parameter_alternative(
     server: &Server,
+    names: &NameDisplay<'_>,
     target: &SignatureTarget,
     signature: CallSignature<'_>,
     parameter: CallParameter<'_>,
@@ -155,13 +160,14 @@ fn parameter_alternative(
     CompletionAlternative {
         description: HoverEntry {
             scope: Some(owner),
-            declaration: parameter_detail(server, parameter),
+            declaration: parameter_detail(server, names, parameter),
             documentation: None,
         },
         documentation_source: Some(CompletionDocumentation::Parameter {
             callable: target.key,
             name: parameter.declaration.name.0,
         }),
+        detail_source: None,
     }
 }
 

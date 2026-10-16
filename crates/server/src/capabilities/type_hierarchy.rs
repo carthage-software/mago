@@ -101,7 +101,7 @@ fn hierarchy_item(codebase: &CodebaseMetadata, key: &[u8]) -> Option<TypeHierarc
             ClassKind::Enum => SymbolKind::Enum,
         },
         file: meta.span.file_id,
-        range: Range::new(meta.span.start.offset, meta.span.end.offset),
+        range: Range::new(selection.start.offset, meta.span.end.offset),
         selection_range: Range::new(selection.start.offset, selection.end.offset),
     })
 }

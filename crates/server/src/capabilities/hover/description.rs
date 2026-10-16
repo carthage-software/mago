@@ -115,14 +115,7 @@ pub(super) fn function_like(
     }
     let name = presentation.map_or(meta.original_name, |method| method.name);
     signature.push_str(&short_name(name.as_bytes()));
-    let names = NameDisplay::for_types(
-        codebase,
-        meta.parameters
-            .iter()
-            .filter_map(|parameter| parameter.type_metadata.as_ref())
-            .chain(meta.return_type_metadata.as_ref())
-            .map(|ty| &ty.type_union),
-    );
+    let names = crate::capabilities::signature::type_names(codebase, meta);
     let mut parameters = Vec::with_capacity(meta.parameters.len());
     for param in &meta.parameters {
         let mut parameter = String::new();
