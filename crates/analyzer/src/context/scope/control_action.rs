@@ -255,7 +255,8 @@ impl ControlAction {
                             // A continue targeting the analyzed switch exits the case instead of continuing locally.
                             match break_type.get(target) {
                                 Some(BreakType::Switch) => {
-                                    control_actions.insert(Self::get_action_for_switch_target(target_switch_index, target));
+                                    control_actions
+                                        .insert(Self::get_action_for_switch_target(target_switch_index, target));
                                 }
                                 _ if count > 1 => {
                                     control_actions.insert(ControlAction::Continue);
@@ -289,9 +290,8 @@ impl ControlAction {
                                 let target = break_type_len - count;
                                 // Preserve transfers to the analyzed switch so its caller can resolve the exit.
                                 match break_type.get(target) {
-                                    Some(BreakType::Switch) => {
-                                        control_actions.insert(Self::get_action_for_switch_target(target_switch_index, target))
-                                    }
+                                    Some(BreakType::Switch) => control_actions
+                                        .insert(Self::get_action_for_switch_target(target_switch_index, target)),
                                     Some(BreakType::Loop) => {
                                         let target_is_immediate_loop =
                                             !break_type[target + 1..].contains(&BreakType::Loop);
@@ -307,7 +307,8 @@ impl ControlAction {
                             } else if let Some(b) = break_type.get(break_type_len - count) {
                                 if b.is_switch() {
                                     let target = break_type_len - count;
-                                    control_actions.insert(Self::get_action_for_switch_target(target_switch_index, target));
+                                    control_actions
+                                        .insert(Self::get_action_for_switch_target(target_switch_index, target));
                                 } else {
                                     control_actions.insert(ControlAction::BreakImmediateLoop);
                                 }
