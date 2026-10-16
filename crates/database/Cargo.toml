@@ -19,6 +19,7 @@ tracing = { workspace = true }
 walkdir = { workspace = true }
 foldhash = { workspace = true }
 globset = { workspace = true }
+ignore = { workspace = true }
 serde = { workspace = true, features = ["rc"], optional = true }
 rayon = { workspace = true }
 notify = { workspace = true }
