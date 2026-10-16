@@ -162,9 +162,7 @@ pub fn build(file: &MagoFile, linter_ctx: &LinterContext, with_semantics: bool) 
         let checker = SemanticsChecker::new(linter_ctx.settings.php_version);
         lint_issues.extend(checker.check(file, program, &resolved));
     }
-    if file.file_type.is_host()
-        && let Some(registry) = &linter_ctx.registry
-    {
+    if let Some(registry) = linter_ctx.registry_for(file) {
         let linter = Linter::from_registry(&arena, Arc::clone(registry), linter_ctx.settings.php_version);
         lint_issues.extend(linter.lint(file, program, &resolved));
     }

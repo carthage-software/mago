@@ -527,12 +527,14 @@ impl Configuration {
     ///
     /// This prevents global configuration files from overriding project-local configuration.
     fn find_config_files(root_dir: &Path, fallback_roots: &[Option<PathBuf>]) -> Option<(PathBuf, ConfigFormat)> {
-        let config_files = [CONFIGURATION_FILE_NAME, CONFIGURATION_DIST_FILE_NAME];
+        if let Some(found) = Self::find_project_config_file(root_dir) {
+            return Some(found);
+        }
 
-        for name in config_files.iter() {
+        for root in fallback_roots.iter().flatten() {
             for format in ConfigFormat::ALL.iter() {
                 for ext in format.extensions() {
-                    let candidate = root_dir.join(format!("{name}.{ext}"));
+                    let candidate = root.join(format!("{CONFIGURATION_FILE_NAME}.{ext}"));
                     if candidate.exists() {
                         return Some((candidate, *format));
                     }
@@ -540,10 +542,15 @@ impl Configuration {
             }
         }
 
-        for root in fallback_roots.iter().flatten() {
-            for format in ConfigFormat::ALL.iter() {
+        None
+    }
+
+    /// The project's own `mago.<ext>`, or else its `mago.dist.<ext>`, in `root_dir`.
+    pub(crate) fn find_project_config_file(root_dir: &Path) -> Option<(PathBuf, ConfigFormat)> {
+        for name in [CONFIGURATION_FILE_NAME, CONFIGURATION_DIST_FILE_NAME] {
+            for format in ConfigFormat::ALL {
                 for ext in format.extensions() {
-                    let candidate = root.join(format!("{CONFIGURATION_FILE_NAME}.{ext}"));
+                    let candidate = root_dir.join(format!("{name}.{ext}"));
                     if candidate.exists() {
                         return Some((candidate, *format));
                     }

@@ -39,6 +39,11 @@ impl SourcePattern {
         Ok(Self { root, specificity, pattern: Some(pattern) })
     }
 
+    /// Whether the loader walks this source as a directory, rather than matching a glob or a single file.
+    pub fn walks(&self) -> bool {
+        self.pattern.is_none()
+    }
+
     pub fn matches(&self, path: &Path, extension_ok: bool) -> bool {
         let Ok(relative) = path.strip_prefix(&self.root) else { return false };
         match &self.pattern {

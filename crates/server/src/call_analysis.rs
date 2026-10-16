@@ -9,6 +9,7 @@ use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::identifier::method::MethodIdentifier;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
+use mago_database::DatabaseReader;
 use mago_database::file::File;
 use mago_span::HasSpan;
 use mago_span::Position;
@@ -157,6 +158,68 @@ pub(crate) fn call_targets(
     keys.sort_unstable();
     keys.dedup();
     keys
+}
+
+/// Which unnamed calls can reach a set of method declarations: `new` reaches
+/// constructors, and invoking a value reaches `__invoke`.
+#[derive(Debug, Clone, Copy, Default)]
+pub(crate) struct ImplicitCalls {
+    constructors: bool,
+    invocations: bool,
+}
+
+impl ImplicitCalls {
+    pub(crate) fn of(database: &impl DatabaseReader, declarations: &[Span]) -> Self {
+        let mut calls = Self::default();
+        for span in declarations {
+            let Ok(file) = database.get_ref(&span.file_id) else { continue };
+            let Some(name) = file.contents.get(span.start.offset as usize..span.end.offset as usize) else { continue };
+            calls.constructors |= name.eq_ignore_ascii_case(b"__construct");
+            calls.invocations |= name.eq_ignore_ascii_case(b"__invoke");
+        }
+        calls
+    }
+
+    pub(crate) fn is_empty(self) -> bool {
+        !self.constructors && !self.invocations
+    }
+
+    /// Selections of the calls in `file` that reach one of `declarations`.
+    /// `certain` leaves out invoked values with a non-callable branch.
+    pub(crate) fn ranges<'a>(
+        self,
+        codebase: &'a CodebaseMetadata,
+        file: &'a File,
+        analysis: &'a FileAnalysis,
+        editor: Option<&'a EditorFileData>,
+        declarations: &'a [Span],
+        certain: bool,
+    ) -> impl Iterator<Item = Range> + 'a {
+        let reaches = move |key: FunctionLikeIdentifier| {
+            codebase
+                .get_function_like(&key)
+                .and_then(|meta| meta.name_span)
+                .is_some_and(|span| declarations.contains(&span))
+        };
+        analysis
+            .calls
+            .iter()
+            .filter(move |call| match call.kind {
+                CallKind::Constructor => {
+                    self.constructors && call_targets(codebase, file, analysis, editor, call).into_iter().any(reaches)
+                }
+                CallKind::Callable => {
+                    self.invocations
+                        && editor
+                            .and_then(|editor| editor.callable_types.invocation_targets_at_end(call.selection.end))
+                            .is_some_and(|(targets, uncertain)| {
+                                !(certain && uncertain) && targets.iter().any(|target| reaches(target.key()))
+                            })
+                }
+                CallKind::Function | CallKind::Method | CallKind::StaticMethod => false,
+            })
+            .map(|call| call.selection)
+    }
 }
 
 /// Include callable invocations without assuming their source parameter positions.

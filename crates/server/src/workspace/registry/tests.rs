@@ -24,7 +24,11 @@ use crate::{Features, Server, Settings};
 
 fn workspace(root: &Path) -> Workspace<u64> {
     let root = root.canonicalize().unwrap();
-    let configuration = DatabaseConfiguration::new(&root, vec![b"."], vec![], vec![], vec![b"php"]);
+    workspace_with(&root, DatabaseConfiguration::new(&root, vec![b"."], vec![], vec![], vec![b"php"]))
+}
+
+fn workspace_with(root: &Path, configuration: DatabaseConfiguration<'_>) -> Workspace<u64> {
+    let root = root.to_path_buf();
     let matcher = WorkspaceMatcher::from_configuration(&configuration).unwrap();
     let (database, links) = DatabaseLoader::new(configuration.into_static()).load_with_directory_symlinks().unwrap();
     let mut server = Server::new(
@@ -39,6 +43,7 @@ fn workspace(root: &Path) -> Workspace<u64> {
             linter: LinterSettings::default(),
             formatter: FormatSettings::default(),
             plugin_registry: Arc::new(PluginRegistry::new()),
+            excludes: crate::Excludes::default(),
         },
     );
     server.analyze_without_collecting().unwrap();
@@ -133,6 +138,78 @@ fn directory_deletion_keeps_buffers_and_releases_deleted_analysis() {
     assert_eq!(workspaces.change_disk_files(event(&package, FileChange::Created)).changed_files, 1);
     assert_eq!(file(&workspaces, &gone).id, id);
     assert_eq!(workspaces.entries()[0].server.get_symbols("Restored").len(), 1);
+}
+
+#[test]
+fn created_directories_below_a_source_root_follow_the_loaders_pruning() {
+    let directory = tempfile::tempdir().unwrap();
+    let root = directory.path().canonicalize().unwrap();
+    std::fs::create_dir_all(root.join("generated")).unwrap();
+    std::fs::write(root.join("generated/Top.php"), "<?php class Top {}").unwrap();
+    let mut configuration = DatabaseConfiguration::new(
+        &root,
+        vec![b"generated"],
+        vec![],
+        vec![mago_database::exclusion::Exclusion::Pattern("generated/*".into())],
+        vec![b"php"],
+    );
+    configuration.glob.literal_separator = true;
+    let mut workspaces = Workspaces::new(vec![workspace_with(&root, configuration)]);
+    assert!(workspaces.entries()[0].database().files().next().is_none());
+
+    let deep = root.join("generated/deep");
+    std::fs::create_dir_all(&deep).unwrap();
+    std::fs::write(deep.join("New.php"), "<?php class Created {}").unwrap();
+    assert_eq!(workspaces.change_disk_files(event(&deep, FileChange::Created)).changed_files, 1);
+    assert_eq!(workspaces.entries()[0].server.get_symbols("Created").len(), 1);
+
+    std::fs::remove_dir_all(&deep).unwrap();
+    assert_eq!(workspaces.change_disk_files(event(&deep, FileChange::Deleted)).changed_files, 1);
+    assert!(workspaces.entries()[0].database().files().next().is_none());
+
+    std::fs::create_dir_all(&deep).unwrap();
+    std::fs::write(deep.join("New.php"), "<?php class Created {}").unwrap();
+    assert_eq!(workspaces.change_disk_files(event(&deep, FileChange::Created)).changed_files, 1);
+    std::fs::remove_dir_all(&deep).unwrap();
+    let mut batch = event(&deep, FileChange::Deleted);
+    batch.extend(event(&deep.join("New.php"), FileChange::Deleted));
+    assert_eq!(workspaces.change_disk_files(batch).changed_files, 1);
+    assert!(workspaces.entries()[0].database().files().next().is_none());
+
+    std::fs::create_dir_all(&deep).unwrap();
+    std::fs::write(deep.join("New.php"), "<?php class Created {}").unwrap();
+    assert_eq!(workspaces.change_disk_files(event(&deep, FileChange::Created)).changed_files, 1);
+    std::fs::remove_dir_all(&deep).unwrap();
+    let mut batch: Vec<_> = (0..64)
+        .map(|index| FileEvent { path: root.join(format!("generated/Excluded{index}.php")), kind: FileChange::Deleted })
+        .collect();
+    batch.extend(event(&deep, FileChange::Deleted));
+    assert_eq!(workspaces.change_disk_files(batch).changed_files, 1);
+    assert!(workspaces.entries()[0].database().files().next().is_none());
+}
+
+#[cfg(unix)]
+#[test]
+fn deleted_package_directories_reach_their_glob_matched_aliases() {
+    let directory = tempfile::tempdir().unwrap();
+    let parent = directory.path().canonicalize().unwrap();
+    let target = parent.join("package");
+    let root = parent.join("workspace/project");
+    std::fs::create_dir_all(target.join("sub")).unwrap();
+    std::fs::create_dir_all(root.join("vendor")).unwrap();
+    std::fs::write(target.join("sub/Contact.php"), "<?php class Contact {}").unwrap();
+    let link = root.join("vendor/package");
+    std::os::unix::fs::symlink(&target, &link).unwrap();
+    let mut configuration = DatabaseConfiguration::new(&root, vec![b"src"], vec![b"vendor"], vec![], vec![b"php"]);
+    configuration.excludes.push(mago_database::exclusion::Exclusion::Pattern("**/sub".into()));
+    let mut workspaces = Workspaces::new(vec![workspace_with(&root, configuration)]);
+    let loaded = link.join("sub/Contact.php");
+    assert!(workspaces.entries()[0].database().files().any(|file| file.path.as_deref() == Some(loaded.as_path())));
+
+    std::fs::remove_dir_all(target.join("sub")).unwrap();
+    assert_eq!(DocumentPath::new(&link.join("sub")).resolved(), target.join("sub"));
+    assert_eq!(workspaces.change_disk_files(event(&target.join("sub"), FileChange::Deleted)).changed_files, 1);
+    assert!(workspaces.entries()[0].database().files().next().is_none());
 }
 
 #[cfg(unix)]

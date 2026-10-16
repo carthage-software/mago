@@ -1658,6 +1658,7 @@ dependencies = [
  "foldhash",
  "glob",
  "globset",
+ "ignore",
  "memchr",
  "notify",
  "rayon",
