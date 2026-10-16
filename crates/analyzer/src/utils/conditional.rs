@@ -74,8 +74,11 @@ where
     let pre_referenced_var_ids = std::mem::take(&mut externally_applied_context.conditionally_referenced_variable_ids);
     let pre_assigned_var_ids = std::mem::take(&mut externally_applied_context.assigned_variable_ids);
 
+    let has_pre_condition_if_body_context =
+        expressions_differ(externally_applied_if_cond_expr, internally_applied_if_cond_expr);
+
     let mut if_body_context = None;
-    if expressions_differ(externally_applied_if_cond_expr, internally_applied_if_cond_expr) {
+    if has_pre_condition_if_body_context {
         if_body_context = Some(externally_applied_context.clone());
     }
 
@@ -126,6 +129,9 @@ where
         if_conditional_context.if_body_context = Some(Rc::new(RefCell::new(if_body_context)));
         if_conditional_context.assigned_variable_ids = WordMap::default();
         if_conditional_context.conditionally_referenced_variable_ids.clear();
+        if !has_pre_condition_if_body_context {
+            if_conditional_context.locals.clone_from(&pre_condition_locals);
+        }
 
         let was_inside_conditional = if_conditional_context.flags.inside_conditional();
         if_conditional_context.flags.set_inside_conditional(true);
