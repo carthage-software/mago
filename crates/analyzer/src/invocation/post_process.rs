@@ -23,6 +23,8 @@ use mago_codex::ttype::atomic::scalar::bool::TBool;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator::can_expression_types_be_identical;
 use mago_codex::ttype::comparator::union_comparator::is_contained_by;
+use mago_codex::ttype::expander::TypeExpansionOptions;
+use mago_codex::ttype::expander::expand_union;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::template::TemplateResult;
@@ -38,6 +40,7 @@ use mago_word::Word;
 use mago_word::WordMap;
 use mago_word::WordSet;
 use mago_word::concat_word;
+use mago_word::word;
 
 use crate::artifacts::AnalysisArtifacts;
 use crate::code::IssueCode;
@@ -52,6 +55,7 @@ use crate::formula::get_formula;
 use crate::formula::negate_or_synthesize;
 use crate::invocation::Invocation;
 use crate::invocation::InvocationArgumentsSource;
+use crate::invocation::MethodInvocationKind;
 use crate::invocation::arguments::is_argument_mutated_by_reference;
 use crate::invocation::arguments::is_argument_referenceable;
 use crate::invocation::arguments::is_array_multisort;
@@ -170,6 +174,8 @@ where
                 block_context.possibly_thrown_exceptions.entry(exception).or_default().insert(invoication.span);
             }
         } else {
+            let backed_enum_from_argument_is_valid =
+                backed_enum_from_argument_is_valid(context, block_context, artifacts, invoication, identifier);
             let thrown_types = context.codebase.get_function_like_thrown_types(
                 invoication.target.get_method_context().map(|context| context.class_like_metadata),
                 metadata,
@@ -185,6 +191,12 @@ where
 
                 for exception_atomic in resolved_exception_type.types.into_owned() {
                     for exception in exception_atomic.get_all_object_names() {
+                        if backed_enum_from_argument_is_valid
+                            && exception.as_bytes().eq_ignore_ascii_case(b"valueerror")
+                        {
+                            continue;
+                        }
+
                         block_context.possibly_thrown_exceptions.entry(exception).or_default().insert(invoication.span);
                     }
                 }
@@ -264,6 +276,82 @@ where
     )?;
 
     Ok(())
+}
+
+fn backed_enum_from_argument_is_valid<'ctx, 'arena, A>(
+    context: &Context<'ctx, 'arena, A>,
+    block_context: &BlockContext<'ctx>,
+    artifacts: &AnalysisArtifacts,
+    invocation: &Invocation<'ctx, '_, 'arena>,
+    identifier: &FunctionLikeIdentifier,
+) -> bool
+where
+    A: Arena,
+{
+    let FunctionLikeIdentifier::Method(_, method_name) = identifier else {
+        return false;
+    };
+
+    if !method_name.as_bytes().eq_ignore_ascii_case(b"from") {
+        return false;
+    }
+
+    let Some(method_context) = invocation.target.get_method_context() else {
+        return false;
+    };
+
+    if method_context.invocation_kind != MethodInvocationKind::Static {
+        return false;
+    }
+
+    let enum_metadata = method_context.class_like_metadata;
+    if !enum_metadata.kind.is_enum() || enum_metadata.enum_type.is_none() || enum_metadata.enum_cases.is_empty() {
+        return false;
+    }
+
+    let mut backing_values = Vec::with_capacity(enum_metadata.enum_cases.len());
+    for enum_case in enum_metadata.enum_cases.values() {
+        let Some(value_type) = enum_case.value_type.as_ref() else {
+            return false;
+        };
+
+        if !value_type.is_literal()
+            || (value_type.get_literal_int_value().is_none() && value_type.get_literal_string_value().is_none())
+        {
+            return false;
+        }
+
+        backing_values.push(value_type.clone());
+    }
+
+    let (Some(argument), argument_id) =
+        get_argument_for_parameter(context, block_context, invocation, Some(0), Some(word(b"value")))
+    else {
+        return false;
+    };
+
+    let Some(mut argument_type) = artifacts
+        .get_expression_type(argument)
+        .cloned()
+        .or_else(|| argument_id.and_then(|id| block_context.locals.get(&id).map(|ty| ty.as_ref().clone())))
+    else {
+        return false;
+    };
+
+    let mut backing_value_type = TUnion::from_vec(backing_values);
+    let expansion_options = TypeExpansionOptions::default();
+    expand_union(context.codebase, &mut argument_type, &expansion_options);
+    expand_union(context.codebase, &mut backing_value_type, &expansion_options);
+
+    is_contained_by(
+        context.codebase,
+        &argument_type,
+        &backing_value_type,
+        false,
+        false,
+        false,
+        &mut ComparisonResult::default(),
+    )
 }
 
 fn display_callable_name<A>(

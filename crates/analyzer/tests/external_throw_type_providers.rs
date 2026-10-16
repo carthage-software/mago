@@ -76,8 +76,7 @@ function disabled_expression_fallback(): void { 2 + 2; }
 ";
 
 #[test]
-fn external_throw_type_providers_override_and_fall_back_to_native_contracts() -> Result<(), Box<dyn std::error::Error>>
-{
+fn external_throw_type_providers_override_and_fall_back_to_native_contracts() {
     let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let available = repository.join("vendor/autoload.php").is_file()
         && std::process::Command::new("php").arg("--version").output().is_ok_and(|output| output.status.success());
@@ -86,17 +85,19 @@ fn external_throw_type_providers_override_and_fall_back_to_native_contracts() ->
         "PHP and vendor dependencies are required for the external throw-type provider test"
     );
     if !available {
-        return Ok(());
+        return;
     }
 
     let command = WorkerCommand::new("php")
         .with_argument(repository.join("composer/tests/Sdk/Fixtures/analyzer-throw-type-worker.php"))
         .with_current_directory(repository.clone());
-    let pool = WorkerPool::spawn(command, NonZeroUsize::MIN, WorkerPoolOptions::default())?;
-    let external = ExternalAnalyzer::initialize([Arc::new(pool)], PHPVersion::PHP85, &[], false)?;
+    let pool = WorkerPool::spawn(command, NonZeroUsize::MIN, WorkerPoolOptions::default())
+        .expect("failed to start the external analyzer worker pool");
+    let external = ExternalAnalyzer::initialize([Arc::new(pool)], PHPVersion::PHP85, &[], false)
+        .expect("failed to initialize the external analyzer");
     let mut registry = PluginRegistry::with_library_providers();
     registry.set_external_analyzer(Arc::new(ExternalAnalyzerHandle::ready(external)));
-    registry.prepare_external_analyzer()?;
+    registry.prepare_external_analyzer().expect("failed to prepare the external analyzer");
 
     let file = Arc::new(File::new(
         Cow::Borrowed(b"src/throw-types.php"),
@@ -122,7 +123,7 @@ fn external_throw_type_providers_override_and_fall_back_to_native_contracts() ->
     let analyzer = Analyzer::new(&arena, &file, &resolved_names, &codebase, &registry, settings)
         .with_external_analysis_session(&session);
     let mut result = AnalysisResult::new(symbol_references);
-    analyzer.analyze(program, &mut result)?;
+    analyzer.analyze(program, &mut result).expect("analysis with the external analyzer failed");
 
     let messages = result
         .issues
@@ -152,6 +153,4 @@ fn external_throw_type_providers_override_and_fall_back_to_native_contracts() ->
     assert!(!messages.iter().any(|message| message.contains("function_empty")));
     assert!(!messages.iter().any(|message| message.contains("function_caught")));
     assert!(!messages.iter().any(|message| message.contains("disabled_expression_fallback")));
-
-    Ok(())
 }
