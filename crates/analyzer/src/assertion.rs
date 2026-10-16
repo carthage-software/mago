@@ -524,7 +524,7 @@ where
                     .arguments
                     .get(2)
                     .and_then(|argument| artifacts.get_expression_type(argument.value()))
-                    .is_some_and(mago_codex::ttype::union::TUnion::is_true);
+                    .is_some_and(TUnion::is_true);
 
                 if !should_strict_check {
                     return None;
@@ -550,9 +550,40 @@ where
                     ));
                 }
 
+                let value_types = value_types?;
+                let is_sealed = checked_array.types.as_ref().iter().all(|atomic| match atomic {
+                    TAtomic::Array(array) => {
+                        if !array.is_sealed() {
+                            return false;
+                        }
+
+                        match array {
+                            TArray::Keyed(keyed) => {
+                                let Some(known_items) = keyed.get_known_items() else {
+                                    return false;
+                                };
+
+                                !known_items.is_empty() && known_items.values().all(|(optional, _)| !*optional)
+                            }
+                            TArray::List(list) => {
+                                let Some(known_elements) = list.get_known_elements() else {
+                                    return false;
+                                };
+
+                                !known_elements.is_empty() && known_elements.values().all(|(optional, _)| !*optional)
+                            }
+                        }
+                    }
+                    _ => false,
+                });
+
                 let mut value_assertions = vec![];
-                for atomic in value_types?.types.into_owned() {
-                    value_assertions.push(Assertion::IsIdentical(atomic));
+                if is_sealed {
+                    for atomic in value_types.types.into_owned() {
+                        value_assertions.push(Assertion::IsIdentical(atomic));
+                    }
+                } else {
+                    value_assertions.push(Assertion::InArray(value_types));
                 }
 
                 Some((0, value_assertions))
