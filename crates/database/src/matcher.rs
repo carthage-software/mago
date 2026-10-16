@@ -71,6 +71,20 @@ where
     Ok(builder.build()?)
 }
 
+/// The directories that exclusion globs ending in `/*`, `/**`, or `/**/*` prune with
+/// everything below them.
+pub(crate) fn directory_patterns<'pattern>(
+    patterns: impl IntoIterator<Item = &'pattern str>,
+) -> impl Iterator<Item = &'pattern str> {
+    patterns.into_iter().filter_map(|pattern| {
+        let stripped = pattern
+            .strip_suffix("/**/*")
+            .or_else(|| pattern.strip_suffix("/**"))
+            .or_else(|| pattern.strip_suffix("/*"))?;
+        (!stripped.is_empty() && stripped != "*" && stripped != "**").then_some(stripped)
+    })
+}
+
 /// Compiled matcher for a list of exclusion patterns.
 ///
 /// Split patterns are stored once at construction time so that per-file
