@@ -424,6 +424,7 @@ test_case!(docblock_type_mismatch);
 test_case!(docblock_type_narrowing);
 test_case!(docblock_type_parsing_verification);
 test_case!(docblock_var_on_non_assignment);
+test_case!(does_not_have_array_key_union_reconciliation);
 test_case!(empty_switch);
 test_case!(empty_construct);
 test_case!(generator_return_yield);
