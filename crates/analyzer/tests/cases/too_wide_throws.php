@@ -219,7 +219,7 @@ class TooWideNonThrowingIterator implements Iterator
 /**
  * @implements IteratorAggregate<int, string>
  */
-class TooWideThrowingAggregate implements IteratorAggregate
+final class TooWideThrowingAggregate implements IteratorAggregate
 {
     public function __construct(private bool $shouldThrow)
     {
@@ -268,6 +268,31 @@ class TooWideCyclicAggregate implements IteratorAggregate
     public function getIterator(): TooWideCyclicAggregate
     {
         return $this;
+    }
+}
+
+abstract class TooWideAbstractThrowContract
+{
+    /** @throws TooWideOtherFailure */
+    abstract public function run(): void;
+}
+
+final class TooWideNarrowThrowImplementation extends TooWideAbstractThrowContract
+{
+    #[Override]
+    public function run(): void
+    {
+    }
+}
+
+/**
+ * @implements IteratorAggregate<int, string>
+ */
+final class TooWideFinalNonThrowingAggregate implements IteratorAggregate
+{
+    public function getIterator(): TooWideNonThrowingIterator
+    {
+        return new TooWideNonThrowingIterator();
     }
 }
 
@@ -382,6 +407,12 @@ function too_wide_throws_from_nested_iterator_aggregate(TooWideNestedAggregate $
 }
 
 function too_wide_throws_from_cyclic_iterator_aggregate(TooWideCyclicAggregate $aggregate): void
+{
+    foreach ($aggregate as $value) {
+    }
+}
+
+function too_wide_throws_from_final_non_throwing_iterator_aggregate(TooWideFinalNonThrowingAggregate $aggregate): void
 {
     foreach ($aggregate as $value) {
     }

@@ -89,6 +89,9 @@ pub struct AnalyzerConfiguration {
     /// actually returns (e.g. `: string|false` on a function that always returns a string).
     pub find_overly_wide_return_types: bool,
 
+    /// Whether to warn when a documented `@throws` type cannot escape a function or method.
+    pub find_overly_wide_throw_types: bool,
+
     /// Whether to analyze dead code.
     pub analyze_dead_code: bool,
 
@@ -476,6 +479,7 @@ impl AnalyzerConfiguration {
             analyze_dead_code: self.analyze_dead_code,
             find_unused_definitions: self.find_unused_definitions,
             find_overly_wide_return_types: self.find_overly_wide_return_types,
+            find_overly_wide_throw_types: self.find_overly_wide_throw_types,
             find_unused_expressions: self.find_unused_expressions,
             memoize_properties: self.memoize_properties,
             allow_possibly_undefined_array_keys: self.allow_possibly_undefined_array_keys,
@@ -539,6 +543,7 @@ impl Default for AnalyzerConfiguration {
             find_unused_expressions: defaults.find_unused_expressions,
             find_unused_definitions: defaults.find_unused_definitions,
             find_overly_wide_return_types: defaults.find_overly_wide_return_types,
+            find_overly_wide_throw_types: defaults.find_overly_wide_throw_types,
             analyze_dead_code: defaults.analyze_dead_code,
             memoize_properties: defaults.memoize_properties,
             allow_possibly_undefined_array_keys: defaults.allow_possibly_undefined_array_keys,
@@ -575,6 +580,8 @@ impl Default for AnalyzerConfiguration {
 
 #[cfg(test)]
 mod tests {
+    use clap::ColorChoice;
+    use mago_php_version::PHPVersion;
     use mago_reporting::IgnoreEntry;
 
     use super::AnalyzerConfiguration;
@@ -602,5 +609,21 @@ ignore = [
                 IgnoreEntry::Scoped { code: "unused-variable".to_string(), paths: vec!["tests/".to_string()] },
             ]
         );
+    }
+
+    #[test]
+    fn overly_wide_throw_types_defaults_to_false() {
+        let configuration: AnalyzerConfiguration = toml::from_str("").unwrap();
+
+        assert!(!configuration.find_overly_wide_throw_types);
+        assert!(!configuration.to_settings(PHPVersion::PHP85, ColorChoice::Never, false).find_overly_wide_throw_types);
+    }
+
+    #[test]
+    fn overly_wide_throw_types_can_be_enabled_in_configuration() {
+        let configuration: AnalyzerConfiguration = toml::from_str("find-overly-wide-throw-types = true").unwrap();
+
+        assert!(configuration.find_overly_wide_throw_types);
+        assert!(configuration.to_settings(PHPVersion::PHP85, ColorChoice::Never, false).find_overly_wide_throw_types);
     }
 }

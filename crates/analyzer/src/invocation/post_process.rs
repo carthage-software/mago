@@ -153,7 +153,7 @@ where
         }
     }
 
-    if context.settings.check_throws {
+    if context.settings.check_throws || context.settings.find_overly_wide_throw_types {
         let external_throw_types = match identifier {
             FunctionLikeIdentifier::Function(name) => context.plugin_registry.get_external_function_thrown_exceptions(
                 context.codebase,

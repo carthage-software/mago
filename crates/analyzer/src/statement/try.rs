@@ -81,7 +81,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
         block_context.flags.set_inside_try(true);
         let mut exception_entry_locals: WordMap<Vec<WordSet>> = WordMap::default();
         let mut generic_exception_entry_locals: Vec<(PossiblyThrownGenericException, WordSet)> = Vec::new();
-        if self.catch_clauses.is_empty() || !context.settings.check_throws {
+        if self.catch_clauses.is_empty()
+            || (!context.settings.check_throws && !context.settings.find_overly_wide_throw_types)
+        {
             analyze_statements(self.block.statements.as_slice(), context, block_context, artifacts)?;
         } else {
             for statement in &self.block.statements {

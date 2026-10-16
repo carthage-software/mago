@@ -92,6 +92,7 @@ fn build_analyzer_settings(settings: &WasmAnalyzerSettings, version: PHPVersion)
         find_unused_expressions: settings.find_unused_expressions,
         find_unused_definitions: settings.find_unused_definitions,
         find_overly_wide_return_types: settings.find_overly_wide_return_types,
+        find_overly_wide_throw_types: settings.find_overly_wide_throw_types,
         analyze_dead_code: settings.analyze_dead_code,
         memoize_properties: settings.memoize_properties,
         allow_possibly_undefined_array_keys: settings.allow_possibly_undefined_array_keys,
@@ -509,6 +510,7 @@ mod tests {
             r#"{
                 "analyzer": {
                     "findOverlyWideReturnTypes": true,
+                    "findOverlyWideThrowTypes": true,
                     "allowImplicitPipeCallableTypes": true,
                     "allowSideEffectsInConditions": false
                 }
@@ -521,6 +523,7 @@ mod tests {
         let analyzer_settings = build_analyzer_settings(&settings.analyzer, PHPVersion::PHP85);
 
         assert!(analyzer_settings.find_overly_wide_return_types);
+        assert!(analyzer_settings.find_overly_wide_throw_types);
         assert!(analyzer_settings.allow_implicit_pipe_callable_types);
         assert!(!analyzer_settings.allow_side_effects_in_conditions);
     }

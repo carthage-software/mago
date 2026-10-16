@@ -84,6 +84,7 @@ pub fn default_test_settings() -> Settings {
     Settings {
         find_unused_expressions: true,
         find_unused_definitions: true,
+        find_overly_wide_throw_types: true,
         check_throws: true,
         allow_possibly_undefined_array_keys: false,
         strict_list_index_checks: true,

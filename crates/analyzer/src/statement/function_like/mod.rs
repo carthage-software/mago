@@ -1224,7 +1224,7 @@ fn check_thrown_types<'ctx, A>(
 ) where
     A: Arena,
 {
-    if !context.settings.check_throws {
+    if !context.settings.check_throws && !context.settings.find_overly_wide_throw_types {
         // If the setting is disabled, we skip the check.
         return;
     }
@@ -1250,9 +1250,15 @@ fn check_thrown_types<'ctx, A>(
         })
     };
 
-    check_too_wide_throw_types(context, block_context, artifacts, function_like_metadata, function_kind, || {
-        function_name()
-    });
+    if context.settings.find_overly_wide_throw_types {
+        check_too_wide_throw_types(context, block_context, artifacts, function_like_metadata, function_kind, || {
+            function_name()
+        });
+    }
+
+    if !context.settings.check_throws {
+        return;
+    }
 
     if block_context.possibly_thrown_exceptions.is_empty()
         && block_context.possibly_thrown_generic_exceptions.is_empty()
@@ -1360,11 +1366,7 @@ fn check_too_wide_throw_types<'ctx, A, F>(
     let declared_types = function_like_metadata
         .thrown_types
         .iter()
-        .filter(|thrown_type| {
-            thrown_type.from_docblock
-                && (!thrown_type.inferred
-                    || has_class_docblock_throw_origin(context, block_context, function_like_metadata, thrown_type))
-        })
+        .filter(|thrown_type| thrown_type.from_docblock && !thrown_type.inferred)
         .collect::<Vec<_>>();
 
     for declared_type in declared_types {
@@ -1485,40 +1487,6 @@ fn generic_parameter_is_same_or_extends(
             }
             _ => false,
         }
-    })
-}
-
-fn has_class_docblock_throw_origin<'ctx, A>(
-    context: &Context<'ctx, '_, A>,
-    block_context: &BlockContext<'ctx>,
-    function_like_metadata: &FunctionLikeMetadata,
-    thrown_type: &TypeMetadata,
-) -> bool
-where
-    A: Arena,
-{
-    let Some(class_like_metadata) = block_context.scope.get_class_like() else {
-        return false;
-    };
-
-    let Some(overridden_methods) = class_like_metadata.overridden_method_ids.get(&function_like_metadata.name) else {
-        return false;
-    };
-
-    overridden_methods.iter().any(|(parent_name, method_id)| {
-        let Some(parent_method) = context.codebase.function_likes.get(&method_id.get_key()) else {
-            return false;
-        };
-
-        let has_explicit_throw = parent_method.thrown_types.iter().any(|parent_throw| {
-            parent_throw.from_docblock && !parent_throw.inferred && parent_throw.span == thrown_type.span
-        });
-
-        has_explicit_throw
-            && context
-                .codebase
-                .get_class_like(parent_name.as_bytes())
-                .is_some_and(|parent_class| !parent_class.kind.is_interface())
     })
 }
 
