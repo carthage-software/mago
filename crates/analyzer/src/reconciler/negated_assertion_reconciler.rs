@@ -298,18 +298,17 @@ fn subtract_complex_type<A>(
                 acceptable_types.push(existing_atomic);
             }
             (TAtomic::Scalar(TScalar::String(existing_string)), TAtomic::Callable(assertion_callable)) => {
-                // `!is_callable()` removes callable alternatives. A string literal
-                // naming a function (e.g. `"strlen"`) is callable, so under
-                // `!is_callable` it must be removed when it resolves to the
-                // asserted function.
                 if let TCallable::Alias(FunctionLikeIdentifier::Function(callable_name)) = assertion_callable
                     && let Some(literal) = existing_string.get_known_literal_value()
-                    && literal.eq_ignore_ascii_case(callable_name.as_bytes())
-                    && context.codebase.function_exists(literal)
                 {
-                    *can_be_disjunct = true;
+                    let literal = literal.strip_prefix(b"\\").unwrap_or(literal);
+                    if literal.eq_ignore_ascii_case(callable_name.as_bytes())
+                        && context.codebase.function_exists(literal)
+                    {
+                        *can_be_disjunct = true;
 
-                    continue;
+                        continue;
+                    }
                 }
 
                 acceptable_types.push(existing_atomic);
