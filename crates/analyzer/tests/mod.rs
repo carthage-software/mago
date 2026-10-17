@@ -159,6 +159,7 @@ test_case!(arrays_in_array);
 test_case!(arrays_index_into_int);
 test_case!(arrays_index_with_wrong_key_type);
 test_case!(arrays_isset_narrows_optional);
+test_case!(nested_generic_array_isset_shape_narrowing);
 test_case!(arrays_keyed_array_literal);
 test_case!(arrays_keyed_destructuring);
 test_case!(arrays_list_append);
