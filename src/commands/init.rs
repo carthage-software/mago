@@ -131,6 +131,7 @@ impl AnalyzerStrictnessPreset {
                 analyze_dead_code: false,
                 check_throws: false,
                 check_dead_catch: false,
+                forbid_checked_exceptions_in_callables: false,
                 allow_possibly_undefined_array_keys: true,
                 check_missing_override: false,
                 find_unused_parameters: false,
@@ -150,6 +151,7 @@ impl AnalyzerStrictnessPreset {
                 analyze_dead_code: false,
                 check_throws: false,
                 check_dead_catch: false,
+                forbid_checked_exceptions_in_callables: false,
                 allow_possibly_undefined_array_keys: true,
                 check_missing_override: false,
                 find_unused_parameters: false,
@@ -169,6 +171,7 @@ impl AnalyzerStrictnessPreset {
                 analyze_dead_code: false,
                 check_throws: true,
                 check_dead_catch: false,
+                forbid_checked_exceptions_in_callables: false,
                 allow_possibly_undefined_array_keys: false,
                 check_missing_override: true,
                 find_unused_parameters: true,
@@ -188,6 +191,7 @@ impl AnalyzerStrictnessPreset {
                 analyze_dead_code: true,
                 check_throws: true,
                 check_dead_catch: false,
+                forbid_checked_exceptions_in_callables: true,
                 allow_possibly_undefined_array_keys: false,
                 check_missing_override: true,
                 find_unused_parameters: true,
@@ -412,6 +416,9 @@ struct InitializationAnalyzerSettings {
     check_throws: bool,
     /// Whether to report catch clauses that cannot catch a known exception
     check_dead_catch: bool,
+
+    /// Whether to forbid checked exceptions escaping deferred callables
+    forbid_checked_exceptions_in_callables: bool,
     /// Whether to allow access to potentially undefined array keys
     allow_possibly_undefined_array_keys: bool,
     /// Whether to check for missing #[Override] attributes
@@ -674,6 +681,14 @@ fn setup_analyzer(theme: &ColorfulTheme) -> Result<InitializationAnalyzerSetting
             .with_prompt(" │  Check catch clauses with no known matching exception? (requires check-throws)")
             .default(settings.check_dead_catch)
             .interact()?;
+        if settings.check_throws {
+            settings.forbid_checked_exceptions_in_callables = Confirm::with_theme(theme)
+                .with_prompt(" │  Forbid checked exceptions escaping deferred callables?")
+                .default(settings.forbid_checked_exceptions_in_callables)
+                .interact()?;
+        } else {
+            settings.forbid_checked_exceptions_in_callables = false;
+        }
         settings.check_missing_type_hints = Confirm::with_theme(theme)
             .with_prompt(" │  Check for missing type hints?")
             .default(settings.check_missing_type_hints)
@@ -977,6 +992,8 @@ fn build_analyzer_settings_string(settings: &InitializationAnalyzerSettings) -> 
     lines.push(format!("allow-possibly-undefined-array-keys = {}", settings.allow_possibly_undefined_array_keys));
     lines.push(format!("check-throws = {}", settings.check_throws));
     lines.push(format!("check-dead-catch = {}", settings.check_dead_catch));
+    lines.push(format!("forbid-checked-exceptions-in-callables = {}", settings.forbid_checked_exceptions_in_callables));
+    lines.push("allowed-checked-exception-callables = []".to_string());
     lines.push("unchecked-exceptions = [\"Error\", \"LogicException\"]".to_string());
     lines.push("unchecked-exception-classes = []".to_string());
     lines.push(format!("check-missing-override = {}", settings.check_missing_override));
@@ -1006,6 +1023,7 @@ mod tests {
             analyze_dead_code: false,
             check_throws: false,
             check_dead_catch: false,
+            forbid_checked_exceptions_in_callables: false,
             allow_possibly_undefined_array_keys: true,
             check_missing_override: false,
             find_unused_parameters: false,
@@ -1096,6 +1114,7 @@ mod tests {
             analyze_dead_code: true,
             check_throws: true,
             check_dead_catch: false,
+            forbid_checked_exceptions_in_callables: false,
             allow_possibly_undefined_array_keys: false,
             check_missing_override: false,
             find_unused_parameters: false,

@@ -64,7 +64,11 @@ where
     let lhs_type_option = artifacts.get_rc_expression_type(&binary.lhs);
 
     let Some(lhs_type) = lhs_type_option else {
-        binary.rhs.analyze(context, block_context, artifacts)?;
+        let was_potentially_skipped = block_context.flags.inside_potentially_skipped_code();
+        block_context.flags.set_inside_potentially_skipped_code(true);
+        let rhs_result = binary.rhs.analyze(context, block_context, artifacts);
+        block_context.flags.set_inside_potentially_skipped_code(was_potentially_skipped);
+        rhs_result?;
 
         artifacts.set_expression_type(binary, get_mixed());
 
@@ -131,12 +135,18 @@ where
         // Prevents its terminating control flow and recorded thrown exceptions from affecting the remainder of the block
         let mut dead_rhs_context = block_context.clone();
         dead_rhs_context.flags.set_has_returned(true);
+        dead_rhs_context.flags.set_inside_potentially_skipped_code(true);
+        dead_rhs_context.flags.set_inside_definitely_unreachable_code(true);
         binary.rhs.analyze(context, &mut dead_rhs_context, artifacts)?;
     } else {
         let non_null_lhs_type = lhs_type.to_non_nullable();
         let has_returned = block_context.flags.has_returned();
+        let was_potentially_skipped = block_context.flags.inside_potentially_skipped_code();
+        block_context.flags.set_inside_potentially_skipped_code(true);
         block_context.flags.set_has_returned(false);
-        binary.rhs.analyze(context, block_context, artifacts)?;
+        let rhs_result = binary.rhs.analyze(context, block_context, artifacts);
+        block_context.flags.set_inside_potentially_skipped_code(was_potentially_skipped);
+        rhs_result?;
         block_context.flags.set_has_returned(block_context.flags.has_returned() && has_returned);
 
         let rhs_type =

@@ -98,6 +98,8 @@ These flags toggle individual analyses. Defaults are tuned for everyday use; fli
 | `allow-possibly-undefined-array-keys` | `true` | **Deprecated.** Allow accessing keys that may be missing without flagging it. Setting this to `false` warns on `array<K, V>` reads with a single literal key but does not widen the type to `T\|null`. Use `strict-array-index-existence` instead. |
 | `check-throws` | `false` | Report exceptions that are not caught and not declared with `@throws`. |
 | `check-dead-catch` | `false` | Report catch clauses that match no known exception from their `try` block. Requires `check-throws`; undocumented code may still throw exceptions the analyzer cannot see. |
+| `forbid-checked-exceptions-in-callables` | `false` | With `check-throws`, report checked exceptions escaping stored callables and callbacks passed to APIs not known to invoke them synchronously, unless caught locally or allowed for that API parameter. |
+| `allowed-checked-exception-callables` | `[]` | API callback parameter positions exempt from the deferred-callable check, in `<resolved-name>:<zero-based-index>` form (string array). |
 | `check-missing-override` | `false` | Report missing `#[Override]` attributes on overriding methods (PHP 8.3+). |
 | `find-unused-parameters` | `false` | Report parameters that are never read. |
 | `strict-list-index-checks` | `false` | Require any integer used as a list index to be provably non-negative. |
@@ -185,6 +187,24 @@ unchecked-exception-classes = [
 ```
 
 Use `unchecked-exceptions` to silence an entire category, like every `LogicException` subclass. Use `unchecked-exception-classes` when you want to ignore one specific exception while still tracking siblings and parents.
+
+## Checked exceptions in deferred callables
+
+Set `forbid-checked-exceptions-in-callables = true` alongside `check-throws = true` to report checked exceptions that escape a callable stored for later or passed to an API not known to invoke it synchronously. A `@throws` declaration does not satisfy this rule; catch the exception inside the callable to handle it locally. Exceptions configured as unchecked are ignored.
+
+Some APIs deliberately handle exceptions thrown by their callback. Add those callback parameters to `allowed-checked-exception-callables` using the resolved function or method name followed by a colon and the zero-based parameter index:
+
+```toml
+[analyzer]
+check-throws = true
+forbid-checked-exceptions-in-callables = true
+allowed-checked-exception-callables = [
+    "Symfony\\Component\\HttpFoundation\\StreamedResponse::__construct:0",
+    "PHPUnit\\Framework\\MockObject\\Builder\\InvocationMocker::willReturnCallback:0",
+]
+```
+
+Entries are matched case-insensitively. The allow-list exempts only the named parameter position; other callbacks passed to the same API remain checked.
 
 ## Experimental API detection
 
@@ -289,6 +309,7 @@ find-overly-wide-return-types = true
 analyze-dead-code = true
 check-throws = true
 check-dead-catch = true
+forbid-checked-exceptions-in-callables = true
 check-missing-override = true
 find-unused-parameters = true
 check-missing-type-hints = true

@@ -26,6 +26,8 @@ impl BlockContextFlags {
     /// its body.
     pub const INSIDE_CLASS_LIKE_ATTRIBUTE: u32 = 1 << 18;
     pub const INSIDE_REFERENCE: u32 = 1 << 19;
+    pub const INSIDE_POTENTIALLY_SKIPPED_CODE: u32 = 1 << 20;
+    pub const INSIDE_DEFINITELY_UNREACHABLE_CODE: u32 = 1 << 21;
 
     #[inline]
     pub const fn new() -> Self {
@@ -155,6 +157,16 @@ impl BlockContextFlags {
     }
 
     #[inline(always)]
+    pub const fn inside_potentially_skipped_code(&self) -> bool {
+        self.contains(Self::INSIDE_POTENTIALLY_SKIPPED_CODE)
+    }
+
+    #[inline(always)]
+    pub const fn inside_definitely_unreachable_code(&self) -> bool {
+        self.contains(Self::INSIDE_DEFINITELY_UNREACHABLE_CODE)
+    }
+
+    #[inline(always)]
     pub fn set_inside_conditional(&mut self, value: bool) {
         self.set(Self::INSIDE_CONDITIONAL, value);
     }
@@ -252,5 +264,15 @@ impl BlockContextFlags {
     #[inline(always)]
     pub fn set_inside_reference(&mut self, value: bool) {
         self.set(Self::INSIDE_REFERENCE, value);
+    }
+
+    #[inline(always)]
+    pub fn set_inside_potentially_skipped_code(&mut self, value: bool) {
+        self.set(Self::INSIDE_POTENTIALLY_SKIPPED_CODE, value);
+    }
+
+    #[inline(always)]
+    pub fn set_inside_definitely_unreachable_code(&mut self, value: bool) {
+        self.set(Self::INSIDE_DEFINITELY_UNREACHABLE_CODE, value);
     }
 }

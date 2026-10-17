@@ -2204,6 +2204,7 @@ function iterator_to_array(Traversable|array $iterator, bool $preserve_keys = tr
  */
 function iterator_count(Traversable|array $iterator): int {}
 
+/** @param-immediately-invoked-callable $callback */
 function iterator_apply(Traversable $iterator, callable $callback, ?array $args = null): int {}
 
 /**

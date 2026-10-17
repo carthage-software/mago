@@ -32,7 +32,7 @@ use mago_word::WordSet;
 static PRELUDE: LazyLock<Prelude> = LazyLock::new(Prelude::build);
 static PLUGIN_REGISTRY: LazyLock<PluginRegistry> = LazyLock::new(PluginRegistry::with_library_providers);
 
-fn analyze_file(path: &Path, content: &str) {
+fn analyze_file(path: &Path, content: &str, forbid_checked_exceptions_in_callables: bool) {
     let Prelude { mut database, mut metadata, mut symbol_references } = PRELUDE.clone();
 
     let file = File::ephemeral(
@@ -55,6 +55,7 @@ fn analyze_file(path: &Path, content: &str) {
         find_unused_expressions: true,
         find_unused_definitions: true,
         check_throws: true,
+        forbid_checked_exceptions_in_callables,
         allow_possibly_undefined_array_keys: false,
         strict_list_index_checks: true,
         check_property_initialization: true,
@@ -72,17 +73,33 @@ fn analyze_file(path: &Path, content: &str) {
     }
 }
 
-const BENCHMARKED_PREFIXES: &[&str] = &["issue_", "psl_", "sealed_class_", "trait_", "conditional_"];
+const BENCHMARKED_PREFIXES: &[&str] =
+    &["issue_2504_", "issue_", "psl_", "sealed_class_", "trait_", "conditional_", "forbid_checked_exceptions_"];
 
 fn discover_cases_by_prefix() -> Vec<(&'static str, Vec<(PathBuf, String)>)> {
     let cases_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("cases");
     let mut buckets: Vec<(&'static str, Vec<(PathBuf, String)>)> =
         BENCHMARKED_PREFIXES.iter().map(|p| (*p, Vec::new())).collect();
 
+    collect_cases_by_prefix(&cases_dir, &mut buckets);
+
+    for (_, files) in &mut buckets {
+        files.sort_by(|a, b| a.0.cmp(&b.0));
+    }
+
+    buckets
+}
+
+fn collect_cases_by_prefix(cases_dir: &Path, buckets: &mut [(&'static str, Vec<(PathBuf, String)>)]) {
     let entries =
-        std::fs::read_dir(&cases_dir).unwrap_or_else(|e| panic!("failed to read {}: {e}", cases_dir.display()));
+        std::fs::read_dir(cases_dir).unwrap_or_else(|e| panic!("failed to read {}: {e}", cases_dir.display()));
     for entry in entries.flatten() {
         let path = entry.path();
+        if path.is_dir() {
+            collect_cases_by_prefix(&path, buckets);
+            continue;
+        }
+
         if path.extension().and_then(|s| s.to_str()) != Some("php") {
             continue;
         }
@@ -93,12 +110,6 @@ fn discover_cases_by_prefix() -> Vec<(&'static str, Vec<(PathBuf, String)>)> {
             std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("failed to read {}: {e}", path.display()));
         bucket.1.push((path, content));
     }
-
-    for (_, files) in &mut buckets {
-        files.sort_by(|a, b| a.0.cmp(&b.0));
-    }
-
-    buckets
 }
 
 fn bench_cases(c: &mut Criterion) {
@@ -112,13 +123,25 @@ fn bench_cases(c: &mut Criterion) {
         }
 
         let bench_name = prefix.trim_end_matches('_');
-        group.bench_with_input(BenchmarkId::from_parameter(bench_name), &files, |b, files| {
-            b.iter(|| {
-                for (p, c) in files {
-                    analyze_file(p, c);
-                }
+        if prefix == "forbid_checked_exceptions_" {
+            for (mode, enabled) in [("disabled", false), ("enabled", true)] {
+                group.bench_with_input(BenchmarkId::new(bench_name, mode), &files, |b, files| {
+                    b.iter(|| {
+                        for (p, c) in files {
+                            analyze_file(p, c, enabled);
+                        }
+                    });
+                });
+            }
+        } else {
+            group.bench_with_input(BenchmarkId::from_parameter(bench_name), &files, |b, files| {
+                b.iter(|| {
+                    for (p, c) in files {
+                        analyze_file(p, c, false);
+                    }
+                });
             });
-        });
+        }
     }
 
     group.finish();

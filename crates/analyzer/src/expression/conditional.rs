@@ -72,6 +72,18 @@ where
 
     let mut if_block_context = if_conditional_scope.if_body_context;
     let mut conditionally_referenced_variable_ids = if_conditional_scope.conditionally_referenced_variable_ids;
+    let condition_type = artifacts.get_rc_expression_type(condition).cloned();
+    let condition_is_always_truthy =
+        condition_type.as_ref().is_some_and(|condition_type| condition_type.is_always_truthy());
+    let condition_is_always_falsy =
+        condition_type.as_ref().is_some_and(|condition_type| condition_type.is_always_falsy());
+
+    if !condition_is_always_truthy {
+        if_block_context.flags.set_inside_potentially_skipped_code(true);
+    }
+    if condition_is_always_falsy {
+        if_block_context.flags.set_inside_definitely_unreachable_code(true);
+    }
 
     let assertion_context = context.get_assertion_context_from_block(block_context);
     let mut if_clauses = get_formula(condition.span(), condition.span(), condition, assertion_context, artifacts, &context.settings.algebra_thresholds(), context.settings.formula_size_threshold).unwrap_or_else(|| {
@@ -213,6 +225,12 @@ where
     }
 
     let mut else_block_context = block_context.clone();
+    if !condition_is_always_falsy {
+        else_block_context.flags.set_inside_potentially_skipped_code(true);
+    }
+    if condition_is_always_truthy {
+        else_block_context.flags.set_inside_definitely_unreachable_code(true);
+    }
 
     if let Some(then) = then.as_ref() {
         then.analyze(context, &mut if_block_context, artifacts)?;
@@ -347,7 +365,6 @@ where
         .extend(else_block_context.conditionally_referenced_variable_ids);
 
     let mut then_type = None;
-    let condition_type = artifacts.get_rc_expression_type(&condition).cloned();
     if let Some(then_expression) = then.as_ref() {
         if let Some(rc_then_type) = artifacts.get_rc_expression_type(then_expression).cloned() {
             then_type = Some(rc_then_type);

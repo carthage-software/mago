@@ -13,6 +13,7 @@ use wasm_bindgen::prelude::*;
 use mago_analyzer::plugin::available_plugins;
 use mago_analyzer::plugin::create_registry_with_plugins;
 use mago_analyzer::settings::Settings as AnalyzerSettings;
+use mago_analyzer::settings::normalize_allowed_checked_exception_callable;
 use mago_database::DatabaseReader;
 use mago_database::ReadDatabase;
 use mago_database::file::File;
@@ -97,6 +98,12 @@ fn build_analyzer_settings(settings: &WasmAnalyzerSettings, version: PHPVersion)
         allow_possibly_undefined_array_keys: settings.allow_possibly_undefined_array_keys,
         check_throws: settings.check_throws,
         check_dead_catch: settings.check_dead_catch,
+        forbid_checked_exceptions_in_callables: settings.forbid_checked_exceptions_in_callables,
+        allowed_checked_exception_callables: settings
+            .allowed_checked_exception_callables
+            .iter()
+            .map(|entry| normalize_allowed_checked_exception_callable(entry))
+            .collect(),
         unchecked_exceptions: settings.unchecked_exceptions.iter().map(|e| mago_word::word(e.as_bytes())).collect(),
         unchecked_exception_classes: settings
             .unchecked_exception_classes
@@ -510,7 +517,10 @@ mod tests {
                 "analyzer": {
                     "findOverlyWideReturnTypes": true,
                     "allowImplicitPipeCallableTypes": true,
-                    "allowSideEffectsInConditions": false
+                    "allowSideEffectsInConditions": false,
+                    "checkThrows": true,
+                    "forbidCheckedExceptionsInCallables": true,
+                    "allowedCheckedExceptionCallables": ["\\TrustedDispatcher::Consume:0"]
                 }
             }"#,
         );
@@ -523,5 +533,12 @@ mod tests {
         assert!(analyzer_settings.find_overly_wide_return_types);
         assert!(analyzer_settings.allow_implicit_pipe_callable_types);
         assert!(!analyzer_settings.allow_side_effects_in_conditions);
+        assert!(analyzer_settings.check_throws);
+        assert!(analyzer_settings.forbid_checked_exceptions_in_callables);
+        assert!(
+            analyzer_settings
+                .allowed_checked_exception_callables
+                .contains(&mago_word::word(b"trusteddispatcher::consume:0"))
+        );
     }
 }

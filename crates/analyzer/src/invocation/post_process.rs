@@ -146,7 +146,7 @@ where
         }
     }
 
-    if context.settings.check_throws {
+    if context.settings.check_throws && !block_context.flags.inside_definitely_unreachable_code() {
         let external_throw_types = match identifier {
             FunctionLikeIdentifier::Function(name) => context.plugin_registry.get_external_function_thrown_exceptions(
                 context.codebase,

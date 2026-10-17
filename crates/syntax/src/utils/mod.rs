@@ -10,10 +10,12 @@ use crate::cst::Expression;
 use crate::cst::ForBody;
 use crate::cst::ForeachBody;
 use crate::cst::IfBody;
+use crate::cst::Literal;
 use crate::cst::MatchArm;
 use crate::cst::PartialApplication;
 use crate::cst::Return;
 use crate::cst::Statement;
+use crate::cst::Switch;
 use crate::cst::SwitchBody;
 use crate::cst::SwitchCase;
 use crate::cst::WhileBody;
@@ -24,6 +26,44 @@ pub mod condition;
 pub mod control_flow;
 pub mod definition;
 pub mod reference;
+
+#[inline]
+#[must_use]
+pub fn unparenthesized_expression<'ast, 'arena>(mut expression: &'ast Expression<'arena>) -> &'ast Expression<'arena> {
+    while let Expression::Parenthesized(parenthesized) = expression {
+        expression = parenthesized.expression;
+    }
+
+    expression
+}
+
+#[inline]
+#[must_use]
+pub fn known_integer_switch_start(switch: &Switch<'_>) -> Option<Option<usize>> {
+    let switch_value = integer_literal_value(switch.expression)?;
+    let mut default_index = None;
+
+    for (index, case) in switch.body.cases().iter().enumerate() {
+        let Some(case_expression) = case.expression() else {
+            default_index = Some(index);
+
+            continue;
+        };
+
+        if integer_literal_value(case_expression)? == switch_value {
+            return Some(Some(index));
+        }
+    }
+
+    Some(default_index)
+}
+
+fn integer_literal_value(expression: &Expression<'_>) -> Option<u64> {
+    match unparenthesized_expression(expression) {
+        Expression::Literal(Literal::Integer(literal)) => literal.value,
+        _ => None,
+    }
+}
 
 #[inline]
 #[must_use]

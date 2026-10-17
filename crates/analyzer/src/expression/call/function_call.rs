@@ -1,5 +1,6 @@
 use mago_allocator::Arena;
 use mago_codex::identifier::function_like::FunctionLikeIdentifier;
+use mago_codex::metadata::parameter::CallableExceptionCatchSummary;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::callable::TCallable;
 use mago_codex::ttype::atomic::callable::TCallableSignature;
@@ -15,6 +16,7 @@ use mago_word::word;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
+use crate::artifacts::CallableStorageLocation;
 use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
@@ -24,8 +26,10 @@ use crate::expression::call::get_function_like_target;
 use crate::expression::call::get_function_like_target_with_skip;
 use crate::invocation::InvocationArgumentsSource;
 use crate::invocation::InvocationTarget;
+use crate::invocation::callbacks::immediate_callable_parameter_offset;
 use crate::plugin::ExpressionHookResult;
 use crate::plugin::context::HookContext;
+use crate::utils::expression::get_block_expression_id;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for FunctionCall<'arena> {
     fn analyze<'ctx, A>(
@@ -73,6 +77,17 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for FunctionCall<'arena> {
             false,
             false, // object_has_nullsafe_null - not applicable for function calls
         )?;
+
+        if context.settings.check_throws
+            && !block_context.flags.inside_definitely_unreachable_code()
+            && let Some(parameter_offset) = immediate_callable_parameter_offset(block_context, self.function)
+        {
+            artifacts.record_callback_parameter_invocation(
+                self.span(),
+                parameter_offset,
+                vec![CallableExceptionCatchSummary { catch_groups: Vec::new() }],
+            );
+        }
 
         if context.plugin_registry.has_function_call_hooks() {
             let mut hook_context = HookContext::new(context.codebase, context.source_file, block_context, artifacts);
@@ -141,8 +156,20 @@ where
     block_context.flags.set_inside_call(true);
     expression.analyze(context, block_context, artifacts)?;
     block_context.flags.set_inside_call(was_inside_call);
-    let Some(expression_type) = artifacts.get_expression_type(expression) else {
+    let Some(expression_type) = artifacts.get_expression_type(expression).cloned() else {
         return Ok((vec![], false));
+    };
+
+    let storage_location = if context.settings.check_throws
+        && context.settings.forbid_checked_exceptions_in_callables
+        && crate::callables::is_local_callable_storage_expression(expression)
+    {
+        get_block_expression_id(expression, context, block_context).map(|variable| CallableStorageLocation {
+            scope: block_context.scope.get_function_like_identifier(),
+            variable,
+        })
+    } else {
+        None
     };
 
     let mut encountered_invalid_targets = false;
@@ -157,6 +184,19 @@ where
         if let Some(callable) = cast_atomic_to_callable(atomic, context.codebase, Some(template_result)) {
             match callable.as_ref() {
                 TCallable::Signature(callable_signature) => {
+                    if let Some(identifier) = callable_signature.get_source()
+                        && context.settings.check_throws
+                        && context.settings.forbid_checked_exceptions_in_callables
+                        && !block_context.flags.inside_definitely_unreachable_code()
+                    {
+                        artifacts.record_direct_callable_invocation(
+                            identifier,
+                            storage_location,
+                            expression.span(),
+                            block_context.scope.get_function_like_identifier(),
+                        );
+                    }
+
                     if let Some(id) = callable_signature.get_source()
                         && let Some(mut target) = get_function_like_target(
                             context,
@@ -189,6 +229,18 @@ where
                     });
                 }
                 TCallable::Alias(id) => {
+                    if context.settings.check_throws
+                        && context.settings.forbid_checked_exceptions_in_callables
+                        && !block_context.flags.inside_definitely_unreachable_code()
+                    {
+                        artifacts.record_direct_callable_invocation(
+                            *id,
+                            storage_location,
+                            expression.span(),
+                            block_context.scope.get_function_like_identifier(),
+                        );
+                    }
+
                     if let Some(t) = get_function_like_target(context, *id, None, expression.span(), None) {
                         targets.push(t);
                     } else {

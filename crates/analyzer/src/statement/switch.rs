@@ -80,7 +80,7 @@ where
     new_locals: Option<WordMap<Rc<TUnion>>>,
     redefined_variables: Option<WordMap<Rc<TUnion>>>,
     possibly_redefined_variables: Option<WordMap<Rc<TUnion>>>,
-    leftover_statement_groups: Vec<(Vec<Statement<'arena>>, bool)>,
+    leftover_statement_groups: Vec<(Vec<Statement<'arena>>, bool, bool)>,
     leftover_case_equality_expression: Option<Expression<'arena>>,
     has_fallthrough: bool,
     has_reachable_fallthrough: bool,
@@ -164,6 +164,7 @@ where
         let mut previous_empty_cases = vec![];
 
         let mut previously_matching_case = None;
+        let mut previous_case_may_match = false;
         for (i, case) in cases.iter().enumerate() {
             let is_last = i == last_case_index;
 
@@ -187,6 +188,7 @@ where
                 is_last,
                 i,
                 previously_matching_case,
+                previous_case_may_match,
             );
             self.artifacts.finish_expression_type_checkpoint(match &result {
                 Ok((_, action)) => *action,
@@ -198,10 +200,34 @@ where
                 previously_matching_case = Some(case.span());
             }
 
+            if is_matching != Some(false) && !case.is_default() {
+                previous_case_may_match = true;
+            }
+
             previous_empty_cases = vec![];
         }
 
-        let all_options_returned = self.case_exit_types.values().all(|t| *t == ControlAction::Return);
+        let mut fallthrough_exits = false;
+        let mut all_options_exit = true;
+        for case_index in (0..self.case_actions.len()).rev() {
+            let Some(case_actions) = self.case_actions.get(&case_index) else {
+                fallthrough_exits = false;
+                all_options_exit = false;
+                continue;
+            };
+
+            fallthrough_exits = !case_actions.is_empty()
+                && case_actions.iter().all(|action| match action {
+                    ControlAction::None => fallthrough_exits,
+                    ControlAction::End
+                    | ControlAction::Break
+                    | ControlAction::BreakImmediateLoop
+                    | ControlAction::Continue
+                    | ControlAction::Return => true,
+                    ControlAction::LeaveSwitch | ControlAction::BreakTargetSwitch => false,
+                });
+            all_options_exit &= fallthrough_exits;
+        }
         let is_exhaustive = self.has_default_case || {
             let mut final_else_context = original_context.clone();
             let final_else_clauses: Vec<_> =
@@ -273,7 +299,7 @@ where
 
         self.artifacts.fully_matched_switch_offsets.insert(switch.start_position().offset);
         self.block_context.assigned_variable_ids.extend(self.new_assigned_variable_ids);
-        self.block_context.flags.set_has_returned(all_options_returned && is_exhaustive);
+        self.block_context.flags.set_has_returned(all_options_exit && is_exhaustive);
 
         Ok(())
     }
@@ -291,6 +317,7 @@ where
         is_last: bool,
         case_index: usize,
         previously_matching_case: Option<Span>,
+        previous_case_may_match: bool,
     ) -> Result<(Option<bool>, CheckpointAction), AnalysisError> {
         if self.context.settings.version.is_deprecated(Feature::SwitchSemicolonSeparators)
             && matches!(switch_case.separator(), SwitchCaseSeparator::SemiColon(_))
@@ -395,7 +422,22 @@ where
             let mut has_non_duplicate_empty_case = false;
             for previous_empty_case in previous_empty_cases {
                 previous_empty_case.expression.analyze(self.context, self.block_context, self.artifacts)?;
-                if !self.check_for_duplicate_case_condition(previous_empty_case.expression, true) {
+                let previous_empty_case_may_match = self
+                    .artifacts
+                    .get_rc_expression_type(previous_empty_case.expression)
+                    .is_none_or(|previous_condition_type| {
+                        !(switch_condition_type.is_true() && previous_condition_type.is_always_falsy())
+                            && can_expression_types_be_identical(
+                                self.context.codebase,
+                                switch_condition_type.as_ref(),
+                                previous_condition_type.as_ref(),
+                                false,
+                                true,
+                            )
+                    });
+                if previous_empty_case_may_match
+                    && !self.check_for_duplicate_case_condition(previous_empty_case.expression, true)
+                {
                     has_non_duplicate_empty_case = true;
                 }
             }
@@ -442,30 +484,29 @@ where
                             .with_note("This case condition will never match the switch subject's type.")
                             .with_help("Remove this case or ensure that the switch subject's type can still match it."),
                     );
-                } else if !is_last
-                    && ((switch_condition_type.is_true() && condition_type.is_always_truthy())
-                        || is_always_identical_to(condition_type.as_ref(), switch_condition_type.as_ref()))
+                } else if (switch_condition_type.is_true() && condition_type.is_always_truthy())
+                    || is_always_identical_to(condition_type.as_ref(), switch_condition_type.as_ref())
                 {
                     result = Some(true);
 
-                    self.context.collector.report_with_code(
-                        IssueCode::AlwaysMatchingSwitchCase,
-                        Issue::error("This switch case will always match, making subsequent cases unreachable.")
-                            .with_annotation(
-                                Annotation::primary(case_condition.span())
-                                    .with_message("This case will always match the subject."),
-                            )
-                            .with_annotation(
-                                Annotation::secondary(switch.expression.span()).with_message(format!(
+                    if !is_last {
+                        self.context.collector.report_with_code(
+                            IssueCode::AlwaysMatchingSwitchCase,
+                            Issue::error("This switch case will always match, making subsequent cases unreachable.")
+                                .with_annotation(
+                                    Annotation::primary(case_condition.span())
+                                        .with_message("This case will always match the subject."),
+                                )
+                                .with_annotation(Annotation::secondary(switch.expression.span()).with_message(format!(
                                     "Switch subject has type `{}`.",
                                     switch_condition_type.get_id()
-                                )),
-                            )
-                            .with_note("All subsequent `case` and `default` statements are unreachable.")
-                            .with_help(
-                                "Remove this case or rearrange the switch cases to ensure that this case is last.",
-                            ),
-                    );
+                                )))
+                                .with_note("All subsequent `case` and `default` statements are unreachable.")
+                                .with_help(
+                                    "Remove this case or rearrange the switch cases to ensure that this case is last.",
+                                ),
+                        );
+                    }
                 }
             }
 
@@ -499,7 +540,11 @@ where
 
             self.has_fallthrough = true;
             self.has_reachable_fallthrough = case_statements_are_reachable;
-            self.leftover_statement_groups.push((switch_case.statements().to_vec(), case_has_direct_entry));
+            self.leftover_statement_groups.push((
+                switch_case.statements().to_vec(),
+                case_has_direct_entry,
+                case_statements_are_reachable,
+            ));
             return Ok((result, CheckpointAction::Rollback));
         }
 
@@ -623,16 +668,31 @@ where
         }
 
         self.artifacts.case_scopes.push(CaseScope::new());
+        if previous_case_may_match || result != Some(true) {
+            case_block_context.flags.set_inside_potentially_skipped_code(true);
+        }
+        if !case_statements_are_reachable {
+            case_block_context.flags.set_inside_definitely_unreachable_code(true);
+        }
 
         if self.has_fallthrough {
             self.has_fallthrough = false;
 
-            for (leftover_statements, has_direct_entry) in std::mem::take(&mut self.leftover_statement_groups) {
+            for (leftover_statements, has_direct_entry, is_reachable) in
+                std::mem::take(&mut self.leftover_statement_groups)
+            {
+                let was_inside_definitely_unreachable_code =
+                    case_block_context.flags.inside_definitely_unreachable_code();
+                if !is_reachable {
+                    case_block_context.flags.set_inside_definitely_unreachable_code(true);
+                }
+
                 if has_direct_entry {
                     case_block_context.flags.set_has_returned(false);
                 }
 
                 analyze_statements(&leftover_statements, self.context, &mut case_block_context, self.artifacts)?;
+                case_block_context.flags.set_inside_definitely_unreachable_code(was_inside_definitely_unreachable_code);
             }
 
             if case_has_direct_entry {
@@ -929,12 +989,24 @@ where
     }
 
     fn update_case_exit_map(&mut self, case: &SwitchCase, case_index: usize) {
-        let actions_set = ControlAction::from_statements(
+        let mut break_types = self
+            .block_context
+            .break_types
+            .iter()
+            .map(|break_context| if break_context.is_switch() { BreakType::Switch } else { BreakType::Loop })
+            .collect::<Vec<_>>();
+        break_types.push(BreakType::Switch);
+
+        let mut actions_set = ControlAction::from_switch_case_statements(
             case.statements().iter().collect(),
-            vec![BreakType::Switch],
+            break_types,
             Some(self.artifacts),
             true,
         );
+        if actions_set.contains(ControlAction::BreakTargetSwitch) {
+            actions_set.retain(|action| action != ControlAction::BreakTargetSwitch);
+            actions_set.insert(ControlAction::LeaveSwitch);
+        }
 
         let effective_action = if actions_set.contains(ControlAction::None)
             && matches!(self.last_case_exit_type, ControlAction::Return)
@@ -957,6 +1029,14 @@ where
     }
 
     fn get_last_action(case_actions: &ControlActionSet) -> Option<ControlAction> {
+        if case_actions.len() == 1 && case_actions.contains(ControlAction::BreakImmediateLoop) {
+            return Some(ControlAction::BreakImmediateLoop);
+        }
+
+        if case_actions.len() == 1 && case_actions.contains(ControlAction::Break) {
+            return Some(ControlAction::Break);
+        }
+
         match (
             case_actions.len(),
             case_actions.contains(ControlAction::None),
