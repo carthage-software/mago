@@ -96,7 +96,7 @@ impl FunctionReturnTypeProvider for ArrayKeyExistsProvider {
 
 fn literal_array_key_from_expression(expr: &Expression<'_>) -> Option<ArrayKey> {
     match expr {
-        Expression::Literal(Literal::String(s)) => s.value.map(|v| ArrayKey::String(mago_word::word(v))),
+        Expression::Literal(Literal::String(s)) => s.value.map(|v| ArrayKey::from_string(mago_word::word(v))),
         Expression::Literal(Literal::Integer(i)) => i.value.and_then(|v| i64::try_from(v).ok()).map(ArrayKey::Integer),
         _ => None,
     }
