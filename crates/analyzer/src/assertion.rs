@@ -784,7 +784,7 @@ where
     }
 
     if let Some(null_position) = has_null_variable(left, right, artifacts) {
-        return get_null_equality_assertions(left, right, assertion_context, null_position);
+        return get_null_equality_assertions(left, is_identity, right, assertion_context, null_position);
     }
 
     if let Some(true_position) = has_true_variable(left, right, artifacts) {
@@ -1339,6 +1339,7 @@ where
 
 fn get_null_equality_assertions<A>(
     left: &Expression,
+    is_identity: bool,
     right: &Expression,
     assertion_context: AssertionContext<'_, '_, A>,
     null_position: OtherValuePosition,
@@ -1365,7 +1366,9 @@ where
         let var_name = assertion_context.get_expression_id(base_conditional);
 
         if let Some(var_name) = var_name {
-            if_types.insert(var_name, vec![vec![Assertion::IsType(TAtomic::Null)]]);
+            let assertion =
+                if is_identity { Assertion::IsType(TAtomic::Null) } else { Assertion::IsEqual(TAtomic::Null) };
+            if_types.insert(var_name, vec![vec![assertion]]);
         }
     }
 
