@@ -7,11 +7,14 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::sync::LazyLock;
 use std::time::Duration;
+use std::time::Instant;
 
+use criterion::BenchmarkGroup;
 use criterion::BenchmarkId;
 use criterion::Criterion;
 use criterion::criterion_group;
 use criterion::criterion_main;
+use criterion::measurement::WallTime;
 use mago_allocator::LocalArena;
 
 use foldhash::HashSet;
@@ -56,16 +59,7 @@ fn analyze_file_with_settings(path: &Path, content: &str, check_dead_catch: bool
     let resolver = NameResolver::new(&arena);
     let resolved_names = resolver.resolve(program);
 
-    let settings = Settings {
-        find_unused_expressions: true,
-        find_unused_definitions: true,
-        check_throws: true,
-        check_dead_catch,
-        allow_possibly_undefined_array_keys: false,
-        strict_list_index_checks: true,
-        check_property_initialization: true,
-        ..Default::default()
-    };
+    let settings = analyzer_settings(check_dead_catch, false);
 
     metadata.extend(scan_program(&arena, source_file, program, &resolved_names, settings.version));
     populate_codebase(&mut metadata, &mut symbol_references, WordSet::default(), HashSet::default());
@@ -76,6 +70,78 @@ fn analyze_file_with_settings(path: &Path, content: &str, check_dead_catch: bool
     if let Err(e) = analyzer.analyze(program, &mut analysis_result) {
         panic!("Analysis failed for {}: {e}", path.display());
     }
+}
+
+fn analyzer_settings(check_dead_catch: bool, find_overly_wide_throw_types: bool) -> Settings {
+    Settings {
+        find_unused_expressions: true,
+        find_unused_definitions: true,
+        find_overly_wide_throw_types,
+        check_throws: true,
+        check_dead_catch,
+        allow_possibly_undefined_array_keys: false,
+        strict_list_index_checks: true,
+        check_property_initialization: true,
+        ..Default::default()
+    }
+}
+
+fn bench_analysis_only(
+    group: &mut BenchmarkGroup<'_, WallTime>,
+    id: String,
+    path: &Path,
+    content: &str,
+    settings: Settings,
+) {
+    let Prelude { mut database, mut metadata, mut symbol_references } = PRELUDE.clone();
+    let file = File::ephemeral(
+        Cow::Owned(path.file_name().unwrap().to_string_lossy().into_owned().into_bytes()),
+        Cow::Owned(content.as_bytes().to_vec()),
+    );
+    let file_id = database.add(file);
+    let source_file = database.get_ref(&file_id).expect("file just added must exist");
+    let arena = LocalArena::new();
+    let program = parse_file(&arena, source_file);
+    if program.has_errors() {
+        panic!("Parse failed for {}: {:?}", path.display(), program.errors);
+    }
+
+    let resolver = NameResolver::new(&arena);
+    let resolved_names = resolver.resolve(program);
+
+    metadata.extend(scan_program(&arena, source_file, program, &resolved_names, settings.version));
+    populate_codebase(&mut metadata, &mut symbol_references, WordSet::default(), HashSet::default());
+
+    group.bench_function(id, |b| {
+        b.iter_custom(|iterations| {
+            let mut elapsed = Duration::ZERO;
+
+            for _ in 0..iterations {
+                let analysis_arena = LocalArena::new();
+                let analyzer = Analyzer::new(
+                    &analysis_arena,
+                    source_file,
+                    &resolved_names,
+                    &metadata,
+                    &PLUGIN_REGISTRY,
+                    settings.clone(),
+                );
+                let mut analysis_result = AnalysisResult::new(symbol_references.clone());
+
+                let started = Instant::now();
+                let analysis = analyzer.analyze(program, &mut analysis_result);
+                elapsed += started.elapsed();
+
+                if let Err(e) = analysis {
+                    panic!("Analysis failed for {}: {e}", path.display());
+                }
+
+                std::hint::black_box(analysis_result);
+            }
+
+            elapsed
+        });
+    });
 }
 
 const BENCHMARKED_PREFIXES: &[&str] = &["issue_", "psl_", "sealed_class_", "trait_", "conditional_", "too_wide_throws"];
@@ -128,13 +194,24 @@ fn bench_cases(c: &mut Criterion) {
         }
 
         let bench_name = prefix.trim_end_matches('_');
-        group.bench_with_input(BenchmarkId::from_parameter(bench_name), &files, |b, files| {
-            b.iter(|| {
-                for (p, c) in files {
-                    analyze_file(p, c);
-                }
+        if prefix == "too_wide_throws" {
+            for (path, content) in &files {
+                let id = if files.len() == 1 {
+                    bench_name.to_owned()
+                } else {
+                    format!("{bench_name}_{}", path.file_stem().and_then(|stem| stem.to_str()).unwrap_or("case"))
+                };
+                bench_analysis_only(&mut group, id, path, content, analyzer_settings(false, true));
+            }
+        } else {
+            group.bench_with_input(BenchmarkId::from_parameter(bench_name), &files, |b, files| {
+                b.iter(|| {
+                    for (p, c) in files {
+                        analyze_file(p, c);
+                    }
+                });
             });
-        });
+        }
     }
 
     group.finish();
@@ -153,9 +230,13 @@ fn bench_generic_throw_fixtures(c: &mut Criterion) {
             std::fs::read_to_string(&path).unwrap_or_else(|error| panic!("failed to read {}: {error}", path.display()));
         let check_dead_catch = *fixture == "generic_method_throw_dead_catch";
 
-        group.bench_function(*fixture, |b| {
-            b.iter(|| analyze_file_with_settings(&path, &content, check_dead_catch));
-        });
+        bench_analysis_only(
+            &mut group,
+            (*fixture).to_owned(),
+            &path,
+            &content,
+            analyzer_settings(check_dead_catch, true),
+        );
     }
 
     group.finish();

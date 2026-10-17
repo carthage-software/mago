@@ -2921,6 +2921,18 @@ test_case!(
     expected_issue_counts = [("too-wide-throw-type", 2)]
 );
 #[test]
+fn terminal_match_throw_preserves_unhandled_check() {
+    let content = include_bytes!("cases/flow_match_with_throw_arm_default.php");
+    crate::framework::TestCase::new(stringify!(terminal_match_throw_preserves_unhandled_check), content)
+        .settings(mago_analyzer::settings::Settings {
+            check_throws: true,
+            find_overly_wide_throw_types: true,
+            ..Default::default()
+        })
+        .expect_issue_code_count("unhandled-thrown-type", 1)
+        .run();
+}
+#[test]
 fn too_wide_terminal_match_throw_disabled() {
     let content = include_bytes!("cases/too_wide_terminal_match_throw.php");
     crate::framework::TestCase::new(stringify!(too_wide_terminal_match_throw_disabled), content)
