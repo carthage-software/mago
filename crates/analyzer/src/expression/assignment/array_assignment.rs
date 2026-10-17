@@ -151,6 +151,7 @@ where
     let root_array_type = Rc::new(root_array_type);
     if let Some(root_var_id) = &root_var_id {
         block_context.locals.insert(*root_var_id, Rc::clone(&root_array_type));
+        block_context.assigned_variable_ids.insert(*root_var_id, array_target.span().start_offset());
 
         if let Some(constraint) = block_context.by_reference_constraints.get(root_var_id)
             && let Some(constraint_type) = constraint.constraint_type.as_ref()

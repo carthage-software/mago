@@ -103,7 +103,7 @@ where
     externally_applied_context.flags.set_inside_conditional(was_inside_conditional);
 
     let if_body_context = if_body_context.unwrap_or_else(|| externally_applied_context.clone());
-    let post_if_context = externally_applied_context.clone();
+    let mut post_if_context = externally_applied_context.clone();
     let mut conditionally_referenced_variable_ids;
     let assigned_in_conditional_variable_ids;
     let newish_var_ids;
@@ -128,6 +128,15 @@ where
         if_conditional_context.flags.set_inside_conditional(true);
         condition.analyze(context, &mut if_conditional_context, artifacts)?;
         if_conditional_context.flags.set_inside_conditional(was_inside_conditional);
+
+        for variable_id in if_conditional_context.assigned_variable_ids.keys() {
+            if post_if_context.locals.contains_key(variable_id)
+                && let Some(variable_type) = if_conditional_context.locals.get(variable_id)
+            {
+                post_if_context.locals.insert(*variable_id, Rc::clone(variable_type));
+                externally_applied_context.locals.insert(*variable_id, Rc::clone(variable_type));
+            }
+        }
 
         if_conditional_context.conditionally_referenced_variable_ids.extend(first_cond_referenced_var_ids);
         if_conditional_context.assigned_variable_ids.extend(first_cond_assigned_var_ids);

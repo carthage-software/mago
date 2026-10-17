@@ -56,11 +56,18 @@ pub struct ResolvedMethodCall {
 }
 
 #[derive(Debug, Clone)]
+pub(crate) struct ShortCircuitAssignmentTypes {
+    pub when_true: WordMap<Rc<TUnion>>,
+    pub when_false: WordMap<Rc<TUnion>>,
+}
+
+#[derive(Debug, Clone)]
 pub struct AnalysisArtifacts {
     pub expression_types: HashMap<(u32, u32), Rc<TUnion>>,
     pub if_true_assertions: HashMap<(u32, u32), WordMap<AssertionSet>>,
     pub if_false_assertions: HashMap<(u32, u32), WordMap<AssertionSet>>,
     pub true_branch_only_assertions: HashMap<(u32, u32), WordMap<AssertionSet>>,
+    pub(crate) short_circuit_assignment_types: HashMap<(u32, u32), ShortCircuitAssignmentTypes>,
     pub inferred_return_types: Vec<Rc<TUnion>>,
     pub inferred_yield_key_types: Vec<TUnion>,
     pub inferred_yield_value_types: Vec<TUnion>,
@@ -101,6 +108,7 @@ impl AnalysisArtifacts {
             if_true_assertions: HashMap::default(),
             if_false_assertions: HashMap::default(),
             true_branch_only_assertions: HashMap::default(),
+            short_circuit_assignment_types: HashMap::default(),
             symbol_references: SymbolReferences::new(),
             case_scopes: Vec::new(),
             loop_scope: None,
