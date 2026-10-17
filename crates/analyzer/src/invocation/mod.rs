@@ -39,6 +39,7 @@ mod parameter_tests;
 pub(crate) use resolver::resolve_invocation_type;
 
 pub(crate) mod arguments;
+pub(crate) mod callbacks;
 
 pub mod analyzer;
 pub mod post_process;

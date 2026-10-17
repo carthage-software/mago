@@ -57,6 +57,8 @@ use crate::invocation::InvocationTargetParameter;
 use crate::invocation::arguments::analyze_and_store_argument_type;
 use crate::invocation::arguments::get_unpacked_argument_type;
 use crate::invocation::arguments::verify_argument_type;
+use crate::invocation::callbacks::builtin_callback_spec;
+use crate::invocation::callbacks::immediate_builtin_callback_map_values;
 use crate::invocation::resolver::resolve_invocation_type;
 use crate::invocation::template_inference::infer_parameter_templates_from_argument;
 use crate::invocation::template_inference::infer_parameter_templates_from_default;
@@ -64,6 +66,7 @@ use crate::invocation::template_result::get_class_template_parameters_from_resul
 use crate::invocation::template_result::populate_template_result_from_invocation;
 use crate::invocation::template_result::refine_template_result_for_function_like;
 use crate::utils::expression::get_block_expression_id;
+use crate::utils::misc::unwrap_expression;
 
 fn narrow_class_related_argument<A>(
     context: &Context<'_, '_, A>,
@@ -188,6 +191,7 @@ where
     populate_template_result_from_invocation(context, invocation, template_result);
 
     let arg_count = invocation.arguments_source.argument_count();
+    let callback_spec = if context.settings.check_throws { builtin_callback_spec(&invocation.target) } else { None };
     let mut analyzed_argument_types = vec![None; arg_count];
 
     let mut non_closure_arguments = Vec::with_capacity(arg_count);
@@ -228,7 +232,39 @@ where
             } else {
                 get_parameter_of_argument(&invocation.target, &argument, offset)
             };
-            if matches!(argument.value(), Some(Expression::Closure(_) | Expression::ArrowFunction(_))) {
+            let value = argument.value().map(unwrap_expression);
+            let is_closure_argument =
+                value.is_some_and(|value| matches!(value, Expression::Closure(_) | Expression::ArrowFunction(_)));
+
+            if context.settings.check_throws {
+                if is_closure_argument
+                    && parameter.is_some_and(|(parameter_offset, _)| {
+                        callback_spec.is_some_and(|spec| {
+                            spec.is_immediate_callback_argument(
+                                parameter_offset,
+                                offset,
+                                invocation.arguments_source.argument_count(),
+                            )
+                        })
+                    })
+                    && let Some(value) = value
+                {
+                    artifacts.register_immediate_callback_expression(value.span());
+                }
+
+                if parameter.is_some_and(|(parameter_offset, _)| {
+                    callback_spec.is_some_and(|spec| spec.callback_map_parameter_offset() == Some(parameter_offset))
+                }) && let Some(value) = value
+                {
+                    for callback_value in immediate_builtin_callback_map_values(value) {
+                        if matches!(callback_value, Expression::Closure(_) | Expression::ArrowFunction(_)) {
+                            artifacts.register_immediate_callback_expression(callback_value.span());
+                        }
+                    }
+                }
+            }
+
+            if is_closure_argument {
                 closure_arguments.push((offset, parameter));
             } else {
                 non_closure_arguments.push((offset, parameter));
