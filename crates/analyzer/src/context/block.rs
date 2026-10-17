@@ -114,6 +114,8 @@ pub struct BlockContext<'ctx> {
     pub control_actions: ControlActionSet,
     pub possibly_thrown_exceptions: WordMap<HashSet<Span>>,
     pub possibly_thrown_generic_exceptions: HashSet<PossiblyThrownGenericException>,
+    pub possibly_thrown_exceptions_for_too_wide: WordMap<HashSet<Span>>,
+    pub possibly_thrown_generic_exceptions_for_too_wide: HashSet<PossiblyThrownGenericException>,
 
     /// Properties that are DEFINITELY initialized in ALL code paths.
     /// Uses intersection semantics - a property must be initialized in ALL branches.
@@ -246,6 +248,8 @@ impl<'ctx> BlockContext<'ctx> {
             control_actions: ControlActionSet::new(),
             possibly_thrown_exceptions: WordMap::default(),
             possibly_thrown_generic_exceptions: HashSet::default(),
+            possibly_thrown_exceptions_for_too_wide: WordMap::default(),
+            possibly_thrown_generic_exceptions_for_too_wide: HashSet::default(),
             definitely_initialized_properties: WordSet::default(),
             possibly_initialized_properties: WordSet::default(),
             definitely_uninitialized_property_ids: WordSet::default(),

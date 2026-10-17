@@ -809,19 +809,31 @@ where
     fn merge_match_contexts(&mut self, arm_exit_contexts: &[BlockContext<'ctx>]) {
         let reachable_contexts: Vec<_> = arm_exit_contexts.iter().filter(|c| !c.flags.has_returned()).collect();
 
-        // Terminal arms are excluded below, but their thrown exceptions still escape the match.
-        for context in arm_exit_contexts {
-            for (exception, spans) in &context.possibly_thrown_exceptions {
-                self.block_context
-                    .possibly_thrown_exceptions
-                    .entry(*exception)
-                    .or_default()
-                    .extend(spans.iter().copied());
-            }
+        if self.context.settings.check_throws || self.context.settings.find_overly_wide_throw_types {
+            for context in arm_exit_contexts.iter().filter(|context| context.flags.has_returned()) {
+                let (exceptions, generic_exceptions) = if self.context.settings.check_throws {
+                    (
+                        &mut self.block_context.possibly_thrown_exceptions,
+                        &mut self.block_context.possibly_thrown_generic_exceptions,
+                    )
+                } else {
+                    (
+                        &mut self.block_context.possibly_thrown_exceptions_for_too_wide,
+                        &mut self.block_context.possibly_thrown_generic_exceptions_for_too_wide,
+                    )
+                };
 
-            self.block_context
-                .possibly_thrown_generic_exceptions
-                .extend(context.possibly_thrown_generic_exceptions.iter().cloned());
+                for (exception, spans) in &context.possibly_thrown_exceptions {
+                    exceptions.entry(*exception).or_default().extend(spans.iter().copied());
+                }
+
+                for (exception, spans) in &context.possibly_thrown_exceptions_for_too_wide {
+                    exceptions.entry(*exception).or_default().extend(spans.iter().copied());
+                }
+
+                generic_exceptions.extend(context.possibly_thrown_generic_exceptions.iter().cloned());
+                generic_exceptions.extend(context.possibly_thrown_generic_exceptions_for_too_wide.iter().cloned());
+            }
         }
 
         if reachable_contexts.is_empty() {

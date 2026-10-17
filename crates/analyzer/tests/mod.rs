@@ -1953,6 +1953,7 @@ test_case!(flow_match_unhandled_thrown);
 test_case!(flow_match_unreachable_arm);
 test_case!(flow_match_with_default);
 test_case!(flow_match_with_throw_arm);
+test_case!(flow_match_with_throw_arm_default, mago_analyzer::settings::Settings::default());
 test_case!(flow_method_call_invalidates);
 test_case!(flow_method_on_possibly_null);
 test_case!(flow_method_return_narrow);
@@ -2914,6 +2915,18 @@ test_case!(
     mago_analyzer::settings::Settings { find_overly_wide_throw_types: true, ..Default::default() },
     expected_issue_counts = [("too-wide-throw-type", 1)]
 );
+test_case!(
+    too_wide_terminal_match_throw,
+    mago_analyzer::settings::Settings { find_overly_wide_throw_types: true, ..Default::default() },
+    expected_issue_counts = [("too-wide-throw-type", 2)]
+);
+#[test]
+fn too_wide_terminal_match_throw_disabled() {
+    let content = include_bytes!("cases/too_wide_terminal_match_throw.php");
+    crate::framework::TestCase::new(stringify!(too_wide_terminal_match_throw_disabled), content)
+        .settings(mago_analyzer::settings::Settings::default())
+        .run();
+}
 test_case!(generic_throw_template_bound_chain);
 test_case!(generic_method_throw_dead_catch, {
     let mut settings = default_test_settings();

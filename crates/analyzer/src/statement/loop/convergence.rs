@@ -402,6 +402,8 @@ fn same_flow(left: &BlockContext<'_>, right: &BlockContext<'_>) -> bool {
         && left.control_actions == right.control_actions
         && left.possibly_thrown_exceptions == right.possibly_thrown_exceptions
         && left.possibly_thrown_generic_exceptions == right.possibly_thrown_generic_exceptions
+        && left.possibly_thrown_exceptions_for_too_wide == right.possibly_thrown_exceptions_for_too_wide
+        && left.possibly_thrown_generic_exceptions_for_too_wide == right.possibly_thrown_generic_exceptions_for_too_wide
         && left.definitely_initialized_properties == right.definitely_initialized_properties
         && left.possibly_initialized_properties == right.possibly_initialized_properties
         && left.definitely_uninitialized_property_ids == right.definitely_uninitialized_property_ids
