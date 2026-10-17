@@ -1827,7 +1827,9 @@ fn is_unbound_class_template(
             .is_some_and(|parameters| parameters.contains_key(&parameter.parameter_name))
 }
 
-fn get_iterator_method_return_type(
+/// Gets the specialized return type of an iterator protocol method.
+#[must_use]
+pub fn get_iterator_method_return_type(
     codebase: &CodebaseMetadata,
     class_metadata: &ClassLikeMetadata,
     type_parameters: Option<&[TUnion]>,
