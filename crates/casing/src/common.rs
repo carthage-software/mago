@@ -97,9 +97,10 @@ pub(crate) fn is_case_camel_like(input: &[u8], options: CamelLikeOptions) -> boo
             continue;
         }
 
+        // Digits have no case: they neither start nor end a word, so a letter
+        // after a digit keeps its case (`isB2b`, `x5c`).
         if is_ascii_digit(byte) && options.concat_num {
             found_real_char = true;
-            new_word = true;
 
             if !emit_checked(input, &mut output_index, byte) {
                 return false;
@@ -167,7 +168,6 @@ fn convert_camel_like(input: &[u8], options: CamelLikeOptions) -> Vec<u8> {
 
         if is_ascii_digit(byte) && options.concat_num {
             found_real_char = true;
-            new_word = true;
             output.push(byte);
             index += 1;
             continue;
