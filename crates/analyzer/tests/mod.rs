@@ -2920,6 +2920,8 @@ fn issue_2478_php84() {
     framework::TestCase::new("issue_2478", include_bytes!("cases/issue_2478.php")).settings(settings).run();
 }
 
+test_case!(chained_logical_or_assignment_subsequent_operand);
+
 #[test]
 #[cfg_attr(miri, ignore)]
 fn test_all_test_cases_are_ran() {

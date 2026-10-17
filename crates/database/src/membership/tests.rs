@@ -202,3 +202,191 @@ fn nested_symlink_packages_keep_the_loaders_source_type_and_exclusions() {
     assert!(!matcher.can_contain_files(&config.workspace.join("cache")));
     assert_eq!(matcher.classify(&config.workspace.join("vendor/../../Outside.php")), None);
 }
+
+#[cfg(unix)]
+#[test]
+fn git_ignored_symlinks_keep_the_loaders_source_type() {
+    let dir = fixture(&["src/Main.php"]);
+    std::fs::create_dir_all(dir.path().join(".git")).unwrap();
+    std::fs::write(dir.path().join(".gitignore"), "/vendor/\n").unwrap();
+    let package = fixture(&["Service.php"]);
+    std::fs::create_dir_all(dir.path().join("vendor")).unwrap();
+    std::os::unix::fs::symlink(package.path(), dir.path().join("vendor/package")).unwrap();
+    let root = dir.path().canonicalize().unwrap().to_string_lossy().into_owned();
+    let config = configuration(&dir, &[&root], &[], &[]);
+    let ignores = std::sync::Arc::new(crate::git::GitIgnores::discover_with_global(dir.path(), None).unwrap());
+    let matcher =
+        WorkspaceMatcher::from_configuration(&config).unwrap().with_git_ignores(std::sync::Arc::clone(&ignores));
+    let database = DatabaseLoader::new(config.clone()).with_git_ignores(ignores).load().unwrap();
+    for (name, expected) in [("src/Main.php", FileType::Host), ("vendor/package/Service.php", FileType::Vendored)] {
+        let path = config.workspace.join(name);
+        let loaded =
+            database.files().find(|file| file.path.as_deref() == Some(path.as_path())).map(|file| file.file_type);
+        assert_eq!(loaded, Some(expected), "loader: {name}");
+        assert_eq!(matcher.classify(&path), Some(expected), "matcher: {name}");
+    }
+    assert_eq!(matcher.classify(&config.workspace.join("vendor/package/New.php")), Some(FileType::Vendored));
+}
+
+#[test]
+fn directory_globs_exclude_nested_files_like_the_loader() {
+    let dir = fixture(&["generated/Top.php", "generated/deep/Nested.php", "generatedx/Kept.php", "src/Main.php"]);
+    let root = dir.path().canonicalize().unwrap().to_string_lossy().into_owned();
+    let mut config = configuration(&dir, &[&root], &[], &[]);
+    config.glob.literal_separator = true;
+    config.excludes = vec![Exclusion::Pattern(Cow::Borrowed("generated/*"))];
+    let matcher = WorkspaceMatcher::from_configuration(&config).unwrap();
+    assert_rows(
+        &config,
+        &matcher,
+        &[
+            ("generated/Top.php", None),
+            ("generated/deep/Nested.php", None),
+            ("generatedx/Kept.php", Some(FileType::Host)),
+            ("src/Main.php", Some(FileType::Host)),
+        ],
+    );
+    assert_eq!(matcher.classify(&config.workspace.join("generated/new/Created.php")), None);
+}
+
+#[test]
+fn directory_globs_prune_only_below_each_walked_source_root() {
+    let dir = fixture(&["generated/Top.php", "generated/deep/Old.php"]);
+    let shared = fixture(&["cache/Top.php", "cache/deep/Old.php", "Kept.php"]);
+    let shared_root = shared.path().canonicalize().unwrap().to_string_lossy().into_owned();
+    let mut config = configuration(&dir, &["generated", &shared_root], &[], &[]);
+    config.glob.literal_separator = true;
+    config.excludes = vec![
+        Exclusion::Pattern(Cow::Borrowed("generated/*")),
+        Exclusion::Pattern(Cow::Owned(format!("{shared_root}/cache/*"))),
+    ];
+    let matcher = WorkspaceMatcher::from_configuration(&config).unwrap();
+    assert_rows(&config, &matcher, &[("generated/Top.php", None), ("generated/deep/Old.php", Some(FileType::Host))]);
+    assert_eq!(matcher.classify(&config.workspace.join("generated/deep/New.php")), Some(FileType::Host));
+    assert!(matcher.can_contain_files(&config.workspace.join("generated/deep")));
+    assert!(matcher.can_contain_files(&config.workspace.join("generated/new")));
+
+    let database = DatabaseLoader::new(config.clone()).load().unwrap();
+    for (name, expected) in [("cache/Top.php", None), ("cache/deep/Old.php", None), ("Kept.php", Some(FileType::Host))]
+    {
+        let path = shared.path().canonicalize().unwrap().join(name);
+        let loaded =
+            database.files().find(|file| file.path.as_deref() == Some(path.as_path())).map(|file| file.file_type);
+        assert_eq!(loaded, expected, "loader: {name}");
+        assert_eq!(matcher.classify(&path), expected, "matcher: {name}");
+    }
+    assert_eq!(matcher.classify(&shared.path().canonicalize().unwrap().join("cache/deep/New.php")), None);
+    assert!(!matcher.can_contain_files(&shared.path().canonicalize().unwrap().join("cache/deep")));
+    assert!(matcher.can_contain_files(&shared.path().canonicalize().unwrap().join("other")));
+}
+
+#[test]
+fn pruned_directories_cannot_contain_files_and_file_globs_never_prune_them() {
+    let dir = fixture(&["generated/deep/Old.php", "vendor/package/Library.php"]);
+    let mut config = configuration(&dir, &["."], &["vendor"], &[]);
+    config.glob.literal_separator = true;
+    config.excludes =
+        vec![Exclusion::Pattern(Cow::Borrowed("generated/*")), Exclusion::Pattern(Cow::Borrowed("**/vendor"))];
+    let matcher = WorkspaceMatcher::from_configuration(&config).unwrap();
+    assert_rows(
+        &config,
+        &matcher,
+        &[("generated/deep/Old.php", None), ("vendor/package/Library.php", Some(FileType::Vendored))],
+    );
+    assert!(!matcher.can_contain_files(&config.workspace.join("generated")));
+    assert!(!matcher.can_contain_files(&config.workspace.join("generated/deep")));
+    assert!(matcher.can_contain_files(&config.workspace.join("vendor")));
+    assert!(matcher.watch_roots().any(|root| root == config.workspace.join("vendor")));
+}
+
+#[cfg(unix)]
+#[test]
+fn pruned_symlink_aliases_keep_the_path_the_loader_reads() {
+    let dir = fixture(&["src/deep/Old.php"]);
+    std::os::unix::fs::symlink(dir.path().join("src"), dir.path().join("generated")).unwrap();
+    let root = dir.path().canonicalize().unwrap().to_string_lossy().into_owned();
+    let mut config = configuration(&dir, &[&root], &[], &[]);
+    config.glob.literal_separator = true;
+    config.excludes = vec![Exclusion::Pattern(Cow::Borrowed("generated/*"))];
+    let matcher = WorkspaceMatcher::from_configuration(&config).unwrap();
+    let database = DatabaseLoader::new(config.clone()).load().unwrap();
+    let paths: Vec<_> = database.files().filter_map(|file| file.path.clone()).collect();
+    assert_eq!(paths, [config.workspace.join("src/deep/Old.php")]);
+
+    let requested = config.workspace.join("generated/deep/New.php");
+    let resolved = config.workspace.join("src/deep/New.php");
+    assert_eq!(matcher.classify(&requested), Some(FileType::Host));
+    assert_eq!(matcher.source_path(&requested, &resolved), resolved.as_path());
+    let kept = config.workspace.join("src/deep/New.php");
+    assert_eq!(matcher.source_path(&kept, &kept), kept.as_path());
+}
+
+#[test]
+fn command_exclusions_follow_the_sources_they_are_added_to() {
+    let dir = fixture(&[
+        "generated/Top.php",
+        "generated/deep/Old.php",
+        "vendor/generated/Top.php",
+        "vendor/generated/deep/Service.php",
+        "vendor/other/Kept.php",
+        "patches/generated/deep/Patch.php",
+    ]);
+
+    let excludes = [
+        Exclusion::Pattern(Cow::Borrowed("generated/*")),
+        Exclusion::Pattern(Cow::Borrowed("vendor/generated/*")),
+        Exclusion::Pattern(Cow::Borrowed("patches/generated/*")),
+    ];
+
+    let glob = GlobSettings { literal_separator: true, ..GlobSettings::default() };
+    for (paths, nested_excluded) in [(vec!["generated"], false), (vec!["."], true)] {
+        let config = configuration(&dir, &paths, &["vendor"], &["patches"]);
+        let matcher = WorkspaceMatcher::from_configuration(&config).unwrap();
+        let exclusions = matcher.exclusions(&excludes, glob).unwrap();
+        let mut command = config.clone();
+        command.glob = glob;
+        command.excludes = excludes.to_vec();
+        let database = DatabaseLoader::new(command).load().unwrap();
+        for (name, file_type, excluded) in [
+            ("generated/Top.php", FileType::Host, true),
+            ("generated/deep/Old.php", FileType::Host, nested_excluded),
+            ("vendor/generated/Top.php", FileType::Vendored, true),
+            ("vendor/generated/deep/Service.php", FileType::Vendored, true),
+            ("vendor/other/Kept.php", FileType::Vendored, false),
+            ("patches/generated/deep/Patch.php", FileType::Patch, true),
+        ] {
+            let path = config.workspace.join(name);
+            assert_eq!(exclusions.is_excluded(&path, file_type), excluded, "exclusions: {name} {paths:?}");
+            let loaded = database.files().find(|file| file.path.as_deref() == Some(path.as_path()));
+            assert_eq!(loaded.map(|file| file.file_type), (!excluded).then_some(file_type), "loader: {name} {paths:?}");
+        }
+    }
+}
+
+#[cfg(unix)]
+#[test]
+fn git_ignores_use_the_path_the_registry_keeps() {
+    let repository = fixture(&["app/src/Main.php"]);
+    std::fs::create_dir_all(repository.path().join(".git")).unwrap();
+    std::fs::write(repository.path().join(".gitignore"), "/app/cache/\n").unwrap();
+    std::fs::create_dir_all(repository.path().join("app/cache")).unwrap();
+    std::os::unix::fs::symlink(repository.path().join("app/cache"), repository.path().join("alias")).unwrap();
+    let workspace = repository.path().join("app").canonicalize().unwrap();
+    let config = DatabaseConfiguration {
+        workspace: Cow::Owned(workspace.clone()),
+        paths: vec![Cow::Owned(workspace.to_string_lossy().into_owned().into_bytes())],
+        includes: Vec::new(),
+        patches: Vec::new(),
+        excludes: Vec::new(),
+        extensions: vec![Cow::Borrowed(b"php")],
+        glob: GlobSettings::default(),
+    };
+    let ignores = std::sync::Arc::new(crate::git::GitIgnores::discover_with_global(&workspace, None).unwrap());
+    let matcher = WorkspaceMatcher::from_configuration(&config).unwrap().with_git_ignores(ignores);
+    let alias = repository.path().canonicalize().unwrap().join("alias/New.php");
+    let resolved = workspace.join("cache/New.php");
+
+    assert_eq!(matcher.source_path(&alias, &resolved), resolved.as_path());
+    assert_eq!(matcher.classify(&alias), Some(FileType::Vendored));
+    assert_eq!(matcher.classify(&workspace.join("src/Main.php")), Some(FileType::Host));
+}

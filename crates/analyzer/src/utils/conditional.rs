@@ -74,28 +74,22 @@ where
     let pre_referenced_var_ids = std::mem::take(&mut externally_applied_context.conditionally_referenced_variable_ids);
     let pre_assigned_var_ids = std::mem::take(&mut externally_applied_context.assigned_variable_ids);
 
-    let has_pre_condition_if_body_context =
-        expressions_differ(externally_applied_if_cond_expr, internally_applied_if_cond_expr);
-
-    let mut if_body_context = None;
-    if has_pre_condition_if_body_context {
-        if_body_context = Some(externally_applied_context.clone());
-    }
+    let must_reanalyze_full_condition = expressions_differ(internally_applied_if_cond_expr, condition)
+        || expressions_differ(externally_applied_if_cond_expr, condition);
+    let if_body_context = must_reanalyze_full_condition.then(|| externally_applied_context.clone());
 
     let was_inside_conditional = externally_applied_context.flags.inside_conditional();
 
     // When the second pass below runs it re-covers everything this pass touches, so record and
     // discard this pass's diagnostics to avoid reporting them twice; its type/data-flow effects
     // are kept regardless.
-    let must_reanalyze_full_condition = expressions_differ(internally_applied_if_cond_expr, condition)
-        || expressions_differ(externally_applied_if_cond_expr, condition);
-
     externally_applied_context.flags.set_inside_conditional(true);
     let tmp_if_body_context = std::mem::take(&mut externally_applied_context.if_body_context);
     if must_reanalyze_full_condition {
         context.collector.start_recording();
     }
-    externally_applied_if_cond_expr.analyze(context, externally_applied_context, artifacts)?;
+    let first_condition = if must_reanalyze_full_condition { externally_applied_if_cond_expr } else { condition };
+    first_condition.analyze(context, externally_applied_context, artifacts)?;
     if must_reanalyze_full_condition {
         context.collector.finish_recording();
     }
@@ -129,9 +123,6 @@ where
         if_conditional_context.if_body_context = Some(Rc::new(RefCell::new(if_body_context)));
         if_conditional_context.assigned_variable_ids = WordMap::default();
         if_conditional_context.conditionally_referenced_variable_ids.clear();
-        if !has_pre_condition_if_body_context {
-            if_conditional_context.locals.clone_from(&pre_condition_locals);
-        }
 
         let was_inside_conditional = if_conditional_context.flags.inside_conditional();
         if_conditional_context.flags.set_inside_conditional(true);
@@ -226,6 +217,9 @@ where
 
 #[inline]
 fn expressions_differ(left: &Expression<'_>, right: &Expression<'_>) -> bool {
+    let left = left.unparenthesized();
+    let right = right.unparenthesized();
+
     !std::ptr::eq(left, right) && left != right
 }
 
