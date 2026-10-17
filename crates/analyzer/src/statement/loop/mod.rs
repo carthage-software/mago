@@ -1826,6 +1826,10 @@ fn record_iterator_protocol_throws<'ctx, A>(
 ) where
     A: Arena,
 {
+    if !context.settings.find_overly_wide_throw_types {
+        return;
+    }
+
     let mut visited_classes = Vec::new();
     record_iterator_protocol_throws_recursive(
         context,
@@ -2000,10 +2004,14 @@ fn record_method_throws<'ctx, A>(
                         atomic_type: thrown_atomic,
                         span,
                     };
-                    block_context.possibly_thrown_generic_exceptions.insert(thrown_generic);
+                    block_context.possibly_thrown_generic_exceptions_for_too_wide.insert(thrown_generic);
                 } else {
                     for exception_name in thrown_atomic.get_all_object_names() {
-                        block_context.possibly_thrown_exceptions.entry(exception_name).or_default().insert(span);
+                        block_context
+                            .possibly_thrown_exceptions_for_too_wide
+                            .entry(exception_name)
+                            .or_default()
+                            .insert(span);
                     }
                 }
             }

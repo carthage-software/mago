@@ -73,7 +73,7 @@ macro_rules! test_case {
 
 test_case!(accessing_undefined_class_constant);
 test_case!(issue_2616);
-test_case!(issue_2616_positions);
+test_case!(issue_2616_positions, expected_issue_counts = [("too-wide-throw-type", 1)]);
 test_case!(issue_2616_bounds);
 test_case!(generic_docblock_native_return);
 test_case!(message_quality);
@@ -1958,6 +1958,10 @@ test_case!(flow_match_unhandled_thrown);
 test_case!(flow_match_unreachable_arm);
 test_case!(flow_match_with_default);
 test_case!(flow_match_with_throw_arm);
+test_case!(
+    flow_match_with_throw_arm_default,
+    mago_analyzer::settings::Settings { check_throws: false, find_overly_wide_throw_types: true, ..Default::default() }
+);
 test_case!(flow_method_call_invalidates);
 test_case!(flow_method_on_possibly_null);
 test_case!(flow_method_return_narrow);
@@ -2521,7 +2525,7 @@ test_case!(issue_1365);
 test_case!(issue_1368);
 test_case!(issue_1372);
 test_case!(issue_1374);
-test_case!(issue_1375, expected_issue_counts = [("unhandled-thrown-type", 1)]);
+test_case!(issue_1375);
 test_case!(issue_1387);
 test_case!(issue_1410);
 test_case!(issue_1411);
@@ -2552,7 +2556,7 @@ test_case!(issue_2005);
 test_case!(issue_2014);
 test_case!(issue_2015);
 test_case!(issue_2018);
-test_case!(issue_2019, expected_issue_counts = [("unhandled-thrown-type", 1)]);
+test_case!(issue_2019);
 test_case!(issue_2025);
 test_case!(call_site_variance);
 test_case!(call_site_variance_projection);
@@ -2907,7 +2911,7 @@ test_case!(issue_2484);
 test_case!(issue_2485);
 test_case!(issue_2499);
 test_case!(issue_2508);
-test_case!(issue_2520, expected_issue_counts = [("too-wide-throw-type", 2)]);
+test_case!(issue_2520);
 test_case!(issue_2523);
 test_case!(issue_2563);
 test_case!(issue_2585);
@@ -2950,6 +2954,28 @@ test_case!(
     mago_analyzer::settings::Settings { find_overly_wide_throw_types: true, ..Default::default() },
     expected_issue_counts = [("too-wide-throw-type", 1)]
 );
+test_case!(
+    too_wide_terminal_match_throw,
+    mago_analyzer::settings::Settings { find_overly_wide_throw_types: true, ..Default::default() },
+    expected_issue_counts = [("too-wide-throw-type", 2)]
+);
+test_case!(
+    issue_2520_iterator_throws_opt_in,
+    mago_analyzer::settings::Settings { check_throws: false, find_overly_wide_throw_types: true, ..Default::default() },
+    expected_issue_counts = [("too-wide-throw-type", 2)]
+);
+test_case!(
+    iterator_foreach_aggregate_throws_opt_in,
+    mago_analyzer::settings::Settings { check_throws: false, find_overly_wide_throw_types: true, ..Default::default() },
+    expected_issue_counts = [("too-wide-throw-type", 2)]
+);
+#[test]
+fn too_wide_terminal_match_throw_disabled() {
+    let content = include_bytes!("cases/too_wide_terminal_match_throw.php");
+    crate::framework::TestCase::new(stringify!(too_wide_terminal_match_throw_disabled), content)
+        .settings(mago_analyzer::settings::Settings::default())
+        .run();
+}
 test_case!(generic_throw_template_bound_chain);
 test_case!(generic_method_throw_dead_catch, {
     let mut settings = default_test_settings();
@@ -2996,7 +3022,7 @@ test_case!(parameter_null_default_docblock_type);
 test_case!(parameter_null_default_php90, crate::framework::php_90_settings());
 test_case!(multilevel_inheritance_unbound_template_bound);
 test_case!(partial_union_method_call);
-test_case!(iterator_foreach_value_type, expected_issue_counts = [("too-wide-throw-type", 2)]);
+test_case!(iterator_foreach_value_type);
 test_case!(inherited_too_wide_throw_type, expected_issue_counts = [("too-wide-throw-type", 1)]);
 test_case!(possibly_undefined_switch_finally);
 test_case!(inline_var_tag_undefined_variable);

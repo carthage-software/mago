@@ -1405,29 +1405,37 @@ fn check_too_wide_throw_types<'ctx, A, F>(
 
             let erased_atomic_type = erase_throw_type_parameters(atomic_type);
             let declared_exception = TUnion::from_atomic(erased_atomic_type);
-            let is_thrown_by_name = block_context.possibly_thrown_exceptions.keys().any(|thrown_type| {
-                let thrown_exception = TUnion::from_atomic(TAtomic::Object(TObject::new_named(*thrown_type)));
+            let is_thrown_by_name = block_context
+                .possibly_thrown_exceptions
+                .keys()
+                .chain(block_context.possibly_thrown_exceptions_for_too_wide.keys())
+                .any(|thrown_type| {
+                    let thrown_exception = TUnion::from_atomic(TAtomic::Object(TObject::new_named(*thrown_type)));
 
-                union_comparator::is_contained_by(
-                    context.codebase,
-                    &thrown_exception,
-                    &declared_exception,
-                    false,
-                    false,
-                    false,
-                    &mut ComparisonResult::default(),
-                )
-            });
+                    union_comparator::is_contained_by(
+                        context.codebase,
+                        &thrown_exception,
+                        &declared_exception,
+                        false,
+                        false,
+                        false,
+                        &mut ComparisonResult::default(),
+                    )
+                });
 
-            let is_thrown_as_generic = block_context.possibly_thrown_generic_exceptions.iter().any(|generic_throw| {
-                if generic_throw.object_names.is_empty()
-                    || generic_throw.object_names.iter().all(|name| is_exception_unchecked(context, *name))
-                {
-                    return false;
-                }
+            let is_thrown_as_generic = block_context
+                .possibly_thrown_generic_exceptions
+                .iter()
+                .chain(block_context.possibly_thrown_generic_exceptions_for_too_wide.iter())
+                .any(|generic_throw| {
+                    if generic_throw.object_names.is_empty()
+                        || generic_throw.object_names.iter().all(|name| is_exception_unchecked(context, *name))
+                    {
+                        return false;
+                    }
 
-                throw_atomic_is_contained_by(context, &generic_throw.atomic_type, atomic_type)
-            });
+                    throw_atomic_is_contained_by(context, &generic_throw.atomic_type, atomic_type)
+                });
 
             let is_thrown = is_thrown_by_name || is_thrown_as_generic;
 

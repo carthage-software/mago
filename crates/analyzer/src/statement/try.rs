@@ -70,6 +70,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
 
         let existing_thrown_exceptions = std::mem::take(&mut block_context.possibly_thrown_exceptions);
         let existing_thrown_generic_exceptions = std::mem::take(&mut block_context.possibly_thrown_generic_exceptions);
+        let existing_too_wide_thrown_exceptions =
+            std::mem::take(&mut block_context.possibly_thrown_exceptions_for_too_wide);
+        let existing_too_wide_thrown_generic_exceptions =
+            std::mem::take(&mut block_context.possibly_thrown_generic_exceptions_for_too_wide);
         let old_block_context_locals = block_context.locals.clone();
         let loop_final_actions = artifacts.loop_scope.as_ref().map(snapshot_loop_final_actions);
         let mut try_block_context = block_context.clone();
@@ -100,22 +104,47 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                         })
                     })
                     .collect::<WordSet>();
-                let thrown_generic_exceptions = block_context.possibly_thrown_generic_exceptions.clone();
-                let thrown_exception_counts = block_context
+                let mut thrown_generic_exceptions = block_context.possibly_thrown_generic_exceptions.clone();
+                thrown_generic_exceptions
+                    .extend(block_context.possibly_thrown_generic_exceptions_for_too_wide.iter().cloned());
+
+                let mut thrown_exception_counts = WordMap::default();
+                for (exception, spans) in block_context
                     .possibly_thrown_exceptions
                     .iter()
-                    .map(|(exception, spans)| (*exception, spans.len()))
-                    .collect::<WordMap<_>>();
+                    .chain(block_context.possibly_thrown_exceptions_for_too_wide.iter())
+                {
+                    *thrown_exception_counts.entry(*exception).or_insert(0) += spans.len();
+                }
 
                 analyze_statements(std::slice::from_ref(statement), context, block_context, artifacts)?;
 
-                for (exception, spans) in &block_context.possibly_thrown_exceptions {
-                    if spans.len() > thrown_exception_counts.get(exception).copied().unwrap_or_default() {
+                let mut newly_thrown_exceptions = WordSet::default();
+                for (exception, _) in block_context
+                    .possibly_thrown_exceptions
+                    .iter()
+                    .chain(block_context.possibly_thrown_exceptions_for_too_wide.iter())
+                {
+                    if !newly_thrown_exceptions.insert(*exception) {
+                        continue;
+                    }
+
+                    let total_span_count = block_context
+                        .possibly_thrown_exceptions
+                        .get(exception)
+                        .map_or(0, HashSet::len)
+                        + block_context.possibly_thrown_exceptions_for_too_wide.get(exception).map_or(0, HashSet::len);
+
+                    if total_span_count > thrown_exception_counts.get(exception).copied().unwrap_or_default() {
                         exception_entry_locals.entry(*exception).or_default().push(definitely_defined_locals.clone());
                     }
                 }
 
-                for thrown_generic in &block_context.possibly_thrown_generic_exceptions {
+                let current_generic_exceptions = block_context
+                    .possibly_thrown_generic_exceptions
+                    .iter()
+                    .chain(block_context.possibly_thrown_generic_exceptions_for_too_wide.iter());
+                for thrown_generic in current_generic_exceptions {
                     if !thrown_generic_exceptions.contains(thrown_generic) {
                         generic_exception_entry_locals
                             .push((thrown_generic.clone(), definitely_defined_locals.clone()));
@@ -200,6 +229,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
 
         try_block_context.possibly_thrown_exceptions = block_context.possibly_thrown_exceptions.clone();
         try_block_context.possibly_thrown_generic_exceptions = block_context.possibly_thrown_generic_exceptions.clone();
+        try_block_context.possibly_thrown_exceptions_for_too_wide =
+            block_context.possibly_thrown_exceptions_for_too_wide.clone();
+        try_block_context.possibly_thrown_generic_exceptions_for_too_wide =
+            block_context.possibly_thrown_generic_exceptions_for_too_wide.clone();
         try_block_context.variables_possibly_in_scope = block_context.variables_possibly_in_scope.clone();
         let has_untracked_throw_source = context.settings.check_throws
             && has_untracked_throw_source(
@@ -269,6 +302,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
             }
 
             let possibly_thrown_exceptions = std::mem::take(&mut catch_block_context.possibly_thrown_exceptions);
+            let possibly_thrown_exceptions_for_too_wide =
+                std::mem::take(&mut catch_block_context.possibly_thrown_exceptions_for_too_wide);
             let is_covered_by_previous_catch = caught_classes.iter().all(|caught| {
                 previously_caught_classes
                     .iter()
@@ -310,7 +345,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
             let mut caught_exception_types = WordSet::default();
             let mut definitely_defined_locals: Option<WordSet> = None;
             for caught_class in &caught_classes {
-                for possibly_thrown_exception in possibly_thrown_exceptions.keys() {
+                for possibly_thrown_exception in
+                    possibly_thrown_exceptions.keys().chain(possibly_thrown_exceptions_for_too_wide.keys())
+                {
                     if possibly_thrown_exception.as_bytes().eq_ignore_ascii_case(caught_class.as_bytes())
                         || context
                             .codebase
@@ -325,8 +362,13 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                         }
 
                         original_block_context.possibly_thrown_exceptions.remove(possibly_thrown_exception);
+                        original_block_context
+                            .possibly_thrown_exceptions_for_too_wide
+                            .remove(possibly_thrown_exception);
                         block_context.possibly_thrown_exceptions.remove(possibly_thrown_exception);
+                        block_context.possibly_thrown_exceptions_for_too_wide.remove(possibly_thrown_exception);
                         catch_block_context.possibly_thrown_exceptions.remove(possibly_thrown_exception);
+                        catch_block_context.possibly_thrown_exceptions_for_too_wide.remove(possibly_thrown_exception);
                     }
                 }
             }
@@ -342,6 +384,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
             let caught_generic_exceptions = catch_block_context
                 .possibly_thrown_generic_exceptions
                 .iter()
+                .chain(catch_block_context.possibly_thrown_generic_exceptions_for_too_wide.iter())
                 .filter(|generic_throw| {
                     generic_throw_is_contained_by(context, generic_throw, &caught_type, &fully_caught_classes)
                 })
@@ -358,11 +401,20 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                 original_block_context
                     .possibly_thrown_generic_exceptions
                     .retain(|thrown_generic| thrown_generic != &generic_throw);
+                original_block_context
+                    .possibly_thrown_generic_exceptions_for_too_wide
+                    .retain(|thrown_generic| thrown_generic != &generic_throw);
                 block_context
                     .possibly_thrown_generic_exceptions
                     .retain(|thrown_generic| thrown_generic != &generic_throw);
+                block_context
+                    .possibly_thrown_generic_exceptions_for_too_wide
+                    .retain(|thrown_generic| thrown_generic != &generic_throw);
                 catch_block_context
                     .possibly_thrown_generic_exceptions
+                    .retain(|thrown_generic| thrown_generic != &generic_throw);
+                catch_block_context
+                    .possibly_thrown_generic_exceptions_for_too_wide
                     .retain(|thrown_generic| thrown_generic != &generic_throw);
             }
 
@@ -564,6 +616,18 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
 
         for thrown_generic in existing_thrown_generic_exceptions {
             block_context.possibly_thrown_generic_exceptions.insert(thrown_generic);
+        }
+
+        for (possibly_thrown_exception, throw_spans) in existing_too_wide_thrown_exceptions {
+            block_context
+                .possibly_thrown_exceptions_for_too_wide
+                .entry(possibly_thrown_exception)
+                .or_default()
+                .extend(throw_spans);
+        }
+
+        for thrown_generic in existing_too_wide_thrown_generic_exceptions {
+            block_context.possibly_thrown_generic_exceptions_for_too_wide.insert(thrown_generic);
         }
 
         block_context.flags.set_has_returned(if finally_has_returned {
