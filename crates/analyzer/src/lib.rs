@@ -261,6 +261,11 @@ where
         #[cfg(not(target_arch = "wasm32"))]
         let statements_start = trace_enabled.then(std::time::Instant::now);
         analyze_statements(statements, &mut context, &mut block_context, &mut artifacts)?;
+        for pending in artifacts.take_unresolved_immediate_callback_throws() {
+            for issue in pending.issues {
+                context.collector.report_with_code(crate::code::IssueCode::UnhandledThrownType, issue);
+            }
+        }
         #[cfg(not(target_arch = "wasm32"))]
         if let Some(start) = statements_start {
             telemetry::record_statements(start.elapsed());

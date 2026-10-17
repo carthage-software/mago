@@ -318,6 +318,7 @@ test_case!(issue_2503_dead_catch, {
     settings.check_dead_catch = true;
     settings
 });
+test_case!(issue_2504_immediate_builtin_callback_throws);
 test_case!(issue_2503_check_throws_disabled, {
     let mut settings = default_test_settings();
     settings.check_throws = false;

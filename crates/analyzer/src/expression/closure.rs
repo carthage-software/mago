@@ -45,6 +45,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
         A: Arena,
     {
         let s = self.span();
+        let is_immediate_callback = artifacts.is_immediate_callback_expression(s);
 
         let Some(function_metadata) = context.codebase.get_closure_at(context.source_file, s) else {
             return Err(AnalysisError::InternalError(
@@ -218,7 +219,20 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
             &self.parameter_list,
             FunctionLikeBody::Statements(self.body.statements.as_slice(), self.body.span()),
             inferred_parameter_types,
+            true,
         )?;
+
+        if is_immediate_callback {
+            for (exception, spans) in &inner_block_context.possibly_thrown_exceptions {
+                block_context.possibly_thrown_exceptions.entry(*exception).or_default().extend(spans);
+            }
+        } else if !inner_block_context.possibly_thrown_exceptions.is_empty() {
+            artifacts.register_pending_immediate_callback_throws(
+                s,
+                inner_block_context.possibly_thrown_exceptions.clone(),
+                inner_artifacts.deferred_thrown_type_issues.clone(),
+            );
+        }
 
         for referenced_variable in inner_block_context.references_to_external_scope {
             let Some(inner_type) = inner_block_context.locals.remove(&referenced_variable) else {
