@@ -169,7 +169,8 @@ public function bar(
 | `align-parameters` | 布尔值 | `false` | 按变量进行多行形参列表的列对齐。 |
 | `align-named-arguments` | 布尔值 | `false` | 在多行调用和 attribute 中对命名实参进行列对齐。 |
 | `array-table-style-alignment` | 布尔值 | `true` | 对数组使用表格风格对齐。 |
-| `align-assignment-like` | 布尔值 | `false` | 对连续的赋值类构造(变量、多行数组键值对、属性、常量、枚举 case、match 分支)进行列对齐。紧凑的内联数组保持不对齐。 |
+| `align-assignment-like` | 布尔值 | `false` | 对连续的赋值类构造(变量、属性、常量、枚举 case)进行列对齐。 |
+| `align-double-arrows` | 布尔值 | `false` | 对连续的多行数组键值对和 match 分支按 `=>` 进行列对齐。紧凑的内联数组保持不对齐。 |
 
 ## `use` 语句
 

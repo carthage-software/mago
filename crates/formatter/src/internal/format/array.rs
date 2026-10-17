@@ -610,7 +610,7 @@ fn detect_array_element_alignment_runs<'arena, A>(
 where
     A: Arena,
 {
-    if !f.settings.align_assignment_like || elements.is_empty() {
+    if !f.settings.align_double_arrows || elements.is_empty() {
         return std::vec::Vec::new();
     }
 
