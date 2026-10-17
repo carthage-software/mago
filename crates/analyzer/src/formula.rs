@@ -15,6 +15,7 @@ use mago_span::Span;
 use mago_syntax::cst::*;
 use mago_word::Word;
 use mago_word::WordMap;
+use mago_word::word;
 
 use crate::artifacts::AnalysisArtifacts;
 use crate::assertion::OtherValuePosition;
@@ -296,7 +297,11 @@ where
             return negate_formula(&clauses, algebra_thresholds);
         }
 
-        if let Expression::Binary(binary_expression) = unwrap_expression(unary_prefix.operand) {
+        if let Expression::Binary(binary_expression) = unwrap_expression(unary_prefix.operand)
+            && !artifacts
+                .short_circuit_assignment_types
+                .contains_key(&(binary_expression.start_offset(), binary_expression.end_offset()))
+        {
             if matches!(binary_expression.operator, BinaryOperator::Or(_) | BinaryOperator::LowOr(_)) {
                 return handle_binary_and_operation(
                     conditional_object_id,
@@ -593,11 +598,37 @@ fn collect_conditional_assertions_inner(
                 formula_size_threshold,
             );
 
+            let assigned_types =
+                artifacts.short_circuit_assignment_types.get(&(binary.start_offset(), binary.end_offset()));
+
+            if let Some(assigned_types) = assigned_types {
+                assertions.retain(|variable, assertions| {
+                    !assigned_types.when_true.keys().chain(assigned_types.when_false.keys()).any(|assigned| {
+                        var_has_root(*variable, *assigned)
+                            || assertions.iter().flatten().any(|assertion| {
+                                assertion
+                                    .referenced_variable()
+                                    .is_some_and(|referenced| var_has_root(referenced, *assigned))
+                            })
+                    })
+                });
+            }
+
             let is_conjunction = matches!(binary.operator, BinaryOperator::And(_) | BinaryOperator::LowAnd(_));
             if is_conjunction == when_true {
                 extend_conditional_assertions(&mut assertions, right_assertions);
             } else {
                 disjoin_conditional_assertions(&mut assertions, right_assertions, formula_size_threshold);
+            }
+
+            if let Some(assigned_types) = assigned_types {
+                let branch_types = if when_true { &assigned_types.when_true } else { &assigned_types.when_false };
+                for (variable, ty) in branch_types {
+                    assertions
+                        .entry(*variable)
+                        .or_default()
+                        .push(ty.types.iter().cloned().map(Assertion::IsType).collect());
+                }
             }
 
             assertions
@@ -998,7 +1029,7 @@ fn handle_binary_or_operation<A>(
 where
     A: Arena,
 {
-    let left_clauses = get_base_formula(
+    let mut left_clauses = get_base_formula(
         conditional_object_id,
         left.span(),
         left,
@@ -1007,6 +1038,9 @@ where
         algebra_thresholds,
         formula_size_threshold,
     )?;
+
+    forget_overwritten_assertions(left, right, &mut left_clauses, artifacts);
+
     let right_clauses = get_base_formula(
         conditional_object_id,
         right.span(),
@@ -1043,6 +1077,9 @@ where
         algebra_thresholds,
         formula_size_threshold,
     )?;
+
+    forget_overwritten_assertions(left, right, &mut clauses, artifacts);
+
     clauses.extend(get_base_formula(
         conditional_object_id,
         right.span(),
@@ -1054,6 +1091,44 @@ where
     )?);
 
     if clauses.len() > usize::from(formula_size_threshold) { None } else { Some(clauses) }
+}
+
+fn forget_overwritten_assertions(
+    left: &Expression,
+    right: &Expression,
+    clauses: &mut [Clause],
+    artifacts: &AnalysisArtifacts,
+) {
+    let Some(assigned_types) = artifacts.short_circuit_assignment_types.get(&(left.start_offset(), right.end_offset()))
+    else {
+        return;
+    };
+
+    for clause in clauses {
+        if !clause.possibilities.iter().any(|(variable, assertions)| {
+            assigned_types.when_true.keys().chain(assigned_types.when_false.keys()).any(|assigned| {
+                var_has_root(*variable, *assigned)
+                    || assertions.values().any(|assertion| {
+                        assertion.referenced_variable().is_some_and(|referenced| var_has_root(referenced, *assigned))
+                    })
+            })
+        }) {
+            continue;
+        }
+
+        let variable = word(format!("*{}-{}-{}", clause.span.start_offset(), clause.span.end_offset(), clause.hash));
+        *clause = Clause::new(
+            AssertionMap::from_iter([(
+                variable,
+                AssertionMap::from_iter([(Assertion::Truthy.to_hash(), Assertion::Truthy)]),
+            )]),
+            clause.condition_span,
+            clause.span,
+            Some(false),
+            Some(true),
+            Some(false),
+        );
+    }
 }
 
 pub fn remove_clauses_with_mixed_variables(

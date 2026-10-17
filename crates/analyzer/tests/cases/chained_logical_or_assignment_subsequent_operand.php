@@ -25,14 +25,14 @@ function run(mixed $value): bool
 function test_conditional_assignment(bool $flag): bool
 {
     $value = null;
-    // @mago-expect analysis:possible-method-access-on-null
+    // @mago-expect analysis:method-access-on-null
     return $flag && ($value = new Service()) instanceof Service || $value->execute();
 }
 
 function test_conditional_assignment_and(bool $flag): bool
 {
     $value = null;
-    // @mago-expect analysis:possible-method-access-on-null
+    // @mago-expect analysis:method-access-on-null
     return $flag && ($value = get_service()) !== null || $value->execute();
 }
 
