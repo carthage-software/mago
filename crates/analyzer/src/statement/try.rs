@@ -33,7 +33,9 @@ use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::context::scope::control_action::ControlAction;
+use crate::context::scope::control_action::ControlActionSet;
 use crate::context::scope::finally_scope::FinallyScope;
+use crate::context::scope::loop_scope::LoopScope;
 use crate::context::utils::inherit_branch_context_properties;
 use crate::error::AnalysisError;
 use crate::statement::analyze_statements;
@@ -65,6 +67,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
 
         let existing_thrown_exceptions = std::mem::take(&mut block_context.possibly_thrown_exceptions);
         let old_block_context_locals = block_context.locals.clone();
+        let loop_final_actions = artifacts.loop_scope.as_ref().map(snapshot_loop_final_actions);
         let mut try_block_context = block_context.clone();
 
         if self.finally_clause.is_some() {
@@ -424,6 +427,20 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
 
         let mut finally_has_returned = false;
         if let Some(finally_clause) = self.finally_clause.as_ref() {
+            let finally_actions = ControlAction::from_statements(
+                finally_clause.block.statements.iter().collect(),
+                vec![],
+                Some(artifacts),
+                true,
+            );
+
+            if !finally_actions.contains(ControlAction::None)
+                && let (Some(loop_scope), Some(loop_final_actions)) =
+                    (artifacts.loop_scope.as_mut(), loop_final_actions.as_deref())
+            {
+                restore_loop_final_actions(loop_scope, loop_final_actions);
+            }
+
             // SAFETY: when a try statement has a `finally_clause`, the finally scope is always
             // initialized on `try_block_context` before reaching this point, so the `Option` is
             // guaranteed to be `Some`.
@@ -493,6 +510,30 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
         });
 
         Ok(())
+    }
+}
+
+fn snapshot_loop_final_actions(loop_scope: &LoopScope) -> Vec<ControlActionSet> {
+    let mut final_actions = Vec::new();
+    let mut current_loop_scope = Some(loop_scope);
+
+    while let Some(loop_scope) = current_loop_scope {
+        final_actions.push(loop_scope.final_actions.clone());
+        current_loop_scope = loop_scope.parent_loop.as_deref();
+    }
+
+    final_actions
+}
+
+fn restore_loop_final_actions(loop_scope: &mut LoopScope, final_actions: &[ControlActionSet]) {
+    let Some((final_actions, parent_final_actions)) = final_actions.split_first() else {
+        return;
+    };
+
+    loop_scope.final_actions.clone_from(final_actions);
+
+    if let Some(parent_loop) = loop_scope.parent_loop.as_deref_mut() {
+        restore_loop_final_actions(parent_loop, parent_final_actions);
     }
 }
 
