@@ -1,4 +1,5 @@
 use mago_allocator::Arena;
+use std::cell::RefCell;
 use std::rc::Rc;
 
 use foldhash::HashSet;
@@ -27,19 +28,14 @@ use mago_word::WordSet;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
-use crate::artifacts::CheckpointAction;
 use crate::assertion::get_class_type_relations;
 use crate::code::IssueCode;
-use crate::common::synthetic::new_synthetic_call;
-use crate::common::synthetic::new_synthetic_negation;
 use crate::context::Context;
 use crate::context::block::BlockContext;
-use crate::context::scope::if_scope::IfScope;
 use crate::error::AnalysisError;
 use crate::formula::get_formula;
 use crate::formula::negate_or_synthesize;
 use crate::reconciler;
-use crate::utils::conditional;
 use crate::utils::expression::expression_has_observable_side_effect;
 use crate::utils::symbol_existence::extract_function_constant_existence;
 
@@ -338,75 +334,6 @@ where
     Ok(())
 }
 
-fn collect_definitely_evaluated_ored_expressions<'ast, 'arena>(
-    expression: &'ast Expression<'arena>,
-    expressions: &mut Vec<&'ast Expression<'arena>>,
-) {
-    match expression {
-        Expression::Parenthesized(p) => collect_definitely_evaluated_ored_expressions(p.expression, expressions),
-        Expression::Binary(Binary { lhs, operator: BinaryOperator::Or(_) | BinaryOperator::LowOr(_), rhs }) => {
-            collect_definitely_evaluated_ored_expressions(lhs, expressions);
-            collect_definitely_evaluated_ored_expressions(rhs, expressions);
-        }
-        _ => expressions.push(expression),
-    }
-}
-
-fn propagate_conditionally_assigned_variables<'ctx, 'arena, A>(
-    context: &mut Context<'ctx, 'arena, A>,
-    artifacts: &mut AnalysisArtifacts,
-    block_context: &BlockContext<'ctx>,
-    right_block_context: &mut BlockContext<'ctx>,
-    left_assigned_var_ids: &WordMap<u32>,
-    left_referenced_var_ids: &mut WordSet,
-    condition: &'arena Expression<'arena>,
-) -> Result<WordSet, AnalysisError>
-where
-    A: Arena,
-{
-    let mut lhs_false_context = block_context.clone();
-    let mut expressions = Vec::new();
-    collect_definitely_evaluated_ored_expressions(condition, &mut expressions);
-
-    artifacts.begin_expression_type_checkpoint();
-    let (result, _) = context.record(|context| {
-        for expression in expressions {
-            let negated_expression = new_synthetic_negation(context.arena, expression);
-            let assertion = new_synthetic_call(context.arena, "assert", negated_expression);
-
-            let was_inside_negation = lhs_false_context.flags.inside_negation();
-            lhs_false_context.flags.set_inside_negation(true);
-
-            assertion.analyze(context, &mut lhs_false_context, artifacts)?;
-
-            lhs_false_context.flags.set_inside_negation(was_inside_negation);
-        }
-
-        Result::<_, AnalysisError>::Ok(())
-    });
-
-    artifacts.finish_expression_type_checkpoint(if result.is_ok() {
-        CheckpointAction::Rollback
-    } else {
-        CheckpointAction::Keep
-    });
-    result?;
-
-    let mut reassigned_vars = WordSet::default();
-    for variable_id in left_assigned_var_ids.keys() {
-        if let Some(variable_type) = lhs_false_context.locals.get(variable_id) {
-            right_block_context.locals.insert(*variable_id, Rc::clone(variable_type));
-            reassigned_vars.insert(*variable_id);
-        }
-        if let Some(offset) = lhs_false_context.assigned_variable_ids.get(variable_id) {
-            right_block_context.assigned_variable_ids.insert(*variable_id, *offset);
-        }
-        left_referenced_var_ids.remove(variable_id);
-    }
-
-    Ok(reassigned_vars)
-}
-
 #[inline]
 pub fn analyze_logical_or_operation<'ctx, 'arena, A>(
     binary: &Binary<'arena>,
@@ -417,62 +344,26 @@ pub fn analyze_logical_or_operation<'ctx, 'arena, A>(
 where
     A: Arena,
 {
-    let mut left_block_context;
-    let mut left_referenced_var_ids;
-    let left_assigned_var_ids;
+    let false_context = block_context.logical_or_false_context.take();
+    let left_false_context = is_logical_or_operation(binary.lhs).then(|| Rc::new(RefCell::new(None)));
+    let pre_referenced_var_ids = std::mem::take(&mut block_context.conditionally_referenced_variable_ids);
+    let pre_assigned_var_ids = std::mem::take(&mut block_context.assigned_variable_ids);
+    let if_body_context = block_context.if_body_context.take();
+    let was_inside_conditional = block_context.flags.inside_conditional();
+    block_context.flags.set_inside_conditional(true);
+    block_context.logical_or_false_context.clone_from(&left_false_context);
 
-    if is_logical_or_operation(binary.lhs, 3) {
-        let pre_referenced_var_ids = block_context.conditionally_referenced_variable_ids.clone();
-        block_context.conditionally_referenced_variable_ids.clear();
+    binary.lhs.analyze(context, block_context, artifacts)?;
 
-        let pre_assigned_var_ids = block_context.assigned_variable_ids.clone();
+    block_context.logical_or_false_context = None;
+    block_context.flags.set_inside_conditional(was_inside_conditional);
+    block_context.if_body_context = if_body_context;
 
-        left_block_context = block_context.clone();
-        left_block_context.assigned_variable_ids.clear();
-
-        let tmp_if_body_block_context = left_block_context.if_body_context;
-        left_block_context.if_body_context = None;
-
-        binary.lhs.analyze(context, &mut left_block_context, artifacts)?;
-
-        left_block_context.if_body_context = tmp_if_body_block_context;
-
-        for var_id in &left_block_context.parent_conflicting_clause_variables {
-            block_context.remove_variable_from_conflicting_clauses(context, *var_id, None);
-        }
-
-        for (var_id, left_type) in &left_block_context.locals {
-            if let Some(context_type) = block_context.locals.get(var_id) {
-                let combined_type = combine_union_types_rc(
-                    context_type,
-                    left_type,
-                    context.codebase,
-                    context.settings.combiner_options(),
-                );
-
-                block_context.locals.insert(*var_id, combined_type);
-            } else if left_block_context.assigned_variable_ids.contains_key(var_id) {
-                block_context.locals.insert(*var_id, Rc::clone(left_type));
-            }
-        }
-
-        left_referenced_var_ids = left_block_context.conditionally_referenced_variable_ids.clone();
-        left_block_context.conditionally_referenced_variable_ids.extend(pre_referenced_var_ids);
-
-        left_assigned_var_ids = left_block_context.assigned_variable_ids.clone();
-        left_block_context.assigned_variable_ids.extend(pre_assigned_var_ids);
-
-        left_referenced_var_ids.retain(|id| !left_assigned_var_ids.contains_key(id));
-    } else {
-        let mut if_scope = IfScope::default();
-
-        let if_conditional_scope =
-            conditional::analyze(context, block_context, artifacts, &mut if_scope, binary.lhs, false)?;
-
-        left_block_context = if_conditional_scope.if_body_context;
-        left_referenced_var_ids = if_conditional_scope.conditionally_referenced_variable_ids;
-        left_assigned_var_ids = if_conditional_scope.assigned_in_conditional_variable_ids;
-    }
+    let mut left_referenced_var_ids = block_context.conditionally_referenced_variable_ids.clone();
+    left_referenced_var_ids.retain(|id| !block_context.assigned_variable_ids.contains_key(id));
+    block_context.conditionally_referenced_variable_ids.extend(pre_referenced_var_ids);
+    block_context.assigned_variable_ids.extend(pre_assigned_var_ids);
+    let left_block_context = block_context.clone();
 
     let lhs_type = match artifacts.get_rc_expression_type(&binary.lhs).cloned() {
         Some(lhs_type) => {
@@ -483,63 +374,52 @@ where
         None => Rc::new(get_mixed()),
     };
 
-    let left_clauses = get_formula(
-        binary.lhs.span(),
-        binary.lhs.span(),
-        binary.lhs,
-        context.get_assertion_context_from_block(block_context),
-        artifacts,
-        &context.settings.algebra_thresholds(),
-        context.settings.formula_size_threshold,
-    )
-    .unwrap_or_default();
+    let (mut right_block_context, clauses_for_right_analysis) =
+        if let Some(left_false_context) = left_false_context.and_then(|scope| scope.borrow_mut().take()) {
+            let clauses = left_false_context.clauses.clone();
+            (left_false_context, clauses)
+        } else {
+            let left_clauses = get_formula(
+                binary.lhs.span(),
+                binary.lhs.span(),
+                binary.lhs,
+                context.get_assertion_context_from_block(block_context),
+                artifacts,
+                &context.settings.algebra_thresholds(),
+                context.settings.formula_size_threshold,
+            )
+            .unwrap_or_default();
 
-    let mut negated_left_clauses = negate_or_synthesize(
-        &left_clauses,
-        binary.lhs,
-        context.get_assertion_context_from_block(block_context),
-        artifacts,
-        &context.settings.algebra_thresholds(),
-        context.settings.formula_size_threshold,
-    );
+            let mut negated_left_clauses = negate_or_synthesize(
+                &left_clauses,
+                binary.lhs,
+                context.get_assertion_context_from_block(block_context),
+                artifacts,
+                &context.settings.algebra_thresholds(),
+                context.settings.formula_size_threshold,
+            );
 
-    if !left_block_context.reconciled_expression_clauses.is_empty() {
-        let left_reconciled_clauses_hashed =
-            left_block_context.reconciled_expression_clauses.iter().map(|v| &**v).collect::<HashSet<_>>();
+            if !left_block_context.reconciled_expression_clauses.is_empty() {
+                let left_reconciled_clauses_hashed =
+                    left_block_context.reconciled_expression_clauses.iter().map(|v| &**v).collect::<HashSet<_>>();
 
-        negated_left_clauses.retain(|c| !left_reconciled_clauses_hashed.contains(c));
+                negated_left_clauses.retain(|c| !left_reconciled_clauses_hashed.contains(c));
 
-        if negated_left_clauses.len() == 1 {
-            let first = &negated_left_clauses[0];
-            if first.wedge && first.possibilities.is_empty() {
-                negated_left_clauses = Vec::new();
+                if negated_left_clauses.len() == 1 {
+                    let first = &negated_left_clauses[0];
+                    if first.wedge && first.possibilities.is_empty() {
+                        negated_left_clauses = Vec::new();
+                    }
+                }
             }
-        }
-    }
 
-    let mut clauses_for_right_analysis = saturate_shared_clauses(
-        block_context.clauses.iter().cloned().chain(negated_left_clauses.into_iter().map(Rc::new)),
-        &context.settings.algebra_thresholds(),
-    );
+            let clauses_for_right_analysis = saturate_shared_clauses(
+                block_context.clauses.iter().cloned().chain(negated_left_clauses.into_iter().map(Rc::new)),
+                &context.settings.algebra_thresholds(),
+            );
 
-    let mut right_block_context = block_context.clone();
-
-    if !left_assigned_var_ids.is_empty() {
-        let reassigned_vars = propagate_conditionally_assigned_variables(
-            context,
-            artifacts,
-            block_context,
-            &mut right_block_context,
-            &left_assigned_var_ids,
-            &mut left_referenced_var_ids,
-            binary.lhs,
-        )?;
-
-        if !reassigned_vars.is_empty() {
-            clauses_for_right_analysis =
-                BlockContext::remove_reconciled_clause_refs(&clauses_for_right_analysis, &reassigned_vars).0;
-        }
-    }
+            (block_context.clone(), clauses_for_right_analysis)
+        };
 
     let (negated_type_assertions, active_negated_type_assertions) = find_satisfying_assignments_iter(
         clauses_for_right_analysis.iter().map(Rc::as_ref),
@@ -550,6 +430,8 @@ where
     let mut changed_var_ids = WordSet::default();
 
     let result_type: TUnion;
+    let right_false_context =
+        (false_context.is_some() && is_logical_or_operation(binary.rhs)).then(|| Rc::new(RefCell::new(None)));
 
     if lhs_type.is_always_truthy() {
         // true || x → true (no fix)
@@ -589,9 +471,11 @@ where
 
         let tmp_if_body_context = right_block_context.if_body_context;
         right_block_context.if_body_context = None;
+        right_block_context.logical_or_false_context.clone_from(&right_false_context);
 
         binary.rhs.analyze(context, &mut right_block_context, artifacts)?;
 
+        right_block_context.logical_or_false_context = None;
         right_block_context.if_body_context = tmp_if_body_context;
 
         let rhs_type = match artifacts.get_rc_expression_type(&binary.rhs).cloned() {
@@ -698,18 +582,14 @@ where
 
         block_context
             .conditionally_referenced_variable_ids
-            .extend(right_block_context.conditionally_referenced_variable_ids);
+            .extend(right_block_context.conditionally_referenced_variable_ids.iter().copied());
         block_context.assigned_variable_ids.extend(right_block_context.assigned_variable_ids.clone());
     }
 
     if let Some(if_body_context) = &block_context.if_body_context {
         let mut if_body_context_inner = if_body_context.borrow_mut();
         for (var_id, right_type) in &right_block_context.locals {
-            if let Some(if_type) = if_body_context_inner.locals.get(var_id) {
-                let combined_type =
-                    combine_union_types_rc(right_type, if_type, context.codebase, context.settings.combiner_options());
-                if_body_context_inner.locals.insert(*var_id, combined_type);
-            } else if let Some(left_type) = left_block_context.locals.get(var_id) {
+            if let Some(left_type) = left_block_context.locals.get(var_id) {
                 if_body_context_inner.locals.insert(
                     *var_id,
                     combine_union_types_rc(
@@ -739,6 +619,42 @@ where
     }
 
     artifacts.set_expression_type(binary, result_type);
+
+    if let Some(false_context) = false_context {
+        let right_false_context =
+            if let Some(right_false_context) = right_false_context.and_then(|scope| scope.borrow_mut().take()) {
+                right_false_context
+            } else {
+                let right_clauses = get_formula(
+                    binary.rhs.span(),
+                    binary.rhs.span(),
+                    binary.rhs,
+                    context.get_assertion_context_from_block(&right_block_context),
+                    artifacts,
+                    &context.settings.algebra_thresholds(),
+                    context.settings.formula_size_threshold,
+                )
+                .unwrap_or_default();
+
+                let negated_right_clauses = negate_or_synthesize(
+                    &right_clauses,
+                    binary.rhs,
+                    context.get_assertion_context_from_block(&right_block_context),
+                    artifacts,
+                    &context.settings.algebra_thresholds(),
+                    context.settings.formula_size_threshold,
+                );
+
+                right_block_context.clauses = saturate_shared_clauses(
+                    right_block_context.clauses.iter().cloned().chain(negated_right_clauses.into_iter().map(Rc::new)),
+                    &context.settings.algebra_thresholds(),
+                );
+
+                right_block_context
+            };
+
+        *false_context.borrow_mut() = Some(right_false_context);
+    }
 
     Ok(())
 }
@@ -933,17 +849,9 @@ fn report_redundant_logical_operation<'arena, A>(
 }
 
 #[inline]
-const fn is_logical_or_operation(expression: &Expression<'_>, max_nesting: usize) -> bool {
-    if max_nesting == 0 {
-        return true;
-    }
-
-    match expression {
-        Expression::Parenthesized(p) => is_logical_or_operation(p.expression, max_nesting),
-        Expression::Binary(b) => match b.operator {
-            BinaryOperator::Or(_) | BinaryOperator::LowOr(_) => is_logical_or_operation(b.lhs, max_nesting - 1),
-            _ => false,
-        },
-        _ => false,
-    }
+const fn is_logical_or_operation(expression: &Expression<'_>) -> bool {
+    matches!(
+        expression.unparenthesized(),
+        Expression::Binary(Binary { operator: BinaryOperator::Or(_) | BinaryOperator::LowOr(_), .. })
+    )
 }
