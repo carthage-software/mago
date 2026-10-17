@@ -49,7 +49,7 @@ jobs:
           echo "::endgroup::"
 
           echo "::group::Running Mago analyze on carthage-software/cel-php"
-          ${{ github.workspace }}/target/release/mago --config config/mago.toml analyze --reporting-format=count
+          ${{ github.workspace }}/target/release/mago --config config/mago.toml analyze --reporting-format=rich
           echo "::endgroup::"
 
       - name: Test against azjezz/psl
