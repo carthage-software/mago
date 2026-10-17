@@ -87,7 +87,17 @@ pub(crate) fn inherit_branch_context_properties<'ctx, A>(
         }
     }
 
-    if context.settings.check_throws || context.settings.find_overly_wide_throw_types {
+    inherit_thrown_exceptions(context, destination_context, source_context);
+}
+
+pub(crate) fn inherit_thrown_exceptions<'ctx, A>(
+    context: &Context<'ctx, '_, A>,
+    destination_context: &mut BlockContext<'ctx>,
+    source_context: &BlockContext<'ctx>,
+) where
+    A: Arena,
+{
+    if context.settings.check_throws {
         for (exception, spans) in &source_context.possibly_thrown_exceptions {
             destination_context.possibly_thrown_exceptions.entry(*exception).or_default().extend(spans);
         }
@@ -96,4 +106,39 @@ pub(crate) fn inherit_branch_context_properties<'ctx, A>(
             .possibly_thrown_generic_exceptions
             .extend(source_context.possibly_thrown_generic_exceptions.iter().cloned());
     }
+
+    if context.settings.find_overly_wide_throw_types {
+        merge_too_wide_thrown_exceptions(destination_context, source_context);
+    }
+}
+
+pub(crate) fn inherit_too_wide_thrown_exceptions<'ctx, A>(
+    context: &Context<'ctx, '_, A>,
+    destination_context: &mut BlockContext<'ctx>,
+    source_context: &BlockContext<'ctx>,
+) where
+    A: Arena,
+{
+    if !context.settings.find_overly_wide_throw_types {
+        return;
+    }
+
+    merge_too_wide_thrown_exceptions(destination_context, source_context);
+}
+
+fn merge_too_wide_thrown_exceptions(destination_context: &mut BlockContext<'_>, source_context: &BlockContext<'_>) {
+    for (exception, spans) in &source_context.possibly_thrown_exceptions {
+        destination_context.possibly_thrown_exceptions_for_too_wide.entry(*exception).or_default().extend(spans);
+    }
+
+    for (exception, spans) in &source_context.possibly_thrown_exceptions_for_too_wide {
+        destination_context.possibly_thrown_exceptions_for_too_wide.entry(*exception).or_default().extend(spans);
+    }
+
+    destination_context
+        .possibly_thrown_generic_exceptions_for_too_wide
+        .extend(source_context.possibly_thrown_generic_exceptions.iter().cloned());
+    destination_context
+        .possibly_thrown_generic_exceptions_for_too_wide
+        .extend(source_context.possibly_thrown_generic_exceptions_for_too_wide.iter().cloned());
 }

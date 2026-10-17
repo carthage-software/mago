@@ -119,6 +119,8 @@ pub struct BlockContext<'ctx> {
     pub control_actions: ControlActionSet,
     pub possibly_thrown_exceptions: WordMap<HashSet<Span>>,
     pub possibly_thrown_generic_exceptions: HashSet<PossiblyThrownGenericException>,
+    pub possibly_thrown_exceptions_for_too_wide: WordMap<HashSet<Span>>,
+    pub possibly_thrown_generic_exceptions_for_too_wide: HashSet<PossiblyThrownGenericException>,
 
     /// Properties that are DEFINITELY initialized in ALL code paths.
     /// Uses intersection semantics - a property must be initialized in ALL branches.
@@ -249,6 +251,8 @@ impl<'ctx> BlockContext<'ctx> {
             control_actions: self.control_actions,
             possibly_thrown_exceptions: self.possibly_thrown_exceptions,
             possibly_thrown_generic_exceptions: self.possibly_thrown_generic_exceptions,
+            possibly_thrown_exceptions_for_too_wide: self.possibly_thrown_exceptions_for_too_wide,
+            possibly_thrown_generic_exceptions_for_too_wide: self.possibly_thrown_generic_exceptions_for_too_wide,
             definitely_initialized_properties: self.definitely_initialized_properties,
             possibly_initialized_properties: self.possibly_initialized_properties,
             definitely_uninitialized_property_ids: self.definitely_uninitialized_property_ids,
@@ -299,6 +303,8 @@ impl<'ctx> BlockContext<'ctx> {
             control_actions: ControlActionSet::new(),
             possibly_thrown_exceptions: WordMap::default(),
             possibly_thrown_generic_exceptions: HashSet::default(),
+            possibly_thrown_exceptions_for_too_wide: WordMap::default(),
+            possibly_thrown_generic_exceptions_for_too_wide: HashSet::default(),
             definitely_initialized_properties: WordSet::default(),
             possibly_initialized_properties: WordSet::default(),
             definitely_uninitialized_property_ids: WordSet::default(),

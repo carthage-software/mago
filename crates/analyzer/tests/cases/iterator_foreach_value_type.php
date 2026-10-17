@@ -153,7 +153,6 @@ final class AggregateItemList implements \IteratorAggregate // @mago-expect anal
     }
 }
 
-/** @throws \Exception */
 function processAggregateItems(AggregateItemList $list): int
 {
     $total = 0;
@@ -173,7 +172,6 @@ final class CyclicAggregate implements \IteratorAggregate // @mago-expect analys
     }
 }
 
-/** @throws \Exception */
 function processCyclic(CyclicAggregate $cyclic): void
 {
     foreach ($cyclic as $item) { // @mago-expect analysis:mixed-assignment
