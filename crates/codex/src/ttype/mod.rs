@@ -1,4 +1,5 @@
 use std::borrow::Cow;
+use std::collections::BTreeMap;
 use std::rc::Rc;
 use std::sync::Arc;
 
@@ -1249,26 +1250,46 @@ fn intersect_atomic_types(
     let mut narrower_type = None;
     let mut wider_type = None;
 
-    if union_comparator::is_contained_by(
-        codebase,
-        &t2_union,
-        &t1_union,
-        false,
-        false,
-        false,
-        &mut ComparisonResult::default(),
-    ) {
+    // `is_contained_by` cannot express that a known-shape array requires
+    // specific keys, so it may consider a generic array and a known-shape
+    // array mutually contained and pick the generic one, discarding the
+    // known items. Handle those intersections in the array branch below.
+    let skip_containment = match (type_1, type_2) {
+        (TAtomic::Array(left), TAtomic::Array(right)) => {
+            let known_items = |array: &TArray| match array {
+                TArray::Keyed(keyed) => keyed.known_items.is_some(),
+                TArray::List(_) => false,
+            };
+            known_items(left) ^ known_items(right)
+        }
+        _ => false,
+    };
+
+    let t2_in_t1 = !skip_containment
+        && union_comparator::is_contained_by(
+            codebase,
+            &t2_union,
+            &t1_union,
+            false,
+            false,
+            false,
+            &mut ComparisonResult::default(),
+        );
+    let t1_in_t2 = !skip_containment
+        && union_comparator::is_contained_by(
+            codebase,
+            &t1_union,
+            &t2_union,
+            false,
+            false,
+            false,
+            &mut ComparisonResult::default(),
+        );
+
+    if t2_in_t1 {
         narrower_type = Some(type_2);
         wider_type = Some(type_1);
-    } else if union_comparator::is_contained_by(
-        codebase,
-        &t1_union,
-        &t2_union,
-        false,
-        false,
-        false,
-        &mut ComparisonResult::default(),
-    ) {
+    } else if t1_in_t2 {
         narrower_type = Some(type_1);
         wider_type = Some(type_2);
     }
@@ -1299,8 +1320,53 @@ fn intersect_atomic_types(
             TArray::Keyed(keyed) => keyed.known_items.is_some(),
         };
 
-        if array_has_known_shape(left_array) || array_has_known_shape(right_array) {
+        let left_known = array_has_known_shape(left_array);
+        let right_known = array_has_known_shape(right_array);
+
+        // Two known-shape arrays cannot be merged here (key-by-key reconciliation is
+        // unsupported); keep both variants instead of collapsing to nothing.
+        if left_known && right_known {
             return None;
+        }
+
+        // A known-shape array intersected with a generic parameterized array: keep the
+        // known items, narrowing each known value by the other side's value type, and
+        // intersect the generic key/value parameters. Sealed shapes (no parameters) are
+        // not merged, preserving the previous conservative behavior.
+        if left_known || right_known {
+            let (shape, generic) = if left_known { (left_array, right_array) } else { (right_array, left_array) };
+            let TArray::Keyed(shape_keyed) = shape else { return None };
+            let TArray::Keyed(generic_keyed) = generic else { return None };
+
+            let (shape_key, shape_value) = shape_keyed.parameters.as_ref()?;
+            let (generic_key, generic_value) = generic_keyed.parameters.as_ref()?;
+            let shape_items = shape_keyed.known_items.as_ref()?;
+
+            let mut known_items = BTreeMap::new();
+            for (key, (optional, value_type)) in shape_items.iter() {
+                let narrowed = intersect_union_types(value_type, generic_value, codebase).unwrap_or_else(get_never);
+                if narrowed.is_never() {
+                    return None;
+                }
+                known_items.insert(*key, (*optional, narrowed));
+            }
+
+            let key = intersect_union_types(shape_key, generic_key, codebase).unwrap_or_else(get_never);
+            let value = intersect_union_types(shape_value, generic_value, codebase).unwrap_or_else(get_never);
+
+            let non_empty = left_array.is_non_empty() || right_array.is_non_empty();
+
+            if non_empty && (key.is_never() || value.is_never()) {
+                return None;
+            }
+
+            *intersection_performed = true;
+            return Some(TAtomic::Array(TArray::Keyed(TKeyedArray {
+                known_items: Some(Arc::new(known_items)),
+                parameters: Some((Arc::new(key), Arc::new(value))),
+                non_empty,
+                known_non_list: false,
+            })));
         }
 
         let (left_key, left_value) = get_array_parameters(left_array, codebase);
