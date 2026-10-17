@@ -474,32 +474,26 @@ where
                 }
             },
             TAtomic::Scalar(TScalar::String(string)) if is_loose_equality => {
-                if string.is_truthy {
+                if string.is_truthy || string.is_non_empty {
                     did_remove_type = true;
                 } else if let Some(TStringLiteral::Value(val)) = string.literal {
-                    if val.as_bytes() == b"" || val.as_bytes() == b"0" {
+                    if val.as_bytes() == b"" {
                         acceptable_types.push(atomic.clone());
                     } else {
                         did_remove_type = true;
                     }
-                } else if string.is_non_empty {
-                    acceptable_types.push(TAtomic::Scalar(TScalar::literal_string(word("0"))));
-                    did_remove_type = true;
                 } else {
                     acceptable_types.push(EMPTY_STRING_ATOMIC.clone());
-                    acceptable_types.push(TAtomic::Scalar(TScalar::literal_string(word("0"))));
                     did_remove_type = true;
                 }
             }
             TAtomic::Scalar(TScalar::Generic) if is_loose_equality => {
                 acceptable_types.push(EMPTY_STRING_ATOMIC.clone());
-                acceptable_types.push(TAtomic::Scalar(TScalar::literal_string(word("0"))));
                 acceptable_types.push(TAtomic::Scalar(TScalar::r#false()));
                 did_remove_type = true;
             }
             TAtomic::Scalar(TScalar::ArrayKey) if is_loose_equality => {
                 acceptable_types.push(EMPTY_STRING_ATOMIC.clone());
-                acceptable_types.push(TAtomic::Scalar(TScalar::literal_string(word("0"))));
                 did_remove_type = true;
             }
             TAtomic::Array(array) if is_loose_equality => {
