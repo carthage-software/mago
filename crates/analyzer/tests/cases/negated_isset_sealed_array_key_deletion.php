@@ -78,3 +78,45 @@ function test_else_branch_retains_non_null(array $arr): void
 
     accept_null($arr['foo']); // @mago-expect analysis:invalid-argument
 }
+
+/**
+ * @param array{val: string|null} $arr
+ */
+function test_union_syntax_required_nullable_key_narrowed_to_null(array $arr): ?string
+{
+    if (!isset($arr['val'])) {
+        accept_null($arr['val']);
+
+        return $arr['val'];
+    }
+
+    return $arr['val'];
+}
+
+/**
+ * @param list{?string, int} $list
+ */
+function test_list_known_element_narrowed_to_null(array $list): ?string
+{
+    if (!isset($list[0])) {
+        accept_null($list[0]);
+
+        return $list[0];
+    }
+
+    return $list[0];
+}
+
+/**
+ * @param list{?string, int} $list
+ */
+function test_list_known_element_else_branch_retains_non_null(array $list): void
+{
+    if (!isset($list[0])) {
+        accept_null($list[0]);
+
+        return;
+    }
+
+    accept_null($list[0]); // @mago-expect analysis:invalid-argument
+}
