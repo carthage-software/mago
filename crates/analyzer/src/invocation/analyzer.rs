@@ -24,6 +24,7 @@ use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::class_like_string::TClassLikeString;
 use mago_codex::ttype::atomic::scalar::string::TString;
 use mago_codex::ttype::atomic::scalar::string::TStringLiteral;
+use mago_codex::ttype::cast::cast_atomic_to_callable;
 use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::expander;
 use mago_codex::ttype::expander::StaticClassType;
@@ -44,7 +45,11 @@ use mago_word::WordSet;
 use mago_word::concat_word;
 
 use crate::artifacts::AnalysisArtifacts;
+use crate::artifacts::CallableInvocationKind;
+use crate::artifacts::CallableStorageLocation;
+use crate::artifacts::CallbackCallsiteContext;
 use crate::artifacts::ClosureBindScope;
+use crate::artifacts::DeferredCallableCallsiteContext;
 use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
@@ -57,6 +62,8 @@ use crate::invocation::InvocationTargetParameter;
 use crate::invocation::arguments::analyze_and_store_argument_type;
 use crate::invocation::arguments::get_unpacked_argument_type;
 use crate::invocation::arguments::verify_argument_type;
+use crate::invocation::callbacks::classify_callback;
+use crate::invocation::callbacks::immediate_callable_parameter_offset;
 use crate::invocation::resolver::resolve_invocation_type;
 use crate::invocation::template_inference::infer_parameter_templates_from_argument;
 use crate::invocation::template_inference::infer_parameter_templates_from_default;
@@ -64,6 +71,7 @@ use crate::invocation::template_result::get_class_template_parameters_from_resul
 use crate::invocation::template_result::populate_template_result_from_invocation;
 use crate::invocation::template_result::refine_template_result_for_function_like;
 use crate::utils::expression::get_block_expression_id;
+use crate::utils::misc::unwrap_expression;
 
 fn narrow_class_related_argument<A>(
     context: &Context<'_, '_, A>,
@@ -141,6 +149,65 @@ fn adjust_offset_for_variadic(target: &InvocationTarget<'_>, argument_offset: us
         parameter_count - 1
     } else {
         argument_offset
+    }
+}
+
+fn is_callable_array_type(type_union: &TUnion) -> bool {
+    type_union.types.iter().any(|atomic| match atomic {
+        TAtomic::Array(TArray::Keyed(array)) => {
+            array.get_generic_parameters().is_some_and(|(_, value_type)| value_type.has_callable())
+                || array
+                    .get_known_items()
+                    .is_some_and(|items| items.values().any(|(_, value_type)| value_type.has_callable()))
+        }
+        TAtomic::Array(TArray::List(array)) => {
+            array.get_element_type().has_callable()
+                || array
+                    .get_known_elements()
+                    .is_some_and(|items| items.values().any(|(_, value_type)| value_type.has_callable()))
+        }
+        _ => false,
+    })
+}
+
+fn callback_callsite_context(
+    target: &InvocationTarget<'_>,
+    parameter_offset: Option<usize>,
+    source_argument_offset: usize,
+    argument_count: usize,
+    is_unpacked: bool,
+    artifacts: &AnalysisArtifacts,
+) -> CallbackCallsiteContext {
+    let callsite = deferred_callable_callsite_context(
+        target,
+        parameter_offset,
+        source_argument_offset,
+        argument_count,
+        is_unpacked,
+        artifacts,
+    );
+
+    CallbackCallsiteContext {
+        target: callsite.target,
+        parameter_offset: callsite.parameter_offset,
+        invocation_kind: callsite.invocation_kind,
+    }
+}
+
+fn deferred_callable_callsite_context(
+    target: &InvocationTarget<'_>,
+    parameter_offset: Option<usize>,
+    source_argument_offset: usize,
+    argument_count: usize,
+    is_unpacked: bool,
+    artifacts: &AnalysisArtifacts,
+) -> DeferredCallableCallsiteContext {
+    DeferredCallableCallsiteContext {
+        target: parameter_offset.and_then(|_| target.get_function_like_identifier().copied()),
+        parameter_offset: parameter_offset.unwrap_or(source_argument_offset),
+        invocation_kind: parameter_offset.and_then(|parameter_offset| {
+            classify_callback(target, parameter_offset, source_argument_offset, argument_count, is_unpacked, artifacts)
+        }),
     }
 }
 
@@ -228,10 +295,83 @@ where
             } else {
                 get_parameter_of_argument(&invocation.target, &argument, offset)
             };
-            if matches!(argument.value(), Some(Expression::Closure(_) | Expression::ArrowFunction(_))) {
+            let callback = argument.value().map(unwrap_expression);
+            if let Some(callback) = callback
+                .filter(|expression| matches!(expression, Expression::Closure(_) | Expression::ArrowFunction(_)))
+            {
+                let callback_parameter = parameter.map(|(parameter_offset, _)| parameter_offset);
+                let callsite = callback_callsite_context(
+                    &invocation.target,
+                    callback_parameter,
+                    offset,
+                    arg_count,
+                    argument.is_unpacked(),
+                    artifacts,
+                );
+                artifacts.record_callback_callsite(callback.span(), callsite);
+                if context.settings.check_throws && context.settings.forbid_checked_exceptions_in_callables {
+                    artifacts.record_callable_callback_callsite(
+                        FunctionLikeIdentifier::for_closure(context.source_file, callback.span()),
+                        deferred_callable_callsite_context(
+                            &invocation.target,
+                            callback_parameter,
+                            offset,
+                            arg_count,
+                            argument.is_unpacked(),
+                            artifacts,
+                        ),
+                        None,
+                    );
+                }
+
                 closure_arguments.push((offset, parameter));
             } else {
                 non_closure_arguments.push((offset, parameter));
+            }
+
+            if let Some((parameter_offset, _)) = parameter
+                && classify_callback(
+                    &invocation.target,
+                    parameter_offset,
+                    offset,
+                    arg_count,
+                    argument.is_unpacked(),
+                    artifacts,
+                ) == Some(CallableInvocationKind::Immediately)
+                && parameter.and_then(|(_, parameter)| parameter.get_type()).is_some_and(is_callable_array_type)
+                && let Some(elements) =
+                    argument.value().map(unwrap_expression).and_then(Expression::get_array_like_elements)
+            {
+                for callback in elements.iter().filter_map(|element| element.get_value()) {
+                    let callback = unwrap_expression(callback);
+                    if !matches!(callback, Expression::Closure(_) | Expression::ArrowFunction(_)) {
+                        continue;
+                    }
+
+                    let callsite = callback_callsite_context(
+                        &invocation.target,
+                        Some(parameter_offset),
+                        offset,
+                        arg_count,
+                        argument.is_unpacked(),
+                        artifacts,
+                    );
+                    artifacts.record_callback_callsite(callback.span(), callsite);
+                    if context.settings.check_throws && context.settings.forbid_checked_exceptions_in_callables {
+                        artifacts.record_callable_callback_callsite(
+                            FunctionLikeIdentifier::for_closure(context.source_file, callback.span()),
+                            deferred_callable_callsite_context(
+                                &invocation.target,
+                                Some(parameter_offset),
+                                offset,
+                                arg_count,
+                                argument.is_unpacked(),
+                                artifacts,
+                            ),
+                            None,
+                        );
+                    }
+                }
             }
         }
     }
@@ -250,15 +390,13 @@ where
     let calling_instance_type = calling_class_like.and_then(|(_, atomic)| atomic);
     let method_class_type = method_call_context.map(|ctx| &ctx.class_type);
 
-    for (argument_offset, parameter) in &non_closure_arguments {
-        let Some(argument) = invocation.arguments_source.get_argument(*argument_offset) else {
+    for (argument_offset, parameter) in non_closure_arguments.iter().copied() {
+        let Some(argument) = invocation.arguments_source.get_argument(argument_offset) else {
             continue;
         };
         let Some(argument_expression) = argument.value() else {
             continue;
         };
-
-        let parameter = *parameter;
 
         analyze_and_store_argument_type(
             context,
@@ -266,13 +404,43 @@ where
             artifacts,
             &invocation.target,
             argument_expression,
-            *argument_offset,
+            argument_offset,
             &mut analyzed_argument_types,
             parameter.is_some_and(|p| p.1.is_by_reference()),
             None,
         )?;
 
-        if let Some((argument_type, _)) = &mut analyzed_argument_types[*argument_offset]
+        if context.settings.check_throws && context.settings.forbid_checked_exceptions_in_callables {
+            let directly_invoked_parameter_offset =
+                immediate_callable_parameter_offset(block_context, argument_expression);
+            for callback_parameter_offset in
+                crate::invocation::callbacks::callable_parameter_offsets_referenced_in_expression(
+                    block_context,
+                    argument_expression,
+                )
+            {
+                let invoked_immediately = Some(callback_parameter_offset) == directly_invoked_parameter_offset
+                    && parameter.is_some_and(|(parameter_offset, _)| {
+                        classify_callback(
+                            &invocation.target,
+                            parameter_offset,
+                            argument_offset,
+                            arg_count,
+                            argument.is_unpacked(),
+                            artifacts,
+                        ) == Some(CallableInvocationKind::Immediately)
+                    });
+
+                if invoked_immediately {
+                    artifacts
+                        .record_callback_parameter_invocation(argument_expression.span(), callback_parameter_offset);
+                } else {
+                    artifacts.record_callback_parameter_escape(callback_parameter_offset);
+                }
+            }
+        }
+
+        if let Some((argument_type, _)) = &mut analyzed_argument_types[argument_offset]
             && let Some(narrowed_type) = narrow_class_related_argument(
                 context,
                 block_context,
@@ -285,7 +453,97 @@ where
             *argument_type = Rc::new(narrowed_type);
         }
 
-        if let Some(argument_type) = &analyzed_argument_types[*argument_offset]
+        if let Some((argument_type, _)) = &analyzed_argument_types[argument_offset] {
+            let callback_parameter = parameter.map(|(parameter_offset, _)| parameter_offset);
+            let callsite = callback_callsite_context(
+                &invocation.target,
+                callback_parameter,
+                argument_offset,
+                arg_count,
+                argument.is_unpacked(),
+                artifacts,
+            );
+            let callback_storage_location = if context.settings.check_throws
+                && context.settings.forbid_checked_exceptions_in_callables
+                && crate::callables::is_local_callable_storage_expression(argument_expression)
+            {
+                get_block_expression_id(argument_expression, context, block_context).map(|variable| {
+                    CallableStorageLocation { scope: block_context.scope.get_function_like_identifier(), variable }
+                })
+            } else {
+                None
+            };
+            let callable_identifiers =
+                if parameter.and_then(|(_, parameter)| parameter.get_type()).is_some_and(is_callable_array_type) {
+                    crate::callables::callable_identifiers_in_type(argument_type, context.codebase)
+                } else {
+                    argument_type
+                        .types
+                        .iter()
+                        .filter_map(|atomic| {
+                            let callable = cast_atomic_to_callable(atomic, context.codebase, None)?;
+                            match callable.as_ref() {
+                                TCallable::Alias(identifier) => Some(*identifier),
+                                TCallable::Signature(signature) => signature.get_source(),
+                            }
+                        })
+                        .collect::<HashSet<_>>()
+                };
+
+            for identifier in callable_identifiers {
+                if context.settings.check_throws
+                    && (context.settings.forbid_checked_exceptions_in_callables || !identifier.is_closure())
+                {
+                    artifacts.record_callable_callback_callsite(
+                        identifier,
+                        deferred_callable_callsite_context(
+                            &invocation.target,
+                            callback_parameter,
+                            argument_offset,
+                            arg_count,
+                            argument.is_unpacked(),
+                            artifacts,
+                        ),
+                        callback_storage_location,
+                    );
+
+                    if context.settings.forbid_checked_exceptions_in_callables
+                        && callsite.invocation_kind == Some(CallableInvocationKind::Immediately)
+                    {
+                        artifacts.record_direct_callable_invocation(
+                            identifier,
+                            callback_storage_location,
+                            invocation.span,
+                            block_context.scope.get_function_like_identifier(),
+                        );
+                    }
+                }
+
+                let Some((callable_span, effects)) = artifacts.get_callable_effects_by_identifier(identifier) else {
+                    continue;
+                };
+
+                if identifier.is_closure()
+                    && callsite.invocation_kind != Some(CallableInvocationKind::Immediately)
+                    && context.settings.check_throws
+                    && context.settings.forbid_checked_exceptions_in_callables
+                {
+                    let reported_exceptions = crate::callables::report_deferred_callable_exceptions(
+                        context,
+                        callable_span,
+                        &effects.possibly_thrown_exceptions,
+                        callsite.target.map(|target| (target, callsite.parameter_offset)),
+                        artifacts.get_reported_callable_exceptions(identifier),
+                    );
+
+                    for exception in reported_exceptions {
+                        artifacts.record_reported_callable_exception(identifier, exception);
+                    }
+                }
+            }
+        }
+
+        if let Some(argument_type) = &analyzed_argument_types[argument_offset]
             && let Some((_, parameter_ref)) = parameter
             && parameter_ref.get_type().is_some_and(|ty| ty.is_expandable() || ty.has_template_types())
         {
@@ -304,7 +562,7 @@ where
                     &parameter_type,
                     &argument_type.0,
                     template_result,
-                    *argument_offset,
+                    argument_offset,
                     argument_type.1,
                     false,
                 );
@@ -312,11 +570,11 @@ where
         }
     }
 
-    for (argument_offset, parameter) in &non_closure_arguments {
-        let Some(argument) = invocation.arguments_source.get_argument(*argument_offset) else {
+    for (argument_offset, parameter) in non_closure_arguments.iter().copied() {
+        let Some(argument) = invocation.arguments_source.get_argument(argument_offset) else {
             continue;
         };
-        let Some((_, parameter)) = *parameter else {
+        let Some((_, parameter)) = parameter else {
             continue;
         };
 
@@ -324,7 +582,7 @@ where
             continue;
         };
 
-        let argument_type = if let Some((argument_type, _)) = &analyzed_argument_types[*argument_offset] {
+        let argument_type = if let Some((argument_type, _)) = &analyzed_argument_types[argument_offset] {
             (**argument_type).clone()
         } else if argument.is_placeholder() {
             TUnion::from_atomic(TAtomic::Variable(parameter_name.0))
@@ -338,15 +596,14 @@ where
     let global_closure_bind_scope = detect_closure_bind_scope(context, invocation, &analyzed_argument_types);
     let previous_bind_scope = artifacts.closure_bind_scope.take();
 
-    for (argument_offset, parameter) in &closure_arguments {
-        let Some(argument) = invocation.arguments_source.get_argument(*argument_offset) else {
+    for (argument_offset, parameter) in closure_arguments.iter().copied() {
+        let Some(argument) = invocation.arguments_source.get_argument(argument_offset) else {
             continue;
         };
         let Some(argument_expression) = argument.value() else {
             continue;
         };
 
-        let parameter = *parameter;
         let mut parameter_type_had_template_types = false;
         // Store the original unreplaced type for template inference, so closure return types
         // can contribute bounds even after other arguments have already inferred some bounds.
@@ -438,16 +695,40 @@ where
             artifacts,
             &invocation.target,
             argument_expression,
-            *argument_offset,
+            argument_offset,
             &mut analyzed_argument_types,
             parameter.is_some_and(|p| p.1.is_by_reference()),
             parameter_type.as_ref(),
         )?;
 
+        let callback_expression = unwrap_expression(argument_expression);
+        let callback_identifier = FunctionLikeIdentifier::for_closure(context.source_file, callback_expression.span());
+        if let Some(callsite) = artifacts.get_callback_callsite(callback_expression.span())
+            && callsite.target.is_none()
+            && !artifacts.callback_is_invoked_immediately(
+                callsite.target,
+                callsite.parameter_offset,
+                callsite.invocation_kind,
+            )
+            && let Some(effects) = artifacts.get_callable_effects(callback_expression.span())
+        {
+            let reported_exceptions = crate::callables::report_deferred_callable_exceptions(
+                context,
+                callback_expression.span(),
+                &effects.possibly_thrown_exceptions,
+                callsite.target.map(|target| (target, callsite.parameter_offset)),
+                artifacts.get_reported_callable_exceptions(callback_identifier),
+            );
+
+            for exception in reported_exceptions {
+                artifacts.record_reported_callable_exception(callback_identifier, exception);
+            }
+        }
+
         // Use the original unreplaced type for inference to allow closure return types
         // to contribute bounds that can widen literal types from other arguments.
         if parameter_type_had_template_types
-            && let Some(argument_type) = &analyzed_argument_types[*argument_offset]
+            && let Some(argument_type) = &analyzed_argument_types[argument_offset]
             && let Some(base_type) = &base_parameter_type_for_inference
         {
             infer_parameter_templates_from_argument(
@@ -455,21 +736,21 @@ where
                 base_type,
                 &argument_type.0,
                 template_result,
-                *argument_offset,
+                argument_offset,
                 argument_type.1,
                 true,
             );
         }
     }
 
-    for (argument_offset, parameter) in &closure_arguments {
-        let Some((_, parameter)) = *parameter else {
+    for (argument_offset, parameter) in closure_arguments.iter().copied() {
+        let Some((_, parameter)) = parameter else {
             continue;
         };
         let Some(parameter_name) = parameter.get_name() else {
             continue;
         };
-        let Some((argument_type, _)) = &analyzed_argument_types[*argument_offset] else {
+        let Some((argument_type, _)) = &analyzed_argument_types[argument_offset] else {
             continue;
         };
 

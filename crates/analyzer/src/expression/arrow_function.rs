@@ -3,12 +3,14 @@ use foldhash::HashSet;
 use mago_allocator::Arena;
 use mago_bytes::BytesDisplay;
 use mago_codex::context::ScopeContext;
+use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_span::HasSpan;
 use mago_syntax::cst::ArrowFunction;
 use mago_word::word;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
+use crate::artifacts::CallableEffectSummary;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
@@ -30,6 +32,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
         A: Arena,
     {
         let s = self.span();
+        let identifier = FunctionLikeIdentifier::for_closure(context.source_file, s);
+        let defer_thrown_check = context.settings.forbid_checked_exceptions_in_callables
+            && crate::callables::has_unallowed_deferred_callable_callsite(context, artifacts, identifier);
 
         let Some(function_metadata) = context.codebase.get_closure_at(context.source_file, s) else {
             return Err(AnalysisError::InternalError(
@@ -123,7 +128,18 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
             &self.parameter_list,
             FunctionLikeBody::Expression(self.expression),
             inferred_parameter_types,
+            defer_thrown_check,
         )?;
+
+        let effects = CallableEffectSummary {
+            possibly_thrown_exceptions: inner_block_context.possibly_thrown_exceptions.clone(),
+        };
+        artifacts.record_callable_effects(s, effects.clone());
+        artifacts.record_callable_effects_for_identifier(
+            FunctionLikeIdentifier::Closure(function_metadata.name),
+            s,
+            effects,
+        );
 
         let resulting_closure = resolve_closure_like_type(
             context,

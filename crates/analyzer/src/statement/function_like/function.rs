@@ -105,6 +105,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Function<'arena> {
             &self.parameter_list,
             FunctionLikeBody::Statements(self.body.statements.as_slice(), self.body.span()),
             None,
+            false,
         )?;
 
         // Call plugin on_leave_function hooks

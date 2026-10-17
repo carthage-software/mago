@@ -30,6 +30,7 @@ use mago_word::Word;
 
 use crate::context::Context;
 
+pub(crate) mod callbacks;
 mod resolver;
 mod template_inference;
 
