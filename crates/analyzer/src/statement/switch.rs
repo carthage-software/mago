@@ -959,16 +959,12 @@ where
             .collect::<Vec<_>>();
         break_types.push(BreakType::Switch);
 
-        let mut actions_set = ControlAction::from_switch_case_statements(
+        let actions_set = ControlAction::from_switch_case_statements(
             case.statements().iter().collect(),
             break_types,
             Some(self.artifacts),
             true,
         );
-        if actions_set.contains(ControlAction::BreakTargetSwitch) {
-            actions_set.retain(|action| action != ControlAction::BreakTargetSwitch);
-            actions_set.insert(ControlAction::LeaveSwitch);
-        }
 
         let effective_action = if actions_set.contains(ControlAction::None)
             && matches!(self.last_case_exit_type, ControlAction::Return)
