@@ -358,6 +358,10 @@ where
                 apply_original_subject_assertions,
             )?;
 
+            if arm_status != ArmExecutionStatus::Never {
+                running_else_context.flags.set_inside_potentially_skipped_code(true);
+            }
+
             if let Some(coverage) = &mut finite_array_coverage {
                 for condition in &expression_arm.conditions {
                     coverage.subtract(condition, self.artifacts);
@@ -571,6 +575,9 @@ where
         }
 
         let mut arm_body_context = running_else_context.clone();
+        if arm_status != ArmExecutionStatus::Always {
+            arm_body_context.flags.set_inside_potentially_skipped_code(true);
+        }
         let assertion_context = self.context.get_assertion_context_from_block(&arm_body_context);
 
         let arm_clauses = get_formula(
@@ -778,6 +785,9 @@ where
         }
 
         let mut default_context = running_else_context.clone();
+        if previous_arms_executed != ArmExecutionStatus::Never {
+            default_context.flags.set_inside_potentially_skipped_code(true);
+        }
         default_arm.expression.analyze(self.context, &mut default_context, self.artifacts)?;
 
         arm_body_types.push(

@@ -10,6 +10,7 @@ use mago_analyzer::settings::DEFAULT_FORMULA_SIZE_THRESHOLD;
 use mago_analyzer::settings::DEFAULT_LOOP_ASSIGNMENT_DEPTH_THRESHOLD;
 use mago_analyzer::settings::DEFAULT_SLOW_FILE_WARNING_THRESHOLD_MS;
 use mago_analyzer::settings::Settings;
+use mago_analyzer::settings::normalize_allowed_checked_exception_callable;
 use mago_codex::ttype::combiner::DEFAULT_ARRAY_COMBINATION_THRESHOLD;
 use mago_codex::ttype::combiner::DEFAULT_INTEGER_COMBINATION_THRESHOLD;
 use mago_codex::ttype::combiner::DEFAULT_STRING_COMBINATION_THRESHOLD;
@@ -117,6 +118,16 @@ pub struct AnalyzerConfiguration {
     /// This check only runs when `check_throws` is enabled and defaults to `false`,
     /// since undocumented code may still throw exceptions that static analysis cannot see.
     pub check_dead_catch: bool,
+
+    /// Whether to forbid checked exceptions escaping callables that are stored or passed to
+    /// APIs not known to invoke them synchronously. Requires `check_throws = true`.
+    pub forbid_checked_exceptions_in_callables: bool,
+
+    /// Callable parameter positions where escaping checked exceptions are allowed.
+    ///
+    /// Each entry uses `<function-or-method>:<zero-based-parameter-index>`, for example
+    /// `Symfony\\Component\\HttpFoundation\\StreamedResponse::__construct:0`.
+    pub allowed_checked_exception_callables: Vec<String>,
 
     /// Exceptions to ignore including all subclasses (hierarchy-aware).
     ///
@@ -481,6 +492,12 @@ impl AnalyzerConfiguration {
             allow_possibly_undefined_array_keys: self.allow_possibly_undefined_array_keys,
             check_throws: self.check_throws,
             check_dead_catch: self.check_dead_catch,
+            forbid_checked_exceptions_in_callables: self.forbid_checked_exceptions_in_callables,
+            allowed_checked_exception_callables: self
+                .allowed_checked_exception_callables
+                .iter()
+                .map(|entry| normalize_allowed_checked_exception_callable(entry))
+                .collect(),
             unchecked_exceptions: self.unchecked_exceptions.iter().map(|s| mago_word::word(s.as_bytes())).collect(),
             unchecked_exception_classes: self
                 .unchecked_exception_classes
@@ -544,6 +561,8 @@ impl Default for AnalyzerConfiguration {
             allow_possibly_undefined_array_keys: defaults.allow_possibly_undefined_array_keys,
             check_throws: defaults.check_throws,
             check_dead_catch: defaults.check_dead_catch,
+            forbid_checked_exceptions_in_callables: defaults.forbid_checked_exceptions_in_callables,
+            allowed_checked_exception_callables: vec![],
             unchecked_exceptions: vec![],
             unchecked_exception_classes: vec![],
             check_missing_override: defaults.check_missing_override,

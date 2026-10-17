@@ -264,7 +264,25 @@ where
             resulting_type
         }
     } else {
+        if !block_context.flags.inside_definitely_unreachable_code() {
+            crate::callables::record_unresolved_callable_closure_arguments(
+                context,
+                artifacts,
+                &invocation_arguments,
+                call_span,
+                block_context.scope.get_function_like_identifier(),
+            );
+        }
         analyze_invocation_arguments_source(context, block_context, artifacts, &invocation_arguments)?;
+        if !block_context.flags.inside_definitely_unreachable_code() {
+            crate::callables::record_unresolved_callable_arguments(
+                context,
+                artifacts,
+                &invocation_arguments,
+                call_span,
+                block_context.scope.get_function_like_identifier(),
+            );
+        }
 
         if encountered_mixed_targets {
             get_mixed()

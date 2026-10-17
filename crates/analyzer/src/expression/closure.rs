@@ -25,10 +25,12 @@ use mago_word::word;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
+use crate::artifacts::CallableEffectSummary;
 use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
+use crate::invocation::callbacks::record_callable_effects;
 use crate::statement::function_like::FunctionLikeBody;
 use crate::statement::function_like::analyze_function_like;
 use crate::statement::function_like::resolve_closure_like_type;
@@ -45,6 +47,15 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
         A: Arena,
     {
         let s = self.span();
+        let callback_callsite = artifacts.get_callback_callsite(s);
+        let is_immediate_callback = callback_callsite.is_some_and(|callsite| {
+            callsite.invocation_kind == Some(mago_codex::metadata::parameter::CallableInvocationKind::Immediately)
+        });
+        let identifier = FunctionLikeIdentifier::for_closure(context.source_file, s);
+        let defer_thrown_check = is_immediate_callback
+            || (context.settings.forbid_checked_exceptions_in_callables
+                && (block_context.flags.inside_definitely_unreachable_code()
+                    || crate::callables::has_unallowed_deferred_callable_callsite(context, artifacts, identifier)));
 
         let Some(function_metadata) = context.codebase.get_closure_at(context.source_file, s) else {
             return Err(AnalysisError::InternalError(
@@ -218,7 +229,26 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
             &self.parameter_list,
             FunctionLikeBody::Statements(self.body.statements.as_slice(), self.body.span()),
             inferred_parameter_types,
+            defer_thrown_check,
         )?;
+
+        let effects = CallableEffectSummary {
+            possibly_thrown_exceptions: inner_block_context.possibly_thrown_exceptions.clone(),
+        };
+        record_callable_effects(
+            s,
+            effects.clone(),
+            is_immediate_callback,
+            context.settings.check_throws,
+            block_context,
+            artifacts,
+            context.codebase,
+        );
+        artifacts.record_callable_effects_for_identifier(
+            FunctionLikeIdentifier::Closure(function_metadata.name),
+            s,
+            effects,
+        );
 
         for referenced_variable in inner_block_context.references_to_external_scope {
             let Some(inner_type) = inner_block_context.locals.remove(&referenced_variable) else {

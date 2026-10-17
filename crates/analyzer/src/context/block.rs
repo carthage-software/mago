@@ -105,6 +105,7 @@ pub struct BlockContext<'ctx> {
     pub logical_or_false_context: Option<Rc<RefCell<Option<Self>>>>,
     pub control_actions: ControlActionSet,
     pub possibly_thrown_exceptions: WordMap<HashSet<Span>>,
+    pub catchable_exception_names: WordSet,
 
     /// Properties that are DEFINITELY initialized in ALL code paths.
     /// Uses intersection semantics - a property must be initialized in ALL branches.
@@ -236,6 +237,7 @@ impl<'ctx> BlockContext<'ctx> {
             logical_or_false_context: None,
             control_actions: ControlActionSet::new(),
             possibly_thrown_exceptions: WordMap::default(),
+            catchable_exception_names: WordSet::default(),
             definitely_initialized_properties: WordSet::default(),
             possibly_initialized_properties: WordSet::default(),
             definitely_uninitialized_property_ids: WordSet::default(),

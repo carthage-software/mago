@@ -426,6 +426,9 @@ where
             artifacts.set_loop_scope(loop_scope.clone());
         }
 
+        if !is_do && !always_enters_loop.get() {
+            continue_context.flags.set_inside_potentially_skipped_code(true);
+        }
         analyze_statements(statements, context, &mut continue_context, artifacts)?;
         loop_scope = unsafe {
             // SAFETY: we know the loop scope will remain in the context.
@@ -469,9 +472,15 @@ where
                 // SAFETY: `artifacts.loop_scope` was set above before analyzing pre-conditions; taking it
                 // back into the local `loop_scope` binding is sound because no other code path consumes it.
                 loop_scope = unsafe { artifacts.take_loop_scope_unchecked() };
+                if !pre_conditions.is_empty() && loop_scope.truthy_pre_conditions {
+                    always_enters_loop.set(true);
+                }
             }
 
             let mut continue_context = loop_context.clone();
+            if !is_do && !always_enters_loop.get() {
+                continue_context.flags.set_inside_potentially_skipped_code(true);
+            }
 
             loop_scope = {
                 artifacts.set_loop_scope(loop_scope);
@@ -852,7 +861,9 @@ where
                 }
 
                 continue_context.clauses.clone_from(&pre_loop_context.clauses);
-
+                if !is_do && !always_enters_loop.get() {
+                    continue_context.flags.set_inside_potentially_skipped_code(true);
+                }
                 clean_nodes(statements, artifacts);
 
                 let loop_scope = {

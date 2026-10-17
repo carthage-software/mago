@@ -6,9 +6,14 @@ use foldhash::HashSet;
 use mago_word::Word;
 use mago_word::WordMap;
 use mago_word::WordSet;
+use mago_word::ascii_lowercase_word;
 
 use mago_algebra::assertion_set::AssertionSet;
+use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::metadata::CodebaseMetadata;
+use mago_codex::metadata::parameter::CallableExceptionCatchGroup;
+use mago_codex::metadata::parameter::CallableExceptionCatchSummary;
+use mago_codex::metadata::parameter::CallableInvocationKind;
 use mago_codex::reference::SymbolReferences;
 use mago_codex::ttype::combine_owned_union_types_rc;
 use mago_codex::ttype::combiner::CombinerOptions;
@@ -23,6 +28,7 @@ use crate::context::block::ReferenceConstraintSource;
 use crate::context::scope::case_scope::CaseScope;
 use crate::context::scope::loop_scope::LoopScope;
 use crate::readonly::PendingReadonlyPropertyWrite;
+use crate::utils::expression::is_derived_access_path;
 
 pub(crate) use self::expression_types::CheckpointAction;
 pub(crate) use self::expression_types::ExpressionTypeCheckpoints;
@@ -47,6 +53,73 @@ pub struct ClosureBindScope {
     pub has_this: bool,
 }
 
+/// Exceptions a callable may throw after its local `try`/`catch` handling.
+#[derive(Debug, Clone, Default)]
+pub(crate) struct CallableEffectSummary {
+    /// Exception class names mapped to the source spans that may throw them.
+    pub possibly_thrown_exceptions: WordMap<HashSet<Span>>,
+}
+
+fn merge_callable_effect_summary(target: &mut CallableEffectSummary, source: CallableEffectSummary) {
+    for (exception, spans) in source.possibly_thrown_exceptions {
+        target.possibly_thrown_exceptions.entry(exception).or_default().extend(spans);
+    }
+}
+
+fn merge_callback_parameter_effects(
+    target: &mut HashMap<usize, Vec<CallableExceptionCatchSummary>>,
+    source: HashMap<usize, Vec<CallableExceptionCatchSummary>>,
+) {
+    for (parameter_offset, invocation_catches) in source {
+        let stored = target.entry(parameter_offset).or_default();
+        for invocation_catch in invocation_catches {
+            if !stored.contains(&invocation_catch) {
+                stored.push(invocation_catch);
+            }
+        }
+    }
+}
+
+/// The resolved callsite where a callable is supplied as a callback argument.
+#[derive(Debug, Clone)]
+pub(crate) struct CallbackCallsiteContext {
+    /// The source span of the invocation that receives the callback.
+    pub(crate) invocation_span: Span,
+    /// The function-like scope containing the invocation.
+    pub(crate) scope: Option<FunctionLikeIdentifier>,
+    /// The resolved function or method being called, when statically known.
+    pub(crate) target: Option<FunctionLikeIdentifier>,
+    /// The mapped parameter position, or the source argument position if the target parameter is unresolved.
+    pub(crate) parameter_offset: usize,
+    /// The invocation contract from the parameter metadata, when declared.
+    pub(crate) invocation_kind: Option<CallableInvocationKind>,
+    /// Catch types surrounding the callee's callback invocation sites, if known.
+    pub(crate) caught_exceptions: Option<Vec<CallableExceptionCatchSummary>>,
+}
+
+#[derive(Debug, Clone)]
+pub(crate) struct DeferredCallableCallsiteContext {
+    pub(crate) invocation_span: Span,
+    pub(crate) scope: Option<FunctionLikeIdentifier>,
+    pub(crate) target: Option<FunctionLikeIdentifier>,
+    pub(crate) parameter_offset: usize,
+    pub(crate) invocation_kind: Option<CallableInvocationKind>,
+}
+
+#[derive(Debug, Clone, Copy, Default)]
+pub(crate) struct CallableUsage {
+    directly_invoked: bool,
+    stored: bool,
+    unlocated_stored: bool,
+    escapes_scope: bool,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+pub(crate) struct CallableStorageLocation {
+    pub scope: Option<FunctionLikeIdentifier>,
+    pub variable: Word,
+}
+
 /// One semantic receiver and method target retained for a source-level call.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct ResolvedMethodCall {
@@ -64,6 +137,8 @@ pub(crate) struct ShortCircuitAssignmentTypes {
 #[derive(Debug, Clone)]
 pub struct AnalysisArtifacts {
     pub expression_types: HashMap<(u32, u32), Rc<TUnion>>,
+    pub(crate) throwing_condition_exceptions: HashMap<(u32, u32), WordMap<HashSet<Span>>>,
+    pub(crate) try_catch_reachability: HashMap<(u32, u32), bool>,
     pub if_true_assertions: HashMap<(u32, u32), WordMap<AssertionSet>>,
     pub if_false_assertions: HashMap<(u32, u32), WordMap<AssertionSet>>,
     pub true_branch_only_assertions: HashMap<(u32, u32), WordMap<AssertionSet>>,
@@ -81,6 +156,23 @@ pub struct AnalysisArtifacts {
     pub method_calls_parent_constructor: HashMap<(Word, Word), bool>,
     pub method_calls_parent_initializer: HashMap<(Word, Word), Word>,
     pub closure_bind_scope: Option<ClosureBindScope>,
+    pub(crate) callable_effects: HashMap<(u32, u32), CallableEffectSummary>,
+    pub(crate) callable_effects_by_identifier: HashMap<FunctionLikeIdentifier, (Span, CallableEffectSummary)>,
+    pub(crate) callback_callsites: HashMap<(u32, u32), CallbackCallsiteContext>,
+    pub(crate) callable_callback_callsites: HashMap<FunctionLikeIdentifier, Vec<DeferredCallableCallsiteContext>>,
+    pub(crate) callable_usage: HashMap<FunctionLikeIdentifier, CallableUsage>,
+    pub(crate) callable_storage_locations: HashMap<FunctionLikeIdentifier, HashSet<CallableStorageLocation>>,
+    pub(crate) callable_storage_owners_by_location: HashMap<CallableStorageLocation, HashSet<FunctionLikeIdentifier>>,
+    pub(crate) direct_callable_invocation_spans:
+        HashMap<FunctionLikeIdentifier, HashSet<(Span, Option<FunctionLikeIdentifier>)>>,
+    pub(crate) directly_invoked_callable_storage_locations:
+        HashMap<FunctionLikeIdentifier, HashSet<CallableStorageLocation>>,
+    pub(crate) callable_callback_storage_locations: HashMap<FunctionLikeIdentifier, HashSet<CallableStorageLocation>>,
+    pub(crate) reported_callable_exceptions: HashMap<FunctionLikeIdentifier, WordSet>,
+    pub(crate) callback_parameter_invocations: HashMap<(u32, u32), (usize, Vec<CallableExceptionCatchSummary>)>,
+    pub(crate) callback_parameter_catches: HashMap<(u32, u32), Vec<(u32, CallableExceptionCatchGroup)>>,
+    pub(crate) callback_parameter_effects:
+        HashMap<FunctionLikeIdentifier, HashMap<usize, Vec<CallableExceptionCatchSummary>>>,
     pub resolved_method_calls: Vec<ResolvedMethodCall>,
     pub(crate) editor: Option<EditorArtifacts>,
     pub(crate) variable_definedness: HashMap<(u32, u32), WordMap<VariableDefinedness>>,
@@ -102,6 +194,8 @@ impl AnalysisArtifacts {
     pub fn new() -> Self {
         Self {
             expression_types: HashMap::default(),
+            throwing_condition_exceptions: HashMap::default(),
+            try_catch_reachability: HashMap::default(),
             inferred_return_types: Vec::new(),
             inferred_yield_key_types: Vec::new(),
             inferred_yield_value_types: Vec::new(),
@@ -119,6 +213,20 @@ impl AnalysisArtifacts {
             method_calls_parent_constructor: HashMap::default(),
             method_calls_parent_initializer: HashMap::default(),
             closure_bind_scope: None,
+            callable_effects: HashMap::default(),
+            callable_effects_by_identifier: HashMap::default(),
+            callback_callsites: HashMap::default(),
+            callable_callback_callsites: HashMap::default(),
+            callable_usage: HashMap::default(),
+            callable_storage_locations: HashMap::default(),
+            callable_storage_owners_by_location: HashMap::default(),
+            direct_callable_invocation_spans: HashMap::default(),
+            directly_invoked_callable_storage_locations: HashMap::default(),
+            callable_callback_storage_locations: HashMap::default(),
+            reported_callable_exceptions: HashMap::default(),
+            callback_parameter_invocations: HashMap::default(),
+            callback_parameter_catches: HashMap::default(),
+            callback_parameter_effects: HashMap::default(),
             resolved_method_calls: Vec::new(),
             editor: None,
             variable_definedness: HashMap::default(),
@@ -127,6 +235,380 @@ impl AnalysisArtifacts {
             static_local_types: None,
             expression_type_checkpoints: ExpressionTypeCheckpoints::default(),
             retain_completed_expression_types: true,
+        }
+    }
+
+    /// Records the post-catch effects of a closure or arrow function.
+    pub(crate) fn record_callable_effects(&mut self, span: Span, effects: CallableEffectSummary) {
+        let entry = self.callable_effects.entry((span.start.offset, span.end.offset)).or_default();
+        merge_callable_effect_summary(entry, effects);
+    }
+
+    pub(crate) fn record_callable_effects_for_identifier(
+        &mut self,
+        identifier: FunctionLikeIdentifier,
+        span: Span,
+        effects: CallableEffectSummary,
+    ) {
+        self.record_callable_effects(span, effects.clone());
+
+        let entry = self
+            .callable_effects_by_identifier
+            .entry(identifier)
+            .or_insert_with(|| (span, CallableEffectSummary::default()));
+        for (exception, spans) in effects.possibly_thrown_exceptions {
+            entry.1.possibly_thrown_exceptions.entry(exception).or_default().extend(spans);
+        }
+    }
+
+    /// Returns the post-catch effects recorded for a callable at a source span.
+    #[must_use]
+    pub(crate) fn get_callable_effects(&self, span: Span) -> Option<&CallableEffectSummary> {
+        self.callable_effects.get(&(span.start.offset, span.end.offset))
+    }
+
+    pub(crate) fn record_callback_callsite(&mut self, span: Span, callsite: CallbackCallsiteContext) {
+        self.callback_callsites.insert((span.start.offset, span.end.offset), callsite);
+    }
+
+    pub(crate) fn record_callable_callback_callsite(
+        &mut self,
+        identifier: FunctionLikeIdentifier,
+        callsite: DeferredCallableCallsiteContext,
+        storage_location: Option<CallableStorageLocation>,
+    ) {
+        self.callable_callback_callsites.entry(identifier).or_default().push(callsite);
+
+        if let Some(storage_location) = storage_location {
+            self.callable_callback_storage_locations.entry(identifier).or_default().insert(storage_location);
+            self.callable_storage_owners_by_location.entry(storage_location).or_default().insert(identifier);
+        }
+    }
+
+    pub(crate) fn record_direct_callable_invocation(
+        &mut self,
+        identifier: FunctionLikeIdentifier,
+        storage_location: Option<CallableStorageLocation>,
+        invocation_span: Span,
+        invocation_scope: Option<FunctionLikeIdentifier>,
+    ) {
+        let canonical_identifier = match identifier {
+            FunctionLikeIdentifier::Function(name) => {
+                FunctionLikeIdentifier::Function(ascii_lowercase_word(name.as_bytes()))
+            }
+            FunctionLikeIdentifier::Method(class, method) => FunctionLikeIdentifier::Method(
+                ascii_lowercase_word(class.as_bytes()),
+                ascii_lowercase_word(method.as_bytes()),
+            ),
+            FunctionLikeIdentifier::Closure(name) => FunctionLikeIdentifier::Closure(name),
+        };
+        self.direct_callable_invocation_spans
+            .entry(identifier)
+            .or_default()
+            .insert((invocation_span, invocation_scope));
+        self.direct_callable_invocation_spans
+            .entry(canonical_identifier)
+            .or_default()
+            .insert((invocation_span, invocation_scope));
+
+        if identifier.is_closure() {
+            self.callable_usage.entry(identifier).or_default().directly_invoked = true;
+        }
+
+        if let Some(storage_location) = storage_location {
+            let ancestor_storage_locations = self
+                .callable_storage_owners_by_location
+                .iter()
+                .filter_map(|(stored_location, owners)| {
+                    (stored_location.scope == storage_location.scope
+                        && owners.contains(&identifier)
+                        && (stored_location.variable == storage_location.variable
+                            || is_derived_access_path(storage_location.variable, stored_location.variable)))
+                    .then_some(*stored_location)
+                })
+                .collect::<Vec<_>>();
+
+            let directly_invoked_locations =
+                self.directly_invoked_callable_storage_locations.entry(identifier).or_default();
+            directly_invoked_locations.insert(storage_location);
+            directly_invoked_locations.extend(ancestor_storage_locations);
+            self.callable_storage_owners_by_location.entry(storage_location).or_default().insert(identifier);
+        }
+    }
+
+    pub(crate) fn record_callable_storage(
+        &mut self,
+        identifier: FunctionLikeIdentifier,
+        escapes_scope: bool,
+        storage_location: Option<CallableStorageLocation>,
+    ) {
+        let usage = self.callable_usage.entry(identifier).or_default();
+        usage.stored = true;
+        usage.escapes_scope |= escapes_scope;
+
+        if let Some(storage_location) = storage_location {
+            self.callable_storage_locations.entry(identifier).or_default().insert(storage_location);
+            self.callable_storage_owners_by_location.entry(storage_location).or_default().insert(identifier);
+        }
+
+        if storage_location.is_none() || escapes_scope {
+            usage.unlocated_stored = true;
+        }
+    }
+
+    pub(crate) fn replace_callable_storage_location(
+        &mut self,
+        storage_location: CallableStorageLocation,
+        identifiers: HashSet<FunctionLikeIdentifier>,
+        escapes_scope: bool,
+    ) {
+        let Some(previous_identifiers) = self.callable_storage_owners_by_location.remove(&storage_location) else {
+            return;
+        };
+
+        for identifier in previous_identifiers.iter().copied() {
+            if !identifiers.contains(&identifier) {
+                self.remove_callable_storage_location_for_identifier(identifier, storage_location);
+            }
+        }
+
+        for identifier in identifiers {
+            if previous_identifiers.contains(&identifier) {
+                self.callable_storage_owners_by_location.entry(storage_location).or_default().insert(identifier);
+
+                let usage = self.callable_usage.entry(identifier).or_default();
+                usage.stored = true;
+                usage.escapes_scope |= escapes_scope;
+                usage.unlocated_stored |= escapes_scope;
+            } else {
+                self.record_callable_storage(identifier, escapes_scope, Some(storage_location));
+            }
+        }
+    }
+
+    pub(crate) fn clear_callable_storage_location(&mut self, storage_location: CallableStorageLocation) {
+        let locations_to_clear = self
+            .callable_storage_owners_by_location
+            .keys()
+            .copied()
+            .filter(|location| {
+                location.scope == storage_location.scope
+                    && (location.variable == storage_location.variable
+                        || is_derived_access_path(location.variable, storage_location.variable))
+            })
+            .collect::<Vec<_>>();
+
+        for location in locations_to_clear {
+            self.clear_callable_storage_location_exact(location);
+        }
+    }
+
+    fn clear_callable_storage_location_exact(&mut self, storage_location: CallableStorageLocation) {
+        let Some(identifiers) = self.callable_storage_owners_by_location.remove(&storage_location) else {
+            return;
+        };
+
+        for identifier in identifiers {
+            self.remove_callable_storage_location_for_identifier(identifier, storage_location);
+        }
+    }
+
+    fn remove_callable_storage_location_for_identifier(
+        &mut self,
+        identifier: FunctionLikeIdentifier,
+        storage_location: CallableStorageLocation,
+    ) {
+        let remove_storage_locations =
+            if let Some(storage_locations) = self.callable_storage_locations.get_mut(&identifier) {
+                storage_locations.remove(&storage_location);
+                storage_locations.is_empty()
+            } else {
+                false
+            };
+
+        if remove_storage_locations {
+            self.callable_storage_locations.remove(&identifier);
+        }
+
+        for locations in [
+            self.directly_invoked_callable_storage_locations.get_mut(&identifier),
+            self.callable_callback_storage_locations.get_mut(&identifier),
+        ]
+        .into_iter()
+        .flatten()
+        {
+            locations.remove(&storage_location);
+        }
+
+        let has_locations = self.callable_storage_locations.contains_key(&identifier);
+        if let Some(usage) = self.callable_usage.get_mut(&identifier) {
+            usage.stored = usage.unlocated_stored || has_locations;
+        }
+    }
+
+    #[must_use]
+    pub(crate) fn callable_escapes_scope(&self, identifier: FunctionLikeIdentifier) -> bool {
+        self.callable_usage.get(&identifier).is_some_and(|usage| usage.escapes_scope)
+    }
+
+    #[must_use]
+    pub(crate) fn has_uninvoked_callable_storage_location(&self, identifier: FunctionLikeIdentifier) -> bool {
+        let Some(storage_locations) = self.callable_storage_locations.get(&identifier) else {
+            return false;
+        };
+
+        let directly_invoked_locations = self.directly_invoked_callable_storage_locations.get(&identifier);
+        let callback_locations = self.callable_callback_storage_locations.get(&identifier);
+
+        storage_locations.iter().any(|location| {
+            !directly_invoked_locations.is_some_and(|locations| locations.contains(location))
+                && !callback_locations.is_some_and(|locations| locations.contains(location))
+        })
+    }
+
+    pub(crate) fn record_reported_callable_exception(&mut self, identifier: FunctionLikeIdentifier, exception: Word) {
+        self.reported_callable_exceptions.entry(identifier).or_default().insert(exception);
+    }
+
+    #[must_use]
+    pub(crate) fn get_reported_callable_exceptions(&self, identifier: FunctionLikeIdentifier) -> Option<&WordSet> {
+        self.reported_callable_exceptions.get(&identifier)
+    }
+
+    #[must_use]
+    pub(crate) fn get_callable_effects_by_identifier(
+        &self,
+        identifier: FunctionLikeIdentifier,
+    ) -> Option<(Span, &CallableEffectSummary)> {
+        self.callable_effects_by_identifier.get(&identifier).map(|(span, effects)| (*span, effects))
+    }
+
+    pub(crate) fn iter_callable_effects_by_identifier(
+        &self,
+    ) -> impl Iterator<Item = (FunctionLikeIdentifier, Span, &CallableEffectSummary)> {
+        self.callable_effects_by_identifier.iter().map(|(identifier, (span, effects))| (*identifier, *span, effects))
+    }
+
+    #[must_use]
+    pub(crate) fn should_report_stored_callable(&self, identifier: FunctionLikeIdentifier) -> bool {
+        let Some(usage) = self.callable_usage.get(&identifier) else {
+            return false;
+        };
+
+        let has_storage_locations =
+            self.callable_storage_locations.get(&identifier).is_some_and(|locations| !locations.is_empty());
+        let unhandled_storage_location = if has_storage_locations {
+            self.has_uninvoked_callable_storage_location(identifier)
+        } else if identifier.is_closure() {
+            !usage.directly_invoked
+        } else {
+            return usage.stored;
+        };
+
+        usage.stored && (unhandled_storage_location || usage.escapes_scope)
+    }
+
+    /// Returns the resolved callsite where a closure was supplied as a callback argument.
+    #[must_use]
+    pub(crate) fn get_callback_callsite(&self, span: Span) -> Option<&CallbackCallsiteContext> {
+        self.callback_callsites.get(&(span.start.offset, span.end.offset))
+    }
+
+    pub(crate) fn record_callback_parameter_invocation(
+        &mut self,
+        span: Span,
+        parameter_offset: usize,
+        invocation_catches: Vec<CallableExceptionCatchSummary>,
+    ) {
+        self.callback_parameter_invocations
+            .insert((span.start.offset, span.end.offset), (parameter_offset, invocation_catches));
+    }
+
+    pub(crate) fn record_callback_parameter_catches(
+        &mut self,
+        range: (u32, u32),
+        try_span: Span,
+        catch_group: CallableExceptionCatchGroup,
+    ) {
+        let try_size = try_span.end.offset.saturating_sub(try_span.start.offset);
+        let groups = self.callback_parameter_catches.entry(range).or_default();
+        let entry = (try_size, catch_group);
+        if !groups.contains(&entry) {
+            groups.push(entry);
+        }
+    }
+
+    pub(crate) fn record_callback_parameter_effects(
+        &mut self,
+        identifier: FunctionLikeIdentifier,
+        effects: HashMap<usize, Vec<CallableExceptionCatchSummary>>,
+    ) {
+        let entry = self.callback_parameter_effects.entry(identifier).or_default();
+        merge_callback_parameter_effects(entry, effects);
+    }
+
+    #[must_use]
+    pub(crate) fn get_callback_parameter_effects(
+        &self,
+        identifier: &FunctionLikeIdentifier,
+        parameter_offset: usize,
+    ) -> Option<&[CallableExceptionCatchSummary]> {
+        self.callback_parameter_effects.get(identifier)?.get(&parameter_offset).map(Vec::as_slice)
+    }
+
+    pub(crate) fn absorb_deferred_callable_tracking(&mut self, other: &mut Self) {
+        for (span, reachable) in std::mem::take(&mut other.try_catch_reachability) {
+            self.try_catch_reachability.entry(span).and_modify(|current| *current |= reachable).or_insert(reachable);
+        }
+        self.callback_callsites.extend(std::mem::take(&mut other.callback_callsites));
+        for (identifier, callsites) in std::mem::take(&mut other.callable_callback_callsites) {
+            self.callable_callback_callsites.entry(identifier).or_default().extend(callsites);
+        }
+        for (identifier, other_usage) in std::mem::take(&mut other.callable_usage) {
+            let usage = self.callable_usage.entry(identifier).or_default();
+            usage.directly_invoked |= other_usage.directly_invoked;
+            usage.stored |= other_usage.stored;
+            usage.unlocated_stored |= other_usage.unlocated_stored;
+            usage.escapes_scope |= other_usage.escapes_scope;
+        }
+        for (identifier, storage_locations) in std::mem::take(&mut other.callable_storage_locations) {
+            self.callable_storage_locations.entry(identifier).or_default().extend(storage_locations);
+        }
+        for (storage_location, identifiers) in std::mem::take(&mut other.callable_storage_owners_by_location) {
+            self.callable_storage_owners_by_location.entry(storage_location).or_default().extend(identifiers);
+        }
+        for (identifier, spans) in std::mem::take(&mut other.direct_callable_invocation_spans) {
+            self.direct_callable_invocation_spans.entry(identifier).or_default().extend(spans);
+        }
+        for (identifier, invoked_locations) in std::mem::take(&mut other.directly_invoked_callable_storage_locations) {
+            self.directly_invoked_callable_storage_locations.entry(identifier).or_default().extend(invoked_locations);
+        }
+        for (identifier, callback_locations) in std::mem::take(&mut other.callable_callback_storage_locations) {
+            self.callable_callback_storage_locations.entry(identifier).or_default().extend(callback_locations);
+        }
+    }
+
+    pub(crate) fn absorb_callable_effects(&mut self, other: &mut Self) {
+        for (span, effects) in std::mem::take(&mut other.callable_effects) {
+            let entry = self.callable_effects.entry(span).or_default();
+            merge_callable_effect_summary(entry, effects);
+        }
+        for (identifier, (span, effects)) in std::mem::take(&mut other.callable_effects_by_identifier) {
+            let entry = self
+                .callable_effects_by_identifier
+                .entry(identifier)
+                .or_insert_with(|| (span, CallableEffectSummary::default()));
+            for (exception, spans) in effects.possibly_thrown_exceptions {
+                entry.1.possibly_thrown_exceptions.entry(exception).or_default().extend(spans);
+            }
+        }
+
+        for (identifier, exceptions) in std::mem::take(&mut other.reported_callable_exceptions) {
+            self.reported_callable_exceptions.entry(identifier).or_default().extend(exceptions);
+        }
+        for (identifier, effects) in std::mem::take(&mut other.callback_parameter_effects) {
+            let entry = self.callback_parameter_effects.entry(identifier).or_default();
+            merge_callback_parameter_effects(entry, effects);
         }
     }
 
@@ -281,6 +763,34 @@ impl AnalysisArtifacts {
         let t = self.expression_types.get(&get_expression_range(expression))?;
 
         Some(&**t)
+    }
+
+    pub(crate) fn set_throwing_condition_exceptions<T>(&mut self, condition: &T, exceptions: WordMap<HashSet<Span>>)
+    where
+        T: HasSpan,
+    {
+        self.throwing_condition_exceptions.insert(get_expression_range(condition), exceptions);
+    }
+
+    pub(crate) fn get_throwing_condition_exceptions<T>(&self, condition: &T) -> Option<&WordMap<HashSet<Span>>>
+    where
+        T: HasSpan,
+    {
+        self.throwing_condition_exceptions.get(&get_expression_range(condition))
+    }
+
+    pub(crate) fn record_try_catch_reachability<T>(&mut self, catch_block: &T, reachable: bool)
+    where
+        T: HasSpan,
+    {
+        self.try_catch_reachability.insert(get_expression_range(catch_block), reachable);
+    }
+
+    pub(crate) fn get_try_catch_reachability<T>(&self, catch_block: &T) -> Option<bool>
+    where
+        T: HasSpan,
+    {
+        self.try_catch_reachability.get(&get_expression_range(catch_block)).copied()
     }
 
     /// Set the type of expression `expression` to `t`.

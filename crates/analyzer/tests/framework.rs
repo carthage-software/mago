@@ -32,6 +32,7 @@ pub struct TestCase<'src> {
     name: &'src str,
     content: &'src [u8],
     settings: Option<Settings>,
+    expected_issues: Vec<&'src str>,
     expected_property_reads: Vec<(&'src str, &'src str, usize)>,
     expected_symbol_references: Vec<(&'src str, &'src str, usize)>,
 }
@@ -43,6 +44,7 @@ impl<'src> TestCase<'src> {
             name,
             content,
             settings: None,
+            expected_issues: Vec::new(),
             expected_property_reads: Vec::new(),
             expected_symbol_references: Vec::new(),
         }
@@ -51,6 +53,12 @@ impl<'src> TestCase<'src> {
     #[must_use]
     pub fn settings(mut self, settings: Settings) -> Self {
         self.settings = Some(settings);
+        self
+    }
+
+    #[must_use]
+    pub fn expect_issues(mut self, issue_codes: Vec<&'src str>) -> Self {
+        self.expected_issues = issue_codes;
         self
     }
 
@@ -173,10 +181,15 @@ fn run_test_case_inner(config: TestCase) {
         );
     }
 
-    verify_reported_issues(config.name, analysis_result, metadata);
+    verify_reported_issues(config.name, analysis_result, metadata, &config.expected_issues);
 }
 
-fn verify_reported_issues(test_name: &str, mut analysis_result: AnalysisResult, mut codebase: CodebaseMetadata) {
+fn verify_reported_issues(
+    test_name: &str,
+    mut analysis_result: AnalysisResult,
+    mut codebase: CodebaseMetadata,
+    expected_issue_codes: &[&str],
+) {
     let mut actual_issues_collected = std::mem::take(&mut analysis_result.issues);
 
     actual_issues_collected.extend(codebase.take_issues(true));
@@ -190,12 +203,34 @@ fn verify_reported_issues(test_name: &str, mut analysis_result: AnalysisResult, 
         *actual_issue_counts.entry(issue_code).or_insert(0) += 1;
     }
 
-    if !actual_issue_counts.is_empty() {
-        let mut discrepancies = Vec::new();
-        for (actual_kind, &actual_count) in &actual_issue_counts {
-            discrepancies.push(format!("- Unexpected issue(s) `{}`: found {}.", actual_kind.as_str(), actual_count));
-        }
+    let mut expected_issue_counts: BTreeMap<&str, usize> = BTreeMap::new();
+    for issue_code in expected_issue_codes {
+        *expected_issue_counts.entry(issue_code).or_insert(0) += 1;
+    }
 
+    let mut discrepancies = Vec::new();
+    for (actual_kind, &actual_count) in &actual_issue_counts {
+        let expected_count = expected_issue_counts.get(actual_kind.as_str()).copied().unwrap_or(0);
+        if actual_count > expected_count {
+            discrepancies.push(format!(
+                "- Unexpected issue(s) `{}`: found {}, expected {}.",
+                actual_kind.as_str(),
+                actual_count,
+                expected_count
+            ));
+        }
+    }
+
+    for (expected_kind, &expected_count) in &expected_issue_counts {
+        let actual_count = actual_issue_counts.get(*expected_kind).copied().unwrap_or(0);
+        if actual_count < expected_count {
+            discrepancies.push(format!(
+                "- Missing expected issue(s) `{expected_kind}`: expected {expected_count}, found {actual_count}.",
+            ));
+        }
+    }
+
+    if !discrepancies.is_empty() {
         let mut panic_message = format!("Test '{test_name}' failed with issue discrepancies:\n");
         for d in discrepancies {
             let _ = writeln!(panic_message, "  {d}");

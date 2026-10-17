@@ -13,6 +13,7 @@ use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
+use mago_codex::ttype::atomic::array::list::TList;
 use mago_codex::ttype::atomic::mixed::TMixed;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::float::TFloat;
@@ -20,6 +21,7 @@ use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::combiner;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::atomic_comparator;
+use mago_codex::ttype::get_int;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::get_non_negative_int;
@@ -892,9 +894,26 @@ fn compose_array_plus<A>(left: &TArray, right: &TArray, context: &Context<'_, '_
 where
     A: Arena,
 {
-    if let (TArray::Keyed(left_keyed), TArray::Keyed(right_keyed)) = (left, right) {
-        let composed = compose_keyed_plus(left_keyed, right_keyed);
-        return vec![TAtomic::Array(TArray::Keyed(composed))];
+    match (left, right) {
+        (TArray::Keyed(left_keyed), TArray::Keyed(right_keyed)) => {
+            return vec![TAtomic::Array(TArray::Keyed(compose_keyed_plus(left_keyed, right_keyed)))];
+        }
+        (TArray::List(left_list), TArray::List(right_list))
+            if known_list_shape_is_exact(left_list) && known_list_shape_is_exact(right_list) =>
+        {
+            return vec![TAtomic::Array(TArray::List(compose_list_plus(left_list, right_list)))];
+        }
+        (TArray::Keyed(left_keyed), TArray::List(right_list))
+            if let Some(right_keyed) = list_as_keyed_array(right_list) =>
+        {
+            return vec![TAtomic::Array(TArray::Keyed(compose_keyed_plus(left_keyed, &right_keyed)))];
+        }
+        (TArray::List(left_list), TArray::Keyed(right_keyed))
+            if let Some(left_keyed) = list_as_keyed_array(left_list) =>
+        {
+            return vec![TAtomic::Array(TArray::Keyed(compose_keyed_plus(&left_keyed, right_keyed)))];
+        }
+        _ => {}
     }
 
     let mut combined = combiner::combine(
@@ -914,6 +933,64 @@ where
     }
 
     combined
+}
+
+/// Compose two known list shapes under PHP's left-biased `+` operator.
+fn compose_list_plus(left: &TList, right: &TList) -> TList {
+    let mut composed_known = right.known_elements.as_deref().cloned().unwrap_or_default();
+
+    if let Some(left_known) = left.known_elements.as_deref() {
+        for (index, (_, left_value)) in left_known {
+            composed_known.insert(*index, (false, left_value.clone()));
+        }
+    }
+
+    let non_empty = left.non_empty || right.non_empty || composed_known.values().any(|(optional, _)| !*optional);
+
+    TList {
+        element_type: Arc::new(get_never()),
+        known_elements: Some(composed_known).filter(|items| !items.is_empty()).map(Into::into),
+        known_count: left.known_count.zip(right.known_count).map(|(left, right)| left.max(right)),
+        non_empty,
+    }
+}
+
+fn known_list_shape_is_exact(list: &TList) -> bool {
+    let Some(known_count) = list.known_count else {
+        return false;
+    };
+
+    let Some(known_elements) = list.known_elements.as_deref() else {
+        return false;
+    };
+
+    known_elements.len() == known_count
+        && known_elements.iter().enumerate().all(|(index, (key, (optional, _)))| index == *key && !*optional)
+}
+
+/// Convert known list elements to integer-keyed entries for cross-shape union.
+fn list_as_keyed_array(list: &TList) -> Option<TKeyedArray> {
+    use std::collections::BTreeMap;
+
+    let known_items = list
+        .known_elements
+        .as_deref()?
+        .iter()
+        .map(|(index, item)| Some((ArrayKey::Integer(i64::try_from(*index).ok()?), item.clone())))
+        .collect::<Option<BTreeMap<_, _>>>()?;
+
+    let parameters = if known_list_shape_is_exact(list) || list.element_type.is_never() {
+        None
+    } else {
+        Some((Arc::new(get_int()), Arc::clone(&list.element_type)))
+    };
+
+    Some(TKeyedArray {
+        known_items: Some(known_items).filter(|items| !items.is_empty()).map(Into::into),
+        parameters,
+        non_empty: list.non_empty,
+        known_non_list: false,
+    })
 }
 
 /// `+` composition for two keyed shapes.

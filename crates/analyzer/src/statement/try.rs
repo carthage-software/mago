@@ -1,4 +1,5 @@
 use mago_allocator::Arena;
+use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use std::cell::RefCell;
 use std::collections::hash_map::Entry;
 use std::rc::Rc;
@@ -12,30 +13,61 @@ use mago_word::WordMap;
 use mago_word::WordSet;
 use mago_word::word;
 
+use mago_codex::metadata::parameter::CallableExceptionCatchArm;
+use mago_codex::metadata::parameter::CallableExceptionCatchGroup;
 use mago_codex::ttype;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::combiner::CombinerOptions;
+use mago_codex::ttype::comparator::union_comparator::can_expression_types_be_identical;
 use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
+use mago_syntax::cst::ArrowFunction;
+use mago_syntax::cst::Binary;
+use mago_syntax::cst::BinaryOperator;
+use mago_syntax::cst::Block;
+use mago_syntax::cst::Closure;
+use mago_syntax::cst::Conditional;
+use mago_syntax::cst::DeclareColonDelimitedBody;
 use mago_syntax::cst::Expression;
+use mago_syntax::cst::ForColonDelimitedBody;
+use mago_syntax::cst::ForeachColonDelimitedBody;
+use mago_syntax::cst::Function;
+use mago_syntax::cst::Goto;
 use mago_syntax::cst::Hint;
+use mago_syntax::cst::If;
+use mago_syntax::cst::IfColonDelimitedBody;
+use mago_syntax::cst::Literal;
+use mago_syntax::cst::Method;
+use mago_syntax::cst::MethodBody;
 use mago_syntax::cst::Node;
+use mago_syntax::cst::Statement;
+use mago_syntax::cst::Switch;
+use mago_syntax::cst::SwitchCase;
+use mago_syntax::cst::SwitchDefaultCase;
+use mago_syntax::cst::SwitchExpressionCase;
 use mago_syntax::cst::Try;
+use mago_syntax::cst::WhileColonDelimitedBody;
+use mago_syntax::utils::known_integer_switch_start;
+use mago_syntax::walker::Walker;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
+use crate::artifacts::CallbackCallsiteContext;
+use crate::artifacts::DeferredCallableCallsiteContext;
 use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
+use crate::context::scope::control_action::BreakType;
 use crate::context::scope::control_action::ControlAction;
 use crate::context::scope::finally_scope::FinallyScope;
 use crate::context::utils::inherit_branch_context_properties;
 use crate::error::AnalysisError;
+use crate::expression::binary::utils::is_always_identical_to;
 use crate::statement::analyze_statements;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
@@ -48,10 +80,17 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
     where
         A: Arena,
     {
+        let tracks_catchable_exceptions =
+            context.settings.check_throws && context.settings.forbid_checked_exceptions_in_callables;
         let mut catch_actions = vec![];
         let mut all_catches_leave = !self.catch_clauses.is_empty();
+        let mut catch_class_names = WordSet::default();
 
         for catch_clause in &self.catch_clauses {
+            if tracks_catchable_exceptions {
+                catch_class_names.extend(get_catch_hint_names(context, &catch_clause.hint));
+            }
+
             let actions = ControlAction::from_statements(
                 catch_clause.block.statements.iter().collect::<Vec<_>>(),
                 vec![],
@@ -63,9 +102,16 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
             catch_actions.push(actions);
         }
 
+        let callback_invocations_before_try =
+            artifacts.callback_parameter_invocations.keys().copied().collect::<foldhash::HashSet<_>>();
         let existing_thrown_exceptions = std::mem::take(&mut block_context.possibly_thrown_exceptions);
         let old_block_context_locals = block_context.locals.clone();
         let mut try_block_context = block_context.clone();
+        let previous_catchable_exception_names =
+            tracks_catchable_exceptions.then(|| block_context.catchable_exception_names.clone());
+        if tracks_catchable_exceptions {
+            block_context.catchable_exception_names.extend(catch_class_names.iter().copied());
+        }
 
         if self.finally_clause.is_some() {
             try_block_context.finally_scope = Some(Rc::new(RefCell::new(FinallyScope::new())));
@@ -74,6 +120,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
         let assigned_variable_ids = std::mem::take(&mut block_context.assigned_variable_ids);
 
         let was_inside_try = block_context.flags.inside_try();
+        let was_potentially_skipped = block_context.flags.inside_potentially_skipped_code();
         block_context.flags.set_inside_try(true);
         let mut exception_entry_locals: WordMap<Vec<WordSet>> = WordMap::default();
         if self.catch_clauses.is_empty() || !context.settings.check_throws {
@@ -98,14 +145,34 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
 
                 analyze_statements(std::slice::from_ref(statement), context, block_context, artifacts)?;
 
+                let mut has_catchable_throw = false;
                 for (exception, spans) in &block_context.possibly_thrown_exceptions {
                     if spans.len() > thrown_exception_counts.get(exception).copied().unwrap_or_default() {
                         exception_entry_locals.entry(*exception).or_default().push(definitely_defined_locals.clone());
+
+                        if tracks_catchable_exceptions {
+                            has_catchable_throw |=
+                                catch_class_names.iter().any(|caught| could_be_caught(context, *exception, *caught));
+                        }
                     }
+                }
+
+                if tracks_catchable_exceptions && has_catchable_throw {
+                    block_context.flags.set_inside_potentially_skipped_code(true);
                 }
             }
         }
+        let callback_invocations_in_try = artifacts
+            .callback_parameter_invocations
+            .keys()
+            .filter(|range| !callback_invocations_before_try.contains(range))
+            .copied()
+            .collect::<Vec<_>>();
         block_context.flags.set_inside_try(was_inside_try);
+        block_context.flags.set_inside_potentially_skipped_code(was_potentially_skipped);
+        if let Some(previous_catchable_exception_names) = previous_catchable_exception_names {
+            block_context.catchable_exception_names = previous_catchable_exception_names;
+        }
         if !self.catch_clauses.is_empty() {
             block_context.flags.set_has_returned(false);
         }
@@ -116,6 +183,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
             Some(artifacts),
             true,
         );
+        let try_body_guarantees_catch = tracks_catchable_exceptions
+            && try_body_ends_in_guaranteed_throw(self.block.statements.as_slice(), context, artifacts);
 
         let newly_assigned_variable_ids = std::mem::take(&mut block_context.assigned_variable_ids);
         block_context.assigned_variable_ids.extend(assigned_variable_ids);
@@ -182,8 +251,21 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
 
         try_block_context.possibly_thrown_exceptions = block_context.possibly_thrown_exceptions.clone();
         try_block_context.variables_possibly_in_scope = block_context.variables_possibly_in_scope.clone();
-        let has_untracked_throw_source = context.settings.check_throws
-            && has_untracked_throw_source(context, &self.block, &try_block_context.possibly_thrown_exceptions);
+        let has_untracked_throw_source = if context.settings.check_throws {
+            if tracks_catchable_exceptions {
+                has_untracked_throw_source_with_reachability(
+                    context,
+                    &self.block,
+                    &try_block_context.possibly_thrown_exceptions,
+                    artifacts,
+                    try_block_context.scope.get_function_like_identifier(),
+                )
+            } else {
+                has_untracked_throw_source_legacy(context, &self.block, &try_block_context.possibly_thrown_exceptions)
+            }
+        } else {
+            false
+        };
 
         let try_leaves_loop = artifacts
             .loop_scope
@@ -203,12 +285,49 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
         let mut original_block_context = try_block_context.clone();
         let mut definitely_newly_assigned_var_ids = newly_assigned_variable_ids;
         let mut previously_caught_types = WordSet::default();
+        let mut callback_catch_arms = Vec::new();
 
         for (i, catch_clause) in self.catch_clauses.iter().enumerate() {
             let mut catch_block_context = original_block_context.clone();
             catch_block_context.flags.set_has_returned(false);
-            let (caught_classes, has_valid_caught_classes) =
+            let (caught_classes, has_unresolved_caught_type, has_valid_caught_classes) =
                 get_caught_classes(context, &catch_block_context, artifacts, &catch_clause.hint);
+
+            let catch_can_receive_try_exception = try_block_context.possibly_thrown_exceptions.keys().any(|thrown| {
+                !catch_types_fully_cover(context, *thrown, &previously_caught_types)
+                    && (caught_classes.iter().any(|caught| {
+                        could_be_caught(context, *thrown, *caught)
+                            && !catch_types_fully_cover(context, *caught, &previously_caught_types)
+                    }) || has_unresolved_caught_type)
+            });
+            let untracked_throw_can_reach_catch = has_untracked_throw_source
+                && !catch_types_fully_cover(context, word(b"Throwable"), &previously_caught_types)
+                && (!has_valid_caught_classes
+                    || caught_classes
+                        .iter()
+                        .any(|caught| !catch_types_fully_cover(context, *caught, &previously_caught_types))
+                    || has_unresolved_caught_type);
+            let catch_is_reachable =
+                !has_valid_caught_classes || untracked_throw_can_reach_catch || catch_can_receive_try_exception;
+            if tracks_catchable_exceptions {
+                artifacts.record_try_catch_reachability(&catch_clause.block, catch_is_reachable);
+            }
+
+            let catch_is_guaranteed = tracks_catchable_exceptions
+                && try_body_guarantees_catch
+                && !has_untracked_throw_source
+                && has_valid_caught_classes
+                && !try_block_context.possibly_thrown_exceptions.is_empty()
+                && try_block_context
+                    .possibly_thrown_exceptions
+                    .keys()
+                    .all(|thrown| catch_types_fully_cover(context, *thrown, &caught_classes))
+                && !previously_caught_types.iter().any(|previous| {
+                    try_block_context
+                        .possibly_thrown_exceptions
+                        .keys()
+                        .any(|thrown| could_be_caught(context, *thrown, *previous))
+                });
 
             for (variable_id, variable_type) in &mut catch_block_context.locals {
                 if let Some(old_type) = old_block_context_locals.get(variable_id) {
@@ -245,19 +364,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
             }
 
             let possibly_thrown_exceptions = std::mem::take(&mut catch_block_context.possibly_thrown_exceptions);
-            let is_covered_by_previous_catch = caught_classes.iter().all(|caught| {
-                previously_caught_types
-                    .iter()
-                    .any(|previous| context.codebase.is_instance_of(caught.as_bytes(), previous.as_bytes()))
-            });
             if context.settings.check_throws
                 && context.settings.check_dead_catch
                 && has_valid_caught_classes
-                && (is_covered_by_previous_catch
-                    || (!has_untracked_throw_source
-                        && !possibly_thrown_exceptions.keys().any(|thrown| {
-                            caught_classes.iter().any(|caught| could_be_caught(context, *thrown, *caught))
-                        })))
+                && !catch_is_reachable
             {
                 context.collector.report_with_code(
                     IssueCode::DeadCatch,
@@ -280,27 +390,25 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
 
             let mut caught_exception_types = WordSet::default();
             let mut definitely_defined_locals: Option<WordSet> = None;
-            for caught_class in &caught_classes {
-                for possibly_thrown_exception in possibly_thrown_exceptions.keys() {
-                    if possibly_thrown_exception.as_bytes().eq_ignore_ascii_case(caught_class.as_bytes())
-                        || context
-                            .codebase
-                            .is_instance_of(possibly_thrown_exception.as_bytes(), caught_class.as_bytes())
+            let mut caught_types = previously_caught_types.clone();
+            caught_types.extend(caught_classes.iter().copied());
+            for possibly_thrown_exception in possibly_thrown_exceptions.keys() {
+                if catch_types_fully_cover(context, *possibly_thrown_exception, &caught_types) {
+                    if caught_exception_types.insert(*possibly_thrown_exception)
+                        && let Some(entry_locals) = exception_entry_locals.get(possibly_thrown_exception)
                     {
-                        if caught_exception_types.insert(*possibly_thrown_exception)
-                            && let Some(entry_locals) = exception_entry_locals.get(possibly_thrown_exception)
-                        {
-                            for entry_locals in entry_locals {
-                                intersect_definitely_defined_locals(&mut definitely_defined_locals, entry_locals);
-                            }
+                        for entry_locals in entry_locals {
+                            intersect_definitely_defined_locals(&mut definitely_defined_locals, entry_locals);
                         }
-
-                        original_block_context.possibly_thrown_exceptions.remove(possibly_thrown_exception);
-                        block_context.possibly_thrown_exceptions.remove(possibly_thrown_exception);
-                        catch_block_context.possibly_thrown_exceptions.remove(possibly_thrown_exception);
                     }
+
+                    original_block_context.possibly_thrown_exceptions.remove(possibly_thrown_exception);
+                    block_context.possibly_thrown_exceptions.remove(possibly_thrown_exception);
+                    catch_block_context.possibly_thrown_exceptions.remove(possibly_thrown_exception);
                 }
             }
+
+            let thrown_exceptions_before_catch = catch_block_context.possibly_thrown_exceptions.clone();
 
             if let Some(definitely_defined_locals) = definitely_defined_locals {
                 for variable_id in definitely_defined_locals {
@@ -335,7 +443,38 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
 
             let old_catch_assigned_variable_ids = std::mem::take(&mut catch_block_context.assigned_variable_ids);
 
+            let was_inside_definitely_unreachable_code = catch_block_context.flags.inside_definitely_unreachable_code();
+            if tracks_catchable_exceptions && !catch_is_guaranteed {
+                catch_block_context.flags.set_inside_potentially_skipped_code(true);
+            }
+            if tracks_catchable_exceptions && !catch_is_reachable {
+                catch_block_context.flags.set_inside_definitely_unreachable_code(true);
+            }
             analyze_statements(catch_clause.block.statements.as_slice(), context, &mut catch_block_context, artifacts)?;
+            catch_block_context.flags.set_inside_definitely_unreachable_code(was_inside_definitely_unreachable_code);
+
+            let rethrows_types = catch_block_context
+                .possibly_thrown_exceptions
+                .iter()
+                .filter_map(|(exception, spans)| {
+                    spans
+                        .iter()
+                        .any(|span| {
+                            !thrown_exceptions_before_catch
+                                .get(exception)
+                                .is_some_and(|previous_spans| previous_spans.contains(span))
+                        })
+                        .then_some(*exception)
+                })
+                .collect();
+
+            callback_catch_arms.push(CallableExceptionCatchArm {
+                exception_types: caught_classes.iter().copied().collect(),
+                rethrows: false,
+                rethrows_types,
+                rethrows_caught_types: Vec::new(),
+                rethrows_with_catches: Vec::new(),
+            });
 
             // recalculate in case there's a no-return clause
             if let Some(actions) = catch_actions.get_mut(i) {
@@ -352,7 +491,13 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
             let new_catch_assigned_variables_ids = catch_block_context.assigned_variable_ids.clone();
             catch_block_context.assigned_variable_ids.extend(old_catch_assigned_variable_ids);
 
-            inherit_branch_context_properties(context, block_context, &catch_block_context);
+            if catch_is_reachable {
+                inherit_branch_context_properties(context, block_context, &catch_block_context);
+            } else {
+                let mut reachable_catch_block_context = catch_block_context.clone();
+                reachable_catch_block_context.possibly_thrown_exceptions = thrown_exceptions_before_catch;
+                inherit_branch_context_properties(context, block_context, &reachable_catch_block_context);
+            }
 
             let catch_doesnt_leave_parent_scope = catch_actions[i].contains(ControlAction::None);
 
@@ -423,6 +568,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
         }
 
         let mut finally_has_returned = false;
+        let mut finally_overrides_pending_exceptions = false;
+        let mut finally_thrown_types = WordSet::default();
         if let Some(finally_clause) = self.finally_clause.as_ref() {
             // SAFETY: when a try statement has a `finally_clause`, the finally scope is always
             // initialized on `try_block_context` before reaching this point, so the `Option` is
@@ -446,6 +593,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                 }
             }
             finally_block_context.flags.set_has_returned(false);
+            let thrown_before_finally = block_context.possibly_thrown_exceptions.clone();
 
             analyze_statements(
                 finally_clause.block.statements.as_slice(),
@@ -453,6 +601,27 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                 &mut finally_block_context,
                 artifacts,
             )?;
+
+            let finally_actions = ControlAction::from_statements(
+                finally_clause.block.statements.iter().collect::<Vec<_>>(),
+                vec![],
+                Some(artifacts),
+                true,
+            );
+            let has_goto =
+                !finally_actions.contains(ControlAction::None) || finally_block_contains_goto(&finally_clause.block);
+            finally_overrides_pending_exceptions =
+                has_goto && !finally_goto_can_complete_normally(&finally_clause.block, artifacts);
+            let finally_new_exceptions =
+                newly_thrown_exceptions(&finally_block_context.possibly_thrown_exceptions, &thrown_before_finally);
+            finally_thrown_types.extend(finally_new_exceptions.keys().copied());
+            if finally_overrides_pending_exceptions {
+                block_context.possibly_thrown_exceptions = finally_new_exceptions;
+            } else {
+                for (exception, spans) in finally_new_exceptions {
+                    block_context.possibly_thrown_exceptions.entry(exception).or_default().extend(spans);
+                }
+            }
 
             finally_has_returned = finally_block_context.flags.has_returned();
             block_context.possibly_undefined_variable_ids.extend(finally_block_context.possibly_undefined_variable_ids);
@@ -462,6 +631,27 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                 if let Some(finally_variable_type) = finally_variable_type {
                     block_context.locals.insert(variable_id, finally_variable_type);
                 }
+            }
+        }
+
+        if finally_overrides_pending_exceptions {
+            for arm in &mut callback_catch_arms {
+                arm.rethrows = false;
+                arm.rethrows_types = finally_thrown_types.iter().copied().collect();
+                arm.rethrows_caught_types.clear();
+                arm.rethrows_with_catches.clear();
+            }
+        }
+
+        if !callback_invocations_in_try.is_empty()
+            && (!callback_catch_arms.is_empty() || finally_overrides_pending_exceptions)
+        {
+            let catch_group = CallableExceptionCatchGroup {
+                arms: callback_catch_arms,
+                overrides_pending_exceptions: finally_overrides_pending_exceptions,
+            };
+            for range in callback_invocations_in_try {
+                artifacts.record_callback_parameter_catches(range, self.span(), catch_group.clone());
             }
         }
 
@@ -496,6 +686,334 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
     }
 }
 
+struct GotoScanner;
+
+struct GotoPresenceScanner;
+
+impl<'ast, 'arena> Walker<'ast, 'arena, bool> for GotoPresenceScanner {
+    fn walk_goto(&self, _: &'ast Goto<'arena>, contains_goto: &mut bool) {
+        *contains_goto = true;
+    }
+
+    fn walk_function(&self, _: &'ast Function<'arena>, _: &mut bool) {}
+
+    fn walk_closure(&self, _: &'ast Closure<'arena>, _: &mut bool) {}
+
+    fn walk_arrow_function(&self, _: &'ast ArrowFunction<'arena>, _: &mut bool) {}
+
+    fn walk_method(&self, _: &'ast Method<'arena>, _: &mut bool) {}
+}
+
+fn finally_block_contains_goto(block: &Block<'_>) -> bool {
+    let mut contains_goto = false;
+    GotoPresenceScanner.walk_block(block, &mut contains_goto);
+    contains_goto
+}
+
+struct GotoScan<'ctx> {
+    artifacts: &'ctx AnalysisArtifacts,
+    goto_targets: WordSet,
+}
+
+impl<'ast, 'arena, 'ctx> Walker<'ast, 'arena, GotoScan<'ctx>> for GotoScanner {
+    fn walk_block(&self, block: &'ast Block<'arena>, context: &mut GotoScan<'ctx>) {
+        walk_reachable_statements(self, block.statements.as_slice(), context);
+    }
+
+    fn walk_declare_colon_delimited_body(
+        &self,
+        body: &'ast DeclareColonDelimitedBody<'arena>,
+        context: &mut GotoScan<'ctx>,
+    ) {
+        walk_reachable_statements(self, body.statements.as_slice(), context);
+    }
+
+    fn walk_foreach_colon_delimited_body(
+        &self,
+        body: &'ast ForeachColonDelimitedBody<'arena>,
+        context: &mut GotoScan<'ctx>,
+    ) {
+        walk_reachable_statements(self, body.statements.as_slice(), context);
+    }
+
+    fn walk_for_colon_delimited_body(&self, body: &'ast ForColonDelimitedBody<'arena>, context: &mut GotoScan<'ctx>) {
+        walk_reachable_statements(self, body.statements.as_slice(), context);
+    }
+
+    fn walk_while_colon_delimited_body(
+        &self,
+        body: &'ast WhileColonDelimitedBody<'arena>,
+        context: &mut GotoScan<'ctx>,
+    ) {
+        walk_reachable_statements(self, body.statements.as_slice(), context);
+    }
+
+    fn walk_switch(&self, switch: &'ast Switch<'arena>, context: &mut GotoScan<'ctx>) {
+        let cases = switch.body.cases();
+        let Some(start_index) = known_integer_switch_start(switch) else {
+            for case in cases {
+                self.walk_switch_case_contents(case, context);
+            }
+
+            return;
+        };
+
+        let Some(start_index) = start_index else {
+            return;
+        };
+
+        for case in &cases[start_index..] {
+            self.walk_switch_case_contents(case, context);
+
+            let actions = ControlAction::from_statements(
+                case.statements().iter().collect(),
+                vec![],
+                Some(context.artifacts),
+                true,
+            );
+            if !actions.contains(ControlAction::None) {
+                break;
+            }
+        }
+    }
+
+    fn walk_switch_expression_case(&self, case: &'ast SwitchExpressionCase<'arena>, context: &mut GotoScan<'ctx>) {
+        walk_reachable_statements(self, case.statements.as_slice(), context);
+    }
+
+    fn walk_switch_default_case(&self, case: &'ast SwitchDefaultCase<'arena>, context: &mut GotoScan<'ctx>) {
+        walk_reachable_statements(self, case.statements.as_slice(), context);
+    }
+
+    fn walk_if_colon_delimited_body(&self, body: &'ast IfColonDelimitedBody<'arena>, context: &mut GotoScan<'ctx>) {
+        walk_reachable_statements(self, body.statements.as_slice(), context);
+
+        for clause in &body.else_if_clauses {
+            walk_reachable_statements(self, clause.statements.as_slice(), context);
+        }
+
+        if let Some(clause) = &body.else_clause {
+            walk_reachable_statements(self, clause.statements.as_slice(), context);
+        }
+    }
+
+    fn walk_goto(&self, goto: &'ast Goto<'arena>, context: &mut GotoScan<'ctx>) {
+        context.goto_targets.insert(word(goto.label.value));
+    }
+
+    fn walk_function(&self, _: &'ast Function<'arena>, _: &mut GotoScan<'ctx>) {}
+
+    fn walk_closure(&self, _: &'ast Closure<'arena>, _: &mut GotoScan<'ctx>) {}
+
+    fn walk_arrow_function(&self, _: &'ast ArrowFunction<'arena>, _: &mut GotoScan<'ctx>) {}
+
+    fn walk_method(&self, _: &'ast Method<'arena>, _: &mut GotoScan<'ctx>) {}
+}
+
+impl GotoScanner {
+    fn walk_switch_case_contents(&self, case: &SwitchCase<'_>, context: &mut GotoScan<'_>) {
+        match case {
+            SwitchCase::Expression(case) => self.walk_switch_expression_case(case, context),
+            SwitchCase::Default(case) => self.walk_switch_default_case(case, context),
+        }
+    }
+}
+
+fn walk_reachable_statements(walker: &GotoScanner, statements: &[Statement<'_>], context: &mut GotoScan<'_>) {
+    let mut falls_through = true;
+    for statement in statements {
+        if !falls_through && !statement_is_goto_target(statement, &context.goto_targets) {
+            continue;
+        }
+
+        walker.walk_statement(statement, context);
+
+        let actions = ControlAction::from_statements(vec![statement], vec![], Some(context.artifacts), true);
+        falls_through = !matches!(statement, Statement::Goto(_)) && actions.contains(ControlAction::None);
+    }
+}
+
+fn statement_is_goto_target(statement: &Statement<'_>, goto_targets: &WordSet) -> bool {
+    matches!(statement, Statement::Label(label) if goto_targets.contains(&word(label.name.value)))
+}
+
+fn finally_goto_can_complete_normally(block: &Block<'_>, artifacts: &AnalysisArtifacts) -> bool {
+    let label_indices = block
+        .statements
+        .iter()
+        .enumerate()
+        .filter_map(|(index, statement)| match statement {
+            Statement::Label(label) => Some((word(label.name.value), index)),
+            _ => None,
+        })
+        .collect::<WordMap<_>>();
+    let mut pending_indices = vec![0];
+    let mut visited_indices = HashSet::default();
+
+    while let Some(index) = pending_indices.pop() {
+        if index == block.statements.len() {
+            return true;
+        }
+
+        if !visited_indices.insert(index) {
+            continue;
+        }
+
+        for flow in finally_statement_flows(&block.statements[index], artifacts) {
+            match flow {
+                FinallyFlow::Continue => pending_indices.push(index + 1),
+                FinallyFlow::Goto(label) => {
+                    let Some(target) = label_indices.get(&label) else {
+                        return true;
+                    };
+
+                    pending_indices.push(*target);
+                }
+                FinallyFlow::Abrupt | FinallyFlow::Break(_) | FinallyFlow::SwitchExit => {}
+                FinallyFlow::Unknown => return true,
+            }
+        }
+    }
+
+    false
+}
+
+#[derive(Clone, Copy, Eq, Hash, PartialEq)]
+enum FinallyFlow {
+    Continue,
+    Goto(Word),
+    Break(usize),
+    SwitchExit,
+    Abrupt,
+    Unknown,
+}
+
+fn finally_statement_flows(statement: &Statement<'_>, artifacts: &AnalysisArtifacts) -> HashSet<FinallyFlow> {
+    match statement {
+        Statement::Goto(goto) => HashSet::from_iter([FinallyFlow::Goto(word(goto.label.value))]),
+        Statement::Break(break_statement) => HashSet::from_iter([finally_break_flow(break_statement.level)]),
+        Statement::Block(block) => finally_statement_list_flows(block.statements.as_slice(), artifacts),
+        Statement::Switch(switch) => finally_switch_flows(switch, artifacts),
+        Statement::If(if_statement) => {
+            let mut flows = finally_statement_list_flows(if_statement.body.statements(), artifacts);
+            for statements in if_statement.body.else_if_statements() {
+                flows.extend(finally_statement_list_flows(statements, artifacts));
+            }
+            if let Some(statements) = if_statement.body.else_statements() {
+                flows.extend(finally_statement_list_flows(statements, artifacts));
+            } else {
+                flows.insert(FinallyFlow::Continue);
+            }
+            flows
+        }
+        _ => {
+            let mut scan = GotoScan { artifacts, goto_targets: WordSet::default() };
+            GotoScanner.walk_statement(statement, &mut scan);
+            if !scan.goto_targets.is_empty() {
+                return HashSet::from_iter([FinallyFlow::Unknown]);
+            }
+
+            let actions = ControlAction::from_statements(vec![statement], vec![], Some(artifacts), true);
+            let mut flows = HashSet::default();
+            if actions.contains(ControlAction::None) {
+                flows.insert(FinallyFlow::Continue);
+            }
+            if actions.iter().any(|action| action != ControlAction::None) {
+                flows.insert(FinallyFlow::Abrupt);
+            }
+            flows
+        }
+    }
+}
+
+fn finally_break_flow(level: Option<&Expression<'_>>) -> FinallyFlow {
+    let Some(level) = level else {
+        return FinallyFlow::Break(1);
+    };
+
+    let Expression::Literal(Literal::Integer(literal)) = mago_syntax::utils::unparenthesized_expression(level) else {
+        return FinallyFlow::Unknown;
+    };
+
+    let Some(level) = literal.value.and_then(|level| usize::try_from(level).ok()).filter(|level| *level > 0) else {
+        return FinallyFlow::Unknown;
+    };
+
+    FinallyFlow::Break(level)
+}
+
+fn finally_switch_flows(switch: &Switch<'_>, artifacts: &AnalysisArtifacts) -> HashSet<FinallyFlow> {
+    let cases = switch.body.cases();
+    let start_index = match known_integer_switch_start(switch) {
+        Some(Some(start_index)) => vec![start_index],
+        Some(None) => return HashSet::from_iter([FinallyFlow::Continue]),
+        None => (0..cases.len()).collect(),
+    };
+    let mut flows = HashSet::default();
+    if !switch.body.has_default_case() && known_integer_switch_start(switch).is_none() {
+        flows.insert(FinallyFlow::Continue);
+    }
+
+    for start_index in start_index {
+        let mut case_flows = HashSet::from_iter([FinallyFlow::Continue]);
+        for case in &cases[start_index..] {
+            if !case_flows.contains(&FinallyFlow::Continue) {
+                break;
+            }
+
+            case_flows.remove(&FinallyFlow::Continue);
+            let next_flows = finally_statement_list_flows(case.statements(), artifacts);
+            case_flows.extend(next_flows.into_iter().map(|flow| match flow {
+                FinallyFlow::Break(1) => FinallyFlow::SwitchExit,
+                FinallyFlow::Break(level) => FinallyFlow::Break(level - 1),
+                flow => flow,
+            }));
+        }
+
+        if case_flows.remove(&FinallyFlow::SwitchExit) {
+            case_flows.insert(FinallyFlow::Continue);
+        }
+        flows.extend(case_flows);
+    }
+
+    flows
+}
+
+fn finally_statement_list_flows(statements: &[Statement<'_>], artifacts: &AnalysisArtifacts) -> HashSet<FinallyFlow> {
+    let mut flows = HashSet::from_iter([FinallyFlow::Continue]);
+    for statement in statements {
+        if !flows.contains(&FinallyFlow::Continue) {
+            break;
+        }
+
+        flows.remove(&FinallyFlow::Continue);
+        flows.extend(finally_statement_flows(statement, artifacts));
+    }
+
+    flows
+}
+
+fn newly_thrown_exceptions(
+    current: &WordMap<HashSet<Span>>,
+    previous: &WordMap<HashSet<Span>>,
+) -> WordMap<HashSet<Span>> {
+    let mut added = WordMap::default();
+    for (exception, spans) in current {
+        let previous_spans = previous.get(exception);
+        let new_spans = spans
+            .iter()
+            .filter(|span| !previous_spans.is_some_and(|previous_spans| previous_spans.contains(span)))
+            .copied()
+            .collect::<HashSet<_>>();
+
+        if !new_spans.is_empty() {
+            added.insert(*exception, new_spans);
+        }
+    }
+
+    added
+}
+
 /// Intersects definitely defined locals from paths that can enter the same catch clause.
 fn intersect_definitely_defined_locals(definitely_defined_locals: &mut Option<WordSet>, entry_locals: &WordSet) {
     match definitely_defined_locals {
@@ -508,12 +1026,60 @@ fn intersect_definitely_defined_locals(definitely_defined_locals: &mut Option<Wo
     }
 }
 
+fn try_body_ends_in_guaranteed_throw<A>(
+    statements: &[Statement<'_>],
+    context: &Context<'_, '_, A>,
+    artifacts: &AnalysisArtifacts,
+) -> bool
+where
+    A: Arena,
+{
+    let Some(Statement::Expression(expression)) = statements.last() else {
+        return false;
+    };
+
+    if !matches!(*expression.expression, Expression::Throw(_)) {
+        return false;
+    }
+
+    crate::statement::r#if::statement_sequence_has_no_exit_and_falls_through(
+        &statements[..statements.len() - 1],
+        context,
+        artifacts,
+    )
+}
+
+pub(crate) fn get_catch_hint_names<A>(context: &Context<'_, '_, A>, hint: &Hint<'_>) -> WordSet
+where
+    A: Arena,
+{
+    fn walk<A>(context: &Context<'_, '_, A>, hint: &Hint<'_>, names: &mut WordSet)
+    where
+        A: Arena,
+    {
+        match hint {
+            Hint::Identifier(identifier) => {
+                names.insert(word(context.resolved_names.get(identifier)));
+            }
+            Hint::Union(union_hint) => {
+                walk(context, union_hint.left, names);
+                walk(context, union_hint.right, names);
+            }
+            _ => {}
+        }
+    }
+
+    let mut names = WordSet::default();
+    walk(context, hint, &mut names);
+    names
+}
+
 fn get_caught_classes<'arena, A>(
     context: &mut Context<'_, 'arena, A>,
     block_context: &BlockContext<'_>,
     artifacts: &mut AnalysisArtifacts,
     hint: &Hint<'arena>,
-) -> (WordSet, bool)
+) -> (WordSet, bool, bool)
 where
     A: Arena,
 {
@@ -577,6 +1143,7 @@ where
     let throwable = word(b"Throwable");
     let mut caught_classes: WordSet =
         WordSet::with_capacity_and_hasher(caught_identifiers.len(), foldhash::fast::FixedState::default());
+    let mut has_unresolved_caught_type = false;
     for (caught_type, caught_span) in caught_identifiers {
         artifacts.symbol_references.add_reference_to_symbol(
             &block_context.scope,
@@ -593,6 +1160,7 @@ where
         }
 
         let Some(class_like_metadata) = context.codebase.get_class_like(caught_type.as_bytes()) else {
+            has_unresolved_caught_type = true;
             context.collector.report_with_code(
                 IssueCode::NonExistentCatchType,
                 Issue::error(format!("Attempting to catch an undefined class or interface: `{caught_type}`."))
@@ -686,7 +1254,39 @@ where
         caught_classes.insert(throwable);
     }
 
-    (caught_classes, has_valid_caught_classes)
+    (caught_classes, has_unresolved_caught_type, has_valid_caught_classes)
+}
+
+/// Returns whether every value represented by `thrown` is caught by `caught`.
+///
+/// Unlike `could_be_caught`, this is directional: a broad throw type is not fully consumed by a
+/// narrower catch type, even when the two types can overlap.
+pub(crate) fn catch_fully_covers<A>(context: &Context<'_, '_, A>, thrown: Word, caught: Word) -> bool
+where
+    A: Arena,
+{
+    let thrown_name = thrown.as_bytes().strip_prefix(b"\\").unwrap_or(thrown.as_bytes());
+    let caught_name = caught.as_bytes().strip_prefix(b"\\").unwrap_or(caught.as_bytes());
+
+    caught_name.eq_ignore_ascii_case(b"Throwable")
+        || thrown_name.eq_ignore_ascii_case(caught_name)
+        || context.codebase.is_instance_of(thrown_name, caught_name)
+}
+
+/// Returns whether a set of catch types covers every value represented by `thrown`.
+pub(crate) fn catch_types_fully_cover<A>(context: &Context<'_, '_, A>, thrown: Word, caught_types: &WordSet) -> bool
+where
+    A: Arena,
+{
+    if caught_types.iter().any(|caught| catch_fully_covers(context, thrown, *caught)) {
+        return true;
+    }
+
+    let thrown_name = thrown.as_bytes().strip_prefix(b"\\").unwrap_or(thrown.as_bytes());
+    context.codebase.is_instance_of(thrown_name, b"Throwable")
+        && [word(b"Exception"), word(b"Error")].iter().all(|throwable_branch| {
+            caught_types.iter().any(|caught| catch_fully_covers(context, *throwable_branch, *caught))
+        })
 }
 
 /// Returns whether an exception represented by `thrown` could match `caught`.
@@ -694,7 +1294,7 @@ where
 /// The throw set stores declared types, which may include subclasses. Incomplete metadata and
 /// interface intersections therefore need conservative handling to avoid false unreachable-catch
 /// reports.
-fn could_be_caught<A>(context: &Context<'_, '_, A>, thrown: Word, caught: Word) -> bool
+pub(crate) fn could_be_caught<A>(context: &Context<'_, '_, A>, thrown: Word, caught: Word) -> bool
 where
     A: Arena,
 {
@@ -732,7 +1332,27 @@ where
     false
 }
 
-fn has_untracked_throw_source<'arena, A>(
+fn has_untracked_throw_source_with_reachability<'arena, A>(
+    context: &Context<'_, 'arena, A>,
+    block: &mago_syntax::cst::Block<'arena>,
+    possibly_thrown_exceptions: &WordMap<HashSet<Span>>,
+    artifacts: &AnalysisArtifacts,
+    invocation_scope: Option<FunctionLikeIdentifier>,
+) -> bool
+where
+    A: Arena,
+{
+    has_untracked_throw_source_in_node(
+        context,
+        Node::Block(block),
+        possibly_thrown_exceptions,
+        artifacts,
+        invocation_scope,
+        true,
+    )
+}
+
+fn has_untracked_throw_source_legacy<'arena, A>(
     context: &Context<'_, 'arena, A>,
     block: &mago_syntax::cst::Block<'arena>,
     possibly_thrown_exceptions: &WordMap<HashSet<Span>>,
@@ -799,6 +1419,512 @@ where
         })
         .into_iter()
         .any(|_| true)
+}
+
+pub(crate) fn expression_has_untracked_throw_source<A>(
+    context: &Context<'_, '_, A>,
+    expression: &Expression<'_>,
+    possibly_thrown_exceptions: &WordMap<HashSet<Span>>,
+    artifacts: &AnalysisArtifacts,
+) -> bool
+where
+    A: Arena,
+{
+    has_untracked_throw_source_in_node(
+        context,
+        Node::Expression(expression),
+        possibly_thrown_exceptions,
+        artifacts,
+        None,
+        false,
+    )
+}
+
+fn has_untracked_throw_source_in_node<'arena, A>(
+    context: &Context<'_, 'arena, A>,
+    root: Node<'_, 'arena>,
+    possibly_thrown_exceptions: &WordMap<HashSet<Span>>,
+    artifacts: &AnalysisArtifacts,
+    invocation_scope: Option<FunctionLikeIdentifier>,
+    restrict_to_invocation_scope: bool,
+) -> bool
+where
+    A: Arena,
+{
+    let mut reachability = ThrowSourceReachabilityScan {
+        artifacts,
+        codebase: context.codebase,
+        source_file: context.source_file,
+        block_span: root.span(),
+        invocation_scope,
+        restrict_to_invocation_scope,
+        scan_callable_bodies: false,
+        unreachable_spans: Vec::new(),
+    };
+    walk_throw_source_root(root, &mut reachability);
+    reachability.scan_callable_bodies = true;
+    loop {
+        let previous_unreachable_span_count = reachability.unreachable_spans.len();
+        walk_throw_source_root(root, &mut reachability);
+        if reachability.unreachable_spans.len() == previous_unreachable_span_count {
+            break;
+        }
+    }
+
+    root.filter_map(|node| {
+        if reachability.unreachable_spans.iter().any(|span| span_contains(*span, node.span())) {
+            return None;
+        }
+
+        match node {
+            Node::Call(call) => {
+                let span = call.span();
+                if has_tracked_throw_span(possibly_thrown_exceptions, span) {
+                    return None;
+                }
+
+                match call {
+                    mago_syntax::cst::Call::Function(function_call) => {
+                        let Expression::Identifier(identifier) = function_call.function else {
+                            return Some(());
+                        };
+
+                        if identifier.last_segment().eq_ignore_ascii_case(b"json_decode") {
+                            return Some(());
+                        }
+
+                        let Some(function) = context.codebase.get_function(identifier.value()) else {
+                            return Some(());
+                        };
+
+                        let has_untracked_thrown_types = if function.flags.is_internal() {
+                            !function.thrown_types.is_empty()
+                        } else {
+                            function.thrown_types.is_empty()
+                        };
+
+                        has_untracked_thrown_types.then_some(())
+                    }
+                    _ => Some(()),
+                }
+            }
+            Node::Instantiation(instantiation) => {
+                let span = instantiation.span();
+                if has_tracked_throw_span(possibly_thrown_exceptions, span) {
+                    return None;
+                }
+
+                let Expression::Identifier(identifier) = instantiation.class else {
+                    return Some(());
+                };
+
+                let class_name = identifier.value().strip_prefix(b"\\").unwrap_or(identifier.value());
+                if !context.codebase.is_instance_of(class_name, b"Throwable") {
+                    return Some(());
+                }
+
+                has_untracked_throwable_constructor(context.codebase, class_name).then_some(())
+            }
+            Node::Foreach(_)
+            | Node::Clone(_)
+            | Node::ArrayAccess(_)
+            | Node::PropertyAccess(_)
+            | Node::NullSafePropertyAccess(_) => Some(()),
+            _ => None,
+        }
+    })
+    .into_iter()
+    .any(|_| true)
+}
+
+fn walk_throw_source_root(root: Node<'_, '_>, context: &mut ThrowSourceReachabilityScan<'_>) {
+    match root {
+        Node::Block(block) => ThrowSourceReachabilityScanner.walk_block(block, context),
+        Node::Expression(expression) => ThrowSourceReachabilityScanner.walk_expression(expression, context),
+        _ => unreachable!(),
+    }
+}
+
+struct ThrowSourceReachabilityScan<'ctx> {
+    artifacts: &'ctx AnalysisArtifacts,
+    codebase: &'ctx CodebaseMetadata,
+    source_file: &'ctx mago_database::file::File,
+    block_span: Span,
+    invocation_scope: Option<FunctionLikeIdentifier>,
+    restrict_to_invocation_scope: bool,
+    scan_callable_bodies: bool,
+    unreachable_spans: Vec<Span>,
+}
+
+struct ThrowSourceReachabilityScanner;
+
+impl<'ast, 'arena, 'context> Walker<'ast, 'arena, ThrowSourceReachabilityScan<'context>>
+    for ThrowSourceReachabilityScanner
+{
+    fn walk_switch(&self, switch: &'ast Switch<'arena>, context: &mut ThrowSourceReachabilityScan<'context>) {
+        self.walk_expression(switch.expression, context);
+
+        let cases = switch.body.cases();
+        let mut direct_entries = vec![false; cases.len()];
+
+        if let Some(start_index) = known_integer_switch_start(switch) {
+            if let Some(start_index) = start_index {
+                direct_entries[start_index] = true;
+
+                if !cases[start_index].is_default() {
+                    for case in cases.iter().skip(start_index + 1) {
+                        if let Some(condition) = case.expression() {
+                            push_unreachable_span(condition.span(), context);
+                        }
+                    }
+                }
+            }
+        } else {
+            let switch_type = context.artifacts.get_rc_expression_type(switch.expression);
+            let mut can_evaluate_later_cases = true;
+            let mut default_index = None;
+
+            for (index, case) in cases.iter().enumerate() {
+                if case.is_default() {
+                    default_index = Some(index);
+                    continue;
+                }
+
+                if let Some(condition) = case.expression() {
+                    if can_evaluate_later_cases {
+                        self.walk_expression(condition, context);
+                    } else {
+                        push_unreachable_span(condition.span(), context);
+                    }
+
+                    let condition_type = context.artifacts.get_rc_expression_type(condition);
+                    direct_entries[index] = can_evaluate_later_cases
+                        && switch_type.zip(condition_type).is_none_or(|(switch_type, condition_type)| {
+                            !(switch_type.is_true() && condition_type.is_always_falsy())
+                                && can_expression_types_be_identical(
+                                    context.codebase,
+                                    switch_type.as_ref(),
+                                    condition_type.as_ref(),
+                                    false,
+                                    true,
+                                )
+                        });
+
+                    let case_always_matches = can_evaluate_later_cases
+                        && switch_type.zip(condition_type).is_some_and(|(switch_type, condition_type)| {
+                            (switch_type.is_true() && condition_type.is_always_truthy())
+                                || is_always_identical_to(condition_type.as_ref(), switch_type.as_ref())
+                        });
+                    if case_always_matches {
+                        can_evaluate_later_cases = false;
+                    }
+                }
+            }
+
+            if let Some(default_index) = default_index {
+                direct_entries[default_index] = can_evaluate_later_cases;
+            }
+        }
+
+        let mut can_fall_through = false;
+        for (index, case) in cases.iter().enumerate() {
+            let direct_entry_possible = direct_entries[index];
+            let case_is_reachable = direct_entry_possible || can_fall_through;
+            if case_is_reachable {
+                for statement in case.statements() {
+                    self.walk_statement(statement, context);
+                }
+                let actions = ControlAction::from_switch_case_statements(
+                    case.statements().iter().collect(),
+                    vec![BreakType::Switch],
+                    Some(context.artifacts),
+                    true,
+                );
+                can_fall_through = actions.contains(ControlAction::None);
+            } else {
+                push_unreachable_statement_spans(case.statements(), context);
+                can_fall_through = false;
+            }
+        }
+    }
+
+    fn walk_try(&self, try_statement: &'ast Try<'arena>, context: &mut ThrowSourceReachabilityScan<'context>) {
+        self.walk_block(&try_statement.block, context);
+
+        for catch_clause in &try_statement.catch_clauses {
+            let catch_is_reachable =
+                context.artifacts.get_try_catch_reachability(&catch_clause.block).unwrap_or_else(|| {
+                    crate::context::scope::control_action::try_block_may_throw(
+                        try_statement.block.statements.as_slice(),
+                        Some(context.artifacts),
+                    )
+                });
+
+            if catch_is_reachable {
+                self.walk_block(&catch_clause.block, context);
+            } else {
+                push_unreachable_span(catch_clause.block.span(), context);
+            }
+        }
+
+        if let Some(finally_clause) = &try_statement.finally_clause {
+            self.walk_block(&finally_clause.block, context);
+        }
+    }
+
+    fn walk_binary(&self, binary: &'ast Binary<'arena>, context: &mut ThrowSourceReachabilityScan<'context>) {
+        self.walk_expression(binary.lhs, context);
+
+        let lhs_type = context.artifacts.get_rc_expression_type(binary.lhs);
+        let rhs_is_reachable = match binary.operator {
+            BinaryOperator::And(_) | BinaryOperator::LowAnd(_) => {
+                !lhs_type.is_some_and(|lhs_type| lhs_type.is_always_falsy())
+            }
+            BinaryOperator::Or(_) | BinaryOperator::LowOr(_) => {
+                !lhs_type.is_some_and(|lhs_type| lhs_type.is_always_truthy())
+            }
+            BinaryOperator::NullCoalesce(_) => {
+                crate::callables::static_local_expression_may_be_nullish(
+                    binary.lhs,
+                    lhs_type.map(|type_union| type_union.as_ref()),
+                    context.artifacts,
+                ) || lhs_type.is_none_or(|lhs_type| {
+                    lhs_type.has_nullish() || lhs_type.possibly_undefined() || lhs_type.possibly_undefined_from_try()
+                })
+            }
+            _ => true,
+        };
+
+        if rhs_is_reachable {
+            self.walk_expression(binary.rhs, context);
+        } else {
+            push_unreachable_span(binary.rhs.span(), context);
+        }
+    }
+
+    fn walk_conditional(
+        &self,
+        conditional: &'ast Conditional<'arena>,
+        context: &mut ThrowSourceReachabilityScan<'context>,
+    ) {
+        self.walk_expression(conditional.condition, context);
+
+        let condition_type = context.artifacts.get_rc_expression_type(conditional.condition);
+        if condition_type.is_some_and(|condition_type| condition_type.is_always_falsy()) {
+            if let Some(then) = conditional.then {
+                push_unreachable_span(then.span(), context);
+            }
+        } else if let Some(then) = conditional.then {
+            self.walk_expression(then, context);
+        }
+
+        if condition_type.is_some_and(|condition_type| condition_type.is_always_truthy()) {
+            push_unreachable_span(conditional.r#else.span(), context);
+        } else {
+            self.walk_expression(conditional.r#else, context);
+        }
+    }
+
+    fn walk_if(&self, if_statement: &'ast If<'arena>, context: &mut ThrowSourceReachabilityScan<'context>) {
+        self.walk_expression(if_statement.condition, context);
+
+        let condition_type = context.artifacts.get_rc_expression_type(if_statement.condition);
+        let mut can_reach_next_branch = !condition_type.is_some_and(|condition_type| condition_type.is_always_truthy());
+
+        if condition_type.is_some_and(|condition_type| condition_type.is_always_falsy()) {
+            push_unreachable_statement_spans(if_statement.body.statements(), context);
+        } else {
+            for statement in if_statement.body.statements() {
+                self.walk_statement(statement, context);
+            }
+        }
+
+        for (condition, statements) in if_statement.body.else_if_clauses() {
+            if !can_reach_next_branch {
+                push_unreachable_span(condition.span(), context);
+                push_unreachable_statement_spans(statements, context);
+                continue;
+            }
+
+            self.walk_expression(condition, context);
+            let condition_type = context.artifacts.get_rc_expression_type(condition);
+            if condition_type.is_some_and(|condition_type| condition_type.is_always_falsy()) {
+                push_unreachable_statement_spans(statements, context);
+            } else {
+                for statement in statements {
+                    self.walk_statement(statement, context);
+                }
+            }
+
+            if condition_type.is_some_and(|condition_type| condition_type.is_always_truthy()) {
+                can_reach_next_branch = false;
+            }
+        }
+
+        if let Some(statements) = if_statement.body.else_statements() {
+            if can_reach_next_branch {
+                for statement in statements {
+                    self.walk_statement(statement, context);
+                }
+            } else {
+                push_unreachable_statement_spans(statements, context);
+            }
+        }
+    }
+
+    fn walk_closure(&self, closure: &'ast Closure<'arena>, context: &mut ThrowSourceReachabilityScan<'context>) {
+        if !context.scan_callable_bodies {
+            return;
+        }
+
+        let identifier = FunctionLikeIdentifier::for_closure(context.source_file, closure.span());
+        let invoked_immediately = has_immediate_callback_invocation(context, identifier, closure.span())
+            || has_reachable_direct_callable_invocation(context, identifier);
+
+        if invoked_immediately {
+            let previous_scope = context.invocation_scope;
+            context.invocation_scope = Some(identifier);
+            self.walk_block(&closure.body, context);
+            context.invocation_scope = previous_scope;
+        } else {
+            push_unreachable_span(closure.span(), context);
+        }
+    }
+
+    fn walk_arrow_function(
+        &self,
+        arrow_function: &'ast ArrowFunction<'arena>,
+        context: &mut ThrowSourceReachabilityScan<'context>,
+    ) {
+        if !context.scan_callable_bodies {
+            return;
+        }
+
+        let identifier = FunctionLikeIdentifier::for_closure(context.source_file, arrow_function.span());
+        let invoked_immediately = has_immediate_callback_invocation(context, identifier, arrow_function.span())
+            || has_reachable_direct_callable_invocation(context, identifier);
+
+        if invoked_immediately {
+            let previous_scope = context.invocation_scope;
+            context.invocation_scope = Some(identifier);
+            self.walk_expression(arrow_function.expression, context);
+            context.invocation_scope = previous_scope;
+        } else {
+            push_unreachable_span(arrow_function.span(), context);
+        }
+    }
+
+    fn walk_function(&self, function: &'ast Function<'arena>, context: &mut ThrowSourceReachabilityScan<'context>) {
+        if !context.scan_callable_bodies {
+            return;
+        }
+
+        if let Some(identifier) = callable_identifier_for_span(context.artifacts, function.span())
+            && (has_immediate_callback_invocation(context, identifier, function.span())
+                || has_reachable_direct_callable_invocation(context, identifier))
+        {
+            let previous_scope = context.invocation_scope;
+            context.invocation_scope = Some(identifier);
+            self.walk_block(&function.body, context);
+            context.invocation_scope = previous_scope;
+        } else {
+            push_unreachable_span(function.span(), context);
+        }
+    }
+
+    fn walk_method(&self, method: &'ast Method<'arena>, context: &mut ThrowSourceReachabilityScan<'context>) {
+        if !context.scan_callable_bodies {
+            return;
+        }
+
+        if let Some(identifier) = callable_identifier_for_span(context.artifacts, method.span())
+            && (has_immediate_callback_invocation(context, identifier, method.span())
+                || has_reachable_direct_callable_invocation(context, identifier))
+        {
+            let previous_scope = context.invocation_scope;
+            context.invocation_scope = Some(identifier);
+            if let MethodBody::Concrete(body) = &method.body {
+                self.walk_block(body, context);
+            } else {
+                push_unreachable_span(method.span(), context);
+            }
+            context.invocation_scope = previous_scope;
+        } else {
+            push_unreachable_span(method.span(), context);
+        }
+    }
+}
+
+fn callable_identifier_for_span(artifacts: &AnalysisArtifacts, span: Span) -> Option<FunctionLikeIdentifier> {
+    artifacts
+        .iter_callable_effects_by_identifier()
+        .find_map(|(identifier, callable_span, _)| (callable_span == span).then_some(identifier))
+}
+
+fn has_immediate_callback_invocation(
+    context: &ThrowSourceReachabilityScan<'_>,
+    identifier: FunctionLikeIdentifier,
+    callable_span: Span,
+) -> bool {
+    let is_reachable_immediate_deferred_callsite = |callsite: &DeferredCallableCallsiteContext| {
+        callsite.invocation_kind == Some(mago_codex::metadata::parameter::CallableInvocationKind::Immediately)
+            && (!context.restrict_to_invocation_scope || callsite.scope == context.invocation_scope)
+            && span_contains(context.block_span, callsite.invocation_span)
+            && !context
+                .unreachable_spans
+                .iter()
+                .any(|unreachable_span| span_contains(*unreachable_span, callsite.invocation_span))
+    };
+    let is_reachable_immediate_callback_callsite = |callsite: &CallbackCallsiteContext| {
+        callsite.invocation_kind == Some(mago_codex::metadata::parameter::CallableInvocationKind::Immediately)
+            && (!context.restrict_to_invocation_scope || callsite.scope == context.invocation_scope)
+            && span_contains(context.block_span, callsite.invocation_span)
+            && !context
+                .unreachable_spans
+                .iter()
+                .any(|unreachable_span| span_contains(*unreachable_span, callsite.invocation_span))
+    };
+
+    context
+        .artifacts
+        .callable_callback_callsites
+        .get(&identifier)
+        .is_some_and(|callsites| callsites.iter().any(&is_reachable_immediate_deferred_callsite))
+        || context.artifacts.get_callback_callsite(callable_span).is_some_and(is_reachable_immediate_callback_callsite)
+}
+
+fn has_reachable_direct_callable_invocation(
+    context: &ThrowSourceReachabilityScan<'_>,
+    identifier: FunctionLikeIdentifier,
+) -> bool {
+    context.artifacts.direct_callable_invocation_spans.get(&identifier).is_some_and(|spans| {
+        spans.iter().any(|(invocation_span, invocation_scope)| {
+            (!context.restrict_to_invocation_scope || *invocation_scope == context.invocation_scope)
+                && span_contains(context.block_span, *invocation_span)
+                && !context
+                    .unreachable_spans
+                    .iter()
+                    .any(|unreachable_span| span_contains(*unreachable_span, *invocation_span))
+        })
+    })
+}
+
+fn push_unreachable_span(span: Span, context: &mut ThrowSourceReachabilityScan<'_>) {
+    if !context.unreachable_spans.contains(&span) {
+        context.unreachable_spans.push(span);
+    }
+}
+
+fn push_unreachable_statement_spans(statements: &[Statement<'_>], context: &mut ThrowSourceReachabilityScan<'_>) {
+    for statement in statements {
+        push_unreachable_span(statement.span(), context);
+    }
+}
+
+fn span_contains(container: Span, span: Span) -> bool {
+    container.file_id == span.file_id
+        && container.start.offset <= span.start.offset
+        && container.end.offset >= span.end.offset
 }
 
 fn has_tracked_throw_span(possibly_thrown_exceptions: &WordMap<HashSet<Span>>, span: Span) -> bool {

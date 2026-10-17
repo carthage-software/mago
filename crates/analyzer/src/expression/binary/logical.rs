@@ -291,8 +291,13 @@ where
         result_type = get_false();
         let mut dead_rhs_context = right_block_context.clone();
         dead_rhs_context.flags.set_has_returned(true);
+        dead_rhs_context.flags.set_inside_potentially_skipped_code(true);
+        dead_rhs_context.flags.set_inside_definitely_unreachable_code(true);
         binary.rhs.analyze(context, &mut dead_rhs_context, artifacts)?;
     } else {
+        if !lhs_type.is_always_truthy() {
+            right_block_context.flags.set_inside_potentially_skipped_code(true);
+        }
         binary.rhs.analyze(context, &mut right_block_context, artifacts)?;
         let rhs_type = match artifacts.get_rc_expression_type(&binary.rhs).cloned() {
             Some(rhs_type) => {
@@ -608,6 +613,8 @@ where
         report_redundant_logical_operation(context, binary, "always true", "not evaluated", "`true`", None);
         result_type = get_true();
         right_block_context.flags.set_has_returned(true);
+        right_block_context.flags.set_inside_potentially_skipped_code(true);
+        right_block_context.flags.set_inside_definitely_unreachable_code(true);
         binary.rhs.analyze(context, &mut right_block_context, artifacts)?;
     } else {
         if !negated_type_assertions.is_empty() {
@@ -642,6 +649,9 @@ where
         right_block_context.if_body_context = None;
         right_block_context.logical_or_false_context.clone_from(&right_false_context);
 
+        if !lhs_type.is_always_falsy() {
+            right_block_context.flags.set_inside_potentially_skipped_code(true);
+        }
         binary.rhs.analyze(context, &mut right_block_context, artifacts)?;
 
         right_block_context.logical_or_false_context = None;

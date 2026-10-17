@@ -104,6 +104,14 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Return<'arena> {
             Rc::new(get_void())
         };
 
+        if context.settings.check_throws
+            && context.settings.forbid_checked_exceptions_in_callables
+            && self.value.is_some()
+            && !block_context.flags.inside_definitely_unreachable_code()
+        {
+            crate::callables::record_stored_callables(artifacts, &inferred_return_type, context.codebase, true, None);
+        }
+
         handle_return_value(context, block_context, artifacts, self.value, inferred_return_type, self.span());
 
         Ok(())
@@ -301,7 +309,7 @@ pub fn handle_return_value<'ctx, A>(
         }
     }
 
-    if return_value.is_some() {
+    if return_value.is_some() && !block_context.flags.inside_definitely_unreachable_code() {
         artifacts.inferred_return_types.push(Rc::clone(&inferred_return_type));
     }
 
