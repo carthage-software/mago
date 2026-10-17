@@ -737,13 +737,10 @@ fn adjust_array_type_remove_key(
             TAtomic::Array(TArray::Keyed(TKeyedArray { known_items, .. })) => {
                 if let Some(known_items) = known_items {
                     let known_items = Arc::make_mut(known_items);
-                    if has_inverted_isset
-                        && let Some((is_optional, existing_item_type)) = known_items.get(&dictkey)
-                        && !*is_optional
-                    {
+                    if has_inverted_isset && let Some((is_optional, existing_item_type)) = known_items.get(&dictkey) {
                         match intersect_union_types(&get_null(), existing_item_type, codebase) {
                             Some(intersected) if !intersected.is_never() => {
-                                known_items.insert(dictkey, (false, intersected));
+                                known_items.insert(dictkey, (*is_optional, intersected));
                             }
                             _ => {
                                 known_items.remove(&dictkey);
@@ -762,11 +759,10 @@ fn adjust_array_type_remove_key(
                     let known_elements = Arc::make_mut(known_elements);
                     if has_inverted_isset
                         && let Some((is_optional, existing_item_type)) = known_elements.get(&arraykey_offset)
-                        && !*is_optional
                     {
                         match intersect_union_types(&get_null(), existing_item_type, codebase) {
                             Some(intersected) if !intersected.is_never() => {
-                                known_elements.insert(arraykey_offset, (false, intersected));
+                                known_elements.insert(arraykey_offset, (*is_optional, intersected));
                             }
                             _ => {
                                 known_elements.remove(&arraykey_offset);
