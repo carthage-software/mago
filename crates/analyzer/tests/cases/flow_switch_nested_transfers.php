@@ -209,3 +209,23 @@ function finally_normal_completion_preserves_pending_break(): int
 
     return 1;
 }
+
+function finally_local_breaks_reach_finally_return(): int
+{
+    try {
+        return 0;
+    } finally {
+        while (true) {
+            switch (mt_rand(0, 1)) {
+                case 0:
+                    break;
+                default:
+                    break 2;
+            }
+
+            break;
+        }
+
+        return 1;
+    }
+}
