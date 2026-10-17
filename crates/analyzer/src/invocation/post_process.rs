@@ -1307,7 +1307,9 @@ where
 
 fn assertion_excludes_null(assertion: &Assertion) -> bool {
     match assertion {
-        Assertion::IsType(atomic) | Assertion::IsIdentical(atomic) => !atomic.is_null(),
+        Assertion::IsType(atomic) | Assertion::IsIdentical(atomic) | Assertion::IsIdenticalFromEquality(atomic) => {
+            !atomic.is_null()
+        }
         Assertion::IsNotType(atomic) | Assertion::IsNotIdentical(atomic) | Assertion::IsNotEqual(atomic) => {
             atomic.is_null()
         }

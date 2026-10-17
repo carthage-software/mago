@@ -27,6 +27,7 @@ pub enum Assertion {
     Falsy,
     Truthy,
     IsIdentical(TAtomic),
+    IsIdenticalFromEquality(TAtomic),
     IsNotIdentical(TAtomic),
     IsEqual(TAtomic),
     IsNotEqual(TAtomic),
@@ -101,6 +102,7 @@ impl Assertion {
             Assertion::IsType(atomic) => atomic.get_id(),
             Assertion::IsNotType(atomic) => concat_word!(b"!", atomic.get_id()),
             Assertion::IsIdentical(atomic) => concat_word!(b"=", atomic.get_id()),
+            Assertion::IsIdenticalFromEquality(atomic) => concat_word!(b"=from-equality-", atomic.get_id()),
             Assertion::IsNotIdentical(atomic) => concat_word!(b"!=", atomic.get_id()),
             Assertion::IsEqual(atomic) => concat_word!(b"~", atomic.get_id()),
             Assertion::IsNotEqual(atomic) => concat_word!(b"!~", atomic.get_id()),
@@ -217,6 +219,7 @@ impl Assertion {
                 | Assertion::HasStringArrayAccess
                 | Assertion::IsEqualIsset
                 | Assertion::IsIdentical(_)
+                | Assertion::IsIdenticalFromEquality(_)
                 | Assertion::IsNotIdentical(_)
                 | Assertion::IsEqual(_)
                 | Assertion::IsNotEqual(_)
@@ -240,6 +243,7 @@ impl Assertion {
             Assertion::IsType(_) => Assertion::IsType(atomic),
             Assertion::IsNotType(_) => Assertion::IsNotType(atomic),
             Assertion::IsIdentical(_) => Assertion::IsIdentical(atomic),
+            Assertion::IsIdenticalFromEquality(_) => Assertion::IsIdenticalFromEquality(atomic),
             Assertion::IsNotIdentical(_) => Assertion::IsNotIdentical(atomic),
             Assertion::IsEqual(_) => Assertion::IsEqual(atomic),
             Assertion::IsNotEqual(_) => Assertion::IsNotEqual(atomic),
@@ -251,6 +255,7 @@ impl Assertion {
     pub fn get_type(&self) -> Option<&TAtomic> {
         match self {
             Assertion::IsIdentical(atomic)
+            | Assertion::IsIdenticalFromEquality(atomic)
             | Assertion::IsNotIdentical(atomic)
             | Assertion::IsType(atomic)
             | Assertion::IsNotType(atomic)
@@ -263,6 +268,7 @@ impl Assertion {
     pub fn get_type_mut(&mut self) -> Option<&mut TAtomic> {
         match self {
             Assertion::IsIdentical(atomic)
+            | Assertion::IsIdenticalFromEquality(atomic)
             | Assertion::IsNotIdentical(atomic)
             | Assertion::IsType(atomic)
             | Assertion::IsNotType(atomic)
@@ -454,6 +460,7 @@ impl Assertion {
             },
             Assertion::Countable => matches!(other, Assertion::NotCountable(negatable) if *negatable),
             Assertion::NotCountable(_) => matches!(other, Assertion::Countable),
+            Assertion::IsIdenticalFromEquality(_) => false,
         }
     }
 
@@ -503,7 +510,8 @@ impl Assertion {
             Assertion::IsLessThanFromBound(_)
             | Assertion::IsLessThanOrEqualFromBound(_)
             | Assertion::IsGreaterThanFromBound(_)
-            | Assertion::IsGreaterThanOrEqualFromBound(_) => Assertion::Any,
+            | Assertion::IsGreaterThanOrEqualFromBound(_)
+            | Assertion::IsIdenticalFromEquality(_) => Assertion::Any,
             Assertion::IsLessThanVariable(variable) => Assertion::IsGreaterThanOrEqualVariable(*variable),
             Assertion::IsLessThanOrEqualVariable(variable) => Assertion::IsGreaterThanVariable(*variable),
             Assertion::IsGreaterThanVariable(variable) => Assertion::IsLessThanOrEqualVariable(*variable),
@@ -530,6 +538,7 @@ impl Assertion {
                 | Self::IsLessThanOrEqualFromBound(_)
                 | Self::IsGreaterThanFromBound(_)
                 | Self::IsGreaterThanOrEqualFromBound(_)
+                | Self::IsIdenticalFromEquality(_)
         )
     }
 
