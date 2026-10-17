@@ -1976,6 +1976,16 @@ where
     get_mixed()
 }
 
+/// PHP casts decimal numeric string keys to integers (`$arr['10']` is `$arr[10]`), so
+/// normalize string keys before looking them up in `known_items`, which stores keys
+/// already normalized to integers.
+fn normalize_array_key(key: ArrayKey) -> ArrayKey {
+    match key {
+        ArrayKey::String(value) => ArrayKey::from_string(value),
+        other => other,
+    }
+}
+
 fn reconcile_has_array_key<A>(
     context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
@@ -1988,6 +1998,8 @@ fn reconcile_has_array_key<A>(
 where
     A: Arena,
 {
+    let key_name = normalize_array_key(*key_name);
+
     let mut did_remove_type = existing_var_type.possibly_undefined();
     let mut new_var_type = existing_var_type.clone();
     let mut acceptable_types = vec![];
@@ -1999,14 +2011,14 @@ where
                 did_remove_type = true;
                 if let Some(known_items) = known_items {
                     let known_items = Arc::make_mut(known_items);
-                    if let Some(known_item) = known_items.get_mut(key_name) {
+                    if let Some(known_item) = known_items.get_mut(&key_name) {
                         if known_item.0 {
                             *non_empty = true;
                             *known_item = (false, known_item.1.clone());
                         }
                     } else if let Some((_, value_param)) = parameters {
                         *non_empty = true;
-                        known_items.insert(*key_name, (false, (**value_param).clone()));
+                        known_items.insert(key_name, (false, (**value_param).clone()));
                     } else {
                         continue;
                     }
@@ -2019,7 +2031,7 @@ where
                         false,
                     ) {
                         *non_empty = true;
-                        *known_items = Some(BTreeMap::from([(*key_name, (false, (**value_param).clone()))]).into());
+                        *known_items = Some(BTreeMap::from([(key_name, (false, (**value_param).clone()))]).into());
                     } else {
                         continue;
                     }
@@ -2033,21 +2045,21 @@ where
                 did_remove_type = true;
                 if let ArrayKey::Integer(i) = key_name {
                     if let Some(known_elements) = known_elements.as_mut().map(Arc::make_mut) {
-                        if let Some(known_element) = known_elements.get_mut(&(*i as usize)) {
+                        if let Some(known_element) = known_elements.get_mut(&(i as usize)) {
                             if known_element.0 {
                                 *non_empty = true;
                                 *known_element = (false, known_element.1.clone());
                             }
                         } else if !element_type.is_never() {
                             *non_empty = true;
-                            known_elements.insert(*i as usize, (false, (**element_type).clone()));
+                            known_elements.insert(i as usize, (false, (**element_type).clone()));
                         } else {
                             continue;
                         }
                     } else if !element_type.is_never() {
                         *non_empty = true;
                         *known_elements =
-                            Some(BTreeMap::from([(*i as usize, (false, (**element_type).clone()))]).into());
+                            Some(BTreeMap::from([(i as usize, (false, (**element_type).clone()))]).into());
                     }
 
                     acceptable_types.push(atomic);
@@ -2064,7 +2076,7 @@ where
                 } else {
                     let acceptable_atomic = TAtomic::GenericParameter(TGenericParameter {
                         constraint: Arc::new(reconcile_has_array_key(
-                            context, assertion, constraint, None, key_name, negated, None,
+                            context, assertion, constraint, None, &key_name, negated, None,
                         )),
                         parameter_name: *parameter_name,
                         defining_entity: *defining_entity,
@@ -2123,6 +2135,8 @@ fn reconcile_has_nonnull_entry_for_key<A>(
 where
     A: Arena,
 {
+    let key_name = normalize_array_key(*key_name);
+
     let mut new_var_type = existing_var_type.clone();
 
     let existing_var_types = std::mem::take(new_var_type.types.to_mut());
@@ -2134,7 +2148,7 @@ where
             TAtomic::Array(TArray::Keyed(TKeyedArray { known_items, parameters, .. })) => {
                 if let Some(known_items) = known_items {
                     let known_items = Arc::make_mut(known_items);
-                    if let Some(known_item) = known_items.get_mut(key_name) {
+                    if let Some(known_item) = known_items.get_mut(&key_name) {
                         let nonnull = subtract_null(context, assertion, &known_item.1, None, negated, None);
 
                         if known_item.0 {
@@ -2144,7 +2158,7 @@ where
                         }
                     } else if let Some((_, value_param)) = parameters {
                         let nonnull = subtract_null(context, assertion, value_param, None, negated, None);
-                        known_items.insert(*key_name, (false, nonnull));
+                        known_items.insert(key_name, (false, nonnull));
                     } else {
                         continue;
                     }
@@ -2157,7 +2171,7 @@ where
                         false,
                     ) {
                         let nonnull = subtract_null(context, assertion, value_param, None, negated, None);
-                        *known_items = Some(BTreeMap::from([(*key_name, (false, nonnull))]).into());
+                        *known_items = Some(BTreeMap::from([(key_name, (false, nonnull))]).into());
                     } else {
                         continue;
                     }
@@ -2173,7 +2187,7 @@ where
                 };
 
                 if let Some(known_elements) = known_elements.as_mut().map(Arc::make_mut) {
-                    if let Some(known_element) = known_elements.get_mut(&(*i as usize)) {
+                    if let Some(known_element) = known_elements.get_mut(&(i as usize)) {
                         let nonnull = subtract_null(context, assertion, &known_element.1, None, negated, None);
 
                         if known_element.0 {
@@ -2183,20 +2197,20 @@ where
                         }
                     } else if !element_type.is_never() {
                         let nonnull = subtract_null(context, assertion, element_type, None, negated, None);
-                        known_elements.insert(*i as usize, (false, nonnull));
+                        known_elements.insert(i as usize, (false, nonnull));
                     } else {
                         continue;
                     }
                 } else if !element_type.is_never() {
                     let nonnull = subtract_null(context, assertion, element_type, None, negated, None);
-                    *known_elements = Some(BTreeMap::from([(*i as usize, (false, nonnull))]).into());
+                    *known_elements = Some(BTreeMap::from([(i as usize, (false, nonnull))]).into());
                 }
 
                 acceptable_types.push(atomic);
             }
             TAtomic::GenericParameter(generic_parameter) => {
                 if let Some(atomic) = map_concrete_generic_constraint(generic_parameter, |constraint| {
-                    reconcile_has_nonnull_entry_for_key(context, assertion, constraint, None, key_name, negated, None)
+                    reconcile_has_nonnull_entry_for_key(context, assertion, constraint, None, &key_name, negated, None)
                 }) {
                     acceptable_types.push(atomic);
                 }
@@ -2210,7 +2224,7 @@ where
                 keyed_array.types.to_mut()[0] = TAtomic::Array(TArray::Keyed(TKeyedArray {
                     known_items: Some(
                         BTreeMap::from([(
-                            *key_name,
+                            key_name,
                             (false, subtract_null(context, assertion, &get_mixed(), None, negated, None)),
                         )])
                         .into(),
