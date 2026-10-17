@@ -301,6 +301,7 @@ pub fn reconcile_keyed_types<'ctx, A>(
                     block_context,
                     changed_var_ids,
                     context.codebase,
+                    has_inverted_isset && !has_inverted_key_exists,
                 );
             }
 
@@ -350,6 +351,7 @@ pub fn reconcile_keyed_types<'ctx, A>(
                         block_context,
                         changed_var_ids,
                         context.codebase,
+                        has_inverted_isset && !has_inverted_key_exists,
                     );
                 }
             } else if memchr::memmem::find(key_str, b"->").is_some() && !is_equality {
@@ -708,6 +710,7 @@ fn adjust_array_type_remove_key(
     context: &mut BlockContext<'_>,
     changed_var_ids: &mut WordSet,
     codebase: &CodebaseMetadata,
+    has_inverted_isset: bool,
 ) {
     key_parts.pop();
     let Some(array_key) = key_parts.pop() else {
@@ -733,7 +736,22 @@ fn adjust_array_type_remove_key(
         match base_atomic_type {
             TAtomic::Array(TArray::Keyed(TKeyedArray { known_items, .. })) => {
                 if let Some(known_items) = known_items {
-                    Arc::make_mut(known_items).remove(&dictkey);
+                    let known_items = Arc::make_mut(known_items);
+                    if has_inverted_isset
+                        && let Some((is_optional, existing_item_type)) = known_items.get(&dictkey)
+                        && !*is_optional
+                    {
+                        match intersect_union_types(&get_null(), existing_item_type, codebase) {
+                            Some(intersected) if !intersected.is_never() => {
+                                known_items.insert(dictkey, (false, intersected));
+                            }
+                            _ => {
+                                known_items.remove(&dictkey);
+                            }
+                        }
+                    } else {
+                        known_items.remove(&dictkey);
+                    }
                 }
             }
             TAtomic::Array(TArray::List(TList { known_elements, .. })) => {
@@ -741,7 +759,22 @@ fn adjust_array_type_remove_key(
                     && let Ok(arraykey_offset) = usize::try_from(arraykey_value)
                     && let Some(known_elements) = known_elements
                 {
-                    Arc::make_mut(known_elements).remove(&arraykey_offset);
+                    let known_elements = Arc::make_mut(known_elements);
+                    if has_inverted_isset
+                        && let Some((is_optional, existing_item_type)) = known_elements.get(&arraykey_offset)
+                        && !*is_optional
+                    {
+                        match intersect_union_types(&get_null(), existing_item_type, codebase) {
+                            Some(intersected) if !intersected.is_never() => {
+                                known_elements.insert(arraykey_offset, (false, intersected));
+                            }
+                            _ => {
+                                known_elements.remove(&arraykey_offset);
+                            }
+                        }
+                    } else {
+                        known_elements.remove(&arraykey_offset);
+                    }
                 }
             }
             _ => {
