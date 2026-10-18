@@ -296,11 +296,12 @@ pub fn reconcile_keyed_types<'ctx, A>(
             // Even when the type doesn't exist and result is never, we still need to
             // update parent array types for negated isset/key_exists to remove the key
             if key_str.ends_with(b"]") && (has_inverted_isset || has_inverted_key_exists) {
-                adjust_array_type_remove_key(
+                adjust_array_type_for_missing_key(
                     borrow_path_parts(key_str),
                     block_context,
                     changed_var_ids,
                     context.codebase,
+                    false,
                 );
             }
 
@@ -345,11 +346,12 @@ pub fn reconcile_keyed_types<'ctx, A>(
                         true,
                     );
                 } else {
-                    adjust_array_type_remove_key(
+                    adjust_array_type_for_missing_key(
                         borrow_path_parts(key_str),
                         block_context,
                         changed_var_ids,
                         context.codebase,
+                        has_inverted_isset && !has_inverted_key_exists,
                     );
                 }
             } else if memchr::memmem::find(key_str, b"->").is_some() && !is_equality {
@@ -703,11 +705,12 @@ fn adjust_array_type(
     context.locals.insert(base_key_atom, Rc::new(existing_type));
 }
 
-fn adjust_array_type_remove_key(
+fn adjust_array_type_for_missing_key(
     mut key_parts: Vec<&[u8]>,
     context: &mut BlockContext<'_>,
     changed_var_ids: &mut WordSet,
     codebase: &CodebaseMetadata,
+    preserve_null: bool,
 ) {
     key_parts.pop();
     let Some(array_key) = key_parts.pop() else {
@@ -729,11 +732,20 @@ fn adjust_array_type_remove_key(
         return;
     };
 
-    for base_atomic_type in existing_type.types.to_mut() {
+    existing_type.types.to_mut().retain_mut(|base_atomic_type| {
         match base_atomic_type {
             TAtomic::Array(TArray::Keyed(TKeyedArray { known_items, .. })) => {
                 if let Some(known_items) = known_items {
-                    Arc::make_mut(known_items).remove(&dictkey);
+                    let known_items = Arc::make_mut(known_items);
+                    if let Some((optional, item_type)) = known_items.get_mut(&dictkey) {
+                        if preserve_null && item_type.can_be_null() {
+                            *item_type = get_null();
+                        } else if *optional {
+                            known_items.remove(&dictkey);
+                        } else {
+                            return false;
+                        }
+                    }
                 }
             }
             TAtomic::Array(TArray::List(TList { known_elements, .. })) => {
@@ -741,11 +753,20 @@ fn adjust_array_type_remove_key(
                     && let Ok(arraykey_offset) = usize::try_from(arraykey_value)
                     && let Some(known_elements) = known_elements
                 {
-                    Arc::make_mut(known_elements).remove(&arraykey_offset);
+                    let known_elements = Arc::make_mut(known_elements);
+                    if let Some((optional, item_type)) = known_elements.get_mut(&arraykey_offset) {
+                        if preserve_null && item_type.can_be_null() {
+                            *item_type = get_null();
+                        } else if *optional {
+                            known_elements.remove(&arraykey_offset);
+                        } else {
+                            return false;
+                        }
+                    }
                 }
             }
             _ => {
-                continue;
+                return true;
             }
         }
 
@@ -763,6 +784,12 @@ fn adjust_array_type_remove_key(
                 false,
             );
         }
+
+        true
+    });
+
+    if existing_type.types.is_empty() {
+        existing_type = get_never();
     }
 
     context.locals.insert(base_key_atom, Rc::new(existing_type));

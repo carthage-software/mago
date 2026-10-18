@@ -19,6 +19,7 @@ use mago_codex::ttype::atomic::scalar::float::TFloat;
 use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::get_never;
+use mago_codex::ttype::get_null;
 use mago_codex::ttype::get_undefined_null;
 use mago_codex::ttype::intersect_union_types;
 use mago_codex::ttype::union::TUnion;
@@ -231,9 +232,8 @@ where
         Assertion::Falsy | Assertion::Empty => {
             Some(reconcile_falsy_or_empty(context, assertion, existing_var_type, key, negated, span))
         }
-        Assertion::IsNotIsset | Assertion::ArrayKeyDoesNotExist => {
-            Some(reconcile_not_isset(context, existing_var_type, key, span))
-        }
+        Assertion::IsNotIsset => Some(reconcile_not_isset(existing_var_type, key)),
+        Assertion::ArrayKeyDoesNotExist => Some(get_undefined_null()),
         Assertion::DoesNotHaveArrayKey(key_name) => {
             Some(reconcile_no_array_key(context, assertion, existing_var_type, key, span, key_name, negated))
         }
@@ -1305,31 +1305,19 @@ where
     )
 }
 
-fn reconcile_not_isset<A>(
-    _context: &mut Context<'_, '_, A>,
-    existing_var_type: &TUnion,
-    key: Option<&[u8]>,
-    span: Option<&Span>,
-) -> TUnion
-where
-    A: Arena,
-{
-    // When !isset is true, the value is definitely not set (either null or undefined)
-    // For array accesses, this means the key doesn't exist or the value is null
-    // In both cases, the resulting type should be null
+fn reconcile_not_isset(existing_var_type: &TUnion, key: Option<&[u8]>) -> TUnion {
     if existing_var_type.possibly_undefined() || existing_var_type.possibly_undefined_from_try() {
         return get_undefined_null();
     }
 
-    if !existing_var_type.is_nullable()
-        && let Some(key) = key
+    if existing_var_type.can_be_null() {
+        return get_null();
+    }
+
+    if let Some(key) = key
         && memchr::memchr(b'[', key).is_none()
         && (!existing_var_type.is_mixed() || existing_var_type.is_always_truthy())
     {
-        if span.is_some() {
-            // todo
-        }
-
         return get_never();
     }
 

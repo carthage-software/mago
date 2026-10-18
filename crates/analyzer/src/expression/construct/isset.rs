@@ -52,8 +52,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for IssetConstruct<'arena> {
 
                 if value_type.possibly_undefined()
                     || value_type.possibly_undefined_from_try()
-                    || value_type.has_null()
-                    || value_type.has_nullable_mixed()
+                    || value_type.can_be_null()
                 {
                     all_definitely_set = false;
                 }
