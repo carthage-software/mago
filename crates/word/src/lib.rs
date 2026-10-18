@@ -31,6 +31,8 @@
 
 mod bumpalloc;
 mod interner;
+#[cfg(feature = "serde")]
+pub mod table;
 mod util;
 mod word;
 

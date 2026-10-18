@@ -24,3 +24,6 @@ parking_lot = { workspace = true }
 itoa = { workspace = true }
 ryu = { workspace = true }
 serde = { workspace = true, optional = true }
+
+[dev-dependencies]
+bincode = { workspace = true }

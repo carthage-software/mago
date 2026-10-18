@@ -105,5 +105,3 @@ pub static CURRENT_DIR: LazyLock<PathBuf> = LazyLock::new(|| {
         std::process::exit(1);
     })
 });
-
-pub const PRELUDE_BYTES: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/prelude.bin"));

@@ -71,6 +71,7 @@ mod consts;
 mod error;
 mod extensions;
 mod macros;
+mod prelude;
 mod service;
 mod updater;
 mod utils;

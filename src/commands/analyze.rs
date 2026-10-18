@@ -65,7 +65,6 @@ use crate::commands::args::substitution::SubstitutionArgs;
 use crate::commands::outcome::CommandOutcome;
 use crate::commands::stdin_input;
 use crate::config::Configuration;
-use crate::consts::PRELUDE_BYTES;
 use crate::error::Error;
 use crate::extensions::initialize_external_analyzer;
 use crate::extensions::start_external_analyzer;
@@ -311,25 +310,26 @@ impl AnalyzeCommand {
             orchestrator.set_external_analyzer_handle(external_analyzer);
         }
 
+        let loading = (!self.no_stubs).then(crate::prelude::Loading::new);
         let (prelude, database) = rayon::join(
             || {
                 let start = trace_enabled.then(Instant::now);
-                let prelude = if self.no_stubs {
-                    Prelude::default()
-                } else {
-                    Prelude::decode(PRELUDE_BYTES).expect("Failed to decode embedded prelude")
-                };
+                let prelude = loading.as_ref().map_or_else(Prelude::default, crate::prelude::Loading::finish);
                 prelude_duration = start.map(|s| s.elapsed());
                 prelude
             },
             || {
                 let start = trace_enabled.then(Instant::now);
                 let database = orchestrator.load_database(&configuration.source.workspace, true, None, stdin_override);
+                if let Some(loading) = &loading {
+                    loading.help();
+                }
                 load_database_duration = start.map(|s| s.elapsed());
                 database
             },
         );
 
+        drop(loading);
         let Prelude { database: prelude_database, metadata, symbol_references } = prelude;
         let mut database = database?;
         database.merge_base(prelude_database);
@@ -413,11 +413,8 @@ impl AnalyzeCommand {
                 configuration.analyzer.performance.slow_file_warning_threshold_ms = threshold;
             }
 
-            let Prelude { database, metadata, symbol_references } = if self.no_stubs {
-                Prelude::default()
-            } else {
-                Prelude::decode(PRELUDE_BYTES).expect("Failed to decode embedded prelude")
-            };
+            let Prelude { database, metadata, symbol_references } =
+                if self.no_stubs { Prelude::default() } else { crate::prelude::load() };
 
             let mut orchestrator = create_orchestrator(&configuration, color_choice, false, false, true);
             orchestrator.add_exclude_patterns(configuration.analyzer.excludes.iter());

@@ -242,6 +242,7 @@ rayon = "1.10.0"
 dhat = "0.3"
 rust-embed = { version = "8.7.2", features = ["interpolate-folder-path", "include-exclude"] }
 bincode = { version = "2.0.1", features = ["serde"] }
+zstd = { version = "0.13", default-features = false }
 libc = "=0.2.189"
 ryu = "1.0"
 itoa = "1.0"
@@ -302,12 +303,14 @@ unicode-width = { workspace = true }
 notify = { workspace = true }
 dhat = { workspace = true, optional = true }
 schemars = { workspace = true }
+zstd = { workspace = true }
 
 [[test]]
 name = "suite"
 harness = false
 
 [dev-dependencies]
+bincode = { workspace = true }
 libtest-mimic = { workspace = true }
 serde = { workspace = true }
 temp-env = { workspace = true }
@@ -316,6 +319,8 @@ serde_json = { workspace = true }
 
 [build-dependencies]
 mago-prelude = { workspace = true, features = ["build"] }
+bincode = { workspace = true }
+zstd = { workspace = true }
 
 [target.'cfg(any(target_os = "macos", target_os = "windows", target_env = "musl", target_env = "gnu"))'.dependencies]
 mimalloc = { version = "0.1.47" }

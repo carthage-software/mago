@@ -357,7 +357,10 @@ impl serde::Serialize for Word {
     where
         S: serde::Serializer,
     {
-        ser.serialize_bytes(self.as_bytes())
+        match crate::table::encoded(*self) {
+            Some(index) => ser.serialize_u32(index),
+            None => ser.serialize_bytes(self.as_bytes()),
+        }
     }
 }
 
@@ -367,6 +370,14 @@ impl<'de> serde::Deserialize<'de> for Word {
     where
         D: serde::Deserializer<'de>,
     {
+        if let Some(table) = crate::table::decoding() {
+            let index = <u32 as serde::Deserialize>::deserialize(de)?;
+
+            return table.get(index).ok_or_else(|| {
+                serde::de::Error::invalid_value(serde::de::Unexpected::Unsigned(index.into()), &"a word table index")
+            });
+        }
+
         struct V;
 
         impl<'de> serde::de::Visitor<'de> for V {

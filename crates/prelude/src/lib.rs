@@ -62,7 +62,9 @@ impl Prelude {
     /// incompatible binary data.
     #[cfg(feature = "serde")]
     pub fn decode(bytes: &[u8]) -> Result<Self, PreludeError> {
-        let (prelude, _) = bincode::serde::decode_from_slice(bytes, standard())?;
+        let (words, read): (Vec<mago_word::Word>, usize) = bincode::serde::decode_from_slice(bytes, standard())?;
+        let (prelude, _) =
+            mago_word::table::decode(&words, || bincode::serde::decode_from_slice(&bytes[read..], standard()))?;
 
         Ok(prelude)
     }
@@ -88,7 +90,11 @@ impl Prelude {
     /// Returns a [`PreludeError`] if serialization fails.
     #[cfg(feature = "build")]
     pub fn encode(&self) -> Result<Vec<u8>, PreludeError> {
-        Ok(bincode::serde::encode_to_vec(self, standard())?)
+        let (prelude, words) = mago_word::table::encode(|| bincode::serde::encode_to_vec(self, standard()));
+        let mut bytes = bincode::serde::encode_to_vec(&words, standard())?;
+        bytes.extend(prelude?);
+
+        Ok(bytes)
     }
 }
 
