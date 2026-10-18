@@ -6,6 +6,8 @@ use mago_word::Word;
 use mago_word::WordSet;
 use mago_word::ascii_lowercase_word;
 
+pub mod strictness;
+
 /// Default maximum logical formula size during conditional analysis.
 pub const DEFAULT_FORMULA_SIZE_THRESHOLD: u16 = 512;
 
@@ -40,6 +42,9 @@ pub struct Settings {
     /// Warn when a function's declared return type contains a branch the body never actually returns
     /// (e.g. `: string|false` on a function that always returns a string). Defaults to `false`.
     pub find_overly_wide_return_types: bool,
+
+    /// Warn when a documented `@throws` type cannot escape the function or method. Defaults to `false`.
+    pub find_overly_wide_throw_types: bool,
 
     /// Analyze code that appears to be unreachable. Defaults to `false`.
     pub analyze_dead_code: bool,
@@ -421,6 +426,7 @@ impl Settings {
             find_unused_expressions: true,
             find_unused_definitions: true,
             find_overly_wide_return_types: false,
+            find_overly_wide_throw_types: false,
             analyze_dead_code: false,
             memoize_properties: true,
             allow_possibly_undefined_array_keys: true,
