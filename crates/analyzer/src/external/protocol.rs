@@ -2416,7 +2416,6 @@ where
         46 => Assertion::StringLengthGreaterThanOrEqual(
             reader.read_u64("string length greater-than-or-equal bound")? as i64
         ),
-        47 => Assertion::IsIdenticalFromEquality(decode_assertion_atomic(reader, request_type)?),
         unknown => return Err(protocol(format!("unknown invocation assertion kind {unknown}"))),
     })
 }

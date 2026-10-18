@@ -841,7 +841,9 @@ fn write_assertion(writer: &mut PayloadWriter, assertion: &Assertion) -> Result<
         Assertion::NotCountable(_) => 44,
         Assertion::StringLengthLessThan(_) => 45,
         Assertion::StringLengthGreaterThanOrEqual(_) => 46,
-        Assertion::IsIdenticalFromEquality(_) => 47,
+        Assertion::IsIdenticalFromEquality(_) => {
+            return Err(protocol("internal equality assertions cannot be exported"));
+        }
     };
     writer.write_u8(kind);
 
@@ -849,7 +851,6 @@ fn write_assertion(writer: &mut PayloadWriter, assertion: &Assertion) -> Result<
         Assertion::IsType(atomic)
         | Assertion::IsNotType(atomic)
         | Assertion::IsIdentical(atomic)
-        | Assertion::IsIdenticalFromEquality(atomic)
         | Assertion::IsNotIdentical(atomic)
         | Assertion::IsEqual(atomic)
         | Assertion::IsNotEqual(atomic) => write_atomic(writer, atomic)?,

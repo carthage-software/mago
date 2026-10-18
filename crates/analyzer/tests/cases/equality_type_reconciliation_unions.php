@@ -14,6 +14,11 @@ function test_union_equality_narrowing(int|string $a, float|string $b): void {
     if ($a === $b) {
         takes_string($a);
         takes_string($b);
+        takes_false($a); // @mago-expect analysis:invalid-argument
+        takes_false($b); // @mago-expect analysis:invalid-argument
+    } else {
+        takes_string($a); // @mago-expect analysis:possibly-invalid-argument
+        takes_string($b); // @mago-expect analysis:possibly-invalid-argument
     }
 }
 
@@ -26,6 +31,7 @@ function test_union_equality_false_branch(string $tag, string|false $value): voi
         takes_string($tag);
         takes_string($value);
     } else {
+        takes_false($value); // @mago-expect analysis:possibly-invalid-argument
         if ($value === 'a') {
             takes_string($value);
         }
@@ -44,6 +50,7 @@ function test_union_equality_false_branch(string $tag, string|false $value): voi
  */
 function test_union_equality_negated_condition(string $tag, string|false $value): void {
     if (!($tag === $value)) {
+        takes_false($value); // @mago-expect analysis:possibly-invalid-argument
         if ($value === 'a') {
             takes_string($value);
         }
