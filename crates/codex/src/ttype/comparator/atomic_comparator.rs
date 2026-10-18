@@ -1,3 +1,4 @@
+use std::str::from_utf8;
 use std::sync::Arc;
 
 use mago_word::concat_word;
@@ -17,6 +18,7 @@ use crate::ttype::atomic::object::named::TNamedObject;
 use crate::ttype::atomic::reference::TReference;
 use crate::ttype::atomic::scalar::TScalar;
 use crate::ttype::atomic::scalar::class_like_string::TClassLikeString;
+use crate::ttype::atomic::scalar::int::TInteger;
 use crate::ttype::atomic::scalar::string::TString;
 use crate::ttype::atomic::scalar::string::TStringCasing;
 use crate::ttype::atomic::scalar::string::TStringLiteral;
@@ -759,7 +761,7 @@ pub(crate) fn can_be_identical(
         || is_contained_by(codebase, second_part, first_part, inside_assertion, &mut second_comparison_result)
         || (first_comparison_result.type_coerced.unwrap_or(false)
             && second_comparison_result.type_coerced.unwrap_or(false))
-        || (allow_type_coercion && first_part.is_some_scalar() && second_part.is_some_scalar())
+        || (allow_type_coercion && scalars_can_be_identical_with_coercion(first_part, second_part))
     {
         return true;
     }
@@ -832,6 +834,129 @@ fn strings_can_be_identical(lhs: &TString, rhs: &TString) -> bool {
     }
 
     true
+}
+
+#[must_use]
+pub fn scalars_can_be_identical_with_coercion(first: &TAtomic, second: &TAtomic) -> bool {
+    let (TAtomic::Scalar(first_scalar), TAtomic::Scalar(second_scalar)) = (first, second) else {
+        return false;
+    };
+
+    match (first_scalar, second_scalar) {
+        (TScalar::Generic, _) | (_, TScalar::Generic) => true,
+        (TScalar::ArrayKey, _) | (_, TScalar::ArrayKey) => true,
+        (TScalar::Bool(b1), TScalar::Bool(b2)) => !(b1.is_true() && b2.is_false() || b1.is_false() && b2.is_true()),
+        (TScalar::Bool(b), other) | (other, TScalar::Bool(b)) => {
+            !(b.is_true() && other.is_falsy() || b.is_false() && other.is_truthy())
+        }
+        (TScalar::Integer(i1), TScalar::Integer(i2)) => {
+            if let (Some(v1), Some(v2)) = (i1.get_literal_value(), i2.get_literal_value()) {
+                v1 == v2
+            } else {
+                i1.overlaps(*i2)
+            }
+        }
+        (TScalar::Float(f1), TScalar::Float(f2)) => {
+            if let (Some(v1), Some(v2)) = (f1.get_literal_value(), f2.get_literal_value()) { v1 == v2 } else { true }
+        }
+        (TScalar::String(s1), TScalar::String(s2)) => {
+            if let (Some(v1), Some(v2)) = (s1.get_known_literal_value(), s2.get_known_literal_value()) {
+                if v1 == v2 {
+                    true
+                } else if s1.is_numeric && s2.is_numeric {
+                    match (from_utf8(v1), from_utf8(v2)) {
+                        (Ok(str1), Ok(str2)) => {
+                            let str1 = str1.trim();
+                            let str2 = str2.trim();
+
+                            if let (Ok(num1), Ok(num2)) = (str1.parse::<i64>(), str2.parse::<i64>()) {
+                                num1 == num2
+                            } else {
+                                match (str1.parse::<f64>(), str2.parse::<f64>()) {
+                                    (Ok(num1), Ok(num2)) => num1 == num2,
+                                    _ => false,
+                                }
+                            }
+                        }
+                        _ => false,
+                    }
+                } else {
+                    false
+                }
+            } else {
+                s1.get_known_literal_value().is_none_or(|_| s1.is_numeric)
+                    && s2.get_known_literal_value().is_none_or(|_| s2.is_numeric)
+            }
+        }
+        (TScalar::String(s), TScalar::ClassLikeString(cls)) | (TScalar::ClassLikeString(cls), TScalar::String(s)) => {
+            if let (Some(v1), TClassLikeString::Literal { value }) = (s.get_known_literal_value(), cls) {
+                v1.eq_ignore_ascii_case(value.as_bytes())
+            } else {
+                true
+            }
+        }
+        (TScalar::ClassLikeString(c1), TScalar::ClassLikeString(c2)) => {
+            if let (TClassLikeString::Literal { value: v1 }, TClassLikeString::Literal { value: v2 }) = (c1, c2) {
+                v1.as_bytes().eq_ignore_ascii_case(v2.as_bytes())
+            } else {
+                true
+            }
+        }
+        (TScalar::Integer(i), TScalar::Float(f)) | (TScalar::Float(f), TScalar::Integer(i)) => {
+            if let (Some(iv), Some(fv)) = (i.get_literal_value(), f.get_literal_value()) {
+                (iv as f64) == fv
+            } else {
+                true
+            }
+        }
+        (TScalar::Integer(i), TScalar::String(s)) | (TScalar::String(s), TScalar::Integer(i)) => {
+            if let Some(s_val) = s.get_known_literal_value() {
+                if let Ok(s_str) = from_utf8(s_val) {
+                    if let Ok(s_int) = s_str.trim().parse::<i64>() {
+                        if let Some(i_val) = i.get_literal_value() {
+                            i_val == s_int
+                        } else {
+                            i.overlaps(TInteger::literal(s_int))
+                        }
+                    } else if let Ok(s_float) = s_str.trim().parse::<f64>() {
+                        if let Some(i_val) = i.get_literal_value() { (i_val as f64) == s_float } else { true }
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            } else {
+                true
+            }
+        }
+        (TScalar::Float(f), TScalar::String(s)) | (TScalar::String(s), TScalar::Float(f)) => {
+            if let Some(s_val) = s.get_known_literal_value() {
+                if let Ok(s_str) = from_utf8(s_val) {
+                    if let Ok(s_float) = s_str.trim().parse::<f64>() {
+                        if let Some(f_val) = f.get_literal_value() { f_val == s_float } else { true }
+                    } else {
+                        false
+                    }
+                } else {
+                    false
+                }
+            } else {
+                true
+            }
+        }
+        (TScalar::ClassLikeString(_), TScalar::Integer(_) | TScalar::Float(_))
+        | (TScalar::Integer(_) | TScalar::Float(_), TScalar::ClassLikeString(_)) => false,
+        (TScalar::Numeric, TScalar::String(s)) | (TScalar::String(s), TScalar::Numeric) => {
+            if let Some(s_val) = s.get_known_literal_value() {
+                if let Ok(s_str) = from_utf8(s_val) { s_str.trim().parse::<f64>().is_ok() } else { false }
+            } else {
+                true
+            }
+        }
+        (TScalar::Numeric, TScalar::ClassLikeString(_)) | (TScalar::ClassLikeString(_), TScalar::Numeric) => false,
+        (TScalar::Numeric, _) | (_, TScalar::Numeric) => true,
+    }
 }
 
 fn entry_can_match_parameters(

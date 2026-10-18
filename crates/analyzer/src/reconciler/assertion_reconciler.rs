@@ -1,9 +1,6 @@
 use std::collections::BTreeMap;
 use std::sync::Arc;
 
-use itoa::Buffer as IntegerBuffer;
-use ryu::Buffer as FloatBuffer;
-
 use mago_allocator::Arena;
 use mago_codex::assertion::Assertion;
 use mago_codex::metadata::CodebaseMetadata;
@@ -35,6 +32,7 @@ use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::atomic_comparator;
 use mago_codex::ttype::comparator::atomic_comparator::is_contained_by;
+use mago_codex::ttype::comparator::atomic_comparator::scalars_can_be_identical_with_coercion;
 use mago_codex::ttype::comparator::union_comparator::can_expression_types_be_identical;
 use mago_codex::ttype::expander;
 use mago_codex::ttype::expander::TypeExpansionOptions;
@@ -1225,7 +1223,11 @@ where
     for existing_var_atomic_type in existing_var_type.types.as_ref() {
         match existing_var_atomic_type {
             TAtomic::Scalar(TScalar::String(TString { literal: None | Some(TStringLiteral::Unspecified), .. })) => {
-                acceptable_types.push(literal_asserted_type.clone());
+                acceptable_types.push(if is_loose_equality && literal_asserted_type.is_numeric() {
+                    existing_var_atomic_type.clone()
+                } else {
+                    literal_asserted_type.clone()
+                });
             }
             TAtomic::Scalar(TScalar::String(TString {
                 literal: Some(TStringLiteral::Value(existing_str)), ..
@@ -1239,30 +1241,10 @@ where
 
                 acceptable_types.push(literal_asserted_type.clone());
             }
-            TAtomic::Scalar(TScalar::Float(TFloat::Literal(float_value)))
-                if is_loose_equality && FloatBuffer::new().format(**float_value).as_bytes() == assertion_str_val =>
+            TAtomic::Scalar(_)
+                if is_loose_equality
+                    && scalars_can_be_identical_with_coercion(existing_var_atomic_type, &literal_asserted_type) =>
             {
-                acceptable_types.push(existing_var_atomic_type.clone());
-            }
-            TAtomic::Scalar(TScalar::Bool(TBool { value: Some(false) }))
-                if is_loose_equality && assertion_str_val.is_empty() =>
-            {
-                acceptable_types.push(existing_var_atomic_type.clone());
-            }
-            TAtomic::Scalar(TScalar::Bool(TBool { value: Some(true) }))
-                if is_loose_equality && assertion_str_val == b"1" =>
-            {
-                acceptable_types.push(existing_var_atomic_type.clone());
-            }
-            TAtomic::Scalar(TScalar::Integer(TInteger::Literal(int_value)))
-                if is_loose_equality && IntegerBuffer::new().format(*int_value).as_bytes() == assertion_str_val =>
-            {
-                acceptable_types.push(existing_var_atomic_type.clone());
-            }
-            TAtomic::Scalar(TScalar::Float(TFloat::Float)) if is_loose_equality => {
-                acceptable_types.push(existing_var_atomic_type.clone());
-            }
-            TAtomic::Scalar(TScalar::Integer(TInteger::Unspecified)) if is_loose_equality => {
                 acceptable_types.push(existing_var_atomic_type.clone());
             }
             TAtomic::GenericParameter(generic_parameter) => {
