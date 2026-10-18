@@ -89,7 +89,6 @@ pub mod change;
 pub mod error;
 pub mod exclusion;
 pub mod file;
-pub mod git;
 pub mod loader;
 pub mod matcher;
 pub mod membership;
