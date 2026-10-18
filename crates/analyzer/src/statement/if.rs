@@ -387,7 +387,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
         }
 
         if let Some(loop_scope) = artifacts.loop_scope.as_mut() {
-            loop_scope.final_actions.extend(if_scope.final_actions);
+            loop_scope.final_actions.extend(&if_scope.final_actions);
         }
 
         block_context.variables_possibly_in_scope.extend(if_scope.new_variables_possibly_in_scope);
@@ -604,7 +604,7 @@ where
     let has_leaving_statements =
         has_ending_statements || (!final_actions.is_empty() && !final_actions.contains(ControlAction::None));
 
-    if_scope.if_actions = final_actions;
+    if_scope.if_actions = final_actions.clone();
     if_scope.final_actions = final_actions;
 
     let new_assigned_variable_ids = if_block_context.assigned_variable_ids.clone();
@@ -951,9 +951,9 @@ where
         ControlAction::from_statements(else_if_clause.1.iter().collect(), vec![], Some(artifacts), true);
 
     let (has_ending_statements, has_break_statement, has_continue_statement, has_leaving_statements) =
-        get_branch_control_flags(final_actions);
+        get_branch_control_flags(&final_actions);
 
-    if_scope.if_actions.extend(final_actions);
+    if_scope.if_actions.extend(&final_actions);
 
     if has_leaving_statements {
         if_scope.reasonable_clauses = vec![];
@@ -1189,9 +1189,9 @@ where
     };
 
     let (has_ending_statements, has_break_statement, has_continue_statement, has_leaving_statements) =
-        get_branch_control_flags(final_actions);
+        get_branch_control_flags(&final_actions);
 
-    if_scope.final_actions.extend(final_actions);
+    if_scope.final_actions.extend(&final_actions);
 
     if !has_leaving_statements {
         update_if_scope(
@@ -1583,7 +1583,7 @@ fn synthesize_branch_discriminator_clauses(
     clauses
 }
 
-fn get_branch_control_flags(final_actions: ControlActionSet) -> (bool, bool, bool, bool) {
+fn get_branch_control_flags(final_actions: &ControlActionSet) -> (bool, bool, bool, bool) {
     if final_actions.is_empty() {
         return (false, false, false, false);
     }
