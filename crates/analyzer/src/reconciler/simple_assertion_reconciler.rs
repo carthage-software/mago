@@ -1584,7 +1584,7 @@ fn get_callable_array_shape() -> TAtomic {
     TAtomic::Array(TArray::Keyed(TKeyedArray::new().with_known_items(known_items).with_non_empty(true)))
 }
 
-fn reconcile_non_empty_countable<A>(
+pub(crate) fn reconcile_non_empty_countable<A>(
     context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
@@ -1640,7 +1640,7 @@ where
 
     if let Some(key) = key
         && let Some(span) = span
-        && (!did_remove_type || acceptable_types.is_empty())
+        && ((!did_remove_type && !assertion.has_equality()) || acceptable_types.is_empty())
     {
         let old_var_type_atom = existing_var_type.get_id();
 

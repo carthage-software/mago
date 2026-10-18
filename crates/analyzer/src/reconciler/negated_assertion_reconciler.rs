@@ -34,6 +34,7 @@ use mago_span::Span;
 use crate::reconciler::Context;
 use crate::reconciler::assertion_reconciler::can_iterate_as;
 use crate::reconciler::assertion_reconciler::intersect_atomic_with_atomic;
+use crate::reconciler::map_generic_constraint;
 use crate::reconciler::simple_negated_assertion_reconciler;
 use crate::reconciler::trigger_issue_for_impossible;
 
@@ -392,6 +393,24 @@ where
         }
 
         match &existing_atomic_type {
+            TAtomic::GenericParameter(parameter) => {
+                if let Some(atomic) = map_generic_constraint(parameter, |constraint| {
+                    let narrowed = handle_literal_negated_equality(
+                        context,
+                        assertion,
+                        constraint,
+                        None,
+                        old_var_type_atom,
+                        None,
+                        negated,
+                    );
+
+                    did_remove_type |= &narrowed != constraint;
+                    narrowed
+                }) {
+                    acceptable_types.push(atomic);
+                }
+            }
             TAtomic::Scalar(TScalar::String(existing_string)) => {
                 let existing_literal_string = existing_atomic_type.get_literal_string_value();
                 let assertion_literal_string = assertion_type.get_literal_string_value();

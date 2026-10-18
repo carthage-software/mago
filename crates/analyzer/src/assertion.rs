@@ -17,6 +17,8 @@ use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::atomic::scalar::string::TString;
 use mago_codex::ttype::atomic::scalar::string::TStringCasing;
 use mago_codex::ttype::cast::cast_atomic_to_callable;
+use mago_codex::ttype::comparator::ComparisonResult;
+use mago_codex::ttype::comparator::atomic_comparator;
 use mago_codex::ttype::get_array_value_parameter;
 use mago_codex::ttype::get_arraykey;
 use mago_codex::ttype::get_bool;
@@ -25,6 +27,8 @@ use mago_codex::ttype::get_float;
 use mago_codex::ttype::get_iterable_value_parameter;
 use mago_codex::ttype::get_numeric_string;
 use mago_codex::ttype::get_true;
+use mago_codex::ttype::shared::EMPTY_KEYED_ARRAY_ATOMIC;
+use mago_codex::ttype::shared::EMPTY_STRING_ATOMIC;
 use mago_codex::ttype::union::TUnion;
 use mago_span::HasSpan;
 use mago_span::Span;
@@ -786,7 +790,7 @@ where
     }
 
     if let Some(null_position) = has_null_variable(left, right, artifacts) {
-        return get_null_equality_assertions(left, right, assertion_context, null_position);
+        return get_null_equality_assertions(left, is_identity, right, artifacts, assertion_context, null_position);
     }
 
     if let Some(true_position) = has_true_variable(left, right, artifacts) {
@@ -879,7 +883,14 @@ where
     }
 
     if let Some(null_position) = has_null_variable(left, right, artifacts) {
-        return get_null_inequality_assertions(left, right, assertion_context, null_position);
+        return get_null_inequality_assertions(
+            left,
+            operator.is_identity(),
+            right,
+            artifacts,
+            assertion_context,
+            null_position,
+        );
     }
 
     if let Some(false_position) = has_false_variable(left, right, artifacts) {
@@ -1341,7 +1352,9 @@ where
 
 fn get_null_equality_assertions<A>(
     left: &Expression,
+    is_identity: bool,
     right: &Expression,
+    artifacts: &AnalysisArtifacts,
     assertion_context: AssertionContext<'_, '_, A>,
     null_position: OtherValuePosition,
 ) -> Vec<WordMap<AssertionSet>>
@@ -1354,35 +1367,78 @@ where
         OtherValuePosition::Right => left,
     };
 
-    if let Expression::Binary(binary) = unwrap_expression(base_conditional)
+    let (base_conditional, null_assertion) = if let Expression::Binary(binary) = unwrap_expression(base_conditional)
         && let BinaryOperator::NullCoalesce(_) = binary.operator
         && let Expression::Literal(Literal::Null(_)) = unwrap_expression(binary.rhs)
     {
-        let coalesce_lhs = binary.lhs;
-
-        if let Some(var_name) = assertion_context.get_expression_id(coalesce_lhs) {
-            if_types.insert(var_name, vec![vec![Assertion::IsNotIsset]]);
-        }
+        (binary.lhs, Assertion::IsNotIsset)
     } else {
-        let var_name = assertion_context.get_expression_id(base_conditional);
+        (base_conditional, Assertion::IsType(TAtomic::Null))
+    };
 
-        if let Some(var_name) = var_name {
-            if_types.insert(var_name, vec![vec![Assertion::IsType(TAtomic::Null)]]);
+    if let Some(var_name) = assertion_context.get_expression_id(base_conditional) {
+        let mut assertions = vec![null_assertion];
+        if !is_identity {
+            assertions.extend([
+                Assertion::IsIdentical(TAtomic::Scalar(TScalar::r#false())),
+                Assertion::IsIdentical(TAtomic::Scalar(TScalar::literal_int(0))),
+                Assertion::IsIdentical(TAtomic::Scalar(TScalar::literal_float(0.0))),
+                Assertion::IsIdentical(EMPTY_STRING_ATOMIC.clone()),
+                Assertion::IsIdentical(EMPTY_KEYED_ARRAY_ATOMIC.clone()),
+            ]);
+
+            if let Some(existing_type) = artifacts.get_expression_type(base_conditional) {
+                assertions.retain(|assertion| {
+                    assertion.get_type().is_none_or(|atomic| {
+                        existing_type
+                            .types
+                            .iter()
+                            .any(|existing| can_contain_null_equivalent(existing, atomic, assertion_context.codebase))
+                    })
+                });
+            }
+        }
+
+        if !assertions.is_empty() {
+            if_types.insert(var_name, vec![assertions]);
         }
     }
 
     vec![if_types]
 }
 
+fn can_contain_null_equivalent(existing: &TAtomic, value: &TAtomic, codebase: &CodebaseMetadata) -> bool {
+    if let TAtomic::GenericParameter(parameter) = existing {
+        return parameter
+            .constraint
+            .types
+            .iter()
+            .any(|existing| can_contain_null_equivalent(existing, value, codebase));
+    }
+
+    atomic_comparator::is_contained_by(codebase, value, existing, true, &mut ComparisonResult::new())
+}
+
 fn get_null_inequality_assertions<A>(
     left: &Expression,
+    is_identity: bool,
     right: &Expression,
+    artifacts: &AnalysisArtifacts,
     assertion_context: AssertionContext<'_, '_, A>,
     null_position: OtherValuePosition,
 ) -> Vec<WordMap<AssertionSet>>
 where
     A: Arena,
 {
+    if !is_identity {
+        return get_null_equality_assertions(left, false, right, artifacts, assertion_context, null_position)
+            .into_iter()
+            .map(|assertions| {
+                assertions.into_iter().map(|(key, assertions)| (key, negate_assertion_set(assertions))).collect()
+            })
+            .collect();
+    }
+
     let mut if_types = WordMap::default();
     let base_conditional = match null_position {
         OtherValuePosition::Left => right,

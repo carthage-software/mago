@@ -31,6 +31,7 @@ use crate::reconciler::Context;
 use crate::reconciler::map_generic_constraint;
 use crate::reconciler::simple_assertion_reconciler::get_acceptable_type;
 use crate::reconciler::simple_assertion_reconciler::intersect_null;
+use crate::reconciler::simple_assertion_reconciler::reconcile_non_empty_countable;
 use crate::reconciler::trigger_issue_for_impossible;
 
 pub(crate) fn reconcile<A>(
@@ -166,6 +167,9 @@ where
                     span,
                     assertion.has_equality(),
                 ));
+            }
+            TAtomic::Array(array) if array.is_empty() && matches!(assertion, Assertion::IsNotIdentical(_)) => {
+                return Some(reconcile_non_empty_countable(context, assertion, existing_var_type, key, negated, span));
             }
             TAtomic::Array(TArray::List(_)) => {
                 return Some(subtract_list_array(
