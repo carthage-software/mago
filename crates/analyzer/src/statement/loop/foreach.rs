@@ -55,6 +55,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Foreach<'arena> {
         let (always_enters_loop, mut key_type, mut value_type) =
             r#loop::analyze_iterator(context, block_context, artifacts, iterator, iterator_variable_id, self)?;
 
+        if !context.settings.analyze_dead_code
+            && artifacts.get_expression_type(iterator).is_some_and(TUnion::is_empty_array)
+        {
+            return Ok(());
+        }
+
         if key_type.is_never() {
             key_type = get_mixed();
         }
