@@ -1,3 +1,4 @@
+use std::str::from_utf8;
 use std::sync::Arc;
 
 use mago_word::concat_word;
@@ -835,7 +836,8 @@ fn strings_can_be_identical(lhs: &TString, rhs: &TString) -> bool {
     true
 }
 
-fn scalars_can_be_identical_with_coercion(first: &TAtomic, second: &TAtomic) -> bool {
+#[must_use]
+pub fn scalars_can_be_identical_with_coercion(first: &TAtomic, second: &TAtomic) -> bool {
     let (TAtomic::Scalar(first_scalar), TAtomic::Scalar(second_scalar)) = (first, second) else {
         return false;
     };
@@ -862,18 +864,28 @@ fn scalars_can_be_identical_with_coercion(first: &TAtomic, second: &TAtomic) -> 
                 if v1 == v2 {
                     true
                 } else if s1.is_numeric && s2.is_numeric {
-                    match (std::str::from_utf8(v1), std::str::from_utf8(v2)) {
-                        (Ok(str1), Ok(str2)) => match (str1.trim().parse::<f64>(), str2.trim().parse::<f64>()) {
-                            (Ok(num1), Ok(num2)) => num1 == num2,
-                            _ => false,
-                        },
+                    match (from_utf8(v1), from_utf8(v2)) {
+                        (Ok(str1), Ok(str2)) => {
+                            let str1 = str1.trim();
+                            let str2 = str2.trim();
+
+                            if let (Ok(num1), Ok(num2)) = (str1.parse::<i64>(), str2.parse::<i64>()) {
+                                num1 == num2
+                            } else {
+                                match (str1.parse::<f64>(), str2.parse::<f64>()) {
+                                    (Ok(num1), Ok(num2)) => num1 == num2,
+                                    _ => false,
+                                }
+                            }
+                        }
                         _ => false,
                     }
                 } else {
                     false
                 }
             } else {
-                false
+                s1.get_known_literal_value().is_none_or(|_| s1.is_numeric)
+                    && s2.get_known_literal_value().is_none_or(|_| s2.is_numeric)
             }
         }
         (TScalar::String(s), TScalar::ClassLikeString(cls)) | (TScalar::ClassLikeString(cls), TScalar::String(s)) => {
@@ -892,14 +904,14 @@ fn scalars_can_be_identical_with_coercion(first: &TAtomic, second: &TAtomic) -> 
         }
         (TScalar::Integer(i), TScalar::Float(f)) | (TScalar::Float(f), TScalar::Integer(i)) => {
             if let (Some(iv), Some(fv)) = (i.get_literal_value(), f.get_literal_value()) {
-                (iv as f64) == fv && (fv.fract() == 0.0 && iv == fv as i64)
+                (iv as f64) == fv
             } else {
                 true
             }
         }
         (TScalar::Integer(i), TScalar::String(s)) | (TScalar::String(s), TScalar::Integer(i)) => {
             if let Some(s_val) = s.get_known_literal_value() {
-                if let Ok(s_str) = std::str::from_utf8(s_val) {
+                if let Ok(s_str) = from_utf8(s_val) {
                     if let Ok(s_int) = s_str.trim().parse::<i64>() {
                         if let Some(i_val) = i.get_literal_value() {
                             i_val == s_int
@@ -907,11 +919,7 @@ fn scalars_can_be_identical_with_coercion(first: &TAtomic, second: &TAtomic) -> 
                             i.overlaps(TInteger::literal(s_int))
                         }
                     } else if let Ok(s_float) = s_str.trim().parse::<f64>() {
-                        if let Some(i_val) = i.get_literal_value() {
-                            (i_val as f64) == s_float && i_val == (s_float as i64)
-                        } else {
-                            true
-                        }
+                        if let Some(i_val) = i.get_literal_value() { (i_val as f64) == s_float } else { true }
                     } else {
                         false
                     }
@@ -924,7 +932,7 @@ fn scalars_can_be_identical_with_coercion(first: &TAtomic, second: &TAtomic) -> 
         }
         (TScalar::Float(f), TScalar::String(s)) | (TScalar::String(s), TScalar::Float(f)) => {
             if let Some(s_val) = s.get_known_literal_value() {
-                if let Ok(s_str) = std::str::from_utf8(s_val) {
+                if let Ok(s_str) = from_utf8(s_val) {
                     if let Ok(s_float) = s_str.trim().parse::<f64>() {
                         if let Some(f_val) = f.get_literal_value() { f_val == s_float } else { true }
                     } else {
@@ -941,7 +949,7 @@ fn scalars_can_be_identical_with_coercion(first: &TAtomic, second: &TAtomic) -> 
         | (TScalar::Integer(_) | TScalar::Float(_), TScalar::ClassLikeString(_)) => false,
         (TScalar::Numeric, TScalar::String(s)) | (TScalar::String(s), TScalar::Numeric) => {
             if let Some(s_val) = s.get_known_literal_value() {
-                if let Ok(s_str) = std::str::from_utf8(s_val) { s_str.trim().parse::<f64>().is_ok() } else { false }
+                if let Ok(s_str) = from_utf8(s_val) { s_str.trim().parse::<f64>().is_ok() } else { false }
             } else {
                 true
             }
