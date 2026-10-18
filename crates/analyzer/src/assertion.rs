@@ -53,8 +53,10 @@ use crate::context::assertion::AssertionContext;
 use crate::resolver::class_name::get_class_name_from_atomic;
 use crate::resolver::function::BuiltinNarrowingFunction;
 use crate::resolver::function::get_builtin_get_class_or_gettype_call;
+use crate::utils::expression::expression_has_observable_side_effect;
 use crate::utils::expression::get_expression_id;
 use crate::utils::expression::get_index_id;
+use crate::utils::expression::get_literal_array_key;
 use crate::utils::expression::get_non_nullsafe_expression_id;
 use crate::utils::misc::unwrap_expression;
 
@@ -173,7 +175,7 @@ where
             }
             Construct::Isset(isset_construct) => {
                 for value in &isset_construct.values {
-                    if let Some(value_id) = assertion_context.get_expression_id(value) {
+                    if let Some(value_id) = get_isset_expression_id(value, artifacts, assertion_context) {
                         if let Expression::Variable(variable) = value
                             && let Some(expression_type) = artifacts.get_expression_type(variable)
                             && !expression_type.is_mixed()
@@ -2045,6 +2047,49 @@ fn get_expression_integer_value(artifacts: &AnalysisArtifacts, expression: &Expr
         }
         _ => None,
     }
+}
+
+fn get_isset_expression_id<A>(
+    expression: &Expression,
+    artifacts: &AnalysisArtifacts,
+    assertion_context: AssertionContext<'_, '_, A>,
+) -> Option<Word> {
+    let Expression::ArrayAccess(access) = unwrap_expression(expression) else {
+        return assertion_context.get_expression_id(expression);
+    };
+
+    let array_id = get_isset_expression_id(access.array, artifacts, assertion_context)?;
+    let index_id = if let Some(key) = get_literal_array_key(access.index, artifacts) {
+        if let ArrayKey::String(value) = key
+            && memchr::memchr2(b'\'', b'\\', value.as_bytes()).is_some()
+        {
+            let mut escaped = Vec::with_capacity(value.len() + 2);
+            escaped.push(b'\'');
+            for &byte in value.as_bytes() {
+                if matches!(byte, b'\'' | b'\\') {
+                    escaped.push(b'\\');
+                }
+
+                escaped.push(byte);
+            }
+
+            escaped.push(b'\'');
+            word(&escaped)
+        } else {
+            key.id_word()
+        }
+    } else if expression_has_observable_side_effect(access.index) {
+        return None;
+    } else {
+        get_index_id(
+            access.index,
+            assertion_context.this_class_name,
+            assertion_context.resolved_names,
+            Some(assertion_context.codebase),
+        )?
+    };
+
+    Some(concat_word!(array_id.as_bytes(), b"[", index_id.as_bytes(), b"]"))
 }
 
 fn get_expression_array_key(artifacts: &AnalysisArtifacts, expression: &Expression) -> Option<ArrayKey> {

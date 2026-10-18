@@ -543,6 +543,29 @@ where
     result.filter(|entry_type| !entry_type.is_never() && !entry_type.is_mixed())
 }
 
+fn resolve_literal_array_key(array_key: &[u8]) -> Option<ArrayKey> {
+    if (array_key.starts_with(b"'") || array_key.starts_with(b"\"")) && array_key.len() >= 2 {
+        let value = &array_key[1..(array_key.len() - 1)];
+        if array_key.starts_with(b"'") && value.contains(&b'\\') {
+            let mut decoded = Vec::with_capacity(value.len());
+            let mut bytes = value.iter();
+            while let Some(&byte) = bytes.next() {
+                if byte == b'\\' && matches!(bytes.as_slice().first(), Some(b'\'' | b'\\')) {
+                    decoded.push(*bytes.next()?);
+                } else {
+                    decoded.push(byte);
+                }
+            }
+
+            return Some(ArrayKey::from_string(word(&decoded)));
+        }
+
+        return Some(ArrayKey::from_string(word(value)));
+    }
+
+    std::str::from_utf8(array_key).ok()?.parse().ok().map(ArrayKey::Integer)
+}
+
 fn adjust_array_type(
     mut key_parts: Vec<&[u8]>,
     context: &mut BlockContext<'_>,
@@ -560,9 +583,9 @@ fn adjust_array_type(
     let base_key: Vec<u8> = key_parts.iter().flat_map(|part| part.iter()).copied().collect();
     let base_key_atom = word(&base_key);
 
-    if array_key.starts_with(b"$") {
-        // When the key is a variable, we can't narrow to a specific key,
-        // but we CAN remove empty array variants since isset proves the array is non-empty.
+    let resolved_key = resolve_literal_array_key(array_key);
+
+    if resolved_key.is_none() && array_key.starts_with(b"$") {
         if let Some(existing_type) = context.locals.get(&base_key_atom).cloned()
             && existing_type.types.iter().any(|t| matches!(t, TAtomic::Array(a) if a.is_empty()))
         {
@@ -576,13 +599,8 @@ fn adjust_array_type(
         return;
     }
 
-    let mut has_string_offset = false;
-
-    let arraykey_offset = if array_key.starts_with(b"'") || array_key.starts_with(b"\"") {
-        has_string_offset = true;
-        &array_key[1..(array_key.len() - 1)]
-    } else {
-        array_key
+    let Some(dictkey) = resolved_key else {
+        return;
     };
 
     let mut existing_type = if let Some(existing_type) = context.locals.get(&base_key_atom) {
@@ -597,17 +615,6 @@ fn adjust_array_type(
     for mut base_atomic_type in atomic_types {
         match &mut base_atomic_type {
             TAtomic::Array(TArray::Keyed(TKeyedArray { known_items, .. })) => {
-                let dictkey = if has_string_offset {
-                    ArrayKey::from_string(word(arraykey_offset))
-                } else if let Some(arraykey_value) =
-                    std::str::from_utf8(arraykey_offset).ok().and_then(|s| s.parse::<i64>().ok())
-                {
-                    ArrayKey::Integer(arraykey_value)
-                } else {
-                    compatible_types.push(base_atomic_type);
-                    continue;
-                };
-
                 if let Some(known_items) = known_items {
                     let known_items = Arc::make_mut(known_items);
                     if let Some((existing_optional, existing_item_type)) = known_items.get(&dictkey) {
@@ -627,8 +634,8 @@ fn adjust_array_type(
                 }
             }
             TAtomic::Array(TArray::List(TList { known_elements, .. })) => {
-                if let Some(arraykey_offset) =
-                    std::str::from_utf8(arraykey_offset).ok().and_then(|s| s.parse::<usize>().ok())
+                if let ArrayKey::Integer(arraykey_value) = dictkey
+                    && let Ok(arraykey_offset) = usize::try_from(arraykey_value)
                 {
                     if let Some(known_elements) = known_elements.as_mut().map(Arc::make_mut) {
                         if let Some((_, existing_item_type)) = known_elements.get(&arraykey_offset) {
@@ -650,19 +657,8 @@ fn adjust_array_type(
                 }
             }
             TAtomic::Mixed(_) => {
-                let key = if has_string_offset {
-                    ArrayKey::from_string(word(arraykey_offset))
-                } else if let Some(arraykey_value) =
-                    std::str::from_utf8(arraykey_offset).ok().and_then(|s| s.parse::<i64>().ok())
-                {
-                    ArrayKey::Integer(arraykey_value)
-                } else {
-                    compatible_types.push(base_atomic_type);
-                    continue;
-                };
-
                 base_atomic_type = TAtomic::Array(TArray::Keyed(TKeyedArray {
-                    known_items: Some(BTreeMap::from([(key, (optional, result_type.clone()))]).into()),
+                    known_items: Some(BTreeMap::from([(dictkey, (optional, result_type.clone()))]).into()),
                     parameters: Some((Arc::new(get_arraykey()), Arc::new(get_mixed()))),
                     non_empty: !optional,
                     known_non_list: false,
@@ -720,17 +716,8 @@ fn adjust_array_type_remove_key(
 
     key_parts.pop();
 
-    if array_key.starts_with(b"$") {
+    let Some(dictkey) = resolve_literal_array_key(array_key) else {
         return;
-    }
-
-    let mut has_string_offset = false;
-
-    let arraykey_offset = if array_key.starts_with(b"'") || array_key.starts_with(b"\"") {
-        has_string_offset = true;
-        &array_key[1..(array_key.len() - 1)]
-    } else {
-        array_key
     };
 
     let base_key: Vec<u8> = key_parts.iter().flat_map(|part| part.iter()).copied().collect();
@@ -745,23 +732,13 @@ fn adjust_array_type_remove_key(
     for base_atomic_type in existing_type.types.to_mut() {
         match base_atomic_type {
             TAtomic::Array(TArray::Keyed(TKeyedArray { known_items, .. })) => {
-                let dictkey = if has_string_offset {
-                    ArrayKey::from_string(word(arraykey_offset))
-                } else if let Some(arraykey_value) =
-                    std::str::from_utf8(arraykey_offset).ok().and_then(|s| s.parse::<i64>().ok())
-                {
-                    ArrayKey::Integer(arraykey_value)
-                } else {
-                    continue;
-                };
-
                 if let Some(known_items) = known_items {
                     Arc::make_mut(known_items).remove(&dictkey);
                 }
             }
             TAtomic::Array(TArray::List(TList { known_elements, .. })) => {
-                if let Some(arraykey_offset) =
-                    std::str::from_utf8(arraykey_offset).ok().and_then(|s| s.parse::<usize>().ok())
+                if let ArrayKey::Integer(arraykey_value) = dictkey
+                    && let Ok(arraykey_offset) = usize::try_from(arraykey_value)
                     && let Some(known_elements) = known_elements
                 {
                     Arc::make_mut(known_elements).remove(&arraykey_offset);
@@ -985,14 +962,11 @@ fn add_nested_assertions(
                 new_base_key.push(b']');
                 let base_key_atom = word(&base_key);
                 let entry = new_types.entry(base_key_atom).or_default();
-                let new_key = if array_key.starts_with(b"'") || array_key.starts_with(b"\"") {
-                    Some(ArrayKey::from_string(word(&array_key[1..(array_key.len() - 1)])))
+
+                let new_key = if let Some(resolved_key) = resolve_literal_array_key(array_key) {
+                    Some(resolved_key)
                 } else if array_key.starts_with(b"$") {
                     None
-                } else if let Some(arraykey_value) =
-                    std::str::from_utf8(array_key).ok().and_then(|s| s.parse::<i64>().ok())
-                {
-                    Some(ArrayKey::Integer(arraykey_value))
                 } else {
                     continue 'outer;
                 };
@@ -1215,19 +1189,12 @@ where
 
             key_parts.pop();
 
-            let array_key_offset = if !array_key.is_empty() && array_key.iter().all(u8::is_ascii_digit) {
-                std::str::from_utf8(array_key).ok().and_then(|s| s.parse::<usize>().ok())
-            } else {
-                None
+            let resolved_key = resolve_literal_array_key(array_key);
+            let array_key_offset = match resolved_key {
+                Some(ArrayKey::Integer(i)) => usize::try_from(i).ok(),
+                _ => None,
             };
-
-            let array_key_type = if let Some(array_key_offset) = array_key_offset {
-                ArrayKey::Integer(array_key_offset as i64)
-            } else if array_key.starts_with(b"'") || array_key.starts_with(b"\"") {
-                ArrayKey::from_string(word(&array_key[1..(array_key.len() - 1)]))
-            } else {
-                ArrayKey::String(word(array_key))
-            };
+            let array_key_type = resolved_key.unwrap_or_else(|| ArrayKey::String(word(array_key)));
 
             let mut new_base_key = base_key.clone();
             new_base_key.push(b'[');
@@ -1253,7 +1220,7 @@ where
                             return None;
                         }
 
-                        let known_item = if !array_key.starts_with(b"$")
+                        let known_item = if resolved_key.is_some()
                             && let Some(known_items) = known_items
                         {
                             known_items.get(&array_key_type)
