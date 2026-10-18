@@ -598,7 +598,7 @@ fn adjust_array_type(
         match &mut base_atomic_type {
             TAtomic::Array(TArray::Keyed(TKeyedArray { known_items, .. })) => {
                 let dictkey = if has_string_offset {
-                    ArrayKey::String(word(arraykey_offset))
+                    ArrayKey::from_string(word(arraykey_offset))
                 } else if let Some(arraykey_value) =
                     std::str::from_utf8(arraykey_offset).ok().and_then(|s| s.parse::<i64>().ok())
                 {
@@ -651,7 +651,7 @@ fn adjust_array_type(
             }
             TAtomic::Mixed(_) => {
                 let key = if has_string_offset {
-                    ArrayKey::String(word(arraykey_offset))
+                    ArrayKey::from_string(word(arraykey_offset))
                 } else if let Some(arraykey_value) =
                     std::str::from_utf8(arraykey_offset).ok().and_then(|s| s.parse::<i64>().ok())
                 {
@@ -746,7 +746,7 @@ fn adjust_array_type_remove_key(
         match base_atomic_type {
             TAtomic::Array(TArray::Keyed(TKeyedArray { known_items, .. })) => {
                 let dictkey = if has_string_offset {
-                    ArrayKey::String(word(arraykey_offset))
+                    ArrayKey::from_string(word(arraykey_offset))
                 } else if let Some(arraykey_value) =
                     std::str::from_utf8(arraykey_offset).ok().and_then(|s| s.parse::<i64>().ok())
                 {
@@ -986,7 +986,7 @@ fn add_nested_assertions(
                 let base_key_atom = word(&base_key);
                 let entry = new_types.entry(base_key_atom).or_default();
                 let new_key = if array_key.starts_with(b"'") || array_key.starts_with(b"\"") {
-                    Some(ArrayKey::String(word(&array_key[1..(array_key.len() - 1)])))
+                    Some(ArrayKey::from_string(word(&array_key[1..(array_key.len() - 1)])))
                 } else if array_key.starts_with(b"$") {
                     None
                 } else if let Some(arraykey_value) =
@@ -1224,7 +1224,7 @@ where
             let array_key_type = if let Some(array_key_offset) = array_key_offset {
                 ArrayKey::Integer(array_key_offset as i64)
             } else if array_key.starts_with(b"'") || array_key.starts_with(b"\"") {
-                ArrayKey::String(word(&array_key[1..(array_key.len() - 1)]))
+                ArrayKey::from_string(word(&array_key[1..(array_key.len() - 1)]))
             } else {
                 ArrayKey::String(word(array_key))
             };
