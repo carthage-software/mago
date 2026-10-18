@@ -27,7 +27,6 @@ use mago_codex::ttype::atomic::scalar::float::TFloat;
 use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::atomic::scalar::string::TString;
 use mago_codex::ttype::atomic::scalar::string::TStringCasing;
-use mago_codex::ttype::atomic::scalar::string::TStringLiteral;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::atomic_comparator;
 use mago_codex::ttype::comparator::union_comparator;
@@ -50,8 +49,6 @@ use mago_codex::ttype::get_scalar;
 use mago_codex::ttype::get_string_with_props;
 use mago_codex::ttype::get_union_from_integer;
 use mago_codex::ttype::intersect_union_types;
-use mago_codex::ttype::shared::EMPTY_KEYED_ARRAY_ATOMIC;
-use mago_codex::ttype::shared::EMPTY_STRING_ATOMIC;
 use mago_codex::ttype::shared::MIXED_KEYED_ARRAY_ATOMIC;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;
@@ -433,7 +430,6 @@ where
         return get_null();
     }
 
-    let is_loose_equality = matches!(assertion, Assertion::IsEqual(_));
     let mut acceptable_types = Vec::new();
     let mut did_remove_type = false;
 
@@ -461,49 +457,6 @@ where
 
                 did_remove_type = true;
             }
-            TAtomic::Scalar(TScalar::Bool(bool_type)) if is_loose_equality => match bool_type.value {
-                Some(false) => {
-                    acceptable_types.push(atomic.clone());
-                }
-                Some(true) => {
-                    did_remove_type = true;
-                }
-                None => {
-                    acceptable_types.push(TAtomic::Scalar(TScalar::r#false()));
-                    did_remove_type = true;
-                }
-            },
-            TAtomic::Scalar(TScalar::String(string)) if is_loose_equality => {
-                if string.is_truthy || string.is_non_empty {
-                    did_remove_type = true;
-                } else if let Some(TStringLiteral::Value(val)) = string.literal {
-                    if val.as_bytes() == b"" {
-                        acceptable_types.push(atomic.clone());
-                    } else {
-                        did_remove_type = true;
-                    }
-                } else {
-                    acceptable_types.push(EMPTY_STRING_ATOMIC.clone());
-                    did_remove_type = true;
-                }
-            }
-            TAtomic::Scalar(TScalar::Generic) if is_loose_equality => {
-                acceptable_types.push(EMPTY_STRING_ATOMIC.clone());
-                acceptable_types.push(TAtomic::Scalar(TScalar::r#false()));
-                did_remove_type = true;
-            }
-            TAtomic::Scalar(TScalar::ArrayKey) if is_loose_equality => {
-                acceptable_types.push(EMPTY_STRING_ATOMIC.clone());
-                did_remove_type = true;
-            }
-            TAtomic::Array(array) if is_loose_equality => {
-                if array.is_non_empty() || array.get_minimum_size() > 0 {
-                    did_remove_type = true;
-                } else {
-                    acceptable_types.push(EMPTY_KEYED_ARRAY_ATOMIC.clone());
-                    did_remove_type = true;
-                }
-            }
             TAtomic::Object(TObject::Named(named_object)) if !named_object.has_type_parameters() => {
                 did_remove_type = true;
             }
@@ -513,17 +466,20 @@ where
         }
     }
 
-    finalize(
-        context,
-        acceptable_types,
-        did_remove_type,
-        key,
-        span,
-        existing_var_type,
-        assertion,
-        negated,
-        is_loose_equality,
-    )
+    if (acceptable_types.is_empty() || !did_remove_type)
+        && let Some(key) = key
+        && let Some(span) = span
+    {
+        let old_var_type_atom = existing_var_type.get_id();
+
+        trigger_issue_for_impossible(context, old_var_type_atom, key, assertion, !did_remove_type, negated, span);
+    }
+
+    if !acceptable_types.is_empty() {
+        return TUnion::from_vec(acceptable_types);
+    }
+
+    get_never()
 }
 
 pub(crate) fn intersect_resource<A>(
@@ -1628,7 +1584,7 @@ fn get_callable_array_shape() -> TAtomic {
     TAtomic::Array(TArray::Keyed(TKeyedArray::new().with_known_items(known_items).with_non_empty(true)))
 }
 
-fn reconcile_non_empty_countable<A>(
+pub(crate) fn reconcile_non_empty_countable<A>(
     context: &mut Context<'_, '_, A>,
     assertion: &Assertion,
     existing_var_type: &TUnion,
@@ -1684,7 +1640,7 @@ where
 
     if let Some(key) = key
         && let Some(span) = span
-        && (!did_remove_type || acceptable_types.is_empty())
+        && ((!did_remove_type && !assertion.has_equality()) || acceptable_types.is_empty())
     {
         let old_var_type_atom = existing_var_type.get_id();
 
