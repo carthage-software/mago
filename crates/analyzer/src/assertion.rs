@@ -91,6 +91,11 @@ where
     match expression {
         Expression::UnaryPrefix(UnaryPrefix { operator: UnaryPrefixOperator::Not(_), operand }) => {
             let assertions = scrape_assertions(operand, artifacts, assertion_context);
+            // Negating facts about multiple variables requires an OR across variable IDs.
+            if assertions.len() != 1 || assertions[0].len() != 1 {
+                return vec![];
+            }
+
             let mut negated_assertions = WordMap::default();
             for assertion in assertions {
                 for (var_name, assertion_set) in assertion {
@@ -884,16 +889,13 @@ where
     }
 
     if is_identity
+        && let (
+            Expression::Variable(Variable::Direct(left_variable)),
+            Expression::Variable(Variable::Direct(right_variable)),
+        ) = (unwrap_expression(left), unwrap_expression(right))
         && let (Some(left_type), Some(right_type)) =
             (artifacts.get_expression_type(&left.span()), artifacts.get_expression_type(&right.span()))
     {
-        let left_var_name = assertion_context.get_expression_id(left);
-        let right_var_name = assertion_context.get_expression_id(right);
-
-        if left_var_name.is_none() && right_var_name.is_none() {
-            return vec![];
-        }
-
         if left_type == right_type {
             return vec![];
         }
@@ -904,23 +906,23 @@ where
         if !left_overlap.is_never() && !right_overlap.is_never() {
             let mut if_types = WordMap::default();
 
-            if let Some(left_var_name) = left_var_name
-                && left_type != &left_overlap
-            {
+            if left_type != &left_overlap {
                 let left_assertions: Vec<Assertion> =
-                    left_overlap.types.iter().cloned().map(Assertion::IsIdenticalFromEquality).collect();
-                if_types.insert(left_var_name, vec![left_assertions]);
+                    left_overlap.types.iter().cloned().map(Assertion::IsIdentical).collect();
+                if_types.insert(word(left_variable.name), vec![left_assertions]);
             }
 
-            if let Some(right_var_name) = right_var_name
-                && right_type != &right_overlap
-            {
+            if right_type != &right_overlap {
                 let right_assertions: Vec<Assertion> =
-                    right_overlap.types.iter().cloned().map(Assertion::IsIdenticalFromEquality).collect();
-                if_types.insert(right_var_name, vec![right_assertions]);
+                    right_overlap.types.iter().cloned().map(Assertion::IsIdentical).collect();
+                if_types.insert(word(right_variable.name), vec![right_assertions]);
             }
 
             if !if_types.is_empty() {
+                // Keep the comparison itself: its type consequences alone are not equivalent to equality.
+                let comparison_id =
+                    Word::from(format!("*{}-{}", left.span().start.offset, right.span().end.offset).as_str());
+                if_types.insert(comparison_id, vec![vec![Assertion::Truthy]]);
                 return vec![if_types];
             }
         }

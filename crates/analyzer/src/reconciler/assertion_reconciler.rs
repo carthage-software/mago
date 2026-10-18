@@ -997,9 +997,7 @@ fn get_missing_type(assertion: &Assertion, key: Option<&[u8]>, inside_loop: bool
         return get_undefined_null();
     }
 
-    if let Assertion::IsIdentical(atomic) | Assertion::IsIdenticalFromEquality(atomic) | Assertion::IsType(atomic) =
-        assertion
-    {
+    if let Assertion::IsIdentical(atomic) | Assertion::IsType(atomic) = assertion {
         let mut atomic = atomic.clone();
         atomic.remove_placeholders();
         return wrap_atomic(atomic.clone());

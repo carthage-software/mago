@@ -83,3 +83,72 @@ function test_equal_unions(int|string $a, int|string $b): void {
     if ($a === $b) {
     }
 }
+
+function takes_true(true $_value): void {}
+
+function test_union_equality_compound_guard(int|string $a, float|string $b, bool $flag): void {
+    if ($a === $b && $flag) {
+        return;
+    }
+
+    takes_false($flag); // @mago-expect analysis:possibly-invalid-argument
+}
+
+function test_union_equality_negated_disjunction(int|string $a, float|string $b, bool $flag): void {
+    if (!($a === $b) || $flag) {
+        takes_true($flag); // @mago-expect analysis:less-specific-argument
+    }
+}
+
+function accepts_string(string $_value): bool {
+    return true;
+}
+
+function test_union_equality_composition(int|string $a, float|string $b, bool $flag): void {
+    if ($a === $b && accepts_string($a)) {
+        takes_string($b);
+    }
+
+    if ($a === $b || $flag) {
+        if (!$flag) {
+            takes_string($a);
+            takes_string($b);
+        }
+    }
+
+    if (!!(($a) === ($b))) {
+        takes_string($a);
+        takes_string($b);
+    }
+
+    if (!($a === $b)) {
+        return;
+    }
+
+    takes_string($a);
+    takes_string($b);
+}
+
+/**
+ * @param 'a'|'b' $tag
+ * @param 'a'|'b'|false $value
+ */
+function test_union_equality_loose_boolean_wrapper(string $tag, string|false $value): void {
+    if ((!($tag === $value)) == true) {
+        takes_false($value); // @mago-expect analysis:possibly-invalid-argument
+    }
+}
+
+function test_union_equality_result_assignment(int|string $a, float|string $b): void {
+    if ($a = ($a === $b)) {
+        takes_true($a);
+        takes_string($b);
+        takes_string($a); // @mago-expect analysis:invalid-argument
+    }
+}
+
+function test_union_equality_operand_assignment(int|string $x, float|string $b, int $replacement): void {
+    if (($a = $x) === ((($a = $replacement) > 0) ? $b : $b)) {
+        takes_string($a); // @mago-expect analysis:invalid-argument
+    }
+}

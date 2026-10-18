@@ -170,8 +170,7 @@ pub fn reconcile_keyed_types<'ctx, A>(
                         assertion,
                         Assertion::Truthy | Assertion::Falsy | Assertion::Empty | Assertion::NonEmpty
                     );
-                is_equality = is_equality
-                    && matches!(assertion, Assertion::IsIdentical(_) | Assertion::IsIdenticalFromEquality(_));
+                is_equality = is_equality && matches!(assertion, Assertion::IsIdentical(_));
                 has_empty = has_empty || matches!(assertion, Assertion::Empty);
                 has_inverted_isset = has_inverted_isset || matches!(assertion, Assertion::IsNotIsset);
                 has_inverted_key_exists =

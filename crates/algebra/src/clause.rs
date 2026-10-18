@@ -186,7 +186,7 @@ impl Clause {
                     Assertion::Any => concat_word!(var_name, " is any"),
                     Assertion::Falsy => concat_word!("!", var_name),
                     Assertion::Truthy => var_name,
-                    Assertion::IsType(v) | Assertion::IsIdentical(v) | Assertion::IsIdenticalFromEquality(v) => {
+                    Assertion::IsType(v) | Assertion::IsIdentical(v) => {
                         concat_word!(var_name, " is ", v.get_id())
                     }
                     Assertion::IsNotType(v) | Assertion::IsNotIdentical(v) => {
