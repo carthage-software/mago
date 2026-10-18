@@ -3,16 +3,13 @@ use std::cell::RefCell;
 use std::rc::Rc;
 
 use foldhash::HashSet;
-use memchr::memmem::find;
 
 use mago_algebra::assertion_set::AssertionSet;
 use mago_algebra::clause::Clause;
 use mago_codex::assertion::Assertion;
 use mago_codex::context::ScopeContext;
-use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::add_optional_union_type;
-use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::get_mixed;
@@ -578,46 +575,6 @@ impl<'ctx> BlockContext<'ctx> {
                 self.conditionally_referenced_variable_ids.insert(var_atom);
             }
         }
-    }
-
-    pub fn resolve_array_key(&self, array_key: &[u8], codebase: &CodebaseMetadata) -> Option<ArrayKey> {
-        if (array_key.starts_with(b"'") || array_key.starts_with(b"\"")) && array_key.len() >= 2 {
-            return Some(ArrayKey::from_string(word(&array_key[1..(array_key.len() - 1)])));
-        }
-
-        if let Some(value) = std::str::from_utf8(array_key).ok().and_then(|s| s.parse::<i64>().ok()) {
-            return Some(ArrayKey::Integer(value));
-        }
-
-        if array_key.starts_with(b"$") {
-            return self.locals.get(&word(array_key))?.get_single_array_key();
-        }
-
-        if let Some(sep) = find(array_key, b"::") {
-            if let Some(existing) = self.locals.get(&word(array_key)) {
-                if let Some(key) = existing.get_single_array_key() {
-                    return Some(key);
-                }
-            }
-
-            let class_name = &array_key[..sep];
-            let current_class = self.scope.get_class_like_name();
-            let fq_class_name = if (class_name == b"self" || class_name == b"static")
-                && let Some(current_class) = &current_class
-            {
-                current_class.as_bytes()
-            } else {
-                class_name
-            };
-
-            let fq_class_name = fq_class_name.strip_prefix(b"\\").unwrap_or(fq_class_name);
-            let const_name = &array_key[sep + 2..];
-            if let Some(constant_type) = codebase.get_class_constant_type(fq_class_name, const_name) {
-                return constant_type.get_single_array_key();
-            }
-        }
-
-        None
     }
 
     pub(crate) fn remove_variable<'arena, A>(

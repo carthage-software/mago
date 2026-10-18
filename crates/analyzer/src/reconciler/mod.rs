@@ -119,7 +119,7 @@ pub fn reconcile_keyed_types<'ctx, A>(
         }
     }
 
-    add_nested_assertions(&mut new_types, &mut active_new_types, block_context, context.codebase);
+    add_nested_assertions(&mut new_types, &mut active_new_types, block_context);
     if new_types.len() > 1 {
         new_types
             .to_mut()
@@ -543,6 +543,29 @@ where
     result.filter(|entry_type| !entry_type.is_never() && !entry_type.is_mixed())
 }
 
+fn resolve_literal_array_key(array_key: &[u8]) -> Option<ArrayKey> {
+    if (array_key.starts_with(b"'") || array_key.starts_with(b"\"")) && array_key.len() >= 2 {
+        let value = &array_key[1..(array_key.len() - 1)];
+        if array_key.starts_with(b"'") && value.contains(&b'\\') {
+            let mut decoded = Vec::with_capacity(value.len());
+            let mut bytes = value.iter();
+            while let Some(&byte) = bytes.next() {
+                if byte == b'\\' && matches!(bytes.as_slice().first(), Some(b'\'' | b'\\')) {
+                    decoded.push(*bytes.next()?);
+                } else {
+                    decoded.push(byte);
+                }
+            }
+
+            return Some(ArrayKey::from_string(word(&decoded)));
+        }
+
+        return Some(ArrayKey::from_string(word(value)));
+    }
+
+    std::str::from_utf8(array_key).ok()?.parse().ok().map(ArrayKey::Integer)
+}
+
 fn adjust_array_type(
     mut key_parts: Vec<&[u8]>,
     context: &mut BlockContext<'_>,
@@ -560,7 +583,7 @@ fn adjust_array_type(
     let base_key: Vec<u8> = key_parts.iter().flat_map(|part| part.iter()).copied().collect();
     let base_key_atom = word(&base_key);
 
-    let resolved_key = context.resolve_array_key(array_key, codebase);
+    let resolved_key = resolve_literal_array_key(array_key);
 
     if resolved_key.is_none() && array_key.starts_with(b"$") {
         if let Some(existing_type) = context.locals.get(&base_key_atom).cloned()
@@ -693,7 +716,7 @@ fn adjust_array_type_remove_key(
 
     key_parts.pop();
 
-    let Some(dictkey) = context.resolve_array_key(array_key, codebase) else {
+    let Some(dictkey) = resolve_literal_array_key(array_key) else {
         return;
     };
 
@@ -861,7 +884,6 @@ fn add_nested_assertions(
     new_types: &mut Cow<'_, AssertionMap<Word, AssertionSet>>,
     active_new_types: &mut AssertionMap<Word, HashSet<usize>>,
     context: &BlockContext<'_>,
-    codebase: &CodebaseMetadata,
 ) {
     let nested_assertions = new_types
         .iter()
@@ -941,7 +963,7 @@ fn add_nested_assertions(
                 let base_key_atom = word(&base_key);
                 let entry = new_types.entry(base_key_atom).or_default();
 
-                let new_key = if let Some(resolved_key) = context.resolve_array_key(array_key, codebase) {
+                let new_key = if let Some(resolved_key) = resolve_literal_array_key(array_key) {
                     Some(resolved_key)
                 } else if array_key.starts_with(b"$") {
                     None
@@ -1167,7 +1189,7 @@ where
 
             key_parts.pop();
 
-            let resolved_key = block_context.resolve_array_key(array_key, context.codebase);
+            let resolved_key = resolve_literal_array_key(array_key);
             let array_key_offset = match resolved_key {
                 Some(ArrayKey::Integer(i)) => usize::try_from(i).ok(),
                 _ => None,
