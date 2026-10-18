@@ -165,6 +165,7 @@ public function bar(
 
 | Option | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
+| `disable-argument-hugging` | boolean | `false` | Disable argument hugging except for positional arrays and closures; calls that fit remain inline. |
 | `always-break-named-arguments-list` | boolean | `false` | Always break named-argument lists. |
 | `always-break-attribute-named-argument-lists` | boolean | `false` | Always break named arguments in attributes. |
 | `align-parameters` | boolean | `false` | Column-align multi-line parameter lists by the variable. |

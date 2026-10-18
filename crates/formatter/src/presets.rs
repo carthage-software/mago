@@ -159,6 +159,7 @@ const DEFAULT_PRESET: FormatSettings = FormatSettings {
     omit_redundant_arithmetic_binary_expression_parentheses: false,
     omit_redundant_bitwise_binary_expression_parentheses: false,
     preserve_redundant_logical_binary_expression_parentheses: false,
+    disable_argument_hugging: false,
     always_break_named_arguments_list: false,
     always_break_attribute_named_argument_lists: false,
     align_named_arguments: false,

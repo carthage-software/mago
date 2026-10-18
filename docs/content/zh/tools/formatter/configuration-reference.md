@@ -164,6 +164,7 @@ public function bar(
 
 | 选项 | 类型 | 默认值 | 说明 |
 | :--- | :--- | :--- | :--- |
+| `disable-argument-hugging` | 布尔值 | `false` | 禁用实参紧贴括号排版，但保留位置实参中的数组和闭包；可在一行内放下的调用保持单行。 |
 | `always-break-named-arguments-list` | 布尔值 | `false` | 始终对命名实参列表换行。 |
 | `always-break-attribute-named-argument-lists` | 布尔值 | `false` | 始终对 attribute 中的命名实参换行。 |
 | `align-parameters` | 布尔值 | `false` | 按变量进行多行形参列表的列对齐。 |

@@ -260,7 +260,8 @@ where
         can_expand_first_or_last && !force_break && should_expand_first_arg(f, argument_list, false);
     let should_expand_last =
         can_expand_first_or_last && !force_break && should_expand_last_arg(f, argument_list, false);
-    let is_single_late_breaking_argument = !force_break && is_single_late_breaking_argument(f, argument_list);
+    let is_single_late_breaking_argument =
+        !f.settings.disable_argument_hugging && !force_break && is_single_late_breaking_argument(f, argument_list);
     let named_argument_width = if should_align_named_arguments(f, argument_list, should_break_all, should_inline) {
         Some(get_max_named_argument_width(argument_list))
     } else {
@@ -777,6 +778,34 @@ where
 {
     let arguments = argument_list.arguments.as_slice();
 
+    if f.settings.disable_argument_hugging {
+        return match arguments {
+            [argument] => {
+                argument.is_positional()
+                    && !argument_has_surrounding_comments(f, argument)
+                    && argument.value().is_some_and(|value| {
+                        matches!(
+                            unwrap_parenthesized(value),
+                            Expression::Array(_) | Expression::LegacyArray(_) | Expression::Closure(_)
+                        ) && should_hug_expression(f, value, false)
+                    })
+            }
+            [first, last] => {
+                !argument_has_surrounding_comments(f, first)
+                    && !argument_has_surrounding_comments(f, last)
+                    && first.value().is_some_and(|value| is_simple_single_line_expression(f, value))
+                    && last.is_positional()
+                    && last.value().is_some_and(|value| {
+                        matches!(
+                            unwrap_parenthesized(value),
+                            Expression::Array(_) | Expression::LegacyArray(_) | Expression::Closure(_)
+                        )
+                    })
+            }
+            _ => false,
+        };
+    }
+
     match arguments.len() {
         1 => {
             !argument_has_surrounding_comments(f, &arguments[0])
@@ -884,6 +913,18 @@ where
         return false;
     };
 
+    let (first_value, second_value) = if f.settings.disable_argument_hugging {
+        (unwrap_parenthesized(first_value), unwrap_parenthesized(second_value))
+    } else {
+        (first_value, second_value)
+    };
+
+    if f.settings.disable_argument_hugging
+        && (!first_argument.is_positional() || !matches!(first_value, Expression::Closure(_)))
+    {
+        return false;
+    }
+
     could_expand_value(f, first_value, nested_args)
         && is_hopefully_short_call_argument(second_value)
         && !could_expand_value(f, second_value, nested_args)
@@ -904,6 +945,22 @@ where
     }
 
     let Some(last_argument_value) = last_argument.value() else { return false };
+    let last_argument_value = if f.settings.disable_argument_hugging {
+        unwrap_parenthesized(last_argument_value)
+    } else {
+        last_argument_value
+    };
+
+    if f.settings.disable_argument_hugging
+        && (!last_argument.is_positional()
+            || !matches!(
+                last_argument_value,
+                Expression::Array(_) | Expression::LegacyArray(_) | Expression::Closure(_)
+            ))
+    {
+        return false;
+    }
+
     let penultimate_argument = if argument_list.arguments.len() >= 2 {
         argument_list.arguments.get(argument_list.arguments.len() - 2)
     } else {
@@ -912,7 +969,9 @@ where
 
     let penultimate_argument_comments =
         penultimate_argument.is_some_and(|a| f.has_comment(a.span(), CommentFlags::LEADING | CommentFlags::TRAILING));
-    let penultimate_argument_value = penultimate_argument.and_then(|argument| argument.value());
+    let penultimate_argument_value = penultimate_argument
+        .and_then(|argument| argument.value())
+        .map(|value| if f.settings.disable_argument_hugging { unwrap_parenthesized(value) } else { value });
 
     could_expand_value(f, last_argument_value, nested_args)
         // If the last two arguments are of the same type,

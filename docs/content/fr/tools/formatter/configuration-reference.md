@@ -164,6 +164,7 @@ public function bar(
 
 | Option | Type | Défaut | Description |
 | :--- | :--- | :--- | :--- |
+| `disable-argument-hugging` | booléen | `false` | Désactiver le regroupement des arguments, sauf pour les tableaux et fermetures positionnels ; les appels qui tiennent sur une ligne restent en ligne. |
 | `always-break-named-arguments-list` | booléen | `false` | Toujours casser les listes d'arguments nommés. |
 | `always-break-attribute-named-argument-lists` | booléen | `false` | Toujours casser les arguments nommés dans les attributs. |
 | `align-parameters` | booléen | `false` | Aligner en colonnes les listes de paramètres multi-lignes par variable. |

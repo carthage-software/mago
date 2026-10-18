@@ -57,6 +57,10 @@ macro_rules! test_case {
 }
 
 // Test cases
+test_case!(disable_argument_hugging);
+test_case!(disable_argument_hugging_default_off);
+test_case!(disable_argument_hugging_narrow);
+test_case!(disable_argument_hugging_narrow_default_off);
 test_case!(leading_comment_with_missing_prefix);
 test_case!(docblock_before_function_declaration);
 test_case!(inline_single_breaking_value_argument);

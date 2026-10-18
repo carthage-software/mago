@@ -658,6 +658,16 @@ generate_formatter_settings! {
     /// Default: false
     preserve_redundant_logical_binary_expression_parentheses: bool => "default_false",
 
+    /// Whether to disable argument hugging for expressions other than positional arrays and closures.
+    ///
+    /// When enabled, calls that exceed the print width break around nested calls, instantiations,
+    /// and other expressions instead of keeping the outer parentheses inline. Calls that fit on
+    /// one line remain inline. Positional arrays and closures can still hug the call parentheses,
+    /// including a last array or a first or last closure in a multi-argument call.
+    ///
+    /// Default: false
+    disable_argument_hugging: bool => "default_false",
+
     /// Whether to always break named argument lists into multiple lines.
     ///
     /// When enabled:
