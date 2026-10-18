@@ -170,7 +170,25 @@ pub(crate) fn is_array_contained_by_array(
 
             if !*container_is_optional {
                 if !input_has_key {
-                    if input_value_type.is_never() {
+                    let key_is_guaranteed = match (input_array, container_key) {
+                        (TArray::List(list), ArrayKey::Integer(index)) => usize::try_from(index).is_ok_and(|index| {
+                            index < input_array.get_minimum_size()
+                                || list
+                                    .known_elements
+                                    .as_ref()
+                                    .is_some_and(|elements| elements.range(index..).any(|(_, (optional, _))| !optional))
+                        }),
+                        (TArray::Keyed(_), _) => {
+                            input_array.is_non_empty()
+                                && !input_array.has_known_items()
+                                && input_key_type
+                                    .as_ref()
+                                    .is_some_and(|key_type| key_type.get_single_array_key() == Some(container_key))
+                        }
+                        _ => false,
+                    };
+
+                    if input_value_type.is_never() || !key_is_guaranteed {
                         return false;
                     }
 

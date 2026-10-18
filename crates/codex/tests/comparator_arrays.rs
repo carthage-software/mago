@@ -4,6 +4,109 @@ use comparator_common::*;
 
 use std::collections::BTreeMap;
 
+use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::atomic::array::TArray;
+use mago_codex::ttype::intersect_union_types;
+
+#[test]
+fn generic_array_does_not_guarantee_required_shape_keys() {
+    let shape = t_keyed_with_both(
+        u(t_string()),
+        u(t_int()),
+        BTreeMap::from([(ak_str("required"), (false, u(t_int())))]),
+        false,
+    );
+
+    for non_empty in [false, true] {
+        let generic = t_keyed_unsealed(u(t_string()), u(t_int()), non_empty);
+        assert_atomic_not_subtype(&generic, &shape);
+    }
+}
+
+#[test]
+fn generic_array_can_satisfy_optional_shape_keys() {
+    let shape =
+        t_keyed_with_both(u(t_string()), u(t_int()), BTreeMap::from([(ak_str("optional"), (true, u(t_int())))]), false);
+
+    assert_atomic_subtype(&t_keyed_unsealed(u(t_string()), u(t_int()), false), &shape);
+    assert_atomic_not_subtype(&t_keyed_unsealed(u(t_string()), u(t_string()), false), &shape);
+}
+
+#[test]
+fn open_shape_does_not_guarantee_other_required_keys() {
+    let input =
+        t_keyed_with_both(u(t_string()), u(t_int()), BTreeMap::from([(ak_str("other"), (false, u(t_int())))]), false);
+    let container = t_keyed_with_both(
+        u(t_string()),
+        u(t_int()),
+        BTreeMap::from([(ak_str("required"), (false, u(t_int())))]),
+        false,
+    );
+
+    assert_atomic_not_subtype(&input, &container);
+}
+
+#[test]
+fn array_intersection_keeps_required_shape_keys() {
+    let codebase = empty_codebase();
+    let generic = u(t_keyed_unsealed(u(t_string()), u(t_int()), false));
+    let shape = u(t_keyed_with_both(
+        u(t_string()),
+        u(t_int()),
+        BTreeMap::from([(ak_str("required"), (false, u(t_int())))]),
+        false,
+    ));
+
+    assert_eq!(intersect_union_types(&generic, &shape, &codebase), Some(shape.clone()));
+    assert_eq!(intersect_union_types(&shape, &generic, &codebase), Some(shape));
+}
+
+#[test]
+fn non_empty_list_guarantees_only_its_first_index() {
+    for (key, expected) in [(ak_int(0), true), (ak_int(1), false), (ak_str("required"), false)] {
+        let shape =
+            t_keyed_with_both(u(t_array_key()), u(t_int()), BTreeMap::from([(key, (false, u(t_int())))]), false);
+
+        assert_atomic_not_subtype(&t_list(u(t_int()), false), &shape);
+        assert_eq!(atomic_is_contained(&t_list(u(t_int()), true), &shape, &empty_codebase()), expected);
+    }
+}
+
+#[test]
+fn non_empty_array_with_one_possible_key_guarantees_that_key() {
+    let shape = t_keyed_with_both(
+        u(t_string()),
+        u(t_int()),
+        BTreeMap::from([(ak_str("required"), (false, u(t_int())))]),
+        false,
+    );
+
+    assert_atomic_subtype(&t_keyed_unsealed(us("required"), u(t_int()), true), &shape);
+    assert_atomic_not_subtype(&t_keyed_unsealed(us("required"), u(t_int()), false), &shape);
+    assert_atomic_not_subtype(&t_keyed_unsealed(us("other"), u(t_int()), true), &shape);
+    assert_atomic_not_subtype(
+        &t_keyed_with_both(us("required"), u(t_int()), BTreeMap::from([(ak_str("other"), (false, u(t_int())))]), true),
+        &shape,
+    );
+}
+
+#[test]
+fn known_list_index_guarantees_earlier_indices() {
+    let mut input = t_list(u(t_int()), false);
+    let TAtomic::Array(TArray::List(list)) = &mut input else {
+        panic!("Expected a list");
+    };
+
+    list.known_elements = Some(BTreeMap::from([(2, (false, u(t_int())))]).into());
+
+    for index in 0..4 {
+        let shape =
+            t_keyed_with_both(u(t_int()), u(t_int()), BTreeMap::from([(ak_int(index), (false, u(t_int())))]), false);
+
+        assert_eq!(atomic_is_contained(&input, &shape, &empty_codebase()), index <= 2);
+    }
+}
+
 #[test]
 fn empty_in_empty() {
     assert_atomic_subtype(&t_empty_array(), &t_empty_array());
