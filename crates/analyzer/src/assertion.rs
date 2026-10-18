@@ -1,5 +1,6 @@
 use mago_allocator::Arena;
 use std::cmp::Ordering;
+use std::collections::BTreeSet;
 
 use mago_algebra::assertion_set::AssertionSet;
 use mago_algebra::assertion_set::negate_assertion_set;
@@ -528,7 +529,7 @@ where
                     .arguments
                     .get(2)
                     .and_then(|argument| artifacts.get_expression_type(argument.value()))
-                    .is_some_and(mago_codex::ttype::union::TUnion::is_true);
+                    .is_some_and(TUnion::is_true);
 
                 if !should_strict_check {
                     return None;
@@ -542,21 +543,82 @@ where
                     .and_then(|expr| artifacts.get_expression_type(expr))?;
 
                 let mut value_types = None;
+                let mut required_values: Option<BTreeSet<TAtomic>> = None;
                 for atomic in checked_array.types.as_ref() {
                     let TAtomic::Array(array) = atomic else {
                         return None;
                     };
 
+                    let array_value_type = get_array_value_parameter(array, assertion_context.codebase);
+                    let mut array_required_values = BTreeSet::new();
+                    let mut add_required_value = |value_type: &TUnion| {
+                        if !value_type.is_single() {
+                            return;
+                        }
+
+                        let value = value_type.get_single();
+                        if value.is_literal()
+                            || value.is_literal_class_string()
+                            || matches!(value, TAtomic::Object(TObject::Enum(r#enum)) if r#enum.case.is_some())
+                        {
+                            array_required_values.insert(value.clone());
+                        }
+                    };
+
+                    if array.is_non_empty() {
+                        add_required_value(&array_value_type);
+                    }
+
+                    match array {
+                        TArray::Keyed(keyed) => {
+                            if let Some(items) = keyed.get_known_items() {
+                                for (optional, value_type) in items.values() {
+                                    if !optional {
+                                        add_required_value(value_type);
+                                    }
+                                }
+                            }
+                        }
+                        TArray::List(list) => {
+                            if let Some(items) = list.get_known_elements() {
+                                for (optional, value_type) in items.values() {
+                                    if !optional {
+                                        add_required_value(value_type);
+                                    }
+                                }
+                            }
+                        }
+                    }
+
+                    if let Some(required_values) = &mut required_values {
+                        required_values.retain(|value| array_required_values.contains(value));
+                    } else {
+                        required_values = Some(array_required_values);
+                    }
+
                     value_types = Some(add_optional_union_type(
-                        get_array_value_parameter(array, assertion_context.codebase),
+                        array_value_type,
                         value_types.as_ref(),
                         assertion_context.codebase,
                     ));
                 }
 
-                let mut value_assertions = vec![];
-                for atomic in value_types?.types.into_owned() {
-                    value_assertions.push(Assertion::IsIdentical(atomic));
+                let value_types = value_types?;
+                let required_values = required_values?;
+                let has_unknown_values = value_types.types.iter().any(|value| !required_values.contains(value));
+                let mut value_assertions = required_values
+                    .into_iter()
+                    .map(|value| {
+                        if matches!(value, TAtomic::Object(TObject::Enum(_))) {
+                            Assertion::IsType(value)
+                        } else {
+                            Assertion::IsIdentical(value)
+                        }
+                    })
+                    .collect::<Vec<_>>();
+
+                if has_unknown_values {
+                    value_assertions.insert(0, Assertion::InArray(value_types));
                 }
 
                 Some((0, value_assertions))

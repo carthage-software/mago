@@ -18,7 +18,6 @@ use mago_codex::ttype::atomic::scalar::bool::TBool;
 use mago_codex::ttype::atomic::scalar::float::TFloat;
 use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::comparator::union_comparator;
-use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::get_undefined_null;
 use mago_codex::ttype::intersect_union_types;
@@ -1465,7 +1464,7 @@ where
         trigger_issue_for_impossible(context, existing_var_type.get_id(), key, assertion, true, negated, pos);
     }
 
-    get_mixed()
+    existing_var_type.clone()
 }
 
 fn reconcile_no_array_key<A>(

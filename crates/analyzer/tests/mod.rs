@@ -2907,6 +2907,7 @@ test_case!(strict_in_array_int_haystack_string_coercion);
 test_case!(short_circuit_assignment_type_propagation);
 test_case!(isset_literal_variable_array_key_narrowing);
 test_case!(loose_null_equality_narrowing_drops_falsy_strings);
+test_case!(in_array_possible_and_required_values);
 
 #[test]
 fn issue_2478_without_property_memoization() {
