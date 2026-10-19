@@ -9,7 +9,6 @@ use mago_algebra::disjoin_clauses;
 use mago_algebra::negate_formula;
 use mago_codex::assertion::Assertion;
 use mago_codex::ttype::atomic::TAtomic;
-use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::cst::*;
@@ -77,15 +76,7 @@ where
     A: Arena,
 {
     if let Some(var_name) = assertion_context.get_expression_id(other_side) {
-        let matches_literal = is_identical == literal_is_true;
-        let assertion = if artifacts.get_expression_type(other_side).is_some_and(|ty| ty.is_bool()) {
-            if matches_literal { Assertion::Truthy } else { Assertion::Falsy }
-        } else {
-            let literal_atomic =
-                if literal_is_true { TAtomic::Scalar(TScalar::r#true()) } else { TAtomic::Scalar(TScalar::r#false()) };
-
-            if is_identical { Assertion::IsType(literal_atomic) } else { Assertion::IsNotType(literal_atomic) }
-        };
+        let assertion = if is_identical == literal_is_true { Assertion::Truthy } else { Assertion::Falsy };
 
         let mut clause_map = AssertionMap::default();
         let mut type_map = AssertionMap::default();
@@ -166,6 +157,20 @@ where
     let expression = unwrap_expression(conditional);
 
     if let Expression::Binary(binary) = expression {
+        if binary.operator.is_null_coalesce()
+            && artifacts.get_expression_type(binary.rhs).is_some_and(|ty| ty.is_always_falsy())
+        {
+            return get_base_formula(
+                binary.lhs.span(),
+                binary.lhs.span(),
+                binary.lhs,
+                assertion_context,
+                artifacts,
+                algebra_thresholds,
+                formula_size_threshold,
+            );
+        }
+
         if matches!(binary.operator, BinaryOperator::And(_) | BinaryOperator::LowAnd(_)) {
             return handle_binary_and_operation(
                 conditional_object_id,
@@ -221,7 +226,9 @@ where
                 _ => None,
             };
 
-            if let Some((other_side, literal_is_true)) = boolean_comparison {
+            if let Some((other_side, literal_is_true)) = boolean_comparison
+                && artifacts.get_expression_type(other_side).is_some_and(|ty| ty.is_bool())
+            {
                 let mut formula = get_boolean_literal_comparison_formula(
                     conditional_object_id,
                     creating_object_id,
