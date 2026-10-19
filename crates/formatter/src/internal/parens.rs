@@ -510,6 +510,14 @@ where
             return false;
         };
 
+        if matches!(expression, Expression::Call(_))
+            && let Node::Binary(binary) = self.parent_node()
+            && matches!(binary.operator, BinaryOperator::Instanceof(_))
+            && expression.start_offset() > binary.operator.start_offset()
+        {
+            return true;
+        }
+
         if let Some(Node::PartialApplication(partial_application)) = self.grandparent_node() {
             if let PartialApplication::Function(_) = partial_application {
                 return self.function_callee_expression_need_parenthesis(expression);
