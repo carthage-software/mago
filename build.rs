@@ -10,6 +10,18 @@ pub fn main() -> io::Result<()> {
     println!("cargo:rustc-env=TARGET={}", std::env::var("TARGET").unwrap());
     println!("cargo:rerun-if-changed=crates/prelude/assets");
     println!("cargo:rerun-if-changed=build.rs");
+    println!("cargo:rerun-if-env-changed=CARGO_ENCODED_RUSTFLAGS");
+    println!("cargo:rustc-check-cfg=cfg(mago_instrumented)");
+
+    let rustflags = std::env::var("CARGO_ENCODED_RUSTFLAGS").unwrap_or_default();
+    if rustflags.split('\x1f').any(|flag| {
+        let flag = flag.strip_prefix("-C").or_else(|| flag.strip_prefix("--codegen=")).unwrap_or(flag);
+        let name = flag.split('=').next().unwrap_or_default();
+
+        matches!(name, "profile-generate" | "instrument-coverage")
+    }) {
+        println!("cargo:rustc-cfg=mago_instrumented");
+    }
 
     let out_dir = std::env::var("OUT_DIR").expect("OUT_DIR environment variable not set");
     let out_dir = Path::new(&out_dir);

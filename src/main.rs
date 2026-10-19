@@ -150,14 +150,14 @@ pub fn main() -> ExitCode {
         trace!("total process time: {:?}", main_start.elapsed());
     }
 
-    #[cfg(all(unix, not(feature = "dhat-heap")))]
+    #[cfg(all(unix, not(any(feature = "dhat-heap", mago_instrumented))))]
     exit_without_teardown(code);
 
     code
 }
 
 /// Exits right away, leaving memory and other process resources for the OS to reclaim.
-#[cfg(all(unix, not(feature = "dhat-heap")))]
+#[cfg(all(unix, not(any(feature = "dhat-heap", mago_instrumented))))]
 fn exit_without_teardown(code: ExitCode) {
     use std::io::Write;
 

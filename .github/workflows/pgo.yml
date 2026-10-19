@@ -1,0 +1,83 @@
+name: PGO Build
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  pgo:
+    name: ${{ matrix.target }}
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - { os: ubuntu-latest, target: x86_64-unknown-linux-musl }
+          - { os: macos-latest, target: aarch64-apple-darwin }
+          - { os: macos-latest, target: x86_64-apple-darwin }
+
+    defaults:
+      run:
+        shell: bash
+
+    env:
+      TARGET: ${{ matrix.target }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install musl tools
+        if: runner.os == 'Linux'
+        run: sudo apt-get update && sudo apt-get install -y musl-tools
+
+      - name: Install Rust toolchain
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.target }}
+          components: llvm-tools-preview
+
+      - name: Cache Rust dependencies
+        uses: Swatinem/rust-cache@v2
+        with:
+          key: pgo-${{ matrix.target }}
+
+      - name: Install cargo-pgo
+        run: cargo install cargo-pgo --locked --version 0.3.0
+
+      - name: Configure build
+        run: |
+          if [[ "$RUNNER_OS" == "macOS" ]]; then
+            echo "CFLAGS=-fno-profile-generate -fno-profile-use" >> "$GITHUB_ENV"
+          fi
+          echo "MAGO_BINARY=target/$TARGET/release/mago" >> "$GITHUB_ENV"
+
+      - name: Build instrumented binary
+        run: cargo pgo build -- --locked --target="$TARGET"
+
+      - name: Collect profiles on success and failure
+        run: |
+          "$MAGO_BINARY" --no-version-check --workspace tests/fixtures/pgo --config tests/fixtures/pgo/mago.toml analyze clean.php --reporting-format count
+          test -n "$(find target/pgo-profiles -type f -name '*.profraw' -size +0c -print -quit)"
+          find target/pgo-profiles -type f -name '*.profraw' -delete
+
+          status=0
+          "$MAGO_BINARY" --no-version-check --workspace tests/fixtures/pgo --config tests/fixtures/pgo/mago.toml analyze invalid.php --reporting-format count || status=$?
+          test "$status" -eq 1
+          test -n "$(find target/pgo-profiles -type f -name '*.profraw' -size +0c -print -quit)"
+
+      - name: Build optimized binary
+        run: cargo pgo optimize build -- --locked --target="$TARGET"
+
+      - name: Check optimized binary
+        run: |
+          "$MAGO_BINARY" --no-version-check --workspace tests/fixtures/pgo --config tests/fixtures/pgo/mago.toml analyze clean.php --reporting-format count
+          status=0
+          "$MAGO_BINARY" --no-version-check --workspace tests/fixtures/pgo --config tests/fixtures/pgo/mago.toml analyze invalid.php --reporting-format count || status=$?
+          test "$status" -eq 1
