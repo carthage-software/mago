@@ -694,7 +694,7 @@ async fn unfinished_control_heads_publish_only_their_parse_errors() {
             ("if (true", unclosed),
             ("if ($a) {} elseif ($a", unclosed),
             ("while ($a", unclosed),
-            ("while ($kind === Kind::Alpha", (unclosed.0, unclosed.1, "Unexpected end of file")),
+            ("while ($kind === Kind::Alpha", unclosed),
             ("do {} while ($a", unclosed),
             ("switch ($a", unclosed),
             ("if ($this->", member),
