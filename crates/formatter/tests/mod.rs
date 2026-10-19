@@ -555,6 +555,7 @@ test_case!(issue_2491_logical_assignment);
 test_case!(issue_2524_argument_list);
 test_case!(issue_2524_binary_expression);
 test_case!(issue_2584);
+test_case!(issue_2588);
 test_case!(idempotency_docblock_before_parameter);
 test_case!(idempotency_html_echo_ternary_break);
 test_case!(idempotency_inline_echo_mid_line_call);
