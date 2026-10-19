@@ -293,7 +293,8 @@ impl AnalysisService {
         )
         // We only need file signatures if there's a custom plugin that can inspect them,
         // so just don't bother computing them here
-        .with_file_signatures(self.plugin_registry.has_custom_plugins());
+        .with_file_signatures(self.plugin_registry.has_custom_plugins())
+        .with_project_references(retain_project_references);
 
         let plugin_registry = Arc::clone(&self.plugin_registry);
         let before_plugin_registry = Arc::clone(&self.plugin_registry);
@@ -518,17 +519,16 @@ impl Reducer<AnalysisTaskResult, AnalysisResult> for AnalysisResultReducer {
         results: Vec<AnalysisTaskResult>,
     ) -> Result<AnalysisResult, OrchestratorError> {
         let mut aggregated_result = AnalysisResult::new(symbol_references);
-        let codebase_issues = codebase.take_issues(true);
-        aggregated_result
-            .issues
-            .reserve(codebase_issues.len() + results.iter().map(|result| result.result.issues.len()).sum::<usize>());
+        let mut issues = Vec::with_capacity(results.len() + 1);
         let mut snapshots = Vec::new();
-        for result in results {
+        for mut result in results {
+            issues.push(std::mem::take(&mut result.result.issues));
             aggregated_result.extend(result.result);
             snapshots.extend(result.snapshot);
         }
 
-        aggregated_result.issues.extend(codebase_issues);
+        issues.push(codebase.take_issues(true));
+        aggregated_result.issues = IssueCollection::concat(issues);
         let after_file = self.plugin_registry.has_external_after_file_analysis_hooks().map_err(AnalysisError::from)?;
         if after_file {
             #[cfg(not(target_arch = "wasm32"))]

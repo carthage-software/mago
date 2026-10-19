@@ -20,6 +20,7 @@ use std::str::FromStr;
 
 use foldhash::HashMap;
 use foldhash::HashMapExt;
+use rayon::prelude::*;
 use regex::Regex;
 use schemars::JsonSchema;
 use strum::Display;
@@ -232,6 +233,7 @@ pub struct Issue {
 /// A collection of issues.
 #[derive(Debug, Clone, Eq, PartialEq)]
 #[cfg_attr(feature = "serde", derive(serde::Serialize, serde::Deserialize))]
+#[allow(clippy::unsafe_derive_deserialize)]
 pub struct IssueCollection {
     issues: Vec<Issue>,
 }
@@ -746,6 +748,31 @@ impl IssueCollection {
         Self { issues: issues.into_iter().collect() }
     }
 
+    /// Joins `collections` in order, moving each into place in parallel.
+    #[must_use]
+    pub fn concat(collections: Vec<IssueCollection>) -> Self {
+        let total = collections.iter().map(IssueCollection::len).sum();
+        let mut issues = Vec::with_capacity(total);
+        let mut slots = issues.spare_capacity_mut();
+        let mut parts = Vec::with_capacity(collections.len());
+        for collection in collections {
+            let (head, tail) = slots.split_at_mut(collection.len());
+            parts.push((head, collection.issues));
+            slots = tail;
+        }
+
+        parts.into_par_iter().for_each(|(slots, source)| {
+            for (slot, issue) in slots.iter_mut().zip(source) {
+                slot.write(issue);
+            }
+        });
+
+        // SAFETY: the parts cover the first `total` slots, and each part wrote every slot it holds.
+        unsafe { issues.set_len(total) };
+
+        Self { issues }
+    }
+
     pub fn push(&mut self, issue: Issue) {
         self.issues.push(issue);
     }
@@ -989,6 +1016,17 @@ mod tests {
         assert_eq!(Level::Warning.downgrade(), Level::Help);
         assert_eq!(Level::Help.downgrade(), Level::Note);
         assert_eq!(Level::Note.downgrade(), Level::Note);
+    }
+
+    #[test]
+    pub fn test_issue_collection_concat_keeps_order() {
+        let collections: Vec<IssueCollection> = (0..300usize)
+            .map(|part| IssueCollection::from((0..part % 7).map(|index| Issue::error(format!("{part}:{index}")))))
+            .collect();
+        let expected: Vec<Issue> = collections.iter().flat_map(IssueCollection::iter).cloned().collect();
+
+        assert_eq!(IssueCollection::concat(collections).into_iter().collect::<Vec<_>>(), expected);
+        assert!(IssueCollection::concat(Vec::new()).is_empty());
     }
 
     #[test]

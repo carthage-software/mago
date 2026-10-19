@@ -1,9 +1,15 @@
+use std::cmp::Reverse;
+use std::collections::BinaryHeap;
+
 use mago_word::Word;
 use mago_word::word;
 
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
 use crate::ttype::union::TUnion;
+
+// Limit to prevent combinatorial explosion (max 20 values = ~1M combinations)
+const MAX_MASK_VALUES: usize = 20;
 
 /// Represents `int-mask<1, 2, 4>` utility type.
 ///
@@ -44,9 +50,7 @@ impl TIntMask {
             return vec![0];
         }
 
-        // Limit to prevent combinatorial explosion (max 20 values = ~1M combinations)
-        let max_values = 20;
-        let n = n.min(max_values);
+        let n = n.min(MAX_MASK_VALUES);
         let values = &values[..n];
 
         let mut result = Vec::with_capacity(1 << n);
@@ -61,6 +65,35 @@ impl TIntMask {
         result.sort_unstable();
         result.dedup();
         result
+    }
+
+    #[must_use]
+    pub fn calculate_smallest_mask_combinations(values: &[i64], limit: usize) -> Vec<i64> {
+        let values = &values[..values.len().min(MAX_MASK_VALUES)];
+        if (1usize << values.len()) <= limit || values.iter().any(|value| *value < 0) {
+            let mut combinations = Self::calculate_mask_combinations(values);
+            combinations.truncate(limit);
+            return combinations;
+        }
+
+        let mut combinations = Vec::with_capacity(limit);
+        let mut candidates = BinaryHeap::from([Reverse(0)]);
+        while combinations.len() < limit
+            && let Some(Reverse(combination)) = candidates.pop()
+        {
+            if combinations.last() == Some(&combination) {
+                continue;
+            }
+
+            combinations.push(combination);
+            for value in values {
+                if combination | value != combination {
+                    candidates.push(Reverse(combination | value));
+                }
+            }
+        }
+
+        combinations
     }
 }
 
@@ -125,6 +158,31 @@ mod tests {
                 }
 
                 assert_eq!(TIntMask::calculate_mask_combinations(&values), subset_combinations(&values), "{values:?}");
+            }
+        }
+    }
+
+    #[test]
+    fn smallest_mask_combinations_are_a_prefix_of_all_combinations() {
+        let bits: Vec<i64> = (0..=20).map(|bit| 1 << bit).collect();
+        let cases: [&[i64]; 7] = [
+            &[],
+            &[0, 1, 2, 4, 8, 16, 32, 64, 128, 256, 512, 1024],
+            &[3, 5, 6, 12, 24, 48, 96, 192, 384, 768],
+            &[1024, 1, 512, 2, 256, 4, 128, 8, 64, 16, 32, 32, 0],
+            &bits,
+            &[-1, 1, 2, 4, 8, 16, 32, 64, 128, 256],
+            &[i64::MAX, 7, 9, 11, 1 << 40, 1 << 41, 1 << 42, 1 << 43, 1 << 44, 3],
+        ];
+
+        for values in cases {
+            let all = TIntMask::calculate_mask_combinations(values);
+            for limit in [0, 1, 2, 7, 128, 129, 130, all.len(), all.len() + 1] {
+                assert_eq!(
+                    TIntMask::calculate_smallest_mask_combinations(values, limit),
+                    all[..limit.min(all.len())],
+                    "{values:?} {limit}"
+                );
             }
         }
     }

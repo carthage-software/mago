@@ -17,6 +17,7 @@ use rayon::prelude::*;
 
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::populator::populate_codebase_parallel;
+use mago_codex::populator::populate_codebase_parallel_without_references;
 use mago_codex::reference::SymbolReferences;
 use mago_codex::scanner::scan_program;
 use mago_codex::signature_builder;
@@ -112,6 +113,7 @@ pub struct ParallelPipeline<T, I, R> {
     reducer: Box<dyn Reducer<I, R> + Send + Sync>,
     should_use_progress_bar: bool,
     build_file_signatures: bool,
+    retain_project_references: bool,
 }
 
 impl<T, I, R> std::fmt::Debug for ParallelPipeline<T, I, R>
@@ -130,6 +132,7 @@ where
             .field("reducer", &"<reducer>")
             .field("should_use_progress_bar", &self.should_use_progress_bar)
             .field("build_file_signatures", &self.build_file_signatures)
+            .field("retain_project_references", &self.retain_project_references)
             .finish()
     }
 }
@@ -177,11 +180,17 @@ where
             reducer,
             should_use_progress_bar,
             build_file_signatures: true,
+            retain_project_references: true,
         }
     }
 
     pub(super) fn with_file_signatures(mut self, enabled: bool) -> Self {
         self.build_file_signatures = enabled;
+        self
+    }
+
+    pub(super) fn with_project_references(mut self, retain: bool) -> Self {
+        self.retain_project_references = retain;
         self
     }
 
@@ -345,7 +354,26 @@ where
         let mut symbol_references = self.symbol_references;
         let mut populate_duration = Duration::ZERO;
         measure!(trace_enabled, populate_duration, {
-            populate_codebase_parallel(&mut merged_codex, &mut symbol_references, safe_symbols, safe_symbol_members);
+            if self.retain_project_references {
+                populate_codebase_parallel(
+                    &mut merged_codex,
+                    &mut symbol_references,
+                    safe_symbols,
+                    safe_symbol_members,
+                );
+            } else {
+                let discarded = std::mem::take(&mut symbol_references);
+                rayon::join(
+                    || drop(discarded),
+                    || {
+                        populate_codebase_parallel_without_references(
+                            &mut merged_codex,
+                            safe_symbols,
+                            safe_symbol_members,
+                        )
+                    },
+                );
+            }
         });
 
         if let Some(compiling_bar) = compiling_bar {

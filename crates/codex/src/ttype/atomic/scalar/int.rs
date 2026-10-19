@@ -15,7 +15,6 @@ use std::ops::Sub;
 
 use mago_word::Word;
 use mago_word::concat_word;
-use mago_word::i64_word;
 use mago_word::word;
 
 use crate::ttype::TType;
@@ -911,9 +910,10 @@ impl TInteger {
 impl TType for TInteger {
     #[inline]
     fn get_id(&self) -> Word {
+        let mut buffer = itoa::Buffer::new();
         match self {
             TInteger::Literal(value) => {
-                concat_word!(b"int(", i64_word(*value), b")")
+                concat_word!(b"int(", buffer.format(*value), b")")
             }
             TInteger::From(value) => {
                 if *value == 1 {
@@ -921,7 +921,7 @@ impl TType for TInteger {
                 } else if *value == 0 {
                     word("non-negative-int")
                 } else {
-                    concat_word!(b"int<", i64_word(*value), b", max>")
+                    concat_word!(b"int<", buffer.format(*value), b", max>")
                 }
             }
             TInteger::To(value) => {
@@ -930,10 +930,13 @@ impl TType for TInteger {
                 } else if *value == 0 {
                     word("non-positive-int")
                 } else {
-                    concat_word!(b"int<min, ", i64_word(*value), b">")
+                    concat_word!(b"int<min, ", buffer.format(*value), b">")
                 }
             }
-            TInteger::Range(from, to) => concat_word!(b"int<", i64_word(*from), b", ", i64_word(*to), b">"),
+            TInteger::Range(from, to) => {
+                let mut upper = itoa::Buffer::new();
+                concat_word!(b"int<", buffer.format(*from), b", ", upper.format(*to), b">")
+            }
             TInteger::Unspecified => word("int"),
             TInteger::UnspecifiedLiteral => word("literal-int"),
         }

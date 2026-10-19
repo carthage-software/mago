@@ -262,6 +262,7 @@ pub fn populate_class_likes_parallel(
     sorted_classes: &[Word],
     codebase: &mut CodebaseMetadata,
     symbol_references: &mut SymbolReferences,
+    retain_references: bool,
 ) {
     let mut seeds = OverrideSeeds::default();
     if sorted_classes.len() < 128 || rayon::current_num_threads() == 1 {
@@ -272,6 +273,8 @@ pub fn populate_class_likes_parallel(
     }
 
     let positions: WordMap<usize> = sorted_classes.iter().enumerate().map(|(index, name)| (*name, index)).collect();
+    let mut dependencies: Option<Vec<ClassDependencies>> =
+        Some(sorted_classes.par_iter().map(|name| class_dependencies(*name, codebase, &positions)).collect());
     let mut levels = vec![0; sorted_classes.len()];
     let mut layers: Vec<Vec<usize>> = Vec::new();
     let mut segment_start = 0;
@@ -279,30 +282,18 @@ pub fn populate_class_likes_parallel(
     let mut serial_dependencies = WordSet::default();
 
     for (index, &name) in sorted_classes.iter().enumerate() {
-        let mut level = 0;
-        let independent = codebase.class_likes.get(&name).is_some_and(|metadata| {
-            if metadata.name != name {
-                return false;
-            }
+        let class_dependencies = match &mut dependencies {
+            Some(dependencies) => std::mem::take(&mut dependencies[index]),
+            None => class_dependencies(name, codebase, &positions),
+        };
 
-            let trait_requirements = metadata
-                .used_traits
-                .iter()
-                .filter_map(|name| codebase.get_class_like_by_word(*name))
-                .flat_map(|trait_metadata| trait_metadata.require_implements.iter().copied());
-            let inherited_requirements = metadata
-                .require_extends
-                .iter()
-                .filter_map(|name| codebase.get_class_like_by_word(*name))
-                .flat_map(|required_metadata| required_metadata.all_parent_interfaces.iter().copied());
-            hierarchy_dependencies(metadata).chain(trait_requirements).chain(inherited_requirements).all(|dependency| {
-                let Some(dependency) = codebase.resolve_class_like_word(dependency) else {
-                    return true;
-                };
+        let mut level = 0;
+        let independent = class_dependencies.is_some_and(|class_dependencies| {
+            class_dependencies.into_iter().all(|(dependency, dependency_index)| {
                 if serial_dependencies.contains(&dependency) {
                     return false;
                 }
-                let Some(&dependency_index) = positions.get(&dependency) else {
+                let Some(dependency_index) = dependency_index else {
                     return true;
                 };
                 if dependency_index >= index {
@@ -317,11 +308,19 @@ pub fn populate_class_likes_parallel(
 
         if !independent {
             serial_dependencies.insert(name);
-            parallel_classes +=
-                populate_hierarchy_segment(sorted_classes, segment_start, index, &layers, codebase, symbol_references);
+            parallel_classes += populate_hierarchy_segment(
+                sorted_classes,
+                segment_start,
+                index,
+                &layers,
+                codebase,
+                symbol_references,
+                retain_references,
+            );
             layers.clear();
             populate_class_like_metadata_iterative(name, codebase, symbol_references, &mut seeds);
             segment_start = index + 1;
+            dependencies = None;
             continue;
         }
 
@@ -339,6 +338,7 @@ pub fn populate_class_likes_parallel(
         &layers,
         codebase,
         symbol_references,
+        retain_references,
     );
 
     tracing::trace!(
@@ -346,6 +346,31 @@ pub fn populate_class_likes_parallel(
         serial_classes = sorted_classes.len() - parallel_classes,
         "Class hierarchy populated."
     );
+}
+
+type ClassDependencies = Option<Vec<(Word, Option<usize>)>>;
+
+fn class_dependencies(name: Word, codebase: &CodebaseMetadata, positions: &WordMap<usize>) -> ClassDependencies {
+    let metadata = codebase.class_likes.get(&name).filter(|metadata| metadata.name == name)?;
+    let trait_requirements = metadata
+        .used_traits
+        .iter()
+        .filter_map(|name| codebase.get_class_like_by_word(*name))
+        .flat_map(|trait_metadata| trait_metadata.require_implements.iter().copied());
+    let inherited_requirements = metadata
+        .require_extends
+        .iter()
+        .filter_map(|name| codebase.get_class_like_by_word(*name))
+        .flat_map(|required_metadata| required_metadata.all_parent_interfaces.iter().copied());
+
+    Some(
+        hierarchy_dependencies(metadata)
+            .chain(trait_requirements)
+            .chain(inherited_requirements)
+            .filter_map(|dependency| codebase.resolve_class_like_word(dependency))
+            .map(|dependency| (dependency, positions.get(&dependency).copied()))
+            .collect(),
+    )
 }
 
 fn hierarchy_dependencies(metadata: &ClassLikeMetadata) -> impl Iterator<Item = Word> + '_ {
@@ -366,6 +391,7 @@ fn populate_hierarchy_segment(
     layers: &[Vec<usize>],
     codebase: &mut CodebaseMetadata,
     symbol_references: &mut SymbolReferences,
+    retain_references: bool,
 ) -> usize {
     if end - start < 128 || !layers.iter().any(|layer| layer.len() >= rayon::current_num_threads()) {
         let mut seeds = OverrideSeeds::default();
@@ -378,20 +404,35 @@ fn populate_hierarchy_segment(
     let mut references = Vec::new();
     let mut spare: Vec<Box<ClassLikeMetadata>> = Vec::new();
     for layer in layers {
+        // Placeholders are never modified, so those of the previous layer only need a new identity.
+        let mut recycled: Vec<Option<Box<ClassLikeMetadata>>> =
+            spare.drain(spare.len().saturating_sub(layer.len())..).map(Some).collect();
+        recycled.resize_with(layer.len(), || None);
         let placeholders: Vec<Option<Box<ClassLikeMetadata>>> = layer
             .par_iter()
-            .map(|&index| {
+            .zip(recycled)
+            .map(|(&index, recycled)| {
                 let metadata = codebase.class_likes.get(&sorted_classes[index])?;
-                let mut placeholder = ClassLikeMetadata::new(
-                    metadata.name,
-                    metadata.original_name,
-                    metadata.span,
-                    metadata.name_span,
-                    metadata.flags,
-                );
+                let mut placeholder = match recycled {
+                    Some(mut placeholder) => {
+                        placeholder.name = metadata.name;
+                        placeholder.original_name = metadata.original_name;
+                        placeholder.span = metadata.span;
+                        placeholder.name_span = metadata.name_span;
+                        placeholder.flags = metadata.flags;
+                        placeholder
+                    }
+                    None => Box::new(ClassLikeMetadata::new(
+                        metadata.name,
+                        metadata.original_name,
+                        metadata.span,
+                        metadata.name_span,
+                        metadata.flags,
+                    )),
+                };
                 // Keep the kind for stale method IDs; other metadata reads use earlier layers.
                 placeholder.kind = metadata.kind;
-                Some(Box::new(placeholder))
+                Some(placeholder)
             })
             .collect();
 
@@ -428,13 +469,11 @@ fn populate_hierarchy_segment(
                 spare.push(std::mem::replace(target, metadata));
             }
         }
-
-        spare.par_drain(..).for_each(drop);
     }
 
-    for references in references {
-        symbol_references.extend(references);
-    }
+    spare.into_par_iter().for_each(drop);
+
+    super::keep_references(symbol_references, references, retain_references);
 
     for &name in &sorted_classes[start..end] {
         if let Some(metadata) = codebase.class_likes.remove(&name) {

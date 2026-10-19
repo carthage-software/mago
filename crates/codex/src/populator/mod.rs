@@ -44,7 +44,7 @@ pub fn populate_codebase(
     safe_symbols: WordSet,
     safe_symbol_members: HashSet<SymbolIdentifier>,
 ) {
-    populate_codebase_inner(codebase, symbol_references, safe_symbols, safe_symbol_members, None, false, true)
+    populate_codebase_inner(codebase, symbol_references, safe_symbols, safe_symbol_members, None, false, true, true)
 }
 
 /// Populates independent type signatures in the current Rayon pool.
@@ -63,6 +63,26 @@ pub fn populate_codebase_parallel(
         None,
         !cfg!(target_arch = "wasm32"),
         true,
+        true,
+    )
+}
+
+/// Populates like [`populate_codebase_parallel`], discarding the symbol references it finds.
+#[allow(clippy::implicit_hasher)]
+pub fn populate_codebase_parallel_without_references(
+    codebase: &mut CodebaseMetadata,
+    safe_symbols: WordSet,
+    safe_symbol_members: HashSet<SymbolIdentifier>,
+) {
+    populate_codebase_inner(
+        codebase,
+        &mut SymbolReferences::new(),
+        safe_symbols,
+        safe_symbol_members,
+        None,
+        !cfg!(target_arch = "wasm32"),
+        true,
+        false,
     )
 }
 
@@ -87,6 +107,7 @@ pub fn populate_codebase_targeted(
         Some(dirty_symbols),
         false,
         true,
+        true,
     )
 }
 
@@ -106,6 +127,7 @@ pub fn populate_codebase_after_body_edit(
         Some(dirty_symbols),
         false,
         false,
+        true,
     )
 }
 
@@ -117,6 +139,7 @@ fn populate_codebase_inner(
     mut dirty_symbols: Option<HashSet<SymbolIdentifier>>,
     parallel: bool,
     mut repopulate_unchanged_signatures: bool,
+    retain_references: bool,
 ) {
     #[cfg(not(target_arch = "wasm32"))]
     let mut phase_start = tracing::enabled!(tracing::Level::TRACE).then(std::time::Instant::now);
@@ -206,7 +229,7 @@ fn populate_codebase_inner(
 
     let sorted_classes = sorter::sort_class_likes(codebase, &class_likes_to_repopulate);
     if parallel {
-        hierarchy::populate_class_likes_parallel(&sorted_classes, codebase, symbol_references);
+        hierarchy::populate_class_likes_parallel(&sorted_classes, codebase, symbol_references, retain_references);
     } else {
         let mut seeds = methods::OverrideSeeds::default();
         for class_name in sorted_classes {
@@ -403,9 +426,8 @@ fn populate_codebase_inner(
 
         rayon::join(
             || {
-                for references in function_chunks.into_iter().chain(class_chunks).chain(constant_chunks) {
-                    symbol_references.extend(references);
-                }
+                let chunks = function_chunks.into_iter().chain(class_chunks).chain(constant_chunks).collect();
+                keep_references(symbol_references, chunks, retain_references);
             },
             || {
                 if !incremental || !class_likes_to_repopulate.is_empty() {
@@ -433,6 +455,7 @@ fn populate_codebase_inner(
             entries,
             symbol_references,
             parallel,
+            retain_references,
             |(name, function_like_metadata, force_repopulation), references| {
                 let reference_source = reference_source(name);
 
@@ -458,9 +481,15 @@ fn populate_codebase_inner(
 
             Some((*name, metadata, force_repopulation))
         });
-        populate_entries(entries, symbol_references, parallel, |(name, metadata, force_repopulation), references| {
-            hierarchy::populate_class_like_types(name, metadata, &codebase.symbols, references, force_repopulation);
-        });
+        populate_entries(
+            entries,
+            symbol_references,
+            parallel,
+            retain_references,
+            |(name, metadata, force_repopulation), references| {
+                hierarchy::populate_class_like_types(name, metadata, &codebase.symbols, references, force_repopulation);
+            },
+        );
         trace_phase!("class_types");
 
         let entries = codebase.constants.iter_mut().filter_map(|(name, constant)| {
@@ -471,9 +500,15 @@ fn populate_codebase_inner(
 
             Some((*name, constant, force_repopulation))
         });
-        populate_entries(entries, symbol_references, parallel, |(name, constant, force_repopulation), references| {
-            populate_constant(name, constant, &codebase.symbols, references, force_repopulation);
-        });
+        populate_entries(
+            entries,
+            symbol_references,
+            parallel,
+            retain_references,
+            |(name, constant, force_repopulation), references| {
+                populate_constant(name, constant, &codebase.symbols, references, force_repopulation);
+            },
+        );
         trace_phase!("constants");
 
         if !incremental || !class_likes_to_repopulate.is_empty() {
@@ -533,6 +568,7 @@ fn populate_entries<I>(
     entries: impl Iterator<Item = I>,
     references: &mut SymbolReferences,
     parallel: bool,
+    retain_references: bool,
     populate: impl Fn(I, &mut SymbolReferences) + Sync,
 ) where
     I: Send,
@@ -544,8 +580,16 @@ fn populate_entries<I>(
         return;
     }
 
-    for chunk in populate_chunks(entries, populate) {
-        references.extend(chunk);
+    keep_references(references, populate_chunks(entries, populate), retain_references);
+}
+
+pub(crate) fn keep_references(references: &mut SymbolReferences, chunks: Vec<SymbolReferences>, retain: bool) {
+    if retain {
+        for chunk in chunks {
+            references.extend(chunk);
+        }
+    } else {
+        chunks.into_par_iter().for_each(drop);
     }
 }
 
@@ -637,6 +681,85 @@ mod tests {
     use crate::scanner::scan_program;
 
     #[test]
+    fn parallel_docblock_inheritance_matches_serial() -> Result<(), Box<dyn std::error::Error>> {
+        let mut source = String::from(
+            "<?php
+interface Traversable {}
+interface Iterator extends Traversable { public function current(): mixed; public function key(): mixed; }
+interface IteratorAggregate extends Traversable { public function getIterator(): Iterator; }
+/** @template T */
+interface Source {
+    /** @return list<T> */
+    public function all(): array;
+    /** @param T $value */
+    public function add(mixed $value): void;
+}
+class Strings implements IteratorAggregate {
+    /** @return Iterator<int, string> */
+    public function getIterator(): Iterator { return $this->getIterator(); }
+}
+class Invokable {
+    /** @return list<int> */
+    public function __invoke(): array { return []; }
+}
+class Consumer {
+    /** @param callable(): list<int> $callback */
+    public function take(Invokable $callback): void {}
+    /** @param iterable<int, string> $values */
+    public function read(Strings $values): void {}
+}
+",
+        );
+        for index in 0..600 {
+            writeln!(
+                source,
+                "
+/** @implements Source<Strings> */
+class Store{index} implements Source {{
+    public function all(): array {{ return []; }}
+    public function add(mixed $value): void {{}}
+}}
+class Wrapped{index} extends Strings {{
+    public function getIterator(): Iterator {{ return $this->getIterator(); }}
+}}
+class Called{index} extends Invokable {{
+    public function __invoke(): array {{ return []; }}
+}}
+class Reader{index} extends Consumer {{
+    public function take(Called{index} $callback): void {{}}
+    public function read(Wrapped{index} $values): void {{}}
+}}
+"
+            )?;
+        }
+
+        let file = File::ephemeral(Cow::Borrowed(b"docblocks.php"), Cow::Owned(source.into_bytes()));
+        let arena = LocalArena::new();
+        let program = parse_file(&arena, &file);
+        if program.has_errors() {
+            return Err(format!("docblock fixture did not parse: {:?}", program.errors).into());
+        }
+        let names = NameResolver::new(&arena).resolve(program);
+        let scanned = scan_program(&arena, &file, program, &names, PHPVersion::LATEST);
+
+        let populate = |threads, parallel| -> Result<_, rayon::ThreadPoolBuildError> {
+            let mut codebase = scanned.clone();
+            let mut references = SymbolReferences::new();
+            rayon::ThreadPoolBuilder::new().num_threads(threads).build()?.install(|| {
+                let populate = if parallel { populate_codebase_parallel } else { populate_codebase };
+                populate(&mut codebase, &mut references, WordSet::default(), HashSet::default());
+            });
+            Ok(codebase)
+        };
+
+        if populate(1, false)? != populate(4, true)? {
+            return Err("parallel docblock inheritance changed metadata".into());
+        }
+
+        Ok(())
+    }
+
+    #[test]
     fn parallel_population_matches_serial_metadata_and_references() -> Result<(), Box<dyn std::error::Error>> {
         let mut source = String::from("<?php class base { public function method(): base { return $this; } }\n");
         for index in 0..160 {
@@ -722,9 +845,9 @@ const CONSTANT_{index} = null;
                 }
             };
             let mut expected = SymbolReferences::new();
-            populate_entries(0..256, &mut expected, false, populate);
+            populate_entries(0..256, &mut expected, false, true, populate);
             let mut actual = SymbolReferences::new();
-            pool.install(|| populate_entries(0..256, &mut actual, true, populate));
+            pool.install(|| populate_entries(0..256, &mut actual, true, true, populate));
             assert_eq!(actual, expected, "cross-chunk order changed with signature_first={signature_first}");
         }
     }

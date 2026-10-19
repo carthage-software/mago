@@ -601,7 +601,7 @@ fn scrape_type_properties(
     }
 
     if combination.flags.nonnull_mixed().unwrap_or(false) {
-        if atomic == TAtomic::Null {
+        if matches!(atomic, TAtomic::Null) {
             combination.flags.set_nonnull_mixed(Some(false));
             combination.flags.insert(CombinationFlags::GENERIC_MIXED);
         }
@@ -1005,7 +1005,7 @@ fn scrape_type_properties(
 
     // this probably won't ever happen, but the object top type
     // can eliminate variants
-    if atomic == TAtomic::Object(TObject::Any) {
+    if matches!(atomic, TAtomic::Object(TObject::Any)) {
         combination.flags.insert(CombinationFlags::HAS_OBJECT_TOP_TYPE);
         combination.value_types.retain(|_, t| !matches!(t, TAtomic::Object(TObject::Named(_))));
         combination.value_types.insert(atomic.get_id(), atomic);
@@ -1162,7 +1162,7 @@ fn scrape_type_properties(
         return;
     }
 
-    if atomic == TAtomic::Scalar(TScalar::Generic) {
+    if matches!(atomic, TAtomic::Scalar(TScalar::Generic)) {
         combination.literal_strings.clear();
         combination.integers.clear();
         combination.literal_floats.clear();
@@ -1180,7 +1180,7 @@ fn scrape_type_properties(
         return;
     }
 
-    if atomic == TAtomic::Scalar(TScalar::ArrayKey) {
+    if matches!(atomic, TAtomic::Scalar(TScalar::ArrayKey)) {
         if combination.value_types.contains_key(&*ATOM_SCALAR) {
             return;
         }

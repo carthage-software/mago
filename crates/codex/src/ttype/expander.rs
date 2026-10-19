@@ -1276,8 +1276,7 @@ fn expand_int_mask(int_mask: &TIntMask, codebase: &CodebaseMetadata, options: &T
         return vec![TAtomic::Scalar(TScalar::int())];
     }
 
-    let combinations = TIntMask::calculate_mask_combinations(&literal_values);
-    combinations.into_iter().map(|v| TAtomic::Scalar(TScalar::literal_int(v))).collect()
+    mask_combinations(&literal_values)
 }
 
 #[cold]
@@ -1300,7 +1299,16 @@ fn expand_int_mask_of(
         return vec![TAtomic::Scalar(TScalar::int())];
     }
 
-    let combinations = TIntMask::calculate_mask_combinations(&literal_values);
+    mask_combinations(&literal_values)
+}
+
+fn mask_combinations(literal_values: &[i64]) -> Vec<TAtomic> {
+    let generalization_limit = usize::from(combiner::CombinerOptions::default().integer_combination_threshold) + 1;
+    let mut combinations = TIntMask::calculate_smallest_mask_combinations(literal_values, generalization_limit);
+    if !combinations.contains(&0) {
+        combinations.push(0);
+    }
+
     combinations.into_iter().map(|v| TAtomic::Scalar(TScalar::literal_int(v))).collect()
 }
 
@@ -3221,6 +3229,53 @@ mod tests {
                     false
                 }
             }));
+        }
+    }
+
+    #[test]
+    fn bounded_mask_combinations_combine_like_all_combinations() {
+        use crate::ttype::atomic::mixed::truthiness::TMixedTruthiness;
+
+        let codebase = CodebaseMetadata::default();
+        let literal = |value| TAtomic::Scalar(TScalar::literal_int(value));
+        let neighbours: Vec<Vec<TAtomic>> = vec![
+            vec![],
+            vec![TAtomic::Mixed(TMixed::new())],
+            vec![TAtomic::Mixed(TMixed::truthy())],
+            vec![TAtomic::Mixed(TMixed::new().with_truthiness(TMixedTruthiness::Falsy))],
+            vec![TAtomic::Mixed(TMixed::new().with_is_non_null(true))],
+            vec![TAtomic::Mixed(TMixed::isset_from_loop())],
+            vec![TAtomic::Scalar(TScalar::int())],
+            vec![TAtomic::Scalar(TScalar::Integer(TInteger::positive()))],
+            vec![literal(3), literal(-7)],
+            (0..200)
+                .map(|value| TAtomic::Scalar(TScalar::Integer(TInteger::from_bounds(Some(value), Some(value + 10)))))
+                .collect(),
+            vec![TAtomic::Scalar(TScalar::string())],
+            vec![TAtomic::Scalar(TScalar::literal_string(word("a")))],
+            vec![TAtomic::Scalar(TScalar::ArrayKey)],
+            vec![TAtomic::Scalar(TScalar::Numeric)],
+            vec![TAtomic::Scalar(TScalar::Generic)],
+            vec![TAtomic::Scalar(TScalar::bool())],
+            vec![TAtomic::Null],
+            vec![TAtomic::Never],
+        ];
+
+        for values in [&[1, 2, 4, 8, 16, 32, 64, 128, 256][..], &[-1024, -512, 1, 2, 4, 8, 16, 32, 64, 128]] {
+            let all: Vec<TAtomic> = TIntMask::calculate_mask_combinations(values).into_iter().map(literal).collect();
+            let bounded = mask_combinations(values);
+            assert!(bounded.len() < all.len());
+
+            for before in &neighbours {
+                for after in &neighbours {
+                    let combine = |mask: &[TAtomic]| {
+                        let types = before.iter().chain(mask).chain(after).cloned().collect();
+                        combiner::combine(types, &codebase, combiner::CombinerOptions::default())
+                    };
+
+                    assert_eq!(combine(&bounded), combine(&all), "{values:?} {before:?} {after:?}");
+                }
+            }
         }
     }
 }

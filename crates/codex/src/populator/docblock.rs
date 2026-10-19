@@ -1,18 +1,27 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
 
+use foldhash::HashSet;
 use rayon::prelude::*;
 
 use mago_span::Span;
 use mago_word::Word;
 use mago_word::WordMap;
 use mago_word::WordSet;
+use mago_word::word;
 
 use crate::assertion::Assertion;
+use crate::identifier::method::MethodIdentifier;
 use crate::metadata::CodebaseMetadata;
+use crate::metadata::class_like::TemplateTypes;
 use crate::metadata::flags::MetadataFlags;
+use crate::metadata::function_like::FunctionLikeMetadata;
 use crate::metadata::ttype::TypeMetadata;
 use crate::misc::GenericParent;
+use crate::ttype::TType;
+use crate::ttype::TypeRef;
+use crate::ttype::atomic::TAtomic;
+use crate::ttype::atomic::callable::TCallable;
 use crate::ttype::comparator::ComparisonResult;
 use crate::ttype::comparator::union_comparator;
 use crate::ttype::template::TemplateResult;
@@ -261,7 +270,7 @@ pub fn inherit_method_docblocks(
         }
     }
 
-    apply_inheritance_work(codebase, inheritance_work);
+    apply_inheritance_work(codebase, inheritance_work, parallel);
 }
 
 fn collect_parallel_inheritance_work<T>(
@@ -347,66 +356,293 @@ fn collect_inheritance_work(
     }
 }
 
+struct MethodInheritance {
+    child_method_id: (Word, Word),
+    return_type: Option<TypeMetadata>,
+    params_to_inherit: Vec<bool>,
+    param_types: Vec<Option<(TUnion, Span, bool)>>,
+    template_types: Option<TemplateTypes>,
+    thrown_types: Option<Vec<TypeMetadata>>,
+    clear_inferred_assertions: bool,
+    assertions: Option<BTreeMap<Word, Vec<Assertion>>>,
+    if_true_assertions: Option<BTreeMap<Word, Vec<Assertion>>>,
+    if_false_assertions: Option<BTreeMap<Word, Vec<Assertion>>>,
+}
+
 /// Sorts and applies docblock inheritance work items.
-fn apply_inheritance_work(codebase: &mut CodebaseMetadata, mut inheritance_work: Vec<(usize, Word, Word, Word, Word)>) {
+fn apply_inheritance_work(
+    codebase: &mut CodebaseMetadata,
+    mut inheritance_work: Vec<(usize, Word, Word, Word, Word)>,
+    parallel: bool,
+) {
     inheritance_work.sort_by_key(|work| work.0);
 
-    for (_, class_name, method_name, parent_class, parent_method) in inheritance_work {
-        let child_method_id = (class_name, method_name);
-        let parent_method_id = (parent_class, parent_method);
-
-        let Some(parent_method) = codebase.function_likes.get(&parent_method_id) else {
-            continue;
-        };
-
-        let parent_return_type = parent_method.return_type_metadata.as_ref();
-        let parent_native_return_type = parent_method.return_type_declaration_metadata.as_ref();
-        let parent_parameters = &parent_method.parameters;
-        let parent_template_types = &parent_method.template_types;
-        let parent_thrown_types = &parent_method.thrown_types;
-        let parent_assertions = &parent_method.assertions;
-        let parent_if_true_assertions = &parent_method.if_true_assertions;
-        let parent_if_false_assertions = &parent_method.if_false_assertions;
-
-        let Some(child_class) = codebase.class_likes.get(&class_name) else {
-            continue;
-        };
-
-        let parent_template_params = child_class.template_extended_parameters.get(&parent_class);
-        let template_result = parent_template_params.filter(|parameters| !parameters.is_empty()).map(|parent_params| {
-            let mut template_result = TemplateResult::default();
-            for (template_name, concrete_type) in parent_params {
-                template_result.add_lower_bound(
-                    *template_name,
-                    GenericParent::ClassLike(parent_class),
-                    concrete_type.clone(),
-                );
+    if !parallel || inheritance_work.len() < 1024 || rayon::current_num_threads() == 1 {
+        for work in inheritance_work {
+            if let Some(inheritance) = resolve_method_inheritance(codebase, work) {
+                apply_method_inheritance(codebase, inheritance);
             }
-            template_result
-        });
+        }
 
-        let substitute_type = |metadata: &TypeMetadata| {
-            if let Some(template_result) = template_result.as_ref() {
-                inferred_type_replacer::replace(&metadata.type_union, template_result, codebase)
-            } else {
-                metadata.type_union.clone()
-            }
+        return;
+    }
+
+    let mut written: HashSet<(Word, Word)> = HashSet::default();
+    let mut start = 0;
+    for (index, &(_, class_name, method_name, parent_class, parent_method)) in inheritance_work.iter().enumerate() {
+        if written.contains(&(parent_class, parent_method)) || !written.insert((class_name, method_name)) {
+            apply_inheritance_run(codebase, &inheritance_work[start..index]);
+            written.clear();
+            written.insert((class_name, method_name));
+            start = index;
+        }
+    }
+
+    apply_inheritance_run(codebase, &inheritance_work[start..]);
+}
+
+/// Resolves a run of items, none reading a method written earlier in the run, against the state
+/// before the run; items whose type comparisons may read other method signatures resolve in order.
+fn apply_inheritance_run(codebase: &mut CodebaseMetadata, run: &[(usize, Word, Word, Word, Word)]) {
+    let resolved: Vec<Option<Option<MethodInheritance>>> = run
+        .par_iter()
+        .with_min_len(32)
+        .map_init(SignatureReads::default, |reads, work| {
+            (!reads.of_item(codebase, *work)).then(|| resolve_method_inheritance(codebase, *work))
+        })
+        .collect();
+
+    for (work, resolved) in run.iter().zip(resolved) {
+        let inheritance = match resolved {
+            Some(inheritance) => inheritance,
+            None => resolve_method_inheritance(codebase, *work),
         };
 
-        let parent_return_type = parent_return_type.map(|metadata| {
-            if template_result.is_some() {
-                Cow::Owned(TypeMetadata {
-                    type_union: substitute_type(metadata),
-                    span: metadata.span,
-                    from_docblock: metadata.from_docblock,
-                    inferred: metadata.inferred,
+        if let Some(inheritance) = inheritance {
+            apply_method_inheritance(codebase, inheritance);
+        }
+    }
+}
+
+/// Finds items whose type comparisons may read method signatures: those of traversable and
+/// invokable objects, of callable aliases, and of members reached by expanding a type.
+#[derive(Default)]
+struct SignatureReads<'types> {
+    classes: WordMap<bool>,
+    nodes: Vec<TypeRef<'types>>,
+}
+
+impl<'types> SignatureReads<'types> {
+    fn of_item(
+        &mut self,
+        codebase: &'types CodebaseMetadata,
+        (_, class_name, method_name, parent_class, parent_method): (usize, Word, Word, Word, Word),
+    ) -> bool {
+        let (Some(parent), Some(child), Some(child_class)) = (
+            codebase.function_likes.get(&(parent_class, parent_method)),
+            codebase.function_likes.get(&(class_name, method_name)),
+            codebase.class_likes.get(&class_name),
+        ) else {
+            return false;
+        };
+
+        self.of_signature(codebase, parent)
+            || self.of_signature(codebase, child)
+            || parent.thrown_types.iter().any(|thrown| self.of_union(codebase, &thrown.type_union))
+            || [&parent.assertions, &parent.if_true_assertions, &parent.if_false_assertions]
+                .into_iter()
+                .flat_map(BTreeMap::values)
+                .flatten()
+                .any(|assertion| match assertion {
+                    Assertion::InArray(union) | Assertion::NotInArray(union) => self.of_union(codebase, union),
+                    _ => assertion.get_type().is_some_and(|atomic| self.of_nodes(codebase, TypeRef::Atomic(atomic))),
                 })
-            } else {
-                Cow::Borrowed(metadata)
-            }
-        });
+            || child_class
+                .template_extended_parameters
+                .get(&parent_class)
+                .is_some_and(|parameters| parameters.values().any(|union| self.of_union(codebase, union)))
+    }
 
-        let (
+    fn of_signature(&mut self, codebase: &'types CodebaseMetadata, method: &'types FunctionLikeMetadata) -> bool {
+        method
+            .return_type_metadata
+            .iter()
+            .chain(&method.return_type_declaration_metadata)
+            .chain(
+                method
+                    .parameters
+                    .iter()
+                    .flat_map(|parameter| parameter.type_metadata.iter().chain(&parameter.type_declaration_metadata)),
+            )
+            .any(|metadata| self.of_union(codebase, &metadata.type_union))
+    }
+
+    fn of_union(&mut self, codebase: &'types CodebaseMetadata, union: &'types TUnion) -> bool {
+        self.of_nodes(codebase, TypeRef::Union(union))
+    }
+
+    fn of_nodes(&mut self, codebase: &'types CodebaseMetadata, root: TypeRef<'types>) -> bool {
+        self.nodes.clear();
+        self.nodes.push(root);
+        while let Some(node) = self.nodes.pop() {
+            match node {
+                TypeRef::Union(union) => union.append_child_nodes(&mut self.nodes),
+                TypeRef::Atomic(atomic) => {
+                    if self.of_atomic(codebase, atomic) {
+                        return true;
+                    }
+
+                    atomic.append_child_nodes(&mut self.nodes);
+                }
+            }
+        }
+
+        false
+    }
+
+    fn of_atomic(&mut self, codebase: &CodebaseMetadata, atomic: &TAtomic) -> bool {
+        match atomic {
+            TAtomic::Object(object) => object.get_name().is_some_and(|name| {
+                *self.classes.entry(name).or_insert_with(|| {
+                    let traversable = word("traversable");
+                    let invoke =
+                        codebase.get_declaring_method_identifier(&MethodIdentifier::new(name, word("__invoke")));
+
+                    codebase.get_class_like(name.as_bytes()).is_some_and(|class| {
+                        class.name == traversable || class.all_parent_interfaces.contains(&traversable)
+                    }) || codebase
+                        .method_exists(invoke.get_class_name().as_bytes(), invoke.get_method_name().as_bytes())
+                })
+            }),
+            TAtomic::Callable(TCallable::Alias(_))
+            | TAtomic::Reference(_)
+            | TAtomic::Alias(_)
+            | TAtomic::Derived(_)
+            | TAtomic::Conditional(_) => true,
+            _ => false,
+        }
+    }
+}
+
+fn resolve_method_inheritance(
+    codebase: &CodebaseMetadata,
+    (_, class_name, method_name, parent_class, parent_method): (usize, Word, Word, Word, Word),
+) -> Option<MethodInheritance> {
+    let child_method_id = (class_name, method_name);
+    let parent_method_id = (parent_class, parent_method);
+
+    let parent_method = codebase.function_likes.get(&parent_method_id)?;
+
+    let parent_return_type = parent_method.return_type_metadata.as_ref();
+    let parent_native_return_type = parent_method.return_type_declaration_metadata.as_ref();
+    let parent_parameters = &parent_method.parameters;
+    let parent_template_types = &parent_method.template_types;
+    let parent_thrown_types = &parent_method.thrown_types;
+    let parent_assertions = &parent_method.assertions;
+    let parent_if_true_assertions = &parent_method.if_true_assertions;
+    let parent_if_false_assertions = &parent_method.if_false_assertions;
+
+    let child_class = codebase.class_likes.get(&class_name)?;
+
+    let parent_template_params = child_class.template_extended_parameters.get(&parent_class);
+    let template_result = parent_template_params.filter(|parameters| !parameters.is_empty()).map(|parent_params| {
+        let mut template_result = TemplateResult::default();
+        for (template_name, concrete_type) in parent_params {
+            template_result.add_lower_bound(
+                *template_name,
+                GenericParent::ClassLike(parent_class),
+                concrete_type.clone(),
+            );
+        }
+        template_result
+    });
+
+    let substitute_type = |metadata: &TypeMetadata| {
+        if let Some(template_result) = template_result.as_ref() {
+            inferred_type_replacer::replace(&metadata.type_union, template_result, codebase)
+        } else {
+            metadata.type_union.clone()
+        }
+    };
+
+    let parent_return_type = parent_return_type.map(|metadata| {
+        if template_result.is_some() {
+            Cow::Owned(TypeMetadata {
+                type_union: substitute_type(metadata),
+                span: metadata.span,
+                from_docblock: metadata.from_docblock,
+                inferred: metadata.inferred,
+            })
+        } else {
+            Cow::Borrowed(metadata)
+        }
+    });
+
+    let (
+        should_inherit_return,
+        params_to_inherit,
+        should_inherit_templates,
+        should_inherit_thrown,
+        should_inherit_assertions,
+        should_inherit_if_true_assertions,
+        should_inherit_if_false_assertions,
+        should_clear_inferred_assertions,
+    ) = {
+        let child_method = codebase.function_likes.get(&child_method_id)?;
+
+        let has_explicit_inherit_doc = child_method.flags.contains(MetadataFlags::INHERITS_DOCS);
+
+        let should_inherit_return = should_inherit_docblock_type(
+            parent_native_return_type.map(|m| &m.type_union),
+            parent_return_type.as_deref().filter(|m| m.from_docblock),
+            child_method.return_type_declaration_metadata.as_ref().map(|m| &m.type_union),
+            child_method.return_type_metadata.as_ref().filter(|m| m.from_docblock),
+            true,
+            has_explicit_inherit_doc,
+            codebase,
+        );
+
+        let params_to_inherit: Vec<bool> = parent_parameters
+            .iter()
+            .enumerate()
+            .map(|(i, parent_param)| {
+                let Some(child_param) = child_method.parameters.get(i) else {
+                    return false;
+                };
+
+                should_inherit_docblock_type(
+                    parent_param.type_declaration_metadata.as_ref().map(|m| &m.type_union),
+                    parent_param.type_metadata.as_ref().filter(|m| m.from_docblock),
+                    child_param.type_declaration_metadata.as_ref().map(|m| &m.type_union),
+                    child_param.type_metadata.as_ref().filter(|m| m.from_docblock),
+                    false,
+                    has_explicit_inherit_doc,
+                    codebase,
+                )
+            })
+            .collect();
+
+        let should_inherit_templates = child_method.template_types.is_empty() && !parent_template_types.is_empty();
+        let should_inherit_thrown = child_method.thrown_types.is_empty() && !parent_thrown_types.is_empty();
+
+        let parent_has_any_assertions = !parent_assertions.is_empty()
+            || !parent_if_true_assertions.is_empty()
+            || !parent_if_false_assertions.is_empty();
+        let child_assertions_are_inferred = child_method.assertions_inferred;
+
+        let child_assertions_overridable =
+            |child: &BTreeMap<Word, Vec<Assertion>>| -> bool { child.is_empty() || child_assertions_are_inferred };
+
+        let should_inherit_assertions =
+            child_assertions_overridable(&child_method.assertions) && !parent_assertions.is_empty();
+        let should_inherit_if_true_assertions =
+            child_assertions_overridable(&child_method.if_true_assertions) && !parent_if_true_assertions.is_empty();
+        let should_inherit_if_false_assertions =
+            child_assertions_overridable(&child_method.if_false_assertions) && !parent_if_false_assertions.is_empty();
+
+        let should_clear_inferred_assertions = parent_has_any_assertions && child_assertions_are_inferred;
+
+        (
             should_inherit_return,
             params_to_inherit,
             should_inherit_templates,
@@ -415,147 +651,76 @@ fn apply_inheritance_work(codebase: &mut CodebaseMetadata, mut inheritance_work:
             should_inherit_if_true_assertions,
             should_inherit_if_false_assertions,
             should_clear_inferred_assertions,
-        ) = {
-            let Some(child_method) = codebase.function_likes.get(&child_method_id) else {
-                continue;
-            };
+        )
+    };
 
-            let has_explicit_inherit_doc = child_method.flags.contains(MetadataFlags::INHERITS_DOCS);
+    if !should_inherit_return
+        && !params_to_inherit.iter().any(|inherit| *inherit)
+        && !should_inherit_templates
+        && !should_inherit_thrown
+        && !should_inherit_assertions
+        && !should_inherit_if_true_assertions
+        && !should_inherit_if_false_assertions
+        && !should_clear_inferred_assertions
+    {
+        return None;
+    }
 
-            let should_inherit_return = should_inherit_docblock_type(
-                parent_native_return_type.map(|m| &m.type_union),
-                parent_return_type.as_deref().filter(|m| m.from_docblock),
-                child_method.return_type_declaration_metadata.as_ref().map(|m| &m.type_union),
-                child_method.return_type_metadata.as_ref().filter(|m| m.from_docblock),
-                true,
-                has_explicit_inherit_doc,
-                codebase,
-            );
+    let substituted_return_type = parent_return_type.filter(|_| should_inherit_return).map(|metadata| {
+        let metadata = metadata.into_owned();
 
-            let params_to_inherit: Vec<bool> = parent_parameters
-                .iter()
-                .enumerate()
-                .map(|(i, parent_param)| {
-                    let Some(child_param) = child_method.parameters.get(i) else {
-                        return false;
-                    };
+        (metadata.type_union, metadata.span, metadata.from_docblock)
+    });
 
-                    should_inherit_docblock_type(
-                        parent_param.type_declaration_metadata.as_ref().map(|m| &m.type_union),
-                        parent_param.type_metadata.as_ref().filter(|m| m.from_docblock),
-                        child_param.type_declaration_metadata.as_ref().map(|m| &m.type_union),
-                        child_param.type_metadata.as_ref().filter(|m| m.from_docblock),
-                        false,
-                        has_explicit_inherit_doc,
-                        codebase,
-                    )
-                })
-                .collect();
+    let substituted_param_types: Vec<Option<(TUnion, Span, bool)>> = parent_parameters
+        .iter()
+        .zip(&params_to_inherit)
+        .map(|(parameter, inherit)| {
+            parameter
+                .type_metadata
+                .as_ref()
+                .filter(|_| *inherit)
+                .map(|metadata| (substitute_type(metadata), metadata.span, metadata.from_docblock))
+        })
+        .collect();
 
-            let should_inherit_templates = child_method.template_types.is_empty() && !parent_template_types.is_empty();
-            let should_inherit_thrown = child_method.thrown_types.is_empty() && !parent_thrown_types.is_empty();
-
-            let parent_has_any_assertions = !parent_assertions.is_empty()
-                || !parent_if_true_assertions.is_empty()
-                || !parent_if_false_assertions.is_empty();
-            let child_assertions_are_inferred = child_method.assertions_inferred;
-
-            let child_assertions_overridable =
-                |child: &BTreeMap<Word, Vec<Assertion>>| -> bool { child.is_empty() || child_assertions_are_inferred };
-
-            let should_inherit_assertions =
-                child_assertions_overridable(&child_method.assertions) && !parent_assertions.is_empty();
-            let should_inherit_if_true_assertions =
-                child_assertions_overridable(&child_method.if_true_assertions) && !parent_if_true_assertions.is_empty();
-            let should_inherit_if_false_assertions = child_assertions_overridable(&child_method.if_false_assertions)
-                && !parent_if_false_assertions.is_empty();
-
-            let should_clear_inferred_assertions = parent_has_any_assertions && child_assertions_are_inferred;
-
-            (
-                should_inherit_return,
-                params_to_inherit,
-                should_inherit_templates,
-                should_inherit_thrown,
-                should_inherit_assertions,
-                should_inherit_if_true_assertions,
-                should_inherit_if_false_assertions,
-                should_clear_inferred_assertions,
-            )
-        };
-
-        if !should_inherit_return
-            && !params_to_inherit.iter().any(|inherit| *inherit)
-            && !should_inherit_templates
-            && !should_inherit_thrown
-            && !should_inherit_assertions
-            && !should_inherit_if_true_assertions
-            && !should_inherit_if_false_assertions
-            && !should_clear_inferred_assertions
-        {
-            continue;
-        }
-
-        let substituted_return_type = parent_return_type.filter(|_| should_inherit_return).map(|metadata| {
-            let metadata = metadata.into_owned();
-
-            (metadata.type_union, metadata.span, metadata.from_docblock)
-        });
-
-        let substituted_param_types: Vec<Option<(TUnion, Span, bool)>> = parent_parameters
+    let parent_templates_to_apply = if should_inherit_templates { Some(parent_template_types.clone()) } else { None };
+    let parent_thrown_to_apply = should_inherit_thrown.then(|| {
+        parent_thrown_types
             .iter()
-            .zip(&params_to_inherit)
-            .map(|(parameter, inherit)| {
-                parameter
-                    .type_metadata
-                    .as_ref()
-                    .filter(|_| *inherit)
-                    .map(|metadata| (substitute_type(metadata), metadata.span, metadata.from_docblock))
+            .map(|metadata| TypeMetadata {
+                type_union: substitute_type(metadata),
+                span: metadata.span,
+                from_docblock: true,
+                inferred: true,
             })
-            .collect();
+            .collect()
+    });
 
-        let parent_templates_to_apply =
-            if should_inherit_templates { Some(parent_template_types.clone()) } else { None };
-        let parent_thrown_to_apply = should_inherit_thrown.then(|| {
-            parent_thrown_types
-                .iter()
-                .map(|metadata| TypeMetadata {
-                    type_union: substitute_type(metadata),
-                    span: metadata.span,
-                    from_docblock: true,
-                    inferred: true,
-                })
-                .collect()
-        });
+    let resolve_assertions = |assertions: &BTreeMap<Word, Vec<Assertion>>| {
+        assertions
+            .iter()
+            .map(|(name, assertions)| {
+                let resolved = if let Some(template_result) = template_result.as_ref() {
+                    assertions.iter().flat_map(|a| a.resolve_templates(codebase, template_result)).collect()
+                } else {
+                    assertions.clone()
+                };
 
-        let resolve_assertions = |assertions: &BTreeMap<Word, Vec<Assertion>>| {
-            assertions
-                .iter()
-                .map(|(name, assertions)| {
-                    let resolved = if let Some(template_result) = template_result.as_ref() {
-                        assertions.iter().flat_map(|a| a.resolve_templates(codebase, template_result)).collect()
-                    } else {
-                        assertions.clone()
-                    };
+                (*name, resolved)
+            })
+            .collect()
+    };
 
-                    (*name, resolved)
-                })
-                .collect()
-        };
+    let parent_assertions_to_apply =
+        if should_inherit_assertions { Some(resolve_assertions(parent_assertions)) } else { None };
+    let parent_if_true_assertions_to_apply =
+        if should_inherit_if_true_assertions { Some(resolve_assertions(parent_if_true_assertions)) } else { None };
+    let parent_if_false_assertions_to_apply =
+        if should_inherit_if_false_assertions { Some(resolve_assertions(parent_if_false_assertions)) } else { None };
 
-        let parent_assertions_to_apply =
-            if should_inherit_assertions { Some(resolve_assertions(parent_assertions)) } else { None };
-        let parent_if_true_assertions_to_apply =
-            if should_inherit_if_true_assertions { Some(resolve_assertions(parent_if_true_assertions)) } else { None };
-        let parent_if_false_assertions_to_apply = if should_inherit_if_false_assertions {
-            Some(resolve_assertions(parent_if_false_assertions))
-        } else {
-            None
-        };
-
-        let narrowed_return = if should_inherit_return
-            && let Some((type_union, span, from_docblock)) = substituted_return_type
-        {
+    let narrowed_return =
+        if should_inherit_return && let Some((type_union, span, from_docblock)) = substituted_return_type {
             let child_native_return =
                 codebase.function_likes.get(&child_method_id).and_then(|m| m.return_type_declaration_metadata.as_ref());
 
@@ -604,50 +769,64 @@ fn apply_inheritance_work(codebase: &mut CodebaseMetadata, mut inheritance_work:
             None
         };
 
-        let Some(child_method) = codebase.function_likes.get_mut(&child_method_id) else {
-            continue;
-        };
+    Some(MethodInheritance {
+        child_method_id,
+        return_type: narrowed_return,
+        params_to_inherit,
+        param_types: substituted_param_types,
+        template_types: parent_templates_to_apply,
+        thrown_types: parent_thrown_to_apply,
+        clear_inferred_assertions: should_clear_inferred_assertions,
+        assertions: parent_assertions_to_apply,
+        if_true_assertions: parent_if_true_assertions_to_apply,
+        if_false_assertions: parent_if_false_assertions_to_apply,
+    })
+}
 
-        if let Some(narrowed_return) = narrowed_return {
-            child_method.return_type_metadata = Some(narrowed_return);
-        }
+fn apply_method_inheritance(codebase: &mut CodebaseMetadata, inheritance: MethodInheritance) {
+    let Some(child_method) = codebase.function_likes.get_mut(&inheritance.child_method_id) else {
+        return;
+    };
 
-        for (i, substituted_param) in substituted_param_types.into_iter().enumerate() {
-            if params_to_inherit.get(i).copied() == Some(true)
-                && let Some(child_param) = child_method.parameters.get_mut(i)
-                && let Some((type_union, span, from_docblock)) = substituted_param
-            {
-                child_param.type_metadata = Some(TypeMetadata { type_union, span, from_docblock, inferred: true });
-                child_param.add_null_from_null_default();
-            }
-        }
+    if let Some(narrowed_return) = inheritance.return_type {
+        child_method.return_type_metadata = Some(narrowed_return);
+    }
 
-        if let Some(parent_templates) = parent_templates_to_apply {
-            child_method.template_types = parent_templates;
+    for (i, substituted_param) in inheritance.param_types.into_iter().enumerate() {
+        if inheritance.params_to_inherit.get(i).copied() == Some(true)
+            && let Some(child_param) = child_method.parameters.get_mut(i)
+            && let Some((type_union, span, from_docblock)) = substituted_param
+        {
+            child_param.type_metadata = Some(TypeMetadata { type_union, span, from_docblock, inferred: true });
+            child_param.add_null_from_null_default();
         }
+    }
 
-        if let Some(parent_thrown) = parent_thrown_to_apply {
-            child_method.thrown_types = parent_thrown;
-        }
+    if let Some(parent_templates) = inheritance.template_types {
+        child_method.template_types = parent_templates;
+    }
 
-        if should_clear_inferred_assertions {
-            child_method.assertions.clear();
-            child_method.if_true_assertions.clear();
-            child_method.if_false_assertions.clear();
-            child_method.assertions_inferred = false;
-        }
+    if let Some(parent_thrown) = inheritance.thrown_types {
+        child_method.thrown_types = parent_thrown;
+    }
 
-        if let Some(parent_asserts) = parent_assertions_to_apply {
-            child_method.assertions = parent_asserts;
-        }
+    if inheritance.clear_inferred_assertions {
+        child_method.assertions.clear();
+        child_method.if_true_assertions.clear();
+        child_method.if_false_assertions.clear();
+        child_method.assertions_inferred = false;
+    }
 
-        if let Some(parent_true_asserts) = parent_if_true_assertions_to_apply {
-            child_method.if_true_assertions = parent_true_asserts;
-        }
+    if let Some(parent_asserts) = inheritance.assertions {
+        child_method.assertions = parent_asserts;
+    }
 
-        if let Some(parent_false_asserts) = parent_if_false_assertions_to_apply {
-            child_method.if_false_assertions = parent_false_asserts;
-        }
+    if let Some(parent_true_asserts) = inheritance.if_true_assertions {
+        child_method.if_true_assertions = parent_true_asserts;
+    }
+
+    if let Some(parent_false_asserts) = inheritance.if_false_assertions {
+        child_method.if_false_assertions = parent_false_asserts;
     }
 }
 
