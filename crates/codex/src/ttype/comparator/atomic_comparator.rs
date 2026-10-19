@@ -622,6 +622,14 @@ pub(crate) fn can_be_identical(
         };
     }
 
+    if inside_assertion
+        && let (TAtomic::Array(first_array), TAtomic::Array(second_array)) = (first_part, second_part)
+        && first_array.get_minimum_size() == 0
+        && second_array.get_minimum_size() == 0
+    {
+        return true;
+    }
+
     if let (TAtomic::Array(TArray::Keyed(first_array)), TAtomic::Array(TArray::Keyed(second_array))) =
         (first_part, second_part)
     {

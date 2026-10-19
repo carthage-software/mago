@@ -152,3 +152,29 @@ function test_union_equality_operand_assignment(int|string $x, float|string $b, 
         takes_string($a); // @mago-expect analysis:invalid-argument
     }
 }
+
+/**
+ * @param array<string, int>|bool $a
+ * @param array<string, string>|bool $b
+ */
+function test_union_equality_empty_arrays(array|bool $a, array|bool $b): bool {
+    if ($a === $b) {
+        return $a; // @mago-expect analysis:invalid-return-statement
+    }
+
+    return false;
+}
+
+test_union_equality_empty_arrays([], []);
+
+/**
+ * @param non-empty-array<string, int>|bool $a
+ * @param array<string, string>|bool $b
+ */
+function test_union_equality_non_empty_array(array|bool $a, array|bool $b): bool {
+    if ($a === $b) {
+        return $a;
+    }
+
+    return false;
+}
