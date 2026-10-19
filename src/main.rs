@@ -73,9 +73,9 @@ mod error;
 mod extensions;
 mod language_server;
 mod macros;
-mod prelude;
 #[cfg(all(target_os = "macos", not(feature = "dhat-heap")))]
 mod memory;
+mod prelude;
 mod service;
 mod updater;
 mod utils;

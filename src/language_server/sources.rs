@@ -9,12 +9,13 @@ use mago_database::file::{File, FileId};
 use tempfile::NamedTempFile;
 use tower_lsp_server::gen_lsp_types::Uri;
 
-use crate::consts::{PRELUDE_BYTES, VERSION};
+use crate::consts::VERSION;
 use crate::language_server::uri::UriFilePath;
+use crate::prelude::PRELUDE;
 use mago_server::workspace::paths::relative_source_name;
 
 static PRELUDE_DIRECTORY: LazyLock<PathBuf> =
-    LazyLock::new(|| Path::new(VERSION).join(FileId::new(PRELUDE_BYTES).to_string()));
+    LazyLock::new(|| Path::new(VERSION).join(FileId::new(PRELUDE).to_string()));
 const WORKSPACE_MARKER: &str = ".workspace-uri";
 
 pub struct SourceFiles {

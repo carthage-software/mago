@@ -19,7 +19,7 @@ fn sources_remain_queryable_across_sessions_and_keep_workspace_ownership() {
     let mut sources = SourceFiles::new(directory.path());
     assert_eq!(
         sources.root.parent(),
-        Some(cache_root().join(VERSION).join(FileId::new(PRELUDE_BYTES).to_string()).as_path())
+        Some(cache_root().join(VERSION).join(FileId::new(PRELUDE).to_string()).as_path())
     );
     let uri = sources.uri(&file).unwrap();
     let path = uri.to_file_path().unwrap();
@@ -77,7 +77,7 @@ fn cached_workspace_roots_require_a_valid_matching_origin() {
     std::fs::write(&marker, Uri::from_file_path(&sources.workspace).unwrap().as_str()).unwrap();
     assert!(SourceFiles::workspace_for_cached_path(&sources.root.join("../Core/test.php")).is_err());
     let cache = cache_root();
-    let prelude = FileId::new(PRELUDE_BYTES).to_string();
+    let prelude = FileId::new(PRELUDE).to_string();
     let workspace_id = sources.root.file_name().unwrap();
     for prefix in [
         Path::new(&prelude).to_path_buf(),
