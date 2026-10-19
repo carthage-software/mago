@@ -400,9 +400,8 @@ where
             T!["::"] => {
                 let double_colon = self.stream.consume_span()?;
                 let selector = self.parse_classlike_member_selector()?;
-                let current = self.stream.lookahead(0)?.ok_or_else(|| self.stream.unexpected(None, &[]))?;
 
-                if Precedence::CallDim > precedence && matches!(current.kind, T!["("]) {
+                if Precedence::CallDim > precedence && matches!(self.stream.peek_kind(0)?, Some(T!["("])) {
                     let partial_args = self.parse_partial_argument_list()?;
 
                     if partial_args.has_placeholders() {

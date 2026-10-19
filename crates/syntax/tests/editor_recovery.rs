@@ -2,9 +2,10 @@ use mago_allocator::LocalArena;
 use mago_database::file::File;
 use mago_span::{HasSpan, Span};
 use mago_syntax::cst::{
-    Access, ClassLikeMember, Expression, ForBody, ForeachBody, IfBody, MethodBody, Program, Statement, Variable,
-    WhileBody,
+    Access, Call, ClassLikeConstantSelector, ClassLikeMember, Expression, ForBody, ForeachBody, IfBody, MethodBody,
+    Program, Statement, Terminator, Variable, WhileBody,
 };
+use mago_syntax::error::{Expected, ParseError};
 use mago_syntax::parser::parse_file_borrowed_with_settings;
 use mago_syntax::settings::ParserSettings;
 
@@ -42,6 +43,7 @@ fn editor_recovery_handles_each_truncated_prefix_without_changing_valid_trees() 
         "<?php interface I { function f(): void; } trait T { function f(): void {} } enum E { case A; }",
         "<?php function f($a) { if ($a->b) return 1; elseif ($a) {} else {} while ($a->c) {} do {} while ($a); switch ($a) {} }",
         "<?php function f($a) { foreach ($a as $k => $v) $a(); for ($i = 0; $i < $a; $i++) {} if ($a): elseif ($a): endif; }",
+        include_str!("fixtures/issue_2589_complete.php"),
     ] {
         let settings = ParserSettings { recover_incomplete: true, ..Default::default() };
         for end in 0..=source.len() {
@@ -56,6 +58,75 @@ fn editor_recovery_handles_each_truncated_prefix_without_changing_valid_trees() 
             }
         }
     }
+}
+
+fn assert_missing_static_member(source: &'static str) {
+    for source in [source, source.trim_end()] {
+        let file = File::ephemeral(b"a.php".as_slice().into(), source.as_bytes().into());
+        let arena = LocalArena::new();
+        let strict = parse_file_borrowed_with_settings(&arena, &file, ParserSettings::default());
+        assert!(!strict.errors.is_empty(), "{source}");
+        assert!(!strict.statements.iter().any(|statement| matches!(statement, Statement::Expression(_))), "{source}");
+
+        let recovered = parse_file_borrowed_with_settings(
+            &arena,
+            &file,
+            ParserSettings { recover_incomplete: true, ..Default::default() },
+        );
+        assert!(!recovered.errors.is_empty(), "{source}");
+        assert!(
+            recovered
+                .errors
+                .iter()
+                .all(|error| !matches!(error, ParseError::UnexpectedEndOfFile(Expected::OneOf([]), ..))),
+            "{source}: {:?}",
+            recovered.errors
+        );
+
+        let Some(Statement::Expression(statement)) = recovered.statements.last() else {
+            panic!("{source}: missing expression statement")
+        };
+        assert!(matches!(statement.terminator, Terminator::Missing(_)), "{source}");
+
+        let expression = match statement.expression {
+            Expression::Assignment(assignment) => assignment.rhs,
+            Expression::Call(Call::Function(call)) => {
+                assert_eq!(call.argument_list.arguments.len(), 1, "{source}");
+                call.argument_list.arguments[0].value()
+            }
+            expression => expression,
+        };
+        let Expression::Access(Access::ClassConstant(access)) = expression else {
+            panic!("{source}: missing static access: {expression:?}")
+        };
+        let Expression::Identifier(class) = access.class else { panic!("{source}: missing class name") };
+        assert_eq!(class.value(), b"Foo", "{source}");
+        let ClassLikeConstantSelector::Missing(span) = access.constant else {
+            panic!("{source}: expected missing member")
+        };
+        assert_eq!(span.length(), 0, "{source}");
+        assert!(access.end_offset() <= file.size, "{source}");
+    }
+}
+
+#[test]
+fn editor_recovery_keeps_static_access_at_eof() {
+    assert_missing_static_member(include_str!("fixtures/issue_2589_static_access.php"));
+}
+
+#[test]
+fn editor_recovery_keeps_static_access_argument_at_eof() {
+    assert_missing_static_member(include_str!("fixtures/issue_2589_static_argument.php"));
+}
+
+#[test]
+fn editor_recovery_keeps_static_property_at_eof() {
+    assert_missing_static_member(include_str!("fixtures/issue_2589_static_property.php"));
+}
+
+#[test]
+fn editor_recovery_keeps_static_property_argument_at_eof() {
+    assert_missing_static_member(include_str!("fixtures/issue_2589_static_property_argument.php"));
 }
 
 fn function_body<'arena>(program: &'arena Program<'arena>) -> Option<&'arena [Statement<'arena>]> {

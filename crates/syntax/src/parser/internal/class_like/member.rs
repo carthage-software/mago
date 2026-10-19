@@ -92,7 +92,10 @@ where
         };
 
         Ok(match token.kind {
-            T!["$"] | T!["${"] | T!["$variable"] => ClassLikeMemberSelector::Variable(self.parse_variable()?),
+            T!["$"] | T!["${"] | T!["$variable"] => match self.parse_variable() {
+                Ok(variable) => ClassLikeMemberSelector::Variable(variable),
+                Err(error) => ClassLikeMemberSelector::Missing(self.recover_at_eof(error)?),
+            },
             T!["{"] => ClassLikeMemberSelector::Expression(ClassLikeMemberExpressionSelector {
                 left_brace: self.stream.eat_span(T!["{"])?,
                 expression: self.parse_expression()?,
