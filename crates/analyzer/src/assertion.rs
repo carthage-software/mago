@@ -164,7 +164,8 @@ where
         }
         Expression::Construct(construct) => match construct {
             Construct::Empty(empty_construct) => {
-                let Some(value_id) = assertion_context.get_expression_id(empty_construct.value) else {
+                let Some(value_id) = get_isset_expression_id(empty_construct.value, artifacts, assertion_context)
+                else {
                     return vec![];
                 };
 
