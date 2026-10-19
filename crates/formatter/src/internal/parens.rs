@@ -263,12 +263,10 @@ where
 
     /// Check if a class constant access needs parentheses based on its parent context.
     ///
-    /// PHP grammar does not allow class constant access directly after `new` or `instanceof`:
-    /// - `new Foo::BAR()` is a parse error - needs `new (Foo::BAR)()`
+    /// PHP grammar does not allow class constant access directly after `instanceof`:
     /// - `$x instanceof Foo::BAR` is a parse error - needs `$x instanceof (Foo::BAR)`
     ///
     /// However, static property access is allowed:
-    /// - `new Foo::$bar()` is valid
     /// - `$x instanceof Foo::$bar` is valid
     fn class_constant_access_needs_parens(&self, node: Node<'arena, 'arena>) -> bool {
         let Node::Access(Access::ClassConstant(_)) = node else {
@@ -283,10 +281,6 @@ where
             Some(Node::Binary(binary)) if matches!(binary.operator, BinaryOperator::Instanceof(_)) => {
                 let unwrapped_rhs = unwrap_parenthesized(binary.rhs);
                 unwrapped_rhs.span() == node_span
-            }
-            Some(Node::Instantiation(inst)) => {
-                let unwrapped_class = unwrap_parenthesized(inst.class);
-                unwrapped_class.span() == node_span
             }
             _ => false,
         }
@@ -586,8 +580,22 @@ where
             return self.instantiation_needs_parens(i);
         }
 
-        if instantiation && matches!(expression, Expression::Call(_)) {
-            return true;
+        if instantiation {
+            let mut expression = expression;
+            loop {
+                expression = match unwrap_parenthesized(expression) {
+                    Expression::ArrayAccess(access) => access.array,
+                    Expression::Access(Access::Property(access)) => access.object,
+                    Expression::Access(Access::NullSafeProperty(access)) => access.object,
+                    Expression::Access(Access::StaticProperty(access)) => access.class,
+                    Expression::Variable(_)
+                    | Expression::Identifier(_)
+                    | Expression::Static(_)
+                    | Expression::Self_(_)
+                    | Expression::Parent(_) => return false,
+                    _ => return true,
+                };
+            }
         }
 
         if let Expression::Construct(construct) = expression {
