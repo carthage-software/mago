@@ -26,7 +26,6 @@ use mago_server::workspace::Workspace;
 use mago_server::workspace::directory_aliases::DirectoryAliases;
 
 use crate::config::Configuration;
-use crate::consts::PRELUDE_BYTES;
 use crate::error::Error;
 use crate::language_server::ServerConfig;
 use crate::language_server::diagnostic_cache::DiagnosticCache;
@@ -59,8 +58,7 @@ fn build(folder: PathBuf, server_config: &ServerConfig, strict: bool) -> Result<
             server_config.configuration.clone()
         }
     };
-    let prelude = Prelude::decode(PRELUDE_BYTES).map_err(|e| format!("decode prelude: {e}"))?;
-    let Prelude { database: prelude_db, metadata, symbol_references } = prelude;
+    let Prelude { database: prelude_db, metadata, symbol_references } = crate::prelude::load();
 
     let parser_settings = configuration.parser.to_settings();
     let analyzer_settings = configuration.analyzer.to_settings(configuration.php_version, ColorChoice::Never, false);
