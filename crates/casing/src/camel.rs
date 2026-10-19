@@ -86,9 +86,26 @@ mod tests {
             assert_eq!(to_camel_case(name).as_ref(), name.as_bytes());
         }
 
+        // An uppercase letter after a digit starts a new word.
+        for name in ["x509Certificate", "isB2B", "sha256Hash"] {
+            assert!(is_camel_case(name), "{name} should be camel case");
+            assert_eq!(to_camel_case(name).as_ref(), name.as_bytes());
+        }
+
         // A separator before the digit still starts a new word.
         assert_eq!(to_camel_case("foo_2bar").as_ref(), b"foo2Bar");
         assert!(!is_camel_case("foo_2bar"));
+        assert_eq!(to_camel_case("X_2bar").as_ref(), b"x2Bar");
+    }
+
+    #[test]
+    fn conversion_is_idempotent() {
+        for input in ["X_2bar", "X509Certificate", "B2B", "b2b", "foo2bar", "foo_2bar", "FOO_BAR_2", "isB2b", "Foo2Bar"]
+        {
+            let once = to_camel_case(input).into_owned();
+            assert!(is_camel_case(&once), "{input} converts to non-canonical {:?}", String::from_utf8_lossy(&once));
+            assert_eq!(to_camel_case(&once).as_ref(), once.as_slice(), "{input}");
+        }
     }
 
     #[test]

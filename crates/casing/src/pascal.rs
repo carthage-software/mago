@@ -68,6 +68,28 @@ mod tests {
     }
 
     #[test]
+    fn letter_after_digit_keeps_its_case() {
+        for name in ["X509Certificate", "B2B", "B2b", "Http2Client", "Sha256Hash", "Base64url", "User2"] {
+            assert!(is_pascal_case(name), "{name} should be pascal case");
+            assert_eq!(to_pascal_case(name).as_ref(), name.as_bytes());
+        }
+
+        // A separator before the digit still starts a new word.
+        assert_eq!(to_pascal_case("X_2bar").as_ref(), b"X2Bar");
+        assert!(!is_pascal_case("X_2bar"));
+    }
+
+    #[test]
+    fn conversion_is_idempotent() {
+        for input in ["X_2bar", "x_2bar", "X509CERTIFICATE", "b2b", "foo2bar", "foo_2bar", "FOO_BAR_2", "isB2b", "B2B"]
+        {
+            let once = to_pascal_case(input).into_owned();
+            assert!(is_pascal_case(&once), "{input} converts to non-canonical {:?}", String::from_utf8_lossy(&once));
+            assert_eq!(to_pascal_case(&once).as_ref(), once.as_slice(), "{input}");
+        }
+    }
+
+    #[test]
     fn supports_byte_input() {
         assert_eq!(to_pascal_case(b"foo_bar").as_ref(), b"FooBar");
         assert!(is_pascal_case(b"FooBar"));
