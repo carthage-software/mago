@@ -25,6 +25,7 @@ final class ReferenceType implements AtomicType
         public readonly ?array $intersections,
         public readonly ?string $member,
         public readonly ?ReferenceSelectorKind $selector,
+        public readonly ?string $fallback = null,
     ) {}
 
     public function __toString(): string

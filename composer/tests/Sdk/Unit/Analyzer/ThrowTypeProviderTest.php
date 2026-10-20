@@ -69,7 +69,7 @@ final class ThrowTypeProviderTest extends TestCase
         $writer->writeU32(13);
         $writer->writeBytes('$input');
         $writer->writeBoolean(false);
-        $payload = pack('N3', 0x4D41_4E41, 0x0002_0001, 20 << 16) . $writer->finish();
+        $payload = pack('N3', 0x4D41_4E41, 0x0002_0002, 20 << 16) . $writer->finish();
 
         [, $reader] = Protocol::readRequest($payload);
         $request = Protocol::readReturnTypeRequest($reader);
@@ -94,7 +94,7 @@ final class ThrowTypeProviderTest extends TestCase
         $writer->writeU32(22);
         $writer->writeBytes('$value[0]');
         $writer->writeBoolean(false);
-        $payload = pack('N3', 0x4D41_4E41, 0x0002_0001, 21 << 16) . $writer->finish();
+        $payload = pack('N3', 0x4D41_4E41, 0x0002_0002, 21 << 16) . $writer->finish();
 
         [, $reader] = Protocol::readRequest($payload);
         $request = Protocol::readExpressionThrowTypeRequest($reader);

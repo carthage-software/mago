@@ -13,4 +13,5 @@ enum ReferenceSelectorKind
     case Identifier;
     case StartsWith;
     case EndsWith;
+    case Fallback;
 }

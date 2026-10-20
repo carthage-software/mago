@@ -609,6 +609,9 @@ fn expand_global_reference(
 ) {
     let (constant, constants) = match selector {
         TGlobalReferenceSelector::Identifier(name) => (codebase.constants.get_key_value(name), None),
+        TGlobalReferenceSelector::Fallback { name, fallback } => {
+            (codebase.constants.get_key_value(name).or_else(|| codebase.constants.get_key_value(fallback)), None)
+        }
         _ => (None, Some(&codebase.constants)),
     };
 

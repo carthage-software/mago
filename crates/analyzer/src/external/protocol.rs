@@ -133,7 +133,7 @@ use crate::invocation::MethodTargetContext;
 
 pub const ANALYZER_PROTOCOL_MAGIC: [u8; 4] = *b"MANA";
 pub const ANALYZER_PROTOCOL_MAJOR: u16 = 2;
-pub const ANALYZER_PROTOCOL_MINOR: u16 = 1;
+pub const ANALYZER_PROTOCOL_MINOR: u16 = 2;
 
 const HEADER_LENGTH: usize = 12;
 const INITIAL_MESSAGE_CAPACITY: usize = 256;
@@ -1943,6 +1943,11 @@ fn encode_reference_snapshot<'type_info>(
                     writer.write_u8(2);
                     writer.write_bytes(name.as_bytes())?;
                 }
+                TGlobalReferenceSelector::Fallback { name, fallback } => {
+                    writer.write_u8(5);
+                    writer.write_bytes(name.as_bytes())?;
+                    writer.write_bytes(fallback.as_bytes())?;
+                }
                 TGlobalReferenceSelector::StartsWith(prefix) => {
                     writer.write_u8(3);
                     writer.write_bytes(prefix.as_bytes())?;
@@ -3065,6 +3070,10 @@ fn decode_complete_reference(
                 2 => TGlobalReferenceSelector::Identifier(word(reader.read_bytes("global reference name")?)),
                 3 => TGlobalReferenceSelector::StartsWith(word(reader.read_bytes("global reference prefix")?)),
                 4 => TGlobalReferenceSelector::EndsWith(word(reader.read_bytes("global reference suffix")?)),
+                5 => TGlobalReferenceSelector::Fallback {
+                    name: word(reader.read_bytes("global reference name")?),
+                    fallback: word(reader.read_bytes("global reference fallback")?),
+                },
                 unknown => return Err(protocol(format!("unknown global reference selector {unknown}"))),
             },
         },
@@ -3368,16 +3377,29 @@ pub(super) mod testing {
 
     #[test]
     fn global_constant_references_roundtrip() {
-        let reference = TReference::Global { selector: TGlobalReferenceSelector::Identifier(word(b"MODE_OBJECT")) };
-        let mut writer = PayloadWriter::new();
-        let mut types = Vec::new();
-        let mut table = SnapshotTypeTable { offset: 0, types: &mut types };
-        encode_reference_snapshot(&mut writer, &reference, &mut table, 0).unwrap();
+        for selector in [
+            TGlobalReferenceSelector::Identifier(word(b"MODE_OBJECT")),
+            TGlobalReferenceSelector::Fallback { name: word(b"app\\MODE_OBJECT"), fallback: word(b"MODE_OBJECT") },
+        ] {
+            let reference = TReference::Global { selector };
+            let mut writer = PayloadWriter::new();
+            let mut types = Vec::new();
+            let mut table = SnapshotTypeTable { offset: 0, types: &mut types };
+            encode_reference_snapshot(&mut writer, &reference, &mut table, 0).unwrap();
 
-        let payload = writer.finish();
-        let mut reader = PayloadReader::new(&payload);
-        assert_eq!(decode_complete_reference(&mut reader, 0).unwrap(), reference);
-        reader.finish().unwrap();
+            let payload = writer.finish();
+            let mut reader = PayloadReader::new(&payload);
+            assert_eq!(decode_complete_reference(&mut reader, 0).unwrap(), reference);
+            reader.finish().unwrap();
+        }
+    }
+
+    #[test]
+    fn constant_fallback_references_reject_old_protocol_headers() {
+        let mut payload = message_writer(CALLABLE_SIGNATURE_RESPONSE).finish();
+        payload[6..8].copy_from_slice(&1u16.to_be_bytes());
+        assert!(matches!(message_kind(&payload),
+            Err(ExternalAnalyzerError::Protocol(message)) if message.contains("unsupported analyzer protocol version 2.1")));
     }
 
     #[test]

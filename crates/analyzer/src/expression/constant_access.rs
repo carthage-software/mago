@@ -32,8 +32,13 @@ impl<'arena> Analyzable<'_, 'arena> for ConstantAccess<'arena> {
         let name = BytesDisplay(name_bytes);
         let unqualified_name = self.name.value();
 
-        let constant_metadata =
-            context.codebase.get_constant(name_bytes).or_else(|| context.codebase.get_constant(unqualified_name));
+        let constant_metadata = context.codebase.get_constant(name_bytes).or_else(|| {
+            if !self.name.is_local() || context.resolved_names.is_imported(&self.name) {
+                return None;
+            }
+
+            context.codebase.get_constant(unqualified_name)
+        });
 
         let Some(constant_metadata) = constant_metadata else {
             if let Some(literal_type) = get_literal_constant_type(name_bytes) {

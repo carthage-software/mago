@@ -613,6 +613,7 @@ final class TypeCodec
             $writer,
             $reference->selector ?? throw new ProtocolException('A member or global reference requires a selector.'),
             $reference->member,
+            $reference->fallback,
         );
     }
 
@@ -620,16 +621,22 @@ final class TypeCodec
         PayloadWriter $writer,
         ReferenceSelectorKind $selector,
         ?string $member,
+        ?string $fallback,
     ): void {
         $writer->writeU8(match ($selector) {
             ReferenceSelectorKind::Wildcard => 1,
             ReferenceSelectorKind::Identifier => 2,
             ReferenceSelectorKind::StartsWith => 3,
             ReferenceSelectorKind::EndsWith => 4,
+            ReferenceSelectorKind::Fallback => 5,
         });
 
         if ($selector !== ReferenceSelectorKind::Wildcard) {
             $writer->writeBytes($member ?? '');
+        }
+
+        if ($selector === ReferenceSelectorKind::Fallback) {
+            $writer->writeBytes($fallback ?? throw new ProtocolException('A fallback reference requires a name.'));
         }
     }
 
@@ -1139,14 +1146,15 @@ final class TypeCodec
         };
     }
 
-    /** @return array{?string, ReferenceSelectorKind} */
+    /** @return array{?string, ReferenceSelectorKind, ?string} */
     private static function readReferenceSelector(PayloadReader $reader): array
     {
         return match ($kind = $reader->readU8()) {
-            1 => [null, ReferenceSelectorKind::Wildcard],
-            2 => [$reader->readBytes(), ReferenceSelectorKind::Identifier],
-            3 => [$reader->readBytes(), ReferenceSelectorKind::StartsWith],
-            4 => [$reader->readBytes(), ReferenceSelectorKind::EndsWith],
+            1 => [null, ReferenceSelectorKind::Wildcard, null],
+            2 => [$reader->readBytes(), ReferenceSelectorKind::Identifier, null],
+            3 => [$reader->readBytes(), ReferenceSelectorKind::StartsWith, null],
+            4 => [$reader->readBytes(), ReferenceSelectorKind::EndsWith, null],
+            5 => [$reader->readBytes(), ReferenceSelectorKind::Fallback, $reader->readBytes()],
             default => throw new ProtocolException("Unknown reference selector kind {$kind}."),
         };
     }

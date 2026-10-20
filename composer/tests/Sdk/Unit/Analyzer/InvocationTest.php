@@ -168,7 +168,7 @@ final class InvocationTest extends TestCase
 
     private static function messagePayload(string $payload): string
     {
-        return pack('N3', 0x4D41_4E41, 0x0002_0001, 2 << 16) . $payload;
+        return pack('N3', 0x4D41_4E41, 0x0002_0002, 2 << 16) . $payload;
     }
 
     private static function decode(string $payload): ReturnTypeRequest

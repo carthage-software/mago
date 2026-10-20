@@ -758,9 +758,14 @@ fn infer_constant<'ctx, 'arena>(
         }
     }
 
-    Some(wrap_atomic(TAtomic::Reference(TReference::Global {
-        selector: TGlobalReferenceSelector::Identifier(ascii_lowercase_constant_name_word(fqn)),
-    })))
+    let name = ascii_lowercase_constant_name_word(fqn);
+    let selector = if constant.is_local() && !names.is_imported(constant) && fqn != constant.value() {
+        TGlobalReferenceSelector::Fallback { name, fallback: ascii_lowercase_constant_name_word(constant.value()) }
+    } else {
+        TGlobalReferenceSelector::Identifier(name)
+    };
+
+    Some(wrap_atomic(TAtomic::Reference(TReference::Global { selector })))
 }
 
 #[inline]

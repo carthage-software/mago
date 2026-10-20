@@ -1009,10 +1009,17 @@ pub fn populate_atomic_type(
                 }
             }
             TReference::Global { selector } => {
-                if let TGlobalReferenceSelector::Identifier(name) = selector
-                    && let Some(reference_source) = reference_source
-                {
-                    add_symbol_reference(reference_source, symbol_references, *name);
+                if let Some(reference_source) = reference_source {
+                    match selector {
+                        TGlobalReferenceSelector::Identifier(name) => {
+                            add_symbol_reference(reference_source, symbol_references, *name);
+                        }
+                        TGlobalReferenceSelector::Fallback { name, fallback } => {
+                            add_symbol_reference(reference_source, symbol_references, *name);
+                            add_symbol_reference(reference_source, symbol_references, *fallback);
+                        }
+                        _ => {}
+                    }
                 }
             }
         },

@@ -43,6 +43,10 @@ pub enum TGlobalReferenceSelector {
     StartsWith(Word),
     /// A global constant whose name ends with a given suffix, e.g. `*_SUFFIX`.
     EndsWith(Word),
+    Fallback {
+        name: Word,
+        fallback: Word,
+    },
 }
 
 impl TGlobalReferenceSelector {
@@ -52,6 +56,7 @@ impl TGlobalReferenceSelector {
     pub fn matches(&self, name: Word) -> bool {
         match self {
             Self::Identifier(identifier) => name == *identifier,
+            Self::Fallback { name: primary, fallback } => name == *primary || name == *fallback,
             Self::StartsWith(prefix) => name.as_bytes().starts_with(prefix.as_bytes()),
             Self::EndsWith(suffix) => name.as_bytes().ends_with(suffix.as_bytes()),
         }
@@ -190,6 +195,9 @@ impl TType for TReference {
             },
             TReference::Global { selector } => match selector {
                 TGlobalReferenceSelector::Identifier(name) => concat_word!(b"unknown-global-ref(", name, b")"),
+                TGlobalReferenceSelector::Fallback { name, fallback } => {
+                    concat_word!(b"unknown-global-ref(", name, b" ?? ", fallback, b")")
+                }
                 TGlobalReferenceSelector::StartsWith(name) => {
                     concat_word!(b"unknown-global-ref(", name, b"*)")
                 }

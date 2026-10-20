@@ -385,6 +385,11 @@ impl Renderer<'_> {
                 output.extend_from_slice(b"unknown-global-ref(");
                 match selector {
                     TGlobalReferenceSelector::Identifier(name) => output.extend_from_slice(name.as_bytes()),
+                    TGlobalReferenceSelector::Fallback { name, fallback } => {
+                        output.extend_from_slice(name.as_bytes());
+                        output.extend_from_slice(b" ?? ");
+                        output.extend_from_slice(fallback.as_bytes());
+                    }
                     TGlobalReferenceSelector::StartsWith(name) => {
                         output.extend_from_slice(name.as_bytes());
                         output.push(b'*');

@@ -42,7 +42,7 @@ final class EffectiveCallableSignatureTest extends TestCase
         ]);
         $reader = new PayloadReader(Protocol::writeCallableSignatureResponse($signature));
         self::assertSame(0x4D41_4E41, $reader->readU32());
-        self::assertSame(0x0002_0001, $reader->readU32());
+        self::assertSame(0x0002_0002, $reader->readU32());
         self::assertSame(0x800C_0000, $reader->readU32());
         self::assertTrue($reader->readBoolean());
         self::assertFalse($reader->readBoolean());
