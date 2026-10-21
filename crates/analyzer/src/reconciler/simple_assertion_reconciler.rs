@@ -1224,7 +1224,9 @@ where
     for atomic in existing_var_type.types.as_ref() {
         match atomic {
             TAtomic::Scalar(TScalar::Bool(existing_bool)) => {
-                if existing_bool.is_general() || *existing_bool == boolean {
+                if boolean.is_general() {
+                    acceptable_types.push(atomic.clone());
+                } else if existing_bool.is_general() || *existing_bool == boolean {
                     acceptable_types.push(TAtomic::Scalar(TScalar::Bool(boolean)));
                 } else {
                     did_remove_type = true;

@@ -167,6 +167,10 @@ where
     left_block_context.parent_conflicting_clause_variables.clear();
     left_block_context.reconciled_expression_clauses = Vec::new();
 
+    // Inside an `if` condition, a nested conjunction leaves the types of its true branch in
+    // the context, so keep the types from before the left operand for its falsy branch.
+    let pre_left_locals = block_context.if_body_context.is_some().then(|| block_context.locals.clone());
+
     let left_was_inside_general_use = left_block_context.flags.inside_general_use();
     left_block_context.flags.set_inside_general_use(true);
     binary.lhs.analyze(context, &mut left_block_context, artifacts)?;
@@ -417,6 +421,14 @@ where
         right_assigned_var_ids.keys().any(|var_id| right_block_context.locals.contains_key(var_id));
 
     if has_right_assignments {
+        if let Some(pre_left_locals) = pre_left_locals {
+            for (var_id, var_type) in pre_left_locals {
+                if !left_block_context.assigned_variable_ids.contains_key(&var_id) {
+                    left_block_context.locals.insert(var_id, var_type);
+                }
+            }
+        }
+
         let left_clauses = get_formula(
             binary.lhs.span(),
             binary.lhs.span(),
