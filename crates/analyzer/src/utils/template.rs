@@ -97,6 +97,7 @@ where
                                         calling_template_extended,
                                         &combined_parameters.into_iter().collect::<WordMap<_>>(),
                                     )
+                                    .unwrap_or_else(get_mixed)
                                 } else {
                                     wrap_atomic(atomic_type.clone())
                                 };
@@ -177,21 +178,20 @@ where
 ///
 /// # Returns
 ///
-/// An `TUnion` representing the resolved concrete type for the template parameter,
-/// or `any` if it cannot be resolved.
+/// The resolved type for the template parameter, or `None` if no type was inferred.
 pub fn get_generic_parameter_for_offset(
     class_like_name: Word,
     template_name: Word,
     template_extended_parameters: &WordMap<IndexMap<Word, TUnion, RandomState>>,
     found_generic_parameters: &WordMap<Vec<GenericTemplate>>,
-) -> TUnion {
+) -> Option<TUnion> {
     if let Some(result_map) = found_generic_parameters.get(&template_name)
         && let Some(found_parameter_type) = result_map
             .iter()
             .find(|t| t.defining_entity == GenericParent::ClassLike(class_like_name))
             .map(|t| &t.constraint)
     {
-        return found_parameter_type.clone();
+        return Some(found_parameter_type.clone());
     }
 
     for (extending_class_name, type_map) in template_extended_parameters {
@@ -216,5 +216,5 @@ pub fn get_generic_parameter_for_offset(
         }
     }
 
-    get_mixed()
+    None
 }

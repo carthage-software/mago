@@ -12,12 +12,16 @@ use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::atomic::scalar::class_like_string::TClassLikeString;
+use mago_codex::ttype::expander;
 use mago_codex::ttype::expander::StaticClassType;
+use mago_codex::ttype::expander::TypeExpansionOptions;
+use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::get_object;
 use mago_codex::ttype::template::GenericTemplate;
 use mago_codex::ttype::template::TemplateResult;
 use mago_codex::ttype::template::bounds::get_most_specific_type_from_bounds;
+use mago_codex::ttype::template::inferred_type_replacer;
 use mago_codex::ttype::template::variance::Variance;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;
@@ -374,7 +378,7 @@ where
         }
 
         let mut resolved_template_types = vec![];
-        for (offset, (template_name, _)) in metadata.template_types.iter().enumerate() {
+        for (offset, (template_name, template)) in metadata.template_types.iter().enumerate() {
             let mut template_type = if let Some(lower_bounds) =
                 template_result.get_lower_bounds_for_class_like(*template_name, metadata.name)
             {
@@ -405,6 +409,9 @@ where
                     &metadata.template_extended_parameters,
                     &found_generic_parameters,
                 )
+                .unwrap_or_else(|| {
+                    if template.default.is_some() { wrap_atomic(TAtomic::Placeholder) } else { get_mixed() }
+                })
             } else if is_spl_object_storage {
                 get_never()
             } else {
@@ -449,6 +456,32 @@ where
                 .map(|(_, _)| if is_spl_object_storage { get_never() } else { wrap_atomic(TAtomic::Placeholder) })
                 .collect(),
         );
+    }
+
+    if let Some(parameters) = &mut type_parameters
+        && metadata.template_types.values().any(|template| template.default.is_some())
+        && parameters.iter().any(TUnion::is_placeholder)
+    {
+        let mut resolved_templates = TemplateResult::default();
+        for ((template_name, template), parameter) in metadata.template_types.iter().zip(parameters) {
+            if parameter.is_placeholder()
+                && let Some(default) = &template.default
+            {
+                *parameter = inferred_type_replacer::replace(default, &resolved_templates, context.codebase);
+                expander::expand_union(
+                    context.codebase,
+                    parameter,
+                    &TypeExpansionOptions {
+                        self_class: Some(metadata.name),
+                        static_class_type: StaticClassType::Exact(metadata.name),
+                        function_is_final: metadata.flags.is_final(),
+                        ..Default::default()
+                    },
+                );
+            }
+
+            resolved_templates.add_lower_bound(*template_name, template.defining_entity, parameter.clone());
+        }
     }
 
     let skip_constructor_warning =
