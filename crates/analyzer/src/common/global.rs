@@ -17,7 +17,6 @@ use mago_codex::ttype::get_int_range;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_non_empty_string;
 use mago_codex::ttype::get_non_negative_int;
-use mago_codex::ttype::get_one_int;
 use mago_codex::ttype::get_positive_int;
 use mago_codex::ttype::get_string;
 use mago_codex::ttype::get_truthy_string;
@@ -41,7 +40,7 @@ std::thread_local! {
         }));
 
         map.insert(word("$argc"), Rc::new({
-            let mut type_union = get_one_int();
+            let mut type_union = get_positive_int();
 
             type_union.set_ignore_nullable_issues(true);
             type_union

@@ -2888,6 +2888,8 @@ test_case!(issue_2563);
 test_case!(issue_2585);
 test_case!(issue_2594);
 test_case!(issue_2600);
+test_case!(issue_2607_argc);
+test_case!(issue_2607_count);
 test_case!(simplexml_truthiness);
 test_case!(closure_capture_by_reference_array);
 test_case!(nullable_receiver_method_call);
