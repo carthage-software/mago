@@ -1574,7 +1574,7 @@ where
     let var_name = assertion_context.get_expression_id(base_conditional);
 
     if let Some(var_name) = var_name {
-        if_types.insert(var_name, vec![vec![Assertion::IsType(TAtomic::Scalar(TScalar::r#true()))]]);
+        if_types.insert(var_name, vec![vec![Assertion::IsNotType(TAtomic::Scalar(TScalar::r#true()))]]);
     }
 
     vec![if_types]
