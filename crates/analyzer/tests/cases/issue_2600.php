@@ -214,3 +214,187 @@ function mutationOnRightInvalidatesAssertion(Box $box, bool $result): Item
     // @mago-expect analysis:nullable-return-statement,invalid-return-statement
     return $box->get();
 }
+
+function stop(Box $box): never
+{
+    $box->item = null;
+
+    exit;
+}
+
+function terminatingRightOfOr(Box $box, bool $flag): Item
+{
+    if (!$box->has()) {
+        return new Item();
+    }
+
+    $flag || stop($box);
+
+    return $box->get();
+}
+
+function terminatingRightOfAnd(Box $box, bool $flag): Item
+{
+    if (!$box->has()) {
+        return new Item();
+    }
+
+    $flag && stop($box);
+
+    return $box->get();
+}
+
+function terminatingRightOfOrInIf(Box $box, bool $flag): Item
+{
+    if (!$box->has()) {
+        return new Item();
+    }
+
+    if ($flag || stop($box)) {
+    }
+
+    return $box->get();
+}
+
+function terminatingRightOfAndInIf(Box $box, bool $flag): Item
+{
+    if (!$box->has()) {
+        return new Item();
+    }
+
+    if ($flag && stop($box)) {
+    }
+
+    return $box->get();
+}
+
+function terminatingNestedOr(Box $box, bool $flag, bool $other): Item
+{
+    if (!$box->has()) {
+        return new Item();
+    }
+
+    if ($flag || ($other || stop($box))) {
+    }
+
+    return $box->get();
+}
+
+function terminatingNestedAnd(Box $box, bool $flag, bool $other): Item
+{
+    if (!$box->has()) {
+        return new Item();
+    }
+
+    if ($flag && ($other && stop($box))) {
+    }
+
+    return $box->get();
+}
+
+/** @param list<bool> $flags */
+function terminatingRightOfOrInLoop(Box $box, array $flags): Item
+{
+    if (!$box->has()) {
+        return new Item();
+    }
+
+    foreach ($flags as $flag) {
+        $flag || stop($box);
+
+        return $box->get();
+    }
+
+    return new Item();
+}
+
+/** @param list<bool> $flags */
+function terminatingRightOfAndInLoop(Box $box, array $flags): Item
+{
+    if (!$box->has()) {
+        return new Item();
+    }
+
+    foreach ($flags as $flag) {
+        $flag && stop($box);
+
+        return $box->get();
+    }
+
+    return new Item();
+}
+
+function mutatingLeftOfTerminatingOr(Box $box, bool $flag): Item
+{
+    if (!$box->has()) {
+        return new Item();
+    }
+
+    $box->reset($flag) || stop($box);
+
+    // @mago-expect analysis:nullable-return-statement,invalid-return-statement
+    return $box->get();
+}
+
+function mutatingLeftOfTerminatingAnd(Box $box, bool $flag): Item
+{
+    if (!$box->has()) {
+        return new Item();
+    }
+
+    if ($box->reset($flag) && stop($box)) {
+    }
+
+    // @mago-expect analysis:nullable-return-statement,invalid-return-statement
+    return $box->get();
+}
+
+function conditionalMutationInAndInvalidatesAssertion(Box $box, bool $flag, bool $result): Item
+{
+    if (!$box->has()) {
+        return new Item();
+    }
+
+    $flag && $box->reset($result);
+
+    // @mago-expect analysis:nullable-return-statement,invalid-return-statement
+    return $box->get();
+}
+
+/** @throws \RuntimeException */
+function throwAfterReset(Box $box): never
+{
+    $box->item = null;
+
+    throw new \RuntimeException();
+}
+
+function caughtThrowOnRightOfOr(Box $box, bool $flag): Item
+{
+    if (!$box->has()) {
+        return new Item();
+    }
+
+    try {
+        $flag || throwAfterReset($box);
+    } catch (\RuntimeException) {
+    }
+
+    // @mago-expect analysis:nullable-return-statement,invalid-return-statement
+    return $box->get();
+}
+
+function caughtThrowOnRightOfAnd(Box $box, bool $flag): Item
+{
+    if (!$box->has()) {
+        return new Item();
+    }
+
+    try {
+        $flag && throwAfterReset($box);
+    } catch (\RuntimeException) {
+    }
+
+    // @mago-expect analysis:nullable-return-statement,invalid-return-statement
+    return $box->get();
+}

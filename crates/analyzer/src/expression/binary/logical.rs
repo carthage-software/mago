@@ -370,13 +370,19 @@ where
         .parent_conflicting_clause_variables
         .extend(right_block_context.parent_conflicting_clause_variables.iter().copied());
 
-    // The right-hand side context started from the left-hand side context, so it holds every
-    // method call that is still stable after either operand ran. Narrowings recorded before this
-    // expression survive only if neither operand invalidated them.
-    block_context.stable_method_calls.clone_from(&right_block_context.stable_method_calls);
+    let continuing_context = if !block_context.flags.inside_try()
+        && (right_block_context.flags.has_returned()
+            || artifacts.get_expression_type(binary.rhs).is_some_and(TUnion::is_never))
+    {
+        &left_block_context
+    } else {
+        &right_block_context
+    };
+
+    block_context.stable_method_calls.clone_from(&continuing_context.stable_method_calls);
     block_context.stable_method_call_assertions.retain(|method_call, _| {
         left_block_context.stable_method_call_assertions.contains_key(method_call)
-            && right_block_context.stable_method_call_assertions.contains_key(method_call)
+            && continuing_context.stable_method_call_assertions.contains_key(method_call)
     });
 
     if let Some(if_body_context) = &block_context.if_body_context
@@ -769,11 +775,18 @@ where
         block_context.assigned_variable_ids.extend(right_block_context.assigned_variable_ids.clone());
     }
 
-    // Keep method targets available for branch reconciliation, but do not carry assertions
-    // established only on the right across an expression that can short-circuit.
-    block_context.stable_method_calls.clone_from(&right_block_context.stable_method_calls);
+    let continuing_context = if !block_context.flags.inside_try()
+        && (right_block_context.flags.has_returned()
+            || artifacts.get_expression_type(binary.rhs).is_some_and(TUnion::is_never))
+    {
+        &left_block_context
+    } else {
+        &right_block_context
+    };
+
+    block_context.stable_method_calls.clone_from(&continuing_context.stable_method_calls);
     block_context.stable_method_call_assertions.retain(|method_call, assertions| {
-        right_block_context
+        continuing_context
             .stable_method_call_assertions
             .get(method_call)
             .is_some_and(|current| assertions.iter().all(|clause| current.contains(clause)))
