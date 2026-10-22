@@ -87,6 +87,13 @@ Here is a small checklist to get you going:
 
 Before we can merge your pull request, please follow these guidelines to maintain code quality and consistency:
 
+### One Open Pull Request
+
+Keep only one pull request open at a time, including drafts. Wait until it is merged or closed before opening another.
+Code reviews take human time and effort, and we cannot review several PRs from one person at once.
+
+Repository maintainers and collaborators are exempt from this limit.
+
 ### Tests
 
 If you are submitting a bug-fix, please add a test case to reproduce the bug.

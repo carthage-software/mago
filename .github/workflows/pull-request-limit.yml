@@ -1,0 +1,63 @@
+name: One Open Pull Request
+
+on:
+  pull_request_target:
+    types: [opened, reopened]
+
+concurrency:
+  group: pull-request-limit-${{ github.event.pull_request.user.id }}
+  cancel-in-progress: false
+
+jobs:
+  enforce:
+    name: Limit open pull requests per author
+    runs-on: ubuntu-latest
+    permissions:
+      pull-requests: write
+    steps:
+      - name: Close extra pull requests
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const { data: pullRequest } = await github.rest.pulls.get({
+              ...context.repo,
+              pull_number: context.issue.number
+            });
+
+            if (['OWNER', 'MEMBER', 'COLLABORATOR'].includes(pullRequest.author_association)) {
+              return;
+            }
+
+            const pullRequests = await github.paginate(github.rest.pulls.list, {
+              ...context.repo,
+              state: 'open',
+              sort: 'created',
+              direction: 'asc',
+              per_page: 100
+            });
+
+            const [oldest, ...extraPullRequests] = pullRequests
+              .filter(pull => pull.user?.id === pullRequest.user.id)
+              .sort((left, right) => left.number - right.number);
+
+            for (const pull of extraPullRequests) {
+              await github.rest.issues.createComment({
+                ...context.repo,
+                issue_number: pull.number,
+                body: [
+                  'Thank you for contributing. Mago allows one open pull request per person, including drafts.',
+                  `Your pull request #${oldest.number} is still open, so we are closing this one.`,
+                  '',
+                  'Code reviews take human time and effort. Our team cannot review several PRs from one person at once. Please do not submit PRs in bulk.',
+                  '',
+                  `Please wait until #${oldest.number} is merged or closed before reopening this PR or opening another.`,
+                  'Repository maintainers and collaborators are exempt from this limit.'
+                ].join('\n')
+              });
+
+              await github.rest.pulls.update({
+                ...context.repo,
+                pull_number: pull.number,
+                state: 'closed'
+              });
+            }
