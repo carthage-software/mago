@@ -12,12 +12,15 @@ use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::object::named::TNamedObject;
 use mago_codex::ttype::atomic::scalar::class_like_string::TClassLikeString;
+use mago_codex::ttype::expander;
 use mago_codex::ttype::expander::StaticClassType;
+use mago_codex::ttype::expander::TypeExpansionOptions;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::get_object;
 use mago_codex::ttype::template::GenericTemplate;
 use mago_codex::ttype::template::TemplateResult;
 use mago_codex::ttype::template::bounds::get_most_specific_type_from_bounds;
+use mago_codex::ttype::template::inferred_type_replacer;
 use mago_codex::ttype::template::variance::Variance;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;
@@ -449,6 +452,32 @@ where
                 .map(|(_, _)| if is_spl_object_storage { get_never() } else { wrap_atomic(TAtomic::Placeholder) })
                 .collect(),
         );
+    }
+
+    if let Some(parameters) = &mut type_parameters
+        && metadata.template_types.values().any(|template| template.default.is_some())
+    {
+        let mut resolved_templates = TemplateResult::default();
+        for ((template_name, template), parameter) in metadata.template_types.iter().zip(parameters) {
+            if parameter.is_placeholder()
+                && let Some(default) = &template.default
+            {
+                // Apply defaults after inference and widening, using the final types of earlier parameters.
+                *parameter = inferred_type_replacer::replace(default, &resolved_templates, context.codebase);
+                expander::expand_union(
+                    context.codebase,
+                    parameter,
+                    &TypeExpansionOptions {
+                        self_class: Some(metadata.name),
+                        static_class_type: StaticClassType::Exact(metadata.name),
+                        function_is_final: metadata.flags.is_final(),
+                        ..Default::default()
+                    },
+                );
+            }
+
+            resolved_templates.add_lower_bound(*template_name, template.defining_entity, parameter.clone());
+        }
     }
 
     let skip_constructor_warning =
