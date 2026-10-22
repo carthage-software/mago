@@ -526,6 +526,16 @@ fn expand_member_reference(
     options: &TypeExpansionOptions,
     new_return_type_parts: &mut Vec<TAtomic>,
 ) {
+    let class_like_name = if class_like_name.as_bytes().eq_ignore_ascii_case(b"parent") {
+        options
+            .self_class
+            .and_then(|name| codebase.get_class_like_by_name(name))
+            .and_then(|metadata| metadata.direct_parent_class)
+            .unwrap_or(class_like_name)
+    } else {
+        class_like_name
+    };
+
     if let TReferenceMemberSelector::Identifier(member_name) = member_selector
         && member_name.as_bytes().eq_ignore_ascii_case(b"class")
     {

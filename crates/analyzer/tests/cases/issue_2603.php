@@ -251,3 +251,89 @@ function noDefault(): void
     needsInt($object->value);
     needsString($object->value);
 }
+
+/** @template T */
+class DefaultConstructorParent
+{
+    /** @param T $value */
+    public function __construct(public mixed $value) {}
+}
+
+/**
+ * @template T = string
+ * @template U = list<T>
+ * @extends DefaultConstructorParent<T>
+ */
+class InheritedConstructorDefault extends DefaultConstructorParent
+{
+    /** @var U */
+    public $items;
+}
+
+/** @param list<string> $value */
+function needsStringList(array $value): void {}
+
+/** @param list<int> $value */
+function needsIntList(array $value): void {}
+
+/** @param list<mixed> $value */
+function needsMixedList(array $value): void {}
+
+function inheritedConstructorDefaults(string $value, mixed $unknown): void
+{
+    $strings = new InheritedConstructorDefault($value);
+    needsStringList($strings->items);
+    // @mago-expect analysis:invalid-argument
+    needsIntList($strings->items);
+
+    $integers = new InheritedConstructorDefault(42);
+    needsIntList($integers->items);
+    // @mago-expect analysis:invalid-argument
+    needsStringList($integers->items);
+
+    $mixed = new InheritedConstructorDefault($unknown);
+    needsMixedList($mixed->items);
+    // @mago-expect analysis:mixed-argument
+    needsString($mixed->value);
+}
+
+/**
+ * @template TId of int|null = int|null
+ * @extends DefaultConstructorParent<string>
+ */
+class InheritedScalarDefault extends DefaultConstructorParent
+{
+    /** @var TId */
+    public $id;
+}
+
+function inheritedScalarDefault(): void
+{
+    $article = new InheritedScalarDefault('value');
+    // @mago-expect analysis:possibly-null-argument
+    needsInt($article->id);
+    // @mago-expect analysis:invalid-argument,possibly-null-argument
+    needsString($article->id);
+}
+
+class DefaultConstantParent
+{
+    public const DEFAULT_VALUE = 42;
+}
+
+/** @template T of int = parent::DEFAULT_VALUE */
+class ParentConstantDefault extends DefaultConstantParent
+{
+    public const DEFAULT_VALUE = 43;
+
+    /** @var T */
+    public $value;
+}
+
+function parentConstantDefault(): void
+{
+    $object = new ParentConstantDefault();
+    needs42($object->value);
+    // @mago-expect analysis:invalid-argument
+    needs43($object->value);
+}

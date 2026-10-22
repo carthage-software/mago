@@ -15,6 +15,7 @@ use mago_codex::ttype::atomic::scalar::class_like_string::TClassLikeString;
 use mago_codex::ttype::expander;
 use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::expander::TypeExpansionOptions;
+use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::get_object;
 use mago_codex::ttype::template::GenericTemplate;
@@ -377,7 +378,7 @@ where
         }
 
         let mut resolved_template_types = vec![];
-        for (offset, (template_name, _)) in metadata.template_types.iter().enumerate() {
+        for (offset, (template_name, template)) in metadata.template_types.iter().enumerate() {
             let mut template_type = if let Some(lower_bounds) =
                 template_result.get_lower_bounds_for_class_like(*template_name, metadata.name)
             {
@@ -408,6 +409,9 @@ where
                     &metadata.template_extended_parameters,
                     &found_generic_parameters,
                 )
+                .unwrap_or_else(|| {
+                    if template.default.is_some() { wrap_atomic(TAtomic::Placeholder) } else { get_mixed() }
+                })
             } else if is_spl_object_storage {
                 get_never()
             } else {
@@ -456,13 +460,13 @@ where
 
     if let Some(parameters) = &mut type_parameters
         && metadata.template_types.values().any(|template| template.default.is_some())
+        && parameters.iter().any(TUnion::is_placeholder)
     {
         let mut resolved_templates = TemplateResult::default();
         for ((template_name, template), parameter) in metadata.template_types.iter().zip(parameters) {
             if parameter.is_placeholder()
                 && let Some(default) = &template.default
             {
-                // Apply defaults after inference and widening, using the final types of earlier parameters.
                 *parameter = inferred_type_replacer::replace(default, &resolved_templates, context.codebase);
                 expander::expand_union(
                     context.codebase,
