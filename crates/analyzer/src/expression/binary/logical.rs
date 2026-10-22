@@ -370,13 +370,19 @@ where
         .parent_conflicting_clause_variables
         .extend(right_block_context.parent_conflicting_clause_variables.iter().copied());
 
-    // The right-hand side context started from the left-hand side context, so it holds every
-    // method call that is still stable after either operand ran. Narrowings recorded before this
-    // expression survive only if neither operand invalidated them.
-    block_context.stable_method_calls.clone_from(&right_block_context.stable_method_calls);
+    let continuing_context = if !block_context.flags.inside_try()
+        && (right_block_context.flags.has_returned()
+            || artifacts.get_expression_type(binary.rhs).is_some_and(TUnion::is_never))
+    {
+        &left_block_context
+    } else {
+        &right_block_context
+    };
+
+    block_context.stable_method_calls.clone_from(&continuing_context.stable_method_calls);
     block_context.stable_method_call_assertions.retain(|method_call, _| {
         left_block_context.stable_method_call_assertions.contains_key(method_call)
-            && right_block_context.stable_method_call_assertions.contains_key(method_call)
+            && continuing_context.stable_method_call_assertions.contains_key(method_call)
     });
 
     if let Some(if_body_context) = &block_context.if_body_context
@@ -607,8 +613,9 @@ where
         // true || x → true (no fix)
         report_redundant_logical_operation(context, binary, "always true", "not evaluated", "`true`", None);
         result_type = get_true();
-        right_block_context.flags.set_has_returned(true);
-        binary.rhs.analyze(context, &mut right_block_context, artifacts)?;
+        let mut dead_rhs_context = right_block_context.clone();
+        dead_rhs_context.flags.set_has_returned(true);
+        binary.rhs.analyze(context, &mut dead_rhs_context, artifacts)?;
     } else {
         if !negated_type_assertions.is_empty() {
             reconciler::reconcile_keyed_types(
@@ -768,6 +775,23 @@ where
         block_context.assigned_variable_ids.extend(right_block_context.assigned_variable_ids.clone());
     }
 
+    let continuing_context = if !block_context.flags.inside_try()
+        && (right_block_context.flags.has_returned()
+            || artifacts.get_expression_type(binary.rhs).is_some_and(TUnion::is_never))
+    {
+        &left_block_context
+    } else {
+        &right_block_context
+    };
+
+    block_context.stable_method_calls.clone_from(&continuing_context.stable_method_calls);
+    block_context.stable_method_call_assertions.retain(|method_call, assertions| {
+        continuing_context
+            .stable_method_call_assertions
+            .get(method_call)
+            .is_some_and(|current| assertions.iter().all(|clause| current.contains(clause)))
+    });
+
     if let Some(if_body_context) = &block_context.if_body_context {
         let mut if_body_context_inner = if_body_context.borrow_mut();
         for (var_id, right_type) in &right_block_context.locals {
@@ -790,6 +814,13 @@ where
         if_body_context_inner
             .assigned_variable_ids
             .extend(block_context.assigned_variable_ids.iter().map(|(k, v)| (*k, *v)));
+        if_body_context_inner.stable_method_calls.clone_from(&block_context.stable_method_calls);
+        if_body_context_inner.stable_method_call_assertions.retain(|method_call, assertions| {
+            block_context
+                .stable_method_call_assertions
+                .get(method_call)
+                .is_some_and(|current| assertions.iter().all(|clause| current.contains(clause)))
+        });
     }
 
     let has_right_assignments =

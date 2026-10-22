@@ -129,6 +129,16 @@ where
         condition.analyze(context, &mut if_conditional_context, artifacts)?;
         if_conditional_context.flags.set_inside_conditional(was_inside_conditional);
 
+        for target_context in [&mut post_if_context, &mut *externally_applied_context] {
+            target_context.stable_method_calls.clone_from(&if_conditional_context.stable_method_calls);
+            target_context.stable_method_call_assertions.retain(|method_call, assertions| {
+                if_conditional_context
+                    .stable_method_call_assertions
+                    .get(method_call)
+                    .is_some_and(|current| assertions.iter().all(|clause| current.contains(clause)))
+            });
+        }
+
         for variable_id in if_conditional_context.assigned_variable_ids.keys() {
             if post_if_context.locals.contains_key(variable_id)
                 && let Some(variable_type) = if_conditional_context.locals.get(variable_id)
