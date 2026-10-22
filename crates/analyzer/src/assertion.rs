@@ -1611,7 +1611,7 @@ where
                     Ordering::Greater => {
                         if_types.insert(
                             array_variable_id,
-                            vec![vec![Assertion::DoesNotHasAtLeastCount(maximum_count as usize)]],
+                            vec![vec![Assertion::DoesNotHasAtLeastCount((maximum_count as usize).saturating_add(1))]],
                         );
                     }
                 }
@@ -1843,7 +1843,7 @@ where
                     Ordering::Greater => {
                         if_types.insert(
                             array_variable_id,
-                            vec![vec![Assertion::DoesNotHasAtLeastCount(maximum_count as usize)]],
+                            vec![vec![Assertion::DoesNotHasAtLeastCount((maximum_count as usize).saturating_add(1))]],
                         );
                     }
                 }
