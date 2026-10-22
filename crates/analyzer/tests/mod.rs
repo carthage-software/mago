@@ -2886,6 +2886,7 @@ test_case!(issue_2520);
 test_case!(issue_2523);
 test_case!(issue_2563);
 test_case!(issue_2585);
+test_case!(issue_2591);
 test_case!(issue_2594);
 test_case!(simplexml_truthiness);
 test_case!(closure_capture_by_reference_array);
