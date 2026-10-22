@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 final class Item
 {
+    /** @mutation-free */
     public function name(): string
     {
         return 'item';
