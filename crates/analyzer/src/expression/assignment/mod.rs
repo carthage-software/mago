@@ -52,6 +52,7 @@ use crate::context::scope::var_references_dynamic;
 use crate::error::AnalysisError;
 use crate::expression::find_expression_logic_issues;
 use crate::formula::get_formula;
+use crate::formula::negate_or_synthesize;
 use crate::resolver::function::is_builtin_function_call;
 use crate::utils::docblock::check_docblock_type_incompatibility;
 use crate::utils::docblock::get_type_from_var_docblock;
@@ -1263,6 +1264,18 @@ fn handle_assignment_with_boolean_logic<'ctx, 'arena, A>(
         return;
     }
 
+    let right_clauses = right_clauses.into_iter().map(Rc::unwrap_or_clone).collect::<Vec<_>>();
+    let negated_clauses = negate_or_synthesize(
+        &right_clauses,
+        source_expression,
+        context.get_assertion_context_from_block(block_context),
+        artifacts,
+        &context.settings.algebra_thresholds(),
+        context.settings.formula_size_threshold,
+    );
+    let negated_clauses =
+        BlockContext::filter_clauses(context, variable_id, negated_clauses.into_iter().map(Rc::new).collect(), None);
+
     let mut covered_variable_ids: WordSet = WordSet::default();
     covered_variable_ids.insert(variable_id);
     for clause in &right_clauses {
@@ -1273,19 +1286,28 @@ fn handle_assignment_with_boolean_logic<'ctx, 'arena, A>(
 
     block_context.parent_conflicting_clause_variables.retain(|var| !covered_variable_ids.contains(var));
 
-    let mut possibilities = AssertionMap::default();
-    possibilities.insert(variable_id, AssertionMap::from_iter([(Assertion::Falsy.to_hash(), Assertion::Falsy)]));
+    for (assertion, clauses) in [
+        (Assertion::Falsy, right_clauses),
+        (Assertion::Truthy, negated_clauses.into_iter().map(Rc::unwrap_or_clone).collect()),
+    ] {
+        if clauses.is_empty() {
+            continue;
+        }
 
-    block_context.clauses.extend(
-        disjoin_clauses(
-            vec![Clause::new(possibilities, variable_expression_id, variable_expression_id, None, None, None)],
-            right_clauses.into_iter().map(|v| (*v).clone()).collect(),
-            source_expression.span(),
-            &context.settings.algebra_thresholds(),
-        )
-        .into_iter()
-        .map(Rc::new),
-    );
+        let mut possibilities = AssertionMap::default();
+        possibilities.insert(variable_id, AssertionMap::from_iter([(assertion.to_hash(), assertion)]));
+
+        block_context.clauses.extend(
+            disjoin_clauses(
+                vec![Clause::new(possibilities, variable_expression_id, variable_expression_id, None, None, None)],
+                clauses,
+                source_expression.span(),
+                &context.settings.algebra_thresholds(),
+            )
+            .into_iter()
+            .map(Rc::new),
+        );
+    }
 }
 
 fn is_closure_expression<'arena>(expression: &'arena Expression<'arena>) -> bool {
