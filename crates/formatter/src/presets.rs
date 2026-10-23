@@ -165,6 +165,7 @@ const DEFAULT_PRESET: FormatSettings = FormatSettings {
     align_parameters: false,
     array_table_style_alignment: true,
     align_assignment_like: false,
+    align_double_arrows: false,
     sort_uses: SortUses(SortOrder::AlphanumericAscending),
     sort_class_methods: false,
     separate_use_types: true,
