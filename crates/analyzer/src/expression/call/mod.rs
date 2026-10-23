@@ -264,7 +264,9 @@ where
             resulting_type
         }
     } else {
+        crate::callables::record_unresolved_callable_closure_arguments(context, artifacts, &invocation_arguments);
         analyze_invocation_arguments_source(context, block_context, artifacts, &invocation_arguments)?;
+        crate::callables::record_unresolved_callable_arguments(context, artifacts, &invocation_arguments);
 
         if encountered_mixed_targets {
             get_mixed()

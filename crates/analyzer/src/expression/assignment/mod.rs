@@ -271,6 +271,66 @@ where
         property_write_kind,
     )?;
 
+    if successful
+        && context.settings.check_throws
+        && context.settings.forbid_checked_exceptions_in_callables
+        && assignment_operator.is_none()
+    {
+        if let Some(source_expression) = source_expression {
+            for parameter_offset in crate::invocation::callbacks::callable_parameter_offsets_referenced_in_expression(
+                block_context,
+                source_expression,
+            ) {
+                artifacts.record_callback_parameter_escape(parameter_offset);
+            }
+        }
+
+        let escapes_scope = block_context.is_global_scope()
+            || target_variable_id
+                .is_some_and(|variable| block_context.references_to_external_scope.contains(&variable))
+            || crate::callables::callable_storage_target_is_static_local(
+                target_expression,
+                &block_context.static_locals,
+            )
+            || crate::callables::callable_storage_target_escapes_scope(target_expression);
+        let storage_location = crate::callables::is_local_callable_storage_expression(target_expression)
+            .then(|| {
+                get_root_expression_id(target_expression).map(|variable| crate::artifacts::CallableStorageLocation {
+                    scope: block_context.scope.get_function_like_identifier(),
+                    variable,
+                })
+            })
+            .flatten();
+
+        if let Some(storage_location) = storage_location {
+            artifacts.clear_callable_storage_location(storage_location);
+        }
+
+        crate::callables::record_stored_callables(
+            artifacts,
+            &source_type,
+            context.codebase,
+            escapes_scope,
+            storage_location,
+        );
+
+        if matches!(unwrap_expression(target_expression), Expression::ArrayAccess(_))
+            && let Some(root_variable) = get_root_expression_id(target_expression)
+            && let Some(root_type) = block_context.locals.get(&root_variable)
+        {
+            crate::callables::refresh_stored_array_callables(
+                artifacts,
+                root_type,
+                context.codebase,
+                escapes_scope,
+                crate::artifacts::CallableStorageLocation {
+                    scope: block_context.scope.get_function_like_identifier(),
+                    variable: root_variable,
+                },
+            );
+        }
+    }
+
     if !successful {
         if matches!(
             target_expression,

@@ -104,6 +104,24 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Return<'arena> {
             Rc::new(get_void())
         };
 
+        if context.settings.check_throws
+            && context.settings.forbid_checked_exceptions_in_callables
+            && self.value.is_some()
+        {
+            if let Some(value) = self.value {
+                for parameter_offset in
+                    crate::invocation::callbacks::callable_parameter_offsets_referenced_in_expression(
+                        block_context,
+                        value,
+                    )
+                {
+                    artifacts.record_callback_parameter_escape(parameter_offset);
+                }
+            }
+
+            crate::callables::record_stored_callables(artifacts, &inferred_return_type, context.codebase, true, None);
+        }
+
         handle_return_value(context, block_context, artifacts, self.value, inferred_return_type, self.span());
 
         Ok(())

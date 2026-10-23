@@ -6,7 +6,10 @@ use std::borrow::Cow;
 use std::path::Path;
 use std::path::PathBuf;
 use std::sync::LazyLock;
+use std::time::Duration;
+use std::time::Instant;
 
+use criterion::Bencher;
 use criterion::BenchmarkId;
 use criterion::Criterion;
 use criterion::criterion_group;
@@ -32,7 +35,7 @@ use mago_word::WordSet;
 static PRELUDE: LazyLock<Prelude> = LazyLock::new(Prelude::build);
 static PLUGIN_REGISTRY: LazyLock<PluginRegistry> = LazyLock::new(PluginRegistry::with_library_providers);
 
-fn analyze_file(path: &Path, content: &str) {
+fn analyze_file(path: &Path, content: &str, forbid_checked_exceptions_in_callables: bool) {
     let Prelude { mut database, mut metadata, mut symbol_references } = PRELUDE.clone();
 
     let file = File::ephemeral(
@@ -55,6 +58,7 @@ fn analyze_file(path: &Path, content: &str) {
         find_unused_expressions: true,
         find_unused_definitions: true,
         check_throws: true,
+        forbid_checked_exceptions_in_callables,
         allow_possibly_undefined_array_keys: false,
         strict_list_index_checks: true,
         check_property_initialization: true,
@@ -72,7 +76,75 @@ fn analyze_file(path: &Path, content: &str) {
     }
 }
 
-const BENCHMARKED_PREFIXES: &[&str] = &["issue_", "psl_", "sealed_class_", "trait_", "conditional_"];
+fn bench_forbid_checked_exceptions(
+    b: &mut Bencher<'_>,
+    path: &Path,
+    content: &str,
+    forbid_checked_exceptions_in_callables: bool,
+) {
+    // Prepare immutable inputs once; each timed iteration gets a fresh analyzer
+    // arena and result, while only `analyzer.analyze` contributes to the sample.
+    let Prelude { mut database, mut metadata, mut symbol_references } = PRELUDE.clone();
+
+    let file = File::ephemeral(
+        Cow::Owned(path.file_name().unwrap().to_string_lossy().into_owned().into_bytes()),
+        Cow::Owned(content.as_bytes().to_vec()),
+    );
+    let file_id = database.add(file);
+    let source_file = database.get_ref(&file_id).expect("file just added must exist");
+
+    let arena = LocalArena::new();
+    let program = parse_file(&arena, source_file);
+    if program.has_errors() {
+        panic!("Parse failed for {}: {:?}", path.display(), program.errors);
+    }
+
+    let resolved_names = NameResolver::new(&arena).resolve(program);
+
+    let settings = Settings {
+        find_unused_expressions: true,
+        find_unused_definitions: true,
+        check_throws: true,
+        forbid_checked_exceptions_in_callables,
+        allow_possibly_undefined_array_keys: false,
+        strict_list_index_checks: true,
+        check_property_initialization: true,
+        ..Default::default()
+    };
+
+    metadata.extend(scan_program(&arena, source_file, program, &resolved_names, settings.version));
+    populate_codebase(&mut metadata, &mut symbol_references, WordSet::default(), HashSet::default());
+
+    b.iter_custom(|iterations| {
+        let mut measured = Duration::ZERO;
+
+        for _ in 0..iterations {
+            let analysis_arena = LocalArena::new();
+            let analyzer = Analyzer::new(
+                &analysis_arena,
+                source_file,
+                &resolved_names,
+                &metadata,
+                &PLUGIN_REGISTRY,
+                settings.clone(),
+            );
+            let mut analysis_result = AnalysisResult::new(symbol_references.clone());
+
+            let started = Instant::now();
+            if let Err(error) = analyzer.analyze(program, &mut analysis_result) {
+                panic!("Analysis failed for {}: {error}", path.display());
+            }
+            measured += started.elapsed();
+
+            std::hint::black_box(analysis_result);
+        }
+
+        measured
+    });
+}
+
+const BENCHMARKED_PREFIXES: &[&str] =
+    &["issue_", "psl_", "sealed_class_", "trait_", "conditional_", "forbid_checked_exceptions_"];
 
 fn discover_cases_by_prefix() -> Vec<(&'static str, Vec<(PathBuf, String)>)> {
     let cases_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("cases");
@@ -112,13 +184,23 @@ fn bench_cases(c: &mut Criterion) {
         }
 
         let bench_name = prefix.trim_end_matches('_');
-        group.bench_with_input(BenchmarkId::from_parameter(bench_name), &files, |b, files| {
-            b.iter(|| {
-                for (p, c) in files {
-                    analyze_file(p, c);
-                }
+        if prefix == "forbid_checked_exceptions_" {
+            assert_eq!(files.len(), 1, "expected one focused checked-exception benchmark fixture");
+            let (path, content) = &files[0];
+            for (mode, enabled) in [("disabled", false), ("enabled", true)] {
+                group.bench_with_input(BenchmarkId::new(bench_name, mode), &(path, content), |b, input| {
+                    bench_forbid_checked_exceptions(b, input.0, input.1, enabled);
+                });
+            }
+        } else {
+            group.bench_with_input(BenchmarkId::from_parameter(bench_name), &files, |b, files| {
+                b.iter(|| {
+                    for (p, c) in files {
+                        analyze_file(p, c, false);
+                    }
+                });
             });
-        });
+        }
     }
 
     group.finish();

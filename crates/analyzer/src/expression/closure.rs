@@ -25,6 +25,7 @@ use mago_word::word;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
+use crate::artifacts::CallableEffectSummary;
 use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
@@ -45,6 +46,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
         A: Arena,
     {
         let s = self.span();
+        let identifier = FunctionLikeIdentifier::for_closure(context.source_file, s);
+        let defer_thrown_check = context.settings.forbid_checked_exceptions_in_callables
+            && crate::callables::has_unallowed_deferred_callable_callsite(context, artifacts, identifier);
 
         let Some(function_metadata) = context.codebase.get_closure_at(context.source_file, s) else {
             return Err(AnalysisError::InternalError(
@@ -218,7 +222,18 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
             &self.parameter_list,
             FunctionLikeBody::Statements(self.body.statements.as_slice(), self.body.span()),
             inferred_parameter_types,
+            defer_thrown_check,
         )?;
+
+        let effects = CallableEffectSummary {
+            possibly_thrown_exceptions: inner_block_context.possibly_thrown_exceptions.clone(),
+        };
+        artifacts.record_callable_effects(s, effects.clone());
+        artifacts.record_callable_effects_for_identifier(
+            FunctionLikeIdentifier::Closure(function_metadata.name),
+            s,
+            effects,
+        );
 
         for referenced_variable in inner_block_context.references_to_external_scope {
             let Some(inner_type) = inner_block_context.locals.remove(&referenced_variable) else {

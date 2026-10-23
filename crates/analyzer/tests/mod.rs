@@ -37,6 +37,16 @@ macro_rules! test_case {
             test.run();
         }
     };
+    ($test_name:ident, $settings:expr, issues = [$($issue:literal),* $(,)?]) => {
+        #[test]
+        fn $test_name() {
+            let content = include_bytes!(concat!("cases/", stringify!($test_name), ".php"));
+            $crate::framework::TestCase::new(stringify!($test_name), content)
+                .settings($settings)
+                .expect_issues(vec![$($issue),*])
+                .run();
+        }
+    };
     ($test_name:ident, $settings:expr) => {
         #[test]
         fn $test_name() {
@@ -321,6 +331,30 @@ test_case!(issue_2503_dead_catch, {
 test_case!(issue_2503_check_throws_disabled, {
     let mut settings = default_test_settings();
     settings.check_throws = false;
+    settings
+});
+
+test_case!(
+    forbid_checked_exceptions_in_callables,
+    {
+        let mut settings = default_test_settings();
+        settings.forbid_checked_exceptions_in_callables = true;
+        settings.allowed_checked_exception_callables.insert(mago_word::word(b"trusted_callbacks:0"));
+        settings.allowed_checked_exception_callables.insert(mago_word::word(b"trusteddispatcher::consume:0"));
+        settings
+    },
+    issues = ["unhandled-thrown-type"]
+);
+test_case!(deferred_callable_callback_classification, {
+    let mut settings = default_test_settings();
+    settings.forbid_checked_exceptions_in_callables = true;
+    settings
+});
+test_case!(deferred_callable_exception_option_disabled);
+test_case!(deferred_callable_exception_without_check_throws, {
+    let mut settings = default_test_settings();
+    settings.check_throws = false;
+    settings.forbid_checked_exceptions_in_callables = true;
     settings
 });
 test_case!(docblock_param_out);
