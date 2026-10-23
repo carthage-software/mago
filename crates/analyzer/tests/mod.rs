@@ -2893,6 +2893,7 @@ test_case!(issue_2601);
 test_case!(issue_2607_argc);
 test_case!(issue_2607_count);
 test_case!(issue_2603);
+test_case!(issue_2611);
 test_case!(issue_2612);
 test_case!(issue_2612_intersections);
 test_case!(simplexml_truthiness);
