@@ -7,7 +7,7 @@ declare(strict_types=1);
  *
  * @throws RuntimeException
  *
- * @return array{'fragment'?: non-empty-string, 'host'?: non-empty-string, 'pass'?: non-empty-string, 'path'?: non-empty-string, 'port'?: int<0, 65535>, 'query'?: non-empty-string, 'scheme'?: non-empty-string, 'user'?: non-empty-string}
+ * @return array{'fragment'?: string, 'host'?: non-empty-string, 'pass'?: string, 'path'?: non-empty-string, 'port'?: int<0, 65535>, 'query'?: string, 'scheme'?: non-empty-string, 'user'?: string}
  */
 function getFullResult(string $url): array
 {
@@ -79,7 +79,7 @@ function getPort(string $url): ?int
  *
  * @throws RuntimeException
  *
- * @return non-empty-string|null
+ * @return string|null
  */
 function getUser(string $url): ?string
 {
@@ -97,7 +97,7 @@ function getUser(string $url): ?string
  *
  * @throws RuntimeException
  *
- * @return non-empty-string|null
+ * @return string|null
  */
 function getPass(string $url): ?string
 {
@@ -133,7 +133,7 @@ function getPath(string $url): ?string
  *
  * @throws RuntimeException
  *
- * @return non-empty-string|null
+ * @return string|null
  */
 function getQuery(string $url): ?string
 {
@@ -151,7 +151,7 @@ function getQuery(string $url): ?string
  *
  * @throws RuntimeException
  *
- * @return non-empty-string|null
+ * @return string|null
  */
 function getFragment(string $url): ?string
 {
@@ -169,7 +169,7 @@ function getFragment(string $url): ?string
  *
  * @throws RuntimeException
  *
- * @return array{'fragment'?: non-empty-string, 'host'?: non-empty-string, 'pass'?: non-empty-string, 'path'?: non-empty-string, 'port'?: int<0, 65535>, 'query'?: non-empty-string, 'scheme'?: non-empty-string, 'user'?: non-empty-string}
+ * @return array{'fragment'?: string, 'host'?: non-empty-string, 'pass'?: string, 'path'?: non-empty-string, 'port'?: int<0, 65535>, 'query'?: string, 'scheme'?: non-empty-string, 'user'?: string}
  */
 function getFullResultWithMinusOne(string $url): array
 {
