@@ -70,6 +70,7 @@ impl Plugin for StdlibPlugin {
         registry.register_function_call_hook(session::SessionSetCookieParamsHook);
         registry.register_function_call_hook(math::IntdivHook);
 
+        registry.register_method_provider(closure::ClosureFromCallableProvider);
         registry.register_method_provider(closure::ClosureGetCurrentProvider);
         registry.register_method_provider(r#enum::EnumCasesProvider);
         registry.register_method_provider(reflection::ReflectionMethodGetNameProvider);
