@@ -94,6 +94,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Method<'arena> {
                 &self.parameter_list,
                 FunctionLikeBody::Statements(concrete_body.statements.as_slice(), concrete_body.span()),
                 None,
+                false,
             )?;
 
             let method_key = (class_like_metadata.name, lowercase_method_name);

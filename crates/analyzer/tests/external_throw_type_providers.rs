@@ -76,28 +76,40 @@ function disabled_expression_fallback(): void { 2 + 2; }
 ";
 
 #[test]
-fn external_throw_type_providers_override_and_fall_back_to_native_contracts() {
+fn external_throw_type_providers_override_and_fall_back_to_native_contracts() -> Result<(), Box<dyn std::error::Error>>
+{
+    macro_rules! ensure {
+        ($condition:expr, $message:expr $(,)?) => {
+            if !$condition {
+                return Err(std::io::Error::other($message).into());
+            }
+        };
+        ($condition:expr $(,)?) => {
+            if !$condition {
+                return Err(std::io::Error::other(stringify!($condition)).into());
+            }
+        };
+    }
+
     let repository = Path::new(env!("CARGO_MANIFEST_DIR")).join("../..");
     let available = repository.join("vendor/autoload.php").is_file()
         && std::process::Command::new("php").arg("--version").output().is_ok_and(|output| output.status.success());
-    assert!(
-        available || std::env::var_os("MAGO_REQUIRE_PHP_SDK_TESTS").is_none(),
-        "PHP and vendor dependencies are required for the external throw-type provider test"
-    );
     if !available {
-        return;
+        ensure!(
+            std::env::var_os("MAGO_REQUIRE_PHP_SDK_TESTS").is_none(),
+            "PHP and vendor dependencies are required for the external throw-type provider test"
+        );
+        return Ok(());
     }
 
     let command = WorkerCommand::new("php")
         .with_argument(repository.join("composer/tests/Sdk/Fixtures/analyzer-throw-type-worker.php"))
         .with_current_directory(repository.clone());
-    let pool = WorkerPool::spawn(command, NonZeroUsize::MIN, WorkerPoolOptions::default())
-        .expect("failed to start the external analyzer worker pool");
-    let external = ExternalAnalyzer::initialize([Arc::new(pool)], PHPVersion::PHP85, &[], false)
-        .expect("failed to initialize the external analyzer");
+    let pool = WorkerPool::spawn(command, NonZeroUsize::MIN, WorkerPoolOptions::default())?;
+    let external = ExternalAnalyzer::initialize([Arc::new(pool)], PHPVersion::PHP85, &[], false)?;
     let mut registry = PluginRegistry::with_library_providers();
     registry.set_external_analyzer(Arc::new(ExternalAnalyzerHandle::ready(external)));
-    registry.prepare_external_analyzer().expect("failed to prepare the external analyzer");
+    registry.prepare_external_analyzer()?;
 
     let file = Arc::new(File::new(
         Cow::Borrowed(b"src/throw-types.php"),
@@ -107,7 +119,7 @@ fn external_throw_type_providers_override_and_fall_back_to_native_contracts() {
     ));
     let arena = LocalArena::new();
     let program = parse_file(&arena, &file);
-    assert!(!program.has_errors(), "the throw-type fixture should parse");
+    ensure!(!program.has_errors(), "the throw-type fixture should parse");
     let resolved_names = NameResolver::new(&arena).resolve(program);
     let mut codebase = PRELUDE.metadata.clone();
     codebase.extend(scan_program(&arena, &file, program, &resolved_names, PHPVersion::PHP85));
@@ -123,7 +135,7 @@ fn external_throw_type_providers_override_and_fall_back_to_native_contracts() {
     let analyzer = Analyzer::new(&arena, &file, &resolved_names, &codebase, &registry, settings)
         .with_external_analysis_session(&session);
     let mut result = AnalysisResult::new(symbol_references);
-    analyzer.analyze(program, &mut result).expect("analysis with the external analyzer failed");
+    analyzer.analyze(program, &mut result)?;
 
     let messages = result
         .issues
@@ -131,26 +143,28 @@ fn external_throw_type_providers_override_and_fall_back_to_native_contracts() {
         .filter(|issue| issue.code.as_deref() == Some("unhandled-thrown-type"))
         .map(|issue| issue.message.to_string())
         .collect::<Vec<_>>();
-    assert_eq!(messages.len(), 6, "unexpected unhandled-throw findings: {messages:#?}");
-    assert!(
+    ensure!(messages.len() == 6, format!("unexpected unhandled-throw findings: {messages:#?}"));
+    ensure!(
         messages.iter().any(|message| message.contains("RuntimeException") && message.contains("function_override"))
     );
-    assert!(
+    ensure!(
         messages.iter().any(|message| message.contains("FallbackException") && message.contains("function_fallback"))
     );
-    assert!(messages.iter().any(|message| message.contains("RuntimeException") && message.contains("method_override")));
-    assert!(messages.iter().any(|message| message.contains("DomainException") && message.contains("expression_throw")));
-    assert!(
+    ensure!(messages.iter().any(|message| message.contains("RuntimeException") && message.contains("method_override")));
+    ensure!(messages.iter().any(|message| message.contains("DomainException") && message.contains("expression_throw")));
+    ensure!(
         messages
             .iter()
             .any(|message| message.contains("FallbackException") && message.contains("disabled_function_fallback"))
     );
-    assert!(
+    ensure!(
         messages
             .iter()
             .any(|message| message.contains("FallbackException") && message.contains("disabled_method_fallback"))
     );
-    assert!(!messages.iter().any(|message| message.contains("function_empty")));
-    assert!(!messages.iter().any(|message| message.contains("function_caught")));
-    assert!(!messages.iter().any(|message| message.contains("disabled_expression_fallback")));
+    ensure!(!messages.iter().any(|message| message.contains("function_empty")));
+    ensure!(!messages.iter().any(|message| message.contains("function_caught")));
+    ensure!(!messages.iter().any(|message| message.contains("disabled_expression_fallback")));
+
+    Ok(())
 }

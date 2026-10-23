@@ -17,9 +17,11 @@ use mago_codex::identifier::function_like::FunctionLikeIdentifier;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
+use mago_codex::ttype::atomic::callable::TCallable;
 use mago_codex::ttype::atomic::resource::TResource;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::bool::TBool;
+use mago_codex::ttype::cast::cast_atomic_to_callable;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator::can_expression_types_be_identical;
 use mago_codex::ttype::comparator::union_comparator::is_contained_by;
@@ -59,6 +61,8 @@ use crate::invocation::MethodInvocationKind;
 use crate::invocation::arguments::is_argument_mutated_by_reference;
 use crate::invocation::arguments::is_argument_referenceable;
 use crate::invocation::arguments::is_array_multisort;
+use crate::invocation::callbacks::builtin_callback_spec;
+use crate::invocation::callbacks::immediate_builtin_callback_map_values;
 use crate::invocation::resolver::resolve_invocation_type;
 use crate::plugin::provider::assertion::InvocationAssertions;
 use crate::reconciler;
@@ -204,6 +208,8 @@ where
 
             collect_plugin_throw_types(context, block_context, artifacts, invoication, identifier);
         }
+
+        record_immediate_builtin_callback_throw_types(context, block_context, artifacts, invoication);
     }
 
     if !apply_assertions {
@@ -352,6 +358,124 @@ where
         false,
         &mut ComparisonResult::default(),
     )
+}
+
+fn record_immediate_builtin_callback_throw_types<'ctx, 'arena, A>(
+    context: &Context<'ctx, 'arena, A>,
+    block_context: &mut BlockContext<'ctx>,
+    artifacts: &mut AnalysisArtifacts,
+    invocation: &Invocation<'ctx, '_, 'arena>,
+) where
+    A: Arena,
+{
+    let Some(callback_spec) = builtin_callback_spec(&invocation.target) else {
+        return;
+    };
+
+    let mut callback_expressions = Vec::new();
+    let mut callback_map_value_types = Vec::new();
+    if let Some(parameter_offset) = callback_spec.callback_parameter_offset()
+        && let (Some(callback_expression), _) =
+            get_argument_for_parameter(context, block_context, invocation, Some(parameter_offset), None)
+    {
+        callback_expressions.push(callback_expression);
+    }
+
+    if let Some(parameter_offset) = callback_spec.callback_map_parameter_offset()
+        && let (Some(callback_map_expression), _) =
+            get_argument_for_parameter(context, block_context, invocation, Some(parameter_offset), None)
+    {
+        callback_expressions.extend(immediate_builtin_callback_map_values(callback_map_expression));
+        if let Some(callback_map_type) = artifacts.get_expression_type(callback_map_expression) {
+            callback_map_value_types.extend(immediate_builtin_callback_map_value_types(callback_map_type));
+        }
+    }
+
+    if let Some(argument_offsets) =
+        callback_spec.comparison_callback_argument_range(invocation.arguments_source.argument_count())
+    {
+        for argument_offset in argument_offsets {
+            if let Some(callback_expression) =
+                invocation.arguments_source.get_argument(argument_offset).and_then(|argument| argument.value())
+            {
+                callback_expressions.push(callback_expression);
+            }
+        }
+    }
+
+    let callback_types = callback_expressions
+        .iter()
+        .filter_map(|callback_expression| artifacts.get_expression_type(callback_expression))
+        .chain(callback_map_value_types);
+    let callbacks = callback_types
+        .flat_map(|callback_type| {
+            callback_type.types.iter().filter_map(|atomic| {
+                let callable = cast_atomic_to_callable(atomic, context.codebase, None)?;
+                match callable.as_ref() {
+                    TCallable::Alias(identifier) => Some(*identifier),
+                    TCallable::Signature(signature) => signature.source,
+                }
+            })
+        })
+        .collect::<Vec<_>>();
+
+    for callback in callbacks {
+        let Some(callback_metadata) = context.codebase.get_function_like(&callback) else {
+            continue;
+        };
+
+        if matches!(callback, FunctionLikeIdentifier::Closure(_))
+            && let Some(pending) = artifacts.get_pending_immediate_callback_throws(callback_metadata.span)
+        {
+            for (exception, spans) in pending.exceptions {
+                block_context.possibly_thrown_exceptions.entry(exception).or_default().extend(spans);
+            }
+        }
+
+        let class_like = match callback {
+            FunctionLikeIdentifier::Method(class_name, _) => context.codebase.get_class_like(class_name.as_bytes()),
+            FunctionLikeIdentifier::Function(_) | FunctionLikeIdentifier::Closure(_) => None,
+        };
+
+        for thrown_type in context.codebase.get_function_like_thrown_types(class_like, callback_metadata) {
+            for atomic in thrown_type.type_union.types.iter() {
+                for exception in atomic.get_all_object_names() {
+                    block_context.possibly_thrown_exceptions.entry(exception).or_default().insert(invocation.span);
+                }
+            }
+        }
+    }
+}
+
+fn immediate_builtin_callback_map_value_types(callback_map_type: &TUnion) -> Vec<&TUnion> {
+    let mut callback_types = Vec::new();
+
+    for atomic in callback_map_type.types.iter() {
+        let TAtomic::Array(array) = atomic else {
+            continue;
+        };
+
+        match array {
+            TArray::Keyed(keyed) => {
+                if let Some(known_items) = &keyed.known_items {
+                    callback_types.extend(known_items.values().map(|(_, value_type)| value_type));
+                }
+
+                if let Some((_, value_type)) = &keyed.parameters {
+                    callback_types.push(value_type);
+                }
+            }
+            TArray::List(list) => {
+                if let Some(known_elements) = &list.known_elements {
+                    callback_types.extend(known_elements.values().map(|(_, value_type)| value_type));
+                }
+
+                callback_types.push(&list.element_type);
+            }
+        }
+    }
+
+    callback_types
 }
 
 fn display_callable_name<A>(

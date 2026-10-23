@@ -30,6 +30,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
         A: Arena,
     {
         let s = self.span();
+        let is_immediate_callback = artifacts.is_immediate_callback_expression(s);
 
         let Some(function_metadata) = context.codebase.get_closure_at(context.source_file, s) else {
             return Err(AnalysisError::InternalError(
@@ -123,7 +124,20 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
             &self.parameter_list,
             FunctionLikeBody::Expression(self.expression),
             inferred_parameter_types,
+            true,
         )?;
+
+        if is_immediate_callback {
+            for (exception, spans) in &inner_block_context.possibly_thrown_exceptions {
+                block_context.possibly_thrown_exceptions.entry(*exception).or_default().extend(spans);
+            }
+        } else if !inner_block_context.possibly_thrown_exceptions.is_empty() {
+            artifacts.register_pending_immediate_callback_throws(
+                s,
+                inner_block_context.possibly_thrown_exceptions.clone(),
+                inner_artifacts.deferred_thrown_type_issues.clone(),
+            );
+        }
 
         let resulting_closure = resolve_closure_like_type(
             context,
