@@ -886,13 +886,15 @@ fn push_not_null_clause_for_id(
     type_map.insert(assertion_hash, assertion);
     clause_map.insert(base_id, type_map);
 
+    // These clauses are derived from the nullsafe chain rather than written by the user,
+    // so they narrow types without counting as an explicit check on `base_id`.
     formula.push(Clause::new(
         clause_map,
         conditional_object_id,
         creating_object_id,
         Some(false),
         Some(true),
-        Some(false),
+        Some(true),
     ));
 }
 
