@@ -60,7 +60,7 @@ pub fn is_contained_by(
     all_matched
 }
 
-/// Checks containment while treating omitted, non-defaulted generic arguments in the
+/// Checks containment while treating omitted generic arguments in the
 /// container as erased runtime wildcards.
 ///
 /// This is intentionally narrower than normal generic containment. It is used where a
@@ -113,7 +113,7 @@ fn replace_erased_template_arguments(input_type: &TUnion, container_type: &TUnio
         };
 
         for (container_parameter, input_parameter) in container_parameters.iter_mut().zip(input_parameters) {
-            if container_parameter.from_unspecified_template() {
+            if container_parameter.from_template_fallback() {
                 *container_parameter = input_parameter.clone();
                 replaced = true;
             }

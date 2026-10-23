@@ -35,8 +35,8 @@ use crate::statement::analyze_statements;
 use crate::statement::attributes::AttributeTarget;
 use crate::statement::attributes::analyze_attributes;
 use crate::statement::function_like::add_properties_to_context;
+use crate::statement::function_like::check_type_metadata;
 use crate::statement::function_like::get_this_type;
-use crate::statement::function_like::report_undefined_type_references;
 use crate::statement::r#return::handle_return_value;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Property<'arena> {
@@ -229,6 +229,30 @@ where
         AttributeTarget::Method,
     )?;
 
+    let hook_metadata = parent_block_context
+        .scope
+        .get_class_like()
+        .and_then(|class_like| class_like.properties.get(&property_name))
+        .and_then(|property| property.hooks.get(&word(hook.name.value)));
+
+    if let Some(hook_metadata) = hook_metadata {
+        if let Some(return_type) = &hook_metadata.return_type_metadata {
+            check_type_metadata(context, return_type);
+        }
+
+        if let Some(param) = &hook_metadata.parameter
+            && let Some(param_type) = param.get_type_metadata()
+        {
+            check_type_metadata(context, param_type);
+
+            if param_type.from_docblock
+                && let Some(param_type_decl) = param.get_type_declaration_metadata()
+            {
+                check_type_metadata(context, param_type_decl);
+            }
+        }
+    }
+
     let PropertyHookBody::Concrete(body) = &hook.body else {
         return Ok(());
     };
@@ -237,24 +261,8 @@ where
     scope.set_class_like(parent_block_context.scope.get_class_like());
     scope.set_static(false);
 
-    if let Some(class_like) = parent_block_context.scope.get_class_like()
-        && let Some(property) = class_like.properties.get(&property_name)
-        && let Some(hook_meta) = property.hooks.get(&word(hook.name.value))
-    {
-        scope.set_property_hook(Some((property_name, hook_meta)));
-
-        if let Some(param) = &hook_meta.parameter
-            && let Some(param_type) = param.get_type_metadata()
-        {
-            report_undefined_type_references(context, param_type);
-
-            // Only check native declaration if effective type is from docblock
-            if param_type.from_docblock
-                && let Some(param_type_decl) = param.get_type_declaration_metadata()
-            {
-                report_undefined_type_references(context, param_type_decl);
-            }
-        }
+    if let Some(hook_metadata) = hook_metadata {
+        scope.set_property_hook(Some((property_name, hook_metadata)));
     }
 
     let mut hook_block_context = BlockContext::new(scope, context.settings.register_super_globals);

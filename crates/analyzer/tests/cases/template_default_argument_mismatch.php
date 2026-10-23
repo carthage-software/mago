@@ -13,11 +13,7 @@ final class Holder
     public function __construct(public readonly mixed $value) {}
 }
 
-/**
- * @mago-expect analysis:docblock-type-mismatch
- *
- * @return Holder<string>
- */
+/** @return Holder<string> */
 function make_string_holder(): Holder
 {
     return new Holder('hello');

@@ -19,6 +19,7 @@ use crate::statement::attributes::AttributeTarget;
 use crate::statement::attributes::analyze_attributes;
 use crate::statement::function_like::FunctionLikeBody;
 use crate::statement::function_like::analyze_function_like;
+use crate::statement::function_like::check_function_like_types;
 use crate::statement::function_like::check_unused_function_template_parameters;
 use crate::statement::function_like::unused_parameter;
 use crate::utils::missing_type_hints;
@@ -123,6 +124,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Method<'arena> {
                     context,
                 );
             }
+        } else {
+            check_function_like_types(context, method_metadata);
         }
 
         check_unused_function_template_parameters(context, method_metadata, self.name.span(), "method", || {

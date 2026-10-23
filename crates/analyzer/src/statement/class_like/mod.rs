@@ -17,6 +17,7 @@ use mago_codex::metadata::ttype::TypeMetadata;
 use mago_codex::misc::GenericParent;
 use mago_codex::reference::ReferenceOrigin;
 use mago_codex::ttype::TType;
+use mago_codex::ttype::TypeRef;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::generic::TGenericParameter;
 use mago_codex::ttype::atomic::scalar::TScalar;
@@ -65,8 +66,10 @@ use crate::error::AnalysisError;
 use crate::plugin::context::HookContext;
 use crate::statement::attributes::analyze_class_like_attributes;
 use crate::statement::class_like::method_signature::SignatureCompatibilityIssue;
-use crate::statement::function_like::report_undefined_type_references;
+use crate::statement::function_like::check_type_metadata;
 use crate::utils::missing_type_hints;
+use crate::utils::template::check_template_arguments;
+use crate::utils::template::check_template_definitions;
 
 pub mod constant;
 pub mod enum_case;
@@ -1049,6 +1052,7 @@ where
     }
     check_class_like_properties(context, class_like_metadata);
     check_docblock_declared_members(context, class_like_metadata, declaration_span);
+    check_template_definitions(context, &class_like_metadata.template_types, name_span.unwrap_or(declaration_span));
 
     let mut scope = ScopeContext::new(ReferenceOrigin::Symbol((class_like_metadata.name, mago_word::empty_word())));
     scope.set_class_like(Some(class_like_metadata));
@@ -1108,12 +1112,12 @@ where
                     if let Some(prop_meta) = class_like_metadata.properties.get(&property_name)
                         && let Some(type_meta) = &prop_meta.type_metadata
                     {
-                        report_undefined_type_references(context, type_meta);
+                        check_type_metadata(context, type_meta);
 
                         if type_meta.from_docblock
                             && let Some(type_decl_meta) = &prop_meta.type_declaration_metadata
                         {
-                            report_undefined_type_references(context, type_decl_meta);
+                            check_type_metadata(context, type_decl_meta);
                         }
                     }
                 }
@@ -1729,6 +1733,8 @@ fn check_template_parameters<'ctx, A>(
                 i += 1;
                 continue;
             };
+
+            check_template_arguments(context, TypeRef::Union(&extended_type), inheritance.span());
 
             let mut template_type = parent_template.constraint.clone();
 
@@ -3035,6 +3041,10 @@ fn check_docblock_declared_members<A>(
 ) where
     A: Arena,
 {
+    for alias in class_like_metadata.type_aliases.values() {
+        check_template_arguments(context, TypeRef::Union(&alias.type_union), alias.span);
+    }
+
     for pseudo_method_name in &class_like_metadata.pseudo_methods {
         let Some(metadata) = context.codebase.function_likes.get(&(class_like_metadata.name, *pseudo_method_name))
         else {
@@ -3042,12 +3052,12 @@ fn check_docblock_declared_members<A>(
         };
 
         if let Some(return_type) = &metadata.return_type_metadata {
-            report_undefined_type_references(context, return_type);
+            check_type_metadata(context, return_type);
         }
 
         for parameter in &metadata.parameters {
             if let Some(parameter_type) = &parameter.type_declaration_metadata {
-                report_undefined_type_references(context, parameter_type);
+                check_type_metadata(context, parameter_type);
             }
         }
     }
@@ -3060,7 +3070,7 @@ fn check_docblock_declared_members<A>(
         for type_metadata in
             [&property_metadata.type_metadata, &property_metadata.write_type_metadata].into_iter().flatten()
         {
-            report_undefined_type_references(context, type_metadata);
+            check_type_metadata(context, type_metadata);
         }
     }
 
@@ -3071,7 +3081,7 @@ fn check_docblock_declared_members<A>(
 
     for mixin in &class_like_metadata.mixins {
         if docblocks.iter().any(|docblock| docblock.contains(&mixin.span)) {
-            report_undefined_type_references(context, mixin);
+            check_type_metadata(context, mixin);
         }
     }
 }

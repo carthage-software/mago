@@ -46,10 +46,13 @@ use mago_codex::ttype::get_void;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;
 use mago_php_version::feature::Feature;
+use mago_phpdoc_syntax::PHPDocParser;
+use mago_phpdoc_syntax::cst::TagValue;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
+use mago_syntax::comments::docblock::PrecedingDocblocks;
 use mago_syntax::cst::Expression;
 use mago_syntax::cst::FunctionLikeParameterList;
 use mago_syntax::cst::Statement;
@@ -74,6 +77,8 @@ use crate::statement::r#return::handle_return_value;
 use crate::statement::r#static::add_captured_types;
 use crate::statement::r#static::infer_static_local_types;
 use crate::utils::expression::get_variable_id;
+use crate::utils::template::check_template_arguments;
+use crate::utils::template::check_template_definitions;
 
 pub mod function;
 pub mod unused_parameter;
@@ -195,16 +200,16 @@ where
         .with_variable_definedness_targets(parent_artifacts.variable_definedness_targets())
         .with_editor_artifacts(parent_artifacts.editor.is_some());
 
+    check_function_like_types(context, function_like_metadata);
+
     if let Some(return_type) = &function_like_metadata.return_type_metadata {
         add_symbol_references(&return_type.type_union, &block_context.scope, &mut artifacts);
-        report_undefined_type_references(context, return_type);
 
         // Only check native declaration if effective type is from docblock (to avoid duplicates)
         if return_type.from_docblock
             && let Some(native_return) = &function_like_metadata.return_type_declaration_metadata
         {
             add_symbol_references(&native_return.type_union, &block_context.scope, &mut artifacts);
-            report_undefined_type_references(context, native_return);
         }
     }
 
@@ -217,13 +222,10 @@ where
         let expanded_native =
             expand_type_metadata(context, block_context, &mut artifacts, function_like_metadata, native_return);
 
-        let is_compatible = union_comparator::is_contained_by(
+        let is_compatible = union_comparator::is_contained_by_with_erased_template_arguments(
             context.codebase,
             &expanded_docblock,
             &expanded_native,
-            false,
-            false,
-            false,
             &mut ComparisonResult::default(),
         );
 
@@ -404,17 +406,6 @@ where
     for (i, parameter_metadata) in function_like_metadata.parameters.iter().enumerate() {
         let parameter_variable_str = parameter_metadata.get_name().0;
 
-        if let Some(parameter_type) = parameter_metadata.get_type_metadata() {
-            report_undefined_type_references(context, parameter_type);
-
-            // Only check native declaration if effective type is from docblock (to avoid duplicates)
-            if parameter_type.from_docblock
-                && let Some(native_type) = parameter_metadata.get_type_declaration_metadata()
-            {
-                report_undefined_type_references(context, native_type);
-            }
-        }
-
         let declared_parameter_type = if let Some(parameter_type) = parameter_metadata.get_type_metadata() {
             let effective_type =
                 expand_type_metadata(context, block_context, artifacts, function_like_metadata, parameter_type);
@@ -457,7 +448,8 @@ where
                 } else if !is_overriding_method
                     && !effective_type.has_template_types()
                     && !expanded_native.has_template_types()
-                    && !expanded_native.contains_unspecified_template_arguments()
+                    && !expanded_native
+                        .any_child_node(|node| matches!(node, TypeRef::Union(union) if union.from_template_fallback()))
                 {
                     let dropped: Vec<&TAtomic> = expanded_native
                         .types
@@ -1514,13 +1506,108 @@ fn check_parameter_default_value<'ctx, 'arena, A>(
     context.collector.report_with_code(IssueCode::InvalidParameterDefaultValue, issue);
 }
 
-/// Reports missing types, including object types whose declarations were removed after population.
-pub fn report_undefined_type_references<A>(context: &mut Context<'_, '_, A>, type_metadata: &TypeMetadata)
+pub fn check_function_like_types<A>(context: &mut Context<'_, '_, A>, metadata: &FunctionLikeMetadata)
+where
+    A: Arena,
+{
+    let comments = context.comments;
+    let is_declared = |ty: &TypeMetadata| {
+        !ty.from_docblock
+            || PrecedingDocblocks::new(comments, metadata.span.start.offset)
+                .any(|docblock| docblock.span.contains(&ty.span))
+    };
+
+    if let Some(return_type) = &metadata.return_type_metadata {
+        check_type_metadata(context, return_type);
+
+        if return_type.from_docblock
+            && let Some(native_return) = &metadata.return_type_declaration_metadata
+        {
+            check_type_metadata(context, native_return);
+        }
+    }
+
+    for parameter in &metadata.parameters {
+        if let Some(parameter_type) = &parameter.type_metadata {
+            check_type_metadata(context, parameter_type);
+
+            if parameter_type.from_docblock
+                && let Some(native_type) = &parameter.type_declaration_metadata
+            {
+                check_type_metadata(context, native_type);
+            }
+        }
+
+        for parameter_type in [&parameter.out_type, &parameter.closure_this_type].into_iter().flatten() {
+            if is_declared(parameter_type) {
+                check_template_arguments(context, TypeRef::Union(&parameter_type.type_union), parameter_type.span);
+            }
+        }
+    }
+
+    for thrown_type in &metadata.thrown_types {
+        if is_declared(thrown_type) {
+            check_template_arguments(context, TypeRef::Union(&thrown_type.type_union), thrown_type.span);
+        }
+    }
+
+    if let Some(method) = &metadata.method_metadata {
+        for constraint in method.where_constraints.values() {
+            check_template_arguments(context, TypeRef::Union(&constraint.type_union), constraint.span);
+        }
+    }
+
+    let span = metadata.name_span.unwrap_or(metadata.span);
+    check_template_definitions(context, &metadata.template_types, span);
+
+    if metadata.has_docblock
+        && (!metadata.assertions.is_empty()
+            || (!metadata.assertions_inferred
+                && (!metadata.if_true_assertions.is_empty() || !metadata.if_false_assertions.is_empty())))
+    {
+        let mut declared = [false; 3];
+        for trivia in PrecedingDocblocks::new(comments, metadata.span.start.offset).important_only(&[b"assert"]) {
+            let document = PHPDocParser::parse_without_trivia(context.arena, trivia.value, trivia.span);
+            for tag in document.tags() {
+                match tag.value {
+                    TagValue::Assert(_) => declared[0] = true,
+                    TagValue::AssertIfTrue(_) => declared[1] = true,
+                    TagValue::AssertIfFalse(_) => declared[2] = true,
+                    _ => {}
+                }
+            }
+        }
+
+        for (is_declared, assertions) in declared.into_iter().zip([
+            &metadata.assertions,
+            &metadata.if_true_assertions,
+            &metadata.if_false_assertions,
+        ]) {
+            if !is_declared {
+                continue;
+            }
+
+            for assertions in assertions.values() {
+                for assertion in assertions {
+                    if let Some(asserted_type) = assertion.get_type() {
+                        check_template_arguments(context, TypeRef::Atomic(asserted_type), span);
+                    }
+                }
+            }
+        }
+    }
+}
+
+pub fn check_type_metadata<A>(context: &mut Context<'_, '_, A>, type_metadata: &TypeMetadata)
 where
     A: Arena,
 {
     if type_metadata.inferred {
         return;
+    }
+
+    if type_metadata.from_docblock {
+        check_template_arguments(context, TypeRef::Union(&type_metadata.type_union), type_metadata.span);
     }
 
     type_metadata.type_union.any_child_node(|type_ref| {
