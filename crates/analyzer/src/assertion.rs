@@ -20,6 +20,7 @@ use mago_codex::ttype::atomic::scalar::string::TStringCasing;
 use mago_codex::ttype::cast::cast_atomic_to_callable;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::atomic_comparator;
+use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::get_array_value_parameter;
 use mago_codex::ttype::get_arraykey;
 use mago_codex::ttype::get_bool;
@@ -90,6 +91,11 @@ where
     match expression {
         Expression::UnaryPrefix(UnaryPrefix { operator: UnaryPrefixOperator::Not(_), operand }) => {
             let assertions = scrape_assertions(operand, artifacts, assertion_context);
+            // Negating facts about multiple variables requires an OR across variable IDs.
+            if assertions.len() != 1 || assertions[0].len() != 1 {
+                return vec![];
+            }
+
             let mut negated_assertions = WordMap::default();
             for assertion in assertions {
                 for (var_name, assertion_set) in assertion {
@@ -881,6 +887,46 @@ where
             assertion_context,
             typed_value_position,
         );
+    }
+
+    if is_identity
+        && let (
+            Expression::Variable(Variable::Direct(left_variable)),
+            Expression::Variable(Variable::Direct(right_variable)),
+        ) = (unwrap_expression(left), unwrap_expression(right))
+        && let (Some(left_type), Some(right_type)) =
+            (artifacts.get_expression_type(&left.span()), artifacts.get_expression_type(&right.span()))
+    {
+        if left_type == right_type {
+            return vec![];
+        }
+
+        let (left_overlap, right_overlap) =
+            union_comparator::strict_equality_overlap(assertion_context.codebase, left_type, right_type);
+
+        if !left_overlap.is_never() && !right_overlap.is_never() {
+            let mut if_types = WordMap::default();
+
+            if left_type != &left_overlap {
+                let left_assertions: Vec<Assertion> =
+                    left_overlap.types.iter().cloned().map(Assertion::IsIdentical).collect();
+                if_types.insert(word(left_variable.name), vec![left_assertions]);
+            }
+
+            if right_type != &right_overlap {
+                let right_assertions: Vec<Assertion> =
+                    right_overlap.types.iter().cloned().map(Assertion::IsIdentical).collect();
+                if_types.insert(word(right_variable.name), vec![right_assertions]);
+            }
+
+            if !if_types.is_empty() {
+                // Keep the comparison itself: its type consequences alone are not equivalent to equality.
+                let comparison_id =
+                    Word::from(format!("*{}-{}", left.span().start.offset, right.span().end.offset).as_str());
+                if_types.insert(comparison_id, vec![vec![Assertion::Truthy]]);
+                return vec![if_types];
+            }
+        }
     }
 
     vec![]
