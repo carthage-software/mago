@@ -161,7 +161,11 @@ pub enum InvocationArgumentsSource<'ast, 'arena> {
     /// Arguments are provided in a standard list, like `foo($a, $b)`.
     ArgumentList(&'ast ArgumentList<'arena>),
     /// The single argument is the input from a pipe operator, like `$input` in `$input |> foo(...)`.
-    PipeInput(&'ast Pipe<'arena>),
+    PipeInput {
+        pipe: &'ast Pipe<'arena>,
+        /// The input was analyzed before resolving an inline callable's parameter types.
+        input_is_analyzed: bool,
+    },
     /// Arguments from a partial application, which may include placeholders.
     PartialArgumentList(&'ast PartialArgumentList<'arena>),
     /// Constructor arguments supplied to an attribute.
@@ -175,7 +179,7 @@ pub enum InvocationArgumentsSource<'ast, 'arena> {
 #[derive(Debug, Clone, Copy)]
 pub enum InvocationArgument<'ast, 'arena> {
     /// The value provided as input via the pipe operator. This is treated as the first positional argument.
-    PipedValue(&'ast Expression<'arena>),
+    PipedValue { expression: &'ast Expression<'arena>, is_analyzed: bool },
     /// A positional argument.
     Positional(&'ast PositionalArgument<'arena>),
     /// A named argument.
@@ -564,7 +568,7 @@ impl<'ast, 'arena> InvocationArgumentsSource<'ast, 'arena> {
     pub fn argument_count(&self) -> usize {
         match self {
             InvocationArgumentsSource::ArgumentList(argument_list) => argument_list.arguments.len(),
-            InvocationArgumentsSource::PipeInput(_) => 1,
+            InvocationArgumentsSource::PipeInput { .. } => 1,
             InvocationArgumentsSource::None(_) => 0,
             InvocationArgumentsSource::PartialArgumentList(partial_argument_list)
             | InvocationArgumentsSource::AttributeArgumentList(partial_argument_list) => {
@@ -589,9 +593,9 @@ impl<'ast, 'arena> InvocationArgumentsSource<'ast, 'arena> {
                     Argument::Named(named_argument) => InvocationArgument::Named(named_argument),
                 })
             }
-            InvocationArgumentsSource::PipeInput(pipe) => {
+            InvocationArgumentsSource::PipeInput { pipe, input_is_analyzed } => {
                 if index == 0 {
-                    Some(InvocationArgument::PipedValue(pipe.input))
+                    Some(InvocationArgument::PipedValue { expression: pipe.input, is_analyzed: *input_is_analyzed })
                 } else {
                     None
                 }
@@ -712,7 +716,7 @@ impl<'ast, 'arena> InvocationArgument<'ast, 'arena> {
     #[inline]
     pub const fn value(&self) -> Option<&'ast Expression<'arena>> {
         match self {
-            InvocationArgument::PipedValue(expr) => Some(expr),
+            InvocationArgument::PipedValue { expression, .. } => Some(expression),
             InvocationArgument::Positional(pos_arg) => Some(pos_arg.value),
             InvocationArgument::Named(named_arg) => Some(named_arg.value),
             _ => None,
@@ -761,7 +765,7 @@ impl HasSpan for InvocationArgumentsSource<'_, '_> {
     fn span(&self) -> Span {
         match self {
             InvocationArgumentsSource::ArgumentList(arg_list) => arg_list.span(),
-            InvocationArgumentsSource::PipeInput(pipe) => pipe.span(),
+            InvocationArgumentsSource::PipeInput { pipe, .. } => pipe.span(),
             InvocationArgumentsSource::None(span) => *span,
             InvocationArgumentsSource::PartialArgumentList(partial_arg_list)
             | InvocationArgumentsSource::AttributeArgumentList(partial_arg_list) => partial_arg_list.span(),
@@ -772,7 +776,7 @@ impl HasSpan for InvocationArgumentsSource<'_, '_> {
 impl HasSpan for InvocationArgument<'_, '_> {
     fn span(&self) -> Span {
         match self {
-            InvocationArgument::PipedValue(expr) => expr.span(),
+            InvocationArgument::PipedValue { expression, .. } => expression.span(),
             InvocationArgument::Positional(pos_arg) => pos_arg.span(),
             InvocationArgument::Named(named_arg) => named_arg.span(),
             InvocationArgument::Placeholder(placeholder) => placeholder.span(),
