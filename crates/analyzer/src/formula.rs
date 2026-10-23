@@ -22,6 +22,8 @@ use crate::assertion::has_null_variable;
 use crate::assertion::scrape_assertions;
 use crate::context::assertion::AssertionContext;
 use crate::context::scope::var_has_root;
+use crate::resolver::function::is_builtin_function_call;
+use crate::utils::expression::expression_has_observable_side_effect;
 use crate::utils::expression::expression_is_nullsafe;
 use crate::utils::expression::get_non_nullsafe_expression_id;
 use crate::utils::expression::get_nullsafe_base_expressions;
@@ -481,6 +483,64 @@ fn add_nullsafe_condition_clauses<A>(
             }
         }
         Expression::Call(Call::Function(call))
+            if let Some(needle) = call.argument_list.arguments.first()
+                && expression_is_nullsafe(needle.value())
+                && is_builtin_function_call(
+                    call,
+                    b"in_array",
+                    assertion_context.resolved_names,
+                    assertion_context.codebase,
+                )
+                && let Some(needle_id) = assertion_context.get_expression_id(needle.value())
+                && let Some(subject_id) = get_non_nullsafe_expression_id(needle_id) =>
+        {
+            let Some(clause) = formula.iter_mut().find(|clause| {
+                clause.possibilities.len() == 1
+                    && clause.possibilities.get(&needle_id).is_some_and(|assertions| {
+                        !assertions.is_empty()
+                            && assertions.values().all(|assertion| match assertion {
+                                Assertion::IsIdentical(atomic) => !atomic.is_null(),
+                                Assertion::IsType(TAtomic::Object(_)) => true,
+                                Assertion::InArray(ty) => !ty.can_be_null(),
+                                _ => false,
+                            })
+                    })
+            }) else {
+                return;
+            };
+
+            if call
+                .argument_list
+                .arguments
+                .iter()
+                .skip(1)
+                .any(|argument| argument_may_mutate(Node::Expression(argument.value())))
+            {
+                return;
+            }
+
+            let Some(assertions) = clause.possibilities.shift_remove(&needle_id) else {
+                return;
+            };
+
+            *clause = Clause::new(
+                AssertionMap::from_iter([(subject_id, assertions)]),
+                clause.condition_span,
+                clause.span,
+                Some(clause.wedge),
+                Some(clause.reconcilable),
+                Some(clause.generated),
+            );
+
+            add_nullsafe_base_clauses(
+                needle.value(),
+                formula,
+                conditional_object_id,
+                creating_object_id,
+                assertion_context,
+            );
+        }
+        Expression::Call(Call::Function(call))
             if let Expression::Identifier(name) = call.function
                 && call.argument_list.arguments.len() == 1 =>
         {
@@ -498,6 +558,21 @@ fn add_nullsafe_condition_clauses<A>(
             add_nullsafe_base_clauses(expression, formula, conditional_object_id, creating_object_id, assertion_context)
         }
     }
+}
+
+fn argument_may_mutate(node: Node<'_, '_>) -> bool {
+    match node {
+        Node::Call(_) | Node::Instantiation(_) | Node::AnonymousClass(_) | Node::Pipe(_) | Node::Construct(_) => {
+            return true;
+        }
+        Node::Expression(expression) if expression_has_observable_side_effect(expression) => return true,
+        _ => {}
+    }
+
+    let mut may_mutate = false;
+    node.visit_children(|child| may_mutate = may_mutate || argument_may_mutate(child));
+
+    may_mutate
 }
 
 fn add_conditional_assertion_clauses(
