@@ -53,8 +53,8 @@ pub struct Settings {
 
     /// Enable checking for unhandled thrown exceptions.
     ///
-    /// When `true`, the analyzer will report any exception that is thrown but not caught
-    /// in a `try-catch` block or documented in a `@throws` tag.
+    /// When `true`, the analyzer reports exceptions that are thrown but not caught in a
+    /// `try-catch` block or documented in a `@throws` tag.
     ///
     /// This check is disabled by default (`false`) as it can be computationally expensive.
     pub check_throws: bool,
@@ -64,6 +64,12 @@ pub struct Settings {
     /// This check only runs when `check_throws` is enabled. It is disabled by default
     /// because exceptions from undocumented code cannot be ruled out statically.
     pub check_dead_catch: bool,
+
+    /// Enable checking that overriding and implementing methods declare covariant `@throws` types.
+    ///
+    /// A missing `@throws` tag means `Throwable`; use `@throws void` for no exceptions.
+    /// This check is disabled by default (`false`).
+    pub check_throw_type_covariance: bool,
 
     /// Exceptions to ignore including all subclasses (hierarchy-aware).
     ///
@@ -426,6 +432,7 @@ impl Settings {
             allow_possibly_undefined_array_keys: true,
             check_throws: false,
             check_dead_catch: false,
+            check_throw_type_covariance: false,
             unchecked_exceptions: WordSet::default(),
             unchecked_exception_classes: WordSet::default(),
             use_colors: true,

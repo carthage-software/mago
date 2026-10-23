@@ -323,6 +323,34 @@ test_case!(issue_2503_check_throws_disabled, {
     settings.check_throws = false;
     settings
 });
+test_case!(throw_covariance_invalid, {
+    let mut settings = crate::framework::default_test_settings();
+    settings.check_throws = false;
+    settings.check_throw_type_covariance = true;
+    settings
+});
+test_case!(throw_covariance_valid, {
+    let mut settings = crate::framework::default_test_settings();
+    settings.check_throw_type_covariance = true;
+    settings
+});
+test_case!(throw_covariance_inherited_context, {
+    let mut settings = crate::framework::default_test_settings();
+    settings.check_throw_type_covariance = true;
+    settings
+});
+test_case!(throw_covariance_inherited_parent, {
+    let mut settings = crate::framework::default_test_settings();
+    settings.check_throw_type_covariance = true;
+    settings
+});
+test_case!(throw_covariance_disabled, {
+    let mut settings = crate::framework::default_test_settings();
+    settings.check_throw_type_covariance = mago_analyzer::settings::Settings::default().check_throw_type_covariance;
+    assert!(settings.check_throws);
+    assert!(!settings.check_throw_type_covariance);
+    settings
+});
 test_case!(docblock_param_out);
 test_case!(docblock_assert_method);
 test_case!(docblock_assert_if_true);
@@ -2676,6 +2704,7 @@ test_case!(issue_1755);
 test_case!(issue_1756, {
     let mut s = crate::framework::default_test_settings();
     s.check_throws = false;
+    s.check_throw_type_covariance = false;
     s
 });
 test_case!(issue_1757);
@@ -2687,11 +2716,13 @@ test_case!(issue_1764);
 test_case!(issue_1765, {
     let mut s = crate::framework::default_test_settings();
     s.check_throws = false;
+    s.check_throw_type_covariance = false;
     s
 });
 test_case!(issue_1765_allow, {
     let mut s = crate::framework::default_test_settings();
     s.check_throws = false;
+    s.check_throw_type_covariance = false;
     s.allow_array_truthy_operand = true;
     s
 });
@@ -2726,6 +2757,7 @@ test_case!(issue_1796);
 test_case!(issue_1781, {
     let mut s = crate::framework::default_test_settings();
     s.check_throws = false;
+    s.check_throw_type_covariance = false;
     s
 });
 test_case!(issue_1440);
@@ -2753,6 +2785,7 @@ test_case!(issue_2119);
 test_case!(issue_2124, {
     let mut settings = crate::framework::default_test_settings();
     settings.check_throws = false;
+    settings.check_throw_type_covariance = false;
     settings
 });
 test_case!(issue_2125);
