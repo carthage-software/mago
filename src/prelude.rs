@@ -16,7 +16,7 @@ use zstd::zstd_safe::WriteBuf;
 
 include!(concat!(env!("OUT_DIR"), "/prelude_frames.rs"));
 
-static PRELUDE: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/prelude.zst"));
+pub(crate) static PRELUDE: &[u8] = include_bytes!(concat!(env!("OUT_DIR"), "/prelude.zst"));
 
 const PENDING: u8 = 0;
 const CLAIMED: u8 = 1;

@@ -55,6 +55,7 @@ use tracing::trace;
 use crate::commands::CliArguments;
 use crate::commands::MagoCommand;
 use crate::config::Configuration;
+use crate::config::LoadOptions;
 use crate::consts::MAXIMUM_PHP_VERSION;
 use crate::consts::MINIMUM_PHP_VERSION;
 use crate::consts::VERSION;
@@ -70,7 +71,10 @@ mod config;
 mod consts;
 mod error;
 mod extensions;
+mod language_server;
 mod macros;
+#[cfg(all(target_os = "macos", not(feature = "dhat-heap")))]
+mod memory;
 mod prelude;
 mod service;
 mod updater;
@@ -79,10 +83,15 @@ mod version_check;
 
 #[cfg(all(
     not(feature = "dhat-heap"),
-    any(target_os = "macos", target_os = "windows", target_env = "musl", target_env = "gnu")
+    not(target_os = "macos"),
+    any(target_os = "windows", target_env = "musl", target_env = "gnu")
 ))]
 #[global_allocator]
 static ALLOC: mimalloc::MiMalloc = mimalloc::MiMalloc;
+
+#[cfg(all(target_os = "macos", not(feature = "dhat-heap")))]
+#[global_allocator]
+static ALLOC: memory::Allocator = memory::Allocator::new();
 
 #[cfg(feature = "dhat-heap")]
 #[global_allocator]
@@ -209,6 +218,11 @@ pub fn run(main_start: Instant) -> Result<ExitCode, Error> {
 
     let clap_start = Instant::now();
     let arguments = CliArguments::parse();
+    #[cfg(all(target_os = "macos", not(feature = "dhat-heap")))]
+    if matches!(arguments.command, MagoCommand::LanguageServer(_)) {
+        ALLOC.enable_language_server();
+    }
+
     let clap_duration = clap_start.elapsed();
 
     if matches!(arguments.command, MagoCommand::Version) {
@@ -247,19 +261,18 @@ pub fn run(main_start: Instant) -> Result<ExitCode, Error> {
         ..
     } = arguments;
 
-    let config_load_start = trace_enabled.then(Instant::now);
-    let mut configuration = Configuration::load(
+    let options = LoadOptions {
         workspace,
-        config.as_deref(),
+        file: config,
         php_version,
         threads,
         allow_unsupported_php_version,
         no_version_check,
-    )?;
+        no_extensions,
+    };
 
-    if no_extensions {
-        configuration.extension_hosts.clear();
-    }
+    let config_load_start = trace_enabled.then(Instant::now);
+    let configuration = options.load()?;
     let config_load_duration = config_load_start.map(|s| s.elapsed()).unwrap_or_default();
 
     if let MagoCommand::SelfUpdate(cmd) = command {
@@ -308,6 +321,7 @@ pub fn run(main_start: Instant) -> Result<ExitCode, Error> {
         MagoCommand::Guard(cmd) => cmd.execute(configuration, arguments.colors).map(|outcome| outcome.exit_code),
         MagoCommand::InspectBaseline(cmd) => cmd.execute(configuration, arguments.colors),
         MagoCommand::GenerateCompletions(cmd) => cmd.execute(),
+        MagoCommand::LanguageServer(cmd) => cmd.execute(configuration, options),
         MagoCommand::SelfUpdate(_) => {
             unreachable!("The self-update command should have been handled before this point.")
         }

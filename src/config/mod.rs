@@ -104,6 +104,7 @@ use crate::config::analyzer::AnalyzerConfiguration;
 use crate::config::extension::ExtensionHostConfiguration;
 use crate::config::formatter::FormatterConfiguration;
 use crate::config::guard::GuardConfiguration;
+use crate::config::language_server::LanguageServerConfiguration;
 use crate::config::linter::LinterConfiguration;
 use crate::config::parser::ParserConfiguration;
 use crate::config::source::SourceConfiguration;
@@ -115,6 +116,7 @@ pub mod analyzer;
 pub mod extension;
 pub mod formatter;
 pub mod guard;
+pub mod language_server;
 pub mod linter;
 pub mod parser;
 pub mod source;
@@ -296,6 +298,10 @@ pub struct Configuration {
     #[serde(default)]
     pub extension_hosts: BTreeMap<String, ExtensionHostConfiguration>,
 
+    /// Language server settings for this workspace.
+    #[serde(default)]
+    pub language_server: LanguageServerConfiguration,
+
     /// Linter service configuration.
     ///
     /// Controls linting behavior, including enabled/disabled rules, rule-specific
@@ -366,6 +372,47 @@ pub struct Configuration {
     #[serde(default, skip_serializing)]
     #[schemars(skip)]
     pub config_file_is_explicit: bool,
+
+    /// The canonical path of every loaded layer: the configuration file and each file it extends.
+    #[serde(default, skip_serializing)]
+    #[schemars(skip)]
+    pub config_layers: Vec<PathBuf>,
+}
+
+/// The command-line options a configuration is loaded with, kept so it can be loaded again.
+#[derive(Debug, Clone, Default)]
+pub struct LoadOptions {
+    pub workspace: Option<PathBuf>,
+    pub file: Option<PathBuf>,
+    pub php_version: Option<PHPVersion>,
+    pub threads: Option<usize>,
+    pub allow_unsupported_php_version: bool,
+    pub no_version_check: bool,
+    pub no_extensions: bool,
+}
+
+impl LoadOptions {
+    /// Load the configuration as [`Configuration::load`] does, without extension hosts when they are disabled.
+    ///
+    /// # Errors
+    ///
+    /// Returns the errors of [`Configuration::load`].
+    pub fn load(&self) -> Result<Configuration, Error> {
+        let mut configuration = Configuration::load(
+            self.workspace.clone(),
+            self.file.as_deref(),
+            self.php_version,
+            self.threads,
+            self.allow_unsupported_php_version,
+            self.no_version_check,
+        )?;
+
+        if self.no_extensions {
+            configuration.extension_hosts.clear();
+        }
+
+        Ok(configuration)
+    }
 }
 
 impl Configuration {
@@ -439,9 +486,9 @@ impl Configuration {
             config_file_is_explicit = false;
         }
 
+        let mut layers: HashSet<PathBuf> = HashSet::new();
         let mut configuration: Configuration = if let Some((path, format)) = &resolved_config_file {
-            let mut visited: HashSet<PathBuf> = HashSet::new();
-            let merged = load_layer(path, *format, &mut visited)?;
+            let merged = load_layer(path, *format, &mut layers)?;
             serde_json::from_value::<Configuration>(merged)
                 .map_err(|e| Error::ParseConfigFile { path: path.clone(), source: Box::new(e) })?
         } else {
@@ -452,6 +499,7 @@ impl Configuration {
 
         configuration.config_file = resolved_config_file.as_ref().map(|(p, _)| p.clone());
         configuration.config_file_is_explicit = config_file_is_explicit;
+        configuration.config_layers = layers.into_iter().collect();
 
         if allow_unsupported_php_version && !configuration.allow_unsupported_php_version {
             tracing::warn!("Allowing unsupported PHP versions.");
@@ -521,17 +569,8 @@ impl Configuration {
     ///
     /// This prevents global configuration files from overriding project-local configuration.
     fn find_config_files(root_dir: &Path, fallback_roots: &[Option<PathBuf>]) -> Option<(PathBuf, ConfigFormat)> {
-        let config_files = [CONFIGURATION_FILE_NAME, CONFIGURATION_DIST_FILE_NAME];
-
-        for name in config_files.iter() {
-            for format in ConfigFormat::ALL.iter() {
-                for ext in format.extensions() {
-                    let candidate = root_dir.join(format!("{name}.{ext}"));
-                    if candidate.exists() {
-                        return Some((candidate, *format));
-                    }
-                }
-            }
+        if let Some(found) = Self::find_project_config_file(root_dir) {
+            return Some(found);
         }
 
         for root in fallback_roots.iter().flatten() {
@@ -546,6 +585,20 @@ impl Configuration {
         }
 
         None
+    }
+
+    /// The project's own `mago.<ext>`, or else its `mago.dist.<ext>`, in `root_dir`.
+    pub(crate) fn find_project_config_file(root_dir: &Path) -> Option<(PathBuf, ConfigFormat)> {
+        Self::project_config_candidates(root_dir).find(|(candidate, _)| candidate.exists())
+    }
+
+    /// Every path [`find_project_config_file`](Self::find_project_config_file) checks, in order.
+    pub(crate) fn project_config_candidates(root_dir: &Path) -> impl Iterator<Item = (PathBuf, ConfigFormat)> + '_ {
+        [CONFIGURATION_FILE_NAME, CONFIGURATION_DIST_FILE_NAME].into_iter().flat_map(move |name| {
+            ConfigFormat::ALL.iter().flat_map(move |format| {
+                format.extensions().iter().map(move |ext| (root_dir.join(format!("{name}.{ext}")), *format))
+            })
+        })
     }
 
     /// Apply environment-variable overrides for the small set of documented top-level
@@ -628,6 +681,7 @@ impl Configuration {
             version_drift_fail_level: VersionDriftFailLevel::Major,
             source: SourceConfiguration::from_workspace(workspace),
             extension_hosts: BTreeMap::new(),
+            language_server: LanguageServerConfiguration::default(),
             linter: LinterConfiguration::default(),
             parser: ParserConfiguration::default(),
             formatter: FormatterConfiguration::default(),
@@ -636,6 +690,7 @@ impl Configuration {
             editor_url: None,
             config_file: None,
             config_file_is_explicit: false,
+            config_layers: Vec::new(),
         }
     }
 }
@@ -657,6 +712,7 @@ impl Configuration {
             "version-drift-fail-level": self.version_drift_fail_level,
             "source": self.source,
             "extension-hosts": self.extension_hosts,
+            "language-server": self.language_server,
             "linter": self.linter.to_filtered_value(self.php_version),
             "parser": self.parser,
             "formatter": self.formatter.to_value(),
