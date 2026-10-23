@@ -2087,13 +2087,23 @@ where
                             continue;
                         };
 
-                        assertions.push(Assertion::IsType(name.get_object_type(context.codebase)));
+                        let object_type = name.get_object_type(context.codebase);
+
+                        // The class is only known exactly for a literal class string or a final
+                        // class. Otherwise, the rhs may name a subclass, so a failed check says
+                        // nothing about the lhs: use an identity assertion, whose negation does
+                        // not remove the type.
+                        if name.fqcn.is_some() && (name.is_from_literal_class_string() || name.is_final) {
+                            assertions.push(Assertion::IsType(object_type));
+                        } else {
+                            assertions.push(Assertion::IsIdentical(object_type));
+                        }
                     }
 
                     // If we failed to resolve the class-name on the rhs of
                     // `instanceof`, assert that the lhs is a generic `object`.
                     if assertions.is_empty() && !expression_type.is_objecty() {
-                        assertions.push(Assertion::IsType(TAtomic::Object(TObject::Any)));
+                        assertions.push(Assertion::IsIdentical(TAtomic::Object(TObject::Any)));
                     }
 
                     if !assertions.is_empty() {
