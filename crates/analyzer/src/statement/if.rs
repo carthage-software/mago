@@ -416,24 +416,11 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
             for (variable_id, variable_type) in redefined_variables {
                 block_context.locals.insert(variable_id, variable_type);
 
-                if !if_scope.reasonable_clauses.is_empty() {
-                    if_scope.reasonable_clauses = BlockContext::filter_clauses(
-                        context,
-                        variable_id,
-                        if_scope.reasonable_clauses,
-                        block_context.locals.get(&variable_id).map(std::convert::AsRef::as_ref),
-                    );
-                }
-
                 if_scope.updated_variables.insert(variable_id);
             }
         }
 
-        let if_body_always_exits =
-            !if_scope.if_actions.is_empty() && !if_scope.if_actions.contains(ControlAction::None);
-
-        if if_body_always_exits
-            && !if_scope.reasonable_clauses.is_empty()
+        if !if_scope.reasonable_clauses.is_empty()
             && (if_scope.reasonable_clauses.len() > 1 || !if_scope.reasonable_clauses[0].wedge)
         {
             block_context.clauses = mago_algebra::saturate_shared_clauses(
@@ -616,7 +603,7 @@ where
     inherit_branch_context_properties(context, outer_block_context, &if_block_context);
 
     if !has_leaving_statements {
-        let new_assigned_variable_ids_keys = new_assigned_variable_ids.keys().copied().collect::<Vec<Word>>();
+        retain_unchanged_branch_clauses(&mut if_scope.reasonable_clauses, &old_if_locals, &if_block_context);
 
         update_if_scope(
             context,
@@ -628,18 +615,6 @@ where
             &if_scope.conditionally_changed_variable_ids.clone(),
             true,
         );
-
-        if !if_scope.reasonable_clauses.is_empty() {
-            for variable_id in new_assigned_variable_ids_keys {
-                let previous_clauses = std::mem::take(&mut if_scope.reasonable_clauses);
-                if_scope.reasonable_clauses = BlockContext::filter_clauses(
-                    context,
-                    variable_id,
-                    previous_clauses,
-                    if_block_context.locals.get(&variable_id).map(std::convert::AsRef::as_ref),
-                );
-            }
-        }
     } else if !has_break_statement {
         if_scope.reasonable_clauses = vec![];
 
@@ -931,6 +906,7 @@ where
         }
     }
 
+    let old_else_if_locals = else_if_block_context.locals.clone();
     let pre_assigned_variable_ids = std::mem::take(&mut else_if_block_context.assigned_variable_ids);
     let pre_possibly_assigned_variable_ids = std::mem::take(&mut else_if_block_context.possibly_assigned_variable_ids);
 
@@ -954,6 +930,7 @@ where
         get_branch_control_flags(&final_actions);
 
     if_scope.if_actions.extend(&final_actions);
+    if_scope.final_actions.extend(&final_actions);
 
     if has_leaving_statements {
         if_scope.reasonable_clauses = vec![];
@@ -985,14 +962,17 @@ where
             false,
         );
 
-        if if_scope.reasonable_clauses.is_empty() || else_if_clauses.is_empty() {
+        let mut surviving_clauses: Vec<_> = else_if_clauses.iter().cloned().map(Rc::new).collect();
+        retain_unchanged_branch_clauses(&mut surviving_clauses, &old_else_if_locals, &else_if_block_context);
+
+        if if_scope.reasonable_clauses.is_empty() || surviving_clauses.is_empty() {
             if_scope.reasonable_clauses = vec![];
         } else {
             let previous_clauses = std::mem::take(&mut if_scope.reasonable_clauses);
 
             if_scope.reasonable_clauses = disjoin_clauses(
                 previous_clauses.into_iter().map(Rc::unwrap_or_clone).collect(),
-                else_if_clauses.clone(),
+                surviving_clauses.into_iter().map(Rc::unwrap_or_clone).collect(),
                 else_if_clause.0.span(),
                 &context.settings.algebra_thresholds(),
             )
@@ -1139,6 +1119,8 @@ where
         else_types.keys().any(|var_id| else_block_context.locals.get(var_id).is_some_and(|t| t.is_never()));
 
     if is_unreachable {
+        if_scope.reasonable_clauses.clear();
+
         if else_statements.is_some() {
             context.collector.report_with_code(
                 IssueCode::UnreachableElseClause,
@@ -1160,7 +1142,6 @@ where
         return Ok(());
     }
 
-    let old_else_locals = else_block_context.locals.clone();
     let pre_assigned_variable_ids = std::mem::take(&mut else_block_context.assigned_variable_ids);
     let pre_possibly_assigned_variable_ids = std::mem::take(&mut else_block_context.possibly_assigned_variable_ids);
 
@@ -1206,24 +1187,6 @@ where
         );
 
         if_scope.reasonable_clauses = vec![];
-    }
-
-    if !if_scope.negated_types.is_empty() {
-        let variables_to_update = if_scope
-            .negated_types
-            .keys()
-            .copied()
-            .filter(|var| outer_block_context.locals.contains_key(var))
-            .collect::<WordSet>();
-
-        outer_block_context.update_locals(
-            context,
-            &old_else_locals,
-            else_block_context,
-            has_leaving_statements,
-            &variables_to_update,
-            &mut if_scope.updated_variables,
-        );
     }
 
     if !has_ending_statements {
@@ -1479,6 +1442,26 @@ fn merge_definitely_uninitialized_property_ids(if_scope: &mut IfScope<'_>, branc
                 Some(branch_context.definitely_uninitialized_property_ids.clone());
         }
     }
+}
+
+fn retain_unchanged_branch_clauses(
+    clauses: &mut Vec<Rc<Clause>>,
+    start_locals: &WordMap<Rc<TUnion>>,
+    end_context: &BlockContext<'_>,
+) {
+    let unchanged = |variable_id: Word| {
+        start_locals.get(&variable_id) == end_context.locals.get(&variable_id)
+            && !end_context.parent_conflicting_clause_variables.iter().any(|assigned_id| {
+                var_has_root(variable_id, *assigned_id) || var_references_dynamic(variable_id, *assigned_id)
+            })
+    };
+
+    clauses.retain(|clause| {
+        clause.possibilities.iter().all(|(variable_id, assertions)| {
+            unchanged(*variable_id)
+                && assertions.values().all(|assertion| assertion.referenced_variable().is_none_or(unchanged))
+        })
+    });
 }
 
 fn get_definitely_evaluated_ored_expressions<'ast, 'arena>(

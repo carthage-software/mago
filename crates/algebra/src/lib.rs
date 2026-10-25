@@ -264,15 +264,15 @@ fn saturate_clause_handles<'clause>(
         unique_clauses: Vec<ClauseHandle<'_>>,
         saturation_complexity: usize,
         consensus_limit: usize,
-    ) -> Vec<ClauseHandle<'_>> {
+    ) -> (Vec<ClauseHandle<'_>>, bool) {
         let unique_clauses_len = unique_clauses.len();
         if unique_clauses_len == 0 || unique_clauses_len > saturation_complexity {
             // If the complexity is too high, or there are no clauses, return an empty set.
-            return vec![];
+            return (vec![], false);
         }
 
         if unique_clauses_len == 1 {
-            return unique_clauses;
+            return (unique_clauses, false);
         }
 
         if unique_clauses_len == 2
@@ -281,11 +281,12 @@ fn saturate_clause_handles<'clause>(
             && unique_clauses[0].possibilities.first().map(|(key, _)| key)
                 != unique_clauses[1].possibilities.first().map(|(key, _)| key)
         {
-            return unique_clauses;
+            return (unique_clauses, false);
         }
 
         let mut removed_indices: Vec<bool> = vec![false; unique_clauses_len];
         let mut added_clauses: Vec<Clause> = Vec::new();
+        let mut propagated_units = false;
         // Link clauses with matching key sets in input order. Hash collisions still
         // reach the exact comparison below. Resolution needs at least two variables.
         let hasher = FixedState::default();
@@ -368,6 +369,7 @@ fn saturate_clause_handles<'clause>(
                     }
 
                     removed_indices[clause_b_idx] = true;
+                    propagated_units = true;
 
                     if matching_clause_possibilities.len() == 1 {
                         if let Some(updated_clause) = clause_b.remove_possibilities(clause_var) {
@@ -618,13 +620,25 @@ fn saturate_clause_handles<'clause>(
             simplified_clauses.retain(|f| !removed_hashes.contains(&f.hash));
         }
 
-        simplified_clauses
+        (simplified_clauses, propagated_units)
     }
 
     let mut seen: HashSet<u32> = HashSet::default();
-    let unique_clauses = clauses.into_iter().filter(|c| seen.insert(c.hash)).collect();
+    let mut unique_clauses = clauses.into_iter().filter(|c| seen.insert(c.hash)).collect();
 
-    saturate_clauses_inner(unique_clauses, thresholds.saturation_complexity.into(), thresholds.consensus_limit.into())
+    loop {
+        let (simplified, propagated_units) = saturate_clauses_inner(
+            unique_clauses,
+            thresholds.saturation_complexity.into(),
+            thresholds.consensus_limit.into(),
+        );
+
+        if !propagated_units {
+            return simplified;
+        }
+
+        unique_clauses = simplified;
+    }
 }
 
 /// Extracts simple assertions from a set of clauses and identifies which are "active".
@@ -1135,6 +1149,44 @@ mod tests {
         let expected = std::iter::once(unit.clone()).chain(derived).collect::<Vec<_>>();
 
         assert_exact(&saturate_clauses(&[unit, compound], &AlgebraThresholds::default()), &expected);
+    }
+
+    #[test]
+    fn unit_propagation_applies_all_units_to_a_disjunction() {
+        let input = [
+            clause(1, &[("$a", Assertion::Truthy), ("$b", Assertion::Truthy), ("$c", Assertion::Truthy)]),
+            clause(2, &[("$a", Assertion::Falsy)]),
+            clause(3, &[("$b", Assertion::Falsy)]),
+        ];
+
+        for order in [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]] {
+            let reordered = order.map(|index| input[index].clone());
+            let output = saturate_clauses(&reordered, &AlgebraThresholds::default());
+            let (truths, _) = find_satisfying_assignments(&output, None, &mut WordSet::default());
+
+            assert_eq!(truths.get(&word("$a")), Some(&vec![vec![Assertion::Falsy]]));
+            assert_eq!(truths.get(&word("$b")), Some(&vec![vec![Assertion::Falsy]]));
+            assert_eq!(truths.get(&word("$c")), Some(&vec![vec![Assertion::Truthy]]));
+        }
+    }
+
+    #[test]
+    fn unit_propagation_applies_newly_derived_units() {
+        let input = [
+            clause(1, &[("$a", Assertion::Truthy)]),
+            clause(2, &[("$a", Assertion::Falsy), ("$b", Assertion::Truthy)]),
+            clause(3, &[("$b", Assertion::Falsy), ("$c", Assertion::Truthy)]),
+        ];
+
+        for order in [[0, 1, 2], [0, 2, 1], [1, 0, 2], [1, 2, 0], [2, 0, 1], [2, 1, 0]] {
+            let reordered = order.map(|index| input[index].clone());
+            let output = saturate_clauses(&reordered, &AlgebraThresholds::default());
+            let (truths, _) = find_satisfying_assignments(&output, None, &mut WordSet::default());
+
+            for variable in ["$a", "$b", "$c"] {
+                assert_eq!(truths.get(&word(variable)), Some(&vec![vec![Assertion::Truthy]]));
+            }
+        }
     }
 
     #[test]
