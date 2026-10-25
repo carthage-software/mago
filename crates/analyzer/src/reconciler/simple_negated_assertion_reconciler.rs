@@ -18,6 +18,7 @@ use mago_codex::ttype::atomic::scalar::bool::TBool;
 use mago_codex::ttype::atomic::scalar::float::TFloat;
 use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::comparator::union_comparator;
+use mago_codex::ttype::get_arraykey;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::get_null;
 use mago_codex::ttype::get_undefined_null;
@@ -377,6 +378,23 @@ where
 
             // Otherwise (no concrete subtracting class to compare against) the object atomic is dropped:
             // negating `is_object` removes every object branch from the union.
+        } else if let TAtomic::Iterable(iterable) = &atomic
+            && !is_equality
+            && matches!(type_to_subtract, Some(TAtomic::Object(TObject::Any)))
+        {
+            // `iterable` is `array|Traversable`; removing the object part leaves the array part.
+            did_remove_type = true;
+
+            let key_type = if iterable.key_type.is_always_array_key(false) {
+                Arc::clone(&iterable.key_type)
+            } else {
+                Arc::new(get_arraykey())
+            };
+
+            acceptable_types.push(TAtomic::Array(TArray::Keyed(TKeyedArray::new_with_parameters(
+                key_type,
+                Arc::clone(&iterable.value_type),
+            ))));
         } else {
             acceptable_types.push(atomic);
         }
