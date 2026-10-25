@@ -658,7 +658,7 @@ fn saturate_clause_handles<'clause>(
 ///
 /// * `clauses` - A slice of clauses to analyze.
 /// * `creating_conditional_id` - An optional `Span` representing a conditional context.
-///   An assertion is "active" if its `condition_span` matches this ID.
+///   An assertion is "active" if its clause is not generated and its `condition_span` matches this ID.
 /// * `conditionally_referenced_var_ids` - A mutable `HashSet` that will be populated with all
 ///   variable IDs found in non-generated clauses.
 ///
@@ -728,6 +728,7 @@ pub fn find_satisfying_assignments_iter<'clause>(
 
         if let Some(creating_conditional_id) = creating_conditional_id
             && creating_conditional_id == clause.condition_span
+            && !clause.generated
         {
             active_truths.entry(*variable_id).or_default().insert(new_truth_index);
         }

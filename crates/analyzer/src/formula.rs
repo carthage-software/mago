@@ -967,7 +967,7 @@ fn push_not_null_clause_for_id(
         creating_object_id,
         Some(false),
         Some(true),
-        Some(false),
+        Some(true),
     ));
 }
 
