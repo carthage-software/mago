@@ -42,6 +42,7 @@ use mago_codex::ttype::get_null;
 use mago_codex::ttype::get_specialized_template_type;
 use mago_codex::ttype::get_string;
 use mago_codex::ttype::get_undefined_null;
+use mago_codex::ttype::intersect_read_types;
 use mago_codex::ttype::template::TemplateResult;
 use mago_codex::ttype::template::inferred_type_replacer;
 use mago_codex::ttype::union::TUnion;
@@ -1348,106 +1349,105 @@ pub(crate) fn handle_array_access_on_named_object<A>(
 where
     A: Arena,
 {
-    fn get_array_access_classes<'ctx, A>(
-        context: &mut Context<'ctx, '_, A>,
+    fn get_primary_array_access_parameters<A>(
+        context: &Context<'_, '_, A>,
         atomic: &TAtomic,
         for_assignment: bool,
-    ) -> Option<(Vec<&'ctx ClassLikeMetadata>, TUnion, TUnion)>
+    ) -> Option<(TUnion, TUnion)>
     where
         A: Arena,
     {
-        let mut parameters = vec![];
-        let metadata = 'metadata: {
-            let TAtomic::Object(TObject::Named(named_object)) = atomic else {
-                break 'metadata None;
-            };
-
-            let array_access = word(b"ArrayAccess");
-            if !context.codebase.is_instance_of(named_object.name.as_bytes(), array_access.as_bytes()) {
-                break 'metadata None;
-            }
-
-            let Some(metadata) = context.codebase.get_class_like(named_object.name.as_bytes()) else {
-                break 'metadata None;
-            };
-
-            let Some(array_access_metadata) = context.codebase.get_class_like(array_access.as_bytes()) else {
-                break 'metadata None;
-            };
-
-            let Some(key_template_name) = array_access_metadata.template_types.first().map(|(name, _)| *name) else {
-                break 'metadata None;
-            };
-
-            let Some(value_template_name) = array_access_metadata.template_types.get_index(1).map(|(name, _)| *name)
-            else {
-                break 'metadata None;
-            };
-
-            let key_type = get_specialized_template_type(
-                context.codebase,
-                key_template_name,
-                array_access,
-                metadata,
-                named_object.get_type_parameters(),
-            )
-            .unwrap_or_else(get_mixed);
-
-            let value_type = for_assignment
-                .then(|| get_array_access_assignment_value_type(context, metadata, named_object))
-                .flatten()
-                .unwrap_or_else(|| {
-                    get_specialized_template_type(
-                        context.codebase,
-                        value_template_name,
-                        array_access,
-                        metadata,
-                        named_object.get_type_parameters(),
-                    )
-                    .unwrap_or_else(get_mixed)
-                });
-
-            parameters.push((key_type, value_type));
-
-            Some(metadata)
+        let TAtomic::Object(TObject::Named(named_object)) = atomic else {
+            return None;
         };
 
-        let mut class_likes = vec![];
-
-        if let Some(metadata) = metadata {
-            class_likes.push(metadata);
-        }
-
-        if let Some(intersection_types) = atomic.get_intersection_types() {
-            for intersection_type in intersection_types {
-                if let Some(intersections) = get_array_access_classes(context, intersection_type, for_assignment) {
-                    class_likes.extend(intersections.0);
-
-                    parameters.push((intersections.1, intersections.2));
-                }
-            }
-        }
-
-        let mut key_type = None;
-        let mut value_type = None;
-
-        for (key_parameter_type, value_parameter_type) in parameters {
-            key_type = Some(add_optional_union_type(key_parameter_type, key_type.as_ref(), context.codebase));
-
-            value_type = Some(add_optional_union_type(value_parameter_type, value_type.as_ref(), context.codebase));
-        }
-
-        if class_likes.is_empty() {
+        let array_access = word(b"ArrayAccess");
+        if !context.codebase.is_instance_of(named_object.name.as_bytes(), array_access.as_bytes()) {
             return None;
         }
 
-        Some((class_likes, key_type.unwrap_or_else(get_mixed), value_type.unwrap_or_else(get_mixed)))
+        let metadata = context.codebase.get_class_like(named_object.name.as_bytes())?;
+        let array_access_metadata = context.codebase.get_class_like(array_access.as_bytes())?;
+        let key_template = array_access_metadata.template_types.first().map(|(name, _)| *name)?;
+        let value_template = array_access_metadata.template_types.get_index(1).map(|(name, _)| *name)?;
+        let key = get_specialized_template_type(
+            context.codebase,
+            key_template,
+            array_access,
+            metadata,
+            named_object.get_type_parameters(),
+        )
+        .unwrap_or_else(get_mixed);
+
+        let value = for_assignment
+            .then(|| get_array_access_assignment_value_type(context, metadata, named_object))
+            .flatten()
+            .unwrap_or_else(|| {
+                get_specialized_template_type(
+                    context.codebase,
+                    value_template,
+                    array_access,
+                    metadata,
+                    named_object.get_type_parameters(),
+                )
+                .unwrap_or_else(get_mixed)
+            });
+
+        Some((key, value))
     }
 
+    fn visit_array_access_parameters<A>(
+        context: &Context<'_, '_, A>,
+        atomic: &TAtomic,
+        for_assignment: bool,
+        visitor: &mut impl FnMut(TUnion, TUnion),
+    ) where
+        A: Arena,
+    {
+        if let Some((key, value)) = get_primary_array_access_parameters(context, atomic, for_assignment) {
+            visitor(key, value);
+        }
+
+        for intersection in atomic.get_intersection_types().unwrap_or_default() {
+            visit_array_access_parameters(context, intersection, for_assignment, visitor);
+        }
+    }
+
+    let parameters = if !named_object.has_intersection_types() {
+        get_primary_array_access_parameters(context, named_object, assign_value_type.is_some())
+    } else {
+        let mut keys = None;
+        let mut fallback = None;
+        let mut read_type = None;
+        visit_array_access_parameters(context, named_object, assign_value_type.is_some(), &mut |key, value| {
+            if assign_value_type.is_none()
+                && is_contained_by(
+                    context.codebase,
+                    index_type,
+                    &key,
+                    false,
+                    false,
+                    false,
+                    &mut ComparisonResult::new(),
+                )
+            {
+                read_type = Some(match read_type.take() {
+                    Some(previous) => intersect_read_types(&previous, &value, context.codebase),
+                    None => value,
+                });
+                fallback = None;
+            } else if read_type.is_none() {
+                fallback = Some(add_optional_union_type(value, fallback.as_ref(), context.codebase));
+            }
+
+            keys = Some(add_optional_union_type(key, keys.as_ref(), context.codebase));
+        });
+
+        keys.map(|key| (key, read_type.or(fallback).unwrap_or_else(get_mixed)))
+    };
+
     // TODO: we should analyze calls to `offsetSet` and `offsetGet` here.
-    let Some((_array_access_classes, expected_key_type, mut resulting_value_type)) =
-        get_array_access_classes(context, named_object, assign_value_type.is_some())
-    else {
+    let Some((expected_key_type, mut resulting_value_type)) = parameters else {
         context.collector.report_with_code(
             IssueCode::InvalidArrayAccess,
             Issue::error(format!(

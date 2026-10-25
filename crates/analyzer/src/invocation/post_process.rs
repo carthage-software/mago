@@ -736,6 +736,12 @@ fn clear_object_property_narrowings<'ctx, 'arena, A>(
     let mut escaped_roots: Vec<Word> = Vec::new();
     let mut container_escapes = false;
     let mut has_object_argument = false;
+
+    if let Some(receiver) = receiver_variable.filter(|receiver| *receiver != b"$this") {
+        escaped_roots.push(word(receiver));
+        has_object_argument = true;
+    }
+
     for argument in invocation.arguments_source.iter_arguments() {
         let Some(expression) = argument.value() else {
             continue;

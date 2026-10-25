@@ -30,6 +30,7 @@ use crate::artifacts::AnalysisArtifacts;
 use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
+use crate::utils::template::check_template_arguments;
 use mago_bytes::BytesDisplay;
 
 /// Populates the context with variable types defined in the docblock.
@@ -225,6 +226,10 @@ where
                         &mut artifacts.symbol_references,
                         true,
                     );
+
+                    if allow_tracing {
+                        check_template_arguments(context, TypeRef::Union(&variable_type), var_tag.r#type.span());
+                    }
 
                     expander::expand_union(
                         context.codebase,

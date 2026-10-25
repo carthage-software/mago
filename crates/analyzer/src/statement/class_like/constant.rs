@@ -20,6 +20,7 @@ use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::statement::attributes::AttributeTarget;
 use crate::statement::attributes::analyze_attributes;
+use crate::statement::function_like::check_type_metadata;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for ClassLikeConstant<'arena> {
     fn analyze<'ctx, A>(
@@ -62,6 +63,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ClassLikeConstantItem<'arena> {
         if let Some(class_metadata) = block_context.scope.get_class_like()
             && let Some(constant_metadata) = class_metadata.constants.get(&word(self.name.value))
         {
+            if let Some(type_metadata) = &constant_metadata.type_metadata {
+                check_type_metadata(context, type_metadata);
+            }
+
             if let Some(inferred_type) = constant_metadata.inferred_type.as_ref()
                 && inferred_type.is_never()
             {

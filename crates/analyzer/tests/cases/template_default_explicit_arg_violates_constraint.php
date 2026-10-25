@@ -13,11 +13,8 @@ final class Bag
     public function __construct(public readonly mixed $value) {}
 }
 
-/**
- * @mago-expect analysis:docblock-type-mismatch
- *
- * @param Bag<bool> $b
- */
+// @mago-expect analysis:invalid-template-parameter
+/** @param Bag<bool> $b */
 function take(Bag $b): void
 {
     echo (string) $b->value;

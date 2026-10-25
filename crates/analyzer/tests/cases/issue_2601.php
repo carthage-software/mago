@@ -48,6 +48,7 @@ function problem_or_of_two_plain_null_checks(?Item $item): void
     $a = $item !== null;
     $b = $item !== null;
 
+    // @mago-expect analysis:redundant-logical-operation
     if ($a || $b) {
         consume($item->name);
     }

@@ -54,6 +54,9 @@ macro_rules! test_case {
 }
 
 test_case!(accessing_undefined_class_constant);
+test_case!(issue_2616);
+test_case!(issue_2616_positions);
+test_case!(issue_2616_bounds);
 test_case!(generic_docblock_native_return);
 test_case!(message_quality);
 test_case!(ds_map_defaults);
@@ -2887,12 +2890,21 @@ test_case!(issue_2523);
 test_case!(issue_2563);
 test_case!(issue_2585);
 test_case!(issue_2590);
+test_case!(issue_2591);
+test_case!(issue_2592);
+test_case!(issue_2593);
+test_case!(issue_2593_short_circuit);
 test_case!(issue_2594);
+test_case!(issue_2599);
 test_case!(issue_2600);
 test_case!(issue_2601);
 test_case!(issue_2607_argc);
 test_case!(issue_2607_count);
 test_case!(issue_2603);
+test_case!(issue_2611);
+test_case!(issue_2612);
+test_case!(issue_2612_intersections);
+test_case!(issue_2619);
 test_case!(simplexml_truthiness);
 test_case!(closure_capture_by_reference_array);
 test_case!(nullable_receiver_method_call);
@@ -2926,6 +2938,7 @@ test_case!(foreach_empty_array_analyze_dead_code, {
     settings.analyze_dead_code = true;
     settings
 });
+test_case!(equality_type_reconciliation_unions);
 
 #[test]
 fn issue_2478_without_property_memoization() {

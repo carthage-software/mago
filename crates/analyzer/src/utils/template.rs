@@ -6,20 +6,184 @@ use mago_allocator::Arena;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
 use mago_codex::metadata::class_like::TemplateTypes;
 use mago_codex::misc::GenericParent;
+use mago_codex::ttype::TType;
+use mago_codex::ttype::TypeRef;
 use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::generic::TGenericParameter;
+use mago_codex::ttype::atomic::object::TObject;
+use mago_codex::ttype::atomic::object::named::TNamedObject;
+use mago_codex::ttype::comparator::ComparisonResult;
+use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::expander;
 use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::expander::TypeExpansionOptions;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::template::GenericTemplate;
+use mago_codex::ttype::template::TemplateResult;
+use mago_codex::ttype::template::definition_type_replacer;
+use mago_codex::ttype::template::definition_type_replacer::DefinitionReplacementOptions;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;
+use mago_reporting::Annotation;
+use mago_reporting::Issue;
+use mago_span::Span;
 use mago_word::Word;
 use mago_word::WordMap;
 
+use crate::code::IssueCode;
 use crate::context::Context;
+
+pub fn check_template_arguments<A>(context: &mut Context<'_, '_, A>, root: TypeRef<'_>, span: Span)
+where
+    A: Arena,
+{
+    let mut nodes = vec![root];
+    while let Some(node) = nodes.pop() {
+        match node {
+            TypeRef::Union(union) => union.append_child_nodes(&mut nodes),
+            TypeRef::Atomic(TAtomic::GenericParameter(_)) => {}
+            TypeRef::Atomic(atomic) => {
+                if let TAtomic::Object(TObject::Named(named)) = atomic {
+                    check_named_template_arguments(context, named, span);
+                }
+
+                atomic.append_child_nodes(&mut nodes);
+            }
+        }
+    }
+}
+
+pub fn check_template_definitions<A>(context: &mut Context<'_, '_, A>, templates: &TemplateTypes, span: Span)
+where
+    A: Arena,
+{
+    for template in templates.values() {
+        if let GenericParent::FunctionLike(id) = template.defining_entity
+            && context
+                .codebase
+                .function_likes
+                .get(&id)
+                .is_some_and(|metadata| metadata.name_span.unwrap_or(metadata.span) != span)
+        {
+            continue;
+        }
+
+        check_template_arguments(context, TypeRef::Union(&template.constraint), span);
+
+        if let Some(default) = &template.default {
+            check_template_arguments(context, TypeRef::Union(default), span);
+        }
+    }
+}
+
+fn check_named_template_arguments<A>(context: &mut Context<'_, '_, A>, named: &TNamedObject, span: Span)
+where
+    A: Arena,
+{
+    let Some(arguments) = named.get_type_parameters() else {
+        return;
+    };
+
+    let Some(metadata) = context.codebase.get_class_like_by_name(named.name) else {
+        return;
+    };
+
+    let expected = metadata.template_types.len();
+    let required =
+        metadata.template_types.values().rposition(|template| template.default.is_none()).map_or(0, |i| i + 1);
+    let actual = arguments.len();
+    let name = metadata.original_name;
+    let definition_span = metadata.name_span.unwrap_or(metadata.span);
+
+    if actual < required || actual > expected {
+        let (code, message) = if actual < required {
+            (
+                IssueCode::MissingTemplateParameter,
+                format!("Too few template arguments for `{name}`: expected at least {required}, but found {actual}."),
+            )
+        } else {
+            (
+                IssueCode::ExcessTemplateParameter,
+                format!("Too many template arguments for `{name}`: expected {expected}, but found {actual}."),
+            )
+        };
+
+        context.collector.report_with_code(
+            code,
+            Issue::error(message)
+                .with_annotation(Annotation::primary(span).with_message("Check the template arguments in this type"))
+                .with_annotation(
+                    Annotation::secondary(definition_span)
+                        .with_message(format!("`{name}` defines {expected} template parameters")),
+                ),
+        );
+    }
+
+    let mut replacements = None;
+    for (i, (argument, (template_name, template))) in arguments.iter().zip(&metadata.template_types).enumerate() {
+        if template.constraint.is_mixed()
+            || argument.from_template_fallback()
+            || named.variances.as_ref().and_then(|variances| variances.get(i)).is_some_and(|v| v.is_bivariant())
+        {
+            continue;
+        }
+
+        let mut constraint = if template.constraint.has_template_types() {
+            let replacements = replacements.get_or_insert_with(|| {
+                let template_types = metadata
+                    .template_types
+                    .iter()
+                    .zip(arguments)
+                    .map(|((name, template), argument)| {
+                        (*name, vec![GenericTemplate::new(template.defining_entity, argument.clone())])
+                    })
+                    .collect();
+
+                TemplateResult::new(template_types, HashMap::default())
+            });
+
+            definition_type_replacer::replace(
+                &template.constraint,
+                replacements,
+                context.codebase,
+                DefinitionReplacementOptions::default(),
+            )
+        } else {
+            template.constraint.clone()
+        };
+
+        let options = TypeExpansionOptions { self_class: Some(metadata.name), ..Default::default() };
+        expander::expand_union(context.codebase, &mut constraint, &options);
+
+        let mut argument = argument.clone();
+        expander::expand_union(context.codebase, &mut argument, &options);
+
+        if !union_comparator::is_contained_by(
+            context.codebase,
+            &argument,
+            &constraint,
+            false,
+            false,
+            false,
+            &mut ComparisonResult::default(),
+        ) {
+            context.collector.report_with_code(
+                IssueCode::InvalidTemplateParameter,
+                Issue::error(format!("Template argument for `{name}` does not satisfy its constraint."))
+                    .with_annotation(Annotation::primary(span).with_message(format!(
+                        "Type `{}` is not compatible with `{}` for template `{template_name}`",
+                        argument.get_id(),
+                        constraint.get_id(),
+                    )))
+                    .with_annotation(
+                        Annotation::secondary(definition_span)
+                            .with_message(format!("`{name}` declares template `{template_name}` here")),
+                    ),
+            );
+        }
+    }
+}
 
 /// Type alias for template lower bounds - maps parameter names to their bounds per defining entity.
 pub type TemplateLowerBounds = HashMap<Word, HashMap<GenericParent, TUnion>>;

@@ -1,5 +1,3 @@
-template_dir := `mktemp -d`
-
 # Lists all available commands.
 list:
     @just --list

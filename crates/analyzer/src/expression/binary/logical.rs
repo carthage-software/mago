@@ -93,7 +93,35 @@ where
         return assigned_variables.keys().filter_map(|id| left_locals.get(id).map(|ty| (*id, Rc::clone(ty)))).collect();
     }
 
-    let mut right_context = Cow::Borrowed(right_context);
+    let right_context =
+        reconcile_short_circuit_context(binary, when_true, context, artifacts, Cow::Borrowed(right_context));
+
+    assigned_variables
+        .keys()
+        .filter_map(|id| {
+            Some((
+                *id,
+                combine_union_types_rc(
+                    left_locals.get(id)?,
+                    right_context.locals.get(id)?,
+                    context.codebase,
+                    context.settings.combiner_options(),
+                ),
+            ))
+        })
+        .collect()
+}
+
+fn reconcile_short_circuit_context<'ctx, 'source, A>(
+    binary: &Binary<'_>,
+    when_true: bool,
+    context: &mut Context<'ctx, '_, A>,
+    artifacts: &AnalysisArtifacts,
+    mut right_context: Cow<'source, BlockContext<'ctx>>,
+) -> Cow<'source, BlockContext<'ctx>>
+where
+    A: Arena,
+{
     let mut clauses = get_formula(
         binary.rhs.span(),
         binary.rhs.span(),
@@ -132,20 +160,7 @@ where
         );
     }
 
-    assigned_variables
-        .keys()
-        .filter_map(|id| {
-            Some((
-                *id,
-                combine_union_types_rc(
-                    left_locals.get(id)?,
-                    right_context.locals.get(id)?,
-                    context.codebase,
-                    context.settings.combiner_options(),
-                ),
-            ))
-        })
-        .collect()
+    right_context
 }
 
 #[inline]
@@ -158,6 +173,8 @@ pub fn analyze_logical_and_operation<'ctx, 'arena, A>(
 where
     A: Arena,
 {
+    let true_context = block_context.logical_and_true_context.take();
+    let left_true_context = is_logical_and_operation(binary.lhs).then(|| Rc::new(RefCell::new(None)));
     let mut left_block_context = block_context.clone();
     let pre_referenced_var_ids = left_block_context.conditionally_referenced_variable_ids.clone();
     let pre_assigned_var_ids = left_block_context.assigned_variable_ids.clone();
@@ -167,9 +184,11 @@ where
     left_block_context.parent_conflicting_clause_variables.clear();
     left_block_context.reconciled_expression_clauses = Vec::new();
 
+    left_block_context.logical_and_true_context.clone_from(&left_true_context);
     let left_was_inside_general_use = left_block_context.flags.inside_general_use();
     left_block_context.flags.set_inside_general_use(true);
     binary.lhs.analyze(context, &mut left_block_context, artifacts)?;
+    left_block_context.logical_and_true_context = None;
     left_block_context.flags.set_inside_general_use(left_was_inside_general_use);
 
     extract_function_constant_existence(binary.lhs, artifacts, &mut left_block_context, false);
@@ -230,26 +249,13 @@ where
     }
 
     let mut changed_var_ids = WordSet::default();
-    let mut right_block_context;
-    if left_assertions.is_empty() {
-        right_block_context = left_block_context.clone();
-    } else {
-        right_block_context = block_context.clone();
+    let mut right_block_context =
+        left_true_context.and_then(|scope| scope.borrow_mut().take()).unwrap_or_else(|| left_block_context.clone());
+    right_block_context.if_body_context.clone_from(&left_block_context.if_body_context);
+    right_block_context.known_functions.extend(left_block_context.known_functions.iter().copied());
+    right_block_context.known_constants.extend(left_block_context.known_constants.iter().copied());
 
-        right_block_context.known_functions.extend(left_block_context.known_functions.iter().copied());
-        right_block_context.known_constants.extend(left_block_context.known_constants.iter().copied());
-
-        // The right-hand side only runs after the left-hand side, so method calls evaluated on
-        // the left must stay stable while reconciling the left assertions below.
-        right_block_context.stable_method_calls.clone_from(&left_block_context.stable_method_calls);
-        right_block_context.stable_method_call_assertions.clone_from(&left_block_context.stable_method_call_assertions);
-
-        for variable_id in left_assertions.keys() {
-            if let Some(variable_type) = left_block_context.locals.get(variable_id) {
-                right_block_context.locals.entry(*variable_id).or_insert_with(|| Rc::clone(variable_type));
-            }
-        }
-
+    if !left_assertions.is_empty() {
         let empty_referenced_vars = WordSet::default();
 
         reconciler::reconcile_keyed_types(
@@ -282,6 +288,10 @@ where
     }
 
     right_block_context.assigned_variable_ids.clear();
+    let right_true_context = ((true_context.is_some() || block_context.if_body_context.is_some())
+        && is_logical_and_operation(binary.rhs))
+    .then(|| Rc::new(RefCell::new(None)));
+    right_block_context.logical_and_true_context.clone_from(&right_true_context);
     let result_type: TUnion;
     if lhs_type.is_always_falsy() {
         if !block_context.flags.inside_loop_expressions() {
@@ -346,6 +356,9 @@ where
         }
     }
 
+    right_block_context.logical_and_true_context = None;
+    let right_true_context = right_true_context.and_then(|scope| scope.borrow_mut().take());
+
     artifacts.set_expression_type(binary, result_type);
 
     block_context.conditionally_referenced_variable_ids =
@@ -390,7 +403,8 @@ where
     {
         let mut if_body_context_inner = if_body_context.borrow_mut();
 
-        if_body_context_inner.locals.extend(right_block_context.locals.iter().map(|(k, v)| (*k, Rc::clone(v))));
+        let right_true_context = right_true_context.as_ref().unwrap_or(&right_block_context);
+        if_body_context_inner.locals.extend(right_true_context.locals.iter().map(|(k, v)| (*k, Rc::clone(v))));
         if_body_context_inner
             .conditionally_referenced_variable_ids
             .extend(block_context.conditionally_referenced_variable_ids.iter().copied());
@@ -402,17 +416,6 @@ where
         if_body_context_inner
             .stable_method_call_assertions
             .retain(|method_call, _| block_context.stable_method_call_assertions.contains_key(method_call));
-    }
-
-    if block_context.if_body_context.is_some()
-        && left_block_context.assigned_variable_ids.is_empty()
-        && right_assigned_var_ids.is_empty()
-    {
-        block_context.locals =
-            if block_context.flags.inside_negation() { left_block_context.locals } else { right_block_context.locals };
-        artifacts.short_circuit_assignment_types.remove(&(binary.start_offset(), binary.end_offset()));
-
-        return Ok(());
     }
 
     block_context
@@ -504,6 +507,19 @@ where
         artifacts.short_circuit_assignment_types.insert((binary.start_offset(), binary.end_offset()), assignment_types);
     } else {
         artifacts.short_circuit_assignment_types.remove(&(binary.start_offset(), binary.end_offset()));
+    }
+
+    if let Some(true_context) = true_context {
+        *true_context.borrow_mut() = Some(
+            reconcile_short_circuit_context(
+                binary,
+                true,
+                context,
+                artifacts,
+                Cow::Owned(right_true_context.unwrap_or(right_block_context)),
+            )
+            .into_owned(),
+        );
     }
 
     Ok(())
@@ -1129,6 +1145,14 @@ fn report_redundant_logical_operation<'arena, A>(
     } else {
         context.collector.report_with_code(IssueCode::RedundantLogicalOperation, issue);
     }
+}
+
+#[inline]
+const fn is_logical_and_operation(expression: &Expression<'_>) -> bool {
+    matches!(
+        expression.unparenthesized(),
+        Expression::Binary(Binary { operator: BinaryOperator::And(_) | BinaryOperator::LowAnd(_), .. })
+    )
 }
 
 #[inline]

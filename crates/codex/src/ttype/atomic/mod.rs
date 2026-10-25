@@ -963,7 +963,7 @@ pub fn populate_atomic_type(
                 }
 
                 if let Some(symbol_kind) = codebase_symbols.get_kind(name.to_ascii_lowercase()) {
-                    if symbol_kind == SymbolKind::Enum {
+                    if symbol_kind == SymbolKind::Enum && parameters.is_none() {
                         *unpopulated_atomic = TAtomic::Object(TObject::new_enum(*name));
                     } else {
                         let intersection_types = intersection_types.take().map(|intersection_types| {

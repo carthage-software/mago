@@ -44,6 +44,7 @@ abstract class Relation
 
 class Builder
 {
+    // @mago-expect analysis:invalid-template-parameter(2)
     /**
      * @param array<array-key, (callable(Relation<mixed, mixed, mixed>): mixed)|string> $relations
      */
@@ -60,6 +61,7 @@ function eagerLoad(Builder $builder): void
 
     $builder->with([
         'templates' =>
+            // @mago-expect analysis:invalid-template-parameter(2)
             /** @param Relation<mixed, mixed, mixed> $query */
             static function (Relation $query): void {
                 $query->where('is_guide', false);
