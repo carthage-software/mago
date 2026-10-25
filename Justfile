@@ -107,6 +107,7 @@ publish:
     cargo publish -p mago-linter
     cargo publish -p mago-orchestrator
     cargo publish -p mago-wasm
+    cargo publish -p mago-server
     cargo publish
 
 # Cleans all build artifacts from the workspace.
