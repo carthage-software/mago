@@ -3879,7 +3879,7 @@ function array_map(?callable $callback, array $array, array ...$arrays): array {
  * @param array<K, V> $array
  * @param int<1, max> $length
  *
- * @return ($preserve_keys is true ? list<array<K, V>> : list<list<V>>)
+ * @return ($preserve_keys is true ? list<non-empty-array<K, V>> : list<non-empty-list<V>>)
  *
  * @pure
  */

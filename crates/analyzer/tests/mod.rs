@@ -116,6 +116,7 @@ test_case!(array_unique_non_empty);
 test_case!(arrays_simple_list_literal);
 test_case!(arrays_array_chunk);
 test_case!(arrays_array_chunk_zero_size);
+test_case!(arrays_array_chunk_non_empty);
 test_case!(arrays_array_column);
 test_case!(arrays_array_combine);
 test_case!(arrays_array_count_values);
