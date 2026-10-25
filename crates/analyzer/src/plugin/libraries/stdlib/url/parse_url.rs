@@ -12,6 +12,7 @@ use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::atomic::scalar::string::TString;
 use mago_codex::ttype::get_int_range;
 use mago_codex::ttype::get_non_empty_string;
+use mago_codex::ttype::get_string;
 use mago_codex::ttype::union::TUnion;
 use mago_word::Word;
 
@@ -158,10 +159,13 @@ fn get_component_return_type(component: i64) -> TUnion {
     let false_type = TAtomic::Scalar(TScalar::Bool(TBool::r#false()));
 
     match component {
-        PHP_URL_SCHEME | PHP_URL_HOST | PHP_URL_USER | PHP_URL_PASS | PHP_URL_PATH | PHP_URL_QUERY
-        | PHP_URL_FRAGMENT => {
+        PHP_URL_SCHEME | PHP_URL_HOST | PHP_URL_PATH => {
             // false|null|non-empty-string
             TUnion::from_vec(vec![false_type, TAtomic::Null, TAtomic::Scalar(TScalar::String(TString::non_empty()))])
+        }
+        PHP_URL_USER | PHP_URL_PASS | PHP_URL_QUERY | PHP_URL_FRAGMENT => {
+            // false|null|string: since PHP 8.0 these may be present but empty (e.g. `https://example.com/?`)
+            TUnion::from_vec(vec![false_type, TAtomic::Null, TAtomic::Scalar(TScalar::String(TString::general()))])
         }
         PHP_URL_PORT => {
             // false|null|int<0, 65535>
@@ -195,9 +199,15 @@ fn get_all_components_return_type() -> TUnion {
 fn get_full_array_return_type() -> TUnion {
     let mut known_items: BTreeMap<ArrayKey, (bool, TUnion)> = BTreeMap::new();
 
-    let optional_string_fields = ["scheme", "user", "pass", "host", "path", "query", "fragment"];
-    for field in optional_string_fields {
+    let optional_non_empty_string_fields = ["scheme", "host", "path"];
+    for field in optional_non_empty_string_fields {
         known_items.insert(ArrayKey::String(Word::from(field)), (true, get_non_empty_string()));
+    }
+
+    // Since PHP 8.0 these may be present but empty (e.g. `https://example.com/?`).
+    let optional_string_fields = ["user", "pass", "query", "fragment"];
+    for field in optional_string_fields {
+        known_items.insert(ArrayKey::String(Word::from(field)), (true, get_string()));
     }
 
     known_items.insert(ArrayKey::String(Word::from("port")), (true, get_int_range(Some(0), Some(0xFFFF))));
