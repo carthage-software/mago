@@ -36,6 +36,7 @@ use crate::statement::analyze_statements;
 
 pub mod analysis_result;
 pub mod artifacts;
+mod callables;
 pub mod code;
 pub mod error;
 pub mod external;
@@ -261,6 +262,7 @@ where
         #[cfg(not(target_arch = "wasm32"))]
         let statements_start = trace_enabled.then(std::time::Instant::now);
         analyze_statements(statements, &mut context, &mut block_context, &mut artifacts)?;
+        crate::callables::report_deferred_callable_exceptions_for_file(&mut context, &artifacts);
         #[cfg(not(target_arch = "wasm32"))]
         if let Some(start) = statements_start {
             telemetry::record_statements(start.elapsed());

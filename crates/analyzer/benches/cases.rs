@@ -79,10 +79,25 @@ fn discover_cases_by_prefix() -> Vec<(&'static str, Vec<(PathBuf, String)>)> {
     let mut buckets: Vec<(&'static str, Vec<(PathBuf, String)>)> =
         BENCHMARKED_PREFIXES.iter().map(|p| (*p, Vec::new())).collect();
 
+    collect_cases_by_prefix(&cases_dir, &mut buckets);
+
+    for (_, files) in &mut buckets {
+        files.sort_by(|a, b| a.0.cmp(&b.0));
+    }
+
+    buckets
+}
+
+fn collect_cases_by_prefix(cases_dir: &Path, buckets: &mut [(&'static str, Vec<(PathBuf, String)>)]) {
     let entries =
-        std::fs::read_dir(&cases_dir).unwrap_or_else(|e| panic!("failed to read {}: {e}", cases_dir.display()));
+        std::fs::read_dir(cases_dir).unwrap_or_else(|e| panic!("failed to read {}: {e}", cases_dir.display()));
     for entry in entries.flatten() {
         let path = entry.path();
+        if path.is_dir() {
+            collect_cases_by_prefix(&path, buckets);
+            continue;
+        }
+
         if path.extension().and_then(|s| s.to_str()) != Some("php") {
             continue;
         }
@@ -93,12 +108,6 @@ fn discover_cases_by_prefix() -> Vec<(&'static str, Vec<(PathBuf, String)>)> {
             std::fs::read_to_string(&path).unwrap_or_else(|e| panic!("failed to read {}: {e}", path.display()));
         bucket.1.push((path, content));
     }
-
-    for (_, files) in &mut buckets {
-        files.sort_by(|a, b| a.0.cmp(&b.0));
-    }
-
-    buckets
 }
 
 fn bench_cases(c: &mut Criterion) {

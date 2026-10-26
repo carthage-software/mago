@@ -8,6 +8,7 @@ use mago_algebra::AssertionMap;
 use mago_word::Word;
 use mago_word::WordMap;
 use mago_word::WordSet;
+use mago_word::word;
 
 use mago_algebra::clause::Clause;
 use mago_algebra::disjoin_clauses;
@@ -17,6 +18,7 @@ use mago_algebra::saturate_clauses;
 use mago_codex::assertion::Assertion;
 use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::combine_union_types;
 use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::union::TUnion;
@@ -31,6 +33,7 @@ use mago_syntax::cst::If;
 use mago_syntax::cst::Statement;
 use mago_syntax::cst::UnaryPrefix;
 use mago_syntax::cst::UnaryPrefixOperator;
+use mago_syntax::utils::unparenthesized_expression;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -67,6 +70,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
     where
         A: Arena,
     {
+        let previous_thrown_exceptions = (context.settings.check_throws
+            && context.settings.forbid_checked_exceptions_in_callables)
+            .then(|| block_context.possibly_thrown_exceptions.clone());
         let mut if_scope = IfScope::new();
 
         let needs_post_leaving_context = is_obvious_boolean_condition(self.condition) && {
@@ -79,6 +85,13 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
 
         let if_conditional_scope =
             conditional::analyze(context, block_context, artifacts, &mut if_scope, self.condition, true)?;
+
+        if let Some(previous) = &previous_thrown_exceptions {
+            let exceptions = new_thrown_exception_spans(&block_context.possibly_thrown_exceptions, previous);
+            if !exceptions.is_empty() {
+                artifacts.set_throwing_condition_exceptions(self.condition, exceptions);
+            }
+        }
 
         if needs_post_leaving_context {
             if_scope.post_leaving_if_context = Some(block_context.clone());
@@ -281,8 +294,24 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
             &context.settings.algebra_thresholds(),
         );
 
+        let if_condition_type = artifacts.get_rc_expression_type(self.condition);
+        if !if_condition_type.is_some_and(|condition_type| condition_type.is_always_falsy()) {
+            else_block_context.flags.set_inside_potentially_skipped_code(true);
+        }
+        if if_condition_type.is_some_and(|condition_type| condition_type.is_always_truthy()) {
+            else_block_context.flags.set_inside_definitely_unreachable_code(true);
+        }
+
         for clause in self.body.else_if_clauses() {
             analyze_else_if_clause(context, &mut if_scope, &mut else_block_context, block_context, artifacts, clause)?;
+
+            let condition_type = artifacts.get_rc_expression_type(clause.0);
+            if !condition_type.is_some_and(|condition_type| condition_type.is_always_falsy()) {
+                else_block_context.flags.set_inside_potentially_skipped_code(true);
+            }
+            if condition_type.is_some_and(|condition_type| condition_type.is_always_truthy()) {
+                else_block_context.flags.set_inside_definitely_unreachable_code(true);
+            }
         }
 
         analyze_else_statements(
@@ -388,6 +417,20 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
 
         if let Some(loop_scope) = artifacts.loop_scope.as_mut() {
             loop_scope.final_actions.extend(if_scope.final_actions);
+        }
+
+        if context.settings.check_throws
+            && context.settings.forbid_checked_exceptions_in_callables
+            && has_reachable_exit_path(
+                self,
+                context,
+                artifacts,
+                previous_thrown_exceptions.as_ref().is_some_and(|previous| {
+                    !new_thrown_exception_names(&block_context.possibly_thrown_exceptions, previous).is_empty()
+                }),
+            )
+        {
+            block_context.flags.set_inside_potentially_skipped_code(true);
         }
 
         block_context.variables_possibly_in_scope.extend(if_scope.new_variables_possibly_in_scope);
@@ -498,6 +541,331 @@ const fn is_obvious_boolean_condition(condition: &Expression) -> bool {
     }
 }
 
+fn has_reachable_exit_path<A>(
+    if_statement: &If<'_>,
+    context: &Context<'_, '_, A>,
+    artifacts: &AnalysisArtifacts,
+    has_unhandled_throw: bool,
+) -> bool
+where
+    A: Arena,
+{
+    let flow = if_statement_flow(if_statement, context, artifacts);
+    has_unhandled_throw || flow.has_reachable_exit || !flow.thrown_exception_names.is_empty() || flow.has_unknown_throw
+}
+
+fn new_thrown_exception_names(current: &WordMap<HashSet<Span>>, previous: &WordMap<HashSet<Span>>) -> WordSet {
+    current
+        .iter()
+        .filter_map(|(exception, spans)| {
+            spans
+                .iter()
+                .any(|span| !previous.get(exception).is_some_and(|previous_spans| previous_spans.contains(span)))
+                .then_some(*exception)
+        })
+        .collect()
+}
+
+fn new_thrown_exception_spans(
+    current: &WordMap<HashSet<Span>>,
+    previous: &WordMap<HashSet<Span>>,
+) -> WordMap<HashSet<Span>> {
+    current
+        .iter()
+        .filter_map(|(exception, spans)| {
+            let new_spans = spans
+                .iter()
+                .filter(|span| !previous.get(exception).is_some_and(|previous_spans| previous_spans.contains(span)))
+                .copied()
+                .collect::<HashSet<_>>();
+
+            (!new_spans.is_empty()).then_some((*exception, new_spans))
+        })
+        .collect()
+}
+
+pub(crate) fn statement_sequence_has_no_exit_and_falls_through<A>(
+    statements: &[Statement<'_>],
+    context: &Context<'_, '_, A>,
+    artifacts: &AnalysisArtifacts,
+) -> bool
+where
+    A: Arena,
+{
+    let flow = statement_sequence_flow(statements, context, artifacts);
+    flow.can_fall_through && !flow.has_reachable_exit && !flow.has_unknown_throw
+}
+
+struct StatementFlow {
+    has_reachable_exit: bool,
+    can_fall_through: bool,
+    thrown_exception_names: WordSet,
+    has_unknown_throw: bool,
+}
+
+impl StatementFlow {
+    fn falling_through() -> Self {
+        Self {
+            has_reachable_exit: false,
+            can_fall_through: true,
+            thrown_exception_names: WordSet::default(),
+            has_unknown_throw: false,
+        }
+    }
+
+    fn merge_reachable_path(&mut self, other: Self) {
+        self.has_reachable_exit |= other.has_reachable_exit;
+        self.can_fall_through |= other.can_fall_through;
+        self.thrown_exception_names.extend(other.thrown_exception_names);
+        self.has_unknown_throw |= other.has_unknown_throw;
+    }
+}
+
+fn statement_sequence_flow<A>(
+    statements: &[Statement<'_>],
+    context: &Context<'_, '_, A>,
+    artifacts: &AnalysisArtifacts,
+) -> StatementFlow
+where
+    A: Arena,
+{
+    let mut flow = StatementFlow::falling_through();
+
+    for statement in statements {
+        if !flow.can_fall_through {
+            break;
+        }
+
+        let statement_flow = match statement {
+            Statement::If(if_statement) => if_statement_flow(if_statement, context, artifacts),
+            Statement::Block(block) => statement_sequence_flow(block.statements.as_slice(), context, artifacts),
+            Statement::Try(try_statement) => try_statement_flow(try_statement, context, artifacts),
+            Statement::Expression(expression)
+                if matches!(unparenthesized_expression(expression.expression), Expression::Throw(_)) =>
+            {
+                let Expression::Throw(throw) = unparenthesized_expression(expression.expression) else {
+                    unreachable!();
+                };
+                let mut flow = StatementFlow {
+                    has_reachable_exit: false,
+                    can_fall_through: false,
+                    thrown_exception_names: WordSet::default(),
+                    has_unknown_throw: false,
+                };
+
+                if let Some(exception_type) = artifacts.get_expression_type(throw.exception) {
+                    for atomic in exception_type.types.iter() {
+                        if let TAtomic::Object(TObject::Named(named_object)) = atomic {
+                            flow.thrown_exception_names.insert(named_object.name);
+                        } else {
+                            flow.has_unknown_throw = true;
+                        }
+                    }
+                } else {
+                    flow.has_unknown_throw = true;
+                }
+
+                flow
+            }
+            _ => {
+                let actions = ControlAction::from_statements(vec![statement], vec![], Some(artifacts), true);
+                StatementFlow {
+                    has_reachable_exit: actions.iter().any(|action| action != ControlAction::None),
+                    can_fall_through: actions.contains(ControlAction::None),
+                    thrown_exception_names: WordSet::default(),
+                    has_unknown_throw: crate::context::scope::control_action::try_block_may_throw(
+                        std::slice::from_ref(statement),
+                        Some(artifacts),
+                    ),
+                }
+            }
+        };
+
+        flow.has_reachable_exit |= statement_flow.has_reachable_exit;
+        flow.thrown_exception_names.extend(statement_flow.thrown_exception_names);
+        flow.has_unknown_throw |= statement_flow.has_unknown_throw;
+        flow.can_fall_through = statement_flow.can_fall_through;
+    }
+
+    flow
+}
+
+fn try_statement_flow<A>(
+    try_statement: &mago_syntax::cst::Try<'_>,
+    context: &Context<'_, '_, A>,
+    artifacts: &AnalysisArtifacts,
+) -> StatementFlow
+where
+    A: Arena,
+{
+    let mut try_flow = statement_sequence_flow(try_statement.block.statements.as_slice(), context, artifacts);
+    let try_may_throw = crate::context::scope::control_action::try_block_may_throw(
+        try_statement.block.statements.as_slice(),
+        Some(artifacts),
+    );
+    try_flow.has_unknown_throw |= try_may_throw && try_flow.thrown_exception_names.is_empty();
+
+    let mut uncaught_exception_names = try_flow.thrown_exception_names.clone();
+    let mut uncaught_unknown_throw = try_flow.has_unknown_throw;
+    let mut can_fall_through = try_flow.can_fall_through;
+    let mut catch_exit = false;
+    let mut catch_exception_names = WordSet::default();
+    let mut catch_unknown_throw = false;
+    let mut previously_caught_types = WordSet::default();
+
+    if try_may_throw || !uncaught_exception_names.is_empty() || uncaught_unknown_throw {
+        for catch_clause in &try_statement.catch_clauses {
+            let caught_names = crate::statement::r#try::get_catch_hint_names(context, &catch_clause.hint);
+            let catch_has_reachable_type = caught_names.is_empty()
+                || caught_names.iter().any(|caught| {
+                    !crate::statement::r#try::catch_types_fully_cover(context, *caught, &previously_caught_types)
+                });
+            let matched_exception_names = uncaught_exception_names
+                .iter()
+                .copied()
+                .filter(|thrown| {
+                    !crate::statement::r#try::catch_types_fully_cover(context, *thrown, &previously_caught_types)
+                        && caught_names.iter().any(|caught| {
+                            !crate::statement::r#try::catch_types_fully_cover(
+                                context,
+                                *caught,
+                                &previously_caught_types,
+                            ) && crate::statement::r#try::could_be_caught(context, *thrown, *caught)
+                        })
+                })
+                .collect::<WordSet>();
+
+            if (uncaught_unknown_throw && catch_has_reachable_type) || !matched_exception_names.is_empty() {
+                let catch_flow = statement_sequence_flow(catch_clause.block.statements.as_slice(), context, artifacts);
+                catch_exit |= catch_flow.has_reachable_exit;
+                can_fall_through |= catch_flow.can_fall_through;
+                catch_exception_names.extend(catch_flow.thrown_exception_names);
+                catch_unknown_throw |= catch_flow.has_unknown_throw;
+            }
+
+            let mut all_caught_types = previously_caught_types.clone();
+            all_caught_types.extend(caught_names.iter().copied());
+            for caught in matched_exception_names {
+                if crate::statement::r#try::catch_types_fully_cover(context, caught, &all_caught_types) {
+                    uncaught_exception_names.remove(&caught);
+                }
+            }
+
+            if crate::statement::r#try::catch_types_fully_cover(context, word(b"Throwable"), &all_caught_types) {
+                uncaught_exception_names.clear();
+                uncaught_unknown_throw = false;
+            }
+
+            previously_caught_types.extend(caught_names);
+        }
+    }
+
+    let mut escaping_exception_names = uncaught_exception_names;
+    escaping_exception_names.extend(catch_exception_names);
+    let escaping_unknown_throw = uncaught_unknown_throw || catch_unknown_throw;
+
+    if let Some(finally_clause) = &try_statement.finally_clause {
+        let finally_flow = statement_sequence_flow(finally_clause.block.statements.as_slice(), context, artifacts);
+        let finally_can_fall_through = finally_flow.can_fall_through;
+        let mut thrown_exception_names = finally_flow.thrown_exception_names;
+        if finally_can_fall_through {
+            thrown_exception_names.extend(escaping_exception_names);
+        }
+
+        return StatementFlow {
+            has_reachable_exit: finally_flow.has_reachable_exit
+                || (finally_can_fall_through && (try_flow.has_reachable_exit || catch_exit)),
+            can_fall_through: can_fall_through && finally_can_fall_through,
+            thrown_exception_names,
+            has_unknown_throw: finally_flow.has_unknown_throw || (finally_can_fall_through && escaping_unknown_throw),
+        };
+    }
+
+    StatementFlow {
+        has_reachable_exit: try_flow.has_reachable_exit || catch_exit,
+        can_fall_through,
+        thrown_exception_names: escaping_exception_names,
+        has_unknown_throw: escaping_unknown_throw,
+    }
+}
+
+fn if_statement_flow<A>(
+    if_statement: &If<'_>,
+    context: &Context<'_, '_, A>,
+    artifacts: &AnalysisArtifacts,
+) -> StatementFlow
+where
+    A: Arena,
+{
+    let first_condition_type = artifacts.get_rc_expression_type(if_statement.condition);
+    let mut flow = StatementFlow {
+        has_reachable_exit: false,
+        can_fall_through: false,
+        thrown_exception_names: WordSet::default(),
+        has_unknown_throw: false,
+    };
+    if let Some(exceptions) = artifacts.get_throwing_condition_exceptions(if_statement.condition) {
+        flow.thrown_exception_names.extend(exceptions.keys().copied());
+    }
+    flow.has_unknown_throw |= condition_has_unknown_throw(if_statement.condition, context, artifacts);
+    let mut can_reach_next_branch = true;
+
+    if !first_condition_type.is_some_and(|condition_type| condition_type.is_always_falsy()) {
+        flow.merge_reachable_path(statement_sequence_flow(if_statement.body.statements(), context, artifacts));
+    }
+
+    if first_condition_type.is_some_and(|condition_type| condition_type.is_always_truthy()) {
+        can_reach_next_branch = false;
+    }
+
+    for (condition, statements) in if_statement.body.else_if_clauses() {
+        if !can_reach_next_branch {
+            break;
+        }
+
+        if let Some(exceptions) = artifacts.get_throwing_condition_exceptions(condition) {
+            flow.thrown_exception_names.extend(exceptions.keys().copied());
+        }
+        flow.has_unknown_throw |= condition_has_unknown_throw(condition, context, artifacts);
+
+        let condition_type = artifacts.get_rc_expression_type(condition);
+        if !condition_type.is_some_and(|condition_type| condition_type.is_always_falsy()) {
+            flow.merge_reachable_path(statement_sequence_flow(statements, context, artifacts));
+        }
+
+        if condition_type.is_some_and(|condition_type| condition_type.is_always_truthy()) {
+            can_reach_next_branch = false;
+        }
+    }
+
+    if can_reach_next_branch {
+        if let Some(statements) = if_statement.body.else_statements() {
+            flow.merge_reachable_path(statement_sequence_flow(statements, context, artifacts));
+        } else {
+            flow.can_fall_through = true;
+        }
+    }
+
+    flow
+}
+
+fn condition_has_unknown_throw<A>(
+    condition: &Expression<'_>,
+    context: &Context<'_, '_, A>,
+    artifacts: &AnalysisArtifacts,
+) -> bool
+where
+    A: Arena,
+{
+    crate::context::scope::control_action::expression_may_throw(condition, Some(artifacts))
+        && artifacts.get_throwing_condition_exceptions(condition).is_none_or(|exceptions| {
+            exceptions.is_empty()
+                || crate::statement::r#try::expression_has_untracked_throw_source(
+                    context, condition, exceptions, artifacts,
+                )
+        })
+}
+
 fn analyze_if_statement_block<'ctx, 'arena, A>(
     context: &mut Context<'ctx, 'arena, A>,
     if_scope: &mut IfScope<'ctx>,
@@ -585,6 +953,13 @@ where
     let assigned_variable_ids = std::mem::take(&mut if_block_context.assigned_variable_ids);
     let possibly_assigned_variable_ids = std::mem::take(&mut if_block_context.possibly_assigned_variable_ids);
 
+    let if_condition_type = artifacts.get_rc_expression_type(&if_statement.condition);
+    if !if_condition_type.is_some_and(|condition_type| condition_type.is_always_truthy()) {
+        if_block_context.flags.set_inside_potentially_skipped_code(true);
+    }
+    if if_condition_type.is_some_and(|condition_type| condition_type.is_always_falsy()) {
+        if_block_context.flags.set_inside_definitely_unreachable_code(true);
+    }
     analyze_statements(if_statement.body.statements(), context, &mut if_block_context, artifacts)?;
 
     for variable_id in &if_block_context.parent_conflicting_clause_variables {
@@ -710,8 +1085,18 @@ fn analyze_else_if_clause<'ctx, 'ast, 'arena, A>(
 where
     A: Arena,
 {
+    let previous_thrown_exceptions = (context.settings.check_throws
+        && context.settings.forbid_checked_exceptions_in_callables)
+        .then(|| else_block_context.possibly_thrown_exceptions.clone());
     let if_conditional_scope =
         conditional::analyze(context, else_block_context, artifacts, if_scope, else_if_clause.0, true)?;
+
+    if let Some(previous) = &previous_thrown_exceptions {
+        let exceptions = new_thrown_exception_spans(&else_block_context.possibly_thrown_exceptions, previous);
+        if !exceptions.is_empty() {
+            artifacts.set_throwing_condition_exceptions(else_if_clause.0, exceptions);
+        }
+    }
 
     let mut else_if_block_context = if_conditional_scope.if_body_context;
     let mut conditionally_referenced_variable_ids = if_conditional_scope.conditionally_referenced_variable_ids;
@@ -934,6 +1319,13 @@ where
     let pre_assigned_variable_ids = std::mem::take(&mut else_if_block_context.assigned_variable_ids);
     let pre_possibly_assigned_variable_ids = std::mem::take(&mut else_if_block_context.possibly_assigned_variable_ids);
 
+    let condition_type = artifacts.get_rc_expression_type(else_if_clause.0);
+    if !condition_type.is_some_and(|condition_type| condition_type.is_always_truthy()) {
+        else_if_block_context.flags.set_inside_potentially_skipped_code(true);
+    }
+    if condition_type.is_some_and(|condition_type| condition_type.is_always_falsy()) {
+        else_if_block_context.flags.set_inside_definitely_unreachable_code(true);
+    }
     analyze_statements(else_if_clause.1, context, &mut else_if_block_context, artifacts)?;
 
     for variable_id in &else_if_block_context.parent_conflicting_clause_variables {

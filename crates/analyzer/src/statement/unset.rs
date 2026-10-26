@@ -23,11 +23,13 @@ use mago_syntax::cst::Unset;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
+use crate::artifacts::CallableStorageLocation;
 use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::utils::expression::get_block_expression_id;
+use crate::utils::expression::get_root_expression_id;
 use mago_word::concat_word;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
@@ -43,11 +45,34 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
         let was_inside_unset = block_context.flags.inside_unset();
         block_context.flags.set_inside_unset(true);
 
+        let mut previous_value_may_throw_to_catch = false;
+
         for value in &self.values {
+            let thrown_exceptions_before_value = (context.settings.check_throws
+                && context.settings.forbid_checked_exceptions_in_callables
+                && !block_context.catchable_exception_names.is_empty())
+            .then(|| block_context.possibly_thrown_exceptions.clone());
             let was_inside_general_use = block_context.flags.inside_general_use();
             block_context.flags.set_inside_general_use(true);
             value.analyze(context, block_context, artifacts)?;
             block_context.flags.set_inside_general_use(was_inside_general_use);
+
+            let value_may_throw_to_catch = thrown_exceptions_before_value.is_some_and(|previous_exceptions| {
+                block_context.possibly_thrown_exceptions.iter().any(|(thrown, spans)| {
+                    spans.iter().any(|span| {
+                        !previous_exceptions.get(thrown).is_some_and(|previous_spans| previous_spans.contains(span))
+                    }) && block_context
+                        .catchable_exception_names
+                        .iter()
+                        .any(|caught| crate::statement::r#try::could_be_caught(context, *thrown, *caught))
+                })
+            }) || (!block_context.catchable_exception_names.is_empty()
+                && crate::statement::r#try::expression_has_untracked_throw_source(
+                    context,
+                    value,
+                    &block_context.possibly_thrown_exceptions,
+                    artifacts,
+                ));
 
             let value_id = get_block_expression_id(value, context, block_context);
 
@@ -57,9 +82,25 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
                 block_context.remove_variable(value_id.as_bytes(), true, context);
                 block_context.possibly_assigned_variable_ids.insert(*value_id);
                 block_context.references_possibly_from_confusing_scope.remove(value_id);
+
+                if context.settings.check_throws
+                    && context.settings.forbid_checked_exceptions_in_callables
+                    && !block_context.flags.inside_potentially_skipped_code()
+                    && !block_context.flags.inside_definitely_unreachable_code()
+                    && !previous_value_may_throw_to_catch
+                    && !value_may_throw_to_catch
+                    && crate::callables::is_local_callable_storage_expression(value)
+                {
+                    artifacts.clear_callable_storage_location(CallableStorageLocation {
+                        scope: block_context.scope.get_function_like_identifier(),
+                        variable: *value_id,
+                    });
+                }
             }
 
             check_property_unset(context, artifacts, self.unset.span, value);
+
+            previous_value_may_throw_to_catch |= value_may_throw_to_catch;
 
             'array_access: {
                 let Expression::ArrayAccess(array_access) = value else {
@@ -325,6 +366,37 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
 
                 block_context.locals.insert(array_id, Rc::clone(&rc));
                 block_context.remove_variable_from_conflicting_clauses(context, array_id, Some(rc.as_ref()));
+
+                if context.settings.check_throws
+                    && context.settings.forbid_checked_exceptions_in_callables
+                    && !block_context.flags.inside_potentially_skipped_code()
+                    && !block_context.flags.inside_definitely_unreachable_code()
+                    && !previous_value_may_throw_to_catch
+                    && !value_may_throw_to_catch
+                    && crate::callables::is_local_callable_storage_expression(value)
+                    && let Some(root_variable) = get_root_expression_id(value)
+                    && root_variable == array_id
+                    && let Some(root_type) = block_context.locals.get(&root_variable)
+                {
+                    let escapes_scope = block_context.is_global_scope()
+                        || block_context.references_to_external_scope.contains(&root_variable)
+                        || crate::callables::callable_storage_target_is_static_local(
+                            value,
+                            &block_context.static_locals,
+                        )
+                        || crate::callables::callable_storage_target_escapes_scope(value);
+
+                    crate::callables::refresh_stored_array_callables(
+                        artifacts,
+                        root_type,
+                        context.codebase,
+                        escapes_scope,
+                        CallableStorageLocation {
+                            scope: block_context.scope.get_function_like_identifier(),
+                            variable: root_variable,
+                        },
+                    );
+                }
             };
         }
 

@@ -58,6 +58,7 @@ use mago_text_edit::TextEdit;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
+use crate::artifacts::CallableEffectSummary;
 use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
@@ -181,6 +182,7 @@ pub fn analyze_function_like<'ctx, 'ast, 'arena, A>(
     parameter_list: &'ast FunctionLikeParameterList<'arena>,
     body: FunctionLikeBody<'ast, 'arena>,
     inferred_parameter_types: Option<HashMap<usize, TUnion>>,
+    defer_thrown_check: bool,
 ) -> Result<AnalysisArtifacts, AnalysisError>
 where
     A: Arena,
@@ -194,6 +196,7 @@ where
         .with_retained_expression_types(parent_artifacts.should_retain_completed_expression_types())
         .with_variable_definedness_targets(parent_artifacts.variable_definedness_targets())
         .with_editor_artifacts(parent_artifacts.editor.is_some());
+    artifacts.callback_parameter_effects.clone_from(&parent_artifacts.callback_parameter_effects);
 
     if let Some(return_type) = &function_like_metadata.return_type_metadata {
         add_symbol_references(&return_type.type_union, &block_context.scope, &mut artifacts);
@@ -364,7 +367,41 @@ where
     }
 
     check_return_type_width(context, block_context, &mut artifacts, function_like_metadata);
-    check_thrown_types(context, block_context, &mut artifacts, function_like_metadata);
+
+    if let Some(identifier) = block_context.scope.get_function_like_identifier() {
+        let mut callback_parameter_effects = HashMap::default();
+        for (range, (parameter_offset, invocation_catches)) in &artifacts.callback_parameter_invocations {
+            let mut outer_catches = artifacts.callback_parameter_catches.get(range).cloned().unwrap_or_default();
+            outer_catches.sort_by_key(|(try_size, _)| *try_size);
+            let effects = callback_parameter_effects.entry(*parameter_offset).or_insert_with(Vec::new);
+            for invocation_catch in invocation_catches {
+                let mut summary = invocation_catch.clone();
+                summary.catch_groups.extend(outer_catches.iter().map(|(_, catch_group)| catch_group.clone()));
+                if !effects.contains(&summary) {
+                    effects.push(summary);
+                }
+            }
+        }
+
+        if !callback_parameter_effects.is_empty() {
+            parent_artifacts.record_callback_parameter_effects(identifier, callback_parameter_effects);
+        }
+    }
+
+    if context.settings.check_throws
+        && let Some(identifier) = block_context.scope.get_function_like_identifier()
+        && (identifier.is_function() || identifier.is_method())
+    {
+        artifacts.record_callable_effects_for_identifier(
+            identifier,
+            function_like_metadata.span,
+            CallableEffectSummary { possibly_thrown_exceptions: block_context.possibly_thrown_exceptions.clone() },
+        );
+    }
+
+    if !defer_thrown_check {
+        check_thrown_types(context, block_context, &mut artifacts, function_like_metadata);
+    }
 
     std::mem::swap(&mut context.type_resolution_context, &mut previous_type_resolution_context);
     let expression_types = std::mem::take(&mut artifacts.expression_types);
@@ -381,6 +418,8 @@ where
     }
     parent_artifacts.symbol_references.extend(std::mem::take(&mut artifacts.symbol_references));
     parent_artifacts.pending_readonly_property_writes.append(&mut artifacts.pending_readonly_property_writes);
+    parent_artifacts.absorb_deferred_callable_tracking(&mut artifacts);
+    parent_artifacts.absorb_callable_effects(&mut artifacts);
 
     Ok(artifacts)
 }
@@ -1308,6 +1347,12 @@ fn check_thrown_types<'ctx, A>(
                 "You can add `@throws {thrown_type}` to the {function_kind}'s docblock or wrap the throwing code in a `try-catch` block."
             ));
 
+        if context.settings.forbid_checked_exceptions_in_callables
+            && let Some(identifier) = block_context.scope.get_function_like_identifier()
+        {
+            artifacts.record_reported_callable_exception(identifier, *thrown_type);
+        }
+
         context.collector.report_with_code(IssueCode::UnhandledThrownType, issue);
     }
 }
@@ -1317,7 +1362,7 @@ fn check_thrown_types<'ctx, A>(
 /// Returns `true` if the exception is:
 /// - In `unchecked_exception_classes` (exact match only)
 /// - In `unchecked_exceptions` or is a subclass of any exception in that set (hierarchy-aware)
-fn is_exception_unchecked<A>(context: &Context<'_, '_, A>, exception_name: Word) -> bool
+pub(crate) fn is_exception_unchecked<A>(context: &Context<'_, '_, A>, exception_name: Word) -> bool
 where
     A: Arena,
 {

@@ -6,6 +6,13 @@ use mago_word::Word;
 use mago_word::WordSet;
 use mago_word::ascii_lowercase_word;
 
+/// Normalizes a configured callback allowlist key by trimming whitespace,
+/// removing leading namespace separators, and lowercasing ASCII characters.
+#[must_use]
+pub fn normalize_allowed_checked_exception_callable(value: &str) -> Word {
+    ascii_lowercase_word(value.trim().trim_start_matches('\\').as_bytes())
+}
+
 /// Default maximum logical formula size during conditional analysis.
 pub const DEFAULT_FORMULA_SIZE_THRESHOLD: u16 = 512;
 
@@ -64,6 +71,23 @@ pub struct Settings {
     /// This check only runs when `check_throws` is enabled. It is disabled by default
     /// because exceptions from undocumented code cannot be ruled out statically.
     pub check_dead_catch: bool,
+
+    /// Forbid checked exceptions from escaping callables that are stored or passed to APIs
+    /// not known to invoke them synchronously.
+    ///
+    /// This check runs only when `check_throws` is enabled. Exceptions caught inside the
+    /// callable and exceptions ignored by the unchecked-exception settings are not reported.
+    /// API parameter positions listed in `allowed_checked_exception_callables` are exempt.
+    ///
+    /// Defaults to `false`.
+    pub forbid_checked_exceptions_in_callables: bool,
+
+    /// Callable parameter positions where escaping checked exceptions are allowed.
+    ///
+    /// Each entry uses the form `<function-or-method>:<zero-based-parameter-index>`, for
+    /// example `Symfony\\Component\\HttpFoundation\\StreamedResponse::__construct:0`.
+    /// Names are matched case-insensitively.
+    pub allowed_checked_exception_callables: WordSet,
 
     /// Exceptions to ignore including all subclasses (hierarchy-aware).
     ///
@@ -426,6 +450,8 @@ impl Settings {
             allow_possibly_undefined_array_keys: true,
             check_throws: false,
             check_dead_catch: false,
+            forbid_checked_exceptions_in_callables: false,
+            allowed_checked_exception_callables: WordSet::default(),
             unchecked_exceptions: WordSet::default(),
             unchecked_exception_classes: WordSet::default(),
             use_colors: true,

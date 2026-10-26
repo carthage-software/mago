@@ -1607,6 +1607,7 @@ function localeconv(): array {}
  *
  * @param array<K, V> $array
  * @param (callable(V, K): bool) $callback
+ * @param-immediately-invoked-callable $callback
  *
  * @return V|null
  *
@@ -1621,6 +1622,7 @@ function array_find(array $array, callable $callback): mixed {}
  *
  * @param array<K, V> $array
  * @param (callable(V, K): bool) $callback
+ * @param-immediately-invoked-callable $callback
  *
  * @return ($array is array{} ? null : K|null)
  *
@@ -1635,6 +1637,7 @@ function array_find_key(array $array, callable $callback): mixed {}
  *
  * @param array<K, V> $array
  * @param (callable(V, K): bool) $callback
+ * @param-immediately-invoked-callable $callback
  *
  * @since 8.4
  */
@@ -1647,6 +1650,7 @@ function array_any(array $array, callable $callback): bool {}
  *
  * @param array<K, V> $array
  * @param (callable(V, K): bool) $callback
+ * @param-immediately-invoked-callable $callback
  *
  * @since 8.4
  */
@@ -2706,6 +2710,7 @@ function error_get_last(): ?array {}
  * @template R
  *
  * @param callable(I...): R|callable-string|string $callback
+ * @param-immediately-invoked-callable $callback
  * @param I ...$args
  *
  * @return R
@@ -2717,6 +2722,7 @@ function call_user_func(callable|string $callback, mixed ...$args): mixed {}
  * @template R
  *
  * @param callable(I...): R|callable-string|string $callback
+ * @param-immediately-invoked-callable $callback
  * @param array<I> $args
  *
  * @return R
@@ -2728,6 +2734,7 @@ function call_user_func_array(callable|string $callback, array $args): mixed {}
  * @template R
  *
  * @param callable(I...): R|callable-string|string $callback
+ * @param-immediately-invoked-callable $callback
  * @param I ...$args
  *
  * @return R
@@ -2739,6 +2746,7 @@ function forward_static_call(callable|string $callback, mixed ...$args): mixed {
  * @template R
  *
  * @param callable(I...): R|callable-string|string $callback
+ * @param-immediately-invoked-callable $callback
  * @param array<I> $args
  *
  * @return R
@@ -3683,6 +3691,7 @@ function array_reverse(array $array, bool $preserve_keys = false): array {}
  *
  * @param array<K, V> $array
  * @param (callable(I, V): I) $callback
+ * @param-immediately-invoked-callable $callback
  * @param null|I $initial
  *
  * @return I
@@ -3851,6 +3860,7 @@ function array_product(array $array): int|float {}
  *
  * @param array<K, V> $array
  * @param null|(callable(V, K): bool)|(callable(V): bool)|(callable(K): bool) $callback
+ * @param-immediately-invoked-callable $callback
  *
  * @return array<K, V>
  */
@@ -3863,6 +3873,7 @@ function array_filter(array $array, ?callable $callback = null, int $mode = 0): 
  * @template U
  *
  * @param (callable(V): U)|(callable(V, S): U)|null $callback
+ * @param-immediately-invoked-callable $callback
  * @param array<K, V> $array
  * @param array<S> ...$arrays
  *
@@ -4064,51 +4075,61 @@ function get_debug_type(mixed $value): string {}
 function get_resource_id($resource): int {}
 
 /**
+ * @param-immediately-invoked-callable $rest
  * @no-named-arguments
  */
 function array_diff_ukey(array $array, ...$rest): array {}
 
 /**
+ * @param-immediately-invoked-callable $rest
  * @no-named-arguments
  */
 function array_udiff(array $array, ...$rest): array {}
 
 /**
+ * @param-immediately-invoked-callable $rest
  * @no-named-arguments
  */
 function array_udiff_assoc(array $array, ...$rest): array {}
 
 /**
+ * @param-immediately-invoked-callable $rest
  * @no-named-arguments
  */
 function array_diff_uassoc(array $array, ...$rest): array {}
 
 /**
+ * @param-immediately-invoked-callable $rest
  * @no-named-arguments
  */
 function array_udiff_uassoc(array $array, ...$rest): array {}
 
 /**
+ * @param-immediately-invoked-callable $rest
  * @no-named-arguments
  */
 function array_uintersect_assoc(array $array, ...$rest): array {}
 
 /**
+ * @param-immediately-invoked-callable $rest
  * @no-named-arguments
  */
 function array_intersect_uassoc(array $array, ...$rest): array {}
 
 /**
+ * @param-immediately-invoked-callable $rest
  * @no-named-arguments
  */
 function array_uintersect_uassoc(array $array, ...$rest): array {}
 
 /**
+ * @param-immediately-invoked-callable $rest
  * @no-named-arguments
  */
 function array_intersect_ukey(array $array, ...$rest): array {}
 
 /**
+ * @param-immediately-invoked-callable $rest
  * @no-named-arguments
  */
 function array_uintersect(array $array, ...$rest): array {}
@@ -4196,6 +4217,7 @@ function rsort(array &$array, int $flags = SORT_REGULAR): true {}
  *
  * @param array<T> $array
  * @param (callable(T, T): int) $callback
+ * @param-immediately-invoked-callable $callback
  *
  * @param-out ($array is non-empty-array|non-empty-list ? non-empty-list<T> : list<T>) $array
  */
@@ -4207,6 +4229,7 @@ function usort(array &$array, callable $callback): true {}
  *
  * @param array<K, V> $array
  * @param (callable(V, V): int) $callback
+ * @param-immediately-invoked-callable $callback
  *
  * @param-out ($array is non-empty-array|non-empty-list ? non-empty-array<K, V> : array<K, V>) $array
  */
@@ -4218,6 +4241,7 @@ function uasort(array &$array, callable $callback): true {}
  *
  * @param array<K, V> $array
  * @param (callable(K, K): int) $callback
+ * @param-immediately-invoked-callable $callback
  *
  * @param-out ($array is non-empty-array|non-empty-list ? non-empty-array<K, V> : array<K, V>) $array
  */
@@ -4546,6 +4570,7 @@ function metaphone(string $string, int $max_phonemes = 0): string {}
  *
  * @param object|array<K, V> $array
  * @param (callable(V, K, T): O) $callback
+ * @param-immediately-invoked-callable $callback
  * @param T|null $arg
  *
  * @param-out ($array is object ? object : (
@@ -4558,6 +4583,7 @@ function metaphone(string $string, int $max_phonemes = 0): string {}
  */
 function array_walk(object|array &$array, callable $callback, mixed $arg = null): true {}
 
+/** @param-immediately-invoked-callable $callback */
 function array_walk_recursive(object|array &$array, callable $callback, mixed $arg = null): true {}
 
 /**
