@@ -87,7 +87,7 @@ mod tests {
         }
 
         // An uppercase letter after a digit starts a new word.
-        for name in ["x509Certificate", "isB2B", "sha256Hash"] {
+        for name in ["x509Certificate", "isB2B", "b2B"] {
             assert!(is_camel_case(name), "{name} should be camel case");
             assert_eq!(to_camel_case(name).as_ref(), name.as_bytes());
         }
