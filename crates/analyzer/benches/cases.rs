@@ -7,6 +7,7 @@ use std::path::Path;
 use std::path::PathBuf;
 use std::sync::LazyLock;
 
+use criterion::BatchSize;
 use criterion::BenchmarkId;
 use criterion::Criterion;
 use criterion::criterion_group;
@@ -121,6 +122,67 @@ fn bench_cases(c: &mut Criterion) {
         });
     }
 
+    group.finish();
+}
+
+fn bench_throw_covariance(c: &mut Criterion) {
+    LazyLock::force(&PRELUDE);
+    LazyLock::force(&PLUGIN_REGISTRY);
+
+    let cases = [
+        ("invalid", include_str!("../tests/cases/throw_covariance_invalid.php"), 5),
+        ("valid", include_str!("../tests/cases/throw_covariance_valid.php"), 0),
+        ("inherited_context", include_str!("../tests/cases/throw_covariance_inherited_context.php"), 1),
+        ("inherited_parent", include_str!("../tests/cases/throw_covariance_inherited_parent.php"), 2),
+        ("disabled", include_str!("../tests/cases/throw_covariance_disabled.php"), 1),
+    ];
+
+    let mut group = c.benchmark_group("analyzer_throw_covariance");
+    for (name, content, incompatible_count) in cases {
+        let Prelude { mut database, mut metadata, mut symbol_references } = PRELUDE.clone();
+        let arena = LocalArena::new();
+        let source = content.lines().filter(|line| !line.contains("@mago-expect")).collect::<Vec<_>>().join("\n");
+        let file_id =
+            database.add(File::ephemeral(b"throw_covariance.php".as_slice().into(), source.into_bytes().into()));
+        let source_file = database.get_ref(&file_id).expect("benchmark file must exist");
+        let program = parse_file(&arena, source_file);
+        assert!(!program.has_errors(), "throw covariance fixture must parse");
+        let resolved_names = NameResolver::new(&arena).resolve(program);
+        metadata.extend(scan_program(&arena, source_file, program, &resolved_names, Settings::default().version));
+        populate_codebase(&mut metadata, &mut symbol_references, WordSet::default(), HashSet::default());
+
+        for enabled in [false, true] {
+            let settings = Settings { check_throw_type_covariance: enabled, ..Default::default() };
+            let run_analysis = |analysis_arena: &LocalArena, result: &mut AnalysisResult| {
+                let analyzer = Analyzer::new(
+                    analysis_arena,
+                    source_file,
+                    &resolved_names,
+                    &metadata,
+                    &PLUGIN_REGISTRY,
+                    settings.clone(),
+                );
+                analyzer.analyze(program, result).expect("throw covariance analysis must succeed");
+            };
+            let mut result = AnalysisResult::new(SymbolReferences::default());
+            run_analysis(&LocalArena::new(), &mut result);
+            assert_eq!(
+                result.issues.iter().filter(|issue| issue.code.as_deref() == Some("incompatible-throw-type")).count(),
+                if enabled { incompatible_count } else { 0 },
+                "{name}",
+            );
+            group.bench_function(BenchmarkId::new(name, if enabled { "enabled" } else { "disabled" }), |b| {
+                b.iter_batched_ref(
+                    || (LocalArena::new(), AnalysisResult::new(SymbolReferences::default())),
+                    |(analysis_arena, result)| {
+                        run_analysis(analysis_arena, result);
+                        std::hint::black_box(result);
+                    },
+                    BatchSize::PerIteration,
+                )
+            });
+        }
+    }
     group.finish();
 }
 
@@ -255,5 +317,5 @@ fn bench_nested_attribute_group(c: &mut Criterion, group_name: &str, cases: &[(&
     group.finish();
 }
 
-criterion_group!(benches, bench_cases, bench_parameter_attribute_defaults);
+criterion_group!(benches, bench_cases, bench_throw_covariance, bench_parameter_attribute_defaults);
 criterion_main!(benches);

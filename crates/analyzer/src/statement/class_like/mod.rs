@@ -2206,13 +2206,37 @@ fn check_abstract_method_signatures<'ctx, A>(
             let substituted_appearing_method =
                 get_substituted_method(appearing_method, class_like_metadata, method_fqcn, context.codebase);
 
-            let issues = method_signature::validate_method_signature_compatibility(
+            let mut issues = method_signature::validate_method_signature_compatibility(
                 context.codebase,
                 class_like_metadata.name,
                 &substituted_appearing_method,
                 &substituted_overridden_method,
                 final_parent_class.is_some(),
             );
+
+            if context.settings.check_throw_type_covariance
+                && let Some(issue) = method_signature::validate_method_throw_type_covariance(
+                    context.codebase,
+                    class_like_metadata
+                        .appearing_method_ids
+                        .get(method_name_atom)
+                        .map_or(method_fqcn, MethodIdentifier::get_class_name),
+                    class_like_metadata.name,
+                    if overridden_class.kind.is_trait() {
+                        class_like_metadata
+                            .direct_parent_class
+                            .and_then(|parent_name| context.codebase.get_class_like_by_name(parent_name))
+                            .and_then(|parent| parent.appearing_method_ids.get(method_name_atom))
+                            .map_or(declaring_class_name, MethodIdentifier::get_class_name)
+                    } else {
+                        declaring_class_name
+                    },
+                    &substituted_appearing_method,
+                    &substituted_overridden_method,
+                )
+            {
+                issues.push(issue);
+            }
 
             if issues.is_empty() {
                 continue;
@@ -2625,11 +2649,11 @@ fn report_trait_property_conflict<A>(
     );
 }
 
-/// Apply template parameter substitution to a method's parameter and return types
+/// Apply template parameter substitution to a method's parameter, return, and throw types
 ///
 /// For example, if interface has `K` and `V` template parameters, and the implementation
 /// maps them to `TKey` and `TValue`, this function replaces all occurrences of `K` with `TKey`
-/// and `V` with `TValue` in the method signature.
+/// and `V` with `TValue` in the method signature and throw contract.
 ///
 /// Gets the substituted method by applying template parameter mapping from the class.
 /// Returns the original method if no template substitution is needed.
@@ -2701,6 +2725,57 @@ fn merge_method_signature_into(
         other.return_type_declaration_metadata.as_ref(),
         codebase,
     );
+
+    let merged_throw_type = get_declared_method_throw_type(merged, codebase);
+    let other_throw_type = get_declared_method_throw_type(other, codebase);
+    let merged_throw_type = match (merged_throw_type, other_throw_type) {
+        (Some(merged), Some(other)) => {
+            let type_union =
+                intersect_union_types(&merged.type_union, &other.type_union, codebase).unwrap_or_else(get_never);
+
+            let mut merged_type = merged;
+            merged_type.type_union = type_union;
+
+            Some(merged_type)
+        }
+        (Some(merged), None) => Some(merged),
+        (None, Some(other)) => Some(other),
+        (None, None) => None,
+    };
+
+    merged.thrown_types = merged_throw_type.into_iter().collect();
+}
+
+/// Combines explicit throw annotations into a single effective contract.
+///
+/// An absent annotation is represented by `None` and means `Throwable`; an explicit `@throws void`
+/// is represented by `Some(never)`. The caller intersects contracts from separate inheritance paths.
+fn get_declared_method_throw_type(method: &FunctionLikeMetadata, codebase: &CodebaseMetadata) -> Option<TypeMetadata> {
+    let inherits_docs = method.flags.inherits_docs();
+    let mut declared_throw_types =
+        method.thrown_types.iter().filter(|thrown_type| !thrown_type.inferred || inherits_docs);
+    let first_throw_type = declared_throw_types.next()?;
+    let mut throw_type = get_never();
+
+    for thrown_type in std::iter::once(first_throw_type).chain(declared_throw_types) {
+        let mut thrown_type_union = thrown_type.type_union.clone();
+        if thrown_type_union.is_void() {
+            continue;
+        }
+
+        thrown_type_union.types.to_mut().retain(|atomic| !atomic.is_void());
+        if thrown_type_union.is_never() {
+            continue;
+        }
+
+        throw_type = combine_union_types(&throw_type, &thrown_type_union, codebase, CombinerOptions::default());
+    }
+
+    let mut throw_type_metadata = first_throw_type.clone();
+    throw_type_metadata.type_union = throw_type;
+    throw_type_metadata.inferred = false;
+
+    Some(throw_type_metadata)
 }
 
 fn join_type_metadata(target: Option<&mut TypeMetadata>, other: Option<&TypeMetadata>, codebase: &CodebaseMetadata) {
@@ -2737,6 +2812,10 @@ fn apply_template_substitution_to_method(
 
     if let Some(return_type) = &mut substituted_method.return_type_metadata {
         return_type.type_union = inferred_type_replacer::replace(&return_type.type_union, template_result, codebase);
+    }
+
+    for thrown_type in &mut substituted_method.thrown_types {
+        thrown_type.type_union = inferred_type_replacer::replace(&thrown_type.type_union, template_result, codebase);
     }
 
     substituted_method
@@ -2799,13 +2878,29 @@ fn check_interface_method_signatures<'ctx, A>(
             context.codebase,
         );
 
-        let issues = method_signature::validate_method_signature_compatibility(
+        let mut issues = method_signature::validate_method_signature_compatibility(
             context.codebase,
             class_like_metadata.name,
             &substituted_class_method,
             &substituted_interface_method,
             false,
         );
+
+        if context.settings.check_throw_type_covariance
+            && let Some(issue) = method_signature::validate_method_throw_type_covariance(
+                context.codebase,
+                class_like_metadata
+                    .appearing_method_ids
+                    .get(method_name_atom)
+                    .map_or(class_fqcn_word, MethodIdentifier::get_class_name),
+                class_like_metadata.name,
+                interface_fqcn_word,
+                &substituted_class_method,
+                &substituted_interface_method,
+            )
+        {
+            issues.push(issue);
+        }
 
         for incompatibility in issues {
             // Use the method span as primary location (where the issue actually is)
@@ -2972,6 +3067,32 @@ fn report_signature_compatibility_issue<'ctx, A>(
                 )
                 .with_note("Return types must be covariant: child must return equal or narrower types than parent.")
                 .with_help("Change the return type to be compatible with the parent method."),
+            );
+        }
+        SignatureCompatibilityIssue::IncompatibleThrowType { child_type, parent_type, child_is_implicit } => {
+            let child_contract = if child_is_implicit { "Implicit throw type" } else { "Throw type" };
+            let child_explanation = if child_is_implicit {
+                "Without an `@throws` tag, this method may throw any `Throwable`"
+            } else {
+                "This method declares a throw type broader than its parent contract"
+            };
+
+            context.collector.report_with_code(
+                IssueCode::IncompatibleThrowType,
+                Issue::error(format!(
+                    "{child_contract} `{child_type}` of `{child_name}::{method_name}()` is incompatible with parent throw type `{parent_type}` of `{parent_name}::{method_name}()`"
+                ))
+                .with_annotation(Annotation::primary(primary_span).with_message(child_explanation))
+                .with_annotation(Annotation::secondary(parent_class_span).with_message(format!(
+                    "Parent throw contract is declared by `{parent_name}::{method_name}()`"
+                )))
+                .with_annotation(
+                    Annotation::secondary(child_class_span).with_message(format!("In class `{child_name}`")),
+                )
+                .with_note("Throw types must be covariant: an overriding method can declare only exception types compatible with the parent method's throw contract.")
+                .with_help(format!(
+                    "Declare a throw type compatible with `{parent_type}`, or use `@throws void` if `{child_name}::{method_name}()` does not throw."
+                )),
             );
         }
         SignatureCompatibilityIssue::MissingReturnTypeDeclaration { parent_type } => {

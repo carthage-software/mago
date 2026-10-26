@@ -96,8 +96,9 @@ Ces indicateurs activent ou désactivent des analyses individuelles. Les valeurs
 | `analyze-dead-code` | `false` | Analyse le code qui semble inaccessible. |
 | `memoize-properties` | `true` | Suit les valeurs littérales de propriété pour une inférence plus précise, au prix d'un peu de mémoire. |
 | `allow-possibly-undefined-array-keys` | `true` | **Déprécié.** Autorise l'accès aux clés qui peuvent manquer sans le signaler. Le passer à `false` signale uniquement les lectures de `array<K, V>` avec une clé littérale unique et n'élargit pas le type à `T\|null`. Préférez `strict-array-index-existence`. |
-| `check-throws` | `false` | Signale les exceptions non capturées et non déclarées avec `@throws`. |
+| `check-throws` | `false` | Signale les exceptions non capturées qui ne sont ni interceptées ni documentées avec `@throws`. |
 | `check-dead-catch` | `false` | Signale les clauses `catch` qui ne correspondent à aucune exception connue du bloc `try`. Nécessite `check-throws` ; du code non documenté peut malgré tout lancer des exceptions invisibles pour l'analyseur. |
+| `check-throw-type-covariance` | `false` | Vérifie la covariance des contrats `@throws` dans les redéfinitions et implémentations. Sans annotation, le type est `Throwable`; utilisez `@throws void` pour indiquer l’absence d’exception. |
 | `check-missing-override` | `false` | Signale les attributs `#[Override]` manquants sur les méthodes redéfinissantes (PHP 8.3+). |
 | `find-unused-parameters` | `false` | Signale les paramètres qui ne sont jamais lus. |
 | `strict-list-index-checks` | `false` | Exige que tout entier utilisé comme index de liste soit prouvé non négatif. |
