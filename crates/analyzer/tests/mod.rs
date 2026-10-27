@@ -19,6 +19,24 @@ mod framework;
 /// 2. Read the content from the file `cases/my_test.php`.
 /// 3. Create and run a `TestCase` with that content and the specified settings.
 macro_rules! test_case {
+    ($test_name:ident, $settings:expr, expected_issue_counts = [$(($code:literal, $count:literal)),+ $(,)?]) => {
+        #[test]
+        fn $test_name() {
+            let content = include_bytes!(concat!("cases/", stringify!($test_name), ".php"));
+            let test = $crate::framework::TestCase::new(stringify!($test_name), content).settings($settings);
+            $(let test = test.expect_issue_code_count($code, $count);)+
+            test.run();
+        }
+    };
+    ($test_name:ident, expected_issue_counts = [$(($code:literal, $count:literal)),+ $(,)?]) => {
+        #[test]
+        fn $test_name() {
+            let content = include_bytes!(concat!("cases/", stringify!($test_name), ".php"));
+            let test = $crate::framework::TestCase::new(stringify!($test_name), content);
+            $(let test = test.expect_issue_code_count($code, $count);)+
+            test.run();
+        }
+    };
     ($test_name:ident, references = [$(($class:literal, $member:literal, $count:literal)),+ $(,)?]) => {
         #[test]
         fn $test_name() {
@@ -55,7 +73,7 @@ macro_rules! test_case {
 
 test_case!(accessing_undefined_class_constant);
 test_case!(issue_2616);
-test_case!(issue_2616_positions);
+test_case!(issue_2616_positions, expected_issue_counts = [("too-wide-throw-type", 1)]);
 test_case!(issue_2616_bounds);
 test_case!(generic_docblock_native_return);
 test_case!(message_quality);
@@ -316,11 +334,15 @@ test_case!(docblock_return_basic);
 test_case!(docblock_throws_exception);
 test_case!(docblock_throws_unhandled);
 test_case!(issue_2544_backed_enum_from_throws);
-test_case!(issue_2503_dead_catch, {
-    let mut settings = default_test_settings();
-    settings.check_dead_catch = true;
-    settings
-});
+test_case!(
+    issue_2503_dead_catch,
+    {
+        let mut settings = default_test_settings();
+        settings.check_dead_catch = true;
+        settings
+    },
+    expected_issue_counts = [("too-wide-throw-type", 1)]
+);
 test_case!(issue_2503_check_throws_disabled, {
     let mut settings = default_test_settings();
     settings.check_throws = false;
@@ -1014,7 +1036,7 @@ test_case!(or_never);
 test_case!(abstract_method_inheritance);
 test_case!(variadic_array_type);
 test_case!(parse_str);
-test_case!(assertion_after_side_effect);
+test_case!(assertion_after_side_effect, expected_issue_counts = [("too-wide-throw-type", 1)]);
 test_case!(undefined_string_key_in_union);
 test_case!(possibly_undefined_string_key_in_union, {
     let mut s = crate::framework::default_test_settings();
@@ -1936,6 +1958,10 @@ test_case!(flow_match_unhandled_thrown);
 test_case!(flow_match_unreachable_arm);
 test_case!(flow_match_with_default);
 test_case!(flow_match_with_throw_arm);
+test_case!(
+    flow_match_with_throw_arm_default,
+    mago_analyzer::settings::Settings { check_throws: false, find_overly_wide_throw_types: true, ..Default::default() }
+);
 test_case!(flow_method_call_invalidates);
 test_case!(flow_method_on_possibly_null);
 test_case!(flow_method_return_narrow);
@@ -2905,6 +2931,88 @@ test_case!(issue_2611);
 test_case!(issue_2612);
 test_case!(issue_2612_intersections);
 test_case!(issue_2619);
+test_case!(too_wide_throws, expected_issue_counts = [("too-wide-throw-type", 11), ("unhandled-thrown-type", 1)]);
+test_case!(
+    array_map_callback_empty,
+    crate::framework::default_test_settings(),
+    expected_issue_counts = [("too-wide-throw-type", 2)]
+);
+#[test]
+fn array_map_callback_empty_option_off() {
+    let content = include_bytes!("cases/array_map_callback_empty.php");
+    crate::framework::TestCase::new(stringify!(array_map_callback_empty_option_off), content)
+        .settings(mago_analyzer::settings::Settings { check_throws: true, ..Default::default() })
+        .expect_issue_code_count("unhandled-thrown-type", 2)
+        .run();
+}
+test_case!(
+    overly_wide_throw_types_disabled,
+    mago_analyzer::settings::Settings { check_throws: true, ..Default::default() }
+);
+test_case!(
+    overly_wide_throw_types_enabled_without_unhandled_check,
+    mago_analyzer::settings::Settings { find_overly_wide_throw_types: true, ..Default::default() },
+    expected_issue_counts = [("too-wide-throw-type", 1)]
+);
+test_case!(
+    too_wide_terminal_match_throw,
+    mago_analyzer::settings::Settings { find_overly_wide_throw_types: true, ..Default::default() },
+    expected_issue_counts = [("too-wide-throw-type", 2)]
+);
+test_case!(
+    issue_2520_iterator_throws_opt_in,
+    mago_analyzer::settings::Settings { check_throws: false, find_overly_wide_throw_types: true, ..Default::default() },
+    expected_issue_counts = [("too-wide-throw-type", 2)]
+);
+test_case!(
+    iterator_foreach_aggregate_throws_opt_in,
+    mago_analyzer::settings::Settings { check_throws: false, find_overly_wide_throw_types: true, ..Default::default() },
+    expected_issue_counts = [("too-wide-throw-type", 2)]
+);
+#[test]
+fn too_wide_terminal_match_throw_disabled() {
+    let content = include_bytes!("cases/too_wide_terminal_match_throw.php");
+    crate::framework::TestCase::new(stringify!(too_wide_terminal_match_throw_disabled), content)
+        .settings(mago_analyzer::settings::Settings::default())
+        .run();
+}
+test_case!(generic_throw_template_bound_chain);
+test_case!(generic_method_throw_dead_catch, {
+    let mut settings = default_test_settings();
+    settings.check_dead_catch = true;
+    settings
+});
+test_case!(generic_throw_unused_detection, expected_issue_counts = [("too-wide-throw-type", 1)]);
+test_case!(generic_iterator_aggregate_union_bindings);
+test_case!(generic_throwing_iterator_foreach);
+test_case!(
+    recursive_generic_throw_resolution,
+    expected_issue_counts = [("too-wide-throw-type", 2), ("unhandled-thrown-type", 2)]
+);
+test_case!(unresolved_recursive_generic_throw);
+test_case!(
+    too_wide_generic_throw,
+    expected_issue_counts = [
+        ("too-wide-throw-type", 6),
+        ("unhandled-thrown-type", 2),
+        ("unused-template-parameter", 1),
+        ("avoid-catching-error", 2),
+    ]
+);
+test_case!(
+    check_throws_disabled,
+    {
+        let mut settings = default_test_settings();
+        settings.check_throws = false;
+        settings
+    },
+    expected_issue_counts = [("too-wide-throw-type", 1)]
+);
+test_case!(check_throws_unchecked, {
+    let mut settings = default_test_settings();
+    settings.unchecked_exceptions.insert(mago_word::word("RuntimeException"));
+    settings
+});
 test_case!(simplexml_truthiness);
 test_case!(closure_capture_by_reference_array);
 test_case!(nullable_receiver_method_call);
@@ -2915,6 +3023,7 @@ test_case!(parameter_null_default_php90, crate::framework::php_90_settings());
 test_case!(multilevel_inheritance_unbound_template_bound);
 test_case!(partial_union_method_call);
 test_case!(iterator_foreach_value_type);
+test_case!(inherited_too_wide_throw_type, expected_issue_counts = [("too-wide-throw-type", 1)]);
 test_case!(possibly_undefined_switch_finally);
 test_case!(inline_var_tag_undefined_variable);
 test_case!(phpdoc_native_type_merge);

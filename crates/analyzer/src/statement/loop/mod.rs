@@ -17,8 +17,10 @@ use mago_reporting::IssueCollection;
 
 use mago_algebra::saturate_shared_clauses;
 use mago_codex::metadata::CodebaseMetadata;
+use mago_codex::misc::GenericParent;
 use mago_codex::ttype;
 use mago_codex::ttype::TType;
+use mago_codex::ttype::TypeRef;
 use mago_codex::ttype::add_optional_union_type;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
@@ -36,11 +38,15 @@ use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::get_array_parameters;
 use mago_codex::ttype::get_arraykey;
 use mago_codex::ttype::get_iterable_parameters;
+use mago_codex::ttype::get_iterator_method_return_type;
 use mago_codex::ttype::get_literal_string;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::get_non_empty_string;
+use mago_codex::ttype::get_specialized_template_type;
 use mago_codex::ttype::get_string;
+use mago_codex::ttype::template::TemplateResult;
+use mago_codex::ttype::template::inferred_type_replacer;
 use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -64,6 +70,7 @@ use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::context::block::BreakContext;
+use crate::context::block::PossiblyThrownGenericException;
 use crate::context::scope::control_action::ControlAction;
 use crate::context::scope::loop_scope::LoopScope;
 use crate::context::scope::var_has_root;
@@ -74,6 +81,8 @@ use crate::formula::negate_or_synthesize;
 use crate::reconciler::reconcile_keyed_types;
 use crate::statement::r#loop::assignment_map_visitor::get_assignment_map;
 use crate::statement::r#loop::cleaner::clean_nodes;
+use crate::utils::exception::get_throw_type_atomics;
+use crate::utils::exception::get_throw_type_object_names;
 
 mod assignment_map_visitor;
 mod cleaner;
@@ -85,6 +94,8 @@ pub mod r#do;
 pub mod r#for;
 pub mod foreach;
 pub mod r#while;
+
+const MAX_ITERATOR_PROTOCOL_RECURSION_DEPTH: usize = 64;
 
 pub fn parse_control_flow_level<'ctx, 'arena, A>(
     level: Option<&Expression<'arena>>,
@@ -1658,6 +1669,15 @@ where
                         always_enters_loop = false;
 
                         if let Some((k, v)) = get_iterable_parameters(iterator_atomic, context.codebase) {
+                            record_iterator_protocol_throws(
+                                context,
+                                block_context,
+                                atomic_object.name,
+                                atomic_object.type_parameters.as_deref(),
+                                iterator.span(),
+                                foreach.target.key().is_some(),
+                            );
+
                             (k, v)
                         } else {
                             let class_name = atomic_object.name;
@@ -1794,6 +1814,209 @@ where
     // every atomic in the iterator type is iterable; no diagnostic needed
 
     Ok((always_enters_loop, key_type.unwrap_or_else(get_mixed), value_type.unwrap_or_else(get_mixed)))
+}
+
+fn record_iterator_protocol_throws<'ctx, A>(
+    context: &Context<'ctx, '_, A>,
+    block_context: &mut BlockContext<'ctx>,
+    class_name: Word,
+    type_parameters: Option<&[TUnion]>,
+    span: Span,
+    include_key: bool,
+) where
+    A: Arena,
+{
+    if !context.settings.find_overly_wide_throw_types {
+        return;
+    }
+
+    let mut visited_classes = Vec::new();
+    record_iterator_protocol_throws_recursive(
+        context,
+        block_context,
+        class_name,
+        type_parameters,
+        span,
+        include_key,
+        &mut visited_classes,
+    );
+}
+
+fn record_iterator_protocol_throws_recursive<'ctx, A>(
+    context: &Context<'ctx, '_, A>,
+    block_context: &mut BlockContext<'ctx>,
+    class_name: Word,
+    type_parameters: Option<&[TUnion]>,
+    span: Span,
+    include_key: bool,
+    visited_classes: &mut Vec<(Word, Option<Vec<TUnion>>)>,
+) where
+    A: Arena,
+{
+    let Some(class_metadata) = context.codebase.get_class_like(class_name.as_bytes()) else {
+        return;
+    };
+
+    let type_parameters_key = type_parameters.map(|types| types.to_vec());
+    if visited_classes.len() >= MAX_ITERATOR_PROTOCOL_RECURSION_DEPTH
+        || visited_classes.iter().any(|(visited_class, visited_type_parameters)| {
+            visited_class == &class_metadata.name && visited_type_parameters == &type_parameters_key
+        })
+    {
+        return;
+    }
+    visited_classes.push((class_metadata.name, type_parameters_key));
+
+    if context.codebase.is_instance_of(class_name.as_bytes(), b"Iterator") {
+        record_iterator_method_throws(context, block_context, class_name, type_parameters, span, include_key);
+        let _ = visited_classes.pop();
+        return;
+    }
+
+    if !context.codebase.is_instance_of(class_name.as_bytes(), b"IteratorAggregate") {
+        let _ = visited_classes.pop();
+        return;
+    }
+
+    record_method_throws(context, block_context, class_name, type_parameters, b"getiterator", span);
+
+    let Some(return_type) =
+        get_iterator_method_return_type(context.codebase, class_metadata, type_parameters, b"getiterator")
+    else {
+        let _ = visited_classes.pop();
+        return;
+    };
+
+    for atomic_type in return_type.types.iter() {
+        for returned_class in atomic_type.get_all_object_names() {
+            if !context.codebase.is_instance_of(returned_class.as_bytes(), b"Iterator")
+                && !context.codebase.is_instance_of(returned_class.as_bytes(), b"IteratorAggregate")
+            {
+                continue;
+            }
+
+            let returned_type_parameters = match atomic_type {
+                TAtomic::Object(TObject::Named(named_object)) if named_object.name == returned_class => {
+                    named_object.type_parameters.as_deref()
+                }
+                _ => None,
+            };
+
+            record_iterator_protocol_throws_recursive(
+                context,
+                block_context,
+                returned_class,
+                returned_type_parameters,
+                span,
+                include_key,
+                visited_classes,
+            );
+        }
+    }
+
+    let _ = visited_classes.pop();
+}
+
+fn record_iterator_method_throws<'ctx, A>(
+    context: &Context<'ctx, '_, A>,
+    block_context: &mut BlockContext<'ctx>,
+    class_name: Word,
+    type_parameters: Option<&[TUnion]>,
+    span: Span,
+    include_key: bool,
+) where
+    A: Arena,
+{
+    let methods: &[&[u8]] = if include_key {
+        &[b"current", b"key", b"next", b"rewind", b"valid"]
+    } else {
+        &[b"current", b"next", b"rewind", b"valid"]
+    };
+
+    for method_name in methods {
+        record_method_throws(context, block_context, class_name, type_parameters, method_name, span);
+    }
+}
+
+fn record_method_throws<'ctx, A>(
+    context: &Context<'ctx, '_, A>,
+    block_context: &mut BlockContext<'ctx>,
+    class_name: Word,
+    type_parameters: Option<&[TUnion]>,
+    method_name: &[u8],
+    span: Span,
+) where
+    A: Arena,
+{
+    let Some(class_metadata) = context.codebase.get_class_like(class_name.as_bytes()) else {
+        return;
+    };
+
+    let Some(method_metadata) = context.codebase.get_declaring_method(class_name.as_bytes(), method_name) else {
+        return;
+    };
+
+    let has_only_inherited_throws = method_metadata.thrown_types.iter().all(|thrown_type| thrown_type.inferred);
+    // A final class fixes this implementation, so inherited throw contracts do not apply here.
+    let is_final_implementation = class_metadata.flags.is_final() && has_only_inherited_throws;
+    let thrown_types: &[_] = if is_final_implementation {
+        &[]
+    } else {
+        context.codebase.get_function_like_thrown_types(Some(class_metadata), method_metadata)
+    };
+
+    for thrown_type in thrown_types {
+        let mut thrown_type_union = thrown_type.type_union.clone();
+        if thrown_type_union.has_template_types() {
+            let mut template_result = TemplateResult::default();
+            for node in thrown_type_union.get_all_child_nodes() {
+                if let TypeRef::Atomic(TAtomic::GenericParameter(parameter)) = node
+                    && let GenericParent::ClassLike(defining_class) = parameter.defining_entity
+                    && let Some(template_type) = get_specialized_template_type(
+                        context.codebase,
+                        parameter.parameter_name,
+                        defining_class,
+                        class_metadata,
+                        type_parameters,
+                    )
+                {
+                    template_result.add_lower_bound(parameter.parameter_name, parameter.defining_entity, template_type);
+                }
+            }
+
+            if !template_result.lower_bounds.is_empty() {
+                thrown_type_union =
+                    inferred_type_replacer::replace(&thrown_type_union, &template_result, context.codebase);
+            }
+        }
+
+        for atomic_type in thrown_type_union.types.iter() {
+            if !atomic_type.extends_or_implements(context.codebase, b"Throwable") {
+                continue;
+            }
+
+            for thrown_atomic in get_throw_type_atomics(atomic_type) {
+                if matches!(&thrown_atomic, TAtomic::GenericParameter(_))
+                    && thrown_atomic.extends_or_implements(context.codebase, b"Throwable")
+                {
+                    let thrown_generic = PossiblyThrownGenericException {
+                        object_names: get_throw_type_object_names(context.codebase, &thrown_atomic),
+                        atomic_type: thrown_atomic,
+                        span,
+                    };
+                    block_context.possibly_thrown_generic_exceptions_for_too_wide.insert(thrown_generic);
+                } else {
+                    for exception_name in thrown_atomic.get_all_object_names() {
+                        block_context
+                            .possibly_thrown_exceptions_for_too_wide
+                            .entry(exception_name)
+                            .or_default()
+                            .insert(span);
+                    }
+                }
+            }
+        }
+    }
 }
 
 fn combine_loop_types(

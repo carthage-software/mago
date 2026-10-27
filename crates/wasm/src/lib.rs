@@ -32,7 +32,8 @@ use mago_syntax::parser::parse_file;
 use mago_syntax::settings::ParserSettings;
 
 use crate::types::IssueSource;
-use crate::types::WasmAnalyzerSettings;
+#[doc(hidden)]
+pub use crate::types::WasmAnalyzerSettings;
 use crate::types::WasmIntegrationInfo;
 use crate::types::WasmIssue;
 use crate::types::WasmPluginInfo;
@@ -86,12 +87,15 @@ fn issue_key(issue: &WasmIssue) -> Option<(String, u32, u32)> {
     Some((code.clone(), ann.start_line, ann.start_column))
 }
 
-fn build_analyzer_settings(settings: &WasmAnalyzerSettings, version: PHPVersion) -> AnalyzerSettings {
+#[doc(hidden)]
+#[must_use]
+pub fn build_analyzer_settings(settings: &WasmAnalyzerSettings, version: PHPVersion) -> AnalyzerSettings {
     AnalyzerSettings {
         version,
         find_unused_expressions: settings.find_unused_expressions,
         find_unused_definitions: settings.find_unused_definitions,
         find_overly_wide_return_types: settings.find_overly_wide_return_types,
+        find_overly_wide_throw_types: settings.find_overly_wide_throw_types,
         analyze_dead_code: settings.analyze_dead_code,
         memoize_properties: settings.memoize_properties,
         allow_possibly_undefined_array_keys: settings.allow_possibly_undefined_array_keys,

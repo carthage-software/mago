@@ -73,7 +73,9 @@ final class Collection implements IteratorAggregate
         return new ArrayIterator($this->items);
     }
 
-    /** @return T|null */
+    /**
+     * @return T|null
+     */
     public function first(): ?Entity
     {
         foreach ($this as $item) {

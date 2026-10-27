@@ -130,6 +130,7 @@ impl AnalyzerStrictnessPreset {
                 find_unused_expressions: false,
                 analyze_dead_code: false,
                 check_throws: false,
+                find_overly_wide_throw_types: false,
                 check_dead_catch: false,
                 allow_possibly_undefined_array_keys: true,
                 check_missing_override: false,
@@ -149,6 +150,7 @@ impl AnalyzerStrictnessPreset {
                 find_unused_expressions: false,
                 analyze_dead_code: false,
                 check_throws: false,
+                find_overly_wide_throw_types: false,
                 check_dead_catch: false,
                 allow_possibly_undefined_array_keys: true,
                 check_missing_override: false,
@@ -168,6 +170,7 @@ impl AnalyzerStrictnessPreset {
                 find_unused_expressions: true,
                 analyze_dead_code: false,
                 check_throws: true,
+                find_overly_wide_throw_types: true,
                 check_dead_catch: false,
                 allow_possibly_undefined_array_keys: false,
                 check_missing_override: true,
@@ -187,6 +190,7 @@ impl AnalyzerStrictnessPreset {
                 find_unused_expressions: true,
                 analyze_dead_code: true,
                 check_throws: true,
+                find_overly_wide_throw_types: true,
                 check_dead_catch: false,
                 allow_possibly_undefined_array_keys: false,
                 check_missing_override: true,
@@ -410,6 +414,8 @@ struct InitializationAnalyzerSettings {
     analyze_dead_code: bool,
     /// Whether to check for unhandled thrown exceptions
     check_throws: bool,
+    /// Whether to check if documented @throws types can escape.
+    find_overly_wide_throw_types: bool,
     /// Whether to report catch clauses that cannot catch a known exception
     check_dead_catch: bool,
     /// Whether to allow access to potentially undefined array keys
@@ -669,6 +675,10 @@ fn setup_analyzer(theme: &ColorfulTheme) -> Result<InitializationAnalyzerSetting
         settings.check_throws = Confirm::with_theme(theme)
             .with_prompt(" │  Check for unhandled thrown exceptions?")
             .default(settings.check_throws)
+            .interact()?;
+        settings.find_overly_wide_throw_types = Confirm::with_theme(theme)
+            .with_prompt(" │  Check whether documented @throws types can escape?")
+            .default(settings.find_overly_wide_throw_types)
             .interact()?;
         settings.check_dead_catch = Confirm::with_theme(theme)
             .with_prompt(" │  Check catch clauses with no known matching exception? (requires check-throws)")
@@ -976,6 +986,7 @@ fn build_analyzer_settings_string(settings: &InitializationAnalyzerSettings) -> 
     lines.push(format!("memoize-properties = {}", settings.memoize_properties));
     lines.push(format!("allow-possibly-undefined-array-keys = {}", settings.allow_possibly_undefined_array_keys));
     lines.push(format!("check-throws = {}", settings.check_throws));
+    lines.push(format!("find-overly-wide-throw-types = {}", settings.find_overly_wide_throw_types));
     lines.push(format!("check-dead-catch = {}", settings.check_dead_catch));
     lines.push("unchecked-exceptions = [\"Error\", \"LogicException\"]".to_string());
     lines.push("unchecked-exception-classes = []".to_string());
@@ -1005,6 +1016,7 @@ mod tests {
             find_unused_expressions: false,
             analyze_dead_code: false,
             check_throws: false,
+            find_overly_wide_throw_types: false,
             check_dead_catch: false,
             allow_possibly_undefined_array_keys: true,
             check_missing_override: false,
@@ -1063,6 +1075,7 @@ mod tests {
 
         let result: Result<Configuration, _> = toml::from_str(&content);
         assert!(result.is_ok(), "Generated config should parse. Error: {:?}\n\nConfig:\n{}", result.err(), content);
+        assert!(content.contains("find-overly-wide-throw-types = false"));
     }
 
     #[test]
@@ -1095,6 +1108,7 @@ mod tests {
             find_unused_expressions: true,
             analyze_dead_code: true,
             check_throws: true,
+            find_overly_wide_throw_types: true,
             check_dead_catch: false,
             allow_possibly_undefined_array_keys: false,
             check_missing_override: false,
@@ -1122,6 +1136,7 @@ mod tests {
 
         let result: Result<Configuration, _> = toml::from_str(&content);
         assert!(result.is_ok(), "Generated config should parse. Error: {:?}\n\nConfig:\n{}", result.err(), content);
+        assert!(content.contains("find-overly-wide-throw-types = true"));
     }
 
     #[test]
@@ -1170,6 +1185,7 @@ mod tests {
         assert!(!relaxed.find_unused_expressions);
         assert!(!relaxed.analyze_dead_code);
         assert!(!relaxed.check_throws);
+        assert!(!relaxed.find_overly_wide_throw_types);
         assert!(relaxed.allow_possibly_undefined_array_keys);
 
         // Test Balanced preset
@@ -1177,6 +1193,7 @@ mod tests {
         assert!(balanced.find_unused_definitions);
         assert!(!balanced.find_unused_expressions);
         assert!(!balanced.check_throws);
+        assert!(!balanced.find_overly_wide_throw_types);
         assert!(balanced.allow_possibly_undefined_array_keys);
 
         // Test Strict preset
@@ -1184,6 +1201,7 @@ mod tests {
         assert!(strict.find_unused_definitions);
         assert!(strict.find_unused_expressions);
         assert!(strict.check_throws);
+        assert!(strict.find_overly_wide_throw_types);
         assert!(!strict.allow_possibly_undefined_array_keys);
         assert!(strict.check_missing_override);
         assert!(strict.find_unused_parameters);
@@ -1194,6 +1212,7 @@ mod tests {
         assert!(maximum.find_unused_expressions);
         assert!(maximum.analyze_dead_code);
         assert!(maximum.check_throws);
+        assert!(maximum.find_overly_wide_throw_types);
         assert!(!maximum.allow_possibly_undefined_array_keys);
         assert!(maximum.check_missing_type_hints);
         assert!(maximum.no_boolean_literal_comparison);
