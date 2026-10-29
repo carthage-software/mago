@@ -557,6 +557,7 @@ test_case!(issue_2524_binary_expression);
 test_case!(issue_2584);
 test_case!(issue_2587);
 test_case!(issue_2588);
+test_case!(issue_2643);
 test_case!(idempotency_docblock_before_parameter);
 test_case!(idempotency_html_echo_ternary_break);
 test_case!(idempotency_inline_echo_mid_line_call);
