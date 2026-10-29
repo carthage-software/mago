@@ -17,7 +17,7 @@ To become a sponsor, please visit [the sponsorship page](https://github.com/spon
 
 ---
 
-<a href="http://julian.center" title="Julian Schramm"><kbd><img src="https://avatars.githubusercontent.com/u/79840527?u=2e15d0ec9e6d0bf6554ef69af6b1dba32a051417&v=4&s=160" width="80" height="80" alt="Julian Schramm" /></kbd></a><a href="https://github.com/ddanielou" title="ddanielou"><kbd><img src="https://avatars.githubusercontent.com/u/1174337?v=4&s=160" width="80" height="80" alt="ddanielou" /></kbd></a>
+<a href="http://julian.center" title="Julian Schramm"><kbd><img src="https://avatars.githubusercontent.com/u/79840527?u=072e6949e7600af33f97c8c3dd6d823d62668d32&v=4&s=160" width="80" height="80" alt="Julian Schramm" /></kbd></a><a href="https://github.com/ddanielou" title="ddanielou"><kbd><img src="https://avatars.githubusercontent.com/u/1174337?v=4&s=160" width="80" height="80" alt="ddanielou" /></kbd></a>
 
 ---
 
