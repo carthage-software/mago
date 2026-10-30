@@ -72,6 +72,11 @@ fn emit_checked(input: &[u8], output_index: &mut usize, emitted: u8) -> bool {
     true
 }
 
+#[inline(always)]
+fn starts_word_at_uppercase(byte: u8, last_char: u8, after_digit: bool) -> bool {
+    is_ascii_uppercase(byte) && (after_digit || (is_ascii_lowercase(last_char) && last_char != b' '))
+}
+
 #[inline]
 pub(crate) fn is_case_camel_like(input: &[u8], options: CamelLikeOptions) -> bool {
     let input_trimmed = trim_right(input);
@@ -81,6 +86,7 @@ pub(crate) fn is_case_camel_like(input: &[u8], options: CamelLikeOptions) -> boo
     let mut first_word = options.first_word;
     let mut last_char = b' ';
     let mut found_real_char = false;
+    let mut after_digit = false;
 
     let mut index = 0;
     while index < input_trimmed.len() {
@@ -97,9 +103,12 @@ pub(crate) fn is_case_camel_like(input: &[u8], options: CamelLikeOptions) -> boo
             continue;
         }
 
+        // Digits have no case, so the letter after a digit keeps its case: an
+        // uppercase letter starts a new word (`X509Certificate`, `B2B`) and a
+        // lowercase letter continues the current one (`isB2b`, `x5c`).
         if is_ascii_digit(byte) && options.concat_num {
             found_real_char = true;
-            new_word = true;
+            after_digit = true;
 
             if !emit_checked(input, &mut output_index, byte) {
                 return false;
@@ -109,7 +118,10 @@ pub(crate) fn is_case_camel_like(input: &[u8], options: CamelLikeOptions) -> boo
             continue;
         }
 
-        if new_word || ((is_ascii_lowercase(last_char) && is_ascii_uppercase(byte)) && last_char != b' ') {
+        let starts_word = new_word || starts_word_at_uppercase(byte, last_char, after_digit);
+        after_digit = false;
+
+        if starts_word {
             found_real_char = true;
             new_word = false;
 
@@ -149,6 +161,7 @@ fn convert_camel_like(input: &[u8], options: CamelLikeOptions) -> Vec<u8> {
     let mut first_word = options.first_word;
     let mut last_char = b' ';
     let mut found_real_char = false;
+    let mut after_digit = false;
 
     let mut index = 0;
     while index < input.len() {
@@ -167,13 +180,16 @@ fn convert_camel_like(input: &[u8], options: CamelLikeOptions) -> Vec<u8> {
 
         if is_ascii_digit(byte) && options.concat_num {
             found_real_char = true;
-            new_word = true;
+            after_digit = true;
             output.push(byte);
             index += 1;
             continue;
         }
 
-        if new_word || ((is_ascii_lowercase(last_char) && is_ascii_uppercase(byte)) && last_char != b' ') {
+        let starts_word = new_word || starts_word_at_uppercase(byte, last_char, after_digit);
+        after_digit = false;
+
+        if starts_word {
             found_real_char = true;
             new_word = false;
 
