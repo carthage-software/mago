@@ -462,7 +462,7 @@ fn get_argument<'ast, 'arena>(
 
             None
         }
-        InvocationArgumentsSource::PipeInput(pipe) => {
+        InvocationArgumentsSource::PipeInput { pipe, .. } => {
             if index == 0 {
                 Some(pipe.input)
             } else {
