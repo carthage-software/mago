@@ -727,10 +727,9 @@ generate_formatter_settings! {
     /// Whether to align consecutive assignment-like constructs in columns.
     ///
     /// When enabled, consecutive variable assignments, class properties, class constants,
-    /// global constants, array key-value pairs, and backed enum cases are column-aligned.
+    /// global constants, and backed enum cases are column-aligned.
     ///
-    /// For arrays, this applies to multiline or width-broken mappings. Compact inline arrays
-    /// stay compact and are not padded into columns.
+    /// `=>` in array key-value pairs and match arms is aligned by `align_double_arrows`.
     ///
     /// Example with `true`:
     /// ```php
@@ -756,6 +755,29 @@ generate_formatter_settings! {
     ///
     /// Default: false
     align_assignment_like: bool => "default_false",
+
+    /// Whether to align `=>` in consecutive array key-value pairs and match arms.
+    ///
+    /// This applies to multiline or width-broken arrays and match expressions. Compact inline
+    /// arrays stay compact and are not padded into columns.
+    ///
+    /// Example with `true`:
+    /// ```php
+    /// $array = [
+    ///     'a'    => 1,
+    ///     'bbbb' => 2,
+    /// ];
+    ///
+    /// $label = match ($status) {
+    ///     Status::Pending  => 'Pending',
+    ///     Status::Approved => 'Approved',
+    /// };
+    /// ```
+    ///
+    /// Note: Comments break alignment runs. In arrays, blank lines do too.
+    ///
+    /// Default: false
+    align_double_arrows: bool => "default_false",
 
     /// Controls how `use` statements are sorted.
     ///

@@ -169,7 +169,8 @@ public function bar(
 | `align-parameters` | booléen | `false` | Aligner en colonnes les listes de paramètres multi-lignes par variable. |
 | `align-named-arguments` | booléen | `false` | Aligner en colonnes les arguments nommés dans les appels et attributs multi-lignes. |
 | `array-table-style-alignment` | booléen | `true` | Utiliser l'alignement de style tableau pour les arrays. |
-| `align-assignment-like` | booléen | `false` | Aligner en colonnes les constructions de type affectation consécutives (variables, paires clé/valeur de tableau multi-lignes, propriétés, constantes, cas d'enum, bras de match). Les arrays inline compacts restent non alignés. |
+| `align-assignment-like` | booléen | `false` | Aligner en colonnes les constructions de type affectation consécutives (variables, propriétés, constantes, cas d'enum). |
+| `align-double-arrows` | booléen | `false` | Aligner en colonnes le `=>` des paires clé/valeur de tableau multi-lignes et des bras de match consécutifs. Les arrays inline compacts restent non alignés. |
 
 ## Instructions `use`
 
