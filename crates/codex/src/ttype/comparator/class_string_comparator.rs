@@ -39,6 +39,12 @@ pub fn is_contained_by(
                 return true;
             }
 
+            // A literal class-string names exactly one class, so a class-string that may name a
+            // subclass does not fit inside it.
+            if matches!(input_scalar, TScalar::ClassLikeString(_)) {
+                return false;
+            }
+
             Cow::Owned(class_name_object(codebase, *value))
         }
         TClassLikeString::Generic { constraint, .. } | TClassLikeString::OfType { constraint, .. } => {

@@ -314,6 +314,9 @@ where
     let resolved_function_name = ascii_lowercase_word(assertion_context.resolved_names.get(function_identifier));
     let should_check_against_unresolved = { function_identifier.is_local() };
 
+    let is_subclass_of_call = (should_check_against_unresolved && function_name.as_bytes() == b"is_subclass_of")
+        || resolved_function_name.as_bytes() == b"is_subclass_of";
+
     let is_array_key_exists = |name: &[u8]| matches!(name, b"array_key_exists" | b"key_exists");
     if (should_check_against_unresolved && is_array_key_exists(function_name.as_bytes()))
         || is_array_key_exists(resolved_function_name.as_bytes())
@@ -664,6 +667,13 @@ where
         && let Some((variable_id, needs_isset)) = extract_expression_id(argument)
     {
         let mut assertions = vec![function_assertions];
+        if is_subclass_of_call {
+            // `is_subclass_of()` is strict: the target class is not a subclass of itself.
+            for excluded in get_is_subclass_of_self_exclusions(assertion_context, artifacts, function_call) {
+                assertions.insert(0, vec![Assertion::IsNotIdentical(excluded)]);
+            }
+        }
+
         if needs_isset {
             assertions.push(vec![Assertion::IsIsset]);
         }
@@ -672,6 +682,54 @@ where
     }
 
     if_types
+}
+
+/// Returns the literal class-strings in the subject of an `is_subclass_of()` call that name the
+/// target class itself. `is_subclass_of(Foo::class, Foo::class)` is `false`, so these literals
+/// must be removed when the call is true, and kept when it is false.
+fn get_is_subclass_of_self_exclusions<A>(
+    assertion_context: AssertionContext<'_, '_, A>,
+    artifacts: &AnalysisArtifacts,
+    function_call: &FunctionCall,
+) -> Vec<TAtomic>
+where
+    A: Arena,
+{
+    let arguments = &function_call.argument_list.arguments;
+    let allow_string = arguments
+        .get(2)
+        .and_then(|argument| artifacts.get_expression_type(argument.value()))
+        .is_none_or(|t| !t.is_false());
+    if !allow_string {
+        return vec![];
+    }
+
+    let Some(target_name) = arguments
+        .get(1)
+        .and_then(|argument| artifacts.get_expression_type(argument.value()))
+        .filter(|target| target.is_single())
+        .and_then(|target| get_class_name_from_atomic(assertion_context.codebase, target.get_single()))
+        .and_then(|resolved| resolved.fqcn)
+    else {
+        return vec![];
+    };
+
+    let Some(subject) = arguments.first().and_then(|argument| artifacts.get_expression_type(argument.value())) else {
+        return vec![];
+    };
+
+    subject
+        .types
+        .iter()
+        .filter(|atomic| {
+            matches!(
+                atomic,
+                TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Literal { value }))
+                    if value.as_bytes().eq_ignore_ascii_case(target_name.as_bytes())
+            )
+        })
+        .cloned()
+        .collect()
 }
 
 fn get_possible_array_key_argument_type(
