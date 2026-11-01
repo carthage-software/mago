@@ -47,6 +47,105 @@ fn parses_spaced_lists_and_repeated_categories() {
 }
 
 #[test]
+fn line_pragma_does_not_cover_later_lines() {
+    // Regression: an own-line pragma used to apply to *any* issue further down the file,
+    // which silently suppressed unrelated issues and hid the missing `unfulfilled-expect`.
+    let arena = LocalArena::new();
+    let source = b"<?php\n\n// @mago-expect analysis:foo\n$plain = 'plain';\n\n$value = 'value';\nreturn $value;\n";
+    let file = File::ephemeral(Cow::Borrowed(b"line_scope.php"), Cow::Borrowed(source.as_slice()));
+    let program = parse_file(&arena, &file);
+    assert!(!program.has_errors());
+
+    let mut collector = Collector::new(&arena, &file, program, &["analysis"]);
+
+    let needle = b"return $value;";
+    let start = source.windows(needle.len()).position(|window| window == needle).unwrap() as u32;
+    let span = Span::new(file.id, Position::new(start), Position::new(start + needle.len() as u32));
+
+    assert!(
+        collector.report(Issue::warning("Test issue").with_code("foo").with_annotation(Annotation::primary(span))),
+        "an issue that does not follow the pragma's line must not be suppressed"
+    );
+
+    let issues = collector.finish();
+    assert!(
+        issues.iter().any(|issue| issue.code.as_deref() == Some("unfulfilled-expect")),
+        "the unmatched pragma must be reported as unfulfilled"
+    );
+}
+
+#[test]
+fn line_pragma_covers_the_statement_that_follows_it() {
+    let arena = LocalArena::new();
+    let source = b"<?php\n\n// @mago-expect analysis:foo\n$plain = 'plain';\n\n$other = 'other';\n";
+    let file = File::ephemeral(Cow::Borrowed(b"line_scope_positive.php"), Cow::Borrowed(source.as_slice()));
+    let program = parse_file(&arena, &file);
+    assert!(!program.has_errors());
+
+    let mut collector = Collector::new(&arena, &file, program, &["analysis"]);
+
+    let needle = b"'plain'";
+    let start = source.windows(needle.len()).position(|window| window == needle).unwrap() as u32;
+    let span = Span::new(file.id, Position::new(start), Position::new(start + needle.len() as u32));
+
+    assert!(
+        !collector.report(Issue::warning("Test issue").with_code("foo").with_annotation(Annotation::primary(span))),
+        "the issue on the line that follows the pragma must be suppressed"
+    );
+
+    assert!(collector.finish().is_empty(), "a fulfilled pragma reports nothing");
+}
+
+#[test]
+fn stacked_line_pragmas_all_apply_to_the_same_statement() {
+    let arena = LocalArena::new();
+    let source =
+        b"<?php\n\n// @mago-expect analysis:foo\n// @mago-expect analysis:bar\n$plain = 'plain';\n\n$other = 'other';\n";
+    let file = File::ephemeral(Cow::Borrowed(b"line_scope_stacked.php"), Cow::Borrowed(source.as_slice()));
+    let program = parse_file(&arena, &file);
+    assert!(!program.has_errors());
+
+    let mut collector = Collector::new(&arena, &file, program, &["analysis"]);
+
+    let needle = b"'plain'";
+    let start = source.windows(needle.len()).position(|window| window == needle).unwrap() as u32;
+    let span = Span::new(file.id, Position::new(start), Position::new(start + needle.len() as u32));
+
+    for code in ["foo", "bar"] {
+        assert!(
+            !collector.report(Issue::warning("Test issue").with_code(code).with_annotation(Annotation::primary(span))),
+            "pragma `{code}` stacked above the statement must still apply"
+        );
+    }
+
+    assert!(collector.finish().is_empty(), "both stacked pragmas are fulfilled");
+}
+
+#[test]
+fn repeated_codes_in_one_pragma_each_suppress_an_issue() {
+    let arena = LocalArena::new();
+    let source = b"<?php\n\n// @mago-expect analysis:foo,foo\n$plain = 'plain';\n";
+    let file = File::ephemeral(Cow::Borrowed(b"line_scope_repeated.php"), Cow::Borrowed(source.as_slice()));
+    let program = parse_file(&arena, &file);
+    assert!(!program.has_errors());
+
+    let mut collector = Collector::new(&arena, &file, program, &["analysis"]);
+
+    let needle = b"'plain'";
+    let start = source.windows(needle.len()).position(|window| window == needle).unwrap() as u32;
+    let span = Span::new(file.id, Position::new(start), Position::new(start + needle.len() as u32));
+
+    for _ in 0..2 {
+        assert!(
+            !collector.report(Issue::warning("Test issue").with_code("foo").with_annotation(Annotation::primary(span))),
+            "each repeated code must absorb one issue"
+        );
+    }
+
+    assert!(collector.finish().is_empty(), "a repeated code pragma is fulfilled");
+}
+
+#[test]
 fn fixes_unused_codes_and_partial_counts_in_spaced_lists() {
     let arena = LocalArena::new();
     let file = File::ephemeral(Cow::Borrowed(b"fixes.php"), Cow::Borrowed(include_bytes!("cases/fixes.php")));
