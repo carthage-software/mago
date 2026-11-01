@@ -5660,6 +5660,8 @@ to keep the codebase clean and maintainable.</p>
 <div class="rule__body">
 <p>Detects loops (<code>for</code>, <code>foreach</code>, <code>while</code>, <code>do-while</code>) that have an empty body. An empty
 loop body does not perform any actions and is likely a mistake or redundant code.</p>
+<p>The fix is marked as unsafe because removing the loop also removes the evaluation of its
+header (function calls, assignments, increments), which can change behavior.</p>
 <hr class="rule__separator">
 <div class="rule-examples">
 <div class="rule-example rule-example--bad">
