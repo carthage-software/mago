@@ -2958,6 +2958,7 @@ fn issue_2478_php84() {
 
 test_case!(chained_logical_or_assignment_subsequent_operand);
 test_case!(switch_paradoxical_unreachable_case_detection);
+test_case!(issue_2650);
 
 #[test]
 #[cfg_attr(miri, ignore)]
