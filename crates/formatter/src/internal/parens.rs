@@ -83,6 +83,13 @@ where
             return false;
         }
 
+        // The parentheses are added around the `Expression` holding this node instead.
+        if let Node::Expression(expression) = self.parent_node()
+            && is_instanceof_rhs_needing_parens(self.grandparent_node(), expression)
+        {
+            return false;
+        }
+
         if matches!(node, Node::Binary(_) | Node::Conditional(_))
             && matches!(self.parent_node(), Node::PropertyAccess(_) | Node::NullSafePropertyAccess(_))
         {
@@ -97,7 +104,6 @@ where
             Node::Assignment(_) => self.assignment_needs_parens(node),
             Node::Literal(_) => self.literal_needs_parens(node),
             Node::Pipe(_) => self.pipe_node_needs_parens(node),
-            Node::Access(Access::ClassConstant(_)) => self.class_constant_access_needs_parens(node),
             Node::ArrowFunction(_) => self.arrow_function_needs_parens(node),
             Node::Construct(_) => self.construct_needs_parens(node),
             Node::Yield(_) => self.yield_needs_parens(node),
@@ -259,31 +265,6 @@ where
         }
 
         false
-    }
-
-    /// Check if a class constant access needs parentheses based on its parent context.
-    ///
-    /// PHP grammar does not allow class constant access directly after `instanceof`:
-    /// - `$x instanceof Foo::BAR` is a parse error - needs `$x instanceof (Foo::BAR)`
-    ///
-    /// However, static property access is allowed:
-    /// - `$x instanceof Foo::$bar` is valid
-    fn class_constant_access_needs_parens(&self, node: Node<'arena, 'arena>) -> bool {
-        let Node::Access(Access::ClassConstant(_)) = node else {
-            return false;
-        };
-
-        let node_span = node.span();
-
-        let grandparent = self.grandparent_node();
-
-        match grandparent {
-            Some(Node::Binary(binary)) if matches!(binary.operator, BinaryOperator::Instanceof(_)) => {
-                let unwrapped_rhs = unwrap_parenthesized(binary.rhs);
-                unwrapped_rhs.span() == node_span
-            }
-            _ => false,
-        }
     }
 
     fn binary_node_needs_parens(&self, node: Node<'arena, 'arena>) -> bool {
@@ -504,11 +485,7 @@ where
             return false;
         };
 
-        if matches!(expression, Expression::Call(_))
-            && let Node::Binary(binary) = self.parent_node()
-            && matches!(binary.operator, BinaryOperator::Instanceof(_))
-            && expression.start_offset() > binary.operator.start_offset()
-        {
+        if is_instanceof_rhs_needing_parens(Some(self.parent_node()), expression) {
             return true;
         }
 
@@ -681,6 +658,53 @@ fn binary_has_explicit_wrapping_parens<'arena>(
         Expression::Binary(binary) => {
             binary_has_explicit_wrapping_parens(target, binary.lhs)
                 || binary_has_explicit_wrapping_parens(target, binary.rhs)
+        }
+        _ => false,
+    }
+}
+
+/// Returns `true` if `expression` is the right-hand side of the `instanceof` expression `parent` and must be
+/// wrapped in parentheses.
+///
+/// PHP only accepts a class name, `static`, or a variable-like expression after `instanceof`; anything else needs
+/// parentheses, whatever its precedence:
+///
+/// - `$x instanceof (string) $y` is a parse error, unlike `$x instanceof ((string) $y)`.
+/// - `$x instanceof FOO` refers to the class `FOO`, while `$x instanceof (FOO)` uses the value of the constant `FOO`.
+fn is_instanceof_rhs_needing_parens<'arena>(
+    parent: Option<Node<'arena, 'arena>>,
+    expression: &'arena Expression<'arena>,
+) -> bool {
+    let Some(Node::Binary(binary)) = parent else {
+        return false;
+    };
+
+    matches!(binary.operator, BinaryOperator::Instanceof(_))
+        && expression.start_offset() > binary.operator.start_offset()
+        && !is_class_name_reference(expression)
+}
+
+/// Whether `expression` can follow `instanceof` without parentheses (`class_name_reference` in PHP's grammar).
+fn is_class_name_reference(expression: &Expression<'_>) -> bool {
+    matches!(
+        expression,
+        Expression::Identifier(_) | Expression::Static(_) | Expression::Self_(_) | Expression::Parent(_)
+    ) || is_new_variable(expression)
+}
+
+/// Whether `expression` is a variable, or an array, property or static property access on one
+/// (`new_variable` in PHP's grammar).
+fn is_new_variable(expression: &Expression<'_>) -> bool {
+    match expression {
+        Expression::Variable(_) => true,
+        Expression::ArrayAccess(access) => is_new_variable(access.array),
+        Expression::Access(Access::Property(access)) => is_new_variable(access.object),
+        Expression::Access(Access::NullSafeProperty(access)) => is_new_variable(access.object),
+        Expression::Access(Access::StaticProperty(access)) => {
+            matches!(
+                access.class,
+                Expression::Identifier(_) | Expression::Static(_) | Expression::Self_(_) | Expression::Parent(_)
+            ) || is_new_variable(access.class)
         }
         _ => false,
     }
