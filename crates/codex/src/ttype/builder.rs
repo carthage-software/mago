@@ -966,11 +966,7 @@ fn get_reference_from_kind(
             break 'iterator;
         }
 
-        let Some(type_parameters) = &mut type_parameters else {
-            type_parameters = Some(vec![mixed_default(), mixed_default()]);
-
-            break 'iterator;
-        };
+        let type_parameters = type_parameters.get_or_insert_with(Vec::new);
 
         if type_parameters.len() == 1 {
             type_parameters.insert(0, mixed_default());
