@@ -261,6 +261,7 @@ test_case!(array_comment);
 test_case!(array_preserve_empty_lines);
 test_case!(spacing_options);
 test_case!(spacing_options_flipped);
+test_case!(spacing_between_parentheses);
 test_case!(line_options);
 test_case!(line_options_flipped);
 test_case!(line_options_all_on);

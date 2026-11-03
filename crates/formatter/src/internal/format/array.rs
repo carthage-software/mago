@@ -123,6 +123,9 @@ where
         }
 
         left_delimiter_content.push(Document::String(array_like.get_left_delimiter()));
+        if !array_like.elements().is_empty() && f.settings.space_between_parentheses {
+            left_delimiter_content.push(Document::space());
+        }
         if let Some(s) = f.print_trailing_comments(array_like.get_left_delimiter_span()) {
             left_delimiter_content.push(s);
         }
@@ -130,8 +133,15 @@ where
         Document::Array(left_delimiter_content)
     };
 
-    let get_right_delimiter = |f: &mut FormatterState<'_, 'arena, A>, array_like: &ArrayLike<'arena>| {
+    let get_right_delimiter = |f: &mut FormatterState<'_, 'arena, A>, array_like: &ArrayLike<'arena>, inline: bool| {
         let mut right_delimiter_content = vec_in![f.arena;];
+        if !array_like.elements().is_empty() && f.settings.space_between_parentheses {
+            right_delimiter_content.push(if inline {
+                Document::space()
+            } else {
+                Document::IfBreak(IfBreak::new(f.arena, Document::empty(), Document::space()).with_id(group_id))
+            });
+        }
         right_delimiter_content.push(Document::String(array_like.get_right_delimiter()));
         if let Some(s) = f.print_trailing_comments(array_like.get_right_delimiter_span()) {
             right_delimiter_content.push(s);
@@ -148,7 +158,7 @@ where
             parts.push(dangling_comments);
         }
 
-        parts.push(get_right_delimiter(f, &array_like));
+        parts.push(get_right_delimiter(f, &array_like, true));
 
         return Document::Group(Group::new(parts));
     }
@@ -160,7 +170,7 @@ where
 
     if !should_break && let Some(element) = inline_single_element(f, &array_like) {
         parts.push(element);
-        parts.push(get_right_delimiter(f, &array_like));
+        parts.push(get_right_delimiter(f, &array_like, true));
 
         return Document::Group(Group::new(parts));
     }
@@ -244,7 +254,7 @@ where
         parts.push(Document::Line(Line::soft()));
     }
 
-    parts.push(get_right_delimiter(f, &array_like));
+    parts.push(get_right_delimiter(f, &array_like, false));
 
     let force_break = use_table_style || has_floating_comments;
 

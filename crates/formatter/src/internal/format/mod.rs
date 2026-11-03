@@ -125,6 +125,7 @@ use crate::internal::format::return_value::format_return_value;
 use crate::internal::format::statement::print_statement_sequence;
 use crate::internal::format::string::print_lowercase_keyword;
 use crate::internal::utils;
+use crate::settings::BraceStyle;
 use crate::settings::SortOrder;
 use crate::wrap;
 
@@ -2090,7 +2091,7 @@ where
 {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena, A>) -> Document<'arena, A> {
         wrap!(f, self, Try, {
-            let mut parts = vec_in![f.arena; self.r#try.format(f), Document::space(), self.block.format(f)];
+            let mut parts = vec_in![f.arena; self.r#try.format(f), if f.settings.closure_brace_style == BraceStyle::AlwaysNextLine { Document::Line(Line::hard()) } else { Document::space() }, self.block.format(f)];
 
             let mut prev_block_span = self.block.span();
             for clause in &self.catch_clauses {
@@ -2119,8 +2120,9 @@ where
 
             Document::Group(Group::new(vec_in![f.arena;
                 self.catch.format(f),
-                Document::space(),
+                if f.settings.space_between_parentheses { Document::empty() } else { Document::space() },
                 format_token(f, self.left_parenthesis, b"("),
+                if self.variable.is_some() && f.settings.space_between_parentheses { Document::space() } else { Document::empty() },
                 Document::Group(Group::new(vec_in![f.arena;
                     Document::IndentIfBreak(IndentIfBreak::new(hint_group_id, {
                         let mut context = vec_in![f.arena; Document::Line(Line::soft())];
@@ -2135,8 +2137,9 @@ where
                     })),
                     Document::Line(Line::soft()),
                 ]).with_id(hint_group_id)),
+                if self.variable.is_some() && f.settings.space_between_parentheses { Document::space() } else { Document::empty() },
                 format_token(f, self.right_parenthesis, b")"),
-                Document::space(),
+                if f.settings.closure_brace_style == BraceStyle::AlwaysNextLine { Document::Line(Line::hard()) } else { Document::space() },
                 self.block.format(f),
             ]))
         })
@@ -2239,6 +2242,10 @@ where
             let mut contents = vec_in![f.arena; self.unset.format(f), Document::String(b"(")];
 
             if !self.values.is_empty() {
+                if f.settings.space_between_parentheses {
+                    contents.push(Document::space());
+                }
+
                 let mut values = Document::join(f.arena, self.values.iter().map(|v| v.format(f)), Separator::CommaLine);
 
                 // `unset()` accepts a trailing comma since the same version as function calls (7.3)
@@ -2250,6 +2257,9 @@ where
 
                 contents.push(Document::Indent(values));
                 contents.push(Document::Line(Line::soft()));
+                if f.settings.space_between_parentheses {
+                    contents.push(Document::soft_space());
+                }
             }
 
             contents.push(Document::String(b")"));
