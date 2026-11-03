@@ -188,6 +188,10 @@ where
     }
 
     let mut resulting_type = resulting_expression_type.unwrap_or_else(get_never);
+    if artifacts.get_expression_type(object).is_some_and(|t| t.possibly_undefined()) {
+        resulting_type.set_possibly_undefined(true, None);
+    }
+
     let object_has_nullsafe_null = artifacts.get_expression_type(object).is_some_and(|t| t.has_nullsafe_null());
     if resolution_result.all_properties_non_nullable
         && ((is_null_safe && resolution_result.encountered_null) || object_has_nullsafe_null)
