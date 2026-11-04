@@ -24,6 +24,7 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::context::scope::conditional_scope::IfConditionalScope;
 use crate::context::scope::if_scope::IfScope;
+use crate::context::utils::inherit_too_wide_thrown_exceptions;
 use crate::error::AnalysisError;
 use crate::reconciler::reconcile_keyed_types;
 
@@ -128,6 +129,7 @@ where
         if_conditional_context.flags.set_inside_conditional(true);
         condition.analyze(context, &mut if_conditional_context, artifacts)?;
         if_conditional_context.flags.set_inside_conditional(was_inside_conditional);
+        inherit_too_wide_thrown_exceptions(context, externally_applied_context, &if_conditional_context);
 
         for target_context in [&mut post_if_context, &mut *externally_applied_context] {
             target_context.stable_method_calls.clone_from(&if_conditional_context.stable_method_calls);

@@ -54,7 +54,6 @@ function throw_if(
     Closure|Throwable|string $exception = RuntimeException::class,
     mixed ...$parameters,
 ): mixed {
-    // @mago-expect analysis:unhandled-thrown-type
     return throw_if($condition, $exception, ...$parameters);
 }
 

@@ -10,6 +10,7 @@ use mago_codex::assertion::Assertion;
 use mago_codex::context::ScopeContext;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::add_optional_union_type;
+use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::get_mixed;
@@ -50,6 +51,13 @@ pub struct ReferenceConstraint {
     pub constraint_span: Span,
     pub source: ReferenceConstraintSource,
     pub constraint_type: Option<Rc<TUnion>>,
+}
+
+#[derive(Clone, Debug, PartialEq, Eq, Hash)]
+pub struct PossiblyThrownGenericException {
+    pub atomic_type: TAtomic,
+    pub span: Span,
+    pub object_names: Vec<Word>,
 }
 
 #[derive(Clone, Debug)]
@@ -106,6 +114,9 @@ pub struct BlockContext<'ctx> {
     pub logical_or_false_context: Option<Rc<RefCell<Option<Self>>>>,
     pub control_actions: ControlActionSet,
     pub possibly_thrown_exceptions: WordMap<HashSet<Span>>,
+    pub possibly_thrown_generic_exceptions: HashSet<PossiblyThrownGenericException>,
+    pub possibly_thrown_exceptions_for_too_wide: WordMap<HashSet<Span>>,
+    pub possibly_thrown_generic_exceptions_for_too_wide: HashSet<PossiblyThrownGenericException>,
 
     /// Properties that are DEFINITELY initialized in ALL code paths.
     /// Uses intersection semantics - a property must be initialized in ALL branches.
@@ -238,6 +249,9 @@ impl<'ctx> BlockContext<'ctx> {
             logical_or_false_context: None,
             control_actions: ControlActionSet::new(),
             possibly_thrown_exceptions: WordMap::default(),
+            possibly_thrown_generic_exceptions: HashSet::default(),
+            possibly_thrown_exceptions_for_too_wide: WordMap::default(),
+            possibly_thrown_generic_exceptions_for_too_wide: HashSet::default(),
             definitely_initialized_properties: WordSet::default(),
             possibly_initialized_properties: WordSet::default(),
             definitely_uninitialized_property_ids: WordSet::default(),

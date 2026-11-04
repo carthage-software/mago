@@ -93,10 +93,11 @@ These flags toggle individual analyses. Defaults are tuned for everyday use; fli
 | `find-unused-expressions` | `true` | Report expressions whose result is discarded, like `$a + $b;`. |
 | `find-unused-definitions` | `true` | Report private definitions that are never referenced. |
 | `find-overly-wide-return-types` | `false` | Warn when a declared return type contains a branch the body never produces, like `: string\|false` on a function that always returns a string. Available since 1.20.0. |
+| `find-overly-wide-throw-types` | `false` | Warn when a documented `@throws` type cannot escape the function or method. |
 | `analyze-dead-code` | `false` | Analyse code that appears unreachable. |
 | `memoize-properties` | `true` | Track literal property values for sharper inference, at the cost of some memory. |
 | `allow-possibly-undefined-array-keys` | `true` | **Deprecated.** Allow accessing keys that may be missing without flagging it. Setting this to `false` warns on `array<K, V>` reads with a single literal key but does not widen the type to `T\|null`. Use `strict-array-index-existence` instead. |
-| `check-throws` | `false` | Report exceptions that are not caught and not declared with `@throws`. |
+| `check-throws` | `false` | Report uncaught exceptions missing from `@throws`. |
 | `check-dead-catch` | `false` | Report catch clauses that match no known exception from their `try` block. Requires `check-throws`; undocumented code may still throw exceptions the analyzer cannot see. |
 | `check-missing-override` | `false` | Report missing `#[Override]` attributes on overriding methods (PHP 8.3+). |
 | `find-unused-parameters` | `false` | Report parameters that are never read. |
@@ -163,7 +164,7 @@ A bare entry like `boot` accepts a matching method on any class, while `PHPUnit\
 
 ## Exception filtering
 
-When `check-throws` is enabled, two options let you skip specific exceptions.
+When `check-throws` or `find-overly-wide-throw-types` is enabled, two options let you skip specific exceptions.
 
 | Option | Type | Default | Description |
 | :--- | :--- | :--- | :--- |
@@ -286,6 +287,7 @@ The analyzer runs at a moderate strictness by default. Crank it up by enabling m
 find-unused-expressions = true
 find-unused-definitions = true
 find-overly-wide-return-types = true
+find-overly-wide-throw-types = true
 analyze-dead-code = true
 check-throws = true
 check-dead-catch = true

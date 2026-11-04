@@ -809,6 +809,33 @@ where
     fn merge_match_contexts(&mut self, arm_exit_contexts: &[BlockContext<'ctx>]) {
         let reachable_contexts: Vec<_> = arm_exit_contexts.iter().filter(|c| !c.flags.has_returned()).collect();
 
+        if self.context.settings.find_overly_wide_throw_types {
+            for context in arm_exit_contexts.iter().filter(|context| context.flags.has_returned()) {
+                for (exception, spans) in &context.possibly_thrown_exceptions {
+                    self.block_context
+                        .possibly_thrown_exceptions_for_too_wide
+                        .entry(*exception)
+                        .or_default()
+                        .extend(spans.iter().copied());
+                }
+
+                for (exception, spans) in &context.possibly_thrown_exceptions_for_too_wide {
+                    self.block_context
+                        .possibly_thrown_exceptions_for_too_wide
+                        .entry(*exception)
+                        .or_default()
+                        .extend(spans.iter().copied());
+                }
+
+                self.block_context
+                    .possibly_thrown_generic_exceptions_for_too_wide
+                    .extend(context.possibly_thrown_generic_exceptions.iter().cloned());
+                self.block_context
+                    .possibly_thrown_generic_exceptions_for_too_wide
+                    .extend(context.possibly_thrown_generic_exceptions_for_too_wide.iter().cloned());
+            }
+        }
+
         if reachable_contexts.is_empty() {
             self.block_context.flags.set_has_returned(true);
             return;

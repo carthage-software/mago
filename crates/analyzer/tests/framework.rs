@@ -34,6 +34,7 @@ pub struct TestCase<'src> {
     settings: Option<Settings>,
     expected_property_reads: Vec<(&'src str, &'src str, usize)>,
     expected_symbol_references: Vec<(&'src str, &'src str, usize)>,
+    expected_issue_counts: Vec<(&'src str, usize)>,
 }
 
 impl<'src> TestCase<'src> {
@@ -45,6 +46,7 @@ impl<'src> TestCase<'src> {
             settings: None,
             expected_property_reads: Vec::new(),
             expected_symbol_references: Vec::new(),
+            expected_issue_counts: Vec::new(),
         }
     }
 
@@ -66,6 +68,12 @@ impl<'src> TestCase<'src> {
         self
     }
 
+    #[must_use]
+    pub fn expect_issue_code_count(mut self, code: &'src str, count: usize) -> Self {
+        self.expected_issue_counts.push((code, count));
+        self
+    }
+
     pub fn run(self) {
         run_test_case_inner(self);
     }
@@ -76,6 +84,7 @@ pub fn default_test_settings() -> Settings {
     Settings {
         find_unused_expressions: true,
         find_unused_definitions: true,
+        find_overly_wide_throw_types: true,
         check_throws: true,
         allow_possibly_undefined_array_keys: false,
         strict_list_index_checks: true,
@@ -173,10 +182,15 @@ fn run_test_case_inner(config: TestCase) {
         );
     }
 
-    verify_reported_issues(config.name, analysis_result, metadata);
+    verify_reported_issues(config.name, analysis_result, metadata, config.expected_issue_counts);
 }
 
-fn verify_reported_issues(test_name: &str, mut analysis_result: AnalysisResult, mut codebase: CodebaseMetadata) {
+fn verify_reported_issues(
+    test_name: &str,
+    mut analysis_result: AnalysisResult,
+    mut codebase: CodebaseMetadata,
+    expected_issue_counts: Vec<(&str, usize)>,
+) {
     let mut actual_issues_collected = std::mem::take(&mut analysis_result.issues);
 
     actual_issues_collected.extend(codebase.take_issues(true));
@@ -190,13 +204,30 @@ fn verify_reported_issues(test_name: &str, mut analysis_result: AnalysisResult, 
         *actual_issue_counts.entry(issue_code).or_insert(0) += 1;
     }
 
-    if !actual_issue_counts.is_empty() {
+    let expected_issue_counts =
+        expected_issue_counts.into_iter().map(|(code, count)| (code.to_owned(), count)).collect::<BTreeMap<_, _>>();
+
+    if actual_issue_counts != expected_issue_counts {
         let mut discrepancies = Vec::new();
         for (actual_kind, &actual_count) in &actual_issue_counts {
-            discrepancies.push(format!("- Unexpected issue(s) `{}`: found {}.", actual_kind.as_str(), actual_count));
+            let expected_count = expected_issue_counts.get(actual_kind).copied().unwrap_or_default();
+            if actual_count != expected_count {
+                discrepancies.push(format!(
+                    "- Issue `{}`: expected {}, found {}.",
+                    actual_kind.as_str(),
+                    expected_count,
+                    actual_count
+                ));
+            }
         }
 
-        let mut panic_message = format!("Test '{test_name}' failed with issue discrepancies:\n");
+        for (expected_kind, &expected_count) in &expected_issue_counts {
+            if !actual_issue_counts.contains_key(expected_kind) {
+                discrepancies.push(format!("- Issue `{}`: expected {}, found 0.", expected_kind, expected_count));
+            }
+        }
+
+        let mut panic_message = format!("Test '{test_name}' failed with issue count discrepancies:\n");
         for d in discrepancies {
             let _ = writeln!(panic_message, "  {d}");
         }

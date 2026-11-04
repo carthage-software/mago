@@ -54,7 +54,9 @@ fn analyze_file(path: &Path, content: &str) {
     let settings = Settings {
         find_unused_expressions: true,
         find_unused_definitions: true,
+        find_overly_wide_throw_types: true,
         check_throws: true,
+        check_dead_catch: true,
         allow_possibly_undefined_array_keys: false,
         strict_list_index_checks: true,
         check_property_initialization: true,
@@ -72,7 +74,7 @@ fn analyze_file(path: &Path, content: &str) {
     }
 }
 
-const BENCHMARKED_PREFIXES: &[&str] = &["issue_", "psl_", "sealed_class_", "trait_", "conditional_"];
+const BENCHMARKED_PREFIXES: &[&str] = &["issue_", "psl_", "sealed_class_", "trait_", "conditional_", "too_wide_"];
 
 fn discover_cases_by_prefix() -> Vec<(&'static str, Vec<(PathBuf, String)>)> {
     let cases_dir = Path::new(env!("CARGO_MANIFEST_DIR")).join("tests").join("cases");
@@ -114,8 +116,8 @@ fn bench_cases(c: &mut Criterion) {
         let bench_name = prefix.trim_end_matches('_');
         group.bench_with_input(BenchmarkId::from_parameter(bench_name), &files, |b, files| {
             b.iter(|| {
-                for (p, c) in files {
-                    analyze_file(p, c);
+                for (path, content) in files {
+                    analyze_file(path, content);
                 }
             });
         });
@@ -201,7 +203,7 @@ fn bench_nested_attribute_group(c: &mut Criterion, group_name: &str, cases: &[(&
     for (name, many_parameters, class_source) in cases {
         let Prelude { mut database, mut metadata, mut symbol_references } = PRELUDE.clone();
         let arena = LocalArena::new();
-        let settings = Settings::default();
+        let settings = Settings { find_overly_wide_throw_types: true, check_dead_catch: true, ..Settings::default() };
         let resolver = NameResolver::new(&arena);
         let dependencies =
             vec![(PathBuf::from("attribute_dependencies.php"), attribute_dependencies(*many_parameters))];
