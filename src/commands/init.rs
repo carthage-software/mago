@@ -54,6 +54,7 @@ use crate::config::Configuration;
 use crate::consts::COMPOSER_JSON_FILE;
 use crate::consts::CONFIGURATION_FILE_NAME;
 use crate::consts::DEFAULT_PHP_VERSION;
+use crate::consts::PHP_EXTENSION;
 use crate::error::Error;
 use crate::utils::version::extract_minimum_php_version;
 
@@ -226,6 +227,7 @@ workspace = "."
 paths = [{paths}]
 includes = [{includes}]
 excludes = [{excludes}]
+extensions = [{extensions}]
 
 [source.glob]
 literal-separator = true
@@ -236,9 +238,7 @@ literal-separator = true
 integrations = [{integrations}]
 
 [linter.rules]
-ambiguous-function-call = { enabled = false }
-literal-named-argument = { enabled = false }
-halstead = { effort-threshold = 7000 }
+{linter_rules}
 
 [analyzer]
 plugins = [{analyzer_plugins}]
@@ -344,26 +344,19 @@ impl InitCommand {
         let InitializationProjectSettings { php_version, paths, includes, excludes } = setup_project(&theme)?;
 
         let integrations = setup_linter(&theme)?;
-        let formatter_config = setup_formatter(&theme)?;
+        let formatter_config = setup_formatter(&theme, &integrations)?;
         let analyzer_settings = setup_analyzer(&theme)?;
 
         print_step_header(5, "Review & Confirm");
-        let config_content = CONFIGURATION_TEMPLATE
-            .replace("{mago_version}", env!("CARGO_PKG_VERSION"))
-            .replace("{php_version}", &php_version)
-            .replace("{paths}", &quote_format_strings(&paths))
-            .replace("{includes}", &quote_format_strings(&includes))
-            .replace("{excludes}", &quote_format_strings(&excludes))
-            .replace(
-                "{integrations}",
-                &quote_format_strings(&integrations.iter().map(|i| i.to_string().to_lowercase()).collect::<Vec<_>>()),
-            )
-            .replace("{formatter_config}", &formatter_config)
-            .replace(
-                "{analyzer_plugins}",
-                &quote_format_strings(&analyzer_settings.plugins.iter().map(|p| p.to_string()).collect::<Vec<_>>()),
-            )
-            .replace("{analyzer_settings}", &build_analyzer_settings_string(&analyzer_settings));
+        let config_content = generate_config_content(
+            &php_version,
+            &paths,
+            &includes,
+            &excludes,
+            &integrations,
+            &formatter_config,
+            &analyzer_settings,
+        );
 
         if write_configuration_if_confirmed(&theme, &configuration_file, &config_content)? {
             print_final_summary();
@@ -533,23 +526,38 @@ fn setup_linter(theme: &ColorfulTheme) -> Result<Vec<Integration>, Error> {
     }
 }
 
-fn setup_formatter(theme: &ColorfulTheme) -> Result<String, Error> {
+fn setup_formatter(theme: &ColorfulTheme, integrations: &[Integration]) -> Result<String, Error> {
     print_step_header(3, "Formatter Configuration");
     println!("  │  {}", "The Formatter automatically rewrites your files to a consistent style.".bright_black());
     println!("  │  {}", "This ends debates about spacing and helps you focus on the code.".bright_black());
     println!("  │");
 
+    let suggested_preset = preset_for_integrations(integrations);
+    if let Some(preset) = suggested_preset {
+        println!(
+            "  │  {}",
+            format!("The `{}` preset matches this project's coding standard.", preset.name()).bright_black()
+        );
+        println!("  │");
+    }
+
     let base_config = if Confirm::with_theme(theme)
         .with_prompt(" │  Do you want to use a preset formatter configuration?")
-        .default(false)
+        .default(suggested_preset.is_some())
         .interact()?
     {
         println!("  │");
 
         let preset_values = FormatterPreset::all();
         let preset_items = preset_values.iter().map(|p| p.description()).collect::<Vec<_>>();
-        let selection =
-            Select::with_theme(theme).with_prompt(" │  Select a preset").items(&preset_items).default(0).interact()?;
+        let default_selection = suggested_preset
+            .and_then(|preset| preset_values.iter().position(|candidate| *candidate == preset))
+            .unwrap_or(0);
+        let selection = Select::with_theme(theme)
+            .with_prompt(" │  Select a preset")
+            .items(&preset_items)
+            .default(default_selection)
+            .interact()?;
 
         let selected_preset = preset_values[selection];
 
@@ -840,6 +848,10 @@ fn detect_integrations_from_composer(composer: &ComposerPackage) -> Vec<Integrat
         integrations.push(Integration::Laravel);
     }
 
+    if is_drupal_project(composer) {
+        integrations.push(Integration::Drupal);
+    }
+
     if has_package(composer, "phpunit/phpunit") {
         integrations.push(Integration::PHPUnit);
     }
@@ -853,6 +865,17 @@ fn detect_integrations_from_composer(composer: &ComposerPackage) -> Vec<Integrat
     }
 
     integrations
+}
+
+/// Checks whether the composer metadata points at a Drupal site, module, theme, or profile.
+fn is_drupal_project(composer: &ComposerPackage) -> bool {
+    has_package_prefix(composer, "drupal/")
+        || composer.r#type.as_ref().is_some_and(|package_type| package_type.0.starts_with("drupal-"))
+}
+
+/// Returns the formatter preset that matches a detected integration's coding standard.
+fn preset_for_integrations(integrations: &[Integration]) -> Option<FormatterPreset> {
+    integrations.contains(&Integration::Drupal).then_some(FormatterPreset::Drupal)
 }
 
 fn detect_analyzer_plugins_from_composer(composer: &ComposerPackage) -> Vec<AnalyzerPlugin> {
@@ -967,6 +990,76 @@ fn quote_format_strings(items: &[String]) -> String {
     items.iter().map(|p| format!("\"{}\"", p)).collect::<Vec<_>>().join(", ")
 }
 
+/// File extensions, besides `php`, that hold Drupal code: hooks, update functions, and other
+/// procedural code sit in `.module`, `.install`, `.theme` and similar files. The list matches the
+/// `extensions` argument in Drupal core's `phpcs.xml.dist`, minus the non-PHP entries.
+const DRUPAL_EXTENSIONS: [&str; 7] = ["engine", "inc", "install", "module", "profile", "test", "theme"];
+
+/// Builds the `extensions` list of the `[source]` section for the detected integrations.
+fn build_source_extensions(integrations: &[Integration]) -> Vec<String> {
+    let mut extensions = vec![PHP_EXTENSION.to_string()];
+    if integrations.contains(&Integration::Drupal) {
+        extensions.extend(DRUPAL_EXTENSIONS.map(String::from));
+    }
+
+    extensions
+}
+
+/// Linter rules every generated configuration sets.
+const BASE_LINTER_RULES: &str = "ambiguous-function-call = { enabled = false }
+literal-named-argument = { enabled = false }
+halstead = { effort-threshold = 7000 }";
+
+/// Linter rules matching the Drupal coding standards.
+const DRUPAL_LINTER_RULES: &str = "# Drupal coding standards.
+interface-name = { psr = true }
+trait-name = { psr = true }
+method-name = { enabled = true }
+# Drupal prefixes private helper functions with an underscore, which snake case rejects.
+function-name = { enabled = false }";
+
+/// Builds the body of the `[linter.rules]` section for the detected integrations.
+fn build_linter_rules_string(integrations: &[Integration]) -> String {
+    let mut blocks = vec![BASE_LINTER_RULES];
+
+    if integrations.contains(&Integration::Drupal) {
+        blocks.push(DRUPAL_LINTER_RULES);
+    }
+
+    blocks.join("\n\n")
+}
+
+/// Fills the configuration template with the values collected during initialization.
+#[allow(clippy::too_many_arguments)]
+fn generate_config_content(
+    php_version: &str,
+    paths: &[String],
+    includes: &[String],
+    excludes: &[String],
+    integrations: &[Integration],
+    formatter_config: &str,
+    analyzer_settings: &InitializationAnalyzerSettings,
+) -> String {
+    CONFIGURATION_TEMPLATE
+        .replace("{mago_version}", env!("CARGO_PKG_VERSION"))
+        .replace("{php_version}", php_version)
+        .replace("{paths}", &quote_format_strings(paths))
+        .replace("{includes}", &quote_format_strings(includes))
+        .replace("{excludes}", &quote_format_strings(excludes))
+        .replace("{extensions}", &quote_format_strings(&build_source_extensions(integrations)))
+        .replace(
+            "{integrations}",
+            &quote_format_strings(&integrations.iter().map(|i| i.to_string().to_lowercase()).collect::<Vec<_>>()),
+        )
+        .replace("{linter_rules}", &build_linter_rules_string(integrations))
+        .replace("{formatter_config}", formatter_config)
+        .replace(
+            "{analyzer_plugins}",
+            &quote_format_strings(&analyzer_settings.plugins.iter().map(|p| p.to_string()).collect::<Vec<_>>()),
+        )
+        .replace("{analyzer_settings}", &build_analyzer_settings_string(analyzer_settings))
+}
+
 fn build_analyzer_settings_string(settings: &InitializationAnalyzerSettings) -> String {
     let mut lines = Vec::new();
 
@@ -1018,34 +1111,6 @@ mod tests {
             check_missing_type_hints: false,
             register_super_globals: true,
         }
-    }
-
-    #[allow(clippy::too_many_arguments)]
-    fn generate_config_content(
-        php_version: &str,
-        paths: &[String],
-        includes: &[String],
-        excludes: &[String],
-        integrations: &[Integration],
-        formatter_config: &str,
-        analyzer_settings: &InitializationAnalyzerSettings,
-    ) -> String {
-        CONFIGURATION_TEMPLATE
-            .replace("{mago_version}", env!("CARGO_PKG_VERSION"))
-            .replace("{php_version}", php_version)
-            .replace("{paths}", &quote_format_strings(paths))
-            .replace("{includes}", &quote_format_strings(includes))
-            .replace("{excludes}", &quote_format_strings(excludes))
-            .replace(
-                "{integrations}",
-                &quote_format_strings(&integrations.iter().map(|i| i.to_string().to_lowercase()).collect::<Vec<_>>()),
-            )
-            .replace("{formatter_config}", formatter_config)
-            .replace(
-                "{analyzer_plugins}",
-                &quote_format_strings(&analyzer_settings.plugins.iter().map(|p| p.to_string()).collect::<Vec<_>>()),
-            )
-            .replace("{analyzer_settings}", &build_analyzer_settings_string(analyzer_settings))
     }
 
     #[test]
@@ -1137,6 +1202,9 @@ mod tests {
             &create_default_analyzer_settings(),
         );
 
+        assert!(content.contains(r#"extensions = ["php"]"#), "only Drupal projects get extra extensions");
+        assert!(!content.contains("interface-name"), "Drupal rules should not leak into other projects");
+
         let result: Result<Configuration, _> = toml::from_str(&content);
         assert!(result.is_ok(), "Generated config should parse. Error: {:?}\n\nConfig:\n{}", result.err(), content);
     }
@@ -1204,6 +1272,46 @@ mod tests {
         assert_eq!(AnalyzerPlugin::Psl.to_string(), "psl");
         assert_eq!(AnalyzerPlugin::FlowPhp.to_string(), "flow-php");
         assert_eq!(AnalyzerPlugin::PsrContainer.to_string(), "psr-container");
+    }
+
+    #[test]
+    fn test_generated_config_for_drupal() {
+        let content = generate_config_content(
+            "8.3",
+            &["web/modules/custom".to_string()],
+            &["vendor".to_string()],
+            &[],
+            &[Integration::Drupal],
+            "[formatter]\npreset = \"drupal\"",
+            &create_default_analyzer_settings(),
+        );
+
+        assert!(content.contains(r#"integrations = ["drupal"]"#));
+        assert!(content.contains(DRUPAL_LINTER_RULES));
+
+        let configuration: Configuration = toml::from_str(&content).expect("generated config should parse");
+        assert_eq!(
+            configuration.source.extensions,
+            ["php", "engine", "inc", "install", "module", "profile", "test", "theme"]
+        );
+    }
+
+    #[test]
+    fn test_detect_drupal_from_composer() {
+        let is_drupal = |json: &str| {
+            let composer = ComposerPackage::from_str(json).expect("composer.json should parse");
+            detect_integrations_from_composer(&composer).contains(&Integration::Drupal)
+        };
+
+        assert!(is_drupal(r#"{"require": {"drupal/core-recommended": "^11.0"}}"#));
+        assert!(is_drupal(r#"{"type": "drupal-module"}"#));
+        assert!(!is_drupal(r#"{"require": {"laravel/framework": "^11.0"}}"#));
+    }
+
+    #[test]
+    fn test_preset_for_integrations() {
+        assert_eq!(preset_for_integrations(&[Integration::Drupal]), Some(FormatterPreset::Drupal));
+        assert_eq!(preset_for_integrations(&[Integration::Symfony]), None);
     }
 
     #[test]
