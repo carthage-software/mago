@@ -284,8 +284,9 @@ where
         wrap!(f, self, For, {
             let mut contents = vec_in![f.arena;
                 self.r#for.format(f),
-                Document::space(),
+                if f.settings.space_between_parentheses { Document::empty() } else { Document::space() },
                 format_token(f, self.left_parenthesis, b"("),
+                if f.settings.space_between_parentheses { Document::space() } else { Document::empty() },
             ];
 
             fn format_expressions<'arena, A>(
@@ -332,6 +333,9 @@ where
                 Document::Line(Line::soft()),
             ])));
 
+            if f.settings.space_between_parentheses {
+                contents.push(Document::space());
+            }
             contents.push(format_token(f, self.right_parenthesis, b")"));
             contents.push(self.body.format(f));
 
@@ -591,13 +595,15 @@ where
         wrap!(f, self, Foreach, {
             Document::Array(vec_in![f.arena;
                 self.foreach.format(f),
-                Document::space(),
+                if f.settings.space_between_parentheses { Document::empty() } else { Document::space() },
                 format_token(f, self.left_parenthesis, b"("),
+                if f.settings.space_between_parentheses { Document::space() } else { Document::empty() },
                 self.expression.format(f),
                 Document::space(),
                 self.r#as.format(f),
                 Document::space(),
                 self.target.format(f),
+                if f.settings.space_between_parentheses { Document::space() } else { Document::empty() },
                 format_token(f, self.right_parenthesis, b")"),
                 self.body.format(f),
             ])

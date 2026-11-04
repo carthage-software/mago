@@ -604,6 +604,10 @@ where
             let mut contents = vec_in![f.arena; self.isset.format(f), Document::String(b"(")];
 
             if !self.values.is_empty() {
+                if f.settings.space_between_parentheses {
+                    contents.push(Document::space());
+                }
+
                 let mut values = Document::join(f.arena, self.values.iter().map(|v| v.format(f)), Separator::CommaLine);
 
                 // `isset()` accepts a trailing comma since the same version as function calls (7.3)
@@ -615,6 +619,9 @@ where
 
                 contents.push(Document::Indent(values));
                 contents.push(Document::Line(Line::soft()));
+                if f.settings.space_between_parentheses {
+                    contents.push(Document::soft_space());
+                }
             }
 
             contents.push(Document::String(b")"));
@@ -635,7 +642,9 @@ where
     Document::Group(Group::new(vec_in![f.arena;
         keyword,
         Document::String(b"("),
+        if f.settings.space_between_parentheses { Document::space() } else { Document::empty() },
         value,
+        if f.settings.space_between_parentheses { Document::soft_space() } else { Document::empty() },
         Document::String(b")"),
     ]))
 }

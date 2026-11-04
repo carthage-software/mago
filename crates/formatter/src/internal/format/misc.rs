@@ -825,9 +825,11 @@ where
         && !must_break
     {
         Document::Group(Group::new(vec_in![f.arena;
-            Document::space(),
+            if f.settings.space_between_parentheses { Document::empty() } else { Document::space() },
             format_token(f, left_parenthesis, b"("),
+            if f.settings.space_between_parentheses { Document::space() } else { Document::empty() },
             condition.format(f),
+            if f.settings.space_between_parentheses { Document::space() } else { Document::empty() },
             format_token(f, right_parenthesis, b")"),
         ]))
     } else {
@@ -836,13 +838,15 @@ where
 
         Document::Group(
             Group::new(vec_in![f.arena;
-                Document::space(),
+                if f.settings.space_between_parentheses { Document::empty() } else { Document::space() },
                 format_token(f, left_parenthesis, b"("),
+                if f.settings.space_between_parentheses { Document::space() } else { Document::empty() },
                 Document::IndentIfBreak(IndentIfBreak::new(group_id, vec_in![f.arena;
                     Document::Line(if must_break { Line::hard() } else { Line::soft() }),
                     condition.format(f),
                 ])),
                 Document::Line(if must_break { Line::hard() } else { Line::soft() }),
+                if f.settings.space_between_parentheses { Document::space() } else { Document::empty() },
                 format_token(f, right_parenthesis, b")"),
             ])
             .with_id(group_id)

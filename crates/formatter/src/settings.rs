@@ -965,6 +965,14 @@ generate_formatter_settings! {
     /// Default: false
     space_before_hook_parameter_list_parenthesis: bool => "default_false",
 
+    /// Whether to add spaces between the parenthesis in parameter lists.
+    ///
+    /// When enabled: `$hook ($param)`
+    /// When disabled: `$hook($param)`
+    ///
+    /// Default: false
+    space_between_parentheses: bool => "default_false",
+
     /// Whether to keep abstract property hooks inline.
     ///
     /// When enabled: `public int $id { get; }`
