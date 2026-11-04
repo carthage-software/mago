@@ -720,7 +720,11 @@ where
                 // The issue is inside the same comment as the pragma!
                 true
             } else if pragma.own_line {
-                pragma.start_line < issue_start_line
+                // A line-level pragma covers exactly the line that follows the comment, never
+                // anything further down the file. Matching `pragma.start_line < issue_start_line`
+                // would let a pragma swallow the next unrelated issue of the same code anywhere
+                // below it, and `unfulfilled-expect` would never fire for such a pragma.
+                issue_start_line == pragma.end_line.saturating_add(1)
             } else {
                 self.file.line_number(pragma.span.start_offset()) == issue_start_line
             };
@@ -731,7 +735,18 @@ where
 
             if let Some(current_best_index) = best_match_index {
                 let current_best: &Pragma<'_> = &self.pragmas[current_best_index];
-                if !current_best.own_line && pragma.own_line {
+                // A pragma that already matched everything it expected must not take an issue away
+                // from a sibling pragma that still waits for one. This is what makes repeated
+                // codes (`code,code`) and scoped pragmas (which are never "consumed") behave:
+                // each duplicate entry gets its own issue.
+                let current_best_has_room = current_best.matches < current_best.expected_matches;
+                let candidate_has_room = pragma.matches < pragma.expected_matches;
+                if current_best_has_room && !candidate_has_room {
+                    // Current best still waits for an issue. Keep current.
+                } else if !current_best_has_room && candidate_has_room {
+                    // Current best is satisfied, new one still waits. New one is better.
+                    best_match_index = Some(i);
+                } else if !current_best.own_line && pragma.own_line {
                     // Current best is inline, new one is docblock. Keep current.
                 } else if current_best.own_line && !pragma.own_line {
                     // Current best is docblock, new one is inline. New one is better.
