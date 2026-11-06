@@ -58,6 +58,7 @@ test_case!(issue_2616);
 test_case!(issue_2616_positions);
 test_case!(issue_2616_bounds);
 test_case!(bare_generator_docblock);
+test_case!(sensitive_parameter_value_generic);
 test_case!(generic_docblock_native_return);
 test_case!(message_quality);
 test_case!(ds_map_defaults);
