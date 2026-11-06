@@ -739,7 +739,7 @@ where
         InvocationArgumentsSource::ArgumentList(argument_list) => {
             argument_list.analyze(context, block_context, artifacts)?;
         }
-        InvocationArgumentsSource::PipeInput(pipe) => {
+        InvocationArgumentsSource::PipeInput { pipe, input_is_analyzed: false } => {
             let was_inside_call = block_context.flags.inside_call();
             let was_inside_general_use = block_context.flags.inside_general_use();
             block_context.flags.set_inside_call(true);

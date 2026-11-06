@@ -265,7 +265,7 @@ where
             block_context,
             artifacts,
             &invocation.target,
-            argument_expression,
+            argument,
             *argument_offset,
             &mut analyzed_argument_types,
             parameter.is_some_and(|p| p.1.is_by_reference()),
@@ -340,9 +340,6 @@ where
 
     for (argument_offset, parameter) in &closure_arguments {
         let Some(argument) = invocation.arguments_source.get_argument(*argument_offset) else {
-            continue;
-        };
-        let Some(argument_expression) = argument.value() else {
             continue;
         };
 
@@ -437,7 +434,7 @@ where
             block_context,
             artifacts,
             &invocation.target,
-            argument_expression,
+            argument,
             *argument_offset,
             &mut analyzed_argument_types,
             parameter.is_some_and(|p| p.1.is_by_reference()),
@@ -511,7 +508,7 @@ where
                         block_context,
                         artifacts,
                         &invocation.target,
-                        argument_expression,
+                        argument,
                         usize::MAX,
                         &mut analyzed_argument_types,
                         false,
@@ -861,7 +858,7 @@ where
                         block_context,
                         artifacts,
                         &invocation.target,
-                        argument_expression,
+                        *unpacked_argument,
                         usize::MAX,
                         &mut analyzed_argument_types,
                         last_parameter_ref.is_by_reference(),
@@ -981,7 +978,7 @@ where
                             block_context,
                             artifacts,
                             &invocation.target,
-                            argument_expression,
+                            unpacked_argument,
                             usize::MAX,
                             &mut analyzed_argument_types,
                             last_parameter_ref.is_by_reference(),
@@ -1048,7 +1045,7 @@ where
                                 block_context,
                                 artifacts,
                                 &invocation.target,
-                                argument_expression,
+                                argument,
                                 usize::MAX,
                                 &mut analyzed_argument_types,
                                 false,
@@ -1172,7 +1169,7 @@ where
         let target_name_str = invocation.target.guess_name(context);
 
         let main_message = match invocation.arguments_source {
-            InvocationArgumentsSource::PipeInput(_) => format!(
+            InvocationArgumentsSource::PipeInput { .. } => format!(
                 "Too few arguments for {target_kind_str} `{target_name_str}` when used with the pipe operator `|>`. Pipe provides 1, but at least {number_of_required_parameters} required."
             ),
             _ => format!("Too few arguments provided for {target_kind_str} `{target_name_str}`."),
@@ -1199,7 +1196,7 @@ where
                 Annotation::secondary(invocation.target.span())
                     .with_message(format!("For this {target_kind_str} call")),
             ),
-            InvocationArgumentsSource::PipeInput(pipe) => issue
+            InvocationArgumentsSource::PipeInput { pipe, .. } => issue
                 .with_annotation(Annotation::secondary(pipe.callable.span()).with_message(format!(
                     "This {target_kind_str} requires at least {number_of_required_parameters} argument(s)",
                 )))
@@ -1232,7 +1229,7 @@ where
             .map_or_else(|| invocation.arguments_source.span(), |argument| argument.span());
 
         let main_message = match invocation.arguments_source {
-            InvocationArgumentsSource::PipeInput(_) => format!(
+            InvocationArgumentsSource::PipeInput { .. } => format!(
                 "The {target_kind_str} `{target_name_str}` used with pipe operator `|>` expects 0 arguments, but 1 (the piped value) is provided."
             ),
             _ => format!("Too many arguments provided for {target_kind_str} `{target_name_str}`."),
@@ -1243,7 +1240,7 @@ where
         );
 
         issue = match invocation.arguments_source {
-            InvocationArgumentsSource::PipeInput(pipe) => issue
+            InvocationArgumentsSource::PipeInput { pipe, .. } => issue
                 .with_annotation(
                     Annotation::secondary(pipe.callable.span())
                         .with_message(format!("This {target_kind_str} expects 0 arguments")),
