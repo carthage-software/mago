@@ -157,3 +157,53 @@ pub fn check_override_attribute<'ctx, 'arena, A>(
         });
     }
 }
+
+pub fn check_property_override_attributes<'ctx, A>(
+    metadata: &'ctx ClassLikeMetadata,
+    context: &mut Context<'ctx, '_, A>,
+) where
+    A: Arena,
+{
+    if context.settings.version < PHPVersion::PHP85 || metadata.kind.is_trait() || metadata.has_incomplete_hierarchy() {
+        return;
+    }
+
+    let class_name = metadata.original_name;
+    for (property_name, property_metadata) in &metadata.properties {
+        let Some(attribute) = property_metadata
+            .attributes
+            .iter()
+            .find(|attribute| attribute.name.as_bytes().eq_ignore_ascii_case(b"Override"))
+        else {
+            continue;
+        };
+
+        if metadata.overridden_property_ids.contains_key(property_name) {
+            continue;
+        }
+
+        let issue = Issue::error(format!("Invalid `#[Override]` attribute on `{class_name}::{property_name}`."));
+        let issue = match metadata.declaring_property_ids.get(property_name) {
+            Some(trait_name) if *trait_name != metadata.name => {
+                let trait_name =
+                    context.codebase.get_class_like(trait_name.as_bytes()).map_or(*trait_name, |t| t.original_name);
+
+                issue
+                    .with_annotation(Annotation::primary(metadata.name_span.unwrap_or(metadata.span)).with_message(
+                        format!("`{property_name}` comes from trait `{trait_name}` and doesn't override any parent property."),
+                    ))
+                    .with_annotation(Annotation::secondary(attribute.span).with_message("The attribute is declared here."))
+            }
+            _ => issue.with_annotation(
+                Annotation::primary(attribute.span).with_message("This property doesn't override any parent property."),
+            ),
+        };
+
+        context.collector.report_with_code(
+            IssueCode::InvalidOverrideAttribute,
+            issue
+                .with_note("The attribute should only be used when explicitly overriding a parent property.")
+                .with_help(format!("Remove the `#[Override]` attribute from `{property_name}` or verify inheritance.")),
+        );
+    }
+}
