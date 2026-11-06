@@ -632,9 +632,9 @@ fn clear_object_property_narrowings<'ctx, 'arena, A>(
 
         class_metadata.is_some_and(|metadata| {
             metadata.flags.is_readonly()
-                || metadata
-                    .properties
-                    .get(&Word::new(property_name))
+                || context
+                    .codebase
+                    .get_declaring_property(metadata.name.as_bytes(), concat_word!(b"$", property_name).as_bytes())
                     .is_some_and(|property| property.flags.is_readonly())
         })
     };
@@ -903,9 +903,9 @@ where
         return true;
     }
 
-    class_metadata
-        .properties
-        .get(&Word::new(property))
+    context
+        .codebase
+        .get_declaring_property(class_name.as_bytes(), concat_word!(b"$", property).as_bytes())
         .is_some_and(|property_metadata| property_metadata.flags.is_readonly())
 }
 
