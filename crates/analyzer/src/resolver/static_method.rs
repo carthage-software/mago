@@ -429,16 +429,28 @@ where
         }
     };
 
-    if let Some(result) = result
-        && !check_method_visibility_by_id(
+    if let Some(result) = result {
+        if !check_method_visibility_by_id(
             context,
             block_context.scope.get_class_like_name(),
             &method_id,
             access_span,
             Some(selector.span()),
-        )
-    {
-        result.has_invalid_target = true;
+        ) {
+            result.has_invalid_target = true;
+        }
+
+        // A trait's `self` binds to the consuming class, which can implement the abstract method.
+        let is_trait_self =
+            classname.is_self() && current_class_metadata.is_some_and(|metadata| metadata.kind.is_trait());
+
+        if function_like.method_metadata.as_ref().is_some_and(|metadata| metadata.is_abstract)
+            && (classname.is_named() || classname.is_from_literal_class_string())
+            && !is_trait_self
+        {
+            report_abstract_method_call(context, &declaring_method_id, selector.span());
+            result.has_invalid_target = true;
+        }
     }
 
     if function_like.flags.is_magic_method()
@@ -653,6 +665,22 @@ where
             })
         })
     })
+}
+
+fn report_abstract_method_call<A>(context: &mut Context<'_, '_, A>, method_id: &MethodIdentifier, span: Span)
+where
+    A: Arena,
+{
+    let class_name = display_class_like_name(context, method_id.get_class_name());
+    let method_name = display_method_name(context, method_id.get_class_name(), method_id.get_method_name());
+
+    context.collector.report_with_code(
+        IssueCode::InvalidStaticMethodCall,
+        Issue::error(format!("Cannot call abstract method `{class_name}::{method_name}` directly."))
+            .with_annotation(Annotation::primary(span).with_message("This call selects an abstract method"))
+            .with_note("Abstract methods declare a contract but do not provide an implementation.")
+            .with_help("Call a concrete implementation instead, or use `static::` for late static binding."),
+    );
 }
 
 fn report_non_static_access<A>(context: &mut Context<'_, '_, A>, method_id: &MethodIdentifier, span: Span)

@@ -283,7 +283,9 @@ function exercise_parameter_variable_heterogeneous_values(ParameterVariableCompl
     $types->sameList(new ComplexFoo(), [new ComplexBar()]);
 
     take_complex_tuple($types->tuple(new ComplexFoo(), new ComplexBar()));
+    // @mago-expect analysis:invalid-static-method-call
     take_complex_foo(ParameterVariableComplexStatic::identity(new ComplexFoo()));
+    // @mago-expect analysis:invalid-static-method-call
     take_complex_foo(ParameterVariableComplexStatic::get('foo'));
 }
 
@@ -395,6 +397,7 @@ function exercise_parameter_variable_additional_invocation_forms(ParameterVariab
     take_complex_foo($firstClassInvoker('foo'));
     take_complex_foo($firstClassInvoker(key: 'foo'));
 
+    // @mago-expect analysis:invalid-static-method-call
     $firstClassStatic = ParameterVariableComplexStatic::get(...);
     take_complex_foo($firstClassStatic('foo'));
     take_complex_foo($firstClassStatic(key: 'foo'));
