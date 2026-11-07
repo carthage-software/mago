@@ -515,8 +515,12 @@ fn is_deferred_trait_binding(
     current_class_metadata.is_some_and(|metadata| {
         metadata.kind.is_trait()
             && (classname.is_relative()
-                // A trait's `self::class` carries its name, but binds to the consuming class at runtime.
-                || (classname.is_from_literal_class_string() && classname.fqcn == Some(metadata.original_name)))
+                // Literal class strings do not retain `self::class` or `parent::class` provenance.
+                // The consuming class and its actual parent can implement the abstract method.
+                || (classname.is_from_literal_class_string()
+                    && classname.fqcn.is_some_and(|name| {
+                        name == metadata.original_name || metadata.require_extends.contains(&name.to_ascii_lowercase())
+                    })))
     })
 }
 
