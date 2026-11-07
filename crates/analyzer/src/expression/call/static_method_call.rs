@@ -201,6 +201,133 @@ mod tests {
     use crate::test_analysis;
 
     test_analysis! {
+        name = abstract_method_trait_parent_requirement,
+        code = indoc! {"
+            <?php
+
+            abstract class BaseItem {
+                abstract public static function getValue(): int;
+            }
+
+            class ParentItem extends BaseItem {
+                public static function getValue(): int {
+                    return 1;
+                }
+            }
+
+            /** @phpstan-require-extends BaseItem */
+            trait ItemTrait {
+                public static function getTotal(): int {
+                    return parent::getValue();
+                }
+            }
+
+            final class Item extends ParentItem {
+                use ItemTrait;
+            }
+
+            echo Item::getTotal();
+        "}
+    }
+
+    test_analysis! {
+        name = abstract_method_trait_self_class_string,
+        code = indoc! {"
+            <?php
+
+            trait ItemTrait {
+                abstract public static function getValue(): int;
+
+                public static function getTotal(): int {
+                    $class = self::class;
+                    return $class::getValue();
+                }
+            }
+
+            final class Item {
+                use ItemTrait;
+
+                public static function getValue(): int {
+                    return 1;
+                }
+            }
+
+            echo Item::getTotal();
+        "}
+    }
+
+    test_analysis! {
+        name = abstract_method_literal_string,
+        code = indoc! {"
+            <?php
+
+            abstract class Item {
+                abstract public static function getValue(): int;
+            }
+
+            $class = 'Item';
+            echo $class::getValue();
+        "},
+        issues = [IssueCode::InvalidStaticMethodCall]
+    }
+
+    test_analysis! {
+        name = abstract_method_unconstrained_string,
+        code = indoc! {"
+            <?php
+
+            function getTotal(string $class): void {
+                $class::getValue();
+            }
+        "}
+    }
+
+    test_analysis! {
+        name = abstract_method_non_static_access_diagnostic,
+        code = indoc! {"
+            <?php
+
+            abstract class Item {
+                abstract public function getValue(): int;
+            }
+
+            Item::getValue();
+        "},
+        issues = [IssueCode::InvalidStaticMethodAccess]
+    }
+
+    test_analysis! {
+        name = abstract_method_non_static_self_call,
+        code = indoc! {"
+            <?php
+
+            abstract class Item {
+                abstract public function getValue(): int;
+
+                public function getTotal(): int {
+                    return self::getValue();
+                }
+            }
+        "},
+        issues = [IssueCode::InvalidStaticMethodCall]
+    }
+
+    test_analysis! {
+        name = abstract_method_interface_class_string_diagnostic,
+        code = indoc! {"
+            <?php
+
+            interface Item {
+                public static function getValue(): int;
+            }
+
+            $class = Item::class;
+            $class::getValue();
+        "},
+        issues = [IssueCode::PossiblyStaticAccessOnInterface]
+    }
+
+    test_analysis! {
         name = abstract_method_self_call,
         code = indoc! {"
             <?php
