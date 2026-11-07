@@ -201,6 +201,42 @@ mod tests {
     use crate::test_analysis;
 
     test_analysis! {
+        name = abstract_method_trait_parent_class_string,
+        code = indoc! {"
+            <?php
+
+            abstract class BaseItem {
+                abstract public static function getValue(): int;
+            }
+
+            class ParentItem extends BaseItem {
+                public static function getValue(): int {
+                    return 42;
+                }
+            }
+
+            /** @phpstan-require-extends BaseItem */
+            trait ItemTrait {
+                public static function getTotal(): int {
+                    $class = parent::class;
+                    return $class::getValue();
+                }
+
+                public static function getInvalidTotal(): int {
+                    return BaseItem::getValue();
+                }
+            }
+
+            final class Item extends ParentItem {
+                use ItemTrait;
+            }
+
+            echo Item::getTotal();
+        "},
+        issues = [IssueCode::InvalidStaticMethodCall]
+    }
+
+    test_analysis! {
         name = abstract_method_trait_parent_requirement,
         code = indoc! {"
             <?php
