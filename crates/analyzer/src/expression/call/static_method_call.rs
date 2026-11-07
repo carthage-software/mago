@@ -201,6 +201,169 @@ mod tests {
     use crate::test_analysis;
 
     test_analysis! {
+        name = abstract_method_self_call,
+        code = indoc! {"
+            <?php
+
+            abstract class ParentItem {
+                abstract protected static function getValue(): int;
+
+                public static function getTotal(): int {
+                    return self::getValue();
+                }
+            }
+
+            final class ChildItem extends ParentItem {
+                protected static function getValue(): int {
+                    return 1;
+                }
+            }
+
+            echo ChildItem::getTotal();
+        "},
+        issues = [IssueCode::InvalidStaticMethodCall]
+    }
+
+    test_analysis! {
+        name = abstract_method_exact_calls,
+        code = indoc! {"
+            <?php
+
+            abstract class ParentItem {
+                abstract public static function getValue(): int;
+            }
+
+            final class ChildItem extends ParentItem {
+                public static function getValue(): int {
+                    return parent::getValue();
+                }
+            }
+
+            echo ParentItem::getValue();
+            $class = ParentItem::class;
+            echo $class::getValue();
+        "},
+        issues = [
+            IssueCode::InvalidStaticMethodCall,
+            IssueCode::InvalidStaticMethodCall,
+            IssueCode::InvalidStaticMethodCall,
+        ]
+    }
+
+    test_analysis! {
+        name = abstract_method_late_static_call,
+        code = indoc! {"
+            <?php
+
+            abstract class ParentItem {
+                abstract protected static function getValue(): int;
+
+                public static function getTotal(): int {
+                    return static::getValue();
+                }
+            }
+
+            final class ChildItem extends ParentItem {
+                protected static function getValue(): int {
+                    return 1;
+                }
+            }
+
+            echo ChildItem::getTotal();
+        "}
+    }
+
+    test_analysis! {
+        name = abstract_method_concrete_self_and_parent_calls,
+        code = indoc! {"
+            <?php
+
+            abstract class ParentItem {
+                protected static function getValue(): int {
+                    return 1;
+                }
+            }
+
+            final class ChildItem extends ParentItem {
+                public static function getTotal(): int {
+                    return self::getValue() + parent::getValue();
+                }
+            }
+
+            echo ChildItem::getTotal();
+        "}
+    }
+
+    test_analysis! {
+        name = abstract_method_trait_self_requirement,
+        code = indoc! {"
+            <?php
+
+            trait ItemTrait {
+                abstract protected static function getValue(): int;
+
+                public static function getTotal(): int {
+                    return self::getValue();
+                }
+            }
+
+            final class Item {
+                use ItemTrait;
+
+                protected static function getValue(): int {
+                    return 1;
+                }
+            }
+
+            echo Item::getTotal();
+        "}
+    }
+
+    test_analysis! {
+        name = abstract_method_runtime_receivers,
+        code = indoc! {"
+            <?php
+
+            abstract class Item {
+                abstract public static function getValue(): int;
+
+                public function getTotal(): int {
+                    return $this::getValue();
+                }
+            }
+
+            /** @param class-string<Item> $class */
+            function fromClass(string $class): int {
+                return $class::getValue();
+            }
+
+            function fromObject(Item $item): int {
+                return $item::getValue();
+            }
+        "}
+    }
+
+    test_analysis! {
+        name = abstract_method_magic_probe,
+        code = indoc! {"
+            <?php
+
+            abstract class Item {
+                /** @param list<mixed> $arguments */
+                abstract public static function __callStatic(string $name, array $arguments): mixed;
+
+                public static function getValue(): int {
+                    return 1;
+                }
+
+                public static function getTotal(): int {
+                    return self::getValue();
+                }
+            }
+        "}
+    }
+
+    test_analysis! {
         name = calling_non_static_method_statically_is_ok,
         code = indoc! {"
             <?php
