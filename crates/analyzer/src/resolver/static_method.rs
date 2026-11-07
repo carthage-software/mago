@@ -203,6 +203,7 @@ where
                 && !is_relative
                 && method.is_static
                 && defining_class_metadata.kind.is_trait()
+                && !is_deferred_trait_binding(classname, current_class_metadata)
                 && context.settings.version.is_deprecated(Feature::CallStaticMethodOnTrait)
             {
                 report_deprecated_static_access_on_trait(context, defining_class_metadata.original_name, class_span);
@@ -440,13 +441,21 @@ where
             result.has_invalid_target = true;
         }
 
-        // A trait's `self` binds to the consuming class, which can implement the abstract method.
-        let is_trait_self =
-            classname.is_self() && current_class_metadata.is_some_and(|metadata| metadata.kind.is_trait());
+        // Ordinary literal strings retain a class name, unlike unconstrained runtime strings.
+        let is_exact_class = classname.is_named()
+            || classname.is_from_literal_class_string()
+            || (matches!(classname.origin, ResolutionOrigin::AnyString) && classname.fqcn.is_some());
 
-        if function_like.method_metadata.as_ref().is_some_and(|metadata| metadata.is_abstract)
-            && (classname.is_named() || classname.is_from_literal_class_string())
-            && !is_trait_self
+        if let Some(method_metadata) = function_like.method_metadata.as_ref()
+            && method_metadata.is_abstract
+            && is_exact_class
+            && !defining_class_metadata.kind.is_interface()
+            && !is_deferred_trait_binding(classname, current_class_metadata)
+            && (method_metadata.is_static
+                || classname.is_relative()
+                || current_class_metadata.is_some_and(|metadata| {
+                    metadata.name == defining_class_metadata.name || metadata.has_parent(defining_class_metadata.name)
+                }))
         {
             report_abstract_method_call(context, &declaring_method_id, selector.span());
             result.has_invalid_target = true;
@@ -496,6 +505,18 @@ where
         declaring_object: None,
         is_static: function_like.method_metadata.as_ref().is_some_and(|m| m.is_static),
         mixin_without_magic_method: None,
+    })
+}
+
+fn is_deferred_trait_binding(
+    classname: &ResolvedClassname,
+    current_class_metadata: Option<&ClassLikeMetadata>,
+) -> bool {
+    current_class_metadata.is_some_and(|metadata| {
+        metadata.kind.is_trait()
+            && (classname.is_relative()
+                // A trait's `self::class` carries its name, but binds to the consuming class at runtime.
+                || (classname.is_from_literal_class_string() && classname.fqcn == Some(metadata.original_name)))
     })
 }
 
