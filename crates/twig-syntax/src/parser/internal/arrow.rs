@@ -49,8 +49,8 @@ where
         let rp_tok = self.stream.expect_kind(TwigTokenKind::RightParen, b"expected `)`")?;
         let right_parenthesis = self.stream.span_of(&rp_tok);
 
-        if let Some(arrow_tok) = self.stream.try_consume(TwigTokenKind::FatArrow)?
-            && let Expression::Name(n) = &inner
+        if let Expression::Name(n) = &inner
+            && let Some(arrow_tok) = self.stream.try_consume(TwigTokenKind::FatArrow)?
         {
             let fat_arrow = self.stream.span_of(&arrow_tok);
             let mut param_nodes = self.new_vec();

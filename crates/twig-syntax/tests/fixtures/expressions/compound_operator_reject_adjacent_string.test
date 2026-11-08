@@ -1,0 +1,6 @@
+--TEST--
+Word operators need a boundary before a string.
+--TEMPLATE--
+{{ value not in'x' }}
+--EXCEPTION--
+Twig\Error\SyntaxError: Unexpected token "operator" of value "not" ("end of print statement" expected) in "index.twig" at line 2 column 10.

@@ -1,0 +1,4 @@
+{%include record('template','fragment.twig') with {'value':record('with','hello')} only%}
+{%include 'missing.twig' ignore missing%}
+{%embed 'base.twig'%}{%block content%}{{x}}{%endblock%}{%endembed%}
+{%use 'blocks.twig' with content as reused%}{{block('reused')}}

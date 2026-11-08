@@ -61,10 +61,12 @@ use crate::cst::Sandbox;
 use crate::cst::Set;
 use crate::cst::Slice;
 use crate::cst::Statement;
+use crate::cst::StringConcatenation;
 use crate::cst::StringLiteral;
 use crate::cst::Template;
 use crate::cst::Test;
 use crate::cst::Text;
+use crate::cst::TypeDeclaration;
 use crate::cst::Types;
 use crate::cst::Unary;
 use crate::cst::Unknown;
@@ -118,11 +120,13 @@ pub enum NodeKind {
     Cache,
     CacheOption,
     Types,
+    TypeDeclaration,
     Unknown,
     Name,
     Number,
     StringLiteral,
     InterpolatedString,
+    StringConcatenation,
     Interpolation,
     Bool,
     Null,
@@ -194,11 +198,13 @@ pub enum Node<'ast, 'arena> {
     Cache(&'ast Cache<'arena>),
     CacheOption(&'ast CacheOption<'arena>),
     Types(&'ast Types<'arena>),
+    TypeDeclaration(&'ast TypeDeclaration<'arena>),
     Unknown(&'ast Unknown<'arena>),
     Name(&'ast Name<'arena>),
     Number(&'ast Number<'arena>),
     StringLiteral(&'ast StringLiteral<'arena>),
     InterpolatedString(&'ast InterpolatedString<'arena>),
+    StringConcatenation(&'ast StringConcatenation<'arena>),
     Interpolation(&'ast Interpolation<'arena>),
     Bool(&'ast Bool),
     Null(&'ast Null),
@@ -268,11 +274,13 @@ impl HasSpan for Node<'_, '_> {
             Node::Cache(n) => n.span(),
             Node::CacheOption(n) => n.span(),
             Node::Types(n) => n.span(),
+            Node::TypeDeclaration(n) => n.span(),
             Node::Unknown(n) => n.span(),
             Node::Name(n) => n.span(),
             Node::Number(n) => n.span(),
             Node::StringLiteral(n) => n.span(),
             Node::InterpolatedString(n) => n.span(),
+            Node::StringConcatenation(n) => n.span(),
             Node::Interpolation(n) => n.span(),
             Node::Bool(n) => n.span(),
             Node::Null(n) => n.span(),

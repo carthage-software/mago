@@ -417,13 +417,15 @@ fn operator_has_every() {
 #[test]
 fn operator_same_as() {
     let toks = lex("{{ a is same as(b) }}");
-    assert!(toks.iter().any(|t| t.kind == TwigTokenKind::SameAs));
+    assert!(toks.iter().any(|t| t.kind == TwigTokenKind::Name && t.value == b"same"));
+    assert!(toks.iter().any(|t| t.kind == TwigTokenKind::Name && t.value == b"as"));
 }
 
 #[test]
 fn operator_divisible_by() {
     let toks = lex("{{ a is divisible by(3) }}");
-    assert!(toks.iter().any(|t| t.kind == TwigTokenKind::DivisibleBy));
+    assert!(toks.iter().any(|t| t.kind == TwigTokenKind::Name && t.value == b"divisible"));
+    assert!(toks.iter().any(|t| t.kind == TwigTokenKind::Name && t.value == b"by"));
 }
 
 #[test]

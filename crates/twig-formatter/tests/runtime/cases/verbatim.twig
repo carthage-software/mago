@@ -1,0 +1,5 @@
+{%verbatim%} {{ never  format }} {% odd %} {%endverbatim%}
+{% types {x: 'string', y?: 'string'} %}{{ x }}
+{% types x: 'string', y?: 'string', %}{{ x }}
+{% types {x: 'string', # checked
+ y?: 'string'} %}{{ x }}

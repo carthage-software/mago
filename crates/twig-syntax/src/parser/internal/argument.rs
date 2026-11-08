@@ -8,6 +8,8 @@ use crate::cst::NamedArgumentSeparator;
 use crate::cst::PositionalArgument;
 use crate::error::ParseError;
 use crate::parser::Parser;
+use crate::parser::stream::is_keyword_usable_as_name;
+use crate::parser::stream::looks_like_identifier;
 use crate::token::TwigTokenKind;
 
 impl<'arena, A> Parser<'_, 'arena, A>
@@ -34,8 +36,11 @@ where
     /// Parse a single argument - `name = value`, `name: value`, `...value`
     /// or a plain positional expression.
     pub(crate) fn parse_argument(&mut self) -> Result<Argument<'arena>, ParseError<'arena>> {
-        let is_named = self.stream.peek_kind(0)? == Some(TwigTokenKind::Name)
-            && matches!(self.stream.peek_kind(1)?, Some(TwigTokenKind::Equal) | Some(TwigTokenKind::Colon));
+        let is_named =
+            self.stream.lookahead(0)?.is_some_and(|token| {
+                token.kind == TwigTokenKind::Name
+                    || is_keyword_usable_as_name(token.kind) && looks_like_identifier(token.value)
+            }) && matches!(self.stream.peek_kind(1)?, Some(TwigTokenKind::Equal) | Some(TwigTokenKind::Colon));
         if is_named {
             let name_tok = self.stream.consume()?;
             let separator_tok = self.stream.consume()?;

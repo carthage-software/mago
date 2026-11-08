@@ -62,6 +62,7 @@ fn is_parse_time_error(message: &str) -> bool {
         "a mapping value",
         "a list of arguments",
         "cannot have a multi-target",
+        "arrow function argument must be a list of variables or a single variable",
         "must have the same number of variables",
         "expecting closing tag",
         "unexpected \"",
@@ -102,6 +103,7 @@ fn is_parse_time_error(message: &str) -> bool {
             }
 
             return lo.contains("unexpected token")
+                || lo.contains("arrow function argument must be a list of variables or a single variable")
                 || lo.contains("unexpected character")
                 || lo.contains("unclosed")
                 || lo.contains("expected");

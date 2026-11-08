@@ -63,7 +63,7 @@ pub fn get_staged_file(workspace: &Path, path: &Path) -> Result<File, Error> {
         .output()
         .map_err(|e| Error::Database(DatabaseError::IOError(e)))?;
 
-    Ok(File::ephemeral(Cow::Borrowed(b"<stdin>"), Cow::Owned(output.stdout)))
+    Ok(File::ephemeral(Cow::Owned(path.as_os_str().as_encoded_bytes().to_vec()), Cow::Owned(output.stdout)))
 }
 
 /// Updates the contents of the staged file

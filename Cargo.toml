@@ -21,7 +21,7 @@ package.homepage = "https://mago.carthage.software"
 package.repository = "https://github.com/carthage-software/mago"
 package.rust-version = "1.100.0"
 members = ["crates/*", "docs"]
-exclude = ["crates/syntax/fuzz", "crates/twig-syntax/fuzz"]
+exclude = ["crates/syntax/fuzz", "crates/twig-syntax/fuzz", "crates/twig-formatter/fuzz"]
 
 [workspace.lints.cargo]
 unused_workspace_dependencies = "allow"
@@ -172,6 +172,8 @@ mago-casing = { path = "crates/casing", version = "1.59.0" }
 mago-composer = { path = "crates/composer", version = "1.59.0" }
 mago-text-edit = { path = "crates/text-edit", version = "1.59.0" }
 mago-formatter = { path = "crates/formatter", version = "1.59.0" }
+mago-formatter-core = { path = "crates/formatter-core", version = "1.59.0" }
+mago-twig-formatter = { path = "crates/twig-formatter", version = "1.59.0" }
 mago-fingerprint = { path = "crates/fingerprint", version = "1.59.0" }
 mago-flags = { path = "crates/flags", version = "1.59.0" }
 mago-hir = { path = "crates/hir", version = "1.59.0" }
@@ -271,6 +273,7 @@ mago-database = { workspace = true }
 mago-linter = { workspace = true, features = ["serde"] }
 mago-names = { workspace = true }
 mago-formatter = { workspace = true, features = ["serde"] }
+mago-twig-formatter = { workspace = true, features = ["serde"] }
 mago-text-edit = { workspace = true }
 mago-php-version = { workspace = true }
 mago-composer = { workspace = true }

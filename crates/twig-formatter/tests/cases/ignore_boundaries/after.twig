@@ -1,0 +1,10 @@
+{% if a %}
+{{ x }}
+{# @mago-format-ignore-next #}
+{% endif %}
+{{ y }}
+{% if a %}
+{# @mago-format-ignore-next #}
+{% else %}
+{{ y }}
+{% endif %}

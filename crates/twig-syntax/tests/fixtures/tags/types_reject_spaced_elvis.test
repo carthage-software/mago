@@ -1,0 +1,6 @@
+--TEST--
+Optional type declarations require an adjacent question mark and colon
+--TEMPLATE--
+{% types value ? : 'string' %}
+--EXCEPTION--
+Twig\Error\SyntaxError: A type name must be followed by a colon (:). Unexpected token "operator" of value "? :" ("punctuation" expected with value ":") in "index.twig" at line 2 column 16.

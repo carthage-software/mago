@@ -407,6 +407,7 @@ fn orchestrator_loads_initialization_stubs_into_the_source_database() {
         linter_settings: LinterSettings::default(),
         guard_settings: GuardSettings::default(),
         formatter_settings: FormatSettings::default(),
+        twig_formatter_settings: None,
         disable_default_analyzer_plugins: false,
         analyzer_plugins: vec![],
         use_progress_bars: false,

@@ -57,6 +57,7 @@ where
     pub(crate) state: State,
     pub(crate) stream: TokenStream<'arena, A>,
     pub(crate) errors: Vec<'arena, ParseError<'arena>, A>,
+    pub(crate) recursion_limit: u16,
     _input: std::marker::PhantomData<&'input ()>,
 }
 
@@ -77,6 +78,7 @@ where
             state: State::default(),
             stream,
             errors: Vec::new_in(arena),
+            recursion_limit: MAX_RECURSION_DEPTH,
             _input: std::marker::PhantomData,
         }
     }
@@ -102,8 +104,16 @@ where
             state: State::default(),
             stream,
             errors: Vec::new_in(arena),
+            recursion_limit: MAX_RECURSION_DEPTH,
             _input: std::marker::PhantomData,
         }
+    }
+
+    /// Lower the nesting limit for callers with smaller stacks.
+    #[must_use]
+    pub fn with_recursion_limit(mut self, limit: u16) -> Self {
+        self.recursion_limit = limit.min(MAX_RECURSION_DEPTH);
+        self
     }
 
     /// Consume the parser and produce an arena-allocated [`Template`].

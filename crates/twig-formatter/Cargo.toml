@@ -1,0 +1,36 @@
+[package]
+name = "mago-twig-formatter"
+description = "Formats Twig tags and expressions while preserving template text."
+version.workspace = true
+edition.workspace = true
+authors.workspace = true
+license.workspace = true
+homepage.workspace = true
+repository.workspace = true
+rust-version.workspace = true
+
+[lints]
+workspace = true
+
+[dependencies]
+mago-allocator = { workspace = true }
+mago-database = { workspace = true }
+mago-formatter-core = { workspace = true }
+mago-span = { workspace = true }
+mago-twig-syntax = { workspace = true }
+memchr = { workspace = true }
+schemars = { workspace = true }
+serde = { workspace = true, optional = true }
+
+[features]
+default = []
+serde = ["dep:serde", "mago-formatter-core/serde"]
+
+[dev-dependencies]
+criterion = { workspace = true }
+mago-syntax-core = { workspace = true }
+pretty_assertions = { workspace = true }
+
+[[bench]]
+name = "formatter"
+harness = false

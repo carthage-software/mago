@@ -71,6 +71,7 @@ where
     }
 
     fn parse_macro_argument(&mut self) -> Result<MacroArgument<'arena>, ParseError<'arena>> {
+        let ellipsis = self.stream.try_consume(TwigTokenKind::DotDotDot)?.map(|token| self.stream.span_of(&token));
         let name = self.expect_flexible_identifier(b"expected macro argument name")?;
         let (equal, default) = if let Some(eq_tok) = self.stream.try_consume(TwigTokenKind::Equal)? {
             let value = self.parse_expression()?;
@@ -78,6 +79,6 @@ where
         } else {
             (None, None)
         };
-        Ok(MacroArgument { name, equal, default })
+        Ok(MacroArgument { ellipsis, name, equal, default })
     }
 }

@@ -1,0 +1,5 @@
+{% macro example(first, ...rest) %}{{first}}:{{rest|join(',')}}{%endmacro%}
+{{_self.example('a','b','c')}}
+{% from 'macros.twig' import same as s %}{{s()}}
+{% import 'macros.twig' as macros %}{{macros.same()}}
+{{ _self }}

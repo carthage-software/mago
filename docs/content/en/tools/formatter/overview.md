@@ -28,6 +28,7 @@ The output is identical for a given CST regardless of the input style. The runti
 
 ## Where to next
 
+- [Twig templates](/tools/formatter/twig/): format Twig syntax without reformatting HTML.
 - [Usage](/tools/formatter/usage/): how to run `mago format`.
 - [Format ignore](/tools/formatter/format-ignore/): pragmas to skip formatting for files, regions, or individual statements.
 - [Configuration reference](/tools/formatter/configuration-reference/): every option you can set.

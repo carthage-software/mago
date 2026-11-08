@@ -37,6 +37,7 @@
     "revolt/event-loop": "^1.0.9"
   },
   "require-dev": {
-    "phpunit/phpunit": "^10.5"
+    "phpunit/phpunit": "^10.5",
+    "twig/twig": "^3.30"
   }
 }

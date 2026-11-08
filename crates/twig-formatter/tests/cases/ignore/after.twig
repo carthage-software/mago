@@ -1,0 +1,11 @@
+{# @mago-format-ignore-next #}
+{%if a%}
+{{  a  }}
+{%endif%}
+{{ b }}
+{# @mago-format-ignore-start #}
+{{  c  }}
+{%if d%}{{d}}{%endif%}
+{# @mago-format-ignore-end #}
+{{ e }}
+

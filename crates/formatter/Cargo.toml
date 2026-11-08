@@ -13,6 +13,7 @@ rust-version.workspace = true
 workspace = true
 
 [dependencies]
+mago-formatter-core = { workspace = true }
 mago-syntax = { workspace = true }
 mago-database = { workspace = true }
 mago-span = { workspace = true }
@@ -20,7 +21,6 @@ mago-php-version = { workspace = true }
 foldhash = { workspace = true }
 memchr = { workspace = true }
 serde = { workspace = true, optional = true }
-unicode-width = { workspace = true }
 mago-allocator = { workspace = true }
 schemars = { workspace = true }
 
@@ -28,6 +28,7 @@ schemars = { workspace = true }
 default = []
 serde = [
     "dep:serde",
+    "mago-formatter-core/serde",
 ]
 
 [dev-dependencies]

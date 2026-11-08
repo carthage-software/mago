@@ -1,0 +1,29 @@
+{{  user.name|default( 'unknown' )  }}
+{{foo[ key ]}}
+{{ 1+2*3 }}
+{{ not   active or a==b }}
+{{ ( 1 + 2 ) * 3 }}
+{{ 1 .. 12 }}
+{{ values[ 1 : 3 ] }}
+{{ [1,2,...items] }}
+{{ {'a':1, b : 2, ...other} }}
+{{ f( name : 'x', option = true, ...args ) }}
+{{ value is not same as( null ) }}
+{{ value is divisible by 3 }}
+{{ a?b:c }}
+{{ a?:b }}
+{{ a ? : b }}
+{{ a ?
+    : b }}
+{{ a ? b }}
+{{1e1_0 + 1.5e+1_0}}
+{{1_2.3_4E-1_2}}
+{{ items|filter( (value, key)=>key>0 ) }}
+{{ - -1 }}
+{{ foo?.bar( 1,2 ) }}
+{{ foo.( 'bar' ) }}
+{{ 0 . 2 }}
+{{ foo.0 . 2 }}
+{{ foo( # note
+0 . 2) }}
+

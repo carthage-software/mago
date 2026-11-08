@@ -185,6 +185,7 @@ generate_ast_walker! {
             Expression::Number(n) => walker.walk_number(n, context),
             Expression::String(n) => walker.walk_string_literal(n, context),
             Expression::InterpolatedString(n) => walker.walk_interpolated_string(n, context),
+            Expression::StringConcatenation(n) => walker.walk_string_concatenation(n, context),
             Expression::Bool(n) => walker.walk_bool(n, context),
             Expression::Null(n) => walker.walk_null(n, context),
             Expression::Array(n) => walker.walk_array(n, context),
@@ -443,10 +444,7 @@ generate_ast_walker! {
 
     'arena Cache as cache => {
         walker.walk_expression(&cache.key, context);
-        if let Some(option) = &cache.ttl {
-            walker.walk_cache_option(option, context);
-        }
-        if let Some(option) = &cache.tags {
+        for option in cache.options() {
             walker.walk_cache_option(option, context);
         }
         for statement in &cache.body {
@@ -459,7 +457,14 @@ generate_ast_walker! {
     }
 
     'arena Types as types => {
-        walker.walk_expression(&types.mapping, context);
+        for declaration in types.declarations.iter() {
+            walker.walk_type_declaration(declaration, context);
+        }
+    }
+
+    'arena TypeDeclaration as type_declaration => {
+        walker.walk_identifier(&type_declaration.name, context);
+        walker.walk_string_literal(&type_declaration.value, context);
     }
 
     'arena Unknown as unknown => {}
@@ -472,6 +477,11 @@ generate_ast_walker! {
         for part in interpolated_string.parts {
             walker.walk_string_part(part, context);
         }
+    }
+
+    'arena StringConcatenation as string_concatenation => {
+        walker.walk_expression(string_concatenation.lhs, context);
+        walker.walk_expression(string_concatenation.rhs, context);
     }
 
     'arena StringPart as string_part => {

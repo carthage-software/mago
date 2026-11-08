@@ -1,7 +1,7 @@
 //! Code formatting command implementation.
 //!
 //! This module implements the `mago format` (aliased as `mago fmt`) command, which
-//! automatically formats PHP code according to configured style rules. The formatter
+//! automatically formats PHP and Twig code according to configured style rules. The formatter
 //! ensures consistent code style across the entire codebase.
 //!
 //! # Formatting Modes
@@ -63,9 +63,9 @@ use crate::utils::git;
 use crate::utils::git::get_staged_file;
 use crate::utils::git::update_staged_file;
 
-/// Command for formatting PHP source files according to style rules.
+/// Command for formatting PHP and Twig source files according to style rules.
 ///
-/// This command applies consistent formatting to PHP code based on the configured
+/// This command applies consistent formatting to source code based on the configured
 /// style preferences. It supports multiple modes including in-place formatting,
 /// check mode for CI, and dry-run mode for previewing changes.
 #[derive(Parser, Debug, Default)]
@@ -101,7 +101,7 @@ pub struct FormatCommand {
 
     /// Read input from STDIN, format it, and write to STDOUT.
     ///
-    /// This flag allows you to pipe PHP code directly into the formatter.
+    /// Pass `--stdin-filepath template.twig` for Twig; stdin defaults to PHP.
     ///
     /// When using this option, the formatter reads from standard input,
     /// formats the code according to the configuration, and outputs the
@@ -119,6 +119,7 @@ pub struct FormatCommand {
     ///   If the path matches an exclude pattern, the input is written back
     ///   to STDOUT unchanged.
     /// - Improve diagnostic messages by referencing the real filepath.
+    /// - Select the Twig formatter for `.twig` files.
     ///
     /// Editor integrations should pass the buffer path here (for example,
     /// Zed's `{buffer_path}` substitution).
@@ -128,7 +129,7 @@ pub struct FormatCommand {
     /// Format files that are staged in git.
     ///
     /// This flag is designed for git pre-commit hooks. It will:
-    /// 1. Find all PHP files currently staged for commit
+    /// 1. Find all PHP and Twig files currently staged for commit
     /// 2. Format those staged files in memory
     /// 3. Update the staged files so the formatted version is committed
     ///
@@ -147,7 +148,7 @@ impl FormatCommand {
     /// 1. **Mode Selection**: Determines which mode to use based on flags
     /// 2. **STDIN Handling**: If `--stdin-input`, reads from stdin and formats immediately
     /// 3. **Staged Handling**: If `--staged`, formats only git-staged files
-    /// 4. **Database Loading**: Scans workspace for PHP files (unless stdin mode)
+    /// 4. **Database Loading**: Scans the workspace for source files (unless stdin mode)
     /// 5. **Service Creation**: Creates formatting service with configuration
     /// 6. **Formatting**: Processes each file according to the selected mode
     /// 7. **Reporting**: Outputs results (summary, diffs, or exit code)
@@ -176,6 +177,10 @@ impl FormatCommand {
         }
 
         let mut orchestrator = create_orchestrator(&configuration, color_choice, false, true, false);
+        if configuration.formatter.twig.enabled {
+            orchestrator.add_source_extension("twig");
+        }
+
         orchestrator.add_exclude_patterns(configuration.formatter.excludes.iter());
         if !self.path.is_empty() {
             orchestrator.set_source_paths(self.path.iter().map(|p| p.to_string_lossy().to_string()));
@@ -290,7 +295,7 @@ impl FormatCommand {
     /// This method implements the `--staged` mode for git pre-commit hooks:
     ///
     /// 1. Verifies we're in a git repository
-    /// 2. Gets the list of staged PHP files
+    /// 2. Gets the list of staged source files
     /// 3. Formats the staged files in memory
     /// 4. Updates the staged file with its formatted version
     ///
@@ -307,6 +312,10 @@ impl FormatCommand {
         let workspace = &configuration.source.workspace;
 
         let mut orchestrator = create_orchestrator(&configuration, color_choice, false, true, false);
+        if configuration.formatter.twig.enabled {
+            orchestrator.add_source_extension("twig");
+        }
+
         orchestrator.add_exclude_patterns(configuration.formatter.excludes.iter());
 
         let database = orchestrator.load_database(workspace, false, None, None)?;
@@ -319,6 +328,7 @@ impl FormatCommand {
         }
 
         let mut changed_files_count = 0;
+        let mut failed = false;
         for path in staged_file_paths {
             let absolute_path = workspace.join(&path);
             let canonical_path = absolute_path.canonicalize().unwrap_or(absolute_path);
@@ -334,19 +344,24 @@ impl FormatCommand {
                     changed_files_count += 1;
                 }
                 FileFormatStatus::FailedToParse(parse_error) => {
+                    failed = true;
                     tracing::error!("Failed to parse staged file '{}': {}", path.display(), parse_error);
                 }
             };
         }
 
         if changed_files_count == 0 {
+            if failed {
+                return Ok(ExitCode::FAILURE);
+            }
+
             tracing::info!("All staged files are already formatted.");
             return Ok(ExitCode::SUCCESS);
         }
 
         tracing::info!("Formatted and re-staged {changed_files_count} file(s).");
 
-        Ok(ExitCode::SUCCESS)
+        Ok(if failed { ExitCode::FAILURE } else { ExitCode::SUCCESS })
     }
 }
 

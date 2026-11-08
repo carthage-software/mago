@@ -7,6 +7,8 @@ use crate::cst::Parenthesized;
 use crate::cst::StringLiteral;
 use crate::error::ParseError;
 use crate::parser::Parser;
+use crate::parser::stream::is_keyword_usable_as_name;
+use crate::parser::stream::looks_like_identifier;
 use crate::token::TwigTokenKind;
 use mago_allocator::prelude::*;
 
@@ -41,7 +43,9 @@ where
         let key_tok = self.stream.lookahead(0)?.ok_or_else(|| self.stream.unexpected(None, &[TwigTokenKind::Name]))?;
 
         // Shorthand entry: `{ a, b }` becomes key `'a'`, value `a`.
-        if key_tok.kind == TwigTokenKind::Name {
+        let name_key = key_tok.kind == TwigTokenKind::Name
+            || is_keyword_usable_as_name(key_tok.kind) && looks_like_identifier(key_tok.value);
+        if name_key {
             let next = self.stream.peek_kind(1)?;
             if matches!(next, Some(TwigTokenKind::Comma) | Some(TwigTokenKind::RightBrace) | None) {
                 self.stream.consume()?;
@@ -61,6 +65,10 @@ where
                 self.stream.consume()?;
                 let is_float = key_tok.value.contains(&b'.');
                 Expression::Number(Number { raw: key_tok.value, is_float, span: self.stream.span_of(&key_tok) })
+            }
+            _ if name_key => {
+                self.stream.consume()?;
+                Expression::String(StringLiteral { raw: key_tok.value, span: self.stream.span_of(&key_tok) })
             }
             TwigTokenKind::LeftParen => {
                 let lp_tok = self.stream.consume()?;

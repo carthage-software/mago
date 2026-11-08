@@ -2,6 +2,7 @@ use std::ops::Range;
 
 use mago_allocator::Arena;
 use mago_database::file::File;
+use mago_formatter_core::printer::Printer;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::cst::Node;
@@ -14,7 +15,6 @@ use crate::Formatter;
 use crate::has_format_ignore_comment;
 use crate::internal::FormatterState;
 use crate::internal::format::Format;
-use crate::internal::printer::Printer;
 
 /// A formatted statement, member, or import group and the source it replaces.
 #[derive(Debug)]
@@ -86,7 +86,7 @@ impl<'arena, A: Arena> Formatter<'arena, A> {
             state.set_range(selected.0, selected.1);
             let document = program.format(&mut state);
             let Some((output, printed)) =
-                Printer::new(self.arena, document, file.size as usize, self.settings).build_range()
+                Printer::new(self.arena, self.settings.into()).build_range(document, file.size as usize)
             else {
                 return Ok(None);
             };

@@ -1,0 +1,32 @@
+[package]
+name = "mago-twig-formatter-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+authors = ["Seifeddine Gmati <azjezz@carthage.software>"]
+license = "MIT OR Apache-2.0"
+
+[workspace]
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+mago-allocator = { path = "../../allocator" }
+mago-database = { path = "../../database" }
+mago-syntax-core = { path = "../../syntax-core" }
+mago-twig-formatter = { path = ".." }
+mago-twig-syntax = { path = "../../twig-syntax" }
+
+[[bin]]
+name = "formatter"
+path = "fuzz_targets/formatter.rs"
+test = false
+doc = false
+bench = false
+
+[profile.release]
+debug = 1
+opt-level = 3
+overflow-checks = true

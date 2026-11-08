@@ -1,0 +1,4 @@
+[source]
+paths = ["src"]
+[formatter.twig]
+enabled = false

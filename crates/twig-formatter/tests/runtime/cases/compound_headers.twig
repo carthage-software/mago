@@ -1,0 +1,11 @@
+{%set starts,ends='fragment.twig','fragment.twig'%}
+{%include starts with''|default({value:record('starts','one')})only%}
+{%include ends with''|default({value:record('ends','two')})only%}
+{%include ''~starts with''|default({value:record('tail','three')})only%}
+{%set starts,ends='base.twig','base.twig'%}
+{%embed starts with''|default({value:record('embed-starts','four')})%}{%block content%}{{value}}{%endblock%}{%endembed%}
+{%embed ends with''|default({value:record('embed-ends','five')})%}{%block content%}{{value}}{%endblock%}{%endembed%}
+{{x is foo has some}}
+{{x is foo has every}}
+{{x is foo starts with}}
+{{x is foo ends with}}

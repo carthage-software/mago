@@ -8,9 +8,13 @@ use mago_database::file::FileId;
 use mago_formatter::Formatter;
 use mago_formatter::settings::FormatSettings;
 use mago_php_version::PHPVersion;
+use mago_span::HasSpan;
+use mago_span::Span;
 use mago_syntax::error::ParseError;
 use mago_syntax::parser::parse_file_borrowed_with_settings;
 use mago_syntax::settings::ParserSettings;
+use mago_twig_formatter::Formatter as TwigFormatter;
+use mago_twig_formatter::settings::FormatSettings as TwigFormatSettings;
 
 use crate::error::OrchestratorError;
 use crate::service::pipeline::StatelessParallelPipeline;
@@ -20,7 +24,33 @@ use crate::service::pipeline::StatelessReducer;
 pub enum FileFormatStatus {
     Unchanged,
     Changed(Vec<u8>),
-    FailedToParse(ParseError),
+    FailedToParse(FormatParseError),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub enum FormatParseError {
+    Php(ParseError),
+    Twig { message: String, span: Span },
+}
+
+impl std::fmt::Display for FormatParseError {
+    fn fmt(&self, formatter: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Php(error) => std::fmt::Display::fmt(error, formatter),
+            Self::Twig { message, .. } => formatter.write_str(message),
+        }
+    }
+}
+
+impl std::error::Error for FormatParseError {}
+
+impl HasSpan for FormatParseError {
+    fn span(&self) -> Span {
+        match self {
+            Self::Php(error) => error.span(),
+            Self::Twig { span, .. } => *span,
+        }
+    }
 }
 
 #[derive(Debug)]
@@ -33,6 +63,7 @@ pub struct FormatService {
     database: ReadDatabase,
     php_version: PHPVersion,
     settings: FormatSettings,
+    twig_settings: Option<TwigFormatSettings>,
     parser_settings: ParserSettings,
     use_progress_bars: bool,
 }
@@ -43,10 +74,11 @@ impl FormatService {
         database: ReadDatabase,
         php_version: PHPVersion,
         settings: FormatSettings,
+        twig_settings: Option<TwigFormatSettings>,
         parser_settings: ParserSettings,
         use_progress_bars: bool,
     ) -> Self {
-        Self { database, php_version, settings, parser_settings, use_progress_bars }
+        Self { database, php_version, settings, twig_settings, parser_settings, use_progress_bars }
     }
 
     /// Formats a single file, allocating a fresh arena.
@@ -69,6 +101,7 @@ impl FormatService {
         let context = FormatContext {
             php_version: self.php_version,
             settings: self.settings,
+            twig_settings: self.twig_settings,
             parser_settings: self.parser_settings,
         };
 
@@ -84,6 +117,7 @@ impl FormatService {
         let context = FormatContext {
             php_version: self.php_version,
             settings: self.settings,
+            twig_settings: self.twig_settings,
             parser_settings: self.parser_settings,
         };
 
@@ -122,6 +156,7 @@ impl FormatService {
         let context = FormatContext {
             php_version: self.php_version,
             settings: self.settings,
+            twig_settings: self.twig_settings,
             parser_settings: self.parser_settings,
         };
 
@@ -169,7 +204,7 @@ impl FormatResult {
         self.changed_files.values().any(|status| matches!(status, FileFormatStatus::Changed(_)))
     }
 
-    pub fn parse_errors(&self) -> impl Iterator<Item = (&FileId, &ParseError)> {
+    pub fn parse_errors(&self) -> impl Iterator<Item = (&FileId, &FormatParseError)> {
         self.changed_files.iter().filter_map(|(file_id, status)| {
             if let FileFormatStatus::FailedToParse(error) = status { Some((file_id, error)) } else { None }
         })
@@ -194,15 +229,35 @@ struct FormatContext {
     php_version: PHPVersion,
     /// The configured settings for the formatter.
     settings: FormatSettings,
+    twig_settings: Option<TwigFormatSettings>,
     /// The parser settings.
     parser_settings: ParserSettings,
 }
 
 impl FormatContext {
     fn format_file(self, file: &File, arena: &LocalArena) -> FileFormatStatus {
+        if file
+            .name
+            .get(file.name.len().saturating_sub(5)..)
+            .is_some_and(|suffix| suffix.eq_ignore_ascii_case(b".twig"))
+        {
+            let Some(settings) = self.twig_settings else {
+                return FileFormatStatus::Unchanged;
+            };
+
+            return match TwigFormatter::new(arena, settings).format_file(file) {
+                Ok(content) if file.contents == content => FileFormatStatus::Unchanged,
+                Ok(content) => FileFormatStatus::Changed(content.to_vec()),
+                Err(error) => FileFormatStatus::FailedToParse(FormatParseError::Twig {
+                    message: error.to_string(),
+                    span: error.span(),
+                }),
+            };
+        }
+
         let program = parse_file_borrowed_with_settings(arena, file, self.parser_settings);
         if let Some(parse_error) = program.errors.first() {
-            return FileFormatStatus::FailedToParse(parse_error.clone());
+            return FileFormatStatus::FailedToParse(FormatParseError::Php(parse_error.clone()));
         }
 
         let formatter = Formatter::new(arena, self.php_version, self.settings);

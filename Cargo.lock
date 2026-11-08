@@ -1329,6 +1329,7 @@ dependencies = [
  "mago-syntax",
  "mago-syntax-core",
  "mago-text-edit",
+ "mago-twig-formatter",
  "mago-word",
  "mimalloc",
  "notify",
@@ -1553,6 +1554,7 @@ dependencies = [
  "mago-allocator",
  "mago-bytes",
  "mago-database",
+ "mago-formatter-core",
  "mago-php-version",
  "mago-span",
  "mago-syntax",
@@ -1561,6 +1563,16 @@ dependencies = [
  "schemars",
  "serde",
  "serde_json",
+]
+
+[[package]]
+name = "mago-formatter-core"
+version = "1.59.0"
+dependencies = [
+ "mago-allocator",
+ "memchr",
+ "schemars",
+ "serde",
  "unicode-width",
 ]
 
@@ -1671,7 +1683,9 @@ dependencies = [
  "mago-php-version",
  "mago-reporting",
  "mago-semantics",
+ "mago-span",
  "mago-syntax",
+ "mago-twig-formatter",
  "mago-word",
  "rayon",
  "tracing",
@@ -1802,6 +1816,23 @@ name = "mago-text-edit"
 version = "1.59.0"
 dependencies = [
  "pretty_assertions",
+ "serde",
+]
+
+[[package]]
+name = "mago-twig-formatter"
+version = "1.59.0"
+dependencies = [
+ "codspeed-criterion-compat",
+ "mago-allocator",
+ "mago-database",
+ "mago-formatter-core",
+ "mago-span",
+ "mago-syntax-core",
+ "mago-twig-syntax",
+ "memchr",
+ "pretty_assertions",
+ "schemars",
  "serde",
 ]
 

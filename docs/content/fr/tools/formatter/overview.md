@@ -28,6 +28,7 @@ La sortie est identique pour un CST donné quel que soit le style d'entrée. Le 
 
 ## Où aller ensuite
 
+- [Templates Twig](/tools/formatter/twig/) : formater Twig sans reformater le HTML.
 - [Utilisation](/tools/formatter/usage/) : comment exécuter `mago format`.
 - [Format ignore](/tools/formatter/format-ignore/) : pragmas pour ignorer le formatage des fichiers, des régions ou des instructions individuelles.
 - [Référence de configuration](/tools/formatter/configuration-reference/) : toutes les options que vous pouvez définir.

@@ -17,6 +17,8 @@ use-tabs = true
 
 ## 预设
 
+PHP 设置和预设不适用于 Twig。使用 [`[formatter.twig]`](/tools/formatter/twig/#配置) 配置或关闭 Twig 格式化。
+
 预设是为某种编码标准量身打包的一整套格式化器选项。
 
 ```toml

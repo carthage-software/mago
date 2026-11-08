@@ -1,0 +1,14 @@
+{{ "hello #{x}  there" }}
+{{ "hello #{x}  there" # comment
+ }}
+{{ '\n  spaces' # comment
+ }}
+{{ 'a' ~ 'b' }}
+{{ "#{x}" ~ '  suffix' }}
+{{ 'line one
+  line two' }}
+{{'a' "#{b}"}}
+{{"#{a}" 'b'}}
+{{"a#{b}" 'c' "#{a}"}}
+{{"#{a}" "#{b}" "#{c}"}}
+{{'a' "#{b}"|upper}}

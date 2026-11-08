@@ -1,0 +1,4 @@
+extends = "base.toml"
+
+[formatter.twig]
+print-width = 60

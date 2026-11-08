@@ -30,6 +30,7 @@ jobs:
           - { crate: syntax, target: lexer, seeds: "../analyzer/tests/cases ../formatter/tests/cases" }
           - { crate: twig-syntax, target: parser, seeds: "fuzz/seeds/parser" }
           - { crate: twig-syntax, target: lexer, seeds: "fuzz/seeds/lexer" }
+          - { crate: twig-formatter, target: formatter, seeds: "tests/cases tests/runtime/cases" }
 
     steps:
       - name: checkout

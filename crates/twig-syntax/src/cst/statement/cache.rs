@@ -36,6 +36,17 @@ pub struct Cache<'arena> {
     pub end_close_tag: Span,
 }
 
+impl<'arena> Cache<'arena> {
+    pub fn options(&self) -> impl Iterator<Item = &CacheOption<'arena>> {
+        let (first, second) = match (&self.ttl, &self.tags) {
+            (Some(ttl), Some(tags)) if tags.keyword.span.start < ttl.keyword.span.start => (Some(tags), Some(ttl)),
+            (ttl, tags) => (ttl.as_ref(), tags.as_ref()),
+        };
+
+        first.into_iter().chain(second)
+    }
+}
+
 impl HasSpan for Cache<'_> {
     fn span(&self) -> Span {
         self.open_tag.join(self.end_close_tag)
