@@ -118,3 +118,16 @@ function iterable_not_full_typed_array_is_traversable(iterable $it): void
         accept_traversable($it);
     }
 }
+
+/**
+ * @param iterable<int, string> $it
+ * @return array<int, string>
+ */
+function iterable_not_object_is_array(iterable $it): array
+{
+    if (!is_object($it)) {
+        return $it;
+    }
+
+    return [];
+}
