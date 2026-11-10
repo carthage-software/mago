@@ -1,117 +1,89 @@
-use std::io::Write;
-use std::path::Path;
-use std::process::Command;
-use std::process::Output;
-use std::process::Stdio;
+mod common_twig_format;
 
-const BEFORE: &[u8] = include_bytes!("fixtures/format_twig/before.twig");
-const AFTER: &[u8] = include_bytes!("fixtures/format_twig/after.twig");
-const PHP: &[u8] = include_bytes!("fixtures/format_twig/unchanged.php");
-const INVALID: &[u8] = include_bytes!("fixtures/format_twig/invalid.twig");
-
-fn workspace(configuration: &str) -> tempfile::TempDir {
-    let directory = tempfile::tempdir().unwrap();
-    std::fs::create_dir(directory.path().join("src")).unwrap();
-    std::fs::write(directory.path().join("mago.toml"), configuration).unwrap();
-    std::fs::write(directory.path().join("src/template.html.twig"), BEFORE).unwrap();
-    std::fs::write(directory.path().join("src/unchanged.php"), PHP).unwrap();
-    directory
-}
-
-fn command(workspace: &Path) -> Command {
-    let mut command = Command::new(env!("CARGO_BIN_EXE_mago"));
-    command.args(["--no-version-check", "--colors", "never", "--threads", "2"]).current_dir(workspace);
-    command
-}
-
-fn run(workspace: &Path, arguments: &[&str]) -> Output {
-    command(workspace).args(arguments).output().unwrap()
-}
-
-fn stdin(workspace: &Path, filepath: Option<&str>, content: &[u8]) -> Output {
-    let mut command = command(workspace);
-    command.args(["fmt", "--stdin-input"]);
-    if let Some(filepath) = filepath {
-        command.args(["--stdin-filepath", filepath]);
-    }
-
-    let mut child = command.stdin(Stdio::piped()).stdout(Stdio::piped()).stderr(Stdio::piped()).spawn().unwrap();
-    child.stdin.take().unwrap().write_all(content).unwrap();
-    child.wait_with_output().unwrap()
-}
-
-fn contents(workspace: &Path) -> Vec<u8> {
-    std::fs::read(workspace.join("src/template.html.twig")).unwrap()
-}
+use common_twig_format::*;
 
 #[test]
-fn formats_mixed_workspaces_and_checks_without_writing() {
-    let directory = workspace(include_str!("fixtures/format_twig/mago.toml"));
+fn formats_only_twig_inputs_and_checks_without_writing() {
+    let directory = workspace(CONFIG);
     let root = directory.path();
-    for arguments in [["fmt", "--check"], ["fmt", "--dry-run"]] {
+    for arguments in [["twig:fmt", "--check"], ["twig:fmt", "--dry-run"]] {
         let output = run(root, &arguments);
         assert_eq!(output.status.code(), Some(1), "{}", String::from_utf8_lossy(&output.stderr));
         assert_eq!(contents(root), BEFORE);
     }
-
-    let output = run(root, &["fmt"]);
-    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    assert!(run(root, &["twig:fmt"]).status.success());
     assert_eq!(contents(root), AFTER);
-    assert_eq!(std::fs::read(root.join("src/unchanged.php")).unwrap(), PHP);
-    assert!(run(root, &["fmt", "--check"]).status.success());
+    assert_eq!(std::fs::read(root.join("src/unchanged.php")).unwrap(), PHP_BEFORE);
+    assert!(run(root, &["twig:fmt", "--check"]).status.success());
 }
 
 #[test]
-fn formats_explicit_twig_files_and_directories() {
+fn formats_explicit_files_and_directories() {
     for path in ["src/template.html.twig", "src"] {
-        let directory = workspace(include_str!("fixtures/format_twig/mago.toml"));
-        let output = run(directory.path(), &["fmt", path]);
+        let directory = workspace(CONFIG);
+        let output = run(directory.path(), &["twig:fmt", path]);
         assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
         assert_eq!(contents(directory.path()), AFTER);
     }
 }
 
 #[test]
-fn stdin_uses_filepath_to_select_twig() {
-    let directory = workspace(include_str!("fixtures/format_twig/mago.toml"));
-    for path in [directory.path().join("src/template.html.twig"), "src/unsaved.twig".into(), "src/UPPER.TWIG".into()] {
-        let output = stdin(directory.path(), Some(path.to_str().unwrap()), BEFORE);
+fn command_selects_twig_for_explicit_files_with_any_suffix() {
+    for name in ["buffer", "buffer.php", "buffer.TWIG"] {
+        let directory = workspace(CONFIG);
+        let path = directory.path().join(name);
+        std::fs::write(&path, include_bytes!("fixtures/format_twig/language_boundary.twig")).unwrap();
+        let output = run(directory.path(), &["twig:fmt", name]);
+        assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+        assert_eq!(std::fs::read(path).unwrap(), include_bytes!("fixtures/format_twig/language_boundary.after.twig"));
+    }
+}
+
+#[test]
+fn stdin_always_uses_twig_regardless_of_buffer_name() {
+    let directory = workspace(CONFIG);
+    for path in
+        [None, Some("src/template.html.twig"), Some("src/unsaved"), Some("src/buffer.php"), Some("src/UPPER.TWIG")]
+    {
+        let output = stdin(directory.path(), path, BEFORE);
         assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
         assert_eq!(output.stdout, AFTER);
     }
-
-    for path in [None, Some("twig"), Some("src/twig.php")] {
-        let output = stdin(directory.path(), path, PHP);
-        assert!(output.status.success());
-        assert_eq!(output.stdout, PHP);
-    }
-
     assert_eq!(contents(directory.path()), BEFORE);
 }
 
 #[test]
-fn can_disable_twig_without_disabling_php() {
-    let directory = workspace(include_str!("fixtures/format_twig/disabled.toml"));
-    std::fs::write(directory.path().join("src/template.html.twig"), INVALID).unwrap();
-    assert!(run(directory.path(), &["fmt", "--check"]).status.success());
-    assert!(run(directory.path(), &["fmt", "src/template.html.twig"]).status.success());
-    assert_eq!(contents(directory.path()), INVALID);
-    let output = stdin(directory.path(), Some("src/template.html.twig"), INVALID);
-    assert!(output.status.success());
-    assert_eq!(output.stdout, INVALID);
+fn php_formatter_uses_php_regardless_of_buffer_name() {
+    let directory = workspace(CONFIG);
+    for path in [None, Some("src/template.html.twig"), Some("src/buffer.php")] {
+        let output = stdin_for(directory.path(), "fmt", path, PHP_BEFORE);
+        assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+        assert_eq!(output.stdout, PHP);
+    }
+    assert_eq!(stdin_for(directory.path(), "fmt", None, BEFORE).stdout, BEFORE);
 }
 
 #[test]
-fn honors_source_and_formatter_excludes() {
+fn disabling_twig_does_not_disable_php() {
+    let directory = workspace(include_str!("fixtures/format_twig/disabled.toml"));
+    let root = directory.path();
+    std::fs::write(root.join("src/template.html.twig"), INVALID).unwrap();
+    assert!(run(root, &["twig:fmt", "--check"]).status.success());
+    assert!(run(root, &["twig:fmt", "src/template.html.twig"]).status.success());
+    assert_eq!(stdin(root, Some("src/template.html.twig"), INVALID).stdout, INVALID);
+    assert_eq!(contents(root), INVALID);
+    assert!(run(root, &["fmt"]).status.success());
+    assert_eq!(std::fs::read(root.join("src/unchanged.php")).unwrap(), PHP);
+}
+
+#[test]
+fn honors_source_and_twig_excludes() {
     let directory = workspace(include_str!("fixtures/format_twig/excludes.toml"));
     for path in ["src/source-excluded.twig", "src/format-excluded.twig"] {
         std::fs::write(directory.path().join(path), BEFORE).unwrap();
-        let output = stdin(directory.path(), Some(path), BEFORE);
-        assert!(output.status.success());
-        assert_eq!(output.stdout, BEFORE);
+        assert_eq!(stdin(directory.path(), Some(path), BEFORE).stdout, BEFORE);
     }
-
-    assert!(run(directory.path(), &["fmt"]).status.success());
+    assert!(run(directory.path(), &["twig:fmt"]).status.success());
     assert_eq!(contents(directory.path()), AFTER);
     for path in ["src/source-excluded.twig", "src/format-excluded.twig"] {
         assert_eq!(std::fs::read(directory.path().join(path)).unwrap(), BEFORE);
@@ -119,101 +91,56 @@ fn honors_source_and_formatter_excludes() {
 }
 
 #[test]
-fn rejects_invalid_twig_without_writing_it() {
-    let directory = workspace(include_str!("fixtures/format_twig/mago.toml"));
+fn php_formatter_excludes_do_not_apply_to_twig() {
+    let directory = workspace("[source]\npaths=['src']\n[formatter]\nexcludes=['src']\n");
+    assert!(run(directory.path(), &["twig:fmt"]).status.success());
+    assert_eq!(contents(directory.path()), AFTER);
+    assert_eq!(std::fs::read(directory.path().join("src/unchanged.php")).unwrap(), PHP_BEFORE);
+}
+
+#[test]
+fn invalid_templates_remain_unchanged() {
+    let directory = workspace(CONFIG);
     std::fs::write(directory.path().join("src/template.html.twig"), INVALID).unwrap();
-    let output = run(directory.path(), &["fmt"]);
+    let output = run(directory.path(), &["twig:fmt"]);
     assert!(!output.status.success());
     assert!(String::from_utf8_lossy(&output.stderr).contains("template.html.twig"));
     assert_eq!(contents(directory.path()), INVALID);
-    let output = stdin(directory.path(), Some("src/template.html.twig"), INVALID);
+    let output = stdin(directory.path(), None, INVALID);
     assert!(!output.status.success());
     assert!(output.stdout.is_empty());
 }
 
 #[test]
-fn extreme_nesting_returns_an_error_without_aborting() {
-    let directory = workspace(include_str!("fixtures/format_twig/mago.toml"));
+fn extreme_nesting_reports_an_error_without_aborting() {
+    let directory = workspace(CONFIG);
     for source in [
         format!("{{{{ {}x{} }}}}", "(".repeat(5000), ")".repeat(5000)),
         format!("{}x{}", "{% if x %}".repeat(5000), "{% endif %}".repeat(5000)),
     ] {
-        let output = stdin(directory.path(), Some("src/template.html.twig"), source.as_bytes());
+        let output = stdin(directory.path(), None, source.as_bytes());
         assert_eq!(output.status.code(), Some(2), "{}", String::from_utf8_lossy(&output.stderr));
         assert!(output.stdout.is_empty());
     }
 }
 
 #[test]
-fn twig_settings_are_separate_and_visible_in_configuration() {
-    let directory = workspace(include_str!("fixtures/format_twig/settings.toml"));
-    let output = run(directory.path(), &["config", "--show", "formatter"]);
-    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
-    let config: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(config["print-width"], 20);
-    assert_eq!(config["twig"]["print-width"], 80);
-    assert_eq!(config["twig"]["enabled"], true);
-    assert_eq!(config["twig"]["tab-width"], 2);
-    let output = stdin(directory.path(), Some("src/template.html.twig"), BEFORE);
-    assert!(output.status.success());
-    assert_eq!(output.stdout, include_bytes!("fixtures/format_twig/two_spaces.twig"));
-    let schema = run(directory.path(), &["config", "--schema", "--show", "formatter"]);
-    assert!(schema.status.success());
-    let schema: serde_json::Value = serde_json::from_slice(&schema.stdout).unwrap();
-    let mut twig = &schema["properties"]["twig"];
-    if let Some(reference) = twig["$ref"].as_str() {
-        twig = schema.pointer(reference.strip_prefix('#').unwrap()).unwrap();
-    }
-
-    for name in ["enabled", "print-width", "tab-width", "use-tabs", "end-of-line"] {
-        assert!(twig["properties"][name].is_object(), "Missing Twig setting in schema: {name}");
-    }
-}
-
-#[test]
-fn rejects_unknown_twig_settings() {
-    let directory = workspace(include_str!("fixtures/format_twig/unknown_setting.toml"));
-    let output = run(directory.path(), &["fmt"]);
-    assert!(!output.status.success());
-    assert!(String::from_utf8_lossy(&output.stderr).contains("unknown"));
-}
-
-#[test]
-fn inherits_twig_settings_through_configuration_layers() {
-    let directory = workspace(include_str!("fixtures/format_twig/inherits.toml"));
-    std::fs::write(directory.path().join("base.toml"), include_str!("fixtures/format_twig/settings.toml")).unwrap();
-    let output = run(directory.path(), &["config", "--show", "formatter"]);
-    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
-    let config: serde_json::Value = serde_json::from_slice(&output.stdout).unwrap();
-    assert_eq!(config["twig"]["print-width"], 60);
-    assert_eq!(config["twig"]["tab-width"], 2);
-    assert_eq!(config["print-width"], 20);
-    let output = stdin(directory.path(), Some("src/template.html.twig"), BEFORE);
-    assert!(output.status.success());
-    assert_eq!(output.stdout, include_bytes!("fixtures/format_twig/two_spaces.twig"));
-}
-
-fn git(workspace: &Path, arguments: &[&str]) -> Output {
-    let output = Command::new("git").args(arguments).current_dir(workspace).output().unwrap();
-    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
-    output
-}
-
-#[test]
-fn formats_staged_twig_without_changing_the_worktree() {
-    let directory = workspace(include_str!("fixtures/format_twig/mago.toml"));
+fn staged_tools_keep_languages_and_working_copies_separate() {
+    let directory = workspace(CONFIG);
     let root = directory.path();
     git(root, &["init", "--quiet"]);
     git(root, &["config", "core.autocrlf", "false"]);
-    git(root, &["add", "src/template.html.twig"]);
-    let output = run(root, &["fmt", "--staged"]);
-    assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+    git(root, &["add", "src/template.html.twig", "src/unchanged.php"]);
+    assert!(run(root, &["twig:fmt", "--staged"]).status.success());
     assert_eq!(git(root, &["show", ":src/template.html.twig"]).stdout, AFTER);
+    assert_eq!(git(root, &["show", ":src/unchanged.php"]).stdout, PHP_BEFORE);
     assert_eq!(contents(root), BEFORE);
-
+    assert!(run(root, &["fmt", "--staged"]).status.success());
+    assert_eq!(git(root, &["show", ":src/unchanged.php"]).stdout, PHP);
+    assert_eq!(std::fs::read(root.join("src/unchanged.php")).unwrap(), PHP_BEFORE);
     std::fs::write(root.join("src/template.html.twig"), INVALID).unwrap();
     git(root, &["add", "src/template.html.twig"]);
-    assert!(!run(root, &["fmt", "--staged"]).status.success());
+    assert!(!run(root, &["twig:fmt", "--staged"]).status.success());
     assert_eq!(git(root, &["show", ":src/template.html.twig"]).stdout, INVALID);
 }
 
@@ -229,65 +156,34 @@ fn staged_mode_honors_disabled_twig_and_excludes() {
         std::fs::write(root.join(path), INVALID).unwrap();
         git(root, &["init", "--quiet"]);
         git(root, &["add", path]);
-        let output = run(root, &["fmt", "--staged"]);
-        assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+        assert!(run(root, &["twig:fmt", "--staged"]).status.success());
         assert_eq!(git(root, &["show", &format!(":{path}")]).stdout, INVALID);
     }
 }
 
 #[test]
-fn php_tools_do_not_discover_twig_files() {
-    let directory = workspace(include_str!("fixtures/format_twig/mago.toml"));
-    std::fs::write(directory.path().join("src/template.html.twig"), INVALID).unwrap();
-    for command in ["analyze", "lint", "guard"] {
-        let output = run(directory.path(), &[command]);
-        assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
+fn php_commands_and_file_listing_do_not_discover_twig() {
+    let directory = workspace(CONFIG);
+    let root = directory.path();
+    std::fs::write(root.join("src/template.html.twig"), INVALID).unwrap();
+    for command in ["analyze", "lint", "guard", "fmt"] {
+        let output = run(root, &[command]);
+        assert!(output.status.success(), "{command}: {}", String::from_utf8_lossy(&output.stderr));
+    }
+    assert_eq!(contents(root), INVALID);
+    for tool in ["formatter", "linter", "analyzer", "guard"] {
+        let output = run(root, &["list-files", "--command", tool, "-0"]);
+        assert!(output.status.success());
+        assert!(!String::from_utf8_lossy(&output.stdout).contains("template.html.twig"));
     }
 }
 
 #[test]
-fn formatter_file_listing_includes_enabled_twig_files() {
-    for (configuration, enabled) in [
-        (include_str!("fixtures/format_twig/mago.toml"), true),
-        (include_str!("fixtures/format_twig/disabled.toml"), false),
-    ] {
-        let directory = workspace(configuration);
-        let listed = run(directory.path(), &["list-files", "--command", "formatter", "-0"]);
-        assert!(listed.status.success(), "{}", String::from_utf8_lossy(&listed.stderr));
-        assert_eq!(String::from_utf8_lossy(&listed.stdout).contains("template.html.twig"), enabled);
-
-        for arguments in [
-            vec!["list-files"],
-            vec!["list-files", "--command", "linter"],
-            vec!["list-files", "--command", "analyzer"],
-            vec!["list-files", "--command", "guard"],
-        ] {
-            let listed = run(directory.path(), &arguments);
-            assert!(listed.status.success());
-            assert!(!String::from_utf8_lossy(&listed.stdout).contains("template.html.twig"));
-        }
-    }
-}
-
-#[test]
-fn formatter_file_listing_honors_excludes() {
-    let directory = workspace(include_str!("fixtures/format_twig/excludes.toml"));
-    for path in ["src/source-excluded.twig", "src/format-excluded.twig"] {
-        std::fs::write(directory.path().join(path), BEFORE).unwrap();
-    }
-
-    let listed = run(directory.path(), &["list-files", "--command", "formatter"]);
-    assert!(listed.status.success(), "{}", String::from_utf8_lossy(&listed.stderr));
-    let paths = String::from_utf8_lossy(&listed.stdout);
-    assert!(paths.contains("template.html.twig"));
-    assert!(!paths.contains("source-excluded.twig"));
-    assert!(!paths.contains("format-excluded.twig"));
-}
-
-#[test]
-fn fix_uses_twig_formatter() {
-    let directory = workspace(include_str!("fixtures/format_twig/mago.toml"));
-    let output = run(directory.path(), &["fix", "--no-guard", "--no-analyze", "--no-lint"]);
+fn fix_does_not_run_the_twig_formatter() {
+    let directory = workspace(CONFIG);
+    let root = directory.path();
+    let output = run(root, &["fix", "--no-guard", "--no-analyze", "--no-lint"]);
     assert!(output.status.success(), "{}", String::from_utf8_lossy(&output.stderr));
-    assert_eq!(contents(directory.path()), AFTER);
+    assert_eq!(contents(root), BEFORE);
+    assert_eq!(std::fs::read(root.join("src/unchanged.php")).unwrap(), PHP);
 }

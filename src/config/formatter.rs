@@ -9,7 +9,6 @@ use serde::Serialize;
 
 use mago_formatter::presets::FormatterPreset;
 use mago_formatter::settings::*;
-use mago_twig_formatter::settings::FormatSettings as TwigFormatSettings;
 
 /// Configuration options for formatting source code.
 #[derive(Default, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -26,23 +25,6 @@ pub struct FormatterConfiguration {
     /// individual settings during deserialization.
     #[serde(skip_serializing)]
     pub settings: FormatSettings,
-
-    pub twig: TwigFormatterConfiguration,
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, JsonSchema)]
-#[serde(default, rename_all = "kebab-case", deny_unknown_fields)]
-pub struct TwigFormatterConfiguration {
-    /// Whether to format `.twig` files.
-    pub enabled: bool,
-    #[serde(flatten)]
-    pub settings: TwigFormatSettings,
-}
-
-impl Default for TwigFormatterConfiguration {
-    fn default() -> Self {
-        Self { enabled: true, settings: TwigFormatSettings::default() }
-    }
 }
 
 impl JsonSchema for FormatterConfiguration {
@@ -68,7 +50,6 @@ impl JsonSchema for FormatterConfiguration {
                 );
 
                 props.insert("preset".to_string(), generator.subschema_for::<Option<FormatterPreset>>().to_value());
-                props.insert("twig".to_string(), generator.subschema_for::<TwigFormatterConfiguration>().to_value());
             }
 
             obj.insert("title".to_string(), serde_json::json!("FormatterConfiguration"));
@@ -90,8 +71,6 @@ struct RawFormatterConfiguration {
     excludes: Vec<String>,
     #[serde(default)]
     preset: Option<FormatterPreset>,
-    #[serde(default)]
-    twig: TwigFormatterConfiguration,
     #[serde(flatten)]
     settings: RawFormatSettings,
 }
@@ -107,7 +86,6 @@ impl FormatterConfiguration {
         let mut value = serde_json::to_value(self.settings).unwrap_or_default();
         if let serde_json::Value::Object(ref mut map) = value {
             map.insert("excludes".to_string(), serde_json::to_value(&self.excludes).unwrap_or_default());
-            map.insert("twig".to_string(), serde_json::to_value(&self.twig).unwrap_or_default());
         }
 
         value
@@ -119,7 +97,7 @@ impl From<RawFormatterConfiguration> for FormatterConfiguration {
         let base = raw.preset.map(|p| p.settings()).unwrap_or_default();
         let settings = raw.settings.merge_with(base);
 
-        Self { excludes: raw.excludes, settings, twig: raw.twig }
+        Self { excludes: raw.excludes, settings }
     }
 }
 

@@ -114,13 +114,7 @@ impl ListFilesCommand {
         if let Some(command) = self.command {
             match command {
                 Command::Linter => orchestrator.add_exclude_patterns(configuration.linter.excludes.iter()),
-                Command::Formatter => {
-                    if configuration.formatter.twig.enabled {
-                        orchestrator.add_source_extension("twig");
-                    }
-
-                    orchestrator.add_exclude_patterns(configuration.formatter.excludes.iter());
-                }
+                Command::Formatter => orchestrator.add_exclude_patterns(configuration.formatter.excludes.iter()),
                 Command::Analyzer => orchestrator.add_exclude_patterns(configuration.analyzer.excludes.iter()),
                 Command::Guard => orchestrator.add_exclude_patterns(configuration.guard.excludes.iter()),
             }

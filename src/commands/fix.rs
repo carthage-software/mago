@@ -14,6 +14,7 @@ use crate::commands::analyze::AnalyzeCommand;
 use crate::commands::args::baseline_reporting::BaselineReportingArgs;
 use crate::commands::args::reporting::ReportingArgs;
 use crate::commands::format::FormatCommand;
+use crate::commands::formatting::FormatArgs;
 use crate::commands::guard::GuardCommand;
 use crate::commands::lint::LintCommand;
 use crate::commands::outcome::CommandOutcome;
@@ -114,9 +115,8 @@ impl FixCommand {
                         .execute(configuration, color_choice)?,
                     FixTool::Lint => LintCommand { path, baseline_reporting, ..LintCommand::default() }
                         .execute(configuration, color_choice)?,
-                    FixTool::Format => {
-                        FormatCommand { path, ..FormatCommand::default() }.execute(configuration, color_choice)?
-                    }
+                    FixTool::Format => FormatCommand { arguments: FormatArgs { path, ..Default::default() } }
+                        .execute(configuration, color_choice)?,
                 };
 
                 if result.exit_code != ExitCode::SUCCESS {

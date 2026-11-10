@@ -59,6 +59,8 @@ use crate::service::format::FormatService;
 use crate::service::guard::GuardService;
 use crate::service::incremental_analysis::IncrementalAnalysisService;
 use crate::service::lint::LintService;
+use crate::service::twig_format::TwigFormatService;
+use mago_twig_formatter::settings::FormatSettings as TwigFormatSettings;
 
 pub use config::OrchestratorConfiguration;
 pub use error::OrchestratorError;
@@ -419,10 +421,14 @@ impl<'cfg> Orchestrator<'cfg> {
             database,
             self.config.php_version,
             self.config.formatter_settings,
-            self.config.twig_formatter_settings,
             self.config.parser_settings,
             self.config.use_progress_bars,
         )
+    }
+
+    #[must_use]
+    pub fn get_twig_format_service(&self, database: ReadDatabase, settings: TwigFormatSettings) -> TwigFormatService {
+        TwigFormatService::new(database, settings, self.config.use_progress_bars)
     }
 
     /// Formats a single file according to the configured style settings.

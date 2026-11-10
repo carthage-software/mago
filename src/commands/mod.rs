@@ -70,6 +70,7 @@ use crate::commands::inspect_baseline::InspectBaselineCommand;
 use crate::commands::lint::LintCommand;
 use crate::commands::list_files::ListFilesCommand;
 use crate::commands::self_update::SelfUpdateCommand;
+use crate::commands::twig_format::TwigFormatCommand;
 use crate::error::Error;
 
 mod args;
@@ -80,6 +81,7 @@ pub mod cst;
 pub mod extension;
 pub mod fix;
 pub mod format;
+mod formatting;
 pub mod generate_completions;
 pub mod guard;
 pub mod init;
@@ -89,6 +91,7 @@ pub mod list_files;
 mod outcome;
 pub mod self_update;
 pub mod stdin_input;
+pub mod twig_format;
 
 /// ANSI color styling configuration for Mago's CLI output.
 ///
@@ -194,6 +197,10 @@ pub enum MagoCommand {
     /// **Usage**: `mago lint [OPTIONS]`
     #[command(name = "lint")]
     Lint(LintCommand),
+
+    /// Format Twig templates.
+    #[command(name = "twig:fmt")]
+    TwigFormat(TwigFormatCommand),
 
     /// Apply fixes until guard, analyzer, linter, and formatter make no more changes.
     #[command(name = "fix")]

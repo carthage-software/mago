@@ -3,7 +3,7 @@ paths = ["src"]
 [formatter]
 print-width = 20
 use-tabs = true
-[formatter.twig]
+[twig.formatter]
 print-width = 80
 tab-width = 2
 use-tabs = false

@@ -1,23 +1,23 @@
 +++
-title = "Templates Twig"
+title = "Formateur Twig"
 description = "Formater la syntaxe Twig sans reformater le HTML."
 nav_order = 35
 nav_section = "Tools"
-nav_subsection = "Formatter"
+nav_subsection = "Twig Formatter"
 +++
-# Templates Twig
+# Formateur Twig
 
-`mago fmt` formate les fichiers `.twig`, y compris `index.html.twig`. Il les cherche dans `source.paths` sans qu'il faille ajouter `twig` à `source.extensions`. Les outils PHP gardent leur sélection de fichiers actuelle.
+`mago twig:fmt` formate les templates Twig. La recherche dans les dossiers sélectionne les fichiers `.twig` sous `source.paths`, dont `index.html.twig`, sans tenir compte de `source.extensions`. Les fichiers explicites utilisent Twig, même sans extension ou avec `.php`. `mago fmt`, `mago fix` et la commande de liste des fichiers gardent leur comportement PHP.
 
 ```sh
-mago fmt templates/
-mago fmt --check
-mago fmt --dry-run
-mago fmt --staged
-mago fmt --stdin-input --stdin-filepath templates/index.html.twig < templates/index.html.twig
+mago twig:fmt templates/
+mago twig:fmt --check
+mago twig:fmt --dry-run
+mago twig:fmt --staged
+mago twig:fmt --stdin-input --stdin-filepath templates/index.html.twig < templates/index.html.twig
 ```
 
-Pour l'entrée standard, `--stdin-filepath` sélectionne Twig. Sans chemin, Mago utilise le formateur PHP. La phase de formatage de `mago fix` prend aussi Twig en charge.
+La commande choisit le langage. L'entrée standard utilise toujours Twig, avec ou sans `--stdin-filepath` ; ce chemin ne sert qu'aux exclusions et aux messages. La sortie va sur stdout, sans modifier le fichier du tampon. `--staged` sélectionne les fichiers dont l'extension est exactement `.twig` et ne modifie que l'index Git. Les fichiers `.TWIG` explicites restent valides.
 
 ## Périmètre
 
@@ -53,10 +53,10 @@ Aucun réglage ne réécrit les espaces hors des balises. Mago garde les balises
 
 ## Configuration
 
-Les réglages Twig se trouvent sous `[formatter.twig]`. Ils n'héritent pas des réglages ni des préréglages PHP. `source.excludes` et `formatter.excludes` s'appliquent aux deux langages.
+Les réglages Twig se trouvent sous `[twig.formatter]`. Ils n'héritent pas des réglages, exclusions ou préréglages PHP. `source.excludes` s'applique aux deux outils ; `twig.formatter.excludes` ne concerne que Twig. Utiliser `mago config --show twig` ou `mago config --show twig.formatter`, avec `--schema` pour le schéma. `extends` fusionne les réglages comme d'habitude. L'ancienne table `[formatter.twig]` n'est pas prise en charge.
 
 ```toml
-[formatter.twig]
+[twig.formatter]
 enabled = true
 print-width = 120
 tab-width = 4
@@ -67,6 +67,7 @@ end-of-line = "auto"
 | Option | Défaut | Effet |
 | :--- | :--- | :--- |
 | `enabled` | `true` | Formate les fichiers `.twig`. Si faux, les laisse inchangés, y compris via stdin et dans l'index Git. |
+| `excludes` | `[]` | Préfixes de chemin ou globs propres à Twig, selon `source.glob`. |
 | `print-width` | `120` | Largeur visée pour les expressions Twig. Les longues chaînes restent intactes. |
 | `tab-width` | `4` | Nombre d'espaces par niveau et largeur d'une tabulation. |
 | `use-tabs` | `false` | Utilise des tabulations pour indenter. |
@@ -75,7 +76,7 @@ end-of-line = "auto"
 Pour désactiver le formatage Twig :
 
 ```toml
-[formatter.twig]
+[twig.formatter]
 enabled = false
 ```
 

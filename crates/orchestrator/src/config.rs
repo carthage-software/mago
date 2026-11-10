@@ -10,7 +10,6 @@ use mago_guard::settings::Settings as GuardSettings;
 use mago_linter::settings::Settings as LinterSettings;
 use mago_php_version::PHPVersion;
 use mago_syntax::settings::ParserSettings;
-use mago_twig_formatter::settings::FormatSettings as TwigFormatSettings;
 
 /// The complete configuration for the orchestrator and all its services.
 ///
@@ -122,9 +121,6 @@ pub struct OrchestratorConfiguration<'cfg> {
     /// Controls code style preferences like indentation, line length, etc.
     /// See [`mago_formatter::settings::FormatSettings`] for available options.
     pub formatter_settings: FormatSettings,
-
-    /// Twig formatter settings, or `None` to leave Twig files unchanged.
-    pub twig_formatter_settings: Option<TwigFormatSettings>,
 
     /// Disable all default analyzer plugins (including stdlib).
     ///

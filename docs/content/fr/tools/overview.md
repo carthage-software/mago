@@ -6,7 +6,7 @@ nav_section = "Tools"
 +++
 # Outils
 
-Mago est un seul binaire qui regroupe quatre outils. Ils partagent la configuration, le parseur et le runtime, vous pouvez donc utiliser n'importe quelle combinaison sans payer pour les outils que vous n'exécutez pas.
+Mago regroupe plusieurs outils dans un binaire. Chaque commande choisit son parseur et ses règles. Les outils partagent les réglages de fichiers et les rapports.
 
 ## [Formateur](/tools/formatter/overview/)
 
@@ -23,3 +23,7 @@ Un moteur d'analyse statique qui détecte les erreurs de types et les bugs logiq
 ## [Guard architectural](/tools/guard/overview/)
 
 Applique les règles de dépendance et les conventions structurelles. Utile lorsque vous voulez interdire certains chemins `use`, codifier les frontières entre couches ou affirmer que le code d'une partie du projet n'importe jamais le code d'une autre.
+
+## [Formateur Twig](/tools/formatter/twig/)
+
+`mago twig:fmt` formate Twig avec ses propres réglages `[twig.formatter]`. Le texte du template reste intact ; le HTML n'est pas reformaté. Le formateur PHP et `mago fix` ne le lancent pas.

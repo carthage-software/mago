@@ -1,23 +1,23 @@
 +++
-title = "Twig 模板"
+title = "Twig 格式化器"
 description = "格式化 Twig 语法，不重新格式化 HTML。"
 nav_order = 35
 nav_section = "工具"
-nav_subsection = "Formatter"
+nav_subsection = "Twig Formatter"
 +++
-# Twig 模板
+# Twig 格式化器
 
-`mago fmt` 支持 `.twig` 文件，包括 `index.html.twig`。它会在 `source.paths` 下查找这些文件，无需把 `twig` 加入 `source.extensions`。PHP 工具的文件选择不变。
+`mago twig:fmt` 格式化 Twig 模板。扫描目录时，它选择 `source.paths` 下的 `.twig` 文件（包括 `index.html.twig`），不受 `source.extensions` 影响。显式文件始终按 Twig 处理，即使没有扩展名或使用 `.php`。`mago twig:fmt`、`mago fix` 和现有文件列表命令保持原有 PHP 行为。
 
 ```sh
-mago fmt templates/
-mago fmt --check
-mago fmt --dry-run
-mago fmt --staged
-mago fmt --stdin-input --stdin-filepath templates/index.html.twig < templates/index.html.twig
+mago twig:fmt templates/
+mago twig:fmt --check
+mago twig:fmt --dry-run
+mago twig:fmt --staged
+mago twig:fmt --stdin-input --stdin-filepath templates/index.html.twig < templates/index.html.twig
 ```
 
-从标准输入读取时，用 `--stdin-filepath` 选择 Twig。未提供路径时，Mago 使用 PHP 格式化器。`mago fix` 的格式化阶段也支持 Twig。
+命令决定语言。标准输入始终使用 Twig，无论是否提供 `--stdin-filepath`；该路径只用于排除规则和错误位置。结果写入 stdout，不修改缓冲区对应的磁盘文件。`--staged` 只选择扩展名严格为 `.twig` 的文件，并且只更新 Git 暂存区，不修改工作区文件。显式指定的 `.TWIG` 文件仍可使用。
 
 ## 范围
 
@@ -53,10 +53,10 @@ Twig 会将标签外的空白作为文本输出。Mago 保留这些文本的每�
 
 ## 配置
 
-Twig 设置位于 `[formatter.twig]` 下，不继承 PHP 格式化器的设置或预设。`source.excludes` 和 `formatter.excludes` 同时适用于两种语言。
+Twig 设置位于 `[twig.formatter]` 下，不继承 PHP 格式化器的设置、排除规则或预设。`source.excludes` 适用于两个工具；`twig.formatter.excludes` 只用于 Twig。可运行 `mago config --show twig` 或 `mago config --show twig.formatter`，加上 `--schema` 查看配置架构。配置层按现有 `extends` 规则合并。旧的 `[formatter.twig]` 表不受支持。
 
 ```toml
-[formatter.twig]
+[twig.formatter]
 enabled = true
 print-width = 120
 tab-width = 4
@@ -67,6 +67,7 @@ end-of-line = "auto"
 | 选项 | 默认值 | 作用 |
 | :--- | :--- | :--- |
 | `enabled` | `true` | 格式化 `.twig` 文件。关闭后文件保持不变，标准输入和 Git 暂存文件也一样。 |
+| `excludes` | `[]` | Twig 专用的路径前缀或 glob，遵循共用的 `source.glob` 设置。 |
 | `print-width` | `120` | Twig 表达式的目标行宽。不会拆分长字符串。 |
 | `tab-width` | `4` | 每级缩进的空格数及制表符宽度。 |
 | `use-tabs` | `false` | 使用制表符缩进。 |
@@ -75,7 +76,7 @@ end-of-line = "auto"
 关闭 Twig 格式化：
 
 ```toml
-[formatter.twig]
+[twig.formatter]
 enabled = false
 ```
 

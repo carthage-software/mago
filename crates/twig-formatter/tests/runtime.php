@@ -69,7 +69,7 @@ function format(string $binary, string $config, string $source): string
             $directory,
             '--config',
             $config,
-            'fmt',
+            'twig:fmt',
             '--stdin-input',
             '--stdin-filepath',
             'case.twig',
@@ -178,7 +178,7 @@ $config = $directory . '/mago.toml';
 $checked = 0;
 try {
     foreach ($profiles as $profile => $settings) {
-        write($config, "[source]\npaths = []\n[formatter.twig]\n$settings\n");
+        write($config, "[source]\npaths = []\n[twig.formatter]\n$settings\n");
         foreach (cases() as $name => $source) {
             $formatted = format($binary, $config, $source);
             foreach ($environments as $twig) {

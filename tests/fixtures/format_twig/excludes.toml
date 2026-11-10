@@ -1,5 +1,5 @@
 [source]
 paths = ["src"]
 excludes = ["src/source-excluded.twig"]
-[formatter]
+[twig.formatter]
 excludes = ["src/format-excluded.twig"]
