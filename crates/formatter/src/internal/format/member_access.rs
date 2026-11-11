@@ -422,13 +422,13 @@ where
 
     #[inline]
     fn is_already_broken(&self, f: &FormatterState<'_, '_, A>) -> bool {
-        let mut accesses_len = self.accesses.len();
-        if should_inline_first_access(f, self) {
-            accesses_len -= 1; // First access is inline, so we don't count it for broken links
-        }
+        let inline_prefix_len = inline_prefix_len(f, self);
+        let accesses_len = self.accesses.len() - inline_prefix_len;
 
+        // Only count gaps that remain breakable after the inline prefix is attached.
         let broken_links = self
             .link_gaps()
+            .skip(inline_prefix_len)
             .filter(|(start, end)| misc::has_new_line_in_range(f.source_text, start.offset, end.offset))
             .count();
 
@@ -915,7 +915,10 @@ where
         }
     }
 
-    let mut should_reset = false;
+    // A property group following an inline method needs its own break opportunity.
+    let mut should_reset = accesses_iter.peek().is_some_and(|(i, next)| {
+        *i > 0 && next.is_property_access() && !member_access_chain.accesses[i - 1].is_property_access()
+    });
     // Now handle the remaining method calls
     while let Some((i, chain_link)) = accesses_iter.next() {
         let is_in_fluent_chain = fluent_access_chain_start.is_some_and(|start| i >= start);
