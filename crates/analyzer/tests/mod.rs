@@ -2978,6 +2978,18 @@ fn issue_2641_without_property_memoization() {
     framework::TestCase::new("issue_2641", include_bytes!("cases/issue_2641.php")).settings(settings).run();
 }
 
+test_case!(issue_2641_nullsafe);
+
+#[test]
+fn issue_2641_nullsafe_without_property_memoization() {
+    let mut settings = default_test_settings();
+    settings.memoize_properties = false;
+
+    framework::TestCase::new("issue_2641_nullsafe", include_bytes!("cases/issue_2641_nullsafe.php"))
+        .settings(settings)
+        .run();
+}
+
 test_case!(issue_2676);
 
 #[test]
