@@ -378,7 +378,14 @@ where
             Rc::make_mut(&mut source_type).set_by_reference(source_expression.is_reference());
         }
 
-        analyze_reference_assignment(context, block_context, target_expression, source_expression);
+        analyze_reference_assignment(
+            context,
+            block_context,
+            artifacts,
+            target_expression,
+            source_expression,
+            &source_type,
+        )?;
     }
 
     if let Some(root) = get_root_expression_id(target_expression) {
@@ -466,11 +473,14 @@ where
 }
 
 fn analyze_reference_assignment<'ctx, 'ast, 'arena, A>(
-    context: &Context<'ctx, 'arena, A>,
+    context: &mut Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
+    artifacts: &mut AnalysisArtifacts,
     target_expression: &'ast Expression<'arena>,
     source_expression: &'ast Expression<'arena>,
-) where
+    source_type: &Rc<TUnion>,
+) -> Result<(), AnalysisError>
+where
     A: Arena,
 {
     let Expression::UnaryPrefix(UnaryPrefix {
@@ -478,16 +488,33 @@ fn analyze_reference_assignment<'ctx, 'ast, 'arena, A>(
         operand: referenced_expression,
     }) = source_expression
     else {
-        return;
+        return Ok(());
     };
 
     let target_variable_id = get_block_expression_id(target_expression, context, block_context);
     let referenced_variable_id = get_block_expression_id(referenced_expression, context, block_context);
     let (Some(target_variable_id), Some(referenced_variable_id)) = (target_variable_id, referenced_variable_id) else {
-        return;
+        return Ok(());
     };
 
-    block_context.locals.entry(referenced_variable_id).or_insert_with(|| Rc::new(get_mixed()));
+    if let Expression::ArrayAccess(array_access) = referenced_expression
+        && get_root_expression_id(referenced_expression) != Some(target_variable_id)
+        && artifacts.get_expression_type(array_access.array).is_some_and(|ty| !ty.has_object_type())
+    {
+        assign_to_expression(
+            context,
+            block_context,
+            artifacts,
+            referenced_expression,
+            Some(referenced_variable_id),
+            None,
+            Rc::clone(source_type),
+            false,
+            PropertyWriteKind::Mutation,
+        )?;
+    }
+
+    block_context.locals.entry(referenced_variable_id).or_insert_with(|| Rc::clone(source_type));
 
     if block_context.references_in_scope.contains_key(&target_variable_id) {
         block_context.decrement_reference_count(target_variable_id.as_bytes());
@@ -502,6 +529,8 @@ fn analyze_reference_assignment<'ctx, 'ast, 'arena, A>(
     if memchr::memchr(b'[', referenced_bytes).is_some() || memchr::memmem::find(referenced_bytes, b"->").is_some() {
         block_context.references_to_external_scope.insert(target_variable_id);
     }
+
+    Ok(())
 }
 
 pub fn analyze_assignment_to_variable<'ctx, 'arena, A>(

@@ -710,6 +710,7 @@ test_case!(pass_by_ref);
 test_case!(issue_2235);
 test_case!(return_by_ref);
 test_case!(array_refs);
+test_case!(issue_2639);
 test_case!(ref_constraint_conflict);
 test_case!(match_not_exhaustive);
 test_case!(match_expression);

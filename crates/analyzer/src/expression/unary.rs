@@ -108,6 +108,11 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPrefix<'arena> {
             // operators that always retain the type of the operand
             UnaryPrefixOperator::Reference(_) => {
                 let mut referenced_type = operand_type.map_or_else(get_mixed, |t| t.as_ref().clone());
+                if matches!(self.operand, Expression::ArrayAccess(_)) && referenced_type.possibly_undefined() {
+                    referenced_type = referenced_type.as_nullable();
+                    referenced_type.set_possibly_undefined(false, None);
+                }
+
                 referenced_type.set_by_reference(true);
 
                 artifacts.set_rc_expression_type(self, Rc::new(referenced_type));
