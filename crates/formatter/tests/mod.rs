@@ -204,6 +204,7 @@ test_case!(member_access_chain);
 test_case!(preserved_chain_multiline_arguments);
 test_case!(preserved_chain_multiline_arguments_first_on_new_line);
 test_case!(preserved_chain_multiline_arguments_default);
+test_case!(preserved_chain_multiline_properties);
 test_case!(member_access_chain_short_after_breaking_receiver_args);
 test_case!(member_access_chain_short_after_collapsed_receiver_args);
 test_case!(same_line_chain_property_receiver);
