@@ -858,6 +858,34 @@ pub fn test_only_public_methods_restricts_declared_class_api() {
 }
 
 #[test]
+pub fn test_is_guard_non_final_class() {
+    let code = indoc! {r"
+        <?php
+            namespace App\Entity {
+                class Test {
+
+                }
+            }
+    "};
+
+    let settings = Settings {
+        structural: StructuralSettings {
+            rules: vec![StructuralRule {
+                on: "**\\Entity\\*".into(),
+                target: StructuralSymbolKind::Class.into(),
+                must_be_final: Some(true),
+                ..Default::default()
+            }],
+        },
+        ..Default::default()
+    };
+
+    let result = test_guard("get_error_on_non_final_class", code, settings);
+    assert!(!result.structural_flaws.is_empty(), "Expected violations: Should declare final");
+    assert!(result.structural_flaws.iter().all(|flaw| flaw.kind.error_code() == "must-be-final"));
+}
+
+#[test]
 pub fn test_is_final_annotation_counted() {
     let code = indoc! {r"
         <?php
