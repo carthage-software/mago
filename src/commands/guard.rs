@@ -159,8 +159,7 @@ impl GuardCommand {
         let command_start = trace_enabled.then(Instant::now);
 
         let prelude_start = trace_enabled.then(Instant::now);
-        let Prelude { database, metadata, .. } =
-            if self.no_stubs { Prelude::default() } else { crate::prelude::load() };
+        let Prelude { database, .. } = if self.no_stubs { Prelude::default() } else { crate::prelude::load() };
         let prelude_duration = prelude_start.map(|s| s.elapsed());
 
         // Determine requested mode from CLI flags
@@ -244,7 +243,7 @@ impl GuardCommand {
         }
 
         let guard_run_start = trace_enabled.then(Instant::now);
-        let service = orchestrator.get_guard_service(database.read_only(), metadata);
+        let service = orchestrator.get_guard_service(database.read_only());
         let result = service.run()?;
         let guard_run_duration = guard_run_start.map(|s| s.elapsed());
 
