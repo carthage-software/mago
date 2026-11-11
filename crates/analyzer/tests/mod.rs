@@ -951,6 +951,7 @@ test_case!(traversable_array_iterable_compare);
 test_case!(pseudo_method_on_interface);
 test_case!(dom_node_list_array_access);
 test_case!(iterable_instanceof_traversable_narrow, crate::framework::infection_like_settings());
+test_case!(issue_2620);
 test_case!(generator_is_iterator_subtype, crate::framework::infection_like_settings());
 test_case!(explode_then_assert_count, crate::framework::infection_like_settings());
 test_case!(iterable_not_iterator_keeps_aggregate, crate::framework::infection_like_settings());
