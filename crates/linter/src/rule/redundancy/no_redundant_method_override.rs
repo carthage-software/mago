@@ -132,7 +132,7 @@ impl LintRule for NoRedundantMethodOverrideRule {
             return;
         };
 
-        if block.statements.len() != 1 {
+        if !method.attribute_lists.is_empty() || block.statements.len() != 1 {
             return;
         }
 
@@ -204,4 +204,120 @@ fn matches_method<'arena>(
     }
 
     true
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    use indoc::indoc;
+
+    use crate::test_lint_failure;
+    use crate::test_lint_success;
+
+    test_lint_success! {
+        name = override_with_attribute,
+        rule = NoRedundantMethodOverrideRule,
+        code = indoc! {r"
+            <?php
+
+            #[Attribute(Attribute::TARGET_METHOD)]
+            final class Groups {
+                public function __construct(public array $groups) {}
+            }
+
+            class Line {
+                public function getAmount(): int {
+                    return 100;
+                }
+            }
+
+            class GroupedLine extends Line {
+                #[Groups(['line:write'])]
+                public function getAmount(): int {
+                    return parent::getAmount();
+                }
+            }
+        "},
+    }
+
+    test_lint_success! {
+        name = void_override_with_attribute,
+        rule = NoRedundantMethodOverrideRule,
+        code = indoc! {r"
+            <?php
+
+            class BaseRecord {
+                public function save(): void {}
+            }
+
+            class Record extends BaseRecord {
+                #[Override]
+                public function save(): void {
+                    parent::save();
+                }
+            }
+        "},
+    }
+
+    test_lint_success! {
+        name = static_override_with_attribute,
+        rule = NoRedundantMethodOverrideRule,
+        code = indoc! {r"
+            <?php
+
+            class BaseRecord {
+                public static function count(): int {
+                    return 1;
+                }
+            }
+
+            class Record extends BaseRecord {
+                #[Override]
+                public static function count(): int {
+                    return parent::count();
+                }
+            }
+        "},
+    }
+
+    test_lint_failure! {
+        name = override_without_attribute,
+        rule = NoRedundantMethodOverrideRule,
+        count = 1,
+        code = indoc! {r"
+            <?php
+
+            class Line {
+                public function getAmount(): int {
+                    return 100;
+                }
+            }
+
+            class PlainLine extends Line {
+                public function getAmount(): int {
+                    return parent::getAmount();
+                }
+            }
+        "},
+    }
+
+    test_lint_failure! {
+        name = void_override_without_attribute,
+        rule = NoRedundantMethodOverrideRule,
+        count = 1,
+        code = indoc! {r"
+            <?php
+
+            class BaseRecord {
+                public function save(): void {}
+            }
+
+            class Record extends BaseRecord {
+                public function save(): void {
+                    parent::save();
+                }
+            }
+        "},
+    }
 }
