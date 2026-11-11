@@ -464,7 +464,7 @@ fn fold_concat_operands(operands: &[&Expression<'_>], artifacts: &AnalysisArtifa
     }
 
     if current_strings.iter().all(|s| !s.is_literal_origin()) {
-        let is_non_empty = current_strings.iter().any(|s| s.is_non_empty);
+        let is_non_empty = current_strings.iter().all(|s| s.is_non_empty);
         let is_truthy = current_strings.iter().all(|s| s.is_truthy);
         let casing = if current_strings.iter().all(|s| s.is_lowercase()) {
             TStringCasing::Lowercase
@@ -487,8 +487,12 @@ fn concat_string_lists(left_strings: Vec<TString>, right_strings: &[TString], th
         left_strings.iter().any(|s| s.literal.is_some()) || right_strings.iter().any(|s| s.literal.is_some());
 
     if !has_literals || left_strings.len().saturating_mul(right_strings.len()) > threshold as usize {
-        let is_non_empty = left_strings.iter().any(|s| s.is_non_empty) || right_strings.iter().any(|s| s.is_non_empty);
-        let is_truthy = left_strings.iter().all(|s| s.is_truthy) || right_strings.iter().all(|s| s.is_truthy);
+        let left_is_non_empty = left_strings.iter().all(|s| s.is_non_empty);
+        let right_is_non_empty = right_strings.iter().all(|s| s.is_non_empty);
+        let is_non_empty = left_is_non_empty || right_is_non_empty;
+        let is_truthy = (left_is_non_empty && right_is_non_empty)
+            || left_strings.iter().all(|s| s.is_truthy)
+            || right_strings.iter().all(|s| s.is_truthy);
         let casing = if left_strings.iter().all(|s| s.is_lowercase()) && right_strings.iter().all(|s| s.is_lowercase())
         {
             TStringCasing::Lowercase
@@ -506,7 +510,9 @@ fn concat_string_lists(left_strings: Vec<TString>, right_strings: &[TString], th
         for right_string in right_strings {
             let mut resulting_string = TString::general();
             resulting_string.is_non_empty = left_string.is_non_empty || right_string.is_non_empty;
-            resulting_string.is_truthy = left_string.is_truthy || right_string.is_truthy;
+            resulting_string.is_truthy = left_string.is_truthy
+                || right_string.is_truthy
+                || (left_string.is_non_empty && right_string.is_non_empty);
             resulting_string.casing = match (left_string.casing, right_string.casing) {
                 (TStringCasing::Lowercase, TStringCasing::Lowercase) => TStringCasing::Lowercase,
                 (TStringCasing::Uppercase, TStringCasing::Uppercase) => TStringCasing::Uppercase,

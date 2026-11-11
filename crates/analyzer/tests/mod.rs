@@ -1343,6 +1343,12 @@ test_case!(strings_strtolower_preserves_non_empty);
 test_case!(strings_concat_literal_prefix_is_non_empty);
 test_case!(strings_concat_two_unknown_strings);
 test_case!(strings_concat_non_empty_with_string);
+test_case!(issue_2623);
+test_case!(issue_2623_threshold, {
+    let mut settings = default_test_settings();
+    settings.string_combination_threshold = 1;
+    settings
+});
 test_case!(strings_compound_assign_with_literal);
 test_case!(strings_concat_with_array_fails);
 test_case!(strings_concat_with_null_implicit);
