@@ -203,6 +203,7 @@ where
                 && !is_relative
                 && method.is_static
                 && defining_class_metadata.kind.is_trait()
+                && !is_deferred_trait_binding(classname, current_class_metadata)
                 && context.settings.version.is_deprecated(Feature::CallStaticMethodOnTrait)
             {
                 report_deprecated_static_access_on_trait(context, defining_class_metadata.original_name, class_span);
@@ -429,16 +430,38 @@ where
         }
     };
 
-    if let Some(result) = result
-        && !check_method_visibility_by_id(
+    if let Some(result) = result {
+        let is_visible = check_method_visibility_by_id(
             context,
             block_context.scope.get_class_like_name(),
             &method_id,
             access_span,
             Some(selector.span()),
-        )
-    {
-        result.has_invalid_target = true;
+        );
+        if !is_visible {
+            result.has_invalid_target = true;
+        }
+
+        // Ordinary literal strings retain a class name, unlike unconstrained runtime strings.
+        let is_exact_class = classname.is_named()
+            || classname.is_from_literal_class_string()
+            || (matches!(classname.origin, ResolutionOrigin::AnyString) && classname.fqcn.is_some());
+
+        if let Some(method_metadata) = function_like.method_metadata.as_ref()
+            && is_visible
+            && method_metadata.is_abstract
+            && is_exact_class
+            && !defining_class_metadata.kind.is_interface()
+            && !is_deferred_trait_binding(classname, current_class_metadata)
+            && (method_metadata.is_static
+                || classname.is_relative()
+                || current_class_metadata.is_some_and(|metadata| {
+                    metadata.name == defining_class_metadata.name || metadata.has_parent(defining_class_metadata.name)
+                }))
+        {
+            report_abstract_method_call(context, &declaring_method_id, selector.span());
+            result.has_invalid_target = true;
+        }
     }
 
     if function_like.flags.is_magic_method()
@@ -484,6 +507,22 @@ where
         declaring_object: None,
         is_static: function_like.method_metadata.as_ref().is_some_and(|m| m.is_static),
         mixin_without_magic_method: None,
+    })
+}
+
+fn is_deferred_trait_binding(
+    classname: &ResolvedClassname,
+    current_class_metadata: Option<&ClassLikeMetadata>,
+) -> bool {
+    current_class_metadata.is_some_and(|metadata| {
+        metadata.kind.is_trait()
+            && (classname.is_relative()
+                // Literal class strings do not retain `self::class` or `parent::class` provenance.
+                // The consuming class and its actual parent can implement the abstract method.
+                || (classname.is_from_literal_class_string()
+                    && classname.fqcn.is_some_and(|name| {
+                        name == metadata.original_name || metadata.require_extends.contains(&name.to_ascii_lowercase())
+                    })))
     })
 }
 
@@ -653,6 +692,22 @@ where
             })
         })
     })
+}
+
+fn report_abstract_method_call<A>(context: &mut Context<'_, '_, A>, method_id: &MethodIdentifier, span: Span)
+where
+    A: Arena,
+{
+    let class_name = display_class_like_name(context, method_id.get_class_name());
+    let method_name = display_method_name(context, method_id.get_class_name(), method_id.get_method_name());
+
+    context.collector.report_with_code(
+        IssueCode::InvalidStaticMethodCall,
+        Issue::error(format!("Cannot call abstract method `{class_name}::{method_name}` directly."))
+            .with_annotation(Annotation::primary(span).with_message("This call selects an abstract method"))
+            .with_note("Abstract methods declare a contract but do not provide an implementation.")
+            .with_help("Call a concrete implementation instead, or use `static::` for late static binding."),
+    );
 }
 
 fn report_non_static_access<A>(context: &mut Context<'_, '_, A>, method_id: &MethodIdentifier, span: Span)
