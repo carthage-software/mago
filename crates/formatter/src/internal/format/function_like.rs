@@ -412,6 +412,9 @@ where
             }
 
             contents.push(Document::String(b"("));
+            if !self.variables.is_empty() && f.settings.space_between_parentheses {
+                contents.push(Document::space());
+            }
 
             let mut variables = vec_in![f.arena];
             for variable in &self.variables {
@@ -430,6 +433,10 @@ where
                 contents.push(comments);
             } else {
                 contents.push(Document::Line(Line::soft()));
+            }
+
+            if !self.variables.is_empty() && f.settings.space_between_parentheses {
+                contents.push(Document::space());
             }
 
             contents.push(Document::String(b")"));

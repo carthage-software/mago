@@ -87,6 +87,10 @@ where
 
     let mut parts = vec_in![f.arena; left_parenthesis];
 
+    if f.settings.space_between_parentheses {
+        parts.push(Document::space());
+    }
+
     let mut printed = vec_in![f.arena; ];
     let len = parameter_list.parameters.len();
     let previous_variable_padding = f.parameter_state.variable_padding;
@@ -116,6 +120,11 @@ where
 
     if should_hug_the_parameters {
         parts.extend(printed);
+
+        if f.settings.space_between_parentheses {
+            parts.push(Document::space());
+        }
+
         parts.push(Document::String(b")"));
 
         return Document::Array(parts);
@@ -137,6 +146,10 @@ where
         parts.push(comments);
     } else {
         parts.push(Document::Line(Line::soft()));
+    }
+
+    if f.settings.space_between_parentheses {
+        parts.push(Document::IfBreak(IfBreak::new(f.arena, Document::empty(), Document::space()).with_id(list_id)));
     }
 
     parts.push(Document::String(b")"));

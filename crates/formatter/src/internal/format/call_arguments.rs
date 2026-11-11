@@ -209,6 +209,10 @@ where
             force_break = true;
         }
 
+        if !argument_list.arguments.is_empty() && f.settings.space_between_parentheses {
+            contents.push(Document::space());
+        }
+
         Document::Array(contents)
     };
 
@@ -238,14 +242,14 @@ where
     {
         let argument = &argument_list.arguments.as_slice()[0];
         let argument_doc = argument.format(f);
-        let right_parenthesis = format_token(f, argument_list.right_parenthesis, b")");
+        let right_parenthesis = format_right_parenthesis(f, argument_list);
 
         return Document::Array(vec_in![f.arena; left_parenthesis, argument_doc, right_parenthesis]);
     }
 
     if argument_list.arguments.is_empty() {
         let dangling_comments = f.print_dangling_comments(argument_list.span(), true);
-        let right_parenthesis = format_token(f, argument_list.right_parenthesis, b")");
+        let right_parenthesis = format_right_parenthesis(f, argument_list);
 
         return Document::Array(vec_in![f.arena;
             left_parenthesis,
@@ -305,7 +309,7 @@ where
     f.argument_state.named_argument_padding = previous_named_argument_padding;
 
     let dangling_comments = f.print_dangling_comments(argument_list.span(), true);
-    let right_parenthesis = format_token(f, argument_list.right_parenthesis, b")");
+    let right_parenthesis = format_right_parenthesis(f, argument_list);
 
     if should_break_all {
         return print_broken_out_arguments(
@@ -614,6 +618,22 @@ where
     contents.push(clone_in_arena(f.arena, right_parenthesis));
 
     Document::Array(contents)
+}
+
+fn format_right_parenthesis<'arena, A>(
+    f: &mut FormatterState<'_, 'arena, A>,
+    argument_list: &PartialArgumentList<'arena>,
+) -> Document<'arena, A>
+where
+    A: Arena,
+{
+    let right_parenthesis = format_token(f, argument_list.right_parenthesis, b")");
+
+    if !argument_list.arguments.is_empty() && f.settings.space_between_parentheses {
+        Document::Array(vec_in![f.arena; Document::soft_space(), right_parenthesis])
+    } else {
+        right_parenthesis
+    }
 }
 
 #[inline]
