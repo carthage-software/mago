@@ -28,3 +28,11 @@ final class ArrayLogin implements PseudoLogin, RealLogin
         return $credentials;
     }
 }
+
+final class PseudoOnlyLogin implements PseudoLogin
+{
+    public function login(array $credentials): array
+    {
+        return $credentials;
+    }
+}
