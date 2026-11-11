@@ -422,13 +422,11 @@ where
 
     #[inline]
     fn is_already_broken(&self, f: &FormatterState<'_, '_, A>) -> bool {
-        let inline_prefix_len = inline_prefix_len(f, self);
-        let accesses_len = self.accesses.len() - inline_prefix_len;
+        let breakable_boundaries = self.breakable_accesses(f).filter(|breakable| *breakable).count();
 
-        // Only count gaps that remain breakable after the inline prefix is attached.
+        // An authored break in the inline prefix can move to a later group boundary.
         let broken_links = self
             .link_gaps()
-            .skip(inline_prefix_len)
             .filter(|(start, end)| misc::has_new_line_in_range(f.source_text, start.offset, end.offset))
             .count();
 
@@ -436,16 +434,33 @@ where
             return false;
         }
 
-        if broken_links >= accesses_len || broken_links >= 2 {
+        if broken_links >= breakable_boundaries || broken_links >= 2 {
             return true;
         }
 
-        if accesses_len <= 3 {
-            // we must have at least 2 breaks for chains of length 3 or less
+        if breakable_boundaries <= 3 {
+            // Partial breaks in a short sequence of groups do not force the whole chain.
             return false;
         }
 
         true
+    }
+
+    /// Identify the gaps where the chained layout can break, including fluent group boundaries.
+    fn breakable_accesses<'chain>(
+        &'chain self,
+        f: &'chain FormatterState<'_, 'arena, A>,
+    ) -> impl Iterator<Item = bool> + 'chain {
+        let inline_prefix_len = inline_prefix_len(f, self);
+        let fluent_chain_start = self.find_fluent_access_chain_start();
+
+        self.accesses.iter().enumerate().zip(self.link_gaps()).map(move |((i, access), (start, end))| {
+            i >= inline_prefix_len
+                && (i == 0
+                    || fluent_chain_start.is_none_or(|fluent_start| i < fluent_start)
+                    || (access.is_property_access() && !self.accesses[i - 1].is_property_access())
+                    || f.has_inner_comment(Span::new(f.file_id(), start, end)))
+        })
     }
 
     fn link_gaps(&self) -> impl Iterator<Item = (Position, Position)> + '_ {
@@ -583,7 +598,8 @@ where
             return must_break;
         }
 
-        self.is_already_broken(f)
+        // A fully inline prefix can select the chained layout without forcing a parent break.
+        self.is_already_broken(f) && self.breakable_accesses(f).any(|breakable| breakable)
     }
 
     #[inline]
@@ -887,12 +903,11 @@ where
         vec_in![f.arena; base_document]
     };
 
-    let mut accesses_iter = member_access_chain.accesses.iter().enumerate().peekable();
-    let fluent_access_chain_start = member_access_chain.find_fluent_access_chain_start();
+    let mut accesses_iter = member_access_chain.accesses.iter().enumerate();
+    let mut breakable_accesses = Vec::new_in(f.arena);
+    breakable_accesses.extend(member_access_chain.breakable_accesses(f));
     let must_break = member_access_chain.must_break(f);
     let group_id = f.next_id();
-
-    let mut last_element_end = member_access_chain.base.span().end;
 
     for _ in 0..inline_prefix_len(f, member_access_chain) {
         let Some((_, chain_link)) = accesses_iter.next() else {
@@ -903,7 +918,6 @@ where
 
         let selector = chain_link.get_selector();
         parts.push(selector.format(f));
-        last_element_end = selector.span().end;
         if let Some(argument_list) = chain_link.get_arguments_list() {
             let mut formatted_argument_list = vec_in![f.arena; print_argument_list(f, argument_list, true)];
             if let Some(comments) = f.print_trailing_comments(argument_list.span()) {
@@ -911,26 +925,12 @@ where
             }
 
             parts.push(Document::Group(Group::new(formatted_argument_list)));
-            last_element_end = argument_list.span().end;
         }
     }
 
-    // A property group following an inline method needs its own break opportunity.
-    let mut should_reset = accesses_iter.peek().is_some_and(|(i, next)| {
-        *i > 0 && next.is_property_access() && !member_access_chain.accesses[i - 1].is_property_access()
-    });
     // Now handle the remaining method calls
-    while let Some((i, chain_link)) = accesses_iter.next() {
-        let is_in_fluent_chain = fluent_access_chain_start.is_some_and(|start| i >= start);
-
-        let must_have_new_line = if !is_in_fluent_chain || should_reset || i == 0 {
-            should_reset = false;
-            true
-        } else {
-            f.has_inner_comment(Span::new(f.file_id(), last_element_end, chain_link.get_operator_span().start))
-        };
-
-        let mut contents = if must_have_new_line {
+    for (i, chain_link) in accesses_iter {
+        let mut contents = if breakable_accesses[i] {
             if must_break {
                 vec_in![f.arena; Document::Line(Line::hard())]
             } else {
@@ -942,7 +942,6 @@ where
 
         contents.push(format_access_operator(f, chain_link.get_operator_span(), chain_link.get_operator_as_bytes()));
         let selector = chain_link.get_selector();
-        last_element_end = selector.span().end;
         contents.push(selector.format(f));
         if let Some(argument_list) = chain_link.get_arguments_list() {
             let mut formatted_argument_list = vec_in![f.arena; print_argument_list(f, argument_list, true)];
@@ -951,18 +950,12 @@ where
             }
 
             contents.push(Document::Group(Group::new(formatted_argument_list)));
-            last_element_end = argument_list.span().end;
         }
 
         if must_break {
             parts.push(Document::Indent(contents));
         } else {
             parts.push(Document::IndentIfBreak(IndentIfBreak::new(group_id, contents)));
-        }
-
-        let is_next_property = accesses_iter.peek().is_some_and(|(_, next)| next.is_property_access());
-        if !chain_link.is_property_access() && is_next_property {
-            should_reset = true;
         }
     }
 
@@ -1052,7 +1045,9 @@ where
         && member_access_chain.is_first_link_object_method_call()
         && (member_access_chain.is_first_link_already_broken(f)
             || member_access_chain.has_break_after_first_access(f)
-            || member_access_chain.exceeds_print_width(f))
+            || member_access_chain.exceeds_print_width(f)
+            // Unknown-width multi-link chains can expand while formatting their arguments.
+            || (member_access_chain.accesses.len() > 1 && member_access_chain.get_flat_width(false).is_none()))
     {
         return false;
     }
