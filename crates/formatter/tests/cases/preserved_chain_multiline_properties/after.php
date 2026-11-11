@@ -30,4 +30,5 @@ $query->getResult()
         return $item->active;
     });
 
-expect(config('filesystems.disks.' . Disk::BASE_NAME))->toBeArray()->host->not->toBeNull();
+expect(config('filesystems.disks.' . Disk::BASE_NAME))->toBeArray()
+    ->host->not->toBeNull();

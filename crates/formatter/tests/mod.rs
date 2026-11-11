@@ -52,6 +52,12 @@ macro_rules! test_case {
                 .unwrap();
 
             $crate::assert_code_eq(expected, reformatted_code, "Reformatted code does not match expected");
+
+            let third_pass = formatter
+                .format_code(Cow::Borrowed(b"reformatted_code.php"), Cow::Owned(reformatted_code.to_vec()))
+                .unwrap();
+
+            $crate::assert_code_eq(expected, third_pass, "Third formatting pass does not match expected");
         }
     };
 }
@@ -205,6 +211,12 @@ test_case!(preserved_chain_multiline_arguments);
 test_case!(preserved_chain_multiline_arguments_first_on_new_line);
 test_case!(preserved_chain_multiline_arguments_default);
 test_case!(preserved_chain_multiline_properties);
+test_case!(preserved_chain_break_boundaries);
+test_case!(preserved_chain_property_boundary);
+test_case!(preserved_chain_break_boundaries_same_line);
+test_case!(preserved_chain_static_property_group);
+test_case!(inline_method_property_group);
+test_case!(preserved_chain_same_line_instantiation);
 test_case!(member_access_chain_short_after_breaking_receiver_args);
 test_case!(member_access_chain_short_after_collapsed_receiver_args);
 test_case!(same_line_chain_property_receiver);
