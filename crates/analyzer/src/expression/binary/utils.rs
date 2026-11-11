@@ -218,15 +218,11 @@ pub fn are_definitely_not_loosely_equal(
         return !loosely_equal;
     }
 
-    if (lhs.is_int() && rhs.is_int())
+    ((lhs.is_int() && rhs.is_int())
         || (lhs.is_bool() && rhs.is_bool())
         || (lhs.is_float() && rhs.is_float())
-        || (lhs.is_null() && rhs.is_null())
-    {
-        are_definitely_not_identical(codebase, lhs, rhs, false)
-    } else {
-        false
-    }
+        || (lhs.is_null() && rhs.is_null()))
+        && are_definitely_not_identical(codebase, lhs, rhs, false)
 }
 
 pub fn are_definitely_loosely_equal(php_version: PHPVersion, lhs: &TUnion, rhs: &TUnion) -> bool {

@@ -501,13 +501,11 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
             block_context.possibly_thrown_exceptions.entry(possibly_thrown_exception).or_default().extend(throw_spans);
         }
 
-        block_context.flags.set_has_returned(if finally_has_returned {
-            true
-        } else if !try_block_control_actions.contains(ControlAction::None) {
-            self.catch_clauses.is_empty() || all_catches_leave
-        } else {
-            false
-        });
+        block_context.flags.set_has_returned(
+            finally_has_returned
+                || (!try_block_control_actions.contains(ControlAction::None)
+                    && (self.catch_clauses.is_empty() || all_catches_leave)),
+        );
 
         Ok(())
     }

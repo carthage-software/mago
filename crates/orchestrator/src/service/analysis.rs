@@ -297,12 +297,12 @@ impl AnalysisService {
         .with_project_references(retain_project_references);
 
         let plugin_registry = Arc::clone(&self.plugin_registry);
-        let before_plugin_registry = Arc::clone(&self.plugin_registry);
+        let before_plugin_registry = self.plugin_registry;
         let before_external_session = external_session.clone();
         let before_capabilities = Arc::clone(&lifecycle_capabilities);
-        let map_capabilities = Arc::clone(&lifecycle_capabilities);
+        let map_capabilities = lifecycle_capabilities;
         let before_additional_symbol_references = Arc::clone(&additional_symbol_references);
-        let map_additional_symbol_references = Arc::clone(&additional_symbol_references);
+        let map_additional_symbol_references = additional_symbol_references;
 
         #[cfg(not(target_arch = "wasm32"))]
         let trace_enabled = tracing::enabled!(tracing::Level::TRACE);

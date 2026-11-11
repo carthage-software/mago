@@ -206,7 +206,7 @@ where
                 previously_matching_case = Some(case.span());
             }
 
-            previous_empty_cases = vec![];
+            previous_empty_cases.clear();
         }
 
         let mut fallthrough_exits = false;

@@ -869,28 +869,25 @@ pub fn scalars_can_be_identical_with_coercion(first: &TAtomic, second: &TAtomic)
         }
         (TScalar::String(s1), TScalar::String(s2)) => {
             if let (Some(v1), Some(v2)) = (s1.get_known_literal_value(), s2.get_known_literal_value()) {
-                if v1 == v2 {
-                    true
-                } else if s1.is_numeric && s2.is_numeric {
-                    match (from_utf8(v1), from_utf8(v2)) {
-                        (Ok(str1), Ok(str2)) => {
-                            let str1 = str1.trim();
-                            let str2 = str2.trim();
+                v1 == v2
+                    || (s1.is_numeric
+                        && s2.is_numeric
+                        && match (from_utf8(v1), from_utf8(v2)) {
+                            (Ok(str1), Ok(str2)) => {
+                                let str1 = str1.trim();
+                                let str2 = str2.trim();
 
-                            if let (Ok(num1), Ok(num2)) = (str1.parse::<i64>(), str2.parse::<i64>()) {
-                                num1 == num2
-                            } else {
-                                match (str1.parse::<f64>(), str2.parse::<f64>()) {
-                                    (Ok(num1), Ok(num2)) => num1 == num2,
-                                    _ => false,
+                                if let (Ok(num1), Ok(num2)) = (str1.parse::<i64>(), str2.parse::<i64>()) {
+                                    num1 == num2
+                                } else {
+                                    match (str1.parse::<f64>(), str2.parse::<f64>()) {
+                                        (Ok(num1), Ok(num2)) => num1 == num2,
+                                        _ => false,
+                                    }
                                 }
                             }
-                        }
-                        _ => false,
-                    }
-                } else {
-                    false
-                }
+                            _ => false,
+                        })
             } else {
                 s1.get_known_literal_value().is_none_or(|_| s1.is_numeric)
                     && s2.get_known_literal_value().is_none_or(|_| s2.is_numeric)

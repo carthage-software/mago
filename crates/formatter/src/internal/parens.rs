@@ -510,13 +510,9 @@ where
         }
 
         if let Node::ArrayAccess(access) = self.parent_node() {
-            return if !matches!(expression, Expression::Binary(_))
+            return !matches!(expression, Expression::Binary(_))
                 && expression.end_offset() < access.left_bracket.start_offset()
-            {
-                self.callee_expression_need_parenthesis(expression, false)
-            } else {
-                false
-            };
+                && self.callee_expression_need_parenthesis(expression, false);
         }
 
         if let Some(Node::Access(access)) = self.grandparent_node() {
@@ -538,11 +534,7 @@ where
                 Access::ClassConstant(class_constant_access) => class_constant_access.double_colon.start_offset(),
             };
 
-            return if expression.end_offset() < offset {
-                self.callee_expression_need_parenthesis(expression, false)
-            } else {
-                false
-            };
+            return expression.end_offset() < offset && self.callee_expression_need_parenthesis(expression, false);
         }
 
         false

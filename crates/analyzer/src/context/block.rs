@@ -528,13 +528,7 @@ impl<'ctx> BlockContext<'ctx> {
         self.remove_variable_from_conflicting_clauses(
             context,
             remove_var_id,
-            if existing_type.is_mixed() {
-                None
-            } else if let Some(new_type) = new_type {
-                Some(new_type)
-            } else {
-                None
-            },
+            if existing_type.is_mixed() { None } else { new_type },
         );
 
         self.locals.retain(|var_id, _| !var_has_root(*var_id, remove_var_id));

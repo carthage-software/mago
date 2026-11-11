@@ -1674,11 +1674,9 @@ where
                             Hint::Nullable(_) | Hint::Union(_) | Hint::Intersection(_) | Hint::Parenthesized(_)
                         );
 
-                    let use_short_syntax = if !force_long_syntax && f.settings.null_type_hint.is_question() {
-                        matches!(union_hint.left, Hint::Null(_)) || matches!(union_hint.right, Hint::Null(_))
-                    } else {
-                        false
-                    };
+                    let use_short_syntax = !force_long_syntax
+                        && f.settings.null_type_hint.is_question()
+                        && (matches!(union_hint.left, Hint::Null(_)) || matches!(union_hint.right, Hint::Null(_)));
 
                     if use_short_syntax {
                         let non_null_hint =
