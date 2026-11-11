@@ -1218,7 +1218,25 @@ where
                     }
 
                     if resolved_clause_is_conjunction {
+                        let has_multiple_exclusions = resolved_or_clause.len() > 1;
                         for assertion in resolved_or_clause {
+                            if has_multiple_exclusions
+                                && let Assertion::IsNotType(atomic) = &assertion
+                                && let Some(asserted_type) = asserted_type
+                            {
+                                let excluded_type = TUnion::from_atomic(atomic.clone());
+                                if !can_expression_types_be_identical(
+                                    context.codebase,
+                                    asserted_type,
+                                    &excluded_type,
+                                    false,
+                                    false,
+                                ) && !generic_keyed_array_can_be_list(asserted_type, &excluded_type)
+                                {
+                                    continue;
+                                }
+                            }
+
                             add_and_assertion(&mut new_variable_possibilities, assertion);
                         }
                     } else {
