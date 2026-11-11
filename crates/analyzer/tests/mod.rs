@@ -1358,6 +1358,7 @@ test_case!(strings_class_string_constraint_violation);
 test_case!(strings_class_string_throwable_ok);
 test_case!(strings_strlen_returns_non_negative);
 test_case!(strings_strlen_of_non_empty_is_positive);
+test_case!(issue_2655);
 test_case!(strings_explode_returns_list_with_separator);
 test_case!(strings_implode_basic);
 test_case!(strings_implode_single_empty_element);
