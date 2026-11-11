@@ -328,7 +328,10 @@ where
         && let Some(return_type) = &function_metadata.return_type_metadata
         && !return_type.type_union.is_void()
         && !function_like_metadata.flags.has_yield()
-        && !function_like_metadata.return_type_declaration_metadata.as_ref().is_some_and(|d| d.type_union.is_void())
+        && !function_like_metadata
+            .return_type_declaration_metadata
+            .as_ref()
+            .is_some_and(|d| d.type_union.is_void() && !return_type.type_union.is_never())
     {
         let expanded_type =
             expand_type_metadata(context, block_context, &mut artifacts, function_like_metadata, return_type);

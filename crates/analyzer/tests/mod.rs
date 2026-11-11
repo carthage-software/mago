@@ -403,6 +403,7 @@ test_case!(docblock_scalar_type);
 test_case!(docblock_mixed_type);
 test_case!(docblock_void_return);
 test_case!(docblock_never_return);
+test_case!(issue_2625);
 test_case!(docblock_no_return_alias);
 test_case!(docblock_closure_type);
 test_case!(docblock_callable_type);

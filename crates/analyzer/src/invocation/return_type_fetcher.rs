@@ -96,6 +96,7 @@ where
     let target_return_type = if let Some(function_like_metadata) = invocation.target.get_function_like_metadata()
         && let Some(docblock_return) = function_like_metadata.return_type_metadata.as_ref()
         && docblock_return.from_docblock
+        && !docblock_return.type_union.is_never()
         && !docblock_return.type_union.has_template_types()
         && !docblock_return.type_union.is_generic_parameter()
         && !docblock_return.type_union.types.iter().any(|t| {
