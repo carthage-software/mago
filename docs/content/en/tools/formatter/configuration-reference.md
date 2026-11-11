@@ -138,7 +138,7 @@ public function bar(
 | `first-method-chain-on-new-line` | boolean | `true` | When an object chain (`->`, `?->`) breaks, put the first call on a new line. Static access (`::`) stays attached to its target (PER-CS 4.7). |
 | `method-chain-semicolon-on-next-line` | boolean | `false` | When a multi-line chain is a statement, put the terminating semicolon on its own line. |
 | `preserve-breaking-member-access-chain` | boolean | `false` | Preserve existing line breaks in member-access chains. |
-| `preserve-breaking-member-access-chain-first-method-on-same-line` | boolean | `false` | Requires `preserve-breaking-member-access-chain`. Keep the first method on the receiver line, including newly broken multi-link object chains, overriding `first-method-chain-on-new-line` unless comments require a break. |
+| `preserve-breaking-member-access-chain-first-method-on-same-line` | boolean | `false` | Requires `preserve-breaking-member-access-chain`. In the chained layout, keep the first method on the receiver line, including newly broken multi-link object chains, overriding `first-method-chain-on-new-line` unless comments require a break. |
 
 ## Preserving author breaks
 

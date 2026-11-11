@@ -420,8 +420,8 @@ generate_formatter_settings! {
     /// When preserving a broken object method chain, keep the first method call on the same line as the receiver.
     ///
     /// Requires `preserve_breaking_member_access_chain`. For multi-link object
-    /// chains, this also applies when formatting introduces the breaks, overriding
-    /// `first_method_chain_on_new_line` so the first pass produces a stable layout.
+    /// chains using the formatter's chained layout, this also applies when formatting
+    /// introduces the breaks, overriding `first_method_chain_on_new_line`.
     /// Comments between the receiver and first method can still require a break.
     ///
     /// When enabled:
