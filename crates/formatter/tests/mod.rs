@@ -216,6 +216,7 @@ test_case!(preserved_chain_property_boundary);
 test_case!(preserved_chain_break_boundaries_same_line);
 test_case!(preserved_chain_static_property_group);
 test_case!(inline_method_property_group);
+test_case!(preserved_inline_method_property_group);
 test_case!(preserved_chain_same_line_instantiation);
 test_case!(member_access_chain_short_after_breaking_receiver_args);
 test_case!(member_access_chain_short_after_collapsed_receiver_args);

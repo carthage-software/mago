@@ -1,3 +1,4 @@
 <?php
 
-$chain = new Foo()->bar->baz();
+$chain = new Foo()->bar
+    ->baz();
