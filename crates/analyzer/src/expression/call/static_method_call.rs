@@ -201,6 +201,104 @@ mod tests {
     use crate::test_analysis;
 
     test_analysis! {
+        name = abstract_method_inaccessible_with_magic,
+        code = indoc! {"
+            <?php
+
+            abstract class A {
+                abstract protected static function go(): int;
+
+                /** @param list<mixed> $arguments */
+                public static function __callStatic(string $name, array $arguments): mixed {
+                    return 7;
+                }
+            }
+
+            echo A::go();
+        "},
+        issues = [IssueCode::InvalidMethodAccess]
+    }
+
+    test_analysis! {
+        name = abstract_method_inaccessible_with_inherited_magic,
+        code = indoc! {"
+            <?php
+
+            class MagicParent {
+                /** @param list<mixed> $arguments */
+                public static function __callStatic(string $name, array $arguments): mixed {
+                    return 7;
+                }
+            }
+
+            abstract class A extends MagicParent {
+                abstract protected static function go(): int;
+            }
+
+            echo A::go();
+        "},
+        issues = [IssueCode::InvalidMethodAccess]
+    }
+
+    test_analysis! {
+        name = abstract_method_private_trait_requirement_with_magic,
+        code = indoc! {"
+            <?php
+
+            trait Requirement {
+                abstract private static function go(): int;
+            }
+
+            abstract class A {
+                use Requirement;
+
+                /** @param list<mixed> $arguments */
+                public static function __callStatic(string $name, array $arguments): mixed {
+                    return 7;
+                }
+            }
+
+            echo A::go();
+        "},
+        issues = [IssueCode::InvalidMethodAccess]
+    }
+
+    test_analysis! {
+        name = abstract_method_accessible_with_magic,
+        code = indoc! {"
+            <?php
+
+            abstract class A {
+                abstract protected static function go(): int;
+
+                /** @param list<mixed> $arguments */
+                public static function __callStatic(string $name, array $arguments): mixed {
+                    return 7;
+                }
+
+                public static function run(): int {
+                    return self::go();
+                }
+            }
+        "},
+        issues = [IssueCode::InvalidStaticMethodCall]
+    }
+
+    test_analysis! {
+        name = abstract_method_inaccessible_without_magic,
+        code = indoc! {"
+            <?php
+
+            abstract class A {
+                abstract protected static function go(): int;
+            }
+
+            echo A::go();
+        "},
+        issues = [IssueCode::InvalidMethodAccess]
+    }
+
+    test_analysis! {
         name = abstract_method_trait_parent_class_string,
         code = indoc! {"
             <?php
