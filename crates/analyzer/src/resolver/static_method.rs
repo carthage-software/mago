@@ -431,13 +431,14 @@ where
     };
 
     if let Some(result) = result {
-        if !check_method_visibility_by_id(
+        let is_visible = check_method_visibility_by_id(
             context,
             block_context.scope.get_class_like_name(),
             &method_id,
             access_span,
             Some(selector.span()),
-        ) {
+        );
+        if !is_visible {
             result.has_invalid_target = true;
         }
 
@@ -447,6 +448,7 @@ where
             || (matches!(classname.origin, ResolutionOrigin::AnyString) && classname.fqcn.is_some());
 
         if let Some(method_metadata) = function_like.method_metadata.as_ref()
+            && is_visible
             && method_metadata.is_abstract
             && is_exact_class
             && !defining_class_metadata.kind.is_interface()
