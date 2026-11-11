@@ -2978,6 +2978,8 @@ fn issue_2641_without_property_memoization() {
     framework::TestCase::new("issue_2641", include_bytes!("cases/issue_2641.php")).settings(settings).run();
 }
 
+test_case!(issue_2676);
+
 #[test]
 #[cfg_attr(miri, ignore)]
 fn test_all_test_cases_are_ran() {

@@ -43,6 +43,8 @@ pub(crate) fn is_contained_by(
         return true;
     };
 
+    let input_is_container_class = input_metadata.name == container_metadata.name;
+
     let mut all_parameters_match = true;
     for (parameter_offset, container_type_parameter) in container_type_parameters.iter().enumerate() {
         let Some((template_name, _)) = container_metadata.template_types.get_index(parameter_offset) else {
@@ -150,6 +152,7 @@ pub(crate) fn is_contained_by(
         }
 
         if all_parameters_match
+            && input_is_container_class
             && !specialized_template_type.has_template()
             && !container_type_parameter.has_template()
             && (specialized_template_type.is_never()
