@@ -2138,6 +2138,10 @@ fn check_abstract_method_signatures<'ctx, A>(
         let overridden_declaring_classes: Vec<Word> =
             overridden_method_ids.values().map(|id| id.get_class_name()).collect();
 
+        let has_real_parent = overridden_method_ids.values().any(|id| {
+            context.codebase.get_method_by_id(id).is_some_and(|parent_method| !parent_method.flags.is_magic_method())
+        });
+
         for parent_declaring_method_id in overridden_method_ids.values() {
             let declaring_class_name = parent_declaring_method_id.get_class_name();
             let declaring_class_name_str = declaring_class_name.as_ref();
@@ -2150,6 +2154,15 @@ fn check_abstract_method_signatures<'ctx, A>(
                 *other != declaring_class_name
                     && context.codebase.is_instance_of(other.as_bytes(), declaring_class_name_str)
             }) {
+                continue;
+            }
+
+            if has_real_parent
+                && context
+                    .codebase
+                    .get_method_by_id(parent_declaring_method_id)
+                    .is_some_and(|parent_method| parent_method.flags.is_magic_method())
+            {
                 continue;
             }
 
@@ -2778,6 +2791,19 @@ fn check_interface_method_signatures<'ctx, A>(
         };
 
         if should_skip_same_method(class_fqcn_str, interface_fqcn_str) {
+            continue;
+        }
+
+        if interface_method.flags.is_magic_method()
+            && class_like_metadata.overridden_method_ids.get(method_name_atom).is_some_and(|entries| {
+                entries.values().any(|id| {
+                    context
+                        .codebase
+                        .get_method_by_id(id)
+                        .is_some_and(|parent_method| !parent_method.flags.is_magic_method())
+                })
+            })
+        {
             continue;
         }
 
