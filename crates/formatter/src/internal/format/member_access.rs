@@ -1037,8 +1037,8 @@ where
         && member_access_chain.is_first_link_object_method_call()
         // A lone broken call has no later links to keep broken after inlining it.
         // Moving it back onto the receiver's line can make the next pass break it again.
-        && ((member_access_chain.accesses.len() > 1 && member_access_chain.is_first_link_already_broken(f))
-            || member_access_chain.has_break_after_first_access(f)
+        // Multi-link chains can also break while formatting their arguments.
+        && (member_access_chain.accesses.len() > 1
             || member_access_chain.exceeds_print_width_from_line_start(f));
 
     if preserve_same_line_first_method {
