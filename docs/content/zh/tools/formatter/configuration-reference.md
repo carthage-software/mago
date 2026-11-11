@@ -138,7 +138,7 @@ public function bar(
 | `first-method-chain-on-new-line` | 布尔值 | `true` | 当对象链(`->`、`?->`)断开时,把第一个调用放到新行。静态访问(`::`)保持附着在其目标上(PER-CS 4.7)。 |
 | `method-chain-semicolon-on-next-line` | 布尔值 | `false` | 当多行链是一条语句时,把终结的分号放到独立的一行。 |
 | `preserve-breaking-member-access-chain` | 布尔值 | `false` | 保留成员访问链中已有的换行。 |
-| `preserve-breaking-member-access-chain-first-method-on-same-line` | 布尔值 | `false` | 保留断开链时,把第一个方法保留在接收者所在行。 |
+| `preserve-breaking-member-access-chain-first-method-on-same-line` | 布尔值 | `false` | 需要启用 `preserve-breaking-member-access-chain`。把第一个方法保留在接收者所在行，也适用于格式化时才换行的多环节对象链；优先于 `first-method-chain-on-new-line`，但注释要求换行时除外。 |
 
 ## 保留作者的换行
 
