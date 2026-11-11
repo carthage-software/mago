@@ -137,7 +137,7 @@ public function bar(
 | `method-chain-breaking-style` | enum | `"next-line"` | Une fois qu'une chaîne se brise, où l'appel se positionne. Valeurs : `same-line`, `next-line`. |
 | `first-method-chain-on-new-line` | booléen | `true` | Lorsqu'une chaîne d'objet (`->`, `?->`) se brise, mettre le premier appel sur une nouvelle ligne. L'accès statique (`::`) reste attaché à sa cible (PER-CS 4.7). |
 | `method-chain-semicolon-on-next-line` | booléen | `false` | Lorsqu'une chaîne multi-lignes est une instruction, mettre le point-virgule de terminaison sur sa propre ligne. |
-| `preserve-breaking-member-access-chain` | booléen | `false` | Préserver les sauts de ligne existants dans les chaînes d'accès aux membres. |
+| `preserve-breaking-member-access-chain` | booléen | `false` | Préserver les chaînes d'accès aux membres réparties sur plusieurs lignes aux limites des méthodes et des groupes de propriétés fluides, plutôt que chaque saut de ligne du code source. Un saut de ligne absorbé par un préfixe en ligne peut maintenir les groupes suivants sur des lignes séparées. |
 | `preserve-breaking-member-access-chain-first-method-on-same-line` | booléen | `false` | Nécessite `preserve-breaking-member-access-chain`. Dans la mise en forme chaînée, garder la première méthode sur la ligne du récepteur, y compris pour les chaînes d'objet à plusieurs maillons nouvellement réparties sur plusieurs lignes, en priorité sur `first-method-chain-on-new-line`, sauf si des commentaires imposent un saut de ligne. |
 
 ## Préservation des sauts de l'auteur

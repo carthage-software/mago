@@ -414,6 +414,9 @@ generate_formatter_settings! {
 
     /// Whether to preserve line breaks in method chains, even if they could fit on a single line.
     ///
+    /// Breaks follow method and fluent-property group boundaries, not every source
+    /// gap. A break absorbed by an inline prefix can keep the remaining groups broken.
+    ///
     /// Default: false
     preserve_breaking_member_access_chain: bool => "default_false",
 
