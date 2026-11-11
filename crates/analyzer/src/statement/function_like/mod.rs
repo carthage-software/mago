@@ -1284,8 +1284,13 @@ fn check_thrown_types<'ctx, A>(
         let mut issue =
             Issue::error(format!("Potentially unhandled exception `{thrown_type}` in `{}`.", function_name()));
 
+        // The spans are stored in a hash set, so sort them to report the throw sites
+        // in source order; pragmas are matched against the first primary annotation.
+        let mut thrown_spans = thrown_spans.iter().copied().collect::<Vec<_>>();
+        thrown_spans.sort_unstable();
+
         for span in thrown_spans {
-            issue = issue.with_annotation(Annotation::primary(*span).with_message("Exception may be thrown here"));
+            issue = issue.with_annotation(Annotation::primary(span).with_message("Exception may be thrown here"));
         }
 
         issue = issue

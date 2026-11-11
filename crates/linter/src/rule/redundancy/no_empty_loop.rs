@@ -12,6 +12,7 @@ use mago_syntax::cst::Node;
 use mago_syntax::cst::NodeKind;
 use mago_syntax::cst::Statement;
 use mago_syntax::cst::WhileBody;
+use mago_text_edit::Safety;
 use mago_text_edit::TextEdit;
 
 use crate::category::Category;
@@ -57,6 +58,9 @@ impl LintRule for NoEmptyLoopRule {
             description: indoc! {r"
                 Detects loops (`for`, `foreach`, `while`, `do-while`) that have an empty body. An empty
                 loop body does not perform any actions and is likely a mistake or redundant code.
+
+                The fix is marked as unsafe because removing the loop also removes the evaluation of its
+                header (function calls, assignments, increments), which can change behavior.
             "},
             good_example: indoc! {r"
                 <?php
@@ -124,7 +128,7 @@ impl LintRule for NoEmptyLoopRule {
             .with_help("Consider removing this loop or adding meaningful logic to its body.");
 
         ctx.collector.propose(issue, |edits| {
-            edits.push(TextEdit::delete(node.span()));
+            edits.push(TextEdit::delete(node.span()).with_safety(Safety::Unsafe));
         });
     }
 }
@@ -141,4 +145,42 @@ fn is_statement_empty(statement: &Statement) -> bool {
 #[inline]
 fn are_statements_empty(statements: &[Statement]) -> bool {
     statements.is_empty() || statements.iter().all(is_statement_empty)
+}
+
+#[cfg(test)]
+mod tests {
+    use indoc::indoc;
+    use mago_text_edit::Safety;
+
+    use super::NoEmptyLoopRule;
+    use crate::rule::tests::collect_issues;
+    use crate::settings::Settings;
+
+    #[test]
+    fn fix_is_marked_unsafe() {
+        let issues = collect_issues::<NoEmptyLoopRule, fn(&mut Settings)>(
+            indoc! {r"
+                <?php
+
+                function drain($reader, $pool, array $items): void {
+                    while ($reader->advance()) {}
+                    while ($pool->addPending() && $pool->advanceIterator()) {}
+                    for ($i = 0; $i < 10; $i++) {}
+                    do {} while ($reader->advance());
+                    foreach ($items as $item) {}
+                }
+            "},
+            None,
+            None,
+        );
+
+        assert_eq!(issues.len(), 5);
+
+        for issue in issues.iter() {
+            let edits: Vec<_> = issue.edits.values().collect();
+            assert_eq!(edits.len(), 1);
+            assert_eq!(edits[0].len(), 1);
+            assert_eq!(edits[0][0].safety, Safety::Unsafe);
+        }
+    }
 }
