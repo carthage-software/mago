@@ -19,6 +19,7 @@ use mago_syntax::cst::Statement;
 
 use crate::internal::FormatterState;
 use crate::internal::format::misc::has_new_line_in_range;
+use crate::internal::utils::string_width;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AlignableKind {
@@ -320,6 +321,35 @@ where
         return Vec::new();
     }
 
+    // A statement that only overflows `print-width` because of the alignment padding gets
+    // broken by the printer, which in turn changes the next run on re-format. Treat such
+    // statements as run breakers up front so the layout converges.
+    let mut overflowing = std::collections::HashSet::new();
+    loop {
+        let runs = detect_statement_runs(f, statements, &overflowing);
+        let before = overflowing.len();
+        for run in &runs {
+            for i in run.start..run.end {
+                if statement_overflows_when_aligned(f, statements[i], run.widths.name_width) {
+                    overflowing.insert(i);
+                }
+            }
+        }
+
+        if overflowing.len() == before {
+            return runs;
+        }
+    }
+}
+
+fn detect_statement_runs<'arena, A>(
+    f: &FormatterState<'_, 'arena, A>,
+    statements: &[&'arena Statement<'arena>],
+    overflowing: &std::collections::HashSet<usize>,
+) -> Vec<AlignmentRun>
+where
+    A: Arena,
+{
     detect_alignment_runs(
         statements.len(),
         |i| match statements[i] {
@@ -350,10 +380,41 @@ where
 
             has_blank_line_between(f, prev_span, curr_span)
                 || has_comment_between(f, prev_span, curr_span)
+                || overflowing.contains(&(i - 1))
                 || statement_breaks_alignment_run_after(f, statements[i - 1])
         },
         |start, end, kind| Some(calculate_statement_ref_widths(f, &statements[start..end], kind)),
     )
+}
+
+/// Whether a single-line assignment would exceed `print-width` once its name is padded to `name_width`.
+fn statement_overflows_when_aligned<A>(f: &FormatterState<'_, '_, A>, stmt: &Statement<'_>, name_width: usize) -> bool
+where
+    A: Arena,
+{
+    let Statement::Expression(expr_stmt) = stmt else {
+        return false;
+    };
+    let Expression::Assignment(assign) = &expr_stmt.expression else {
+        return false;
+    };
+
+    let span = stmt.span();
+    let lhs_span = assign.lhs.span();
+    let (start, end) = (span.start_offset() as usize, span.end_offset() as usize);
+    if has_new_line_in_range(f.source_text, span.start_offset(), span.end_offset()) || end > f.source_text.len() {
+        return false;
+    }
+
+    let padding = name_width.saturating_sub(lhs_span.length() as usize);
+    if padding == 0 {
+        return false;
+    }
+
+    let line_start = f.source_text[..start].iter().rposition(|&b| b == b'\n').map_or(0, |p| p + 1);
+    let width = string_width(&f.source_text[line_start..end]);
+
+    width + padding > f.settings.print_width
 }
 
 /// Calculate alignment widths for a slice of statement references.
