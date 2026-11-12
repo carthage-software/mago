@@ -11,6 +11,7 @@ use mago_syntax::cst::ClassLikeConstant;
 use mago_syntax::cst::ClassLikeMember;
 use mago_syntax::cst::EnumCaseItem;
 use mago_syntax::cst::Expression;
+use mago_syntax::cst::Hint;
 use mago_syntax::cst::Modifier;
 use mago_syntax::cst::Property;
 use mago_syntax::cst::PropertyItem;
@@ -32,8 +33,8 @@ pub enum AlignableKind {
 /// Alignment widths for formatting.
 #[derive(Debug, Clone, Copy, Default)]
 pub struct AlignmentWidths {
-    /// Width of the type hint column (for properties only).
-    /// This is used to align variable names when types have different lengths.
+    /// Width of the type hint column (for properties and class constants).
+    /// This is used to align names when types have different lengths.
     pub type_width: usize,
     /// Width of the name/key column.
     pub name_width: usize,
@@ -45,7 +46,7 @@ impl AlignmentWidths {
         Self { type_width: 0, name_width }
     }
 
-    /// Create alignment widths with type width (for properties).
+    /// Create alignment widths with type width (for properties and class constants).
     pub const fn with_type_width(type_width: usize, name_width: usize) -> Self {
         Self { type_width, name_width }
     }
@@ -126,10 +127,12 @@ fn property_has_attributes(prop: &Property<'_>) -> bool {
 fn have_compatible_modifiers(prev: &ClassLikeMember<'_>, curr: &ClassLikeMember<'_>) -> bool {
     match (prev, curr) {
         (ClassLikeMember::Property(prev_prop), ClassLikeMember::Property(curr_prop)) => {
-            get_property_modifier_signature(prev_prop) == get_property_modifier_signature(curr_prop)
+            prev_prop.hint().is_some() == curr_prop.hint().is_some()
+                && get_property_modifier_signature(prev_prop) == get_property_modifier_signature(curr_prop)
         }
         (ClassLikeMember::Constant(prev_const), ClassLikeMember::Constant(curr_const)) => {
-            get_constant_modifier_signature(prev_const) == get_constant_modifier_signature(curr_const)
+            prev_const.hint.is_some() == curr_const.hint.is_some()
+                && get_constant_modifier_signature(prev_const) == get_constant_modifier_signature(curr_const)
         }
         (ClassLikeMember::EnumCase(_), ClassLikeMember::EnumCase(_)) => true,
         _ => false,
@@ -169,6 +172,40 @@ fn calculate_modifier_signature(modifiers: &Sequence<'_, Modifier<'_>>) -> u32 {
         };
     }
     sig
+}
+
+pub fn get_hint_width<A>(f: &FormatterState<'_, '_, A>, hint: &Hint<'_>) -> usize
+where
+    A: Arena,
+{
+    const fn is_compound(hint: &Hint<'_>) -> bool {
+        matches!(hint, Hint::Nullable(_) | Hint::Union(_) | Hint::Intersection(_) | Hint::Parenthesized(_))
+    }
+
+    fn width(hint: &Hint<'_>, short_nullable: bool, nested: bool) -> usize {
+        let short_nullable_here = short_nullable && !nested;
+
+        match hint {
+            Hint::Parenthesized(parenthesized) => 2 + width(parenthesized.hint, short_nullable, true),
+            Hint::Nullable(nullable) => {
+                let null_width = if short_nullable_here && !is_compound(nullable.hint) { 1 } else { 5 };
+
+                null_width + width(nullable.hint, short_nullable, true)
+            }
+            Hint::Union(union) => match (union.left, union.right) {
+                (Hint::Null(_), other) | (other, Hint::Null(_)) if short_nullable_here && !is_compound(other) => {
+                    1 + width(other, short_nullable, true)
+                }
+                (left, right) => width(left, short_nullable, true) + 1 + width(right, short_nullable, true),
+            },
+            Hint::Intersection(intersection) => {
+                width(intersection.left, short_nullable, true) + 1 + width(intersection.right, short_nullable, true)
+            }
+            _ => hint.span().length() as usize,
+        }
+    }
+
+    width(hint, f.settings.null_type_hint.is_question(), false)
 }
 
 pub fn get_alignment(runs: &[AlignmentRun], index: usize) -> Option<AlignmentWidths> {
@@ -258,23 +295,34 @@ where
 
             has_attributes || (i > 0 && !have_compatible_modifiers(&members[i - 1], member))
         },
-        |start, end, kind| Some(calculate_class_member_widths(&members[start..end], kind)),
+        |start, end, kind| Some(calculate_class_member_widths(f, &members[start..end], kind)),
     )
 }
 
 /// Calculate alignment widths for a slice of class-like members.
-fn calculate_class_member_widths(members: &[ClassLikeMember<'_>], kind: AlignableKind) -> AlignmentWidths {
+fn calculate_class_member_widths<A>(
+    f: &FormatterState<'_, '_, A>,
+    members: &[ClassLikeMember<'_>],
+    kind: AlignableKind,
+) -> AlignmentWidths
+where
+    A: Arena,
+{
     let mut max_type_width = 0usize;
     let mut max_name_width = 0usize;
 
     for member in members {
         match (kind, member) {
             (AlignableKind::PropertyWithDefault, ClassLikeMember::Property(prop)) => {
-                let (type_width, name_width) = calculate_plain_property_widths(prop);
+                let (type_width, name_width) = calculate_plain_property_widths(f, prop);
                 max_type_width = max_type_width.max(type_width);
                 max_name_width = max_name_width.max(name_width);
             }
             (AlignableKind::ClassConstant, ClassLikeMember::Constant(constant)) => {
+                if let Some(hint) = &constant.hint {
+                    max_type_width = max_type_width.max(get_hint_width(f, hint));
+                }
+
                 for item in constant.items.iter() {
                     let name_width = item.name.value.len();
                     max_name_width = max_name_width.max(name_width);
@@ -288,20 +336,19 @@ fn calculate_class_member_widths(members: &[ClassLikeMember<'_>], kind: Alignabl
         }
     }
 
-    if kind == AlignableKind::PropertyWithDefault {
-        AlignmentWidths::with_type_width(max_type_width, max_name_width)
-    } else {
-        AlignmentWidths::new(max_name_width)
-    }
+    AlignmentWidths::with_type_width(max_type_width, max_name_width)
 }
 
 /// Calculate the type width and name width for a plain property.
 /// Type width is the width of the type hint (e.g., "int" = 3, "string" = 6).
 /// Name width is the width of the variable name (e.g., "$foo" = 4).
-fn calculate_plain_property_widths(prop: &Property<'_>) -> (usize, usize) {
+fn calculate_plain_property_widths<A>(f: &FormatterState<'_, '_, A>, prop: &Property<'_>) -> (usize, usize)
+where
+    A: Arena,
+{
     match prop {
         Property::Plain(p) => {
-            let type_width = p.hint.as_ref().map_or(0, |h| (h.span().end_offset() - h.span().start_offset()) as usize);
+            let type_width = p.hint.as_ref().map_or(0, |h| get_hint_width(f, h));
             let name_width = p.items.iter().map(|item| item.variable().name.len()).max().unwrap_or(0);
             (type_width, name_width)
         }

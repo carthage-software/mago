@@ -12,7 +12,6 @@ use mago_syntax::cst::EnumCaseItem;
 use mago_syntax::cst::Method;
 use mago_syntax::cst::Modifier;
 use mago_syntax::cst::ModifierSequenceExt;
-use mago_syntax::cst::PlainProperty;
 use mago_syntax::cst::Property;
 use mago_syntax::cst::PropertyItem;
 use mago_syntax::cst::Sequence;
@@ -27,6 +26,7 @@ use crate::internal::format::Format;
 use crate::internal::format::alignment::AlignmentWidths;
 use crate::internal::format::alignment::detect_class_member_alignment_runs;
 use crate::internal::format::alignment::get_alignment;
+use crate::internal::format::alignment::get_hint_width;
 use crate::internal::format::assignment::AssignmentAlignment;
 use crate::internal::format::block::block_is_empty;
 use crate::settings::BraceStyle;
@@ -192,7 +192,7 @@ where
                 }
 
                 if let Some(widths) = get_alignment(&alignment_runs, i) {
-                    let alignment = calculate_member_alignment(item, &widths);
+                    let alignment = calculate_member_alignment(f, item, &widths);
                     f.set_alignment_context(Some(alignment));
                 }
 
@@ -464,10 +464,17 @@ fn get_visibility_order(modifiers: &Sequence<'_, Modifier<'_>>) -> u8 {
 }
 
 /// Calculate alignment padding for a class member based on the run's max widths.
-fn calculate_member_alignment(member: &ClassLikeMember<'_>, widths: &AlignmentWidths) -> AssignmentAlignment {
+fn calculate_member_alignment<A>(
+    f: &FormatterState<'_, '_, A>,
+    member: &ClassLikeMember<'_>,
+    widths: &AlignmentWidths,
+) -> AssignmentAlignment
+where
+    A: Arena,
+{
     let (current_type_width, current_name_width) = match member {
         ClassLikeMember::Property(Property::Plain(p)) => {
-            let type_width = get_plain_property_type_width(p);
+            let type_width = p.hint.as_ref().map_or(0, |h| get_hint_width(f, h));
             let name_width = p
                 .items
                 .iter()
@@ -478,9 +485,10 @@ fn calculate_member_alignment(member: &ClassLikeMember<'_>, widths: &AlignmentWi
                 .unwrap_or(0);
             (type_width, name_width)
         }
-        ClassLikeMember::Constant(constant) => {
-            (0, constant.items.iter().map(|item| item.name.value.len()).max().unwrap_or(0))
-        }
+        ClassLikeMember::Constant(constant) => (
+            constant.hint.as_ref().map_or(0, |h| get_hint_width(f, h)),
+            constant.items.iter().map(|item| item.name.value.len()).max().unwrap_or(0),
+        ),
         ClassLikeMember::EnumCase(case) => {
             if let EnumCaseItem::Backed(backed) = &case.item {
                 (0, backed.name.value.len())
@@ -495,8 +503,4 @@ fn calculate_member_alignment(member: &ClassLikeMember<'_>, widths: &AlignmentWi
     let name_padding = widths.name_width.saturating_sub(current_name_width);
 
     AssignmentAlignment { type_padding, name_padding, break_group_id: None }
-}
-
-fn get_plain_property_type_width(prop: &PlainProperty<'_>) -> usize {
-    prop.hint.as_ref().map_or(0, |h| h.span().length() as usize)
 }

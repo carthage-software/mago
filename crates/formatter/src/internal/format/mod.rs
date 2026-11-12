@@ -933,6 +933,12 @@ where
             if let Some(h) = &self.hint {
                 contents.push(Document::space());
                 contents.push(h.format(f));
+
+                if let Some(alignment) = f.alignment_context()
+                    && alignment.type_padding > 0
+                {
+                    contents.push(Document::String(utils::spaces(f.arena, alignment.type_padding)));
+                }
             }
 
             push_comma_separated_items(f, &mut contents, self.items.as_slice());

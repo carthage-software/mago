@@ -557,6 +557,7 @@ test_case!(issue_2524_binary_expression);
 test_case!(issue_2584);
 test_case!(issue_2587);
 test_case!(issue_2588);
+test_case!(issue_2634);
 test_case!(issue_2643);
 test_case!(issue_2645);
 test_case!(issue_2646);
