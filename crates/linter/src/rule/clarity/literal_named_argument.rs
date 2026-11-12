@@ -9,6 +9,7 @@ use mago_reporting::Issue;
 use mago_reporting::Level;
 use mago_span::HasSpan;
 use mago_syntax::cst::Argument;
+use mago_syntax::cst::Call;
 use mago_syntax::cst::Expression;
 use mago_syntax::cst::Literal;
 use mago_syntax::cst::Node;
@@ -92,7 +93,7 @@ impl LintRule for LiteralNamedArgumentRule {
     }
 
     fn targets() -> &'static [NodeKind] {
-        const TARGETS: &[NodeKind] = &[NodeKind::FunctionCall];
+        const TARGETS: &[NodeKind] = &[NodeKind::Call];
 
         TARGETS
     }
@@ -105,20 +106,21 @@ impl LintRule for LiteralNamedArgumentRule {
     where
         A: Arena,
     {
-        let Node::FunctionCall(function_call) = node else {
+        let Node::Call(call) = node else {
             return;
         };
 
         // Skip variadic functions and functions marked with @no-named-arguments
-        if function_call_matches_any(ctx, function_call, &VARIADIC_FUNCTIONS).is_some()
-            || function_call_matches_any(ctx, function_call, &NO_NAMED_ARGUMENTS_FUNCTIONS).is_some()
+        if let Call::Function(function_call) = call
+            && (function_call_matches_any(ctx, function_call, &VARIADIC_FUNCTIONS).is_some()
+                || function_call_matches_any(ctx, function_call, &NO_NAMED_ARGUMENTS_FUNCTIONS).is_some())
         {
             return;
         }
 
         let mut literal_args: Vec<(&Literal<'arena>, &'arena [u8])> = Vec::new();
 
-        for (index, argument) in function_call.argument_list.arguments.iter().enumerate() {
+        for (index, argument) in call.get_argument_list().arguments.iter().enumerate() {
             if index == 0 && !self.cfg.check_first_argument {
                 continue;
             }
@@ -270,6 +272,170 @@ mod tests {
             <?php
 
             foo('a', 'b');
+        "}
+    }
+
+    test_lint_failure! {
+        name = instance_method_arguments_checked,
+        rule = LiteralNamedArgumentRule,
+        count = 1,
+        code = indoc! {r#"
+            <?php
+
+            $this->curlPost("/some_endpoint/", $data, 57);
+        "#}
+    }
+
+    test_lint_failure! {
+        name = static_method_arguments_checked,
+        rule = LiteralNamedArgumentRule,
+        count = 1,
+        code = indoc! {r"
+            <?php
+
+            Client::post($endpoint, $data, 57);
+        "}
+    }
+
+    test_lint_failure! {
+        name = nullsafe_method_arguments_checked,
+        rule = LiteralNamedArgumentRule,
+        count = 1,
+        code = indoc! {r"
+            <?php
+
+            $client?->post($endpoint, $data, 57);
+        "}
+    }
+
+    test_lint_failure! {
+        name = temporary_object_method_arguments_checked,
+        rule = LiteralNamedArgumentRule,
+        count = 1,
+        code = indoc! {r"
+            <?php
+
+            (new Client())->post($endpoint, $data, 57);
+        "}
+    }
+
+    test_lint_failure! {
+        name = method_first_argument_checked_when_enabled,
+        rule = LiteralNamedArgumentRule,
+        count = 4,
+        settings = |s: &mut crate::settings::Settings| s.rules.literal_named_argument.config.check_first_argument = true,
+        code = indoc! {r"
+            <?php
+
+            $client->configure(true);
+            Client::configure(57);
+            $client?->configure(null);
+            (new Client())->configure('value');
+        "}
+    }
+
+    test_lint_success! {
+        name = method_first_argument_skipped_by_default,
+        rule = LiteralNamedArgumentRule,
+        code = indoc! {r"
+            <?php
+
+            $client->configure(true);
+            Client::configure(57);
+            $client?->configure(null);
+            (new Client())->configure('value');
+        "}
+    }
+
+    test_lint_success! {
+        name = named_method_arguments_are_fine,
+        rule = LiteralNamedArgumentRule,
+        code = indoc! {r"
+            <?php
+
+            $client->post($endpoint, $data, timeout: 57);
+            Client::post($endpoint, $data, timeout: 57);
+            $client?->post($endpoint, $data, timeout: 57);
+            (new Client())->post($endpoint, $data, timeout: 57);
+        "}
+    }
+
+    test_lint_success! {
+        name = method_arguments_below_threshold,
+        rule = LiteralNamedArgumentRule,
+        settings = |s: &mut crate::settings::Settings| s.rules.literal_named_argument.config.threshold = 3,
+        code = indoc! {r"
+            <?php
+
+            $client->configure($key, true, 57);
+            Client::configure($key, true, 57);
+            $client?->configure($key, true, 57);
+            (new Client())->configure($key, true, 57);
+        "}
+    }
+
+    test_lint_failure! {
+        name = method_arguments_at_threshold,
+        rule = LiteralNamedArgumentRule,
+        count = 8,
+        settings = |s: &mut crate::settings::Settings| s.rules.literal_named_argument.config.threshold = 2,
+        code = indoc! {r"
+            <?php
+
+            $client->configure($key, true, 57);
+            Client::configure($key, true, 57);
+            $client?->configure($key, true, 57);
+            (new Client())->configure($key, true, 57);
+        "}
+    }
+
+    test_lint_success! {
+        name = non_literal_method_arguments_are_fine,
+        rule = LiteralNamedArgumentRule,
+        code = indoc! {r"
+            <?php
+
+            $client->post($endpoint, $data, $timeout);
+            Client::post($endpoint, $data, $timeout);
+            $client?->post($endpoint, $data, $timeout);
+            (new Client())->post($endpoint, $data, $timeout);
+        "}
+    }
+
+    test_lint_failure! {
+        name = dynamic_method_arguments_checked,
+        rule = LiteralNamedArgumentRule,
+        count = 3,
+        code = indoc! {r"
+            <?php
+
+            $client->{$method}($key, true);
+            Client::{$method}($key, true);
+            $client?->{$method}($key, true);
+        "}
+    }
+
+    test_lint_failure! {
+        name = methods_do_not_inherit_function_exclusions,
+        rule = LiteralNamedArgumentRule,
+        count = 3,
+        code = indoc! {r"
+            <?php
+
+            $client->sprintf($format, 57);
+            Client::strcmp($value, 'expected');
+            $client?->var_dump($value, true);
+        "}
+    }
+
+    test_lint_success! {
+        name = excluded_functions_are_still_skipped,
+        rule = LiteralNamedArgumentRule,
+        code = indoc! {r"
+            <?php
+
+            sprintf('%d', 57);
+            strcmp($value, 'expected');
         "}
     }
 }

@@ -22,6 +22,8 @@ use mago_syntax::cst::FunctionCall;
 use mago_syntax::cst::Literal;
 use mago_syntax::cst::MethodCall;
 use mago_syntax::cst::NullSafeMethodCall;
+use mago_syntax::cst::NullSafePropertyAccess;
+use mago_syntax::cst::PropertyAccess;
 use mago_syntax::cst::StaticMethodCall;
 use mago_syntax::cst::UnaryPostfixOperator;
 use mago_syntax::cst::UnaryPrefix;
@@ -116,26 +118,45 @@ pub(crate) const fn expression_is_nullsafe(expr: &'_ Expression<'_>) -> bool {
     }
 }
 
-pub(crate) fn get_nullsafe_base_expressions<'ast, 'arena>(
+pub(crate) fn get_access_base_expressions<'ast, 'arena>(
     expression: &'ast Expression<'arena>,
+    artifacts: &AnalysisArtifacts,
 ) -> Vec<&'ast Expression<'arena>> {
     let mut bases = vec![];
     let mut current = Some(unwrap_expression(expression));
+    let mut can_narrow_ordinary_bases = true;
+
     while let Some(expression) = current {
         match expression {
-            Expression::Access(Access::NullSafeProperty(access)) => {
-                bases.push(access.object);
-                current = Some(unwrap_expression(access.object));
+            Expression::Access(Access::NullSafeProperty(NullSafePropertyAccess { object, property, .. }))
+            | Expression::Access(Access::Property(PropertyAccess { object, property, .. })) => {
+                can_narrow_ordinary_bases &= matches!(property, ClassLikeMemberSelector::Identifier(_));
+
+                if matches!(expression, Expression::Access(Access::NullSafeProperty(_)))
+                    || (can_narrow_ordinary_bases
+                        && artifacts.get_expression_type(object).is_some_and(TUnion::can_be_null))
+                {
+                    bases.push(*object);
+                }
+
+                current = Some(unwrap_expression(object));
             }
-            Expression::Access(Access::Property(access)) => {
-                current = Some(unwrap_expression(access.object));
-            }
-            Expression::Call(Call::NullSafeMethod(call)) => {
-                bases.push(call.object);
-                current = Some(unwrap_expression(call.object));
-            }
-            Expression::Call(Call::Method(call)) => {
-                current = Some(unwrap_expression(call.object));
+            Expression::Call(Call::NullSafeMethod(NullSafeMethodCall { object, method, argument_list, .. }))
+            | Expression::Call(Call::Method(MethodCall { object, method, argument_list, .. })) => {
+                can_narrow_ordinary_bases &= matches!(method, ClassLikeMemberSelector::Identifier(_))
+                    && argument_list
+                        .arguments
+                        .iter()
+                        .all(|argument| matches!(unwrap_expression(argument.value()), Expression::Literal(_)));
+
+                if matches!(expression, Expression::Call(Call::NullSafeMethod(_)))
+                    || (can_narrow_ordinary_bases
+                        && artifacts.get_expression_type(object).is_some_and(TUnion::can_be_null))
+                {
+                    bases.push(*object);
+                }
+
+                current = Some(unwrap_expression(object));
             }
             Expression::ArrayAccess(access) => {
                 current = Some(unwrap_expression(access.array));

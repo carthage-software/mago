@@ -315,40 +315,44 @@ fn collect_inheritance_work(
             continue;
         }
 
-        let mut parent_method_id = None;
+        let is_magic_candidate = |candidate: &Word| {
+            codebase
+                .function_likes
+                .get(&(*candidate, *method_name))
+                .is_some_and(|parent_method| parent_method.flags.is_magic_method())
+        };
+
+        let mut candidates: Vec<Word> = Vec::new();
+
         let mut current_class = class_metadata.direct_parent_class;
         while let Some(parent_name) = current_class {
             if method_ids.contains_key(&parent_name) {
-                parent_method_id = Some((parent_name, *method_name));
-                break;
+                candidates.push(parent_name);
             }
-
             current_class = codebase.class_likes.get(&parent_name).and_then(|m| m.direct_parent_class);
         }
 
-        if parent_method_id.is_none() {
-            for interface in &class_metadata.all_parent_interfaces {
-                if method_ids.contains_key(interface) {
-                    parent_method_id = Some((*interface, *method_name));
-                    break;
-                }
-            }
+        let mut interfaces: Vec<Word> = class_metadata
+            .all_parent_interfaces
+            .iter()
+            .filter(|interface| method_ids.contains_key(*interface))
+            .copied()
+            .collect();
+        if interfaces.len() > 1 {
+            interfaces.sort_unstable();
         }
+        candidates.extend(interfaces);
 
-        if parent_method_id.is_none() {
-            for trait_name in &class_metadata.used_traits {
-                if method_ids.contains_key(trait_name) {
-                    parent_method_id = Some((*trait_name, *method_name));
-                    break;
-                }
-            }
-        }
+        candidates.extend(
+            class_metadata.used_traits.iter().filter(|trait_name| method_ids.contains_key(*trait_name)).copied(),
+        );
 
-        if parent_method_id.is_none()
-            && let Some((declaring_class, method_id)) = method_ids.first()
-        {
-            parent_method_id = Some((*declaring_class, method_id.get_method_name()));
-        }
+        let pick = |is_magic: bool| candidates.iter().find(|candidate| is_magic_candidate(candidate) == is_magic);
+
+        let parent_method_id: Option<(Word, Word)> = pick(false)
+            .or_else(|| pick(true))
+            .map(|parent| (*parent, *method_name))
+            .or_else(|| method_ids.first().map(|(_, method_id)| (method_id.get_class_name(), *method_name)));
 
         if let Some((parent_class, parent_method)) = parent_method_id {
             inheritance_work.push((depth, class_name, *method_name, parent_class, parent_method));
@@ -532,6 +536,10 @@ fn resolve_method_inheritance(
     let parent_method_id = (parent_class, parent_method);
 
     let parent_method = codebase.function_likes.get(&parent_method_id)?;
+
+    if parent_method.flags.is_magic_method() {
+        return None;
+    }
 
     let parent_return_type = parent_method.return_type_metadata.as_ref();
     let parent_native_return_type = parent_method.return_type_declaration_metadata.as_ref();

@@ -329,7 +329,10 @@ where
         && let Some(return_type) = &function_metadata.return_type_metadata
         && !return_type.type_union.is_void()
         && !function_like_metadata.flags.has_yield()
-        && !function_like_metadata.return_type_declaration_metadata.as_ref().is_some_and(|d| d.type_union.is_void())
+        && !function_like_metadata
+            .return_type_declaration_metadata
+            .as_ref()
+            .is_some_and(|d| d.type_union.is_void() && !return_type.type_union.is_never())
     {
         let expanded_type =
             expand_type_metadata(context, block_context, &mut artifacts, function_like_metadata, return_type);
@@ -1323,6 +1326,11 @@ fn check_thrown_types<'ctx, A>(
     for (thrown_type, thrown_spans) in unhandled_thrown_exceptions {
         let mut issue =
             Issue::error(format!("Potentially unhandled exception `{thrown_type}` in `{}`.", function_name()));
+
+        // Report the throw sites in source order; pragmas are matched against the
+        // first primary annotation.
+        let mut thrown_spans = thrown_spans.to_vec();
+        thrown_spans.sort_unstable();
 
         for span in thrown_spans {
             issue = issue.with_annotation(Annotation::primary(span).with_message("Exception may be thrown here"));

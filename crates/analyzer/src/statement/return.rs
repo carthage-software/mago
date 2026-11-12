@@ -271,7 +271,7 @@ pub fn handle_return_value<'ctx, A>(
                 let type_declaration_span = function_like_metadata
                     .return_type_metadata
                     .as_ref()
-                    .map_or_else(|| function_like_metadata.span, |signature| signature.span);
+                    .map_or(function_like_metadata.span, |signature| signature.span);
 
                 if let Some(return_value) = return_value {
                     context.collector.report_with_code(

@@ -665,13 +665,22 @@ final class SensitiveParameter
     public function __construct() {}
 }
 
+/**
+ * @template-covariant T
+ */
 #[Mago\AvailableSince(80200)]
 final class SensitiveParameterValue
 {
     private readonly mixed $value;
 
+    /**
+     * @param T $value
+     */
     public function __construct(mixed $value) {}
 
+    /**
+     * @return T
+     */
     public function getValue(): mixed {}
 
     public function __debugInfo(): array {}

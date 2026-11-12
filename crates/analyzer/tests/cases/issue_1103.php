@@ -16,6 +16,7 @@ abstract class Enumeration {
      * @return TCases
      */
     public static function assert(mixed $value): string|int {
+        // @mago-expect analysis:invalid-static-method-call
         if (!in_array($value, self::cases())) {
             throw new InvalidArgumentException();
         }

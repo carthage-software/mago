@@ -112,7 +112,7 @@ pub struct AnalyzerConfiguration {
     /// a future release.
     pub allow_possibly_undefined_array_keys: bool,
 
-    /// Whether to check for thrown exceptions.
+    /// Whether to check for unhandled thrown exceptions.
     pub check_throws: bool,
 
     /// Whether to report catch clauses that cannot catch any known exception.
@@ -120,6 +120,9 @@ pub struct AnalyzerConfiguration {
     /// This check only runs when `check_throws` is enabled and defaults to `false`,
     /// since undocumented code may still throw exceptions that static analysis cannot see.
     pub check_dead_catch: bool,
+
+    /// Whether to check covariance of declared `@throws` types on overrides and implementations.
+    pub check_throw_type_covariance: bool,
 
     /// Exceptions to ignore including all subclasses (hierarchy-aware).
     ///
@@ -485,6 +488,7 @@ impl AnalyzerConfiguration {
             allow_possibly_undefined_array_keys: self.allow_possibly_undefined_array_keys,
             check_throws: self.check_throws,
             check_dead_catch: self.check_dead_catch,
+            check_throw_type_covariance: self.check_throw_type_covariance,
             unchecked_exceptions: self.unchecked_exceptions.iter().map(|s| mago_word::word(s.as_bytes())).collect(),
             unchecked_exception_classes: self
                 .unchecked_exception_classes
@@ -549,6 +553,7 @@ impl Default for AnalyzerConfiguration {
             allow_possibly_undefined_array_keys: defaults.allow_possibly_undefined_array_keys,
             check_throws: defaults.check_throws,
             check_dead_catch: defaults.check_dead_catch,
+            check_throw_type_covariance: defaults.check_throw_type_covariance,
             unchecked_exceptions: vec![],
             unchecked_exception_classes: vec![],
             check_missing_override: defaults.check_missing_override,
@@ -583,6 +588,18 @@ mod tests {
     use mago_reporting::IgnoreEntry;
 
     use super::AnalyzerConfiguration;
+
+    #[test]
+    fn check_throw_type_covariance_defaults_to_false_and_can_be_enabled() {
+        let default_configuration: AnalyzerConfiguration = toml::from_str("").unwrap();
+        assert!(!default_configuration.check_throw_type_covariance);
+
+        let configured: AnalyzerConfiguration = toml::from_str("check-throw-type-covariance = true").unwrap();
+        assert!(configured.check_throw_type_covariance);
+
+        let settings = configured.to_settings(mago_php_version::PHPVersion::LATEST, clap::ColorChoice::Never, false);
+        assert!(settings.check_throw_type_covariance);
+    }
 
     #[test]
     fn ignore_entry_with_pattern_code_and_paths_is_deserialized_as_pattern() {

@@ -315,19 +315,15 @@ fn infer_templates_from_input_and_container_types<A>(
                                 }
 
                                 if let Some(container_parameter) = container_array.parameters.as_ref() {
-                                    let mut input_key_type =
-                                        if let Some(input_parameter) = input_array.parameters.as_ref() {
-                                            Some(Cow::Borrowed(input_parameter.0.as_ref()))
-                                        } else {
-                                            None
-                                        };
+                                    let mut input_key_type = input_array
+                                        .parameters
+                                        .as_ref()
+                                        .map(|input_parameter| Cow::Borrowed(input_parameter.0.as_ref()));
 
-                                    let mut input_value_type =
-                                        if let Some(input_parameter) = input_array.parameters.as_ref() {
-                                            Some(Cow::Borrowed(input_parameter.1.as_ref()))
-                                        } else {
-                                            None
-                                        };
+                                    let mut input_value_type = input_array
+                                        .parameters
+                                        .as_ref()
+                                        .map(|input_parameter| Cow::Borrowed(input_parameter.1.as_ref()));
 
                                     if let Some(known_input_items) = &input_array.known_items {
                                         for (input_key, (_, input_item)) in known_input_items.iter() {

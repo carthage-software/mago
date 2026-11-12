@@ -132,6 +132,7 @@ impl AnalyzerStrictnessPreset {
                 check_throws: false,
                 find_overly_wide_throw_types: false,
                 check_dead_catch: false,
+                check_throw_type_covariance: false,
                 allow_possibly_undefined_array_keys: true,
                 check_missing_override: false,
                 find_unused_parameters: false,
@@ -152,6 +153,7 @@ impl AnalyzerStrictnessPreset {
                 check_throws: false,
                 find_overly_wide_throw_types: false,
                 check_dead_catch: false,
+                check_throw_type_covariance: false,
                 allow_possibly_undefined_array_keys: true,
                 check_missing_override: false,
                 find_unused_parameters: false,
@@ -172,6 +174,7 @@ impl AnalyzerStrictnessPreset {
                 check_throws: true,
                 find_overly_wide_throw_types: true,
                 check_dead_catch: false,
+                check_throw_type_covariance: false,
                 allow_possibly_undefined_array_keys: false,
                 check_missing_override: true,
                 find_unused_parameters: true,
@@ -192,6 +195,7 @@ impl AnalyzerStrictnessPreset {
                 check_throws: true,
                 find_overly_wide_throw_types: true,
                 check_dead_catch: false,
+                check_throw_type_covariance: false,
                 allow_possibly_undefined_array_keys: false,
                 check_missing_override: true,
                 find_unused_parameters: true,
@@ -418,6 +422,8 @@ struct InitializationAnalyzerSettings {
     find_overly_wide_throw_types: bool,
     /// Whether to report catch clauses that cannot catch a known exception
     check_dead_catch: bool,
+    /// Whether to check covariance of declared `@throws` types
+    check_throw_type_covariance: bool,
     /// Whether to allow access to potentially undefined array keys
     allow_possibly_undefined_array_keys: bool,
     /// Whether to check for missing #[Override] attributes
@@ -683,6 +689,10 @@ fn setup_analyzer(theme: &ColorfulTheme) -> Result<InitializationAnalyzerSetting
         settings.check_dead_catch = Confirm::with_theme(theme)
             .with_prompt(" │  Check catch clauses with no known matching exception? (requires check-throws)")
             .default(settings.check_dead_catch)
+            .interact()?;
+        settings.check_throw_type_covariance = Confirm::with_theme(theme)
+            .with_prompt(" │  Check @throws covariance on method overrides and implementations?")
+            .default(settings.check_throw_type_covariance)
             .interact()?;
         settings.check_missing_type_hints = Confirm::with_theme(theme)
             .with_prompt(" │  Check for missing type hints?")
@@ -988,6 +998,7 @@ fn build_analyzer_settings_string(settings: &InitializationAnalyzerSettings) -> 
     lines.push(format!("check-throws = {}", settings.check_throws));
     lines.push(format!("find-overly-wide-throw-types = {}", settings.find_overly_wide_throw_types));
     lines.push(format!("check-dead-catch = {}", settings.check_dead_catch));
+    lines.push(format!("check-throw-type-covariance = {}", settings.check_throw_type_covariance));
     lines.push("unchecked-exceptions = [\"Error\", \"LogicException\"]".to_string());
     lines.push("unchecked-exception-classes = []".to_string());
     lines.push(format!("check-missing-override = {}", settings.check_missing_override));
@@ -1018,6 +1029,7 @@ mod tests {
             check_throws: false,
             find_overly_wide_throw_types: false,
             check_dead_catch: false,
+            check_throw_type_covariance: false,
             allow_possibly_undefined_array_keys: true,
             check_missing_override: false,
             find_unused_parameters: false,
@@ -1110,6 +1122,7 @@ mod tests {
             check_throws: true,
             find_overly_wide_throw_types: true,
             check_dead_catch: false,
+            check_throw_type_covariance: false,
             allow_possibly_undefined_array_keys: false,
             check_missing_override: false,
             find_unused_parameters: false,
@@ -1167,6 +1180,7 @@ mod tests {
         assert!(output.contains("memoize-properties = true"));
         assert!(output.contains("allow-possibly-undefined-array-keys = true"));
         assert!(output.contains("check-throws = false"));
+        assert!(output.contains("check-throw-type-covariance = false"));
         assert!(output.contains("unchecked-exceptions = [\"Error\", \"LogicException\"]"));
         assert!(output.contains("unchecked-exception-classes = []"));
         assert!(output.contains("check-missing-override = false"));
@@ -1175,6 +1189,11 @@ mod tests {
         assert!(output.contains("no-boolean-literal-comparison = false"));
         assert!(output.contains("check-missing-type-hints = false"));
         assert!(output.contains("register-super-globals = true"));
+
+        let mut enabled_settings = create_default_analyzer_settings();
+        enabled_settings.check_throw_type_covariance = true;
+        let enabled_output = build_analyzer_settings_string(&enabled_settings);
+        assert!(enabled_output.contains("check-throw-type-covariance = true"));
     }
 
     #[test]
@@ -1186,6 +1205,7 @@ mod tests {
         assert!(!relaxed.analyze_dead_code);
         assert!(!relaxed.check_throws);
         assert!(!relaxed.find_overly_wide_throw_types);
+        assert!(!relaxed.check_throw_type_covariance);
         assert!(relaxed.allow_possibly_undefined_array_keys);
 
         // Test Balanced preset
@@ -1194,6 +1214,7 @@ mod tests {
         assert!(!balanced.find_unused_expressions);
         assert!(!balanced.check_throws);
         assert!(!balanced.find_overly_wide_throw_types);
+        assert!(!balanced.check_throw_type_covariance);
         assert!(balanced.allow_possibly_undefined_array_keys);
 
         // Test Strict preset
@@ -1202,6 +1223,7 @@ mod tests {
         assert!(strict.find_unused_expressions);
         assert!(strict.check_throws);
         assert!(strict.find_overly_wide_throw_types);
+        assert!(!strict.check_throw_type_covariance);
         assert!(!strict.allow_possibly_undefined_array_keys);
         assert!(strict.check_missing_override);
         assert!(strict.find_unused_parameters);
@@ -1213,6 +1235,7 @@ mod tests {
         assert!(maximum.analyze_dead_code);
         assert!(maximum.check_throws);
         assert!(maximum.find_overly_wide_throw_types);
+        assert!(!maximum.check_throw_type_covariance);
         assert!(!maximum.allow_possibly_undefined_array_keys);
         assert!(maximum.check_missing_type_hints);
         assert!(maximum.no_boolean_literal_comparison);

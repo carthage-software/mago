@@ -127,7 +127,7 @@ where
         let declaring_class_name = context
             .codebase
             .get_class_like_by_name(declaring_class)
-            .map_or_else(|| declaring_class, |metadata| metadata.original_name);
+            .map_or(declaring_class, |metadata| metadata.original_name);
 
         let method_name = method_id.get_method_name();
         let issue_title = format!(

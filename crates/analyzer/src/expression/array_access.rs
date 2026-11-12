@@ -47,16 +47,19 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrayAccess<'arena> {
         let was_inside_isset = block_context.flags.inside_isset();
         let was_inside_general_use = block_context.flags.inside_general_use();
         let was_inside_unset = block_context.flags.inside_unset();
+        let was_inside_reference = block_context.flags.inside_reference();
 
         block_context.flags.set_inside_isset(false);
         block_context.flags.set_inside_general_use(true);
         block_context.flags.set_inside_unset(false);
+        block_context.flags.set_inside_reference(false);
 
         self.index.analyze(context, block_context, artifacts)?;
 
         block_context.flags.set_inside_isset(was_inside_isset);
         block_context.flags.set_inside_unset(was_inside_unset);
         block_context.flags.set_inside_general_use(was_inside_general_use);
+        block_context.flags.set_inside_reference(was_inside_reference);
 
         let index_type =
             artifacts.get_rc_expression_type(&self.index).cloned().unwrap_or_else(|| Rc::new(get_arraykey()));
@@ -99,7 +102,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrayAccess<'arena> {
                 Some(self.index.span()),
                 &container_type,
                 &index_type,
-                false,
+                block_context.flags.inside_reference(),
                 extended_var_id,
                 None,
                 container_type.can_be_null() && expression_is_nullsafe(self.array),

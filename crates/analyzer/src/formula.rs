@@ -22,11 +22,13 @@ use crate::assertion::has_null_variable;
 use crate::assertion::scrape_assertions;
 use crate::context::assertion::AssertionContext;
 use crate::context::scope::var_has_root;
+use crate::reconciler::path_part_count;
+use crate::reconciler::resolve_literal_array_key;
 use crate::resolver::function::is_builtin_function_call;
 use crate::utils::expression::expression_has_observable_side_effect;
 use crate::utils::expression::expression_is_nullsafe;
+use crate::utils::expression::get_access_base_expressions;
 use crate::utils::expression::get_non_nullsafe_expression_id;
-use crate::utils::expression::get_nullsafe_base_expressions;
 use crate::utils::misc::unwrap_expression;
 
 /// Recursively traverses a conditional expression to generate a corresponding logical formula.
@@ -131,6 +133,7 @@ where
         formula_size_threshold,
     )?;
 
+    normalize_array_key_clauses(&mut formula);
     add_conditional_assertion_clauses(
         conditional,
         true,
@@ -159,6 +162,27 @@ where
     let expression = unwrap_expression(conditional);
 
     if let Expression::Binary(binary) = expression {
+        let equality_operator = match binary.operator {
+            BinaryOperator::NotIdentical(span) => Some(BinaryOperator::Identical(span)),
+            BinaryOperator::NotEqual(span) | BinaryOperator::AngledNotEqual(span) => Some(BinaryOperator::Equal(span)),
+            _ => None,
+        };
+
+        if let Some(operator) = equality_operator {
+            let equality = Expression::Binary(Binary { lhs: binary.lhs, operator, rhs: binary.rhs });
+            let clauses = get_base_formula(
+                conditional_object_id,
+                creating_object_id,
+                &equality,
+                assertion_context,
+                artifacts,
+                algebra_thresholds,
+                formula_size_threshold,
+            )?;
+
+            return negate_formula(&clauses, algebra_thresholds);
+        }
+
         if binary.operator.is_null_coalesce()
             && artifacts.get_expression_type(binary.rhs).is_some_and(|ty| ty.is_always_falsy())
         {
@@ -243,7 +267,7 @@ where
                     formula_size_threshold,
                 )?;
 
-                add_nullsafe_condition_clauses(
+                add_access_condition_clauses(
                     expression,
                     &mut formula,
                     conditional_object_id,
@@ -388,7 +412,7 @@ where
         formula_size_threshold,
     )?;
 
-    add_nullsafe_condition_clauses(
+    add_access_condition_clauses(
         expression,
         &mut formula,
         conditional_object_id,
@@ -400,7 +424,7 @@ where
     if formula.len() > usize::from(formula_size_threshold) { None } else { Some(formula) }
 }
 
-fn add_nullsafe_condition_clauses<A>(
+fn add_access_condition_clauses<A>(
     expression: &Expression,
     formula: &mut Vec<Clause>,
     conditional_object_id: Span,
@@ -412,12 +436,13 @@ fn add_nullsafe_condition_clauses<A>(
 {
     match unwrap_expression(expression) {
         Expression::Binary(binary) if matches!(binary.operator, BinaryOperator::Instanceof(_)) => {
-            add_nullsafe_base_clauses(
+            add_access_base_clauses(
                 binary.lhs,
                 formula,
                 conditional_object_id,
                 creating_object_id,
                 assertion_context,
+                artifacts,
             );
         }
         Expression::Binary(binary)
@@ -431,7 +456,14 @@ fn add_nullsafe_condition_clauses<A>(
                 OtherValuePosition::Right => binary.lhs,
             };
 
-            add_nullsafe_base_clauses(operand, formula, conditional_object_id, creating_object_id, assertion_context);
+            add_access_base_clauses(
+                operand,
+                formula,
+                conditional_object_id,
+                creating_object_id,
+                assertion_context,
+                artifacts,
+            );
         }
         Expression::Binary(binary)
             if matches!(binary.operator, BinaryOperator::Equal(_) | BinaryOperator::Identical(_))
@@ -442,18 +474,16 @@ fn add_nullsafe_condition_clauses<A>(
                 OtherValuePosition::Right => binary.lhs,
             };
 
-            add_nullsafe_null_equality_clauses(operand, formula, assertion_context);
+            add_null_equality_base_clauses(operand, formula, assertion_context, artifacts);
         }
         Expression::Binary(binary)
             if matches!(binary.operator, BinaryOperator::Identical(_) | BinaryOperator::NotIdentical(_)) =>
         {
-            let nullsafe_operand = if expression_is_nullsafe(binary.lhs)
-                && !expression_is_nullsafe(binary.rhs)
+            let access_operand = if !get_access_base_expressions(binary.lhs, artifacts).is_empty()
                 && artifacts.get_expression_type(binary.rhs).is_some_and(|ty| !ty.can_be_null())
             {
                 Some(binary.lhs)
-            } else if expression_is_nullsafe(binary.rhs)
-                && !expression_is_nullsafe(binary.lhs)
+            } else if !get_access_base_expressions(binary.rhs, artifacts).is_empty()
                 && artifacts.get_expression_type(binary.lhs).is_some_and(|ty| !ty.can_be_null())
             {
                 Some(binary.rhs)
@@ -461,25 +491,31 @@ fn add_nullsafe_condition_clauses<A>(
                 None
             };
 
-            if let Some(operand) = nullsafe_operand {
-                // `!==` holds with a null receiver too, so the true branch keeps the
-                // nullable bases; `===` establishes a non-null receiver directly.
+            if let Some(operand) = access_operand {
                 if matches!(binary.operator, BinaryOperator::NotIdentical(_)) {
-                    add_nullsafe_null_equality_clauses(operand, formula, assertion_context);
+                    add_null_equality_base_clauses(operand, formula, assertion_context, artifacts);
                 } else {
-                    add_nullsafe_base_clauses(
+                    add_access_base_clauses(
                         operand,
                         formula,
                         conditional_object_id,
                         creating_object_id,
                         assertion_context,
+                        artifacts,
                     );
                 }
             }
         }
         Expression::Construct(Construct::Isset(isset)) => {
             for value in isset.values.iter() {
-                add_nullsafe_base_clauses(value, formula, conditional_object_id, creating_object_id, assertion_context);
+                add_access_base_clauses(
+                    value,
+                    formula,
+                    conditional_object_id,
+                    creating_object_id,
+                    assertion_context,
+                    artifacts,
+                );
             }
         }
         Expression::Call(Call::Function(call))
@@ -532,12 +568,13 @@ fn add_nullsafe_condition_clauses<A>(
                 Some(clause.generated),
             );
 
-            add_nullsafe_base_clauses(
+            add_access_base_clauses(
                 needle.value(),
                 formula,
                 conditional_object_id,
                 creating_object_id,
                 assertion_context,
+                artifacts,
             );
         }
         Expression::Call(Call::Function(call))
@@ -551,12 +588,17 @@ fn add_nullsafe_condition_clauses<A>(
                     && assertion_context.codebase.get_function(resolved_name).is_none());
 
             if is_null && let Some(argument) = call.argument_list.arguments.first() {
-                add_nullsafe_null_equality_clauses(argument.value(), formula, assertion_context);
+                add_null_equality_base_clauses(argument.value(), formula, assertion_context, artifacts);
             }
         }
-        _ => {
-            add_nullsafe_base_clauses(expression, formula, conditional_object_id, creating_object_id, assertion_context)
-        }
+        _ => add_access_base_clauses(
+            expression,
+            formula,
+            conditional_object_id,
+            creating_object_id,
+            assertion_context,
+            artifacts,
+        ),
     }
 }
 
@@ -806,16 +848,17 @@ fn disjoin_conditional_assertions(
     });
 }
 
-pub(crate) fn add_nullsafe_base_clauses<A>(
+pub(crate) fn add_access_base_clauses<A>(
     expression: &Expression,
     formula: &mut Vec<Clause>,
     conditional_object_id: Span,
     creating_object_id: Span,
     assertion_context: AssertionContext<'_, '_, A>,
+    artifacts: &AnalysisArtifacts,
 ) where
     A: Arena,
 {
-    for base in get_nullsafe_base_expressions(expression).into_iter().rev() {
+    for base in get_access_base_expressions(expression, artifacts).into_iter().rev() {
         push_not_null_clause(base, formula, conditional_object_id, creating_object_id, assertion_context);
     }
 
@@ -828,14 +871,15 @@ pub(crate) fn add_nullsafe_base_clauses<A>(
     );
 }
 
-fn add_nullsafe_null_equality_clauses<A>(
+fn add_null_equality_base_clauses<A>(
     expression: &Expression,
     formula: &mut Vec<Clause>,
     assertion_context: AssertionContext<'_, '_, A>,
+    artifacts: &AnalysisArtifacts,
 ) where
     A: Arena,
 {
-    let base_ids = get_nullsafe_base_expressions(expression)
+    let base_ids = get_access_base_expressions(expression, artifacts)
         .into_iter()
         .filter_map(|base| assertion_context.get_expression_id(base))
         .map(|id| get_non_nullsafe_expression_id(id).unwrap_or(id))
@@ -1057,6 +1101,7 @@ where
 
     match negated_clauses {
         Some(mut negated_clauses) => {
+            normalize_array_key_clauses(&mut negated_clauses);
             add_conditional_assertion_clauses(
                 conditional,
                 false,
@@ -1135,6 +1180,47 @@ where
     let clauses = disjoin_clauses(left_clauses, right_clauses, conditional_object_id, algebra_thresholds);
 
     if clauses.len() > usize::from(formula_size_threshold) { None } else { Some(clauses) }
+}
+
+fn normalize_array_key_clauses(clauses: &mut [Clause]) {
+    for clause in clauses {
+        if clause.wedge || !clause.reconcilable || clause.possibilities.len() != 2 {
+            continue;
+        }
+
+        let replacement = clause.possibilities.iter().find_map(|(root, assertions)| {
+            if assertions.len() != 1 {
+                return None;
+            }
+
+            let Assertion::DoesNotHaveArrayKey(key) = assertions.values().next()? else {
+                return None;
+            };
+
+            clause.possibilities.iter().find_map(|(access, assertions)| {
+                let suffix = access.as_bytes().strip_prefix(root.as_bytes())?;
+                if path_part_count(suffix) != 3 {
+                    return None;
+                }
+
+                let index = suffix.strip_prefix(b"[")?.strip_suffix(b"]")?;
+
+                (resolve_literal_array_key(index) == Some(*key)).then(|| (*access, assertions.clone()))
+            })
+        });
+
+        if let Some((access, mut assertions)) = replacement {
+            assertions.insert(Assertion::ArrayKeyDoesNotExist.to_hash(), Assertion::ArrayKeyDoesNotExist);
+            *clause = Clause::new(
+                AssertionMap::from_iter([(access, assertions)]),
+                clause.condition_span,
+                clause.span,
+                Some(clause.wedge),
+                Some(clause.reconcilable),
+                Some(clause.generated),
+            );
+        }
+    }
 }
 
 #[inline]

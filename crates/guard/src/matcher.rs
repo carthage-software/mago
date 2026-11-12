@@ -116,11 +116,7 @@ fn do_match(fqcn: Option<&[u8]>, pattern: Option<&[u8]>, is_constant: bool) -> b
             let is_last = fqcn_rest.is_none() && pattern_rest.is_none();
             let case_sensitive = is_constant && is_last;
 
-            if segment_matches(f_part, p_part, case_sensitive) {
-                do_match(fqcn_rest, pattern_rest, is_constant)
-            } else {
-                false
-            }
+            segment_matches(f_part, p_part, case_sensitive) && do_match(fqcn_rest, pattern_rest, is_constant)
         }
         _ => false,
     }

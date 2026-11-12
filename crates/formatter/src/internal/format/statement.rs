@@ -317,16 +317,10 @@ where
     {
         statement_parts.push(Document::Line(Line::hard()));
 
-        let should_add_empty_line = if should_add_empty_line_after(f, stmt) {
-            if !f.settings.empty_line_between_same_symbols && is_symbol(stmt) {
-                let next_stmt = stmts.get(i + 1);
-                next_stmt.is_none_or(|next| !is_same_symbol_type(stmt, next))
-            } else {
-                true
-            }
-        } else {
-            false
-        };
+        let should_add_empty_line = should_add_empty_line_after(f, stmt)
+            && (f.settings.empty_line_between_same_symbols
+                || !is_symbol(stmt)
+                || stmts.get(i + 1).is_none_or(|next| !is_same_symbol_type(stmt, next)));
 
         if should_add_empty_line || f.is_next_line_empty(stmt.span()) {
             statement_parts.push(Document::Line(Line::hard()));

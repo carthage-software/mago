@@ -101,6 +101,7 @@ pub fn build_analyzer_settings(settings: &WasmAnalyzerSettings, version: PHPVers
         allow_possibly_undefined_array_keys: settings.allow_possibly_undefined_array_keys,
         check_throws: settings.check_throws,
         check_dead_catch: settings.check_dead_catch,
+        check_throw_type_covariance: settings.check_throw_type_covariance,
         unchecked_exceptions: settings.unchecked_exceptions.iter().map(|e| mago_word::word(e.as_bytes())).collect(),
         unchecked_exception_classes: settings
             .unchecked_exception_classes

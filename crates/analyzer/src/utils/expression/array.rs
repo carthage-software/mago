@@ -288,7 +288,9 @@ where
                 has_valid_expected_index = true;
             }
             TAtomic::Null | TAtomic::Void => {
-                if !array_like_type.ignore_nullable_issues() && !in_assignment {
+                if !array_like_type.ignore_nullable_issues()
+                    && (!in_assignment || block_context.flags.inside_reference())
+                {
                     value_type = Some(add_optional_union_type(get_null(), value_type.as_ref(), context.codebase));
                 }
 
@@ -722,6 +724,10 @@ where
                 return resulting_type;
             }
 
+            if in_assignment && block_context.flags.inside_reference() && type_param.is_never() {
+                return get_null();
+            }
+
             if !in_assignment {
                 if type_param.is_never()
                     && let Some(span) = span
@@ -1031,6 +1037,10 @@ where
             }
 
             let result = if in_assignment && has_value_parameter && !value_parameter.is_mixed() {
+                if block_context.flags.inside_reference() {
+                    *has_possibly_undefined = true;
+                }
+
                 // Assignment to a new key on an array with explicit generic parameters - allow it without error
                 // This handles cases like $_SERVER (which has ...<non-empty-string, string>)
                 // But NOT unsealed arrays with just `...` (which have mixed as value type)
@@ -1277,14 +1287,14 @@ where
                     )
                 };
 
-            if !in_assignment && !key_is_definitely_defined {
+            if (!in_assignment || block_context.flags.inside_reference()) && !key_is_definitely_defined {
                 *has_possibly_undefined = true;
 
                 let inside_isset_or_unset = block_context.flags.inside_isset() || block_context.flags.inside_unset();
                 let lax_warn = !context.settings.allow_possibly_undefined_array_keys;
                 let strict = context.settings.strict_array_index_existence;
 
-                if !inside_isset_or_unset && (lax_warn || strict) {
+                if !in_assignment && !inside_isset_or_unset && (lax_warn || strict) {
                     let single_key = index_type.get_single_array_key();
                     if strict || single_key.is_some() {
                         let index_type_str = index_type.get_id();
@@ -1329,7 +1339,7 @@ where
             }
 
             value_parameter.into_owned()
-        } else if in_assignment {
+        } else if in_assignment && !block_context.flags.inside_reference() {
             get_never()
         } else {
             get_null()

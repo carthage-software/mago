@@ -1,5 +1,7 @@
 //! `strlen()` return type provider.
 
+use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::get_literal_int;
 use mago_codex::ttype::get_non_negative_int;
 use mago_codex::ttype::union::TUnion;
@@ -38,9 +40,26 @@ impl FunctionReturnTypeProvider for StrlenProvider {
     ) -> Option<TUnion> {
         let string_argument = invocation.get_argument(0, &[b"string"])?;
         let string_argument_type = context.get_expression_type(string_argument)?;
-        match string_argument_type.get_single_literal_string_value() {
-            Some(string_literal) => Some(get_literal_int(string_literal.len() as i64)),
-            None => Some(get_non_negative_int()),
+        let string_types = string_argument_type.types.as_ref();
+        if let [atomic] = string_types {
+            return Some(match atomic.get_literal_string_value() {
+                Some(string_literal) => get_literal_int(string_literal.len() as i64),
+                None => get_non_negative_int(),
+            });
         }
+
+        let mut lengths = Vec::with_capacity(string_types.len());
+        for atomic in string_types {
+            let Some(string_literal) = atomic.get_literal_string_value() else {
+                return Some(get_non_negative_int());
+            };
+
+            lengths.push(TAtomic::Scalar(TScalar::literal_int(string_literal.len() as i64)));
+        }
+
+        lengths.sort_unstable();
+        lengths.dedup();
+
+        Some(TUnion::from_vec(lengths))
     }
 }

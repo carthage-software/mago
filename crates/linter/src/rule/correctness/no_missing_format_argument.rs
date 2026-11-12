@@ -135,7 +135,7 @@ impl LintRule for NoMissingFormatArgumentRule {
                 let values_start = info.format_index + 1;
                 let values_count = total_args.saturating_sub(values_start);
 
-                if values_count >= parsed.required_args {
+                if values_count >= parsed.required_args || arguments[values_start..].iter().any(Argument::is_unpacked) {
                     return;
                 }
 
@@ -147,8 +147,8 @@ impl LintRule for NoMissingFormatArgumentRule {
                             function_name,
                             parsed.placeholder_count,
                             if parsed.placeholder_count == 1 { "placeholder" } else { "placeholders" },
-                            parsed.required_args,
-                            if parsed.required_args == 1 { "" } else { "s" },
+                            values_count,
+                            if values_count == 1 { "" } else { "s" },
                         ),
                     )
                     .with_code(self.meta.code)
@@ -364,6 +364,8 @@ mod tests {
 
     use indoc::indoc;
 
+    use crate::rule::tests::collect_issues;
+    use crate::settings::Settings;
     use crate::test_lint_failure;
     use crate::test_lint_success;
 
@@ -509,6 +511,89 @@ mod tests {
 
             $result = sprintf('Hello %s', $name, $extra);
         "},
+    }
+
+    test_lint_success! {
+        name = sprintf_unpacked_values,
+        rule = NoMissingFormatArgumentRule,
+        code = indoc! {r"
+            <?php
+
+            sprintf('%s %s', ...$values);
+        "},
+    }
+
+    test_lint_success! {
+        name = printf_mixed_unpacked_values,
+        rule = NoMissingFormatArgumentRule,
+        code = indoc! {r#"
+            <?php
+
+            $totals = [1, 2, 3];
+            printf("%s %s %d %d %d\n", 'total', '', ...$totals);
+        "#},
+    }
+
+    test_lint_success! {
+        name = fprintf_unpacked_values,
+        rule = NoMissingFormatArgumentRule,
+        code = indoc! {r"
+            <?php
+
+            fprintf($stream, '%s %s %s', 'first', ...$values);
+        "},
+    }
+
+    test_lint_success! {
+        name = psl_unpacked_values,
+        rule = NoMissingFormatArgumentRule,
+        code = indoc! {r"
+            <?php
+
+            \Psl\Str\format('%s %s', ...$values);
+            \Psl\IO\write('%s %s', ...$values);
+            \Psl\IO\write_line('%s %s', ...$values);
+            \Psl\IO\write_error('%s %s', ...$values);
+            \Psl\IO\write_error_line('%s %s', ...$values);
+        "},
+    }
+
+    test_lint_success! {
+        name = sprintf_multiple_unpacked_values,
+        rule = NoMissingFormatArgumentRule,
+        code = indoc! {r"
+            <?php
+
+            sprintf('%s %s %s', ...$first, ...$second);
+        "},
+    }
+
+    #[test]
+    fn reports_supplied_value_counts() {
+        let issues = collect_issues::<NoMissingFormatArgumentRule, fn(&mut Settings)>(
+            indoc! {r"
+                <?php
+
+                sprintf('%s');
+                sprintf('%s %d', 'name');
+                sprintf('%s %d %d', 'name', 1);
+                sprintf('%3$s', 'name');
+                fprintf($stream, '%s %s', 'name');
+            "},
+            None,
+            None,
+        );
+
+        assert_eq!(
+            issues.iter().map(|issue| issue.message.as_ref()).collect::<Vec<_>>(),
+            [
+                "Call to `sprintf` contains 1 placeholder, 0 values given.",
+                "Call to `sprintf` contains 2 placeholders, 1 value given.",
+                "Call to `sprintf` contains 3 placeholders, 2 values given.",
+                "Call to `sprintf` contains 1 placeholder, 1 value given.",
+                "Call to `fprintf` contains 2 placeholders, 1 value given.",
+            ]
+        );
     }
 
     test_lint_failure! {

@@ -71,9 +71,10 @@ use crate::reconciler;
 use crate::reconciler::assertion_reconciler::intersect_union_with_union;
 use crate::utils::exception::get_throw_type_atomics;
 use crate::utils::exception::get_throw_type_object_names;
+use crate::utils::expression::expression_is_nullsafe;
+use crate::utils::expression::get_access_base_expressions;
 use crate::utils::expression::get_block_expression_id;
 use crate::utils::expression::get_non_nullsafe_expression_id;
-use crate::utils::expression::get_nullsafe_base_expressions;
 use crate::utils::misc::unwrap_expression;
 
 pub fn post_invocation_process<'ctx, 'arena, A>(
@@ -1539,28 +1540,38 @@ where
 
                 if !resolved_or_clause.is_empty() {
                     let resolved_clause_is_conjunction = resolved_or_clause.iter().all(Assertion::is_negation);
-                    let excludes_null = if resolved_clause_is_conjunction {
-                        resolved_or_clause.iter().any(assertion_excludes_null)
-                    } else {
-                        resolved_or_clause.iter().all(assertion_excludes_null)
-                    };
 
-                    if excludes_null && let Some(assertion_expression) = assertion_expression {
-                        for base in get_nullsafe_base_expressions(assertion_expression) {
-                            let Some(base_id) = get_block_expression_id(base, context, block_context) else {
-                                continue;
-                            };
-
-                            let base_id = get_non_nullsafe_expression_id(base_id).unwrap_or(base_id);
-                            add_and_assertion(
-                                type_assertions.entry(base_id).or_default(),
-                                Assertion::IsNotType(TAtomic::Null),
-                            );
-                        }
+                    if let Some(assertion_expression) = assertion_expression {
+                        add_access_base_assertions(
+                            context,
+                            block_context,
+                            artifacts,
+                            assertion_expression,
+                            &resolved_or_clause,
+                            &mut type_assertions,
+                        );
                     }
 
                     if resolved_clause_is_conjunction {
+                        let has_multiple_exclusions = resolved_or_clause.len() > 1;
                         for assertion in resolved_or_clause {
+                            if has_multiple_exclusions
+                                && let Assertion::IsNotType(atomic) = &assertion
+                                && let Some(asserted_type) = asserted_type
+                            {
+                                let excluded_type = TUnion::from_atomic(atomic.clone());
+                                if !can_expression_types_be_identical(
+                                    context.codebase,
+                                    asserted_type,
+                                    &excluded_type,
+                                    false,
+                                    false,
+                                ) && !generic_keyed_array_can_be_list(asserted_type, &excluded_type)
+                                {
+                                    continue;
+                                }
+                            }
+
                             add_and_assertion(&mut new_variable_possibilities, assertion);
                         }
                     } else {
@@ -1574,6 +1585,38 @@ where
             }
             None => {
                 if let Some(assertion_expression) = assertion_expression {
+                    if expression_is_nullsafe(assertion_expression) {
+                        let mut resolved_assertions = Vec::new();
+
+                        for assertion in variable_assertions {
+                            let Some(atomic) = assertion.get_type() else {
+                                resolved_assertions.push(assertion.clone());
+                                continue;
+                            };
+
+                            let resolved_type = resolve_invocation_type(
+                                context,
+                                invocation,
+                                template_result,
+                                parameters,
+                                TUnion::from_atomic(atomic.clone()),
+                            );
+
+                            resolved_assertions.extend(
+                                resolved_type.types.into_owned().into_iter().map(|atomic| assertion.with_type(atomic)),
+                            );
+                        }
+
+                        has_non_redundant_assertion |= add_access_base_assertions(
+                            context,
+                            block_context,
+                            artifacts,
+                            assertion_expression,
+                            &resolved_assertions,
+                            &mut type_assertions,
+                        );
+                    }
+
                     if variable_assertions.len() != 1 {
                         continue; // We only support single assertions for expressions
                         // maybe we should support more? idk for now, we are following
@@ -1653,9 +1696,49 @@ where
     type_assertions
 }
 
+fn add_access_base_assertions<'arena, A>(
+    context: &Context<'_, 'arena, A>,
+    block_context: &BlockContext<'_>,
+    artifacts: &AnalysisArtifacts,
+    expression: &Expression<'arena>,
+    assertions: &[Assertion],
+    type_assertions: &mut AssertionMap<Word, AssertionSet>,
+) -> bool
+where
+    A: Arena,
+{
+    let excludes_null = if assertions.iter().all(Assertion::is_negation) {
+        assertions.iter().any(assertion_excludes_null)
+    } else {
+        assertions.iter().all(assertion_excludes_null)
+    };
+
+    if !excludes_null {
+        return false;
+    }
+
+    let mut added_assertion = false;
+    for base in get_access_base_expressions(expression, artifacts) {
+        let Some(base_id) = get_block_expression_id(base, context, block_context) else {
+            continue;
+        };
+
+        let base_id = get_non_nullsafe_expression_id(base_id).unwrap_or(base_id);
+        add_and_assertion(type_assertions.entry(base_id).or_default(), Assertion::IsNotType(TAtomic::Null));
+        added_assertion = true;
+    }
+
+    added_assertion
+}
+
 fn assertion_excludes_null(assertion: &Assertion) -> bool {
     match assertion {
-        Assertion::IsType(atomic) | Assertion::IsIdentical(atomic) => !atomic.is_null(),
+        Assertion::IsType(atomic) | Assertion::IsIdentical(atomic) => match atomic {
+            TAtomic::Null | TAtomic::Void => false,
+            TAtomic::Mixed(mixed) => mixed.is_non_null(),
+            TAtomic::GenericParameter(parameter) => !parameter.constraint.can_be_null(),
+            _ => true,
+        },
         Assertion::IsNotType(atomic) | Assertion::IsNotIdentical(atomic) | Assertion::IsNotEqual(atomic) => {
             atomic.is_null()
         }

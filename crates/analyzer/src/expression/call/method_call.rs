@@ -541,13 +541,9 @@ where
         };
 
         let mut invocation = Invocation::new(target, InvocationArgumentsSource::ArgumentList(argument_list), span);
-        let signature_handled = if context.external_analysis_session.is_some()
+        let signature_handled = context.external_analysis_session.is_some()
             && context.plugin_registry.may_have_callable_signature_provider(&requested_identifier)
-        {
-            apply_callable_signature(context, artifacts, &requested_identifier, &mut invocation)
-        } else {
-            false
-        };
+            && apply_callable_signature(context, artifacts, &requested_identifier, &mut invocation);
 
         let mut invocation_template_result = template_result.clone();
         let mut parameter_types = WordMap::default();

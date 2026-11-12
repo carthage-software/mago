@@ -72,9 +72,12 @@ macro_rules! test_case {
 }
 
 test_case!(accessing_undefined_class_constant);
+test_case!(issue_2686);
+test_case!(issue_2686_mixed_parents);
 test_case!(issue_2616);
 test_case!(issue_2616_positions, expected_issue_counts = [("too-wide-throw-type", 1)]);
 test_case!(issue_2616_bounds);
+test_case!(bare_generator_docblock);
 test_case!(generic_docblock_native_return);
 test_case!(message_quality);
 test_case!(ds_map_defaults);
@@ -348,6 +351,54 @@ test_case!(issue_2503_check_throws_disabled, {
     settings.check_throws = false;
     settings
 });
+test_case!(
+    throw_covariance_invalid,
+    {
+        let mut settings = crate::framework::default_test_settings();
+        settings.check_throws = false;
+        settings.check_throw_type_covariance = true;
+        settings
+    },
+    expected_issue_counts = [("too-wide-throw-type", 5)]
+);
+test_case!(
+    throw_covariance_valid,
+    {
+        let mut settings = crate::framework::default_test_settings();
+        settings.check_throw_type_covariance = true;
+        settings
+    },
+    expected_issue_counts = [("too-wide-throw-type", 6)]
+);
+test_case!(
+    throw_covariance_inherited_context,
+    {
+        let mut settings = crate::framework::default_test_settings();
+        settings.check_throw_type_covariance = true;
+        settings
+    },
+    expected_issue_counts = [("too-wide-throw-type", 2)]
+);
+test_case!(
+    throw_covariance_inherited_parent,
+    {
+        let mut settings = crate::framework::default_test_settings();
+        settings.check_throw_type_covariance = true;
+        settings
+    },
+    expected_issue_counts = [("too-wide-throw-type", 3)]
+);
+test_case!(
+    throw_covariance_disabled,
+    {
+        let mut settings = crate::framework::default_test_settings();
+        settings.check_throw_type_covariance = mago_analyzer::settings::Settings::default().check_throw_type_covariance;
+        assert!(settings.check_throws);
+        assert!(!settings.check_throw_type_covariance);
+        settings
+    },
+    expected_issue_counts = [("too-wide-throw-type", 1)]
+);
 test_case!(docblock_param_out);
 test_case!(docblock_assert_method);
 test_case!(docblock_assert_if_true);
@@ -394,6 +445,7 @@ test_case!(docblock_scalar_type);
 test_case!(docblock_mixed_type);
 test_case!(docblock_void_return);
 test_case!(docblock_never_return);
+test_case!(issue_2625);
 test_case!(docblock_no_return_alias);
 test_case!(docblock_closure_type);
 test_case!(docblock_callable_type);
@@ -545,6 +597,14 @@ test_case!(iterables_count_countable_ok);
 test_case!(iterables_array_keys_after_iterator_to_array);
 test_case!(iterables_array_keys_on_iterator_invalid);
 test_case!(iterables_foreach_by_ref);
+test_case!(issue_2662, {
+    let mut settings = default_test_settings();
+    settings.strict_list_index_checks = false;
+    settings
+});
+test_case!(issue_2656);
+test_case!(issue_2621);
+test_case!(sdk_repeated_reader_calls);
 test_case!(iterables_generator_with_non_iterable_return_type);
 test_case!(iterables_generator_send_match);
 test_case!(iterables_generator_send_mismatch);
@@ -700,6 +760,7 @@ test_case!(pass_by_ref);
 test_case!(issue_2235);
 test_case!(return_by_ref);
 test_case!(array_refs);
+test_case!(issue_2639);
 test_case!(ref_constraint_conflict);
 test_case!(match_not_exhaustive);
 test_case!(match_expression);
@@ -942,6 +1003,7 @@ test_case!(traversable_array_iterable_compare);
 test_case!(pseudo_method_on_interface);
 test_case!(dom_node_list_array_access);
 test_case!(iterable_instanceof_traversable_narrow, crate::framework::infection_like_settings());
+test_case!(issue_2620);
 test_case!(generator_is_iterator_subtype, crate::framework::infection_like_settings());
 test_case!(explode_then_assert_count, crate::framework::infection_like_settings());
 test_case!(iterable_not_iterator_keeps_aggregate, crate::framework::infection_like_settings());
@@ -1334,6 +1396,12 @@ test_case!(strings_strtolower_preserves_non_empty);
 test_case!(strings_concat_literal_prefix_is_non_empty);
 test_case!(strings_concat_two_unknown_strings);
 test_case!(strings_concat_non_empty_with_string);
+test_case!(issue_2623);
+test_case!(issue_2623_threshold, {
+    let mut settings = default_test_settings();
+    settings.string_combination_threshold = 1;
+    settings
+});
 test_case!(strings_compound_assign_with_literal);
 test_case!(strings_concat_with_array_fails);
 test_case!(strings_concat_with_null_implicit);
@@ -1349,6 +1417,7 @@ test_case!(strings_class_string_constraint_violation);
 test_case!(strings_class_string_throwable_ok);
 test_case!(strings_strlen_returns_non_negative);
 test_case!(strings_strlen_of_non_empty_is_positive);
+test_case!(issue_2655);
 test_case!(strings_explode_returns_list_with_separator);
 test_case!(strings_implode_basic);
 test_case!(strings_implode_single_empty_element);
@@ -1968,6 +2037,7 @@ test_case!(flow_method_return_narrow);
 test_case!(flow_narrow_lost_after_call);
 test_case!(flow_narrow_then_mutate);
 test_case!(flow_negated_array_key_exists);
+test_case!(issue_2681);
 test_case!(flow_negated_is_array);
 test_case!(flow_negated_isset);
 test_case!(flow_neq_empty_string);
@@ -2705,6 +2775,7 @@ test_case!(issue_1755);
 test_case!(issue_1756, {
     let mut s = crate::framework::default_test_settings();
     s.check_throws = false;
+    s.check_throw_type_covariance = false;
     s
 });
 test_case!(issue_1757);
@@ -2716,11 +2787,13 @@ test_case!(issue_1764);
 test_case!(issue_1765, {
     let mut s = crate::framework::default_test_settings();
     s.check_throws = false;
+    s.check_throw_type_covariance = false;
     s
 });
 test_case!(issue_1765_allow, {
     let mut s = crate::framework::default_test_settings();
     s.check_throws = false;
+    s.check_throw_type_covariance = false;
     s.allow_array_truthy_operand = true;
     s
 });
@@ -2755,6 +2828,7 @@ test_case!(issue_1796);
 test_case!(issue_1781, {
     let mut s = crate::framework::default_test_settings();
     s.check_throws = false;
+    s.check_throw_type_covariance = false;
     s
 });
 test_case!(issue_1440);
@@ -2782,6 +2856,7 @@ test_case!(issue_2119);
 test_case!(issue_2124, {
     let mut settings = crate::framework::default_test_settings();
     settings.check_throws = false;
+    settings.check_throw_type_covariance = false;
     settings
 });
 test_case!(issue_2125);
@@ -2835,6 +2910,7 @@ test_case!(issue_2233);
 test_case!(issue_2249);
 test_case!(issue_2250);
 test_case!(issue_2251);
+test_case!(issue_2640);
 test_case!(issue_2254);
 test_case!(issue_2256);
 test_case!(issue_2258);
@@ -3048,6 +3124,7 @@ test_case!(foreach_empty_array_analyze_dead_code, {
     settings
 });
 test_case!(equality_type_reconciliation_unions);
+test_case!(issue_2642);
 
 #[test]
 fn issue_2478_without_property_memoization() {
@@ -3067,6 +3144,8 @@ fn issue_2478_php84() {
 
 test_case!(chained_logical_or_assignment_subsequent_operand);
 test_case!(switch_paradoxical_unreachable_case_detection);
+test_case!(issue_2650);
+test_case!(issue_2676);
 
 #[test]
 #[cfg_attr(miri, ignore)]

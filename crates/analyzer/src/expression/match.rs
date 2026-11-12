@@ -49,7 +49,7 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::context::utils::inherit_branch_context_properties;
 use crate::error::AnalysisError;
-use crate::formula::add_nullsafe_base_clauses;
+use crate::formula::add_access_base_clauses;
 use crate::formula::get_formula;
 use crate::formula::negate_or_synthesize;
 use crate::reconciler::reconcile_keyed_types;
@@ -614,12 +614,13 @@ where
             .iter()
             .all(|condition| self.artifacts.get_expression_type(condition).is_some_and(|ty| !ty.can_be_null()))
         {
-            add_nullsafe_base_clauses(
+            add_access_base_clauses(
                 self.stmt.expression,
                 &mut nullsafe_subject_clauses,
                 expression_arm.span(),
                 expression_arm.span(),
                 assertion_context,
+                self.artifacts,
             );
         }
 

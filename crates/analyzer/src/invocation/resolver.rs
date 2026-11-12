@@ -614,14 +614,12 @@ where
             &mut comparison_result,
         );
 
-        let are_int_float_disjoint = if target.is_single() && subject.is_single() {
-            matches!(
+        let are_int_float_disjoint = target.is_single()
+            && subject.is_single()
+            && matches!(
                 (subject.effective_int_or_float(), target.effective_int_or_float()),
                 (Some(true), Some(false)) | (Some(false), Some(true))
-            )
-        } else {
-            false
-        };
+            );
 
         let are_disjoint = are_int_float_disjoint
             || !union_comparator::can_expression_types_be_identical(context.codebase, &subject, &target, false, false);

@@ -157,7 +157,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Break<'arena> {
                             context.codebase,
                             CombinerOptions::default(),
                         )),
-                        None => Rc::clone(&var_type),
+                        None => var_type,
                     },
                 );
             }

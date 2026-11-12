@@ -266,6 +266,7 @@ final class AnalyzerCodeModuleGenerator
         'incompatible-parameter-count',
         'incompatible-parameter-type',
         'incompatible-return-type',
+        'incompatible-throw-type',
         'incompatible-parameter-name',
         'non-static-abstract-implementation',
         'incompatible-property-access',

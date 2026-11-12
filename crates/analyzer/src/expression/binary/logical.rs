@@ -233,7 +233,7 @@ where
         if context_clauses.len() == 1 {
             let first = &context_clauses[0];
             if first.wedge && first.possibilities.is_empty() {
-                context_clauses = Vec::new();
+                context_clauses.clear();
             }
         }
     }
@@ -605,7 +605,7 @@ where
                 if negated_left_clauses.len() == 1 {
                     let first = &negated_left_clauses[0];
                     if first.wedge && first.possibilities.is_empty() {
-                        negated_left_clauses = Vec::new();
+                        negated_left_clauses.clear();
                     }
                 }
             }

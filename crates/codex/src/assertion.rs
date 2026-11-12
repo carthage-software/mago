@@ -384,13 +384,7 @@ impl Assertion {
             },
             Assertion::Empty => matches!(other, Assertion::NonEmpty),
             Assertion::NonEmpty => matches!(other, Assertion::Empty),
-            Assertion::NonEmptyCountable(negatable) => {
-                if *negatable {
-                    matches!(other, Assertion::EmptyCountable)
-                } else {
-                    false
-                }
-            }
+            Assertion::NonEmptyCountable(negatable) => *negatable && matches!(other, Assertion::EmptyCountable),
             Assertion::EmptyCountable => matches!(other, Assertion::NonEmptyCountable(true)),
             Assertion::HasExactCount(number) => match other {
                 Assertion::DoesNotHaveExactCount(other_number) => other_number == number,
