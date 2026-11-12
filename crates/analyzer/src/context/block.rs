@@ -10,9 +10,10 @@ use mago_codex::assertion::Assertion;
 use mago_codex::context::ScopeContext;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::add_optional_union_type;
+use mago_codex::ttype::combine_union_types_rc;
+use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator;
-use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_never;
 use mago_codex::ttype::union::TUnion;
 use mago_span::Span;
@@ -663,7 +664,7 @@ impl<'ctx> BlockContext<'ctx> {
         start_block_context: &Self,
         end_block_context: &mut Self,
         has_leaving_statements: bool,
-        vars_to_update: &WordSet,
+        vars_to_update: &WordMap<Rc<TUnion>>,
         updated_vars: &mut WordSet,
     ) where
         A: Arena,
@@ -689,7 +690,7 @@ impl<'ctx> BlockContext<'ctx> {
         start_locals: &WordMap<Rc<TUnion>>,
         end_block_context: &mut Self,
         has_leaving_statements: bool,
-        vars_to_update: &WordSet,
+        vars_to_update: &WordMap<Rc<TUnion>>,
         updated_vars: &mut WordSet,
     ) where
         A: Arena,
@@ -699,9 +700,9 @@ impl<'ctx> BlockContext<'ctx> {
         }
 
         for (variable_id, old_type) in start_locals {
-            if !vars_to_update.contains(variable_id) {
+            let Some(else_type) = vars_to_update.get(variable_id) else {
                 continue;
-            }
+            };
 
             let new_type = if !has_leaving_statements && end_block_context.has_variable_atom(*variable_id) {
                 end_block_context.locals.get(variable_id).cloned()
@@ -717,6 +718,19 @@ impl<'ctx> BlockContext<'ctx> {
 
                 continue;
             };
+
+            if let Some(new_type) = &new_type
+                && existing_type.eq(old_type.as_ref())
+            {
+                if !old_type.eq(new_type) {
+                    self.locals.insert(
+                        *variable_id,
+                        combine_union_types_rc(else_type, new_type, context.codebase, CombinerOptions::default()),
+                    );
+                }
+
+                continue;
+            }
 
             let old_type = old_type.as_ref().clone();
 
@@ -780,16 +794,8 @@ fn substitute_types<A>(
 where
     A: Arena,
 {
-    if existing_type.is_mixed() || existing_type.is_never() {
+    if existing_type.is_mixed() || existing_type.is_never() || existing_type.eq(&old_type) {
         return existing_type;
-    }
-
-    if existing_type.eq(&old_type) {
-        let Some(new_type) = new_type else {
-            return existing_type;
-        };
-
-        return add_optional_union_type(get_mixed(), Some(new_type), context.codebase);
     }
 
     let updated_type = subtract_union_types(context, existing_type, old_type);

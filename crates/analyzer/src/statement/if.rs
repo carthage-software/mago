@@ -636,9 +636,8 @@ where
         let variables_to_update = if_scope
             .negated_types
             .keys()
-            .filter(|key| pre_assignment_else_redefined_locals.contains_key(key))
-            .copied()
-            .collect::<WordSet>();
+            .filter_map(|key| Some((*key, Rc::clone(pre_assignment_else_redefined_locals.get(key)?))))
+            .collect::<WordMap<_>>();
 
         outer_block_context.update_locals(
             context,
