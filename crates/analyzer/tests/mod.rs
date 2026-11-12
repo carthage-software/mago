@@ -560,6 +560,7 @@ test_case!(issue_2662, {
     settings.strict_list_index_checks = false;
     settings
 });
+test_case!(issue_2656);
 test_case!(iterables_generator_with_non_iterable_return_type);
 test_case!(iterables_generator_send_match);
 test_case!(iterables_generator_send_mismatch);
