@@ -1983,6 +1983,7 @@ test_case!(flow_method_return_narrow);
 test_case!(flow_narrow_lost_after_call);
 test_case!(flow_narrow_then_mutate);
 test_case!(flow_negated_array_key_exists);
+test_case!(issue_2681);
 test_case!(flow_negated_is_array);
 test_case!(flow_negated_isset);
 test_case!(flow_neq_empty_string);

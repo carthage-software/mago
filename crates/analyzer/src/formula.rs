@@ -22,6 +22,8 @@ use crate::assertion::has_null_variable;
 use crate::assertion::scrape_assertions;
 use crate::context::assertion::AssertionContext;
 use crate::context::scope::var_has_root;
+use crate::reconciler::path_part_count;
+use crate::reconciler::resolve_literal_array_key;
 use crate::resolver::function::is_builtin_function_call;
 use crate::utils::expression::expression_has_observable_side_effect;
 use crate::utils::expression::expression_is_nullsafe;
@@ -131,6 +133,7 @@ where
         formula_size_threshold,
     )?;
 
+    normalize_array_key_clauses(&mut formula);
     add_conditional_assertion_clauses(
         conditional,
         true,
@@ -1057,6 +1060,7 @@ where
 
     match negated_clauses {
         Some(mut negated_clauses) => {
+            normalize_array_key_clauses(&mut negated_clauses);
             add_conditional_assertion_clauses(
                 conditional,
                 false,
@@ -1135,6 +1139,47 @@ where
     let clauses = disjoin_clauses(left_clauses, right_clauses, conditional_object_id, algebra_thresholds);
 
     if clauses.len() > usize::from(formula_size_threshold) { None } else { Some(clauses) }
+}
+
+fn normalize_array_key_clauses(clauses: &mut [Clause]) {
+    for clause in clauses {
+        if clause.wedge || !clause.reconcilable || clause.possibilities.len() != 2 {
+            continue;
+        }
+
+        let replacement = clause.possibilities.iter().find_map(|(root, assertions)| {
+            if assertions.len() != 1 {
+                return None;
+            }
+
+            let Assertion::DoesNotHaveArrayKey(key) = assertions.values().next()? else {
+                return None;
+            };
+
+            clause.possibilities.iter().find_map(|(access, assertions)| {
+                let suffix = access.as_bytes().strip_prefix(root.as_bytes())?;
+                if path_part_count(suffix) != 3 {
+                    return None;
+                }
+
+                let index = suffix.strip_prefix(b"[")?.strip_suffix(b"]")?;
+
+                (resolve_literal_array_key(index) == Some(*key)).then(|| (*access, assertions.clone()))
+            })
+        });
+
+        if let Some((access, mut assertions)) = replacement {
+            assertions.insert(Assertion::ArrayKeyDoesNotExist.to_hash(), Assertion::ArrayKeyDoesNotExist);
+            *clause = Clause::new(
+                AssertionMap::from_iter([(access, assertions)]),
+                clause.condition_span,
+                clause.span,
+                Some(clause.wedge),
+                Some(clause.reconcilable),
+                Some(clause.generated),
+            );
+        }
+    }
 }
 
 #[inline]

@@ -545,7 +545,7 @@ where
     result.filter(|entry_type| !entry_type.is_never() && !entry_type.is_mixed())
 }
 
-fn resolve_literal_array_key(array_key: &[u8]) -> Option<ArrayKey> {
+pub(crate) fn resolve_literal_array_key(array_key: &[u8]) -> Option<ArrayKey> {
     if (array_key.starts_with(b"'") || array_key.starts_with(b"\"")) && array_key.len() >= 2 {
         let value = &array_key[1..(array_key.len() - 1)];
         if array_key.starts_with(b"'") && value.contains(&b'\\') {
@@ -1065,7 +1065,7 @@ fn borrow_path_parts(path: &[u8]) -> Vec<&[u8]> {
     parts
 }
 
-fn path_part_count(path: &[u8]) -> usize {
+pub(crate) fn path_part_count(path: &[u8]) -> usize {
     let mut count = 0;
     for_each_path_part(path, |_| count += 1);
     count
