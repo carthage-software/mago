@@ -58,10 +58,10 @@ use crate::utils::docblock::check_docblock_type_incompatibility;
 use crate::utils::docblock::get_type_from_var_docblock;
 use crate::utils::expression::array::get_array_target_type_given_index;
 use crate::utils::expression::expression_has_logic;
+use crate::utils::expression::get_access_base_expressions;
 use crate::utils::expression::get_block_expression_id;
 use crate::utils::expression::get_expression_id;
 use crate::utils::expression::get_non_nullsafe_expression_id;
-use crate::utils::expression::get_nullsafe_base_expressions;
 use crate::utils::expression::get_root_expression_id;
 use crate::utils::misc::unwrap_expression;
 
@@ -309,7 +309,7 @@ where
         && let (Some(target_variable_id), Some(source_expression)) = (target_variable_id, source_expression)
         && matches!(target_expression, Expression::Variable(_))
     {
-        add_nullsafe_assignment_clauses(target_variable_id, source_expression, context, block_context);
+        add_access_assignment_clauses(target_variable_id, source_expression, context, block_context, artifacts);
     }
 
     if let Some(assignment_span) = assignment_span {
@@ -319,15 +319,16 @@ where
     Ok(())
 }
 
-fn add_nullsafe_assignment_clauses<'ctx, 'arena, A>(
+fn add_access_assignment_clauses<'ctx, 'arena, A>(
     target_variable_id: Word,
     source_expression: &Expression<'arena>,
     context: &Context<'ctx, 'arena, A>,
     block_context: &mut BlockContext<'ctx>,
+    artifacts: &AnalysisArtifacts,
 ) where
     A: Arena,
 {
-    for base in get_nullsafe_base_expressions(source_expression) {
+    for base in get_access_base_expressions(source_expression, artifacts) {
         let Some(base_id) = get_block_expression_id(base, context, block_context) else {
             continue;
         };

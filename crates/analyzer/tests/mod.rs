@@ -561,6 +561,7 @@ test_case!(issue_2662, {
     settings
 });
 test_case!(issue_2656);
+test_case!(issue_2621);
 test_case!(iterables_generator_with_non_iterable_return_type);
 test_case!(iterables_generator_send_match);
 test_case!(iterables_generator_send_mismatch);
