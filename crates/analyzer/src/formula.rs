@@ -162,6 +162,27 @@ where
     let expression = unwrap_expression(conditional);
 
     if let Expression::Binary(binary) = expression {
+        let equality_operator = match binary.operator {
+            BinaryOperator::NotIdentical(span) => Some(BinaryOperator::Identical(span)),
+            BinaryOperator::NotEqual(span) | BinaryOperator::AngledNotEqual(span) => Some(BinaryOperator::Equal(span)),
+            _ => None,
+        };
+
+        if let Some(operator) = equality_operator {
+            let equality = Expression::Binary(Binary { lhs: binary.lhs, operator, rhs: binary.rhs });
+            let clauses = get_base_formula(
+                conditional_object_id,
+                creating_object_id,
+                &equality,
+                assertion_context,
+                artifacts,
+                algebra_thresholds,
+                formula_size_threshold,
+            )?;
+
+            return negate_formula(&clauses, algebra_thresholds);
+        }
+
         if binary.operator.is_null_coalesce()
             && artifacts.get_expression_type(binary.rhs).is_some_and(|ty| ty.is_always_falsy())
         {

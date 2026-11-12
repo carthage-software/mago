@@ -2559,7 +2559,41 @@ where
         if_types.insert(other_value_var_name, vec![orred_types]);
     }
 
+    if if_types
+        .values()
+        .flatten()
+        .flatten()
+        .any(|assertion| assertion.get_type().is_some_and(|atomic| !has_single_value(atomic)))
+    {
+        let comparison_id = Word::from(format!("*{}-{}", left.span().start.offset, right.span().end.offset).as_str());
+        if_types.insert(comparison_id, vec![vec![Assertion::Truthy]]);
+    }
+
     if if_types.is_empty() { vec![] } else { vec![if_types] }
+}
+
+fn has_single_value(atomic: &TAtomic) -> bool {
+    if atomic.is_literal()
+        || atomic.is_literal_class_string()
+        || matches!(atomic, TAtomic::Object(TObject::Enum(enumeration)) if enumeration.case.is_some())
+    {
+        return true;
+    }
+
+    let known_value =
+        |(optional, value): &(bool, TUnion)| !optional && value.is_single() && has_single_value(value.get_single());
+
+    match atomic {
+        TAtomic::Array(TArray::List(list)) => {
+            list.element_type.is_never()
+                && list.get_known_elements().is_none_or(|elements| elements.values().all(known_value))
+        }
+        TAtomic::Array(TArray::Keyed(array)) => {
+            array.parameters.is_none()
+                && array.get_known_items().is_none_or(|items| items.len() <= 1 && items.values().all(known_value))
+        }
+        _ => false,
+    }
 }
 
 fn get_typed_value_inequality_assertions<A>(
