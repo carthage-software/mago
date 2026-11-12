@@ -35,6 +35,7 @@ use crate::assertion::get_class_type_relations;
 use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
+use crate::context::utils::inherit_too_wide_thrown_exceptions;
 use crate::error::AnalysisError;
 use crate::formula::get_formula;
 use crate::formula::negate_or_synthesize;
@@ -360,6 +361,11 @@ where
     let right_true_context = right_true_context.and_then(|scope| scope.borrow_mut().take());
 
     artifacts.set_expression_type(binary, result_type);
+
+    inherit_too_wide_thrown_exceptions(context, block_context, &left_block_context);
+    if !lhs_type.is_always_falsy() {
+        inherit_too_wide_thrown_exceptions(context, block_context, &right_block_context);
+    }
 
     block_context.conditionally_referenced_variable_ids =
         left_block_context.conditionally_referenced_variable_ids.clone();
@@ -918,6 +924,11 @@ where
     }
 
     artifacts.set_expression_type(binary, result_type);
+
+    inherit_too_wide_thrown_exceptions(context, block_context, &left_block_context);
+    if !lhs_type.is_always_truthy() {
+        inherit_too_wide_thrown_exceptions(context, block_context, &right_block_context);
+    }
 
     if let Some(false_context) = false_context {
         let right_false_context =
