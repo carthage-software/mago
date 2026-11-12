@@ -1658,6 +1658,7 @@ test_case!(flow_continue_skips);
 test_case!(flow_continue_with_level);
 test_case!(flow_loop_reassign_var);
 test_case!(flow_elseif_chain);
+test_case!(flow_elseif_reassigns_narrowed_variable);
 test_case!(flow_negated_instanceof);
 test_case!(flow_redundant_null_check);
 test_case!(classes_basic_class_declaration);

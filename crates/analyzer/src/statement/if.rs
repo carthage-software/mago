@@ -1381,6 +1381,11 @@ fn update_if_scope<'ctx, A>(
         }
     }
 
+    if_scope.updated_variables.retain(|variable_id| {
+        !new_assigned_variable_ids.contains_key(variable_id)
+            && !new_possibly_assigned_variable_ids.contains(variable_id)
+    });
+
     match &mut if_scope.assigned_variable_ids {
         Some(assigned_variable_ids) => {
             assigned_variable_ids.extend(new_assigned_variable_ids);
