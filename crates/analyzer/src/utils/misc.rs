@@ -69,13 +69,15 @@ pub fn check_for_paradox<A>(
     };
 
     let formula_1_clauses = formula_1.iter().map(|c| &**c).collect::<Vec<_>>();
+    let mut paradox = None;
     for negated_clause_2 in &negated_formula_2 {
         if !negated_clause_2.reconcilable || negated_clause_2.wedge {
-            continue;
+            return;
         }
 
+        let mut is_implied = false;
         for clause_1 in &formula_1_clauses {
-            if negated_clause_2 == *clause_1 || !clause_1.reconcilable || clause_1.wedge {
+            if !clause_1.reconcilable || clause_1.wedge {
                 continue;
             }
 
@@ -88,11 +90,21 @@ pub fn check_for_paradox<A>(
             });
 
             if is_subset && !clause_1.possibilities.is_empty() {
-                report_paradoxical_condition(collector, clause_1, negated_clause_2, span, algebra_thresholds);
-
-                return;
+                is_implied = true;
+                if negated_clause_2 != *clause_1 {
+                    paradox.get_or_insert((*clause_1, negated_clause_2));
+                    break;
+                }
             }
         }
+
+        if !is_implied {
+            return;
+        }
+    }
+
+    if let Some((original_clause, negated_clause)) = paradox {
+        report_paradoxical_condition(collector, original_clause, negated_clause, span, algebra_thresholds);
     }
 }
 
