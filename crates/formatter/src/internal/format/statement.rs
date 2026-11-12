@@ -32,13 +32,9 @@ use crate::document::Trim;
 use crate::internal::FormatterState;
 use crate::internal::comment::CommentFlags;
 use crate::internal::format::Format;
-use crate::internal::format::alignment::AlignmentWidths;
-use crate::internal::format::alignment::detect_statement_ref_alignment_runs;
-use crate::internal::format::alignment::get_alignment;
+use crate::internal::format::alignment::Alignment;
 use crate::internal::format::alignment::has_comment_between;
-use crate::internal::format::assignment::AssignmentAlignment;
 use crate::internal::format::misc::compare_case_insensitive_bytes;
-use crate::internal::format::misc::has_new_line_in_range;
 use crate::settings::SortOrder;
 
 pub fn print_statement_sequence<'arena, A>(
@@ -63,8 +59,7 @@ where
     let mut use_statements: std::vec::Vec<&'arena Use<'arena>> = std::vec::Vec::new();
     let mut parts = vec_in![f.arena;];
 
-    // Detect alignment runs for consecutive assignment statements and global constants
-    let alignment_runs = detect_statement_ref_alignment_runs(f, stmts);
+    let mut alignment = f.settings.align_assignment_like.then(|| Alignment::new(f.next_id(), true));
 
     let last_statement_index = if stmts.is_empty() { None } else { stmts.len().checked_sub(1) };
     let sequence_span = f.current_node().span();
@@ -181,14 +176,20 @@ where
             }
         }
 
-        if let Some(widths) = get_alignment(&alignment_runs, i) {
-            let alignment = calculate_statement_alignment(f, stmt, &widths);
-            f.set_alignment_context(Some(alignment));
+        if alignment.is_some() && is_alignable_statement(stmt) {
+            if i > 0
+                && (std::mem::discriminant(stmts[i - 1]) != std::mem::discriminant(stmt)
+                    || has_comment_between(f, stmts[i - 1].span(), stmt.span()))
+            {
+                alignment = Some(Alignment::new(f.next_id(), true));
+            }
+
+            f.set_alignment(alignment);
         }
 
         let mut formatted_statement = format_statement_with_spacing(f, i, stmt, stmts, last_statement_index, i == 0);
 
-        f.set_alignment_context(None);
+        f.set_alignment(None);
 
         let tag_offset = match stmt {
             Statement::OpeningTag(tag) => Some(tag.span().start.offset),
@@ -910,34 +911,16 @@ pub fn sort_maybe_typed_use_items<'arena>(
     items
 }
 
-fn calculate_statement_alignment<A>(
-    f: &mut FormatterState<'_, '_, A>,
-    stmt: &Statement<'_>,
-    widths: &AlignmentWidths,
-) -> AssignmentAlignment
-where
-    A: Arena,
-{
-    let current_name_width = match stmt {
-        Statement::Expression(expr_stmt) => {
-            if let Expression::Assignment(assign) = &expr_stmt.expression {
-                let lhs_span = assign.lhs.span();
-
-                // Skip multiline LHS expressions for alignment
-                if has_new_line_in_range(f.source_text, lhs_span.start_offset(), lhs_span.end_offset()) {
-                    0
-                } else {
-                    lhs_span.length() as usize
-                }
-            } else {
-                0
-            }
-        }
-        Statement::Constant(constant) => constant.items.iter().map(|item| item.name.value.len()).max().unwrap_or(0),
-        _ => 0,
-    };
-
-    let name_padding = widths.name_width.saturating_sub(current_name_width);
-
-    AssignmentAlignment { type_padding: 0, name_padding, break_group_id: None }
+fn is_alignable_statement(stmt: &Statement<'_>) -> bool {
+    match stmt {
+        Statement::Expression(expression_statement) => matches!(
+            &expression_statement.expression,
+            Expression::Assignment(assignment) if matches!(
+                assignment.lhs,
+                Expression::Variable(_) | Expression::Access(_) | Expression::ArrayAccess(_) | Expression::ArrayAppend(_)
+            )
+        ),
+        Statement::Constant(_) => true,
+        _ => false,
+    }
 }

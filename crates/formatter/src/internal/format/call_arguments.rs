@@ -36,7 +36,6 @@ use crate::internal::format::misc::should_hug_expression;
 use crate::internal::utils::could_expand_value;
 use crate::internal::utils::foreach_binary_operand;
 use crate::internal::utils::get_expression_width;
-use crate::internal::utils::string_width;
 use crate::internal::utils::unwrap_parenthesized;
 use crate::internal::utils::will_break;
 
@@ -261,22 +260,12 @@ where
     let should_expand_last =
         can_expand_first_or_last && !force_break && should_expand_last_arg(f, argument_list, false);
     let is_single_late_breaking_argument = !force_break && is_single_late_breaking_argument(f, argument_list);
-    let named_argument_width = if should_align_named_arguments(f, argument_list, should_break_all, should_inline) {
-        Some(get_max_named_argument_width(argument_list))
-    } else {
-        None
-    };
+    let named_argument_table = should_align_named_arguments(f, argument_list).then(|| f.next_id());
 
     let arguments_count = argument_list.arguments.len();
     let mut formatted_arguments: Vec<'arena, Document<'arena, A>, A> = Vec::with_capacity_in(arguments_count, f.arena);
-    let previous_named_argument_padding = f.argument_state.named_argument_padding;
     for (i, arg) in argument_list.arguments.iter().enumerate() {
-        f.argument_state.named_argument_padding = match (named_argument_width, arg) {
-            (Some(max_width), PartialArgument::Named(argument)) => {
-                Some(max_width.saturating_sub(string_width(argument.name.value)))
-            }
-            _ => None,
-        };
+        f.argument_state.named_argument_table = named_argument_table;
 
         if !should_break_all && !should_inline {
             if should_expand_first && (i == 0) {
@@ -302,7 +291,7 @@ where
 
         formatted_arguments.push(arg.format(f));
     }
-    f.argument_state.named_argument_padding = previous_named_argument_padding;
+    f.argument_state.named_argument_table = None;
 
     let dangling_comments = f.print_dangling_comments(argument_list.span(), true);
     let right_parenthesis = format_token(f, argument_list.right_parenthesis, b")");
@@ -534,6 +523,7 @@ where
             argument.push(Document::String(b","));
 
             if f.is_next_line_empty(element.span()) {
+                argument.push(Document::BreakParent);
                 argument.push(Document::Line(Line::hard()));
                 argument.push(Document::Line(Line::hard()));
             } else if should_break {
@@ -549,41 +539,13 @@ where
     printed_arguments
 }
 
-fn should_align_named_arguments<A>(
-    f: &FormatterState<'_, '_, A>,
-    argument_list: &PartialArgumentList<'_>,
-    should_break_all: bool,
-    should_inline: bool,
-) -> bool
+fn should_align_named_arguments<A>(f: &FormatterState<'_, '_, A>, argument_list: &PartialArgumentList<'_>) -> bool
 where
     A: Arena,
 {
-    if !f.settings.align_named_arguments || should_inline || argument_list.arguments.len() < 2 {
-        return false;
-    }
-
-    if !argument_list.arguments.iter().all(|arg| matches!(arg, PartialArgument::Named(_))) {
-        return false;
-    }
-
-    should_break_all
-        || misc::has_new_line_in_range(
-            f.source_text,
-            argument_list.left_parenthesis.start.offset,
-            argument_list.right_parenthesis.end.offset,
-        )
-}
-
-fn get_max_named_argument_width(argument_list: &PartialArgumentList<'_>) -> usize {
-    argument_list
-        .arguments
-        .iter()
-        .filter_map(|arg| match arg {
-            PartialArgument::Named(argument) => Some(string_width(argument.name.value)),
-            _ => None,
-        })
-        .max()
-        .unwrap_or(0)
+    f.settings.align_named_arguments
+        && argument_list.arguments.len() >= 2
+        && argument_list.arguments.iter().all(|arg| matches!(arg, PartialArgument::Named(_)))
 }
 
 fn print_right_parenthesis<'arena, A>(

@@ -990,7 +990,8 @@ where
 
     if !f.settings.method_chain_breaking_style.is_next_line()
         && member_access_chain.accesses.first().is_some_and(MemberAccess::is_property_access)
-        && !preserve_breaks_first_method(f, member_access_chain)
+        && (!f.settings.preserve_breaking_member_access_chain
+            || f.settings.preserve_breaking_member_access_chain_first_method_on_same_line)
     {
         for (index, access) in member_access_chain.accesses.iter().enumerate() {
             if !access.is_property_access() {
@@ -1000,20 +1001,6 @@ where
     }
 
     1
-}
-
-fn preserve_breaks_first_method<'arena, A>(
-    f: &FormatterState<'_, 'arena, A>,
-    member_access_chain: &MemberAccessChain<'arena, A>,
-) -> bool
-where
-    A: Arena,
-{
-    f.settings.preserve_breaking_member_access_chain
-        && !f.settings.preserve_breaking_member_access_chain_first_method_on_same_line
-        && (member_access_chain.is_first_link_already_broken(f)
-            || member_access_chain.has_break_after_first_access(f)
-            || member_access_chain.exceeds_print_width(f))
 }
 
 fn should_inline_first_access<'arena, A>(
@@ -1054,8 +1041,22 @@ where
         return false;
     }
 
-    if f.settings.first_method_chain_on_new_line && member_access_chain.is_first_link_object_method_call() {
-        return false;
+    // A preserved chain places its first method by the `first_method_on_same_line` setting alone,
+    // so a chain that breaks for the first time has to follow it too.
+    let first_method_on_new_line = if f.settings.preserve_breaking_member_access_chain {
+        !f.settings.preserve_breaking_member_access_chain_first_method_on_same_line
+    } else {
+        f.settings.first_method_chain_on_new_line
+    };
+
+    if member_access_chain.is_first_link_object_method_call() {
+        if first_method_on_new_line {
+            return false;
+        }
+
+        if f.settings.preserve_breaking_member_access_chain {
+            return true;
+        }
     }
 
     if member_access_chain.find_fluent_access_chain_start().is_some_and(|start| start == 0) {

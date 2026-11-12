@@ -55,7 +55,7 @@ use super::block::block_is_empty;
 /// Check if there is a newline character within a specified range of text.
 #[inline(always)]
 pub(super) fn has_new_line_in_range(text: &[u8], start: u32, end: u32) -> bool {
-    text[start as usize..end as usize].contains(&b'\n')
+    memchr::memchr2(b'\n', b'\r', &text[start as usize..end as usize]).is_some()
 }
 
 pub(crate) fn get_document_width<A>(doc: &Document<'_, A>) -> usize
@@ -217,14 +217,14 @@ where
 
     // And either:
     match &instantiation.argument_list {
-        // a. The instantiation is a simple class instantiation without arguments
-        None => true,
+        // `new Foo` prints like `new Foo()`, so it is hugged like it: not at all.
+        None => false,
         Some(argument_list) => {
             let arguments_len = argument_list.arguments.len();
             if 0 == arguments_len {
                 false
             } else if arguments_len == 1 {
-                // b. The instantiation has a single non-named argument that is huggable or an instantiation
+                // a. The instantiation has a single non-named argument that is huggable or an instantiation
                 //   (e.g. `new Foo(new Bar())`)
                 match &argument_list.arguments.as_slice()[0] {
                     Argument::Named(_) => false,
@@ -234,9 +234,9 @@ where
                     }
                 }
             } else {
-                // c. The instantiation has multiple arguments and all are named.
+                // b. The instantiation has multiple arguments and all are named.
                 argument_list.arguments.iter().all(|arg| matches!(arg, Argument::Named(_))) ||
-                // d. The instantiation has less than 4 non-named arguments,
+                // c. The instantiation has less than 4 non-named arguments,
                 // all of which are simple expressions
                 (arguments_len < 4 && argument_list.arguments.iter().all(|arg| {
                     matches!(arg, Argument::Positional(positional) if is_simple_expression(positional.value))

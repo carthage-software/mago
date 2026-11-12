@@ -24,31 +24,18 @@ use mago_syntax::cst::YieldPair;
 
 use crate::document::Document;
 use crate::document::Group;
-use crate::document::IfBreak;
 use crate::document::IndentIfBreak;
 use crate::document::Line;
-use crate::document::group::GroupIdentifier;
 use crate::internal::FormatterState;
 use crate::internal::comment::CommentFlags;
 use crate::internal::format::Format;
+use crate::internal::format::alignment::Alignment;
 use crate::internal::format::binaryish::should_inline_binary_expression;
 use crate::internal::format::member_access::collect_member_access_chain;
 use crate::internal::format::misc::is_breaking_expression;
 use crate::internal::format::misc::is_simple_expression;
-use crate::internal::utils;
 use crate::internal::utils::string_width;
 use crate::internal::utils::unwrap_parenthesized;
-
-/// Alignment information for assignment-like constructs.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct AssignmentAlignment {
-    /// Padding to add after the type hint (for properties with different type widths).
-    pub type_padding: usize,
-    /// Padding to add after the name (before the `=` or `=>` operator).
-    pub name_padding: usize,
-    /// Group id controlling whether padding should only appear when the containing group breaks.
-    pub break_group_id: Option<GroupIdentifier>,
-}
 
 /// Represents nodes in the Concrete Syntax Tree (CST) that involve assignment-like operations.
 #[derive(Debug, Clone, Copy)]
@@ -106,44 +93,20 @@ pub(super) fn print_assignment_with_alignment<'arena, A>(
     lhs: Document<'arena, A>,
     operator: Document<'arena, A>,
     rhs_expression: &'arena Expression<'arena>,
-    alignment: Option<AssignmentAlignment>,
+    alignment: Option<Alignment>,
 ) -> Document<'arena, A>
 where
     A: Arena,
 {
-    if let Some(align) = alignment {
-        let outer_alignment = f.alignment_context();
-        let was_in_aligned_assignment_rhs = f.is_in_aligned_assignment_rhs;
-        f.set_alignment_context(None);
-        f.is_in_aligned_assignment_rhs = true;
-        let rhs = rhs_expression.format(f);
-        f.is_in_aligned_assignment_rhs = was_in_aligned_assignment_rhs;
-        f.set_alignment_context(outer_alignment);
-
-        let padding = if align.name_padding > 0 {
-            let spaces = Document::String(utils::spaces(f.arena, align.name_padding));
-
-            if let Some(group_id) = align.break_group_id {
-                Document::IfBreak(IfBreak::new(f.arena, spaces, Document::empty()).with_id(group_id))
-            } else {
-                spaces
-            }
-        } else {
-            Document::empty()
-        };
-
-        return Document::Array(vec_in![f.arena;
-            lhs,
-            padding,
-            Document::space(),
-            operator,
-            Document::space(),
-            rhs,
-        ]);
-    }
-
     let layout = choose_layout(f, &lhs, &assignment_node, rhs_expression);
     let rhs = rhs_expression.format(f);
+    let (lhs, rhs) = match alignment {
+        Some(alignment) => (
+            Document::Array(vec_in![f.arena; alignment.row(), lhs, alignment.cell(2)]),
+            Document::Array(vec_in![f.arena; alignment.anchor(), rhs]),
+        ),
+        None => (lhs, rhs),
+    };
 
     match layout {
         Layout::Chain => Document::Array(vec_in![f.arena;
@@ -557,6 +520,7 @@ where
 
                 None
             }
+            Expression::Parenthesized(parenthesized) => Some(parenthesized.expression),
             _ => None,
         }
     }

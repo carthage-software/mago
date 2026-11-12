@@ -1,8 +1,7 @@
-//! Alignment utilities for consecutive assignment-like constructs.
+//! Alignment of consecutive assignment-like constructs.
 //!
-//! This module provides functionality for aligning consecutive assignment-like
-//! constructs such as variable assignments, class properties, constants, and
-//! array key-value pairs.
+//! The formatter only marks where a column may be aligned. The printer pads the marks once the
+//! layout is final, so alignment never depends on how the source was laid out.
 
 use mago_allocator::Arena;
 use mago_span::HasSpan;
@@ -10,88 +9,54 @@ use mago_span::Span;
 use mago_syntax::cst::ClassLikeConstant;
 use mago_syntax::cst::ClassLikeMember;
 use mago_syntax::cst::EnumCaseItem;
-use mago_syntax::cst::Expression;
-use mago_syntax::cst::Hint;
 use mago_syntax::cst::Modifier;
 use mago_syntax::cst::Property;
 use mago_syntax::cst::PropertyItem;
 use mago_syntax::cst::Sequence;
-use mago_syntax::cst::Statement;
 
+use crate::document::Column;
+use crate::document::Document;
+use crate::document::group::GroupIdentifier;
 use crate::internal::FormatterState;
-use crate::internal::format::misc::has_new_line_in_range;
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub enum AlignableKind {
-    VariableAssignment,
-    PropertyWithDefault,
-    ClassConstant,
-    GlobalConstant,
-    EnumBackedCase,
+/// The table that the next assignment-like node adds a row to.
+#[derive(Debug, Clone, Copy)]
+pub struct Alignment {
+    pub table: GroupIdentifier,
+    pub adjacent: bool,
+    pub row_started: bool,
 }
 
-/// Alignment widths for formatting.
-#[derive(Debug, Clone, Copy, Default)]
-pub struct AlignmentWidths {
-    /// Width of the type hint column (for properties and class constants).
-    /// This is used to align names when types have different lengths.
-    pub type_width: usize,
-    /// Width of the name/key column.
-    pub name_width: usize,
-}
-
-impl AlignmentWidths {
-    /// Create new alignment widths.
-    pub const fn new(name_width: usize) -> Self {
-        Self { type_width: 0, name_width }
+impl Alignment {
+    pub const fn new(table: GroupIdentifier, adjacent: bool) -> Self {
+        Self { table, adjacent, row_started: false }
     }
 
-    /// Create alignment widths with type width (for properties and class constants).
-    pub const fn with_type_width(type_width: usize, name_width: usize) -> Self {
-        Self { type_width, name_width }
-    }
-}
-
-/// A run of consecutive alignable items with their calculated widths.
-#[derive(Debug)]
-pub struct AlignmentRun {
-    /// Start index of the run (inclusive).
-    pub start: usize,
-    /// End index of the run (exclusive).
-    pub end: usize,
-    /// Calculated alignment widths for this run.
-    pub widths: AlignmentWidths,
-}
-
-impl AlignmentRun {
-    /// Create a new alignment run.
-    pub const fn new(start: usize, end: usize, widths: AlignmentWidths) -> Self {
-        Self { start, end, widths }
+    pub const fn started(mut self) -> Self {
+        self.row_started = true;
+        self
     }
 
-    /// Check if an index falls within this run.
-    pub const fn contains(&self, index: usize) -> bool {
-        index >= self.start && index < self.end
-    }
-}
-
-/// Check if there's a blank line between two spans.
-pub fn has_blank_line_between<A>(f: &FormatterState<'_, '_, A>, prev_span: Span, next_span: Span) -> bool
-where
-    A: Arena,
-{
-    let source = f.source_text;
-    let start = prev_span.end_offset() as usize;
-    let end = next_span.start_offset() as usize;
-
-    if start >= end || end > source.len() {
-        return false;
+    pub fn row<'arena, A>(self) -> Document<'arena, A>
+    where
+        A: Arena,
+    {
+        if self.row_started { Document::empty() } else { self.cell(0) }
     }
 
-    let between = &source[start..end];
-    let newline_count = memchr::memchr_iter(b'\n', between).count();
+    pub fn anchor<'arena, A>(self) -> Document<'arena, A>
+    where
+        A: Arena,
+    {
+        self.cell(Column::ANCHOR)
+    }
 
-    newline_count >= 2
+    pub fn cell<'arena, A>(self, index: u8) -> Document<'arena, A>
+    where
+        A: Arena,
+    {
+        Document::Column(Column { table: self.table, index, shift: 0, gutter: 0, adjacent: self.adjacent })
+    }
 }
 
 /// Check if there's a comment between two spans.
@@ -105,6 +70,26 @@ where
     })
 }
 
+pub fn has_attributes(member: &ClassLikeMember<'_>) -> bool {
+    match member {
+        ClassLikeMember::Property(Property::Plain(property)) => !property.attribute_lists.is_empty(),
+        ClassLikeMember::Property(Property::Hooked(property)) => !property.attribute_lists.is_empty(),
+        ClassLikeMember::Constant(constant) => !constant.attribute_lists.is_empty(),
+        ClassLikeMember::EnumCase(case) => !case.attribute_lists.is_empty(),
+        _ => false,
+    }
+}
+
+/// Whether a class-like member can be a row of an alignment table.
+pub fn is_alignable_member(member: &ClassLikeMember<'_>) -> bool {
+    match member {
+        ClassLikeMember::Property(property) => is_plain_property_with_default(property),
+        ClassLikeMember::Constant(_) => true,
+        ClassLikeMember::EnumCase(case) => matches!(case.item, EnumCaseItem::Backed(_)),
+        _ => false,
+    }
+}
+
 /// Check if a property is a plain property with a default value.
 /// Hooked properties are excluded from alignment because they span multiple lines.
 fn is_plain_property_with_default(prop: &Property<'_>) -> bool {
@@ -114,17 +99,9 @@ fn is_plain_property_with_default(prop: &Property<'_>) -> bool {
     }
 }
 
-/// Get the attribute lists for a property.
-fn property_has_attributes(prop: &Property<'_>) -> bool {
-    match prop {
-        Property::Plain(p) => !p.attribute_lists.is_empty(),
-        Property::Hooked(p) => !p.attribute_lists.is_empty(),
-    }
-}
-
 /// Check if two members have compatible modifiers for alignment.
 /// Members with different modifier combinations should not be aligned together.
-fn have_compatible_modifiers(prev: &ClassLikeMember<'_>, curr: &ClassLikeMember<'_>) -> bool {
+pub fn have_compatible_modifiers(prev: &ClassLikeMember<'_>, curr: &ClassLikeMember<'_>) -> bool {
     match (prev, curr) {
         (ClassLikeMember::Property(prev_prop), ClassLikeMember::Property(curr_prop)) => {
             prev_prop.hint().is_some() == curr_prop.hint().is_some()
@@ -172,288 +149,4 @@ fn calculate_modifier_signature(modifiers: &Sequence<'_, Modifier<'_>>) -> u32 {
         };
     }
     sig
-}
-
-pub fn get_hint_width<A>(f: &FormatterState<'_, '_, A>, hint: &Hint<'_>) -> usize
-where
-    A: Arena,
-{
-    const fn is_compound(hint: &Hint<'_>) -> bool {
-        matches!(hint, Hint::Nullable(_) | Hint::Union(_) | Hint::Intersection(_) | Hint::Parenthesized(_))
-    }
-
-    fn width(hint: &Hint<'_>, short_nullable: bool, nested: bool) -> usize {
-        let short_nullable_here = short_nullable && !nested;
-
-        match hint {
-            Hint::Parenthesized(parenthesized) => 2 + width(parenthesized.hint, short_nullable, true),
-            Hint::Nullable(nullable) => {
-                let null_width = if short_nullable_here && !is_compound(nullable.hint) { 1 } else { 5 };
-
-                null_width + width(nullable.hint, short_nullable, true)
-            }
-            Hint::Union(union) => match (union.left, union.right) {
-                (Hint::Null(_), other) | (other, Hint::Null(_)) if short_nullable_here && !is_compound(other) => {
-                    1 + width(other, short_nullable, true)
-                }
-                (left, right) => width(left, short_nullable, true) + 1 + width(right, short_nullable, true),
-            },
-            Hint::Intersection(intersection) => {
-                width(intersection.left, short_nullable, true) + 1 + width(intersection.right, short_nullable, true)
-            }
-            _ => hint.span().length() as usize,
-        }
-    }
-
-    width(hint, f.settings.null_type_hint.is_question(), false)
-}
-
-pub fn get_alignment(runs: &[AlignmentRun], index: usize) -> Option<AlignmentWidths> {
-    runs.iter().find(|run| run.contains(index)).map(|run| run.widths)
-}
-
-pub fn detect_alignment_runs<K>(
-    item_count: usize,
-    kind_of: impl Fn(usize) -> Option<K>,
-    extra_break: impl Fn(usize) -> bool,
-    widths_of: impl Fn(usize, usize, K) -> Option<AlignmentWidths>,
-) -> Vec<AlignmentRun>
-where
-    K: PartialEq + Copy,
-{
-    let mut runs = Vec::new();
-    let mut run_start: Option<(usize, K)> = None;
-
-    let flush = |runs: &mut Vec<AlignmentRun>, run_start: &mut Option<(usize, K)>, end: usize| {
-        if let Some((start, kind)) = run_start.take()
-            && end - start >= 2
-            && let Some(widths) = widths_of(start, end, kind)
-        {
-            runs.push(AlignmentRun::new(start, end, widths));
-        }
-    };
-
-    for i in 0..item_count {
-        let kind = kind_of(i);
-
-        let should_break_run = run_start.is_some_and(|(_, start_kind)| kind != Some(start_kind) || extra_break(i));
-        if should_break_run || kind.is_none() {
-            flush(&mut runs, &mut run_start, i);
-        }
-
-        if let Some(kind) = kind
-            && run_start.is_none()
-        {
-            run_start = Some((i, kind));
-        }
-    }
-
-    flush(&mut runs, &mut run_start, item_count);
-
-    runs
-}
-
-pub fn detect_class_member_alignment_runs<'arena, A>(
-    f: &FormatterState<'_, 'arena, A>,
-    members: &'arena [ClassLikeMember<'arena>],
-) -> Vec<AlignmentRun>
-where
-    A: Arena,
-{
-    if !f.settings.align_assignment_like || members.is_empty() {
-        return Vec::new();
-    }
-
-    detect_alignment_runs(
-        members.len(),
-        |i| match &members[i] {
-            ClassLikeMember::Property(prop) if is_plain_property_with_default(prop) => {
-                Some(AlignableKind::PropertyWithDefault)
-            }
-            ClassLikeMember::Constant(_) => Some(AlignableKind::ClassConstant),
-            ClassLikeMember::EnumCase(case) if matches!(case.item, EnumCaseItem::Backed(_)) => {
-                Some(AlignableKind::EnumBackedCase)
-            }
-            _ => None,
-        },
-        |i| {
-            let member = &members[i];
-            if i > 0 {
-                let prev_span = members[i - 1].span();
-                let curr_span = member.span();
-                if has_blank_line_between(f, prev_span, curr_span) || has_comment_between(f, prev_span, curr_span) {
-                    return true;
-                }
-            }
-
-            let has_attributes = match member {
-                ClassLikeMember::Property(prop) => property_has_attributes(prop),
-                ClassLikeMember::Constant(c) => !c.attribute_lists.is_empty(),
-                ClassLikeMember::EnumCase(c) => !c.attribute_lists.is_empty(),
-                _ => false,
-            };
-
-            has_attributes || (i > 0 && !have_compatible_modifiers(&members[i - 1], member))
-        },
-        |start, end, kind| Some(calculate_class_member_widths(f, &members[start..end], kind)),
-    )
-}
-
-/// Calculate alignment widths for a slice of class-like members.
-fn calculate_class_member_widths<A>(
-    f: &FormatterState<'_, '_, A>,
-    members: &[ClassLikeMember<'_>],
-    kind: AlignableKind,
-) -> AlignmentWidths
-where
-    A: Arena,
-{
-    let mut max_type_width = 0usize;
-    let mut max_name_width = 0usize;
-
-    for member in members {
-        match (kind, member) {
-            (AlignableKind::PropertyWithDefault, ClassLikeMember::Property(prop)) => {
-                let (type_width, name_width) = calculate_plain_property_widths(f, prop);
-                max_type_width = max_type_width.max(type_width);
-                max_name_width = max_name_width.max(name_width);
-            }
-            (AlignableKind::ClassConstant, ClassLikeMember::Constant(constant)) => {
-                if let Some(hint) = &constant.hint {
-                    max_type_width = max_type_width.max(get_hint_width(f, hint));
-                }
-
-                for item in constant.items.iter() {
-                    let name_width = item.name.value.len();
-                    max_name_width = max_name_width.max(name_width);
-                }
-            }
-            (AlignableKind::EnumBackedCase, ClassLikeMember::EnumCase(case)) => {
-                let name_width = case.item.name().value.len();
-                max_name_width = max_name_width.max(name_width);
-            }
-            _ => {}
-        }
-    }
-
-    AlignmentWidths::with_type_width(max_type_width, max_name_width)
-}
-
-/// Calculate the type width and name width for a plain property.
-/// Type width is the width of the type hint (e.g., "int" = 3, "string" = 6).
-/// Name width is the width of the variable name (e.g., "$foo" = 4).
-fn calculate_plain_property_widths<A>(f: &FormatterState<'_, '_, A>, prop: &Property<'_>) -> (usize, usize)
-where
-    A: Arena,
-{
-    match prop {
-        Property::Plain(p) => {
-            let type_width = p.hint.as_ref().map_or(0, |h| get_hint_width(f, h));
-            let name_width = p.items.iter().map(|item| item.variable().name.len()).max().unwrap_or(0);
-            (type_width, name_width)
-        }
-        Property::Hooked(_) => (0, 0),
-    }
-}
-
-pub fn detect_statement_ref_alignment_runs<'arena, A>(
-    f: &FormatterState<'_, 'arena, A>,
-    statements: &[&'arena Statement<'arena>],
-) -> Vec<AlignmentRun>
-where
-    A: Arena,
-{
-    if !f.settings.align_assignment_like || statements.is_empty() {
-        return Vec::new();
-    }
-
-    detect_alignment_runs(
-        statements.len(),
-        |i| match statements[i] {
-            Statement::Expression(expr_stmt) => match &expr_stmt.expression {
-                Expression::Assignment(assign)
-                    if matches!(
-                        assign.lhs,
-                        Expression::Variable(_)
-                            | Expression::Access(_)
-                            | Expression::ArrayAccess(_)
-                            | Expression::ArrayAppend(_)
-                    ) =>
-                {
-                    Some(AlignableKind::VariableAssignment)
-                }
-                _ => None,
-            },
-            Statement::Constant(_) => Some(AlignableKind::GlobalConstant),
-            _ => None,
-        },
-        |i| {
-            if i == 0 {
-                return false;
-            }
-
-            let prev_span = statements[i - 1].span();
-            let curr_span = statements[i].span();
-
-            has_blank_line_between(f, prev_span, curr_span)
-                || has_comment_between(f, prev_span, curr_span)
-                || statement_breaks_alignment_run_after(f, statements[i - 1])
-        },
-        |start, end, kind| Some(calculate_statement_ref_widths(f, &statements[start..end], kind)),
-    )
-}
-
-/// Calculate alignment widths for a slice of statement references.
-fn calculate_statement_ref_widths<A>(
-    f: &FormatterState<'_, '_, A>,
-    statements: &[&Statement<'_>],
-    kind: AlignableKind,
-) -> AlignmentWidths
-where
-    A: Arena,
-{
-    let mut max_name_width = 0usize;
-
-    for stmt in statements {
-        match (kind, *stmt) {
-            (AlignableKind::VariableAssignment, Statement::Expression(expr_stmt)) => {
-                if let Expression::Assignment(assign) = &expr_stmt.expression {
-                    let lhs_span = assign.lhs.span();
-                    if has_new_line_in_range(f.source_text, lhs_span.start_offset(), lhs_span.end_offset()) {
-                        continue;
-                    }
-
-                    let name_width = (lhs_span.end_offset() - lhs_span.start_offset()) as usize;
-                    max_name_width = max_name_width.max(name_width);
-                }
-            }
-            (AlignableKind::GlobalConstant, Statement::Constant(constant)) => {
-                for item in constant.items.iter() {
-                    let name_width = item.name.value.len();
-                    max_name_width = max_name_width.max(name_width);
-                }
-            }
-            _ => {}
-        }
-    }
-
-    AlignmentWidths::new(max_name_width)
-}
-
-/// Check whether a statement should be the last item in its alignment run.
-fn statement_breaks_alignment_run_after<A>(f: &FormatterState<'_, '_, A>, stmt: &Statement<'_>) -> bool
-where
-    A: Arena,
-{
-    match stmt {
-        Statement::Expression(expr_stmt) => {
-            let Expression::Assignment(assign) = &expr_stmt.expression else {
-                return false;
-            };
-
-            let rhs_span = assign.rhs.span();
-            has_new_line_in_range(f.source_text, rhs_span.start_offset(), rhs_span.end_offset())
-        }
-        _ => false,
-    }
 }

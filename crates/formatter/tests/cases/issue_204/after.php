@@ -89,8 +89,8 @@ function getFormsStep(Division $division): int
         + 1 // bar
         + 1 // baz
         + getProductCount($division)
-        + 1 // bay
-    );
+        + 1
+    ); // bay
 }
 
 function f()

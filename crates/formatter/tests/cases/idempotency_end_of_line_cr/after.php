@@ -1,0 +1,1 @@
+<?phpfinal class Utils{    private const FORMATS = [        'normal' => 1,        'verbose' => 2,    ];    public static function message(): string    {        // A comment line.        return <<<EOT            No system CA bundle could be found.            EOT;    }}

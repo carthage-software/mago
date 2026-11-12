@@ -102,6 +102,7 @@ use mago_syntax::cst::UseItems;
 use mago_syntax::cst::UseType;
 
 use crate::document::BreakMode;
+use crate::document::Column;
 use crate::document::Document;
 use crate::document::Group;
 use crate::document::IfBreak;
@@ -111,6 +112,7 @@ use crate::document::Separator;
 use crate::document::Space;
 use crate::document::Trim;
 use crate::internal::FormatterState;
+use crate::internal::format::alignment::Alignment;
 use crate::internal::format::assignment::AssignmentLikeNode;
 use crate::internal::format::assignment::print_assignment_with_alignment;
 use crate::internal::format::block::print_block_of_nodes;
@@ -907,7 +909,7 @@ fn print_eq_assignment<'arena, A>(
 where
     A: Arena,
 {
-    let alignment = f.alignment_context();
+    let alignment = f.take_alignment();
 
     print_assignment_with_alignment(f, node, lhs, Document::String(b"="), value, alignment)
 }
@@ -918,10 +920,15 @@ where
 {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena, A>) -> Document<'arena, A> {
         wrap!(f, self, ClassLikeConstant, {
+            let alignment = f.take_alignment();
             let mut contents = vec_in![f.arena];
             if let Some(attributes) = misc::print_attribute_list_sequence(f, &self.attribute_lists) {
                 contents.push(attributes);
                 contents.push(Document::Line(Line::hard()));
+            }
+
+            if let Some(alignment) = alignment {
+                contents.push(alignment.row());
             }
 
             if !self.modifiers.is_empty() {
@@ -934,14 +941,14 @@ where
                 contents.push(Document::space());
                 contents.push(h.format(f));
 
-                if let Some(alignment) = f.alignment_context()
-                    && alignment.type_padding > 0
-                {
-                    contents.push(Document::String(utils::spaces(f.arena, alignment.type_padding)));
+                if let Some(alignment) = alignment {
+                    contents.push(alignment.cell(1));
                 }
             }
 
+            f.set_alignment(alignment.map(Alignment::started));
             push_comma_separated_items(f, &mut contents, self.items.as_slice());
+            f.set_alignment(None);
 
             contents.push(self.terminator.format(f));
 
@@ -1041,10 +1048,15 @@ where
 {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena, A>) -> Document<'arena, A> {
         wrap!(f, self, PlainProperty, {
+            let alignment = f.take_alignment();
             let mut contents = vec_in![f.arena];
             if let Some(attributes) = misc::print_attribute_list_sequence(f, &self.attribute_lists) {
                 contents.push(attributes);
                 contents.push(Document::Line(Line::hard()));
+            }
+
+            if let Some(alignment) = alignment {
+                contents.push(alignment.row());
             }
 
             contents.extend(print_modifiers(f, &self.modifiers));
@@ -1065,15 +1077,14 @@ where
 
                 contents.push(h.format(f));
 
-                // Add type padding for alignment if in an alignment context
-                if let Some(alignment) = f.alignment_context()
-                    && alignment.type_padding > 0
-                {
-                    contents.push(Document::String(utils::spaces(f.arena, alignment.type_padding)));
+                if let Some(alignment) = alignment {
+                    contents.push(alignment.cell(1));
                 }
 
                 should_add_space = true;
             }
+
+            f.set_alignment(alignment.map(Alignment::started));
 
             if self.items.len() == 1 {
                 if should_add_space {
@@ -1094,6 +1105,7 @@ where
                 }
             }
 
+            f.set_alignment(None);
             contents.push(self.terminator.format(f));
 
             Document::Group(Group::new(contents))
@@ -2020,6 +2032,11 @@ where
                 );
             }
 
+            let variable_column = f.parameter_state.variable_column.take();
+            if let Some(column) = variable_column {
+                contents.push(Document::Column(Column { index: 0, shift: 0, gutter: 0, ..column }));
+            }
+
             contents.extend(print_modifiers(f, &self.modifiers));
             if !self.modifiers.is_empty() {
                 contents.push(Document::space());
@@ -2032,12 +2049,10 @@ where
 
             // The alignment padding goes before `&` / `...` so that they stay attached to the
             // variable name (PSR-12: no space between the variadic operator and the argument name).
-            if let (Some(padding), Some(list_id)) =
-                (f.parameter_state.variable_padding, f.parameter_state.list_group_id)
-                && padding > 0
-            {
-                let spaces = Document::String(utils::spaces(f.arena, padding));
-                contents.push(Document::IfBreak(IfBreak::new(f.arena, spaces, Document::empty()).with_id(list_id)));
+            if let Some(column) = variable_column {
+                let shift = u8::from(self.ampersand.is_some()) + if self.ellipsis.is_some() { 3 } else { 0 };
+
+                contents.push(Document::Column(Column { shift, ..column }));
             }
 
             if self.ampersand.is_some() {

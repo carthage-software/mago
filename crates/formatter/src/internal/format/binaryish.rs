@@ -304,8 +304,7 @@ where
         && ((!f.is_in_inlined_binary_chain && is_lassoc_subchain(&operator, right))
             || misc::has_new_line_in_range(f.source_text, left.end_offset(), original_right.start_offset()));
 
-    let indent_assignment_continuation =
-        f.settings.indent_binary_expression_continuation || f.is_in_aligned_assignment_rhs;
+    let indent_assignment_continuation = f.settings.indent_binary_expression_continuation;
     let indent_continuation = should_inline_logical_or_coalesce_rhs
         && !same_precedence_sub_expression
         && indent_assignment_continuation
@@ -438,6 +437,14 @@ where
         _ => vec_in![f.arena; left.format(f)],
     };
 
+    // A comment after the closing parenthesis of an operand belongs to that operand, even when
+    // the parentheses are dropped.
+    if !std::ptr::eq(original_left, left)
+        && let Some(trailing) = f.print_trailing_comments(original_left.span())
+    {
+        parts.push(trailing);
+    }
+
     f.is_in_inlined_binary_chain = old_inlined_chain_state;
 
     // Only a non-nested operation can be grouped, and logical operands keep their existing chain layout.
@@ -464,6 +471,10 @@ where
             right_prefix: None,
         },
     );
+
+    if is_original_right_parenthesized && let Some(trailing) = f.print_trailing_comments(original_right.span()) {
+        parts.push(trailing);
+    }
 
     parts
 }

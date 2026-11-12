@@ -395,7 +395,10 @@ where
         parent_operator: &BinaryOperator<'arena>,
     ) -> bool {
         if self.settings.omit_redundant_bitwise_binary_expression_parentheses {
-            return false;
+            // Without spaces, `1 << 2.'x'` would read `2.` as a float.
+            return operator.is_bit_shift()
+                && matches!(parent_operator, BinaryOperator::StringConcat(_))
+                && !self.settings.space_around_concatenation_binary_operator;
         }
 
         (operator.is_bit_shift() && !parent_operator.is_bit_shift())
@@ -430,6 +433,23 @@ where
                         return true;
                     }
                 }
+            }
+        }
+
+        // Without spaces, `-1.'x'` would read `1.` as a float.
+        if let Node::UnaryPrefix(unary) = node
+            && !self.settings.space_around_concatenation_binary_operator
+            && let Some(Node::Binary(parent)) = self.nth_parent_kind(2)
+            && matches!(parent.operator, BinaryOperator::StringConcat(_))
+            && node.end_position() < parent.operator.start_position()
+        {
+            let mut operand = unary.operand;
+            while let Expression::UnaryPrefix(inner) = operand {
+                operand = inner.operand;
+            }
+
+            if matches!(operand, Expression::Literal(Literal::Integer(_) | Literal::Float(_))) {
+                return true;
             }
         }
 

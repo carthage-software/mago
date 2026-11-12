@@ -8,12 +8,9 @@ use mago_allocator::vec::Vec;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::cst::ClassLikeMember;
-use mago_syntax::cst::EnumCaseItem;
 use mago_syntax::cst::Method;
 use mago_syntax::cst::Modifier;
 use mago_syntax::cst::ModifierSequenceExt;
-use mago_syntax::cst::Property;
-use mago_syntax::cst::PropertyItem;
 use mago_syntax::cst::Sequence;
 
 use crate::document::Document;
@@ -23,11 +20,11 @@ use crate::document::Line;
 use crate::document::group::GroupIdentifier;
 use crate::internal::FormatterState;
 use crate::internal::format::Format;
-use crate::internal::format::alignment::AlignmentWidths;
-use crate::internal::format::alignment::detect_class_member_alignment_runs;
-use crate::internal::format::alignment::get_alignment;
-use crate::internal::format::alignment::get_hint_width;
-use crate::internal::format::assignment::AssignmentAlignment;
+use crate::internal::format::alignment::Alignment;
+use crate::internal::format::alignment::has_attributes;
+use crate::internal::format::alignment::has_comment_between;
+use crate::internal::format::alignment::have_compatible_modifiers;
+use crate::internal::format::alignment::is_alignable_member;
 use crate::internal::format::block::block_is_empty;
 use crate::settings::BraceStyle;
 
@@ -43,6 +40,7 @@ enum ClassLikeMemberKind {
 
 /// A class member paired with its associated comment index.
 /// Used when sorting members to ensure comments move with their associated member.
+#[derive(Clone, Copy)]
 struct SortedMember<'arena> {
     member: &'arena ClassLikeMember<'arena>,
     comment_index: usize,
@@ -99,7 +97,7 @@ where
                 (wrapped, false)
             };
 
-            let alignment_runs = detect_class_member_alignment_runs(f, class_like_members.as_slice());
+            let mut alignment: Option<(Alignment, &ClassLikeMember<'arena>)> = None;
 
             let mut i = 0;
             let mut formatted_count = 0;
@@ -191,9 +189,23 @@ where
                     members.push(Document::Line(Line::hard()));
                 }
 
-                if let Some(widths) = get_alignment(&alignment_runs, i) {
-                    let alignment = calculate_member_alignment(f, item, &widths);
-                    f.set_alignment_context(Some(alignment));
+                if f.settings.align_assignment_like && is_alignable_member(item) {
+                    let table = match alignment {
+                        Some((table, previous))
+                            if !last_has_line_after
+                                && !has_attributes(item)
+                                && have_compatible_modifiers(previous, item)
+                                && !has_comment_between(f, previous.span(), item.span()) =>
+                        {
+                            table
+                        }
+                        _ => Alignment::new(f.next_id(), false),
+                    };
+
+                    alignment = Some((table, item));
+                    f.set_alignment(Some(table));
+                } else {
+                    alignment = None;
                 }
 
                 if is_sorted {
@@ -202,7 +214,7 @@ where
 
                 members.push(item.format(f));
 
-                f.set_alignment_context(None);
+                f.set_alignment(None);
 
                 if i < (length - 1) {
                     members.push(Document::Line(Line::hard()));
@@ -352,16 +364,20 @@ where
         members_with_indices.push(SortedMember { member, comment_index: member_comment_index });
     }
 
-    members_with_indices.sort_by(|a, b| {
-        match (a.member, b.member) {
-            // Only compare and sort methods; keep all other members in their original relative order
-            (ClassLikeMember::Method(method_a), ClassLikeMember::Method(method_b)) => {
-                compare_methods(method_a, method_b)
-            }
-            // Non-methods stay in original order relative to each other
-            _ => Ordering::Equal,
-        }
-    });
+    let mut methods: Vec<'arena, (&'arena Method<'arena>, SortedMember<'arena>), A> = members_with_indices
+        .iter()
+        .filter_map(|sorted| match sorted.member {
+            ClassLikeMember::Method(method) => Some((method, *sorted)),
+            _ => None,
+        })
+        .collect_in(arena);
+
+    methods.sort_by(|(a, _), (b, _)| compare_methods(a, b));
+
+    let slots = members_with_indices.iter_mut().filter(|sorted| matches!(sorted.member, ClassLikeMember::Method(_)));
+    for (slot, (_, method)) in slots.zip(methods) {
+        *slot = method;
+    }
 
     members_with_indices
 }
@@ -461,46 +477,4 @@ fn get_visibility_order(modifiers: &Sequence<'_, Modifier<'_>>) -> u8 {
         // Default to public if no visibility specified
         0
     }
-}
-
-/// Calculate alignment padding for a class member based on the run's max widths.
-fn calculate_member_alignment<A>(
-    f: &FormatterState<'_, '_, A>,
-    member: &ClassLikeMember<'_>,
-    widths: &AlignmentWidths,
-) -> AssignmentAlignment
-where
-    A: Arena,
-{
-    let (current_type_width, current_name_width) = match member {
-        ClassLikeMember::Property(Property::Plain(p)) => {
-            let type_width = p.hint.as_ref().map_or(0, |h| get_hint_width(f, h));
-            let name_width = p
-                .items
-                .iter()
-                .filter_map(|item| {
-                    if matches!(item, PropertyItem::Concrete(_)) { Some(item.variable().name.len()) } else { None }
-                })
-                .max()
-                .unwrap_or(0);
-            (type_width, name_width)
-        }
-        ClassLikeMember::Constant(constant) => (
-            constant.hint.as_ref().map_or(0, |h| get_hint_width(f, h)),
-            constant.items.iter().map(|item| item.name.value.len()).max().unwrap_or(0),
-        ),
-        ClassLikeMember::EnumCase(case) => {
-            if let EnumCaseItem::Backed(backed) = &case.item {
-                (0, backed.name.value.len())
-            } else {
-                (0, 0)
-            }
-        }
-        _ => (0, 0),
-    };
-
-    let type_padding = widths.type_width.saturating_sub(current_type_width);
-    let name_padding = widths.name_width.saturating_sub(current_name_width);
-
-    AssignmentAlignment { type_padding, name_padding, break_group_id: None }
 }

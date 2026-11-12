@@ -15,12 +15,13 @@ use mago_syntax::cst::NodeKind;
 use mago_syntax::cst::Program;
 use mago_syntax::cst::Trivia;
 
+use crate::document::Column;
 use crate::document::Document;
 use crate::document::group::GroupIdentifier;
 use crate::document::group::GroupIdentifierBuilder;
 use crate::internal::comment::placement::Comments;
 use crate::internal::comment::placement::place_comments;
-use crate::internal::format::assignment::AssignmentAlignment;
+use crate::internal::format::alignment::Alignment;
 use crate::settings::FormatSettings;
 
 pub mod comment;
@@ -34,14 +35,14 @@ pub mod utils;
 pub struct ArgumentState {
     expand_first_argument: bool,
     expand_last_argument: bool,
-    named_argument_padding: Option<usize>,
+    named_argument_table: Option<GroupIdentifier>,
 }
 
 #[derive(Debug, Clone, Copy, Default)]
 pub struct ParameterState {
     list_group_id: Option<GroupIdentifier>,
     hugged_list_group_id: Option<GroupIdentifier>,
-    variable_padding: Option<usize>,
+    variable_column: Option<Column>,
 }
 
 /// A region of source code that should not be formatted.
@@ -147,9 +148,9 @@ where
     condition_group_id: Option<GroupIdentifier>,
     is_wrapped_in_parens: bool,
     is_in_inlined_binary_chain: bool,
-    is_in_aligned_assignment_rhs: bool,
     halted_compilation: bool,
-    alignment_context: Option<AssignmentAlignment>,
+    alignment: Option<Alignment>,
+    trailing_comment_limit: Option<u32>,
     member_access_chain_context: Option<MemberAccessChainContext>,
     range: Option<RangeState>,
 }
@@ -207,10 +208,10 @@ where
             condition_group_id: None,
             is_wrapped_in_parens: false,
             is_in_inlined_binary_chain: false,
-            is_in_aligned_assignment_rhs: false,
             halted_compilation: false,
             in_script_terminating_statement: false,
-            alignment_context: None,
+            alignment: None,
+            trailing_comment_limit: None,
             member_access_chain_context: None,
             range: None,
         }
@@ -251,16 +252,16 @@ where
         Document::Array(vec_in![self.arena; Document::RangeStart, document, Document::RangeEnd])
     }
 
-    /// Get the current alignment context.
+    /// Takes the alignment table that the node being formatted adds a row to.
     #[inline]
-    pub fn alignment_context(&self) -> Option<AssignmentAlignment> {
-        self.alignment_context
+    pub fn take_alignment(&mut self) -> Option<Alignment> {
+        self.alignment.take()
     }
 
-    /// Set the alignment context for the current formatting operation.
+    /// Sets the alignment table that the next assignment-like node adds a row to.
     #[inline]
-    pub fn set_alignment_context(&mut self, context: Option<AssignmentAlignment>) {
-        self.alignment_context = context;
+    pub fn set_alignment(&mut self, alignment: Option<Alignment>) {
+        self.alignment = alignment;
     }
 
     /// Whether a trailing comma may be printed for a construct whose trailing-comma support
@@ -671,7 +672,7 @@ fn is_gap_insignificant(source: &[u8], from: u32, to: u32) -> bool {
 
         // Skip single-line comments (// ... or # ...)
         if (c == b'/' && i + 1 < end && bytes[i + 1] == b'/') || (c == b'#' && !(i + 1 < end && bytes[i + 1] == b'[')) {
-            while i < end && i < bytes.len() && bytes[i] != b'\n' {
+            while i < end && i < bytes.len() && !is_line_terminator(bytes[i]) {
                 i += 1;
             }
 

@@ -49,6 +49,21 @@ where
     /// Do not perform any trimming before printing the next document.
     DoNotTrim,
     Space(Space),
+    Column(Column),
+}
+
+#[derive(Debug, Clone, Copy, Eq, PartialEq, PartialOrd, Ord)]
+pub struct Column {
+    pub table: GroupIdentifier,
+    /// `0` starts a row; higher values are the alignment points of that row, left to right.
+    /// [`Column::ANCHOR`] is never padded: it only has to stay on the line of its row.
+    pub index: u8,
+    /// Width of the text between this point and the position to align.
+    pub shift: u8,
+    /// Extra width to keep between the widest row and the aligned position.
+    pub gutter: u8,
+    /// Whether a row only aligns with the row on the line right above it.
+    pub adjacent: bool,
 }
 
 #[derive(Debug, Eq, PartialEq, PartialOrd, Ord)]
@@ -58,6 +73,10 @@ where
 {
     pub alignment: &'arena [u8],
     pub contents: Vec<'arena, Document<'arena, A>, A>,
+}
+
+impl Column {
+    pub const ANCHOR: u8 = u8::MAX;
 }
 
 #[derive(Debug, Clone, Copy, Eq, PartialEq, Hash, PartialOrd, Ord)]
@@ -336,6 +355,7 @@ where
         Document::Line(line) => Document::Line(*line),
         Document::Trim(trim) => Document::Trim(*trim),
         Document::Space(space) => Document::Space(*space),
+        Document::Column(column) => Document::Column(*column),
         Document::LineSuffixBoundary => Document::LineSuffixBoundary,
         Document::BreakParent => Document::BreakParent,
         Document::DoNotTrim => Document::DoNotTrim,
@@ -522,6 +542,10 @@ where
         },
         Document::DoNotTrim => buffer.push_str("doNotTrim"),
         Document::Space(_) => buffer.push_str("\" \""),
+        Document::Column(column) => {
+            use std::fmt::Write as _;
+            let _ = write!(buffer, "column({}, {})", column.table, column.index);
+        }
     }
 
     buffer

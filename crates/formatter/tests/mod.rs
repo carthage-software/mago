@@ -579,6 +579,16 @@ test_case!(idempotency_corpus_phparkitect_arch_rule);
 test_case!(idempotency_corpus_apiplatform_schema_property);
 test_case!(idempotency_corpus_apiplatform_type_factory);
 test_case!(idempotency_corpus_symfony_json_streamer);
+test_case!(idempotency_align_assignment_like);
+test_case!(idempotency_align_parameters);
+test_case!(idempotency_blank_lines_in_lists);
+test_case!(idempotency_concatenation_without_spaces);
+test_case!(idempotency_end_of_line_cr);
+test_case!(idempotency_narrow_print_width);
+test_case!(idempotency_operator_at_line_end);
+test_case!(idempotency_pint_preset);
+test_case!(idempotency_preserved_chain_first_method);
+test_case!(idempotency_sort_class_methods);
 
 #[test]
 fn issue_2475_2491_and_2524_settings() {

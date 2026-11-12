@@ -67,8 +67,8 @@ function check($a, $b, $c, $d)
         $a === $b
         && $c === $d // both pairs must match
         || $a === $c
-        && $b === $d // or cross-match
-    );
+        && $b === $d
+    ); // or cross-match
 }
 
 // Long chain with trailing comment
@@ -82,6 +82,6 @@ function long_chain($version_parts_count, $major_version, $version_parts, $last_
         && !is_numeric($version_parts[1])
         || !is_numeric($last_part_split[0])
         && $last_part_split !== 'x'
-        && $version_extra !== 'dev' // validate version
-    );
+        && $version_extra !== 'dev'
+    ); // validate version
 }

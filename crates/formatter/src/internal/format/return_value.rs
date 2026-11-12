@@ -26,6 +26,14 @@ pub fn format_return_value<'arena, A>(
 where
     A: Arena,
 {
+    // A comment that follows the `,` or `;` after the value stays there when the value is wrapped
+    // in parentheses, so that the wrapped layout reads the same when it is formatted again.
+    let rest = &f.source_text[value.end_offset() as usize..];
+    let trailing_comment_limit = rest
+        .iter()
+        .position(|byte| !byte.is_ascii_whitespace())
+        .filter(|&offset| matches!(rest[offset], b',' | b';'))
+        .map(|offset| value.end_offset() + offset as u32);
     let value = unwrap_parenthesized(value);
 
     if return_argument_has_leading_comment(f, value) {
@@ -44,8 +52,11 @@ where
 
     if should_wrap_return_value(f, value) {
         let was_inside_parens = f.is_wrapped_in_parens;
+        let previous_trailing_comment_limit = f.trailing_comment_limit;
         f.is_wrapped_in_parens = true;
+        f.trailing_comment_limit = trailing_comment_limit.or(previous_trailing_comment_limit);
         let value_doc = value.format(f);
+        f.trailing_comment_limit = previous_trailing_comment_limit;
         f.is_wrapped_in_parens = was_inside_parens;
 
         let group_id = f.next_id();

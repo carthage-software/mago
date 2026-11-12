@@ -17,6 +17,7 @@ use crate::document::clone_in_arena;
 use crate::document::group::GroupIdentifier;
 use crate::internal::is_line_terminator_or_space;
 use crate::internal::is_space;
+use crate::internal::printer::align::Mark;
 use crate::internal::printer::command::Command;
 use crate::internal::printer::command::CommandDocument;
 use crate::internal::printer::command::Indentation;
@@ -25,6 +26,7 @@ use crate::internal::printer::fits::FitsStack;
 use crate::internal::utils::string_width;
 use crate::settings::FormatSettings;
 
+mod align;
 mod command;
 mod fits;
 
@@ -49,6 +51,8 @@ where
     can_trim: bool,
     range_start: Option<usize>,
     range_end: Option<usize>,
+    marks: Vec<'arena, Mark, A>,
+    suffix_offsets: Vec<'arena, usize, A>,
 }
 
 impl<'arena, A> Printer<'arena, A>
@@ -85,17 +89,21 @@ where
             can_trim: true,
             range_start: None,
             range_end: None,
+            marks: vec_in![arena],
+            suffix_offsets: vec_in![arena],
         }
     }
 
     pub fn build(mut self) -> &'arena [u8] {
         self.print_doc_to_string();
+        self.align();
 
         self.out.leak()
     }
 
     pub(crate) fn build_range(mut self) -> Option<(&'arena [u8], std::ops::Range<usize>)> {
         self.print_doc_to_string();
+        self.align();
         Some((self.out.leak(), self.range_start?..self.range_end?))
     }
 
@@ -132,6 +140,9 @@ where
                             }
                         }
                         Document::Space(space) => self.handle_space(*space),
+                        Document::Column(column) => {
+                            self.marks.push(Mark::new(*column, self.out.len(), self.position));
+                        }
                         Document::Array(docs) => self.push_docs(indentation, mode, docs),
                         Document::Indent(docs) => self.push_docs(indentation.indented(), mode, docs),
                         Document::Align(align) => {
@@ -161,9 +172,17 @@ where
             }
 
             if self.commands.is_empty() && !self.line_suffix.is_empty() {
-                self.commands.extend(self.line_suffix.drain(..).rev());
+                self.flush_line_suffix();
             }
         }
+    }
+
+    fn flush_line_suffix(&mut self) {
+        if !self.marks.is_empty() {
+            self.suffix_offsets.push(self.out.len());
+        }
+
+        self.commands.extend(self.line_suffix.drain(..).rev());
     }
 
     fn remaining_width(&self) -> isize {
@@ -315,7 +334,7 @@ where
 
         if !self.line_suffix.is_empty() {
             self.commands.push(Command::new(*indentation, mode, doc));
-            self.commands.extend(self.line_suffix.drain(..).rev());
+            self.flush_line_suffix();
 
             return should_remeasure;
         }
@@ -346,7 +365,7 @@ where
     ) -> bool {
         if !self.line_suffix.is_empty() {
             self.commands.push(Command::new(indentation, mode, self.arena.alloc(Document::space())));
-            self.commands.extend(self.line_suffix.drain(..).rev());
+            self.flush_line_suffix();
 
             should_remeasure = true;
         }
@@ -491,7 +510,8 @@ where
                 | Document::Trim(_)
                 | Document::DoNotTrim
                 | Document::RangeStart
-                | Document::RangeEnd => {}
+                | Document::RangeEnd
+                | Document::Column(_) => {}
             }
 
             if remaining_width < 0 {

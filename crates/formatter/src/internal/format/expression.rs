@@ -98,7 +98,6 @@ use crate::document::Align;
 use crate::document::BreakMode;
 use crate::document::Document;
 use crate::document::Line;
-use crate::document::group::GroupIdentifier;
 use crate::internal::FormatterState;
 use crate::internal::comment::CommentFlags;
 use crate::internal::format::Format;
@@ -106,10 +105,7 @@ use crate::internal::format::Group;
 use crate::internal::format::IfBreak;
 use crate::internal::format::IndentIfBreak;
 use crate::internal::format::Separator;
-use crate::internal::format::alignment::AlignmentRun;
-use crate::internal::format::alignment::AlignmentWidths;
-use crate::internal::format::alignment::detect_alignment_runs;
-use crate::internal::format::alignment::get_alignment;
+use crate::internal::format::alignment::Alignment;
 use crate::internal::format::alignment::has_comment_between;
 use crate::internal::format::array::ArrayLike;
 use crate::internal::format::array::print_array_like;
@@ -135,7 +131,6 @@ use crate::internal::format::string::print_string;
 use crate::internal::format::string::print_uppercase_keyword;
 use crate::internal::utils;
 use crate::internal::utils::could_expand_value;
-use crate::internal::utils::get_expression_width;
 use crate::internal::utils::unwrap_parenthesized;
 use crate::settings::BraceStyle;
 use crate::wrap;
@@ -529,6 +524,7 @@ where
 {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena, A>) -> Document<'arena, A> {
         wrap!(f, self, KeyValueArrayElement, {
+            let alignment = f.take_alignment();
             let lhs = self.key.format(f);
             let operator = Document::String(b"=>");
 
@@ -538,7 +534,7 @@ where
                 lhs,
                 operator,
                 self.value,
-                f.alignment_context(),
+                alignment,
             )]))
         })
     }
@@ -806,14 +802,12 @@ where
 {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena, A>) -> Document<'arena, A> {
         wrap!(f, self, NamedArgument, {
-            let padding = match f.argument_state.named_argument_padding {
-                Some(padding) => Document::String(utils::spaces(f.arena, padding)),
-                None => Document::empty(),
-            };
+            let alignment = f.argument_state.named_argument_table.take().map(|table| Alignment::new(table, false));
 
             Document::Group(Group::new(vec_in![f.arena;
+                alignment.map_or_else(Document::empty, Alignment::row),
                 self.name.format(f),
-                padding,
+                alignment.map_or_else(Document::empty, |alignment| alignment.cell(1)),
                 Document::String(b":"),
                 Document::space(),
                 self.value.format(f),
@@ -888,6 +882,7 @@ where
 {
     fn format(&'arena self, f: &mut FormatterState<'_, 'arena, A>) -> Document<'arena, A> {
         wrap!(f, self, Assignment, {
+            let alignment = f.take_alignment();
             let lhs = self.lhs.format(f);
 
             let operator = match self.operator {
@@ -913,7 +908,7 @@ where
                 lhs,
                 operator,
                 self.rhs,
-                f.alignment_context(),
+                alignment,
             )
         })
     }
@@ -1137,15 +1132,10 @@ where
     }
 }
 
-#[derive(Debug, Clone, Copy)]
-struct MatchArmAlignment {
-    name_padding: usize,
-}
-
 fn format_match_arm<'arena, A>(
     f: &mut FormatterState<'_, 'arena, A>,
     arm: &'arena MatchArm<'arena>,
-    alignment: Option<MatchArmAlignment>,
+    alignment: Option<Alignment>,
 ) -> Document<'arena, A>
 where
     A: Arena,
@@ -1161,7 +1151,7 @@ where
 fn format_match_default_arm<'arena, A>(
     f: &mut FormatterState<'_, 'arena, A>,
     arm: &'arena MatchDefaultArm<'arena>,
-    alignment: Option<MatchArmAlignment>,
+    alignment: Option<Alignment>,
 ) -> Document<'arena, A>
 where
     A: Arena,
@@ -1177,9 +1167,11 @@ where
         };
 
         Document::Group(Group::new(vec_in![f.arena;
+            alignment.map_or_else(Document::empty, Alignment::row),
             arm.default.format(f),
-            match_arm_alignment_padding(f, alignment),
-            format_token(f, arm.arrow, b" => "),
+            Document::space(),
+            alignment.map_or_else(Document::empty, |alignment| alignment.cell(1)),
+            format_token(f, arm.arrow, b"=> "),
             rhs,
         ]))
     })
@@ -1188,7 +1180,7 @@ where
 fn format_match_expression_arm<'arena, A>(
     f: &mut FormatterState<'_, 'arena, A>,
     arm: &'arena MatchExpressionArm<'arena>,
-    alignment: Option<MatchArmAlignment>,
+    alignment: Option<Alignment>,
 ) -> Document<'arena, A>
 where
     A: Arena,
@@ -1204,7 +1196,7 @@ where
             .take(len.saturating_sub(1))
             .any(|condition| f.has_comment(condition.span(), CommentFlags::TRAILING | CommentFlags::LINE));
 
-        let mut contents = vec_in![f.arena];
+        let mut contents = vec_in![f.arena; alignment.map_or_else(Document::empty, Alignment::row)];
         for (i, condition) in arm.conditions.iter().enumerate() {
             contents.push(condition.format(f));
             if i != (len - 1) {
@@ -1216,11 +1208,11 @@ where
         }
 
         let group_id = f.next_id();
-        contents.push(match_arm_alignment_padding_unless_breaks(f, alignment, group_id));
         contents.push(Document::IndentIfBreak(IndentIfBreak::new(
             group_id,
             vec_in![f.arena;
                 if must_break { Document::Line(Line::hard()) } else { Document::Line(Line::default()) },
+                alignment.map_or_else(Document::empty, |alignment| alignment.cell(1)),
                 format_token(f, arm.arrow, b"=> "),
             ],
         )));
@@ -1255,90 +1247,6 @@ where
             && (f.has_newline(comment.end, false)
                 || misc::has_new_line_in_range(f.source_text, comment.start, comment.end))
     })
-}
-
-fn match_arm_alignment_padding<'arena, A>(
-    f: &mut FormatterState<'_, 'arena, A>,
-    alignment: Option<MatchArmAlignment>,
-) -> Document<'arena, A>
-where
-    A: Arena,
-{
-    match alignment {
-        Some(MatchArmAlignment { name_padding }) if name_padding > 0 => {
-            Document::String(utils::spaces(f.arena, name_padding))
-        }
-        _ => Document::empty(),
-    }
-}
-
-fn match_arm_alignment_padding_unless_breaks<'arena, A>(
-    f: &mut FormatterState<'_, 'arena, A>,
-    alignment: Option<MatchArmAlignment>,
-    group_id: GroupIdentifier,
-) -> Document<'arena, A>
-where
-    A: Arena,
-{
-    if alignment.is_none_or(|alignment| alignment.name_padding == 0) {
-        return Document::empty();
-    }
-
-    let padding = match_arm_alignment_padding(f, alignment);
-    Document::IfBreak(IfBreak::new(f.arena, Document::empty(), padding).with_id(group_id))
-}
-
-fn detect_match_arm_alignment_runs<'arena, A>(
-    f: &FormatterState<'_, 'arena, A>,
-    arms: &'arena [MatchArm<'arena>],
-) -> std::vec::Vec<AlignmentRun>
-where
-    A: Arena,
-{
-    if !f.settings.align_assignment_like || arms.is_empty() {
-        return std::vec::Vec::new();
-    }
-
-    detect_alignment_runs(
-        arms.len(),
-        |i| match_arm_lhs_width(&arms[i]).map(|_| ()),
-        |i| i > 0 && has_comment_between(f, arms[i - 1].span(), arms[i].span()),
-        |start, end, ()| Some(calculate_match_arm_widths(&arms[start..end])),
-    )
-}
-
-fn calculate_match_arm_widths(arms: &[MatchArm<'_>]) -> AlignmentWidths {
-    let max_name_width = arms.iter().filter_map(match_arm_lhs_width).max().unwrap_or(0);
-
-    AlignmentWidths::new(max_name_width)
-}
-
-fn calculate_match_arm_alignment(arm: &MatchArm<'_>, widths: &AlignmentWidths) -> MatchArmAlignment {
-    let current_width = match_arm_lhs_width(arm).unwrap_or(0);
-    let name_padding = widths.name_width.saturating_sub(current_width);
-
-    MatchArmAlignment { name_padding }
-}
-
-fn match_arm_lhs_width(arm: &MatchArm<'_>) -> Option<usize> {
-    match arm {
-        MatchArm::Expression(arm) => match_expression_arm_conditions_width(arm),
-        MatchArm::Default(_) => Some("default".len()),
-    }
-}
-
-fn match_expression_arm_conditions_width(arm: &MatchExpressionArm<'_>) -> Option<usize> {
-    let mut width = 0usize;
-
-    for (i, condition) in arm.conditions.iter().enumerate() {
-        if i > 0 {
-            width += 2;
-        }
-
-        width += get_expression_width(condition)?;
-    }
-
-    Some(width)
 }
 
 impl<'arena, A> Format<'arena, A> for Match<'arena>
@@ -1381,12 +1289,13 @@ where
                 });
 
             if !self.arms.is_empty() {
-                let alignment_runs = detect_match_arm_alignment_runs(f, self.arms.as_slice());
+                let mut alignment = f.settings.align_assignment_like.then(|| Alignment::new(f.next_id(), false));
                 let mut arms_document = Document::join(
                     f.arena,
                     self.arms.iter().enumerate().map(|(i, arm)| {
-                        let alignment =
-                            get_alignment(&alignment_runs, i).map(|widths| calculate_match_arm_alignment(arm, &widths));
+                        if alignment.is_some() && i > 0 && has_comment_between(f, self.arms[i - 1].span(), arm.span()) {
+                            alignment = Some(Alignment::new(f.next_id(), false));
+                        }
 
                         format_match_arm(f, arm, alignment)
                     }),
@@ -1599,7 +1508,7 @@ where
                     part_contents = Document::join(f.arena, part_contents, Separator::HardLine);
 
                     // if ends with a newline, add a newline
-                    if content.ends_with(b"\n") {
+                    if content.ends_with(b"\n") || content.ends_with(b"\r") {
                         part_contents.push(Document::Line(Line::hard()));
                     }
 

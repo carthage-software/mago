@@ -261,6 +261,10 @@ where
             }
 
             let comment_start = trivia.span.start.offset;
+            if self.trailing_comment_limit.is_some_and(|limit| comment_start > limit) {
+                break;
+            }
+
             if range.end_offset() < comment_start && self.is_insignificant(range.end_offset(), comment_start) {
                 let gap = &self.source_text[(range.end_offset() as usize)..(comment_start as usize)];
                 if trivia.kind.is_block_comment() && gap.contains(&b',') {
@@ -770,7 +774,7 @@ where
 
     pub(crate) fn has_placed_leading_own_line_comment(&self, span: Span) -> bool {
         self.has_placed_comment_where(span, Placement::Leading, |_, t| {
-            !t.kind.is_block_comment() || t.value.contains(&b'\n')
+            !t.kind.is_block_comment() || memchr::memchr2(b'\n', b'\r', t.value).is_some()
         })
     }
 

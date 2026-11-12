@@ -18,16 +18,10 @@ use crate::document::IfBreak;
 use crate::document::IndentIfBreak;
 use crate::document::Line;
 use crate::document::clone_in_arena;
-use crate::document::group::GroupIdentifier;
 use crate::internal::FormatterState;
 use crate::internal::format::Format;
-use crate::internal::format::alignment::AlignmentRun;
-use crate::internal::format::alignment::AlignmentWidths;
-use crate::internal::format::alignment::detect_alignment_runs;
-use crate::internal::format::alignment::get_alignment;
-use crate::internal::format::alignment::has_blank_line_between;
+use crate::internal::format::alignment::Alignment;
 use crate::internal::format::alignment::has_comment_between;
-use crate::internal::format::assignment::AssignmentAlignment;
 use crate::internal::format::misc;
 use crate::internal::format::misc::get_document_width;
 use crate::internal::format::misc::is_expandable_expression;
@@ -170,8 +164,7 @@ where
         if f.settings.array_table_style_alignment { get_table_style_column_widths(f, &array_like) } else { None };
     let use_table_style = column_widths.is_some();
 
-    let outer_alignment = f.alignment_context();
-    f.set_alignment_context(None);
+    let outer_alignment = f.take_alignment();
 
     parts.push(Document::IndentIfBreak(IndentIfBreak::new(group_id, {
         let len = elements.len();
@@ -195,30 +188,33 @@ where
                 }
             }
         } else {
-            let kv_alignment_runs = detect_array_element_alignment_runs(f, elements);
+            let mut alignment = f.settings.align_assignment_like.then(|| Alignment::new(f.next_id(), false));
 
-            // Standard formatting with optional key-value alignment
             for (i, element) in elements.iter().enumerate() {
                 let element_span = element.span();
 
-                // Set alignment context if this element is in an alignment run
-                if let Some(widths) = get_alignment(&kv_alignment_runs, i) {
-                    let alignment = calculate_array_element_alignment(element, &widths, group_id);
-                    f.set_alignment_context(Some(alignment));
+                if matches!(element, ArrayElement::KeyValue(_)) {
+                    f.set_alignment(alignment);
                 }
 
                 indent_parts.push(element.format(f));
-
-                // Clear alignment context after formatting
-                f.set_alignment_context(None);
+                f.set_alignment(None);
 
                 if i == len - 1 {
                     break;
                 }
 
+                let is_next_line_empty = f.is_next_line_empty(element_span);
+                if alignment.is_some()
+                    && (is_next_line_empty || has_comment_between(f, element_span, elements[i + 1].span()))
+                {
+                    alignment = Some(Alignment::new(f.next_id(), false));
+                }
+
                 indent_parts.push(Document::String(b","));
                 indent_parts.push(Document::Line(Line::default()));
-                if f.is_next_line_empty(element_span) {
+                if is_next_line_empty {
+                    indent_parts.push(Document::BreakParent);
                     indent_parts.push(Document::Line(Line::hard()));
                 }
             }
@@ -227,7 +223,7 @@ where
         indent_parts
     })));
 
-    f.set_alignment_context(outer_alignment);
+    f.set_alignment(outer_alignment);
 
     let trailing_comma = match &array_like {
         ArrayLike::Array(_) | ArrayLike::LegacyArray(_) => f.settings.trailing_comma,
@@ -600,104 +596,4 @@ where
     let consistent = (sizes.iter().filter(|size| **size == row_size).count() as f64) / (sizes.len() as f64) >= 0.6;
 
     consistent.then_some(column_maximum_widths)
-}
-
-/// Detect alignment runs in array elements for key-value pairs.
-fn detect_array_element_alignment_runs<'arena, A>(
-    f: &FormatterState<'_, 'arena, A>,
-    elements: &'arena [ArrayElement<'arena>],
-) -> std::vec::Vec<AlignmentRun>
-where
-    A: Arena,
-{
-    if !f.settings.align_assignment_like || elements.is_empty() {
-        return std::vec::Vec::new();
-    }
-
-    detect_alignment_runs(
-        elements.len(),
-        |i| matches!(elements[i], ArrayElement::KeyValue(_)).then_some(()),
-        |i| {
-            if i == 0 {
-                return false;
-            }
-
-            let prev_span = elements[i - 1].span();
-            let curr_span = elements[i].span();
-
-            has_blank_line_between(f, prev_span, curr_span) || has_comment_between(f, prev_span, curr_span)
-        },
-        |start, end, ()| calculate_array_element_widths(f, &elements[start..end]),
-    )
-}
-
-fn calculate_array_element_widths<A>(
-    f: &FormatterState<'_, '_, A>,
-    elements: &[ArrayElement<'_>],
-) -> Option<AlignmentWidths>
-where
-    A: Arena,
-{
-    let mut max_key_width = 0usize;
-
-    for element in elements {
-        if let ArrayElement::KeyValue(kv) = element {
-            let key_width = get_expression_span_width(kv.key);
-            max_key_width = max_key_width.max(key_width);
-        }
-    }
-
-    let widths = AlignmentWidths::new(max_key_width);
-
-    array_element_alignment_fits(f, elements, &widths).then_some(widths)
-}
-
-fn array_element_alignment_fits<A>(
-    f: &FormatterState<'_, '_, A>,
-    elements: &[ArrayElement<'_>],
-    widths: &AlignmentWidths,
-) -> bool
-where
-    A: Arena,
-{
-    const KEY_VALUE_SEPARATOR_WIDTH: usize = " => ".len();
-    const COMMA_WIDTH: usize = 1;
-
-    let available_width = f.settings.print_width.saturating_sub(f.settings.tab_width);
-
-    elements.iter().all(|element| {
-        let ArrayElement::KeyValue(element) = element else {
-            return true;
-        };
-
-        let Some(value_width) = get_expression_width(element.value) else {
-            return true;
-        };
-
-        widths
-            .name_width
-            .saturating_add(KEY_VALUE_SEPARATOR_WIDTH)
-            .saturating_add(value_width)
-            .saturating_add(COMMA_WIDTH)
-            <= available_width
-    })
-}
-
-fn get_expression_span_width(expr: &Expression<'_>) -> usize {
-    (expr.end_offset() - expr.start_offset()) as usize
-}
-
-fn calculate_array_element_alignment(
-    element: &ArrayElement<'_>,
-    widths: &AlignmentWidths,
-    break_group_id: GroupIdentifier,
-) -> AssignmentAlignment {
-    let current_key_width = match element {
-        ArrayElement::KeyValue(kv) => get_expression_span_width(kv.key),
-        _ => 0,
-    };
-
-    let name_padding = widths.name_width.saturating_sub(current_key_width);
-
-    AssignmentAlignment { type_padding: 0, name_padding, break_group_id: Some(break_group_id) }
 }

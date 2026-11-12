@@ -1363,11 +1363,8 @@ fn matches_start_of_heredoc_document(input: &Input, prefix_len: usize) -> bool {
         }
 
         let byte = *input.read_at(pos);
-        if byte == b'\n' {
+        if matches!(byte, b'\n' | b'\r') {
             return true; // Newline found: valid heredoc opener.
-        } else if byte == b'\r' {
-            // Handle CRLF: treat '\r' followed by '\n' as a newline as well.
-            return pos + 1 < total && *input.read_at(pos + 1) == b'\n';
         } else if is_part_of_identifier(input.read_at(pos)) {
             length += 1;
         } else {
@@ -1407,12 +1404,9 @@ fn matches_start_of_double_quote_heredoc_document(input: &Input, prefix_len: usi
             return false;
         }
         let byte = input.read_at(pos);
-        if *byte == b'\n' {
+        if matches!(*byte, b'\n' | b'\r') {
             // End of line: valid only if a closing double quote was encountered.
             return terminated;
-        } else if *byte == b'\r' {
-            // Handle CRLF sequences.
-            return terminated && pos + 1 < total && *input.read_at(pos + 1) == b'\n';
         } else if !terminated && is_part_of_identifier(byte) {
             length += 1;
         } else if !terminated && *byte == b'"' {
@@ -1455,10 +1449,8 @@ fn matches_start_of_nowdoc_document(input: &Input, prefix_len: usize) -> bool {
             return false;
         }
         let byte = *input.read_at(pos);
-        if byte == b'\n' {
+        if matches!(byte, b'\n' | b'\r') {
             return terminated;
-        } else if byte == b'\r' {
-            return terminated && pos + 1 < total && *input.read_at(pos + 1) == b'\n';
         } else if !terminated && is_part_of_identifier(&byte) {
             length += 1;
         } else if !terminated && byte == b'\'' {
