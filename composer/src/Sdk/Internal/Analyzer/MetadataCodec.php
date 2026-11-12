@@ -31,8 +31,10 @@ use Mago\Sdk\Analyzer\Metadata\MetadataFlags;
 use Mago\Sdk\Analyzer\Metadata\MethodFields;
 use Mago\Sdk\Analyzer\Metadata\MethodMetadataProjection;
 use Mago\Sdk\Analyzer\Metadata\ParameterMetadata;
+use Mago\Sdk\Analyzer\Metadata\PropertyFields;
 use Mago\Sdk\Analyzer\Metadata\PropertyHookMetadata;
 use Mago\Sdk\Analyzer\Metadata\PropertyMetadata;
+use Mago\Sdk\Analyzer\Metadata\PropertyMetadataProjection;
 use Mago\Sdk\Analyzer\Metadata\TemplateMetadata;
 use Mago\Sdk\Analyzer\Metadata\TypeMetadata;
 use Mago\Sdk\Analyzer\Metadata\VersionRange;
@@ -408,6 +410,28 @@ final class MetadataCodec
             new MetadataFlags($reader->readU64()),
             self::readPropertyHooks($reader),
             self::readVersionRanges($reader),
+        );
+    }
+
+    public static function readPropertyProjection(PayloadReader $reader, int $fields): PropertyMetadataProjection
+    {
+        return new PropertyMetadataProjection(
+            fields: $fields,
+            name: ($fields & PropertyFields::NAMES) !== 0 ? $reader->readBytes() : null,
+            location: ($fields & PropertyFields::LOCATIONS) !== 0 ? self::readOptionalLocation($reader) : null,
+            nameLocation: ($fields & PropertyFields::LOCATIONS) !== 0 ? self::readOptionalLocation($reader) : null,
+            readVisibility: ($fields & PropertyFields::VISIBILITY) !== 0 ? self::readVisibility($reader) : null,
+            writeVisibility: ($fields & PropertyFields::VISIBILITY) !== 0 ? self::readVisibility($reader) : null,
+            declaredType: ($fields & PropertyFields::TYPES) !== 0 ? self::readOptionalTypeMetadata($reader) : null,
+            type: ($fields & PropertyFields::TYPES) !== 0 ? self::readOptionalTypeMetadata($reader) : null,
+            writeType: ($fields & PropertyFields::TYPES) !== 0 ? self::readOptionalTypeMetadata($reader) : null,
+            defaultType: ($fields & PropertyFields::TYPES) !== 0 ? self::readOptionalTypeMetadata($reader) : null,
+            attributes: ($fields & PropertyFields::ATTRIBUTES) !== 0 ? self::readAttributes($reader) : null,
+            flags: ($fields & PropertyFields::FLAGS) !== 0 ? new MetadataFlags($reader->readU64()) : null,
+            hooks: ($fields & PropertyFields::HOOKS) !== 0 ? self::readPropertyHooks($reader) : null,
+            availableVersions: ($fields & PropertyFields::AVAILABLE_VERSIONS) !== 0
+                ? self::readVersionRanges($reader)
+                : null,
         );
     }
 

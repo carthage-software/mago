@@ -60,6 +60,17 @@ const GET_MAGIC_PROPERTIES: u8 = 16;
 const GET_DECLARING_MAGIC_PROPERTIES: u8 = 17;
 const GET_FUNCTION_LIKES: u8 = 18;
 const FIND_METHODS: u8 = 19;
+const GET_PROPERTY_PROJECTIONS: u8 = 20;
+
+const PROPERTY_FIELDS_NAMES: u32 = 1;
+const PROPERTY_FIELDS_LOCATIONS: u32 = 1 << 1;
+const PROPERTY_FIELDS_VISIBILITY: u32 = 1 << 2;
+const PROPERTY_FIELDS_TYPES: u32 = 1 << 3;
+const PROPERTY_FIELDS_ATTRIBUTES: u32 = 1 << 4;
+const PROPERTY_FIELDS_FLAGS: u32 = 1 << 5;
+const PROPERTY_FIELDS_HOOKS: u32 = 1 << 6;
+const PROPERTY_FIELDS_AVAILABLE_VERSIONS: u32 = 1 << 7;
+const PROPERTY_FIELDS_ALL: u32 = (1 << 8) - 1;
 
 const ANY_CLASS_LIKE: u8 = 0;
 const CLASS: u8 = 1;
@@ -188,6 +199,19 @@ pub(super) fn handle_query(
         }),
         GET_FUNCTION_LIKES => query_function_likes(reader, writer, codebase, session),
         FIND_METHODS => find_methods(reader, writer, codebase, session),
+        GET_PROPERTY_PROJECTIONS => {
+            let fields = reader.read_u32("property projection fields")?;
+            if fields & !PROPERTY_FIELDS_ALL != 0 {
+                return Err(protocol(format!("property projection contains unknown fields {fields:#x}")));
+            }
+            writer.write_u32(fields);
+            query_members(reader, writer, |class, member, writer| {
+                write_optional(writer, codebase.get_property(class, member), |writer, metadata| {
+                    write_property_projection(writer, metadata, fields, session)
+                })
+            })
+        }
+
         unknown => Err(protocol(format!("unknown codebase query operation {unknown}"))),
     }
 }
@@ -929,19 +953,44 @@ pub(super) fn write_property(
     metadata: &PropertyMetadata,
     session: &ExternalAnalysisSession,
 ) -> Result<(), ExternalAnalyzerError> {
-    writer.write_bytes(metadata.name.0.as_bytes())?;
-    write_optional_location(writer, metadata.span, session)?;
-    write_optional_location(writer, metadata.name_span, session)?;
-    write_visibility(writer, metadata.read_visibility);
-    write_visibility(writer, metadata.write_visibility);
-    write_optional_type_metadata(writer, metadata.type_declaration_metadata.as_ref(), session)?;
-    write_optional_type_metadata(writer, metadata.type_metadata.as_ref(), session)?;
-    write_optional_type_metadata(writer, metadata.write_type_metadata.as_ref(), session)?;
-    write_optional_type_metadata(writer, metadata.default_type_metadata.as_ref(), session)?;
-    write_attributes(writer, &metadata.attributes, session)?;
-    writer.write_u64(metadata.flags.bits());
-    write_property_hooks(writer, &metadata.hooks, session)?;
-    write_version_constraint(writer, &metadata.version_constraint);
+    write_property_projection(writer, metadata, PROPERTY_FIELDS_ALL, session)
+}
+
+fn write_property_projection(
+    writer: &mut PayloadWriter,
+    metadata: &PropertyMetadata,
+    fields: u32,
+    session: &ExternalAnalysisSession,
+) -> Result<(), ExternalAnalyzerError> {
+    if fields & PROPERTY_FIELDS_NAMES != 0 {
+        writer.write_bytes(metadata.name.0.as_bytes())?;
+    }
+    if fields & PROPERTY_FIELDS_LOCATIONS != 0 {
+        write_optional_location(writer, metadata.span, session)?;
+        write_optional_location(writer, metadata.name_span, session)?;
+    }
+    if fields & PROPERTY_FIELDS_VISIBILITY != 0 {
+        write_visibility(writer, metadata.read_visibility);
+        write_visibility(writer, metadata.write_visibility);
+    }
+    if fields & PROPERTY_FIELDS_TYPES != 0 {
+        write_optional_type_metadata(writer, metadata.type_declaration_metadata.as_ref(), session)?;
+        write_optional_type_metadata(writer, metadata.type_metadata.as_ref(), session)?;
+        write_optional_type_metadata(writer, metadata.write_type_metadata.as_ref(), session)?;
+        write_optional_type_metadata(writer, metadata.default_type_metadata.as_ref(), session)?;
+    }
+    if fields & PROPERTY_FIELDS_ATTRIBUTES != 0 {
+        write_attributes(writer, &metadata.attributes, session)?;
+    }
+    if fields & PROPERTY_FIELDS_FLAGS != 0 {
+        writer.write_u64(metadata.flags.bits());
+    }
+    if fields & PROPERTY_FIELDS_HOOKS != 0 {
+        write_property_hooks(writer, &metadata.hooks, session)?;
+    }
+    if fields & PROPERTY_FIELDS_AVAILABLE_VERSIONS != 0 {
+        write_version_constraint(writer, &metadata.version_constraint);
+    }
     Ok(())
 }
 

@@ -21,6 +21,7 @@ use Mago\Sdk\Analyzer\LifecycleContext;
 use Mago\Sdk\Analyzer\Metadata\ClassLikeMetadata;
 use Mago\Sdk\Analyzer\Metadata\FunctionLikeKind as MetadataFunctionLikeKind;
 use Mago\Sdk\Analyzer\Metadata\MemberIdentifier;
+use Mago\Sdk\Analyzer\Metadata\PropertyFields;
 use Mago\Sdk\Analyzer\MethodCallAnalysisHook;
 use Mago\Sdk\Analyzer\MethodTarget;
 use Mago\Sdk\Analyzer\NodeAnalysisContext;
@@ -603,7 +604,42 @@ final class LifecycleProofPlugin implements
         $methodAttribute = $answerMethod?->attributes[0] ?? null;
         $methodValue = $methodAttribute?->getArgument(0);
         $methodEnabled = $methodAttribute?->getArgument(1, 'enabled');
-        $propertyAttribute = $extensionProperty?->attributes[0] ?? null;
+        $propertyIdentifiers = [
+            new MemberIdentifier('ExtensionProvided', '$value'),
+            new MemberIdentifier('ExtensionProvided', '$missing'),
+            new MemberIdentifier('ExtensionProvided', '$value'),
+        ];
+        $selectedFields = PropertyFields::NAMES | PropertyFields::LOCATIONS | PropertyFields::FLAGS;
+        $projected = $context->codebase->getMultiplePropertyProjections($propertyIdentifiers, $selectedFields);
+        $complete = $context->codebase->getMultiplePropertyProjections($propertyIdentifiers);
+        $empty = $context->codebase->getMultiplePropertyProjections($propertyIdentifiers, 0);
+        if (
+            count($projected) !== 3
+            || $projected[0]?->name !== $extensionProperty?->name
+            || $projected[0]?->location?->file !== $extensionProperty?->location?->file
+            || $projected[0]?->location?->span->start !== $extensionProperty?->location?->span->start
+            || $projected[0]?->location?->span->end !== $extensionProperty?->location?->span->end
+            || $projected[0]?->flags?->bits !== $extensionProperty?->flags->bits
+            || $projected[0]?->attributes !== null
+            || $projected[0]?->has(PropertyFields::TYPES)
+            || !$projected[0]?->has($selectedFields)
+            || $projected[1] !== null
+            || $projected[2] !== $projected[0]
+            || ($complete[0]?->attributes[0] ?? null)?->name !== ($extensionProperty?->attributes[0] ?? null)?->name
+            || $complete[0]?->type === null
+            || $extensionProperty?->type === null
+            || !$context->types->equals($complete[0]->type->type, $extensionProperty->type->type)
+            || $complete[0]->readVisibility !== $extensionProperty->readVisibility
+            || count($complete[0]->hooks ?? []) !== count($extensionProperty->hooks)
+            || count($complete[0]->availableVersions ?? []) !== count($extensionProperty->availableVersions)
+            || $empty[0] === null
+            || $empty[0]->name !== null
+            || $empty[1] !== null
+        ) {
+            throw new RuntimeException('Property projections did not preserve selection, order, or missing members.');
+        }
+
+        $propertyAttribute = $extensionProperty->attributes[0] ?? null;
         $propertyValue = $propertyAttribute?->getArgument(0);
         if (
             $assertingFunction === null

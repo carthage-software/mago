@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace Mago\Sdk\Internal\Analyzer;
 
 use Mago\Sdk\Analyzer\Metadata\MethodMetadataProjection;
+use Mago\Sdk\Analyzer\Metadata\PropertyMetadataProjection;
 
 /** @internal */
 final class MetadataCache
@@ -23,6 +24,9 @@ final class MetadataCache
 
     /** @var array<string, list<MethodMetadataProjection>> */
     public array $methodProjections = [];
+
+    /** @var array<int, array<string, PropertyMetadataProjection|null>> */
+    public array $propertyProjections = [];
 
     /** @var array<string, bool> */
     public array $typeComparisons = [];

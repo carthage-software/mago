@@ -118,6 +118,7 @@ final class Protocol
     public const GET_DECLARING_MAGIC_PROPERTIES = 17;
     public const GET_FUNCTION_LIKES = 18;
     public const FIND_METHODS = 19;
+    public const GET_PROPERTY_PROJECTIONS = 20;
     public const EXISTS_CLASS = 1;
     public const EXISTS_INTERFACE = 2;
     public const EXISTS_TRAIT = 3;
@@ -1581,6 +1582,43 @@ final class Protocol
         }
         if ($operation === self::GET_CLASS_LIKES && $reader->readU8() !== ($classLikeKind ?? self::ANY_CLASS_LIKE)) {
             throw new ProtocolException('A codebase query response contains the wrong class-like kind.');
+        }
+
+        return [$reader, $reader->readCount(65_536)];
+    }
+
+    /** @param list<MemberIdentifier> $properties */
+    public static function writeCodebasePropertyProjectionsRequest(
+        int $generation,
+        array $properties,
+        int $fields,
+    ): string {
+        $writer = self::createMessage(self::CODEBASE_QUERY_REQUEST);
+        $writer->writeU64($generation);
+        $writer->writeU8(self::GET_PROPERTY_PROJECTIONS);
+        $writer->writeU32($fields);
+        $writer->writeCount($properties);
+        foreach ($properties as $property) {
+            $writer->writeBytes($property->class);
+            $writer->writeBytes($property->member);
+        }
+
+        return $writer->finish();
+    }
+
+    /** @return array{PayloadReader, int<0, 4294967295>} */
+    public static function readCodebasePropertyProjectionsResponse(string $payload, int $generation, int $fields): array
+    {
+        [$kind, $reader] = self::readRequest($payload);
+        if ($kind !== self::CODEBASE_QUERY_RESPONSE) {
+            throw new ProtocolException("Expected a codebase query response, received analyzer message {$kind}.");
+        }
+        if (
+            $reader->readU64() !== $generation
+            || $reader->readU8() !== self::GET_PROPERTY_PROJECTIONS
+            || $reader->readU32() !== $fields
+        ) {
+            throw new ProtocolException('A projected property query response does not match its request.');
         }
 
         return [$reader, $reader->readCount(65_536)];

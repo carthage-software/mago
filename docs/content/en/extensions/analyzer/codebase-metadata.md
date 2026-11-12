@@ -144,3 +144,31 @@ Metadata is represented by immutable DTOs under `Mago\Sdk\Analyzer\Metadata`:
 The `Codebase` facade caches lookup results, existence checks, lists, and method projections. Missing lookup and existence results are cached too. `TypeComparator::compareMultiple()` caches both true and false outcomes. These caches belong to one frozen analysis generation; do not persist returned metadata across unrelated Mago runs in an external database unless the extension also owns invalidation.
 
 Within one callback, batching remains important even when data might be cached: it handles cold paths efficiently and allows the native side to optimize one request.
+
+## Selecting property metadata fields
+
+Use `getMultiplePropertyProjections()` when a hook needs property flags or locations
+but not their types, attributes, or hook signatures. The host serializes only the
+selected groups. This avoids transferring and decoding full metadata merely to
+select candidates for a whole-project check.
+
+```php
+use Mago\Sdk\Analyzer\Metadata\MemberIdentifier;
+use Mago\Sdk\Analyzer\Metadata\PropertyFields;
+
+$properties = $context->codebase->getMultiplePropertyProjections(
+    [new MemberIdentifier('App\\Service', '$dependency')],
+    PropertyFields::NAMES | PropertyFields::LOCATIONS | PropertyFields::FLAGS,
+);
+```
+
+Results preserve input order, including duplicates. Missing properties return
+`null`. Lookup uses the same directly declared-property semantics as
+`getMultipleProperties()`; it does not resolve inherited or magic properties. Optional projection properties are `null` when their
+group was not selected; use `has()` to distinguish omitted groups from selected
+nullable values. `PropertyFields::ALL` is the default. A zero mask requests only
+existence, represented by an empty projection for a present property.
+
+The SDK caches projections per analysis generation and field mask. This API
+requires a host supporting property projections; older hosts do not implement its
+query operation. Existing full-metadata APIs and their wire format are unchanged.

@@ -13,7 +13,9 @@ use Mago\Sdk\Analyzer\Metadata\FunctionLikeMetadata;
 use Mago\Sdk\Analyzer\Metadata\MemberIdentifier;
 use Mago\Sdk\Analyzer\Metadata\MethodFields;
 use Mago\Sdk\Analyzer\Metadata\MethodMetadataProjection;
+use Mago\Sdk\Analyzer\Metadata\PropertyFields;
 use Mago\Sdk\Analyzer\Metadata\PropertyMetadata;
+use Mago\Sdk\Analyzer\Metadata\PropertyMetadataProjection;
 use Mago\Sdk\Analyzer\Type\FunctionLikeIdentifier;
 use Mago\Sdk\Analyzer\Type\FunctionLikeKind;
 use Mago\Sdk\CancellationTokenInterface;
@@ -27,6 +29,7 @@ use Mago\Sdk\Internal\Protocol\PayloadReader;
 
 use function array_key_exists;
 use function array_keys;
+use function array_values;
 use function count;
 use function implode;
 use function sort;
@@ -606,6 +609,71 @@ final class Codebase
     public function getMultipleProperties(array $properties): array
     {
         return $this->queryMembers(Protocol::GET_PROPERTIES, $properties, MetadataCodec::readProperty(...));
+    }
+
+    /**
+     * Returns selected fields for directly declared properties, like getMultipleProperties().
+     *
+     * Inherited and magic properties are not resolved by this query.
+     *
+     * Results preserve input order and duplicates; missing properties produce null.
+     * A zero field mask still distinguishes existing properties from missing ones.
+     * Omitted metadata groups are null; use the projection's has() method to
+     * distinguish them from selected nullable values. Cache entries are scoped to
+     * the requested fields and the current analysis generation.
+     *
+     * @param list<MemberIdentifier> $properties
+     * @return list<PropertyMetadataProjection|null>
+     */
+    public function getMultiplePropertyProjections(array $properties, int $fields = PropertyFields::ALL): array
+    {
+        if ($fields < 0 || ($fields & ~PropertyFields::ALL) !== 0) {
+            throw new InvalidArgumentException('A property projection contains unknown fields.');
+        }
+        if ($properties === []) {
+            return [];
+        }
+
+        $bucket = $this->cache->propertyProjections[$fields] ?? [];
+        $keys = [];
+        $missing = [];
+        foreach ($properties as $property) {
+            $key = strtolower($property->class) . "\0" . $property->member;
+            $keys[] = $key;
+            if (!array_key_exists($key, $bucket)) {
+                $missing[$key] = $property;
+            }
+        }
+
+        if ($missing !== []) {
+            $this->cancellation->throwIfCancelled();
+            $payload = Protocol::writeCodebasePropertyProjectionsRequest(
+                $this->cache->generation,
+                array_values($missing),
+                $fields,
+            );
+            $response = $this->host->request($this->parentRequestId, $payload);
+            [$reader, $count] = Protocol::readCodebasePropertyProjectionsResponse(
+                $response,
+                $this->cache->generation,
+                $fields,
+            );
+            if ($count !== count($missing)) {
+                throw new ProtocolException('A projected property query response contains the wrong result count.');
+            }
+            foreach (array_keys($missing) as $key) {
+                $bucket[$key] = $reader->readBoolean() ? MetadataCodec::readPropertyProjection($reader, $fields) : null;
+            }
+            $reader->finish();
+            $this->cache->propertyProjections[$fields] = $bucket;
+        }
+
+        $results = [];
+        foreach ($keys as $key) {
+            $results[] = $bucket[$key];
+        }
+
+        return $results;
     }
 
     public function getMagicProperty(string $class, string $property): ?PropertyMetadata
