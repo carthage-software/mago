@@ -14,6 +14,7 @@ use crate::document::BreakMode;
 use crate::document::Document;
 use crate::document::Group;
 use crate::document::IfBreak;
+use crate::document::IndentIfBreak;
 use crate::document::Line;
 use crate::internal::FormatterState;
 use crate::internal::comment::CommentFlags;
@@ -28,6 +29,8 @@ pub(super) fn print_function_like_parameters<'arena, A>(
 where
     A: Arena,
 {
+    f.parameter_state.hugged_list_group_id = None;
+
     if parameter_list.parameters.is_empty() {
         let mut contents = vec_in![f.arena; Document::String(b"(")];
         if let Some(comments) = f.print_inner_comment(parameter_list.span()) {
@@ -113,12 +116,29 @@ where
         }
     }
     f.parameter_state.variable_padding = previous_variable_padding;
+    f.parameter_state.list_group_id = previous_list_group_id;
+    f.parameter_state.hugged_list_group_id = should_hug_the_parameters.then_some(list_id);
 
     if should_hug_the_parameters {
-        parts.extend(printed);
-        parts.push(Document::String(b")"));
+        let line_if_broken =
+            || Document::IfBreak(IfBreak::then(f.arena, Document::Line(Line::soft())).with_id(list_id));
 
-        return Document::Array(parts);
+        let mut contents = vec_in![f.arena; line_if_broken()];
+        contents.extend(printed);
+
+        let mut hugged = vec_in![f.arena;
+            Document::Group(Group::new(parts).with_id(list_id)),
+            Document::IndentIfBreak(IndentIfBreak::new(list_id, contents)),
+        ];
+
+        if f.trailing_comma_for(Feature::TrailingCommaInParameterList) {
+            hugged.push(Document::IfBreak(IfBreak::then(f.arena, Document::String(b",")).with_id(list_id)));
+        }
+
+        hugged.push(line_if_broken());
+        hugged.push(Document::String(b")"));
+
+        return Document::Array(hugged);
     }
 
     if !parameter_list.parameters.is_empty() {
@@ -140,8 +160,6 @@ where
     }
 
     parts.push(Document::String(b")"));
-
-    f.parameter_state.list_group_id = previous_list_group_id;
 
     Document::Group(Group::new(parts).with_id(list_id).with_break_mode(if force_break {
         BreakMode::Force

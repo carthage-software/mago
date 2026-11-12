@@ -327,6 +327,7 @@ impl<'arena> FunctionLikeParts<'arena> {
         };
 
         let (signature, signature_id) = self.format_signature(f, settings.space_before_params);
+        let hugged_list_group_id = f.parameter_state.hugged_list_group_id.take();
         let dangling_comments = match (&self.body, parameter_list_will_break) {
             (_, Some(false)) => None,
             (FunctionLikeBody::Block(block), _) => {
@@ -336,7 +337,13 @@ impl<'arena> FunctionLikeParts<'arena> {
             (FunctionLikeBody::Abstract(_), _) => None,
         };
 
-        let body = self.format_body(f, settings, signature_id, parameter_list_will_break, dangling_comments);
+        let body = self.format_body(
+            f,
+            settings,
+            hugged_list_group_id.unwrap_or(signature_id),
+            if hugged_list_group_id.is_some() { None } else { parameter_list_will_break },
+            dangling_comments,
+        );
 
         Document::Group(Group::new(vec_in![f.arena;
             attributes,

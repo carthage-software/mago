@@ -40,6 +40,7 @@ pub struct ArgumentState {
 #[derive(Debug, Clone, Copy, Default)]
 pub struct ParameterState {
     list_group_id: Option<GroupIdentifier>,
+    hugged_list_group_id: Option<GroupIdentifier>,
     variable_padding: Option<usize>,
 }
 
