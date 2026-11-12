@@ -545,6 +545,10 @@ pub fn analyze_assignment_to_variable<'ctx, 'arena, A>(
 ) where
     A: Arena,
 {
+    if let Some(existing_type) = block_context.locals.get(&variable_id).cloned() {
+        block_context.remove_descendants(context, variable_id, &existing_type, Some(&assigned_type));
+    }
+
     if let Some(constraint) = block_context.by_reference_constraints.get(&variable_id) {
         if let Some(constraint_type) = constraint.constraint_type.as_ref()
             && !union_comparator::is_contained_by(

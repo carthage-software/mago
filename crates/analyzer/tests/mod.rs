@@ -555,6 +555,11 @@ test_case!(iterables_count_countable_ok);
 test_case!(iterables_array_keys_after_iterator_to_array);
 test_case!(iterables_array_keys_on_iterator_invalid);
 test_case!(iterables_foreach_by_ref);
+test_case!(issue_2662, {
+    let mut settings = default_test_settings();
+    settings.strict_list_index_checks = false;
+    settings
+});
 test_case!(iterables_generator_with_non_iterable_return_type);
 test_case!(iterables_generator_send_match);
 test_case!(iterables_generator_send_mismatch);
