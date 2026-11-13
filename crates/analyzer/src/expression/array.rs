@@ -171,6 +171,25 @@ where
                 let (item_key_value, key_type) = artifacts
                     .get_expression_type(key_value_array_element.key)
                     .map_or((None, get_mixed()), |item_key_type| {
+                        let drop_null = item_key_type.ignore_nullable_issues() && item_key_type.is_nullable();
+                        let drop_false = item_key_type.ignore_falsable_issues() && item_key_type.is_falsable();
+                        let item_key_type = if drop_null || drop_false {
+                            Cow::Owned(
+                                item_key_type.clone_with_types(
+                                    item_key_type
+                                        .types
+                                        .iter()
+                                        .filter(|atomic| {
+                                            !(drop_null && atomic.is_null() || drop_false && atomic.is_false())
+                                        })
+                                        .cloned()
+                                        .collect(),
+                                ),
+                            )
+                        } else {
+                            Cow::Borrowed(item_key_type)
+                        };
+
                         let key_type = if item_key_type.is_null() {
                             get_literal_string(empty_word())
                         } else if item_key_type.is_true() {
@@ -218,7 +237,7 @@ where
 
                             get_arraykey()
                         } else {
-                            item_key_type.clone()
+                            item_key_type.into_owned()
                         };
 
                         let item_key_value =

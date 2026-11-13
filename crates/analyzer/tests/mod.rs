@@ -765,6 +765,7 @@ test_case!(magic_methods);
 test_case!(magic_call_for_inaccessible_method);
 test_case!(inherited_iterable_return_narrowed_to_array);
 test_case!(interpolated_string_truthiness);
+test_case!(ignored_nullable_return_as_array_key);
 test_case!(magic_properties);
 test_case!(magic_property_overridden_by_parent);
 test_case!(magic_property_shadowing_real_property);
