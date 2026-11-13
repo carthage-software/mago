@@ -33,6 +33,7 @@ use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
+use crate::invocation::InvocationArgument;
 use crate::invocation::InvocationTarget;
 use crate::utils::get_type_diff;
 
@@ -90,7 +91,7 @@ pub fn analyze_and_store_argument_type<'ctx, 'arena, A>(
     block_context: &mut BlockContext<'ctx>,
     artifacts: &mut AnalysisArtifacts,
     invocation_target: &InvocationTarget<'ctx>,
-    argument_expression: &Expression<'arena>,
+    argument: InvocationArgument<'_, 'arena>,
     argument_offset: usize,
     analyzed_argument_types: &mut [Option<(Rc<TUnion>, Span)>],
     referenced_parameter: bool,
@@ -102,6 +103,10 @@ where
     if argument_offset != usize::MAX && analyzed_argument_types[argument_offset].is_some() {
         return Ok(());
     }
+
+    let Some(argument_expression) = argument.value() else {
+        return Ok(());
+    };
 
     let inferred_parameter_types = closure_parameter_type.map(|closure_parameter_type| {
         let mut inferred_parameters = HashMap::default();
@@ -144,12 +149,17 @@ where
     block_context.flags.set_inside_call(true);
     block_context.flags.set_inside_variable_reference(referenced_parameter);
 
-    argument_expression.analyze(context, block_context, artifacts)?;
+    let result = if matches!(argument, InvocationArgument::PipedValue { is_analyzed: true, .. }) {
+        Ok(())
+    } else {
+        argument_expression.analyze(context, block_context, artifacts)
+    };
 
     block_context.flags.set_inside_general_use(was_inside_general_use);
     block_context.flags.set_inside_call(was_inside_call);
     block_context.flags.set_inside_variable_reference(was_inside_variable_reference);
     artifacts.inferred_parameter_types = inferred_parameter_types;
+    result?;
 
     let argument_type =
         artifacts.get_rc_expression_type(argument_expression).cloned().unwrap_or_else(|| Rc::new(get_mixed()));
