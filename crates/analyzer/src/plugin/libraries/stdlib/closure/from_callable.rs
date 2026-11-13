@@ -4,8 +4,10 @@ use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::callable::TCallable;
 use mago_codex::ttype::cast::cast_atomic_to_callable;
 use mago_codex::ttype::expander::get_parameter_dependent_signature_of_function_like_identifier;
+use mago_codex::ttype::template::TemplateResult;
 use mago_codex::ttype::union::TUnion;
 
+use crate::expression::partial_application::replace_signature_templates;
 use crate::plugin::context::InvocationInfo;
 use crate::plugin::context::ProviderContext;
 use crate::plugin::provider::Provider;
@@ -48,12 +50,18 @@ impl MethodReturnTypeProvider for ClosureFromCallableProvider {
         let mut closures = Vec::with_capacity(callback_type.types.len());
 
         for atomic in callback_type.types.as_ref() {
+            // Collects the receiver's template arguments, e.g. `T` => `string` for `[$box, 'method']` on `Box<string>`.
+            let mut template_result = TemplateResult::default();
+
             // Fall back to the declared Closure type if any alternative cannot be resolved.
-            let callable = cast_atomic_to_callable(atomic, codebase, None)?;
+            let callable = cast_atomic_to_callable(atomic, codebase, Some(&mut template_result))?;
             let mut signature = match callable.as_ref() {
                 TCallable::Signature(signature) => signature.clone(),
                 TCallable::Alias(identifier) => {
-                    get_parameter_dependent_signature_of_function_like_identifier(identifier, codebase)?
+                    let mut signature =
+                        get_parameter_dependent_signature_of_function_like_identifier(identifier, codebase)?;
+                    replace_signature_templates(&mut signature, &template_result, codebase);
+                    signature
                 }
             };
 

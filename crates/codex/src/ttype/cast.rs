@@ -20,7 +20,7 @@ use crate::ttype::atomic::derived::TDerived;
 use crate::ttype::atomic::object::TObject;
 use crate::ttype::atomic::reference::TReference;
 use crate::ttype::atomic::scalar::TScalar;
-use crate::ttype::template::GenericTemplate;
+use crate::ttype::get_specialized_template_type;
 use crate::ttype::template::TemplateResult;
 use crate::ttype::union::TUnion;
 
@@ -86,6 +86,7 @@ pub fn cast_atomic_to_callable<'atomic>(
                 codebase,
                 named_object.get_name(),
                 named_object.get_type_parameters(),
+                method_identifier.get_class_name(),
             );
 
             return Some(Cow::Owned(TCallable::Alias(method_identifier.into())));
@@ -220,40 +221,67 @@ fn try_object_method(
     if codebase
         .method_exists(method_identifier.get_class_name().as_bytes(), method_identifier.get_method_name().as_bytes())
     {
-        populate_template_result(template_result, codebase, object_name, type_parameters);
+        populate_template_result(
+            template_result,
+            codebase,
+            object_name,
+            type_parameters,
+            method_identifier.get_class_name(),
+        );
         return Some(Cow::Owned(TCallable::Alias(method_identifier.into())));
     }
 
     None
 }
 
+/// Records the declaring class's template types, specialized for the receiver object, as lower bounds.
+///
+/// The method signature references templates defined on the declaring class, which may be an
+/// ancestor of the receiver (e.g. `IntBox extends Box<int>`), so the receiver's type parameters
+/// are mapped through the inheritance chain rather than applied positionally.
 fn populate_template_result(
     template_result: Option<&mut TemplateResult>,
     codebase: &CodebaseMetadata,
     object_name: Word,
     type_parameters: Option<&[TUnion]>,
+    declaring_class_name: Word,
 ) {
     let Some(template_result) = template_result else {
         return;
     };
 
-    let Some(class_metadata) = codebase.get_class_like(object_name.as_bytes()) else {
+    let Some(declaring_class_metadata) = codebase.get_class_like(declaring_class_name.as_bytes()) else {
         return;
     };
 
-    let Some(type_parameters) = type_parameters else {
+    if declaring_class_metadata.template_types.is_empty() {
+        return;
+    }
+
+    let Some(object_class_metadata) = codebase.get_class_like(object_name.as_bytes()) else {
         return;
     };
 
-    for (index, parameter) in type_parameters.iter().enumerate() {
-        let Some(template_name) = class_metadata.get_template_name_for_index(index) else {
+    // Without type arguments, the receiver's own templates stay unresolved.
+    if type_parameters.is_none() && declaring_class_metadata.name == object_class_metadata.name {
+        return;
+    }
+
+    for (template_name, _) in &declaring_class_metadata.template_types {
+        let Some(template_type) = get_specialized_template_type(
+            codebase,
+            *template_name,
+            declaring_class_metadata.name,
+            object_class_metadata,
+            type_parameters,
+        ) else {
             continue;
         };
 
-        template_result
-            .template_types
-            .entry(template_name)
-            .or_default()
-            .push(GenericTemplate::new(GenericParent::ClassLike(object_name), parameter.clone()));
+        template_result.add_lower_bound(
+            *template_name,
+            GenericParent::ClassLike(declaring_class_metadata.name),
+            template_type,
+        );
     }
 }

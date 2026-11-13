@@ -1,6 +1,7 @@
 use mago_allocator::Arena;
 use std::sync::Arc;
 
+use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::misc::VariableIdentifier;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
@@ -39,26 +40,35 @@ fn create_closure_from_first_class_callable<A>(
 where
     A: Arena,
 {
-    for parameter in signature.get_parameters_mut() {
-        *parameter = rewrite_parameter_types(parameter.clone(), |ty| {
-            inferred_type_replacer::replace(&ty, template_result, context.codebase)
-        });
-    }
-
-    if let Some(return_type) = signature.get_return_type_mut() {
-        *return_type = inferred_type_replacer::replace(return_type, template_result, context.codebase);
-    }
-
-    for constraint in Arc::make_mut(&mut signature.constraints).iter_mut() {
-        constraint.input_type =
-            Arc::new(inferred_type_replacer::replace(&constraint.input_type, template_result, context.codebase));
-        constraint.parameter_type =
-            Arc::new(inferred_type_replacer::replace(&constraint.parameter_type, template_result, context.codebase));
-    }
+    replace_signature_templates(&mut signature, template_result, context.codebase);
 
     signature.is_closure = true;
 
     TAtomic::Callable(TCallable::Signature(signature))
+}
+
+/// Substitutes inferred template types into a signature's parameters, return type, and constraints.
+pub(crate) fn replace_signature_templates(
+    signature: &mut TCallableSignature,
+    template_result: &TemplateResult,
+    codebase: &CodebaseMetadata,
+) {
+    for parameter in signature.get_parameters_mut() {
+        *parameter = rewrite_parameter_types(parameter.clone(), |ty| {
+            inferred_type_replacer::replace(&ty, template_result, codebase)
+        });
+    }
+
+    if let Some(return_type) = signature.get_return_type_mut() {
+        *return_type = inferred_type_replacer::replace(return_type, template_result, codebase);
+    }
+
+    for constraint in Arc::make_mut(&mut signature.constraints).iter_mut() {
+        constraint.input_type =
+            Arc::new(inferred_type_replacer::replace(&constraint.input_type, template_result, codebase));
+        constraint.parameter_type =
+            Arc::new(inferred_type_replacer::replace(&constraint.parameter_type, template_result, codebase));
+    }
 }
 
 fn rewrite_parameter_types(
