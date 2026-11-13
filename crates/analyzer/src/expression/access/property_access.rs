@@ -5,7 +5,9 @@ use std::slice::from_ref;
 use mago_allocator::Arena;
 use mago_codex::assertion::Assertion;
 use mago_codex::ttype::add_optional_union_type;
+use mago_codex::ttype::add_union_type;
 use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::expander::StaticClassType;
 use mago_codex::ttype::expander::TypeExpansionOptions;
 use mago_codex::ttype::expander::expand_union;
@@ -188,6 +190,15 @@ where
     }
 
     let mut resulting_type = resulting_expression_type.unwrap_or_else(get_never);
+    if artifacts.get_expression_type(object).is_some_and(|t| t.possibly_undefined()) {
+        resulting_type.set_possibly_undefined(true, None);
+
+        // A missing receiver reads as `null`, so a nullsafe access short-circuits to `null`.
+        if is_null_safe && !resulting_type.is_never() {
+            resulting_type = add_union_type(resulting_type, &get_null(), context.codebase, CombinerOptions::default());
+        }
+    }
+
     let object_has_nullsafe_null = artifacts.get_expression_type(object).is_some_and(|t| t.has_nullsafe_null());
     if resolution_result.all_properties_non_nullable
         && ((is_null_safe && resolution_result.encountered_null) || object_has_nullsafe_null)

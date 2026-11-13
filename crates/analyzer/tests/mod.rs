@@ -3022,6 +3022,36 @@ fn issue_2478_php84() {
 test_case!(chained_logical_or_assignment_subsequent_operand);
 test_case!(switch_paradoxical_unreachable_case_detection);
 test_case!(issue_2650);
+test_case!(issue_2641);
+
+#[test]
+fn issue_2641_strict_array_index_existence() {
+    let mut settings = default_test_settings();
+    settings.strict_array_index_existence = true;
+
+    framework::TestCase::new("issue_2641", include_bytes!("cases/issue_2641.php")).settings(settings).run();
+}
+
+#[test]
+fn issue_2641_without_property_memoization() {
+    let mut settings = default_test_settings();
+    settings.memoize_properties = false;
+
+    framework::TestCase::new("issue_2641", include_bytes!("cases/issue_2641.php")).settings(settings).run();
+}
+
+test_case!(issue_2641_nullsafe);
+
+#[test]
+fn issue_2641_nullsafe_without_property_memoization() {
+    let mut settings = default_test_settings();
+    settings.memoize_properties = false;
+
+    framework::TestCase::new("issue_2641_nullsafe", include_bytes!("cases/issue_2641_nullsafe.php"))
+        .settings(settings)
+        .run();
+}
+
 test_case!(issue_2676);
 
 #[test]
