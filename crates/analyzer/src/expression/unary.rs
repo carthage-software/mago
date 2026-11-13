@@ -380,6 +380,19 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPrefix<'arena> {
             UnaryPrefixOperator::IntCast(_, _) | UnaryPrefixOperator::IntegerCast(_, _) => {
                 let resulting_type = match operand_type {
                     Some(t) => {
+                        if context.settings.warn_array_to_int_cast && t.has_array() {
+                            context.collector.report_with_code(
+                                IssueCode::ArrayToIntCast,
+                                Issue::warning("Suspicious cast from array to integer.")
+                                    .with_annotation(
+                                        Annotation::primary(self.span())
+                                            .with_message("This operand can be an array."),
+                                    )
+                                    .with_note("PHP converts an empty array to `0` and a non-empty array to `1`, not the number of elements.")
+                                    .with_help("Use `count()` to count elements, or extract the intended numeric value. Suppress `array-to-int-cast` if this conversion is intentional."),
+                            );
+                        }
+
                         // we intentionally do not report redundant casts here, as
                         // what we think is an integer, might be a float at runtime.
                         //

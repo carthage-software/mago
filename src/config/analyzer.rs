@@ -166,6 +166,12 @@ pub struct AnalyzerConfiguration {
     /// `if ($array)` is unaffected and never warns.
     pub allow_array_truthy_operand: bool,
 
+    /// Warn about casts from arrays to integers, including unions containing arrays.
+    ///
+    /// PHP converts empty arrays to `0` and non-empty arrays to `1`, not their count.
+    /// Defaults to `false` and does not change inferred cast types.
+    pub warn_array_to_int_cast: bool,
+
     /// Allow operators on classes that overload them, such as `BcMath\Number` and `GMP`.
     ///
     /// When `true`, the analyzer accepts these operators without emitting `invalid-operand`.
@@ -496,6 +502,7 @@ impl AnalyzerConfiguration {
             strict_list_index_checks: self.strict_list_index_checks,
             strict_array_index_existence: self.strict_array_index_existence,
             allow_array_truthy_operand: self.allow_array_truthy_operand,
+            warn_array_to_int_cast: self.warn_array_to_int_cast,
             allow_operator_overloading: self.allow_operator_overloading,
             no_boolean_literal_comparison: self.no_boolean_literal_comparison,
             enforce_class_finality: self.enforce_class_finality,
@@ -556,6 +563,7 @@ impl Default for AnalyzerConfiguration {
             strict_list_index_checks: defaults.strict_list_index_checks,
             strict_array_index_existence: defaults.strict_array_index_existence,
             allow_array_truthy_operand: defaults.allow_array_truthy_operand,
+            warn_array_to_int_cast: defaults.warn_array_to_int_cast,
             allow_operator_overloading: defaults.allow_operator_overloading,
             no_boolean_literal_comparison: defaults.no_boolean_literal_comparison,
             enforce_class_finality: defaults.enforce_class_finality,
@@ -583,6 +591,20 @@ mod tests {
     use mago_reporting::IgnoreEntry;
 
     use super::AnalyzerConfiguration;
+
+    #[test]
+    fn warn_array_to_int_cast_defaults_to_false_and_can_be_enabled() {
+        let default_configuration: AnalyzerConfiguration = toml::from_str("").unwrap();
+        assert!(!default_configuration.warn_array_to_int_cast);
+        let default_settings =
+            default_configuration.to_settings(mago_php_version::PHPVersion::LATEST, clap::ColorChoice::Never, false);
+        assert!(!default_settings.warn_array_to_int_cast);
+
+        let configured: AnalyzerConfiguration = toml::from_str("warn-array-to-int-cast = true").unwrap();
+        assert!(configured.warn_array_to_int_cast);
+        let settings = configured.to_settings(mago_php_version::PHPVersion::LATEST, clap::ColorChoice::Never, false);
+        assert!(settings.warn_array_to_int_cast);
+    }
 
     #[test]
     fn check_throw_type_covariance_defaults_to_false_and_can_be_enabled() {
