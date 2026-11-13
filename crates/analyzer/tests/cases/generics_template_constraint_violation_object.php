@@ -23,5 +23,5 @@ final class GenNotSized
     public int $x = 0;
 }
 
-/** @mago-expect analysis:template-constraint-violation,possibly-invalid-argument */
+/** @mago-expect analysis:template-constraint-violation,invalid-argument */
 new GenSizedHolder2(new GenNotSized());

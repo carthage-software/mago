@@ -5,6 +5,7 @@ use mago_word::concat_word;
 use mago_word::word;
 
 use crate::metadata::CodebaseMetadata;
+use crate::metadata::class_like::ClassLikeMetadata;
 use crate::misc::GenericParent;
 use crate::ttype::TType;
 use crate::ttype::atomic::TAtomic;
@@ -792,8 +793,40 @@ pub(crate) fn can_be_identical(
     if let (TAtomic::Object(first_object), TAtomic::Object(second_object)) = (first_part, second_part)
         && let (Some(first_name), Some(second_name)) = (first_object.get_name(), second_object.get_name())
     {
+        let first_intersections = first_part.get_intersection_types().unwrap_or_default();
+        let second_intersections = second_part.get_intersection_types().unwrap_or_default();
+        if !first_intersections.is_empty() || !second_intersections.is_empty() {
+            let bare = |atomic: &TAtomic| {
+                let mut atomic = atomic.clone();
+                if let Some(types) = atomic.get_intersection_types_mut() {
+                    types.clear();
+                }
+
+                atomic
+            };
+
+            let first_parts: Vec<TAtomic> =
+                std::iter::once(bare(first_part)).chain(first_intersections.iter().cloned()).collect();
+            let second_parts: Vec<TAtomic> =
+                std::iter::once(bare(second_part)).chain(second_intersections.iter().cloned()).collect();
+
+            return first_parts.iter().all(|first| {
+                second_parts
+                    .iter()
+                    .all(|second| can_be_identical(codebase, first, second, inside_assertion, allow_type_coercion))
+            });
+        }
+
         return match (codebase.get_class_like_by_name(first_name), codebase.get_class_like_by_name(second_name)) {
-            (Some(c1), Some(c2)) => c1.kind.is_interface() || c2.kind.is_interface(),
+            (Some(c1), Some(c2)) => {
+                let final_class_outside = |class: &ClassLikeMetadata, interface: &ClassLikeMetadata| {
+                    (class.flags.is_final() || class.kind.is_enum())
+                        && !codebase.is_instance_of(class.name.as_bytes(), interface.name.as_bytes())
+                };
+
+                (c1.kind.is_interface() && !final_class_outside(c2, c1))
+                    || (c2.kind.is_interface() && !final_class_outside(c1, c2))
+            }
             _ => true,
         };
     }

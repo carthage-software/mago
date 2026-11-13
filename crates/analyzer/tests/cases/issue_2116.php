@@ -20,8 +20,8 @@ function rejects_enum_values_in_first_array(): array
 {
     // @mago-expect analysis:template-constraint-violation
     // @mago-expect analysis:template-constraint-violation
-    // @mago-expect analysis:possibly-invalid-argument
-    // @mago-expect analysis:possibly-invalid-argument
+    // @mago-expect analysis:invalid-argument
+    // @mago-expect analysis:invalid-argument
     return array_diff([C::A, C::B], [C::B]);
 }
 

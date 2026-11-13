@@ -334,8 +334,9 @@ where
 
     let mut apply_assertions = |assertions: &AssertionSet| {
         for clause in assertions {
+            let mut narrowed_type = None;
             for assertion in clause {
-                return_type = assertion_reconciler::reconcile(
+                let candidate = assertion_reconciler::reconcile(
                     context,
                     assertion,
                     Some(&return_type),
@@ -345,6 +346,12 @@ where
                     false,
                     false,
                 );
+
+                narrowed_type = Some(add_optional_union_type(candidate, narrowed_type.as_ref(), context.codebase));
+            }
+
+            if let Some(narrowed_type) = narrowed_type {
+                return_type = narrowed_type;
             }
         }
     };

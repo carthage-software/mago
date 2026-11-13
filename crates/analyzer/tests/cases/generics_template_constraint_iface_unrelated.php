@@ -20,5 +20,5 @@ final class GenNotSerializable
 {
 }
 
-/** @mago-expect analysis:possibly-invalid-argument,template-constraint-violation */
+/** @mago-expect analysis:invalid-argument,template-constraint-violation */
 gen_take_serializable(new GenNotSerializable());

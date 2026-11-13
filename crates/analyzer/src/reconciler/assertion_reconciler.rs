@@ -322,6 +322,19 @@ where
     None
 }
 
+fn named_objects_can_intersect<A>(context: &Context<'_, '_, A>, first: &TNamedObject, second: &TNamedObject) -> bool
+where
+    A: Arena,
+{
+    let first_name = first.get_name();
+    let second_name = second.get_name();
+
+    (context.codebase.interface_exists(first_name.as_bytes())
+        && context.codebase.is_inheritable(second_name.as_bytes()))
+        || (context.codebase.interface_exists(second_name.as_bytes())
+            && context.codebase.is_inheritable(first_name.as_bytes()))
+}
+
 pub(crate) fn intersect_atomic_with_atomic<A>(
     context: &mut Context<'_, '_, A>,
     first_type: &TAtomic,
@@ -390,6 +403,40 @@ where
         return intersect_atomic_with_callable(context, second_type);
     }
 
+    if let Some(intersections) = first_type.get_intersection_types().filter(|types| !types.is_empty()) {
+        let mut bare_type = first_type.clone();
+        if let Some(types) = bare_type.get_intersection_types_mut() {
+            types.clear();
+        }
+
+        let mut narrowed_type = intersect_atomic_with_atomic(context, &bare_type, second_type)?;
+        for intersection in intersections {
+            if atomic_comparator::is_contained_by(
+                context.codebase,
+                &narrowed_type,
+                intersection,
+                false,
+                &mut ComparisonResult::new(),
+            ) {
+                continue;
+            }
+
+            let (TAtomic::Object(TObject::Named(narrowed_object)), TAtomic::Object(TObject::Named(intersected_object))) =
+                (&narrowed_type, intersection)
+            else {
+                return None;
+            };
+
+            if !named_objects_can_intersect(context, narrowed_object, intersected_object) {
+                return None;
+            }
+
+            narrowed_type.add_intersection_type(intersection.clone());
+        }
+
+        return Some(narrowed_type);
+    }
+
     match (first_type, second_type) {
         (TAtomic::Object(TObject::Enum(first_enum)), TAtomic::Object(TObject::Enum(second_enum))) => {
             if context.codebase.is_instance_of(first_enum.name.as_bytes(), second_enum.name.as_bytes())
@@ -401,14 +448,7 @@ where
             return None;
         }
         (TAtomic::Object(TObject::Named(first_object)), TAtomic::Object(TObject::Named(second_object))) => {
-            let first_object_name = first_object.get_name();
-            let second_object_name = second_object.get_name();
-
-            if (context.codebase.interface_exists(first_object_name.as_bytes())
-                && context.codebase.is_inheritable(second_object_name.as_bytes()))
-                || (context.codebase.interface_exists(second_object_name.as_bytes())
-                    && context.codebase.is_inheritable(first_object_name.as_bytes()))
-            {
+            if named_objects_can_intersect(context, first_object, second_object) {
                 let mut first_type = first_type.clone();
                 first_type.add_intersection_type(second_type.clone());
 
