@@ -632,11 +632,7 @@ fn clear_object_property_narrowings<'ctx, 'arena, A>(
         }
 
         class_metadata.is_some_and(|metadata| {
-            metadata.flags.is_readonly()
-                || metadata
-                    .properties
-                    .get(&Word::new(property_name))
-                    .is_some_and(|property| property.flags.is_readonly())
+            metadata.flags.is_readonly() || is_readonly_property(context, metadata.name.as_bytes(), property_name)
         })
     };
     let is_self_method_call = matches!(receiver_variable, Some(v) if v == b"$this")
@@ -904,10 +900,17 @@ where
         return true;
     }
 
-    class_metadata
-        .properties
-        .get(&Word::new(property))
-        .is_some_and(|property_metadata| property_metadata.flags.is_readonly())
+    is_readonly_property(context, class_name.as_bytes(), property)
+}
+
+fn is_readonly_property<A>(context: &Context<'_, '_, A>, class_name: &[u8], property: &[u8]) -> bool
+where
+    A: Arena,
+{
+    context
+        .codebase
+        .get_declaring_property(class_name, concat_word!(b"$", property).as_bytes())
+        .is_some_and(|property| property.flags.is_readonly())
 }
 
 /// A variable ID like `$_SESSION['user_id']` - an index access rooted at a PHP
