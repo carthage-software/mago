@@ -446,8 +446,9 @@ where
 
 /// Adds the properties that constructors outside the current file are trusted to initialize.
 ///
-/// Such a constructor is trusted for the properties its class declares or takes from traits, and
-/// the codebase records whether it calls `parent::__construct()`, so the chain can be followed.
+/// Such a constructor is trusted for the properties its class declares or takes from traits. The
+/// codebase records the inherited properties it assigns and whether it calls
+/// `parent::__construct()`, so the chain can be followed.
 fn extend_with_unanalyzed_constructors<A>(
     artifacts: &AnalysisArtifacts,
     context: &Context<'_, '_, A>,
@@ -486,6 +487,8 @@ fn extend_with_unanalyzed_constructors<A>(
                     initialized.insert(*property);
                 }
             }
+
+            initialized.extend(&class_metadata.constructor_assigned_inherited_properties);
 
             method.flags.calls_parent_constructor()
         };

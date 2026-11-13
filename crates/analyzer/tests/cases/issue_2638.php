@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace Issue2638;
 
+use Closure;
+
 // Children come before their parents, so no parent constructor is analyzed yet when a child is
 // checked. Classes that each live in their own file are checked the same way.
 
@@ -191,4 +193,103 @@ trait HasName
 {
     // @mago-expect analysis:uninitialized-property
     public string $name;
+}
+
+final class Addition extends BinaryOperation {}
+
+final class Subtraction extends BinaryOperation
+{
+    public string $note;
+
+    public function __construct(string $left, string $note)
+    {
+        parent::__construct($left);
+
+        $this->note = $note;
+    }
+}
+
+abstract class BinaryOperation extends Node
+{
+    public string $left;
+
+    /** @param array<string, string> $attributes */
+    public function __construct(string $left, array $attributes = [])
+    {
+        $this->attributes = $attributes;
+        $this->left = $left;
+    }
+}
+
+final class RelativeName extends Name {}
+
+class Name extends Node
+{
+    public string $name;
+
+    /** @param array<string, string> $attributes */
+    final public function __construct(string $name, array $attributes = [])
+    {
+        $this->attributes = $attributes;
+        $this->name = $name;
+    }
+}
+
+final class Lazy extends FillsWhenUnset {}
+
+abstract class FillsWhenUnset extends Node
+{
+    public function __construct()
+    {
+        $this->attributes ??= [];
+    }
+}
+
+// @mago-expect analysis:missing-constructor
+final class Deferred extends AssignsInClosure {}
+
+abstract class AssignsInClosure extends Node
+{
+    public Closure $later;
+
+    public function __construct()
+    {
+        $this->later = function (): void {
+            $this->attributes = [];
+        };
+    }
+}
+
+// @mago-expect analysis:missing-constructor
+final class Copied extends AssignsOtherObject {}
+
+abstract class AssignsOtherObject extends Node
+{
+    public function __construct(Node $other)
+    {
+        $other->attributes = [];
+    }
+}
+
+// @mago-expect analysis:missing-constructor
+final class Appended extends AppendsOnly {}
+
+abstract class AppendsOnly extends Node
+{
+    public function __construct()
+    {
+        $this->attributes += ['kind' => 'appended'];
+    }
+}
+
+abstract class Node
+{
+    /** @var array<string, string> */
+    protected array $attributes;
+
+    /** @param array<string, string> $attributes */
+    public function __construct(array $attributes = [])
+    {
+        $this->attributes = $attributes;
+    }
 }

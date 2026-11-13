@@ -10,8 +10,11 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_syntax::comments::docblock::get_docblock_before_position;
+use mago_syntax::cst::Access;
 use mago_syntax::cst::AnonymousClass;
 use mago_syntax::cst::ArrowFunction;
+use mago_syntax::cst::Assignment;
+use mago_syntax::cst::AssignmentOperator;
 use mago_syntax::cst::Call;
 use mago_syntax::cst::Class;
 use mago_syntax::cst::ClassLikeMemberSelector;
@@ -35,6 +38,7 @@ use mago_syntax::cst::Trivia;
 use mago_syntax::cst::UnaryPrefix;
 use mago_syntax::cst::UnaryPrefixOperator;
 use mago_syntax::cst::Use;
+use mago_syntax::cst::Variable;
 use mago_syntax::walker::MutWalker;
 use mago_syntax::walker::walk_anonymous_class_mut;
 use mago_syntax::walker::walk_class_mut;
@@ -45,6 +49,7 @@ use mago_word::Word;
 use mago_word::WordMap;
 use mago_word::WordSet;
 use mago_word::ascii_lowercase_word;
+use mago_word::concat_word;
 use mago_word::empty_word;
 
 use crate::identifier::method::MethodIdentifier;
@@ -542,6 +547,24 @@ where
         }
 
         self.codebase.constants.entry(constant_metadata.name).or_insert(constant_metadata);
+    }
+
+    #[inline]
+    fn walk_in_assignment(&mut self, assignment: &'arena Assignment<'arena>, _context: &mut Context<'ctx, 'arena, A>) {
+        if let Some(Some((class, method))) = self.function_like_stack.last()
+            && method.as_bytes() == b"__construct"
+            && let AssignmentOperator::Assign(_) | AssignmentOperator::Coalesce(_) = assignment.operator
+            && let Expression::Access(Access::Property(access)) = assignment.lhs
+            && let Expression::Variable(Variable::Direct(variable)) = access.object
+            && variable.name == b"$this"
+            && let ClassLikeMemberSelector::Identifier(property) = &access.property
+            && let Some(metadata) = self.codebase.class_likes.get_mut(class)
+        {
+            let property = concat_word!(b"$", property.value);
+            if !metadata.properties.contains_key(&property) {
+                metadata.constructor_assigned_inherited_properties.insert(property);
+            }
+        }
     }
 
     #[inline]
