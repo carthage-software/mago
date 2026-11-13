@@ -62,7 +62,11 @@ pub struct FixCommand {
     #[arg(long)]
     pub ignore_baseline: bool,
 
-    /// Exit with code 1 if issues remain after all available fixes have been applied.
+    /// Exit with code 1 if issues at or above the minimum fail level remain after fixes settle.
+    ///
+    /// The threshold is each tool's configured `minimum-fail-level` and defaults
+    /// to `error`, matching `mago lint` without `--fix`. A higher bar is that
+    /// existing setting. Issues below the threshold do not change the exit code.
     #[arg(long)]
     pub fail_on_remaining: bool,
 

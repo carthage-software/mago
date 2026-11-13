@@ -20,6 +20,7 @@ Most linter rules and a handful of analyzer checks ship automatic fixes. The fla
 | `--potentially-unsafe` | Apply fixes marked potentially-unsafe. Less risky than unsafe but still worth a quick review. |
 | `--format-after-fix`, `fmt` | Run the formatter on every file `--fix` modified. |
 | `--dry-run`, `-d`, `diff` | Preview fixes as a unified diff without writing anything. |
+| `--fail-on-remaining` | Exit with code `1` when issues at or above the minimum fail level remain after `--fix`. The default threshold is `error`, matching `mago lint` without `--fix`. A higher bar is the existing `minimum-fail-level` setting. |
 
 ## Reporting
 

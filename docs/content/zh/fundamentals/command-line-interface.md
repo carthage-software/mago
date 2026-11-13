@@ -83,7 +83,7 @@ mago fix --no-analyze --no-guard
 | `--no-lint` | 跳过 linter。 |
 | `--no-fmt` | 跳过 formatter。 |
 | `--ignore-baseline` | 同时修复各工具基线中已忽略的问题。 |
-| `--fail-on-remaining` | 修复稳定后仍有问题时，以退出码 `1` 结束。 |
+| `--fail-on-remaining` | 修复稳定后，若仍有达到或超过最低失败级别的问题，则以退出码 `1` 结束。默认阈值为 `error`，与不带 `--fix` 的 `mago lint` 一致。更严格的标准使用现有的 `minimum-fail-level` 设置。 |
 | `--max-passes <NUMBER>` | 完整执行轮数上限，默认 `10`，取值范围为 `1` 到 `256`。 |
 
 默认情况下，只要所选安全级别下没有更多可用修复，命令就会成功，即使仍有问题。禁用全部四个工具时，命令不做任何更改并成功退出。

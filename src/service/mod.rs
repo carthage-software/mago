@@ -161,10 +161,11 @@ pub struct IssueProcessor {
     /// Useful for reviewing fixes before applying them. Only applies in fix mode.
     pub dry_run: bool,
 
-    /// Exit with failure if there are remaining unfixed issues after applying fixes.
+    /// Exit with failure if remaining issues meet the minimum fail level.
     ///
-    /// When `true`, the command exits with a non-zero status code if any issues
-    /// could not be automatically fixed and require manual attention.
+    /// When `true`, the command exits with a non-zero status code if any issue
+    /// at or above `minimum_fail_level` could not be automatically fixed.
+    /// Issues below that level are logged and do not change the exit code.
     /// Only applies in fix mode.
     pub fail_on_remaining: bool,
 
@@ -180,8 +181,10 @@ pub struct IssueProcessor {
 
     /// Minimum severity level that causes the command to fail.
     ///
-    /// If any issues at or above this level are found, the command exits with
-    /// a failure code. Only applies in report mode.
+    /// In report mode, the command exits with a failure code if any reported
+    /// issue is at or above this level. In fix mode with `fail_on_remaining`,
+    /// the same comparison applies to issues that remain after fixes, including
+    /// fixes skipped for safety. The configured threshold defaults to `error`.
     pub minimum_fail_level: Level,
 
     /// Minimum severity level to include in the report.
@@ -370,6 +373,10 @@ impl IssueProcessor {
     /// to determine which fixes are safe to apply. When `--format-after-fix` is
     /// enabled, modified files are automatically formatted. When `--dry-run` is
     /// enabled, changes are previewed but not written to disk.
+    ///
+    /// When `--fail-on-remaining` is set, the command fails only if a remaining
+    /// issue is at or above `minimum_fail_level`. Remaining issues are those with
+    /// no edits and fixes skipped as unsafe or potentially unsafe.
     fn handle_fix_mode(
         &self,
         orchestrator: &Orchestrator<'_>,
@@ -380,10 +387,22 @@ impl IssueProcessor {
         let issues =
             if let Some(baseline) = baseline { baseline.filter_issues(issues, &database.read_only()) } else { issues };
 
-        let unfixable_count = (&issues).into_iter().filter(|i| i.edits.is_empty()).count();
+        let mut unfixable_at_fail_level = 0usize;
+        let mut unfixable_below_fail_level = 0usize;
+        for issue in &issues {
+            if !issue.edits.is_empty() {
+                continue;
+            }
+
+            if self.minimum_fail_level <= issue.level {
+                unfixable_at_fail_level += 1;
+            } else {
+                unfixable_below_fail_level += 1;
+            }
+        }
 
         let dry_run = self.dry_run;
-        let (applied_fixes, skipped_unsafe, skipped_potentially_unsafe, bugs, changed_file_ids) =
+        let (applied_fixes, skipped_unsafe, skipped_potentially_unsafe, skipped_at_fail_level, bugs, changed_file_ids) =
             self.apply_fixes(orchestrator, database, issues)?;
 
         if skipped_unsafe > 0 {
@@ -420,17 +439,22 @@ impl IssueProcessor {
 
         if success && self.fail_on_remaining {
             let skipped_safety = skipped_unsafe + skipped_potentially_unsafe;
-            let remaining = unfixable_count + skipped_safety;
-            if remaining > 0 {
-                if unfixable_count > 0 {
+            let below = unfixable_below_fail_level + skipped_safety - skipped_at_fail_level;
+            if below > 0 {
+                let level = self.minimum_fail_level;
+                tracing::info!("{below} remaining issues are below the `{level}` fail threshold.");
+            }
+
+            if unfixable_at_fail_level > 0 || skipped_at_fail_level > 0 {
+                if unfixable_at_fail_level > 0 {
                     tracing::warn!(
-                        "{unfixable_count} issues require manual attention and cannot be fixed automatically."
+                        "{unfixable_at_fail_level} issues require manual attention and cannot be fixed automatically."
                     );
                 }
 
-                if skipped_safety > 0 {
+                if skipped_at_fail_level > 0 {
                     tracing::warn!(
-                        "{skipped_safety} issues were skipped due to safety level. Use `--potentially-unsafe` or `--unsafe` to apply them.",
+                        "{skipped_at_fail_level} issues were skipped due to safety level. Use `--potentially-unsafe` or `--unsafe` to apply them.",
                     );
                 }
 
@@ -531,6 +555,7 @@ impl IssueProcessor {
     /// - Number of files successfully modified
     /// - Number of unsafe fixes skipped
     /// - Number of potentially unsafe fixes skipped
+    /// - Number of skipped unsafe or potentially unsafe fixes at or above the minimum fail level
     /// - Number of bugs encountered during fix application, such as out-of-bounds edits or
     ///   rejected edits
     fn apply_fixes(
@@ -538,7 +563,7 @@ impl IssueProcessor {
         orchestrator: &Orchestrator<'_>,
         database: &mut Database<'_>,
         issues: IssueCollection,
-    ) -> Result<(usize, usize, usize, usize, Vec<FileId>), Error> {
+    ) -> Result<(usize, usize, usize, usize, usize, Vec<FileId>), Error> {
         let read_database = Arc::new(database.read_only());
         let change_log = ChangeLog::new();
 
@@ -554,15 +579,16 @@ impl IssueProcessor {
         // Collect edit batches by file (each batch = all edits from one issue)
         let batches_by_file = issues.to_edit_batches();
         if batches_by_file.is_empty() {
-            return Ok((0, 0, 0, 0, Vec::new()));
+            return Ok((0, 0, 0, 0, 0, Vec::new()));
         }
 
         let format_after_fix = self.format_after_fix;
         let dry_run = self.dry_run;
         let color_choice = self.color_choice;
+        let minimum_fail_level = self.minimum_fail_level;
         let parser_settings = orchestrator.config.parser_settings;
 
-        let results: Vec<(bool, usize, usize, usize)> = batches_by_file
+        let results: Vec<(bool, usize, usize, usize, usize)> = batches_by_file
             .into_par_iter()
             .map_init(LocalArena::new, |arena, (file_id, batches)| {
                 let file = read_database.get_ref(&file_id)?;
@@ -570,10 +596,11 @@ impl IssueProcessor {
 
                 let mut skipped_unsafe = 0usize;
                 let mut skipped_potentially_unsafe = 0usize;
+                let mut skipped_at_fail_level = 0usize;
                 let mut bugs = 0usize;
 
                 // Each batch contains all edits from a single issue - they must be applied together
-                for (rule_code, edits) in batches {
+                for (rule_code, level, edits) in batches {
                     let rule_code = rule_code.as_deref().unwrap_or("unknown");
                     let result = editor.apply_unique_batch(edits, Some(|code: &[u8]| check_php_code(arena, file_id, code, parser_settings)));
                     arena.reset();
@@ -584,9 +611,15 @@ impl IssueProcessor {
                         }
                         ApplyResult::Unsafe => {
                             skipped_unsafe += 1;
+                            if minimum_fail_level <= level {
+                                skipped_at_fail_level += 1;
+                            }
                         }
                         ApplyResult::PotentiallyUnsafe => {
                             skipped_potentially_unsafe += 1;
+                            if minimum_fail_level <= level {
+                                skipped_at_fail_level += 1;
+                            }
                         }
                         ApplyResult::OutOfBounds => {
                             tracing::warn!("Edit out of bounds for `{}` (issue: `{rule_code}`). This is a bug in Mago.", mago_bytes::BytesDisplay(&file.name));
@@ -615,7 +648,7 @@ impl IssueProcessor {
 
                 let fixed_content = editor.finish();
                 if *fixed_content == *file.contents {
-                    return Ok((false, skipped_unsafe, skipped_potentially_unsafe, bugs));
+                    return Ok((false, skipped_unsafe, skipped_potentially_unsafe, skipped_at_fail_level, bugs));
                 }
 
                 let final_content = if format_after_fix {
@@ -642,9 +675,9 @@ impl IssueProcessor {
                 arena.reset();
 
                 let changed = utils::apply_update(&change_log, file, final_content.as_ref(), dry_run, color_choice)?;
-                Ok((changed, skipped_unsafe, skipped_potentially_unsafe, bugs))
+                Ok((changed, skipped_unsafe, skipped_potentially_unsafe, skipped_at_fail_level, bugs))
             })
-            .collect::<Result<Vec<(bool, usize, usize, usize)>, Error>>()?;
+            .collect::<Result<Vec<(bool, usize, usize, usize, usize)>, Error>>()?;
 
         let changed_file_ids = if !dry_run {
             let ids = change_log.changed_file_ids()?;
@@ -657,18 +690,27 @@ impl IssueProcessor {
         let mut applied_fix_count = 0;
         let mut total_skipped_unsafe = 0;
         let mut total_skipped_potentially_unsafe = 0;
+        let mut total_skipped_at_fail_level = 0;
         let mut total_bugs = 0;
 
-        for (changed, skipped_unsafe, skipped_potentially_unsafe, bugs) in results {
+        for (changed, skipped_unsafe, skipped_potentially_unsafe, skipped_at_fail_level, bugs) in results {
             if changed {
                 applied_fix_count += 1;
             }
             total_skipped_unsafe += skipped_unsafe;
             total_skipped_potentially_unsafe += skipped_potentially_unsafe;
+            total_skipped_at_fail_level += skipped_at_fail_level;
             total_bugs += bugs;
         }
 
-        Ok((applied_fix_count, total_skipped_unsafe, total_skipped_potentially_unsafe, total_bugs, changed_file_ids))
+        Ok((
+            applied_fix_count,
+            total_skipped_unsafe,
+            total_skipped_potentially_unsafe,
+            total_skipped_at_fail_level,
+            total_bugs,
+            changed_file_ids,
+        ))
     }
 }
 

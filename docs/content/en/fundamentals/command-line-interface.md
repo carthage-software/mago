@@ -84,7 +84,7 @@ Only safe fixes run by default. The command respects each tool's configuration, 
 | `--no-lint` | Skip the linter. |
 | `--no-fmt` | Skip the formatter. |
 | `--ignore-baseline` | Apply fixes to issues hidden by each tool's baseline too. |
-| `--fail-on-remaining` | Exit with code `1` if issues remain after fixes settle. |
+| `--fail-on-remaining` | Exit with code `1` if issues at or above the minimum fail level remain after fixes settle. The default threshold is `error`, matching `mago lint` without `--fix`. A higher bar is the existing `minimum-fail-level` setting. |
 | `--max-passes <NUMBER>` | Limit full passes; defaults to `10` and accepts `1` to `256`. |
 
 By default, the command succeeds when no more fixes are available at the selected safety level, even if issues remain. Disabling all four tools does nothing and succeeds.

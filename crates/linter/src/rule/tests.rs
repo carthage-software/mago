@@ -141,7 +141,7 @@ where
     let mut editor = TextEditor::new(code.as_bytes());
     let mut has_edits = false;
     for batches in issues.to_edit_batches().into_values() {
-        for (_, edits) in batches {
+        for (_, _, edits) in batches {
             has_edits |= !edits.is_empty();
             editor.apply_unique_batch(edits, None::<fn(&[u8]) -> bool>);
         }

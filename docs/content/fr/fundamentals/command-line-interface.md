@@ -83,7 +83,7 @@ Par défaut, seules les corrections sûres s'appliquent. La commande respecte la
 | `--no-lint` | Ignore le linter. |
 | `--no-fmt` | Ignore le formatter. |
 | `--ignore-baseline` | Corrige aussi les problèmes masqués par les baselines. |
-| `--fail-on-remaining` | Renvoie le code `1` s'il reste des problèmes après les corrections. |
+| `--fail-on-remaining` | Renvoie le code `1` s'il reste des problèmes au niveau minimal d'échec ou au-dessus, une fois les corrections stabilisées. Le seuil par défaut est `error`, comme `mago lint` sans `--fix`. Un seuil plus strict utilise le réglage `minimum-fail-level` existant. |
 | `--max-passes <NUMBER>` | Limite le nombre de passages complets : `10` par défaut, de `1` à `256`. |
 
 Par défaut, la commande réussit quand il ne reste aucune correction autorisée par le niveau de sûreté choisi, même s'il reste des problèmes. Désactiver les quatre outils ne fait rien et réussit.

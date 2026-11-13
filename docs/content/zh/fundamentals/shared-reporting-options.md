@@ -20,6 +20,7 @@ nav_section = "基础"
 | `--potentially-unsafe` | 应用被标记为 potentially-unsafe 的修复。比 unsafe 风险低,但仍值得简单审阅。 |
 | `--format-after-fix`, `fmt` | 在每个被 `--fix` 修改过的文件上运行格式化器。 |
 | `--dry-run`, `-d`, `diff` | 以统一 diff 的形式预览修复,不写入任何内容。 |
+| `--fail-on-remaining` | `--fix` 之后若仍有达到或超过最低失败级别的问题,则以退出码 `1` 结束。默认阈值是 `error`,与不带 `--fix` 的 `mago lint` 一致。更严格的标准使用现有的 `minimum-fail-level` 设置。 |
 
 ## 报告
 

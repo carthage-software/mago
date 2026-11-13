@@ -52,7 +52,7 @@ exit 0
 
 ### Auto-corriger et auto-formater les fichiers indexés
 
-Cela ajoute `--fix` à l'étape lint. `--fail-on-remaining` bloque le commit si des problèmes n'ont pas pu être corrigés automatiquement et nécessitent encore une attention manuelle. Sans cela, `--fix` quitte avec zéro même quand des problèmes non corrigés subsistent.
+Cela ajoute `--fix` à l'étape lint. `--fail-on-remaining` bloque le commit lorsqu'un problème restant est au niveau minimal d'échec ou au-dessus. Le seuil par défaut est `error`, comme `mago lint` sans `--fix`. Un seuil plus strict utilise le réglage `minimum-fail-level` existant. Sans cela, `--fix` quitte avec zéro même quand des problèmes non corrigés subsistent.
 
 ```bash
 #!/bin/sh
