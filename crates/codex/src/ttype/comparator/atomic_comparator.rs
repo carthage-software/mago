@@ -425,8 +425,7 @@ pub fn is_contained_by(
                     // For sealed objects, we need to ensure the input object doesn't have
                     // properties that aren't in the container type
                     for property_name in class_like_metadata.declaring_property_ids.keys() {
-                        let actual_property_name =
-                            word(property_name.as_bytes().strip_prefix(b"$").unwrap_or(property_name.as_bytes()));
+                        let actual_property_name = word(property_name.as_bytes().trim_prefix(b"$"));
 
                         // Check if this property exists in our container's known properties
                         if !container_object_with_properties.known_properties.contains_key(&actual_property_name) {

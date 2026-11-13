@@ -85,7 +85,7 @@ use crate::utils::str_is_numeric;
 #[inline]
 #[must_use]
 pub fn get_literal_constant_type(name: &[u8]) -> Option<TUnion> {
-    let name = name.strip_prefix(b"\\").unwrap_or(name);
+    let name = name.trim_prefix(b"\\");
 
     if name.eq_ignore_ascii_case(b"true") {
         Some(get_true())
@@ -171,7 +171,7 @@ pub fn get_platform_constant_type(name: &[u8]) -> Option<TUnion> {
         TAtomic::Scalar(TScalar::Integer(TInteger::Literal(90))),
     ];
 
-    let name = name.strip_prefix(b"\\").unwrap_or(name);
+    let name = name.trim_prefix(b"\\");
 
     match name {
         b"PHP_MAXPATHLEN"

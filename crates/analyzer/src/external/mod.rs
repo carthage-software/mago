@@ -3017,7 +3017,7 @@ where
         codebase: &CodebaseMetadata,
         session: &ExternalAnalysisSession,
     ) -> Result<bool, ExternalAnalyzerError> {
-        let property_name = property.name.0.as_bytes().strip_prefix(b"$").unwrap_or(property.name.0.as_bytes());
+        let property_name = property.name.0.as_bytes().trim_prefix(b"$");
         let _lookup_trace =
             self.trace_enabled.then(|| LookupTrace { telemetry: &self.telemetry, started_at: Instant::now() });
         if self.trace_enabled {

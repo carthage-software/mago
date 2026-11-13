@@ -391,8 +391,8 @@ fn stdin_logical_name(filepath: &Path, workspace: &Path) -> String {
     let canonical_workspace = workspace.canonicalize();
 
     let stripped: &Path = match (canonical_filepath.as_ref(), canonical_workspace.as_ref()) {
-        (Ok(fp), Ok(ws)) => fp.strip_prefix(ws).unwrap_or(fp),
-        _ => filepath.strip_prefix(workspace).unwrap_or(filepath),
+        (Ok(fp), Ok(ws)) => fp.trim_prefix(ws),
+        _ => filepath.trim_prefix(workspace),
     };
 
     #[cfg(windows)]

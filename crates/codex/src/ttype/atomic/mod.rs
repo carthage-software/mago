@@ -566,7 +566,7 @@ impl TAtomic {
             // Instances of some classes (e.g. an empty `SimpleXMLElement`) can cast to `false`,
             // so they are neither always truthy nor always falsy.
             TAtomic::Object(TObject::Named(named_object)) => {
-                let name = named_object.name.as_bytes().strip_prefix(b"\\").unwrap_or(named_object.name.as_bytes());
+                let name = named_object.name.as_bytes().trim_prefix(b"\\");
                 if POSSIBLY_FALSY_CLASS_NAMES.iter().any(|class_name| name.eq_ignore_ascii_case(class_name)) {
                     return false;
                 }

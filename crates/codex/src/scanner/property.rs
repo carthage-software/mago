@@ -112,7 +112,7 @@ where
         }
 
         let name_bytes = name.0.as_bytes();
-        let prop_name = name_bytes.strip_prefix(b"$").unwrap_or(name_bytes);
+        let prop_name = name_bytes.trim_prefix(b"$");
         property_metadata.set_is_virtual(!hooks_reference_backing_store(&hook_list.hooks, prop_name));
     }
 
@@ -344,7 +344,7 @@ where
             }
 
             let name_bytes = name.0.as_bytes();
-            let prop_name = name_bytes.strip_prefix(b"$").unwrap_or(name_bytes);
+            let prop_name = name_bytes.trim_prefix(b"$");
             metadata.set_is_virtual(!hooks_reference_backing_store(&hooked_property.hook_list.hooks, prop_name));
 
             if matches!(verdict.type_override, Some(TypeOverride::Untyped)) {

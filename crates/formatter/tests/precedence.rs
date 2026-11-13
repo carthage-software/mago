@@ -10,7 +10,7 @@ mod runner {
 
     fn assert_expression_formatting(name: &'static str, formatted: &[u8], expected: &[u8], idempotency: bool) {
         let trimmed = formatted.trim_ascii_start();
-        let trimmed = trimmed.strip_prefix(b"<?=").unwrap_or(trimmed).trim_ascii_start();
+        let trimmed = trimmed.trim_prefix(b"<?=").trim_ascii_start();
         let trimmed = trimmed.trim_ascii_end();
         let trimmed = mago_bytes::trim_end_byte(trimmed, b';').trim_ascii_end();
 

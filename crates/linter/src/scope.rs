@@ -84,7 +84,7 @@ impl<'arena> Scope<'arena> {
                     .name
                     .as_ref()
                     .map(mago_syntax::cst::Identifier::value)
-                    .map_or(&b""[..], |n| if let Some(n) = n.strip_prefix(b"\\") { n } else { n });
+                    .map_or(&b""[..], |n| n.trim_prefix(b"\\"));
 
                 Scope::Namespace(namespace_name)
             }

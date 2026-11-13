@@ -17,7 +17,7 @@ pub fn comment_lines<'arena>(trivia: &Trivia<'arena>) -> Vec<(u32, &'arena [u8])
     let mut lines = Vec::new();
     let mut offset: u32 = 0;
     for line in body.split_inclusive(|&b| b == b'\n') {
-        let trimmed = line.strip_suffix(b"\n").unwrap_or(line);
+        let trimmed = line.trim_suffix(b"\n");
         lines.push((offset, trimmed));
         offset += line.len() as u32;
     }

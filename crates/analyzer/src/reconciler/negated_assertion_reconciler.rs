@@ -302,7 +302,7 @@ fn subtract_complex_type<A>(
                 if let TCallable::Alias(FunctionLikeIdentifier::Function(callable_name)) = assertion_callable
                     && let Some(literal) = existing_string.get_known_literal_value()
                 {
-                    let literal = literal.strip_prefix(b"\\").unwrap_or(literal);
+                    let literal = literal.trim_prefix(b"\\");
                     if literal.eq_ignore_ascii_case(callable_name.as_bytes())
                         && context.codebase.function_exists(literal)
                     {

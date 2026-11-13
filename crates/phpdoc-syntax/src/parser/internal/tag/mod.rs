@@ -35,7 +35,7 @@ where
         let file_id = self.file_id();
         let token = self.stream.eat(TokenKind::Tag)?;
 
-        let raw_name = token.value.strip_prefix(b"@").unwrap_or(token.value);
+        let raw_name = token.value.trim_prefix(b"@");
         let name = Identifier { span: token.span_for(file_id), value: raw_name };
         let vendor = TagVendor::from_name(token.value);
         let remainder = remainder_after_vendor(raw_name, vendor);

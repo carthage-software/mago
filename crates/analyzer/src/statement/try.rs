@@ -822,7 +822,7 @@ where
                     return Some(());
                 };
 
-                let class_name = identifier.value().strip_prefix(b"\\").unwrap_or(identifier.value());
+                let class_name = identifier.value().trim_prefix(b"\\");
                 if !context.codebase.is_instance_of(class_name, b"Throwable") {
                     return Some(());
                 }

@@ -123,7 +123,7 @@ fn looks_like_class_name(value: &[u8]) -> bool {
         value
     };
 
-    let s = s.strip_prefix(b"\\").unwrap_or(s);
+    let s = s.trim_prefix(b"\\");
 
     if s.ends_with(b"\\") {
         return false;

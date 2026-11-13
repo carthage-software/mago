@@ -134,7 +134,7 @@ impl LintRule for NoRedundantVariableRule {
                 continue;
             };
 
-            let bare = name.strip_prefix(b"$").unwrap_or(name);
+            let bare = name.trim_prefix(b"$");
             let name_display = mago_bytes::BytesDisplay(name);
             let bare_display = mago_bytes::BytesDisplay(bare);
             ctx.collector.report(

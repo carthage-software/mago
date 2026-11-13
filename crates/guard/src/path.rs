@@ -86,7 +86,7 @@ impl FromStr for NamespacePath {
             return Ok(NamespacePath::Global);
         }
 
-        let path_to_validate = s.strip_suffix('\\').unwrap_or(s);
+        let path_to_validate = s.trim_suffix('\\');
         if path_to_validate.split('\\').all(is_valid_identifier_part) {
             Ok(NamespacePath::Specific(s.to_string()))
         } else {

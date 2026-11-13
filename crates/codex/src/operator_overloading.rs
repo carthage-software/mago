@@ -93,7 +93,7 @@ pub fn get_operator_overloading_class(atomic: &TAtomic) -> Option<&'static Opera
         return None;
     };
 
-    let name = named_object.name.as_bytes().strip_prefix(b"\\").unwrap_or(named_object.name.as_bytes());
+    let name = named_object.name.as_bytes().trim_prefix(b"\\");
 
     OPERATOR_OVERLOADING_CLASSES.iter().copied().find(|class| name.eq_ignore_ascii_case(class.name.as_bytes()))
 }
@@ -296,7 +296,7 @@ fn parse_gmp_integer(value: &[u8]) -> Option<NumericLiteral> {
 
 fn parse_mpz_string(value: &[u8], radix: Option<u32>) -> Option<NumericLiteral> {
     let trimmed = trim_c_whitespace_start(value);
-    let unsigned = trimmed.strip_prefix(b"-").unwrap_or(trimmed);
+    let unsigned = trimmed.trim_prefix(b"-");
 
     let first_byte = *unsigned.first()?;
     if !char::from(first_byte).is_digit(radix.unwrap_or(10)) {

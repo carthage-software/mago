@@ -342,7 +342,7 @@ fn is_excluded(names: &[&[u8]], exclusions: &[Regex]) -> bool {
 /// Returns a variable's name with the leading `$` dropped, so patterns match the
 /// bare name (e.g. `^get` matches `$getter`).
 fn variable_name<'arena>(variable: &DirectVariable<'arena>) -> &'arena [u8] {
-    variable.name.strip_prefix(b"$".as_slice()).unwrap_or(variable.name)
+    variable.name.trim_prefix(b"$".as_slice())
 }
 
 /// Collects every name declared by a property, across both plain (`$a, $b`) and

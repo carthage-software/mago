@@ -404,7 +404,7 @@ pub fn function_like_parts<'ast, 'arena>(node: Node<'ast, 'arena>) -> Option<Fun
 }
 
 pub fn is_silenced_name(name: &[u8]) -> bool {
-    let bare = name.strip_prefix(b"$").unwrap_or(name);
+    let bare = name.trim_prefix(b"$");
     bare.starts_with(b"_")
 }
 

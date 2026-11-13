@@ -232,7 +232,7 @@ fn is_string_array_key(key: &Expression<'_>) -> bool {
     };
 
     value.is_some_and(|value| {
-        let digits = value.strip_prefix(b"-").unwrap_or(value);
+        let digits = value.trim_prefix(b"-");
 
         digits.is_empty()
             || !digits.iter().all(u8::is_ascii_digit)

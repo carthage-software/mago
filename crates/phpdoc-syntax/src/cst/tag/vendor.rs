@@ -24,7 +24,7 @@ impl TagVendor {
 
     #[must_use]
     pub fn from_name(name: &[u8]) -> Option<TagVendor> {
-        let name = name.strip_prefix(b"@").unwrap_or(name);
+        let name = name.trim_prefix(b"@");
 
         if name.starts_with(b"psalm-") {
             Some(TagVendor::Psalm)

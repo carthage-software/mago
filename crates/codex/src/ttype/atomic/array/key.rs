@@ -39,7 +39,7 @@ impl ArrayKey {
     #[must_use]
     pub fn from_string(value: Word) -> Self {
         let raw = value.as_bytes();
-        let digits = raw.strip_prefix(b"-").unwrap_or(raw);
+        let digits = raw.trim_prefix(b"-");
 
         if digits.is_empty() || !digits.iter().all(u8::is_ascii_digit) || (digits[0] == b'0' && raw != b"0") {
             return Self::String(value);

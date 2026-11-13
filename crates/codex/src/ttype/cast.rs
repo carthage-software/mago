@@ -140,7 +140,7 @@ pub fn can_atomic_be_callable(atomic: &TAtomic, codebase: &CodebaseMetadata) -> 
 /// Strips the leading root namespace separator PHP allows in callable strings,
 /// which always name a fully qualified function-like or class.
 fn strip_root_separator(name: &[u8]) -> &[u8] {
-    name.strip_prefix(b"\\").unwrap_or(name)
+    name.trim_prefix(b"\\")
 }
 
 fn handle_array_callable(

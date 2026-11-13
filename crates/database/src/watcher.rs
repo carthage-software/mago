@@ -343,15 +343,14 @@ impl<'config> DatabaseWatcher<'config> {
             // Normalize to forward slashes for cross-platform determinism
             #[cfg(windows)]
             let logical_name = path
-                .strip_prefix(workspace)
-                .unwrap_or(&path)
+                .trim_prefix(workspace)
                 .as_os_str()
                 .as_encoded_bytes()
                 .iter()
                 .map(|i| if *i == b'\\' { b'/' } else { *i })
                 .collect::<Vec<_>>();
             #[cfg(not(windows))]
-            let logical_name = path.strip_prefix(workspace).unwrap_or(&path).as_os_str().as_encoded_bytes().to_owned();
+            let logical_name = path.trim_prefix(workspace).as_os_str().as_encoded_bytes().to_owned();
 
             let file_id = FileId::new(&logical_name);
 

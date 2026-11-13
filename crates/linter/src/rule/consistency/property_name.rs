@@ -152,7 +152,7 @@ impl PropertyNameRule {
         A: Arena,
     {
         let Some(name) = std::str::from_utf8(name_bytes).ok() else { return };
-        let name_without_dollar = name.strip_prefix('$').unwrap_or(name);
+        let name_without_dollar = name.trim_prefix('$');
 
         if self.cfg.either {
             if !is_camel_case(name_without_dollar) && !is_snake_case(name_without_dollar) {

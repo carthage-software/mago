@@ -758,7 +758,7 @@ where
         let mut property_type = resolution.declared_type_borrowed(context.codebase);
 
         let property_name_bytes = property_name.as_bytes();
-        let raw_property_name = property_name_bytes.strip_prefix(b"$").unwrap_or(property_name_bytes);
+        let raw_property_name = property_name_bytes.trim_prefix(b"$");
 
         let expression_id = if property_metadata.flags.is_static() {
             concat_word!(class_like_metadata.name.as_bytes(), b"::$", raw_property_name)

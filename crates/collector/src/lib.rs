@@ -636,7 +636,7 @@ where
             .or_else(|| trivia_text.strip_prefix(b"#"))
             .unwrap_or(trivia_text);
 
-        let inner = inner.strip_suffix(b"*/").unwrap_or(inner);
+        let inner = inner.trim_suffix(b"*/");
 
         let mut cursor = 0usize;
         for nl in memchr::memchr_iter(b'\n', inner) {

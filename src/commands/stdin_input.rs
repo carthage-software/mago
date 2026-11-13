@@ -32,9 +32,9 @@ pub fn resolve_stdin_override(
     std::io::stdin().read_to_end(&mut content).map_err(|e| Error::Database(DatabaseError::IOError(e)))?;
 
     #[cfg(windows)]
-    let mut logical_name = path.strip_prefix(workspace).unwrap_or(path.as_path()).to_string_lossy().replace('\\', "/");
+    let mut logical_name = path.trim_prefix(workspace).to_string_lossy().replace('\\', "/");
     #[cfg(not(windows))]
-    let mut logical_name = path.strip_prefix(workspace).unwrap_or(path.as_path()).to_string_lossy().into_owned();
+    let mut logical_name = path.trim_prefix(workspace).to_string_lossy().into_owned();
     while logical_name.starts_with("./") {
         logical_name = logical_name.split_off(2);
     }

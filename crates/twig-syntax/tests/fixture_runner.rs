@@ -263,7 +263,7 @@ fn fixtures_match_upstream_accept_reject() {
         let arena = LocalArena::new();
         let tpl = parse(&arena, &fx.template);
         let accepted = !tpl.has_errors();
-        let relative = fx.path.strip_prefix(fixtures_dir()).unwrap_or(&fx.path).display().to_string();
+        let relative = fx.path.trim_prefix(fixtures_dir()).display().to_string();
         match (must_reject, accepted) {
             (true, false) => agree_reject += 1,
             (false, true) => agree_accept += 1,
@@ -308,7 +308,7 @@ fn fixtures_match_upstream_accept_reject() {
         let lines: Vec<String> = collected
             .excluded
             .iter()
-            .map(|(p, r)| format!("excluded: {} :: {}", p.strip_prefix(fixtures_dir()).unwrap_or(p).display(), r))
+            .map(|(p, r)| format!("excluded: {} :: {}", p.trim_prefix(fixtures_dir()).display(), r))
             .collect();
         panic!("verbose: {summary}\n  {}", lines.join("\n  "));
     }
@@ -326,7 +326,7 @@ fn excluded_fixtures_are_explicit_and_self_consistent() {
     let relative: Vec<String> = collected
         .excluded
         .iter()
-        .map(|(p, _)| p.strip_prefix(fixtures_dir()).unwrap_or(p).display().to_string().replace('\\', "/"))
+        .map(|(p, _)| p.trim_prefix(fixtures_dir()).display().to_string().replace('\\', "/"))
         .collect();
 
     assert_eq!(
@@ -361,11 +361,11 @@ fn fixtures_roundtrip_for_accepted_templates() {
         match roundtrip_tokens(&fx.template) {
             Ok(out) if out == fx.template => {}
             Ok(_) => {
-                let rel = fx.path.strip_prefix(fixtures_dir()).unwrap_or(&fx.path).display().to_string();
+                let rel = fx.path.trim_prefix(fixtures_dir()).display().to_string();
                 disagreements.push(format!("round-trip mismatch: {rel}"));
             }
             Err(e) => {
-                let rel = fx.path.strip_prefix(fixtures_dir()).unwrap_or(&fx.path).display().to_string();
+                let rel = fx.path.trim_prefix(fixtures_dir()).display().to_string();
                 disagreements.push(format!("tokenize error: {rel} :: {e}"));
             }
         }

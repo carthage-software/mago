@@ -109,7 +109,7 @@ where
             let mut buffer = self.new_vec::<u8>();
             let mut first = true;
             for line in raw.split(|&byte| byte == b'\n') {
-                let line = line.strip_suffix(b"\r").unwrap_or(line);
+                let line = line.trim_suffix(b"\r");
                 if first {
                     buffer.extend_from_slice(line);
                 } else {

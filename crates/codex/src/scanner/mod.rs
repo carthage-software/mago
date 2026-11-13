@@ -484,7 +484,7 @@ where
         };
 
         let function_name = identifier.value();
-        let bare_name = function_name.strip_prefix(b"\\").unwrap_or(function_name);
+        let bare_name = function_name.trim_prefix(b"\\");
         if matches!(bare_name.len(), 12 | 13)
             && (bare_name.eq_ignore_ascii_case(b"func_get_args")
                 || bare_name.eq_ignore_ascii_case(b"func_get_arg")

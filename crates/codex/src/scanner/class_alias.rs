@@ -114,6 +114,6 @@ where
 
 #[inline]
 fn normalize_class_like_name(value: &[u8]) -> Option<Word> {
-    let value = value.strip_prefix(b"\\").unwrap_or(value);
+    let value = value.trim_prefix(b"\\");
     (!value.is_empty()).then(|| ascii_lowercase_word(value))
 }

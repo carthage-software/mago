@@ -503,11 +503,9 @@ impl<'config> DatabaseLoader<'config> {
             let workspace = canonical_workspace.as_path();
             if let Some((override_name, override_content)) = &self.stdin_override {
                 #[cfg(windows)]
-                let logical_name =
-                    path.strip_prefix(workspace).unwrap_or(path.as_path()).to_string_lossy().replace('\\', "/");
+                let logical_name = path.trim_prefix(workspace).to_string_lossy().replace('\\', "/");
                 #[cfg(not(windows))]
-                let logical_name =
-                    path.strip_prefix(workspace).unwrap_or(path.as_path()).to_string_lossy().into_owned();
+                let logical_name = path.trim_prefix(workspace).to_string_lossy().into_owned();
 
                 if override_name.as_ref() == logical_name.as_bytes() {
                     let file = File::new(
@@ -712,7 +710,7 @@ where
 }
 
 fn workspace_relative_string(path: &Path, workspace: &Path) -> String {
-    let relative = path.strip_prefix(workspace).unwrap_or(path).to_string_lossy();
+    let relative = path.trim_prefix(workspace).to_string_lossy();
     #[cfg(windows)]
     {
         relative.replace('\\', "/")

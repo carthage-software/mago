@@ -2199,7 +2199,7 @@ pub(super) fn decode_throw_type_response(payload: &[u8]) -> Result<Option<WordSe
     let mut exceptions = WordSet::default();
     for _ in 0..count {
         let name = non_empty(reader.read_bytes("thrown exception class name")?, "thrown exception class name")?;
-        let name = name.strip_prefix(b"\\").unwrap_or(name);
+        let name = name.trim_prefix(b"\\");
         if name.contains(&0) {
             return Err(protocol("thrown exception class name contains NUL"));
         }

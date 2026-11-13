@@ -129,7 +129,7 @@ fn unwrap_awaitable_type(union: &TUnion) -> Option<TUnion> {
             TAtomic::Object(TObject::Named(named))
                 if {
                     let name_bytes = named.name.as_bytes();
-                    let stripped = name_bytes.strip_prefix(b"\\").unwrap_or(name_bytes);
+                    let stripped = name_bytes.trim_prefix(b"\\");
                     stripped.eq_ignore_ascii_case(b"Psl\\Async\\Awaitable")
                 } =>
             {

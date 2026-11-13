@@ -1591,8 +1591,7 @@ where
     let find_by_name = || {
         let variable = parameter_name?;
         let variable_bytes = variable.as_bytes();
-        let variable_name: &[u8] =
-            if let Some(stripped) = variable_bytes.strip_prefix(b"$") { stripped } else { variable_bytes };
+        let variable_name: &[u8] = variable_bytes.trim_prefix(b"$");
 
         arguments.iter_arguments().find(|argument| {
             if let Some(named_argument) = argument.get_named_argument() {

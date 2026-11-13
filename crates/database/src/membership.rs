@@ -325,7 +325,7 @@ impl PathExclusions {
                 .take_while(|directory| *directory != source.root && directory.starts_with(&source.root))
                 .any(|directory| {
                     self.directories.is_match(directory)
-                        || self.directories.is_match(directory.strip_prefix(&self.workspace).unwrap_or(directory))
+                        || self.directories.is_match(directory.trim_prefix(&self.workspace))
                 })
     }
 }
