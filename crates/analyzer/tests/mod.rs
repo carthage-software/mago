@@ -762,6 +762,7 @@ test_case!(count);
 test_case!(array_key_exists);
 test_case!(array_shape_numeric_string_key_normalization);
 test_case!(magic_methods);
+test_case!(magic_call_for_inaccessible_method);
 test_case!(magic_properties);
 test_case!(magic_property_overridden_by_parent);
 test_case!(magic_property_shadowing_real_property);

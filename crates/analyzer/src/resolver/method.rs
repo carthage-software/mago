@@ -576,20 +576,31 @@ where
         return candidates;
     };
 
-    let mut method_id = MethodIdentifier::new(class_metadata.original_name, method_name);
-    let function_like_metadata = context.codebase.get_method_by_id(&method_id).or_else(|| {
-        method_id = context.codebase.get_declaring_method_identifier(&method_id);
-        context.codebase.get_method_by_id(&method_id)
-    });
+    let visibility_id = MethodIdentifier::new(class_metadata.original_name, method_name);
+    let mut method_id = visibility_id;
+    let function_like_metadata = context
+        .codebase
+        .get_method_by_id(&method_id)
+        .or_else(|| {
+            method_id = context.codebase.get_declaring_method_identifier(&method_id);
+            context.codebase.get_method_by_id(&method_id)
+        })
+        .filter(|metadata| {
+            !has_magic_call
+                || metadata.flags.is_magic_method()
+                || is_method_visible_by_id(context, block_context, &visibility_id)
+        });
 
     if let Some(function_like_metadata) = function_like_metadata {
-        if !check_method_visibility_by_id(
-            context,
-            block_context.scope.get_class_like_name(),
-            &MethodIdentifier::new(class_metadata.original_name, method_name),
-            access_span,
-            Some(selector.span()),
-        ) {
+        if (!has_magic_call || function_like_metadata.flags.is_magic_method())
+            && !check_method_visibility_by_id(
+                context,
+                block_context.scope.get_class_like_name(),
+                &visibility_id,
+                access_span,
+                Some(selector.span()),
+            )
+        {
             result.has_invalid_target = true;
         }
 

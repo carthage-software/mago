@@ -216,7 +216,7 @@ mod tests {
 
             echo A::go();
         "},
-        issues = [IssueCode::InvalidMethodAccess]
+        issues = [IssueCode::NonDocumentedMethod, IssueCode::MixedArgument]
     }
 
     test_analysis! {
@@ -237,7 +237,7 @@ mod tests {
 
             echo A::go();
         "},
-        issues = [IssueCode::InvalidMethodAccess]
+        issues = [IssueCode::NonDocumentedMethod, IssueCode::MixedArgument]
     }
 
     test_analysis! {
@@ -260,7 +260,7 @@ mod tests {
 
             echo A::go();
         "},
-        issues = [IssueCode::InvalidMethodAccess]
+        issues = [IssueCode::NonDocumentedMethod, IssueCode::MixedArgument]
     }
 
     test_analysis! {

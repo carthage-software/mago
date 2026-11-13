@@ -217,9 +217,10 @@ where
     let mut first_class_id = None;
     let mut magic_call_methods = Vec::new();
 
-    let magic_method_to_check = if classname.is_parent() { word("__call") } else { word("__callStatic") };
+    let in_object_context = classname.is_relative() && !block_context.scope.is_static();
+    let magic_method_to_check = if in_object_context { word("__call") } else { word("__callStatic") };
     if let Some(fq_class_id) = classname.fqcn {
-        let (_, resolved_magic_call_method) = resolve_method_from_class_id(
+        let (_, mut resolved_magic_call_method) = resolve_method_from_class_id(
             fq_class_id,
             classname.is_relative(),
             classname.is_object_instance(),
@@ -228,6 +229,19 @@ where
             true,
             None,
         );
+
+        if resolved_magic_call_method.is_none() && in_object_context {
+            resolved_magic_call_method = resolve_method_from_class_id(
+                fq_class_id,
+                true,
+                classname.is_object_instance(),
+                classname.is_from_class_string(),
+                word("__callStatic"),
+                true,
+                None,
+            )
+            .1;
+        }
 
         let has_magic_static_call = resolved_magic_call_method.is_some();
         magic_call_methods.extend(resolved_magic_call_method);
@@ -430,14 +444,20 @@ where
         }
     };
 
+    let falls_back_to_magic = has_magic_static_call && !function_like.flags.is_magic_method();
+    if falls_back_to_magic && !is_method_visible_by_id(context, block_context, &method_id) {
+        return None;
+    }
+
     if let Some(result) = result {
-        let is_visible = check_method_visibility_by_id(
-            context,
-            block_context.scope.get_class_like_name(),
-            &method_id,
-            access_span,
-            Some(selector.span()),
-        );
+        let is_visible = falls_back_to_magic
+            || check_method_visibility_by_id(
+                context,
+                block_context.scope.get_class_like_name(),
+                &method_id,
+                access_span,
+                Some(selector.span()),
+            );
         if !is_visible {
             result.has_invalid_target = true;
         }
