@@ -1161,6 +1161,7 @@ test_case!(scalars_compound_shift_int);
 test_case!(scalars_compound_times_int);
 test_case!(scalars_compound_xor_int);
 test_case!(scalars_decrement_int);
+test_case!(scalars_div_by_float_zero_non_literal);
 test_case!(scalars_div_by_literal_zero);
 test_case!(scalars_div_by_neg);
 test_case!(scalars_div_by_nonzero_int_pass);

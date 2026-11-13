@@ -766,11 +766,11 @@ fn determine_numeric_result(op: &BinaryOperator<'_>, left: &TAtomic, right: &TAt
                     _ => None,
                 };
 
-                if let (Some(l), Some(r)) = (left_f, right_f) {
-                    if matches!(op, BinaryOperator::Division(_)) && r == 0.0 {
-                        return vec![TAtomic::Never];
-                    }
+                if matches!(op, BinaryOperator::Division(_)) && right_f == Some(0.0) {
+                    return vec![TAtomic::Never];
+                }
 
+                if let (Some(l), Some(r)) = (left_f, right_f) {
                     let result = match op {
                         BinaryOperator::Addition(_) => Some(l + r),
                         BinaryOperator::Subtraction(_) => Some(l - r),
