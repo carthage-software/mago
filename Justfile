@@ -75,8 +75,9 @@ fuzz-twig-parser:
     cd crates/twig-syntax/fuzz && cargo +nightly fuzz run parser corpus/parser seeds/parser
 
 # Publishes all crates to crates.io in the correct order.
-publish:
+publish $CARGO_RESOLVER_INCOMPATIBLE_PUBLISH_AGE="allow":
     # Note: the order of publishing is important, as some crates depend on others.
+    # Each crate needs the siblings published just before it, so the publish-age cooldown is off here.
     cargo publish -p mago-bytes
     cargo publish -p mago-word
     cargo publish -p mago-allocator
