@@ -22,6 +22,7 @@ use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_specialized_template_type;
 use mago_codex::ttype::template::GenericTemplate;
 use mago_codex::ttype::template::TemplateResult;
+use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -254,7 +255,7 @@ where
                         result.has_invalid_target = true;
                     }
 
-                    report_call_on_non_object(context, object_atomic, object.span(), selector);
+                    report_call_on_non_object(context, object_type, object_atomic, object.span(), selector);
                     continue;
                 }
             };
@@ -382,7 +383,7 @@ where
     } else {
         result.has_invalid_target = true;
         result.encountered_mixed = true;
-        report_call_on_non_object(context, &TAtomic::Mixed(TMixed::new()), object.span(), selector);
+        report_call_on_non_object(context, &get_mixed(), &TAtomic::Mixed(TMixed::new()), object.span(), selector);
     }
 
     for method_id in asserted_descendant_method_references {
@@ -881,6 +882,7 @@ where
 
 fn report_call_on_non_object<A>(
     context: &mut Context<'_, '_, A>,
+    object_type: &TUnion,
     atomic_type: &TAtomic,
     obj_span: Span,
     selector: &ClassLikeMemberSelector,
@@ -888,11 +890,18 @@ fn report_call_on_non_object<A>(
     A: Arena,
 {
     let type_str = atomic_type.get_id();
+    let object_type_str = object_type.get_id();
+    let target = if type_str == object_type_str {
+        format!("a non-object type (`{type_str}`)")
+    } else {
+        format!("type `{object_type_str}`, which can be `{type_str}`")
+    };
+
     let issue_msg = match selector {
         ClassLikeMemberSelector::Identifier(id) => {
-            format!("Attempting to call method `{}()` on a non-object type (`{type_str}`).", BytesDisplay(id.value))
+            format!("Attempting to call method `{}()` on {target}.", BytesDisplay(id.value))
         }
-        _ => format!("Attempting to access a method on a non-object type (`{type_str}`)."),
+        _ => format!("Attempting to access a method on {target}."),
     };
 
     context.collector.report_with_code(
@@ -900,7 +909,7 @@ fn report_call_on_non_object<A>(
         Issue::error(issue_msg)
             .with_annotation(Annotation::primary(selector.span()).with_message("Cannot call method here"))
             .with_annotation(
-                Annotation::secondary(obj_span).with_message(format!("This expression has type `{type_str}`")),
+                Annotation::secondary(obj_span).with_message(format!("This expression has type `{object_type_str}`")),
             ),
     );
 }

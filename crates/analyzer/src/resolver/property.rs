@@ -179,7 +179,13 @@ where
                 }
 
                 if !block_context.flags.inside_isset() || !object_atomic.is_mixed() {
-                    report_access_on_non_object(context, object_atomic, property_selector, object_expression.span());
+                    report_access_on_non_object(
+                        context,
+                        &object_type,
+                        object_atomic,
+                        property_selector,
+                        object_expression.span(),
+                    );
                 }
 
                 continue;
@@ -1494,6 +1500,7 @@ pub(crate) fn report_redundant_nullsafe<'arena, A>(
 
 fn report_access_on_non_object<A>(
     context: &mut Context<'_, '_, A>,
+    object_type: &TUnion,
     atomic_type: &TAtomic,
     selector: &ClassLikeMemberSelector,
     object_span: Span,
@@ -1501,18 +1508,27 @@ fn report_access_on_non_object<A>(
     A: Arena,
 {
     let type_str = atomic_type.get_id();
+    let object_type_str = object_type.get_id();
+    let target = if type_str == object_type_str {
+        format!("a non-object type (`{type_str}`)")
+    } else {
+        format!("type `{object_type_str}`, which can be `{type_str}`")
+    };
+
     let issue_msg = match selector {
         ClassLikeMemberSelector::Identifier(id) => {
-            format!("Attempting to access property `${}` on a non-object type (`{type_str}`).", BytesDisplay(id.value))
+            format!("Attempting to access property `${}` on {target}.", BytesDisplay(id.value))
         }
-        _ => format!("Attempting to access a property on a non-object type (`{type_str}`)."),
+        _ => format!("Attempting to access a property on {target}."),
     };
+
     context.collector.report_with_code(
         if atomic_type.is_mixed() { IssueCode::MixedPropertyAccess } else { IssueCode::InvalidPropertyAccess },
         Issue::error(issue_msg)
             .with_annotation(Annotation::primary(selector.span()).with_message("Cannot access property here"))
             .with_annotation(
-                Annotation::secondary(object_span).with_message(format!("This expression has type `{type_str}`")),
+                Annotation::secondary(object_span)
+                    .with_message(format!("This expression has type `{object_type_str}`")),
             ),
     );
 }
