@@ -410,6 +410,8 @@ namespace {
         ) {}
 
         /**
+         * @ignore-falsable-return
+         *
          * @throws PDOException
          */
         public function prepare(string $query, array $options = []): PDOStatement|false {}

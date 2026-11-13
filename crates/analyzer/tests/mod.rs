@@ -563,6 +563,7 @@ test_case!(issue_2662, {
 test_case!(issue_2656);
 test_case!(issue_2621);
 test_case!(sdk_repeated_reader_calls);
+test_case!(issue_2618);
 test_case!(issue_2622);
 test_case!(issue_2629);
 test_case!(issue_2637);

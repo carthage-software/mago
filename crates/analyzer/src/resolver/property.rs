@@ -165,6 +165,10 @@ where
             continue;
         }
 
+        if object_atomic.is_false() && object_type.ignore_falsable_issues() {
+            continue;
+        }
+
         let closure_object;
         let object = match object_atomic {
             TAtomic::Object(object) => object,
