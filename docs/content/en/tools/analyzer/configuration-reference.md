@@ -104,6 +104,7 @@ These flags toggle individual analyses. Defaults are tuned for everyday use; fli
 | `strict-list-index-checks` | `false` | Require any integer used as a list index to be provably non-negative. |
 | `strict-array-index-existence` | `false` | Treat array/list reads whose key is not provably present as `T\|null` and emit a `possibly-undefined-{int,string}-array-index` warning. Replaces `allow-possibly-undefined-array-keys = false`. |
 | `allow-array-truthy-operand` | `false` | Accept arrays as operands of `&&`, `\|\|`, and `xor` without `invalid-operand`. Standalone `if ($array)` is unaffected and never warns. |
+| `warn-array-to-int-cast` | `false` | Warn about `(int)` and `(integer)` casts of arrays or unions containing arrays with `array-to-int-cast`, without changing inferred types. |
 | `allow-operator-overloading` | `false` | Accept operators that `BcMath\Number` and `GMP` overload (arithmetic, bitwise, shifts, `-`, `+`, `~`, `++`, `--`) without `invalid-operand`. The result type is inferred either way; comparisons are unaffected. |
 | `no-boolean-literal-comparison` | `false` | Disallow direct comparisons to boolean literals like `$a === true`. |
 | `check-missing-type-hints` | `false` | Report missing type hints on parameters, properties, and return types. |
@@ -348,6 +349,13 @@ Turn it off and the call requires an explicit type guarantee instead.
 `allow-array-truthy-operand` controls whether arrays are accepted as operands of `&&`, `||`, and `xor`. PHP coerces empty arrays to `false` and non-empty arrays to `true` — the same truthiness used by a standalone `if ($array)`. By default the analyzer flags array operands of logical operators with `invalid-operand` to call out the implicit `bool` coercion; turning the option on suppresses that warning so codebases that rely on the coercion can keep their style. Standalone `if ($array)` is never affected.
 
 `allow-operator-overloading` controls whether operators are accepted on classes that overload them, such as `BcMath\Number` and `GMP`. PHP runs `$a + $b` on these objects through the class rather than as plain arithmetic, which a reader cannot tell from the expression alone. By default the analyzer reports these operations with `invalid-operand`, while still inferring the result as an instance of the class so no follow-on `mixed` issues appear; turning the option on accepts them. Comparisons and `<=>` are not affected by this option, and operands the class rejects at runtime are reported either way.
+
+`warn-array-to-int-cast` enables the `array-to-int-cast` warning for `(int)` and `(integer)` when the operand is an array or a union containing an array. PHP accepts these casts, but converts an empty array to `0` and a non-empty array to `1`, not its element count or a numeric value stored in the array. Use `count()` or extract the intended value instead. The option is disabled by default and does not change inferred cast types. A plain `mixed` operand does not trigger the warning. Intentional conversions can be suppressed with `// @mago-ignore analysis:array-to-int-cast` above the statement.
+
+```toml
+[analyzer]
+warn-array-to-int-cast = true
+```
 
 ## Performance tuning
 
