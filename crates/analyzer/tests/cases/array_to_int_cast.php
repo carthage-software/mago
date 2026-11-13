@@ -45,6 +45,24 @@ function nullableCast(?array $values): int
     return (int) $values; // @mago-expect analysis:array-to-int-cast
 }
 
+/**
+ * @template T of array
+ * @param T $values
+ */
+function genericCast(array $values): int
+{
+    return (int) $values; // @mago-expect analysis:array-to-int-cast
+}
+
+/**
+ * @template T of array|int
+ * @param T $values
+ */
+function genericUnionCast(array|int $values): int
+{
+    return (integer) $values; // @mago-expect analysis:array-to-int-cast
+}
+
 function scalarCast(string|float|bool|null $value): int
 {
     return (int) $value;

@@ -380,7 +380,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPrefix<'arena> {
             UnaryPrefixOperator::IntCast(_, _) | UnaryPrefixOperator::IntegerCast(_, _) => {
                 let resulting_type = match operand_type {
                     Some(t) => {
-                        if context.settings.warn_array_to_int_cast && t.has_array() {
+                        if context.settings.warn_array_to_int_cast && has_array_in_cast_operand(&t) {
                             context.collector.report_with_code(
                                 IssueCode::ArrayToIntCast,
                                 Issue::warning("Suspicious cast from array to integer.")
@@ -1653,6 +1653,12 @@ impl NumericInterval {
 
         Some(TInteger::from_bounds(Some(minimum as i64), Some(maximum as i64)))
     }
+}
+
+fn has_array_in_cast_operand(operand_type: &TUnion) -> bool {
+    operand_type.types.iter().any(|atomic| {
+        atomic.is_array() || atomic.map_generic_parameter_constraint(has_array_in_cast_operand).unwrap_or(false)
+    })
 }
 
 fn cast_type_to_int<A>(
