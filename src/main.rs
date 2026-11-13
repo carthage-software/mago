@@ -88,6 +88,12 @@ static ALLOC: mimalloc::MiMalloc = mimalloc::MiMalloc;
 #[global_allocator]
 static ALLOC: dhat::Alloc = dhat::Alloc;
 
+#[cfg(all(
+    feature = "dhat-heap",
+    any(target_os = "macos", target_os = "windows", target_env = "musl", target_env = "gnu")
+))]
+use mimalloc as _;
+
 /// Exit code for tool errors (configuration errors, parse errors, etc.)
 ///
 /// This is distinct from `ExitCode::FAILURE` (1) which indicates issues were found.

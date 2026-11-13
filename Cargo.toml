@@ -10,6 +10,8 @@ repository = "https://github.com/carthage-software/mago"
 rust-version = "1.100.0"
 exclude = ["composer", "scripts"]
 
+[lints]
+
 [workspace]
 package.edition = "2024"
 package.authors = ["Seifeddine Gmati <azjezz@carthage.software>"]
@@ -20,6 +22,9 @@ package.repository = "https://github.com/carthage-software/mago"
 package.rust-version = "1.100.0"
 members = ["crates/*", "docs"]
 exclude = ["crates/syntax/fuzz", "crates/twig-syntax/fuzz"]
+
+[workspace.lints.cargo]
+unused_workspace_dependencies = "allow"
 
 [workspace.lints.rust]
 unknown_lints = "allow"
