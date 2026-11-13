@@ -63,6 +63,25 @@ function genericUnionCast(array|int $values): int
     return (integer) $values; // @mago-expect analysis:array-to-int-cast
 }
 
+function iterableCast(iterable $values): int
+{
+    return (int) $values; // @mago-expect analysis:array-to-int-cast
+}
+
+/**
+ * @template T of iterable<int, int>
+ * @param T $values
+ */
+function genericIterableCast(iterable $values): int
+{
+    return (integer) $values; // @mago-expect analysis:array-to-int-cast
+}
+
+function traversableCast(Traversable $values): int
+{
+    return (int) $values;
+}
+
 function scalarCast(string|float|bool|null $value): int
 {
     return (int) $value;

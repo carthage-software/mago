@@ -1657,7 +1657,9 @@ impl NumericInterval {
 
 fn has_array_in_cast_operand(operand_type: &TUnion) -> bool {
     operand_type.types.iter().any(|atomic| {
-        atomic.is_array() || atomic.map_generic_parameter_constraint(has_array_in_cast_operand).unwrap_or(false)
+        atomic.is_array()
+            || atomic.is_iterable()
+            || atomic.map_generic_parameter_constraint(has_array_in_cast_operand).unwrap_or(false)
     })
 }
 
