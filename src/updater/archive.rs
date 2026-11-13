@@ -43,7 +43,7 @@ fn extract_zip(archive_path: &Path, file_to_extract: &str, into_dir: &Path) -> R
     let mut archive = zip::ZipArchive::new(file)?;
     let mut entry = archive.by_name(file_to_extract)?;
 
-    let output_path = into_dir.join(entry.name());
+    let output_path = into_dir.join(file_to_extract);
     if let Some(parent) = output_path.parent() {
         fs::create_dir_all(parent)?;
     }
@@ -52,4 +52,33 @@ fn extract_zip(archive_path: &Path, file_to_extract: &str, into_dir: &Path) -> R
     io::copy(&mut entry, &mut output)?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use std::io::Write;
+
+    use super::*;
+
+    #[test]
+    fn extracts_the_requested_file_from_a_zip_archive() {
+        let dir = std::env::temp_dir().join(format!("mago-archive-test-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+
+        let archive_path = dir.join("release.zip");
+        let mut writer = zip::ZipWriter::new(fs::File::create(&archive_path).unwrap());
+        writer.start_file("other.txt", zip::write::SimpleFileOptions::default()).unwrap();
+        writer.write_all(b"ignored").unwrap();
+        writer.start_file("mago.exe", zip::write::SimpleFileOptions::default()).unwrap();
+        writer.write_all(b"binary contents").unwrap();
+        writer.finish().unwrap();
+
+        extract_file(&archive_path, "mago.exe", &dir).unwrap();
+
+        assert_eq!(fs::read(dir.join("mago.exe")).unwrap(), b"binary contents");
+        assert!(!dir.join("other.txt").exists());
+        assert!(extract_file(&archive_path, "missing", &dir).is_err());
+
+        fs::remove_dir_all(&dir).unwrap();
+    }
 }
