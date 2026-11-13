@@ -1,5 +1,6 @@
 use std::borrow::Cow;
 use std::collections::BTreeMap;
+use std::sync::Arc;
 
 use foldhash::HashSet;
 use rayon::prelude::*;
@@ -21,12 +22,54 @@ use crate::misc::GenericParent;
 use crate::ttype::TType;
 use crate::ttype::TypeRef;
 use crate::ttype::atomic::TAtomic;
+use crate::ttype::atomic::array::TArray;
+use crate::ttype::atomic::array::keyed::TKeyedArray;
 use crate::ttype::atomic::callable::TCallable;
 use crate::ttype::comparator::ComparisonResult;
 use crate::ttype::comparator::union_comparator;
+use crate::ttype::get_arraykey;
+use crate::ttype::intersect_union_types;
 use crate::ttype::template::TemplateResult;
 use crate::ttype::template::inferred_type_replacer;
 use crate::ttype::union::TUnion;
+
+/// Narrows an inherited `iterable<K, V>` to `array<K, V>` for a child that declares a native `array`.
+fn narrow_inherited_iterable_to_array(
+    child_native: &TUnion,
+    parent_docblock: &TUnion,
+    codebase: &CodebaseMetadata,
+) -> Option<TUnion> {
+    if !child_native.has_array() || !parent_docblock.has_iterable() {
+        return None;
+    }
+
+    let mut atomics = Vec::with_capacity(parent_docblock.types.len());
+    for atomic in parent_docblock.types.iter() {
+        if let TAtomic::Iterable(iterable) = atomic {
+            let key =
+                intersect_union_types(iterable.get_key_type(), &get_arraykey(), codebase).unwrap_or_else(get_arraykey);
+
+            atomics.push(TAtomic::Array(TArray::Keyed(TKeyedArray::new_with_parameters(
+                Arc::new(key),
+                Arc::new(iterable.get_value_type().clone()),
+            ))));
+        } else if union_comparator::is_contained_by(
+            codebase,
+            &TUnion::from_atomic(atomic.clone()),
+            child_native,
+            false,
+            false,
+            false,
+            &mut ComparisonResult::new(),
+        ) {
+            atomics.push(atomic.clone());
+        } else {
+            return None;
+        }
+    }
+
+    Some(TUnion::from_vec(atomics))
+}
 
 /// Determines whether to inherit a type from the parent based on variance rules.
 ///
@@ -113,7 +156,7 @@ fn should_inherit_docblock_type(
                 false,
                 false,
                 &mut ComparisonResult::new(),
-            );
+            ) || narrow_inherited_iterable_to_array(child_native, &docblock_type, codebase).is_some();
         }
 
         let parent_docblock_contained_in_child = union_comparator::is_contained_by(
@@ -186,7 +229,8 @@ fn should_inherit_docblock_type(
                 &mut ComparisonResult::new(),
             );
 
-            return docblock_compatible_with_child;
+            return docblock_compatible_with_child
+                || narrow_inherited_iterable_to_array(child_native, &docblock_type, codebase).is_some();
         }
 
         false
@@ -763,10 +807,15 @@ fn resolve_method_inheritance(
 
                 if child_is_more_specific && !child_matches_parent_native {
                     child_native_return.type_union.clone()
-                } else if !child_native_return.type_union.accepts_null() && type_union.has_null() {
-                    type_union.to_non_nullable()
                 } else {
-                    type_union
+                    let type_union = if !child_native_return.type_union.accepts_null() && type_union.has_null() {
+                        type_union.to_non_nullable()
+                    } else {
+                        type_union
+                    };
+
+                    narrow_inherited_iterable_to_array(&child_native_return.type_union, &type_union, codebase)
+                        .unwrap_or(type_union)
                 }
             } else {
                 type_union
