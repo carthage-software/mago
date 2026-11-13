@@ -290,6 +290,9 @@ function date_sunset(
  */
 function date_sun_info(int $timestamp, float $latitude, float $longitude): array {}
 
+/**
+ * @inheritors DateTime|DateTimeImmutable
+ */
 interface DateTimeInterface
 {
     /** @var non-empty-string */
