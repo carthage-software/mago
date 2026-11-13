@@ -14,6 +14,7 @@ use mago_syntax::cst::AnonymousClass;
 use mago_syntax::cst::ArrowFunction;
 use mago_syntax::cst::Call;
 use mago_syntax::cst::Class;
+use mago_syntax::cst::ClassLikeMemberSelector;
 use mago_syntax::cst::Closure;
 use mago_syntax::cst::Constant;
 use mago_syntax::cst::Enum;
@@ -28,6 +29,7 @@ use mago_syntax::cst::Namespace;
 use mago_syntax::cst::Program;
 use mago_syntax::cst::PropertyHookConcreteBody;
 use mago_syntax::cst::Return;
+use mago_syntax::cst::StaticMethodCall;
 use mago_syntax::cst::Trait;
 use mago_syntax::cst::Trivia;
 use mago_syntax::cst::UnaryPrefix;
@@ -540,6 +542,22 @@ where
         }
 
         self.codebase.constants.entry(constant_metadata.name).or_insert(constant_metadata);
+    }
+
+    #[inline]
+    fn walk_in_static_method_call(
+        &mut self,
+        static_method_call: &'arena StaticMethodCall<'arena>,
+        _context: &mut Context<'ctx, 'arena, A>,
+    ) {
+        if let Expression::Parent(_) = static_method_call.class
+            && let ClassLikeMemberSelector::Identifier(method) = &static_method_call.method
+            && method.value.eq_ignore_ascii_case(b"__construct")
+            && let Some(Some(enclosing)) = self.function_like_stack.last()
+            && let Some(metadata) = self.codebase.function_likes.get_mut(enclosing)
+        {
+            metadata.flags |= MetadataFlags::CALLS_PARENT_CONSTRUCTOR;
+        }
     }
 
     #[inline]

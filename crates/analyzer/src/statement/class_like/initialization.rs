@@ -111,13 +111,19 @@ where
         let initialized_by_initializers =
             compute_class_initializer_initializations(artifacts, context, class_like_metadata);
 
-        let initialized_by_inherited_constructor = compute_transitive_initializations(
+        let mut initialized_by_inherited_constructor = compute_transitive_initializations(
             artifacts,
             context,
             constructor_declaring_class,
             word("__construct"),
             class_like_metadata.flags.is_final(),
             false,
+        );
+        extend_with_unanalyzed_constructors(
+            artifacts,
+            context,
+            constructor_declaring_class,
+            &mut initialized_by_inherited_constructor,
         );
 
         // Check if the constructor comes from a trait (for cross-file trust logic)
@@ -206,6 +212,8 @@ where
         class_like_metadata.flags.is_final(),
         false,
     );
+
+    extend_with_unanalyzed_constructors(artifacts, context, constructor_declaring_class, &mut definitely_initialized);
 
     // Also include properties initialized by class initializers
     let initialized_by_initializers =
@@ -434,6 +442,65 @@ where
     }
 
     all_initialized
+}
+
+/// Adds the properties that constructors outside the current file are trusted to initialize.
+///
+/// Such a constructor is trusted for the properties its class declares or takes from traits, and
+/// the codebase records whether it calls `parent::__construct()`, so the chain can be followed.
+fn extend_with_unanalyzed_constructors<A>(
+    artifacts: &AnalysisArtifacts,
+    context: &Context<'_, '_, A>,
+    mut class_name: Word,
+    initialized: &mut WordSet,
+) where
+    A: Arena,
+{
+    let constructor = word("__construct");
+    let mut visited = WordSet::default();
+
+    while visited.insert(class_name) {
+        let Some(class_metadata) = context.codebase.get_class_like(class_name.as_bytes()) else {
+            return;
+        };
+
+        let parent_metadata =
+            class_metadata.direct_parent_class.and_then(|parent| context.codebase.get_class_like(parent.as_bytes()));
+
+        let key = (class_name, constructor);
+        let calls_parent_constructor = if artifacts.method_initialized_properties.contains_key(&key) {
+            artifacts.method_calls_parent_constructor.get(&key) == Some(&true)
+        } else {
+            let Some(method) = context
+                .codebase
+                .get_method(class_name.as_bytes(), b"__construct")
+                .filter(|method| method.method_metadata.as_ref().is_some_and(|metadata| !metadata.is_abstract))
+            else {
+                return;
+            };
+
+            for (property, declaring_class) in &class_metadata.declaring_property_ids {
+                if *declaring_class == class_name
+                    || parent_metadata.is_none_or(|parent| !parent.declaring_property_ids.contains_key(property))
+                {
+                    initialized.insert(*property);
+                }
+            }
+
+            method.flags.calls_parent_constructor()
+        };
+
+        if !calls_parent_constructor {
+            return;
+        }
+
+        let Some(parent_constructor) = parent_metadata.and_then(|parent| parent.declaring_method_ids.get(&constructor))
+        else {
+            return;
+        };
+
+        class_name = parent_constructor.get_class_name();
+    }
 }
 
 /// Compute properties initialized by any class initializer method.

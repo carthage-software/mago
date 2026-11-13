@@ -54,6 +54,7 @@ impl MetadataFlags {
     pub const EXTERNAL: MetadataFlags = MetadataFlags(1 << 43);
     pub const USES_FUNC_GET_ARGS: MetadataFlags = MetadataFlags(1 << 44);
     pub const ALLOWS_DYNAMIC_PROPERTIES: MetadataFlags = MetadataFlags(1 << 45);
+    pub const CALLS_PARENT_CONSTRUCTOR: MetadataFlags = MetadataFlags(1 << 46);
 }
 
 impl MetadataFlags {
@@ -130,6 +131,12 @@ impl MetadataFlags {
     #[must_use]
     pub const fn uses_func_get_args(self) -> bool {
         self.contains(Self::USES_FUNC_GET_ARGS)
+    }
+
+    #[inline]
+    #[must_use]
+    pub const fn calls_parent_constructor(self) -> bool {
+        self.contains(Self::CALLS_PARENT_CONSTRUCTOR)
     }
 
     #[inline]

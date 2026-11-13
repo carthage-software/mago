@@ -565,6 +565,7 @@ test_case!(issue_2621);
 test_case!(sdk_repeated_reader_calls);
 test_case!(issue_2629);
 test_case!(issue_2637);
+test_case!(issue_2638);
 test_case!(iterables_generator_with_non_iterable_return_type);
 test_case!(iterables_generator_send_match);
 test_case!(iterables_generator_send_mismatch);
