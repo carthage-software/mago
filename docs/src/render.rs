@@ -72,7 +72,12 @@ pub fn build_site(root: &Path) -> Result<()> {
     }
 
     let templates_glob = templates_glob.to_string_lossy().to_string();
-    let tera = Tera::new(&templates_glob).context("failed to load templates")?;
+    let mut tera = Tera::new();
+    tera.register_filter("json_encode", |value: tera::Value, _: tera::Kwargs, _: &tera::State| {
+        serde_json::to_string(&value).map_err(|error| tera::Error::message(error.to_string()))
+    });
+
+    tera.load_from_glob(&templates_glob).context("failed to load templates")?;
 
     let language_labels =
         config.languages.iter().map(|language| (language.code.clone(), language.name.clone())).collect::<Vec<_>>();
