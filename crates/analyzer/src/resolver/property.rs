@@ -1091,7 +1091,36 @@ where
     let mut read_type = (for_assignment && (resolution.is_magic() || used_set_hook_param))
         .then(|| resolution.declared_type(context.codebase));
 
+    let trait_user = declaring_class_metadata
+        .kind
+        .is_trait()
+        .then(|| {
+            let mut candidate = context.codebase.get_class_like(class_id.as_bytes());
+            while let Some(candidate_metadata) = candidate {
+                if candidate_metadata.used_traits.contains(&declaring_class_metadata.name) {
+                    return Some(candidate_metadata.original_name);
+                }
+
+                candidate = candidate_metadata
+                    .direct_parent_class
+                    .and_then(|parent| context.codebase.get_class_like_by_name(parent));
+            }
+
+            None
+        })
+        .flatten();
+
     let expand_and_localize = |ty: &mut TUnion| {
+        if let Some(trait_user) = trait_user {
+            for atomic in ty.types.to_mut() {
+                if let TAtomic::Object(TObject::Named(named_object)) = atomic
+                    && named_object.name.as_bytes().eq_ignore_ascii_case(declaring_class_metadata.name.as_bytes())
+                {
+                    named_object.name = trait_user;
+                }
+            }
+        }
+
         expander::expand_union(
             context.codebase,
             ty,
