@@ -561,7 +561,16 @@ fn handle_variadic_array_element<'arena, A>(
 {
     let mut all_non_empty = true;
 
-    for atomic_type in variadic_array_element_type.types.as_ref() {
+    let spread_atomics: Vec<&TAtomic> = variadic_array_element_type
+        .types
+        .iter()
+        .flat_map(|atomic| match atomic {
+            TAtomic::GenericParameter(parameter) => parameter.constraint.types.iter().collect(),
+            atomic => vec![atomic],
+        })
+        .collect();
+
+    for atomic_type in spread_atomics {
         let (key_type, value_type) = match atomic_type {
             TAtomic::Array(array_type) => match array_type {
                 TArray::Keyed(keyed_data) => {

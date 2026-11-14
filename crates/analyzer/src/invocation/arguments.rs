@@ -479,6 +479,12 @@ where
             continue;
         }
 
+        if let TAtomic::GenericParameter(parameter) = atomic_type {
+            potential_element_types.push(get_unpacked_argument_type(context, &parameter.constraint, span));
+
+            continue;
+        }
+
         match atomic_type {
             TAtomic::Never => {
                 potential_element_types.push(get_never());

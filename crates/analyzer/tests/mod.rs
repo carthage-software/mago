@@ -3190,6 +3190,7 @@ test_case!(require_implements_keeps_type_arguments);
 test_case!(switch_true_case_ruled_out_by_earlier_case);
 test_case!(static_return_on_other_receiver_is_not_this_static);
 test_case!(constant_initialized_with_new);
+test_case!(unpack_template_bounded_by_iterable);
 
 #[test]
 #[cfg_attr(miri, ignore)]
