@@ -811,8 +811,15 @@ where
                     TAtomic::Array(TArray::List(TList::new(element_type)))
                 });
             }
-            TAtomic::Array(TArray::List(_)) => {
-                acceptable_types.push(atomic.clone());
+            TAtomic::Array(TArray::List(list)) => {
+                if is_non_empty && !list.non_empty {
+                    did_remove_type = true;
+                    let mut list = list.clone();
+                    list.non_empty = true;
+                    acceptable_types.push(TAtomic::Array(TArray::List(list)));
+                } else {
+                    acceptable_types.push(atomic.clone());
+                }
             }
             TAtomic::Iterable(iterable) => {
                 let element_type = iterable.get_value_type();
@@ -896,7 +903,14 @@ where
                 acceptable_types.push(TAtomic::Array(TArray::Keyed(keyed_array.clone())));
             }
             TAtomic::Array(TArray::List(list)) => {
-                acceptable_types.push(TAtomic::Array(TArray::List(list.clone())));
+                let mut list = list.clone();
+                if let Some(TAtomic::Array(assertion_array)) = assertion_type
+                    && assertion_array.is_non_empty()
+                {
+                    list.non_empty = true;
+                }
+
+                acceptable_types.push(TAtomic::Array(TArray::List(list)));
             }
             TAtomic::Iterable(iterable) => {
                 let key_type = refine_array_key(iterable.get_key_type());

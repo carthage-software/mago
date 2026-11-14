@@ -3213,6 +3213,7 @@ test_case!(assert_on_stored_condition_narrows);
 test_case!(duplicate_and_circular_inheritance);
 test_case!(object_shape_assertions_combine);
 test_case!(assertion_on_object_shape_property);
+test_case!(non_empty_assertion_on_list);
 
 #[test]
 #[cfg_attr(miri, ignore)]
