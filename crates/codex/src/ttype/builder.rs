@@ -1116,6 +1116,26 @@ fn get_reference_from_kind(
     }
 }
 
+/// PHP stores a decimal integer string key such as `'123'` as the integer `123`.
+fn normalize_numeric_string_keys(key: TUnion) -> TUnion {
+    if !key.types.iter().any(|atomic| matches!(atomic.to_array_key(), Some(ArrayKey::Integer(_))) && atomic.is_string())
+    {
+        return key;
+    }
+
+    key.clone_with_types(
+        key.types
+            .iter()
+            .map(|atomic| match atomic.to_array_key() {
+                Some(ArrayKey::Integer(integer)) if atomic.is_string() => {
+                    TAtomic::Scalar(TScalar::literal_int(integer))
+                }
+                _ => atomic.clone(),
+            })
+            .collect(),
+    )
+}
+
 #[inline]
 fn get_array_type<'src>(
     mut key: Option<&'src Type<'src>>,
@@ -1134,7 +1154,7 @@ fn get_array_type<'src>(
             if matches!(k, Type::Mixed(_)) {
                 get_arraykey()
             } else {
-                get_union_from_type(k, scope, type_context, classname)?
+                normalize_numeric_string_keys(get_union_from_type(k, scope, type_context, classname)?)
             }
         } else {
             get_arraykey()

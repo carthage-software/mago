@@ -3267,6 +3267,7 @@ test_case!(nullsafe_truthiness_narrows_plain_property);
 test_case!(instanceof_generic_descendant_takes_ancestor_arguments);
 test_case!(string_callable_with_too_many_required_parameters);
 test_case!(shape_intersected_with_array_is_open_shape);
+test_case!(numeric_string_array_key_type_is_int);
 
 #[test]
 #[cfg_attr(miri, ignore)]
