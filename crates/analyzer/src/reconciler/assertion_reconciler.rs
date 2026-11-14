@@ -343,6 +343,26 @@ pub(crate) fn intersect_atomic_with_atomic<A>(
 where
     A: Arena,
 {
+    if let (
+        TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Generic {
+            kind,
+            parameter_name,
+            defining_entity,
+            constraint,
+        })),
+        TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::OfType { constraint: other_constraint, .. })),
+    ) = (first_type, second_type)
+    {
+        let narrowed_constraint = intersect_atomic_with_atomic(context, constraint, other_constraint)?;
+
+        return Some(TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::generic(
+            *kind,
+            *parameter_name,
+            *defining_entity,
+            narrowed_constraint,
+        ))));
+    }
+
     let mut atomic_comparison_results = ComparisonResult::new();
     if atomic_comparator::is_contained_by(
         context.codebase,
