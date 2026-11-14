@@ -3259,6 +3259,7 @@ test_case!(nullsafe_null_does_not_leave_its_chain);
 test_case!(array_access_read_uses_offset_get);
 test_case!(new_spl_object_storage_has_open_templates);
 test_case!(union_container_members_all_bind_templates);
+test_case!(static_call_ends_static_property_narrowing);
 
 #[test]
 #[cfg_attr(miri, ignore)]

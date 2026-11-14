@@ -685,6 +685,16 @@ fn clear_object_property_narrowings<'ctx, 'arena, A>(
             _ => false,
         };
     let clears_this = is_self_method_call || (suspends_fiber && block_context.scope.get_class_like_name().is_some());
+    let clears_static_properties =
+        metadata.and_then(|metadata| metadata.method_metadata.as_ref()).is_some_and(|method| method.is_static)
+            && matches!(
+                invocation.target.get_function_like_identifier(),
+                Some(FunctionLikeIdentifier::Method(class_name, _)) if block_context
+                    .scope
+                    .get_class_like_name()
+                    .is_some_and(|current_class| current_class.as_bytes().eq_ignore_ascii_case(class_name.as_bytes()))
+            );
+    let is_static_property = |var_id: Word| memchr::memmem::find(var_id.as_bytes(), b"::$").is_some();
     if is_self_method_call {
         block_context.definitely_uninitialized_property_ids.clear();
     }
@@ -716,6 +726,9 @@ fn clear_object_property_narrowings<'ctx, 'arena, A>(
         if clears_this && var_id.as_bytes().starts_with(b"$this->") && !preserves_this_property(*var_id) {
             return false;
         }
+        if clears_static_properties && is_static_property(*var_id) {
+            return false;
+        }
         if is_superglobal_index_key(*var_id) {
             return false;
         }
@@ -737,6 +750,7 @@ fn clear_object_property_narrowings<'ctx, 'arena, A>(
                         || (clears_this
                             && var_id.as_bytes().starts_with(b"$this->")
                             && !preserves_this_property(var_id))
+                        || (clears_static_properties && is_static_property(var_id))
                         || is_superglobal_index_key(var_id)
                         || is_superglobal_name(var_id.as_bytes())))
         })
