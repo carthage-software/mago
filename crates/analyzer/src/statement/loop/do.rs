@@ -49,11 +49,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for DoWhile<'arena> {
         let previous_loop_bounds = loop_block_context.loop_bounds;
         loop_block_context.loop_bounds = (span.start.offset, span.end.offset);
 
-        let pre_conditions = r#loop::get_and_expressions(self.condition);
         let (mut inner_loop_block_context, loop_scope) = r#loop::analyze(
             context,
             std::slice::from_ref(self.statement),
-            &pre_conditions,
+            &[self.condition],
             Vec::new(),
             loop_scope,
             &mut loop_block_context,

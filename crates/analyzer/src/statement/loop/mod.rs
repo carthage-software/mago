@@ -1817,18 +1817,6 @@ fn update_loop_scope_contexts<'ctx, A>(
     }
 }
 
-fn get_and_expressions<'ast, 'arena>(cond: &'ast Expression<'arena>) -> Vec<&'ast Expression<'arena>> {
-    if let Expression::Binary(binary) = &cond
-        && let BinaryOperator::Or(_) | BinaryOperator::LowOr(_) = binary.operator
-    {
-        let mut anded = get_and_expressions(binary.lhs);
-        anded.extend(get_and_expressions(binary.rhs));
-        return anded;
-    }
-
-    vec![cond]
-}
-
 /// Analyzes the `foreach` iterator expression.
 ///
 /// # Returns
