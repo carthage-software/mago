@@ -3274,6 +3274,7 @@ test_case!(catch_only_variable_keeps_its_type);
 test_case!(loop_condition_variables_after_the_loop);
 test_case!(loop_condition_forgets_what_the_right_reassigns);
 test_case!(short_circuit_mixed_assignment_keeps_narrowing);
+test_case!(reference_after_coalesce_assignment);
 
 #[test]
 #[cfg_attr(miri, ignore)]

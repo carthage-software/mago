@@ -133,7 +133,8 @@ where
         dead_rhs_context.flags.set_has_returned(true);
         binary.rhs.analyze(context, &mut dead_rhs_context, artifacts)?;
     } else {
-        let non_null_lhs_type = lhs_type.to_non_nullable();
+        let mut non_null_lhs_type = lhs_type.to_non_nullable();
+        non_null_lhs_type.set_possibly_undefined(false, Some(false));
         let has_returned = block_context.flags.has_returned();
         let pre_rhs_locals = has_assignment(Node::Expression(binary.rhs)).then(|| block_context.locals.clone());
         block_context.flags.set_has_returned(false);
