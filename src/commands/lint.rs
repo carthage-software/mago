@@ -408,46 +408,21 @@ impl LintCommand {
 /// - Suggested command to try the rule
 pub fn explain_rule(registry: &RuleRegistry, code: &str) -> Result<ExitCode, Error> {
     let Some(rule) = registry.rules().iter().find(|r| r.meta().code == code) else {
-        println!();
-        println!("  {}", "Error: Rule not found".red().bold());
-        println!("  {}", format!("Could not find a rule with the code '{}'.", code).bright_black());
-        println!("  {}", "Please check the spelling and try again.".bright_black());
-        println!();
+        print_rule_not_found(code);
 
         return Ok(ExitCode::FAILURE);
     };
 
     let meta = rule.meta();
-
-    println!();
-    println!("  ╭─ {} {}", "Rule".bold(), meta.name.cyan().bold());
-    println!("  │");
-
-    println!("{}", wrap_and_prefix(meta.description, "  │  ", 80));
-
-    println!("  │");
-    println!("  │  {}: {}", "Code".bold(), meta.code.yellow());
-    println!("  │  {}: {}", "Category".bold(), meta.category.as_str().magenta());
-
-    if !meta.good_example.trim().is_empty() {
-        println!("  │");
-        println!("  │  {}", "✅ Good Example".green().bold());
-        println!("  │");
-        println!("{}", colorize_code_block(meta.good_example));
-    }
-
-    if !meta.bad_example.trim().is_empty() {
-        println!("  │");
-        println!("  │  {}", "🚫 Bad Example".red().bold());
-        println!("  │");
-        println!("{}", colorize_code_block(meta.bad_example));
-    }
-
-    println!("  │");
-    println!("  │  {}", "Try it out!".bold());
-    println!("  │    {}", format!("mago lint --only {}", meta.code).bright_black());
-    println!("  ╰─");
-    println!();
+    print_rule_explanation(
+        meta.name,
+        meta.description,
+        meta.code,
+        meta.category.as_str(),
+        meta.good_example,
+        meta.bad_example,
+        "mago lint",
+    );
 
     Ok(ExitCode::SUCCESS)
 }
@@ -479,12 +454,6 @@ pub fn explain_rule(registry: &RuleRegistry, code: &str) -> Result<ExitCode, Err
 /// - Pretty-printed for readability
 /// - Machine-parseable for tooling integration
 pub fn list_rules(rules: &[AnyRule], json: bool) -> Result<ExitCode, Error> {
-    if rules.is_empty() && !json {
-        println!("{}", "No rules are currently enabled.".yellow());
-
-        return Ok(ExitCode::SUCCESS);
-    }
-
     if json {
         let entries: Vec<_> = rules.iter().map(|r| RuleEntry { meta: r.meta(), level: r.default_level() }).collect();
 
@@ -493,8 +462,80 @@ pub fn list_rules(rules: &[AnyRule], json: bool) -> Result<ExitCode, Error> {
         return Ok(ExitCode::SUCCESS);
     }
 
-    let max_name = rules.iter().map(|r| r.meta().name.len()).max().unwrap_or(0);
-    let max_code = rules.iter().map(|r| r.meta().code.len()).max().unwrap_or(0);
+    let rows: Vec<_> = rules
+        .iter()
+        .map(|rule| {
+            let meta = rule.meta();
+
+            (meta.name, meta.code, rule.default_level(), meta.category.as_str())
+        })
+        .collect();
+
+    print_rule_table(&rows, "mago lint");
+
+    Ok(ExitCode::SUCCESS)
+}
+
+/// Prints the error shown when `--explain` names an unknown rule.
+pub(crate) fn print_rule_not_found(code: &str) {
+    println!();
+    println!("  {}", "Error: Rule not found".red().bold());
+    println!("  {}", format!("Could not find a rule with the code '{}'.", code).bright_black());
+    println!("  {}", "Please check the spelling and try again.".bright_black());
+    println!();
+}
+
+/// Prints a rule's documentation, as `--explain` shows it.
+pub(crate) fn print_rule_explanation(
+    name: &str,
+    description: &str,
+    code: &str,
+    category: &str,
+    good_example: &str,
+    bad_example: &str,
+    command: &str,
+) {
+    println!();
+    println!("  ╭─ {} {}", "Rule".bold(), name.cyan().bold());
+    println!("  │");
+
+    println!("{}", wrap_and_prefix(description, "  │  ", 80));
+
+    println!("  │");
+    println!("  │  {}: {}", "Code".bold(), code.yellow());
+    println!("  │  {}: {}", "Category".bold(), category.magenta());
+
+    if !good_example.trim().is_empty() {
+        println!("  │");
+        println!("  │  {}", "✅ Good Example".green().bold());
+        println!("  │");
+        println!("{}", colorize_code_block(good_example));
+    }
+
+    if !bad_example.trim().is_empty() {
+        println!("  │");
+        println!("  │  {}", "🚫 Bad Example".red().bold());
+        println!("  │");
+        println!("{}", colorize_code_block(bad_example));
+    }
+
+    println!("  │");
+    println!("  │  {}", "Try it out!".bold());
+    println!("  │    {}", format!("{command} --only {code}").bright_black());
+    println!("  ╰─");
+    println!();
+}
+
+/// Prints the rule table shown by `--list-rules`: one `(name, code, level, category)` row per rule.
+pub(crate) fn print_rule_table(rows: &[(&str, &str, Level, &str)], command: &str) {
+    if rows.is_empty() {
+        println!("{}", "No rules are currently enabled.".yellow());
+
+        return;
+    }
+
+    let max_name = rows.iter().map(|(name, ..)| name.len()).max().unwrap_or(0);
+    let max_code = rows.iter().map(|(_, code, ..)| code.len()).max().unwrap_or(0);
 
     println!();
     println!(
@@ -508,9 +549,8 @@ pub fn list_rules(rules: &[AnyRule], json: bool) -> Result<ExitCode, Error> {
     );
     println!();
 
-    for rule in rules {
-        let meta = rule.meta();
-        let level_str = match rule.default_level() {
+    for (name, code, level, category) in rows {
+        let level_str = match level {
             Level::Error => "Error".red(),
             Level::Warning => "Warning".yellow(),
             Level::Help => "Help".green(),
@@ -519,20 +559,18 @@ pub fn list_rules(rules: &[AnyRule], json: bool) -> Result<ExitCode, Error> {
 
         println!(
             "  {: <width_name$}   {: <width_code$}   {: <8}   {}",
-            meta.name.cyan(),
-            meta.code.bright_black(),
+            name.cyan(),
+            code.bright_black(),
             level_str.bold(),
-            meta.category.as_str().magenta(),
+            category.magenta(),
             width_name = max_name,
             width_code = max_code,
         );
     }
 
     println!();
-    println!("  Run {} to see more information about a specific rule.", "mago lint --explain <CODE>".bold());
+    println!("  Run {} to see more information about a specific rule.", format!("{command} --explain <CODE>").bold());
     println!();
-
-    Ok(ExitCode::SUCCESS)
 }
 
 fn colorize_code_block(code: &str) -> String {

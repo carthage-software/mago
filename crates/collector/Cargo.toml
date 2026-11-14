@@ -17,11 +17,12 @@ mago-span = { workspace = true }
 mago-database = { workspace = true }
 mago-text-edit = { workspace = true }
 mago-reporting = { workspace = true }
-mago-syntax = { workspace = true }
+mago-syntax = { workspace = true, optional = true }
 foldhash = { workspace = true }
 mago-allocator = { workspace = true }
 memchr = { workspace = true }
 
 [features]
-default = []
+default = ["php"]
+php = ["dep:mago-syntax"]
 serde = []

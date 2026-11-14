@@ -27,3 +27,7 @@ Enforces dependency rules and structural conventions. Useful when you want to fo
 ## [Twig formatter](/tools/formatter/twig/)
 
 `mago twig:fmt` formats Twig syntax with its own `[twig.formatter]` settings. It keeps template text unchanged and does not rewrite HTML. The PHP formatter and `mago fix` do not run it.
+
+## [Twig linter](/tools/twig-linter/)
+
+`mago twig:lint` checks Twig templates with its own rules and settings. It supports native reports, baselines, pragmas, staged files, stdin, and safe fixes. The PHP commands do not run Twig lint rules.

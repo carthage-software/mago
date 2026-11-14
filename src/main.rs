@@ -307,6 +307,7 @@ pub fn run(main_start: Instant) -> Result<ExitCode, Error> {
         MagoCommand::Extension(cmd) => cmd.execute(configuration),
         MagoCommand::ListFiles(cmd) => cmd.execute(configuration, arguments.colors),
         MagoCommand::Lint(cmd) => cmd.execute(configuration, arguments.colors).map(|outcome| outcome.exit_code),
+        MagoCommand::TwigLint(cmd) => cmd.execute(configuration, arguments.colors).map(|outcome| outcome.exit_code),
         MagoCommand::Format(cmd) => cmd.execute(configuration, arguments.colors).map(|outcome| outcome.exit_code),
         MagoCommand::TwigFormat(cmd) => cmd.execute(configuration, arguments.colors).map(|outcome| outcome.exit_code),
         MagoCommand::Fix(cmd) => cmd.execute(configuration, arguments.colors),

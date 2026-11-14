@@ -180,6 +180,7 @@ mago-hir = { path = "crates/hir", version = "1.59.0" }
 mago-word = { path = "crates/word", version = "1.59.0" }
 mago-bytes = { path = "crates/bytes", version = "1.59.0" }
 mago-linter = { path = "crates/linter", version = "1.59.0" }
+mago-twig-linter = { path = "crates/twig-linter", version = "1.59.0" }
 mago-names = { path = "crates/names", version = "1.59.0" }
 mago-reporting = { path = "crates/reporting", version = "1.59.0" }
 mago-span = { path = "crates/span", version = "1.59.0" }
@@ -191,7 +192,7 @@ mago-allocator = { path = "crates/allocator", version = "1.59.0" }
 mago-codex = { path = "crates/codex", version = "1.59.0" }
 mago-prelude = { path = "crates/prelude", version = "1.59.0" }
 mago-semantics = { path = "crates/semantics", version = "1.59.0" }
-mago-collector = { path = "crates/collector", version = "1.59.0" }
+mago-collector = { path = "crates/collector", version = "1.59.0", default-features = false }
 mago-database = { path = "crates/database", version = "1.59.0" }
 mago-guard = { path = "crates/guard", version = "1.59.0" }
 mago-orchestrator = { path = "crates/orchestrator", version = "1.59.0" }
@@ -271,6 +272,8 @@ mago-syntax-core = { workspace = true }
 mago-reporting = { workspace = true }
 mago-database = { workspace = true }
 mago-linter = { workspace = true, features = ["serde"] }
+mago-twig-linter = { workspace = true, features = ["serde"] }
+mago-twig-syntax = { workspace = true }
 mago-names = { workspace = true }
 mago-formatter = { workspace = true, features = ["serde"] }
 mago-twig-formatter = { workspace = true, features = ["serde"] }

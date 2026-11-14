@@ -1,0 +1,15 @@
+{{ record(
+    # @mago-expect lint:twig-single-quotes(2)
+    label: "inside_label",
+    value: "inside_value"
+) }}
+{{ "outside" }}
+{% if
+    # @mago-expect lint:twig-single-quotes
+    value == "condition"
+%}
+    {{ "body" }}
+{% endif
+    # @mago-expect lint:twig-single-quotes
+%}
+{{ "after_close" }}

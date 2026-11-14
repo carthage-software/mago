@@ -1,0 +1,32 @@
+[package]
+name = "mago-twig-linter-fuzz"
+version = "0.0.0"
+edition = "2024"
+publish = false
+authors = ["Seifeddine Gmati <azjezz@carthage.software>"]
+license = "MIT OR Apache-2.0"
+
+[workspace]
+
+[package.metadata]
+cargo-fuzz = true
+
+[dependencies]
+libfuzzer-sys = "0.4"
+mago-allocator = { path = "../../allocator" }
+mago-database = { path = "../../database" }
+mago-text-edit = { path = "../../text-edit" }
+mago-twig-linter = { path = ".." }
+mago-twig-syntax = { path = "../../twig-syntax" }
+
+[[bin]]
+name = "linter"
+path = "fuzz_targets/linter.rs"
+test = false
+doc = false
+bench = false
+
+[profile.release]
+debug = 1
+opt-level = 3
+overflow-checks = true

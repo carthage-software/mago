@@ -43,6 +43,7 @@ use crate::config::parser::ParserConfiguration;
 use crate::config::source::SourceConfiguration;
 use crate::config::twig::TwigConfiguration;
 use crate::config::twig_formatter::TwigFormatterConfiguration;
+use crate::config::twig_linter::TwigLinterConfiguration;
 use crate::consts::CURRENT_DIR;
 use crate::error::Error;
 
@@ -60,6 +61,8 @@ enum ConfigSection {
     Twig,
     #[value(name = "twig.formatter")]
     TwigFormatter,
+    #[value(name = "twig.linter")]
+    TwigLinter,
     Analyzer,
     Parser,
     Baseline,
@@ -168,6 +171,10 @@ impl ConfigCommand {
                         let schema = schema_for!(TwigFormatterConfiguration);
                         serde_json::to_string_pretty(&schema)?
                     }
+                    ConfigSection::TwigLinter => {
+                        let schema = schema_for!(TwigLinterConfiguration);
+                        serde_json::to_string_pretty(&schema)?
+                    }
                     ConfigSection::Analyzer => {
                         let schema = schema_for!(AnalyzerConfiguration);
                         serde_json::to_string_pretty(&schema)?
@@ -228,6 +235,11 @@ impl ConfigCommand {
                     TwigFormatterConfiguration::default()
                 } else {
                     configuration.twig.and_then(|twig| twig.formatter).unwrap_or_default()
+                })?,
+                ConfigSection::TwigLinter => serde_json::to_string_pretty(&if self.default {
+                    TwigLinterConfiguration::default()
+                } else {
+                    configuration.twig.and_then(|twig| twig.linter).unwrap_or_default()
                 })?,
                 ConfigSection::Analyzer => {
                     if self.default {

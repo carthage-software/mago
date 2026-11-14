@@ -1,0 +1,10 @@
+{% macro call(value = "default") %}{{ value }}{% endmacro # keep this comment
+%}
+{% block body %}
+{{ record(
+    # @mago-expect lint:twig-single-quotes(2) Keep these double quotes.
+    label = "inline",
+    value = "plain"
+) }}
+{% endblock # keep this comment too
+%}

@@ -1,0 +1,14 @@
+{# @mago-expect lint:twig-no-dump #}
+Rendered text stops the pragma scope.
+{{ dump(first) }}
+{% if value %}
+{# @mago-ignore lint:twig-no-dump #}
+{% endif %}
+{{ dump(second) }}
+{# @mago-expect lint:twig-no-dump #}
+{# Comments and whitespace keep the scope. #}
+{{ dump(third) }}
+{# @mago-expect lint:twig-no-dump(2) #}
+{% if value %}
+    {{ dump(fourth) }}{{ dump(fifth) }}
+{% endif %}

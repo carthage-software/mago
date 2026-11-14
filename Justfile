@@ -55,6 +55,11 @@ test-twig-runtime:
     cargo build --bin mago --locked
     php crates/twig-formatter/tests/runtime.php
 
+# Check Twig lint fixes with the Twig runtime.
+test-twig-linter-runtime:
+    cargo build --bin mago --locked
+    php crates/twig-linter/tests/runtime.php
+
 # Fuzz the PHP lexer. Seeds are drawn from the syntax/analyzer/formatter PHP fixtures.
 fuzz-php-lexer:
     cd crates/syntax/fuzz && cargo +nightly fuzz run lexer \
@@ -82,6 +87,10 @@ fuzz-twig-parser:
 # Fuzz Twig formatting and idempotence.
 fuzz-twig-formatter:
     cd crates/twig-formatter/fuzz && cargo +nightly fuzz run formatter corpus/formatter ../tests/cases
+
+# Fuzz Twig lint rules and their fixes.
+fuzz-twig-linter:
+    cd crates/twig-linter/fuzz && cargo +nightly fuzz run linter corpus/linter ../tests/fixtures ../tests/runtime/cases ../../twig-formatter/tests/cases
 
 # Publishes all crates to crates.io in the correct order.
 publish $CARGO_RESOLVER_INCOMPATIBLE_PUBLISH_AGE="allow":
@@ -117,6 +126,7 @@ publish $CARGO_RESOLVER_INCOMPATIBLE_PUBLISH_AGE="allow":
     cargo publish -p mago-extension
     cargo publish -p mago-analyzer
     cargo publish -p mago-linter
+    cargo publish -p mago-twig-linter
     cargo publish -p mago-orchestrator
     cargo publish -p mago-wasm
     cargo publish

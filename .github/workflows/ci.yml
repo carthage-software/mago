@@ -86,6 +86,11 @@ jobs:
         timeout-minutes: 5
         run: just test-twig-runtime
 
+      - name: Test Twig lint fixes
+        if: matrix.rust == 'stable' && matrix.os == 'ubuntu-latest'
+        timeout-minutes: 5
+        run: just test-twig-linter-runtime
+
       - name: cargo build
         if: matrix.rust == 'stable'
         run: cargo build --release --locked

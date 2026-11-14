@@ -1,12 +1,12 @@
-//! Generate the linter rule reference page from the in-process `mago-linter`
-//! registry.
+//! Generate the rule reference pages from the in-process `mago-linter` and
+//! `mago-twig-linter` registries.
 //!
-//! Walks every rule in the default `RuleRegistry` (with disabled rules
+//! Walks every rule in each default `RuleRegistry` (with disabled rules
 //! included so the docs surface all of them), converts each `RuleMeta` plus
-//! its default level into the same shape `mago lint --list-rules --json` used
-//! to emit, and writes a clippy-style collapsible page per locale into
-//! `content/<lang>/tools/linter/rules.md`. All reader-facing strings come
-//! from `i18n/<lang>.toml`.
+//! its default level into one display shape, and writes a clippy-style
+//! collapsible page per locale into `content/<lang>/tools/linter/rules.md`
+//! and `content/<lang>/tools/twig-linter/rules.md`. All reader-facing
+//! strings come from `i18n/<lang>.toml`.
 
 use std::collections::BTreeMap;
 use std::fs;
@@ -26,6 +26,12 @@ use mago_linter::settings::RulesSettings;
 use mago_linter::settings::Settings as LinterSettings;
 use mago_php_version::PHPVersionRange;
 use mago_reporting::Level;
+use mago_twig_linter::category::Category as TwigCategory;
+use mago_twig_linter::registry::RuleRegistry as TwigRuleRegistry;
+use mago_twig_linter::rule::AnyRule as TwigRule;
+use mago_twig_linter::settings::RulesSettings as TwigRulesSettings;
+use mago_twig_linter::settings::Settings as TwigSettings;
+use mago_twig_linter::version::TwigVersion;
 
 use crate::i18n::I18nMap;
 use crate::i18n::load_languages;
@@ -37,51 +43,141 @@ const SUPPORTED_LANGUAGES: &[&str] = &["en", "fr", "zh"];
 /// One rule's display data, built once and shared across every locale.
 struct RuleEntry {
     code: String,
+    /// The rule's key in the `rules` settings table.
+    config_key: String,
     description: String,
     good_example: String,
     bad_example: String,
     category: Category,
-    requirements: RuleRequirements,
+    requirements: Requirements,
     level: Level,
+}
+
+/// What a rule needs before it runs.
+enum Requirements {
+    Php(RuleRequirements),
+    Twig(Option<TwigVersion>),
+}
+
+/// A linter whose rules get a generated reference page.
+struct RulePage {
+    /// The page's directory under `content/<lang>/`.
+    directory: &'static str,
+    nav_subsection: &'static str,
+    nav_order: u32,
+    /// The prefix of the page's own i18n keys: `<prefix>_page_title`, `<prefix>_intro`, and so on.
+    key_prefix: &'static str,
+    /// The language of the example code fences.
+    example_language: &'static str,
+    rules: Vec<RuleEntry>,
+    default_config: Value,
+    schema: Value,
 }
 
 /// Regenerate the rules pages for every supported locale.
 pub fn generate(documentation_root: &Path) -> Result<()> {
+    let language_codes: Vec<String> = SUPPORTED_LANGUAGES.iter().map(|s| (*s).to_string()).collect();
+    let i18n_root = documentation_root.join("i18n");
+    let i18n = load_languages(&i18n_root, &language_codes)?;
+
+    for page in [php_page()?, twig_page()?] {
+        write_page(documentation_root, &i18n, &page)?;
+    }
+
+    Ok(())
+}
+
+fn php_page() -> Result<RulePage> {
     let settings = LinterSettings::default();
     let registry = RuleRegistry::build(&settings, None, true);
-    let rules: Vec<RuleEntry> = registry
+    let rules = registry
         .rules()
         .iter()
         .map(|rule| {
             let meta = AnyRule::meta(rule);
             RuleEntry {
                 code: meta.code.to_string(),
+                config_key: meta.code.to_string(),
                 description: meta.description.to_string(),
                 good_example: meta.good_example.to_string(),
                 bad_example: meta.bad_example.to_string(),
                 category: meta.category,
-                requirements: meta.requirements,
+                requirements: Requirements::Php(meta.requirements),
                 level: AnyRule::default_level(rule),
             }
         })
         .collect();
 
-    let rules_default_config: Value =
-        serde_json::to_value(&settings.rules).context("failed to serialise default linter settings")?;
-    let rules_schema = serde_json::to_value(schema_for!(RulesSettings))?;
+    Ok(RulePage {
+        directory: "tools/linter",
+        nav_subsection: "Linter",
+        nav_order: 70,
+        key_prefix: "rules",
+        example_language: "php",
+        rules,
+        default_config: serde_json::to_value(&settings.rules).context("failed to serialise default linter settings")?,
+        schema: serde_json::to_value(schema_for!(RulesSettings))?,
+    })
+}
 
+fn twig_page() -> Result<RulePage> {
+    let settings = TwigSettings { version: TwigVersion::LATEST, ..TwigSettings::default() };
+    let registry = TwigRuleRegistry::build(&settings, None, true);
+    let rules = registry
+        .rules()
+        .iter()
+        .map(|rule| {
+            let meta = TwigRule::meta(rule);
+            RuleEntry {
+                code: meta.code.to_string(),
+                config_key: meta.code.trim_start_matches("twig-").to_string(),
+                description: meta.description.to_string(),
+                good_example: meta.good_example.to_string(),
+                bad_example: meta.bad_example.to_string(),
+                category: twig_category(meta.category),
+                requirements: Requirements::Twig(meta.requirements.minimum_twig_version()),
+                level: TwigRule::default_level(rule),
+            }
+        })
+        .collect();
+
+    Ok(RulePage {
+        directory: "tools/twig-linter",
+        nav_subsection: "Twig Linter",
+        nav_order: 45,
+        key_prefix: "twig_rules",
+        example_language: "twig",
+        rules,
+        default_config: serde_json::to_value(TwigRulesSettings::default())
+            .context("failed to serialise default Twig linter settings")?,
+        schema: serde_json::to_value(schema_for!(TwigRulesSettings))?,
+    })
+}
+
+fn twig_category(category: TwigCategory) -> Category {
+    match category {
+        TwigCategory::Clarity => Category::Clarity,
+        TwigCategory::BestPractices => Category::BestPractices,
+        TwigCategory::Consistency => Category::Consistency,
+        TwigCategory::Deprecation => Category::Deprecation,
+        TwigCategory::Maintainability => Category::Maintainability,
+        TwigCategory::Redundancy => Category::Redundancy,
+        TwigCategory::Security => Category::Security,
+        TwigCategory::Safety => Category::Safety,
+        TwigCategory::Correctness => Category::Correctness,
+    }
+}
+
+fn write_page(documentation_root: &Path, i18n: &BTreeMap<String, I18nMap>, page: &RulePage) -> Result<()> {
     tracing::info!(
-        "Regenerating linter rules ({} rules across {} categories).",
-        rules.len(),
-        distinct_categories(&rules).len()
+        "Regenerating {} rules ({} rules across {} categories).",
+        page.directory,
+        page.rules.len(),
+        distinct_categories(&page.rules).len()
     );
 
-    let language_codes: Vec<String> = SUPPORTED_LANGUAGES.iter().map(|s| (*s).to_string()).collect();
-    let i18n_root = documentation_root.join("i18n");
-    let i18n = load_languages(&i18n_root, &language_codes)?;
-
     for language in SUPPORTED_LANGUAGES {
-        let lang_root = documentation_root.join("content").join(language).join("tools/linter");
+        let lang_root = documentation_root.join("content").join(language).join(page.directory);
         let new_page = lang_root.join("rules.md");
         let stale_dir = lang_root.join("rules");
         let stale_overview = lang_root.join("rules-and-categories.md");
@@ -98,8 +194,8 @@ pub fn generate(documentation_root: &Path) -> Result<()> {
 
         let strings = i18n.get(*language).with_context(|| format!("missing i18n strings for {language}"))?;
 
-        let body = render_all_rules(strings, &rules, &rules_default_config, &rules_schema);
-        let markdown = wrap_with_front_matter(strings, &body);
+        let body = render_all_rules(strings, page);
+        let markdown = wrap_with_front_matter(strings, page, &body);
         if let Some(parent) = new_page.parent() {
             fs::create_dir_all(parent).with_context(|| format!("failed to create {}", parent.display()))?;
         }
@@ -107,8 +203,13 @@ pub fn generate(documentation_root: &Path) -> Result<()> {
         fs::write(&new_page, &markdown).with_context(|| format!("failed to write {}", new_page.display()))?;
     }
 
-    tracing::info!("Wrote tools/linter/rules.md for every locale.");
+    tracing::info!("Wrote {}/rules.md for every locale.", page.directory);
     Ok(())
+}
+
+/// Looks up `<prefix>_<suffix>`, then the shared `rules_<suffix>`, then `fallback`.
+fn page_text(strings: &I18nMap, page: &RulePage, suffix: &str, fallback: &str) -> String {
+    t(strings, &format!("{}_{suffix}", page.key_prefix), &t(strings, &format!("rules_{suffix}"), fallback))
 }
 
 fn level_rank(level: Level) -> u8 {
@@ -136,11 +237,12 @@ fn distinct_categories(rules: &[RuleEntry]) -> Vec<Category> {
     seen
 }
 
-fn wrap_with_front_matter(strings: &I18nMap, body: &str) -> String {
-    let title = t(strings, "rules_page_title", "Rules");
-    let description = t(
+fn wrap_with_front_matter(strings: &I18nMap, page: &RulePage, body: &str) -> String {
+    let title = page_text(strings, page, "page_title", "Rules");
+    let description = page_text(
         strings,
-        "rules_page_description",
+        page,
+        "page_description",
         "The full reference of every linter rule, sorted by severity. Click any rule to expand its description, examples, and configuration.",
     );
 
@@ -148,28 +250,26 @@ fn wrap_with_front_matter(strings: &I18nMap, body: &str) -> String {
     out.push_str("+++\n");
     out.push_str(&format!("title = \"{title}\"\n"));
     out.push_str(&format!("description = \"{description}\"\n"));
-    out.push_str("nav_order = 70\n");
+    out.push_str(&format!("nav_order = {}\n", page.nav_order));
     out.push_str("nav_section = \"Tools\"\n");
-    out.push_str("nav_subsection = \"Linter\"\n");
+    out.push_str(&format!("nav_subsection = \"{}\"\n", page.nav_subsection));
     out.push_str("+++\n");
     out.push_str(body);
     out
 }
 
-fn render_all_rules(
-    strings: &I18nMap,
-    rules: &[RuleEntry],
-    rules_default_config: &Value,
-    rules_schema: &Value,
-) -> String {
+fn render_all_rules(strings: &I18nMap, page: &RulePage) -> String {
+    let rules = &page.rules;
     let mut out = String::new();
 
-    let intro = t_format(
+    let intro = page_text(
         strings,
-        "rules_intro",
+        page,
+        "intro",
         "Mago's linter ships {rules} rules across {categories} categories. Click any rule to expand its description, requirements, default configuration, and examples.",
-        &[("rules", &rules.len().to_string()), ("categories", &distinct_categories(rules).len().to_string())],
-    );
+    )
+    .replace("{rules}", &rules.len().to_string())
+    .replace("{categories}", &distinct_categories(rules).len().to_string());
     out.push_str(&intro);
     out.push_str("\n\n");
 
@@ -186,7 +286,7 @@ fn render_all_rules(
     for (category, rules_in_category) in &by_category {
         let display = category_display(strings, *category);
         let slug = category_slug(*category);
-        let blurb = category_blurb(strings, *category);
+        let blurb = category_blurb(strings, page, *category);
         out.push_str(&format!(
             "<a class=\"rule-index__item\" href=\"#{slug}\"><span class=\"rule-index__name\">{display}</span><span class=\"rule-index__count\">{count_label}</span><span class=\"rule-index__blurb\">{blurb}</span></a>",
             count_label = rule_count_label(strings, rules_in_category.len()),
@@ -205,11 +305,11 @@ fn render_all_rules(
         let display = category_display(strings, category);
         let slug = category_slug(category);
         out.push_str(&format!("<h2 id=\"{slug}\">{display}</h2>\n\n"));
-        out.push_str(&category_blurb(strings, category));
+        out.push_str(&category_blurb(strings, page, category));
         out.push_str("\n\n");
         out.push_str("<div class=\"rule-list\">\n\n");
         for rule in rules_in_category {
-            out.push_str(&render_rule(strings, rule, rules_default_config, rules_schema));
+            out.push_str(&render_rule(strings, page, rule));
             out.push('\n');
         }
 
@@ -222,7 +322,11 @@ fn render_all_rules(
 fn render_integration_index(strings: &I18nMap, rules: &[RuleEntry]) -> String {
     let mut by_integration: BTreeMap<String, Vec<&RuleEntry>> = BTreeMap::new();
     for rule in rules {
-        for set in rule.requirements.required_integrations() {
+        let Requirements::Php(requirements) = &rule.requirements else {
+            continue;
+        };
+
+        for set in requirements.required_integrations() {
             for integration in integrations_in_set(set) {
                 by_integration.entry(integration.to_string()).or_default().push(rule);
             }
@@ -297,8 +401,8 @@ fn category_display(strings: &I18nMap, category: Category) -> String {
     t(strings, &format!("rules_category_{}_name", category_variant(category)), category.as_str())
 }
 
-fn category_blurb(strings: &I18nMap, category: Category) -> String {
-    t(strings, &format!("rules_category_{}_blurb", category_variant(category)), "")
+fn category_blurb(strings: &I18nMap, page: &RulePage, category: Category) -> String {
+    page_text(strings, page, &format!("category_{}_blurb", category_variant(category)), "")
 }
 
 fn category_variant(category: Category) -> &'static str {
@@ -329,7 +433,7 @@ fn strip_em_dashes(input: &str) -> String {
     input.replace(" \u{2014} ", ", ").replace('\u{2014}', ",")
 }
 
-fn render_rule(strings: &I18nMap, rule: &RuleEntry, rules_default_config: &Value, rules_schema: &Value) -> String {
+fn render_rule(strings: &I18nMap, page: &RulePage, rule: &RuleEntry) -> String {
     let mut out = String::new();
     let level = level_label(rule.level);
 
@@ -349,7 +453,10 @@ fn render_rule(strings: &I18nMap, rule: &RuleEntry, rules_default_config: &Value
         out.push_str("\n\n");
     }
 
-    let req = render_requirements(strings, &rule.requirements);
+    let req = match &rule.requirements {
+        Requirements::Php(requirements) => render_requirements(strings, requirements),
+        Requirements::Twig(version) => render_twig_requirements(strings, *version),
+    };
     if !req.is_empty() {
         out.push_str(&req);
     }
@@ -369,8 +476,9 @@ fn render_rule(strings: &I18nMap, rule: &RuleEntry, rules_default_config: &Value
         if !bad.is_empty() {
             out.push_str("<div class=\"rule-example rule-example--bad\">\n");
             out.push_str(&format!(
-                "<div class=\"rule-example__label\">{}</div>\n\n```php\n",
+                "<div class=\"rule-example__label\">{}</div>\n\n```{}\n",
                 t(strings, "rules_avoid_label", "Avoid"),
+                page.example_language,
             ));
             out.push_str(bad);
             out.push_str("\n```\n\n</div>\n\n");
@@ -379,8 +487,9 @@ fn render_rule(strings: &I18nMap, rule: &RuleEntry, rules_default_config: &Value
         if !good.is_empty() {
             out.push_str("<div class=\"rule-example rule-example--good\">\n");
             out.push_str(&format!(
-                "<div class=\"rule-example__label\">{}</div>\n\n```php\n",
+                "<div class=\"rule-example__label\">{}</div>\n\n```{}\n",
                 t(strings, "rules_prefer_label", "Prefer"),
+                page.example_language,
             ));
             out.push_str(good);
             out.push_str("\n```\n\n</div>\n\n");
@@ -389,7 +498,7 @@ fn render_rule(strings: &I18nMap, rule: &RuleEntry, rules_default_config: &Value
         out.push_str("</div>\n\n");
     }
 
-    if let Some(table) = render_config_table(strings, &rule.code, rules_default_config, rules_schema) {
+    if let Some(table) = render_config_table(strings, &rule.config_key, &page.default_config, &page.schema) {
         if has_top || has_examples {
             out.push_str("<hr class=\"rule__separator\">\n\n");
         }
@@ -474,6 +583,21 @@ fn render_requirements(strings: &I18nMap, req: &RuleRequirements) -> String {
         out.push_str(&format!("<blockquote class=\"rule-requirement\">{sentence}</blockquote>\n\n"));
     }
     out
+}
+
+fn render_twig_requirements(strings: &I18nMap, version: Option<TwigVersion>) -> String {
+    let Some(version) = version else {
+        return String::new();
+    };
+
+    let sentence = t_format(
+        strings,
+        "twig_rules_twig_min",
+        "This rule needs the minimum Twig version, <code>[twig.linter] version</code>, to be <code>{min}</code> or newer.",
+        &[("min", &version.to_string())],
+    );
+
+    format!("<blockquote class=\"rule-requirement\">{sentence}</blockquote>\n\n")
 }
 
 /// Pull the textual lower/upper bound from a PHPVersionRange. Returns
@@ -627,6 +751,21 @@ mod tests {
                 let option_schema = schema_property(&schema, rule_schema, option).unwrap();
                 let kind = schema_type_label(option_schema).unwrap_or_else(|| json_type_label(value).to_string());
                 assert_eq!(kind, json_type_label(value), "{rule}.{option}");
+            }
+        }
+    }
+
+    #[test]
+    fn twig_rules_have_settings_and_matching_schema_types() {
+        let page = twig_page().unwrap();
+        assert_eq!(page.rules.len(), 25);
+        for rule in &page.rules {
+            let options = page.default_config[&rule.config_key].as_object().unwrap();
+            let rule_schema = schema_property(&page.schema, &page.schema, &rule.config_key).unwrap();
+            for (option, value) in options {
+                let option_schema = schema_property(&page.schema, rule_schema, option).unwrap();
+                let kind = schema_type_label(option_schema).unwrap_or_else(|| json_type_label(value).to_string());
+                assert_eq!(kind, json_type_label(value), "{}.{option}", rule.config_key);
             }
         }
     }

@@ -9,16 +9,20 @@ use mago_reporting::Issue;
 use mago_reporting::IssueCollection;
 use mago_span::HasSpan;
 use mago_span::Span;
+#[cfg(feature = "php")]
 use mago_syntax::cst::Program;
 use mago_text_edit::TextEdit;
 use mago_text_edit::TextRange;
 
 use crate::pragma::Pragma;
 use crate::pragma::PragmaKind;
+#[cfg(feature = "php")]
 use crate::walk::attach_pragma_scopes;
 
 pub mod pragma;
 
+mod preserve;
+#[cfg(feature = "php")]
 mod walk;
 
 #[inline]
@@ -77,6 +81,7 @@ where
     /// If true, skip reporting unfulfilled-expect warnings.
     /// Used during incremental/diff analysis where some symbols are skipped.
     skip_unfulfilled_expect: bool,
+    preserve_pragma_comments: bool,
 }
 
 /// Owned pragma state retained while diagnostics may still arrive after a file's
@@ -90,6 +95,7 @@ pub struct DeferredPragmas {
     aliases: HashMap<&'static str, &'static str>,
     link_template: Option<&'static str>,
     skip_unfulfilled_expect: bool,
+    preserve_pragma_comments: bool,
 }
 
 #[derive(Debug, Clone)]
@@ -126,6 +132,7 @@ where
     /// - `file`: The source file associated with this collector.
     /// - `program`: The CST of the entire program, used to attach pragma scopes.
     /// - `categories`: The categories of pragmas to extract (e.g., "lint", "analysis").
+    #[cfg(feature = "php")]
     #[inline]
     pub fn new<'ast>(
         arena: &'arena A,
@@ -144,11 +151,30 @@ where
             aliases: HashMap::default(),
             link_template: None,
             skip_unfulfilled_expect: false,
+            preserve_pragma_comments: false,
         };
 
         attach_pragma_scopes(&mut collector, program);
 
         collector
+    }
+
+    /// Collect issues with caller-parsed pragmas, preserving comments and surrounding text in fixes.
+    #[must_use]
+    pub fn from_pragmas(arena: &'arena A, file: &'ctx File, pragmas: Vec<'arena, Pragma<'arena>, A>) -> Self {
+        Self {
+            arena,
+            file,
+            pragmas,
+            issues: IssueCollection::new(),
+            recordings: Vec::new_in(arena),
+            disabled_codes: Vec::new_in(arena),
+            active_codes: None,
+            aliases: HashMap::default(),
+            link_template: None,
+            skip_unfulfilled_expect: false,
+            preserve_pragma_comments: true,
+        }
     }
 
     /// Sets the issue code aliases.
@@ -410,6 +436,12 @@ where
             return issues;
         }
 
+        let mut preserved_edits = if self.preserve_pragma_comments {
+            preserve::directive_edits(self.file, &self.pragmas, |pragma| self.is_pragma_skipped(pragma))
+        } else {
+            HashMap::default()
+        };
+
         let mut directive_has_used: HashMap<Span, bool> = HashMap::default();
         let mut trivia_has_used: HashMap<Span, bool> = HashMap::default();
         for pragma in self.pragmas.iter() {
@@ -450,7 +482,9 @@ where
                 None
             };
 
-            let edit = if let Some(partial) = partial_count_edit {
+            let edit = if self.preserve_pragma_comments {
+                preserved_edits.remove(&pragma.span)
+            } else if let Some(partial) = partial_count_edit {
                 Some(partial)
             } else if has_used_sibling_codes {
                 Some(self.compute_code_deletion(&pragma))
@@ -538,6 +572,7 @@ where
                 aliases: self.aliases,
                 link_template: self.link_template,
                 skip_unfulfilled_expect: self.skip_unfulfilled_expect,
+                preserve_pragma_comments: self.preserve_pragma_comments,
             }),
         )
     }
@@ -807,6 +842,7 @@ impl DeferredPragmas {
             aliases: self.aliases,
             link_template: self.link_template,
             skip_unfulfilled_expect: self.skip_unfulfilled_expect,
+            preserve_pragma_comments: self.preserve_pragma_comments,
         }
     }
 }

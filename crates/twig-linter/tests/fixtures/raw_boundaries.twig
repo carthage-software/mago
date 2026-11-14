@@ -1,0 +1,7 @@
+{{ b|raw-and }}
+{{ (1|raw..2)|join(',') }}
+{{ value|raw ?: 'fallback' }}
+{{ value|raw is same as(value) }}
+{{ value|raw # keep the comment
+}}
+{{ record('raw', value)|raw }}

@@ -2,7 +2,9 @@ use mago_allocator::prelude::*;
 
 use mago_database::file::File;
 use mago_span::Span;
+#[cfg(feature = "php")]
 use mago_syntax::comments::comment_lines;
+#[cfg(feature = "php")]
 use mago_syntax::cst::Trivia;
 
 /// Allocate `bytes` as a UTF-8 `&str` in `arena` if valid; otherwise `None`.
@@ -146,6 +148,7 @@ impl PragmaKind {
     }
 }
 
+#[cfg(feature = "php")]
 impl<'arena> Pragma<'arena> {
     /// Extracts and returns all pragmas from a slice of trivia that match the specified category.
     ///
@@ -174,208 +177,214 @@ impl<'arena> Pragma<'arena> {
         trivias
             .iter()
             .filter(|trivia| trivia.kind.is_comment())
-            .flat_map(|trivia| parse_pragmas_in_trivia(arena, file, trivia, categories))
+            .flat_map(|trivia| Self::parse_comment(arena, file, trivia.span, comment_lines(trivia), categories))
             .collect_in(arena)
     }
 }
 
-/// Parses all pragmas within a single trivia (comment) node.
-fn parse_pragmas_in_trivia<'arena, A>(
-    arena: &'arena A,
-    file: &File,
-    trivia: &Trivia<'arena>,
-    categories: &'static [&'static str],
-) -> Vec<'arena, Pragma<'arena>, A>
-where
-    A: Arena,
-{
-    let mut pragmas: Vec<'arena, Pragma<'arena>, A> = Vec::new_in(arena);
-    let base_offset = trivia.span.start;
+impl<'arena> Pragma<'arena> {
+    /// Parse pragmas from comment-body lines whose offsets start at the full comment span.
+    #[must_use]
+    pub fn parse_comment<A>(
+        arena: &'arena A,
+        file: &File,
+        comment_span: Span,
+        lines: impl IntoIterator<Item = (u32, &'arena [u8])>,
+        categories: &'static [&'static str],
+    ) -> Vec<'arena, Pragma<'arena>, A>
+    where
+        A: Arena,
+    {
+        let mut pragmas: Vec<'arena, Pragma<'arena>, A> = Vec::new_in(arena);
+        let base_offset = comment_span.start;
 
-    for (line_offset_in_trivia, line) in comment_lines(trivia) {
-        let absolute_line_start = base_offset + line_offset_in_trivia;
-        let trimmed = line.trim_ascii_start();
-        let leading_whitespace = line.len() - trimmed.len();
-        let pragma_start_offset = absolute_line_start + leading_whitespace as u32;
+        for (line_offset_in_trivia, line) in lines {
+            let absolute_line_start = base_offset + line_offset_in_trivia;
+            let trimmed = line.trim_ascii_start();
+            let leading_whitespace = line.len() - trimmed.len();
+            let pragma_start_offset = absolute_line_start + leading_whitespace as u32;
 
-        let (kind, prefix) = if trimmed.starts_with(b"@mago-ignore") {
-            (PragmaKind::Ignore, b"@mago-ignore".as_slice())
-        } else if trimmed.starts_with(b"@mago-expect") {
-            (PragmaKind::Expect, b"@mago-expect".as_slice())
-        } else {
-            continue;
-        };
-
-        let content_with_leading_space = &trimmed[prefix.len()..];
-        let content = content_with_leading_space.trim_ascii_start();
-
-        let Some((category_bytes, rest)) = split_once_byte(content, b':') else {
-            // Handle `@mago-ignore all` / `@mago-expect all` without a category prefix.
-            let (code_part, rest) = splitn_whitespace_2(content);
-            if code_part != b"all" {
+            let (kind, prefix) = if trimmed.starts_with(b"@mago-ignore") {
+                (PragmaKind::Ignore, b"@mago-ignore".as_slice())
+            } else if trimmed.starts_with(b"@mago-expect") {
+                (PragmaKind::Expect, b"@mago-expect".as_slice())
+            } else {
                 continue;
+            };
+
+            let content_with_leading_space = &trimmed[prefix.len()..];
+            let content = content_with_leading_space.trim_ascii_start();
+
+            let Some((category_bytes, rest)) = split_once_byte(content, b':') else {
+                // Handle `@mago-ignore all` / `@mago-expect all` without a category prefix.
+                let (code_part, rest) = splitn_whitespace_2(content);
+                if code_part != b"all" {
+                    continue;
+                }
+
+                let description_bytes = rest.trim_ascii();
+                let Some(description) = alloc_utf8(arena, description_bytes) else {
+                    continue;
+                };
+
+                let Some(&default_category) = categories.first() else {
+                    continue;
+                };
+
+                let code = "all";
+                let code_offset_in_line = content.as_ptr() as usize - line.as_ptr() as usize;
+                let code_start_offset = absolute_line_start + code_offset_in_line as u32;
+                let code_span = Span::new(file.id, code_start_offset, code_start_offset + code.len() as u32);
+
+                let pragma_end_offset =
+                    pragma_start_offset + prefix.len() as u32 + content_with_leading_space.len() as u32;
+                let span = Span::new(file.id, pragma_start_offset, pragma_end_offset);
+
+                let start_line = file.line_number(comment_span.start.offset);
+                let end_line = file.line_number(comment_span.end.offset);
+                let line_start_offset = file.get_line_start_offset(start_line).unwrap_or(0);
+                let line_end_offset = file.get_line_end_offset(end_line).unwrap_or(file.contents.len() as u32);
+                let prefix_text = &file.contents[line_start_offset as usize..comment_span.start.offset as usize];
+                let postfix_text = &file.contents[comment_span.end.offset as usize..line_end_offset as usize];
+                let own_line = prefix_text.trim_ascii().is_empty() && postfix_text.trim_ascii().is_empty();
+
+                pragmas.push(Pragma {
+                    kind,
+                    span,
+                    trivia_span: comment_span,
+                    code_span,
+                    count_span: None,
+                    expected_matches: 1,
+                    matches: 0,
+                    start_line,
+                    end_line,
+                    own_line,
+                    category: default_category,
+                    code,
+                    description,
+                    scope_span: None,
+                });
+
+                continue;
+            };
+
+            if contains_ascii_whitespace(category_bytes) {
+                continue; // Invalid category format.
             }
 
-            let description_bytes = rest.trim_ascii();
+            let Some(category) = alloc_utf8(arena, category_bytes) else {
+                continue;
+            };
+
+            if !categories.contains(&category) {
+                continue; // Skip if category is not recognized.
+            }
+
+            let rest = rest.trim_ascii_start();
+
+            let (codes_part, after_codes) = split_codes_and_description(rest);
+            if codes_part.is_empty() {
+                continue; // Malformed pragma, no code.
+            }
+
+            let description_bytes = after_codes.trim_ascii();
             let Some(description) = alloc_utf8(arena, description_bytes) else {
                 continue;
             };
 
-            let Some(&default_category) = categories.first() else {
-                continue;
-            };
+            // Split codes by comma and create a pragma for each code.
+            // We iterate comma positions via memchr_iter, tracking each chunk's start in `chunk_start`,
+            // and computing the trimmed code's start offset incrementally without re-scanning.
+            let codes_start_offset = absolute_line_start + (codes_part.as_ptr() as u32) - (line.as_ptr() as u32);
 
-            let code = "all";
-            let code_offset_in_line = content.as_ptr() as usize - line.as_ptr() as usize;
-            let code_start_offset = absolute_line_start + code_offset_in_line as u32;
-            let code_span = Span::new(file.id, code_start_offset, code_start_offset + code.len() as u32);
+            let mut chunk_start = 0usize;
+            let mut comma_positions = memchr::memchr_iter(b',', codes_part);
+            loop {
+                let chunk_end = comma_positions.next().unwrap_or(codes_part.len());
+                let raw_chunk = &codes_part[chunk_start..chunk_end];
+                let code_bytes = raw_chunk.trim_ascii();
+                let next_chunk_start = chunk_end + 1;
 
-            let pragma_end_offset = pragma_start_offset + prefix.len() as u32 + content_with_leading_space.len() as u32;
-            let span = Span::new(file.id, pragma_start_offset, pragma_end_offset);
+                if code_bytes.is_empty() {
+                    if chunk_end == codes_part.len() {
+                        break;
+                    }
+                    chunk_start = next_chunk_start;
+                    continue;
+                }
 
-            let start_line = file.line_number(trivia.span.start.offset);
-            let end_line = file.line_number(trivia.span.end.offset);
-            let line_start_offset = file.get_line_start_offset(start_line).unwrap_or(0);
-            let line_end_offset = file.get_line_end_offset(end_line).unwrap_or(file.contents.len() as u32);
-            let prefix_text = &file.contents[line_start_offset as usize..trivia.span.start.offset as usize];
-            let postfix_text = &file.contents[trivia.span.end.offset as usize..line_end_offset as usize];
-            let own_line = prefix_text.trim_ascii().is_empty() && postfix_text.trim_ascii().is_empty();
+                let Some(code) = alloc_utf8(arena, code_bytes) else {
+                    if chunk_end == codes_part.len() {
+                        break;
+                    }
+                    chunk_start = next_chunk_start;
+                    continue;
+                };
 
-            pragmas.push(Pragma {
-                kind,
-                span,
-                trivia_span: trivia.span,
-                code_span,
-                count_span: None,
-                expected_matches: 1,
-                matches: 0,
-                start_line,
-                end_line,
-                own_line,
-                category: default_category,
-                code,
-                description,
-                scope_span: None,
-            });
+                // Trimmed code's start offset inside codes_part = chunk start + leading whitespace count.
+                let code_start_in_codes_part = chunk_start + (raw_chunk.len() - raw_chunk.trim_ascii_start().len());
+                let code_start_offset = codes_start_offset + code_start_in_codes_part as u32;
+                let entry_start_offset = if chunk_start == 0 {
+                    absolute_line_start + (category_bytes.as_ptr() as usize - line.as_ptr() as usize) as u32
+                } else {
+                    code_start_offset
+                };
 
-            continue;
-        };
+                let code_span = Span::new(file.id, entry_start_offset, code_start_offset + code.len() as u32);
+                let code = code
+                    .split_once(':')
+                    .filter(|(category, _)| categories.contains(category))
+                    .map_or(code, |(_, code)| code.trim_ascii_start());
 
-        if contains_ascii_whitespace(category_bytes) {
-            continue; // Invalid category format.
-        }
+                // Parse an optional `(N)` count suffix. `code(3)` means "suppress up to 3 issues".
+                // A missing or malformed suffix defaults to 1.
+                let (base_code, expected_matches, count_span) = match parse_count_suffix(code) {
+                    Some((base, count, count_start_in_code)) => {
+                        let count_start = code_span.end - (code.len() - count_start_in_code) as u32;
+                        let count_end = code_span.end;
+                        (base, count, Some(Span::new(file.id, count_start, count_end)))
+                    }
+                    None => (code, 1u16, None),
+                };
 
-        let Some(category) = alloc_utf8(arena, category_bytes) else {
-            continue;
-        };
+                let pragma_end_offset =
+                    pragma_start_offset + prefix.len() as u32 + content_with_leading_space.len() as u32;
+                let span = Span::new(file.id, pragma_start_offset, pragma_end_offset);
 
-        if !categories.contains(&category) {
-            continue; // Skip if category is not recognized.
-        }
+                let start_line = file.line_number(comment_span.start.offset);
+                let end_line = file.line_number(comment_span.end.offset);
+                let line_start_offset = file.get_line_start_offset(start_line).unwrap_or(0);
+                let line_end_offset = file.get_line_end_offset(end_line).unwrap_or(file.contents.len() as u32);
+                let prefix_text = &file.contents[line_start_offset as usize..comment_span.start.offset as usize];
+                let postfix_text = &file.contents[comment_span.end.offset as usize..line_end_offset as usize];
+                let own_line = prefix_text.trim_ascii().is_empty() && postfix_text.trim_ascii().is_empty();
 
-        let rest = rest.trim_ascii_start();
+                pragmas.push(Pragma {
+                    kind,
+                    span,
+                    trivia_span: comment_span,
+                    code_span,
+                    count_span,
+                    expected_matches,
+                    matches: 0,
+                    start_line,
+                    end_line,
+                    own_line,
+                    category,
+                    code: base_code,
+                    description,
+                    scope_span: None,
+                });
 
-        let (codes_part, after_codes) = split_codes_and_description(rest);
-        if codes_part.is_empty() {
-            continue; // Malformed pragma, no code.
-        }
-
-        let description_bytes = after_codes.trim_ascii();
-        let Some(description) = alloc_utf8(arena, description_bytes) else {
-            continue;
-        };
-
-        // Split codes by comma and create a pragma for each code.
-        // We iterate comma positions via memchr_iter, tracking each chunk's start in `chunk_start`,
-        // and computing the trimmed code's start offset incrementally without re-scanning.
-        let codes_start_offset = absolute_line_start + (codes_part.as_ptr() as u32) - (line.as_ptr() as u32);
-
-        let mut chunk_start = 0usize;
-        let mut comma_positions = memchr::memchr_iter(b',', codes_part);
-        loop {
-            let chunk_end = comma_positions.next().unwrap_or(codes_part.len());
-            let raw_chunk = &codes_part[chunk_start..chunk_end];
-            let code_bytes = raw_chunk.trim_ascii();
-            let next_chunk_start = chunk_end + 1;
-
-            if code_bytes.is_empty() {
                 if chunk_end == codes_part.len() {
                     break;
                 }
                 chunk_start = next_chunk_start;
-                continue;
             }
-
-            let Some(code) = alloc_utf8(arena, code_bytes) else {
-                if chunk_end == codes_part.len() {
-                    break;
-                }
-                chunk_start = next_chunk_start;
-                continue;
-            };
-
-            // Trimmed code's start offset inside codes_part = chunk start + leading whitespace count.
-            let code_start_in_codes_part = chunk_start + (raw_chunk.len() - raw_chunk.trim_ascii_start().len());
-            let code_start_offset = codes_start_offset + code_start_in_codes_part as u32;
-            let entry_start_offset = if chunk_start == 0 {
-                absolute_line_start + (category_bytes.as_ptr() as usize - line.as_ptr() as usize) as u32
-            } else {
-                code_start_offset
-            };
-
-            let code_span = Span::new(file.id, entry_start_offset, code_start_offset + code.len() as u32);
-            let code = code
-                .split_once(':')
-                .filter(|(category, _)| categories.contains(category))
-                .map_or(code, |(_, code)| code.trim_ascii_start());
-
-            // Parse an optional `(N)` count suffix. `code(3)` means "suppress up to 3 issues".
-            // A missing or malformed suffix defaults to 1.
-            let (base_code, expected_matches, count_span) = match parse_count_suffix(code) {
-                Some((base, count, count_start_in_code)) => {
-                    let count_start = code_span.end - (code.len() - count_start_in_code) as u32;
-                    let count_end = code_span.end;
-                    (base, count, Some(Span::new(file.id, count_start, count_end)))
-                }
-                None => (code, 1u16, None),
-            };
-
-            let pragma_end_offset = pragma_start_offset + prefix.len() as u32 + content_with_leading_space.len() as u32;
-            let span = Span::new(file.id, pragma_start_offset, pragma_end_offset);
-
-            let start_line = file.line_number(trivia.span.start.offset);
-            let end_line = file.line_number(trivia.span.end.offset);
-            let line_start_offset = file.get_line_start_offset(start_line).unwrap_or(0);
-            let line_end_offset = file.get_line_end_offset(end_line).unwrap_or(file.contents.len() as u32);
-            let prefix_text = &file.contents[line_start_offset as usize..trivia.span.start.offset as usize];
-            let postfix_text = &file.contents[trivia.span.end.offset as usize..line_end_offset as usize];
-            let own_line = prefix_text.trim_ascii().is_empty() && postfix_text.trim_ascii().is_empty();
-
-            pragmas.push(Pragma {
-                kind,
-                span,
-                trivia_span: trivia.span,
-                code_span,
-                count_span,
-                expected_matches,
-                matches: 0,
-                start_line,
-                end_line,
-                own_line,
-                category,
-                code: base_code,
-                description,
-                scope_span: None,
-            });
-
-            if chunk_end == codes_part.len() {
-                break;
-            }
-            chunk_start = next_chunk_start;
         }
+
+        pragmas
     }
-
-    pragmas
 }
 
 /// Parses the optional `(N)` count suffix from a pragma code.

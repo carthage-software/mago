@@ -3,6 +3,7 @@ mod alloc;
 mod argument;
 mod array;
 mod arrow;
+mod assignment;
 mod common;
 mod conditional;
 mod expression;
