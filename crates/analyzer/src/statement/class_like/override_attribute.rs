@@ -43,9 +43,8 @@ pub fn check_override_attribute<'ctx, 'arena, A>(
             (None, 0)
         };
 
-        let name_bytes = method.name.value.to_ascii_lowercase();
-        let name = mago_bytes::BytesDisplay(&name_bytes);
-        if name_bytes.eq_ignore_ascii_case(b"__construct") {
+        let name = mago_bytes::BytesDisplay(method.name.value);
+        if method.name.value.eq_ignore_ascii_case(b"__construct") {
             if let Some(attribute) = override_attribute {
                 let issue = Issue::error("Invalid `#[Override]` attribute on constructor.")
                     .with_code(IssueCode::InvalidOverrideAttribute)
@@ -104,7 +103,7 @@ pub fn check_override_attribute<'ctx, 'arena, A>(
             continue;
         };
 
-        if override_attribute.is_some() || metadata.kind.is_trait() {
+        if override_attribute.is_some() || metadata.kind.is_trait() || !context.settings.check_missing_override {
             continue;
         }
 

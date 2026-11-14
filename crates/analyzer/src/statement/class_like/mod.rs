@@ -454,9 +454,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Class<'arena> {
             );
         }
 
-        if context.settings.check_missing_override {
-            override_attribute::check_override_attribute(class_like_metadata, self.members.as_slice(), context);
-        }
+        override_attribute::check_override_attribute(class_like_metadata, self.members.as_slice(), context);
 
         let should_check_unused = 'check_unused: {
             if !context.settings.find_unused_definitions {
@@ -577,9 +575,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Interface<'arena> {
             );
         }
 
-        if context.settings.check_missing_override {
-            override_attribute::check_override_attribute(class_like_metadata, self.members.as_slice(), context);
-        }
+        override_attribute::check_override_attribute(class_like_metadata, self.members.as_slice(), context);
 
         // Call plugin on_leave_interface hooks
         if context.plugin_registry.has_interface_hooks() {
@@ -658,9 +654,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Trait<'arena> {
             );
         }
 
-        if context.settings.check_missing_override {
-            override_attribute::check_override_attribute(class_like_metadata, self.members.as_slice(), context);
-        }
+        override_attribute::check_override_attribute(class_like_metadata, self.members.as_slice(), context);
 
         // Call plugin on_leave_trait hooks
         if context.plugin_registry.has_trait_hooks() {
@@ -721,9 +715,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Enum<'arena> {
 
         check_duplicate_enum_case_values(context, artifacts, name, self);
 
-        if context.settings.check_missing_override {
-            override_attribute::check_override_attribute(class_like_metadata, self.members.as_slice(), context);
-        }
+        override_attribute::check_override_attribute(class_like_metadata, self.members.as_slice(), context);
 
         if context.settings.find_unused_definitions
             && !class_like_metadata.flags.is_unchecked()

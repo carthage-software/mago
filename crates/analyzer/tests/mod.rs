@@ -838,6 +838,7 @@ test_case!(strval_and_interpolation_cast_like);
 test_case!(string_refinement_kept_by_narrowing);
 test_case!(trait_parent_resolves_to_using_class);
 test_case!(trait_self_in_callables_and_subclass_calls);
+test_case!(invalid_override_reported_by_default);
 test_case!(magic_properties);
 test_case!(magic_property_overridden_by_parent);
 test_case!(magic_property_shadowing_real_property);
