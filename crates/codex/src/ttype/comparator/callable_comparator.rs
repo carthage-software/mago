@@ -82,6 +82,14 @@ pub(crate) fn is_contained_by(
             return false;
         }
 
+        if container_parameter.has_default()
+            && !container_parameter.is_variadic()
+            && !input_parameter.has_default()
+            && !input_parameter.is_variadic()
+        {
+            return false;
+        }
+
         let Some(container_parameter_type) = container_parameter.get_type_signature() else {
             continue;
         };
