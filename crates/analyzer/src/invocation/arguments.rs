@@ -103,38 +103,14 @@ where
         return Ok(());
     }
 
-    let inferred_parameter_types = closure_parameter_type.map(|closure_parameter_type| {
-        let mut inferred_parameters = HashMap::default();
-
-        closure_parameter_type
-            .types
-            .as_ref()
-            .iter()
-            .filter_map(|atomic| match atomic {
-                TAtomic::Callable(TCallable::Signature(callable)) => Some(callable),
-                _ => None,
-            })
-            .flat_map(|callable| callable.parameters.iter().enumerate())
-            .filter_map(|(parameter_index, parameter)| {
-                parameter.get_type_signature().map(|param_type| (parameter_index, param_type.clone()))
-            })
-            .for_each(|(parameter_index, parameter_type)| match inferred_parameters.entry(parameter_index) {
-                Entry::Occupied(occupied_entry) => {
-                    let existing_type: TUnion = occupied_entry.remove();
-                    let updated_type =
-                        add_union_type(existing_type, &parameter_type, context.codebase, CombinerOptions::default());
-
-                    inferred_parameters.insert(parameter_index, updated_type);
-                }
-                Entry::Vacant(vacant_entry) => {
-                    vacant_entry.insert(parameter_type);
-                }
-            });
-
-        inferred_parameters
-    });
+    let (inferred_parameter_types, inferred_return_type) =
+        match closure_parameter_type.map(|closure_type| closure_signature_hints(context, closure_type)) {
+            Some((parameter_types, return_type)) => (Some(parameter_types), return_type),
+            None => (None, None),
+        };
 
     let inferred_parameter_types = std::mem::replace(&mut artifacts.inferred_parameter_types, inferred_parameter_types);
+    let inferred_return_type = std::mem::replace(&mut artifacts.inferred_return_type, inferred_return_type);
 
     let was_inside_general_use = block_context.flags.inside_general_use();
     let was_inside_call = block_context.flags.inside_call();
@@ -150,6 +126,7 @@ where
     block_context.flags.set_inside_call(was_inside_call);
     block_context.flags.set_inside_variable_reference(was_inside_variable_reference);
     artifacts.inferred_parameter_types = inferred_parameter_types;
+    artifacts.inferred_return_type = inferred_return_type;
 
     let argument_type =
         artifacts.get_rc_expression_type(argument_expression).cloned().unwrap_or_else(|| Rc::new(get_mixed()));
@@ -549,4 +526,48 @@ where
         .into_iter()
         .reduce(|acc, element_type| add_union_type(acc, &element_type, context.codebase, CombinerOptions::default()))
         .unwrap_or_else(get_never)
+}
+
+pub(crate) fn closure_signature_hints<A>(
+    context: &Context<'_, '_, A>,
+    closure_type: &TUnion,
+) -> (HashMap<usize, TUnion>, Option<TUnion>)
+where
+    A: Arena,
+{
+    let mut parameter_types: HashMap<usize, TUnion> = HashMap::default();
+    let mut return_type: Option<TUnion> = None;
+
+    for callable in closure_type.types.iter().filter_map(|atomic| match atomic {
+        TAtomic::Callable(TCallable::Signature(callable)) => Some(callable),
+        _ => None,
+    }) {
+        for (parameter_index, parameter) in callable.parameters.iter().enumerate() {
+            let Some(parameter_type) = parameter.get_type_signature() else {
+                continue;
+            };
+
+            match parameter_types.entry(parameter_index) {
+                Entry::Occupied(mut occupied_entry) => {
+                    let existing_type = std::mem::replace(occupied_entry.get_mut(), get_never());
+                    *occupied_entry.get_mut() =
+                        add_union_type(existing_type, parameter_type, context.codebase, CombinerOptions::default());
+                }
+                Entry::Vacant(vacant_entry) => {
+                    vacant_entry.insert(parameter_type.clone());
+                }
+            }
+        }
+
+        if let Some(callable_return_type) = callable.get_return_type() {
+            return_type = Some(match return_type {
+                Some(existing_type) => {
+                    add_union_type(existing_type, callable_return_type, context.codebase, CombinerOptions::default())
+                }
+                None => callable_return_type.clone(),
+            });
+        }
+    }
+
+    (parameter_types, return_type)
 }

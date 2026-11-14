@@ -67,6 +67,7 @@ use crate::context::block::BlockContext;
 use crate::context::block::ReferenceConstraint;
 use crate::context::block::ReferenceConstraintSource;
 use crate::error::AnalysisError;
+use crate::invocation::arguments::closure_signature_hints;
 use crate::resolver::property::localize_property_type;
 use crate::resolver::property::resolve_declared_property;
 use crate::statement::analyze_statements;
@@ -186,6 +187,7 @@ pub fn analyze_function_like<'ctx, 'ast, 'arena, A>(
     parameter_list: &'ast FunctionLikeParameterList<'arena>,
     body: FunctionLikeBody<'ast, 'arena>,
     inferred_parameter_types: Option<HashMap<usize, TUnion>>,
+    inferred_return_type: Option<TUnion>,
 ) -> Result<AnalysisArtifacts, AnalysisError>
 where
     A: Arena,
@@ -199,6 +201,7 @@ where
         .with_retained_expression_types(parent_artifacts.should_retain_completed_expression_types())
         .with_variable_definedness_targets(parent_artifacts.variable_definedness_targets())
         .with_editor_artifacts(parent_artifacts.editor.is_some());
+    artifacts.expected_return_type = inferred_return_type;
 
     check_function_like_types(context, function_like_metadata);
 
@@ -311,6 +314,7 @@ where
             }
             FunctionLikeBody::Expression(value) => {
                 block_context.flags.set_inside_return(true);
+                hint_returned_closure(context, block_context, &mut artifacts, value);
                 value.analyze(context, block_context, &mut artifacts)?;
                 block_context.flags.set_inside_return(false);
                 block_context.conditionally_referenced_variable_ids.clear();
@@ -1641,4 +1645,31 @@ where
 
         false
     });
+}
+
+pub(crate) fn hint_returned_closure<A>(
+    context: &Context<'_, '_, A>,
+    block_context: &BlockContext<'_>,
+    artifacts: &mut AnalysisArtifacts,
+    value: &Expression<'_>,
+) where
+    A: Arena,
+{
+    if !matches!(value, Expression::Closure(_) | Expression::ArrowFunction(_)) {
+        return;
+    }
+
+    let Some(expected_type) = block_context
+        .scope
+        .get_function_like()
+        .and_then(|function_like| function_like.return_type_metadata.as_ref())
+        .map(|return_type| &return_type.type_union)
+        .or(artifacts.expected_return_type.as_ref())
+    else {
+        return;
+    };
+
+    let (parameter_types, return_type) = closure_signature_hints(context, expected_type);
+    artifacts.inferred_parameter_types = Some(parameter_types);
+    artifacts.inferred_return_type = return_type;
 }

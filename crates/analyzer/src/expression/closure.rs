@@ -210,6 +210,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
         );
 
         let inferred_parameter_types = artifacts.inferred_parameter_types.take();
+        let inferred_return_type = artifacts.inferred_return_type.take();
         let inner_artifacts = analyze_function_like(
             context,
             artifacts,
@@ -218,6 +219,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
             &self.parameter_list,
             FunctionLikeBody::Statements(self.body.statements.as_slice(), self.body.span()),
             inferred_parameter_types,
+            inferred_return_type,
         )?;
 
         for referenced_variable in inner_block_context.references_to_external_scope {

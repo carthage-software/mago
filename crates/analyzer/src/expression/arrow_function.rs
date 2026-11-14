@@ -115,6 +115,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
         );
 
         let inferred_parameter_types = artifacts.inferred_parameter_types.take();
+        let inferred_return_type = artifacts.inferred_return_type.take();
         let inner_artifacts = analyze_function_like(
             context,
             artifacts,
@@ -123,6 +124,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
             &self.parameter_list,
             FunctionLikeBody::Expression(self.expression),
             inferred_parameter_types,
+            inferred_return_type,
         )?;
 
         let resulting_closure = resolve_closure_like_type(

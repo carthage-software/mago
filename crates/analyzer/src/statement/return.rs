@@ -36,6 +36,7 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::context::scope::control_action::ControlAction;
 use crate::error::AnalysisError;
+use crate::statement::function_like::hint_returned_closure;
 use crate::utils::docblock::check_docblock_type_incompatibility;
 use crate::utils::docblock::get_type_from_var_docblock;
 use crate::utils::get_type_diff;
@@ -54,6 +55,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Return<'arena> {
     {
         let inferred_return_type = if let Some(return_value) = self.value.as_ref() {
             block_context.flags.set_inside_return(true);
+            hint_returned_closure(context, block_context, artifacts, return_value);
             return_value.analyze(context, block_context, artifacts)?;
             block_context.flags.set_inside_return(false);
 
