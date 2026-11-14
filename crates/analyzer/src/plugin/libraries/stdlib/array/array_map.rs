@@ -76,12 +76,26 @@ impl FunctionReturnTypeProvider for ArrayMapProvider {
             return zip_input_arrays(context, invocation, argument_count);
         }
 
-        if argument_count != 2 {
-            return None;
+        let callback_metadata = context.get_callable_metadata(callback_arg);
+        if argument_count > 2 {
+            let return_type = callback_metadata
+                .and_then(|metadata| metadata.return_type_metadata.as_ref())
+                .map(|return_type| return_type.type_union.clone())
+                .or_else(|| match callback_type.types.as_ref() {
+                    [TAtomic::Callable(callable)] => {
+                        callable.get_signature().and_then(|signature| signature.get_return_type().cloned())
+                    }
+                    _ => None,
+                })?;
+
+            if return_type.has_template_types() {
+                return None;
+            }
+
+            return Some(wrap_atomic(TAtomic::Array(TArray::List(TList::new(Arc::new(return_type))))));
         }
 
         let array_arg = invocation.get_argument(1, &[b"array"])?;
-        let callback_metadata = context.get_callable_metadata(callback_arg);
 
         // Fall back to the inferred return type when none is declared, e.g. for
         // an untyped arrow function.
