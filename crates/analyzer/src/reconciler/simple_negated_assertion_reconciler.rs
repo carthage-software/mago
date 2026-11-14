@@ -9,6 +9,8 @@ use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
 use mago_codex::ttype::atomic::array::list::TList;
+use mago_codex::ttype::atomic::derived::TDerived;
+use mago_codex::ttype::atomic::derived::intersection::TDerivedIntersection;
 use mago_codex::ttype::atomic::mixed::truthiness::TMixedTruthiness;
 use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::object::named::TNamedObject;
@@ -17,6 +19,7 @@ use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::bool::TBool;
 use mago_codex::ttype::atomic::scalar::float::TFloat;
 use mago_codex::ttype::atomic::scalar::int::TInteger;
+use mago_codex::ttype::atomic::scalar::string::TString;
 use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::get_arraykey;
 use mago_codex::ttype::get_never;
@@ -32,6 +35,7 @@ use mago_word::word;
 use crate::reconciler::Context;
 use crate::reconciler::map_generic_constraint;
 use crate::reconciler::simple_assertion_reconciler::get_acceptable_type;
+use crate::reconciler::simple_assertion_reconciler::get_callable_array_shape;
 use crate::reconciler::simple_assertion_reconciler::intersect_null;
 use crate::reconciler::simple_assertion_reconciler::reconcile_non_empty_countable;
 use crate::reconciler::trigger_issue_for_impossible;
@@ -355,6 +359,15 @@ where
                 key_type,
                 Arc::clone(&iterable.value_type),
             ))));
+        } else if let TAtomic::Callable(callable) = &atomic
+            && !is_equality
+            && matches!(type_to_subtract, Some(TAtomic::Object(TObject::Any)))
+        {
+            did_remove_type = true;
+            if !callable.is_closure() {
+                acceptable_types.push(get_callable_string(&atomic));
+                acceptable_types.push(get_callable_array(&atomic));
+            }
         } else if atomic.is_object_type() {
             did_remove_type = true;
 
@@ -610,6 +623,13 @@ where
             if is_equality {
                 acceptable_types.push(atomic);
             }
+        } else if let TAtomic::Callable(callable) = &atomic
+            && !is_equality
+            && !callable.is_closure()
+        {
+            did_remove_type = true;
+            acceptable_types.push(get_callable_string(&atomic));
+            acceptable_types.push(get_callable_object(&atomic));
         } else {
             acceptable_types.push(atomic);
         }
@@ -680,6 +700,13 @@ where
                 acceptable_types.push(TAtomic::Scalar(TScalar::float()));
                 acceptable_types.push(TAtomic::Scalar(TScalar::bool()));
             }
+        } else if let TAtomic::Callable(callable) = &atomic
+            && !is_equality
+            && !callable.is_closure()
+        {
+            did_remove_type = true;
+            acceptable_types.push(get_callable_array(&atomic));
+            acceptable_types.push(get_callable_object(&atomic));
         } else if atomic.is_any_string() {
             did_remove_type = true;
 
@@ -1883,4 +1910,26 @@ fn extract_specific_combination(subtract_elements: &BTreeMap<usize, (bool, TUnio
 fn combinations_are_equal(first_combination: &[TAtomic], second_combination: &[TAtomic]) -> bool {
     first_combination.len() == second_combination.len()
         && first_combination.iter().zip(second_combination.iter()).all(|(a, b)| a == b)
+}
+
+fn get_callable_string(callable: &TAtomic) -> TAtomic {
+    let mut intersection =
+        TDerivedIntersection::new(TUnion::from_atomic(TAtomic::Scalar(TScalar::String(TString::callable()))));
+    intersection.add_intersection_type(callable.clone());
+
+    TAtomic::Derived(TDerived::Intersection(intersection))
+}
+
+fn get_callable_object(callable: &TAtomic) -> TAtomic {
+    let mut object = TAtomic::Object(TObject::new_has_method(word("__invoke")));
+    object.add_intersection_type(callable.clone());
+
+    object
+}
+
+fn get_callable_array(callable: &TAtomic) -> TAtomic {
+    let mut intersection = TDerivedIntersection::new(TUnion::from_atomic(get_callable_array_shape()));
+    intersection.add_intersection_type(callable.clone());
+
+    TAtomic::Derived(TDerived::Intersection(intersection))
 }

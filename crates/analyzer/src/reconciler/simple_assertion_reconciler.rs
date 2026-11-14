@@ -931,6 +931,12 @@ where
                     acceptable_types.push(get_callable_array_shape());
                 }
             }
+            TAtomic::Derived(TDerived::Intersection(intersection))
+                if intersection.get_base_type().types.iter().all(|base| matches!(base, TAtomic::Array(_))) =>
+            {
+                did_remove_type = true;
+                acceptable_types.extend(intersection.get_base_type().types.iter().cloned());
+            }
             _ => {
                 did_remove_type = true;
             }
@@ -1613,7 +1619,7 @@ where
     new_var_type
 }
 
-fn get_callable_array_shape() -> TAtomic {
+pub(crate) fn get_callable_array_shape() -> TAtomic {
     let mut known_items = BTreeMap::new();
 
     known_items.insert(
