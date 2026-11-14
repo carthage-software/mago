@@ -27,10 +27,10 @@ namespace {
     function ldap_exop(
         LDAP\Connection $ldap,
         string $request_oid,
-        ?string $request_data,
+        ?string $request_data = null,
         ?array $controls = null,
-        &$response_data,
-        &$response_oid,
+        &$response_data = null,
+        &$response_oid = null,
     ): LDAP\Result|bool {}
 
     #[Mago\AvailableSince(80300)]
@@ -77,16 +77,16 @@ namespace {
 
     function ldap_t61_to_8859(string $value): string {}
 
-    function ldap_connect(?string $uri, int $port = 389): LDAP\Connection|false {}
+    function ldap_connect(?string $uri = null, int $port = 389): LDAP\Connection|false {}
 
     function ldap_close(LDAP\Connection $ldap): bool {}
 
-    function ldap_bind(LDAP\Connection $ldap, ?string $dn, #[SensitiveParameter] ?string $password): bool {}
+    function ldap_bind(LDAP\Connection $ldap, ?string $dn = null, #[SensitiveParameter] ?string $password = null): bool {}
 
     function ldap_bind_ext(
         LDAP\Connection $ldap,
-        ?string $dn,
-        ?string $password,
+        ?string $dn = null,
+        ?string $password = null,
         ?array $controls = null,
     ): LDAP\Result|false {}
 
@@ -279,9 +279,9 @@ namespace {
         LDAP\Connection $ldap,
         LDAP\Result $result,
         &$error_code,
-        &$matched_dn,
-        &$error_message,
-        &$referrals,
+        &$matched_dn = null,
+        &$error_message = null,
+        &$referrals = null,
         &$controls = null,
     ): bool {}
 

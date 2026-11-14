@@ -412,6 +412,10 @@ class LimitIterator extends IteratorIterator implements OuterIterator
      */
     public function __construct(Iterator $iterator, int $offset = 0, int $limit = -1) {}
 
+    public function getPosition(): int {}
+
+    public function seek(int $offset): int {}
+
     /**
      * @return V|null
      * @ignore-nullable-return
@@ -475,6 +479,10 @@ class CachingIterator extends IteratorIterator implements OuterIterator, ArrayAc
      * @return bool
      */
     public function hasNext() {}
+
+    public function getFlags(): int {}
+
+    public function setFlags(int $flags): void {}
 
     /**
      * @return V|null
