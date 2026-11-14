@@ -3166,6 +3166,7 @@ test_case!(truthy_nullsafe_assignment_narrows_receiver);
 test_case!(generic_callback_binds_its_own_template);
 test_case!(loop_bool_identity_keeps_assignment_link);
 test_case!(loop_condition_assignment_after_loop);
+test_case!(endless_loop_exits_only_through_break);
 
 #[test]
 #[cfg_attr(miri, ignore)]

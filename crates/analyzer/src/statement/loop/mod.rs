@@ -275,12 +275,16 @@ fn inherit_loop_block_context<'ctx, A>(
                 if let Some(possible_type) = loop_scope.possibly_defined_loop_parent_variables.get(&variable) {
                     block_context.locals.insert(
                         variable,
-                        Rc::new(ttype::combine_union_types(
-                            &variable_type,
-                            possible_type,
-                            context.codebase,
-                            CombinerOptions::default(),
-                        )),
+                        if known_infinite_loop {
+                            Rc::clone(possible_type)
+                        } else {
+                            Rc::new(ttype::combine_union_types(
+                                &variable_type,
+                                possible_type,
+                                context.codebase,
+                                CombinerOptions::default(),
+                            ))
+                        },
                     );
                 }
             }
