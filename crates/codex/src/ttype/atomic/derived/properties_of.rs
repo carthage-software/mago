@@ -117,6 +117,10 @@ impl TPropertiesOf {
                             continue;
                         };
 
+                        if property_metadata.flags.is_static() {
+                            continue;
+                        }
+
                         // Filter by visibility if specified
                         if let Some(required_visibility) = visibility_filter
                             && property_metadata.read_visibility != required_visibility
