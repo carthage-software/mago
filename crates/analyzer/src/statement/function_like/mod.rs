@@ -168,7 +168,22 @@ where
             }
 
             if let Some(inferred_return_type) = inferred_return_type {
-                signature.return_type = Some(Arc::new(inferred_return_type));
+                let fits_declared = function_metadata.return_type_metadata.is_none()
+                    || signature.return_type.as_deref().is_none_or(|declared| {
+                        union_comparator::is_contained_by(
+                            context.codebase,
+                            &inferred_return_type,
+                            declared,
+                            false,
+                            false,
+                            false,
+                            &mut ComparisonResult::new(),
+                        )
+                    });
+
+                if fits_declared {
+                    signature.return_type = Some(Arc::new(inferred_return_type));
+                }
             } else if inner_has_returned && !inner_artifacts.has_bare_return {
                 signature.return_type = Some(Arc::new(get_never()));
             } else {

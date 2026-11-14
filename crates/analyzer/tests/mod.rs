@@ -3323,6 +3323,7 @@ test_case!(possibly_undefined_variable_reads_as_null_in_conditions);
 test_case!(string_length_comparisons_narrow);
 test_case!(isset_on_uninitialized_typed_property);
 test_case!(closure_inherits_symbol_existence_guards);
+test_case!(closure_keeps_declared_return_over_mixed_body);
 
 #[test]
 #[cfg_attr(miri, ignore)]
