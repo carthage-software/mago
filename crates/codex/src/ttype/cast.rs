@@ -20,8 +20,10 @@ use crate::ttype::atomic::derived::TDerived;
 use crate::ttype::atomic::object::TObject;
 use crate::ttype::atomic::reference::TReference;
 use crate::ttype::atomic::scalar::TScalar;
+use crate::ttype::expander::get_signature_of_function_like_identifier;
 use crate::ttype::template::GenericTemplate;
 use crate::ttype::template::TemplateResult;
+use crate::ttype::template::inferred_type_replacer;
 use crate::ttype::union::TUnion;
 
 #[must_use]
@@ -221,6 +223,37 @@ fn try_object_method(
         .method_exists(method_identifier.get_class_name().as_bytes(), method_identifier.get_method_name().as_bytes())
     {
         populate_template_result(template_result, codebase, object_name, type_parameters);
+
+        if let Some(type_parameters) = type_parameters
+            && let Some(class_metadata) = codebase.get_class_like(object_name.as_bytes())
+            && let Some(mut signature) = get_signature_of_function_like_identifier(
+                &FunctionLikeIdentifier::Method(object_name, method_name),
+                codebase,
+            )
+        {
+            let mut bounds = TemplateResult::default();
+            for (index, parameter) in type_parameters.iter().enumerate() {
+                if let Some(template_name) = class_metadata.get_template_name_for_index(index) {
+                    bounds.add_lower_bound(
+                        template_name,
+                        GenericParent::ClassLike(class_metadata.name),
+                        parameter.clone(),
+                    );
+                }
+            }
+
+            for parameter in signature.get_parameters_mut() {
+                if let Some(parameter_type) = parameter.get_type_signature_mut() {
+                    *parameter_type = inferred_type_replacer::replace(parameter_type, &bounds, codebase);
+                }
+            }
+
+            if let Some(return_type) = signature.get_return_type_mut() {
+                *return_type = inferred_type_replacer::replace(return_type, &bounds, codebase);
+            }
+
+            return Some(Cow::Owned(TCallable::Signature(signature)));
+        }
 
         if codebase.get_class_like_by_name(method_identifier.get_class_name()).is_some_and(|c| c.kind.is_trait()) {
             return Some(Cow::Owned(TCallable::Alias(FunctionLikeIdentifier::Method(object_name, method_name))));
