@@ -1315,7 +1315,25 @@ fn is_iteration_dependent_truthiness_issue(code: Option<&str>) -> bool {
         Ok(IssueCode::ImpossibleCondition
             | IssueCode::RedundantComparison
             | IssueCode::RedundantCondition
-            | IssueCode::RedundantTypeComparison)
+            | IssueCode::RedundantTypeComparison
+            | IssueCode::ImpossibleTypeComparison
+            | IssueCode::ImpossibleNullTypeComparison
+            | IssueCode::ParadoxicalCondition
+            | IssueCode::RedundantLogicalOperation
+            | IssueCode::RedundantNullCoalesce
+            | IssueCode::RedundantIssetCheck
+            | IssueCode::RedundantKeyCheck
+            | IssueCode::ImpossibleKeyCheck
+            | IssueCode::ImpossibleNonnullEntryCheck
+            | IssueCode::UnreachableElseClause
+            | IssueCode::MatchArmAlwaysTrue
+            | IssueCode::UnreachableMatchArm
+            | IssueCode::UnreachableMatchDefaultArm
+            | IssueCode::AlwaysMatchingSwitchCase
+            | IssueCode::UnreachableSwitchCase
+            | IssueCode::UnreachableSwitchDefault
+            | IssueCode::ImpossibleAssignment
+            | IssueCode::NoValue)
     )
 }
 

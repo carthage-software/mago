@@ -819,6 +819,7 @@ test_case!(final_method_static_return_keeps_static);
 test_case!(returned_closure_takes_declared_types);
 test_case!(receiver_bound_template_not_widened);
 test_case!(is_a_keeps_class_string_template);
+test_case!(do_while_first_pass_dead_code);
 test_case!(magic_properties);
 test_case!(magic_property_overridden_by_parent);
 test_case!(magic_property_shadowing_real_property);
