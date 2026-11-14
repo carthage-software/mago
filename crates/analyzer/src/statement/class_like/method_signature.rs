@@ -388,7 +388,6 @@ pub fn validate_method_signature_compatibility(
         let expansion_options = TypeExpansionOptions {
             self_class: Some(child_class_name),
             static_class_type: StaticClassType::Name(child_class_name),
-            function_is_final: child_method_meta.is_final,
             ..Default::default()
         };
 

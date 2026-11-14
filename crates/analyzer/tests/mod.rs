@@ -815,6 +815,7 @@ test_case!(conditional_return_resolves_each_part);
 test_case!(conditional_return_disjoint_arrays);
 test_case!(isset_on_template_union_shape);
 test_case!(this_matches_static_in_invariant_template);
+test_case!(final_method_static_return_keeps_static);
 test_case!(magic_properties);
 test_case!(magic_property_overridden_by_parent);
 test_case!(magic_property_shadowing_real_property);
