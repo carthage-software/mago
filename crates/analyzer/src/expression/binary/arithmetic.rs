@@ -914,7 +914,7 @@ where
 }
 
 /// `+` composition for two keyed shapes.
-fn compose_keyed_plus(left: &TKeyedArray, right: &TKeyedArray) -> TKeyedArray {
+pub(crate) fn compose_keyed_plus(left: &TKeyedArray, right: &TKeyedArray) -> TKeyedArray {
     use std::collections::BTreeMap;
 
     let left_known = left.known_items.as_deref();

@@ -23,7 +23,7 @@ use crate::resolver::class_name::report_non_existent_class_like;
 
 pub mod utils;
 
-mod arithmetic;
+pub(crate) mod arithmetic;
 mod comparison;
 pub(crate) mod concat;
 mod logical;

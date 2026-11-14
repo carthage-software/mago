@@ -8,7 +8,9 @@ mod array_is_list;
 mod array_key_exists;
 mod array_map;
 mod array_merge;
+mod array_merge_recursive;
 mod array_pad;
+mod array_replace;
 mod compact;
 mod range;
 
@@ -20,6 +22,8 @@ pub use array_is_list::ArrayIsListProvider;
 pub use array_key_exists::ArrayKeyExistsProvider;
 pub use array_map::ArrayMapProvider;
 pub use array_merge::ArrayMergeProvider;
+pub use array_merge_recursive::ArrayMergeRecursiveProvider;
 pub use array_pad::ArrayPadProvider;
+pub use array_replace::ArrayReplaceProvider;
 pub use compact::CompactProvider;
 pub use range::RangeProvider;

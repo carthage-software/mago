@@ -53,6 +53,8 @@ impl Plugin for StdlibPlugin {
         registry.register_function_provider(array::ArrayKeyExistsProvider);
         registry.register_function_provider(array::ArrayMapProvider);
         registry.register_function_provider(array::ArrayMergeProvider);
+        registry.register_function_provider(array::ArrayMergeRecursiveProvider);
+        registry.register_function_provider(array::ArrayReplaceProvider);
         registry.register_function_provider(array::ArrayPadProvider);
         registry.register_function_provider(array::CompactProvider);
         registry.register_function_provider(object::GetCalledClassProvider);
