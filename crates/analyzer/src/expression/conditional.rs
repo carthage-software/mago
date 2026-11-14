@@ -14,6 +14,7 @@ use mago_codex::ttype::TType;
 use mago_codex::ttype::combine_optional_union_types;
 use mago_codex::ttype::combine_union_types;
 use mago_codex::ttype::get_mixed;
+use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
@@ -253,89 +254,116 @@ where
     r#else.analyze(context, &mut else_block_context, artifacts)?;
     else_block_context.flags.set_inside_general_use(was_inside_general_use);
 
-    let if_assigned_variables = if_block_context.assigned_variable_ids.keys().copied().collect::<WordSet>();
-    let else_assigned_variables = else_block_context.assigned_variable_ids.keys().copied().collect::<WordSet>();
-    let assigned_variables = if_assigned_variables.intersection(&else_assigned_variables).copied().collect::<WordSet>();
+    let then_finishes = then.as_ref().is_some_and(|then| {
+        if_block_context.flags.has_returned() || artifacts.get_expression_type(then).is_some_and(TUnion::is_never)
+    });
+    let else_finishes =
+        else_block_context.flags.has_returned() || artifacts.get_expression_type(r#else).is_some_and(TUnion::is_never);
 
-    for assigned_variable in assigned_variables {
-        let Some(if_type) = if_block_context.locals.get(&assigned_variable) else {
-            continue;
-        };
+    let continuing_context = match (then_finishes, else_finishes) {
+        (false, true) => Some(&if_block_context),
+        (true, false) => Some(&else_block_context),
+        _ => None,
+    };
 
-        let Some(else_type) = else_block_context.locals.get(&assigned_variable) else {
-            continue;
-        };
+    if let Some(continuing_context) = continuing_context {
+        for (variable_id, variable_type) in &continuing_context.locals {
+            block_context.locals.insert(*variable_id, Rc::clone(variable_type));
+        }
 
-        block_context.locals.insert(
-            assigned_variable,
-            Rc::new(combine_union_types(
-                if_type.as_ref(),
-                else_type.as_ref(),
+        block_context
+            .assigned_variable_ids
+            .extend(continuing_context.assigned_variable_ids.iter().map(|(k, v)| (*k, *v)));
+    } else {
+        let if_assigned_variables = if_block_context.assigned_variable_ids.keys().copied().collect::<WordSet>();
+        let else_assigned_variables = else_block_context.assigned_variable_ids.keys().copied().collect::<WordSet>();
+        let assigned_variables =
+            if_assigned_variables.intersection(&else_assigned_variables).copied().collect::<WordSet>();
+
+        for assigned_variable in assigned_variables {
+            let Some(if_type) = if_block_context.locals.get(&assigned_variable) else {
+                continue;
+            };
+
+            let Some(else_type) = else_block_context.locals.get(&assigned_variable) else {
+                continue;
+            };
+
+            block_context.locals.insert(
+                assigned_variable,
+                Rc::new(combine_union_types(
+                    if_type.as_ref(),
+                    else_type.as_ref(),
+                    context.codebase,
+                    context.settings.combiner_options(),
+                )),
+            );
+
+            if let Some(offset) = if_block_context.assigned_variable_ids.get(&assigned_variable) {
+                block_context.assigned_variable_ids.insert(assigned_variable, *offset);
+            }
+        }
+
+        let if_redefined_variables = if_block_context
+            .get_redefined_locals(&block_context.locals, false, &mut WordSet::default())
+            .keys()
+            .copied()
+            .collect::<WordSet>();
+
+        let else_redefined_variables = else_block_context
+            .get_redefined_locals(&block_context.locals, false, &mut WordSet::default())
+            .keys()
+            .copied()
+            .collect::<WordSet>();
+
+        let redefined_variable_ids =
+            if_redefined_variables.intersection(&else_redefined_variables).copied().collect::<WordSet>();
+
+        for redefined_variable_id in redefined_variable_ids {
+            let if_type = if_block_context.locals.get(&redefined_variable_id);
+            let else_type = else_block_context.locals.get(&redefined_variable_id);
+
+            let combined_type = combine_optional_union_types(
+                if_type.map(std::convert::AsRef::as_ref),
+                else_type.map(std::convert::AsRef::as_ref),
                 context.codebase,
-                context.settings.combiner_options(),
-            )),
-        );
-    }
+            );
 
-    let if_redefined_variables = if_block_context
-        .get_redefined_locals(&block_context.locals, false, &mut WordSet::default())
-        .keys()
-        .copied()
-        .collect::<WordSet>();
+            block_context.locals.insert(redefined_variable_id, Rc::new(combined_type));
+        }
 
-    let else_redefined_variables = else_block_context
-        .get_redefined_locals(&block_context.locals, false, &mut WordSet::default())
-        .keys()
-        .copied()
-        .collect::<WordSet>();
+        inherit_branch_context_properties(context, block_context, &if_block_context);
+        inherit_branch_context_properties(context, block_context, &else_block_context);
 
-    let redefined_variable_ids =
-        if_redefined_variables.intersection(&else_redefined_variables).copied().collect::<WordSet>();
+        for if_redefined_variable in if_redefined_variables {
+            let Some(if_type) = if_block_context.locals.get(&if_redefined_variable) else {
+                continue;
+            };
 
-    for redefined_variable_id in redefined_variable_ids {
-        let if_type = if_block_context.locals.get(&redefined_variable_id);
-        let else_type = else_block_context.locals.get(&redefined_variable_id);
+            let Some(previous_type) = block_context.locals.get(&if_redefined_variable) else {
+                continue;
+            };
 
-        let combined_type = combine_optional_union_types(
-            if_type.map(std::convert::AsRef::as_ref),
-            else_type.map(std::convert::AsRef::as_ref),
-            context.codebase,
-        );
+            let combined_type =
+                combine_optional_union_types(Some(if_type.as_ref()), Some(previous_type.as_ref()), context.codebase);
 
-        block_context.locals.insert(redefined_variable_id, Rc::new(combined_type));
-    }
+            block_context.locals.insert(if_redefined_variable, Rc::new(combined_type));
+        }
 
-    inherit_branch_context_properties(context, block_context, &if_block_context);
-    inherit_branch_context_properties(context, block_context, &else_block_context);
+        for else_redefined_variable in else_redefined_variables {
+            let Some(else_type) = else_block_context.locals.get(&else_redefined_variable) else {
+                continue;
+            };
 
-    for if_redefined_variable in if_redefined_variables {
-        let Some(if_type) = if_block_context.locals.get(&if_redefined_variable) else {
-            continue;
-        };
+            let Some(previous_type) = block_context.locals.get(&else_redefined_variable) else {
+                continue;
+            };
 
-        let Some(previous_type) = block_context.locals.get(&if_redefined_variable) else {
-            continue;
-        };
+            let combined_type =
+                combine_optional_union_types(Some(else_type.as_ref()), Some(previous_type.as_ref()), context.codebase);
 
-        let combined_type =
-            combine_optional_union_types(Some(if_type.as_ref()), Some(previous_type.as_ref()), context.codebase);
-
-        block_context.locals.insert(if_redefined_variable, Rc::new(combined_type));
-    }
-
-    for else_redefined_variable in else_redefined_variables {
-        let Some(else_type) = else_block_context.locals.get(&else_redefined_variable) else {
-            continue;
-        };
-
-        let Some(previous_type) = block_context.locals.get(&else_redefined_variable) else {
-            continue;
-        };
-
-        let combined_type =
-            combine_optional_union_types(Some(else_type.as_ref()), Some(previous_type.as_ref()), context.codebase);
-
-        block_context.locals.insert(else_redefined_variable, Rc::new(combined_type));
+            block_context.locals.insert(else_redefined_variable, Rc::new(combined_type));
+        }
     }
 
     block_context.variables_possibly_in_scope.extend(if_block_context.variables_possibly_in_scope);
