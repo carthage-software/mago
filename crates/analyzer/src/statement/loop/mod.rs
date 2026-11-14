@@ -290,6 +290,14 @@ fn inherit_loop_block_context<'ctx, A>(
             }
         }
 
+        if has_break && known_infinite_loop {
+            for (variable, variable_type) in &loop_scope.possibly_redefined_loop_parent_variables {
+                if block_context.locals.contains_key(variable) {
+                    block_context.locals.insert(*variable, Rc::clone(variable_type));
+                }
+            }
+        }
+
         if has_break {
             for (variable, variable_type) in &loop_scope.possibly_defined_loop_parent_variables {
                 if block_context.locals.contains_key(variable)

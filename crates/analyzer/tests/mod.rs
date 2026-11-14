@@ -3195,6 +3195,7 @@ test_case!(class_against_object_shape_property_types);
 test_case!(lone_var_docblock_drops_known_elements);
 test_case!(header_docblock_before_use_statements);
 test_case!(generator_ends_without_return);
+test_case!(endless_loop_parent_variable_takes_break_type);
 
 #[test]
 #[cfg_attr(miri, ignore)]
