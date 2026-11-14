@@ -437,6 +437,7 @@ where
 {
     let mut collection_types = Vec::new();
     let mut extended_shape = false;
+    let mut extended_lists: Vec<TAtomic> = Vec::new();
 
     if let Some(key_type) = key_type {
         // PHP coerces null to empty string '' when used as array key.
@@ -527,18 +528,26 @@ where
                         // but only up to the threshold to prevent memory explosion on files with
                         // thousands of array pushes.
                         let current_known_count = list.known_elements.as_deref().map_or(0, BTreeMap::len);
+                        let all_known_elements_set = list
+                            .known_elements
+                            .as_deref()
+                            .is_none_or(|elements| elements.values().all(|(optional, _)| !optional));
+
                         if !block_context.flags.inside_loop()
                             && list.element_type.is_never()
+                            && all_known_elements_set
                             && current_known_count < context.settings.array_combination_threshold as usize
                         {
+                            let mut known_elements = list.known_elements.as_deref().cloned().unwrap_or_default();
+                            known_elements.insert(current_known_count, (false, value_type.clone()));
+
                             collection_types.push(TAtomic::Array(TArray::List(TList {
                                 element_type: Arc::new(get_never()),
-                                known_elements: Some(
-                                    BTreeMap::from([(current_known_count, (false, value_type.clone()))]).into(),
-                                ),
+                                known_elements: Some(known_elements.into()),
                                 known_count: None,
                                 non_empty: true,
                             })));
+                            extended_lists.push(original_type.clone());
                         } else {
                             collection_types.push(TAtomic::Array(TArray::List(TList {
                                 element_type: Arc::new(value_type.clone()),
@@ -604,7 +613,7 @@ where
         }
     }
 
-    root_type.types.to_mut().retain(|t| !t.is_null() && !t.is_void());
+    root_type.types.to_mut().retain(|t| !t.is_null() && !t.is_void() && !extended_lists.contains(t));
     if extended_shape {
         root_type.types.to_mut().retain(|t| !matches!(t, TAtomic::Array(TArray::Keyed(_))));
     }
