@@ -251,6 +251,10 @@ pub fn are_definitely_not_identical(
     rhs: &TUnion,
     allow_type_coercion: bool,
 ) -> bool {
+    if (lhs.is_null() && !rhs.can_be_null()) || (rhs.is_null() && !lhs.can_be_null()) {
+        return true;
+    }
+
     // If either type is mixed, we cannot determine non-identity.
     if lhs.has_mixed() || lhs.has_mixed_template() || rhs.has_mixed() || rhs.has_mixed_template() {
         return false;
@@ -275,12 +279,6 @@ pub fn are_definitely_not_identical(
         {
             return !left_enum.as_bytes().eq_ignore_ascii_case(right_enum.as_bytes()) || left_case != right_case;
         }
-    }
-
-    if (lhs.is_null() && (!rhs.is_null() && !rhs.can_be_null()))
-        || (rhs.is_null() && (!lhs.is_null() && !lhs.can_be_null()))
-    {
-        return true;
     }
 
     if lhs.is_bool() {

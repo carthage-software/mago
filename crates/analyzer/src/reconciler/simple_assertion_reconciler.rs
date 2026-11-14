@@ -80,7 +80,7 @@ where
 {
     if let Some(assertion_type) = assertion.get_type() {
         // `mixed is T` -> `T`, and a truthy `mixed` keeps its truthiness
-        if existing_var_type.is_mixed() {
+        if existing_var_type.is_mixed() && (!assertion_type.is_null() || existing_var_type.can_be_null()) {
             let asserted_type = wrap_atomic(assertion_type.clone());
             if let [TAtomic::Mixed(mixed)] = existing_var_type.types.as_ref()
                 && mixed.is_truthy()
@@ -441,7 +441,7 @@ pub(crate) fn intersect_null<A>(
 where
     A: Arena,
 {
-    if existing_var_type.is_mixed() {
+    if existing_var_type.is_mixed() && existing_var_type.can_be_null() {
         return get_null();
     }
 
