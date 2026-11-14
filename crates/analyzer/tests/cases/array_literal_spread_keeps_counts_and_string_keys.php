@@ -2,7 +2,11 @@
 
 declare(strict_types=1);
 
-/** @return list<string> */
+/**
+ * @return list<string>
+ *
+ * @no-named-arguments
+ */
 function func(string $item1, string $item2, string ...$otherItems): array
 {
     return [$item1, $item2, ...$otherItems];

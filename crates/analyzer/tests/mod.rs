@@ -3262,6 +3262,7 @@ test_case!(union_container_members_all_bind_templates);
 test_case!(static_call_ends_static_property_narrowing);
 test_case!(stub_signatures_match_php85_reflection);
 test_case!(final_method_keeps_static_return);
+test_case!(array_literal_spread_keeps_optional_and_generic_items);
 
 #[test]
 #[cfg_attr(miri, ignore)]
