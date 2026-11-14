@@ -25,7 +25,7 @@ pub mod utils;
 
 mod arithmetic;
 mod comparison;
-mod concat;
+pub(crate) mod concat;
 mod logical;
 mod null_coalesce;
 mod spaceship;

@@ -38,6 +38,7 @@ impl Plugin for StdlibPlugin {
 
     fn register(&self, registry: &mut PluginRegistry) {
         registry.register_function_provider(string::StrlenProvider);
+        registry.register_function_provider(string::StrvalProvider);
         registry.register_function_provider(string::SprintfProvider);
         registry.register_function_provider(json::JsonEncodeProvider);
         registry.register_function_provider(random::RandProvider);

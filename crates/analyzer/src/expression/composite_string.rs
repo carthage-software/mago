@@ -111,6 +111,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for CompositeString<'arena> {
                 continue;
             }
 
+            if self.parts().iter().filter(|part| !matches!(part, StringPart::Literal(literal) if literal.value.unwrap_or(literal.raw).is_empty())).count() == 1 {
+                artifacts.set_expression_type(self, casted_part_type);
+
+                return Ok(());
+            }
+
             let part_is_int = part_type.is_int();
             let mut is_non_empty_part = true;
             let mut is_truthy_part = true;

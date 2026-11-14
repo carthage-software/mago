@@ -538,7 +538,7 @@ fn concat_string_lists(left_strings: Vec<TString>, right_strings: &[TString], th
 }
 
 #[inline]
-fn get_operand_strings(operand_type: &TUnion) -> Vec<TString> {
+pub(crate) fn get_operand_strings(operand_type: &TUnion) -> Vec<TString> {
     let mut operand_strings = vec![];
 
     for operand_atomic_type in operand_type.types.as_ref() {

@@ -834,6 +834,7 @@ test_case!(string_casing_through_concat);
 test_case!(conditional_int_float_union_disjoint);
 test_case!(empty_literal_order_independent);
 test_case!(concat_small_int_range);
+test_case!(strval_and_interpolation_cast_like);
 test_case!(magic_properties);
 test_case!(magic_property_overridden_by_parent);
 test_case!(magic_property_shadowing_real_property);
