@@ -1058,12 +1058,14 @@ fn definite_arithmetic_runtime_error(op: &BinaryOperator<'_>, right: &TAtomic) -
     match op {
         BinaryOperator::Modulo(_) => {
             let zero = matches!(right.get_literal_int_value(), Some(0))
-                || matches!(right.get_literal_float_value(), Some(0.0));
+                || right.get_literal_float_value().is_some_and(|value| value.trunc() == 0.0);
 
             if zero { Some("Modulo by zero".to_string()) } else { None }
         }
         BinaryOperator::LeftShift(_) | BinaryOperator::RightShift(_) => {
-            let value = right.get_literal_int_value()?;
+            let value = right
+                .get_literal_int_value()
+                .or_else(|| right.get_literal_float_value().map(|value| value.trunc() as i64))?;
 
             if value < 0 { Some(format!("Bit shift by a negative number (`{value}`)")) } else { None }
         }
