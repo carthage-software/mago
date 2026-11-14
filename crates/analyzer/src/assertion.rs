@@ -1172,14 +1172,21 @@ where
     for atomic in class_name_type.types.iter() {
         if let Some(resolved_class) = get_class_name_from_atomic(assertion_context.codebase, atomic) {
             let object_type = resolved_class.get_object_type(assertion_context.codebase);
+            let names_final_class = resolved_class.is_final
+                || atomic.get_literal_string_value().is_some_and(|name| {
+                    assertion_context.codebase.get_class_like(name).is_some_and(|metadata| {
+                        metadata.original_name.as_bytes() == name
+                            && (metadata.flags.is_final() || metadata.kind.is_enum())
+                    })
+                });
 
             assertions.push(if negated {
-                if resolved_class.is_final {
+                if names_final_class {
                     Assertion::IsNotType(object_type)
                 } else {
                     Assertion::IsNotIdentical(object_type)
                 }
-            } else if resolved_class.is_final {
+            } else if names_final_class {
                 Assertion::IsType(object_type)
             } else {
                 Assertion::IsIdentical(object_type)
