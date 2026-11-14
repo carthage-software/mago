@@ -1112,11 +1112,15 @@ where
     let left_class_part = is_class_constant_access(left);
     let right_class_part = is_class_constant_access(right);
 
+    let is_this_class = |part: &Expression| {
+        assertion_context.this_class_name.is_some() && matches!(unwrap_expression(part), Expression::Static(_))
+    };
+
     let (variable_expr, class_name_expr) = match (left_class_part, right_class_part) {
         // Case 1: Both sides are `::class` expressions (e.g., `$var::class === Foo::class`)
         (Some(left_part), Some(right_part)) => {
-            let left_is_static = is_static_class_reference(left_part);
-            let right_is_static = is_static_class_reference(right_part);
+            let left_is_static = is_static_class_reference(left_part) && !is_this_class(left_part);
+            let right_is_static = is_static_class_reference(right_part) && !is_this_class(right_part);
 
             if !left_is_static && right_is_static {
                 // $var::class === Foo::class  =>  $var is the variable, Foo::class is the type
@@ -1138,7 +1142,11 @@ where
         (None, None) => return None,
     };
 
-    let variable_id = assertion_context.get_expression_id(variable_expr)?;
+    let variable_id = if is_this_class(variable_expr) {
+        word("$this")
+    } else {
+        assertion_context.get_expression_id(variable_expr)?
+    };
 
     let class_name_type = artifacts.get_expression_type(class_name_expr)?;
 
@@ -2349,7 +2357,29 @@ fn is_count_or_size_of_call<A>(expression: &Expression, assertion_context: Asser
 where
     A: Arena,
 {
-    is_function_call_to_one_of(expression, assertion_context, &[b"count", b"sizeof", b"Psl\\Iter\\count"])
+    const COUNT_FUNCTIONS: &[&[u8]] = &[b"count", b"sizeof", b"Psl\\Iter\\count"];
+
+    if let Expression::Call(Call::Function(FunctionCall { argument_list, .. })) = expression
+        && argument_list.arguments.len() == 2
+        && let Some(mode) = argument_list.arguments.get(1)
+        && !mode.is_unpacked()
+        && is_count_normal(mode.value())
+    {
+        return is_function_call_with_arguments_to_one_of(expression, assertion_context, COUNT_FUNCTIONS, 2);
+    }
+
+    is_function_call_to_one_of(expression, assertion_context, COUNT_FUNCTIONS)
+}
+
+fn is_count_normal(mode: &Expression) -> bool {
+    match unwrap_expression(mode) {
+        Expression::ConstantAccess(constant) => {
+            let name = constant.name.value();
+            name.strip_prefix(b"\\").unwrap_or(name) == b"COUNT_NORMAL"
+        }
+        Expression::Literal(Literal::Integer(integer)) => integer.value == Some(0),
+        _ => false,
+    }
 }
 
 fn get_strlen_argument_expression_id<A>(
@@ -2386,11 +2416,24 @@ fn is_function_call_to_one_of<A>(
 where
     A: Arena,
 {
+    is_function_call_with_arguments_to_one_of(expression, assertion_context, functions, 1)
+}
+
+#[inline]
+fn is_function_call_with_arguments_to_one_of<A>(
+    expression: &Expression,
+    assertion_context: AssertionContext<'_, '_, A>,
+    functions: &[&[u8]],
+    argument_count: usize,
+) -> bool
+where
+    A: Arena,
+{
     let Expression::Call(Call::Function(FunctionCall { function, argument_list })) = expression else {
         return false;
     };
 
-    if argument_list.arguments.len() != 1 {
+    if argument_list.arguments.len() != argument_count {
         return false;
     }
 
@@ -2683,12 +2726,13 @@ where
         return None;
     };
 
-    if argument_list.arguments.len() != 1 {
+    let argument = argument_list.arguments.first()?;
+    if argument.is_unpacked() {
         return None;
     }
 
     get_expression_id(
-        argument_list.arguments.first()?.value(),
+        argument.value(),
         assertion_context.this_class_name,
         assertion_context.resolved_names,
         Some(assertion_context.codebase),
