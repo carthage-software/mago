@@ -10,6 +10,7 @@ use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
 use mago_codex::ttype::atomic::array::list::TList;
+use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::get_int;
 use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
@@ -29,6 +30,7 @@ use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::utils::expression::get_block_expression_id;
 use mago_word::concat_word;
+use mago_word::word;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
     fn analyze<'ctx, A>(
@@ -60,6 +62,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
             }
 
             check_property_unset(context, artifacts, self.unset.span, value);
+            forget_shape_property(context, block_context, value);
 
             'array_access: {
                 let Expression::ArrayAccess(array_access) = value else {
@@ -333,6 +336,46 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Unset<'arena> {
         block_context.flags.set_inside_unset(was_inside_unset);
 
         Ok(())
+    }
+}
+
+fn forget_shape_property<A>(context: &Context<'_, '_, A>, block_context: &mut BlockContext<'_>, value: &Expression<'_>)
+where
+    A: Arena,
+{
+    let mut target = value;
+    let mut member_type: Option<TUnion> = None;
+    while let Expression::Access(Access::Property(property_access)) = target
+        && let ClassLikeMemberSelector::Identifier(property_name) = &property_access.property
+        && let Some(object_id) = get_block_expression_id(property_access.object, context, block_context)
+        && let Some(object_type) = block_context.locals.get(&object_id)
+    {
+        let property_name = word(property_name.value);
+        let mut object_type = (**object_type).clone();
+        let mut changed = false;
+        for atomic in object_type.types.to_mut() {
+            let TAtomic::Object(TObject::WithProperties(shape)) = atomic else {
+                continue;
+            };
+
+            match &member_type {
+                None => changed |= shape.known_properties.remove(&property_name).is_some(),
+                Some(member_type) => {
+                    if let Some((_, property_type)) = shape.known_properties.get_mut(&property_name) {
+                        *property_type = member_type.clone();
+                        changed = true;
+                    }
+                }
+            }
+        }
+
+        if !changed {
+            break;
+        }
+
+        block_context.locals.insert(object_id, Rc::new(object_type.clone()));
+        member_type = Some(object_type);
+        target = property_access.object;
     }
 }
 
