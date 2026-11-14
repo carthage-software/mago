@@ -215,7 +215,7 @@ where
                     var_tag.r#type,
                     &context.scope,
                     &context.type_resolution_context,
-                    block_context.scope.get_class_like_name(),
+                    block_context.scope.get_class_like().map(|class| class.original_name),
                 )
             }) {
                 Ok(mut variable_type) => {
