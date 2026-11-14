@@ -229,21 +229,25 @@ final class Translator
 
     public static function getFirst(): string
     {
+        // @mago-expect analysis:redundant-null-coalesce
         return self::MAP[self::KEY_0] ?? '';
     }
 
     public static function getAtBoundary(): string
     {
+        // @mago-expect analysis:redundant-null-coalesce
         return self::MAP[self::KEY_63] ?? '';
     }
 
     public static function getFirstBeyondBoundary(): string
     {
+        // @mago-expect analysis:redundant-null-coalesce
         return self::MAP[self::KEY_64] ?? '';
     }
 
     public static function getLast(): string
     {
+        // @mago-expect analysis:redundant-null-coalesce
         return self::MAP[self::KEY_69] ?? '';
     }
 }

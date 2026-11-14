@@ -787,7 +787,20 @@ where
                     constants,
                     class_constants,
                 )
-                .and_then(|v| v.get_single_array_key()) else {
+                .and_then(|v| {
+                    v.get_single_array_key().or_else(|| match v.types.as_ref() {
+                        [
+                            TAtomic::Reference(TReference::Member {
+                                class_like_name,
+                                member_selector: TReferenceMemberSelector::Identifier(constant_name),
+                            }),
+                        ] => Some(ArrayKey::ClassLikeConstant {
+                            class_like_name: *class_like_name,
+                            constant_name: *constant_name,
+                        }),
+                        _ => None,
+                    })
+                }) else {
                     unknown_key_values.push(value_type);
                     continue;
                 };

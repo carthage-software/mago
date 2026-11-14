@@ -3153,6 +3153,7 @@ fn issue_2641_nullsafe_without_property_memoization() {
 test_case!(issue_2676);
 test_case!(static_property_on_missing_class);
 test_case!(first_class_callable_static_return_binds_receiver);
+test_case!(key_of_constant_with_class_constant_keys);
 
 #[test]
 #[cfg_attr(miri, ignore)]
