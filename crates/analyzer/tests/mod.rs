@@ -3200,6 +3200,7 @@ test_case!(docblock_string_literal_escapes);
 test_case!(callable_parameter_default_must_be_null);
 test_case!(enum_case_value_from_constant);
 test_case!(callable_with_required_parameter_for_optional_one);
+test_case!(combine_unsealed_shapes_widens_known_key);
 
 #[test]
 #[cfg_attr(miri, ignore)]

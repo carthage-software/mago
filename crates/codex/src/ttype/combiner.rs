@@ -958,8 +958,20 @@ fn scrape_type_properties(
                         for possibly_undefined_type_key in possibly_undefined_entries {
                             let possibly_undefined_type =
                                 combination.keyed_array_entries.get_mut(&possibly_undefined_type_key);
-                            if let Some((pu, _)) = possibly_undefined_type {
+                            if let Some((pu, entry_type)) = possibly_undefined_type {
                                 *pu = true;
+
+                                if let Some((key_param, value_param)) = parameters.as_ref()
+                                    && union_comparator::can_expression_types_be_identical(
+                                        codebase,
+                                        &TUnion::from_atomic(possibly_undefined_type_key.to_atomic()),
+                                        key_param,
+                                        false,
+                                        false,
+                                    )
+                                {
+                                    *entry_type = combine_union_types(entry_type, value_param, codebase, options);
+                                }
                             }
                         }
                     } else if !options.overwrite_empty_array {
