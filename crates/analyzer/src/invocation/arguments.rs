@@ -20,6 +20,7 @@ use mago_codex::ttype::expander::get_signature_of_function_like_identifier;
 use mago_codex::ttype::get_iterable_value_parameter;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_never;
+use mago_codex::ttype::get_null;
 use mago_codex::ttype::union::TUnion;
 use mago_reporting::Annotation;
 use mago_reporting::Issue;
@@ -39,6 +40,7 @@ use crate::utils::get_type_diff;
 /// Checks if an argument can be passed by reference.
 pub(super) fn is_argument_referenceable(argument_expression: &Expression, argument_type: &TUnion) -> bool {
     argument_expression.is_referenceable(false)
+        || matches!(argument_expression, Expression::ArrayAppend(append) if append.array.is_referenceable(false))
         || (argument_expression.is_referenceable(true) && argument_type.by_reference())
 }
 
@@ -120,7 +122,19 @@ where
     block_context.flags.set_inside_call(true);
     block_context.flags.set_inside_variable_reference(referenced_parameter);
 
-    argument_expression.analyze(context, block_context, artifacts)?;
+    match argument_expression {
+        Expression::ArrayAppend(append) if referenced_parameter => {
+            append.array.analyze(context, block_context, artifacts)?;
+            artifacts.set_expression_type(argument_expression, get_null());
+        }
+        Expression::ArrayAccess(_) if referenced_parameter => {
+            let was_inside_reference = block_context.flags.inside_reference();
+            block_context.flags.set_inside_reference(true);
+            argument_expression.analyze(context, block_context, artifacts)?;
+            block_context.flags.set_inside_reference(was_inside_reference);
+        }
+        _ => argument_expression.analyze(context, block_context, artifacts)?,
+    }
 
     block_context.flags.set_inside_general_use(was_inside_general_use);
     block_context.flags.set_inside_call(was_inside_call);
