@@ -165,7 +165,10 @@ where
         Some(variable_type) => Rc::clone(variable_type),
         None => {
             if block_context.variables_possibly_in_scope.contains(&variable_atom) {
-                if !block_context.flags.inside_isset() && !block_context.flags.inside_unset() {
+                if !block_context.flags.inside_isset()
+                    && !block_context.flags.inside_unset()
+                    && !block_context.flags.inside_variable_reference()
+                {
                     context.collector.report_with_code(
                         IssueCode::PossiblyUndefinedVariable,
                         Issue::warning(format!(
@@ -214,7 +217,7 @@ where
                     false,
                 );
 
-                Rc::new(get_mixed())
+                Rc::new(get_null())
             } else if block_context.flags.inside_unset() {
                 Rc::new(get_null())
             } else if block_context.flags.inside_isset() {
