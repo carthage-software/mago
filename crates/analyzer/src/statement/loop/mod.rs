@@ -46,7 +46,9 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
+use mago_syntax::cst::AssignmentOperator;
 use mago_syntax::cst::BinaryOperator;
+use mago_syntax::cst::DirectVariable;
 use mago_syntax::cst::Expression;
 use mago_syntax::cst::Foreach;
 use mago_syntax::cst::Literal;
@@ -1146,6 +1148,16 @@ where
             negate_formula(&pre_condition_clauses, &context.settings.algebra_thresholds()).unwrap_or_default()
         };
 
+        if let [pre_condition] = pre_conditions {
+            let mut assignments = vec![];
+            collect_condition_assignments(pre_condition, &mut assignments);
+            for (variable, value) in assignments {
+                if let Some(value_type) = artifacts.get_rc_expression_type(value) {
+                    continue_context.locals.insert(word(variable.name), Rc::clone(value_type));
+                }
+            }
+        }
+
         let (negated_pre_condition_types, _) =
             find_satisfying_assignments(negated_pre_condition_clauses.iter().as_slice(), None, &mut WordSet::default());
 
@@ -1481,6 +1493,30 @@ fn initial_int_bounds(
         TAtomic::Scalar(TScalar::Integer(integer)) => Some(integer.get_bounds()),
         _ => None,
     })
+}
+
+fn collect_condition_assignments<'ast, 'arena>(
+    expression: &'ast Expression<'arena>,
+    assignments: &mut Vec<(&'ast DirectVariable<'arena>, &'ast Expression<'arena>)>,
+) {
+    match expression {
+        Expression::Parenthesized(parenthesized) => {
+            collect_condition_assignments(parenthesized.expression, assignments)
+        }
+        Expression::UnaryPrefix(unary) => collect_condition_assignments(unary.operand, assignments),
+        Expression::Binary(binary) => {
+            collect_condition_assignments(binary.lhs, assignments);
+            collect_condition_assignments(binary.rhs, assignments);
+        }
+        Expression::Assignment(assignment) if matches!(assignment.operator, AssignmentOperator::Assign(_)) => {
+            if let Expression::Variable(Variable::Direct(variable)) = assignment.lhs {
+                assignments.push((variable, assignment.rhs));
+            }
+
+            collect_condition_assignments(assignment.rhs, assignments);
+        }
+        _ => {}
+    }
 }
 
 fn condition_needs_analyzed_types(expression: &Expression<'_>) -> bool {
