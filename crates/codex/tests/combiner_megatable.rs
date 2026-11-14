@@ -108,7 +108,7 @@ fn string_megatable() {
     expect("non-empty∨'hi'", vec![t_non_empty_string(), t_lit_string("hi")], &["non-empty-string"]);
     expect("non-empty∨'0'", vec![t_non_empty_string(), t_lit_string("0")], &["non-empty-string"]);
     expect("non-empty∨''", vec![t_non_empty_string(), t_lit_string("")], &["non-empty-string", "string('')"]);
-    expect("''∨non-empty", vec![t_lit_string(""), t_non_empty_string()], &["string"]);
+    expect("''∨non-empty", vec![t_lit_string(""), t_non_empty_string()], &["non-empty-string", "string('')"]);
 
     expect("numeric∨'1'", vec![t_numeric_string(), t_lit_string("1")], &["numeric-string"]);
     expect("numeric∨'-5'", vec![t_numeric_string(), t_lit_string("-5")], &["numeric-string"]);

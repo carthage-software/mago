@@ -1250,36 +1250,15 @@ fn scrape_type_properties(
                 string_scalar.is_callable = false;
             }
 
-            if string_scalar.is_truthy
-                || string_scalar.is_non_empty
-                || string_scalar.is_numeric
-                || !string_scalar.casing.is_unspecified()
-            {
-                for value in &combination.literal_strings {
-                    if value.is_empty() {
-                        string_scalar.is_non_empty = false;
-                        string_scalar.is_truthy = false;
-                        string_scalar.is_numeric = false;
-                        break;
-                    } else if value.as_bytes() == b"0" {
-                        string_scalar.is_truthy = false;
-                    }
-
-                    if string_scalar.is_numeric && !str_is_numeric(value.as_bytes()) {
-                        literals_to_keep.insert(*value);
-                    } else {
-                        string_scalar.is_numeric = string_scalar.is_numeric && str_is_numeric(value.as_bytes());
-                    }
-
-                    string_scalar.casing = match string_scalar.casing {
-                        TStringCasing::Lowercase if value.as_bytes().iter().all(u8::is_ascii_lowercase) => {
-                            TStringCasing::Lowercase
-                        }
-                        TStringCasing::Uppercase if value.as_bytes().iter().all(u8::is_ascii_uppercase) => {
-                            TStringCasing::Uppercase
-                        }
-                        _ => TStringCasing::Unspecified,
-                    };
+            for value in &combination.literal_strings {
+                let value_bytes = value.as_bytes();
+                if (string_scalar.is_numeric && !str_is_numeric(value_bytes))
+                    || (string_scalar.is_truthy && (value_bytes.is_empty() || value_bytes == b"0"))
+                    || (string_scalar.is_non_empty && value_bytes.is_empty())
+                    || (string_scalar.is_lowercase() && value_bytes.iter().any(u8::is_ascii_uppercase))
+                    || (string_scalar.is_uppercase() && value_bytes.iter().any(u8::is_ascii_lowercase))
+                {
+                    literals_to_keep.insert(*value);
                 }
             }
 

@@ -255,7 +255,7 @@ fn p_non_empty_lit_empty() {
 
 #[test]
 fn p_lit_empty_non_empty() {
-    check(vec![t_lit_string(""), t_non_empty_string()], &["string"]);
+    check(vec![t_lit_string(""), t_non_empty_string()], &["non-empty-string", "string('')"]);
 }
 
 #[test]

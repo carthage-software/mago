@@ -56,11 +56,11 @@ fn non_empty_first_keeps_empty_literal_separate() {
 }
 
 #[test]
-fn empty_literal_first_downgrades_non_empty_to_general_string() {
+fn empty_literal_first_keeps_empty_literal_separate() {
     let result = combine_default(vec![t_lit_string(""), t_non_empty_string()]);
     let mut ids: Vec<String> = result.iter().map(atomic_id_string).collect();
     ids.sort();
-    assert_eq!(ids, vec!["string"]);
+    assert_eq!(ids, vec!["non-empty-string", "string('')"]);
 }
 
 #[test]

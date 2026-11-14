@@ -96,7 +96,7 @@ fn string_cases() {
         ("non-empty ∨ 'hi'", vec![t_non_empty_string(), t_lit_string("hi")], vec!["non-empty-string"]),
         ("'hi' ∨ non-empty", vec![t_lit_string("hi"), t_non_empty_string()], vec!["non-empty-string"]),
         ("non-empty ∨ ''", vec![t_non_empty_string(), t_lit_string("")], vec!["non-empty-string", "string('')"]),
-        ("'' ∨ non-empty", vec![t_lit_string(""), t_non_empty_string()], vec!["string"]),
+        ("'' ∨ non-empty", vec![t_lit_string(""), t_non_empty_string()], vec!["non-empty-string", "string('')"]),
         ("numeric ∨ '123'", vec![t_numeric_string(), t_lit_string("123")], vec!["numeric-string"]),
         ("numeric ∨ 'abc'", vec![t_numeric_string(), t_lit_string("abc")], vec!["numeric-string", "string('abc')"]),
         ("lower ∨ 'hi'", vec![t_lower_string(), t_lit_string("hi")], vec!["lowercase-string"]),
