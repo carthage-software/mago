@@ -781,6 +781,17 @@ where
                     continue;
                 }
 
+                if parameters.is_none()
+                    && let Some(known_items) = known_items
+                {
+                    did_remove_type = true;
+                    if let Some(list) = list_of_sealed_shape(known_items, is_non_empty || *non_empty) {
+                        acceptable_types.push(list);
+                    }
+
+                    continue;
+                }
+
                 if let Some(known_items) = known_items {
                     for (k, (optional, _)) in known_items.iter() {
                         if *optional {
@@ -859,6 +870,63 @@ where
     }
 
     finalize(context, acceptable_types, did_remove_type, key, span, existing_var_type, assertion, negated, is_equality)
+}
+
+/// The lists a sealed shape can be: a list has the keys `0` to `n - 1`, so a key after a gap is absent and a key
+/// before a set one is set. `None` when the shape can never be a list.
+pub(crate) fn list_of_sealed_shape(
+    known_items: &BTreeMap<ArrayKey, (bool, TUnion)>,
+    non_empty: bool,
+) -> Option<TAtomic> {
+    let mut elements: BTreeMap<usize, (bool, TUnion)> = BTreeMap::new();
+    let mut last_required_key: Option<usize> = non_empty.then_some(0);
+
+    for (key, (optional, value)) in known_items {
+        let ArrayKey::Integer(index) = key else {
+            if *optional {
+                continue;
+            }
+
+            return None;
+        };
+
+        if usize::try_from(*index).ok() != Some(elements.len()) {
+            if *optional {
+                continue;
+            }
+
+            return None;
+        }
+
+        if !*optional {
+            last_required_key = Some(elements.len());
+        }
+
+        elements.insert(elements.len(), (*optional, value.clone()));
+    }
+
+    if last_required_key.is_some_and(|last_required_key| last_required_key >= elements.len()) {
+        return None;
+    }
+
+    if elements.is_empty() {
+        return Some(TAtomic::Array(TArray::Keyed(TKeyedArray::new())));
+    }
+
+    if let Some(last_required_key) = last_required_key {
+        for (index, (optional, _)) in &mut elements {
+            if *index < last_required_key {
+                *optional = false;
+            }
+        }
+    }
+
+    Some(TAtomic::Array(TArray::List(TList {
+        element_type: Arc::new(get_never()),
+        known_elements: Some(Arc::new(elements)),
+        known_count: None,
+        non_empty: last_required_key.is_some(),
+    })))
 }
 
 fn intersect_keyed_array<A>(

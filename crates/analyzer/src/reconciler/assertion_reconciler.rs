@@ -57,6 +57,7 @@ use crate::context::Context;
 use crate::reconciler::map_generic_constraint_or_else;
 use crate::reconciler::negated_assertion_reconciler;
 use crate::reconciler::simple_assertion_reconciler;
+use crate::reconciler::simple_assertion_reconciler::list_of_sealed_shape;
 use crate::reconciler::trigger_issue_for_impossible;
 use crate::utils::php_emulation::numeric_string_equals_int;
 
@@ -560,6 +561,17 @@ where
         }
         (TAtomic::Array(TArray::List(first_list)), TAtomic::Array(TArray::List(second_list))) => {
             return intersect_list_arrays(context, first_list, second_list);
+        }
+        (TAtomic::Array(TArray::Keyed(keyed)), TAtomic::Array(TArray::List(list)))
+        | (TAtomic::Array(TArray::List(list)), TAtomic::Array(TArray::Keyed(keyed)))
+            if keyed.parameters.is_none() && keyed.known_items.is_some() =>
+        {
+            let known_items = keyed.get_known_items()?;
+
+            return match list_of_sealed_shape(known_items, keyed.non_empty)? {
+                TAtomic::Array(TArray::List(shape_list)) => intersect_list_arrays(context, &shape_list, list),
+                empty_array => Some(empty_array),
+            };
         }
         (TAtomic::GenericParameter(TGenericParameter { constraint, .. }), TAtomic::Object(TObject::Named(_))) => {
             let new_as = intersect_union_with_atomic(context, constraint, second_type);
