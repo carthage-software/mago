@@ -9,6 +9,7 @@ use mago_algebra::disjoin_clauses;
 use mago_algebra::negate_formula;
 use mago_codex::assertion::Assertion;
 use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::union::TUnion;
 use mago_span::HasSpan;
 use mago_span::Span;
 use mago_syntax::cst::*;
@@ -477,14 +478,24 @@ fn add_access_condition_clauses<A>(
             add_null_equality_base_clauses(operand, formula, assertion_context, artifacts);
         }
         Expression::Binary(binary)
-            if matches!(binary.operator, BinaryOperator::Identical(_) | BinaryOperator::NotIdentical(_)) =>
+            if matches!(
+                binary.operator,
+                BinaryOperator::Identical(_)
+                    | BinaryOperator::NotIdentical(_)
+                    | BinaryOperator::Equal(_)
+                    | BinaryOperator::NotEqual(_)
+                    | BinaryOperator::AngledNotEqual(_)
+            ) =>
         {
+            let is_strict = matches!(binary.operator, BinaryOperator::Identical(_) | BinaryOperator::NotIdentical(_));
+            let never_equals_null = |ty: &TUnion| if is_strict { !ty.can_be_null() } else { ty.is_always_truthy() };
+
             let access_operand = if !get_access_base_expressions(binary.lhs, artifacts).is_empty()
-                && artifacts.get_expression_type(binary.rhs).is_some_and(|ty| !ty.can_be_null())
+                && artifacts.get_expression_type(binary.rhs).is_some_and(never_equals_null)
             {
                 Some(binary.lhs)
             } else if !get_access_base_expressions(binary.rhs, artifacts).is_empty()
-                && artifacts.get_expression_type(binary.lhs).is_some_and(|ty| !ty.can_be_null())
+                && artifacts.get_expression_type(binary.lhs).is_some_and(never_equals_null)
             {
                 Some(binary.rhs)
             } else {
@@ -492,7 +503,10 @@ fn add_access_condition_clauses<A>(
             };
 
             if let Some(operand) = access_operand {
-                if matches!(binary.operator, BinaryOperator::NotIdentical(_)) {
+                if matches!(
+                    binary.operator,
+                    BinaryOperator::NotIdentical(_) | BinaryOperator::NotEqual(_) | BinaryOperator::AngledNotEqual(_)
+                ) {
                     add_null_equality_base_clauses(operand, formula, assertion_context, artifacts);
                 } else {
                     add_access_base_clauses(
