@@ -2209,7 +2209,7 @@ function iterator_apply(Traversable $iterator, callable $callback, ?array $args 
 /**
  * @param object|class-string $object_or_class
  *
- * @return array<class-string, class-string>|false
+ * @return ($object_or_class is object ? array<class-string, class-string> : array<class-string, class-string>|false)
  *
  * @pure
  */
@@ -2218,7 +2218,7 @@ function class_parents($object_or_class, bool $autoload = true): array|false {}
 /**
  * @param object|class-string $object_or_class
  *
- * @return array<trait-string, trait-string>|false
+ * @return ($object_or_class is object ? array<trait-string, trait-string> : array<trait-string, trait-string>|false)
  *
  * @pure
  */

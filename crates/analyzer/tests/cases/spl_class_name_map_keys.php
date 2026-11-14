@@ -42,10 +42,6 @@ function testImplementsClassString(string $class): ?string
 function testParents(Example $obj): ?string
 {
     $parents = class_parents($obj);
-    if ($parents === false) {
-        return null;
-    }
-
     if (isset($parents[ParentClass::class])) {
         return $parents[ParentClass::class];
     }
@@ -56,10 +52,6 @@ function testParents(Example $obj): ?string
 function testUses(Example $obj): ?string
 {
     $uses = class_uses($obj);
-    if ($uses === false) {
-        return null;
-    }
-
     if (isset($uses[SomeTrait::class])) {
         return $uses[SomeTrait::class];
     }
