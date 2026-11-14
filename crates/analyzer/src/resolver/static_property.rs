@@ -29,6 +29,7 @@ use crate::resolver::property::report_deprecated_property;
 use crate::utils::expression::get_block_expression_id;
 use crate::utils::expression::get_variable_id;
 use crate::visibility::check_static_property_read_visibility;
+use crate::visibility::private_member_scope;
 
 /// Resolves all possible static properties from a class expression and a member selector.
 pub fn resolve_static_properties<'ctx, 'ast, 'arena, A>(
@@ -195,6 +196,16 @@ where
     let declaring_class_id = context
         .codebase
         .get_declaring_property_class(class_id.as_bytes(), property_name.as_bytes())
+        .or_else(|| {
+            let scope_metadata =
+                private_member_scope(context.codebase, class_metadata.name, block_context.scope.get_class_like_name())?;
+
+            scope_metadata
+                .properties
+                .get(&property_name)
+                .is_some_and(|property| property.read_visibility.is_private())
+                .then_some(scope_metadata.original_name)
+        })
         .unwrap_or(class_metadata.original_name);
 
     let Some(declaring_class_metadata) = context.codebase.get_class_like(declaring_class_id.as_bytes()) else {

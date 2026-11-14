@@ -621,3 +621,18 @@ fn report_visibility_issue<A>(
 
     context.collector.report_with_code(code, issue);
 }
+
+/// Inside a class, its private members are reachable on any instance of a subclass, which does not
+/// inherit them.  Returns the scope class when `class_name` names a strict subclass of it.
+pub(crate) fn private_member_scope(
+    codebase: &CodebaseMetadata,
+    class_name: Word,
+    scope: Option<Word>,
+) -> Option<&ClassLikeMetadata> {
+    let scope_metadata = codebase.get_class_like_by_name(scope?)?;
+    let class_metadata = codebase.get_class_like_by_name(class_name)?;
+
+    (class_metadata.name != scope_metadata.name
+        && codebase.is_instance_of(class_metadata.name.as_bytes(), scope_metadata.name.as_bytes()))
+    .then_some(scope_metadata)
+}

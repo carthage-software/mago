@@ -44,6 +44,7 @@ use crate::utils::names::display_class_like_name;
 use crate::utils::names::display_method_name;
 use crate::visibility::check_method_visibility_by_id;
 use crate::visibility::is_method_visible_by_id;
+use crate::visibility::private_member_scope;
 
 /// Resolves all possible static method targets from a class expression and a member selector.
 ///
@@ -420,10 +421,30 @@ fn resolve_method_from_metadata<'ctx, 'arena, A>(
 where
     A: Arena,
 {
-    let method_id = MethodIdentifier::new(defining_class_metadata.original_name, method_name);
+    let mut method_id = MethodIdentifier::new(defining_class_metadata.original_name, method_name);
     let declaring_method_id = context.codebase.get_declaring_method_identifier(&method_id);
+    let scope_private_method = || {
+        let scope_metadata = private_member_scope(
+            context.codebase,
+            defining_class_metadata.name,
+            block_context.scope.get_class_like_name(),
+        )?;
+        let scope_method_id = MethodIdentifier::new(scope_metadata.original_name, method_name);
+        let scope_method = context.codebase.get_method_by_id(&scope_method_id)?;
+
+        scope_method
+            .method_metadata
+            .as_ref()
+            .is_some_and(|metadata| metadata.visibility.is_private())
+            .then_some((scope_method_id, scope_method))
+    };
+
     let (declaring_method_id, function_like) = match context.codebase.get_method_by_id(&declaring_method_id) {
         Some(fl) => (declaring_method_id, fl),
+        None if let Some((scope_method_id, scope_method)) = scope_private_method() => {
+            method_id = scope_method_id;
+            (scope_method_id, scope_method)
+        }
         None => {
             let mut found = None;
             for required_class in

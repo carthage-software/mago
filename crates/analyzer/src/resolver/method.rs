@@ -45,6 +45,7 @@ use crate::utils::names::display_class_like_name;
 use crate::utils::names::display_method_name;
 use crate::visibility::check_method_visibility_by_id;
 use crate::visibility::is_method_visible_by_id;
+use crate::visibility::private_member_scope;
 
 #[derive(Debug, Clone)]
 pub struct ResolvedMethod {
@@ -576,7 +577,7 @@ where
         return candidates;
     };
 
-    let visibility_id = MethodIdentifier::new(class_metadata.original_name, method_name);
+    let mut visibility_id = MethodIdentifier::new(class_metadata.original_name, method_name);
     let mut method_id = visibility_id;
     let function_like_metadata = context
         .codebase
@@ -584,6 +585,20 @@ where
         .or_else(|| {
             method_id = context.codebase.get_declaring_method_identifier(&method_id);
             context.codebase.get_method_by_id(&method_id)
+        })
+        .or_else(|| {
+            let scope_metadata =
+                private_member_scope(context.codebase, class_metadata.name, block_context.scope.get_class_like_name())?;
+            let scope_method_id = MethodIdentifier::new(scope_metadata.original_name, method_name);
+            let scope_method = context.codebase.get_method_by_id(&scope_method_id)?;
+            if !scope_method.method_metadata.as_ref().is_some_and(|metadata| metadata.visibility.is_private()) {
+                return None;
+            }
+
+            method_id = scope_method_id;
+            visibility_id = scope_method_id;
+
+            Some(scope_method)
         })
         .filter(|metadata| {
             !has_magic_call
