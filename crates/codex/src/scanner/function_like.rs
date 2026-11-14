@@ -40,6 +40,7 @@ use crate::metadata::flags::MetadataFlags;
 use crate::metadata::function_like::FunctionLikeKind;
 use crate::metadata::function_like::FunctionLikeMetadata;
 use crate::metadata::function_like::MethodMetadata;
+use crate::metadata::ttype::TypeMetadata;
 use crate::misc::GenericParent;
 use crate::scanner::Context;
 use crate::scanner::assertion_inference::infer_assertions_from_block_body;
@@ -60,6 +61,7 @@ use crate::scanner::version_claim::evaluate_version_attributes;
 use crate::ttype::builder;
 use crate::ttype::builder::reject_unresolvable_tag_variable;
 use crate::ttype::get_mixed;
+use crate::ttype::get_string;
 use crate::ttype::resolution::TypeResolutionContext;
 use crate::ttype::template::GenericTemplate;
 use crate::visibility::Visibility;
@@ -109,6 +111,8 @@ where
             Some(class_like_metadata.original_name),
             context,
         )));
+    } else if method.name.value.eq_ignore_ascii_case(b"__tostring") {
+        metadata.set_return_type_declaration_metadata(Some(TypeMetadata::new(get_string(), method.name.span)));
     }
 
     let method_name_str = method.name.value;
