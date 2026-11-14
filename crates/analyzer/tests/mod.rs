@@ -3331,6 +3331,7 @@ test_case!(foreach_by_reference_updates_the_array);
 test_case!(loop_entry_with_numeric_string_or_float_bound);
 test_case!(always_entered_loop_keeps_possibly_undefined);
 test_case!(generic_mixin_property_binds_type_arguments);
+test_case!(stdclass_subclass_allows_undocumented_properties);
 
 #[test]
 #[cfg_attr(miri, ignore)]

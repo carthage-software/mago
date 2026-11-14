@@ -1759,7 +1759,7 @@ pub(super) fn report_non_documented_property<A>(
 ) where
     A: Arena,
 {
-    if classname.as_bytes().eq_ignore_ascii_case(b"stdClass") {
+    if context.codebase.is_instance_of(classname.as_bytes(), b"stdClass") {
         // Special case: we don't report undocumented properties on stdClass
         return;
     }
