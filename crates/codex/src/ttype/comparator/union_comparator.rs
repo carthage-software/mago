@@ -223,6 +223,23 @@ fn is_contained_by_atomic(
         }
     }
 
+    if matches!(input_type_part, TAtomic::Scalar(TScalar::Numeric))
+        && [TScalar::int(), TScalar::float(), TScalar::numeric_string()].into_iter().all(|scalar| {
+            let part = TAtomic::Scalar(scalar);
+            container_atomic_types.iter().any(|container_atomic_type| {
+                atomic_comparator::is_contained_by(
+                    codebase,
+                    &part,
+                    container_atomic_type,
+                    inside_assertion,
+                    &mut ComparisonResult::new(),
+                )
+            })
+        })
+    {
+        return true;
+    }
+
     if matches!(input_type_part, TAtomic::Scalar(TScalar::Generic))
         && !container_type.has_scalar()
         && container_type.has_scalar_combination()

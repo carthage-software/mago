@@ -1106,6 +1106,11 @@ where
             TAtomic::Mixed(_) | TAtomic::Scalar(TScalar::Generic | TScalar::ArrayKey) => {
                 return asserted_type;
             }
+            TAtomic::Scalar(TScalar::Numeric) => {
+                did_remove_type = true;
+                acceptable_types
+                    .push(get_string_with_props(true, is_truthy, is_non_empty, is_callable, casing).get_single_owned());
+            }
             TAtomic::GenericParameter(generic_parameter) => {
                 did_remove_type = true;
 
