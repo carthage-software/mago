@@ -319,20 +319,22 @@ where
         && let Some(fq_class_id) = first_class_id
         && let Some(class_metadata) = context.codebase.get_class_like_by_name(fq_class_id)
         && !class_metadata.mixins.is_empty()
-        // Try to find method in mixin types
-        && let Some(resolved_method) = find_static_method_in_mixins(
+    {
+        let host = TObject::Named(TNamedObject::new(class_metadata.original_name));
+        let mixin_methods = find_static_method_in_mixins(
             context,
             block_context,
+            &host,
             &class_metadata.mixins,
             method_name,
             selector,
             access_span,
             0,
-        )
-    {
-        if !magic_call_methods.is_empty() {
-            resolved_methods.push(resolved_method);
-        } else {
+        );
+
+        if let Some(mixin_classname) = mixin_methods.first().map(|resolved_method| resolved_method.classname)
+            && magic_call_methods.is_empty()
+        {
             if class_metadata.flags.is_final() {
                 report_non_existent_mixin_static_method(
                     context,
@@ -340,7 +342,7 @@ where
                     method_span,
                     fq_class_id,
                     method_name,
-                    resolved_method.classname,
+                    mixin_classname,
                 );
 
                 result.has_invalid_target = true;
@@ -351,12 +353,12 @@ where
                     method_span,
                     fq_class_id,
                     method_name,
-                    resolved_method.classname,
+                    mixin_classname,
                 );
             }
-
-            resolved_methods.push(resolved_method);
         }
+
+        resolved_methods.extend(mixin_methods);
     }
 
     if resolved_methods.is_empty() {
@@ -907,109 +909,81 @@ fn report_non_existent_mixin_static_method<A>(
     );
 }
 
-/// Searches for a static method in mixin types.
-/// Returns Some(ResolvedMethod) if found, None otherwise.
-///
-/// Note: For static method calls, we cannot resolve generic mixin types (e.g., `@mixin T`)
-/// to concrete types because static calls don't have an instance with type parameters.
-/// In such cases, we fall back to using the constraint type.
+/// Searches for a static method in mixin types, binding `static` to the host class like an
+/// instance call does. A generic parameter mixin falls back to its constraint.
 fn find_static_method_in_mixins<'ctx, 'arena, A>(
     context: &mut Context<'ctx, 'arena, A>,
     block_context: &BlockContext<'ctx>,
+    host: &TObject,
     mixins: &[TypeMetadata],
     method_name: Word,
     selector: &ClassLikeMemberSelector<'arena>,
     access_span: Span,
     depth: usize,
-) -> Option<ResolvedMethod>
+) -> Vec<ResolvedMethod>
 where
     A: Arena,
 {
+    let mut resolved_methods = vec![];
     for mixin_type in mixins {
         for mixin_atomic in mixin_type.type_union.types.as_ref() {
-            match mixin_atomic {
-                TAtomic::Object(TObject::Named(named)) => {
-                    if let Some(result) = find_static_method_in_single_mixin(
-                        context,
-                        block_context,
-                        named.name,
-                        method_name,
-                        selector,
-                        access_span,
-                        depth,
-                    ) {
-                        return Some(result);
-                    }
-                }
-                TAtomic::Object(TObject::Enum(enum_type)) => {
-                    if let Some(result) = find_static_method_in_single_mixin(
-                        context,
-                        block_context,
-                        enum_type.name,
-                        method_name,
-                        selector,
-                        access_span,
-                        depth,
-                    ) {
-                        return Some(result);
-                    }
-                }
-                TAtomic::GenericParameter(TGenericParameter { constraint, .. }) => {
-                    // For static calls, we cannot resolve generic parameters since there's no instance.
-                    // Fall back to using the constraint type.
-                    for constraint_atomic in constraint.types.as_ref() {
-                        let constraint_class_name = match constraint_atomic {
-                            TAtomic::Object(TObject::Named(named)) => named.name,
-                            TAtomic::Object(TObject::Enum(enum_type)) => enum_type.name,
-                            _ => continue,
-                        };
+            let candidates = match mixin_atomic {
+                TAtomic::GenericParameter(TGenericParameter { constraint, .. }) => constraint.types.as_ref(),
+                atomic => std::slice::from_ref(atomic),
+            };
 
-                        if let Some(result) = find_static_method_in_single_mixin(
-                            context,
-                            block_context,
-                            constraint_class_name,
-                            method_name,
-                            selector,
-                            access_span,
-                            depth,
-                        ) {
-                            return Some(result);
-                        }
-                    }
-                }
-                _ => {}
+            for candidate in candidates {
+                let TAtomic::Object(mixin_object @ (TObject::Named(_) | TObject::Enum(_))) = candidate else {
+                    continue;
+                };
+
+                resolved_methods.extend(find_static_method_in_single_mixin(
+                    context,
+                    block_context,
+                    host,
+                    mixin_object,
+                    method_name,
+                    selector,
+                    access_span,
+                    depth,
+                ));
             }
         }
     }
 
-    None
+    resolved_methods
 }
 
 /// Searches for a static method in a single mixin class.
 fn find_static_method_in_single_mixin<'ctx, 'arena, A>(
     context: &mut Context<'ctx, 'arena, A>,
     block_context: &BlockContext<'ctx>,
-    mixin_class_name: Word,
+    host: &TObject,
+    mixin_object: &TObject,
     method_name: Word,
     selector: &ClassLikeMemberSelector<'arena>,
     access_span: Span,
     depth: usize,
-) -> Option<ResolvedMethod>
+) -> Vec<ResolvedMethod>
 where
     A: Arena,
 {
-    let mixin_metadata = context.codebase.get_class_like_by_name(mixin_class_name)?;
+    let Some(mixin_metadata) = mixin_object.get_name().and_then(|name| context.codebase.get_class_like_by_name(name))
+    else {
+        return vec![];
+    };
 
     let method_id = MethodIdentifier::new(mixin_metadata.original_name, method_name);
     let declaring_method_id = context.codebase.get_declaring_method_identifier(&method_id);
     let Some(function_like) = context.codebase.get_method_by_id(&declaring_method_id) else {
         if depth >= 8 || mixin_metadata.mixins.is_empty() {
-            return None;
+            return vec![];
         }
 
         return find_static_method_in_mixins(
             context,
             block_context,
+            host,
             &mixin_metadata.mixins,
             method_name,
             selector,
@@ -1022,7 +996,7 @@ where
     if let Some(method_metadata) = &function_like.method_metadata
         && !method_metadata.visibility.is_public()
     {
-        return None;
+        return vec![];
     }
 
     // Check visibility
@@ -1033,21 +1007,27 @@ where
         access_span,
         Some(selector.span()),
     ) {
-        return None;
+        return vec![];
     }
 
-    let static_class_type = if mixin_metadata.kind.is_enum() {
-        StaticClassType::Object(TObject::Enum(TEnum { name: mixin_metadata.original_name, case: None }))
-    } else {
-        StaticClassType::Name(mixin_class_name)
+    let is_static = function_like.method_metadata.as_ref().is_some_and(|m| m.is_static);
+    let (static_class_type, declaring_object) = match mixin_object {
+        TObject::Named(named) if !is_static => (StaticClassType::Object(host.clone()), Some(named.clone())),
+        TObject::Enum(_) if !is_static => {
+            (StaticClassType::Object(host.clone()), Some(TNamedObject::new(mixin_metadata.original_name)))
+        }
+        TObject::Enum(_) => {
+            (StaticClassType::Object(TObject::Enum(TEnum { name: mixin_metadata.original_name, case: None })), None)
+        }
+        _ => (StaticClassType::Name(mixin_metadata.original_name), None),
     };
 
-    Some(ResolvedMethod {
+    vec![ResolvedMethod {
         classname: mixin_metadata.original_name,
         method_identifier: declaring_method_id,
         static_class_type,
-        declaring_object: None,
-        is_static: function_like.method_metadata.as_ref().is_some_and(|m| m.is_static),
+        declaring_object,
+        is_static,
         mixin_without_magic_method: None,
-    })
+    }]
 }
