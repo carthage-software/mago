@@ -104,10 +104,16 @@ pub(crate) fn is_array_contained_by_array(
     }
 
     if container_array.is_list()
-        && matches!(
-            input_array,
-            TArray::Keyed(keyed_array) if keyed_array.parameters.is_some() || keyed_array.known_non_list
-        )
+        && let TArray::Keyed(keyed_array) = input_array
+        && (keyed_array.parameters.is_some()
+            || keyed_array.known_non_list
+            || keyed_array.known_items.as_ref().is_some_and(|items| {
+                let last = items.len().saturating_sub(1);
+                items.iter().enumerate().any(|(position, (key, (optional, _)))| {
+                    !matches!(key, ArrayKey::Integer(index) if usize::try_from(*index) == Ok(position))
+                        || (*optional && position != last)
+                })
+            }))
     {
         return false;
     }
