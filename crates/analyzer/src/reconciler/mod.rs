@@ -748,12 +748,14 @@ fn adjust_array_type_for_missing_key(
 
     existing_type.types.to_mut().retain_mut(|base_atomic_type| {
         match base_atomic_type {
-            TAtomic::Array(TArray::Keyed(TKeyedArray { known_items, .. })) => {
+            TAtomic::Array(TArray::Keyed(TKeyedArray { known_items, parameters, .. })) => {
                 if let Some(known_items) = known_items {
                     let known_items = Arc::make_mut(known_items);
                     if let Some((optional, item_type)) = known_items.get_mut(&dictkey) {
                         if preserve_null && item_type.can_be_null() {
                             *item_type = get_null();
+                        } else if *optional && parameters.is_some() {
+                            *item_type = get_never();
                         } else if *optional {
                             known_items.remove(&dictkey);
                         } else {
