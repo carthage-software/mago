@@ -327,6 +327,7 @@ where
             method_name,
             selector,
             access_span,
+            0,
         )
     {
         if !magic_call_methods.is_empty() {
@@ -919,6 +920,7 @@ fn find_static_method_in_mixins<'ctx, 'arena, A>(
     method_name: Word,
     selector: &ClassLikeMemberSelector<'arena>,
     access_span: Span,
+    depth: usize,
 ) -> Option<ResolvedMethod>
 where
     A: Arena,
@@ -934,6 +936,7 @@ where
                         method_name,
                         selector,
                         access_span,
+                        depth,
                     ) {
                         return Some(result);
                     }
@@ -946,6 +949,7 @@ where
                         method_name,
                         selector,
                         access_span,
+                        depth,
                     ) {
                         return Some(result);
                     }
@@ -967,6 +971,7 @@ where
                             method_name,
                             selector,
                             access_span,
+                            depth,
                         ) {
                             return Some(result);
                         }
@@ -988,6 +993,7 @@ fn find_static_method_in_single_mixin<'ctx, 'arena, A>(
     method_name: Word,
     selector: &ClassLikeMemberSelector<'arena>,
     access_span: Span,
+    depth: usize,
 ) -> Option<ResolvedMethod>
 where
     A: Arena,
@@ -996,7 +1002,21 @@ where
 
     let method_id = MethodIdentifier::new(mixin_metadata.original_name, method_name);
     let declaring_method_id = context.codebase.get_declaring_method_identifier(&method_id);
-    let function_like = context.codebase.get_method_by_id(&declaring_method_id)?;
+    let Some(function_like) = context.codebase.get_method_by_id(&declaring_method_id) else {
+        if depth >= 8 || mixin_metadata.mixins.is_empty() {
+            return None;
+        }
+
+        return find_static_method_in_mixins(
+            context,
+            block_context,
+            &mixin_metadata.mixins,
+            method_name,
+            selector,
+            access_span,
+            depth + 1,
+        );
+    };
 
     // Mixin methods should only be accessible if public
     if let Some(method_metadata) = &function_like.method_metadata
