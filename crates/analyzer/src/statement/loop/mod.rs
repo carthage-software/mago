@@ -1565,6 +1565,14 @@ fn initial_int_bounds(
 
     artifacts.get_expression_type(expression)?.types.iter().find_map(|atomic| match atomic {
         TAtomic::Scalar(TScalar::Integer(integer)) => Some(integer.get_bounds()),
+        TAtomic::Scalar(TScalar::Float(_)) => atomic
+            .get_literal_float_value()
+            .filter(|value| value.fract() == 0.0 && value.abs() < 9_007_199_254_740_992.0)
+            .map(|value| (Some(value as i64), Some(value as i64))),
+        TAtomic::Scalar(TScalar::String(_)) => atomic
+            .get_literal_string_value()
+            .and_then(|value| std::str::from_utf8(value).ok()?.parse::<i64>().ok())
+            .map(|value| (Some(value), Some(value))),
         _ => None,
     })
 }
