@@ -328,6 +328,9 @@ fn detect_unused_statement_expressions<'ast, 'arena, A>(
         Expression::Binary(binary) => {
             if (binary.operator.is_null_coalesce() || binary.operator.is_logical())
                 && (expression_has_observable_side_effect(binary.rhs)
+                    || artifacts
+                        .get_expression_type(binary.rhs)
+                        .is_some_and(mago_codex::ttype::union::TUnion::is_never)
                     || call_may_have_observable_side_effect(binary.rhs, context, artifacts))
             {
                 return;

@@ -776,6 +776,7 @@ test_case!(by_reference_output_variables);
 test_case!(loop_condition_call_assertions);
 test_case!(integer_power_result_type);
 test_case!(bitwise_not_result_type);
+test_case!(narrowing_after_never_right_operand);
 test_case!(magic_properties);
 test_case!(magic_property_overridden_by_parent);
 test_case!(magic_property_shadowing_real_property);

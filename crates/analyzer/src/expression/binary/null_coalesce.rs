@@ -2,7 +2,7 @@ use mago_allocator::Arena;
 use std::borrow::Cow;
 use std::rc::Rc;
 
-use mago_algebra::find_satisfying_assignments;
+use mago_algebra::AssertionMap;
 use mago_codex::assertion::Assertion;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
@@ -26,11 +26,8 @@ use crate::artifacts::AnalysisArtifacts;
 use crate::code::IssueCode;
 use crate::context::Context;
 use crate::context::block::BlockContext;
-use crate::context::scope::if_scope::IfScope;
 use crate::error::AnalysisError;
-use crate::formula::get_formula;
 use crate::reconciler::reconcile_keyed_types;
-use crate::utils::conditional;
 use crate::utils::misc::unwrap_expression;
 
 /// Analyzes the null coalescing operator (`??`).
@@ -180,41 +177,22 @@ where
 
     artifacts.set_rc_expression_type(binary, Rc::new(result_type));
 
-    if rhs_is_never {
-        let assertion_context = context.get_assertion_context_from_block(block_context);
-        let if_clauses = get_formula(
-            binary.lhs.span(),
-            binary.lhs.span(),
-            binary.lhs,
-            assertion_context,
-            artifacts,
-            &context.settings.algebra_thresholds(),
-            context.settings.formula_size_threshold,
-        )
-        .unwrap();
+    if rhs_is_never
+        && let Some(lhs_id) = context.get_assertion_context_from_block(block_context).get_expression_id(binary.lhs)
+    {
+        let mut assertions = AssertionMap::default();
+        assertions.insert(lhs_id, vec![vec![Assertion::IsIsset]]);
 
-        let mut if_scope = IfScope::new();
-        let mut inner_block_context = block_context.clone();
-        inner_block_context.flags.set_inside_isset(true);
-        let if_conditional_scope =
-            conditional::analyze(context, &mut inner_block_context, artifacts, &mut if_scope, binary.lhs, false)?;
-        let mut conditionally_referenced_variable_ids = if_conditional_scope.conditionally_referenced_variable_ids;
-
-        let (reconcilable_if_types, active_if_types) = find_satisfying_assignments(
-            &if_clauses,
-            Some(binary.lhs.span()),
-            &mut conditionally_referenced_variable_ids,
-        );
-
-        let mut changed_variable_ids = mago_word::WordSet::default();
+        let mut referenced_variable_ids = WordSet::default();
+        referenced_variable_ids.insert(lhs_id);
 
         reconcile_keyed_types(
             context,
-            &reconcilable_if_types,
-            active_if_types,
+            &assertions,
+            AssertionMap::default(),
             block_context,
-            &mut changed_variable_ids,
-            &conditionally_referenced_variable_ids,
+            &mut WordSet::default(),
+            &referenced_variable_ids,
             &binary.lhs.span(),
             false,
             false,

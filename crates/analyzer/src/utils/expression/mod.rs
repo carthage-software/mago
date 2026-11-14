@@ -17,6 +17,7 @@ use mago_syntax::cst::ArrayAccess;
 use mago_syntax::cst::Call;
 use mago_syntax::cst::ClassLikeConstantSelector;
 use mago_syntax::cst::ClassLikeMemberSelector;
+use mago_syntax::cst::Construct;
 use mago_syntax::cst::Expression;
 use mago_syntax::cst::FunctionCall;
 use mago_syntax::cst::Literal;
@@ -69,7 +70,21 @@ pub(crate) fn get_literal_array_key(expression: &Expression<'_>, artifacts: &Ana
 pub(crate) const fn expression_has_observable_side_effect(expression: &Expression<'_>) -> bool {
     match expression {
         Expression::Parenthesized(p) => expression_has_observable_side_effect(p.expression),
-        Expression::Assignment(_) | Expression::Throw(_) | Expression::Yield(_) | Expression::Clone(_) => true,
+        Expression::Assignment(_)
+        | Expression::Throw(_)
+        | Expression::Yield(_)
+        | Expression::Clone(_)
+        | Expression::Instantiation(_)
+        | Expression::Construct(
+            Construct::Exit(_)
+            | Construct::Die(_)
+            | Construct::Print(_)
+            | Construct::Eval(_)
+            | Construct::Include(_)
+            | Construct::IncludeOnce(_)
+            | Construct::Require(_)
+            | Construct::RequireOnce(_),
+        ) => true,
         Expression::UnaryPrefix(u) => {
             matches!(
                 u.operator,

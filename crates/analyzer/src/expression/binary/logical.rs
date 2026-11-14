@@ -164,6 +164,60 @@ where
 }
 
 #[inline]
+/// After `$a || throw` the code only goes on when `$a` was true; after `$a && throw`, when it was false.
+fn narrow_after_finishing_left_operand<'ctx, A>(
+    context: &mut Context<'ctx, '_, A>,
+    block_context: &mut BlockContext<'ctx>,
+    artifacts: &AnalysisArtifacts,
+    left: &Expression<'_>,
+    left_is_true: bool,
+) where
+    A: Arena,
+{
+    let Some(clauses) = get_formula(
+        left.span(),
+        left.span(),
+        left,
+        context.get_assertion_context_from_block(block_context),
+        artifacts,
+        &context.settings.algebra_thresholds(),
+        context.settings.formula_size_threshold,
+    ) else {
+        return;
+    };
+
+    let clauses = if left_is_true {
+        clauses
+    } else {
+        negate_or_synthesize(
+            &clauses,
+            left,
+            context.get_assertion_context_from_block(block_context),
+            artifacts,
+            &context.settings.algebra_thresholds(),
+            context.settings.formula_size_threshold,
+        )
+    };
+
+    let (truths, active_truths) = find_satisfying_assignments(&clauses, None, &mut WordSet::default());
+    if truths.is_empty() {
+        return;
+    }
+
+    let mut changed_variable_ids = WordSet::default();
+    reconciler::reconcile_keyed_types(
+        context,
+        &truths,
+        active_truths,
+        block_context,
+        &mut changed_variable_ids,
+        &WordSet::default(),
+        &left.span(),
+        false,
+        false,
+    );
+}
+
 pub fn analyze_logical_and_operation<'ctx, 'arena, A>(
     binary: &Binary<'arena>,
     context: &mut Context<'ctx, 'arena, A>,
@@ -520,6 +574,10 @@ where
             )
             .into_owned(),
         );
+    }
+
+    if !block_context.flags.inside_try() && artifacts.get_expression_type(binary.rhs).is_some_and(TUnion::is_never) {
+        narrow_after_finishing_left_operand(context, block_context, artifacts, binary.lhs, false);
     }
 
     Ok(())
@@ -953,6 +1011,10 @@ where
             };
 
         *false_context.borrow_mut() = Some(right_false_context);
+    }
+
+    if !block_context.flags.inside_try() && artifacts.get_expression_type(binary.rhs).is_some_and(TUnion::is_never) {
+        narrow_after_finishing_left_operand(context, block_context, artifacts, binary.lhs, true);
     }
 
     Ok(())
