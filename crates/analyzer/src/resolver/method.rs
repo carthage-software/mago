@@ -726,7 +726,12 @@ where
         // the method was found in a mixin without the required magic method.
         let mixin_types = collect_mixin_types(context.codebase, class_metadata, outer_object, &class_metadata.mixins);
 
-        for (mixin_class_name, mixin_object) in mixin_types {
+        let mut found_at_depth = None;
+        for (mixin_class_name, mixin_object, depth) in mixin_types {
+            if found_at_depth.is_some_and(|found_at_depth| depth > found_at_depth) {
+                break;
+            }
+
             let Some(mixin_metadata) = context.codebase.get_class_like_by_name(mixin_class_name) else {
                 continue;
             };
@@ -765,6 +770,7 @@ where
                 // Bind `$this`/`static` in the mixin method's return type to the
                 // receiver, not the mixin class: `@mixin` methods behave as if
                 // declared on the class carrying the tag.
+                found_at_depth = Some(depth);
                 candidates.push(MethodCandidate {
                     metadata: mixin_metadata,
                     method_identifier: mixin_method_id,
@@ -1243,10 +1249,11 @@ fn collect_mixin_types(
     class_metadata: &ClassLikeMetadata,
     outer_object: &TObject,
     mixins: &[TypeMetadata],
-) -> Vec<(Word, TObject)> {
+) -> Vec<(Word, TObject, usize)> {
     let mut results = Vec::new();
     let mut visited = HashSet::default();
-    collect_mixin_types_into(codebase, class_metadata, outer_object, mixins, &mut results, &mut visited);
+    collect_mixin_types_into(codebase, class_metadata, outer_object, mixins, &mut results, &mut visited, 0);
+    results.sort_by_key(|(_, _, depth)| *depth);
 
     results
 }
@@ -1256,8 +1263,9 @@ fn collect_mixin_types_into(
     class_metadata: &ClassLikeMetadata,
     outer_object: &TObject,
     mixins: &[TypeMetadata],
-    results: &mut Vec<(Word, TObject)>,
+    results: &mut Vec<(Word, TObject, usize)>,
     visited: &mut HashSet<Word>,
+    depth: usize,
 ) {
     let mut direct: Vec<(Word, &TObject)> = Vec::new();
 
@@ -1324,12 +1332,20 @@ fn collect_mixin_types_into(
         let specialized_obj = specialize_mixin_object(codebase, class_metadata, outer_object, obj);
         let obj = specialized_obj.as_ref().unwrap_or(obj);
 
-        results.push((name, obj.clone()));
+        results.push((name, obj.clone(), depth));
 
         if let Some(mixin_metadata) = codebase.get_class_like_by_name(name)
             && !mixin_metadata.mixins.is_empty()
         {
-            collect_mixin_types_into(codebase, mixin_metadata, obj, &mixin_metadata.mixins, results, visited);
+            collect_mixin_types_into(
+                codebase,
+                mixin_metadata,
+                obj,
+                &mixin_metadata.mixins,
+                results,
+                visited,
+                depth + 1,
+            );
         }
     }
 }
