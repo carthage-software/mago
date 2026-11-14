@@ -1543,7 +1543,7 @@ function explode(string $separator, string $string, int $limit = PHP_INT_MAX): a
  *
  * @pure
  */
-function implode(array|string $separator = '', ?array $array = null): string {}
+function implode(array|string $separator, ?array $array = null): string {}
 
 /**
  * @param array<string>|string $separator
@@ -4403,7 +4403,7 @@ function array_fill_keys(array $keys, mixed $value): array {}
  * @param array<K, V> $array
  * @param V ...$values
  *
- * @param-out ($array is list<V> ? non-empty-list<V> : non-empty-array<K, V>) $array
+ * @param-out ($array is list<V> ? non-empty-list<V> : non-empty-array<K|non-negative-int, V>) $array
  *
  * @return int<1, max>
  *
@@ -4610,7 +4610,7 @@ function array_multisort(array &$array, array|int &...$rest): bool {}
  * @param array<K, V> $array
  * @param V ...$values
  *
- * @param-out ($array is list<V> ? non-empty-list<V> : non-empty-array<K, V>) $array
+ * @param-out ($array is list<V> ? non-empty-list<V> : non-empty-array<K|non-negative-int, V>) $array
  *
  * @return int<1, max>
  *
