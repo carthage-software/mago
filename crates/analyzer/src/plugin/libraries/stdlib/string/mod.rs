@@ -1,9 +1,11 @@
 //! PHP string function providers.
 
+mod implode;
 mod sprintf;
 mod strlen;
 mod strval;
 
+pub use implode::ImplodeProvider;
 pub use sprintf::SprintfProvider;
 pub use sprintf::resolve_sprintf;
 pub use strlen::StrlenProvider;
