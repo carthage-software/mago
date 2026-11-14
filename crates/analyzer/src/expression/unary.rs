@@ -383,13 +383,14 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPrefix<'arena> {
                         if has_array_in_cast_operand(&t) {
                             context.collector.report_with_code(
                                 IssueCode::ArrayToIntCast,
-                                Issue::warning("Suspicious cast from array to integer.")
+                                Issue::warning("Casting an array to int instead of counting its elements.")
                                     .with_annotation(
                                         Annotation::primary(self.span())
-                                            .with_message("This operand can be an array."),
+                                            .with_message("Casting an array to int always returns 1 if the array is non-empty, regardless of the number of elements."),
                                     )
-                                    .with_note("PHP converts an empty array to `0` and a non-empty array to `1`, not the number of elements.")
-                                    .with_help("Use `count()` to count elements, or extract the intended numeric value. Suppress `array-to-int-cast` if this conversion is intentional."),
+                                    .with_help("Use count() to get the number of elements in an array.")
+                                    .with_note("An empty array ([]) casts to 0.")
+                                    .with_note("Any non-empty array casts to 1, not its element count."),
                             );
                         }
 

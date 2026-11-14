@@ -26,12 +26,6 @@ If your code were an essay, the linter is the grammar pass and the analyzer is t
 - **Speed.** Rust core, parallelised, runs an entire project in seconds.
 - **Heuristic checks.** A configurable set of advisory checks for code-quality concerns that are not strict errors but often indicate latent bugs.
 
-## Suspicious array-to-integer casts
-
-The analyzer reports an `array-to-int-cast` warning for `(int)` and `(integer)` casts when the operand is an array or a union containing an array. It also checks template constraints and `iterable`, which can be an array. Plain `mixed`, scalar-only, and `Traversable`-only operands do not trigger the warning.
-
-PHP accepts these casts, but converts an empty array to `0` and a non-empty array to `1`, not its element count or a numeric value stored in the array. Use `count()` or extract the intended value instead. The warning is always enabled and does not change inferred cast types. Intentional conversions can be suppressed with `// @mago-ignore analysis:array-to-int-cast` above the statement, or through the analyzer's `ignore` configuration.
-
 ## Where to next
 
 - [Command reference](/tools/analyzer/command-reference/): every flag `mago analyze` accepts.
