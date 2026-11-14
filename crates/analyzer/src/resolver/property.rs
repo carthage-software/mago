@@ -1097,7 +1097,7 @@ where
         .then(|| {
             let mut candidate = context.codebase.get_class_like(class_id.as_bytes());
             while let Some(candidate_metadata) = candidate {
-                if candidate_metadata.used_traits.contains(&declaring_class_metadata.name) {
+                if candidate_metadata.direct_trait_names().any(|name| name == declaring_class_metadata.name) {
                     return Some(candidate_metadata.original_name);
                 }
 

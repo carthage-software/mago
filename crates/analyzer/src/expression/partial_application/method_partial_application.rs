@@ -76,7 +76,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for MethodPartialApplication<'arena>
                 {
                     let mut candidate = context.codebase.get_class_like(resolved_method.classname.as_bytes());
                     while let Some(candidate_metadata) = candidate {
-                        if candidate_metadata.used_traits.contains(&declaring_trait.name) {
+                        if candidate_metadata.direct_trait_names().any(|name| name == declaring_trait.name) {
                             signature_identifier = FunctionLikeIdentifier::Method(
                                 candidate_metadata.name,
                                 resolved_method.method_identifier.get_method_name(),

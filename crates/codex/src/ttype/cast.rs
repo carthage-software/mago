@@ -221,6 +221,11 @@ fn try_object_method(
         .method_exists(method_identifier.get_class_name().as_bytes(), method_identifier.get_method_name().as_bytes())
     {
         populate_template_result(template_result, codebase, object_name, type_parameters);
+
+        if codebase.get_class_like_by_name(method_identifier.get_class_name()).is_some_and(|c| c.kind.is_trait()) {
+            return Some(Cow::Owned(TCallable::Alias(FunctionLikeIdentifier::Method(object_name, method_name))));
+        }
+
         return Some(Cow::Owned(TCallable::Alias(method_identifier.into())));
     }
 

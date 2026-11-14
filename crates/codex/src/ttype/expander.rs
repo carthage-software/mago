@@ -1088,13 +1088,59 @@ fn get_signature_of_function_like_identifier_with_options(
         ),
     };
 
-    Some(get_signature_of_function_like_metadata_with_options(
+    let mut signature = get_signature_of_function_like_metadata_with_options(
         function_like_identifier,
         function_like_metadata,
         codebase,
         &options,
         preserve_parameter_dependencies,
-    ))
+    );
+
+    if let FunctionLikeIdentifier::Method(classlike_name, method_name) = function_like_identifier
+        && let declaring_class = codebase
+            .get_declaring_method_identifier(&MethodIdentifier::new(*classlike_name, *method_name))
+            .get_class_name()
+        && let Some(declaring_trait) =
+            codebase.get_class_like_by_name(declaring_class).filter(|metadata| metadata.kind.is_trait())
+    {
+        let mut candidate = codebase.get_class_like_by_name(*classlike_name);
+        while let Some(candidate_metadata) = candidate
+            && !candidate_metadata.direct_trait_names().any(|name| name == declaring_trait.name)
+        {
+            candidate =
+                candidate_metadata.direct_parent_class.and_then(|parent| codebase.get_class_like_by_name(parent));
+        }
+
+        if let Some(trait_user) = candidate {
+            let rename = |union: &mut TUnion| {
+                let mut renamed = false;
+                for atomic in union.types.to_mut() {
+                    if let TAtomic::Object(TObject::Named(named)) = atomic
+                        && named.name.as_bytes().eq_ignore_ascii_case(declaring_trait.name.as_bytes())
+                    {
+                        named.name = trait_user.original_name;
+                        renamed = true;
+                    }
+                }
+
+                if renamed {
+                    expand_union(codebase, union, &options);
+                }
+            };
+
+            for parameter in signature.get_parameters_mut() {
+                if let Some(parameter_type) = parameter.get_type_signature_mut() {
+                    rename(parameter_type);
+                }
+            }
+
+            if let Some(return_type) = signature.get_return_type_mut() {
+                rename(return_type);
+            }
+        }
+    }
+
+    Some(signature)
 }
 
 #[must_use]

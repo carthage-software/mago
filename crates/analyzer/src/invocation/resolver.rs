@@ -142,7 +142,7 @@ where
     }
 
     let static_class_type;
-    let self_class;
+    let mut self_class;
     let function_is_final;
     let allow_mixin_static_rebind;
 
@@ -162,6 +162,19 @@ where
                 && let Some(declaring_class_meta) = context.codebase.get_class_like(declaring_class_name.as_bytes())
                 && declaring_class_meta.kind.is_trait()
             {
+                let mut trait_user = Some(method_context.class_like_metadata);
+                while let Some(candidate) = trait_user
+                    && !candidate.direct_trait_names().any(|name| name == declaring_class_meta.name)
+                {
+                    trait_user = candidate
+                        .direct_parent_class
+                        .and_then(|parent| context.codebase.get_class_like_by_name(parent));
+                }
+
+                let trait_user_name =
+                    trait_user.map_or(method_context.class_like_metadata.name, |user| user.original_name);
+                self_class = Some(trait_user_name);
+
                 let mut new_atomics = Vec::with_capacity(resulting_union.types.len());
                 for atomic in resulting_union.types.as_ref() {
                     match atomic {
@@ -169,7 +182,7 @@ where
                             if named_object.name.as_bytes().eq_ignore_ascii_case(declaring_class_name.as_bytes()) =>
                         {
                             let mut new_object = named_object.clone();
-                            new_object.name = method_context.class_like_metadata.name;
+                            new_object.name = trait_user_name;
                             new_atomics.push(TAtomic::Object(TObject::Named(new_object)));
                         }
                         _ => new_atomics.push(atomic.clone()),
