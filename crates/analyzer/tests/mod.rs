@@ -3308,6 +3308,7 @@ test_case!(array_column_int_keys);
 test_case!(unset_readonly_and_restricted_set_properties);
 test_case!(inherited_property_docblock_self_and_parent);
 test_case!(magic_property_without_get_on_open_types);
+test_case!(promoted_parameter_inherits_property_docblock);
 
 #[test]
 #[cfg_attr(miri, ignore)]

@@ -1110,7 +1110,17 @@ fn apply_property_inheritance_work(codebase: &mut CodebaseMetadata, inheritance_
         let Some(child_property) = child_metadata.properties.get_mut(&property_name) else { continue };
 
         inherited.inferred = true;
-        child_property.type_metadata = Some(inherited);
+        let is_promoted = child_property.flags.is_promoted_property();
+        child_property.type_metadata = Some(inherited.clone());
+
+        if is_promoted
+            && let Some(constructor) = codebase.function_likes.get_mut(&(class_name, word("__construct")))
+            && let Some(parameter) =
+                constructor.parameters.iter_mut().find(|parameter| parameter.name.0 == property_name)
+            && !parameter.type_metadata.as_ref().is_some_and(|metadata| metadata.from_docblock)
+        {
+            parameter.type_metadata = Some(inherited);
+        }
     }
 }
 
