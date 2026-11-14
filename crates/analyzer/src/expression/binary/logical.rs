@@ -535,6 +535,11 @@ where
             &right_assigned_var_ids,
         );
 
+        for var_id in right_assigned_var_ids.keys() {
+            block_context.clauses =
+                BlockContext::filter_clauses(context, *var_id, std::mem::take(&mut block_context.clauses), None);
+        }
+
         let assignment_types = ShortCircuitAssignmentTypes {
             when_true: right_assigned_var_ids
                 .keys()
@@ -948,6 +953,11 @@ where
             &right_block_context.locals,
             &right_assigned_var_ids,
         );
+
+        for var_id in right_assigned_var_ids.keys() {
+            block_context.clauses =
+                BlockContext::filter_clauses(context, *var_id, std::mem::take(&mut block_context.clauses), None);
+        }
 
         let assignment_types = ShortCircuitAssignmentTypes {
             when_true: get_short_circuit_branch_types(
