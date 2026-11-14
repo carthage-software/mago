@@ -38,6 +38,8 @@ pub struct IfScope<'ctx> {
     /// Methods definitely called in ALL branches (intersection).
     /// None = no branches processed yet. Some(set) = intersection across branches.
     pub definitely_called_methods: Option<HashSet<Word>>,
+    pub unset_variables: Option<WordSet>,
+    pub possibly_unset_variables: WordSet,
 }
 
 impl IfScope<'_> {
@@ -61,6 +63,8 @@ impl IfScope<'_> {
             definitely_initialized_properties: None,
             definitely_uninitialized_property_ids: None,
             definitely_called_methods: None,
+            unset_variables: None,
+            possibly_unset_variables: WordSet::default(),
         }
     }
 }

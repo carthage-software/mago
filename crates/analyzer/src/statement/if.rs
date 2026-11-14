@@ -465,6 +465,16 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
             block_context.locals.insert(variable_id, Rc::new(new_type));
         }
 
+        let unset_variables = if_scope.unset_variables.unwrap_or_default();
+        for variable_id in if_scope.possibly_unset_variables {
+            if unset_variables.contains(&variable_id) {
+                block_context.remove_variable(variable_id.as_bytes(), true, context);
+            } else if let Some(variable_type) = block_context.locals.get_mut(&variable_id) {
+                Rc::make_mut(variable_type).set_possibly_undefined(true, None);
+                block_context.possibly_undefined_variable_ids.insert(variable_id);
+            }
+        }
+
         block_context.clauses.extend(discriminator_clauses);
         if has_returned {
             block_context.flags.set_has_returned(true);
@@ -1057,6 +1067,7 @@ where
         if_scope.assigned_variable_ids = None;
         if_scope.new_variables = None;
         if_scope.redefined_variables = None;
+        if_scope.unset_variables = Some(WordSet::default());
         if_scope.reasonable_clauses = vec![];
 
         // No else branch means we can't guarantee initialization - clear intersection sets
@@ -1326,6 +1337,23 @@ fn update_if_scope<'ctx, A>(
 
         outer_block_context.called_methods.extend(if_block_context.called_methods.iter().copied());
     }
+    let unset_variables: WordSet = new_possibly_assigned_variable_ids
+        .iter()
+        .filter(|id| {
+            !id.as_bytes().contains(&b'[')
+                && !id.as_bytes().contains(&b'-')
+                && !id.as_bytes().contains(&b':')
+                && outer_block_context.locals.contains_key(*id)
+                && !if_block_context.locals.contains_key(*id)
+        })
+        .copied()
+        .collect();
+    if_scope.possibly_unset_variables.extend(unset_variables.iter().copied());
+    match &mut if_scope.unset_variables {
+        Some(existing) => existing.retain(|id| unset_variables.contains(id)),
+        None => if_scope.unset_variables = Some(unset_variables),
+    }
+
     let mut redefined_variables =
         if_block_context.get_redefined_locals(&outer_block_context.locals, false, &mut WordSet::default());
 
