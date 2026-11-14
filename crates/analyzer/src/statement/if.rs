@@ -170,6 +170,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
             &if_clauses,
             self.condition.span(),
             &context.settings.algebra_thresholds(),
+            true,
         );
 
         if_clauses = saturate_clauses(if_clauses.iter(), &context.settings.algebra_thresholds());
@@ -828,6 +829,7 @@ where
         &else_if_clauses,
         else_if_clause.0.span(),
         &context.settings.algebra_thresholds(),
+        true,
     );
 
     let else_if_clauses = saturate_clauses(else_if_clauses.iter(), &context.settings.algebra_thresholds());

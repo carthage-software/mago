@@ -648,6 +648,7 @@ where
                 &case_clauses,
                 case_condition.span(),
                 &self.context.settings.algebra_thresholds(),
+                false,
             );
 
             entry_clauses.extend(case_clauses.iter().cloned().map(Rc::new));

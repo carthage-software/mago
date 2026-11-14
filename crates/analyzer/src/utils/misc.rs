@@ -1,4 +1,5 @@
 use mago_allocator::Arena;
+use mago_codex::assertion::Assertion;
 use std::rc::Rc;
 
 use foldhash::HashMap;
@@ -24,6 +25,7 @@ pub fn check_for_paradox<A>(
     formula_2: &[Clause],
     span: Span,
     algebra_thresholds: &AlgebraThresholds,
+    report_exact_repeat: bool,
 ) where
     A: Arena,
 {
@@ -70,6 +72,7 @@ pub fn check_for_paradox<A>(
 
     let formula_1_clauses = formula_1.iter().map(|c| &**c).collect::<Vec<_>>();
     let mut paradox = None;
+    let mut implied = None;
     for negated_clause_2 in &negated_formula_2 {
         if !negated_clause_2.reconcilable || negated_clause_2.wedge {
             return;
@@ -95,6 +98,14 @@ pub fn check_for_paradox<A>(
                     paradox.get_or_insert((*clause_1, negated_clause_2));
                     break;
                 }
+
+                if !clause_1.possibilities.values().any(|assertions| {
+                    assertions
+                        .values()
+                        .any(|assertion| matches!(assertion, Assertion::InArray(_) | Assertion::NotInArray(_)))
+                }) {
+                    implied.get_or_insert((*clause_1, negated_clause_2));
+                }
             }
         }
 
@@ -103,7 +114,7 @@ pub fn check_for_paradox<A>(
         }
     }
 
-    if let Some((original_clause, negated_clause)) = paradox {
+    if let Some((original_clause, negated_clause)) = paradox.or(implied.filter(|_| report_exact_repeat)) {
         report_paradoxical_condition(collector, original_clause, negated_clause, span, algebra_thresholds);
     }
 }

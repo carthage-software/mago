@@ -382,6 +382,7 @@ pub fn find_expression_logic_issues<'ctx, 'arena, A>(
         &expression_clauses,
         expression_span,
         &context.settings.algebra_thresholds(),
+        false,
     );
 
     expression_clauses.extend(block_context.clauses.iter().map(|v| (**v).clone()));
