@@ -629,7 +629,7 @@ where
 {
     if f.settings.always_break_named_arguments_list
         && (!for_attributes || f.settings.always_break_attribute_named_argument_lists)
-        && argument_list.arguments.len() >= 2
+        && !argument_list.arguments.is_empty()
         && argument_list.arguments.iter().all(|a| matches!(a, PartialArgument::Named(_)))
     {
         return true;
