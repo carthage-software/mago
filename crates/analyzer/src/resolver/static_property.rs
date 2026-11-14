@@ -135,6 +135,16 @@ where
         };
 
         for property_name in &property_names {
+            let fqcn = std::iter::once(fqcn)
+                .chain(resolved_classname.intersections.iter().filter_map(|intersection| intersection.fqcn))
+                .find(|class_id| {
+                    context
+                        .codebase
+                        .get_class_like(class_id.as_bytes())
+                        .is_some_and(|metadata| metadata.declaring_property_ids.contains_key(property_name))
+                })
+                .unwrap_or(fqcn);
+
             if let Some(resolved_property) = find_static_property_in_class(
                 context,
                 block_context,
