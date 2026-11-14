@@ -411,6 +411,17 @@ where
         ))));
     }
 
+    let specialized_second_type;
+    let second_type = if let (TAtomic::Object(TObject::Named(ancestor)), TAtomic::Object(TObject::Named(descendant))) =
+        (first_type, second_type)
+        && let Some(specialized) = specialize_from_ancestor(context.codebase, descendant, ancestor)
+    {
+        specialized_second_type = TAtomic::Object(TObject::Named(specialized));
+        &specialized_second_type
+    } else {
+        second_type
+    };
+
     let mut atomic_comparison_results = ComparisonResult::new();
     if atomic_comparator::is_contained_by(
         context.codebase,
@@ -741,6 +752,41 @@ fn get_iteration_type<'meta>(
     };
 
     (Some(index), parameter)
+}
+
+/// Gives a generic descendant named without type arguments the arguments its
+/// ancestor carries, through the descendant's `@extends`/`@implements` mapping.
+fn specialize_from_ancestor(
+    codebase: &CodebaseMetadata,
+    descendant: &TNamedObject,
+    ancestor: &TNamedObject,
+) -> Option<TNamedObject> {
+    if descendant.type_parameters.is_some() {
+        return None;
+    }
+
+    let ancestor_arguments = ancestor.get_type_parameters()?;
+    let descendant_metadata = codebase.get_class_like(descendant.name.as_bytes())?;
+    if descendant_metadata.template_types.is_empty() {
+        return None;
+    }
+
+    let ancestor_metadata = codebase.get_class_like(ancestor.name.as_bytes())?;
+    let extended = descendant_metadata.template_extended_parameters.get(&ancestor_metadata.name)?;
+
+    let mut arguments: Vec<TUnion> =
+        descendant_metadata.template_types.values().map(|template| template.constraint.clone()).collect();
+    let mut specialized = false;
+    for ((template_name, _), argument) in ancestor_metadata.template_types.iter().zip(ancestor_arguments) {
+        if let Some(bound) = extended.get(template_name)
+            && let Some(index) = get_bound_template_index(descendant_metadata, bound)
+        {
+            arguments[index] = argument.clone();
+            specialized = true;
+        }
+    }
+
+    specialized.then(|| TNamedObject { type_parameters: Some(arguments.into_boxed_slice()), ..descendant.clone() })
 }
 
 fn get_bound_template_index(class_metadata: &ClassLikeMetadata, bound_type: &TUnion) -> Option<usize> {
