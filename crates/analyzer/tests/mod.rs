@@ -785,6 +785,7 @@ test_case!(array_write_through_several_literal_keys);
 test_case!(variables_assigned_before_break);
 test_case!(variable_variable_assignment_target);
 test_case!(fully_qualified_existence_guards);
+test_case!(yield_from_result_type);
 test_case!(magic_properties);
 test_case!(magic_property_overridden_by_parent);
 test_case!(magic_property_shadowing_real_property);

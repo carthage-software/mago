@@ -279,7 +279,11 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for YieldFrom<'arena> {
             return Ok(());
         };
 
+        let mut result_type: Option<TUnion> = None;
         for atomic in iterator_type.types.iter() {
+            let generator_return = atomic.get_generator_parameters().map_or_else(get_null, |generator| generator.3);
+            result_type = Some(add_optional_union_type(generator_return, result_type.as_ref(), context.codebase));
+
             let (key, value) = if let Some(generator) = atomic.get_generator_parameters() {
                 // the iterator is a generator! not only does it have to match key and value,
                 // but also `send` type must be compatible with the current generator's `send` type
@@ -391,7 +395,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for YieldFrom<'arena> {
             artifacts.inferred_yield_value_types.push(value);
         }
 
-        artifacts.set_expression_type(self, get_null());
+        artifacts.set_expression_type(self, result_type.unwrap_or_else(get_null));
 
         Ok(())
     }
