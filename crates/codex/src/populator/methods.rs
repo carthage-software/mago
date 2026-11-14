@@ -71,7 +71,15 @@ pub fn inherit_methods_from_parent(
         let inherit_original =
             !parent_is_trait || !metadata.excludes_trait_method(parent_metadata.name, *method_name_lc, codebase);
         if inherit_original
-            && (*method_name_lc != constructor_name || parent_metadata.flags.has_consistent_constructor())
+            && (*method_name_lc != constructor_name
+                || parent_metadata.flags.has_consistent_constructor()
+                || parent_metadata.kind.is_interface()
+                || parent_metadata.overridden_method_ids.contains_key(&constructor_name)
+                || codebase
+                    .function_likes
+                    .get(&(declaring_method_id.get_class_name(), *method_name_lc))
+                    .and_then(|meta| meta.method_metadata.as_ref())
+                    .is_some_and(|method| method.is_abstract))
         {
             let add_parent = !parent_is_trait
                 || codebase

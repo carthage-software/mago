@@ -866,6 +866,8 @@ where
 
     if class_like_metadata.flags.has_consistent_constructor()
         && !context.file.file_type.is_patch()
+        && class_like_metadata.direct_parent_class.is_none()
+        && class_like_metadata.used_traits.is_empty()
         && let Some(constructor) = class_like_metadata.add_implicit_constructor()
     {
         scanner.codebase.function_likes.insert((class_like_metadata.name, constructor.name), Box::new(constructor));

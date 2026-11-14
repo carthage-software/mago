@@ -354,8 +354,17 @@ fn collect_inheritance_work(
     inheritance_work: &mut Vec<(usize, Word, Word, Word, Word)>,
 ) {
     let depth = class_metadata.all_parent_classes.len() + class_metadata.all_parent_interfaces.len();
+    let constructor_name = word("__construct");
     for (method_name, method_ids) in &class_metadata.overridden_method_ids {
         if !codebase.function_likes.contains_key(&(class_name, *method_name)) {
+            continue;
+        }
+
+        if *method_name == constructor_name
+            && !method_ids.keys().any(|parent| {
+                codebase.class_likes.get(parent).is_some_and(|parent| parent.flags.has_consistent_constructor())
+            })
+        {
             continue;
         }
 

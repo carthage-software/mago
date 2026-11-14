@@ -304,8 +304,10 @@ where
 
     artifacts.symbol_references.add_reference_for_method_call(&block_context.scope, &constructor_id);
 
-    let mut has_inconsistent_constructor =
-        !metadata.flags.is_final() && metadata.name_span.is_some() && !metadata.flags.has_consistent_constructor();
+    let mut has_inconsistent_constructor = !metadata.flags.is_final()
+        && metadata.name_span.is_some()
+        && !metadata.flags.has_consistent_constructor()
+        && !metadata.overridden_method_ids.contains_key(&word("__construct"));
     let mut constructor_span = None;
 
     let mut template_result = TemplateResult::new(IndexMap::with_hasher(RandomState::default()), HashMap::default());
@@ -313,8 +315,8 @@ where
     let is_spl_object_storage = classname_str.as_bytes().eq_ignore_ascii_case(b"splobjectstorage");
 
     if let Some(constructor) = context.codebase.get_method_by_id(&constructor_declraing_id) {
-        has_inconsistent_constructor =
-            has_inconsistent_constructor && !constructor.method_metadata.as_ref().is_some_and(|meta| meta.is_final);
+        has_inconsistent_constructor = has_inconsistent_constructor
+            && !constructor.method_metadata.as_ref().is_some_and(|meta| meta.is_final || meta.is_abstract);
         constructor_span = Some(constructor.name_span.unwrap_or(constructor.span));
 
         artifacts.symbol_references.add_reference_for_method_call(&block_context.scope, &constructor_declraing_id);
