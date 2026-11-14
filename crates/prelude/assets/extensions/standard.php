@@ -4632,7 +4632,7 @@ function array_unshift(array &$array, mixed ...$values): int {}
  *
  * @param-out (
  *   $replacement is array<ReplacementKey, ReplacementValue> ? (
- *     $array is list<InputValue> ? (
+ *     $array is array<int, InputValue> ? (
  *       $replacement is list<ReplacementValue> ? (
  *         $replacement is non-empty-list<ReplacementValue> ? non-empty-list<InputValue|ReplacementValue> : list<InputValue|ReplacementValue>
  *       ) : (
@@ -4651,14 +4651,14 @@ function array_unshift(array &$array, mixed ...$values): int {}
  *     )
  *   ) : (
  *     $replacement is list<never>|array{} ? (
- *       $array is list<InputValue> ? list<InputValue> : array<InputKey, InputValue>
+ *       $array is array<int, InputValue> ? list<InputValue> : array<InputKey, InputValue>
  *     ) : (
- *       $array is list<InputValue> ? non-empty-list<InputValue|ReplacementScalar> : non-empty-array<InputKey|int, InputValue|ReplacementScalar>
+ *       $array is array<int, InputValue> ? non-empty-list<InputValue|ReplacementScalar> : non-empty-array<InputKey|int, InputValue|ReplacementScalar>
  *     )
  *   )
  * ) $array
  *
- * @return ($array is list<InputValue> ? list<InputValue> : array<InputKey, InputValue>)
+ * @return ($array is array<int, InputValue> ? list<InputValue> : array<InputKey, InputValue>)
  *
  * @pure
  */
