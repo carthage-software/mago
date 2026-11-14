@@ -705,7 +705,7 @@ fn get_shape_from_type(
                     let array_key = get_array_key_from_shape_key(&field_key.key, scope, classname);
 
                     if let ArrayKey::Integer(offset) = array_key {
-                        if offset > 0 && (offset as usize) == next_offset {
+                        if offset >= 0 && (offset as usize) == next_offset {
                             next_offset += 1;
 
                             offset as usize
