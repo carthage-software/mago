@@ -1628,7 +1628,12 @@ fn condition_needs_analyzed_types(expression: &Expression<'_>) -> bool {
                 [binary.lhs, binary.rhs].iter().any(|side| side.is_true() || side.is_false())
             }
             BinaryOperator::And(_) | BinaryOperator::Or(_) | BinaryOperator::LowAnd(_) | BinaryOperator::LowOr(_) => {
-                condition_needs_analyzed_types(binary.lhs) || condition_needs_analyzed_types(binary.rhs)
+                let mut right_assignments = vec![];
+                collect_condition_assignments(binary.rhs, &mut right_assignments);
+
+                !right_assignments.is_empty()
+                    || condition_needs_analyzed_types(binary.lhs)
+                    || condition_needs_analyzed_types(binary.rhs)
             }
             _ => false,
         },

@@ -3272,6 +3272,7 @@ test_case!(downstream_psl_and_sdk_patterns);
 test_case!(switch_break_is_not_a_loop_exit);
 test_case!(catch_only_variable_keeps_its_type);
 test_case!(loop_condition_variables_after_the_loop);
+test_case!(loop_condition_forgets_what_the_right_reassigns);
 
 #[test]
 #[cfg_attr(miri, ignore)]
