@@ -378,20 +378,8 @@ fn get_extended_expression_id<'ast, 'arena>(
                 word(b"self")
             }
         }
-        Expression::Parent(_) if solve_identifiers => {
-            if let Some(class_name) = this_class_name {
-                class_name
-            } else {
-                word(b"parent")
-            }
-        }
-        Expression::Static(_) if solve_identifiers => {
-            if let Some(class_name) = this_class_name {
-                class_name
-            } else {
-                word(b"static")
-            }
-        }
+        Expression::Parent(_) if solve_identifiers => word(b"parent"),
+        Expression::Static(_) if solve_identifiers => word(b"static"),
         Expression::Identifier(identifier) if solve_identifiers => {
             let identifier_id = resolved_names.get(&identifier);
 

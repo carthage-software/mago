@@ -143,7 +143,11 @@ pub fn reconcile_keyed_types<'ctx, A>(
             continue;
         }
 
-        if memchr::memmem::find(key_str, b"::").is_some() && !key_str.contains(&b'$') && !key_str.contains(&b'[') {
+        if memchr::memmem::find(key_str, b"::").is_some()
+            && !key_str.contains(&b'$')
+            && !key_str.contains(&b'[')
+            && (key_str.len() < 7 || key_str[key_str.len() - 7..].eq_ignore_ascii_case(b"::class"))
+        {
             continue;
         }
 
@@ -1195,8 +1199,16 @@ where
     let base_key_atom = word(&base_key);
     if let std::collections::hash_map::Entry::Vacant(e) = block_context.locals.entry(base_key_atom) {
         let sep = memchr::memmem::find(&base_key, b"::")?;
-        let fq_class_name = &base_key[..sep];
+        let written_class_name = &base_key[..sep];
         let const_name = &base_key[sep + 2..];
+
+        let scope_class = block_context.scope.get_class_like();
+        let resolved_class_name = match written_class_name {
+            b"static" | b"self" => Some(scope_class?.name),
+            b"parent" => Some(scope_class?.direct_parent_class?),
+            _ => None,
+        };
+        let fq_class_name = resolved_class_name.as_ref().map_or(written_class_name, |name| name.as_bytes());
 
         if !context.codebase.class_like_exists(fq_class_name) {
             return None;

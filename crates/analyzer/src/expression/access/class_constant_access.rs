@@ -5,7 +5,12 @@ use mago_codex::ttype::expander::TypeExpansionOptions;
 use mago_codex::ttype::expander::expand_union;
 use mago_codex::ttype::get_mixed;
 use mago_codex::ttype::get_never;
+use std::rc::Rc;
+
+use mago_syntax::cst::Access;
 use mago_syntax::cst::ClassConstantAccess;
+use mago_syntax::cst::ClassLikeConstantSelector;
+use mago_syntax::cst::Expression;
 
 use crate::analyzable::Analyzable;
 use crate::artifacts::AnalysisArtifacts;
@@ -13,6 +18,7 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::resolver::class_constant::resolve_class_constants;
+use crate::utils::expression::get_block_expression_id;
 
 impl<'ast, 'arena> Analyzable<'ast, 'arena> for ClassConstantAccess<'arena> {
     fn analyze<'ctx, A>(
@@ -48,10 +54,39 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ClassConstantAccess<'arena> {
             );
         }
 
-        artifacts.set_expression_type(
-            self,
-            if resolution.has_invalid_path { get_never() } else { resulting_type.unwrap_or_else(get_mixed) },
+        if resolution.has_invalid_path {
+            artifacts.set_expression_type(self, get_never());
+
+            return Ok(());
+        }
+
+        let is_class_name = matches!(
+            &self.constant,
+            ClassLikeConstantSelector::Identifier(identifier) if identifier.value.eq_ignore_ascii_case(b"class")
         );
+
+        let constant_id = if is_class_name {
+            None
+        } else {
+            get_block_expression_id(&Expression::Access(Access::ClassConstant(self.clone())), context, block_context)
+        };
+
+        if let Some(constant_id) = constant_id
+            && let Some(narrowed_type) = block_context.locals.get(&constant_id)
+        {
+            artifacts.set_rc_expression_type(self, Rc::clone(narrowed_type));
+
+            return Ok(());
+        }
+
+        let resulting_type = Rc::new(resulting_type.unwrap_or_else(get_mixed));
+        if let Some(constant_id) = constant_id
+            && block_context.flags.inside_conditional()
+        {
+            block_context.locals.insert(constant_id, Rc::clone(&resulting_type));
+        }
+
+        artifacts.set_rc_expression_type(self, resulting_type);
 
         Ok(())
     }
