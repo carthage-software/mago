@@ -45,6 +45,7 @@ use mago_reporting::Annotation;
 use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_span::Span;
+use mago_syntax::cst::Assignment;
 use mago_syntax::cst::AssignmentOperator;
 use mago_syntax::cst::Binary;
 use mago_syntax::cst::BinaryOperator;
@@ -1233,8 +1234,16 @@ where
                 }
             }
 
+            let mut condition_variables = ShortCircuitedVariables::default();
+            if !always_enters_loop.get() {
+                for pre_condition in pre_conditions {
+                    condition_variables.walk_expression(pre_condition, &mut ());
+                }
+            }
+
             for variable_id in changed_variable_ids {
                 if !always_enters_loop.get()
+                    && !condition_variables.assigned.contains(&variable_id)
                     && loop_parent_context.locals.contains_key(&variable_id)
                     && let Some(assertions) = negated_pre_condition_types.get(&variable_id)
                 {
@@ -1585,11 +1594,21 @@ struct ShortCircuitedVariables {
     depth: usize,
     always: WordSet,
     sometimes: WordSet,
+    assigned: WordSet,
 }
 
 impl<'ast, 'arena> MutWalker<'ast, 'arena, ()> for ShortCircuitedVariables {
     fn walk_in_direct_variable(&mut self, variable: &'ast DirectVariable<'arena>, _context: &mut ()) {
         (if self.depth == 0 { &mut self.always } else { &mut self.sometimes }).insert(word(variable.name));
+    }
+
+    fn walk_in_assignment(&mut self, assignment: &'ast Assignment<'arena>, _context: &mut ()) {
+        if self.depth == 0
+            && matches!(assignment.operator, AssignmentOperator::Assign(_))
+            && let Expression::Variable(Variable::Direct(variable)) = assignment.lhs
+        {
+            self.assigned.insert(word(variable.name));
+        }
     }
 
     fn walk_binary(&mut self, binary: &'ast Binary<'arena>, context: &mut ()) {
