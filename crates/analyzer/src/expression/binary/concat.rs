@@ -581,6 +581,10 @@ fn get_operand_strings(operand_type: &TUnion) -> Vec<TString> {
             TScalar::Integer(tint) => {
                 if let Some(v) = tint.get_literal_value() {
                     operand_strings.push(TString::known_literal(i64_word(v)));
+                } else if let (Some(from), Some(to)) = tint.get_bounds()
+                    && to.checked_sub(from).is_some_and(|span| (0..10).contains(&span))
+                {
+                    operand_strings.extend((from..=to).map(|v| TString::known_literal(i64_word(v))));
                 } else {
                     operand_strings.push(TString::general_with_props(
                         true,
