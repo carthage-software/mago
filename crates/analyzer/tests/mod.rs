@@ -3217,6 +3217,7 @@ test_case!(non_empty_assertion_on_list);
 test_case!(instanceof_self_static_and_this);
 test_case!(array_column_index_key_types);
 test_case!(array_item_passed_by_reference_is_a_write);
+test_case!(build_dependent_version_constants);
 
 #[test]
 #[cfg_attr(miri, ignore)]

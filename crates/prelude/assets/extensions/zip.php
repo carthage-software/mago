@@ -2,6 +2,7 @@
 
 class ZipArchive implements Countable
 {
+    /** @var non-empty-string */
     public const LIBZIP_VERSION = '1.7.3';
 
     public const CREATE = 1;

@@ -208,6 +208,14 @@ pub fn get_platform_constant_type(name: &[u8]) -> Option<TUnion> {
         | b"PHP_SYSCONFDIR"
         | b"ICONV_IMPL"
         | b"LIBXML_DOTTED_VERSION"
+        | b"LIBXML_LOADED_VERSION"
+        | b"ICONV_VERSION"
+        | b"OPENSSL_VERSION_TEXT"
+        | b"GD_VERSION"
+        | b"INTL_ICU_VERSION"
+        | b"LIBZIP_VERSION"
+        | b"MB_ONIGURUMA_VERSION"
+        | b"SODIUM_LIBRARY_VERSION"
         | b"PCRE_VERSION" => Some(get_non_empty_string()),
         b"STDIN" | b"STDOUT" | b"STDERR" => Some(get_open_resource()),
         b"NAN" | b"PHP_FLOAT_EPSILON" | b"INF" => Some(get_float()),
