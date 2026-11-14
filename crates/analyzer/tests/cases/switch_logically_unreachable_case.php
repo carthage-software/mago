@@ -2,6 +2,7 @@
 
 /**
  * @mago-expect analysis:redundant-condition
+ * @mago-expect analysis:redundant-comparison,always-matching-switch-case,unreachable-switch-case,unreachable-switch-default
  */
 function test_switch_logically_unreachable_case(int $value): string
 {

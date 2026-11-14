@@ -446,7 +446,31 @@ where
                 }
             }
 
-            case_condition.analyze(self.context, self.block_context, self.artifacts)?;
+            if original_subject_type.is_true() && !self.negated_clauses.is_empty() {
+                let mut condition_context = self.block_context.clone();
+                let (assertions, active_assertions) = mago_algebra::find_satisfying_assignments_iter(
+                    self.negated_clauses.iter(),
+                    None,
+                    &mut WordSet::default(),
+                );
+
+                reconcile_keyed_types(
+                    self.context,
+                    &assertions,
+                    active_assertions,
+                    &mut condition_context,
+                    &mut WordSet::default(),
+                    &WordSet::default(),
+                    &case_condition.span(),
+                    false,
+                    false,
+                );
+
+                case_condition.analyze(self.context, &mut condition_context, self.artifacts)?;
+            } else {
+                case_condition.analyze(self.context, self.block_context, self.artifacts)?;
+            }
+
             let has_alternate_entry = self.has_reachable_fallthrough || has_non_duplicate_empty_case;
             let condition_is_duplicate = self.check_for_duplicate_case_condition(
                 case_condition,
