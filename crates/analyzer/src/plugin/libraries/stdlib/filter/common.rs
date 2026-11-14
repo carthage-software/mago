@@ -1,9 +1,12 @@
 use mago_codex::ttype::atomic::TAtomic;
+use mago_codex::ttype::atomic::array::TArray;
+use mago_codex::ttype::atomic::array::key::ArrayKey;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::atomic::scalar::bool::TBool;
 use mago_codex::ttype::atomic::scalar::float::TFloat;
 use mago_codex::ttype::atomic::scalar::int::TInteger;
 use mago_codex::ttype::atomic::scalar::string::TString;
+use mago_codex::ttype::get_mixed_keyed_array;
 use mago_codex::ttype::union::TUnion;
 
 use crate::plugin::context::InvocationInfo;
@@ -30,6 +33,8 @@ const FILTER_SANITIZE_FULL_SPECIAL_CHARS: i64 = 522;
 const FILTER_SANITIZE_ADD_SLASHES: i64 = 523;
 
 const FILTER_NULL_ON_FAILURE: i64 = 0x0800_0000;
+const FILTER_REQUIRE_ARRAY: i64 = 0x0100_0000;
+const FILTER_FORCE_ARRAY: i64 = 0x0400_0000;
 
 /// Resolves the return type for filter functions (`filter_var` and `filter_input`).
 ///
@@ -45,33 +50,52 @@ pub fn resolve_filter_return_type(
     let filter_type = context.get_expression_type(filter_arg)?;
     let filter_value = filter_type.get_single_literal_int_value()?;
 
-    let null_on_failure = has_null_on_failure_flag(context, invocation, options_index);
+    let flags = get_flags(context, invocation, options_index);
+    let null_on_failure = flags & FILTER_NULL_ON_FAILURE != 0;
+    if flags & FILTER_FORCE_ARRAY != 0 {
+        return Some(get_mixed_keyed_array());
+    }
+
+    if flags & FILTER_REQUIRE_ARRAY != 0 {
+        let mut result = get_mixed_keyed_array();
+        result.types.to_mut().push(failure_type(null_on_failure));
+
+        return Some(result);
+    }
 
     get_filter_return_type(filter_value, null_on_failure)
 }
 
-/// Checks if the options parameter contains the `FILTER_NULL_ON_FAILURE` flag.
-///
-/// This handles the case where the options parameter is a literal integer with the flag set.
-/// It does NOT handle the array form `['flags' => FILTER_NULL_ON_FAILURE]`.
-fn has_null_on_failure_flag(
+/// Reads the flags from the options parameter, either a literal integer or the `flags`
+/// entry of an options array.
+fn get_flags(
     context: &ProviderContext<'_, '_, '_>,
     invocation: &InvocationInfo<'_, '_, '_>,
     options_index: usize,
-) -> bool {
-    let Some(options_arg) = invocation.get_argument(options_index, &[b"options"]) else {
-        return false;
+) -> i64 {
+    let Some(options_type) =
+        invocation.get_argument(options_index, &[b"options"]).and_then(|options| context.get_expression_type(options))
+    else {
+        return 0;
     };
 
-    let Some(options_type) = context.get_expression_type(options_arg) else {
-        return false;
+    if let Some(flags) = options_type.get_single_literal_int_value() {
+        return flags;
+    }
+
+    let [TAtomic::Array(TArray::Keyed(options))] = options_type.types.as_ref() else {
+        return 0;
     };
 
-    let Some(options_value) = options_type.get_single_literal_int_value() else {
-        return false;
-    };
-
-    (options_value & FILTER_NULL_ON_FAILURE) != 0
+    options
+        .get_known_items()
+        .and_then(|items| {
+            items.iter().find_map(|(key, (_, value))| match key {
+                ArrayKey::String(name) if name.as_bytes() == b"flags" => value.get_single_literal_int_value(),
+                _ => None,
+            })
+        })
+        .unwrap_or(0)
 }
 
 /// The failure type: `false` normally, `null` when `FILTER_NULL_ON_FAILURE` is set.
