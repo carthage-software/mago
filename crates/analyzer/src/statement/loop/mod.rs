@@ -1172,7 +1172,10 @@ where
 
             for variable_id in changed_variable_ids {
                 if let Some(reconciled_type) = continue_context.locals.get(&variable_id) {
-                    if loop_parent_context.locals.contains_key(&variable_id) {
+                    if loop_parent_context.locals.contains_key(&variable_id)
+                        || (!reconciled_type.possibly_undefined()
+                            && !variable_id.as_bytes().iter().any(|byte| matches!(byte, b'[' | b'-' | b':')))
+                    {
                         loop_parent_context.locals.insert(variable_id, Rc::clone(reconciled_type));
                     }
 
