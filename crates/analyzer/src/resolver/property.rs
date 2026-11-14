@@ -49,6 +49,7 @@ use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::external::PropertyAccessKind;
 use crate::resolver::class_name::report_non_existent_class_like;
+use crate::resolver::method::collect_mixin_types;
 use crate::resolver::selector::resolve_member_selector;
 use crate::utils::names::display_class_like_name;
 use crate::utils::template::get_template_types_for_class_member;
@@ -965,7 +966,34 @@ where
                     );
                 }
 
-                let resolved = get_resolved_declared_property(context.codebase, &resolution, prop_name, for_assignment);
+                let mut resolved =
+                    get_resolved_declared_property(context.codebase, &resolution, prop_name, for_assignment);
+
+                if let Some((mixin_metadata, type_parameters)) =
+                    collect_mixin_types(context.codebase, class_metadata, object, &class_metadata.mixins)
+                        .into_iter()
+                        .find_map(|(mixin_name, mixin_object, _)| {
+                            let mixin_metadata = context.codebase.get_class_like_by_name(mixin_name)?;
+                            if !mixin_metadata.declaring_property_ids.contains_key(&prop_name) {
+                                return None;
+                            }
+
+                            let TObject::Named(mixin_object) = mixin_object else {
+                                return None;
+                            };
+
+                            Some((mixin_metadata, mixin_object.type_parameters?))
+                        })
+                {
+                    resolved.property_type = localize_property_type(
+                        context,
+                        &resolved.property_type,
+                        &type_parameters,
+                        mixin_metadata,
+                        resolution.declaring_class,
+                    );
+                }
+
                 // For an annotation-governed mixin property, the caller reports a missing
                 // `__get`/`__set` on the accessed class; the mixin-specific warnings below
                 // cover real mixin properties only.

@@ -1298,7 +1298,7 @@ fn type_has_method_assertion(object_type: &TObject, method_name: &[u8]) -> bool 
     }
 }
 
-fn collect_mixin_types(
+pub(crate) fn collect_mixin_types(
     codebase: &CodebaseMetadata,
     class_metadata: &ClassLikeMetadata,
     outer_object: &TObject,
