@@ -427,6 +427,11 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Try<'arena> {
                                 CombinerOptions::default(),
                             )),
                         );
+                    } else {
+                        let mut possibly_undefined_type = (**variable_type).clone();
+                        possibly_undefined_type.set_possibly_undefined(true, None);
+                        block_context.locals.insert(*variable_id, Rc::new(possibly_undefined_type));
+                        block_context.possibly_undefined_variable_ids.insert(*variable_id);
                     }
                 }
 

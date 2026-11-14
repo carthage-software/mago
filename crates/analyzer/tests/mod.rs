@@ -3270,6 +3270,7 @@ test_case!(shape_intersected_with_array_is_open_shape);
 test_case!(numeric_string_array_key_type_is_int);
 test_case!(downstream_psl_and_sdk_patterns);
 test_case!(switch_break_is_not_a_loop_exit);
+test_case!(catch_only_variable_keeps_its_type);
 
 #[test]
 #[cfg_attr(miri, ignore)]
