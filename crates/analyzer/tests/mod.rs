@@ -3227,6 +3227,7 @@ test_case!(repeated_condition_is_paradoxical);
 test_case!(nullsafe_call_arguments_are_conditional);
 test_case!(template_used_in_other_tags);
 test_case!(docblock_quoted_literal_and_key_escapes);
+test_case!(conditional_is_never_takes_else);
 
 #[test]
 #[cfg_attr(miri, ignore)]

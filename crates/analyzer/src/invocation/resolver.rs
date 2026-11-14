@@ -615,6 +615,10 @@ where
         ))];
     }
 
+    if !subject.is_never() && target.is_never() {
+        return if negated { then_type.types.into_owned() } else { otherwise_type.types.into_owned() };
+    }
+
     if !subject.is_never() {
         let mut comparison_result = ComparisonResult::new();
         let subject_is_contained = union_comparator::is_contained_by(
