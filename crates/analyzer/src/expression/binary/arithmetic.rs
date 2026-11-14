@@ -733,6 +733,8 @@ fn determine_numeric_result(op: &BinaryOperator<'_>, left: &TAtomic, right: &TAt
                         } else {
                             vec![TAtomic::Scalar(TScalar::int()), TAtomic::Scalar(TScalar::float())]
                         }
+                    } else if matches!(op, BinaryOperator::Exponentiation(_)) {
+                        integer_power_result(*left_int, *right_int)
                     } else {
                         vec![TAtomic::Scalar(TScalar::int())]
                     }
@@ -841,6 +843,25 @@ fn string_bitwise_result(op: &BinaryOperator<'_>, left: &TAtomic, right: &TAtomi
     match std::str::from_utf8(&result_bytes) {
         Ok(text) => TAtomic::Scalar(TScalar::literal_string(mago_word::word(text))),
         Err(_) => TAtomic::Scalar(TScalar::string()),
+    }
+}
+
+/// `int ** int` is a float when the exponent is negative or the result overflows.
+fn integer_power_result(base: TInteger, exponent: TInteger) -> Vec<TAtomic> {
+    if let (Some(base), Some(exponent)) = (base.get_literal_value(), exponent.get_literal_value()) {
+        let value = (base as f64).powf(exponent as f64);
+
+        return vec![if value.is_finite() {
+            TAtomic::Scalar(TScalar::literal_float(value))
+        } else {
+            TAtomic::Scalar(TScalar::float())
+        }];
+    }
+
+    match exponent.get_bounds() {
+        (Some(minimum), _) if minimum >= 0 => vec![TAtomic::Scalar(TScalar::int())],
+        (_, Some(maximum)) if maximum < 0 => vec![TAtomic::Scalar(TScalar::float())],
+        _ => vec![TAtomic::Scalar(TScalar::int()), TAtomic::Scalar(TScalar::float())],
     }
 }
 
