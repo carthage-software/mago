@@ -91,6 +91,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
 
             if let Some(existing_type) = block_context.locals.get(&variable_atom).cloned() {
                 inner_block_context.locals.insert(variable_atom, existing_type);
+
+                if block_context.possibly_undefined_variable_ids.contains(&variable_atom) {
+                    inner_block_context.possibly_undefined_variable_ids.insert(variable_atom);
+                }
             }
 
             inner_block_context.variables_possibly_in_scope.insert(variable_atom);

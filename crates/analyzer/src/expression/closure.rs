@@ -12,8 +12,10 @@ use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::keyed::TKeyedArray;
 use mago_codex::ttype::atomic::callable::TCallable;
+use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::get_arraykey;
 use mago_codex::ttype::get_mixed;
+use mago_codex::ttype::get_null;
 use mago_codex::ttype::union::TUnion;
 use mago_database::file::File;
 use mago_reporting::Annotation;
@@ -156,6 +158,19 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
                 let variable_atom = word(variable_bytes);
                 let mut variable_type =
                     block_context.locals.get(&variable_atom).cloned().unwrap_or_else(|| Rc::new(get_mixed()));
+
+                if !is_by_reference
+                    && (variable_type.possibly_undefined() || variable_type.possibly_undefined_from_try())
+                {
+                    let mut captured = add_union_type(
+                        (*variable_type).clone(),
+                        &get_null(),
+                        context.codebase,
+                        CombinerOptions::default(),
+                    );
+                    captured.set_possibly_undefined(false, Some(false));
+                    variable_type = Rc::new(captured);
+                }
 
                 if is_by_reference {
                     let captures_itself = is_closure_itself(&variable_type, context.source_file, s);
