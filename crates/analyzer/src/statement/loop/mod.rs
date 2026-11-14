@@ -1483,13 +1483,18 @@ fn initial_int_bounds(
     })
 }
 
-fn condition_has_call(expression: &Expression<'_>) -> bool {
+fn condition_needs_analyzed_types(expression: &Expression<'_>) -> bool {
     match expression {
         Expression::Call(_) => true,
-        Expression::Parenthesized(parenthesized) => condition_has_call(parenthesized.expression),
-        Expression::UnaryPrefix(unary) => condition_has_call(unary.operand),
-        Expression::Binary(binary) => condition_has_call(binary.lhs) || condition_has_call(binary.rhs),
-        Expression::Assignment(assignment) => condition_has_call(assignment.rhs),
+        Expression::Parenthesized(parenthesized) => condition_needs_analyzed_types(parenthesized.expression),
+        Expression::UnaryPrefix(unary) => condition_needs_analyzed_types(unary.operand),
+        Expression::Binary(binary) => {
+            (matches!(binary.operator, BinaryOperator::Identical(_) | BinaryOperator::NotIdentical(_))
+                && [binary.lhs, binary.rhs].iter().any(|side| side.is_true() || side.is_false()))
+                || condition_needs_analyzed_types(binary.lhs)
+                || condition_needs_analyzed_types(binary.rhs)
+        }
+        Expression::Assignment(assignment) => condition_needs_analyzed_types(assignment.rhs),
         _ => false,
     }
 }
@@ -1519,7 +1524,7 @@ where
     loop_context.flags.set_inside_conditional(false);
 
     if first_application
-        && condition_has_call(pre_condition)
+        && condition_needs_analyzed_types(pre_condition)
         && let Some(clauses) = get_formula(
             pre_condition_span,
             pre_condition_span,
