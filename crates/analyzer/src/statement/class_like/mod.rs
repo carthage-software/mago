@@ -3201,6 +3201,7 @@ fn report_signature_compatibility_issue<'ctx, A>(
             let param_name: String = parent_method
                 .parameters
                 .get(parameter_index)
+                .or_else(|| parent_method.parameters.last().filter(|parameter| parameter.flags.is_variadic()))
                 .map_or_else(|| "unknown".to_string(), |p| p.name.0.to_string());
 
             context.collector.report_with_code(
@@ -3221,6 +3222,35 @@ fn report_signature_compatibility_issue<'ctx, A>(
                 )
                 .with_note("Parameter types must be contravariant: child must accept equal or wider types than parent.")
                 .with_help("Change the parameter type to be compatible with the parent method."),
+            );
+        }
+        SignatureCompatibilityIssue::ParameterByReferenceMismatch { parameter_index, child_is_by_reference } => {
+            let param_name: String = parent_method
+                .parameters
+                .get(parameter_index)
+                .or_else(|| parent_method.parameters.last().filter(|parameter| parameter.flags.is_variadic()))
+                .map_or_else(|| "unknown".to_string(), |p| p.name.0.to_string());
+            let (child_passing, parent_passing) =
+                if child_is_by_reference { ("by reference", "by value") } else { ("by value", "by reference") };
+
+            context.collector.report_with_code(
+                IssueCode::IncompatibleParameterType,
+                Issue::error(format!(
+                    "Parameter `{param_name}` of `{child_name}::{method_name}()` is passed {child_passing} but parent `{parent_name}::{method_name}()` takes it {parent_passing}"
+                ))
+                .with_annotation(Annotation::primary(primary_span).with_message(format!(
+                    "Parameter `{param_name}` is passed {child_passing} here"
+                )))
+                .with_annotation(
+                    Annotation::secondary(parent_class_span).with_message(format!(
+                        "Parent method `{parent_name}::{method_name}()` takes it {parent_passing}"
+                    )),
+                )
+                .with_annotation(
+                    Annotation::secondary(child_class_span).with_message(format!("In class `{child_name}`")),
+                )
+                .with_note("PHP requires an overriding method to pass each parameter the same way as the parent: this is a fatal error.")
+                .with_help(format!("Pass `{param_name}` {parent_passing}, as the parent method does.")),
             );
         }
         SignatureCompatibilityIssue::IncompatibleReturnType { child_type, parent_type } => {

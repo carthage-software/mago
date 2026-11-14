@@ -24,6 +24,7 @@ pub enum SignatureCompatibilityIssue {
     VisibilityNarrowed { child_visibility: Visibility, parent_visibility: Visibility },
     ParameterCountMismatch { child_required_count: usize, parent_required_count: usize },
     IncompatibleParameterType { parameter_index: usize, child_type: Word, parent_type: Word },
+    ParameterByReferenceMismatch { parameter_index: usize, child_is_by_reference: bool },
     IncompatibleReturnType { child_type: Word, parent_type: Word },
     IncompatibleThrowType { child_type: Word, parent_type: Word, child_is_implicit: bool },
     MissingReturnTypeDeclaration { parent_type: Word },
@@ -246,6 +247,19 @@ pub fn validate_method_signature_compatibility(
         issues.push(count_mismatch());
 
         return issues;
+    }
+
+    for (index, parent_param) in parent_method.parameters.iter().enumerate() {
+        if let Some(child_param) = child_param_for(index)
+            && child_param.flags.is_by_reference() != parent_param.flags.is_by_reference()
+        {
+            issues.push(SignatureCompatibilityIssue::ParameterByReferenceMismatch {
+                parameter_index: index,
+                child_is_by_reference: child_param.flags.is_by_reference(),
+            });
+
+            return issues;
+        }
     }
 
     for (index, parent_param) in parent_method.parameters.iter().enumerate() {
