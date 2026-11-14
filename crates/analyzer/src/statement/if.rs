@@ -421,6 +421,17 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
             block_context.possibly_undefined_variable_ids.insert(variable_id);
         }
 
+        let branch_descendants: Vec<(Word, Rc<TUnion>)> = if_scope
+            .new_variables
+            .iter()
+            .flatten()
+            .chain(if_scope.redefined_variables.iter().flatten())
+            .filter(|(variable_id, _)| {
+                variable_id.as_bytes().contains(&b'[') || memchr::memmem::find(variable_id.as_bytes(), b"->").is_some()
+            })
+            .map(|(variable_id, variable_type)| (*variable_id, Rc::clone(variable_type)))
+            .collect();
+
         if let Some(new_variables) = if_scope.new_variables {
             for (variable_id, variable_type) in new_variables {
                 block_context.locals.insert(variable_id, variable_type);
@@ -472,6 +483,10 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for If<'arena> {
             }
 
             block_context.locals.insert(variable_id, Rc::new(new_type));
+        }
+
+        for (variable_id, variable_type) in branch_descendants {
+            block_context.locals.entry(variable_id).or_insert(variable_type);
         }
 
         let unset_variables = if_scope.unset_variables.unwrap_or_default();

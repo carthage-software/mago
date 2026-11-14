@@ -1219,15 +1219,20 @@ where
 
         let possible_keys: Vec<ArrayKey> = index_type.types.iter().filter_map(TAtomic::to_array_key).collect();
 
+        let mut key_possibly_missing = false;
         if !possible_keys.is_empty() && possible_keys.len() == index_type.types.len() {
             for key in &possible_keys {
-                if let Some((_, known_item)) = known_items.get(key) {
+                if let Some((optional, known_item)) = known_items.get(key) {
+                    key_possibly_missing |= *optional;
                     value_parameter = Cow::Owned(add_array_access_union_type(
                         value_parameter.into_owned(),
                         known_item,
                         context.codebase,
                         preserve_array_shapes,
                     ));
+                } else {
+                    key_possibly_missing =
+                        !value_parameter.is_never() || possible_keys.iter().any(|key| known_items.contains_key(key));
                 }
             }
         } else {
@@ -1258,7 +1263,7 @@ where
 
         *has_possibly_undefined = true;
 
-        if context.settings.strict_array_index_existence
+        if (context.settings.strict_array_index_existence || (key_possibly_missing && !has_value_parameter))
             && !in_assignment
             && !block_context.flags.inside_isset()
             && !block_context.flags.inside_unset()
