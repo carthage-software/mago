@@ -513,10 +513,12 @@ fn concat_string_lists(left_strings: Vec<TString>, right_strings: &[TString], th
             resulting_string.is_truthy = left_string.is_truthy
                 || right_string.is_truthy
                 || (left_string.is_non_empty && right_string.is_non_empty);
-            resulting_string.casing = match (left_string.casing, right_string.casing) {
-                (TStringCasing::Lowercase, TStringCasing::Lowercase) => TStringCasing::Lowercase,
-                (TStringCasing::Uppercase, TStringCasing::Uppercase) => TStringCasing::Uppercase,
-                _ => TStringCasing::Unspecified,
+            resulting_string.casing = if left_string.is_lowercase() && right_string.is_lowercase() {
+                TStringCasing::Lowercase
+            } else if left_string.is_uppercase() && right_string.is_uppercase() {
+                TStringCasing::Uppercase
+            } else {
+                TStringCasing::Unspecified
             };
             resulting_string.literal = match (&left_string.literal, &right_string.literal) {
                 (Some(TStringLiteral::Value(left_literal)), Some(TStringLiteral::Value(right_literal))) => {

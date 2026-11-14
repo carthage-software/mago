@@ -39,6 +39,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for CompositeString<'arena> {
         let mut non_empty = false;
         let mut truthy = false;
         let mut all_literals = true;
+        let mut lowercase = true;
+        let mut uppercase = true;
         let mut resulting_strings: Option<Vec<String>> = Some(vec![String::new()]);
         let mut impossible = false;
 
@@ -48,6 +50,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for CompositeString<'arena> {
                     let literal = literal_string_part.value.unwrap_or(literal_string_part.raw);
                     truthy = truthy || (!literal.is_empty() && (non_empty || literal != b"0"));
                     non_empty = non_empty || !literal.is_empty();
+                    lowercase = lowercase && !literal.iter().any(u8::is_ascii_uppercase);
+                    uppercase = uppercase && !literal.iter().any(u8::is_ascii_lowercase);
                     if let Some(strings) = resulting_strings.as_mut() {
                         if let Some(Ok(part_str)) = literal_string_part.value.map(str::from_utf8) {
                             for s in strings.iter_mut() {
@@ -107,6 +111,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for CompositeString<'arena> {
                 continue;
             }
 
+            let part_is_int = part_type.is_int();
             let mut is_non_empty_part = true;
             let mut is_truthy_part = true;
             let mut part_is_all_literals = true;
@@ -116,6 +121,12 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for CompositeString<'arena> {
             for cast_part_atomic in casted_part_type.types.as_ref() {
                 is_non_empty_part = is_non_empty_part && cast_part_atomic.is_non_empty_string();
                 is_truthy_part = is_truthy_part && cast_part_atomic.is_truthy();
+                if !part_is_int {
+                    lowercase = lowercase
+                        && matches!(cast_part_atomic, TAtomic::Scalar(TScalar::String(string)) if string.is_lowercase());
+                    uppercase = uppercase
+                        && matches!(cast_part_atomic, TAtomic::Scalar(TScalar::String(string)) if string.is_uppercase());
+                }
 
                 if !part_is_all_literals {
                     continue;
@@ -198,6 +209,14 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for CompositeString<'arena> {
                         .collect(),
                 )
             }
+        } else if lowercase || uppercase {
+            let casing = if lowercase { TStringCasing::Lowercase } else { TStringCasing::Uppercase };
+            let non_empty = truthy || non_empty;
+            TUnion::from_atomic(TAtomic::Scalar(TScalar::String(if all_literals {
+                TString::unspecified_literal_with_props(false, truthy, non_empty, false, casing)
+            } else {
+                TString::general_with_props(false, truthy, non_empty, false, casing)
+            })))
         } else if truthy {
             if all_literals {
                 TUnion::from_atomic(TAtomic::Scalar(TScalar::String(TString::unspecified_literal_with_props(

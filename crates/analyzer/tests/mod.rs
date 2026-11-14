@@ -830,6 +830,7 @@ test_case!(loop_exit_condition_defines_variable);
 test_case!(break_variable_type_from_every_pass);
 test_case!(loop_entry_from_condition);
 test_case!(constant_expression_inference);
+test_case!(string_casing_through_concat);
 test_case!(magic_properties);
 test_case!(magic_property_overridden_by_parent);
 test_case!(magic_property_shadowing_real_property);
