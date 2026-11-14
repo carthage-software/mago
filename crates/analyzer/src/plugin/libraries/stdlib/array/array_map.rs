@@ -22,6 +22,8 @@ use mago_codex::ttype::combiner::CombinerOptions;
 use mago_codex::ttype::comparator::ComparisonResult;
 use mago_codex::ttype::comparator::union_comparator;
 use mago_codex::ttype::get_mixed;
+use mago_codex::ttype::template::TemplateResult;
+use mago_codex::ttype::template::inferred_type_replacer;
 use mago_codex::ttype::union::TUnion;
 use mago_codex::ttype::wrap_atomic;
 use mago_word::Word;
@@ -104,13 +106,39 @@ impl FunctionReturnTypeProvider for ArrayMapProvider {
             .and_then(|metadata| metadata.parameters.first())
             .map(|parameter| parameter.name.0);
 
+        let own_template = callback_type
+            .is_single()
+            .then(|| callback_type.get_single())
+            .and_then(|atomic| if let TAtomic::Callable(callable) = atomic { callable.get_signature() } else { None })
+            .and_then(|signature| signature.get_parameters().first())
+            .and_then(|parameter| parameter.get_type_signature())
+            .or_else(|| {
+                callback_metadata
+                    .and_then(|metadata| metadata.parameters.first())
+                    .and_then(|parameter| parameter.type_metadata.as_ref())
+                    .map(|type_metadata| &type_metadata.type_union)
+            })
+            .and_then(|parameter_type| match parameter_type.types.as_ref() {
+                [TAtomic::GenericParameter(parameter)] if raw_return_type.has_template_types() => Some(parameter),
+                _ => None,
+            });
+
         let resolve_for = |element: &TUnion| -> TUnion {
-            match first_parameter_name {
+            let return_type = match first_parameter_name {
                 Some(parameter_name) => {
                     resolve_conditionals_in_return(codebase, &raw_return_type, parameter_name, element)
                 }
                 None => raw_return_type.clone(),
-            }
+            };
+
+            let Some(parameter) = own_template else {
+                return return_type;
+            };
+
+            let mut own_bounds = TemplateResult::default();
+            own_bounds.add_lower_bound(parameter.parameter_name, parameter.defining_entity, element.clone());
+
+            inferred_type_replacer::replace(&return_type, &own_bounds, codebase)
         };
 
         match array {

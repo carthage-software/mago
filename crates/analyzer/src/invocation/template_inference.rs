@@ -690,10 +690,52 @@ fn infer_templates_from_input_and_container_types<A>(
                         continue;
                     };
 
-                    let input_return_for_inference = if is_cast_from_non_callable {
-                        Cow::Owned(resolve_unbound_templates_to_constraints(input_return))
-                    } else {
+                    let mut own_bounds = TemplateResult::default();
+                    if input_return.has_template_types() {
+                        for (container_parameter, input_parameter) in
+                            container_parameters.iter().zip(input_parameters.iter()).take(minimum_count)
+                        {
+                            let (Some(container_parameter_type), Some(input_parameter_type)) =
+                                (container_parameter.get_type_signature(), input_parameter.get_type_signature())
+                            else {
+                                continue;
+                            };
+
+                            if !input_parameter_type.has_template_types() {
+                                continue;
+                            }
+
+                            let expected = inferred_type_replacer::replace(
+                                container_parameter_type,
+                                template_result,
+                                context.codebase,
+                            );
+
+                            if expected.has_template_types() {
+                                continue;
+                            }
+
+                            infer_templates_from_input_and_container_types(
+                                context,
+                                input_parameter_type,
+                                &expected,
+                                &mut own_bounds,
+                                InferenceOptions::default(),
+                                &mut Vec::new(),
+                            );
+                        }
+                    }
+
+                    let input_return = if own_bounds.lower_bounds.is_empty() {
                         Cow::Borrowed(input_return)
+                    } else {
+                        Cow::Owned(inferred_type_replacer::replace(input_return, &own_bounds, context.codebase))
+                    };
+
+                    let input_return_for_inference = if is_cast_from_non_callable {
+                        Cow::Owned(resolve_unbound_templates_to_constraints(&input_return))
+                    } else {
+                        input_return
                     };
 
                     infer_templates_from_input_and_container_types(

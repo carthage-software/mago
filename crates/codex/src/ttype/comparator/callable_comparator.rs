@@ -8,6 +8,8 @@ use crate::ttype::cast::cast_atomic_to_callable;
 use crate::ttype::comparator::ComparisonResult;
 use crate::ttype::comparator::union_comparator;
 use crate::ttype::expander::get_signature_of_function_like_identifier;
+use crate::ttype::template::TemplateResult;
+use crate::ttype::template::inferred_type_replacer;
 
 pub(crate) fn is_contained_by(
     codebase: &CodebaseMetadata,
@@ -65,6 +67,7 @@ pub(crate) fn is_contained_by(
         }
     }
 
+    let mut own_bounds = TemplateResult::default();
     for (i, input_parameter) in input_params.iter().enumerate() {
         let container_parameter;
         if let Some(inner) = container_params.get(i) {
@@ -102,6 +105,16 @@ pub(crate) fn is_contained_by(
             return false;
         }
 
+        if let [TAtomic::GenericParameter(parameter)] = input_parameter_type.types.as_ref()
+            && !container_parameter_type.has_template_types()
+        {
+            own_bounds.add_lower_bound(
+                parameter.parameter_name,
+                parameter.defining_entity,
+                container_parameter_type.clone(),
+            );
+        }
+
         atomic_comparison_result
             .type_variable_lower_bounds
             .extend(parameter_comparison_result.type_variable_upper_bounds);
@@ -129,9 +142,15 @@ pub(crate) fn is_contained_by(
         return false;
     };
 
+    let input_return_type = if own_bounds.lower_bounds.is_empty() {
+        Cow::Borrowed(input_return_type)
+    } else {
+        Cow::Owned(inferred_type_replacer::replace(input_return_type, &own_bounds, codebase))
+    };
+
     union_comparator::is_return_type_contained_by(
         codebase,
-        input_return_type,
+        &input_return_type,
         container_return_type,
         input_return_type.ignore_falsable_issues(),
         atomic_comparison_result,
