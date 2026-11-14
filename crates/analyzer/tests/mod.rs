@@ -3235,6 +3235,7 @@ test_case!(property_write_after_isset_is_not_ambiguous);
 test_case!(possibly_missing_literal_key_union_on_sealed_shape);
 test_case!(nested_inherited_template_argument_resolves);
 test_case!(template_default_uses_earlier_arguments);
+test_case!(intersection_uses_narrowest_method_return);
 
 #[test]
 #[cfg_attr(miri, ignore)]

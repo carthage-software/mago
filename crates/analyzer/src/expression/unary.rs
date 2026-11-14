@@ -71,6 +71,7 @@ use crate::expression::assignment::PropertyWriteKind;
 use crate::expression::assignment::assign_to_expression;
 use crate::expression::call::method_call::analyze_implicit_method_call;
 use crate::expression::operator_overloading::report_overloaded_operator_on_operand;
+use crate::resolver::method::retain_narrowest_returns;
 use crate::utils::expression::get_block_expression_id;
 use crate::utils::php_emulation::str_increment_bytes;
 use crate::utils::php_emulation::str_is_numeric_bytes;
@@ -2164,48 +2165,51 @@ where
     let intersection_types = atomic.get_intersection_types()?;
     let to_string_id = word(b"__toString");
 
-    for intersection in intersection_types {
-        match intersection {
+    let mut has_to_string_assertion = false;
+    let mut candidates = Vec::new();
+    for part in std::iter::once(atomic).chain(intersection_types) {
+        match part {
             TAtomic::Object(TObject::HasMethod(has_method)) if has_method.has_method(to_string_id.as_bytes()) => {
-                return Some(Ok(get_string()));
+                has_to_string_assertion = true;
             }
-
             TAtomic::Object(TObject::Named(named)) => {
-                let intersection_name = named.get_name();
-                let Some(intersection_class) = context.codebase.get_class_like(intersection_name.as_bytes()) else {
+                let Some(class_metadata) = context.codebase.get_class_like(named.get_name().as_bytes()) else {
                     continue;
                 };
 
-                let intersection_method_id = context.codebase.get_declaring_method_identifier(&MethodIdentifier::new(
-                    intersection_class.original_name,
+                let method_identifier = context.codebase.get_declaring_method_identifier(&MethodIdentifier::new(
+                    class_metadata.original_name,
                     to_string_id,
                 ));
 
-                let Some(method) = context.codebase.get_method(
-                    intersection_method_id.get_class_name().as_bytes(),
-                    intersection_method_id.get_method_name().as_bytes(),
-                ) else {
-                    continue;
-                };
-
-                return Some(analyze_implicit_method_call(
-                    context,
-                    block_context,
-                    artifacts,
-                    &TObject::Named(named.clone()),
-                    operand_expression_id,
-                    intersection_method_id,
-                    intersection_class,
-                    method,
-                    None,
-                    expression_span,
-                ));
+                if context.codebase.get_method_by_id(&method_identifier).is_some() {
+                    candidates.push((named, class_metadata, method_identifier));
+                }
             }
             _ => {}
         }
     }
 
-    None
+    retain_narrowest_returns(context.codebase, &mut candidates, |(_, _, method_identifier)| method_identifier);
+
+    let Some((named, class_metadata, method_identifier)) = candidates.into_iter().next() else {
+        return has_to_string_assertion.then(|| Ok(get_string()));
+    };
+
+    let method = context.codebase.get_method_by_id(&method_identifier)?;
+
+    Some(analyze_implicit_method_call(
+        context,
+        block_context,
+        artifacts,
+        &TObject::Named(named.clone()),
+        operand_expression_id,
+        method_identifier,
+        class_metadata,
+        method,
+        None,
+        expression_span,
+    ))
 }
 
 /// `~` turns an int or float into an int and keeps a string a string.

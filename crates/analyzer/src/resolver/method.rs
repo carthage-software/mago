@@ -831,9 +831,53 @@ where
     if candidates.len() > 1 {
         let mut seen = HashSet::default();
         candidates.retain(|candidate| seen.insert(candidate.method_identifier));
+
+        if object_type.get_intersection_types().is_some() {
+            retain_narrowest_returns(context.codebase, &mut candidates, |candidate| &candidate.method_identifier);
+        }
     }
 
     candidates
+}
+
+/// Keeps the methods of an intersection whose declared return type no other
+/// method narrows: the value is all of the types at once, so the narrowest
+/// declaration holds.
+pub(crate) fn retain_narrowest_returns<T>(
+    codebase: &CodebaseMetadata,
+    methods: &mut Vec<T>,
+    method_identifier: impl Fn(&T) -> &MethodIdentifier,
+) {
+    let return_types: Vec<Option<&TUnion>> = methods
+        .iter()
+        .map(|method| {
+            codebase
+                .get_method_by_id(method_identifier(method))
+                .and_then(|metadata| metadata.return_type_metadata.as_ref())
+                .map(|return_type| &return_type.type_union)
+        })
+        .collect();
+
+    if return_types.iter().flatten().any(|return_type| return_type.has_template_or_static()) {
+        return;
+    }
+
+    let is_narrower = |narrow: Option<&TUnion>, wide: Option<&TUnion>| match (narrow, wide) {
+        (Some(_), None) => true,
+        (Some(narrow), Some(wide)) => {
+            is_contained_by(codebase, narrow, wide, false, false, false, &mut ComparisonResult::new())
+                && !is_contained_by(codebase, wide, narrow, false, false, false, &mut ComparisonResult::new())
+        }
+        _ => false,
+    };
+
+    let mut index = 0;
+    methods.retain(|_| {
+        let current = return_types[index];
+        index += 1;
+
+        !return_types.iter().any(|other| is_narrower(*other, current))
+    });
 }
 
 fn check_where_method_constraints<A>(
