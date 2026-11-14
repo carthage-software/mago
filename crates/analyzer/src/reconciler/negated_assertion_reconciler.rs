@@ -133,6 +133,27 @@ fn subtract_complex_type<A>(
             continue;
         }
 
+        if let TAtomic::GenericParameter(parameter) = &existing_atomic
+            && !matches!(assertion_type, TAtomic::GenericParameter(_))
+            && parameter.constraint.types.len() > 1
+        {
+            let mut constraint = (*parameter.constraint).clone();
+            let mut constraint_can_be_disjunct = false;
+            subtract_complex_type(context, assertion_type, &mut constraint, &mut constraint_can_be_disjunct);
+
+            if constraint_can_be_disjunct {
+                *can_be_disjunct = true;
+            }
+
+            if !constraint.is_never() {
+                let mut narrowed_parameter = parameter.clone();
+                narrowed_parameter.constraint = Arc::new(constraint);
+                acceptable_types.push(TAtomic::GenericParameter(narrowed_parameter));
+            }
+
+            continue;
+        }
+
         if matches!(assertion_type, TAtomic::GenericParameter(_)) {
             if atomic_comparator::is_contained_by(
                 context.codebase,
