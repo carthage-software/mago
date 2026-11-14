@@ -4,12 +4,14 @@ use mago_word::Word;
 use mago_word::word;
 
 use crate::metadata::CodebaseMetadata;
+use crate::symbol::SymbolKind;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::object::TObject;
 use crate::ttype::atomic::object::r#enum::TEnum;
 use crate::ttype::atomic::object::named::TNamedObject;
 use crate::ttype::atomic::scalar::TScalar;
 use crate::ttype::atomic::scalar::class_like_string::TClassLikeString;
+use crate::ttype::atomic::scalar::class_like_string::TClassLikeStringKind;
 use crate::ttype::atomic::scalar::string::TString;
 use crate::ttype::atomic::scalar::string::TStringLiteral;
 use crate::ttype::comparator::ComparisonResult;
@@ -23,6 +25,24 @@ pub fn is_contained_by(
     inside_assertion: bool,
     atomic_comparison_result: &mut ComparisonResult,
 ) -> bool {
+    if let Some(container_kind) = container_class_string.kind()
+        && container_kind != TClassLikeStringKind::Class
+    {
+        let input_kind = match input_scalar {
+            TScalar::ClassLikeString(TClassLikeString::Literal { value }) => {
+                class_like_kind(codebase, value.as_bytes())
+            }
+            TScalar::ClassLikeString(input_class_string) => {
+                input_class_string.kind().filter(|kind| *kind != TClassLikeStringKind::Class)
+            }
+            _ => input_scalar.get_known_literal_string_value().and_then(|value| class_like_kind(codebase, value)),
+        };
+
+        if input_kind.is_some_and(|kind| kind != container_kind) {
+            return false;
+        }
+    }
+
     let fake_container_type = match container_class_string {
         TClassLikeString::Any { .. } => Cow::Owned(TAtomic::Object(TObject::Any)),
         TClassLikeString::Literal { value } => {
@@ -81,6 +101,17 @@ pub fn is_contained_by(
         inside_assertion,
         atomic_comparison_result,
     )
+}
+
+fn class_like_kind(codebase: &CodebaseMetadata, name: &[u8]) -> Option<TClassLikeStringKind> {
+    let name = name.strip_prefix(b"\\").unwrap_or(name);
+
+    Some(match codebase.get_class_like(name)?.kind {
+        SymbolKind::Class => TClassLikeStringKind::Class,
+        SymbolKind::Interface => TClassLikeStringKind::Interface,
+        SymbolKind::Enum => TClassLikeStringKind::Enum,
+        SymbolKind::Trait => TClassLikeStringKind::Trait,
+    })
 }
 
 fn class_name_object(codebase: &CodebaseMetadata, name: Word) -> TAtomic {
