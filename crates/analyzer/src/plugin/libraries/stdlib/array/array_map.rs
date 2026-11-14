@@ -78,15 +78,17 @@ impl FunctionReturnTypeProvider for ArrayMapProvider {
 
         let callback_metadata = context.get_callable_metadata(callback_arg);
         if argument_count > 2 {
-            let return_type = callback_metadata
-                .and_then(|metadata| metadata.return_type_metadata.as_ref())
-                .map(|return_type| return_type.type_union.clone())
-                .or_else(|| match callback_type.types.as_ref() {
-                    [TAtomic::Callable(callable)] => {
-                        callable.get_signature().and_then(|signature| signature.get_return_type().cloned())
-                    }
-                    _ => None,
-                })?;
+            let return_type = match callback_type.types.as_ref() {
+                [TAtomic::Callable(callable)] => {
+                    callable.get_signature().and_then(|signature| signature.get_return_type().cloned())
+                }
+                _ => None,
+            }
+            .or_else(|| {
+                callback_metadata
+                    .and_then(|metadata| metadata.return_type_metadata.as_ref())
+                    .map(|return_type| return_type.type_union.clone())
+            })?;
 
             if return_type.has_template_types() {
                 return None;
