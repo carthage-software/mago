@@ -825,7 +825,15 @@ fn add_possible_key_argument_type(
 
     match key {
         TAtomic::Scalar(TScalar::Integer(integer)) => {
-            if accepts_all_scalars || input_key_type.has_int() {
+            if accepts_all_scalars
+                || input_key_type.types.iter().any(|atomic| match atomic {
+                    TAtomic::Scalar(scalar) => {
+                        matches!(scalar, TScalar::Integer(_) | TScalar::ArrayKey | TScalar::Numeric)
+                    }
+                    TAtomic::GenericParameter(parameter) => parameter.constraint.has_int(),
+                    _ => false,
+                })
+            {
                 add(TUnion::from_atomic(key.clone()), possible_type);
             }
 

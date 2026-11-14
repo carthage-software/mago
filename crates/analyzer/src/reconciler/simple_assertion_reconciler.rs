@@ -2056,7 +2056,7 @@ where
         trigger_issue_for_impossible(context, existing_var_type.get_id(), key, assertion, true, negated, span);
     }
 
-    get_mixed()
+    existing_var_type.clone()
 }
 
 /// PHP casts decimal numeric string keys to integers (`$arr['10']` is `$arr[10]`), so
