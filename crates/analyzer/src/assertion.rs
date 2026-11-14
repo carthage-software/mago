@@ -2161,19 +2161,22 @@ where
                 if let Some(self_class) = context.this_class_name {
                     if_types.insert(
                         counter_variable_id,
-                        vec![vec![Assertion::IsType(TAtomic::Object(TObject::Named(TNamedObject::new_this(
-                            self_class,
+                        vec![vec![Assertion::IsType(TAtomic::Object(TObject::Named(TNamedObject::new(
+                            context
+                                .codebase
+                                .get_class_like(self_class.as_bytes())
+                                .map_or(self_class, |class| class.original_name),
                         ))))]],
                     );
                 }
             }
             Expression::Static(_) => {
                 if let Some(self_class) = context.this_class_name {
+                    let mut static_object = TNamedObject::new(self_class);
+                    static_object.is_static = true;
                     if_types.insert(
                         counter_variable_id,
-                        vec![vec![Assertion::IsIdentical(TAtomic::Object(TObject::Named(TNamedObject::new_this(
-                            self_class,
-                        ))))]],
+                        vec![vec![Assertion::IsIdentical(TAtomic::Object(TObject::Named(static_object)))]],
                     );
                 }
             }
@@ -2198,7 +2201,13 @@ where
                             continue;
                         };
 
-                        let object_type = name.get_object_type(context.codebase);
+                        let mut object_type = name.get_object_type(context.codebase);
+                        if let (TAtomic::Object(TObject::Named(source)), TAtomic::Object(TObject::Named(target))) =
+                            (atomic, &mut object_type)
+                            && source.is_static
+                        {
+                            target.is_static = true;
+                        }
 
                         // The class is only known exactly for a literal class string or a final
                         // class. Otherwise, the rhs may name a subclass, so a failed check says

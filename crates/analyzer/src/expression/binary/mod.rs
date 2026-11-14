@@ -140,7 +140,28 @@ where
         _ => return get_bool(),
     };
 
+    let target_is_static = matches!(binary.rhs, Expression::Static(_))
+        && block_context.scope.get_class_like().is_some_and(|class_like| !class_like.flags.is_final());
     let target_type = TUnion::from_atomic(TAtomic::Object(TObject::Named(TNamedObject::new(class_name))));
+
+    if target_is_static
+        && !lhs_type
+            .types
+            .iter()
+            .all(|atomic| matches!(atomic, TAtomic::Object(TObject::Named(named)) if named.is_static))
+    {
+        return if union_comparator::can_expression_types_be_identical(
+            context.codebase,
+            lhs_type,
+            &target_type,
+            true,
+            false,
+        ) {
+            get_bool()
+        } else {
+            get_false()
+        };
+    }
 
     let mut comparison_result = ComparisonResult::new();
     let is_already_subtype = union_comparator::is_contained_by(
