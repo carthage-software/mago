@@ -386,7 +386,9 @@ pub fn is_contained_by(
                     // class has a `__get` to serve it.
                     let declared_property = match real_property {
                         Some(real) if real.read_visibility.is_public() => Some(real),
-                        _ if class_like_metadata.declaring_method_ids.contains_key(&word("__get")) => {
+                        _ if class_like_metadata.flags.allows_dynamic_properties()
+                            || class_like_metadata.declaring_method_ids.contains_key(&word("__get")) =>
+                        {
                             class_like_metadata
                                 .magic_property_ids
                                 .get(&property_name)

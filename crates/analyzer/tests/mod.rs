@@ -3297,6 +3297,7 @@ test_case!(modulo_and_shift_by_truncated_float);
 test_case!(redeclared_property_inherits_nearest_docblock);
 test_case!(exception_message_and_code_types);
 test_case!(array_map_several_arrays_uses_inferred_callback_return);
+test_case!(dynamic_properties_class_pseudo_property_fits_object_shape);
 
 #[test]
 #[cfg_attr(miri, ignore)]
