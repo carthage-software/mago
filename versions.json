@@ -61,6 +61,7 @@
                 "tools/formatter/configuration-reference",
                 "tools/formatter/format-ignore",
                 "tools/formatter/overview",
+                "tools/formatter/twig",
                 "tools/formatter/usage",
                 "tools/guard/command-reference",
                 "tools/guard/configuration-reference",

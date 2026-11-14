@@ -461,6 +461,27 @@
       
     </details>
     
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Twig Formatter</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../main/fr/tools/formatter/twig">
+            <span>Formateur Twig</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
   </details>
   
   <details class="sidebar-section">
@@ -556,7 +577,7 @@
   <main id="content" class="doc-content">
     <article class="doc-page">
       <h1 id="tools">Outils</h1>
-<p>Mago est un seul binaire qui regroupe quatre outils. Ils partagent la configuration, le parseur et le runtime, vous pouvez donc utiliser n'importe quelle combinaison sans payer pour les outils que vous n'exécutez pas.</p>
+<p>Mago regroupe plusieurs outils dans un binaire. Chaque commande choisit son parseur et ses règles. Les outils partagent les réglages de fichiers et les rapports.</p>
 <h2 id="formatter"><a href="../../../../main/fr/tools/formatter/overview">Formateur</a></h2>
 <p>Un formateur de code déterministe. Il produit une sortie stable et conventionnelle qui suit <a href="https://www.php-fig.org/per/coding-style/">PER-CS</a> par défaut et prend en charge des préréglages pour les styles PSR-12, Laravel et Drupal. Aucune option à régler à l'aveuglette, aucun débat.</p>
 <h2 id="linter"><a href="../../../../main/fr/tools/linter/overview">Linter</a></h2>
@@ -565,6 +586,8 @@
 <p>Un moteur d'analyse statique qui détecte les erreurs de types et les bugs logiques avant l'exécution. Compatible avec les annotations Psalm et PHPStan, avec prise en charge des génériques, des types conditionnels et du raffinement de flux.</p>
 <h2 id="architectural-guard"><a href="../../../../main/fr/tools/guard/overview">Guard architectural</a></h2>
 <p>Applique les règles de dépendance et les conventions structurelles. Utile lorsque vous voulez interdire certains chemins <code>use</code>, codifier les frontières entre couches ou affirmer que le code d'une partie du projet n'importe jamais le code d'une autre.</p>
+<h2 id="twig-formatter"><a href="../../../../main/fr/tools/formatter/twig">Formateur Twig</a></h2>
+<p><code>mago twig:fmt</code> formate Twig avec ses propres réglages <code>[twig.formatter]</code>. Le texte du template reste intact ; le HTML n'est pas reformaté. Le formateur PHP et <code>mago fix</code> ne le lancent pas.</p>
 
     </article>
 
@@ -590,6 +613,10 @@
     
     <li class="doc-toc__item doc-toc__item--lvl2">
       <a class="doc-toc__link" href="#architectural-guard">Guard architectural</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#twig-formatter">Formateur Twig</a>
     </li>
     
   </ol>

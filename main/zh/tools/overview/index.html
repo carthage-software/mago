@@ -488,6 +488,27 @@
       
     </details>
     
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Twig Formatter</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../main/zh/tools/formatter/twig">
+            <span>Twig 格式化器</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
   </details>
   
   <details class="sidebar-section">
@@ -583,7 +604,7 @@
   <main id="content" class="doc-content">
     <article class="doc-page">
       <h1 id="tools">工具</h1>
-<p>Mago 是一个二进制文件,集成了四种工具。它们共享配置、解析器和运行时,因此你可以任意组合使用,不会为没用到的工具付出额外代价。</p>
+<p>Mago 在一个二进制文件中提供多种工具。每个命令选择自己的解析器和规则。工具共用文件设置和报告。</p>
 <h2 id="formatter"><a href="../../../../main/zh/tools/formatter/overview">格式化器</a></h2>
 <p>一个确定性的代码格式化器。默认输出稳定、规范的代码,遵循 <a href="https://www.php-fig.org/per/coding-style/">PER-CS</a>,并支持 PSR-12、Laravel 和 Drupal 风格的预设。没有配置上的左右摇摆,也没有无谓的争论。</p>
 <h2 id="linter"><a href="../../../../main/zh/tools/linter/overview">Linter</a></h2>
@@ -592,6 +613,8 @@
 <p>一个静态分析引擎,在运行时之前捕获类型错误和逻辑 bug。兼容 Psalm 和 PHPStan 注解,支持泛型、条件类型以及流敏感的类型收窄。</p>
 <h2 id="architectural-guard"><a href="../../../../main/zh/tools/guard/overview">架构 guard</a></h2>
 <p>强制执行依赖规则和结构约定。当你想禁止某些 <code>use</code> 路径、固化分层边界,或断言项目中某一部分的代码绝不会引用另一部分时,这个工具非常有用。</p>
+<h2 id="twig-formatter"><a href="../../../../main/zh/tools/formatter/twig">Twig 格式化器</a></h2>
+<p><code>mago twig:fmt</code> 使用独立的 <code>[twig.formatter]</code> 设置格式化 Twig 语法。模板文本保持不变，HTML 不会被重新格式化。PHP 格式化器和 <code>mago fix</code> 不运行此工具。</p>
 
     </article>
 
@@ -617,6 +640,10 @@
     
     <li class="doc-toc__item doc-toc__item--lvl2">
       <a class="doc-toc__link" href="#architectural-guard">架构 guard</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#twig-formatter">Twig 格式化器</a>
     </li>
     
   </ol>

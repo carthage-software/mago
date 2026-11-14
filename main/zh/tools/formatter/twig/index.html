@@ -1,0 +1,725 @@
+<!doctype html>
+<html lang="zh" dir="ltr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  
+  <title>Twig 格式化器 · Mago</title>
+  <meta name="description" content="格式化 Twig 语法，不重新格式化 HTML。">
+  <meta property="og:type" content="website">
+  <meta property="og:title" content="Twig 格式化器 · Mago">
+  <meta property="og:description" content="格式化 Twig 语法，不重新格式化 HTML。">
+  <meta property="og:url" content="https://mago.carthage.software/main/zh/tools/formatter/twig/">
+  <meta property="og:image" content="https://mago.carthage.software/main/_assets/img/banner.png">
+  <meta property="og:image:width" content="1200">
+  <meta property="og:image:height" content="630">
+  <meta property="og:locale" content="zh">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Twig 格式化器 · Mago">
+  <meta name="twitter:description" content="格式化 Twig 语法，不重新格式化 HTML。">
+  <meta name="twitter:image" content="https://mago.carthage.software/main/_assets/img/banner.png">
+  <meta name="theme-color" content="#ffffff" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#0a0a0a" media="(prefers-color-scheme: dark)">
+  <link rel="icon" type="image/png" sizes="32x32" href="../../../../../main/_assets/img/favicon-32x32.png">
+  <link rel="icon" type="image/png" sizes="16x16" href="../../../../../main/_assets/img/favicon-16x16.png">
+  <link rel="apple-touch-icon" sizes="180x180" href="../../../../../main/_assets/img/apple-touch-icon.png">
+  
+  <link rel="preload" href="../../../../../main/_assets/fonts/IBMPlexSerif-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="../../../../../main/_assets/fonts/IBMPlexSans-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="preload" href="../../../../../main/_assets/fonts/IBMPlexMono-Regular.woff2" as="font" type="font/woff2" crossorigin>
+  <link rel="stylesheet" href="../../../../../main/_assets/css/reset.css">
+  <link rel="stylesheet" href="../../../../../main/_assets/css/base.css">
+  <link rel="stylesheet" href="../../../../../main/_assets/css/typography.css">
+  <link rel="stylesheet" href="../../../../../main/_assets/css/layout.css">
+  <link rel="stylesheet" href="../../../../../main/_assets/css/components.css">
+  <link rel="stylesheet" href="../../../../../main/_assets/css/code.css">
+  
+  
+  
+  <style>:root { --accent: #3c8d58; }</style>
+  <link rel="canonical" href="https://mago.carthage.software/main/zh/tools/formatter/twig/">
+  <script>
+    (() => {
+      try {
+        const stored = localStorage.getItem("mago-theme");
+        if (stored === "light" || stored === "dark") {
+          document.documentElement.setAttribute("data-theme", stored);
+        }
+      } catch {}
+    })();
+  </script>
+</head>
+<body>
+  <header class="site-header">
+  <div class="header-start">
+    <a class="brand" href="../../../../../main/zh/">
+      <img class="brand__mark" src="../../../../../main/_assets/img/favicon-32x32.png" alt="" width="22" height="22">
+      <span class="brand__name">Mago</span>
+      <span class="brand__divider">/</span>
+      <span class="brand__tag">PHP toolchain</span>
+    </a>
+  </div>
+
+  <div class="header-center">
+    <button id="search-trigger" class="search-trigger" type="button" title="搜索" aria-label="搜索">
+      <svg class="search-trigger__icon" viewBox="0 0 16 16" fill="none" stroke="currentColor" stroke-width="1.6" aria-hidden="true">
+        <circle cx="7" cy="7" r="4.5"/>
+        <path d="M10.5 10.5 14 14"/>
+      </svg>
+      <span class="search-trigger__hint">按 / 搜索</span>
+    </button>
+  </div>
+
+  <div class="header-end">
+    <nav class="header-nav" aria-label="Primary">
+      <a class="header-link" href="../../../../../main/zh/guide/getting-started">指南</a>
+      <a class="header-link" href="../../../../../main/zh/faq">常见问题</a>
+      <a class="header-link" href="../../../../../main/zh/playground">Playground</a>
+      <a class="header-link" href="https://github.com/sponsors/azjezz" target="_blank" rel="noopener">赞助</a>
+      <a class="header-icon" href="https://github.com/carthage-software/mago" target="_blank" rel="noopener" aria-label="GitHub 仓库" title="GitHub 仓库">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" width="16" height="16">
+          <path d="M8 .2a8 8 0 0 0-2.5 15.6c.4.07.55-.18.55-.4v-1.4c-2.22.48-2.7-1.07-2.7-1.07-.36-.92-.89-1.17-.89-1.17-.73-.5.06-.49.06-.49.8.06 1.23.83 1.23.83.72 1.23 1.88.88 2.34.67.07-.52.28-.88.5-1.08-1.78-.2-3.64-.89-3.64-3.96 0-.87.31-1.59.83-2.15-.08-.2-.36-1.02.08-2.13 0 0 .67-.22 2.2.82a7.6 7.6 0 0 1 4 0c1.53-1.04 2.2-.82 2.2-.82.44 1.11.16 1.93.08 2.13.52.56.83 1.28.83 2.15 0 3.08-1.87 3.76-3.65 3.96.29.25.55.74.55 1.5v2.22c0 .22.15.48.55.4A8 8 0 0 0 8 .2"/>
+        </svg>
+      </a>
+      <a class="header-icon" href="https://discord.gg/mwyyjr27eu" target="_blank" rel="noopener" aria-label="Discord 社区" title="Discord 社区">
+        <svg viewBox="0 0 16 16" fill="currentColor" aria-hidden="true" width="16" height="16">
+          <path d="M13.55 2.92A12.4 12.4 0 0 0 10.42 2c-.13.24-.29.55-.4.81a11.5 11.5 0 0 0-3.42 0A8 8 0 0 0 6.18 2c-1.08.18-2.13.5-3.13.92C1.07 5.85.55 8.7.81 11.51a12.5 12.5 0 0 0 3.84 1.94c.31-.42.58-.86.81-1.32a8 8 0 0 1-1.27-.61l.31-.24a8.95 8.95 0 0 0 7.6 0l.31.24c-.4.24-.83.45-1.27.61.23.46.5.9.81 1.32a12.4 12.4 0 0 0 3.84-1.94c.31-3.27-.51-6.1-2.24-8.59M5.74 9.78c-.74 0-1.36-.69-1.36-1.54s.6-1.55 1.36-1.55c.76 0 1.37.7 1.36 1.55 0 .85-.6 1.54-1.36 1.54m5.02 0c-.74 0-1.36-.69-1.36-1.54s.6-1.55 1.36-1.55c.76 0 1.37.7 1.36 1.55 0 .85-.6 1.54-1.36 1.54"/>
+        </svg>
+      </a>
+    </nav>
+    <details
+  class="header-dropdown header-dropdown--version"
+  data-version-select
+  data-current-version="main"
+  data-current-lang="zh"
+  data-logical-path="tools/formatter/twig"
+  data-path-to-root="../../../../../"
+>
+  <summary>
+    <span class="plate__sigil">v</span>
+    <span>main</span>
+  </summary>
+  <ul class="header-dropdown__menu" data-version-list>
+    
+    <li>
+      <a href="../../../../../main/zh/tools/formatter/twig" aria-current="true">
+        <span>main</span>
+      </a>
+    </li>
+    
+  </ul>
+</details>
+
+    <details class="header-dropdown header-dropdown--language">
+  <summary>
+    <span class="plate__sigil">@</span>
+    <span>ZH</span>
+  </summary>
+  <ul class="header-dropdown__menu">
+    
+    <li>
+      <a href="../../../../../main/en/tools/formatter/twig">
+        <span>English</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="../../../../../main/fr/tools/formatter/twig">
+        <span>Français</span>
+      </a>
+    </li>
+    
+    <li>
+      <a href="../../../../../main/zh/tools/formatter/twig" aria-current="true">
+        <span>简体中文</span>
+      </a>
+    </li>
+    
+  </ul>
+</details>
+
+    <button class="theme-toggle" id="theme-toggle" type="button" aria-label="切换主题">
+      <svg class="icon-moon" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <path d="M11 8.5A4.5 4.5 0 0 1 5.5 3a5 5 0 1 0 5.5 5.5z"/>
+      </svg>
+      <svg class="icon-sun" viewBox="0 0 14 14" fill="none" stroke="currentColor" stroke-width="1.5" aria-hidden="true">
+        <circle cx="7" cy="7" r="2.6"/>
+        <path d="M7 1v1.6M7 11.4V13M1 7h1.6M11.4 7H13M2.5 2.5l1.1 1.1M10.4 10.4l1.1 1.1M2.5 11.5l1.1-1.1M10.4 3.6l1.1-1.1"/>
+      </svg>
+    </button>
+  </div>
+</header>
+
+  <div id="search-root" class="search-root" hidden></div>
+
+  
+  
+  <div class="doc-banner">此翻译可能已过时。</div>
+  
+  <div id="untranslated-banner" class="doc-banner doc-banner--info" hidden>此页面尚未翻译,已重定向至该语言的首页。</div>
+
+  
+<div class="doc-layout">
+  <aside class="doc-sidebar">
+    <nav class="sidebar-nav" aria-label="Documentation navigation">
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 01</span>
+      <span class="sidebar-section__title">指南</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../../main/zh/guide/getting-started">
+          <span>快速开始</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/zh/guide/installation">
+          <span>安装</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/zh/guide/initialization">
+          <span>初始化</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/zh/guide/configuration">
+          <span>配置</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/zh/guide/environment-variables">
+          <span>环境变量</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/zh/guide/list-files">
+          <span>列出文件</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/zh/guide/generate-completions">
+          <span>Shell 补全</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/zh/guide/inspecting-the-cst">
+          <span>查看 CST</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/zh/guide/upgrading">
+          <span>升级</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 02</span>
+      <span class="sidebar-section__title">基础</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../../main/zh/fundamentals/command-line-interface">
+          <span>命令行接口</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/zh/fundamentals/baseline">
+          <span>Baseline</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/zh/fundamentals/suppressing-issues">
+          <span>抑制问题</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/zh/fundamentals/shared-reporting-options">
+          <span>报告与修复选项</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 03</span>
+      <span class="sidebar-section__title">Tools</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Linter</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../../main/zh/tools/linter/rules">
+            <span>规则</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+  </details>
+  
+  <details class="sidebar-section" open>
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 04</span>
+      <span class="sidebar-section__title">工具</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../../main/zh/tools/overview">
+          <span>工具</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Analyzer</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../../main/zh/tools/analyzer/overview">
+            <span>分析器</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/zh/tools/analyzer/command-reference">
+            <span>分析器命令参考</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/zh/tools/analyzer/configuration-reference">
+            <span>分析器配置参考</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Formatter</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../../main/zh/tools/formatter/overview">
+            <span>格式化器</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/zh/tools/formatter/usage">
+            <span>格式化器使用</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/zh/tools/formatter/format-ignore">
+            <span>格式化忽略</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/zh/tools/formatter/command-reference">
+            <span>格式化器命令参考</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/zh/tools/formatter/configuration-reference">
+            <span>格式化器配置参考</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Guard</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../../main/zh/tools/guard/overview">
+            <span>Guard</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/zh/tools/guard/usage">
+            <span>Guard 使用</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/zh/tools/guard/command-reference">
+            <span>Guard 命令参考</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/zh/tools/guard/configuration-reference">
+            <span>Guard 配置参考</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+    <details class="sidebar-subsection">
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Linter</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../../main/zh/tools/linter/overview">
+            <span>Linter</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/zh/tools/linter/usage">
+            <span>Linter 使用</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/zh/tools/linter/integrations">
+            <span>Linter 集成</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/zh/tools/linter/command-reference">
+            <span>Linter 命令参考</span>
+          </a>
+        </li>
+        
+        <li>
+          <a href="../../../../../main/zh/tools/linter/configuration-reference">
+            <span>Linter 配置参考</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+    <details class="sidebar-subsection" open>
+      <summary class="sidebar-subsection__heading">
+        <span class="sidebar-subsection__title">Twig Formatter</span>
+        <span class="sidebar-subsection__chev" aria-hidden="true">+</span>
+      </summary>
+
+      
+      <ul class="sidebar-section__items sidebar-subsection__items">
+        
+        <li>
+          <a href="../../../../../main/zh/tools/formatter/twig" aria-current="page">
+            <span>Twig 格式化器</span>
+          </a>
+        </li>
+        
+      </ul>
+      
+
+      
+    </details>
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 05</span>
+      <span class="sidebar-section__title">实用方案</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../../main/zh/recipes/vscode">
+          <span>Visual Studio Code 实用方案</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/zh/recipes/zed">
+          <span>Zed 实用方案</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/zh/recipes/helix">
+          <span>Helix 实用方案</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/zh/recipes/pre-commit-hooks">
+          <span>Pre-commit hooks 实用方案</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/zh/recipes/github-actions">
+          <span>GitHub Actions 实用方案</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/zh/recipes/docker">
+          <span>Docker 实用方案</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+  <details class="sidebar-section">
+    <summary class="sidebar-section__heading">
+      <span class="sidebar-section__index">§ 06</span>
+      <span class="sidebar-section__title">参考</span>
+      <span class="sidebar-section__chev" aria-hidden="true">+</span>
+    </summary>
+
+    
+    <ul class="sidebar-section__items">
+      
+      <li>
+        <a href="../../../../../main/zh/faq">
+          <span>常见问题</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/zh/benchmarks">
+          <span>基准测试</span>
+        </a>
+      </li>
+      
+      <li>
+        <a href="../../../../../main/zh/contributing">
+          <span>贡献指南</span>
+        </a>
+      </li>
+      
+    </ul>
+    
+
+    
+  </details>
+  
+</nav>
+
+  </aside>
+
+  <main id="content" class="doc-content">
+    <article class="doc-page">
+      <h1 id="twig-formatter">Twig 格式化器</h1>
+<p><code>mago twig:fmt</code> 格式化 Twig 模板。扫描目录时，它选择 <code>source.paths</code> 下的 <code>.twig</code> 文件（包括 <code>index.html.twig</code>），不受 <code>source.extensions</code> 影响。显式文件始终按 Twig 处理，即使没有扩展名或使用 <code>.php</code>。<code>mago twig:fmt</code>、<code>mago fix</code> 和现有文件列表命令保持原有 PHP 行为。</p>
+<pre><code class="language-sh">mago twig:fmt templates/
+mago twig:fmt --check
+mago twig:fmt --dry-run
+mago twig:fmt --staged
+mago twig:fmt --stdin-input --stdin-filepath templates/index.html.twig &lt; templates/index.html.twig
+</code></pre>
+<p>命令决定语言。标准输入始终使用 Twig，无论是否提供 <code>--stdin-filepath</code>；该路径只用于排除规则和错误位置。结果写入 stdout，不修改缓冲区对应的磁盘文件。<code>--staged</code> 只选择扩展名严格为 <code>.twig</code> 的文件，并且只更新 Git 暂存区，不修改工作区文件。显式指定的 <code>.TWIG</code> 文件仍可使用。</p>
+<h2 id="scope">范围</h2>
+<p>Mago 格式化 Twig 标签、表达式、注释和缩进。空格遵循 <a href="https://twig.symfony.com/doc/3.x/coding_standards.html">Twig 编码规范</a>。命名实参保留原有分隔符（<code>name: value</code> 或 <code>name = value</code>），避免格式化后需要更新 Twig 版本。宏参数的默认值仍使用 <code>name = value</code>。</p>
+<p>Mago 不解析或重新格式化 HTML、CSS、JavaScript 或其他模板文本。字符串内容及其中的插值、空白控制标记（<code>-</code> 和 <code>~</code>）以及 <code>verbatim</code> 块的内容保持不变。未知扩展标签保持原样。如果空格变化会使 <code>not</code> 等名称变成运算符，该标签也保留原有布局。文件存在语法错误时，Mago 不修改该文件。</p>
+<p>使用旧版 <code>raw</code> 块的文件也保持原样。</p>
+<p>Mago 使用 Twig 的内置运算符。如果文件依赖扩展添加的自定义运算符，请使用忽略标记。</p>
+<p>Mago 不添加文件末尾换行，也不更改模板文本中的换行符。<code>end-of-line</code> 仅控制格式化器在 Twig 标签内部添加的换行符。</p>
+<p>格式化会改变 Twig 的 <code>source()</code> 函数读取到的文件内容。对于源文本必须保持不变的文件，请使用 <code>@mago-format-ignore</code>。</p>
+<p>为限制栈空间占用，格式化时解析器的嵌套深度上限为 32 层。超过上限时返回错误，文件保持不变。</p>
+<h2 id="indentation">缩进</h2>
+<p>Twig 会将标签外的空白作为文本输出。Mago 保留这些文本的每一个字节，包括行首空白、空行、换行符和文件末尾换行。它只在标签内部拆分代码时添加缩进，新行沿用标签已有的缩进。</p>
+<p>设置 <code>print-width = 30</code> 时：</p>
+<pre><code class="language-twig">  {{
+      user.name|default(
+          'A guest with a longer name'
+      )
+  }}
+</code></pre>
+<p>没有任何设置会改写标签外的空白。含有行内注释、含义不明确的关键字名称或过深表达式的标签会保持原样，以免改变行为。</p>
+<h2 id="configuration">配置</h2>
+<p>Twig 设置位于 <code>[twig.formatter]</code> 下，不继承 PHP 格式化器的设置、排除规则或预设。<code>source.excludes</code> 适用于两个工具；<code>twig.formatter.excludes</code> 只用于 Twig。可运行 <code>mago config --show twig</code> 或 <code>mago config --show twig.formatter</code>，加上 <code>--schema</code> 查看配置架构。配置层按现有 <code>extends</code> 规则合并。旧的 <code>[formatter.twig]</code> 表不受支持。</p>
+<pre><code class="language-toml">[twig.formatter]
+enabled = true
+print-width = 120
+tab-width = 4
+use-tabs = false
+end-of-line = "auto"
+</code></pre>
+<table><thead><tr><th style="text-align: left">选项</th><th style="text-align: left">默认值</th><th style="text-align: left">作用</th></tr></thead><tbody>
+<tr><td style="text-align: left"><code>enabled</code></td><td style="text-align: left"><code>true</code></td><td style="text-align: left">格式化 <code>.twig</code> 文件。关闭后文件保持不变，标准输入和 Git 暂存文件也一样。</td></tr>
+<tr><td style="text-align: left"><code>excludes</code></td><td style="text-align: left"><code>[]</code></td><td style="text-align: left">Twig 专用的路径前缀或 glob，遵循共用的 <code>source.glob</code> 设置。</td></tr>
+<tr><td style="text-align: left"><code>print-width</code></td><td style="text-align: left"><code>120</code></td><td style="text-align: left">Twig 表达式的目标行宽。不会拆分长字符串。</td></tr>
+<tr><td style="text-align: left"><code>tab-width</code></td><td style="text-align: left"><code>4</code></td><td style="text-align: left">每级缩进的空格数及制表符宽度。</td></tr>
+<tr><td style="text-align: left"><code>use-tabs</code></td><td style="text-align: left"><code>false</code></td><td style="text-align: left">使用制表符缩进。</td></tr>
+<tr><td style="text-align: left"><code>end-of-line</code></td><td style="text-align: left"><code>"auto"</code></td><td style="text-align: left">新增换行使用 <code>auto</code>、<code>lf</code>、<code>crlf</code> 或 <code>cr</code>。<code>auto</code> 使用 Twig 标签外模板文本中的首个换行符；没有时使用 LF。</td></tr>
+</tbody></table>
+<p>关闭 Twig 格式化：</p>
+<pre><code class="language-toml">[twig.formatter]
+enabled = false
+</code></pre>
+<h2 id="ignore-markers">忽略标记</h2>
+<p>可以在 Twig 注释中使用与 PHP 格式化器相同的标记：</p>
+<pre><code class="language-twig">{# @mago-format-ignore-next #}
+{{  leave_this_alone  }}
+
+{# @mago-format-ignore-start #}
+{{  leave_this_region_alone  }}
+{# @mago-format-ignore-end #}
+</code></pre>
+<p><code>@mago-format-ignore</code> 跳过整个文件。<code>-next</code> 跳过下一条 Twig 语句；如果它开启一个块，则整个块都跳过。<code>@mago-formatter-ignore</code> 及其后缀同样有效。</p>
+
+    </article>
+
+    <p class="doc-edit"><a href="https://github.com/carthage-software/mago/edit/main/documentation/content/zh/tools/formatter/twig.md">↳ 编辑此页 →</a></p>
+  </main>
+
+  
+<aside class="doc-toc" aria-label="本页内容">
+  <p class="doc-toc__heading">本页内容</p>
+  <ol class="doc-toc__list">
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#scope">范围</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#indentation">缩进</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#configuration">配置</a>
+    </li>
+    
+    <li class="doc-toc__item doc-toc__item--lvl2">
+      <a class="doc-toc__link" href="#ignore-markers">忽略标记</a>
+    </li>
+    
+  </ol>
+</aside>
+
+
+</div>
+
+
+  
+  
+  <footer class="site-footer">
+  <div class="site-footer__inner">
+    <div class="site-footer__start">
+      Carthage Software · MIT
+    </div>
+    <div class="site-footer__center">
+      Mago / main / The oxidized PHP toolchain
+    </div>
+    <div class="site-footer__end">
+      <a href="https://github.com/carthage-software/mago">github.com/carthage-software/mago</a>
+    </div>
+  </div>
+</footer>
+
+  
+
+  <script src="../../../../../main/_assets/js/theme.js" defer></script>
+  <script src="../../../../../main/_assets/js/search.js" defer></script>
+  <script src="../../../../../main/_assets/js/anchors.js" defer></script>
+  <script src="../../../../../main/_assets/js/versions.js" defer></script>
+  <script src="../../../../../main/_assets/js/highlight.js" defer></script>
+  
+  
+  
+</body>
+</html>

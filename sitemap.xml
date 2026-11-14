@@ -56,6 +56,7 @@
   <url><loc>https://mago.carthage.software/main/en/tools/formatter/configuration-reference</loc></url>
   <url><loc>https://mago.carthage.software/main/en/tools/formatter/format-ignore</loc></url>
   <url><loc>https://mago.carthage.software/main/en/tools/formatter/overview</loc></url>
+  <url><loc>https://mago.carthage.software/main/en/tools/formatter/twig</loc></url>
   <url><loc>https://mago.carthage.software/main/en/tools/formatter/usage</loc></url>
   <url><loc>https://mago.carthage.software/main/en/tools/guard/command-reference</loc></url>
   <url><loc>https://mago.carthage.software/main/en/tools/guard/configuration-reference</loc></url>
@@ -99,6 +100,7 @@
   <url><loc>https://mago.carthage.software/main/fr/tools/formatter/configuration-reference</loc></url>
   <url><loc>https://mago.carthage.software/main/fr/tools/formatter/format-ignore</loc></url>
   <url><loc>https://mago.carthage.software/main/fr/tools/formatter/overview</loc></url>
+  <url><loc>https://mago.carthage.software/main/fr/tools/formatter/twig</loc></url>
   <url><loc>https://mago.carthage.software/main/fr/tools/formatter/usage</loc></url>
   <url><loc>https://mago.carthage.software/main/fr/tools/guard/command-reference</loc></url>
   <url><loc>https://mago.carthage.software/main/fr/tools/guard/configuration-reference</loc></url>
@@ -142,6 +144,7 @@
   <url><loc>https://mago.carthage.software/main/zh/tools/formatter/configuration-reference</loc></url>
   <url><loc>https://mago.carthage.software/main/zh/tools/formatter/format-ignore</loc></url>
   <url><loc>https://mago.carthage.software/main/zh/tools/formatter/overview</loc></url>
+  <url><loc>https://mago.carthage.software/main/zh/tools/formatter/twig</loc></url>
   <url><loc>https://mago.carthage.software/main/zh/tools/formatter/usage</loc></url>
   <url><loc>https://mago.carthage.software/main/zh/tools/guard/command-reference</loc></url>
   <url><loc>https://mago.carthage.software/main/zh/tools/guard/configuration-reference</loc></url>

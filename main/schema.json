@@ -979,6 +979,17 @@
         "excludes": []
       }
     },
+    "twig": {
+      "description": "Settings for the standalone Twig commands.",
+      "anyOf": [
+        {
+          "$ref": "#/$defs/TwigConfiguration"
+        },
+        {
+          "type": "null"
+        }
+      ]
+    },
     "analyzer": {
       "description": "Type analyzer service configuration.\n\nControls static type analysis behavior, including strictness levels,\ninference settings, and type-related rules. Defaults to an empty configuration\nif not specified in the config file.",
       "$ref": "#/$defs/AnalyzerConfiguration",
@@ -8653,7 +8664,7 @@
       "additionalProperties": false
     },
     "EndOfLine": {
-      "description": "Specifies the style of line endings.",
+      "description": "The line endings used for generated line breaks.",
       "type": "string",
       "enum": [
         "auto",
@@ -8710,6 +8721,61 @@
     "FormatterPreset": {
       "description": "Available formatter presets.",
       "type": "string"
+    },
+    "TwigConfiguration": {
+      "description": "Settings for the standalone Twig tools.",
+      "type": "object",
+      "properties": {
+        "formatter": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/TwigFormatterConfiguration"
+            },
+            {
+              "type": "null"
+            }
+          ]
+        }
+      },
+      "additionalProperties": false
+    },
+    "TwigFormatterConfiguration": {
+      "description": "Settings used only by `mago twig:fmt`.",
+      "type": "object",
+      "properties": {
+        "enabled": {
+          "type": "boolean",
+          "default": true
+        },
+        "excludes": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          },
+          "default": []
+        },
+        "print-width": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0,
+          "default": 120
+        },
+        "tab-width": {
+          "type": "integer",
+          "format": "uint",
+          "minimum": 0,
+          "default": 4
+        },
+        "use-tabs": {
+          "type": "boolean",
+          "default": false
+        },
+        "end-of-line": {
+          "$ref": "#/$defs/EndOfLine",
+          "default": "auto"
+        }
+      },
+      "additionalProperties": false
     },
     "AnalyzerConfiguration": {
       "description": "Configuration options for the static analyzer.",
