@@ -11,8 +11,13 @@ use mago_syntax::cst::MethodBody;
 use mago_syntax::cst::Modifier;
 
 use crate::internal::checker::MAGIC_METHOD_SEMANTICS;
+use crate::internal::checker::MAGIC_METHOD_TYPES;
+use crate::internal::checker::MAY_BE_NEVER;
+use crate::internal::checker::MAY_BE_OBJECT;
+use crate::internal::checker::MAY_BE_STATIC;
 use crate::internal::checker::function_like::check_for_promoted_properties_outside_constructor;
 use crate::internal::checker::function_like::check_parameter_list_trailing_comma;
+use crate::internal::checker::hint_type_mask;
 use crate::internal::checker::returns_generator;
 use crate::internal::context::Context;
 
@@ -310,6 +315,62 @@ pub fn check_method<'ast, 'arena>(
                 context.report(
                     Issue::error(format!(
                         "Magic method `{class_like_name}::{method_name}` cannot have a return type hint."
+                    ))
+                    .with_annotation(Annotation::primary(hint.span()))
+                    .with_annotation(
+                        Annotation::secondary(method.span())
+                            .with_message(format!("Method `{class_like_name}::{method_name}` defined here.",)),
+                    )
+                    .with_annotation(
+                        Annotation::secondary(class_like_span)
+                            .with_message(format!("{class_like_kind} `{class_like_fqcn}` is defined here.")),
+                    ),
+                );
+            }
+        }
+    }
+
+    for (magic_method, parameter_types, return_type) in MAGIC_METHOD_TYPES {
+        if !method_name_bytes.eq_ignore_ascii_case(magic_method) {
+            continue;
+        }
+
+        for (parameter, (parameter_type, type_name)) in method.parameter_list.parameters.iter().zip(*parameter_types) {
+            let Some(hint) = &parameter.hint else {
+                continue;
+            };
+
+            if hint_type_mask(hint).0 & parameter_type == 0 {
+                let parameter_name = BytesDisplay(parameter.variable.name);
+
+                context.report(
+                    Issue::error(format!(
+                        "Parameter `{parameter_name}` of magic method `{class_like_name}::{method_name}` must be of type `{type_name}`."
+                    ))
+                    .with_annotation(Annotation::primary(hint.span()))
+                    .with_annotation(
+                        Annotation::secondary(method.span())
+                            .with_message(format!("Method `{class_like_name}::{method_name}` defined here.",)),
+                    )
+                    .with_annotation(
+                        Annotation::secondary(class_like_span)
+                            .with_message(format!("{class_like_kind} `{class_like_fqcn}` is defined here.")),
+                    ),
+                );
+            }
+        }
+
+        if let Some((allowed_type, type_name)) = return_type
+            && let Some(hint) = &method.return_type_hint
+        {
+            let (mask, is_complex) = hint_type_mask(&hint.hint);
+            let extra_types = mask & !allowed_type & !MAY_BE_STATIC;
+            let is_complex = is_complex || mask & MAY_BE_STATIC != 0;
+
+            if mask & MAY_BE_NEVER == 0 && (extra_types != 0 || (is_complex && *allowed_type != MAY_BE_OBJECT)) {
+                context.report(
+                    Issue::error(format!(
+                        "Return type of magic method `{class_like_name}::{method_name}` must be `{type_name}`."
                     ))
                     .with_annotation(Annotation::primary(hint.span()))
                     .with_annotation(
