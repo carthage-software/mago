@@ -814,8 +814,13 @@ function define(string $constant_name, mixed $value, bool $case_insensitive = fa
 function defined(string $constant_name): bool {}
 
 /**
+ * @template T of object
+ *
+ * @param T $object
+ *
+ * @return class-string<T>
+ *
  * @pure
- * @return class-string
  */
 function get_class(object $object = UNKNOWN): string {}
 

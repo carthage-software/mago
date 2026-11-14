@@ -856,6 +856,7 @@ test_case!(finally_sees_try_body_exits);
 test_case!(closing_tag_after_exit_is_not_code);
 test_case!(sealed_concrete_base_kept_after_negated_instanceof);
 test_case!(typed_constant_native_type_checked_with_docblock);
+test_case!(stub_callback_diff_exec_get_class);
 test_case!(magic_properties);
 test_case!(magic_property_overridden_by_parent);
 test_case!(magic_property_shadowing_real_property);

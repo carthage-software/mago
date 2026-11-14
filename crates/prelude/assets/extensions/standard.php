@@ -1847,7 +1847,12 @@ function link(string $target, string $link): bool {}
 function unlink(string $filename, mixed $context = null): bool {}
 
 /**
- * @param-out list<string> $output
+ * @template K of array-key
+ * @template V
+ *
+ * @param array<K, V>|null $output
+ *
+ * @param-out ($output is null|array{} ? list<string> : non-empty-array<K|int, V|string>) $output
  * @param-out int $result_code
  */
 function exec(string $command, ?array &$output = null, int|int &$result_code = null): string|false {}
@@ -4064,51 +4069,121 @@ function get_debug_type(mixed $value): string {}
 function get_resource_id($resource): int {}
 
 /**
+ * @template K as array-key
+ * @template V
+ *
+ * @param array<K, V> $array
+ *
+ * @return array<K, V>
+ *
  * @no-named-arguments
  */
 function array_diff_ukey(array $array, ...$rest): array {}
 
 /**
+ * @template K as array-key
+ * @template V
+ *
+ * @param array<K, V> $array
+ *
+ * @return array<K, V>
+ *
  * @no-named-arguments
  */
 function array_udiff(array $array, ...$rest): array {}
 
 /**
+ * @template K as array-key
+ * @template V
+ *
+ * @param array<K, V> $array
+ *
+ * @return array<K, V>
+ *
  * @no-named-arguments
  */
 function array_udiff_assoc(array $array, ...$rest): array {}
 
 /**
+ * @template K as array-key
+ * @template V
+ *
+ * @param array<K, V> $array
+ *
+ * @return array<K, V>
+ *
  * @no-named-arguments
  */
 function array_diff_uassoc(array $array, ...$rest): array {}
 
 /**
+ * @template K as array-key
+ * @template V
+ *
+ * @param array<K, V> $array
+ *
+ * @return array<K, V>
+ *
  * @no-named-arguments
  */
 function array_udiff_uassoc(array $array, ...$rest): array {}
 
 /**
+ * @template K as array-key
+ * @template V
+ *
+ * @param array<K, V> $array
+ *
+ * @return array<K, V>
+ *
  * @no-named-arguments
  */
 function array_uintersect_assoc(array $array, ...$rest): array {}
 
 /**
+ * @template K as array-key
+ * @template V
+ *
+ * @param array<K, V> $array
+ *
+ * @return array<K, V>
+ *
  * @no-named-arguments
  */
 function array_intersect_uassoc(array $array, ...$rest): array {}
 
 /**
+ * @template K as array-key
+ * @template V
+ *
+ * @param array<K, V> $array
+ *
+ * @return array<K, V>
+ *
  * @no-named-arguments
  */
 function array_uintersect_uassoc(array $array, ...$rest): array {}
 
 /**
+ * @template K as array-key
+ * @template V
+ *
+ * @param array<K, V> $array
+ *
+ * @return array<K, V>
+ *
  * @no-named-arguments
  */
 function array_intersect_ukey(array $array, ...$rest): array {}
 
 /**
+ * @template K as array-key
+ * @template V
+ *
+ * @param array<K, V> $array
+ *
+ * @return array<K, V>
+ *
  * @no-named-arguments
  */
 function array_uintersect(array $array, ...$rest): array {}
