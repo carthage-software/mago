@@ -46,6 +46,8 @@ use crate::ttype::atomic::callable::TCallable;
 use crate::ttype::atomic::derived::TDerived;
 use crate::ttype::atomic::derived::index_access::TIndexAccess;
 use crate::ttype::atomic::derived::value_of::TValueOf;
+use crate::ttype::atomic::object::TObject;
+use crate::ttype::atomic::object::named::TNamedObject;
 use crate::ttype::atomic::reference::TGlobalReferenceSelector;
 use crate::ttype::atomic::reference::TReference;
 use crate::ttype::atomic::reference::TReferenceMemberSelector;
@@ -830,6 +832,12 @@ where
 
             Some(TUnion::from_single(Cow::Owned(TAtomic::Array(TArray::Keyed(keyed_array)))))
         }
+        Expression::Instantiation(instantiation) => match instantiation.class {
+            Expression::Identifier(identifier) => Some(wrap_atomic(TAtomic::Object(TObject::Named(
+                TNamedObject::new(word(context.resolved_names.get(identifier))),
+            )))),
+            _ => None,
+        },
         Expression::Closure(closure) => Some(wrap_atomic(TAtomic::Callable(TCallable::Alias(
             FunctionLikeIdentifier::for_closure(context.file, closure.span()),
         )))),
