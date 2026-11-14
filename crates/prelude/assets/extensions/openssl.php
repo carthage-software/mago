@@ -231,6 +231,7 @@ function openssl_sign(
     &$signature,
     OpenSSLAsymmetricKey|OpenSSLCertificate|array|string $private_key,
     string|int $algorithm = OPENSSL_ALGO_SHA1,
+    #[Mago\AvailableSince(80500)] int $padding = 0,
 ): bool {}
 
 function openssl_verify(
@@ -238,6 +239,7 @@ function openssl_verify(
     string $signature,
     OpenSSLAsymmetricKey|OpenSSLCertificate|array|string $public_key,
     string|int $algorithm = OPENSSL_ALGO_SHA1,
+    #[Mago\AvailableSince(80500)] int $padding = 0,
 ): int|false {}
 
 /**
@@ -331,6 +333,7 @@ function openssl_private_decrypt(
     &$decrypted_data,
     OpenSSLAsymmetricKey|OpenSSLCertificate|array|string $private_key,
     int $padding = OPENSSL_PKCS1_PADDING,
+    #[Mago\AvailableSince(80500)] ?string $digest_algo = null,
 ): bool {}
 
 /**
@@ -341,6 +344,7 @@ function openssl_public_encrypt(
     &$encrypted_data,
     OpenSSLAsymmetricKey|OpenSSLCertificate|array|string $public_key,
     int $padding = OPENSSL_PKCS1_PADDING,
+    #[Mago\AvailableSince(80500)] ?string $digest_algo = null,
 ): bool {}
 
 /**

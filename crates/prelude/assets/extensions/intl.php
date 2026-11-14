@@ -1565,43 +1565,43 @@ function grapheme_strlen(string $string): int|false|null {}
  *
  * @pure
  */
-function grapheme_strpos(string $haystack, string $needle, int $offset = 0): int|false {}
+function grapheme_strpos(string $haystack, string $needle, int $offset = 0, #[Mago\AvailableSince(80500)] string $locale = ''): int|false {}
 
 /**
  * @return int<0, max>|false
  *
  * @pure
  */
-function grapheme_stripos(string $haystack, string $needle, int $offset = 0): int|false {}
+function grapheme_stripos(string $haystack, string $needle, int $offset = 0, #[Mago\AvailableSince(80500)] string $locale = ''): int|false {}
 
 /**
  * @return int<0, max>|false
  *
  * @pure
  */
-function grapheme_strrpos(string $haystack, string $needle, int $offset = 0): int|false {}
+function grapheme_strrpos(string $haystack, string $needle, int $offset = 0, #[Mago\AvailableSince(80500)] string $locale = ''): int|false {}
 
 /**
  * @return int<0, max>|false
  *
  * @pure
  */
-function grapheme_strripos(string $haystack, string $needle, int $offset = 0): int|false {}
+function grapheme_strripos(string $haystack, string $needle, int $offset = 0, #[Mago\AvailableSince(80500)] string $locale = ''): int|false {}
 
 /**
  * @pure
  */
-function grapheme_substr(string $string, int $offset, ?int $length = null): string|false {}
+function grapheme_substr(string $string, int $offset, ?int $length = null, #[Mago\AvailableSince(80500)] string $locale = ''): string|false {}
 
 /**
  * @pure
  */
-function grapheme_strstr(string $haystack, string $needle, bool $beforeNeedle = false): string|false {}
+function grapheme_strstr(string $haystack, string $needle, bool $beforeNeedle = false, #[Mago\AvailableSince(80500)] string $locale = ''): string|false {}
 
 /**
  * @pure
  */
-function grapheme_stristr(string $haystack, string $needle, bool $beforeNeedle = false): string|false {}
+function grapheme_stristr(string $haystack, string $needle, bool $beforeNeedle = false, #[Mago\AvailableSince(80500)] string $locale = ''): string|false {}
 
 /**
  * @pure
@@ -1619,6 +1619,7 @@ function grapheme_levenshtein(
     int $insertionCost = 1,
     int $replacementCost = 1,
     int $deletionCost = 1,
+    string $locale = '',
 ): int {}
 
 /**
