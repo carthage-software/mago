@@ -79,9 +79,24 @@ where
     A: Arena,
 {
     if let Some(assertion_type) = assertion.get_type() {
-        // `mixed is T` -> `T`, always
+        // `mixed is T` -> `T`, and a truthy `mixed` keeps its truthiness
         if existing_var_type.is_mixed() {
-            return Some(wrap_atomic(assertion_type.clone()));
+            let asserted_type = wrap_atomic(assertion_type.clone());
+            if let [TAtomic::Mixed(mixed)] = existing_var_type.types.as_ref()
+                && mixed.is_truthy()
+                && !assertion.has_equality()
+            {
+                return Some(reconcile_truthy_or_non_empty(
+                    context,
+                    &Assertion::Truthy,
+                    &asserted_type,
+                    None,
+                    false,
+                    None,
+                ));
+            }
+
+            return Some(asserted_type);
         }
 
         match assertion_type {

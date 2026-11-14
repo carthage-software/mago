@@ -3179,6 +3179,7 @@ test_case!(trait_method_collisions_and_bad_adaptations);
 test_case!(attributes_on_closures_and_hook_parameters);
 test_case!(named_argument_named_like_variadic);
 test_case!(unknown_named_argument_fits_variadic_type);
+test_case!(truthy_mixed_keeps_truthiness_when_narrowed);
 
 #[test]
 #[cfg_attr(miri, ignore)]
