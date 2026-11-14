@@ -859,6 +859,7 @@ fn resolve_static_type(
         StaticClassType::Exact(static_class)
             if !check_compatibility || codebase.is_instance_of(static_class.as_bytes(), named.name.as_bytes()) =>
         {
+            use_own_template_bounds(named, *static_class, codebase);
             named.name = *static_class;
             named.is_static = false;
             named.is_this = false;
@@ -894,6 +895,8 @@ fn resolve_static_type(
                 || (static_obj.type_parameters.is_some() && should_use_static_type_params(named, static_obj, codebase))
             {
                 named.type_parameters.clone_from(&static_obj.type_parameters);
+            } else if static_obj.type_parameters.is_none() {
+                use_own_template_bounds(named, static_obj.name, codebase);
             }
 
             named.name = static_obj.name;
@@ -904,6 +907,7 @@ fn resolve_static_type(
         StaticClassType::Name(static_class)
             if (!check_compatibility || codebase.is_instance_of(static_class.as_bytes(), named.name.as_bytes())) =>
         {
+            use_own_template_bounds(named, *static_class, codebase);
             named.name = *static_class;
             let effectively_final = is_effectively_final(static_class, codebase, options);
             named.is_static = !effectively_final;
@@ -911,6 +915,18 @@ fn resolve_static_type(
         }
         _ => {}
     }
+}
+
+/// Replaces the type arguments of a class with the template bounds of the subclass `static` resolves to.
+fn use_own_template_bounds(named: &mut TNamedObject, static_class: Word, codebase: &CodebaseMetadata) {
+    if named.type_parameters.is_none() || named.name.as_bytes().eq_ignore_ascii_case(static_class.as_bytes()) {
+        return;
+    }
+
+    named.type_parameters = codebase.get_class_like_by_name(static_class).and_then(|metadata| {
+        (!metadata.template_types.is_empty())
+            .then(|| metadata.template_types.values().map(|template| template.constraint.clone()).collect())
+    });
 }
 
 /// Checks whether a class is effectively final for the purpose of `$this`/`static` resolution.
