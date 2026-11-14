@@ -763,6 +763,29 @@ where
             }
         }
 
+        if !in_assignment
+            && type_param.is_never()
+            && !block_context.flags.inside_isset()
+            && !block_context.flags.inside_unset()
+            && !dim_type.types.is_empty()
+            && dim_type.types.iter().all(|atomic| {
+                matches!(atomic, TAtomic::Scalar(TScalar::Integer(integer)) if known_elements
+                    .keys()
+                    .all(|index| i64::try_from(*index).is_ok_and(|index| !integer.overlaps(TInteger::literal(index)))))
+            })
+        {
+            if let Some(span) = span {
+                context.collector.report_with_code(
+                    IssueCode::UndefinedIntArrayIndex,
+                    Issue::error(format!("No index of type `{}` exists on `{}`.", dim_type.get_id(), list.get_id()))
+                        .with_annotation(Annotation::primary(span).with_message("None of these keys exist."))
+                        .with_help("Ensure the index exists before accessing it, or adjust the list access logic."),
+                );
+            }
+
+            return get_null();
+        }
+
         for (_, known_item) in known_elements.values() {
             type_param = Cow::Owned(add_union_type(
                 type_param.into_owned(),

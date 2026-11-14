@@ -3156,6 +3156,7 @@ test_case!(first_class_callable_static_return_binds_receiver);
 test_case!(key_of_constant_with_class_constant_keys);
 test_case!(docblock_type_names_missing_class_constant);
 test_case!(intersection_with_object_shape_in_any_position);
+test_case!(list_index_range_outside_known_keys);
 
 #[test]
 #[cfg_attr(miri, ignore)]
