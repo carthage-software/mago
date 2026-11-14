@@ -1049,7 +1049,13 @@ fn add_nested_assertions(
         }
     }
 
-    new_types.retain(|k, _| !keys_to_remove.contains(k));
+    new_types.retain(|key, assertions| {
+        !keys_to_remove.contains(key)
+            || !assertions
+                .iter()
+                .flatten()
+                .all(|assertion| matches!(assertion, Assertion::IsIsset | Assertion::IsEqualIsset))
+    });
 }
 
 #[cfg(test)]
