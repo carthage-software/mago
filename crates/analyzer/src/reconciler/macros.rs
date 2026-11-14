@@ -45,6 +45,25 @@ macro_rules! intersect_simple {
                     } else {
                         did_remove_type = true;
                     }
+                } else if let TAtomic::GenericParameter(parameter) = atomic {
+                    let mut narrowed_constraint = Vec::new();
+                    for constraint_atomic in parameter.constraint.types.as_ref() {
+                        if matches!(constraint_atomic, $( $subtype_pattern )|+ $( if $subtype_guard )?) {
+                            narrowed_constraint.push(constraint_atomic.clone());
+                        } else if matches!(constraint_atomic, $( $supertype_pattern )|+ $( if $supertype_guard )?) {
+                            narrowed_constraint.extend($max_type.types.iter().cloned());
+                        }
+                    }
+
+                    if narrowed_constraint.as_slice() != parameter.constraint.types.as_ref() {
+                        did_remove_type = true;
+                    }
+
+                    if !narrowed_constraint.is_empty() {
+                        let mut narrowed_parameter = parameter.clone();
+                        narrowed_parameter.constraint = std::sync::Arc::new(TUnion::from_vec(narrowed_constraint));
+                        acceptable_types.push(TAtomic::GenericParameter(narrowed_parameter));
+                    }
                 } else if let TAtomic::Callable(callable) = atomic {
                     did_remove_type = true;
 
