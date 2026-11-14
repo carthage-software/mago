@@ -11,6 +11,7 @@ use mago_reporting::Issue;
 use mago_span::HasSpan;
 use mago_syntax::cst::Expression;
 use mago_syntax::cst::FunctionCall;
+use mago_word::ascii_lowercase_word;
 use mago_word::word;
 
 use crate::analyzable::Analyzable;
@@ -106,7 +107,9 @@ where
 
         let lowercased_name = name.to_ascii_lowercase();
         artifacts.symbol_references.add_reference_to_symbol(&block_context.scope, lowercased_name, false);
-        let skip_error = block_context.known_functions.contains(&lowercased_name);
+        let skip_error = block_context.known_functions.contains(&lowercased_name)
+            || alternative.is_some()
+                && block_context.known_functions.contains(&ascii_lowercase_word(function_name.value()));
 
         let target =
             get_function_like_target_with_skip(context, identifier, alternative, expression.span(), None, skip_error);
