@@ -150,7 +150,7 @@ pub fn handle_return_value<'ctx, A>(
         check_constructor_early_return(context, block_context, return_span, class_name);
     }
 
-    let mut expansion_options = TypeExpansionOptions {
+    let expansion_options = TypeExpansionOptions {
         self_class: block_context.scope.get_class_like_name(),
         static_class_type: if let Some(calling_class) = block_context.scope.get_class_like_name() {
             StaticClassType::Name(calling_class)
@@ -180,12 +180,6 @@ pub fn handle_return_value<'ctx, A>(
     else {
         // Global return, no function context, exiting.
         return;
-    };
-
-    expansion_options.function_is_final = if let Some(method_metadata) = &function_like_metadata.method_metadata {
-        method_metadata.is_final
-    } else {
-        false
     };
 
     if inferred_return_type.is_expandable() {
@@ -241,11 +235,6 @@ pub fn handle_return_value<'ctx, A>(
                         StaticClassType::Name(calling_class)
                     } else {
                         StaticClassType::None
-                    },
-                    function_is_final: if let Some(method_metadata) = &function_like_metadata.method_metadata {
-                        method_metadata.is_final
-                    } else {
-                        false
                     },
                     ..Default::default()
                 },

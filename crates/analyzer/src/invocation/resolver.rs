@@ -143,18 +143,12 @@ where
 
     let static_class_type;
     let mut self_class;
-    let function_is_final;
     let allow_mixin_static_rebind;
 
     if let Some(method_context) = invocation.target.get_method_context() {
         static_class_type = method_context.class_type.clone();
         allow_mixin_static_rebind = method_context.declaring_object_type.is_some();
         self_class = Some(method_context.class_like_metadata.name);
-        function_is_final = invocation
-            .target
-            .get_function_like_metadata()
-            .and_then(|metadata| metadata.method_metadata.as_ref())
-            .is_some_and(|metadata| metadata.is_final);
 
         if let Some(declaring_method_id) = &method_context.declaring_method_id {
             let declaring_class_name = declaring_method_id.get_class_name();
@@ -195,7 +189,6 @@ where
     } else {
         static_class_type = StaticClassType::default();
         self_class = None;
-        function_is_final = false;
         allow_mixin_static_rebind = false;
     }
 
@@ -205,13 +198,7 @@ where
         expander::expand_union(
             context.codebase,
             &mut resulting_union,
-            &TypeExpansionOptions {
-                self_class,
-                static_class_type,
-                function_is_final,
-                allow_mixin_static_rebind,
-                ..Default::default()
-            },
+            &TypeExpansionOptions { self_class, static_class_type, allow_mixin_static_rebind, ..Default::default() },
         );
     }
 
