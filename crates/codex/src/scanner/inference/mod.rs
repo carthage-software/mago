@@ -369,7 +369,8 @@ where
         }
         Expression::UnaryPrefix(UnaryPrefix { operator, operand }) => {
             let operand_type =
-                infer_with_constant_sources(context, scope, operand, enclosing_class, constants, class_constants)?;
+                infer_with_constant_sources(context, scope, operand, enclosing_class, constants, class_constants)
+                    .unwrap_or_else(get_mixed);
 
             match operator {
                 UnaryPrefixOperator::Plus(_) => {
