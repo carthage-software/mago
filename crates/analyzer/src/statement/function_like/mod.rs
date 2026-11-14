@@ -373,6 +373,41 @@ where
         }
     }
 
+    if function_like_metadata.flags.has_yield()
+        && !block_context.flags.has_returned()
+        && let Some(return_type) = &function_like_metadata.return_type_metadata
+    {
+        let expanded_type =
+            expand_type_metadata(context, block_context, &mut artifacts, function_like_metadata, return_type);
+
+        if let [TAtomic::Object(TObject::Named(generator))] = expanded_type.types.as_ref()
+            && generator.name.as_bytes().eq_ignore_ascii_case(b"Generator")
+            && let Some([_, _, _, generator_return]) = generator.get_type_parameters()
+            && !generator_return.accepts_null()
+            && !generator_return.is_mixed()
+            && !generator_return.is_never()
+            && !generator_return.is_void()
+        {
+            let name = function_like_metadata.original_name;
+            context.collector.report_with_code(
+                IssueCode::MissingReturnStatement,
+                Issue::error(format!("Missing return statement in generator `{name}`"))
+                    .with_annotation(
+                        Annotation::primary(function_like_metadata.name_span.unwrap_or(function_like_metadata.span))
+                            .with_message(format!(
+                                "This generator is declared to return '{}'...",
+                                generator_return.get_id()
+                            )),
+                    )
+                    .with_annotation(
+                        Annotation::secondary(body.span()).with_message("...but this path can end without a `return`."),
+                    )
+                    .with_note("A generator that ends without `return` gives `null` from `getReturn()`.")
+                    .with_help("Return a value on every path, or make the generator's return type nullable."),
+            );
+        }
+    }
+
     check_return_type_width(context, block_context, &mut artifacts, function_like_metadata);
     check_thrown_types(context, block_context, &mut artifacts, function_like_metadata);
 
