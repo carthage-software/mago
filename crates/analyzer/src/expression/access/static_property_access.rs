@@ -55,6 +55,7 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticPropertyAccess<'arena> {
             resolve_static_properties(context, block_context, artifacts, self.class, &self.property, false)?;
 
         let mut resulting_expression_type = None;
+        let memoize = !matches!(self.class, Expression::Identifier(identifier) if !context.codebase.class_like_exists(context.resolved_names.get(identifier)));
         if !resolution_result.has_error_path {
             for resolved_property in resolution_result.properties {
                 if let Some(declaring_class_id) = resolved_property.declaring_class_id {
@@ -87,7 +88,9 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for StaticPropertyAccess<'arena> {
         }
 
         let resulting_type = Rc::new(resulting_expression_type.unwrap_or_else(get_never));
-        if let Some(property_access_id) = property_access_id {
+        if let Some(property_access_id) = property_access_id
+            && memoize
+        {
             block_context.locals.insert(property_access_id, Rc::clone(&resulting_type));
         }
 

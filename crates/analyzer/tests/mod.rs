@@ -3151,6 +3151,7 @@ fn issue_2641_nullsafe_without_property_memoization() {
 }
 
 test_case!(issue_2676);
+test_case!(static_property_on_missing_class);
 
 #[test]
 #[cfg_attr(miri, ignore)]

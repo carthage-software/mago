@@ -22,6 +22,7 @@ use crate::context::Context;
 use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::expression::unary::cast_type_to_string;
+use crate::resolver::class_name::report_non_existent_class_like;
 use crate::resolver::class_name::resolve_classnames_from_expression;
 use crate::resolver::property::PropertyResolutionResult;
 use crate::resolver::property::ResolvedProperty;
@@ -188,7 +189,10 @@ where
             return None;
         }
 
-        // Error reporting for non-existent class is handled by `resolve_classnames_from_expression`.
+        if matches!(class_expr, Expression::Identifier(_)) && !block_context.flags.inside_isset() {
+            report_non_existent_class_like(context, class_expr.span(), class_id);
+        }
+
         result.has_invalid_path = true;
         return None;
     };
