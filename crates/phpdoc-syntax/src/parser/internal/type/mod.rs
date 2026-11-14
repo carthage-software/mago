@@ -44,7 +44,6 @@ pub enum TypePrecedence {
     Union,
     Intersection,
     Postfix,
-    Callable,
 }
 
 #[inline]

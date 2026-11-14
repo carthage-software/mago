@@ -656,3 +656,29 @@ fn backtick_after_whitespace_still_opens_inline_code() {
         text.segments
     );
 }
+
+#[test]
+fn callable_return_type_takes_the_slice_suffix() {
+    let arena = LocalArena::new();
+    let document = parse(&arena, b"/** @param \\Closure(string):string[] $c */");
+    let tag = first_tag(&document);
+
+    let TagValue::Param(param) = &tag.value else { panic!() };
+    let Type::Callable(callable) = param.r#type else { panic!("expected callable, got {:?}", param.r#type) };
+    let Some(return_type) =
+        callable.specification.as_ref().and_then(|specification| specification.return_type.as_ref())
+    else {
+        panic!()
+    };
+    assert!(matches!(return_type.return_type, Type::Slice(_)));
+}
+
+#[test]
+fn callable_return_type_stops_at_a_union() {
+    let arena = LocalArena::new();
+    let document = parse(&arena, b"/** @param callable(): int|string $c */");
+    let tag = first_tag(&document);
+
+    let TagValue::Param(param) = &tag.value else { panic!() };
+    assert!(matches!(param.r#type, Type::Union(_)));
+}

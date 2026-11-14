@@ -58,7 +58,7 @@ where
 
         let return_type = if self.stream.is_at(TokenKind::Colon) {
             let colon = self.stream.consume_span()?;
-            let return_type = self.parse_type_with_precedence(TypePrecedence::Callable)?;
+            let return_type = self.parse_type_with_precedence(TypePrecedence::Postfix)?;
 
             Some(CallableTypeReturnType { colon, return_type: self.alloc(return_type) })
         } else {
