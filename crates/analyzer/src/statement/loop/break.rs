@@ -163,6 +163,20 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Break<'arena> {
             }
 
             if loop_scope.iteration_count == 0 {
+                let defined_here = block_context
+                    .locals
+                    .keys()
+                    .filter(|var_id| !loop_scope.parent_context_variables.contains_key(*var_id))
+                    .copied()
+                    .collect::<WordSet>();
+
+                match loop_scope.variables_defined_at_every_break.as_mut() {
+                    Some(defined_at_every_break) => {
+                        defined_at_every_break.retain(|var_id| defined_here.contains(var_id))
+                    }
+                    None => loop_scope.variables_defined_at_every_break = Some(defined_here),
+                }
+
                 for (var_id, var_type) in &block_context.locals {
                     if !loop_scope.parent_context_variables.contains_key(var_id) {
                         loop_scope.possibly_defined_loop_parent_variables.insert(

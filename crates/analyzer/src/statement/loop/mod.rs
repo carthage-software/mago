@@ -281,6 +281,33 @@ fn inherit_loop_block_context<'ctx, A>(
                 }
             }
         }
+
+        if has_break {
+            for (variable, variable_type) in &loop_scope.possibly_defined_loop_parent_variables {
+                if block_context.locals.contains_key(variable)
+                    || variable.as_bytes().iter().any(|byte| matches!(byte, b'[' | b'-' | b':'))
+                {
+                    continue;
+                }
+
+                let always_defined = known_infinite_loop
+                    && loop_scope
+                        .variables_defined_at_every_break
+                        .as_ref()
+                        .is_some_and(|defined_at_every_break| defined_at_every_break.contains(variable));
+
+                if always_defined {
+                    block_context.locals.insert(*variable, Rc::clone(variable_type));
+                } else {
+                    let mut variable_type = (**variable_type).clone();
+                    variable_type.set_possibly_undefined(true, None);
+                    block_context.locals.insert(*variable, Rc::new(variable_type));
+                    block_context.possibly_undefined_variable_ids.insert(*variable);
+                }
+
+                block_context.variables_possibly_in_scope.insert(*variable);
+            }
+        }
     } else {
         block_context.control_actions.insert(ControlAction::End);
         block_context.flags.set_has_returned(true);
