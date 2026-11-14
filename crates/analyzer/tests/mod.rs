@@ -3334,6 +3334,7 @@ test_case!(generic_mixin_property_binds_type_arguments);
 test_case!(stdclass_subclass_allows_undocumented_properties);
 test_case!(call_argument_inside_isset_is_a_plain_read);
 test_case!(implicit_float_to_int_operand);
+test_case!(array_column_object_index_column);
 
 #[test]
 #[cfg_attr(miri, ignore)]

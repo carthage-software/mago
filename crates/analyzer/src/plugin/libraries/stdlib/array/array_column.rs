@@ -1,10 +1,12 @@
 //! `array_column()` return type provider.
 
 use std::borrow::Cow;
+use std::collections::BTreeMap;
 use std::sync::Arc;
 
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::metadata::class_like::ClassLikeMetadata;
+use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::array::TArray;
 use mago_codex::ttype::atomic::array::key::ArrayKey;
@@ -14,10 +16,16 @@ use mago_codex::ttype::atomic::object::TObject;
 use mago_codex::ttype::atomic::scalar::TScalar;
 use mago_codex::ttype::get_array_parameters;
 use mago_codex::ttype::get_arraykey;
+use mago_codex::ttype::get_never;
 use mago_codex::ttype::union::TUnion;
+use mago_reporting::Annotation;
+use mago_reporting::Issue;
+use mago_span::HasSpan;
+use mago_syntax::cst::Expression;
 use mago_word::concat_word;
 use mago_word::word;
 
+use crate::code::IssueCode;
 use crate::plugin::context::InvocationInfo;
 use crate::plugin::context::ProviderContext;
 use crate::plugin::provider::Provider;
@@ -71,7 +79,9 @@ impl FunctionReturnTypeProvider for ArrayColumnProvider {
             return Some(result);
         }
 
-        if let Some(result) = try_resolve_from_keyed_array(&element_type, column_key_type, index_key_type) {
+        if let Some(result) =
+            try_resolve_from_keyed_array(context, &element_type, column_key_type, index_key_argument, index_key_type)
+        {
             return Some(result);
         }
 
@@ -106,19 +116,88 @@ fn try_resolve_from_named_object(
 /// Resolve column and index types from a keyed-array element type by looking
 /// up known items.
 fn try_resolve_from_keyed_array(
+    context: &ProviderContext<'_, '_, '_>,
     element_type: &TUnion,
     column_key_type: &TUnion,
+    index_key_argument: Option<&Expression<'_>>,
     index_key_type: Option<&TUnion>,
 ) -> Option<TUnion> {
     if !element_type.is_single() {
         return None;
     }
 
-    let TAtomic::Array(TArray::Keyed(keyed)) = element_type.get_single() else {
-        return None;
+    let (known_items, sealed) = match element_type.get_single() {
+        TAtomic::Array(TArray::Keyed(keyed)) => (Cow::Borrowed(keyed.get_known_items()?), keyed.parameters.is_none()),
+        TAtomic::Array(TArray::List(list)) => (
+            Cow::Owned(
+                list.known_elements
+                    .as_deref()?
+                    .iter()
+                    .map(|(index, entry)| (ArrayKey::Integer(*index as i64), entry.clone()))
+                    .collect::<BTreeMap<_, _>>(),
+            ),
+            list.element_type.is_never(),
+        ),
+        _ => return None,
     };
 
-    let known_items = keyed.get_known_items()?;
+    if let Some(index_key_argument) = index_key_argument
+        && let Some((index_optional, index_value_type)) = index_key_type
+            .filter(|index_key_type| !index_key_type.is_null())
+            .and_then(literal_array_key)
+            .and_then(|key| known_items.get(&key))
+    {
+        let invalid_count = index_value_type
+            .types
+            .iter()
+            .filter(|atomic| matches!(atomic, TAtomic::Array(_) | TAtomic::Object(_)))
+            .count();
+
+        let (rows_may_be_skipped, rows_are_all_skipped) = if column_key_type.is_null() {
+            (false, false)
+        } else {
+            match literal_array_key(column_key_type).map(|key| known_items.get(&key)) {
+                Some(Some((optional, _))) => (*optional, false),
+                Some(None) => (true, sealed),
+                None => (true, false),
+            }
+        };
+
+        if invalid_count > 0 && !rows_are_all_skipped {
+            let all_invalid = !rows_may_be_skipped && !index_optional && invalid_count == index_value_type.types.len();
+            let index_type_id = index_value_type.get_id();
+
+            if all_invalid {
+                context.report(
+                    IssueCode::InvalidArgument,
+                    Issue::error(format!(
+                        "The index column of `array_column()` has the type `{index_type_id}`, which cannot be an array key."
+                    ))
+                    .with_annotation(
+                        Annotation::primary(index_key_argument.span())
+                            .with_message(format!("This column holds `{index_type_id}`")),
+                    )
+                    .with_note("Since PHP 8, `array_column()` throws a `TypeError` for an array or object in the index column, even a `Stringable` one.")
+                    .with_help("Pick an index column that holds strings or ints, or convert the values first, for example with `array_map()`."),
+                );
+
+                return Some(get_never());
+            }
+
+            context.report(
+                IssueCode::PossiblyInvalidArgument,
+                Issue::error(format!(
+                    "The index column of `array_column()` has the type `{index_type_id}`, which may not be an array key."
+                ))
+                .with_annotation(
+                    Annotation::primary(index_key_argument.span())
+                        .with_message(format!("This column may hold an array or object (`{index_type_id}`)")),
+                )
+                .with_note("Since PHP 8, `array_column()` throws a `TypeError` for an array or object in the index column, even a `Stringable` one.")
+                .with_help("Make sure the index column only holds strings or ints, or convert the values first."),
+            );
+        }
+    }
 
     let column_type = if column_key_type.is_null() {
         element_type.clone()
@@ -145,10 +224,14 @@ fn literal_array_key(key_type: &TUnion) -> Option<ArrayKey> {
 
 /// The array key PHP makes from an index column value.
 fn key_type_for_index(value_type: &TUnion) -> TUnion {
+    let keys: Vec<&TAtomic> =
+        value_type.types.iter().filter(|atomic| !matches!(atomic, TAtomic::Array(_) | TAtomic::Object(_))).collect();
+    if keys.is_empty() {
+        return get_arraykey();
+    }
+
     TUnion::from_vec(
-        value_type
-            .types
-            .iter()
+        keys.into_iter()
             .map(|atomic| match atomic {
                 TAtomic::Scalar(
                     TScalar::ArrayKey | TScalar::Integer(_) | TScalar::String(_) | TScalar::ClassLikeString(_),
