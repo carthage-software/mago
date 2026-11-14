@@ -798,6 +798,7 @@ test_case!(class_constant_narrowing);
 test_case!(postfix_increment_yields_old_value);
 test_case!(namespaced_existence_guards_fall_back_to_global);
 test_case!(negated_instanceof_narrows_template_bound);
+test_case!(variadic_override_parameter_count);
 test_case!(magic_properties);
 test_case!(magic_property_overridden_by_parent);
 test_case!(magic_property_shadowing_real_property);

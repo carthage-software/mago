@@ -1,5 +1,6 @@
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::metadata::function_like::FunctionLikeMetadata;
+use mago_codex::metadata::parameter::FunctionLikeParameterMetadata;
 use mago_codex::ttype::TType;
 use mago_codex::ttype::atomic::TAtomic;
 use mago_codex::ttype::atomic::object::TObject;
@@ -191,55 +192,41 @@ pub fn validate_method_signature_compatibility(
         return issues;
     }
 
-    let parent_param_count = parent_method.parameters.len();
-    let child_param_count = child_method.parameters.len();
+    let is_optional =
+        |parameter: &FunctionLikeParameterMetadata| parameter.flags.has_default() || parameter.flags.is_variadic();
+    let required_count = |parameters: &[FunctionLikeParameterMetadata]| {
+        parameters.iter().filter(|parameter| !is_optional(parameter)).count()
+    };
+    let child_variadic = child_method.parameters.last().filter(|parameter| parameter.flags.is_variadic());
+    let child_param_for = |index: usize| child_method.parameters.get(index).or(child_variadic);
 
-    if child_param_count < parent_param_count {
-        let child_required_count = child_method.parameters.iter().filter(|p| !p.flags.has_default()).count();
-        let parent_required_count = parent_method.parameters.iter().filter(|p| !p.flags.has_default()).count();
+    let count_mismatch = || SignatureCompatibilityIssue::ParameterCountMismatch {
+        child_required_count: required_count(&child_method.parameters),
+        parent_required_count: required_count(&parent_method.parameters),
+    };
 
-        issues
-            .push(SignatureCompatibilityIssue::ParameterCountMismatch { child_required_count, parent_required_count });
+    for (index, parent_param) in parent_method.parameters.iter().enumerate() {
+        let Some(child_param) = child_param_for(index) else {
+            issues.push(count_mismatch());
+
+            return issues;
+        };
+
+        if is_optional(parent_param) && !is_optional(child_param) {
+            issues.push(count_mismatch());
+
+            return issues;
+        }
+    }
+
+    if child_method.parameters.iter().skip(parent_method.parameters.len()).any(|parameter| !is_optional(parameter)) {
+        issues.push(count_mismatch());
 
         return issues;
     }
 
     for (index, parent_param) in parent_method.parameters.iter().enumerate() {
-        let child_param = &child_method.parameters[index];
-
-        let parent_is_optional = parent_param.flags.has_default();
-        let child_is_optional = child_param.flags.has_default();
-
-        if parent_is_optional && !child_is_optional {
-            let child_required_count = child_method.parameters.iter().filter(|p| !p.flags.has_default()).count();
-            let parent_required_count = parent_method.parameters.iter().filter(|p| !p.flags.has_default()).count();
-
-            issues.push(SignatureCompatibilityIssue::ParameterCountMismatch {
-                child_required_count,
-                parent_required_count,
-            });
-
-            return issues;
-        }
-    }
-
-    for index in parent_param_count..child_param_count {
-        let child_param = &child_method.parameters[index];
-        if !child_param.flags.has_default() {
-            let child_required_count = child_method.parameters.iter().filter(|p| !p.flags.has_default()).count();
-            let parent_required_count = parent_method.parameters.iter().filter(|p| !p.flags.has_default()).count();
-
-            issues.push(SignatureCompatibilityIssue::ParameterCountMismatch {
-                child_required_count,
-                parent_required_count,
-            });
-
-            return issues;
-        }
-    }
-
-    for (index, parent_param) in parent_method.parameters.iter().enumerate() {
-        let Some(child_param) = child_method.parameters.get(index) else {
+        let Some(child_param) = child_param_for(index) else {
             continue;
         };
 
