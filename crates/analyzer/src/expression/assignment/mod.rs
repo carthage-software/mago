@@ -1304,6 +1304,9 @@ fn is_boolean_logic(expression: &Expression<'_>, artifacts: &AnalysisArtifacts) 
         Expression::UnaryPrefix(UnaryPrefix { operator: UnaryPrefixOperator::Not(_), operand }) => {
             is_boolean_logic(operand, artifacts)
         }
+        Expression::Assignment(assignment) if matches!(assignment.operator, AssignmentOperator::Assign(_)) => {
+            is_boolean_logic(assignment.rhs, artifacts)
+        }
         Expression::Call(call) => {
             let span = call.span();
             let range = (span.start.offset, span.end.offset);

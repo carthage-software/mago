@@ -3202,6 +3202,7 @@ test_case!(enum_case_value_from_constant);
 test_case!(callable_with_required_parameter_for_optional_one);
 test_case!(combine_unsealed_shapes_widens_known_key);
 test_case!(negated_condition_assignment_keeps_link);
+test_case!(chained_condition_assignment_narrows);
 
 #[test]
 #[cfg_attr(miri, ignore)]
