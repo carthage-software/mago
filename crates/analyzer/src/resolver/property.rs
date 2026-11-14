@@ -1839,12 +1839,14 @@ pub(super) fn report_magic_property_without_get_set_method<A>(
 ) where
     A: Arena,
 {
-    if let Some(class_metadata) = context.codebase.get_class_like_by_name(classname)
-        && class_metadata.kind.is_class()
-        && !class_metadata.flags.is_readonly()
-        && class_metadata.flags.allows_dynamic_properties()
-        && !class_metadata.declaring_property_ids.contains_key(&property_name)
-    {
+    let class_metadata = context.codebase.get_class_like_by_name(classname);
+    if class_metadata.is_some_and(|class_metadata| {
+        class_metadata.kind.is_interface()
+            || (class_metadata.kind.is_class()
+                && !class_metadata.flags.is_readonly()
+                && class_metadata.flags.allows_dynamic_properties()
+                && !class_metadata.declaring_property_ids.contains_key(&property_name))
+    }) {
         return;
     }
 
