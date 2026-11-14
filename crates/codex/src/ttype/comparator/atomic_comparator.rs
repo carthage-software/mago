@@ -11,6 +11,7 @@ use crate::ttype::TType;
 use crate::ttype::atomic::TAtomic;
 use crate::ttype::atomic::array::TArray;
 use crate::ttype::atomic::array::keyed::TKeyedArray;
+use crate::ttype::atomic::array::list::TList;
 use crate::ttype::atomic::callable::TCallable;
 use crate::ttype::atomic::generic::TGenericParameter;
 use crate::ttype::atomic::object::TObject;
@@ -609,16 +610,11 @@ pub(crate) fn can_be_identical(
     if (first_part.is_list() && second_part.is_non_empty_list())
         || (second_part.is_list() && first_part.is_non_empty_list())
     {
-        return if let Some(first_element_type) = first_part.get_list_element_type()
-            && let Some(second_element_type) = second_part.get_list_element_type()
+        return if let (TAtomic::Array(TArray::List(first_list)), TAtomic::Array(TArray::List(second_list))) =
+            (first_part, second_part)
         {
-            union_comparator::can_expression_types_be_identical(
-                codebase,
-                first_element_type,
-                second_element_type,
-                inside_assertion,
-                false,
-            )
+            list_values_can_match(codebase, first_list, second_list, inside_assertion)
+                && list_values_can_match(codebase, second_list, first_list, inside_assertion)
         } else {
             false
         };
@@ -1038,6 +1034,27 @@ fn parameters_can_be_identical(
         }
         _ => true,
     }
+}
+
+fn list_values_can_match(codebase: &CodebaseMetadata, list: &TList, other: &TList, inside_assertion: bool) -> bool {
+    let other_values: Vec<&TUnion> = other
+        .known_elements
+        .iter()
+        .flat_map(|elements| elements.values().map(|(_, element_type)| element_type))
+        .chain((!other.element_type.is_never()).then_some(other.element_type.as_ref()))
+        .collect();
+
+    let can_match = |value: &TUnion| {
+        other_values.iter().any(|other_value| {
+            union_comparator::can_expression_types_be_identical(codebase, value, other_value, inside_assertion, false)
+        })
+    };
+
+    list.known_elements
+        .iter()
+        .flat_map(|elements| elements.values())
+        .all(|(optional, element_type)| *optional || can_match(element_type))
+        && (list.element_type.is_never() || can_match(&list.element_type))
 }
 
 fn keyed_arrays_can_be_identical(

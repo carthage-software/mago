@@ -623,6 +623,7 @@ where
 
         let are_disjoint = are_int_float_disjoint
             || (subject.is_always_truthy() && target.is_always_falsy())
+            || shapes_are_disjoint(context, &subject, &target)
             || !union_comparator::can_expression_types_be_identical(context.codebase, &subject, &target, false, false);
 
         if are_disjoint {
@@ -650,10 +651,11 @@ where
             let mut resolved = get_never();
             for part in parts {
                 let mut part_result = template_result.clone();
-                part_result.lower_bounds.entry(parameter.parameter_name).or_default().insert(
-                    parameter.defining_entity,
-                    vec![TemplateBound::new(TUnion::from_atomic(part), 0, None)],
-                );
+                part_result
+                    .lower_bounds
+                    .entry(parameter.parameter_name)
+                    .or_default()
+                    .insert(parameter.defining_entity, vec![TemplateBound::new(TUnion::from_atomic(part), 0, None)]);
 
                 let part_type = TUnion::from_vec(resolve_conditional(
                     context,
@@ -671,6 +673,40 @@ where
     }
 
     add_union_type(then_type, &otherwise_type, context.codebase, CombinerOptions::default()).types.into_owned()
+}
+
+fn shapes_are_disjoint<A>(context: &Context<'_, '_, A>, subject: &TUnion, target: &TUnion) -> bool
+where
+    A: Arena,
+{
+    subject.types.iter().all(|subject_part| {
+        target.types.iter().all(|target_part| {
+            let (TAtomic::Array(TArray::Keyed(subject_shape)), TAtomic::Array(TArray::Keyed(target_shape))) =
+                (subject_part, target_part)
+            else {
+                return false;
+            };
+
+            let (Some(subject_items), Some(target_items)) = (&subject_shape.known_items, &target_shape.known_items)
+            else {
+                return false;
+            };
+
+            subject_items.iter().any(|(key, (subject_optional, subject_value))| {
+                !subject_optional
+                    && target_items.get(key).is_some_and(|(target_optional, target_value)| {
+                        !target_optional
+                            && !union_comparator::can_expression_types_be_identical(
+                                context.codebase,
+                                subject_value,
+                                target_value,
+                                false,
+                                false,
+                            )
+                    })
+            })
+        })
+    })
 }
 
 #[cfg(test)]

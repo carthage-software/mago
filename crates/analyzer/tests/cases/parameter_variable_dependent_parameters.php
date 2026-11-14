@@ -31,7 +31,7 @@ function exercise_parameter_variable_dependent_parameters(ParameterVariableDepen
     $parameters->set('foo.service', new ParameterBar());
 
     $parameters->setList('foo.service', [new ParameterFoo()]);
-    // @mago-expect analysis:possibly-invalid-argument
+    // @mago-expect analysis:invalid-argument
     $parameters->setList('foo.service', [new ParameterBar()]);
 
     $parameters->setConditional('foo.service', new ParameterFoo());

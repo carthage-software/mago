@@ -279,7 +279,7 @@ function exercise_parameter_variable_heterogeneous_values(ParameterVariableCompl
 
     take_complex_foo($types->identity(new ComplexFoo()));
     $types->sameList(new ComplexFoo(), [new ComplexFoo()]);
-    // @mago-expect analysis:possibly-invalid-argument
+    // @mago-expect analysis:invalid-argument
     $types->sameList(new ComplexFoo(), [new ComplexBar()]);
 
     take_complex_tuple($types->tuple(new ComplexFoo(), new ComplexBar()));
