@@ -164,7 +164,9 @@ where
     let variable_type = match block_context.locals.get(&variable_atom) {
         Some(variable_type) => Rc::clone(variable_type),
         None => {
-            if block_context.variables_possibly_in_scope.contains(&variable_atom) {
+            if block_context.variables_possibly_in_scope.contains(&variable_atom)
+                && !block_context.flags.inside_variable_reference()
+            {
                 if !block_context.flags.inside_isset()
                     && !block_context.flags.inside_unset()
                     && !block_context.flags.inside_variable_reference()
@@ -186,7 +188,8 @@ where
 
                 Rc::new(get_mixed())
             } else if block_context.flags.inside_variable_reference() {
-                context.collector.report_with_code(
+                if !block_context.variables_possibly_in_scope.contains(&variable_atom) {
+                    context.collector.report_with_code(
                     IssueCode::ReferenceToUndefinedVariable,
                     Issue::help(format!("Reference created from a previously undefined variable `{variable_name}`.",))
                         .with_annotation(
@@ -203,6 +206,7 @@ where
                             format!("If this is intentional, consider initializing `{variable_name}` to `null` first for code clarity. Otherwise, check for typos.")
                         ),
                 );
+                }
 
                 // This variable does not currently exist, but is being referenced.
                 // therefore, we need to analyze it as if it was being assigned `null`.
