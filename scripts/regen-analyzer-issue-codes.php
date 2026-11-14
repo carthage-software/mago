@@ -112,6 +112,7 @@ final class AnalyzerCodeModuleGenerator
         'property-type-coercion',
         'redundant-cast',
         'array-to-int-cast',
+        'implicit-float-to-int-cast',
         'redundant-null-coalesce',
         'implicit-to-string-cast',
         'redundant-isset-check',

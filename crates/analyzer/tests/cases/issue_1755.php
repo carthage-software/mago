@@ -29,5 +29,9 @@ use_int($xor);
 
 $bin1 = 15.23;
 $bin2 = 19.17;
+/**
+ * @mago-expect analysis:implicit-float-to-int-cast
+ * @mago-expect analysis:implicit-float-to-int-cast
+ */
 $xor = $bin1 ^ $bin2;
 use_int($xor);

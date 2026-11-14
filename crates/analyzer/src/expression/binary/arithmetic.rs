@@ -3,6 +3,7 @@ use std::collections::VecDeque;
 use std::rc::Rc;
 use std::sync::Arc;
 
+use mago_bytes::BytesDisplay;
 use mago_codex::assertion::Assertion;
 use mago_codex::metadata::CodebaseMetadata;
 use mago_codex::operator_overloading::OperandAcceptance;
@@ -146,6 +147,25 @@ where
             | BinaryOperator::LeftShift(_)
             | BinaryOperator::RightShift(_)
     );
+
+    if (is_bitwise || matches!(binary.operator, BinaryOperator::Modulo(_)))
+        && !left_type.has_object_type()
+        && !right_type.has_object_type()
+    {
+        let operator = BytesDisplay(binary.operator.as_bytes());
+        report_fractional_float_operand(
+            context,
+            binary.lhs.span(),
+            &left_type,
+            &format!("Left operand of `{operator}`"),
+        );
+        report_fractional_float_operand(
+            context,
+            binary.rhs.span(),
+            &right_type,
+            &format!("Right operand of `{operator}`"),
+        );
+    }
 
     if left_type.is_false() && !is_bitwise {
         context.collector.report_with_code(
@@ -900,6 +920,40 @@ fn calculate_int_arithmetic(op: &BinaryOperator<'_>, left: TInteger, right: TInt
     };
 
     if result.is_unspecified() { None } else { Some(result) }
+}
+
+/// Reports a float literal with a fraction (or out of the int range) where PHP converts it to an int.
+pub(crate) fn report_fractional_float_operand<A>(
+    context: &mut Context<'_, '_, A>,
+    operand_span: Span,
+    operand_type: &TUnion,
+    operand_description: &str,
+) where
+    A: Arena,
+{
+    let Some(value) = operand_type.types.iter().find_map(|atomic| {
+        atomic
+            .get_literal_float_value()
+            .filter(|value| value.fract() != 0.0 || *value < i64::MIN as f64 || *value >= -(i64::MIN as f64))
+    }) else {
+        return;
+    };
+
+    context.collector.report_with_code(
+        IssueCode::ImplicitFloatToIntCast,
+        Issue::warning(format!("{operand_description} is converted to an int, which loses the value of `{value}`."))
+            .with_annotation(
+                Annotation::primary(operand_span)
+                    .with_message(format!("This float (`{value}`) does not fit an int exactly")),
+            )
+            .with_note("Bitwise and modulo operators convert their operands to int, dropping any fraction.")
+            .with_note(
+                "Since PHP 8.1 this emits \"Deprecated: Implicit conversion from float to int loses precision\".",
+            )
+            .with_help(
+                "Cast the operand explicitly with `(int)`, or round it first with `round()`, `floor()` or `ceil()`.",
+            ),
+    );
 }
 
 /// Compose two array shapes under PHP's `+` operator.

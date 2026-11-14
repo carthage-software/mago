@@ -69,6 +69,7 @@ use crate::context::block::BlockContext;
 use crate::error::AnalysisError;
 use crate::expression::assignment::PropertyWriteKind;
 use crate::expression::assignment::assign_to_expression;
+use crate::expression::binary::arithmetic::report_fractional_float_operand;
 use crate::expression::call::method_call::analyze_implicit_method_call;
 use crate::expression::operator_overloading::report_overloaded_operator_on_operand;
 use crate::resolver::method::retain_narrowest_returns;
@@ -130,6 +131,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for UnaryPrefix<'arena> {
             }
             UnaryPrefixOperator::BitwiseNot(_) => {
                 if let Some(operand_type) = operand_type {
+                    report_fractional_float_operand(context, self.operand.span(), &operand_type, "Operand of `~`");
+
                     let is_class_without_bitwise_not = |atomic: &TAtomic| {
                         get_operator_overloading_class(atomic)
                             .is_some_and(|class| !class.overloads(OverloadedOperator::BitwiseNot))
