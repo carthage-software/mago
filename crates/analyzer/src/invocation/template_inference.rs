@@ -133,6 +133,19 @@ where
     input_objects
 }
 
+fn expand_generic_parameters_to_constraints(union: &TUnion) -> Vec<TAtomic> {
+    let mut atomics = Vec::with_capacity(union.types.len());
+    for atomic in union.types.iter() {
+        if let TAtomic::GenericParameter(parameter) = atomic {
+            atomics.extend(expand_generic_parameters_to_constraints(&parameter.constraint));
+        } else {
+            atomics.push(atomic.clone());
+        }
+    }
+
+    atomics
+}
+
 fn infer_templates_from_input_and_container_types<A>(
     context: &Context<'_, '_, A>,
     container_type: &TUnion,
@@ -178,6 +191,12 @@ fn infer_templates_from_input_and_container_types<A>(
         .any(|t| matches!(t, TAtomic::Scalar(TScalar::ClassLikeString(TClassLikeString::Generic { .. }))));
 
     let has_bare_generic_parameter = generic_container_parts.iter().any(|t| matches!(t, TAtomic::GenericParameter(_)));
+    let input_type = if !has_bare_generic_parameter && input_type.types.iter().any(TAtomic::is_generic_parameter) {
+        Cow::Owned(TUnion::from_vec(expand_generic_parameters_to_constraints(input_type)))
+    } else {
+        Cow::Borrowed(input_type)
+    };
+
     let residual_input_types = input_type
         .types
         .iter()
