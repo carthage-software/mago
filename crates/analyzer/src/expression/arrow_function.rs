@@ -70,6 +70,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for ArrowFunction<'arena> {
         }
 
         let mut inner_block_context = BlockContext::new(scope, context.settings.register_super_globals);
+        inner_block_context.known_functions.clone_from(&block_context.known_functions);
+        inner_block_context.known_constants.clone_from(&block_context.known_constants);
 
         let variables = get_variables_referenced_in_expression(self.expression, true);
         let params = self.parameter_list.parameters.iter().map(|param| param.variable.name).collect::<HashSet<_>>();

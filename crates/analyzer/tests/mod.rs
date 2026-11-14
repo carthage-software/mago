@@ -3322,6 +3322,7 @@ test_case!(bool_cast_condition_narrows_operand);
 test_case!(possibly_undefined_variable_reads_as_null_in_conditions);
 test_case!(string_length_comparisons_narrow);
 test_case!(isset_on_uninitialized_typed_property);
+test_case!(closure_inherits_symbol_existence_guards);
 
 #[test]
 #[cfg_attr(miri, ignore)]

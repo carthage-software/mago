@@ -83,6 +83,8 @@ impl<'ast, 'arena> Analyzable<'ast, 'arena> for Closure<'arena> {
         }
 
         let mut inner_block_context = BlockContext::new(scope, context.settings.register_super_globals);
+        inner_block_context.known_functions.clone_from(&block_context.known_functions);
+        inner_block_context.known_constants.clone_from(&block_context.known_constants);
 
         if !inner_block_context.scope.is_static() {
             for (variable_id, variable_type) in &block_context.locals {
