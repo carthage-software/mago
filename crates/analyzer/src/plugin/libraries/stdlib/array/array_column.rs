@@ -123,19 +123,24 @@ fn try_resolve_from_keyed_array(
     let column_type = if column_key_type.is_null() {
         element_type.clone()
     } else {
-        let key_str = column_key_type.get_single_literal_string_value()?;
-        let (_, value_type) = known_items.get(&ArrayKey::String(word(key_str)))?;
+        let (_, value_type) = known_items.get(&literal_array_key(column_key_type)?)?;
         value_type.clone()
     };
 
     let index_type = index_key_type.filter(|index_key_type| !index_key_type.is_null()).map(|index_key_type| {
-        index_key_type
-            .get_single_literal_string_value()
-            .and_then(|key| known_items.get(&ArrayKey::String(word(key))))
+        literal_array_key(index_key_type)
+            .and_then(|key| known_items.get(&key))
             .map_or_else(get_arraykey, |(_, value_type)| key_type_for_index(value_type))
     });
 
     Some(build_result(column_type, index_type))
+}
+
+fn literal_array_key(key_type: &TUnion) -> Option<ArrayKey> {
+    key_type
+        .get_single_literal_string_value()
+        .map(|key| ArrayKey::String(word(key)))
+        .or_else(|| key_type.get_single_literal_int_value().map(ArrayKey::Integer))
 }
 
 /// The array key PHP makes from an index column value.
