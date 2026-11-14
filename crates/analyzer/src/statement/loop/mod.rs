@@ -747,6 +747,22 @@ where
                 }
             }
 
+            for (variable_id, parent_context_type) in &original_parent_context.locals {
+                if continue_context.locals.contains_key(variable_id)
+                    || !continue_context.possibly_assigned_variable_ids.contains(variable_id)
+                    || variable_id.as_bytes().contains(&b'[')
+                    || variable_id.as_bytes().contains(&b'-')
+                    || variable_id.as_bytes().contains(&b':')
+                {
+                    continue;
+                }
+
+                let mut possibly_unset_type = (**parent_context_type).clone();
+                possibly_unset_type.set_possibly_undefined(true, None);
+                continue_context.locals.insert(*variable_id, Rc::new(possibly_unset_type));
+                continue_context.possibly_undefined_variable_ids.insert(*variable_id);
+            }
+
             continue_context.flags.set_has_returned(false);
 
             // if there are no changes to the types, no need to re-examine
@@ -1070,6 +1086,15 @@ where
                 } else if let Some(loop_parent_context_type) = loop_parent_context.locals.get_mut(&variable_id) {
                     *loop_parent_context_type = Rc::clone(continue_context_type);
                 }
+            } else if continue_context.possibly_assigned_variable_ids.contains(&variable_id)
+                && !variable_id.as_bytes().contains(&b'[')
+                && !variable_id.as_bytes().contains(&b'-')
+                && !variable_id.as_bytes().contains(&b':')
+            {
+                let mut possibly_unset_type = Rc::unwrap_or_clone(variable_type);
+                possibly_unset_type.set_possibly_undefined(true, None);
+                loop_parent_context.locals.insert(variable_id, Rc::new(possibly_unset_type));
+                loop_parent_context.possibly_undefined_variable_ids.insert(variable_id);
             } else {
                 loop_parent_context.locals.remove(&variable_id);
             }
